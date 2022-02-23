@@ -1,8 +1,16 @@
-import type { ContractTransaction, BaseContract } from 'ethers'
+import { setImmediate as setImmediatePromise } from 'timers/promises'
 import type { Multiaddr } from 'multiaddr'
-import { providers, utils, errors, Wallet, BigNumber, ethers } from 'ethers'
-import type { HoprToken, HoprChannels, TypedEvent } from '@hoprnet/hopr-ethereum'
-import { getContractData } from '@hoprnet/hopr-ethereum'
+import {
+  providers,
+  utils,
+  errors,
+  Wallet,
+  BigNumber,
+  ethers,
+  type ContractTransaction,
+  type BaseContract
+} from 'ethers'
+import { getContractData, type HoprToken, type HoprChannels } from '@hoprnet/hopr-ethereum'
 import {
   Address,
   Ticket,
@@ -19,6 +27,7 @@ import NonceTracker from './nonce-tracker'
 import TransactionManager, { type TransactionPayload } from './transaction-manager'
 import { debug } from '@hoprnet/hopr-utils'
 import { TX_CONFIRMATION_WAIT } from './constants'
+import type { BlockWithTransactions } from '@ethersproject/abstract-provider'
 
 const log = debug('hopr:core-ethereum:ethereum')
 const abiCoder = new utils.AbiCoder()
@@ -65,10 +74,61 @@ export async function createChainWrapper(
   const channelClosureSecs = await channels.secsClosure()
 
   const transactions = new TransactionManager()
+
+  const subscribeBlock = (cb: (blockNumber: number) => void | Promise<void>): (() => void) => {
+    provider.on('block', cb)
+
+    return () => {
+      provider.off('block', cb)
+    }
+  }
+
+  const getLatestBlockNumber = async (): Promise<number> => {
+    const RETRIES = 3
+    for (let i = 0; i < RETRIES; i++) {
+      try {
+        return await provider.getBlockNumber()
+      } catch (err) {
+        if (i + 1 < RETRIES) {
+          await setImmediatePromise()
+          continue
+        } else {
+          log(`Could not determine latest on-chain block. Now waiting for next block.`)
+        }
+      }
+    }
+
+    // Wait for next block and return the blockNumber
+    return new Promise<number>((resolve) => {
+      const unsubscribeBlock = subscribeBlock((blockNumber: number) => {
+        unsubscribeBlock()
+        resolve(blockNumber)
+      })
+    })
+  }
+
+  const getTransactionCount = async (address: Address, blockNumber?: number): Promise<number> => {
+    const RETRIES = 3
+    for (let i = 0; i < RETRIES; i++) {
+      try {
+        return await provider.getTransactionCount(address.toHex(), blockNumber)
+      } catch (err) {
+        if (i + 1 < RETRIES) {
+          await setImmediatePromise()
+          continue
+        } else {
+        }
+      }
+    }
+
+    log(`Could not determine latest transaction count.`)
+    throw Error(`Could not get latest transaction count using the given provider`)
+  }
+
   const nonceTracker = new NonceTracker(
     {
-      getLatestBlockNumber: provider.getBlockNumber.bind(provider),
-      getTransactionCount: (address, blockNumber) => provider.getTransactionCount(address.toHex(), blockNumber),
+      getLatestBlockNumber,
+      getTransactionCount,
       getPendingTransactions: (_addr) => transactions.getAllUnconfirmedTxs(),
       getConfirmedTransactions: (_addr) => Array.from(transactions.confirmed.values())
     },
@@ -91,13 +151,13 @@ export async function createChainWrapper(
    * @param rest contract arguments
    * @returns Promise of a ContractTransaction
    */
-  async function sendTransaction<T extends BaseContract>(
+  const sendTransaction = async <T extends BaseContract>(
     checkDuplicate: Boolean,
     contract: T,
     method: keyof T['functions'],
     handleTxListener: (tx: string) => DeferType<string>,
     ...rest: Parameters<T['functions'][keyof T['functions']]>
-  ): Promise<SendTransactionReturn> {
+  ): Promise<SendTransactionReturn> => {
     const gasLimit = 400e3
     const nonceLock = await nonceTracker.getNonceLock(address)
     const nonce = nonceLock.nextNonce
@@ -238,7 +298,7 @@ export async function createChainWrapper(
    * @param callback transaction handler
    * @returns a Promise that resolve to the hash of the on-chain transaction
    */
-  async function announce(multiaddr: Multiaddr, txHandler: (tx: string) => DeferType<string>): Promise<string> {
+  const announce = async (multiaddr: Multiaddr, txHandler: (tx: string) => DeferType<string>): Promise<string> => {
     try {
       const confirmation = await sendTransaction(
         checkDuplicate,
@@ -254,12 +314,12 @@ export async function createChainWrapper(
     }
   }
 
-  async function withdraw(
+  const withdraw = async (
     currency: 'NATIVE' | 'HOPR',
     recipient: string,
     amount: string,
     txHandler: (tx: string) => DeferType<string>
-  ): Promise<string> {
+  ): Promise<string> => {
     if (currency === 'NATIVE') {
       const nonceLock = await nonceTracker.getNonceLock(address)
       try {
@@ -287,17 +347,16 @@ export async function createChainWrapper(
     }
   }
 
-  async function fundChannel(
-    token: HoprToken,
-    channels: HoprChannels,
+  const fundChannel = async (
     me: Address,
     counterparty: Address,
     myFund: Balance,
     counterpartyFund: Balance,
     txHandler: (tx: string) => DeferType<string>
-  ): Promise<Receipt> {
+  ): Promise<Receipt> => {
+    const totalFund = myFund.toBN().add(counterpartyFund.toBN())
+
     try {
-      const totalFund = myFund.toBN().add(counterpartyFund.toBN())
       const transaction = await sendTransaction(
         checkDuplicate,
         token,
@@ -316,14 +375,12 @@ export async function createChainWrapper(
     }
   }
 
-  async function openChannel(
-    token: HoprToken,
-    channels: HoprChannels,
+  const openChannel = async (
     me: Address,
     counterparty: Address,
     amount: Balance,
     txHandler: (tx: string) => DeferType<string>
-  ): Promise<Receipt> {
+  ): Promise<Receipt> => {
     try {
       const transaction = await sendTransaction(
         checkDuplicate,
@@ -343,11 +400,10 @@ export async function createChainWrapper(
     }
   }
 
-  async function finalizeChannelClosure(
-    channels: HoprChannels,
+  const finalizeChannelClosure = async (
     counterparty: Address,
     txHandler: (tx: string) => DeferType<string>
-  ): Promise<Receipt> {
+  ): Promise<Receipt> => {
     try {
       const transaction = await sendTransaction(
         checkDuplicate,
@@ -363,11 +419,10 @@ export async function createChainWrapper(
     // TODO: catch race-condition
   }
 
-  async function initiateChannelClosure(
-    channels: HoprChannels,
+  const initiateChannelClosure = async (
     counterparty: Address,
     txHandler: (tx: string) => DeferType<string>
-  ): Promise<Receipt> {
+  ): Promise<Receipt> => {
     try {
       const transaction = await sendTransaction(
         checkDuplicate,
@@ -383,13 +438,12 @@ export async function createChainWrapper(
     // TODO: catch race-condition
   }
 
-  async function redeemTicket(
-    channels: HoprChannels,
+  const redeemTicket = async (
     counterparty: Address,
     ackTicket: AcknowledgedTicket,
     ticket: Ticket,
     txHandler: (tx: string) => DeferType<string>
-  ): Promise<Receipt> {
+  ): Promise<Receipt> => {
     try {
       const transaction = await sendTransaction(
         checkDuplicate,
@@ -411,12 +465,11 @@ export async function createChainWrapper(
     }
   }
 
-  async function setCommitment(
-    channels: HoprChannels,
+  const setCommitment = async (
     counterparty: Address,
     commitment: Hash,
     txHandler: (tx: string) => DeferType<string>
-  ): Promise<Receipt> {
+  ): Promise<Receipt> => {
     try {
       const transaction = await sendTransaction(
         checkDuplicate,
@@ -432,63 +485,91 @@ export async function createChainWrapper(
     }
   }
 
-  async function getNativeTokenTransactionInBlock(
+  const getNativeTokenTransactionInBlock = async (
     blockNumber: number,
     isOutgoing: boolean = true
-  ): Promise<Array<string>> {
-    const blockWithTx = await provider.getBlockWithTransactions(blockNumber)
-    const txs = blockWithTx.transactions.filter(
+  ): Promise<Array<string>> => {
+    let blockWithTxs: BlockWithTransactions
+    const RETRIES = 3
+    for (let i = 0; i < RETRIES; i++) {
+      try {
+        blockWithTxs = await provider.getBlockWithTransactions(blockNumber)
+      } catch (err) {
+        if (i + 1 < RETRIES) {
+          // Give other tasks CPU time to happen
+          // Push next provider query to end of next event loop iteration
+          await setImmediatePromise()
+          continue
+        } else {
+          log(`could not retrieve native token transactions from block ${blockNumber} using the provider.`, err)
+          throw err
+        }
+      }
+    }
+
+    const txs = blockWithTxs.transactions.filter(
       (tx) => tx.value.gt(BigNumber.from(0)) && (isOutgoing ? tx.from : tx.to) === wallet.address
     )
     return txs.length === 0 ? [] : txs.map((tx) => tx.hash)
   }
 
-  const api = {
-    getBalance: (address: Address) =>
-      token.balanceOf(address.toHex()).then((res) => new Balance(new BN(res.toString()))),
-    getNativeBalance: (address: Address) =>
-      provider.getBalance(address.toHex()).then((res) => new NativeBalance(new BN(res.toString()))),
-    getNativeTokenTransactionInBlock: (blockNumber: number, isOutgoing: boolean = true) =>
-      getNativeTokenTransactionInBlock(blockNumber, isOutgoing),
+  const getBalance = async (accountAddress: Address): Promise<Balance> => {
+    const RETRIES = 3
+    let rawBalance: BigNumber
+    for (let i = 0; i < RETRIES; i++) {
+      try {
+        rawBalance = await token.balanceOf(accountAddress.toHex())
+      } catch (err) {
+        if (i + 1 < RETRIES) {
+          await setImmediatePromise()
+          continue
+        } else {
+          log(`Could not determine current on-chain token balance using the provider.`)
+          throw Error(`Could not determine on-chain token balance`)
+        }
+      }
+    }
+
+    return new Balance(new BN(rawBalance.toString()))
+  }
+
+  const getNativeBalance = async (accountAddress: Address): Promise<Balance> => {
+    const RETRIES = 3
+    let rawNativeBalance: BigNumber
+    for (let i = 0; i < RETRIES; i++) {
+      try {
+        rawNativeBalance = await provider.getBalance(accountAddress.toHex())
+      } catch (err) {
+        if (i + 1 < RETRIES) {
+          await setImmediatePromise()
+          continue
+        } else {
+          log(`Could not determine current on-chain native balance using the provider.`)
+          throw Error(`Could not determine on-chain native balance`)
+        }
+      }
+    }
+
+    return new NativeBalance(new BN(rawNativeBalance.toString()))
+  }
+
+  return {
+    getBalance,
+    getNativeBalance,
+    getNativeTokenTransactionInBlock,
     announce,
-    withdraw: (
-      currency: 'NATIVE' | 'HOPR',
-      recipient: string,
-      amount: string,
-      txHandler: (tx: string) => DeferType<string>
-    ) => withdraw(currency, recipient, amount, txHandler),
-    fundChannel: (
-      me: Address,
-      counterparty: Address,
-      myTotal: Balance,
-      theirTotal: Balance,
-      txHandler: (tx: string) => DeferType<string>
-    ) => fundChannel(token, channels, me, counterparty, myTotal, theirTotal, txHandler),
-    openChannel: (me: Address, counterparty: Address, amount: Balance, txHandler: (tx: string) => DeferType<string>) =>
-      openChannel(token, channels, me, counterparty, amount, txHandler),
-    finalizeChannelClosure: (counterparty: Address, txHandler: (tx: string) => DeferType<string>) =>
-      finalizeChannelClosure(channels, counterparty, txHandler),
-    initiateChannelClosure: (counterparty: Address, txHandler: (tx: string) => DeferType<string>) =>
-      initiateChannelClosure(channels, counterparty, txHandler),
-    redeemTicket: (
-      counterparty: Address,
-      ackTicket: AcknowledgedTicket,
-      ticket: Ticket,
-      txHandler: (tx: string) => DeferType<string>
-    ) => redeemTicket(channels, counterparty, ackTicket, ticket, txHandler),
+    withdraw,
+    fundChannel,
+    openChannel,
+    finalizeChannelClosure,
+    initiateChannelClosure,
+    redeemTicket,
     getGenesisBlock: () => genesisBlock,
-    setCommitment: (counterparty: Address, comm: Hash, txHandler: (tx: string) => DeferType<string>) =>
-      setCommitment(channels, counterparty, comm, txHandler),
+    setCommitment,
     getWallet: () => wallet,
     waitUntilReady: async () => await provider.ready,
-    getLatestBlockNumber: provider.getBlockNumber.bind(provider), // TODO: use indexer when it's done syncing
-    subscribeBlock: (cb: (blockNumber: number) => void | Promise<void>): (() => void) => {
-      provider.on('block', cb)
-
-      return () => {
-        provider.off('block', cb)
-      }
-    },
+    getLatestBlockNumber, // TODO: use indexer when it's done syncing
+    subscribeBlock,
     subscribeError: (cb: (err: any) => void | Promise<void>): (() => void) => {
       provider.on('error', cb)
       channels.on('error', cb)
@@ -500,21 +581,6 @@ export async function createChainWrapper(
         token.off('error', cb)
       }
     },
-    subscribeChannelEvents: (cb: (event: TypedEvent<any, any>) => void | Promise<void>): (() => void) => {
-      channels.on('*', cb)
-
-      return () => {
-        channels.off('*', cb)
-      }
-    },
-    // Cannot directly apply filters here because it does not return a full event object
-    subscribeTokenEvents: (cb: (event: TypedEvent<any, any>) => void | Promise<void>): (() => void) => {
-      token.on('*', cb)
-
-      return () => {
-        token.off('*', cb)
-      }
-    }, // subscribe all the Transfer events from current nodes in HoprToken.
     unsubscribe: () => {
       provider.removeAllListeners()
       channels.removeAllListeners()
@@ -522,17 +588,19 @@ export async function createChainWrapper(
     },
     getChannels: () => channels,
     getToken: () => token,
-    getPrivateKey: () => utils.arrayify(wallet.privateKey),
-    getPublicKey: () => PublicKey.fromString(utils.computePublicKey(wallet.publicKey, true)),
+    getPrivateKey: () => privateKey,
+    getPublicKey: () => PublicKey.fromPrivKey(privateKey),
     getInfo: () => ({
       network: networkInfo.network,
       hoprTokenAddress: hoprTokenDeployment.address,
       hoprChannelsAddress: hoprChannelsDeployment.address,
       channelClosureSecs
     }),
-    updateConfirmedTransaction: (hash: string) => transactions.moveToConfirmed(hash),
-    getAllQueuingTransactionRequests: () => transactions.getAllQueuingTxs()
+    updateConfirmedTransaction: transactions.moveToConfirmed.bind(
+      transactions
+    ) as TransactionManager['moveToConfirmed'],
+    getAllQueuingTransactionRequests: transactions.getAllQueuingTxs.bind(
+      transactions
+    ) as TransactionManager['getAllQueuingTxs']
   }
-
-  return api
 }
