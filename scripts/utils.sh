@@ -235,7 +235,7 @@ validate_native_address() {
     exit 1
   fi
 
-  is_valid_native_address="$(node -e "const ethers = require('ethers'); console.log(ethers.utils.isAddress('${native_address}'))")"
+  is_valid_native_address="$(curl --silent https://api.hoprnet.org/api/validate/$native_address/get\?text=true)"
   if [ "${is_valid_native_address}" == "false" ]; then
     log "--⛔️ Node returns an invalidddress: ${native_address} derived from endpoint ${endpoint}"
     exit 1
