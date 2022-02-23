@@ -61,8 +61,27 @@ export default class Heartbeat {
     subscribe(this.protocolHeartbeat, this.handleHeartbeatRequest.bind(this), true, errHandler)
   }
 
+  public start() {
+    this._pingNode = this.pingNode.bind(this)
+    this.startHeartbeatInterval()
+    log(`Heartbeat started`)
+  }
+
+  public stop() {
+    this.stopHeartbeatInterval?.()
+    log(`Heartbeat stopped`)
+  }
+
   public handleHeartbeatRequest(msg: Uint8Array, remotePeer: PeerId): Promise<Uint8Array> {
-    this.networkPeers.register(remotePeer)
+    if (this.networkPeers.has(remotePeer)) {
+      this.networkPeers.updateRecord({
+        destination: remotePeer,
+        lastSeen: Date.now()
+      })
+    } else {
+      this.networkPeers.register(remotePeer)
+    }
+
     log(`received heartbeat from ${remotePeer.toB58String()}`)
     return Promise.resolve(Heartbeat.calculatePingResponse(msg))
   }
@@ -77,8 +96,6 @@ export default class Heartbeat {
     log('ping', destination.toB58String())
 
     const challenge = randomBytes(16)
-    const expectedResponse = Heartbeat.calculatePingResponse(challenge)
-
     let pingResponse: Uint8Array[] | undefined
 
     try {
@@ -93,6 +110,8 @@ export default class Heartbeat {
         lastSeen: -1
       }
     }
+
+    const expectedResponse = Heartbeat.calculatePingResponse(challenge)
 
     if (pingResponse == null || pingResponse.length != 1 || !u8aEquals(expectedResponse, pingResponse[0])) {
       log(`Mismatched challenge. Got ${u8aToHex(pingResponse[0])} but expected ${u8aToHex(expectedResponse)}`)
@@ -169,17 +188,6 @@ export default class Heartbeat {
       // Prevent nodes from querying each other at the very same time
       () => randomInteger(this.config.heartbeatInterval, this.config.heartbeatInterval + this.config.heartbeatVariance)
     )
-  }
-
-  public start() {
-    this._pingNode = this.pingNode.bind(this)
-    this.startHeartbeatInterval()
-    log(`Heartbeat started`)
-  }
-
-  public stop() {
-    this.stopHeartbeatInterval?.()
-    log(`Heartbeat stopped`)
   }
 
   public static calculatePingResponse(challenge: Uint8Array): Uint8Array {
