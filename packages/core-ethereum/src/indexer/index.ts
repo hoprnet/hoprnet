@@ -14,7 +14,6 @@ import {
   AccountEntry,
   PublicKey,
   Snapshot,
-  u8aConcat,
   debug,
   retryWithBackoff,
   Balance,
@@ -630,7 +629,7 @@ class Indexer extends EventEmitter {
     // publicKey given by the SC is verified
     const publicKey = PublicKey.fromUncompressedPubKey(
       // add uncompressed key identifier
-      u8aConcat(new Uint8Array([4]), stringToU8a(event.args.publicKey))
+      Uint8Array.from([4, ...stringToU8a(event.args.publicKey)])
     )
     const multiaddr = new Multiaddr(stringToU8a(event.args.multiaddr))
       // remove "p2p" and corresponding peerID

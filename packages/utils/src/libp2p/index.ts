@@ -210,6 +210,13 @@ function generateHandler(
     }
   } else {
     return function libP2PHandler(args: LibP2PHandlerArgs): void {
+      try {
+        // End the send stream by sending nothing
+        args.stream.sink((async function* () {})()).catch(errHandler)
+      } catch (err) {
+        errHandler(err)
+      }
+
       pipe(
         // prettier-ignore
         args.stream,
