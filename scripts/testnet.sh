@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# API used for funding the calls, ideally https://api.hoprnet.org
+# API used for funding the calls, ideally https://api.hoprnet.org. Source code in https://github.com/hoprnet/api
 declare API_ENDPOINT="https://api-hopr-oxbs3v49y-jjperezaguinaga.vercel.app"
 
 # prevent execution of this script, only allow sourcing
