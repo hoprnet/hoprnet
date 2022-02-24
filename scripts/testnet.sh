@@ -63,6 +63,7 @@ funding_wallet_info() {
 wallet_balance() {
   local environment="${1}"
   local address="${2}"
+  local token="${3}"
   curl --silent "$API_ENDPOINT/api/balance/$environment/$address/$token?text=true"
 }
 
