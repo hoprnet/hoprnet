@@ -46,10 +46,12 @@ In the protocol, the **importance score** is implemented as the function `import
 
 #### Deployed Channel contracts
 
-_HoprChannels_ smart contract of the last public testnet - "Wildhorn v2" is deployed on Gnosis Chain at [0xF69C45B4246FD91F17AB9851987c7F100e0273cF](https://blockscout.com/xdai/mainnet/address/0xF69C45B4246FD91F17AB9851987c7F100e0273cF/contracts).
+_HoprChannels_ smart contract of the previous public testnet - "Wildhorn v2" is deployed on Gnosis Chain at [0xF69C45B4246FD91F17AB9851987c7F100e0273cF](https://blockscout.com/xdai/mainnet/address/0xF69C45B4246FD91F17AB9851987c7F100e0273cF/contracts).
 
-_HoprChannels_ smart contract of the lastest release - "Athens" is deployed on Gnosis Chain at [0xD2F008718EEdD7aF7E9a466F5D68bb77D03B8F7A](https://blockscout.com/xdai/mainnet/address/0xD2F008718EEdD7aF7E9a466F5D68bb77D03B8F7A/transactions).
+_HoprChannels_ smart contract of the last public testnet - "Matterhorn" is deployed on Gnosis Chain at [0xD2F008718EEdD7aF7E9a466F5D68bb77D03B8F7A](https://blockscout.com/xdai/mainnet/address/0xD2F008718EEdD7aF7E9a466F5D68bb77D03B8F7A/transactions).
 
 #### Other statistics
 
 For reference, [HOPR xDAI Testnet - Wildhorn v2 Dashboard](https://dune.xyz/hoprnet/HOPR-xDAI-Testnet-Wildhorn-v2) shows some statistics about this public testnet. The analysis is done with on-chain data of emitted events and transaction calls.
+
+The [HOPR protocol - xDAI: Matterhorn Testnet](https://dune.xyz/hoprnet/HOPR-xDAI-Testnet-Matterhorn) shows the recently completed public testnet. Read more on the retrospective of this testnet in the [medium blog](https://medium.com/hoprnet/matterhorn-retrospective-c37f0077b13e).

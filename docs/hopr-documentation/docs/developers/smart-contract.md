@@ -109,7 +109,7 @@ Emitted once a channel if funded.
 | `destination` | address | true    | Address of the destination node of a payment channel. |
 | `amount`      | uint256 | false   | Amount of HOPR being staked into the channel          |
 
-#### ChannelFunded
+#### ChannelOpened
 
 ```solidity
 event ChannelOpened(
