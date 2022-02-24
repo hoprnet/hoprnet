@@ -88,11 +88,11 @@ fund_if_empty() {
   local environment="${2}"
 
   local faucet_address
-  faucet_address        = $(funding_wallet_info "${environment}" "address")
+  faucet_address=$(funding_wallet_info "${environment}" "address")
 
   local faucet_native_balance faucet_hopr_balance
-  faucet_native_balance = $(funding_wallet_info "${environment}" "native")
-  faucet_hopr_balance   = $(funding_wallet_info "${environment}" "hopr")
+  faucet_native_balance=$(funding_wallet_info "${environment}" "native")
+  faucet_hopr_balance=$(funding_wallet_info "${environment}" "hopr")
 
   if [ "${faucet_native_balance}" = '0.0' ]; then
     log "Wallet ${faucet_address} has zero balance and cannot fund node ${address}"
