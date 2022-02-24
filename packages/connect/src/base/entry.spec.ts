@@ -56,7 +56,12 @@ function createFakeNetwork() {
             stream: {
               source: (async function* () {
                 yield OK
-              })()
+              })(),
+              sink: async (source: AsyncIterableIterator<any>) => {
+                // consume the send stream
+                for await (const sth of source) {
+                }
+              }
             }
           })
       })
@@ -420,6 +425,7 @@ describe('entry node functionality', function () {
 
     await new Promise((resolve) => setTimeout(resolve, 1e3))
 
+    console.log(renews)
     // depends on scheduler
     assert([9, 10].includes(renews), `Should capture at least 9 renews but not more than 10`)
 

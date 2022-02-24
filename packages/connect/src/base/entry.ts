@@ -118,7 +118,7 @@ export class EntryNodes extends EventEmitter {
   private startDHTRenewInterval() {
     const renewDHTEntries = async function (this: EntryNodes) {
       const work: [id: PeerId, mulitaddr: Multiaddr, timeout: number][] = []
-      for (const usedRelay of this.usedRelays) {
+      for (const usedRelay of this.getUsedRelays()) {
         const relay = relayFromRelayAddress(usedRelay)
         const relayEntry = this.availableEntryNodes.find((entry: EntryNodeData) => entry.id.equals(relay))
 
