@@ -84,6 +84,10 @@ export const getStatusCodeForInvalidInputInRequest = (inputPath: string) => {
       return STATUS_CODES.INVALID_PEERID
     case 'peerId':
       return STATUS_CODES.INVALID_PEERID
+    case 'setting':
+      return STATUS_CODES.INVALID_SETTING
+    case 'settingValue':
+      return STATUS_CODES.INVALID_SETTING_VALUE
     default:
       return 'INVALID_INPUT'
   }

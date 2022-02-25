@@ -169,12 +169,7 @@ export const POST: Operation = [
       const { channelId, receipt } = await openChannel(node, peerId, amount)
       return res.status(201).send({ channelId, receipt })
     } catch (err) {
-      const INVALID_ARG = [STATUS_CODES.INVALID_AMOUNT, STATUS_CODES.INVALID_PEERID].find((arg) =>
-        err.message.includes(arg)
-      )
-      if (INVALID_ARG) {
-        return res.status(400).send({ status: INVALID_ARG })
-      } else if (err.message.includes(STATUS_CODES.CHANNEL_ALREADY_OPEN)) {
+      if (err.message.includes(STATUS_CODES.CHANNEL_ALREADY_OPEN)) {
         return res.status(403).send({ status: STATUS_CODES.CHANNEL_ALREADY_OPEN })
       } else if (err.message.includes(STATUS_CODES.NOT_ENOUGH_BALANCE)) {
         return res.status(403).send({ status: STATUS_CODES.NOT_ENOUGH_BALANCE })

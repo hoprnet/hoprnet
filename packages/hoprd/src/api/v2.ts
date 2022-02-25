@@ -14,7 +14,7 @@ import type { Server } from 'http'
 import type { Application, Request } from 'express'
 import type { WebSocketServer } from 'ws'
 import type Hopr from '@hoprnet/hopr-core'
-import type { StateOps } from '../types'
+import { SettingKey, StateOps } from '../types'
 import type { LogStream } from './../logs'
 
 const debugLog = debug('hoprd:api:v2')
@@ -87,6 +87,9 @@ export function setupRestApi(service: Application, urlPath: string, node: Hopr, 
       },
       amount: (input) => {
         return !isNaN(Number(input))
+      },
+      settingKey: (input) => {
+        return Object.values(SettingKey).includes(input)
       }
     },
     // customKeywords:

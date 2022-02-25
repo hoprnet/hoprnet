@@ -43,21 +43,12 @@ export const POST: Operation = [
       const txHash = await withdraw(node, currency, recipient, amount)
       return res.status(200).send({ receipt: txHash })
     } catch (err) {
-      // const INVALID_ARG = [
-      //   STATUS_CODES.INVALID_CURRENCY,
-      //   STATUS_CODES.INVALID_AMOUNT,
-      //   STATUS_CODES.INVALID_ADDRESS
-      // ].find((arg) => err.message.includes(arg))
-      // if (INVALID_ARG) {
-      //   return res.status(400).send({ status: INVALID_ARG, error: err.message })
-      // } else {
       return res.status(422).send({
         status: err.message.includes(STATUS_CODES.NOT_ENOUGH_BALANCE)
           ? STATUS_CODES.NOT_ENOUGH_BALANCE
           : STATUS_CODES.UNKNOWN_FAILURE,
         error: err.message
       })
-      // }
     }
   }
 ]

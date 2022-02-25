@@ -29,19 +29,11 @@ export const DELETE: Operation = [
     const { node } = req.context
     const { peerid } = req.params
 
-    if (!peerid) {
-      return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID })
-    }
-
     try {
       const { receipt, channelStatus } = await closeChannel(node, peerid)
       return res.status(200).send({ receipt, channelStatus: channelStatusToString(channelStatus) })
     } catch (err) {
-      if (err.message.includes(STATUS_CODES.INVALID_PEERID)) {
-        return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID })
-      } else {
-        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
-      }
+      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
     }
   }
 ]
