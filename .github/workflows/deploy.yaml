@@ -363,6 +363,7 @@ jobs:
           ./scripts/notify-matrix-cluster-info.sh
         env:
           MATRIX_ROOM: ${{ env.MATRIX_CLUSTER_INFO_ROOM }}
+          HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
 
       - name: Send notification if anything failed on master or release branches
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
@@ -424,6 +425,7 @@ jobs:
           ./scripts/notify-matrix-cluster-info.sh "-nat"
         env:
           MATRIX_ROOM: ${{ env.MATRIX_CLUSTER_INFO_ROOM }}
+          HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
 
       - name: Send notification if anything failed on master or release branches
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
