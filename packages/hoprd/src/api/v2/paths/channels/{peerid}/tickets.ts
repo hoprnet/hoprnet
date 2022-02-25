@@ -38,6 +38,7 @@ GET.apiDoc = {
       required: true,
       schema: {
         type: 'string',
+        format: 'peerId',
         description: 'PeerId attached to the channel.',
         example: '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12'
       }
@@ -53,6 +54,19 @@ GET.apiDoc = {
             items: {
               $ref: '#/components/schemas/Ticket'
             }
+          }
+        }
+      }
+    },
+    '400': {
+      description: 'Invalid peerId.',
+      content: {
+        'application/json': {
+          schema: {
+            $ref: '#/components/schemas/RequestStatus'
+          },
+          example: {
+            status: STATUS_CODES.INVALID_PEERID
           }
         }
       }

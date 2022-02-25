@@ -10,6 +10,17 @@ export const invalidTestPeerId = 'definetly not a valid peerId'
 export const testAlias = 'alias'
 export const testEthAddress = '0x07c97c4f845b4698D79036239153bB381bc72ad3'
 export const testChannelId = new Hash(new Uint8Array(Hash.SIZE))
+// temporary mock, had problems with mocking formatTicket function in integration test
+export const testTicket = {
+  counterparty: { toHex: () => '', toBN: () => '' },
+  challenge: { toHex: () => '', toBN: () => '' },
+  epoch: { toHex: () => '', toBN: () => '' },
+  index: { toHex: () => '', toBN: () => '' },
+  amount: { toHex: () => '', toBN: () => '' },
+  winProb: { toHex: () => '', toBN: () => '' },
+  channelEpoch: { toHex: () => '', toBN: () => '' },
+  signature: { toHex: () => '', toBN: () => '' }
+}
 
 /**
  * Creates express app and initializes all routes for testing

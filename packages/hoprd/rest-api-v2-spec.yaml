@@ -34,11 +34,11 @@ components:
       example:
         status: success
     Signature:
-      type: object
-      properties:
-        signature:
-          type: string
-          description: Signature from requested message.
+      # type: object
+      # properties:
+      #   signature:
+      type: string
+      description: Signature from requested message.
       example: '0x304402201065a95fd22fc3e48266c3b270ace032489b0177e07d33c59e0d13dccc89108402205f41fb911bcfe485a8e58162ebce90382dc96ccafff378e5c8960e07efcf9e92'
     Currency:
       type: string

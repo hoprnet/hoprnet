@@ -13408,6 +13408,7 @@ __metadata:
     chai-openapi-response-validator: ^0.14.2
     debounce: ^1.2.1
     prettier: 2.5.1
+    rewiremock: ^3.14.3
     rimraf: 3.0.2
     supertest: ^6.2.2
     ts-node: 10.5.0
@@ -21829,7 +21830,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"rewiremock@npm:3.14.3":
+"rewiremock@npm:3.14.3, rewiremock@npm:^3.14.3":
   version: 3.14.3
   resolution: "rewiremock@npm:3.14.3"
   dependencies:
