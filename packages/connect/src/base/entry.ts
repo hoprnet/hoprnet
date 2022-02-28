@@ -410,6 +410,9 @@ export class EntryNodes extends EventEmitter {
     }
 
     let done = false
+
+    // calls the iterator, thereby starts the stream and
+    // consumes the first messages, afterwards closes the stream
     for await (const msg of stream.source) {
       verbose(`can relay received ${new TextDecoder().decode(msg.slice())} from ${id.toB58String()}`)
       if (u8aEquals(msg.slice(), OK)) {
