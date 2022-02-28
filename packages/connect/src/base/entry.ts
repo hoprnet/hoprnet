@@ -419,8 +419,12 @@ export class EntryNodes extends EventEmitter {
       break
     }
 
-    // End the send stream by sending nothing
-    stream.sink((async function* () {})())
+    try {
+      // End the send stream by sending nothing
+      stream.sink((async function* () {})()).catch(error)
+    } catch (err) {
+      error(err)
+    }
 
     if (done) {
       return {
