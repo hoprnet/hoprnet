@@ -292,17 +292,11 @@ class Indexer extends EventEmitter {
       }
 
       this.onNewEvents(events)
-      await this.onNewBlock(toBlock, false, false)
+      await this.onNewBlock(toBlock, false, false, true)
       failedCount = 0
       fromBlock = toBlock
 
       log('Sync progress %d% @ block %d', getSyncPercentage(start, fromBlock, maxToBlock), toBlock)
-
-      if (fromBlock < maxToBlock) {
-        // Give other tasks CPU time to happen
-        // Wait until end of next event loop iteration before starting next I/O query
-        await setImmediatePromise()
-      }
     }
 
     return fromBlock
@@ -352,7 +346,12 @@ class Indexer extends EventEmitter {
    * @param blockNumber latest on-chain block number
    * @param fetchEvents [optional] if true, query provider for events in block
    */
-  private async onNewBlock(blockNumber: number, fetchEvents = false, fetchNativeTxs = false): Promise<void> {
+  private async onNewBlock(
+    blockNumber: number,
+    fetchEvents = false,
+    fetchNativeTxs = false,
+    blocking = false
+  ): Promise<void> {
     // NOTE: This function is also used in event handlers
     // where it cannot be 'awaited', so all exceptions need to be caught.
 
@@ -421,7 +420,7 @@ class Indexer extends EventEmitter {
       this.onNewEvents(events)
     }
 
-    await this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot)
+    await this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot, blocking)
   }
 
   /**
@@ -486,7 +485,7 @@ class Indexer extends EventEmitter {
    * @param blockNumber latest on-chain block number
    * @param lastDatabaseSnapshot latest snapshot in database
    */
-  async processUnconfirmedEvents(blockNumber: number, lastDatabaseSnapshot: Snapshot | undefined) {
+  async processUnconfirmedEvents(blockNumber: number, lastDatabaseSnapshot: Snapshot | undefined, blocking: boolean) {
     log(
       'At the new block %d, there are %i unconfirmed events and ready to process %s, because the event was mined at %i (with finality %i)',
       blockNumber,
@@ -575,6 +574,7 @@ class Indexer extends EventEmitter {
       }
 
       if (
+        blocking &&
         this.unconfirmedEvents.size() > 0 &&
         isConfirmedBlock(this.unconfirmedEvents.peek().blockNumber, blockNumber, this.maxConfirmations)
       ) {
