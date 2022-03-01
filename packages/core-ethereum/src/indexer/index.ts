@@ -32,6 +32,7 @@ import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants'
 import type { TypedEvent } from '@hoprnet/hopr-ethereum'
 
 const log = debug('hopr-core-ethereum:indexer')
+const error = debug('hopr-core-ethereum:indexer:error')
 const verbose = debug('hopr-core-ethereum:verbose:indexer')
 
 const getSyncPercentage = (start: number, current: number, end: number) =>
@@ -126,6 +127,23 @@ class Indexer extends EventEmitter {
       await this.onProviderError(error) // exceptions are handled
     })
 
+    this.chain.getToken().on(
+      {
+        topics: [
+          // Token transfer *towards* us
+          [this.chain.getToken().interface.getEventTopic('Transfer')],
+          [u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...this.address.serialize()]))]
+        ]
+      },
+      (async (event: TokenEvent<'Transfer'>) => {
+        try {
+          await this.onTransfer(this.chain.getToken().interface.parseLog(event) as any)
+        } catch (err) {
+          error(`Error while processing transfer event`, err)
+        }
+      }) as any
+    )
+
     // get past events
     fromBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, this.blockRange)
 
@@ -191,15 +209,10 @@ class Indexer extends EventEmitter {
    * channel events
    * @param fromBlock block to start from
    * @param toBlock last block (inclusive) to consider
-   * @param withTokenTransactions [optional] if true, also query for token transfer
    * towards or from the node towards someone else
    * @returns all relevant events in the specified block range
    */
-  private async getEvents(
-    fromBlock: number,
-    toBlock: number,
-    withTokenTransactions: boolean
-  ): Promise<TypedEvent<any, any>[]> {
+  private async getEvents(fromBlock: number, toBlock: number): Promise<TypedEvent<any, any>[]> {
     const queries = [
       this.chain
         .getChannels()
@@ -222,50 +235,6 @@ class Indexer extends EventEmitter {
           })
         })
     ]
-
-    if (withTokenTransactions) {
-      queries.push(
-        ...[
-          this.chain
-            .getToken()
-            .queryFilter(
-              {
-                topics: [
-                  // Token transfer *towards* us
-                  [this.chain.getToken().interface.getEventTopic('Transfer')],
-                  [u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...this.address.serialize()]))]
-                ]
-              },
-              fromBlock,
-              toBlock
-            )
-            .then((events: TypedEvent<any, any>[]) => {
-              return events.map((event: TypedEvent<any, any>) =>
-                Object.assign(event, this.chain.getToken().interface.parseLog(event))
-              )
-            }),
-          this.chain
-            .getToken()
-            .queryFilter(
-              {
-                topics: [
-                  // Token transfer *from* us towards someone else
-                  [this.chain.getToken().interface.getEventTopic('Transfer')],
-                  null,
-                  [u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...this.address.serialize()]))]
-                ]
-              },
-              fromBlock,
-              toBlock
-            )
-            .then((events: TypedEvent<any, any>[]) => {
-              return events.map((event: TypedEvent<any, any>) =>
-                Object.assign(event, this.chain.getToken().interface.parseLog(event))
-              )
-            })
-        ]
-      )
-    }
 
     const events = await Promise.all(queries)
     const normalizedEvents = events
@@ -310,7 +279,7 @@ class Indexer extends EventEmitter {
       let events: Event<any>[] = []
 
       try {
-        events = await this.getEvents(fromBlock, toBlock, false)
+        events = await this.getEvents(fromBlock, toBlock)
         log(`Getting events from ${fromBlock} to ${toBlock} successful, range ${toBlock - fromBlock}`)
       } catch (error) {
         failedCount++
@@ -401,7 +370,7 @@ class Indexer extends EventEmitter {
         // This new block marks a previous block
         // (blockNumber - this.maxConfirmations) is final.
         // Confirm native token transactions in that previous block.
-        nativeTxs = await this.chain.getNativeTokenTransactionInBlock(blockNumber - this.maxConfirmations, true)
+        nativeTxs = await this.chain.getTransactionInBlock(blockNumber - this.maxConfirmations)
       } catch (err) {
         log(
           `error: failed to retrieve information about block ${blockNumber} with finality ${this.maxConfirmations}`,
@@ -411,7 +380,13 @@ class Indexer extends EventEmitter {
 
       // update transaction manager
       if (nativeTxs && nativeTxs.length > 0) {
-        this.indexEvent('withdraw-native', nativeTxs)
+        for (const nativeTx of nativeTxs) {
+          if (this.listeners(`withdraw-native-${nativeTx}`).length > 0) {
+            this.indexEvent(`withdraw-native-${nativeTx}`, [nativeTx])
+          } else if (this.listeners(`withdraw-hopr-${nativeTx}`).length > 0) {
+            this.indexEvent(`withdraw-hopr-${nativeTx}`, [nativeTx])
+          }
+        }
         nativeTxs.forEach((nativeTx) => {
           this.chain.updateConfirmedTransaction(nativeTx)
         })
@@ -425,7 +400,7 @@ class Indexer extends EventEmitter {
 
       for (let i = 0; i < RETRIES; i++) {
         try {
-          events = await this.getEvents(blockNumber - this.maxConfirmations, blockNumber - this.maxConfirmations, true)
+          events = await this.getEvents(blockNumber - this.maxConfirmations, blockNumber - this.maxConfirmations)
         } catch (err) {
           if (i + 1 < RETRIES) {
             // Give other tasks CPU time to happen
@@ -571,14 +546,6 @@ class Indexer extends EventEmitter {
           case 'ChannelUpdated':
           case 'ChannelUpdated(address,address,tuple)':
             await this.onChannelUpdated(event as Event<'ChannelUpdated'>)
-            break
-          case 'Transfer':
-          case 'Transfer(address,address,uint256)':
-            // handle HOPR token transfer
-            this.indexEvent('withdraw-hopr', [event.transactionHash])
-            console.log('ON TRANSFER START')
-            await this.onTransfer(event as TokenEvent<'Transfer'>)
-            console.log('ON TRANSFER END')
             break
           case 'TicketRedeemed':
           case 'TicketRedeemed(address,address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)':

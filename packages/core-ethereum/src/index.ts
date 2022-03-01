@@ -151,7 +151,7 @@ export default class HoprCoreEthereum extends EventEmitter {
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
     // promise of tx hash gets resolved when the tx is mined.
     return this.chain.withdraw(currency, recipient, amount, (tx: string) =>
-      this.setTxHandler(currency === 'NATIVE' ? 'withdraw-native' : 'withdraw-hopr', tx)
+      this.setTxHandler(currency === 'NATIVE' ? `withdraw-native-${tx}` : `withdraw-hopr-${tx}`, tx)
     )
   }
 

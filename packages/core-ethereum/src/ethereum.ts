@@ -27,7 +27,7 @@ import NonceTracker from './nonce-tracker'
 import TransactionManager, { type TransactionPayload } from './transaction-manager'
 import { debug } from '@hoprnet/hopr-utils'
 import { TX_CONFIRMATION_WAIT } from './constants'
-import type { BlockWithTransactions } from '@ethersproject/abstract-provider'
+import type { Block } from '@ethersproject/abstract-provider'
 
 const log = debug('hopr:core-ethereum:ethereum')
 const abiCoder = new utils.AbiCoder()
@@ -485,15 +485,12 @@ export async function createChainWrapper(
     }
   }
 
-  const getNativeTokenTransactionInBlock = async (
-    blockNumber: number,
-    isOutgoing: boolean = true
-  ): Promise<Array<string>> => {
-    let blockWithTxs: BlockWithTransactions
+  const getTransactionInBlock = async (blockNumber: number): Promise<Array<string>> => {
+    let blockTxs: Block
     const RETRIES = 3
     for (let i = 0; i < RETRIES; i++) {
       try {
-        blockWithTxs = await provider.getBlockWithTransactions(blockNumber)
+        blockTxs = await provider.getBlock(blockNumber)
       } catch (err) {
         if (i + 1 < RETRIES) {
           // Give other tasks CPU time to happen
@@ -507,10 +504,7 @@ export async function createChainWrapper(
       }
     }
 
-    const txs = blockWithTxs.transactions.filter(
-      (tx) => tx.value.gt(BigNumber.from(0)) && (isOutgoing ? tx.from : tx.to) === wallet.address
-    )
-    return txs.length === 0 ? [] : txs.map((tx) => tx.hash)
+    return blockTxs.transactions
   }
 
   const getBalance = async (accountAddress: Address): Promise<Balance> => {
@@ -556,7 +550,7 @@ export async function createChainWrapper(
   return {
     getBalance,
     getNativeBalance,
-    getNativeTokenTransactionInBlock,
+    getTransactionInBlock,
     announce,
     withdraw,
     fundChannel,
