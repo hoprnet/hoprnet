@@ -505,7 +505,7 @@ and feeds them to the given handler.
 
 #### Defined in
 
-[libp2p/index.ts:237](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L237)
+[libp2p/index.ts:244](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L244)
 
 ## Variables
 
@@ -2104,7 +2104,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:252](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L252)
+[libp2p/index.ts:259](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L259)
 
 ___
 
