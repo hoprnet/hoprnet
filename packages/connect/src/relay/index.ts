@@ -1,7 +1,13 @@
 import type { HandlerProps } from 'libp2p'
 import type { Connection } from 'libp2p-interfaces/connection'
 import type { MultiaddrConnection } from 'libp2p-interfaces/transport'
-import type { Stream, HoprConnectOptions, HoprConnectDialOptions, HoprConnectTestingOptions } from '../types'
+import type {
+  Stream,
+  HoprConnectOptions,
+  HoprConnectDialOptions,
+  HoprConnectTestingOptions,
+  StreamType
+} from '../types'
 import type Libp2p from 'libp2p'
 import type PeerId from 'peer-id'
 import { type Multiaddr } from 'multiaddr'
@@ -25,6 +31,11 @@ const DEFAULT_MAX_RELAYED_CONNECTIONS = 10
 const log = debug(DEBUG_PREFIX)
 const error = debug(DEBUG_PREFIX.concat(':error'))
 const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
+
+type ConnResult = {
+  conn: Connection
+  stream: Stream<StreamType>
+}
 
 // Specify which libp2p methods this class uses
 // such that Typescript fails to build if anything changes
@@ -51,11 +62,13 @@ type ReducedLibp2p = ReducedPeerStore &
 class Relay {
   private relayState: RelayState
   private webRTCUpgrader: WebRTCUpgrader
+  private usedRelays: PeerId[]
 
   private _onReconnect: Relay['onReconnect'] | undefined
   private _onDelivery: Relay['onDelivery'] | undefined
   private _onRelay: Relay['onRelay'] | undefined
   private _onCanRelay: Relay['onCanRelay'] | undefined
+  private _dialNodeDirectly: Relay['dialNodeDirectly'] | undefined
 
   constructor(
     public libp2p: ReducedLibp2p,
@@ -70,6 +83,10 @@ class Relay {
     this.options.maxRelayedConnections ??= DEFAULT_MAX_RELAYED_CONNECTIONS
 
     this.webRTCUpgrader = new WebRTCUpgrader(this.options)
+
+    // Stores all relays that we announce to other nodes
+    // to make sure we don't close these connections
+    this.usedRelays = []
   }
 
   /**
@@ -83,11 +100,18 @@ class Relay {
     this._onDelivery = this.onDelivery.bind(this)
     this._onCanRelay = this.onCanRelay.bind(this)
 
+    this._dialNodeDirectly = this.dialNodeDirectly.bind(this)
+
     this.libp2p.handle(DELIVERY_PROTOCOL(this.options.environment), this._onDelivery)
     this.libp2p.handle(RELAY_PROTCOL(this.options.environment), this._onRelay)
     this.libp2p.handle(CAN_RELAY_PROTCOL(this.options.environment), this._onCanRelay)
 
     this.webRTCUpgrader.start()
+  }
+
+  setUsedRelays(peers: PeerId[]) {
+    log(`set used relays`, peers)
+    this.usedRelays = peers
   }
 
   /**
@@ -110,13 +134,22 @@ class Relay {
     options?: HoprConnectDialOptions
   ): Promise<MultiaddrConnection | undefined> {
     const abort = new AbortController()
-    const timeout = setTimeout(abort.abort.bind(abort), RELAY_CIRCUIT_TIMEOUT)
+    let connectDone = false
+
+    setTimeout(() => {
+      if (connectDone) {
+        return
+      }
+      connectDone = true
+
+      abort.abort()
+    }, RELAY_CIRCUIT_TIMEOUT)
 
     const baseConnection = await this.dialNodeDirectly(relay, RELAY_PROTCOL(this.options.environment), {
       signal: options?.signal
     }).catch(error)
 
-    clearTimeout(timeout)
+    connectDone = true
 
     if (baseConnection == undefined) {
       error(
@@ -127,10 +160,19 @@ class Relay {
       return
     }
 
-    const handshakeResult = await new RelayHandshake(baseConnection, this.options).initiate(relay, destination)
+    const handshakeResult = await new RelayHandshake(baseConnection.stream, this.options).initiate(relay, destination)
 
     if (!handshakeResult.success) {
       error(`Handshake led to empty stream. Giving up.`)
+      // Only close the connection to the relay if it does not perform relay services
+      // for us.
+      if (this.usedRelays.findIndex((usedRelay: PeerId) => usedRelay.equals(relay)) < 0) {
+        try {
+          await baseConnection.conn.close()
+        } catch (err) {
+          error(`Error while closing unused connection to relay ${relay.toB58String()}`, err)
+        }
+      }
       return
     }
 
@@ -256,7 +298,7 @@ class Relay {
       log(`relayed request rejected, already at max capacity (${this.options.maxRelayedConnections as number})`)
       shaker.reject(RelayHandshakeMessage.FAIL_RELAY_FULL)
     } else {
-      shaker.negotiate(conn.connection.remotePeer, this.dialNodeDirectly.bind(this), this.relayState)
+      shaker.negotiate(conn.connection.remotePeer, this._dialNodeDirectly as Relay['dialNodeDirectly'], this.relayState)
     }
   }
 
@@ -341,17 +383,17 @@ class Relay {
     destination: PeerId,
     protocol: string,
     opts?: HoprConnectDialOptions
-  ): Promise<Stream | undefined> {
-    let stream = await this.tryExistingConnection(destination, protocol)
+  ): Promise<ConnResult | undefined> {
+    let connResult = await this.tryExistingConnection(destination, protocol)
 
     // Only establish a new connection if we don't have any.
     // Don't establish a new direct connection to the recipient when using
     // simulated NAT
-    if (stream == undefined) {
-      stream = await this.establishDirectConnection(destination, protocol, opts)
+    if (connResult == undefined) {
+      connResult = await this.establishDirectConnection(destination, protocol, opts)
     }
 
-    return stream
+    return connResult
   }
 
   /**
@@ -366,7 +408,7 @@ class Relay {
     destination: PeerId,
     protocol: string,
     opts?: HoprConnectDialOptions
-  ): Promise<Stream | undefined> {
+  ): Promise<ConnResult | undefined> {
     const usableAddresses: Multiaddr[] = []
 
     for (const knownAddress of this.libp2p.peerStore.get(destination)?.addresses ?? []) {
@@ -383,8 +425,8 @@ class Relay {
     }
 
     let stream: Stream | undefined
+    let conn: Connection | undefined
     for (const usable of usableAddresses) {
-      let conn: Connection
       try {
         conn = await this.dialDirectly(usable, opts)
       } catch (err) {
@@ -397,9 +439,21 @@ class Relay {
         } catch (err) {
           continue
         }
+
+        if (
+          stream == undefined &&
+          // Only close the connection if we are not using this peer as a relay
+          this.usedRelays.findIndex((usedRelay: PeerId) => usedRelay.equals(destination)) < 0
+        ) {
+          try {
+            await conn.close()
+          } catch {
+            error(`Error while close unused connection to ${destination.toB58String()}`)
+          }
+        }
       }
     }
-    return stream
+    return conn != undefined && stream != undefined ? { conn, stream } : undefined
   }
 
   /**
@@ -409,7 +463,7 @@ class Relay {
    * @param protocol desired protocol
    * @returns a stream to the given peer
    */
-  private async tryExistingConnection(destination: PeerId, protocol: string): Promise<Stream | undefined> {
+  private async tryExistingConnection(destination: PeerId, protocol: string): Promise<ConnResult | undefined> {
     const existingConnection = this.libp2p.connectionManager.get(destination)
 
     if (existingConnection == null) {
@@ -423,7 +477,7 @@ class Relay {
       return
     }
 
-    return stream
+    return stream != undefined ? { conn: existingConnection as any, stream } : undefined
   }
 }
 

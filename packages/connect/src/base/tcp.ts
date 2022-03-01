@@ -2,7 +2,6 @@ import net, { type Socket, type AddressInfo } from 'net'
 import abortable, { AbortError } from 'abortable-iterator'
 import Debug from 'debug'
 import { nodeToMultiaddr } from '../utils'
-import { once } from 'events'
 
 const log = Debug('hopr-connect:tcp')
 const error = Debug('hopr-connect:tcp:error')
@@ -61,43 +60,59 @@ class TCPConnection implements MultiaddrConnection<StreamType> {
         : this._stream.source
   }
 
-  public async close(): Promise<void> {
+  public close(): Promise<void> {
     if (this.conn.destroyed) {
-      return
+      return Promise.resolve()
     }
 
-    const closePromise = once(this.conn, 'close')
+    return new Promise<void>((resolve) => {
+      let done = false
 
-    const start = Date.now()
+      const start = Date.now()
 
-    // Attempt to end the socket. If it takes longer to close than the
-    // timeout, destroy it manually.
-    const timeout = setTimeout(() => {
-      const cOptions = this.remoteAddr.toOptions()
-      log(
-        'timeout closing socket to %s:%s after %dms, destroying it manually',
-        cOptions.host,
-        cOptions.port,
-        Date.now() - start
-      )
+      setTimeout(() => {
+        if (done) {
+          return
+        }
+        done = true
 
-      if (this.conn.destroyed) {
-        log('%s:%s is already destroyed', cOptions.host, cOptions.port)
-      } else {
-        log(`destroying connection`)
-        this.conn.destroy()
-      }
-    }, SOCKET_CLOSE_TIMEOUT)
+        const cOptions = this.remoteAddr.toOptions()
+        log(
+          'timeout closing socket to %s:%s after %dms, destroying it manually',
+          cOptions.host,
+          cOptions.port,
+          Date.now() - start
+        )
 
-    try {
-      this.conn.end()
-    } catch (err) {
-      error(`Error while trying to close TCP connection`, err)
-    }
+        if (this.conn.destroyed) {
+          log('%s:%s is already destroyed', cOptions.host, cOptions.port)
+        } else {
+          log(`destroying connection`)
+          this.conn.destroy()
+        }
 
-    await closePromise
+        resolve()
+      }, SOCKET_CLOSE_TIMEOUT)
 
-    clearTimeout(timeout)
+      this.conn.once('close', () => {
+        if (done) {
+          return
+        }
+        done = true
+
+        resolve()
+      })
+
+      this.conn.end(() => {
+        if (done) {
+          return
+        }
+        done = true
+        this.timeline.close ??= Date.now()
+
+        resolve()
+      })
+    })
   }
 
   private async _sink(source: Stream['source']): Promise<void> {
@@ -132,32 +147,24 @@ class TCPConnection implements MultiaddrConnection<StreamType> {
       const start = Date.now()
       const cOpts = ma.toOptions()
 
-      log('dialing %j', cOpts)
       let rawSocket: Socket
 
       const onError = (err: Error) => {
-        verbose('Error connecting:', err.message)
-        // ENETUNREACH
-        // ECONNREFUSED
-        // @TODO check error(s)
-        err.message = `connection error ${cOpts.host}:${cOpts.port}: ${err.message}`
+        verbose(`Error connecting to ${ma.toString()}.`, err.message)
         done(err)
       }
 
       const onTimeout = () => {
-        log('connnection timeout %s:%s', cOpts.host, cOpts.port)
+        verbose(`Connnection timeout while connecting to ${ma.toString()}`)
         done(new Error(`connection timeout after ${Date.now() - start}ms`))
       }
 
       const onConnect = () => {
-        log('connection opened %j', cOpts)
+        verbose(`Connection successful to ${ma.toString()}`)
         done()
       }
 
       const done = (err?: Error) => {
-        rawSocket?.removeListener('timeout', onTimeout)
-        rawSocket?.removeListener('connect', onConnect)
-
         if (err) {
           rawSocket?.destroy()
           return reject(err)
@@ -173,8 +180,8 @@ class TCPConnection implements MultiaddrConnection<StreamType> {
           signal: options?.signal
         })
         .on('error', onError)
-        .on('timeout', onTimeout)
-        .on('connect', onConnect)
+        .once('timeout', onTimeout)
+        .once('connect', onConnect)
     })
   }
 

@@ -50,16 +50,21 @@ describe('test relay handshake', function () {
         }
 
         return {
-          source: (async function* () {
-            yield Uint8Array.from([RelayHandshakeMessage.OK])
-          })(),
-          sink: async function (source: Stream['source']) {
-            for await (const msg of source) {
-              if (u8aEquals(msg.slice(), initiator.pubKey.marshal())) {
-                initiatorReceived.resolve()
+          stream: {
+            source: (async function* () {
+              yield Uint8Array.from([RelayHandshakeMessage.OK])
+            })(),
+            sink: async function (source: Stream['source']) {
+              for await (const msg of source) {
+                if (u8aEquals(msg.slice(), initiator.pubKey.marshal())) {
+                  initiatorReceived.resolve()
+                }
               }
             }
-          }
+          },
+          conn: {
+            close: async () => {}
+          } as any
         }
       },
       getRelayState()
@@ -96,8 +101,13 @@ describe('test relay handshake', function () {
       initiator,
       async () => {
         return {
-          source: destinationToRelay.source,
-          sink: relayToDestination.sink
+          stream: {
+            source: destinationToRelay.source,
+            sink: relayToDestination.sink
+          },
+          conn: {
+            close: async () => {}
+          } as any
         }
       },
       getRelayState()
@@ -134,8 +144,13 @@ describe('test relay handshake', function () {
       initiator,
       async () => {
         return {
-          source: destinationToRelay.source,
-          sink: relayToDestination.sink
+          stream: {
+            source: destinationToRelay.source,
+            sink: relayToDestination.sink
+          },
+          conn: {
+            close: async () => {}
+          } as any
         }
       },
       getRelayState(true)

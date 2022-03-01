@@ -14,7 +14,6 @@ import {
   AccountEntry,
   PublicKey,
   Snapshot,
-  u8aConcat,
   debug,
   retryWithBackoff,
   Balance,
@@ -33,6 +32,8 @@ import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants'
 import type { TypedEvent } from '@hoprnet/hopr-ethereum'
 
 const log = debug('hopr-core-ethereum:indexer')
+const verbose = debug('hopr-core-ethereum:verbose:indexer')
+
 const getSyncPercentage = (start: number, current: number, end: number) =>
   (((current - start) / (end - start)) * 100).toFixed(2)
 const backoffOption: Parameters<typeof retryWithBackoff>[1] = { maxDelay: MAX_TRANSACTION_BACKOFF }
@@ -101,7 +102,7 @@ class Indexer extends EventEmitter {
     // and feeds them to the event listener
     ;(async function (this: Indexer) {
       for await (const block of orderedBlocks.iterator()) {
-        await this.onNewBlock(block.value, true) // exceptions are handled
+        await this.onNewBlock(block.value, true, true) // exceptions are handled
       }
     }.call(this))
 
@@ -322,7 +323,7 @@ class Indexer extends EventEmitter {
       }
 
       this.onNewEvents(events)
-      await this.onNewBlock(toBlock, false)
+      await this.onNewBlock(toBlock, false, false)
       failedCount = 0
       fromBlock = toBlock
 
@@ -382,7 +383,7 @@ class Indexer extends EventEmitter {
    * @param blockNumber latest on-chain block number
    * @param fetchEvents [optional] if true, query provider for events in block
    */
-  private async onNewBlock(blockNumber: number, fetchEvents = false): Promise<void> {
+  private async onNewBlock(blockNumber: number, fetchEvents = false, fetchNativeTxs = false): Promise<void> {
     // NOTE: This function is also used in event handlers
     // where it cannot be 'awaited', so all exceptions need to be caught.
 
@@ -394,25 +395,27 @@ class Indexer extends EventEmitter {
 
     let lastDatabaseSnapshot = await this.db.getLatestConfirmedSnapshotOrUndefined()
 
-    let nativeTxs: string[] | undefined
-    try {
-      // This new block marks a previous block
-      // (blockNumber - this.maxConfirmations) is final.
-      // Confirm native token transactions in that previous block.
-      nativeTxs = await this.chain.getNativeTokenTransactionInBlock(blockNumber - this.maxConfirmations, true)
-    } catch (err) {
-      log(
-        `error: failed to retrieve information about block ${blockNumber} with finality ${this.maxConfirmations}`,
-        err
-      )
-    }
+    if (fetchNativeTxs) {
+      let nativeTxs: string[] | undefined
+      try {
+        // This new block marks a previous block
+        // (blockNumber - this.maxConfirmations) is final.
+        // Confirm native token transactions in that previous block.
+        nativeTxs = await this.chain.getNativeTokenTransactionInBlock(blockNumber - this.maxConfirmations, true)
+      } catch (err) {
+        log(
+          `error: failed to retrieve information about block ${blockNumber} with finality ${this.maxConfirmations}`,
+          err
+        )
+      }
 
-    // update transaction manager
-    if (nativeTxs && nativeTxs.length > 0) {
-      this.indexEvent('withdraw-native', nativeTxs)
-      nativeTxs.forEach((nativeTx) => {
-        this.chain.updateConfirmedTransaction(nativeTx)
-      })
+      // update transaction manager
+      if (nativeTxs && nativeTxs.length > 0) {
+        this.indexEvent('withdraw-native', nativeTxs)
+        nativeTxs.forEach((nativeTx) => {
+          this.chain.updateConfirmedTransaction(nativeTx)
+        })
+      }
     }
 
     if (fetchEvents) {
@@ -626,7 +629,7 @@ class Indexer extends EventEmitter {
     // publicKey given by the SC is verified
     const publicKey = PublicKey.fromUncompressedPubKey(
       // add uncompressed key identifier
-      u8aConcat(new Uint8Array([4]), stringToU8a(event.args.publicKey))
+      Uint8Array.from([4, ...stringToU8a(event.args.publicKey)])
     )
     const multiaddr = new Multiaddr(stringToU8a(event.args.multiaddr))
       // remove "p2p" and corresponding peerID
@@ -653,8 +656,6 @@ class Indexer extends EventEmitter {
     this.indexEvent('channel-updated', [event.transactionHash])
     log('channel-updated for hash %s', event.transactionHash)
     const channel = await ChannelEntry.fromSCEvent(event, this.getPublicKeyOf.bind(this))
-    log(`Smart contract event`)
-    log(channel.toString())
 
     let prevState: ChannelEntry
     try {
@@ -671,8 +672,8 @@ class Indexer extends EventEmitter {
     }
 
     this.emit('channel-update', channel)
-    log('channel-update for channel')
-    log(channel.toString())
+    verbose('channel-update for channel')
+    verbose(channel.toString())
 
     if (channel.source.toAddress().eq(this.address) || channel.destination.toAddress().eq(this.address)) {
       this.emit('own-channel-updated', channel)
