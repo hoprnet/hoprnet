@@ -87,7 +87,15 @@ async function attemptDial(
       status: InternalDialStatus.CONTINUE
     }
 > {
+  const start = Date.now()
   let struct: Awaited<ReturnType<LibP2P['dialProtocol']>> | null
+
+  let aborted = false
+
+  const onAbort = () => {
+    aborted = true
+  }
+  opts.signal.addEventListener('abort', onAbort)
 
   try {
     struct = await libp2p.dialProtocol(destination, protocol, { signal: opts.signal })
@@ -98,12 +106,24 @@ async function attemptDial(
     }
   }
 
+  opts.signal.removeEventListener('abort', onAbort)
+
   // Libp2p's return types tend to change every now and then
   if (struct != null) {
+    if (aborted) {
+      console.log(`ending obsolete write stream after ${Date.now() - start} ms`)
+      try {
+        struct.stream
+          .sink((async function* () {})())
+          .catch((err: any) => logError(`Error while ending obsolete write stream`, err))
+      } catch (err) {
+        logError(`Error while ending obsolete write stream`, err)
+      }
+    }
     return { status: DialStatus.SUCCESS, resp: struct }
   }
 
-  if (opts.signal.aborted) {
+  if (aborted) {
     return { status: DialStatus.ABORTED }
   }
 
