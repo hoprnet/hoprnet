@@ -37,7 +37,7 @@ usage() {
   msg "Required environment variables"
   msg "------------------------------"
   msg
-  msg "FUNDING_PRIV_KEY\t\tsets the account which is used to fund nodes"
+  msg "FAUCET_SECRET_API_KEY\t\tsets the api key used to authenticate with the funding faucet"
   msg
   msg "Optional environment variables"
   msg "------------------------------"
@@ -53,7 +53,7 @@ usage() {
 { [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
 
 # verify and set parameters
-: ${FUNDING_PRIV_KEY?"Missing environment variable FUNDING_PRIV_KEY"}
+: ${FAUCET_SECRET_API_KEY?"Missing environment variable FAUCET_SECRET_API_KEY"}
 
 declare environment="${1?"missing parameter <environment>"}"
 declare init_script=${2:-}
