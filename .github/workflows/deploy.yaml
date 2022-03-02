@@ -353,9 +353,9 @@ jobs:
         run: |
           ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd" 3
         env:
-          FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
           HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
+          FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
 
       - name: Send cluster info to Matrix
         if: ${{ success() && !env.ACT }}
@@ -415,9 +415,9 @@ jobs:
         run: |
           ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd-nat" 2 "-nat"
         env:
-          FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
           HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
+          FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
 
       - name: Send cluster info to Matrix
         if: ${{ success() && !env.ACT }}
