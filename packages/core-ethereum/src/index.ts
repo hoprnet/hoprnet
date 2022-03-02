@@ -145,7 +145,7 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   announce(multiaddr: Multiaddr): Promise<string> {
-    return this.chain.announce(multiaddr, (tx: string) => this.setTxHandler('announce', tx))
+    return this.chain.announce(multiaddr, (txHash: string) => this.setTxHandler(`announce-${txHash}`, txHash))
   }
 
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
@@ -221,8 +221,8 @@ export default class HoprCoreEthereum extends EventEmitter {
     log(`committing to channel ${c.getId().toHex()}`)
     log(c.toString())
     const setCommitment = async (commitment: Hash) => {
-      return this.chain.setCommitment(c.source.toAddress(), commitment, (tx: string) =>
-        this.setTxHandler('channel-updated', tx)
+      return this.chain.setCommitment(c.source.toAddress(), commitment, (txHash: string) =>
+        this.setTxHandler(`channel-updated-${txHash}`, txHash)
       )
     }
     const getCommitment = async () => (await this.db.getChannel(c.getId())).commitment
@@ -386,8 +386,8 @@ export default class HoprCoreEthereum extends EventEmitter {
         }
       }
 
-      receipt = await this.chain.redeemTicket(counterparty.toAddress(), ackTicket, ticket, (tx: string) =>
-        this.setTxHandler('channel-updated', tx)
+      receipt = await this.chain.redeemTicket(counterparty.toAddress(), ackTicket, ticket, (txHash: string) =>
+        this.setTxHandler(`channel-updated-${txHash}`, txHash)
       )
     } catch (err) {
       // TODO delete ackTicket -- check if it's due to gas!
@@ -413,7 +413,9 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
-    return this.chain.initiateChannelClosure(dest.toAddress(), (tx: string) => this.setTxHandler('channel-updated', tx))
+    return this.chain.initiateChannelClosure(dest.toAddress(), (txHash: string) =>
+      this.setTxHandler(`channel-updated-${txHash}`, txHash)
+    )
   }
 
   public async finalizeClosure(dest: PublicKey): Promise<string> {
@@ -421,8 +423,8 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (c.status !== ChannelStatus.PendingToClose) {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
-    return await this.chain.finalizeChannelClosure(dest.toAddress(), (tx: string) =>
-      this.setTxHandler('channel-updated', tx)
+    return await this.chain.finalizeChannelClosure(dest.toAddress(), (txHash: string) =>
+      this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
   }
 
@@ -440,8 +442,8 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (myBalance.lt(amount)) {
       throw Error('We do not have enough balance to open a channel')
     }
-    await this.chain.openChannel(this.publicKey.toAddress(), dest.toAddress(), amount, (tx: string) =>
-      this.setTxHandler('channel-updated', tx)
+    await this.chain.openChannel(this.publicKey.toAddress(), dest.toAddress(), amount, (txHash: string) =>
+      this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
     return generateChannelId(this.publicKey.toAddress(), dest.toAddress())
   }
@@ -457,7 +459,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       dest.toAddress(),
       myFund,
       counterpartyFund,
-      (tx: string) => this.setTxHandler('channel-updated', tx)
+      (txHash: string) => this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
   }
 }

@@ -11,7 +11,9 @@ import {
   SUGGESTED_NATIVE_BALANCE,
   debug,
   AccountEntry,
-  PublicKey
+  PublicKey,
+  stringToU8a,
+  u8aToHex
 } from '@hoprnet/hopr-utils'
 
 import Indexer from '.'
@@ -125,7 +127,9 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
     }
   }
 }
+
 const createHoprTokenMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
+  const TRANSFER_TOPIC = '0xf099cd8bde557814842a3121e8ddfd433a539b8c9f14bf31ebf108d12e6196e9'
   const pastEvents = ops.pastEvents ?? []
 
   class FakeToken extends EventEmitter {
@@ -145,6 +149,31 @@ const createHoprTokenMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
       pastEvents.push(newEvent)
     }
 
+    // Ethers.js allows to subscribe to specific topics
+    // passed as an object and thereby deviates from normal
+    // EventEmitter implementations
+    // @ts-ignore
+    override on(eventFilter: TypedEventFilter<any> | string, listener: (arg: any) => void) {
+      if (typeof eventFilter === 'string') {
+        super.on(eventFilter, listener)
+      } else {
+        let eventName = ''
+        for (const topic of eventFilter.topics) {
+          if (eventName.length > 0) {
+            eventName += '-'
+          }
+          if (topic != null) {
+            eventName += topic[0]
+          } else {
+            eventName += '*'
+          }
+        }
+        super.on(eventName, listener)
+      }
+
+      return this
+    }
+
     async queryFilter() {
       return pastEvents
     }
@@ -162,6 +191,40 @@ const createHoprTokenMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
   return {
     hoprToken,
     newEvent(event: Event<any>) {
+      if (event.event === 'Transfer') {
+        // Make sure that we catch all events and don't subscribe to events more than once
+        let eventName = TRANSFER_TOPIC
+
+        const from = u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...stringToU8a(event.args.from)]))
+        const to = u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...stringToU8a(event.args.to)]))
+
+        if ((hoprToken as any as EventEmitter).eventNames().includes(eventName)) {
+          hoprToken.emit(eventName, event)
+        }
+
+        if ((hoprToken as any as EventEmitter).eventNames().includes(eventName + '-*')) {
+          hoprToken.emit(eventName + '-*', event)
+        }
+
+        if ((hoprToken as any as EventEmitter).eventNames().includes(eventName + '-*-' + to)) {
+          hoprToken.emit(eventName + '-' + to, event)
+        }
+
+        if ((hoprToken as any as EventEmitter).eventNames().includes(eventName + '-' + from)) {
+          hoprToken.emit(eventName + '-' + from, event)
+        }
+
+        eventName += '-' + to
+
+        if ((hoprToken as any as EventEmitter).eventNames().includes(eventName + '-*')) {
+          hoprToken.emit(eventName + '-*', event)
+        }
+
+        if ((hoprToken as any as EventEmitter).eventNames().includes(eventName + '-' + to)) {
+          hoprToken.emit(eventName + '-' + to, event)
+        }
+      }
+
       pastEvents.push(event)
     }
   }

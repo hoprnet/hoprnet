@@ -32,7 +32,6 @@ import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants'
 import type { TypedEvent } from '@hoprnet/hopr-ethereum'
 
 const log = debug('hopr-core-ethereum:indexer')
-const error = debug('hopr-core-ethereum:indexer:error')
 const verbose = debug('hopr-core-ethereum:verbose:indexer')
 
 const getSyncPercentage = (start: number, current: number, end: number) =>
@@ -47,7 +46,12 @@ const backoffOption: Parameters<typeof retryWithBackoff>[1] = { maxDelay: MAX_TR
 class Indexer extends EventEmitter {
   public status: 'started' | 'restarting' | 'stopped' = 'stopped'
   public latestBlock: number = 0 // latest known on-chain block number
+
+  // Use FIFO + sliding window for many events
   private unconfirmedEvents: FIFO<TypedEvent<any, any>>
+  // Use associative array for rare events
+  private unconfirmedTokenEvents: { [index: number]: TokenEvent<'Transfer'>[] }
+
   private chain: ChainWrapper
   private genesisBlock: number
   private lastSnapshot: IndexerSnapshot | undefined
@@ -64,6 +68,7 @@ class Indexer extends EventEmitter {
     super()
 
     this.unconfirmedEvents = FIFO<TypedEvent<any, any>>()
+    this.unconfirmedTokenEvents = {}
   }
 
   /**
@@ -130,18 +135,24 @@ class Indexer extends EventEmitter {
     this.chain.getToken().on(
       {
         topics: [
-          // Token transfer *towards* us
+          // Token transfer *from* us
           [this.chain.getToken().interface.getEventTopic('Transfer')],
           [u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...this.address.serialize()]))]
         ]
       },
-      (async (event: TokenEvent<'Transfer'>) => {
-        try {
-          await this.onTransfer(this.chain.getToken().interface.parseLog(event) as any)
-        } catch (err) {
-          error(`Error while processing transfer event`, err)
-        }
-      }) as any
+      this.onNewTokenEvent.bind(this)
+    )
+
+    this.chain.getToken().on(
+      {
+        topics: [
+          // Token transfer *towards* us
+          [this.chain.getToken().interface.getEventTopic('Transfer')],
+          null,
+          [u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...this.address.serialize()]))]
+        ]
+      },
+      this.onNewTokenEvent.bind(this)
     )
 
     // get past events
@@ -212,43 +223,68 @@ class Indexer extends EventEmitter {
    * towards or from the node towards someone else
    * @returns all relevant events in the specified block range
    */
-  private async getEvents(fromBlock: number, toBlock: number): Promise<TypedEvent<any, any>[]> {
-    const queries = [
-      this.chain
-        .getChannels()
-        .queryFilter(
-          {
-            topics: [
-              [
-                this.chain.getChannels().interface.getEventTopic('Announcement'),
-                this.chain.getChannels().interface.getEventTopic('ChannelUpdated'),
-                this.chain.getChannels().interface.getEventTopic('TicketRedeemed')
-              ]
-            ]
-          },
-          fromBlock,
-          toBlock
-        )
-        .then((events: TypedEvent<any, any>[]) => {
-          return events.map((event: TypedEvent<any, any>) => {
-            return Object.assign(event, this.chain.getChannels().interface.parseLog(event))
-          })
-        })
-    ]
+  private async getEvents(
+    fromBlock: number,
+    toBlock: number
+  ): Promise<
+    | {
+        success: true
+        events: TypedEvent<any, any>[]
+      }
+    | {
+        success: false
+      }
+  > {
+    let rawEvents: TypedEvent<any, any>[]
 
-    const events = await Promise.all(queries)
-    const normalizedEvents = events
-      .flat(1)
-      .sort(snapshotComparator)
-      // @TODO fix type clash
-      .map((event) => {
+    try {
+      rawEvents = await this.chain.getChannels().queryFilter(
+        {
+          topics: [
+            [
+              this.chain.getChannels().interface.getEventTopic('Announcement'),
+              this.chain.getChannels().interface.getEventTopic('ChannelUpdated'),
+              this.chain.getChannels().interface.getEventTopic('TicketRedeemed')
+            ]
+          ]
+        },
+        fromBlock,
+        toBlock
+      )
+    } catch {
+      return {
+        success: false
+      }
+    }
+
+    // sort in-place
+    rawEvents.sort(snapshotComparator)
+
+    return {
+      success: true,
+      events: rawEvents.map((event) => {
+        Object.assign(event, this.chain.getChannels().interface.parseLog(event))
+
         if (event.event == undefined) {
-          return Object.assign(event, { event: event.name })
+          Object.assign(event, { event: (event as any).name })
+          return event
         }
         return event
       })
+    }
+  }
 
-    return normalizedEvents
+  private onNewTokenEvent(event: TokenEvent<'Transfer'>) {
+    Object.assign(event, this.chain.getToken().interface.parseLog(event))
+    Object.assign(event, { event: (event as any).name })
+
+    if (this.unconfirmedTokenEvents[event.blockNumber] == undefined) {
+      this.unconfirmedTokenEvents[event.blockNumber] = [event]
+    } else {
+      this.unconfirmedTokenEvents[event.blockNumber].push(event)
+      // Sort in-place
+      this.unconfirmedTokenEvents[event.blockNumber].sort(snapshotComparator)
+    }
   }
 
   /**
@@ -276,23 +312,23 @@ class Indexer extends EventEmitter {
       //   toBlock - fromBlock
       // )
 
-      let events: Event<any>[] = []
+      let res = await this.getEvents(fromBlock, toBlock)
 
-      try {
-        events = await this.getEvents(fromBlock, toBlock)
-        log(`Getting events from ${fromBlock} to ${toBlock} successful, range ${toBlock - fromBlock}`)
-      } catch (error) {
+      if (res.success) {
+        this.onNewEvents(res.events)
+        await this.onNewBlock(toBlock, false, false, true)
+      } else {
         failedCount++
 
         if (failedCount > 5) {
-          throw error
+          throw Error(`Could not fetch logs from block ${fromBlock} to ${toBlock}. Giving up`)
         }
+
+        await setImmediatePromise()
 
         continue
       }
 
-      this.onNewEvents(events)
-      await this.onNewBlock(toBlock, false, false, true)
       failedCount = 0
       fromBlock = toBlock
 
@@ -363,13 +399,34 @@ class Indexer extends EventEmitter {
 
     let lastDatabaseSnapshot = await this.db.getLatestConfirmedSnapshotOrUndefined()
 
+    if (fetchEvents) {
+      // Don't fail immediately when one block is temporarily not available
+      const RETRIES = 3
+      let res: Awaited<ReturnType<Indexer['getEvents']>>
+
+      for (let i = 0; i < RETRIES; i++) {
+        res = await this.getEvents(blockNumber - this.maxConfirmations, blockNumber - this.maxConfirmations)
+
+        if (res.success) {
+          this.onNewEvents(res.events)
+          break
+        } else if (i + 1 < RETRIES) {
+          await setImmediatePromise()
+        } else {
+          log(`Cannot fetch block ${blockNumber - this.maxConfirmations} despite ${RETRIES} retries. Skipping block.`)
+        }
+      }
+    }
+
+    await this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot, blocking)
+
     if (fetchNativeTxs) {
-      let nativeTxs: string[] | undefined
+      let nativeTxHashes: string[] | undefined
       try {
         // This new block marks a previous block
         // (blockNumber - this.maxConfirmations) is final.
         // Confirm native token transactions in that previous block.
-        nativeTxs = await this.chain.getTransactionInBlock(blockNumber - this.maxConfirmations)
+        nativeTxHashes = await this.chain.getTransactionsInBlock(blockNumber - this.maxConfirmations)
       } catch (err) {
         log(
           `error: failed to retrieve information about block ${blockNumber} with finality ${this.maxConfirmations}`,
@@ -377,50 +434,31 @@ class Indexer extends EventEmitter {
         )
       }
 
-      // update transaction manager
-      if (nativeTxs && nativeTxs.length > 0) {
-        for (const nativeTx of nativeTxs) {
-          if (this.listeners(`withdraw-native-${nativeTx}`).length > 0) {
-            this.indexEvent(`withdraw-native-${nativeTx}`, [nativeTx])
-          } else if (this.listeners(`withdraw-hopr-${nativeTx}`).length > 0) {
-            this.indexEvent(`withdraw-hopr-${nativeTx}`, [nativeTx])
+      // update transaction manager after updating db
+      if (nativeTxHashes && nativeTxHashes.length > 0) {
+        // @TODO replace this with some efficient set intersection algorithm
+        for (const txHash of nativeTxHashes) {
+          if (this.listeners(`withdraw-native-${txHash}`).length > 0) {
+            this.indexEvent(`withdraw-native-${txHash}`)
+          } else if (this.listeners(`withdraw-hopr-${txHash}`).length > 0) {
+            this.indexEvent(`withdraw-hopr-${txHash}`)
+          } else if (this.listeners(`announce-${txHash}`).length > 0) {
+            this.indexEvent(`announce-${txHash}`)
+          } else if (this.listeners(`channel-updated-${txHash}`).length > 0) {
+            this.indexEvent(`channel-updated-${txHash}`)
           }
         }
-        nativeTxs.forEach((nativeTx) => {
+        nativeTxHashes.forEach((nativeTx) => {
           this.chain.updateConfirmedTransaction(nativeTx)
         })
       }
     }
 
-    if (fetchEvents) {
-      // Don't fail immediately when one block is temporarily not available
-      const RETRIES = 3
-      let events: TypedEvent<any, any>[] = []
-
-      for (let i = 0; i < RETRIES; i++) {
-        try {
-          events = await this.getEvents(blockNumber - this.maxConfirmations, blockNumber - this.maxConfirmations)
-        } catch (err) {
-          if (i + 1 < RETRIES) {
-            // Give other tasks CPU time to happen
-            // Push next provider query to end of next event loop iteration
-            await setImmediatePromise()
-            continue
-          } else {
-            log(
-              `Cannot fetch block ${blockNumber - this.maxConfirmations} despite ${RETRIES} retries. Skipping block.`,
-              err
-            )
-          }
-        }
-
-        break
+    if (this.unconfirmedTokenEvents[blockNumber]?.length > 0) {
+      for (const tokenEvent of this.unconfirmedTokenEvents[blockNumber]) {
+        await this.onTransfer(tokenEvent)
       }
-
-      this.onNewEvents(events)
     }
-
-    await this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot, blocking)
   }
 
   /**
@@ -539,7 +577,6 @@ class Indexer extends EventEmitter {
         switch (eventName) {
           case 'Announcement':
           case 'Announcement(address,bytes,bytes)':
-            this.indexEvent('announce', [event.transactionHash])
             await this.onAnnouncement(event as Event<'Announcement'>, new BN(blockNumber.toPrecision()))
             break
           case 'ChannelUpdated':
@@ -620,7 +657,6 @@ class Indexer extends EventEmitter {
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdated'>): Promise<void> {
-    this.indexEvent('channel-updated', [event.transactionHash])
     log('channel-updated for hash %s', event.transactionHash)
     const channel = await ChannelEntry.fromSCEvent(event, this.getPublicKeyOf.bind(this))
 
@@ -704,8 +740,8 @@ class Indexer extends EventEmitter {
     console.log('onTransfer end', event.args.value.toString())
   }
 
-  private indexEvent(indexerEvent: IndexerEvents, txHash: string[]) {
-    this.emit(indexerEvent, txHash)
+  private indexEvent(indexerEvent: IndexerEvents) {
+    this.emit(indexerEvent)
   }
 
   public async getAccount(address: Address) {
@@ -780,7 +816,7 @@ class Indexer extends EventEmitter {
           return
         }
         done = true
-        this.removeListener(eventType, listener)
+        this.removeListener(eventType, deferred.resolve)
         log('listener %s on %s is removed due to error', eventType, tx)
         setImmediate(resolve, tx)
       }
@@ -791,7 +827,7 @@ class Indexer extends EventEmitter {
         }
         done = true
         // remove listener but throw now error
-        this.removeListener(eventType, listener)
+        this.removeListener(eventType, deferred.resolve)
         log('listener %s on %s timed out and thus removed', eventType, tx)
         setImmediate(reject, tx)
       }, INDEXER_TIMEOUT)
@@ -801,17 +837,13 @@ class Indexer extends EventEmitter {
           return
         }
         done = true
-        this.removeListener(eventType, listener)
+        this.removeListener(eventType, deferred.resolve)
         log('listener %s on %s is removed', eventType, tx)
 
         setImmediate(resolve, tx)
       }
 
-      const listener = (txHash: string[]) => {
-        const indexed = txHash.find((emitted) => emitted === tx)
-        if (indexed) deferred.resolve()
-      }
-      this.addListener(eventType, listener)
+      this.addListener(eventType, deferred.resolve)
       log('listener %s on %s is added', eventType, tx)
     })
 

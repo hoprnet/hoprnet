@@ -485,7 +485,7 @@ export async function createChainWrapper(
     }
   }
 
-  const getTransactionInBlock = async (blockNumber: number): Promise<Array<string>> => {
+  const getTransactionsInBlock = async (blockNumber: number): Promise<Array<string>> => {
     let blockTxs: Block
     const RETRIES = 3
     for (let i = 0; i < RETRIES; i++) {
@@ -550,7 +550,7 @@ export async function createChainWrapper(
   return {
     getBalance,
     getNativeBalance,
-    getTransactionInBlock,
+    getTransactionsInBlock,
     announce,
     withdraw,
     fundChannel,
