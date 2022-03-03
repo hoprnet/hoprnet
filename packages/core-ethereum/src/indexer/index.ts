@@ -391,6 +391,12 @@ class Indexer extends EventEmitter {
     // NOTE: This function is also used in event handlers
     // where it cannot be 'awaited', so all exceptions need to be caught.
 
+    const currentBlock = blockNumber - this.maxConfirmations
+
+    if (currentBlock < 0) {
+      return
+    }
+
     log('Indexer got new block %d', blockNumber)
     this.emit('block', blockNumber)
 
@@ -405,7 +411,7 @@ class Indexer extends EventEmitter {
       let res: Awaited<ReturnType<Indexer['getEvents']>>
 
       for (let i = 0; i < RETRIES; i++) {
-        res = await this.getEvents(blockNumber - this.maxConfirmations, blockNumber - this.maxConfirmations)
+        res = await this.getEvents(currentBlock, currentBlock)
 
         if (res.success) {
           this.onNewEvents(res.events)
@@ -413,7 +419,7 @@ class Indexer extends EventEmitter {
         } else if (i + 1 < RETRIES) {
           await setImmediatePromise()
         } else {
-          log(`Cannot fetch block ${blockNumber - this.maxConfirmations} despite ${RETRIES} retries. Skipping block.`)
+          log(`Cannot fetch block ${currentBlock} despite ${RETRIES} retries. Skipping block.`)
         }
       }
     }
@@ -426,10 +432,10 @@ class Indexer extends EventEmitter {
         // This new block marks a previous block
         // (blockNumber - this.maxConfirmations) is final.
         // Confirm native token transactions in that previous block.
-        nativeTxHashes = await this.chain.getTransactionsInBlock(blockNumber - this.maxConfirmations)
+        nativeTxHashes = await this.chain.getTransactionsInBlock(currentBlock)
       } catch (err) {
         log(
-          `error: failed to retrieve information about block ${blockNumber} with finality ${this.maxConfirmations}`,
+          `error: failed to retrieve information about block ${currentBlock} with finality ${this.maxConfirmations}`,
           err
         )
       }
@@ -447,18 +453,25 @@ class Indexer extends EventEmitter {
           } else if (this.listeners(`channel-updated-${txHash}`).length > 0) {
             this.indexEvent(`channel-updated-${txHash}`)
           }
+
+          this.chain.updateConfirmedTransaction(txHash)
         }
-        nativeTxHashes.forEach((nativeTx) => {
-          this.chain.updateConfirmedTransaction(nativeTx)
-        })
       }
     }
 
-    if (this.unconfirmedTokenEvents[blockNumber]?.length > 0) {
-      for (const tokenEvent of this.unconfirmedTokenEvents[blockNumber]) {
+    if (this.unconfirmedTokenEvents[currentBlock]?.length > 0) {
+      for (const tokenEvent of this.unconfirmedTokenEvents[currentBlock]) {
         await this.onTransfer(tokenEvent)
       }
     }
+
+    try {
+      await this.db.updateLatestBlockNumber(new BN(blockNumber))
+    } catch (err) {
+      log(`error: failed to update database with latest block number ${blockNumber}`, err)
+    }
+
+    this.emit('block-processed', currentBlock)
   }
 
   /**
@@ -619,13 +632,6 @@ class Indexer extends EventEmitter {
         // Wait until end of next event loop iteration before starting next db write-back
         await setImmediatePromise()
       }
-    }
-
-    try {
-      await this.db.updateLatestBlockNumber(new BN(blockNumber))
-      this.emit('block-processed', blockNumber)
-    } catch (err) {
-      log(`error: failed to update database with latest block number ${blockNumber}`, err)
     }
   }
 
