@@ -397,7 +397,7 @@ class Indexer extends EventEmitter {
       return
     }
 
-    log('Indexer got new block %d', blockNumber)
+    log('Indexer got new block %d, handling block %d', blockNumber, blockNumber - this.maxConfirmations)
     this.emit('block', blockNumber)
 
     // update latest block
@@ -624,7 +624,7 @@ class Indexer extends EventEmitter {
       }
 
       if (
-        blocking &&
+        !blocking &&
         this.unconfirmedEvents.size() > 0 &&
         isConfirmedBlock(this.unconfirmedEvents.peek().blockNumber, blockNumber, this.maxConfirmations)
       ) {
@@ -733,7 +733,6 @@ class Indexer extends EventEmitter {
   }
 
   private async onTransfer(event: TokenEvent<'Transfer'>) {
-    console.log('onTransfer start', event.args.value.toString())
     const isIncoming = Address.fromString(event.args.to).eq(this.address)
     const amount = new Balance(new BN(event.args.value.toString()))
 
@@ -742,8 +741,6 @@ class Indexer extends EventEmitter {
     } else {
       await this.db.subHoprBalance(amount)
     }
-
-    console.log('onTransfer end', event.args.value.toString())
   }
 
   private indexEvent(indexerEvent: IndexerEvents) {
