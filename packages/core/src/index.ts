@@ -4,7 +4,7 @@ import type { HoprConnectConfig } from '@hoprnet/hopr-connect'
 
 import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants'
 
-import NetworkPeers from './network/network-peers'
+import NetworkPeers, { Entry } from './network/network-peers'
 import Heartbeat from './network/heartbeat'
 import { findPath } from './path'
 
@@ -552,7 +552,7 @@ class Hopr extends EventEmitter {
    * @param peer peer to query for, default self
    * @param timeout [optional] custom timeout for DHT query
    */
-  public async getAnnouncedAddresses(peer: PeerId = this.getId(), timeout = 5e3): Promise<Multiaddr[]> {
+  public async getMyAnnouncedAddresses(peer: PeerId = this.getId(), timeout = 5e3): Promise<Multiaddr[]> {
     if (peer.equals(this.getId())) {
       return this.libp2p.multiaddrs
     }
@@ -695,6 +695,9 @@ class Hopr extends EventEmitter {
     }
   }
 
+  /**
+   * @returns a list connected peerIds
+   */
   public getConnectedPeers(): PeerId[] {
     if (!this.networkPeers) {
       return []
@@ -702,6 +705,27 @@ class Hopr extends EventEmitter {
     return this.networkPeers.all()
   }
 
+  /**
+   * Takes a look into the indexer.
+   * @returns a list of announced multi addresses
+   */
+  public async getAnnouncedAddresses(): Promise<Multiaddr[]> {
+    return this.indexer.getAnnouncedAddresses()
+  }
+
+  /**
+   * @param peerId of the node we want to get the connection info for
+   * @returns various information about the connection
+   */
+  public getConnectionInfo(peerId: PeerId): Entry {
+    return this.networkPeers.getConnectionInfo(peerId)
+  }
+
+  /**
+   * @deprecated Used by API v1
+   * @returns a string describing the connection status between
+   * us and various nodes
+   */
   public async connectionReport(): Promise<string> {
     if (!this.networkPeers) {
       return 'Node has not started yet'
@@ -758,7 +782,7 @@ class Hopr extends EventEmitter {
     let addrToAnnounce: Multiaddr
 
     if (announceRoutableAddress) {
-      let multiaddrs = await this.getAnnouncedAddresses()
+      let multiaddrs = await this.getMyAnnouncedAddresses()
 
       if (this.options.testing?.announceLocalAddresses) {
         multiaddrs = multiaddrs.filter((ma) => isMultiaddrLocal(ma))

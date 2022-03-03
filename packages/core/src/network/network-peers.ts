@@ -1,9 +1,9 @@
-import { randomSubset } from '@hoprnet/hopr-utils'
-import PeerId from 'peer-id'
-import { NETWORK_QUALITY_THRESHOLD } from '../constants'
 import { type HeartbeatPingResult } from './heartbeat'
+import PeerId from 'peer-id'
+import { randomSubset } from '@hoprnet/hopr-utils'
+import { NETWORK_QUALITY_THRESHOLD } from '../constants'
 
-type Entry = {
+export type Entry = {
   id: PeerId
   heartbeatsSent: number
   heartbeatsSuccess: number
@@ -19,19 +19,14 @@ export const MAX_BACKOFF = MAX_DELAY / MIN_DELAY
 const UNKNOWN_Q = 0.2 // Default quality for nodes we don't know about.
 
 class NetworkPeers {
-  private peers: Entry[]
-
-  private findIndex(peer: PeerId): number {
-    return this.peers.findIndex((entry: Entry) => entry.id.equals(peer))
-  }
+  private peers: Map<string, Entry> = new Map()
 
   constructor(
     existingPeers: Array<PeerId>,
     private exclude: PeerId[] = [],
     private onPeerOffline?: (peer: PeerId) => void
   ) {
-    this.peers = []
-
+    // register all existing peers
     for (const peer of existingPeers) {
       this.register(peer)
     }
@@ -45,20 +40,31 @@ class NetworkPeers {
 
   // @returns a float between 0 (completely unreliable) and 1 (completely
   // reliable) estimating the quality of service of a peer's network connection
-  public qualityOf(peer: PeerId): number {
-    let entryIndex = this.findIndex(peer)
-    if (entryIndex >= 0 && this.peers[entryIndex].heartbeatsSent > 0) {
+  public qualityOf(peerId: PeerId): number {
+    const entry = this.peers.get(peerId.toB58String())
+    if (entry && entry.heartbeatsSent > 0) {
       /*
       return entry.heartbeatsSuccess / entry.heartbeatsSent
       */
-      return this.peers[entryIndex].lastTen
+      return entry.lastTen
     }
     return UNKNOWN_Q
   }
 
+  /**
+   * @param peerId of the node we want to get the connection info for
+   * @returns various information about the connection, throws error if peerId doesn't exist
+   */
+  public getConnectionInfo(peerId: PeerId): Entry {
+    const id = peerId.toB58String()
+    const entry = this.peers.get(id)
+    if (entry) return entry
+    throw Error(`Entry for ${id} does not exist`)
+  }
+
   public pingSince(thresholdTime: number): PeerId[] {
     const toPing: PeerId[] = []
-    for (const entry of this.peers) {
+    for (const entry of this.peers.values()) {
       if (this.nextPing(entry) < thresholdTime) {
         toPing.push(entry.id)
       }
@@ -68,16 +74,11 @@ class NetworkPeers {
   }
 
   public updateRecord(pingResult: HeartbeatPingResult): void {
-    const entryIndex = this.findIndex(pingResult.destination)
-
-    if (entryIndex < 0) {
-      return
-    }
-
-    const previousEntry = this.peers[entryIndex]
+    const id = pingResult.destination.toB58String()
+    const previousEntry = this.peers.get(id)
+    if (!previousEntry) return
 
     let newEntry: Entry
-
     if (pingResult.lastSeen >= 0) {
       newEntry = {
         id: pingResult.destination,
@@ -102,22 +103,26 @@ class NetworkPeers {
       }
     }
 
-    this.peers[entryIndex] = newEntry
+    this.peers.set(id, newEntry)
   }
 
   // Get a random sample peers.
   public randomSubset(size: number, filter?: (peer: PeerId) => boolean): PeerId[] {
+    const peers = Array.from(this.peers.values())
     return randomSubset(
-      this.peers,
-      Math.min(size, this.peers.length),
+      peers,
+      Math.min(size, peers.length),
       filter != null ? (entry: Entry) => filter(entry.id) : undefined
     ).map((e: Entry) => e.id)
   }
 
-  public register(id: PeerId) {
-    if (!this.has(id) && this.exclude.findIndex((x: PeerId) => id.equals(x)) < 0) {
-      this.peers.push({
-        id,
+  public register(peerId: PeerId) {
+    const id = peerId.toB58String()
+
+    // does not have peer and it's not excluded
+    if (!this.peers.has(id) && this.exclude.findIndex((p: PeerId) => peerId.equals(p)) < 0) {
+      this.peers.set(id, {
+        id: peerId,
         heartbeatsSent: 0,
         heartbeatsSuccess: 0,
         lastSeen: Date.now(),
@@ -127,25 +132,30 @@ class NetworkPeers {
     }
   }
 
+  public has(peerId: PeerId): boolean {
+    return this.peers.has(peerId.toB58String())
+  }
+
   public length(): number {
-    return this.peers.length
+    return this.peers.size
   }
 
   public all(): PeerId[] {
-    return this.peers.map((x) => x.id)
+    return Array.from(this.peers.values()).map((peer) => peer.id)
   }
 
-  public has(peer: PeerId): boolean {
-    return this.peers.findIndex((entry: Entry) => entry.id.equals(peer)) >= 0
-  }
-
+  /**
+   * @deprecated Used by API v1
+   * @returns a string describing the connection quality of all connected peers
+   */
   public debugLog(): string {
-    if (this.peers.length == 0) {
+    const peers = Array.from(this.peers.values())
+    if (peers.length == 0) {
       return 'no connected peers'
     }
     let out = ''
     out += `current nodes:\n`
-    this.peers
+    peers
       .sort((a, b) => {
         return this.qualityOf(b.id) - this.qualityOf(a.id)
       })

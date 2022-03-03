@@ -21,7 +21,7 @@ export class Info extends AbstractCommand {
     // @TODO Add connector info etc.
     return log(
       [
-        `Announcing to other nodes as: ${(await this.node.getAnnouncedAddresses()).map((ma) => ma.toString())}`,
+        `Announcing to other nodes as: ${(await this.node.getMyAnnouncedAddresses()).map((ma) => ma.toString())}`,
         `Listening on: ${this.node.getListeningAddresses().map((ma) => ma.toString())}`,
         `Running on: ${smartContractInfo.network}`,
         `HOPR Token: ${smartContractInfo.hoprTokenAddress}`,
