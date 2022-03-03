@@ -56,7 +56,7 @@ alias 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV Bob
 
 Your node will assign the alias (name) to that address. You can now use that alias in commands like ping, send or open payment channel, instead of typing the full address.
 
-For example if you want to ping `16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV` address which was assigned to `Bob`, now you will need only to execute command:
+For example, if you want to ping the address `16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV` which was assigned to `Bob`, you will now only need to execute the command:
 
 ```
 ping Bob
