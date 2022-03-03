@@ -12,6 +12,14 @@ and packet relaying.
 
 ## Requirements
 
+:::info INFO
+
+MacOS M1 users will need to follow an extra set of instructions from [NVM](https://github.com/nvm-sh/nvm#macos-troubleshooting) to allow them to use Node.js 16. 
+
+Node.js should be compiled under x64 architecute.
+
+:::
+
 There are two ways to run a HOPR cluster: locally or via [Gitpod](https://gitpod.io). The best option will depend on your operating system:
 
 - Windows: Gitpod
