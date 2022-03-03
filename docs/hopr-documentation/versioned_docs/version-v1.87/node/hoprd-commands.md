@@ -56,6 +56,12 @@ alias 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV Bob
 
 Your node will assign the alias (name) to that address. You can now use that alias in commands like send or open payment channel, instead of typing the full address.
 
+For example if you want to ping `16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV` address which was assigned to `Bob`, now you will need only to execute command:
+
+```
+ping Bob
+```
+
 :::info
 
 Note that these aliases are not available publicly, and will reset when you restart your node.
