@@ -14,22 +14,25 @@ export type PeerInfo = {
   quality: number
   backoff: number
   isNew: boolean
-  success?: string
 }
 
 /**
- * @param info
- * @returns a measurement of success (in %), returns undefined if node is newly added
+ * Sort peers by quality, highest quality first.
+ * @param peers
+ * @returns peers in DESC order
  */
-export const measureSuccess = (info: { heartbeatsSent: number; heartbeatsSuccess: number }): string => {
-  return info.heartbeatsSent > 0 ? ((info.heartbeatsSuccess / info.heartbeatsSent) * 100).toFixed() + '%' : undefined
+export const sortByQuality = (a: PeerInfo, b: PeerInfo) => {
+  return b.quality - a.quality
 }
 
 /**
+ * @param node a hopr instance
+ * @param quality a float range from 0 to 1
  * @returns List of peers alongside their connection status.
  */
 export const getPeers = async (
-  node: Hopr
+  node: Hopr,
+  quality: number
 ): Promise<{
   announced: PeerInfo[]
   connected: PeerInfo[]
@@ -38,7 +41,10 @@ export const getPeers = async (
     const connected = node.getConnectedPeers().reduce<PeerInfo[]>((result, peerId) => {
       try {
         const info = node.getConnectionInfo(peerId)
+        // exclude if quality is lesser than the one wanted
+        if (info.lastTen < quality) return result
         const isNew = info.heartbeatsSent === 0
+
         result.push({
           peerId: info.id.toB58String(),
           heartbeats: {
@@ -48,8 +54,7 @@ export const getPeers = async (
           lastSeen: info.lastSeen,
           quality: info.lastTen,
           backoff: info.backoff,
-          isNew,
-          success: isNew ? measureSuccess(info) : undefined
+          isNew
         })
       } catch {}
       return result
@@ -60,7 +65,10 @@ export const getPeers = async (
         const peerId = PeerId.createFromB58String(addr.getPeerId())
         try {
           const info = node.getConnectionInfo(peerId)
+          // exclude if quality is lesser than the one wanted
+          if (info.lastTen < quality) return result
           const isNew = info.heartbeatsSent === 0
+
           result.push({
             peerId: info.id.toB58String(),
             multiAddr: addr.toString(),
@@ -71,8 +79,7 @@ export const getPeers = async (
             lastSeen: info.lastSeen,
             quality: info.lastTen,
             backoff: info.backoff,
-            isNew,
-            success: isNew ? measureSuccess(info) : undefined
+            isNew
           })
         } catch {}
         return result
@@ -80,20 +87,26 @@ export const getPeers = async (
     })
 
     return {
-      connected,
-      announced
+      connected: connected.sort(sortByQuality),
+      announced: announced.sort(sortByQuality)
     }
   } catch (error) {
-    throw new Error(STATUS_CODES.UNKNOWN_FAILURE + error.message)
+    throw new Error(STATUS_CODES.UNKNOWN_FAILURE + ' ' + error.message)
   }
 }
 
 export const GET: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
+    const quality = parseFloat(String(req.query.quality ?? 0))
+
+    if (quality > 1)
+      return res
+        .status(400)
+        .send({ status: STATUS_CODES.INVALID_QUALITY, error: 'Quality must be a range from 0 to 1' })
 
     try {
-      const info = await getPeers(node)
+      const info = await getPeers(node, quality)
       return res.status(200).send(info)
     } catch (error) {
       return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
@@ -138,19 +151,27 @@ const PEER_INFO_DOC: any = {
     isNew: {
       type: 'boolean',
       describe: 'True if the node is new (no heartbeats sent yet).'
-    },
-    success: {
-      type: 'string',
-      describe: 'A percentage of how much success there is connecting to the node.'
     }
   }
 }
 
 GET.apiDoc = {
   description:
-    'Lists information for `connected peers` and `announced peers`.\nConnected peers are nodes which are connected to the node while announced peers are nodes which have announced to the network.',
+    'Lists information for `connected peers` and `announced peers`, starting from highest quality to lowest.\nConnected peers are nodes which are connected to the node while announced peers are nodes which have announced to the network.\nOptionally, you can pass `quality` parameter which would filter out peers with lower quality to the one specified.',
   tags: ['Node'],
   operationId: 'nodeGetPeers',
+  parameters: [
+    {
+      in: 'query',
+      name: 'quality',
+      description:
+        'When quality is passed, the response will only include peers with higher or equal quality to the one specified.',
+      schema: {
+        type: 'number',
+        example: '0.5'
+      }
+    }
+  ],
   responses: {
     '200': {
       description: 'Peers information fetched successfuly.',
@@ -161,13 +182,26 @@ GET.apiDoc = {
             properties: {
               connected: {
                 type: 'array',
-                items: PEER_INFO_DOC
+                items: Object.assign({}, PEER_INFO_DOC)
               },
               announced: {
                 type: 'array',
-                items: PEER_INFO_DOC
+                items: Object.assign({}, PEER_INFO_DOC)
               }
             }
+          }
+        }
+      }
+    },
+    '400': {
+      description: `Invalid input. One of the parameters passed is in incorrect format.`,
+      content: {
+        'application/json': {
+          schema: {
+            $ref: '#/components/schemas/RequestStatus'
+          },
+          example: {
+            status: STATUS_CODES.INVALID_QUALITY
           }
         }
       }
