@@ -29,7 +29,7 @@ Want to know more about the staking? [Read here](https://medium.com/hoprnet/hopr
 
 :::info
 
-The HOPR staking contract lives on xDAI chain, and stakes are in xHOPR. You need to make sure your wallet is set to xDAI before you connect to the widget. If you try to connect on Ethereum, nothing will happen.
+The HOPR staking contract lives on Gnosis chain, and stakes are in xHOPR. You need to make sure your wallet is set to Gnosis chain before you connect to the widget. If you try to connect on Ethereum, nothing will happen.
 
 :::
 
@@ -45,7 +45,7 @@ Want to unwrap from wxHOPR to xHOPR or wrap from xHOPR to wxHOPR? You will find 
 
 :::
 
-Once you have the xHOPR you want to stake in your wallet, and your wallet connected to xDAI Chain, you can go ahead and connect to the HOPR staking interface.
+Once you have the xHOPR you want to stake in your wallet, and your wallet connected to Gnosis chain, you can go ahead and connect to the HOPR staking interface.
 
 Visit [https://stake.hoprnet.org](https://stake.hoprnet.org) You’ll see the staking interface.
 
