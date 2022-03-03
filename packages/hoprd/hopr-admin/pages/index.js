@@ -6,13 +6,17 @@ import { Logs } from '../components/log'
 import { Connection } from '../connection'
 import dynamic from 'next/dynamic'
 import Cookies from 'js-cookie'
-import { accountWithdraw, getAddresses, getBalances } from '../fetch/account'
-import { parseCmd } from '../fetch/client'
-import { getAliases, setAliases } from '../fetch/aliases'
-import { closeChannel, getChannels, getTickets, redeemTickets, setChannels } from '../fetch/channels'
-import { getNodeInfo, getNodeVer, pingNodePeer } from '../fetch/node'
-import { getSettings } from '../fetch/settings'
-import { sendMessage, signAddress } from '../fetch/messages'
+import { parseCmd } from '../client'
+import {
+  closeChannel,
+  getAliases,
+  getChannels,
+  getNodeInfo, getNodeVer, getSettings,
+  getTickets, pingNodePeer,
+  redeemTickets, sendMessage,
+  setAliases,
+  setChannels, signAddress, accountWithdraw, getAddresses, getBalances
+} from '../fetch'
 
 const Jazzicon = dynamic(() => import('../components/jazzicon'), { ssr: false })
 const gitHash = process.env.NEXT_PUBLIC_GIT_COMMIT
@@ -128,11 +132,11 @@ export default function Home() {
               case "redeemTickets":
                 // Test cmd: redeemTickets 16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12
                 // FIXME: Debug err code 422
-                redeemTickets(options[0])
+                redeemTickets()
                 break
               case "tickets":
                 // Test cmd: tickets 16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12
-                getTickets(options[0])
+                getTickets()
                 break
               case "version":
                 getNodeVer()
@@ -154,13 +158,10 @@ export default function Home() {
                 // console.log(options)
                 sendMessage(options[0], options[1], options[2])
               case "peers":
-                // TODO: Use /node/info??
-                break
-              case "quit":
-                // TODO: Find out how
+                // TODO: See https://github.com/hoprnet/hoprnet/pull/3617
                 break
               default:
-                console.log("Command Not found")
+                break
             }
             e.target.value = ''
           }
