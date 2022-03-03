@@ -92,9 +92,9 @@ export async function createChainWrapper(
         if (i + 1 < RETRIES) {
           await setImmediatePromise()
           continue
-        } else {
-          log(`Could not determine latest on-chain block. Now waiting for next block.`)
         }
+
+        log(`Could not determine latest on-chain block. Now waiting for next block.`)
       }
     }
 
@@ -115,13 +115,11 @@ export async function createChainWrapper(
       } catch (err) {
         if (i + 1 < RETRIES) {
           await setImmediatePromise()
-          continue
-        } else {
         }
       }
     }
 
-    log(`Could not determine latest transaction count.`)
+    log(`Could not determine latest transaction count using the given provider.`)
     throw Error(`Could not get latest transaction count using the given provider`)
   }
 
@@ -497,10 +495,10 @@ export async function createChainWrapper(
           // Push next provider query to end of next event loop iteration
           await setImmediatePromise()
           continue
-        } else {
-          log(`could not retrieve native token transactions from block ${blockNumber} using the provider.`, err)
-          throw err
         }
+
+        log(`could not retrieve native token transactions from block ${blockNumber} using the provider.`, err)
+        throw err
       }
     }
 
@@ -517,10 +515,10 @@ export async function createChainWrapper(
         if (i + 1 < RETRIES) {
           await setImmediatePromise()
           continue
-        } else {
-          log(`Could not determine current on-chain token balance using the provider.`)
-          throw Error(`Could not determine on-chain token balance`)
         }
+
+        log(`Could not determine current on-chain token balance using the provider.`)
+        throw Error(`Could not determine on-chain token balance`)
       }
     }
 
@@ -537,10 +535,10 @@ export async function createChainWrapper(
         if (i + 1 < RETRIES) {
           await setImmediatePromise()
           continue
-        } else {
-          log(`Could not determine current on-chain native balance using the provider.`)
-          throw Error(`Could not determine on-chain native balance`)
         }
+
+        log(`Could not determine current on-chain native balance using the provider.`)
+        throw Error(`Could not determine on-chain native balance`)
       }
     }
 
