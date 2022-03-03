@@ -3,6 +3,17 @@
  */
 
 import Cookies from 'js-cookie'
+import { parseCmd } from './client'
+import {
+  accountWithdraw,
+  closeChannel,
+  getAddresses,
+  getAliases,
+  getBalances,
+  getChannels,
+  getNodeInfo, getNodeVer, getSettings, getTickets, pingNodePeer, redeemTickets, sendMessage,
+  setAliases, setChannels, signAddress
+} from './fetch'
 
 const MAX_MESSAGES_CACHED = 50
 
@@ -81,10 +92,10 @@ export class Connection {
         ? await fetch(`https://${window.location.host}/api/ssl`).then(
             (_) => new WebSocket('wss://' + window.location.host)
           )
-        : new WebSocket('ws://' + window.location.host)
+        : new WebSocket('ws://' + 'localhost:19501/')
     } catch (err) {
       console.log('Invalid SSL or non-SSL support')
-      client = new WebSocket('ws://' + window.location.host)
+      client = new WebSocket('ws://' + "localhost:19501/")
     }
     console.log('Web socket created')
 
@@ -93,13 +104,92 @@ export class Connection {
       this.setConnecting(false)
 
       document.querySelector('#command').onkeydown = (e) => {
+        // enter
         if (e.keyCode == 13) {
-          // enter
           var text = e.target.value
-          console.log('Command: ', text)
           if (text.length > 0) {
-            client.send(text)
-            this.prevLog = text
+            const userInput = parseCmd(text)
+            let options = []
+            if (userInput.query != '') {
+              options = userInput.query.trim().split(/\s+/)
+            }
+            switch (userInput.cmd) {
+              // Test cmd: withdraw 1337 NATIVE 0xEA9eDAE5CfC794B75C45c8fa89b605508A03742a
+              case "withdraw":
+                accountWithdraw({
+                  "amount": options[0],
+                  "currency": options[1],
+                  "recipient": options[2]
+                })
+                break
+              case "balance":
+                getBalances()
+                this.appendMessage(e)
+                break
+              case "address":
+                getAddresses()
+                break
+              case "alias":
+                // FIXME: setAliases not working (debug)
+                // Test cmd: alias 16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 Alice
+                if (options.length) {
+                  setAliases(options[0], options[1]);
+                } else {
+                  getAliases();
+                }
+                break
+              case "channels":
+                getChannels()
+                break
+              case "close":
+                // Test cmd: close 16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12
+                closeChannel(options[0])
+                break
+              case "info":
+                getNodeInfo()
+                break
+              case "open":
+                // Test cmd: open 16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 1000000
+                // FIXME: debug UNKNOWN_FAILURE
+                if (options.length) {
+                  setChannels(options[0], options[1]);
+                }
+                break
+              case "redeemTickets":
+                // Test cmd: redeemTickets 16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12
+                // FIXME: Debug err code 422
+                redeemTickets()
+                break
+              case "tickets":
+                // Test cmd: tickets 16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12
+                getTickets()
+                break
+              case "version":
+                getNodeVer()
+                break
+              case "ping":
+                // Test cmd: ping 16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12
+                pingNodePeer(options[0])
+                break
+              case "settings":
+                getSettings();
+                break
+              case "sign":
+                // Test cmd: sign 16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12
+                signAddress(options[0]);
+                break
+              case "send":
+                // Test cmd: send Hello 16Uiu2HAm2SF8EdwwUaaSoYTiZSddnG4hLVF7dizh32QFTNWMic2b [16Uiu2HAm1uV82HyD1iJ5DmwJr4LftmJUeMfj8zFypBRACmrJc16n]
+                // FIXME: 400 Bad request
+                // console.log(options)
+                sendMessage(options[0], options[1], options[2])
+              case "peers":
+                // TODO: See https://github.com/hoprnet/hoprnet/pull/3617
+                break
+              default:
+                console.log("Command not found.")
+                break
+            }
             e.target.value = ''
           }
         }
@@ -108,6 +198,22 @@ export class Connection {
           e.target.value = this.prevLog
         }
       }
+      // document.querySelector('#command').onkeydown = (e) => {
+      //   if (e.keyCode == 13) {
+      //     // enter
+      //     var text = e.target.value
+      //     console.log('Command: ', text)
+      //     if (text.length > 0) {
+      //       client.send(text)
+      //       this.prevLog = text
+      //       e.target.value = ''
+      //     }
+      //   }
+      //   if (e.keyCode == 38) {
+      //     // Up Arrow
+      //     e.target.value = this.prevLog
+      //   }
+      // }
     }
 
     client.onmessage = (event) => {
