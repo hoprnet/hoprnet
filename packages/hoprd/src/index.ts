@@ -333,10 +333,9 @@ async function main() {
     process.exit(0)
   }
 
-  let peerId: Awaited<ReturnType<typeof getIdentity>>
   try {
     // 1. Find or create an identity
-    peerId = await getIdentity({
+    const peerId = await getIdentity({
       initialize: argv.init,
       idPath: argv.identity,
       password: argv.password,
