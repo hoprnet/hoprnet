@@ -132,6 +132,29 @@ class Indexer extends EventEmitter {
       await this.onProviderError(error) // exceptions are handled
     })
 
+    this.chain.getToken().on(
+      {
+        topics: [
+          // Token transfer *from* us
+          [this.chain.getToken().interface.getEventTopic('Transfer')],
+          [u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...this.address.serialize()]))]
+        ]
+      },
+      this.onNewTokenEvent.bind(this)
+    )
+
+    this.chain.getToken().on(
+      {
+        topics: [
+          // Token transfer *towards* us
+          [this.chain.getToken().interface.getEventTopic('Transfer')],
+          null,
+          [u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...this.address.serialize()]))]
+        ]
+      },
+      this.onNewTokenEvent.bind(this)
+    )
+
     // get past events
     fromBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, this.blockRange)
 
