@@ -4,19 +4,6 @@ import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils'
 import { SettingKey, State, StateOps } from '../../../../types'
 
-// /**
-//  * Checks if setting value is valid and proper type
-//  * throws if setting value is not valid
-//  */
-// export const validateSettingValue = (key: SettingKey, value: any) => {
-//   switch (key) {
-//     case SettingKey.INCLUDE_RECIPIENT:
-//       if (typeof value !== 'boolean') throw Error()
-//     case SettingKey.STRATEGY:
-//       if (!['passive', 'promiscuous'].includes(value)) throw Error()
-//   }
-// }
-
 /**
  * Sets node setting/s in HOPRd state.
  * Updates HOPRd's state.

@@ -91,9 +91,4 @@ export const getStatusCodeForInvalidInputInRequest = (inputPath: string) => {
     default:
       return 'INVALID_INPUT'
   }
-
-  // NOTE: with this one I could probably add validation on route level and handle it as well
-  // by checking url in error middleware
-  // INVALID_SETTING
-  // INVALID_SETTING_VALUE
 }

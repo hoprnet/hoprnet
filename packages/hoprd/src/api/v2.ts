@@ -54,12 +54,6 @@ export function setupRestApi(service: Application, urlPath: string, node: Hopr, 
     paths: apiPathsPath,
     // since we pass the spec directly we don't need to expose it via HTTP
     exposeApiDocs: false,
-    // errorTransformer: function (openapiError, ajvError) {
-    //   return {
-    //     huje: openapiError,
-    //     muje: ajvError
-    //   }
-    // },
     errorMiddleware: function (err, req, res, next) {
       req
       if (err.status === 400) {
@@ -92,7 +86,6 @@ export function setupRestApi(service: Application, urlPath: string, node: Hopr, 
         return Object.values(SettingKey).includes(input)
       }
     },
-    // customKeywords:
     securityHandlers: {
       // TODO: We assume the handlers are always called in order. This isn't a
       // given and might change in the future. Thus, they should be made order-erindependent.
