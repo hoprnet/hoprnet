@@ -1,6 +1,7 @@
 import type { StreamType } from '../types'
 import type { HandlerProps } from 'libp2p'
-import type { Connection } from 'libp2p-interfaces/connection'
+import type Connection from 'libp2p-interfaces/src/connection/connection'
+import type { Address } from 'libp2p/src/peer-store/address-book'
 
 import { Relay } from './index'
 import PeerId from 'peer-id'
@@ -25,7 +26,7 @@ function getPeerProtocol(peer: PeerId, protocol: string) {
 }
 
 function getPeer(peerId: PeerId, network: EventEmitter) {
-  function handle(protocol: string, handler: (conn: HandlerProps) => void) {
+  async function handle(protocol: string, handler: (conn: HandlerProps) => void) {
     network.on(getPeerProtocol(peerId, protocol), handler)
   }
 
@@ -65,7 +66,7 @@ function getPeer(peerId: PeerId, network: EventEmitter) {
       handle,
       upgrader: {
         upgradeInbound: (async (conn: RelayConnection) => {
-          const shaker = handshake(conn)
+          const shaker = handshake<StreamType>(conn as any)
 
           const message = new TextDecoder().decode((await shaker.read()).slice())
 
@@ -76,15 +77,15 @@ function getPeer(peerId: PeerId, network: EventEmitter) {
         upgradeOutbound: (conn: any) => conn
       },
       peerStore: {
-        get: (peer: PeerId) => {
-          return {
-            addresses: [
+        addressBook: {
+        get: async (peer: PeerId): Promise<Address[]> => {
+          return [
               {
                 multiaddr: new Multiaddr(`/ip4/127.0.0.1/tcp/1/p2p/${peer.toB58String()}`),
                 isCertified: true
               }
             ]
-          }
+        }
         }
       },
       dialer: {} as any,

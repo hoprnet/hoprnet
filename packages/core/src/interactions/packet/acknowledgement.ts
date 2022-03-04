@@ -117,7 +117,7 @@ export function subscribeToAcknowledgements(
   protocolAck: string
 ) {
   const limitConcurrency = oneAtATime<void>()
-  subscribe(
+  await subscribe(
     protocolAck,
     (msg: Uint8Array, remotePeer: PeerId) =>
       limitConcurrency(

@@ -40,7 +40,7 @@ describe('test webrtc connection', function () {
       fakedWebRTCInstance
     )
 
-    const AliceShaker = handshake(conn)
+    const AliceShaker = handshake<StreamType>(conn as any)
     const BobShaker = handshake({
       source: AliceBob.source,
       sink: BobAlice.sink
@@ -139,7 +139,7 @@ describe('test webrtc connection', function () {
       webRTCInstance as any
     )
 
-    const AliceShaker = handshake(conn)
+    const AliceShaker = handshake<StreamType>(conn as any)
     const BobShaker = handshake({
       source: AliceBob.source,
       sink: BobAlice.sink
@@ -175,7 +175,7 @@ describe('test webrtc connection', function () {
       webRTCInstance as any
     )
 
-    const AliceShaker = handshake(conn)
+    const AliceShaker = handshake<StreamType>(conn as any)
     const BobShaker = handshake({
       source: AliceBob.source,
       sink: BobAlice.sink
@@ -235,7 +235,7 @@ describe('test webrtc connection', function () {
       webRTCInstance as any
     )
 
-    const AliceShaker = handshake(conn)
+    const AliceShaker = handshake<StreamType>(conn as any)
     const BobShaker = handshake({
       source: AliceBob.source,
       sink: BobAlice.sink

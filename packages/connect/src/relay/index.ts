@@ -1,16 +1,17 @@
+import type LibP2P from 'libp2p'
+import type PeerId from 'peer-id'
 import type { HandlerProps } from 'libp2p'
-import type { Connection } from 'libp2p-interfaces/connection'
-import type { MultiaddrConnection } from 'libp2p-interfaces/transport'
+import type Connection from 'libp2p-interfaces/src/connection/connection'
+import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
+import { type Multiaddr } from 'multiaddr'
+import type { Address } from 'libp2p/src/peer-store/address-book'
+
 import type {
   Stream,
   HoprConnectOptions,
   HoprConnectDialOptions,
-  HoprConnectTestingOptions,
-  StreamType
+  HoprConnectTestingOptions
 } from '../types'
-import type Libp2p from 'libp2p'
-import type PeerId from 'peer-id'
-import { type Multiaddr } from 'multiaddr'
 
 import { AbortError } from 'abortable-iterator'
 import debug from 'debug'
@@ -34,26 +35,29 @@ const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
 
 type ConnResult = {
   conn: Connection
-  stream: Stream<StreamType>
+  stream: Stream
 }
 
 // Specify which libp2p methods this class uses
 // such that Typescript fails to build if anything changes
+type ReducedAddressBook = {
+  get: (peerId: PeerId) => ReturnType<LibP2P['peerStore']['addressBook']['get']>
+}
 type ReducedPeerStore = {
   peerStore: {
-    get: (peer: PeerId) => Pick<NonNullable<ReturnType<Libp2p['peerStore']['get']>>, 'addresses'> | undefined
+    addressBook: ReducedAddressBook
   }
 }
-type ReducedDHT = { contentRouting: Pick<Libp2p['contentRouting'], 'provide'> }
-type ReducedDialer = { dialer: Pick<Libp2p['dialer'], '_pendingDials'> }
-type ReducedUpgrader = { upgrader: Pick<Libp2p['upgrader'], 'upgradeInbound' | 'upgradeOutbound'> }
-type ReducedConnectionManager = { connectionManager: Pick<Libp2p['connectionManager'], 'connections' | 'get'> }
+type ReducedDHT = { contentRouting: Pick<LibP2P['contentRouting'], 'provide'> }
+type ReducedDialer = { dialer: Pick<LibP2P['dialer'], '_pendingDials'> }
+type ReducedUpgrader = { upgrader: Pick<LibP2P['upgrader'], 'upgradeInbound' | 'upgradeOutbound'> }
+type ReducedConnectionManager = { connectionManager: Pick<LibP2P['connectionManager'], 'connections' | 'get'> }
 type ReducedLibp2p = ReducedPeerStore &
   ReducedDialer &
   ReducedConnectionManager &
   ReducedUpgrader & {
     peerId: PeerId
-    handle: Libp2p['handle']
+    handle: LibP2P['handle']
   } & ReducedDHT
 
 /**
@@ -94,7 +98,7 @@ class Relay {
    * @dev Must not happen in the constructor because `this` is not ready
    *      at that point in time
    */
-  start(): void {
+  async start(): Promise<void> {
     this._onReconnect = this.onReconnect.bind(this)
     this._onRelay = this.onRelay.bind(this)
     this._onDelivery = this.onDelivery.bind(this)
@@ -102,9 +106,9 @@ class Relay {
 
     this._dialNodeDirectly = this.dialNodeDirectly.bind(this)
 
-    this.libp2p.handle(DELIVERY_PROTOCOL(this.options.environment), this._onDelivery)
-    this.libp2p.handle(RELAY_PROTCOL(this.options.environment), this._onRelay)
-    this.libp2p.handle(CAN_RELAY_PROTCOL(this.options.environment), this._onCanRelay)
+    await this.libp2p.handle(DELIVERY_PROTOCOL(this.options.environment), this._onDelivery)
+    await this.libp2p.handle(RELAY_PROTCOL(this.options.environment), this._onRelay)
+    await this.libp2p.handle(CAN_RELAY_PROTCOL(this.options.environment), this._onCanRelay)
 
     this.webRTCUpgrader.start()
   }
@@ -411,7 +415,8 @@ class Relay {
   ): Promise<ConnResult | undefined> {
     const usableAddresses: Multiaddr[] = []
 
-    for (const knownAddress of this.libp2p.peerStore.get(destination)?.addresses ?? []) {
+    const knownAddresses: Address[] = await this.libp2p.peerStore.addressBook.get(destination)
+    for (const knownAddress of knownAddresses) {
       // Check that the address:
       // - matches the format (PeerStore might include addresses of other transport modules)
       // - is a direct address (PeerStore might include relay addresses)

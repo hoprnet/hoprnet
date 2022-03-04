@@ -1,4 +1,4 @@
-import type { MultiaddrConnection } from 'libp2p-interfaces/transport'
+import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
 import type { Instance as SimplePeer } from 'simple-peer'
 import type PeerId from 'peer-id'
 import { durations, u8aToHex, defer, type DeferType } from '@hoprnet/hopr-utils'
@@ -39,7 +39,7 @@ function getAbortableSource(source: Stream['source'], signal?: AbortSignal) {
  * Encapsulate state management and upgrade from relayed connection to
  * WebRTC connection
  */
-class WebRTCConnection implements MultiaddrConnection<StreamType> {
+class WebRTCConnection implements MultiaddrConnection {
   private _switchPromise: DeferType<void>
   private _sinkSourceAttached: boolean
   private _sinkSourceAttachedPromise: DeferType<Stream['source']>

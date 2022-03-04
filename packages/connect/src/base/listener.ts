@@ -13,7 +13,7 @@ import Debug from 'debug'
 import { networkInterfaces, type NetworkInterfaceInfo } from 'os'
 
 import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP } from '../constants'
-import type { MultiaddrConnection, Upgrader, Listener as InterfaceListener } from 'libp2p-interfaces/transport'
+import type { MultiaddrConnection, Upgrader, Listener as InterfaceListener } from 'libp2p-interfaces/src/transport/types'
 
 import PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'

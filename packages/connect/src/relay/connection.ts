@@ -1,5 +1,5 @@
 import { Multiaddr } from 'multiaddr'
-import type { MultiaddrConnection } from 'libp2p-interfaces/transport'
+import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
 import type { Stream, StreamResult, StreamType } from '../types'
 import { randomBytes } from 'crypto'
 import { RelayPrefix, ConnectionStatusMessages, StatusMessages } from '../constants'
@@ -69,7 +69,7 @@ export function statusMessagesCompare(a: Uint8Array, b: Uint8Array): -1 | 0 | 1 
 /**
  * Encapsulates the client-side state management of a relayed connection
  */
-class RelayConnection extends EventEmitter implements MultiaddrConnection<StreamType> {
+class RelayConnection extends EventEmitter implements MultiaddrConnection {
   private _stream: Stream
   private _sourceIterator: AsyncIterator<StreamType>
   private _sinkSourceAttached: boolean
@@ -104,7 +104,6 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection<Stream
   private _counterparty: PeerId
 
   public source: Stream['source']
-  // @ts-ignore
   public sink: Stream['sink']
 
   public conn: Stream

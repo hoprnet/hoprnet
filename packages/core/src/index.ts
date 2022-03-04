@@ -240,7 +240,7 @@ class Hopr extends EventEmitter {
       protocol: string,
       handler: LibP2PHandlerFunction<Promise<void | Uint8Array>>,
       includeReply: boolean,
-      errHandler: (err: any) => void
+      errHandler: (err: any) => Promise<void>
     ) => libp2pSubscribe(this.libp2p, protocol, handler, errHandler, includeReply)) as Subscribe
 
     const sendMessage = ((dest: PeerId, protocol: string, msg: Uint8Array, includeReply: boolean, opts: DialOpts) =>

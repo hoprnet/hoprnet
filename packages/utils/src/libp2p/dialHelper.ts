@@ -52,9 +52,12 @@ export type DialResponse =
     }
 
 // Make sure that Typescript fails to build tests if libp2p API changes
+type ReducedAddressBook = {
+  get: (peerId: PeerId) => ReturnType<LibP2P['peerStore']['addressBook']['get']>
+}
 type ReducedPeerStore = {
   peerStore: {
-    get: (peer: PeerId) => Pick<NonNullable<ReturnType<LibP2P['peerStore']['get']>>, 'addresses'> | undefined
+    addressBook: ReducedAddressBook
   }
 }
 type ReducedDHT = { contentRouting: Pick<LibP2P['contentRouting'], 'routers' | 'findProviders'> }
@@ -202,7 +205,7 @@ async function doDial(
   opts: Required<TimeoutOpts>
 ): Promise<DialResponse> {
   let dialResult: Awaited<ReturnType<typeof attemptDial>>
-  let knownAddresses = libp2p.peerStore.get(destination)?.addresses ?? []
+  let knownAddresses = await libp2p.peerStore.addressBook.get(destination)
 
   // Try to use known addresses
   if (knownAddresses.length > 0) {
@@ -226,7 +229,7 @@ async function doDial(
   const dhtResult = await queryDHT(libp2p, destination, opts)
 
   if (dhtResult.status !== InternalDialStatus.CONTINUE) {
-    knownAddresses = libp2p.peerStore.get(destination)?.addresses ?? []
+  knownAddresses = await libp2p.peerStore.addressBook.get(destination)
 
     printPeerStoreAddresses(
       `Direct dial attempt to ${destination.toB58String()} failed and DHT query has not brought any new addresses. Giving up`,
@@ -246,7 +249,7 @@ async function doDial(
 
   // Only start a dial attempt if we have received new addresses
   if (newAddresses == 0) {
-    knownAddresses = libp2p.peerStore.get(destination)?.addresses ?? []
+  knownAddresses = await libp2p.peerStore.addressBook.get(destination)
 
     printPeerStoreAddresses(
       `Querying the DHT for ${green(destination.toB58String())} did not lead to any new addresses. Giving up.`,

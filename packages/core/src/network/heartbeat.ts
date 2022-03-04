@@ -58,7 +58,7 @@ export default class Heartbeat {
 
     this.protocolHeartbeat = `/hopr/${environmentId}/heartbeat`
 
-    subscribe(this.protocolHeartbeat, this.handleHeartbeatRequest.bind(this), true, errHandler)
+    await subscribe(this.protocolHeartbeat, this.handleHeartbeatRequest.bind(this), true, errHandler)
   }
 
   public start() {

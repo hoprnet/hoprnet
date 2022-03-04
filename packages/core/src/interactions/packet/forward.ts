@@ -24,7 +24,7 @@ export class PacketForwardInteraction {
     private protocolAck: string
   ) {
     this.mixer = new Mixer(this.handleMixedPacket.bind(this))
-    this.subscribe(protocolMsg, this.handlePacket.bind(this), false, (err: any) => {
+    await this.subscribe(protocolMsg, this.handlePacket.bind(this), false, (err: any) => {
       error(`Error while receiving packet`, err)
     })
   }

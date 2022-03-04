@@ -1,6 +1,7 @@
 import { NOISE } from '@chainsafe/libp2p-noise'
 import MPLEX from 'libp2p-mplex'
-import Libp2p from 'libp2p'
+import LibP2P from 'libp2p'
+import type { Address } from 'libp2p/src/peer-store/address-book'
 import { dial as dialHelper, DialStatus } from './dialHelper'
 import { privKeyToPeerId } from './privKeyToPeerId'
 import TCP from 'libp2p-tcp'
@@ -19,8 +20,8 @@ const Alice = privKeyToPeerId(stringToU8a('0xcf0b158c5f9d83dabf81a43391cce6cced6
 const Bob = privKeyToPeerId(stringToU8a('0x801f499e287fa0e5ac546a86d7f1e3ca766249f62759e6a1f2c90de6090cc4c0'))
 const Chris = privKeyToPeerId(stringToU8a('0x1bbb9a915ddd6e19d0f533da6c0fbe8820541a370110728f647829cd2c91bc79'))
 
-async function getNode(id: PeerId, withDHT = false, maDestination?: Multiaddr): Promise<Libp2p> {
-  const node = await Libp2p.create({
+async function getNode(id: PeerId, withDHT = false, maDestination?: Multiaddr): Promise<LibP2P> {
+  const node = await LibP2P.create({
     addresses: {
       listen: [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${id.toB58String()}`).toString()]
     },
@@ -70,23 +71,26 @@ async function getNode(id: PeerId, withDHT = false, maDestination?: Multiaddr): 
 }
 
 function getPeerStore() {
-  const peerStore = new Set<Multiaddr>()
+  const peerStore = new Map<PeerId, Set<Address>>()
 
   return {
-    add: peerStore.add.bind(peerStore),
-    get: () => {
-      // Make sure that Typescript does not build unit test if Libp2p API changes.
-      const multiaddrs: Pick<ReturnType<Libp2p['peerStore']['get']>, 'addresses'>['addresses'] = []
-      for (const value of peerStore.values()) {
-        multiaddrs.push({
-          multiaddr: value,
-          isCertified: true
-        })
+    addressBook: {
+    add: async (peerId: PeerId, multiaddrs: Multiaddr[]): Promise<void> => {
+      const addresses = peerStore.get(peerId) ?? new Set<Address>()
+      for (const address of multiaddrs) {
+        addresses.add({ multiaddr: address, isCertified: true})
       }
-
-      // Libp2p's return value has more properties but
-      // dialHelper only uses the Multiaddresses
-      return { addresses: multiaddrs }
+      peerStore.set(peerId, addresses)
+    },
+    get: async (peerId: PeerId): Promise<Address[]> => {
+      // Make sure that Typescript does not build unit test if Libp2p API changes.
+      const addresses: Set<Address> = peerStore.get(peerId) ?? new Set<Address>()
+      const result: Address[] = []
+      for (const address of addresses.values()) {
+        result.push(address)
+      }
+      return result
+    }
     }
   }
 }
@@ -108,7 +112,7 @@ describe('test dialHelper', function () {
     const peerA = await getNode(Alice)
     const peerB = await getNode(Bob)
 
-    peerA.peerStore.addressBook.add(peerB.peerId, peerB.multiaddrs)
+    await peerA.peerStore.addressBook.add(peerB.peerId, peerB.multiaddrs)
 
     const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)
 
@@ -142,11 +146,11 @@ describe('test dialHelper', function () {
     // Secretly tell peerA the address of peerC
     const peerA = await getNode(Alice, true, peerC.multiaddrs[0])
 
-    peerB.peerStore.addressBook.add(peerA.peerId, peerA.multiaddrs)
-    peerA.peerStore.addressBook.add(peerB.peerId, peerB.multiaddrs)
+    await peerB.peerStore.addressBook.add(peerA.peerId, peerA.multiaddrs)
+    await peerA.peerStore.addressBook.add(peerB.peerId, peerB.multiaddrs)
 
-    peerB.peerStore.addressBook.add(peerC.peerId, peerC.multiaddrs)
-    peerC.peerStore.addressBook.add(peerB.peerId, peerB.multiaddrs)
+    await peerB.peerStore.addressBook.add(peerC.peerId, peerC.multiaddrs)
+    await peerC.peerStore.addressBook.add(peerB.peerId, peerB.multiaddrs)
 
     await peerA.start()
     await peerB.start()
@@ -188,7 +192,7 @@ describe('test dialHelper', function () {
       peerStore
     }
 
-    peerStore.add(new Multiaddr(`/ip4/127.0.0.1/tcp/123/p2p/${Bob.toB58String()}`))
+    await peerStore.addressBook.add(Bob, [new Multiaddr(`/ip4/127.0.0.1/tcp/123/p2p/${Bob.toB58String()}`)])
 
     // Try to call Bob but does not exist
     const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)
@@ -214,7 +218,7 @@ describe('test dialHelper', function () {
       peerStore
     }
 
-    peerStore.add(new Multiaddr(`/ip4/127.0.0.1/tcp/123/p2p/${Bob.toB58String()}`))
+    await peerStore.addressBook.add(Bob, [new Multiaddr(`/ip4/127.0.0.1/tcp/123/p2p/${Bob.toB58String()}`)])
 
     const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)
 

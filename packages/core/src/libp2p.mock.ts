@@ -25,7 +25,7 @@ function createLibp2pMock(peerId: PeerId): LibP2P {
     libp2pLogger(`Libp2p stop method called`)
     return Promise.resolve()
   }
-  libp2p.handle = () => {
+  libp2p.handle = async () => {
     libp2pLogger(`Libp2 handle method called`)
   }
   libp2p.hangUp = () => {
