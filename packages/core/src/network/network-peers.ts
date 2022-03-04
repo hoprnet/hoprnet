@@ -145,27 +145,30 @@ class NetworkPeers {
   }
 
   /**
-   * @deprecated Used by API v1
    * @returns a string describing the connection quality of all connected peers
    */
   public debugLog(): string {
-    const peers = Array.from(this.peers.values())
-    if (peers.length == 0) {
-      return 'no connected peers'
+    if (this.peers.size === 0) return 'no connected peers'
+
+    let out = 'current nodes:\n'
+
+    // sort peers by quality
+    const peers = Array.from(this.peers.entries()).sort(([, a], [, b]) => {
+      return this.qualityOf(b.id) - this.qualityOf(a.id)
+    })
+
+    // append to output string by looping through each peer entry
+    for (const [, entry] of peers) {
+      const success =
+        entry.heartbeatsSent > 0 ? ((entry.heartbeatsSuccess / entry.heartbeatsSent) * 100).toFixed() + '%' : '<new>'
+      out += `- id: ${entry.id.toB58String()}, quality: ${this.qualityOf(entry.id).toFixed(
+        2
+      )} (backoff ${entry.backoff.toFixed()}, ${success} of ${entry.heartbeatsSent}) \n`
     }
-    let out = ''
-    out += `current nodes:\n`
-    peers
-      .sort((a, b) => {
-        return this.qualityOf(b.id) - this.qualityOf(a.id)
-      })
-      .forEach((e: Entry) => {
-        const success =
-          e.heartbeatsSent > 0 ? ((e.heartbeatsSuccess / e.heartbeatsSent) * 100).toFixed() + '%' : '<new>'
-        out += `- id: ${e.id.toB58String()}, quality: ${this.qualityOf(e.id).toFixed(
-          2
-        )} (backoff ${e.backoff.toFixed()}, ${success} of ${e.heartbeatsSent}) \n`
-      })
+
+    // update map with sorted peers
+    this.peers = new Map(peers)
+
     return out
   }
 }
