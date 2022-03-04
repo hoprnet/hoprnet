@@ -49,8 +49,6 @@ class Indexer extends EventEmitter {
 
   // Use FIFO + sliding window for many events
   private unconfirmedEvents: FIFO<TypedEvent<any, any>>
-  // Use associative array for rare events
-  private unconfirmedTokenEvents: { [index: number]: TokenEvent<'Transfer'>[] }
 
   private chain: ChainWrapper
   private genesisBlock: number
@@ -68,7 +66,6 @@ class Indexer extends EventEmitter {
     super()
 
     this.unconfirmedEvents = FIFO<TypedEvent<any, any>>()
-    this.unconfirmedTokenEvents = {}
   }
 
   /**
@@ -131,29 +128,6 @@ class Indexer extends EventEmitter {
     this.unsubscribeErrors = this.chain.subscribeError(async (error: any) => {
       await this.onProviderError(error) // exceptions are handled
     })
-
-    this.chain.getToken().on(
-      {
-        topics: [
-          // Token transfer *from* us
-          [this.chain.getToken().interface.getEventTopic('Transfer')],
-          [u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...this.address.serialize()]))]
-        ]
-      },
-      this.onNewTokenEvent.bind(this)
-    )
-
-    this.chain.getToken().on(
-      {
-        topics: [
-          // Token transfer *towards* us
-          [this.chain.getToken().interface.getEventTopic('Transfer')],
-          null,
-          [u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...this.address.serialize()]))]
-        ]
-      },
-      this.onNewTokenEvent.bind(this)
-    )
 
     // get past events
     fromBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, this.blockRange)
@@ -485,12 +459,6 @@ class Indexer extends EventEmitter {
 
           this.chain.updateConfirmedTransaction(txHash)
         }
-      }
-    }
-
-    if (this.unconfirmedTokenEvents[currentBlock]?.length > 0) {
-      for (const tokenEvent of this.unconfirmedTokenEvents[currentBlock]) {
-        await this.onTransfer(tokenEvent)
       }
     }
 
