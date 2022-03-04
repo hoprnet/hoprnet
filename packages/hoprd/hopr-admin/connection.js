@@ -14,6 +14,7 @@ import {
   getNodeInfo, getNodeVer, getSettings, getTickets, pingNodePeer, redeemTickets, sendMessage,
   setAliases, setChannels, signAddress
 } from './fetch'
+// import ListCommands from '../lib/commands/listCommands'
 
 const MAX_MESSAGES_CACHED = 50
 
@@ -108,6 +109,9 @@ export class Connection {
         if (e.keyCode == 13) {
           var text = e.target.value
           if (text.length > 0) {
+            // client.send(text)
+            // this.prevLog = text
+
             const userInput = parseCmd(text)
             let options = []
             if (userInput.query != '') {
@@ -123,8 +127,10 @@ export class Connection {
                 })
                 break
               case "balance":
-                getBalances()
-                this.appendMessage(e)
+                getBalances().then(balances => {
+                  this.logs.push({type: "log", msg: `${balances.native}`, ts: ""})
+                  this.setMessages(this.logs.slice(0)) // Need a clone
+                })
                 break
               case "address":
                 getAddresses()
@@ -186,6 +192,11 @@ export class Connection {
               case "peers":
                 // TODO: See https://github.com/hoprnet/hoprnet/pull/3617
                 break
+              case "help":
+                client.send("help")
+                // const listcmd = ListCommands()
+                // listcmd.execute()
+                break
               default:
                 console.log("Command not found.")
                 break
@@ -198,22 +209,6 @@ export class Connection {
           e.target.value = this.prevLog
         }
       }
-      // document.querySelector('#command').onkeydown = (e) => {
-      //   if (e.keyCode == 13) {
-      //     // enter
-      //     var text = e.target.value
-      //     console.log('Command: ', text)
-      //     if (text.length > 0) {
-      //       client.send(text)
-      //       this.prevLog = text
-      //       e.target.value = ''
-      //     }
-      //   }
-      //   if (e.keyCode == 38) {
-      //     // Up Arrow
-      //     e.target.value = this.prevLog
-      //   }
-      // }
     }
 
     client.onmessage = (event) => {

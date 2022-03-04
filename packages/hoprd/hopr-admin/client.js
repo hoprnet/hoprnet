@@ -9,7 +9,6 @@ export const getReq = (apiSuffix) => {
       'x-auth-token': API_SECURITY_TOKEN,
     },
   }).then(res => res.json())
-    .then(res => console.log(res));
 }
 
 export const postReq = (apiSuffix, jsonBody) => {
@@ -21,7 +20,6 @@ export const postReq = (apiSuffix, jsonBody) => {
     },
     body: JSON.stringify(jsonBody)
   }).then(res => res.json())
-    .then(res => console.log(res));
 }
 
 export const delReq = (apiSuffix) => {
@@ -31,7 +29,6 @@ export const delReq = (apiSuffix) => {
       'x-auth-token': API_SECURITY_TOKEN,
     },
   }).then(res => res.json())
-    .then(res => console.log(res));
 }
 
 export const parseCmd = (cmdInput) => {

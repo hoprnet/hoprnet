@@ -3,17 +3,13 @@ import { getReq, postReq, delReq } from './client'
 /*
  * Account API
  */
-export const accountWithdraw = (jsonBody) => {
-  postReq("account/withdraw", jsonBody)
-}
+export const accountWithdraw = (jsonBody) => postReq("account/withdraw", jsonBody)
 
-export const getBalances = () => {
-  getReq("account/balances")
-}
 
-export const getAddresses = () => {
-  getReq("account/addresses")
-}
+export const getBalances = () => getReq("account/balances")
+
+export const getAddresses = () => getReq("account/addresses")
+
 
 /*
  * Aliases API
