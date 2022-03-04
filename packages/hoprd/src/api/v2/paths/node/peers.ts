@@ -17,15 +17,6 @@ export type PeerInfo = {
 }
 
 /**
- * Sort peers by quality, highest quality first.
- * @param peers
- * @returns peers in DESC order
- */
-export const sortByQuality = (a: PeerInfo, b: PeerInfo) => {
-  return b.quality - a.quality
-}
-
-/**
  * @param node a hopr instance
  * @param quality a float range from 0 to 1
  * @returns List of peers alongside their connection status.
@@ -87,8 +78,8 @@ export const getPeers = async (
     })
 
     return {
-      connected: connected.sort(sortByQuality),
-      announced: announced.sort(sortByQuality)
+      connected,
+      announced
     }
   } catch (error) {
     throw new Error(STATUS_CODES.UNKNOWN_FAILURE + ' ' + error.message)
@@ -157,7 +148,7 @@ const PEER_INFO_DOC: any = {
 
 GET.apiDoc = {
   description:
-    'Lists information for `connected peers` and `announced peers`, starting from highest quality to lowest.\nConnected peers are nodes which are connected to the node while announced peers are nodes which have announced to the network.\nOptionally, you can pass `quality` parameter which would filter out peers with lower quality to the one specified.',
+    'Lists information for `connected peers` and `announced peers`.\nConnected peers are nodes which are connected to the node while announced peers are nodes which have announced to the network.\nOptionally, you can pass `quality` parameter which would filter out peers with lower quality to the one specified.',
   tags: ['Node'],
   operationId: 'nodeGetPeers',
   parameters: [
