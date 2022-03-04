@@ -57,7 +57,7 @@ export const GET: Operation = [
     const { includingClosed } = req.query
 
     try {
-      const channels = await getChannels(node, !!includingClosed)
+      const channels = await getChannels(node, includingClosed === 'true')
       return res.status(200).send(channels)
     } catch (err) {
       return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
