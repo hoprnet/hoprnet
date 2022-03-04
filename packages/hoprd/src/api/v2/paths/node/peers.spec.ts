@@ -1,6 +1,5 @@
 import sinon from 'sinon'
 import assert from 'assert'
-import PeerId from 'peer-id'
 import { getPeers } from './peers'
 import { STATUS_CODES } from '../../utils'
 import {
