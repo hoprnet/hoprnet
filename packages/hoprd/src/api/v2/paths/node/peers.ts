@@ -28,6 +28,8 @@ export const getPeers = async (
   announced: PeerInfo[]
   connected: PeerInfo[]
 }> => {
+  if (isNaN(quality) || quality > 1) throw new Error(STATUS_CODES.INVALID_QUALITY)
+
   try {
     const connected = node.getConnectedPeers().reduce<PeerInfo[]>((result, peerId) => {
       try {
@@ -91,16 +93,17 @@ export const GET: Operation = [
     const { node } = req.context
     const quality = parseFloat(String(req.query.quality ?? 0))
 
-    if (quality > 1)
-      return res
-        .status(400)
-        .send({ status: STATUS_CODES.INVALID_QUALITY, error: 'Quality must be a range from 0 to 1' })
-
     try {
       const info = await getPeers(node, quality)
       return res.status(200).send(info)
     } catch (error) {
-      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
+      if (error.message.includes(STATUS_CODES.INVALID_QUALITY)) {
+        return res
+          .status(400)
+          .send({ status: STATUS_CODES.INVALID_QUALITY, error: 'Quality must be a range from 0 to 1' })
+      } else {
+        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
+      }
     }
   }
 ]

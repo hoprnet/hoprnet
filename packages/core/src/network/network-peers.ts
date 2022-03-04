@@ -156,6 +156,8 @@ class NetworkPeers {
     const peers = Array.from(this.peers.entries()).sort(([, a], [, b]) => {
       return this.qualityOf(b.id) - this.qualityOf(a.id)
     })
+    // update map with sorted peers
+    this.peers = new Map(peers)
 
     // append to output string by looping through each peer entry
     for (const [, entry] of peers) {
@@ -165,9 +167,6 @@ class NetworkPeers {
         2
       )} (backoff ${entry.backoff.toFixed()}, ${success} of ${entry.heartbeatsSent}) \n`
     }
-
-    // update map with sorted peers
-    this.peers = new Map(peers)
 
     return out
   }
