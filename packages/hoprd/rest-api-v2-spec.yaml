@@ -34,11 +34,8 @@ components:
       example:
         status: success
     Signature:
-      type: object
-      properties:
-        signature:
-          type: string
-          description: Signature from requested message.
+      type: string
+      description: Signature from requested message.
       example: '0x304402201065a95fd22fc3e48266c3b270ace032489b0177e07d33c59e0d13dccc89108402205f41fb911bcfe485a8e58162ebce90382dc96ccafff378e5c8960e07efcf9e92'
     Currency:
       type: string
@@ -49,9 +46,11 @@ components:
       example: 'NATIVE'
     NativeAddress:
       type: string
+      format: address
       description: Blockchain-native account address. Can be funded from external wallets (starts with **0x...**). It **can't be used** internally to send / receive messages, open / close payment channels.
       example: '0xEA9eDAE5CfC794B75C45c8fa89b605508A03742a'
     HoprAddress:
+      format: peerId
       type: string
       description: HOPR account address, also called a PeerId. Used to send / receive messages, open / close payment channels.
       example: '16Uiu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQxTWDcmUX5847roBar'

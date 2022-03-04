@@ -8,13 +8,13 @@ import bodyParser from 'body-parser'
 import { initialize } from 'express-openapi'
 import PeerId from 'peer-id'
 import { debug, Address } from '@hoprnet/hopr-utils'
-import { authenticateWsConnection, removeQueryParams } from './utils'
+import { authenticateWsConnection, getStatusCodeForInvalidInputInRequest, removeQueryParams } from './utils'
 
 import type { Server } from 'http'
 import type { Application, Request } from 'express'
 import type { WebSocketServer } from 'ws'
 import type Hopr from '@hoprnet/hopr-core'
-import type { StateOps } from '../types'
+import { SettingKey, StateOps } from '../types'
 import type { LogStream } from './../logs'
 
 const debugLog = debug('hoprd:api:v2')
@@ -54,6 +54,20 @@ export function setupRestApi(service: Application, urlPath: string, node: Hopr, 
     paths: apiPathsPath,
     // since we pass the spec directly we don't need to expose it via HTTP
     exposeApiDocs: false,
+    // errorTransformer: function (openapiError, ajvError) {
+    //   return {
+    //     huje: openapiError,
+    //     muje: ajvError
+    //   }
+    // },
+    errorMiddleware: function (err, req, res, next) {
+      req
+      if (err.status === 400) {
+        res.status(err.status).send({ status: getStatusCodeForInvalidInputInRequest(err.errors[0].path) })
+      } else {
+        next(err)
+      }
+    },
     // we use custom formats for particular internal data types
     customFormats: {
       peerId: (input) => {
@@ -70,8 +84,15 @@ export function setupRestApi(service: Application, urlPath: string, node: Hopr, 
         } catch (_err) {
           return false
         }
+      },
+      amount: (input) => {
+        return !isNaN(Number(input))
+      },
+      settingKey: (input) => {
+        return Object.values(SettingKey).includes(input)
       }
     },
+    // customKeywords:
     securityHandlers: {
       // TODO: We assume the handlers are always called in order. This isn't a
       // given and might change in the future. Thus, they should be made order-erindependent.
@@ -133,6 +154,8 @@ export function setupRestApi(service: Application, urlPath: string, node: Hopr, 
   service.use(urlPath, ((err, _req, res, _next) => {
     res.status(err.status).json(err)
   }) as express.ErrorRequestHandler)
+
+  return apiInstance
 }
 
 const WS_PATHS = {

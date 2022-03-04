@@ -1,5 +1,6 @@
 import cookie from 'cookie'
 import { debug } from '@hoprnet/hopr-utils'
+import { STATUS_CODES } from './v2/utils'
 
 const debugLog = debug('hoprd:api:utils')
 
@@ -66,4 +67,33 @@ export const removeQueryParams = (path: string): string => {
   let strippedPath = url.pathname
   if (strippedPath.endsWith('/')) strippedPath = strippedPath.slice(0, -1)
   return strippedPath
+}
+
+export const getStatusCodeForInvalidInputInRequest = (inputPath: string) => {
+  switch (inputPath) {
+    case 'currency':
+      return STATUS_CODES.INVALID_CURRENCY
+    case 'amount':
+      return STATUS_CODES.INVALID_AMOUNT
+    case 'recipient':
+      return STATUS_CODES.INVALID_ADDRESS
+    case 'peerId':
+      return STATUS_CODES.INVALID_PEERID
+    case 'peerId':
+    case 'peerid':
+      return STATUS_CODES.INVALID_PEERID
+    case 'peerId':
+      return STATUS_CODES.INVALID_PEERID
+    case 'setting':
+      return STATUS_CODES.INVALID_SETTING
+    case 'settingValue':
+      return STATUS_CODES.INVALID_SETTING_VALUE
+    default:
+      return 'INVALID_INPUT'
+  }
+
+  // NOTE: with this one I could probably add validation on route level and handle it as well
+  // by checking url in error middleware
+  // INVALID_SETTING
+  // INVALID_SETTING_VALUE
 }

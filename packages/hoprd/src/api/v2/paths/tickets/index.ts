@@ -3,7 +3,7 @@ import type { Ticket } from '@hoprnet/hopr-utils'
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils'
 
-export const formatTicket = (ticket: Ticket) => {
+export var formatTicket = (ticket: Ticket) => {
   return {
     counterparty: ticket.counterparty.toHex(),
     challenge: ticket.challenge.toHex(),
