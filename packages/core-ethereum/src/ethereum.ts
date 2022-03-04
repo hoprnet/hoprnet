@@ -4,9 +4,9 @@ import {
   providers,
   utils,
   errors,
-  Wallet,
   BigNumber,
   ethers,
+  type UnsignedTransaction,
   type ContractTransaction,
   type BaseContract
 } from 'ethers'
@@ -49,7 +49,6 @@ export async function createChainWrapper(
     ? new providers.StaticJsonRpcProvider(networkInfo.provider)
     : new providers.WebSocketProvider(networkInfo.provider)
   log('Provider obtained from options', provider.network)
-  const wallet = new Wallet(privateKey).connect(provider)
   const publicKey = PublicKey.fromPrivKey(privateKey)
   const address = publicKey.toAddress()
   const providerChainId = (await provider.getNetwork()).chainId
@@ -62,12 +61,12 @@ export async function createChainWrapper(
   const hoprTokenDeployment = getContractData(networkInfo.network, networkInfo.environment, 'HoprToken')
   const hoprChannelsDeployment = getContractData(networkInfo.network, networkInfo.environment, 'HoprChannels')
 
-  const token = new ethers.Contract(hoprTokenDeployment.address, hoprTokenDeployment.abi, wallet) as HoprToken
+  const token = new ethers.Contract(hoprTokenDeployment.address, hoprTokenDeployment.abi, provider) as HoprToken
 
   const channels = new ethers.Contract(
     hoprChannelsDeployment.address,
     hoprChannelsDeployment.abi,
-    wallet
+    provider
   ) as HoprChannels
 
   const genesisBlock = parseInt(hoprChannelsDeployment.blockNumber)
@@ -151,7 +150,8 @@ export async function createChainWrapper(
    */
   const sendTransaction = async <T extends BaseContract>(
     checkDuplicate: Boolean,
-    contract: T,
+    value: BigNumber | string | number,
+    contract: T | string,
     method: keyof T['functions'],
     handleTxListener: (tx: string) => DeferType<string>,
     ...rest: Parameters<T['functions'][keyof T['functions']]>
@@ -161,9 +161,12 @@ export async function createChainWrapper(
     const nonce = nonceLock.nextNonce
     let transaction: ContractTransaction
 
+    const feeData = await provider.getFeeData()
+
     log('Sending transaction %o', {
       gasLimit,
-      gasPrice,
+      maxFeePerGas: feeData.maxFeePerGas,
+      maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
       nonce
     })
 
@@ -171,8 +174,21 @@ export async function createChainWrapper(
     // https://github.com/ethers-io/ethers.js/blob/master/packages/abstract-signer/src.ts/index.ts#L122
     // 1. omit this._checkProvider("sendTransaction");
     // 2. populate transaction
-    const tx = await contract.populateTransaction[method as string](...rest)
-    const populatedTx = await wallet.populateTransaction({ ...tx, gasLimit, gasPrice, nonce })
+    const populatedTx: UnsignedTransaction = {
+      to: typeof contract === 'string' ? contract : contract.address,
+      value,
+      type: 2,
+      nonce,
+      gasLimit,
+      maxFeePerGas: feeData.maxFeePerGas,
+      maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
+      chainId: providerChainId,
+      data:
+        rest.length > 0 && typeof contract !== 'string'
+          ? contract.interface.encodeFunctionData(method as string, rest)
+          : ''
+    }
+
     const essentialTxPayload: TransactionPayload = {
       to: populatedTx.to,
       data: populatedTx.data as string,
@@ -180,32 +196,34 @@ export async function createChainWrapper(
     }
     log('essentialTxPayload %o', essentialTxPayload)
 
-    let initiatedHash: string
-    let deferredListener: DeferType<string>
-    try {
-      if (checkDuplicate) {
-        const [isDuplicate, hash] = transactions.existInMinedOrPendingWithHigherFee(essentialTxPayload, gasPrice)
-        // check duplicated pending/mined transaction against transaction manager
-        // if transaction manager has a transaction with the same payload that is mined or is pending but with
-        // a higher or equal nonce, halt.
-        log('checkDuplicate checkDuplicate=%s isDuplicate=%s with hash %s', checkDuplicate, isDuplicate, hash)
+    if (checkDuplicate) {
+      const [isDuplicate, hash] = transactions.existInMinedOrPendingWithHigherFee(essentialTxPayload, gasPrice)
+      // check duplicated pending/mined transaction against transaction manager
+      // if transaction manager has a transaction with the same payload that is mined or is pending but with
+      // a higher or equal nonce, halt.
+      log('checkDuplicate checkDuplicate=%s isDuplicate=%s with hash %s', checkDuplicate, isDuplicate, hash)
 
-        if (isDuplicate) {
-          return {
-            code: 'DUPLICATE',
-            tx: { hash }
-          }
+      if (isDuplicate) {
+        return {
+          code: 'DUPLICATE',
+          tx: { hash }
         }
-        // TODO: If the transaction manager is out of sync, check against mempool/mined blocks from provider.
       }
+      // TODO: If the transaction manager is out of sync, check against mempool/mined blocks from provider.
+    }
 
-      // 3. sign transaction
-      const signedTx = await wallet.signTransaction(populatedTx)
-      // compute tx hash and save to initiated tx list in tx manager
-      initiatedHash = utils.keccak256(signedTx)
-      transactions.addToQueuing(initiatedHash, { nonce, gasPrice }, essentialTxPayload)
-      // with let indexer to listen to the tx
-      deferredListener = handleTxListener(initiatedHash)
+    // 3. sign transaction
+    const signingKey = new utils.SigningKey(privateKey)
+    const signature = signingKey.signDigest(utils.keccak256(utils.serializeTransaction(populatedTx)))
+
+    const signedTx = utils.serializeTransaction(populatedTx, signature)
+    // compute tx hash and save to initiated tx list in tx manager
+    const initiatedHash = utils.keccak256(signedTx)
+    transactions.addToQueuing(initiatedHash, { nonce, gasPrice }, essentialTxPayload)
+    // with let indexer to listen to the tx
+    const deferredListener = handleTxListener(initiatedHash)
+
+    try {
       // 4. send transaction to our ethereum provider
       // throws various exceptions if tx gets rejected
       transaction = await provider.sendTransaction(signedTx)
@@ -300,6 +318,7 @@ export async function createChainWrapper(
     try {
       const confirmation = await sendTransaction(
         checkDuplicate,
+        0,
         channels,
         'announce',
         txHandler,
@@ -318,28 +337,14 @@ export async function createChainWrapper(
     amount: string,
     txHandler: (tx: string) => DeferType<string>
   ): Promise<string> => {
-    if (currency === 'NATIVE') {
-      const nonceLock = await nonceTracker.getNonceLock(address)
-      try {
-        // FIXME: track pending tx
-        const transaction = await wallet.sendTransaction({
-          to: recipient,
-          value: BigNumber.from(amount),
-          nonce: BigNumber.from(nonceLock.nextNonce),
-          gasPrice
-        })
-        nonceLock.releaseLock()
-        return transaction.hash
-      } catch (err) {
-        nonceLock.releaseLock()
-        throw err
-      }
-    }
-
-    // withdraw HOPR
     try {
-      const transaction = await sendTransaction(checkDuplicate, token, 'transfer', txHandler, recipient, amount)
-      return transaction.tx.hash
+      if (currency === 'NATIVE') {
+        const transaction = await sendTransaction(checkDuplicate, amount, recipient, undefined, txHandler)
+        return transaction.tx.hash
+      } else {
+        const transaction = await sendTransaction(checkDuplicate, 0, token, 'transfer', txHandler, recipient, amount)
+        return transaction.tx.hash
+      }
     } catch (error) {
       throw new Error(`Failed in sending withdraw transaction ${error}`)
     }
@@ -357,6 +362,7 @@ export async function createChainWrapper(
     try {
       const transaction = await sendTransaction(
         checkDuplicate,
+        0,
         token,
         'send',
         txHandler,
@@ -382,6 +388,7 @@ export async function createChainWrapper(
     try {
       const transaction = await sendTransaction(
         checkDuplicate,
+        0,
         token,
         'send',
         txHandler,
@@ -405,6 +412,7 @@ export async function createChainWrapper(
     try {
       const transaction = await sendTransaction(
         checkDuplicate,
+        0,
         channels,
         'finalizeChannelClosure',
         txHandler,
@@ -424,6 +432,7 @@ export async function createChainWrapper(
     try {
       const transaction = await sendTransaction(
         checkDuplicate,
+        0,
         channels,
         'initiateChannelClosure',
         txHandler,
@@ -445,6 +454,7 @@ export async function createChainWrapper(
     try {
       const transaction = await sendTransaction(
         checkDuplicate,
+        0,
         channels,
         'redeemTicket',
         txHandler,
@@ -471,6 +481,7 @@ export async function createChainWrapper(
     try {
       const transaction = await sendTransaction(
         checkDuplicate,
+        0,
         channels,
         'bumpChannel',
         txHandler,
@@ -558,7 +569,7 @@ export async function createChainWrapper(
     redeemTicket,
     getGenesisBlock: () => genesisBlock,
     setCommitment,
-    getWallet: () => wallet,
+    sendTransaction: provider.sendTransaction.bind(provider) as typeof provider['sendTransaction'],
     waitUntilReady: async () => await provider.ready,
     getLatestBlockNumber, // TODO: use indexer when it's done syncing
     subscribeBlock,

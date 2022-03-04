@@ -5,26 +5,25 @@ import { ChainWrapper, createChainWrapper } from './ethereum'
 import chalk from 'chalk'
 import {
   AcknowledgedTicket,
-  PublicKey,
   Balance,
   Address,
   NativeBalance,
   cacheNoArgAsyncFunction,
   HoprDB,
-  ChannelEntry,
   ChannelStatus,
   generateChannelId,
   Hash,
   debug,
-  DeferType,
-  privKeyToPeerId
+  privKeyToPeerId,
+  type ChannelEntry,
+  type DeferType,
+  type PublicKey
 } from '@hoprnet/hopr-utils'
 import Indexer from './indexer'
 import { CONFIRMATIONS, INDEXER_BLOCK_RANGE, PROVIDER_CACHE_TTL } from './constants'
 import { EventEmitter } from 'events'
 import { initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCommitmentInfo } from './commitment'
-import { IndexerEvents } from './indexer/types'
-import ChainWrapperSingleton from './chain'
+import type { IndexerEvents } from './indexer/types'
 
 const log = debug('hopr-core-ethereum')
 
@@ -74,33 +73,38 @@ export default class HoprCoreEthereum extends EventEmitter {
     protected automaticChainCreation = true
   ) {
     super()
+
     this.indexer = new Indexer(
       this.publicKey.toAddress(),
       this.db,
       this.options?.maxConfirmations ?? CONFIRMATIONS,
       INDEXER_BLOCK_RANGE
     )
+  }
+
+  async initializeChainWrapper() {
     // In some cases, we want to make sure the chain within the connector is not triggered
     // automatically but instead via an event. This is the case for `hoprd`, where we need
     // to get notified after ther chain was properly created, and we can't get setup the
     // listeners before the node was actually created.
-    if (automaticChainCreation) {
-      this.createChain()
+    if (this.automaticChainCreation) {
+      await this.createChain()
     } else {
-      this.once('connector:create', this.createChain)
+      this.once('connector:create', this.createChain.bind(this))
     }
   }
 
   private async createChain(): Promise<void> {
     try {
-      this.chain = await ChainWrapperSingleton.create(this.options, this.privateKey)
-      // Emit event to make sure connector is aware the chain was created properly.
-      this.emit('connector:created')
+      this.chain = await createChainWrapper(this.options, this.privateKey, true)
     } catch (err) {
       const errMsg = 'failed to create provider chain wrapper'
       log(`error: ${errMsg}`, err)
       throw Error(errMsg)
     }
+
+    // Emit event to make sure connector is aware the chain was created properly.
+    this.emit('hopr:connector:created')
   }
 
   async start(): Promise<HoprCoreEthereum> {
@@ -128,10 +132,6 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
     this.started = _start()
     return this.started
-  }
-
-  public getChain(): ChainWrapper {
-    return this.chain
   }
 
   readonly CHAIN_NAME = 'HOPR on Ethereum'
@@ -472,7 +472,6 @@ export {
   ChannelEntry,
   ChannelCommitmentInfo,
   Indexer,
-  ChainWrapperSingleton,
   ChainWrapper,
   createChainWrapper,
   initializeCommitment,

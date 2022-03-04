@@ -333,9 +333,10 @@ async function main() {
     process.exit(0)
   }
 
+  let peerId: Awaited<ReturnType<typeof getIdentity>>
   try {
     // 1. Find or create an identity
-    const peerId = await getIdentity({
+    peerId = await getIdentity({
       initialize: argv.init,
       idPath: argv.identity,
       password: argv.password,
@@ -344,17 +345,16 @@ async function main() {
     })
 
     // 2. Create node instance
-
     logs.log('Creating HOPR Node')
     node = await createHoprNode(peerId, options, false)
     logs.logStatus('PENDING')
     node.on('hopr:message', logMessageToNode)
-    node.on('hopr:connector:created', () => {
+    node.subscribeOnConnector('hopr:connector:created', () => {
       // 2.b - Connector has been created, and we can now trigger the next set of steps.
       logs.log('Connector has been loaded properly.')
       node.emit('hopr:monitoring:start')
     })
-    node.on('hopr:monitoring:start', async () => {
+    node.once('hopr:monitoring:start', async () => {
       // 3. start all monitoring services, and continue with the rest of the setup.
 
       if (argv.rest) {
@@ -413,7 +413,6 @@ async function main() {
 
     // 2.a - Setup connector listener to bubble up to node. Emit connector creation.
     logs.log(`Ready to request on-chain connector to connect to provider.`)
-    node.subscribeOnConnector('connector:created', () => node.emit('hopr:connector:created'))
     node.emitOnConnector('connector:create')
   } catch (e) {
     logs.log('Node failed to start:')
