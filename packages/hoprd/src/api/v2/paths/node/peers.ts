@@ -119,29 +119,33 @@ const PEER_INFO_DOC: any = {
       properties: {
         sent: {
           type: 'number',
-          describe: 'Heartbeats sent to the node'
+          description: 'Heartbeats sent to the node',
+          example: 10
         },
         success: {
           type: 'number',
-          describe: 'Successful heartbeats sent to the node'
+          description: 'Successful heartbeats sent to the node',
+          example: 8
         }
       }
     },
     lastSeen: {
       type: 'number',
-      describe: 'Timestamp on when the node was last seen (in milliseconds)'
+      description: 'Timestamp on when the node was last seen (in milliseconds)',
+      example: 1646410980793
     },
     quality: {
       type: 'number',
-      describe:
-        "A float between 0 (completely unreliable) and 1 (completely reliable) estimating the quality of service of a peer's network connection"
+      description:
+        "A float between 0 (completely unreliable) and 1 (completely reliable) estimating the quality of service of a peer's network connection",
+      example: 0.8
     },
     backoff: {
       type: 'number'
     },
     isNew: {
       type: 'boolean',
-      describe: 'True if the node is new (no heartbeats sent yet).'
+      description: 'True if the node is new (no heartbeats sent yet).'
     }
   }
 }
@@ -173,11 +177,11 @@ GET.apiDoc = {
             properties: {
               connected: {
                 type: 'array',
-                items: Object.assign({}, PEER_INFO_DOC)
+                items: PEER_INFO_DOC
               },
               announced: {
                 type: 'array',
-                items: Object.assign({}, PEER_INFO_DOC)
+                items: PEER_INFO_DOC
               }
             }
           }
@@ -185,7 +189,7 @@ GET.apiDoc = {
       }
     },
     '400': {
-      description: `Invalid input. One of the parameters passed is in incorrect format.`,
+      description: `Invalid input. One of the parameters passed is in an incorrect format.`,
       content: {
         'application/json': {
           schema: {
