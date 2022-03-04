@@ -267,7 +267,15 @@ class Indexer extends EventEmitter {
           success: false
         }
       }
-      rawEvents.push(...tmpEvents)
+
+      for (const event of tmpEvents) {
+        Object.assign(event, query.contract.interface.parseLog(event))
+
+        if (event.event == undefined) {
+          Object.assign(event, { event: (event as any).name })
+        }
+        rawEvents.push(event)
+      }
     }
 
     // sort in-place
@@ -275,15 +283,7 @@ class Indexer extends EventEmitter {
 
     return {
       success: true,
-      events: rawEvents.map((event) => {
-        Object.assign(event, this.chain.getChannels().interface.parseLog(event))
-
-        if (event.event == undefined) {
-          Object.assign(event, { event: (event as any).name })
-          return event
-        }
-        return event
-      })
+      events: rawEvents
     }
   }
 
