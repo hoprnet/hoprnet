@@ -14,7 +14,7 @@ import {
   getNodeInfo, getNodeVer, getSettings, getTickets, pingNodePeer, redeemTickets, sendMessage,
   setAliases, setChannels, signAddress
 } from './fetch'
-// import ListCommands from '../lib/commands/listCommands'
+
 
 const MAX_MESSAGES_CACHED = 50
 
@@ -193,9 +193,8 @@ export class Connection {
                 // TODO: See https://github.com/hoprnet/hoprnet/pull/3617
                 break
               case "help":
-                client.send("help")
-                // const listcmd = ListCommands()
-                // listcmd.execute()
+                // client.send("help")
+                // const test = new Commands()
                 break
               default:
                 console.log("Command not found.")
