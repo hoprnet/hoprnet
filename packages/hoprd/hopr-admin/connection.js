@@ -14,6 +14,7 @@ import {
   getNodeInfo, getNodeVer, getSettings, getTickets, pingNodePeer, redeemTickets, sendMessage,
   setAliases, setChannels, signAddress
 } from './fetch'
+import { Commands } from './commands'
 
 
 const MAX_MESSAGES_CACHED = 50
@@ -117,6 +118,8 @@ export class Connection {
             if (userInput.query != '') {
               options = userInput.query.trim().split(/\s+/)
             }
+
+            const cmds = new Commands();
             switch (userInput.cmd) {
               // Test cmd: withdraw 1337 NATIVE 0xEA9eDAE5CfC794B75C45c8fa89b605508A03742a
               case "withdraw":
@@ -127,10 +130,11 @@ export class Connection {
                 })
                 break
               case "balance":
-                getBalances().then(balances => {
-                  this.logs.push({type: "log", msg: `${balances.native}`, ts: ""})
-                  this.setMessages(this.logs.slice(0)) // Need a clone
-                })
+                // getBalances().then(balances => {
+                //   this.logs.push({type: "log", msg: `${balances.native}`, ts: ""})
+                //   this.setMessages(this.logs.slice(0)) // Need a clone
+                // })
+                cmds.execute('dfd', text);
                 break
               case "address":
                 getAddresses()
@@ -194,7 +198,6 @@ export class Connection {
                 break
               case "help":
                 // client.send("help")
-                // const test = new Commands()
                 break
               default:
                 console.log("Command not found.")

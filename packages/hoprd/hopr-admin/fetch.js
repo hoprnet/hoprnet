@@ -1,3 +1,7 @@
+/*
+ * Single file for re-usability purposes of API in hopr-admin
+ */
+
 import { getReq, postReq, delReq } from './client'
 
 /*
