@@ -24,6 +24,7 @@ import { CONFIRMATIONS, INDEXER_BLOCK_RANGE, PROVIDER_CACHE_TTL } from './consta
 import { EventEmitter } from 'events'
 import { initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCommitmentInfo } from './commitment'
 import type { IndexerEvents } from './indexer/types'
+import BN from 'bn.js'
 
 const log = debug('hopr-core-ethereum')
 
@@ -386,7 +387,7 @@ export default class HoprCoreEthereum extends EventEmitter {
         }
       }
 
-      receipt = await this.chain.redeemTicket(counterparty.toAddress(), ackTicket, ticket, (txHash: string) =>
+      receipt = await this.chain.redeemTicket(counterparty.toAddress(), ackTicket, (txHash: string) =>
         this.setTxHandler(`channel-updated-${txHash}`, txHash)
       )
     } catch (err) {
@@ -442,8 +443,12 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (myBalance.lt(amount)) {
       throw Error('We do not have enough balance to open a channel')
     }
-    await this.chain.openChannel(this.publicKey.toAddress(), dest.toAddress(), amount, (txHash: string) =>
-      this.setTxHandler(`channel-updated-${txHash}`, txHash)
+    await this.chain.fundChannel(
+      this.publicKey.toAddress(),
+      dest.toAddress(),
+      amount,
+      new Balance(new BN(0)),
+      (txHash: string) => this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
     return generateChannelId(this.publicKey.toAddress(), dest.toAddress())
   }
