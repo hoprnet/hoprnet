@@ -2,7 +2,7 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
-import { createTestApiInstance, testAlias, testEthAddress, testPeerId } from '../../fixtures'
+import { createTestApiInstance, testAlias, testPeerId } from '../../fixtures'
 import { STATUS_CODES } from '../../utils'
 
 let node = sinon.fake() as any

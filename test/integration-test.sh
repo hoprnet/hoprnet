@@ -65,8 +65,7 @@ send_message(){
   local step_time=${6:-25}
   local end_time_ns=${7:-0}
   # no timeout set since the test execution environment should cancel the test if it takes too long
-  # -o /dev/null -w %{http_code}
-  local cmd="curl -m ${step_time} --connect-timeout ${step_time} -s -H X-Auth-Token:${api_token} -H Content-Type:application/json --url ${endpoint}/api/v2/messages -w %{http_code} -o /dev/null -d "
+  local cmd="curl -m ${step_time} --connect-timeout ${step_time} -s -H X-Auth-Token:${api_token} -H Content-Type:application/json --url ${endpoint}/api/v2/messages -o /dev/null -w %{http_code} -d "
 
   # if no end time was given we need to calculate it once
   if [ ${end_time_ns} -eq 0 ]; then
@@ -317,13 +316,13 @@ set_setting() {
   local key="${2}"
   local value="${3}"
 
-  result=$(run_command ${node_api} "/settings" "GET" "{\"key\": \"${key}\", \"value\": \"${value}\"}" "" 600)
+  result=$(run_command ${node_api} "/settings/${key}" "PUT" "{\"settingValue\": \"${value}\"}" "" 600)
   echo "${result}"
 }
 
 redeem_tickets_in_channel() {
   local node_api="${1}"
-  local peer_id=${2}
+  local peer_id="${2}"
 
   result=$(run_command ${node_api} "/channels/${peer_id}/tickets/redeem" "POST" "" "" 600)
   echo "${result}"
@@ -331,9 +330,10 @@ redeem_tickets_in_channel() {
 
 get_tickets_in_channel() {
   local node_api="${1}"
-  local peer_id=${2}
+  local peer_id="${2}"
+  local assertion="${3:-"counterparty"}"
 
-  result=$(run_command ${node_api} "/channels/${peer_id}/tickets" "GET" "" "counterparty" 600)
+  result=$(run_command ${node_api} "/channels/${peer_id}/tickets" "GET" "" "${assertion}" 600)
   echo "${result}"
 }
 
@@ -425,16 +425,15 @@ test_aliases() {
   remove_alias ${node_api} "Alice"
   aliases=$(get_aliases ${node_api} "\"me\"")
   [[ "${aliases}" == *"Alice"* ]] && { msg "Alias removal failed: ${aliases}"; exit 1; }
+  echo ${aliases}
 }
 
 test_aliases ${api1} ${addr2}
 
-
-
-# # NO APIv2 ENDPOINT EQUIVALENT
-# log "Check peers"
-# result=$(run_command ${api1} "peers" 'peers have announced themselves' 600)
-# log "-- ${result}"
+# NO APIv2 ENDPOINT EQUIVALENT
+log "Check peers"
+result=$(run_command ${api1} "peers" 'peers have announced themselves' 600)
+log "-- ${result}"
 
 for node in ${addr2} ${addr3} ${addr4} ${addr5}; do
   log "Node 1 ping other node ${node}"
@@ -522,7 +521,7 @@ for i in `seq 1 10`; do
   send_message "${api5}" "${addr2}" 'hello, world' "${addr1}" 
 done
 
-# for the last send tests we use Rest API v2 instead of the older command-based Rest API v1
+for the last send tests we use Rest API v2 instead of the older command-based Rest API v1
 
 for i in `seq 1 10`; do
   log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4"
@@ -534,7 +533,42 @@ for i in `seq 1 10`; do
   send_message "${api1}" "${addr5}" "hello, world" "" 
 done
 
-# TODO: test ticket redemption on specific channel here
+# PROBLEM HERE
+# test_redeem_in_specific_channel() {
+#   local node_id="${1}"
+#   local second_node_id="${2}"
+#   local node_api="${3}"
+#   local second_node_api="${4}"
+
+#   peer_id=$(get_hopr_address ${api_token}@${node_api})
+#   second_peer_id=$(get_hopr_address ${api_token}@${second_node_api})
+
+#   open_channel ${node_id} ${second_node_id} ${node_api} ${second_peer_id}
+
+#   sleep 20
+
+#   for i in `seq 1 3`; do
+#     log "Node ${node_id} send 1 hop message to self via node ${second_node_id}"
+#     send_message "${node_api}" "${peer_id}" "hello, world" "${second_peer_id}" 
+#   done
+
+#   initial_all_tickets_amount=$(get_tickets_statistics ${node_api} "winProportion" | jq -r .unredeemed)
+
+#   ticket_amount=$(get_tickets_in_channel ${second_node_api} ${peer_id} | jq '. | length')
+#   [[ "${ticket_amount}" != "3" ]] && { msg "Ticket ammount is different than expected: ${ticket_amount} != 3"; exit 1; }
+
+#   redeem_tickets_in_channel ${second_node_api} ${peer_id}  
+
+#   get_tickets_in_channel ${second_node_api} ${peer_id} "TICKETS_NOT_FOUND"
+
+#   all_tickets_amount=$(get_tickets_statistics ${node_api} "winProportion" | jq -r .unredeemed)
+#   [[ "${all_tickets_amount}" != $((${initial_all_tickets_amount}-3)) ]] && { msg "Amount of tickets after redemption doesn't add up: ${all_tickets_amount} != ${initial_all_tickets_amount} - 3"; exit 1; }
+
+#   close_channel "1" "3" ${node_api} ${second_peer_id}
+#   echo "all good"
+# }
+
+# test_redeem_in_specific_channel "1" "3" ${api1} ${api3}
 
 redeem_tickets "2" "${api2}" &
 redeem_tickets "3" "${api2}" &
@@ -579,3 +613,24 @@ test_get_all_channels() {
 }
 
 test_get_all_channels ${api1}
+
+test_strategy_setting() {
+  local node_api="${1}"
+
+  settings=$(get_settings ${node_api})
+  strategy=$(echo ${settings} | jq -r .strategy)
+  [[ "${strategy}" != "passive" ]] && { msg "Default strategy should be passive, got: ${strategy}"; exit 1; }
+
+  channels=$(get_all_channels ${node_api} false)
+  [[ "${channels}" == *"channelId"* ]] && { msg "To test strategy setting all channels must be closed: ${channels}"; exit 1; }
+
+  set_setting ${node_api} "strategy" "promiscuous"
+
+  log "Waiting 100 seconds for the node to make connections to other nodes"
+  sleep 100
+
+  channels=$(get_all_channels ${node_api} false)
+  [[ "${channels}" != *"channelId"* ]] && { msg "Node didn't open any connections by itself even when strategy was set to promiscuous: ${channels}"; exit 1; }
+}
+
+test_strategy_setting ${api1}
