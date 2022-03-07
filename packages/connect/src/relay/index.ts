@@ -6,12 +6,7 @@ import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
 import { type Multiaddr } from 'multiaddr'
 import type { Address } from 'libp2p/src/peer-store/address-book'
 
-import type {
-  Stream,
-  HoprConnectOptions,
-  HoprConnectDialOptions,
-  HoprConnectTestingOptions
-} from '../types'
+import type { Stream, HoprConnectOptions, HoprConnectDialOptions, HoprConnectTestingOptions } from '../types'
 
 import { AbortError } from 'abortable-iterator'
 import debug from 'debug'

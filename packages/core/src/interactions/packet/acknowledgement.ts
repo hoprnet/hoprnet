@@ -107,7 +107,7 @@ async function handleAcknowledgement(
   onWinningTicket(ack)
 }
 
-export function subscribeToAcknowledgements(
+export async function subscribeToAcknowledgements(
   subscribe: Subscribe,
   db: HoprDB,
   pubKey: PeerId,

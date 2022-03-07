@@ -24,9 +24,14 @@ export class PacketForwardInteraction {
     private protocolAck: string
   ) {
     this.mixer = new Mixer(this.handleMixedPacket.bind(this))
-    await this.subscribe(protocolMsg, this.handlePacket.bind(this), false, (err: any) => {
-      error(`Error while receiving packet`, err)
-    })
+  }
+
+  private errHandler(err: any) {
+    error(`Error while receiving packet`, err)
+  }
+
+  async start() {
+    await this.subscribe(this.protocolMsg, this.handlePacket.bind(this), false, this.errHandler)
   }
 
   async interact(counterparty: PeerId, packet: Packet): Promise<void> {

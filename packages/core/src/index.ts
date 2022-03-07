@@ -1,5 +1,14 @@
 import { setImmediate } from 'timers/promises'
-import { type default as LibP2P, type Connection } from 'libp2p'
+import EventEmitter from 'events'
+
+import all from 'it-all'
+import { protocols, Multiaddr } from 'multiaddr'
+import chalk from 'chalk'
+
+import type BN from 'bn.js'
+import type { default as LibP2P, Connection } from 'libp2p'
+import type { Peer } from 'libp2p/src/peer-store/types'
+import type PeerId from 'peer-id'
 
 import type { HoprConnectConfig } from '@hoprnet/hopr-connect'
 
@@ -9,10 +18,6 @@ import NetworkPeers from './network/network-peers'
 import Heartbeat, { type HeartbeatPingResult } from './network/heartbeat'
 import { findPath } from './path'
 
-import { protocols, Multiaddr } from 'multiaddr'
-import chalk from 'chalk'
-
-import type PeerId from 'peer-id'
 import {
   PublicKey,
   Balance,
@@ -41,9 +46,7 @@ import {
   createRelayerKey
 } from '@hoprnet/hopr-utils'
 import { type default as HoprCoreEthereum, type Indexer } from '@hoprnet/hopr-core-ethereum'
-import type BN from 'bn.js'
 
-import EventEmitter from 'events'
 import {
   ChannelStrategy,
   PassiveStrategy,
@@ -240,7 +243,7 @@ class Hopr extends EventEmitter {
       protocol: string,
       handler: LibP2PHandlerFunction<Promise<void | Uint8Array>>,
       includeReply: boolean,
-      errHandler: (err: any) => Promise<void>
+      errHandler: (err: any) => void
     ) => libp2pSubscribe(this.libp2p, protocol, handler, errHandler, includeReply)) as Subscribe
 
     const sendMessage = ((dest: PeerId, protocol: string, msg: Uint8Array, includeReply: boolean, opts: DialOpts) =>
@@ -248,8 +251,9 @@ class Hopr extends EventEmitter {
     const hangup = this.libp2p.hangUp.bind(this.libp2p)
 
     // Attach network health measurement functionality
+    const peers: Peer[] = await all(this.libp2p.peerStore.getPeers())
     this.networkPeers = new NetworkPeers(
-      Array.from(this.libp2p.peerStore.peers.values()).map((x) => x.id),
+      peers.map((p) => p.id),
       [this.id],
       (peer: PeerId) => this.publicNodesEmitter.emit('removePublicNode', peer)
     )
@@ -263,7 +267,7 @@ class Hopr extends EventEmitter {
     const protocolAck = `/hopr/${this.environment.id}/ack`
 
     // Attach mixnet functionality
-    subscribeToAcknowledgements(
+    await subscribeToAcknowledgements(
       subscribe,
       this.db,
       this.getId(),
@@ -285,6 +289,7 @@ class Hopr extends EventEmitter {
       protocolMsg,
       protocolAck
     )
+    await this.forward.start()
 
     // Attach socket listener and check availability of entry nodes
     await this.libp2p.start()
@@ -311,7 +316,7 @@ class Hopr extends EventEmitter {
     this.setChannelStrategy(this.options.strategy || new PassiveStrategy())
 
     log('announcing done, starting heartbeat & strategy interval')
-    this.heartbeat.start()
+    await this.heartbeat.start()
     this.startPeriodicStrategyCheck()
 
     this.status = 'RUNNING'
@@ -573,7 +578,7 @@ class Hopr extends EventEmitter {
       return this.libp2p.multiaddrs
     }
 
-    const knownAddresses = this.libp2p.peerStore.get(peer)?.addresses?.map((addr) => addr.multiaddr) ?? []
+    const knownAddresses = await this.getObservedAddresses(peer)
 
     try {
       for await (const relayer of this.libp2p.contentRouting.findProviders(await createRelayerKey(peer), {
@@ -602,8 +607,10 @@ class Hopr extends EventEmitter {
    * Gets the observed addresses of a given peer.
    * @param peer peer to query for
    */
-  public getObservedAddresses(peer: PeerId): Multiaddr[] {
-    return (this.libp2p.peerStore.get(peer)?.addresses ?? []).map((addr) => addr.multiaddr)
+  public async getObservedAddresses(peer: PeerId): Promise<Multiaddr[]> {
+    const addresses = await this.libp2p.peerStore.addressBook.get(peer)
+    const multiAddresses = addresses.map((addr) => addr.multiaddr)
+    return multiAddresses
   }
 
   /**

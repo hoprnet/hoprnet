@@ -75,22 +75,22 @@ function getPeerStore() {
 
   return {
     addressBook: {
-    add: async (peerId: PeerId, multiaddrs: Multiaddr[]): Promise<void> => {
-      const addresses = peerStore.get(peerId) ?? new Set<Address>()
-      for (const address of multiaddrs) {
-        addresses.add({ multiaddr: address, isCertified: true})
+      add: async (peerId: PeerId, multiaddrs: Multiaddr[]): Promise<void> => {
+        const addresses = peerStore.get(peerId) ?? new Set<Address>()
+        for (const address of multiaddrs) {
+          addresses.add({ multiaddr: address, isCertified: true })
+        }
+        peerStore.set(peerId, addresses)
+      },
+      get: async (peerId: PeerId): Promise<Address[]> => {
+        // Make sure that Typescript does not build unit test if Libp2p API changes.
+        const addresses: Set<Address> = peerStore.get(peerId) ?? new Set<Address>()
+        const result: Address[] = []
+        for (const address of addresses.values()) {
+          result.push(address)
+        }
+        return result
       }
-      peerStore.set(peerId, addresses)
-    },
-    get: async (peerId: PeerId): Promise<Address[]> => {
-      // Make sure that Typescript does not build unit test if Libp2p API changes.
-      const addresses: Set<Address> = peerStore.get(peerId) ?? new Set<Address>()
-      const result: Address[] = []
-      for (const address of addresses.values()) {
-        result.push(address)
-      }
-      return result
-    }
     }
   }
 }

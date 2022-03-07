@@ -38,7 +38,7 @@ export default class Heartbeat {
 
   constructor(
     private networkPeers: NetworkPeerStore,
-    subscribe: Subscribe,
+    private subscribe: Subscribe,
     protected sendMessage: SendMessage,
     private hangUp: (addr: PeerId) => Promise<void>,
     environmentId: string,
@@ -52,16 +52,16 @@ export default class Heartbeat {
       heartbeatVariance: config?.heartbeatVariance ?? HEARTBEAT_INTERVAL_VARIANCE,
       maxParallelHeartbeats: config?.maxParallelHeartbeats ?? MAX_PARALLEL_HEARTBEATS
     }
-    const errHandler = (err: any) => {
-      error(`Error while processing heartbeat request`, err)
-    }
-
     this.protocolHeartbeat = `/hopr/${environmentId}/heartbeat`
-
-    await subscribe(this.protocolHeartbeat, this.handleHeartbeatRequest.bind(this), true, errHandler)
   }
 
-  public start() {
+  private errHandler(err: any) {
+    error(`Error while processing heartbeat request`, err)
+  }
+
+  public async start() {
+    await this.subscribe(this.protocolHeartbeat, this.handleHeartbeatRequest.bind(this), true, this.errHandler)
+
     this._pingNode = this.pingNode.bind(this)
     this.startHeartbeatInterval()
     log(`Heartbeat started`)

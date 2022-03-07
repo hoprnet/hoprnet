@@ -10,7 +10,14 @@ import type Libp2p from 'libp2p'
 import { randomBytes } from 'crypto'
 import { toU8aStream, encodeWithLengthPrefix, decodeWithLengthPrefix, eagerIterator } from '../utils'
 import abortable from 'abortable-iterator'
-import type { Stream, StreamResult, StreamType, HoprConnectDialOptions } from '../types'
+import type {
+  StreamSink,
+  StreamResult,
+  StreamType,
+  StreamSource,
+  StreamSourceAsync,
+  HoprConnectDialOptions
+} from '../types'
 import assert from 'assert'
 
 const DEBUG_PREFIX = `hopr-connect`
@@ -27,9 +34,9 @@ export enum MigrationStatus {
   DONE
 }
 
-function getAbortableSource(source: Stream['source'], signal?: AbortSignal) {
+function getAbortableSource(source: StreamSource, signal?: AbortSignal) {
   if (signal != undefined) {
-    source = abortable(source, signal) as Stream['source']
+    source = abortable(source, signal) as StreamSource
   }
 
   return source
@@ -42,7 +49,7 @@ function getAbortableSource(source: Stream['source'], signal?: AbortSignal) {
 class WebRTCConnection implements MultiaddrConnection {
   private _switchPromise: DeferType<void>
   private _sinkSourceAttached: boolean
-  private _sinkSourceAttachedPromise: DeferType<Stream['source']>
+  private _sinkSourceAttachedPromise: DeferType<StreamSource>
   private _webRTCHandshakeFinished: boolean
   private _webRTCAvailable: boolean
   private webRTCHandshakeTimeout?: NodeJS.Timeout
@@ -54,9 +61,8 @@ class WebRTCConnection implements MultiaddrConnection {
   public remoteAddr: MultiaddrConnection['remoteAddr']
   public localAddr: MultiaddrConnection['localAddr']
 
-  // @ts-ignore
-  public sink: Stream['sink']
-  public source: Stream['source']
+  public sink: StreamSink
+  public source: StreamSourceAsync
 
   public conn: RelayConnection | SimplePeer
 
@@ -76,7 +82,7 @@ class WebRTCConnection implements MultiaddrConnection {
     this.destroyed = false
     this._switchPromise = defer<void>()
     this._sinkSourceAttached = false
-    this._sinkSourceAttachedPromise = defer<Stream['source']>()
+    this._sinkSourceAttachedPromise = defer<StreamSource>()
     this._webRTCHandshakeFinished = false
     this._webRTCAvailable = false
 
@@ -110,10 +116,11 @@ class WebRTCConnection implements MultiaddrConnection {
       }
     })
 
+    // @ts-ignore
     this.source = getAbortableSource(this.createSource(), this.options?.signal)
 
     let sinkCreator: Promise<void>
-    this.sink = (source: Stream['source']) => {
+    this.sink = (source: StreamSource) => {
       let deferred = defer<void>()
       sinkCreator.catch(deferred.reject)
       this._sinkSourceAttached = true
@@ -214,7 +221,7 @@ class WebRTCConnection implements MultiaddrConnection {
    * until WebRTC connection is available.
    */
   private async sinkFunction(): Promise<void> {
-    type SinkType = Stream['source'] | StreamResult | void
+    type SinkType = StreamSource | StreamResult | void
 
     let source: AsyncIterator<StreamType> | undefined
     let sourcePromise: Promise<StreamResult> | void
@@ -233,7 +240,7 @@ class WebRTCConnection implements MultiaddrConnection {
           // this is important for sending webrtc signalling messages
           // even before payload messages are ready to send
           eagerIterator(
-            async function* (this: WebRTCConnection): Stream['source'] {
+            async function* (this: WebRTCConnection): StreamSource {
               let webRTCFinished = false
 
               let result: SinkType
@@ -347,7 +354,7 @@ class WebRTCConnection implements MultiaddrConnection {
       }
 
       await toIterable.sink(this.channel)(
-        async function* (this: WebRTCConnection): Stream['source'] {
+        async function* (this: WebRTCConnection): StreamSource {
           let result: SinkType
 
           while (true) {
@@ -392,7 +399,7 @@ class WebRTCConnection implements MultiaddrConnection {
    * until a DONE is received. If a direct WebRTC connection is
    * available, yield messages from WebRTC instance
    */
-  private async *createSource(): Stream['source'] {
+  private async *createSource(): StreamSource {
     for await (const msg of this.relayConn.source) {
       if (msg.length == 0) {
         continue

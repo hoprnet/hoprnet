@@ -48,10 +48,12 @@ export interface PublicNodesEmitter {
 
 export type StreamType = BufferList | Uint8Array
 
-export type StreamSource<T = StreamType> = AsyncIterable<T>
+export type StreamSourceAsync<T = StreamType> = AsyncIterable<T>
+export type StreamSource<T = StreamType> = AsyncIterable<T> | Iterable<T>
+export type StreamSink<T = StreamType> = (source: StreamSource<T>) => Promise<void>
 
 export type Stream<T = StreamType> = {
-  sink: (source: StreamSource<T>) => Promise<void>
+  sink: StreamSink<T>
   source: StreamSource<T>
 }
 

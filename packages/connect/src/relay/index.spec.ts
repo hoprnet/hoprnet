@@ -78,14 +78,14 @@ function getPeer(peerId: PeerId, network: EventEmitter) {
       },
       peerStore: {
         addressBook: {
-        get: async (peer: PeerId): Promise<Address[]> => {
-          return [
+          get: async (peer: PeerId): Promise<Address[]> => {
+            return [
               {
                 multiaddr: new Multiaddr(`/ip4/127.0.0.1/tcp/1/p2p/${peer.toB58String()}`),
                 isCertified: true
               }
             ]
-        }
+          }
         }
       },
       dialer: {} as any,

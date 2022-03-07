@@ -1,9 +1,12 @@
-import type LibP2P from 'libp2p'
-import PeerStore from 'libp2p/src/peer-store'
-import AddressManager from 'libp2p/src/address-manager'
-import { debug } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'
+import PeerStore from 'libp2p/src/peer-store'
+import AddressManager from 'libp2p/src/address-manager'
+import { MemoryDatastore } from 'datastore-core/memory'
+
+import { debug } from '@hoprnet/hopr-utils'
+
+import type LibP2P from 'libp2p'
 
 function createLibp2pMock(peerId: PeerId): LibP2P {
   const libp2pLogger = debug(`hopr:mocks:libp2p`)
@@ -37,7 +40,9 @@ function createLibp2pMock(peerId: PeerId): LibP2P {
     libp2pLogger(`Connection manager event handler called with event "${event}"`)
     return libp2p.connectionManager
   }
-  libp2p.peerStore = new PeerStore({ peerId })
+  const datastore = new MemoryDatastore()
+  const addressFilter = async () => Promise.resolve(true)
+  libp2p.peerStore = new PeerStore({ peerId, datastore, addressFilter })
   libp2p.addressManager = new AddressManager(peerId, {
     announce: [new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${peerId.toB58String()}`).toString()]
   })

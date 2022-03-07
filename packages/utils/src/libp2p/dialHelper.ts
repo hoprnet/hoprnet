@@ -229,7 +229,7 @@ async function doDial(
   const dhtResult = await queryDHT(libp2p, destination, opts)
 
   if (dhtResult.status !== InternalDialStatus.CONTINUE) {
-  knownAddresses = await libp2p.peerStore.addressBook.get(destination)
+    knownAddresses = await libp2p.peerStore.addressBook.get(destination)
 
     printPeerStoreAddresses(
       `Direct dial attempt to ${destination.toB58String()} failed and DHT query has not brought any new addresses. Giving up`,
@@ -249,7 +249,7 @@ async function doDial(
 
   // Only start a dial attempt if we have received new addresses
   if (newAddresses == 0) {
-  knownAddresses = await libp2p.peerStore.addressBook.get(destination)
+    knownAddresses = await libp2p.peerStore.addressBook.get(destination)
 
     printPeerStoreAddresses(
       `Querying the DHT for ${green(destination.toB58String())} did not lead to any new addresses. Giving up.`,

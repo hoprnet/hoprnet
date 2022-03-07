@@ -1,6 +1,6 @@
 import { Multiaddr } from 'multiaddr'
 import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
-import type { Stream, StreamResult, StreamType } from '../types'
+import type { Stream, StreamSink, StreamSource, StreamSourceAsync, StreamResult, StreamType } from '../types'
 import { randomBytes } from 'crypto'
 import { RelayPrefix, ConnectionStatusMessages, StatusMessages } from '../constants'
 import { u8aEquals, u8aToHex, defer, type DeferType } from '@hoprnet/hopr-utils'
@@ -11,7 +11,7 @@ import type PeerId from 'peer-id'
 
 import Debug from 'debug'
 import { EventEmitter } from 'events'
-import { toU8aStream, eagerIterator } from '../utils'
+import { toU8aStream } from '../utils'
 import assert from 'assert'
 
 const DEBUG_PREFIX = 'hopr-connect'
@@ -84,7 +84,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   private _id: string
 
   // Mutexes
-  private _sinkSourceAttachedPromise: DeferType<Stream['source']>
+  private _sinkSourceAttachedPromise: DeferType<StreamSource>
   private _sinkSwitchPromise: DeferType<void>
   private _sourceSwitchPromise: DeferType<void>
   private _migrationDone: DeferType<void> | undefined
@@ -103,8 +103,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
   private _counterparty: PeerId
 
-  public source: Stream['source']
-  public sink: Stream['sink']
+  public source: StreamSourceAsync
+  public sink: StreamSink
 
   public conn: Stream
 
@@ -153,7 +153,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     this._streamClosed = false
 
     this._closePromise = defer<void>()
-    this._sinkSourceAttachedPromise = defer<Stream['source']>()
+    this._sinkSourceAttachedPromise = defer<StreamSource>()
     this._destroyedPromise = defer<void>()
     this._statusMessagePromise = defer<void>()
     this._sinkSwitchPromise = defer<void>()
@@ -166,7 +166,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     // Auto-start sink stream and declare variable in advance
     // to make sure we can attach an error handler to it
     let sinkCreator: Promise<void>
-    this.sink = async (source: Stream['source']) => {
+    this.sink = async (source: StreamSource) => {
       if (this._migrationDone != undefined) {
         await this._migrationDone.promise
       }
@@ -303,8 +303,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
    * and control messages.
    * Once a source is attached, forward the messages from the source to the relay.
    */
-  private async *sinkFunction(): Stream['source'] {
-    type SinkType = Stream['source'] | StreamResult | undefined | void
+  private async *sinkFunction(): StreamSource {
+    type SinkType = StreamSource | StreamResult | undefined | void
 
     let currentSource: AsyncIterator<StreamType> | undefined
     let streamPromise: Promise<StreamResult> | undefined
@@ -367,7 +367,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
         // Make sure that we don't create hanging promises
         this._sinkSourceAttachedPromise.resolve()
-        this._sinkSourceAttachedPromise = defer<Stream['source']>()
+        this._sinkSourceAttachedPromise = defer<StreamSource>()
         result = undefined
         currentSource = undefined
         streamPromise = undefined
@@ -587,7 +587,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       }
     }.call(this)
 
-    return eagerIterator(iterator)
+    return iterator
   }
 
   /**

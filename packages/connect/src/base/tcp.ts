@@ -15,15 +15,15 @@ import type { Multiaddr } from 'multiaddr'
 import toIterable from 'stream-to-it'
 import { toU8aStream } from '../utils'
 import type PeerId from 'peer-id'
-import type { Stream, StreamType, HoprConnectDialOptions } from '../types'
+import type { Stream, StreamSink, StreamSource, StreamSourceAsync, StreamType, HoprConnectDialOptions } from '../types'
 
 /**
  * Class to encapsulate TCP sockets
  */
 class TCPConnection implements MultiaddrConnection {
   public localAddr: Multiaddr
-  public sink: Stream['sink']
-  public source: Stream['source']
+  public sink: StreamSink
+  public source: StreamSourceAsync
 
   private _stream: Stream
 
@@ -54,10 +54,8 @@ class TCPConnection implements MultiaddrConnection {
 
     this.sink = this._sink.bind(this)
 
-    this.source =
-      this._signal != undefined
-        ? (abortable(this._stream.source, this._signal) as Stream['source'])
-        : this._stream.source
+    // @ts-ignore
+    this.source = this._signal != undefined ? abortable(this._stream.source, this._signal) : this._stream.source
   }
 
   public close(): Promise<void> {
@@ -115,11 +113,11 @@ class TCPConnection implements MultiaddrConnection {
     })
   }
 
-  private async _sink(source: Stream['source']): Promise<void> {
+  private async _sink(source: StreamSource): Promise<void> {
     const u8aStream = toU8aStream(source)
     try {
       await this._stream.sink(
-        this._signal != undefined ? (abortable(u8aStream, this._signal) as Stream['source']) : u8aStream
+        this._signal != undefined ? (abortable(u8aStream, this._signal) as StreamSource) : u8aStream
       )
     } catch (err: any) {
       // If aborted we can safely ignore
