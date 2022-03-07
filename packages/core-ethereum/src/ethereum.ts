@@ -29,6 +29,7 @@ import { TX_CONFIRMATION_WAIT } from './constants'
 import type { Block } from '@ethersproject/abstract-provider'
 
 const log = debug('hopr:core-ethereum:ethereum')
+const abiCoder = new utils.AbiCoder()
 
 export type Receipt = string
 export type ChainWrapper = Awaited<ReturnType<typeof createChainWrapper>>
@@ -387,12 +388,10 @@ export async function createChainWrapper(
         txHandler,
         channels.address,
         totalFund.toString(),
-        channels.interface.encodeFunctionData('fundChannelMulti', [
-          partyA.toHex(),
-          partyB.toHex(),
-          fundsA.toBN().toString(),
-          fundsB.toBN().toString()
-        ])
+        abiCoder.encode(
+          ['address', 'address', 'uint256', 'uint256'],
+          [partyA.toHex(), partyB.toHex(), fundsA.toBN().toString(), fundsB.toBN().toString()]
+        )
       )
       return transaction.tx.hash
     } catch (error) {
