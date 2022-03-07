@@ -175,6 +175,10 @@ export async function createHoprNode(
     },
     automaticChainCreation
   )
+
+  // Initialize connection to the blockchain
+  await chain.initializeChainWrapper()
+
   const node = new Hopr(peerId, db, chain, options)
   return node
 }

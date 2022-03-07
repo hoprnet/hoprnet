@@ -27,9 +27,9 @@ import {
 import type { ChainWrapper } from '../ethereum'
 import type { Event, EventNames, IndexerEvents, TokenEvent, TokenEventNames } from './types'
 import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils'
-import { errors } from 'ethers'
+import { Contract, errors } from 'ethers'
 import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants'
-import type { TypedEvent } from '@hoprnet/hopr-ethereum'
+import type { TypedEvent, TypedEventFilter } from '@hoprnet/hopr-ethereum'
 
 const log = debug('hopr-core-ethereum:indexer')
 const verbose = debug('hopr-core-ethereum:verbose:indexer')
@@ -49,8 +49,6 @@ class Indexer extends EventEmitter {
 
   // Use FIFO + sliding window for many events
   private unconfirmedEvents: FIFO<TypedEvent<any, any>>
-  // Use associative array for rare events
-  private unconfirmedTokenEvents: { [index: number]: TokenEvent<'Transfer'>[] }
 
   private chain: ChainWrapper
   private genesisBlock: number
@@ -68,7 +66,6 @@ class Indexer extends EventEmitter {
     super()
 
     this.unconfirmedEvents = FIFO<TypedEvent<any, any>>()
-    this.unconfirmedTokenEvents = {}
   }
 
   /**
@@ -131,29 +128,6 @@ class Indexer extends EventEmitter {
     this.unsubscribeErrors = this.chain.subscribeError(async (error: any) => {
       await this.onProviderError(error) // exceptions are handled
     })
-
-    this.chain.getToken().on(
-      {
-        topics: [
-          // Token transfer *from* us
-          [this.chain.getToken().interface.getEventTopic('Transfer')],
-          [u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...this.address.serialize()]))]
-        ]
-      },
-      this.onNewTokenEvent.bind(this)
-    )
-
-    this.chain.getToken().on(
-      {
-        topics: [
-          // Token transfer *towards* us
-          [this.chain.getToken().interface.getEventTopic('Transfer')],
-          null,
-          [u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...this.address.serialize()]))]
-        ]
-      },
-      this.onNewTokenEvent.bind(this)
-    )
 
     // get past events
     fromBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, this.blockRange)
@@ -225,7 +199,8 @@ class Indexer extends EventEmitter {
    */
   private async getEvents(
     fromBlock: number,
-    toBlock: number
+    toBlock: number,
+    fetchTokenTransactions = false
   ): Promise<
     | {
         success: true
@@ -235,25 +210,68 @@ class Indexer extends EventEmitter {
         success: false
       }
   > {
-    let rawEvents: TypedEvent<any, any>[]
+    let rawEvents: TypedEvent<any, any>[] = []
 
-    try {
-      rawEvents = await this.chain.getChannels().queryFilter(
-        {
+    const queries: { contract: Contract; filter: TypedEventFilter<any> }[] = [
+      {
+        contract: this.chain.getChannels(),
+        filter: {
           topics: [
             [
+              // Relevant channel events
               this.chain.getChannels().interface.getEventTopic('Announcement'),
               this.chain.getChannels().interface.getEventTopic('ChannelUpdated'),
               this.chain.getChannels().interface.getEventTopic('TicketRedeemed')
             ]
           ]
-        },
-        fromBlock,
-        toBlock
-      )
-    } catch {
-      return {
-        success: false
+        }
+      }
+    ]
+
+    // Actively query for logs to prevent polling done by Ethers.js
+    // that don't retry on failed attempts and thus makes the indexer
+    // handle errors produced by internal Ethers.js provider calls
+    if (fetchTokenTransactions) {
+      queries.push({
+        contract: this.chain.getToken(),
+        filter: {
+          topics: [
+            // Token transfer *from* us
+            [this.chain.getToken().interface.getEventTopic('Transfer')],
+            [u8aToHex(this.address.toBytes32())]
+          ]
+        }
+      })
+      queries.push({
+        contract: this.chain.getToken(),
+        filter: {
+          topics: [
+            // Token transfer *towards* us
+            [this.chain.getToken().interface.getEventTopic('Transfer')],
+            null,
+            [u8aToHex(this.address.toBytes32())]
+          ]
+        }
+      })
+    }
+
+    for (const query of queries) {
+      let tmpEvents: TypedEvent<any, any>[]
+      try {
+        tmpEvents = (await query.contract.queryFilter(query.filter, fromBlock, toBlock)) as any
+      } catch {
+        return {
+          success: false
+        }
+      }
+
+      for (const event of tmpEvents) {
+        Object.assign(event, query.contract.interface.parseLog(event))
+
+        if (event.event == undefined) {
+          Object.assign(event, { event: (event as any).name })
+        }
+        rawEvents.push(event)
       }
     }
 
@@ -262,28 +280,7 @@ class Indexer extends EventEmitter {
 
     return {
       success: true,
-      events: rawEvents.map((event) => {
-        Object.assign(event, this.chain.getChannels().interface.parseLog(event))
-
-        if (event.event == undefined) {
-          Object.assign(event, { event: (event as any).name })
-          return event
-        }
-        return event
-      })
-    }
-  }
-
-  private onNewTokenEvent(event: TokenEvent<'Transfer'>) {
-    Object.assign(event, this.chain.getToken().interface.parseLog(event))
-    Object.assign(event, { event: (event as any).name })
-
-    if (this.unconfirmedTokenEvents[event.blockNumber] == undefined) {
-      this.unconfirmedTokenEvents[event.blockNumber] = [event]
-    } else {
-      this.unconfirmedTokenEvents[event.blockNumber].push(event)
-      // Sort in-place
-      this.unconfirmedTokenEvents[event.blockNumber].sort(snapshotComparator)
+      events: rawEvents
     }
   }
 
@@ -345,6 +342,11 @@ class Indexer extends EventEmitter {
    * @private
    */
   private async onProviderError(error: any): Promise<void> {
+    if (String(error).match(/eth_blockNumber/)) {
+      verbose(`Ignoring failed "eth_blockNumber" provider call from Ethers.js`)
+      return
+    }
+
     log(chalk.red(`etherjs error: ${error}`))
 
     try {
@@ -356,11 +358,12 @@ class Indexer extends EventEmitter {
       ) {
         log(chalk.blue('code error falls here', this.chain.getAllQueuingTransactionRequests().length))
         if (this.chain.getAllQueuingTransactionRequests().length > 0) {
-          const wallet = this.chain.getWallet()
           await retryWithBackoff(
             () =>
               Promise.allSettled([
-                ...this.chain.getAllQueuingTransactionRequests().map((request) => wallet.sendTransaction(request)),
+                ...this.chain
+                  .getAllQueuingTransactionRequests()
+                  .map((request) => this.chain.sendTransaction(request as string)),
                 this.restart()
               ]),
             backoffOption
@@ -411,7 +414,7 @@ class Indexer extends EventEmitter {
       let res: Awaited<ReturnType<Indexer['getEvents']>>
 
       for (let i = 0; i < RETRIES; i++) {
-        res = await this.getEvents(currentBlock, currentBlock)
+        res = await this.getEvents(currentBlock, currentBlock, true)
 
         if (res.success) {
           this.onNewEvents(res.events)
@@ -456,12 +459,6 @@ class Indexer extends EventEmitter {
 
           this.chain.updateConfirmedTransaction(txHash)
         }
-      }
-    }
-
-    if (this.unconfirmedTokenEvents[currentBlock]?.length > 0) {
-      for (const tokenEvent of this.unconfirmedTokenEvents[currentBlock]) {
-        await this.onTransfer(tokenEvent)
       }
     }
 
@@ -595,6 +592,11 @@ class Indexer extends EventEmitter {
           case 'ChannelUpdated':
           case 'ChannelUpdated(address,address,tuple)':
             await this.onChannelUpdated(event as Event<'ChannelUpdated'>)
+            break
+          case 'Transfer':
+          case 'Transfer(address,address,uint256)':
+            // handle HOPR token transfer
+            await this.onTransfer(event as TokenEvent<'Transfer'>)
             break
           case 'TicketRedeemed':
           case 'TicketRedeemed(address,address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)':

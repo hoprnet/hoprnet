@@ -4,16 +4,15 @@ import {
   providers,
   utils,
   errors,
-  Wallet,
   BigNumber,
   ethers,
+  type UnsignedTransaction,
   type ContractTransaction,
   type BaseContract
 } from 'ethers'
 import { getContractData, type HoprToken, type HoprChannels } from '@hoprnet/hopr-ethereum'
 import {
   Address,
-  Ticket,
   Balance,
   NativeBalance,
   PublicKey,
@@ -49,7 +48,6 @@ export async function createChainWrapper(
     ? new providers.StaticJsonRpcProvider(networkInfo.provider)
     : new providers.WebSocketProvider(networkInfo.provider)
   log('Provider obtained from options', provider.network)
-  const wallet = new Wallet(privateKey).connect(provider)
   const publicKey = PublicKey.fromPrivKey(privateKey)
   const address = publicKey.toAddress()
   const providerChainId = (await provider.getNetwork()).chainId
@@ -62,12 +60,12 @@ export async function createChainWrapper(
   const hoprTokenDeployment = getContractData(networkInfo.network, networkInfo.environment, 'HoprToken')
   const hoprChannelsDeployment = getContractData(networkInfo.network, networkInfo.environment, 'HoprChannels')
 
-  const token = new ethers.Contract(hoprTokenDeployment.address, hoprTokenDeployment.abi, wallet) as HoprToken
+  const token = new ethers.Contract(hoprTokenDeployment.address, hoprTokenDeployment.abi, provider) as HoprToken
 
   const channels = new ethers.Contract(
     hoprChannelsDeployment.address,
     hoprChannelsDeployment.abi,
-    wallet
+    provider
   ) as HoprChannels
 
   const genesisBlock = parseInt(hoprChannelsDeployment.blockNumber)
@@ -83,6 +81,10 @@ export async function createChainWrapper(
     }
   }
 
+  /**
+   * Gets the latest block number by explicitly querying the provider
+   * @returns a Promise that resolves with the latest block number
+   */
   const getLatestBlockNumber = async (): Promise<number> => {
     const RETRIES = 3
     for (let i = 0; i < RETRIES; i++) {
@@ -98,15 +100,18 @@ export async function createChainWrapper(
       }
     }
 
-    // Wait for next block and return the blockNumber
+    // Waits for next block and returns the blockNumber
     return new Promise<number>((resolve) => {
-      const unsubscribeBlock = subscribeBlock((blockNumber: number) => {
-        unsubscribeBlock()
-        resolve(blockNumber)
-      })
+      provider.once('block', resolve)
     })
   }
 
+  /**
+   * Gets the number of previous transactions
+   * @param address account to query for
+   * @param blockNumber [optional] number of the block to consider
+   * @returns a Promise that resolves with the transaction count
+   */
   const getTransactionCount = async (address: Address, blockNumber?: number): Promise<number> => {
     const RETRIES = 3
     for (let i = 0; i < RETRIES; i++) {
@@ -145,25 +150,34 @@ export async function createChainWrapper(
    * Update nonce-tracker and transaction-manager, broadcast the transaction on chain, and listen
    * to the response until reaching block confirmation.
    * @param checkDuplicate If the flag is true (default), check if an unconfirmed (pending/mined) transaction with the same payload has been sent
+   * @param value amount of native token to send
+   * @param contract destination to send funds to or contract to execute the requested method
    * @param method contract method
-   * @param rest contract arguments
+   * @param rest contract method arguments
    * @returns Promise of a ContractTransaction
    */
   const sendTransaction = async <T extends BaseContract>(
     checkDuplicate: Boolean,
-    contract: T,
+    value: BigNumber | string | number,
+    contract: T | string,
     method: keyof T['functions'],
     handleTxListener: (tx: string) => DeferType<string>,
     ...rest: Parameters<T['functions'][keyof T['functions']]>
   ): Promise<SendTransactionReturn> => {
+    if (rest.length > 0 && typeof contract === 'string') {
+      throw Error(`sendTransaction: passing arguments to non-contract instances is not implemented`)
+    }
+
     const gasLimit = 400e3
     const nonceLock = await nonceTracker.getNonceLock(address)
     const nonce = nonceLock.nextNonce
-    let transaction: ContractTransaction
+
+    const feeData = await provider.getFeeData()
 
     log('Sending transaction %o', {
       gasLimit,
-      gasPrice,
+      maxFeePerGas: feeData.maxFeePerGas,
+      maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
       nonce
     })
 
@@ -171,8 +185,21 @@ export async function createChainWrapper(
     // https://github.com/ethers-io/ethers.js/blob/master/packages/abstract-signer/src.ts/index.ts#L122
     // 1. omit this._checkProvider("sendTransaction");
     // 2. populate transaction
-    const tx = await contract.populateTransaction[method as string](...rest)
-    const populatedTx = await wallet.populateTransaction({ ...tx, gasLimit, gasPrice, nonce })
+    const populatedTx: UnsignedTransaction = {
+      to: typeof contract === 'string' ? contract : contract.address,
+      value,
+      type: 2,
+      nonce,
+      gasLimit,
+      maxFeePerGas: feeData.maxFeePerGas,
+      maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
+      chainId: providerChainId,
+      data:
+        rest.length > 0 && typeof contract !== 'string'
+          ? contract.interface.encodeFunctionData(method as string, rest)
+          : ''
+    }
+
     const essentialTxPayload: TransactionPayload = {
       to: populatedTx.to,
       data: populatedTx.data as string,
@@ -180,38 +207,41 @@ export async function createChainWrapper(
     }
     log('essentialTxPayload %o', essentialTxPayload)
 
-    let initiatedHash: string
-    let deferredListener: DeferType<string>
-    try {
-      if (checkDuplicate) {
-        const [isDuplicate, hash] = transactions.existInMinedOrPendingWithHigherFee(essentialTxPayload, gasPrice)
-        // check duplicated pending/mined transaction against transaction manager
-        // if transaction manager has a transaction with the same payload that is mined or is pending but with
-        // a higher or equal nonce, halt.
-        log('checkDuplicate checkDuplicate=%s isDuplicate=%s with hash %s', checkDuplicate, isDuplicate, hash)
+    if (checkDuplicate) {
+      const [isDuplicate, hash] = transactions.existInMinedOrPendingWithHigherFee(essentialTxPayload, gasPrice)
+      // check duplicated pending/mined transaction against transaction manager
+      // if transaction manager has a transaction with the same payload that is mined or is pending but with
+      // a higher or equal nonce, halt.
+      log('checkDuplicate checkDuplicate=%s isDuplicate=%s with hash %s', checkDuplicate, isDuplicate, hash)
 
-        if (isDuplicate) {
-          return {
-            code: 'DUPLICATE',
-            tx: { hash }
-          }
+      if (isDuplicate) {
+        return {
+          code: 'DUPLICATE',
+          tx: { hash }
         }
-        // TODO: If the transaction manager is out of sync, check against mempool/mined blocks from provider.
       }
+      // TODO: If the transaction manager is out of sync, check against mempool/mined blocks from provider.
+    }
 
-      // 3. sign transaction
-      const signedTx = await wallet.signTransaction(populatedTx)
-      // compute tx hash and save to initiated tx list in tx manager
-      initiatedHash = utils.keccak256(signedTx)
-      transactions.addToQueuing(initiatedHash, { nonce, gasPrice }, essentialTxPayload)
-      // with let indexer to listen to the tx
-      deferredListener = handleTxListener(initiatedHash)
+    // 3. sign transaction
+    const signingKey = new utils.SigningKey(privateKey)
+    const signature = signingKey.signDigest(utils.keccak256(utils.serializeTransaction(populatedTx)))
+
+    const signedTx = utils.serializeTransaction(populatedTx, signature)
+    // compute tx hash and save to initiated tx list in tx manager
+    const initiatedHash = utils.keccak256(signedTx)
+    transactions.addToQueuing(initiatedHash, { nonce, gasPrice }, essentialTxPayload)
+    // with let indexer to listen to the tx
+    const deferredListener = handleTxListener(initiatedHash)
+
+    let transaction: ContractTransaction
+    try {
       // 4. send transaction to our ethereum provider
       // throws various exceptions if tx gets rejected
       transaction = await provider.sendTransaction(signedTx)
     } catch (error) {
       log('Transaction with nonce %d failed to sent: %s', nonce, error)
-      deferredListener && deferredListener.reject()
+      deferredListener.reject()
       // @TODO what if signing the transaction failed and initiatedHash is undefined?
       initiatedHash && transactions.remove(initiatedHash)
       nonceLock.releaseLock()
@@ -233,48 +263,45 @@ export async function createChainWrapper(
     }
 
     log('Transaction with nonce %d successfully sent %s, waiting for confimation', nonce, transaction.hash)
-    transactions.moveFromQueuingToPending(transaction.hash)
     nonceLock.releaseLock()
 
-    try {
-      // wait for the tx to be mined - mininal and scheduled implementation
-      // only fails if tx does not get mined within the specified timeout
-      await new Promise<void>((resolve, reject) => {
-        let done = false
-        const cleanUp = (err?: string) => {
-          if (done) {
-            return
-          }
-          done = true
-
-          provider.off(transaction.hash, onTransaction)
-          // Give other tasks time to get scheduled before
-          // processing the result
-          if (err) {
-            setImmediate(reject, Error(err))
-          } else {
-            setImmediate(resolve)
-          }
+    // wait for the tx to be mined - mininal and scheduled implementation
+    // only fails if tx does not get mined within the specified timeout
+    await new Promise<void>((resolve, reject) => {
+      let done = false
+      const cleanUp = (err?: string) => {
+        if (done) {
+          return
         }
+        done = true
 
-        const onTransaction = (receipt: providers.TransactionReceipt) => {
-          if (receipt.confirmations >= 1) {
-            cleanUp()
-          }
+        provider.off(transaction.hash, onTransaction)
+        // Give other tasks time to get scheduled before
+        // processing the result
+        if (err) {
+          log(`Error while waiting for transaction ${transaction.hash}`, err)
+          // remove listener but not throwing error message
+          deferredListener.reject()
+          // this transaction was not confirmed so we just remove it
+          transactions.remove(transaction.hash)
+
+          setImmediate(reject, Error(err))
+        } else {
+          setImmediate(resolve)
         }
-        setTimeout(cleanUp, timeout, `Timeout while waiting for transaction ${transaction.hash}`)
+      }
 
-        provider.on(transaction.hash, onTransaction)
-      })
-    } catch (error) {
-      log(`Error while waiting for transaction ${transaction.hash}`, error)
-      // remove listener but not throwing error message
-      deferredListener.reject()
-      // this transaction was not confirmed so we just remove it
-      transactions.remove(transaction.hash)
+      const onTransaction = (receipt: providers.TransactionReceipt) => {
+        if (receipt.confirmations >= 1) {
+          cleanUp()
+        }
+      }
+      setTimeout(cleanUp, timeout, `Timeout while waiting for transaction ${transaction.hash}`)
 
-      throw error
-    }
+      // Immediately stops polling once the transaction hash appeared
+      // in the mempool
+      provider.once(transaction.hash, onTransaction)
+    })
 
     try {
       await deferredListener.promise
@@ -288,18 +315,17 @@ export async function createChainWrapper(
     }
   }
 
-  /*
-   * Sends announce transaction on-chain synchronously.
-   * Throws when an error during transaction sending is encountered.
-   *
+  /**
+   * Initiates a transaction that announces nodes on-chain.
    * @param the address to be announced
-   * @param callback transaction handler
-   * @returns a Promise that resolve to the hash of the on-chain transaction
+   * @param txHandler handler to call once the transaction has been published
+   * @returns a Promise that resolves with the transaction hash
    */
   const announce = async (multiaddr: Multiaddr, txHandler: (tx: string) => DeferType<string>): Promise<string> => {
     try {
       const confirmation = await sendTransaction(
         checkDuplicate,
+        0,
         channels,
         'announce',
         txHandler,
@@ -312,51 +338,55 @@ export async function createChainWrapper(
     }
   }
 
+  /**
+   * Initiates a transaction that withdraws funds of the node
+   * @param currency either native token or Hopr token
+   * @param recipient recipeint of the token transfer
+   * @param amount amount of tokens to send
+   * @param txHandler handler to call once the transaction has been published
+   * @returns a Promise that resolves with the transaction hash
+   */
   const withdraw = async (
     currency: 'NATIVE' | 'HOPR',
     recipient: string,
     amount: string,
     txHandler: (tx: string) => DeferType<string>
   ): Promise<string> => {
-    if (currency === 'NATIVE') {
-      const nonceLock = await nonceTracker.getNonceLock(address)
-      try {
-        // FIXME: track pending tx
-        const transaction = await wallet.sendTransaction({
-          to: recipient,
-          value: BigNumber.from(amount),
-          nonce: BigNumber.from(nonceLock.nextNonce),
-          gasPrice
-        })
-        nonceLock.releaseLock()
-        return transaction.hash
-      } catch (err) {
-        nonceLock.releaseLock()
-        throw err
-      }
-    }
-
-    // withdraw HOPR
     try {
-      const transaction = await sendTransaction(checkDuplicate, token, 'transfer', txHandler, recipient, amount)
-      return transaction.tx.hash
+      if (currency === 'NATIVE') {
+        const transaction = await sendTransaction(checkDuplicate, amount, recipient, undefined, txHandler)
+        return transaction.tx.hash
+      } else {
+        const transaction = await sendTransaction(checkDuplicate, 0, token, 'transfer', txHandler, recipient, amount)
+        return transaction.tx.hash
+      }
     } catch (error) {
       throw new Error(`Failed in sending withdraw transaction ${error}`)
     }
   }
 
+  /**
+   * Initiates a transaction that funds a payment channel
+   * @param partyA first participant of the channel
+   * @param partyB second participant of the channel
+   * @param fundsA stake of first party
+   * @param fundsB stake of second party
+   * @param txHandler handler to call once the transaction has been published
+   * @returns a Promise that resolves wiht the transaction hash
+   */
   const fundChannel = async (
-    me: Address,
-    counterparty: Address,
-    myFund: Balance,
-    counterpartyFund: Balance,
+    partyA: Address,
+    partyB: Address,
+    fundsA: Balance,
+    fundsB: Balance,
     txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> => {
-    const totalFund = myFund.toBN().add(counterpartyFund.toBN())
+    const totalFund = fundsA.toBN().add(fundsB.toBN())
 
     try {
       const transaction = await sendTransaction(
         checkDuplicate,
+        0,
         token,
         'send',
         txHandler,
@@ -364,7 +394,7 @@ export async function createChainWrapper(
         totalFund.toString(),
         abiCoder.encode(
           ['address', 'address', 'uint256', 'uint256'],
-          [me.toHex(), counterparty.toHex(), myFund.toBN().toString(), counterpartyFund.toBN().toString()]
+          [partyA.toHex(), partyB.toHex(), fundsA.toBN().toString(), fundsB.toBN().toString()]
         )
       )
       return transaction.tx.hash
@@ -373,50 +403,12 @@ export async function createChainWrapper(
     }
   }
 
-  const openChannel = async (
-    me: Address,
-    counterparty: Address,
-    amount: Balance,
-    txHandler: (tx: string) => DeferType<string>
-  ): Promise<Receipt> => {
-    try {
-      const transaction = await sendTransaction(
-        checkDuplicate,
-        token,
-        'send',
-        txHandler,
-        channels.address,
-        amount.toBN().toString(),
-        abiCoder.encode(
-          ['address', 'address', 'uint256', 'uint256'],
-          [me.toHex(), counterparty.toHex(), amount.toBN().toString(), '0']
-        )
-      )
-      return transaction.tx.hash
-    } catch (error) {
-      throw new Error(`Failed in sending openChannel transaction ${error}`)
-    }
-  }
-
-  const finalizeChannelClosure = async (
-    counterparty: Address,
-    txHandler: (tx: string) => DeferType<string>
-  ): Promise<Receipt> => {
-    try {
-      const transaction = await sendTransaction(
-        checkDuplicate,
-        channels,
-        'finalizeChannelClosure',
-        txHandler,
-        counterparty.toHex()
-      )
-      return transaction.tx.hash
-    } catch (error) {
-      throw new Error(`Failed in sending finalizeChannelClosure transaction ${error}`)
-    }
-    // TODO: catch race-condition
-  }
-
+  /**
+   * Initiates a transaction that initiates the settlement of a payment channel
+   * @param counterparty second participant of the channel
+   * @param txHandler handler to call once the transaction has been published
+   * @returns a Promise that resolves with the transaction hash
+   */
   const initiateChannelClosure = async (
     counterparty: Address,
     txHandler: (tx: string) => DeferType<string>
@@ -424,6 +416,7 @@ export async function createChainWrapper(
     try {
       const transaction = await sendTransaction(
         checkDuplicate,
+        0,
         channels,
         'initiateChannelClosure',
         txHandler,
@@ -436,26 +429,60 @@ export async function createChainWrapper(
     // TODO: catch race-condition
   }
 
-  const redeemTicket = async (
+  /**
+   * Initiates a transaction that performs the second step to settle
+   * a payment channel.
+   * @param counterparty second participant of the payment channel
+   * @param txHandler handler to call once the transaction has been published
+   * @returns a Promise that resolves with the transaction hash
+   */
+  const finalizeChannelClosure = async (
     counterparty: Address,
-    ackTicket: AcknowledgedTicket,
-    ticket: Ticket,
     txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> => {
     try {
       const transaction = await sendTransaction(
         checkDuplicate,
+        0,
+        channels,
+        'finalizeChannelClosure',
+        txHandler,
+        counterparty.toHex()
+      )
+      return transaction.tx.hash
+    } catch (error) {
+      throw new Error(`Failed in sending finalizeChannelClosure transaction ${error}`)
+    }
+    // TODO: catch race-condition
+  }
+
+  /**
+   * Initiates a transaction that redeems an acknowledged ticket
+   * @param counterparty second participant
+   * @param ackTicket the acknowledged ticket to reedeem
+   * @param txHandler handler to call once the transaction has been published
+   * @returns a Promise that resolve with the transaction hash
+   */
+  const redeemTicket = async (
+    counterparty: Address,
+    ackTicket: AcknowledgedTicket,
+    txHandler: (tx: string) => DeferType<string>
+  ): Promise<Receipt> => {
+    try {
+      const transaction = await sendTransaction(
+        checkDuplicate,
+        0,
         channels,
         'redeemTicket',
         txHandler,
         counterparty.toHex(),
-        ackTicket.preImage.serialize(),
-        ackTicket.ticket.epoch.serialize(),
-        ackTicket.ticket.index.serialize(),
-        ackTicket.response.serialize(),
-        ticket.amount.toBN().toString(),
-        ticket.winProb.toBN().toString(),
-        ticket.signature.serialize()
+        ackTicket.preImage.toHex(),
+        ackTicket.ticket.epoch.toHex(),
+        ackTicket.ticket.index.toHex(),
+        ackTicket.response.toHex(),
+        ackTicket.ticket.amount.toBN().toString(),
+        ackTicket.ticket.winProb.toBN().toString(),
+        ackTicket.ticket.signature.toHex()
       )
       return transaction.tx.hash
     } catch (error) {
@@ -463,6 +490,13 @@ export async function createChainWrapper(
     }
   }
 
+  /**
+   * Initiates a transaction that sets a commitment
+   * @param counterparty second participant of the payment channel
+   * @param commitment value to deposit on-chain
+   * @param txHandler handler to call once the transaction has been published
+   * @returns a Promise that resolves with the transaction hash
+   */
   const setCommitment = async (
     counterparty: Address,
     commitment: Hash,
@@ -471,6 +505,7 @@ export async function createChainWrapper(
     try {
       const transaction = await sendTransaction(
         checkDuplicate,
+        0,
         channels,
         'bumpChannel',
         txHandler,
@@ -483,12 +518,17 @@ export async function createChainWrapper(
     }
   }
 
-  const getTransactionsInBlock = async (blockNumber: number): Promise<Array<string>> => {
-    let blockTxs: Block
+  /**
+   * Gets the transaction hashes of a specific block
+   * @param blockNumber block number to look for
+   * @returns a Promise that resolves with the transaction hashes of the requested block
+   */
+  const getTransactionsInBlock = async (blockNumber: number): Promise<string[]> => {
+    let block: Block
     const RETRIES = 3
     for (let i = 0; i < RETRIES; i++) {
       try {
-        blockTxs = await provider.getBlock(blockNumber)
+        block = await provider.getBlock(blockNumber)
       } catch (err) {
         if (i + 1 < RETRIES) {
           // Give other tasks CPU time to happen
@@ -502,9 +542,14 @@ export async function createChainWrapper(
       }
     }
 
-    return blockTxs.transactions
+    return block.transactions
   }
 
+  /**
+   * Gets the token balance of a specific account
+   * @param accountAddress account to query for
+   * @returns a Promise that resolves with the token balance
+   */
   const getBalance = async (accountAddress: Address): Promise<Balance> => {
     const RETRIES = 3
     let rawBalance: BigNumber
@@ -525,6 +570,11 @@ export async function createChainWrapper(
     return new Balance(new BN(rawBalance.toString()))
   }
 
+  /**
+   * Gets the native balance of a specific account
+   * @param accountAddress account to query for
+   * @returns a Promise that resolves with the native balance of the account
+   */
   const getNativeBalance = async (accountAddress: Address): Promise<Balance> => {
     const RETRIES = 3
     let rawNativeBalance: BigNumber
@@ -552,13 +602,12 @@ export async function createChainWrapper(
     announce,
     withdraw,
     fundChannel,
-    openChannel,
     finalizeChannelClosure,
     initiateChannelClosure,
     redeemTicket,
     getGenesisBlock: () => genesisBlock,
     setCommitment,
-    getWallet: () => wallet,
+    sendTransaction: provider.sendTransaction.bind(provider) as typeof provider['sendTransaction'],
     waitUntilReady: async () => await provider.ready,
     getLatestBlockNumber, // TODO: use indexer when it's done syncing
     subscribeBlock,
