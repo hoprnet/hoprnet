@@ -580,49 +580,41 @@ class Indexer extends EventEmitter {
       // @TODO: fix type clash
       const eventName = event.event as EventNames | TokenEventNames
 
-      // update transaction manager
-      this.chain.updateConfirmedTransaction(event.transactionHash)
-      log('Event name %s and hash %s', eventName, event.transactionHash)
-      try {
-        switch (eventName) {
-          case 'Announcement':
-          case 'Announcement(address,bytes,bytes)':
-            await this.onAnnouncement(event as Event<'Announcement'>, new BN(blockNumber.toPrecision()))
-            break
-          case 'ChannelUpdated':
-          case 'ChannelUpdated(address,address,tuple)':
-            await this.onChannelUpdated(event as Event<'ChannelUpdated'>)
-            break
-          case 'Transfer':
-          case 'Transfer(address,address,uint256)':
-            // handle HOPR token transfer
-            await this.onTransfer(event as TokenEvent<'Transfer'>)
-            break
-          case 'TicketRedeemed':
-          case 'TicketRedeemed(address,address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)':
-            // if unlock `outstandingTicketBalance`, if applicable
-            await this.onTicketRedeemed(event as Event<'TicketRedeemed'>)
-            break
-          default:
-            log(`ignoring event '${String(eventName)}'`)
-        }
-      } catch (err) {
-        log('error processing event:', event, err)
-      }
-
       lastDatabaseSnapshot = new Snapshot(
         new BN(event.blockNumber),
         new BN(event.transactionIndex),
         new BN(event.logIndex)
       )
 
-      try {
-        await this.db.updateLatestConfirmedSnapshot(lastDatabaseSnapshot)
-      } catch (err) {
-        log(
-          `error: failed to update latest confirmed snapshot in the database, eventBlockNum=${event.blockNumber}, txIdx=${event.transactionIndex}`,
-          err
-        )
+      // update transaction manager
+      this.chain.updateConfirmedTransaction(event.transactionHash)
+      log('Event name %s and hash %s', eventName, event.transactionHash)
+
+      switch (eventName) {
+        case 'Announcement':
+        case 'Announcement(address,bytes,bytes)':
+          await this.onAnnouncement(
+            event as Event<'Announcement'>,
+            new BN(blockNumber.toPrecision()),
+            lastDatabaseSnapshot
+          )
+          break
+        case 'ChannelUpdated':
+        case 'ChannelUpdated(address,address,tuple)':
+          await this.onChannelUpdated(event as Event<'ChannelUpdated'>, lastDatabaseSnapshot)
+          break
+        case 'Transfer':
+        case 'Transfer(address,address,uint256)':
+          // handle HOPR token transfer
+          await this.onTransfer(event as TokenEvent<'Transfer'>, lastDatabaseSnapshot)
+          break
+        case 'TicketRedeemed':
+        case 'TicketRedeemed(address,address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)':
+          // if unlock `outstandingTicketBalance`, if applicable
+          await this.onTicketRedeemed(event as Event<'TicketRedeemed'>, lastDatabaseSnapshot)
+          break
+        default:
+          log(`ignoring event '${String(eventName)}'`)
       }
 
       if (
@@ -637,7 +629,7 @@ class Indexer extends EventEmitter {
     }
   }
 
-  private async onAnnouncement(event: Event<'Announcement'>, blockNumber: BN): Promise<void> {
+  private async onAnnouncement(event: Event<'Announcement'>, blockNumber: BN, lastSnapshot: Snapshot): Promise<void> {
     // publicKey given by the SC is verified
     const publicKey = PublicKey.fromUncompressedPubKey(
       // add uncompressed key identifier
@@ -657,14 +649,16 @@ class Indexer extends EventEmitter {
       throw Error('Peer ID in multiaddr is null')
     }
     log('New node announced', account.address.toHex(), account.multiAddr.toString())
+
+    await this.db.updateAccount(account, lastSnapshot)
+
     this.emit('peer', {
       id: account.getPeerId(),
       multiaddrs: [account.multiAddr]
     })
-    await this.db.updateAccount(account)
   }
 
-  private async onChannelUpdated(event: Event<'ChannelUpdated'>): Promise<void> {
+  private async onChannelUpdated(event: Event<'ChannelUpdated'>, lastSnapshot: Snapshot): Promise<void> {
     log('channel-updated for hash %s', event.transactionHash)
     const channel = await ChannelEntry.fromSCEvent(event, this.getPublicKeyOf.bind(this))
 
@@ -675,7 +669,7 @@ class Indexer extends EventEmitter {
       // Channel is new
     }
 
-    await this.db.updateChannel(channel.getId(), channel)
+    await this.db.updateChannel(channel.getId(), channel, lastSnapshot)
 
     if (prevState && channel.status == ChannelStatus.Closed && prevState.status != ChannelStatus.Closed) {
       log('channel was closed')
@@ -700,7 +694,7 @@ class Indexer extends EventEmitter {
     }
   }
 
-  private async onTicketRedeemed(event: Event<'TicketRedeemed'>) {
+  private async onTicketRedeemed(event: Event<'TicketRedeemed'>, lastSnapshot: Snapshot) {
     if (Address.fromString(event.args.source).eq(this.address)) {
       // the node used to lock outstandingTicketBalance
       // rebuild part of the Ticket
@@ -712,12 +706,15 @@ class Indexer extends EventEmitter {
 
       try {
         if (!outstandingBalance.toBN().gte(new BN('0'))) {
-          await this.db.resolvePending(partialTicket)
+          await this.db.resolvePending(partialTicket, lastSnapshot)
         } else {
-          await this.db.resolvePending({
-            ...partialTicket,
-            amount: outstandingBalance
-          })
+          await this.db.resolvePending(
+            {
+              ...partialTicket,
+              amount: outstandingBalance
+            },
+            lastSnapshot
+          )
           // It falls into this case when db of sender gets erased while having tickets pending.
           // TODO: handle this may allow sender to send arbitrary amount of tickets through open
           // channels with positive balance, before the counterparty initiates closure.
@@ -734,14 +731,14 @@ class Indexer extends EventEmitter {
     this.emit('channel-closed', channel)
   }
 
-  private async onTransfer(event: TokenEvent<'Transfer'>) {
+  private async onTransfer(event: TokenEvent<'Transfer'>, lastSnapshot: Snapshot) {
     const isIncoming = Address.fromString(event.args.to).eq(this.address)
     const amount = new Balance(new BN(event.args.value.toString()))
 
     if (isIncoming) {
-      await this.db.addHoprBalance(amount)
+      await this.db.addHoprBalance(amount, lastSnapshot)
     } else {
-      await this.db.subHoprBalance(amount)
+      await this.db.subHoprBalance(amount, lastSnapshot)
     }
   }
 

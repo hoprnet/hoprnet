@@ -14,10 +14,13 @@ import {
   HalfKeyChallenge,
   ChannelEntry,
   PublicKey,
-  Address
+  Address,
+  Snapshot
 } from './types'
 import BN from 'bn.js'
 import { SECP256K1_CONSTANTS } from './crypto'
+
+const TestingSnapshot = new Snapshot(new BN(0), new BN(0), new BN(0))
 
 function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address) {
   return Ticket.create(
@@ -100,7 +103,7 @@ describe(`database tests`, function () {
   it('should store ChannelEntry', async function () {
     const channelEntry = ChannelEntry.createMock()
 
-    await db.updateChannel(channelEntry.getId(), channelEntry)
+    await db.updateChannel(channelEntry.getId(), channelEntry, TestingSnapshot)
 
     assert(!!(await db.getChannel(channelEntry.getId())), 'did not find channel')
     assert((await db.getChannels()).length === 1, 'did not find channel')
@@ -159,10 +162,10 @@ describe(`database tests`, function () {
     await db.setHoprBalance(new Balance(new BN(10)))
     assert.equal((await db.getHoprBalance()).toString(), '10')
 
-    await db.addHoprBalance(new Balance(new BN(1)))
+    await db.addHoprBalance(new Balance(new BN(1)), TestingSnapshot)
     assert.equal((await db.getHoprBalance()).toString(), '11')
 
-    await db.subHoprBalance(new Balance(new BN(2)))
+    await db.subHoprBalance(new Balance(new BN(2)), TestingSnapshot)
     assert.equal((await db.getHoprBalance()).toString(), '9')
   })
 })

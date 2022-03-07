@@ -367,8 +367,18 @@ export class HoprDB {
 
   public async deleteAcknowledgedTicketsFromChannel(channel: ChannelEntry): Promise<void> {
     const tickets = await this.getAcknowledgedTickets({ signer: channel.source })
-    Promise.all(tickets.map((ticket) => this.delAcknowledgedTicket(ticket)))
-    await this.increment(NEGLECTED_TICKET_COUNT)
+
+    let neglectedTickets = await this.getCoercedOrDefault<number>(NEGLECTED_TICKET_COUNT, u8aToNumber, 0)
+
+    const batch = this.db.batch()
+
+    for (const ack of tickets) {
+      batch.del(Buffer.from(this.keyOf(acknowledgedTicketKey(ack.ticket.challenge, ack.ticket.channelEpoch))))
+    }
+
+    batch.put(Buffer.from(this.keyOf(NEGLECTED_TICKET_COUNT)), Uint8Array.of(neglectedTickets + 1))
+
+    await batch.write()
   }
 
   /**
@@ -493,8 +503,12 @@ export class HoprDB {
     return this.getAll<ChannelEntry>(CHANNEL_PREFIX, ChannelEntry.deserialize, filter)
   }
 
-  async updateChannel(channelId: Hash, channel: ChannelEntry): Promise<void> {
-    await this.put(createChannelKey(channelId), channel.serialize())
+  async updateChannel(channelId: Hash, channel: ChannelEntry, snapshot: Snapshot): Promise<void> {
+    await this.db
+      .batch()
+      .put(Buffer.from(this.keyOf(createChannelKey(channelId))), Buffer.from(channel.serialize()))
+      .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
+      .write()
   }
 
   async getAccount(address: Address): Promise<AccountEntry | undefined> {
@@ -502,8 +516,12 @@ export class HoprDB {
     return data ? AccountEntry.deserialize(data) : undefined
   }
 
-  async updateAccount(account: AccountEntry): Promise<void> {
-    await this.put(createAccountKey(account.address), account.serialize())
+  async updateAccount(account: AccountEntry, snapshot: Snapshot): Promise<void> {
+    await this.db
+      .batch()
+      .put(Buffer.from(this.keyOf(createAccountKey(account.address))), Buffer.from(account.serialize()))
+      .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
+      .write()
   }
 
   async getAccounts(filter?: (account: AccountEntry) => boolean) {
@@ -537,8 +555,18 @@ export class HoprDB {
     await this.addBalance(PENDING_TICKETS_VALUE(ticket.counterparty), ticket.amount)
   }
 
-  public async resolvePending(ticket: Partial<Ticket>) {
-    await this.subBalance(PENDING_TICKETS_VALUE(ticket.counterparty), ticket.amount)
+  public async resolvePending(ticket: Partial<Ticket>, snapshot: Snapshot) {
+    let val = await this.getCoercedOrDefault<Balance>(
+      PENDING_TICKETS_VALUE(ticket.counterparty),
+      Balance.deserialize,
+      Balance.ZERO()
+    )
+
+    await this.db
+      .batch()
+      .put(Buffer.from(this.keyOf(PENDING_TICKETS_VALUE(ticket.counterparty))), Buffer.from(val.sub(val).serialize()))
+      .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
+      .write()
   }
 
   public async markRedeemeed(a: AcknowledgedTicket): Promise<void> {
@@ -625,11 +653,23 @@ export class HoprDB {
     return this.put(HOPR_BALANCE_KEY, value.serialize())
   }
 
-  public async addHoprBalance(value: Balance): Promise<void> {
-    return this.addBalance(HOPR_BALANCE_KEY, value)
+  public async addHoprBalance(value: Balance, snapshot: Snapshot): Promise<void> {
+    let val = await this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, Balance.deserialize, Balance.ZERO())
+
+    await this.db
+      .batch()
+      .put(Buffer.from(this.keyOf(HOPR_BALANCE_KEY)), Buffer.from(val.add(value).serialize()))
+      .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
+      .write()
   }
 
-  public async subHoprBalance(value: Balance): Promise<void> {
-    return this.subBalance(HOPR_BALANCE_KEY, value)
+  public async subHoprBalance(value: Balance, snapshot: Snapshot): Promise<void> {
+    let val = await this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, Balance.deserialize, Balance.ZERO())
+
+    await this.db
+      .batch()
+      .put(Buffer.from(this.keyOf(HOPR_BALANCE_KEY)), Buffer.from(val.sub(value).serialize()))
+      .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
+      .write()
   }
 }
