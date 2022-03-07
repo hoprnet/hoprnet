@@ -164,6 +164,10 @@ export async function createChainWrapper(
     handleTxListener: (tx: string) => DeferType<string>,
     ...rest: Parameters<T['functions'][keyof T['functions']]>
   ): Promise<SendTransactionReturn> => {
+    if (rest.length > 0 && typeof contract === 'string') {
+      throw Error(`sendTransaction: passing arguments to non-contract instances is not implemented`)
+    }
+
     const gasLimit = 400e3
     const nonceLock = await nonceTracker.getNonceLock(address)
     const nonce = nonceLock.nextNonce

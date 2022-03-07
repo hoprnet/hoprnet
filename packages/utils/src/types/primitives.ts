@@ -139,6 +139,10 @@ export class Address {
     return this.toHex()
   }
 
+  toBytes32(): Uint8Array {
+    return Uint8Array.from([...new Uint8Array(12).fill(0), ...this.arr])
+  }
+
   eq(b: Address) {
     return u8aEquals(this.arr, b.serialize())
   }

@@ -238,7 +238,7 @@ class Indexer extends EventEmitter {
           topics: [
             // Token transfer *from* us
             [this.chain.getToken().interface.getEventTopic('Transfer')],
-            [u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...this.address.serialize()]))]
+            [u8aToHex(this.address.toBytes32())]
           ]
         }
       })
@@ -249,7 +249,7 @@ class Indexer extends EventEmitter {
             // Token transfer *towards* us
             [this.chain.getToken().interface.getEventTopic('Transfer')],
             null,
-            [u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...this.address.serialize()]))]
+            [u8aToHex(this.address.toBytes32())]
           ]
         }
       })
