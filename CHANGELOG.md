@@ -5,6 +5,8 @@
 ### Changes
 
 - New API v2 endpoint `/api/v2/node/stream/websockets` ([#3514](https://github.com/hoprnet/hoprnet/issues/3514))
+- New API v2 endpoint `/api/v2/node/peers` ([#3617](https://github.com/hoprnet/hoprnet/pull/3617))
+- Various performance & cosmetic improvements
 
 ---
 
