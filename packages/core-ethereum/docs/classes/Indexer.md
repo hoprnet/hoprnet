@@ -39,7 +39,7 @@ Also keeps track of the latest block number.
 - [emit](Indexer.md#emit)
 - [eventNames](Indexer.md#eventnames)
 - [getAccount](Indexer.md#getaccount)
-- [getAnnouncedAddresses](Indexer.md#getannouncedaddresses)
+- [getAddressesAnnouncedOnChain](Indexer.md#getaddressesannouncedonchain)
 - [getEvents](Indexer.md#getevents)
 - [getMaxListeners](Indexer.md#getmaxlisteners)
 - [getOpenChannelsFrom](Indexer.md#getopenchannelsfrom)
@@ -446,9 +446,9 @@ ___
 
 ___
 
-### getAnnouncedAddresses
+### getAddressesAnnouncedOnChain
 
-▸ **getAnnouncedAddresses**(): `Promise`<`Multiaddr`[]\>
+▸ **getAddressesAnnouncedOnChain**(): `Promise`<`Multiaddr`[]\>
 
 #### Returns
 
