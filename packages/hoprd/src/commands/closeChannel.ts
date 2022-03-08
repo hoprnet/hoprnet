@@ -34,7 +34,7 @@ export default class CloseChannel extends AbstractCommand {
     log('Closing channel...')
 
     try {
-      const { status, receipt } = await this.node.closeChannel(peerId)
+      const { status, receipt } = await this.node.closeChannel(peerId, 'outgoing')
       const smartContractInfo = this.node.smartContractInfo()
       const channelClosureMins = Math.ceil(smartContractInfo.channelClosureSecs / 60) // convert to minutes
 
