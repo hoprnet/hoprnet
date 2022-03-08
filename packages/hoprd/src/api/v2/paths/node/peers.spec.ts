@@ -37,7 +37,7 @@ const CHARLIE_ENTRY = {
 
 let node = sinon.fake() as any
 node.getConnectedPeers = sinon.fake.returns([ALICE_PEER_ID, BOB_PEER_ID, CHARLIE_PEER_ID])
-node.getAnnouncedAddresses = sinon.fake.resolves([ALICE_MULTI_ADDR, BOB_MULTI_ADDR])
+node.getAddressesAnnouncedOnChain = sinon.fake.resolves([ALICE_MULTI_ADDR, BOB_MULTI_ADDR])
 node.getConnectionInfo = sinon.stub()
 node.getConnectionInfo.withArgs(ALICE_PEER_ID).returns(ALICE_ENTRY)
 node.getConnectionInfo.withArgs(BOB_PEER_ID).returns(BOB_ENTRY)
