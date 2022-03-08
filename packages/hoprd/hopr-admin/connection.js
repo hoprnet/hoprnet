@@ -7,12 +7,7 @@ import { parseCmd } from './client'
 import {
   accountWithdraw,
   closeChannel,
-  getAddresses,
-  getAliases,
-  getBalances,
-  getChannels,
-  getNodeInfo, getNodeVer, getSettings, getTickets, pingNodePeer, redeemTickets, sendMessage,
-  setAliases, setChannels, signAddress
+  getNodeInfo, getNodeVer, getSettings, getTickets, pingNodePeer, redeemTickets, sendMessage, setChannels, signAddress
 } from './fetch'
 import { Commands } from './commands'
 
@@ -85,6 +80,15 @@ export class Connection {
     }
   }
 
+  logger = (msg) => {
+    try {
+      this.logs.push({type: "log", msg: msg, ts: ""})
+      this.setMessages(this.logs.slice(0)) // Need a clone
+    } catch (e) {
+      console.log('ERR', e)
+    }
+  }
+
   async connect() {
     console.log('Connecting ...')
     var client
@@ -110,50 +114,42 @@ export class Connection {
         if (e.keyCode == 13) {
           var text = e.target.value
           if (text.length > 0) {
+            // v1 websocket way
             // client.send(text)
             // this.prevLog = text
 
             const userInput = parseCmd(text)
-            let options = []
-            if (userInput.query != '') {
-              options = userInput.query.trim().split(/\s+/)
-            }
+            // let options = []
+            // if (userInput.query != '') {
+            //   options = userInput.query.trim().split(/\s+/)
+            // }
 
             const cmds = new Commands();
             switch (userInput.cmd) {
               // Test cmd: withdraw 1337 NATIVE 0xEA9eDAE5CfC794B75C45c8fa89b605508A03742a
               case "withdraw":
-                accountWithdraw({
-                  "amount": options[0],
-                  "currency": options[1],
-                  "recipient": options[2]
-                })
+                // accountWithdraw({
+                //   "amount": options[0],
+                //   "currency": options[1],
+                //   "recipient": options[2]
+                // })
                 break
               case "balance":
-                // getBalances().then(balances => {
-                //   this.logs.push({type: "log", msg: `${balances.native}`, ts: ""})
-                //   this.setMessages(this.logs.slice(0)) // Need a clone
-                // })
-                cmds.execute('dfd', text);
+                cmds.execute(this.logger, text);
                 break
               case "address":
-                getAddresses()
+                cmds.execute(this.logger, text);
                 break
               case "alias":
-                // FIXME: setAliases not working (debug)
                 // Test cmd: alias 16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 Alice
-                if (options.length) {
-                  setAliases(options[0], options[1]);
-                } else {
-                  getAliases();
-                }
+                cmds.execute(this.logger, text);
                 break
               case "channels":
-                getChannels()
+                cmds.execute(this.logger, text);
                 break
               case "close":
                 // Test cmd: close 16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12
-                closeChannel(options[0])
+                cmds.execute(this.logger, text);
                 break
               case "info":
                 getNodeInfo()
@@ -193,11 +189,12 @@ export class Connection {
                 // FIXME: 400 Bad request
                 // console.log(options)
                 sendMessage(options[0], options[1], options[2])
+                break
               case "peers":
                 // TODO: See https://github.com/hoprnet/hoprnet/pull/3617
                 break
               case "help":
-                // client.send("help")
+                cmds.execute(this.logger, text);
                 break
               default:
                 console.log("Command not found.")

@@ -1,15 +1,6 @@
-import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from './abstractCommand'
 import { styleValue } from './utils'
-import { PublicKey, ChannelStatus } from '@hoprnet/hopr-utils'
-
-const channelStatusToString = (status: ChannelStatus): string => {
-  if (status === 0) return 'Closed'
-  else if (status === 1) return 'WaitingForCommitment'
-  else if (status === 2) return 'Open'
-  else if (status === 3) return 'PendingToClose'
-  return 'Unknown'
-}
+import { getChannels } from '../fetch'
 
 export default class ListOpenChannels extends AbstractCommand {
   constructor() {
@@ -24,45 +15,39 @@ export default class ListOpenChannels extends AbstractCommand {
     return 'Lists your currently open channels'
   }
 
+  private static consoleOutput(channel) {
+    return `
+Outgoing Channel:       ${styleValue(channel.channelId, 'hash')}
+To:                     ${styleValue(channel.peerId, 'peerId')}
+Status:                 ${styleValue(channel.status, 'highlight')}
+Balance:                ${styleValue(channel.balance, 'number')}
+\``
+  }
+
   /**
    * Lists all channels that we have with other nodes. Triggered from the CLI.
    */
   async execute(log: (str: string) => void): Promise<void> {
     log('fetching channels...')
     try {
-      const selfPubKey = new PublicKey(this.node.getId().pubKey.marshal())
-      const selfAddress = selfPubKey.toAddress()
+      const channels = await getChannels()
+      const channelsFrom = channels.incoming.filter((channel) => channel.status !== "Closed")
 
-      const channelsFrom = (await this.node.getChannelsFrom(selfAddress)).filter(
-        (channel) => channel.status !== ChannelStatus.Closed
-      )
       if (channelsFrom.length == 0) {
         log(`\nNo open channels from node.`)
       }
       // find counterpartys' peerIds
       for (const channel of channelsFrom) {
-        log(`
-Outgoing Channel:       ${styleValue(channel.getId().toHex(), 'hash')}
-To:                     ${styleValue(channel.destination.toPeerId().toB58String(), 'peerId')}
-Status:                 ${styleValue(channelStatusToString(channel.status), 'highlight')}
-Balance:                ${styleValue(channel.balance.toFormattedString(), 'number')}
-`)
+        log(ListOpenChannels.consoleOutput(channel))
       }
 
-      const channelsTo = (await this.node.getChannelsTo(selfAddress)).filter(
-        (channel) => channel.status !== ChannelStatus.Closed
-      )
+      const channelsTo = channels.outgoing.filter((channel) => channel.status !== "Closed")
       if (channelsTo.length == 0) {
         log(`\nNo open channels to node.`)
       }
       // find counterpartys' peerIds
       for (const channel of channelsTo) {
-        log(`
-Incoming Channel:       ${styleValue(channel.getId().toHex(), 'hash')}
-From:                   ${styleValue(channel.source.toPeerId().toB58String(), 'peerId')}
-Status:                 ${styleValue(channelStatusToString(channel.status), 'highlight')}
-Balance:                ${styleValue(channel.balance.toFormattedString(), 'number')}
-`)
+        log(ListOpenChannels.consoleOutput(channel))
       }
       return
     } catch (err) {

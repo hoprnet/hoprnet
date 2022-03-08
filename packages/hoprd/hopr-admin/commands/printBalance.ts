@@ -20,16 +20,17 @@ export default class PrintBalance extends AbstractCommand {
    * @notice triggered by the CLI
    */
   public async execute(log): Promise<void> {
-    const balances = await getBalances().then(res => res.balance)
+    const balances = await getBalances()
+
     const hoprPrefix = 'HOPR Balance:'
-    const hoprBalance = balances.native.toFormattedString()
+    // TODO: toFormattedString()
+    const hoprBalance = balances.hopr
 
     const nativePrefix = 'ETH Balance:'
-    const nativeBalance = balances.native.toFormattedString()
+    const nativeBalance = balances.native
 
     const prefixLength = Math.max(hoprPrefix.length, nativePrefix.length) + 2
 
-    console.log(hoprBalance, nativeBalance, 'dhdhhd')
     // TODO: use 'NativeBalance' and 'Balance' to display currencies
     return log(
       [

@@ -1,13 +1,13 @@
 import { AbstractCommand } from './abstractCommand'
 // import FundChannel from './fundChannel'
-// import CloseChannel from './closeChannel'
-// import ListCommands from './listCommands'
-// import ListOpenChannels from './listOpenChannels'
+import CloseChannel from './closeChannel'
+import ListCommands from './listCommands'
+import ListOpenChannels from './listOpenChannels'
 // import ListConnectedPeers from './listConnected'
 // import { OpenChannel } from './openChannel'
 // import Ping from './ping'
 // import Sign from './sign'
-// import PrintAddress from './printAddress'
+import PrintAddress from './printAddress'
 import PrintBalance from './printBalance'
 // import { SendMessage } from './sendMessage'
 // import StopNode from './stopNode'
@@ -16,9 +16,9 @@ import PrintBalance from './printBalance'
 // import RedeemTickets from './redeemTickets'
 // import Settings from './settings'
 // import Withdraw from './withdraw'
-// import { Alias } from './alias'
+import { Alias } from './alias'
 // import { Info } from './info'
-// import Addresses from './addresses'
+import Addresses from './addresses'
 
 export class Commands {
   readonly commands: AbstractCommand[]
@@ -26,15 +26,15 @@ export class Commands {
 
   constructor() {
     this.commands = [
-      // new Addresses(),
-      // new Alias(),
-      // new CloseChannel(),
+      new Addresses(),
+      new Alias(),
+      new CloseChannel(),
       // new Info(),
       // new ListConnectedPeers(),
-      // new ListCommands(() => this.commands),
-      // new ListOpenChannels(),
+      new ListCommands(() => this.commands),
+      new ListOpenChannels(),
       // new Ping(),
-      // new PrintAddress(),
+      new PrintAddress(),
       new PrintBalance(),
       // new RedeemTickets(),
       // new Sign(),
@@ -65,7 +65,7 @@ export class Commands {
     return this.commandMap.get(command.trim())
   }
 
-  public async execute(log, message: string): Promise<void> {
+  public async execute(log: (string), message: string): Promise<void> {
     const split: (string | undefined)[] = message.trim().split(/\s+/)
     const command = split[0]
     const query = split.slice(1).join(' ')

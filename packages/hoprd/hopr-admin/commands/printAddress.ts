@@ -1,6 +1,6 @@
 import { AbstractCommand } from './abstractCommand'
+import { getAddresses } from '../fetch'
 import { styleValue } from './utils'
-import { PublicKey } from '@hoprnet/hopr-utils'
 
 export default class PrintAddress extends AbstractCommand {
   constructor() {
@@ -21,8 +21,10 @@ export default class PrintAddress extends AbstractCommand {
    * @notice triggered by the CLI
    */
   public async execute(log, query: string): Promise<void> {
+    const addresses = await getAddresses()
+
     const hoprPrefix = 'HOPR Address:'
-    const hoprAddress = this.node.getId().toB58String()
+    const hoprAddress = addresses.hoprAddress
 
     if (query.trim() === 'hopr') {
       return log(hoprAddress)
@@ -30,7 +32,7 @@ export default class PrintAddress extends AbstractCommand {
 
     // @TODO: use 'NativeBalance' and 'Balance' to display currencies
     const nativePrefix = 'ETH Address:'
-    const nativeAddress = new PublicKey(this.node.getId().pubKey.marshal()).toAddress().toHex()
+    const nativeAddress = addresses.nativeAddress
 
     if (query.trim() === 'native') {
       return log(nativeAddress)
