@@ -31,7 +31,7 @@ export default class Addresses extends AbstractCommand {
     }
 
     return log(
-      `Announced addresses for ${query}:\n- ${(await this.node.getMyAnnouncedAddresses(peerId))
+      `Announced addresses for ${query}:\n- ${(await this.node.getAddressesAnnouncedToDHT(peerId))
         .map((ma) => ma.toString())
         .join('\n- ')}` +
         `\nObserved addresses for ${query}:\n- ${this.node

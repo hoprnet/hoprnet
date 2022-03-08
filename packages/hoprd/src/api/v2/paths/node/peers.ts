@@ -53,7 +53,7 @@ export const getPeers = async (
       return result
     }, [])
 
-    const announced = await node.getAnnouncedAddresses().then((addrs) => {
+    const announced = await node.getAddressesAnnouncedOnChain().then((addrs) => {
       return addrs.reduce<PeerInfo[]>((result, addr) => {
         const peerId = PeerId.createFromB58String(addr.getPeerId())
         try {

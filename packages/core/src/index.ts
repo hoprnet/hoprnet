@@ -552,7 +552,7 @@ class Hopr extends EventEmitter {
    * @param peer peer to query for, default self
    * @param timeout [optional] custom timeout for DHT query
    */
-  public async getMyAnnouncedAddresses(peer: PeerId = this.getId(), timeout = 5e3): Promise<Multiaddr[]> {
+  public async getAddressesAnnouncedToDHT(peer: PeerId = this.getId(), timeout = 5e3): Promise<Multiaddr[]> {
     if (peer.equals(this.getId())) {
       return this.libp2p.multiaddrs
     }
@@ -709,8 +709,8 @@ class Hopr extends EventEmitter {
    * Takes a look into the indexer.
    * @returns a list of announced multi addresses
    */
-  public async getAnnouncedAddresses(): Promise<Multiaddr[]> {
-    return this.indexer.getAnnouncedAddresses()
+  public async getAddressesAnnouncedOnChain(): Promise<Multiaddr[]> {
+    return this.indexer.getAddressesAnnouncedOnChain()
   }
 
   /**
@@ -731,7 +731,7 @@ class Hopr extends EventEmitter {
       return 'Node has not started yet'
     }
     const connected = this.networkPeers.debugLog()
-    const announced = await this.connector.indexer.getAnnouncedAddresses()
+    const announced = await this.connector.indexer.getAddressesAnnouncedOnChain()
     return `${connected}
     \n${announced.length} peers have announced themselves on chain:
     \n${announced.map((ma: Multiaddr) => ma.toString()).join('\n')}`
@@ -782,7 +782,7 @@ class Hopr extends EventEmitter {
     let addrToAnnounce: Multiaddr
 
     if (announceRoutableAddress) {
-      let multiaddrs = await this.getMyAnnouncedAddresses()
+      let multiaddrs = await this.getAddressesAnnouncedToDHT()
 
       if (this.options.testing?.announceLocalAddresses) {
         multiaddrs = multiaddrs.filter((ma) => isMultiaddrLocal(ma))
