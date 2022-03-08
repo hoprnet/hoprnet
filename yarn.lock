@@ -3144,6 +3144,7 @@ __metadata:
     chai: 4.3.4
     chai-as-promised: 7.1.1
     chalk: 4.1.2
+    datastore-level: ^8.0.0
     debug: 4.3.3
     heap-js: 2.1.6
     leveldown: 6.1.0
@@ -9186,6 +9187,21 @@ __metadata:
   languageName: node
   linkType: hard
 
+"datastore-level@npm:^8.0.0":
+  version: 8.0.0
+  resolution: "datastore-level@npm:8.0.0"
+  dependencies:
+    datastore-core: ^7.0.0
+    interface-datastore: ^6.0.2
+    it-filter: ^1.0.2
+    it-map: ^1.0.5
+    it-sort: ^1.0.0
+    it-take: ^1.0.1
+    level: ^7.0.0
+  checksum: e61f35672fca685e2ce5833e1546801be06c81863703e370ba7b56b8d0cb264b9429d909d4ed6fef5c2316fd48ff5deccd807a2b88d252af61292a5aedd5648b
+  languageName: node
+  linkType: hard
+
 "death@npm:^1.1.0":
   version: 1.1.0
   resolution: "death@npm:1.1.0"
@@ -10042,6 +10058,18 @@ __metadata:
     level-codec: ^9.0.0
     level-errors: ^2.0.0
   checksum: 74043e6d9061a470614ff61d708c849259ab32932a428fd5ddfb0878719804f56a52f59b31cccd95fddc2e636c0fd22dc3e02481fb98d5bf1bdbbbc44ca09bdc
+  languageName: node
+  linkType: hard
+
+"encoding-down@npm:^7.1.0":
+  version: 7.1.0
+  resolution: "encoding-down@npm:7.1.0"
+  dependencies:
+    abstract-leveldown: ^7.2.0
+    inherits: ^2.0.3
+    level-codec: ^10.0.0
+    level-errors: ^3.0.0
+  checksum: 5de91a003c1ed9f0ec6d3843d1424ace3f4eea28f7459650d3613a41b4062311d53de14aa6bef6136cf8330b70b2f9d5d61c91cac0a28540f5129fa6e57f3471
   languageName: node
   linkType: hard
 
@@ -14921,7 +14949,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"it-sort@npm:^1.0.1":
+"it-sort@npm:^1.0.0, it-sort@npm:^1.0.1":
   version: 1.0.1
   resolution: "it-sort@npm:1.0.1"
   dependencies:
@@ -15516,6 +15544,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"level-codec@npm:^10.0.0":
+  version: 10.0.0
+  resolution: "level-codec@npm:10.0.0"
+  dependencies:
+    buffer: ^6.0.3
+  checksum: 7b3edbe0af0462886814e391d1006acea4806b2b873bb192244a872b1a496043c7a4c73b7e66f76c21a5590c8d6c2729816ab0ab27958391024eb60e5b6d9bb0
+  languageName: node
+  linkType: hard
+
 "level-codec@npm:^9.0.0":
   version: 9.0.2
   resolution: "level-codec@npm:9.0.2"
@@ -15566,7 +15603,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"level-errors@npm:^3.0.1":
+"level-errors@npm:^3.0.0, level-errors@npm:^3.0.1":
   version: 3.0.1
   resolution: "level-errors@npm:3.0.1"
   checksum: fe4486c423e78ab509a8f7908b89a1692cc810dd47e02d9ceca50543b5be0ce3a4d555fb8f4d3c82122f56bd48c27e6175ca06da359b8e359ea2c7848209d8e7
@@ -15637,6 +15674,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"level-js@npm:^6.1.0":
+  version: 6.1.0
+  resolution: "level-js@npm:6.1.0"
+  dependencies:
+    abstract-leveldown: ^7.2.0
+    buffer: ^6.0.3
+    inherits: ^2.0.3
+    ltgt: ^2.1.2
+    run-parallel-limit: ^1.1.0
+  checksum: e858e34e5c3c86a250e7d00d79c08008c951e1913a3ee47d18db8d34f54395419137eb8457b2878073cb05af38240d2e8a496934ead1f0004a5b35709d6af120
+  languageName: node
+  linkType: hard
+
 "level-mem@npm:^3.0.1":
   version: 3.0.1
   resolution: "level-mem@npm:3.0.1"
@@ -15664,6 +15714,16 @@ __metadata:
     encoding-down: ^6.3.0
     levelup: ^4.3.2
   checksum: befe2aa54f2010a6ecf7ddce392c8dee225e1839205080a2704d75e560e28b01191b345494696196777b70d376e3eaae4c9e7c330cc70d3000839f5b18dd78f2
+  languageName: node
+  linkType: hard
+
+"level-packager@npm:^6.0.1":
+  version: 6.0.1
+  resolution: "level-packager@npm:6.0.1"
+  dependencies:
+    encoding-down: ^7.1.0
+    levelup: ^5.1.1
+  checksum: 41c4abe677752a0140cdbf1e37c37ebb979025447c695750d0433462f9308d5cda02cf94bbae112d47727d81c9221f7ec23444c754e72d408944ed8e4426f0f1
   languageName: node
   linkType: hard
 
@@ -15752,7 +15812,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"leveldown@npm:6.1.0":
+"level@npm:^7.0.0":
+  version: 7.0.1
+  resolution: "level@npm:7.0.1"
+  dependencies:
+    level-js: ^6.1.0
+    level-packager: ^6.0.1
+    leveldown: ^6.1.0
+  checksum: a0d43ba60647a87fc577d31cb54e27386c510183156f57f0c485f7f7c706ae54ad769020490f385960849428c100a94832d8f35775babee7df6232b66eb73584
+  languageName: node
+  linkType: hard
+
+"leveldown@npm:6.1.0, leveldown@npm:^6.1.0":
   version: 6.1.0
   resolution: "leveldown@npm:6.1.0"
   dependencies:
@@ -15776,7 +15847,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"levelup@npm:5.1.1":
+"levelup@npm:5.1.1, levelup@npm:^5.1.1":
   version: 5.1.1
   resolution: "levelup@npm:5.1.1"
   dependencies:
@@ -21640,6 +21711,15 @@ __metadata:
   version: 2.4.1
   resolution: "run-async@npm:2.4.1"
   checksum: a2c88aa15df176f091a2878eb840e68d0bdee319d8d97bbb89112223259cebecb94bc0defd735662b83c2f7a30bed8cddb7d1674eb48ae7322dc602b22d03797
+  languageName: node
+  linkType: hard
+
+"run-parallel-limit@npm:^1.1.0":
+  version: 1.1.0
+  resolution: "run-parallel-limit@npm:1.1.0"
+  dependencies:
+    queue-microtask: ^1.2.2
+  checksum: 672c3b87e7f939c684b9965222b361421db0930223ed1e43ebf0e7e48ccc1a022ea4de080bef4d5468434e2577c33b7681e3f03b7593fdc49ad250a55381123c
   languageName: node
   linkType: hard
 

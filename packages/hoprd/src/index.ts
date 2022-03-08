@@ -40,6 +40,9 @@ function defaultEnvironment(): string {
 // Replace default process name (`node`) by `hoprd`
 process.title = 'hoprd'
 
+// Use environment-specific default data path
+const defaultDataPath = path.join(process.cwd(), 'hoprd-db', defaultEnvironment())
+
 const argv = yargs(process.argv.slice(2))
   .option('environment', {
     string: true,
@@ -134,8 +137,8 @@ const argv = yargs(process.argv.slice(2))
   })
   .option('data', {
     string: true,
-    describe: 'manually specify the database directory to use',
-    default: ''
+    describe: 'manually specify the data directory to use',
+    default: defaultDataPath
   })
   .option('init', {
     boolean: true,
@@ -234,6 +237,7 @@ function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
   let options: HoprOptions = {
     createDbIfNotExist: argv.init,
     announce: argv.announce,
+    dataPath: argv.data,
     hosts: parseHosts(),
     environment,
     allowLocalConnections: argv.allowLocalNodeConnections,
@@ -252,9 +256,6 @@ function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
     options.password = argv.password as string
   }
 
-  if (argv.data && argv.data !== '') {
-    options.dbPath = argv.data
-  }
   return options
 }
 

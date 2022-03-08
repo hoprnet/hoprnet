@@ -10,6 +10,7 @@ import type { default as LibP2P, Connection } from 'libp2p'
 import type { Peer } from 'libp2p/src/peer-store/types'
 import type PeerId from 'peer-id'
 
+import { convertPubKeyFromPeerId } from '@hoprnet/hopr-utils'
 import type { HoprConnectConfig } from '@hoprnet/hopr-connect'
 
 import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants'
@@ -81,7 +82,7 @@ type PeerStoreAddress = {
 export type HoprOptions = {
   environment: ResolvedEnvironment
   announce?: boolean
-  dbPath?: string
+  dataPath: string
   createDbIfNotExist?: boolean
   forceCreateDB?: boolean
   allowLocalConnections?: boolean
@@ -299,7 +300,10 @@ class Hopr extends EventEmitter {
 
     // Add all entry nodes that were announced during startup
     this.connector.indexer.off('peer', pushToRecentlyAnnouncedNodes)
-    recentlyAnnouncedNodes.forEach(this.onPeerAnnouncement.bind(this))
+    for (const announcedNode of recentlyAnnouncedNodes) {
+      await setImmediate()
+      await this.onPeerAnnouncement(announcedNode)
+    }
 
     this.connector.indexer.on('channel-waiting-for-commitment', this.onChannelWaitingForCommitment.bind(this))
 
@@ -397,7 +401,7 @@ class Hopr extends EventEmitter {
    * Called whenever a peer is announced
    * @param peer newly announced peer
    */
-  private onPeerAnnouncement(peer: { id: PeerId; multiaddrs: Multiaddr[] }): void {
+  private async onPeerAnnouncement(peer: { id: PeerId; multiaddrs: Multiaddr[] }): Promise<void> {
     if (peer.id.equals(this.id)) {
       // Ignore announcements from ourself
       return
@@ -405,20 +409,20 @@ class Hopr extends EventEmitter {
 
     // Total hack
     // function cannot throw because it has a catch all
-    this.addPeerToDHT(peer.id)
+    await this.addPeerToDHT(peer.id)
 
     const dialables = peer.multiaddrs.filter((ma: Multiaddr) => {
       const tuples = ma.tuples()
       return tuples.length > 1 && tuples[0][0] != protocols('p2p').code
     })
 
-    // @ts-ignore wrong type
-    this.libp2p.peerStore.keyBook.set(peer.id)
+    const pubKey = convertPubKeyFromPeerId(peer.id)
+    await this.libp2p.peerStore.keyBook.set(peer.id, pubKey)
 
     if (dialables.length > 0) {
       this.publicNodesEmitter.emit('addPublicNode', { id: peer.id, multiaddrs: dialables })
 
-      this.libp2p.peerStore.addressBook.add(peer.id, dialables)
+      await this.libp2p.peerStore.addressBook.add(peer.id, dialables)
     }
   }
 

@@ -119,7 +119,7 @@ describe('test relay', function () {
       const conn = await Alice.connect(Bob.libp2p.peerId, Charly.libp2p.peerId)
 
       assert(conn != undefined, `Should be able to connect`)
-      const shaker = handshake(conn)
+      const shaker = handshake<StreamType>(conn as any)
 
       const msg = '<Hello>, that should be sent and echoed through relayed connection'
       shaker.write(new TextEncoder().encode(msg))
@@ -152,7 +152,7 @@ describe('test relay', function () {
       const conn = await Alice.connect(Bob.libp2p.peerId, Charly.libp2p.peerId)
 
       assert(conn != undefined, `Should be able to connect`)
-      const shaker = handshake(conn)
+      const shaker = handshake<StreamType>(conn as any)
 
       const msg = '<Hello>, that should be sent and echoed through relayed connection'
       shaker.write(new TextEncoder().encode(msg))

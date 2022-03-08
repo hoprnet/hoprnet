@@ -30,7 +30,7 @@ export const b58StringRegex = /16Uiu2HA[A-Za-z0-9]{1,45}/i
  *
  * @param peerId the PeerId used to generate a public key
  */
-export async function convertPubKeyFromPeerId(peerId: PeerId): Promise<PublicKey> {
+export function convertPubKeyFromPeerId(peerId: PeerId): PublicKey {
   return keys.unmarshalPublicKey(multihashes.decode(peerId.toBytes()).digest)
 }
 
@@ -40,8 +40,8 @@ export async function convertPubKeyFromPeerId(peerId: PeerId): Promise<PublicKey
  *
  * @param string the B58String used to represent the PeerId
  */
-export async function convertPubKeyFromB58String(b58string: string): Promise<PublicKey> {
-  return await convertPubKeyFromPeerId(PeerId.createFromB58String(b58string))
+export function convertPubKeyFromB58String(b58string: string): PublicKey {
+  return convertPubKeyFromPeerId(PeerId.createFromB58String(b58string))
 }
 
 /**

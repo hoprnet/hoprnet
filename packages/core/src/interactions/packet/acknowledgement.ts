@@ -131,24 +131,22 @@ export async function subscribeToAcknowledgements(
   )
 }
 
-export function sendAcknowledgement(
+export async function sendAcknowledgement(
   packet: Packet,
   destination: PeerId,
   sendMessage: SendMessage,
   privKey: PeerId,
   protocolAck: string
-): void {
-  ;(async () => {
-    const ack = packet.createAcknowledgement(privKey)
+): Promise<void> {
+  const ack = packet.createAcknowledgement(privKey)
 
-    try {
-      await sendMessage(destination, protocolAck, ack.serialize(), false, {
-        timeout: ACKNOWLEDGEMENT_TIMEOUT
-      })
-    } catch (err) {
-      // Currently unclear how to proceed if sending acknowledgements
-      // fails
-      log(`Error: could not send acknowledgement`, err)
-    }
-  })()
+  try {
+    await sendMessage(destination, protocolAck, ack.serialize(), false, {
+      timeout: ACKNOWLEDGEMENT_TIMEOUT
+    })
+  } catch (err) {
+    // Currently unclear how to proceed if sending acknowledgements
+    // fails
+    log(`Error: could not send acknowledgement`, err)
+  }
 }
