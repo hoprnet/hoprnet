@@ -1,6 +1,6 @@
 import { RelayHandshake, RelayHandshakeMessage } from './handshake'
 import { u8aEquals, defer, privKeyToPeerId } from '@hoprnet/hopr-utils'
-import { duplexPair } from 'it-pair/duplex'
+import DuplexPair from 'it-pair/duplex'
 import type PeerId from 'peer-id'
 import assert from 'assert'
 import type { Stream, StreamType } from '../types'
@@ -25,12 +25,12 @@ function getRelayState(existing: boolean = false): Parameters<RelayHandshake['ne
 
 describe('test relay handshake', function () {
   it('check initiating sequence', async function () {
-    const [relayToInitiator, initiatorToRelay] = duplexPair<StreamType>()
+    const [relayToInitiator, initiatorToRelay] = DuplexPair<StreamType>()
 
     const initiatorReceived = defer()
 
-    const initiatorHandshake = new RelayHandshake(relayToInitiator as Stream)
-    const relayHandshake = new RelayHandshake(initiatorToRelay as Stream)
+    const initiatorHandshake = new RelayHandshake(relayToInitiator)
+    const relayHandshake = new RelayHandshake(initiatorToRelay)
 
     initiatorHandshake.initiate(relay, destination)
 
@@ -53,7 +53,7 @@ describe('test relay handshake', function () {
                 }
               }
             }
-          } as Stream,
+          },
           conn: {
             close: async () => {}
           } as any
@@ -66,7 +66,7 @@ describe('test relay handshake', function () {
   })
 
   it('check forwarding sequence', async function () {
-    const [destinationToRelay, relayToDestination] = duplexPair<StreamType>()
+    const [destinationToRelay, relayToDestination] = DuplexPair<StreamType>()
 
     const okReceived = defer()
 
@@ -83,13 +83,13 @@ describe('test relay handshake', function () {
       }
     })
 
-    const destinationHandshake = new RelayHandshake(relayToDestination as Stream).handle(relay)
+    const destinationHandshake = new RelayHandshake(relayToDestination).handle(relay)
 
     const handshakePromise = relayHandshake.negotiate(
       initiator,
       async () => {
         return {
-          stream: destinationToRelay as Stream,
+          stream: destinationToRelay,
           conn: {
             close: async () => {}
           } as any
@@ -104,19 +104,19 @@ describe('test relay handshake', function () {
   })
 
   it('should send messages after handshake', async function () {
-    const [relayToInitiator, initiatorToRelay] = duplexPair<StreamType>()
-    const [destinationToRelay, relayToDestination] = duplexPair<StreamType>()
+    const [relayToInitiator, initiatorToRelay] = DuplexPair<StreamType>()
+    const [destinationToRelay, relayToDestination] = DuplexPair<StreamType>()
 
-    const initiatorHandshake = new RelayHandshake(relayToInitiator as Stream)
-    const relayHandshake = new RelayHandshake(initiatorToRelay as Stream)
+    const initiatorHandshake = new RelayHandshake(relayToInitiator)
+    const relayHandshake = new RelayHandshake(initiatorToRelay)
 
-    const destinationHandshake = new RelayHandshake(relayToDestination as Stream)
+    const destinationHandshake = new RelayHandshake(relayToDestination)
 
     relayHandshake.negotiate(
       initiator,
       async () => {
         return {
-          stream: destinationToRelay as Stream,
+          stream: destinationToRelay,
           conn: {
             close: async () => {}
           } as any

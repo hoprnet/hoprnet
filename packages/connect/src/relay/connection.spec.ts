@@ -5,10 +5,10 @@ import { u8aEquals } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import { EventEmitter, once } from 'events'
 import Pair from 'it-pair'
-import { duplexPair } from 'it-pair/duplex'
+import DuplexPair from 'it-pair/duplex'
 import { ConnectionStatusMessages, RelayPrefix, StatusMessages } from '../constants'
 import handshake from 'it-handshake'
-import { Stream, StreamSource, StreamType } from '../types'
+import { StreamType } from '../types'
 import { createPeerId } from '../base/utils.spec'
 
 describe('test status message sorting', function () {
@@ -32,39 +32,41 @@ describe('relay connection', function () {
   const Bob: PeerId = createPeerId()
 
   it('ping message', async function () {
-    const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
+    const [AliceRelay, RelayAlice] = DuplexPair<StreamType>()
 
     new RelayConnection({
-      stream: AliceRelay as Stream,
+      stream: AliceRelay,
       self: Alice,
       relay: Relay,
       counterparty: Bob,
       onReconnect: async () => {}
     })
 
-    const relayShaker = handshake(RelayAlice as Stream)
+    const relayShaker = handshake(RelayAlice)
 
     relayShaker.write(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PING))
+    console.log('before read')
+    const msg = await relayShaker.read()
+    console.log('after read')
+    const expectedMsg = Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PONG)
 
-    assert(
-      u8aEquals((await relayShaker.read()).slice(), Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PONG))
-    )
+    assert(u8aEquals(msg.slice(), expectedMsg))
   })
 
   it('forward payload', async function () {
-    const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
+    const [AliceRelay, RelayAlice] = DuplexPair<StreamType>()
 
     const alice = new RelayConnection({
-      stream: AliceRelay as Stream,
+      stream: AliceRelay,
       self: Alice,
       relay: Relay,
       counterparty: Bob
     })
 
-    const relayShaker = handshake(RelayAlice as Stream)
+    const relayShaker = handshake(RelayAlice)
 
     const aliceShaker = handshake({
-      source: alice.source as StreamSource,
+      source: alice.source,
       sink: alice.sink
     })
 
@@ -83,16 +85,16 @@ describe('relay connection', function () {
   })
 
   it('stop a relayed connection from the relay', async function () {
-    const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
+    const [AliceRelay, RelayAlice] = DuplexPair<StreamType>()
 
     const alice = new RelayConnection({
-      stream: AliceRelay as Stream,
+      stream: AliceRelay,
       self: Alice,
       relay: Relay,
       counterparty: Bob
     })
 
-    const relayShaker = handshake(RelayAlice as Stream)
+    const relayShaker = handshake(RelayAlice)
 
     relayShaker.write(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP))
 
@@ -115,16 +117,16 @@ describe('relay connection', function () {
   })
 
   it('stop a relayed connection from the client', async function () {
-    const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
+    const [AliceRelay, RelayAlice] = DuplexPair<StreamType>()
 
     const alice = new RelayConnection({
-      stream: AliceRelay as Stream,
+      stream: AliceRelay,
       self: Alice,
       relay: Relay,
       counterparty: Bob
     })
 
-    const relayShaker = handshake(RelayAlice as Stream)
+    const relayShaker = handshake(RelayAlice)
 
     alice.close()
 
@@ -154,12 +156,12 @@ describe('relay connection', function () {
   })
 
   it('reconnect before using stream and use new stream', async function () {
-    const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
+    const [AliceRelay, RelayAlice] = DuplexPair<StreamType>()
 
     let aliceAfterReconnect: RelayConnection | undefined
 
     const alice = new RelayConnection({
-      stream: AliceRelay as Stream,
+      stream: AliceRelay,
       self: Alice,
       relay: Relay,
       counterparty: Bob,
@@ -169,11 +171,11 @@ describe('relay connection', function () {
     })
 
     const aliceShakerBeforeReconnect = handshake({
-      source: alice.source as StreamSource,
+      source: alice.source,
       sink: alice.sink
     })
 
-    const relayShaker = handshake(RelayAlice as Stream)
+    const relayShaker = handshake(RelayAlice)
 
     // try to read something
     aliceShakerBeforeReconnect.read()
@@ -188,7 +190,7 @@ describe('relay connection', function () {
 
     const aliceShaker = handshake({
       sink: aliceAfterReconnect.sink,
-      source: aliceAfterReconnect.source as StreamSource
+      source: aliceAfterReconnect.source
     })
 
     const relayHelloAfterReconnect = new TextEncoder().encode('Hello after reconnect!')
@@ -205,12 +207,12 @@ describe('relay connection', function () {
   })
 
   it('reconnect before using stream and use new stream', async function () {
-    const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
+    const [AliceRelay, RelayAlice] = DuplexPair<StreamType>()
 
     let aliceAfterReconnect: RelayConnection | undefined
 
     const alice = new RelayConnection({
-      stream: AliceRelay as Stream,
+      stream: AliceRelay,
       self: Alice,
       relay: Relay,
       counterparty: Bob,
@@ -220,11 +222,11 @@ describe('relay connection', function () {
     })
 
     const aliceShakerBeforeReconnect = handshake({
-      source: alice.source as StreamSource,
+      source: alice.source,
       sink: alice.sink
     })
 
-    const relayShaker = handshake(RelayAlice as Stream)
+    const relayShaker = handshake(RelayAlice)
 
     let aliceHelloBeforeReconnect = new TextEncoder().encode(`Hello from Alice before reconnecting`)
     aliceShakerBeforeReconnect.write(aliceHelloBeforeReconnect)
@@ -253,7 +255,7 @@ describe('relay connection', function () {
 
       const aliceShaker = handshake({
         sink: aliceAfterReconnect.sink,
-        source: aliceAfterReconnect.source as StreamSource
+        source: aliceAfterReconnect.source
       })
 
       const relayHelloAfterReconnect = new TextEncoder().encode('Hello after reconnect!')
@@ -282,10 +284,10 @@ describe('relay connection', function () {
 
     const webRTC = new WebRTC()
 
-    const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
+    const [AliceRelay, RelayAlice] = DuplexPair<StreamType>()
 
     new RelayConnection({
-      stream: AliceRelay as Stream,
+      stream: AliceRelay,
       self: Alice,
       relay: Relay,
       counterparty: Bob,
@@ -295,7 +297,7 @@ describe('relay connection', function () {
       }
     })
 
-    const relayShaker = handshake(RelayAlice as Stream)
+    const relayShaker = handshake(RelayAlice)
 
     const webRTCHello = 'WebRTC Hello'
 
@@ -330,12 +332,12 @@ describe('relay connection', function () {
 
     const webRTC = new WebRTC()
 
-    const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
+    const [AliceRelay, RelayAlice] = DuplexPair<StreamType>()
 
     let webRTCAfterReconnect: WebRTC | undefined
 
     const alice = new RelayConnection({
-      stream: AliceRelay as Stream,
+      stream: AliceRelay,
       self: Alice,
       relay: Relay,
       counterparty: Bob,
@@ -348,7 +350,7 @@ describe('relay connection', function () {
       }
     })
 
-    const relayShaker = handshake(RelayAlice as Stream)
+    const relayShaker = handshake(RelayAlice)
 
     const webRTCHello = 'WebRTC Hello'
 
@@ -406,12 +408,12 @@ describe('relay connection - stream error propagation', function () {
   const Bob: PeerId = createPeerId()
 
   it('falsy sources in sinks', async function () {
-    const [AliceRelay, _RelayAlice] = duplexPair<StreamType>()
+    const [AliceRelay, RelayAlice] = DuplexPair<StreamType>()
 
     const errorInSource = 'error in source'
 
     const alice = new RelayConnection({
-      stream: AliceRelay as Stream,
+      stream: RelayAlice,
       self: Alice,
       relay: Relay,
       counterparty: Bob
@@ -439,7 +441,7 @@ describe('relay connection - stream error propagation', function () {
     const alice = new RelayConnection({
       stream: {
         sink: () => Promise.reject(Error(errorInSinkFunction)),
-        source: RelayAlice.source as StreamSource
+        source: RelayAlice.source
       },
       self: Alice,
       relay: Relay,

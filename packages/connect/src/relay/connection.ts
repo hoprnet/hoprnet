@@ -11,7 +11,7 @@ import type PeerId from 'peer-id'
 
 import Debug from 'debug'
 import { EventEmitter } from 'events'
-import { toU8aStream } from '../utils'
+import { toU8aStream, eagerIterator } from '../utils'
 import assert from 'assert'
 
 const DEBUG_PREFIX = 'hopr-connect'
@@ -161,6 +161,9 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
     this._sourceIterator = (this._stream.source as AsyncIterable<StreamType>)[Symbol.asyncIterator]()
 
+    // FIXME: The type between iterator/async-iterator cannot be matched in
+    // this case easily.
+    // @ts-ignore
     this.source = this.createSource()
 
     // Auto-start sink stream and declare variable in advance
@@ -284,6 +287,9 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       this.webRTC.channel = this.webRTC.upgradeInbound()
     }
 
+    // FIXME: The type between iterator/async-iterator cannot be matched in
+    // this case easily.
+    // @ts-ignore
     this.source = this.createSource()
 
     return this
@@ -587,7 +593,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       }
     }.call(this)
 
-    return iterator
+    return eagerIterator(iterator)
   }
 
   /**
