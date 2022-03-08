@@ -168,7 +168,7 @@ export const GET: Operation = [
 ]
 
 GET.apiDoc = {
-  description: 'Returns information about the channels between this node and provided peerId.',
+  description: 'Returns information about the channel between this node and provided peerId.',
   tags: ['Channels'],
   operationId: 'channelsGetChannel',
   parameters: [
@@ -194,7 +194,7 @@ GET.apiDoc = {
   ],
   responses: {
     '200': {
-      description: 'Channels fetched succesfully.',
+      description: 'Channel fetched succesfully.',
       content: {
         'application/json': {
           schema: {
