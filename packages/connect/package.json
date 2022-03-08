@@ -53,7 +53,7 @@
     "abortable-iterator": "3.0.2",
     "chai": "4.3.4",
     "chai-spies": "1.0.0",
-    "it-pair": "2.0.2",
+    "it-pair": "1.0.0",
     "it-pipe": "1.1.0",
     "it-pushable": "1.4.2",
     "it-stream-types": "^1.0.4",

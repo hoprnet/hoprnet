@@ -104,9 +104,9 @@ describe(`test libp2pSendMessage`, function () {
         })
       },
       peerStore: {
-        get() {
-          return {
-            addresses: [
+        addressBook: {
+          get(_peer: PeerId) {
+            return [
               {
                 multiaddr: new Multiaddr(`/ip4/1.2.3.4/`)
               }
@@ -116,7 +116,7 @@ describe(`test libp2pSendMessage`, function () {
       }
     }
 
-    libp2pSendMessage(fakeLibp2p as any, desintation, 'demo protocol', msgToReceive, false, { timeout: 5000 })
+    await libp2pSendMessage(fakeLibp2p as any, desintation, 'demo protocol', msgToReceive, false, { timeout: 5000 })
 
     await msgReceived.promise
   })
@@ -162,9 +162,9 @@ describe(`test libp2pSendMessage with response`, function () {
         })
       },
       peerStore: {
-        get() {
-          return {
-            addresses: [
+        addressBook: {
+          get(_peer: PeerId) {
+            return [
               {
                 multiaddr: new Multiaddr(`/ip4/1.2.3.4/`)
               }
@@ -176,7 +176,7 @@ describe(`test libp2pSendMessage with response`, function () {
 
     const results = await Promise.all([
       msgReceived.promise,
-      libp2pSendMessage(fakeLibp2p as any, desintation, 'demo protocol', msgToReceive, true, {
+      await libp2pSendMessage(fakeLibp2p as any, desintation, 'demo protocol', msgToReceive, true, {
         timeout: 5000
       })
     ])

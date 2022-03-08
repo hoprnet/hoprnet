@@ -1,6 +1,6 @@
 import Heartbeat, { type HeartbeatConfig } from './heartbeat'
 import NetworkPeerStore from './network-peers'
-import assert from 'assert'
+import { assert } from 'chai'
 import { type LibP2PHandlerFunction, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { EventEmitter, once } from 'events'
 import type PeerId from 'peer-id'
@@ -144,31 +144,38 @@ describe('unit test heartbeat', async () => {
     heartbeat.stop()
   })
 
-  it('check nodes is noop with only new peers', async () => {
+  it('check nodes does not change quality of newly registered peers', async () => {
     const network = createFakeNetwork()
     const peerA = getPeer(Alice, network)
 
     const peerB = getPeer(Bob, network)
 
+    assert.equal(peerA.peers.qualityOf(Bob).toFixed(1), '0.2')
+
     peerA.peers.register(Bob)
+
+    assert.equal(peerA.peers.qualityOf(Bob).toFixed(1), '0.2')
+
     await peerA.heartbeat.checkNodes()
 
-    assert(peerA.peers.qualityOf(Bob).toFixed(1) === '0.3')
+    assert.equal(peerA.peers.qualityOf(Bob).toFixed(1), '0.2')
     ;[peerA, peerB].map((peer) => peer.heartbeat.stop())
     network.close()
   })
 
-  it('check node interacts with offline peer', async () => {
+  it('check nodes does not change quality of offline peer', async () => {
     const network = createFakeNetwork()
     const peerA = getPeer(Alice, network)
 
+    assert.equal(peerA.peers.qualityOf(Charly).toFixed(1), '0.2')
+
     peerA.peers.register(Charly)
 
-    assert(peerA.peers.qualityOf(Charly).toFixed(1) === '0.2')
+    assert.equal(peerA.peers.qualityOf(Charly).toFixed(1), '0.2')
 
     await peerA.heartbeat.checkNodes()
 
-    assert(peerA.peers.qualityOf(Charly).toFixed(1) === '0.1')
+    assert.equal(peerA.peers.qualityOf(Charly).toFixed(1), '0.2')
 
     peerA.heartbeat.stop()
     network.close()
@@ -176,6 +183,7 @@ describe('unit test heartbeat', async () => {
 
   it('test heartbeat flow', async () => {
     const network = createFakeNetwork()
+
     const peerA = getPeer(Alice, network)
     const peerB = getPeer(Bob, network)
     const peerC = getPeer(Charly, network)
@@ -183,16 +191,17 @@ describe('unit test heartbeat', async () => {
     peerA.peers.register(Bob)
     peerA.peers.register(Charly)
 
-    assert(peerA.peers.has(Charly), `Alice should know about Chris now.`)
+    assert(peerA.peers.has(Charly), `Alice should know about Charly now.`)
     assert(peerA.peers.has(Bob), `Alice should know about Bob now.`)
 
     await peerA.heartbeat.checkNodes()
     await peerA.heartbeat.checkNodes()
     await peerA.heartbeat.checkNodes()
     await peerA.heartbeat.checkNodes()
+    await peerA.heartbeat.checkNodes()
 
-    assert(peerA.peers.qualityOf(Bob) > NETWORK_QUALITY_THRESHOLD, 'bob is high q')
-    assert(peerA.peers.qualityOf(Charly) > NETWORK_QUALITY_THRESHOLD, 'chris is high q')
+    assert.isAbove(peerA.peers.qualityOf(Bob), NETWORK_QUALITY_THRESHOLD)
+    assert.isAbove(peerA.peers.qualityOf(Charly), NETWORK_QUALITY_THRESHOLD)
 
     network.unsubscribe(Charly)
     peerC.heartbeat.stop()
@@ -200,8 +209,8 @@ describe('unit test heartbeat', async () => {
     await peerA.heartbeat.checkNodes()
     await peerA.heartbeat.checkNodes()
 
-    assert(peerA.peers.qualityOf(Bob) > NETWORK_QUALITY_THRESHOLD, 'bob is still high q')
-    assert(peerA.peers.qualityOf(Charly) <= NETWORK_QUALITY_THRESHOLD, 'chris is now low q')
+    assert.isAbove(peerA.peers.qualityOf(Bob), NETWORK_QUALITY_THRESHOLD)
+    assert.isAtMost(peerA.peers.qualityOf(Charly), NETWORK_QUALITY_THRESHOLD)
 
     peerA.heartbeat.stop()
     peerB.heartbeat.stop()
