@@ -1691,7 +1691,7 @@
                 }
             }
         },
-      '/channels/{peerid}':
+      '/channels/{peerid}/{direction}':
         {
           'parameters': [],
           'delete':
@@ -1711,6 +1711,13 @@
                         'description': 'PeerId attached to the channel that we want to close.',
                         'example': '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12'
                       }
+                  },
+                  {
+                    'in': 'path',
+                    'name': 'direction',
+                    'description': 'Specify which channel should be fetched, incoming or outgoing.',
+                    'required': true,
+                    'schema': { 'type': 'string', 'enum': ['incoming', 'outgoing'] }
                   }
                 ],
               'responses':
@@ -1789,7 +1796,15 @@
                     'in': 'path',
                     'name': 'peerid',
                     'description': 'Counterparty peerId assigned to the channel you want to fetch.',
+                    'required': true,
                     'schema': { '$ref': '#/components/schemas/HoprAddress' }
+                  },
+                  {
+                    'in': 'path',
+                    'name': 'direction',
+                    'description': 'Specify which channel should be fetched, incoming or outgoing.',
+                    'required': true,
+                    'schema': { 'type': 'string', 'enum': ['incoming', 'outgoing'] }
                   }
                 ],
               'responses':
@@ -1797,7 +1812,8 @@
                   '200':
                     {
                       'description': 'Channel fetched succesfully.',
-                      'content': { 'application/json': { 'schema': { '$ref': '#/components/schemas/Channel' } } }
+                      'content':
+                        { 'application/json': { 'schema': { 'items': { '$ref': '#/components/schemas/Channel' } } } }
                     },
                   '400':
                     {
