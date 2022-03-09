@@ -36,7 +36,7 @@ The HOPR Association _tech_ members and [Project Owner](#legend) have agreed on 
 | ------------------- | ---------------------------------------------------------------------------------------------------------- |
 | Project Owner       | A HOPR member which ensures epics prioritized are in line with both the short and long term vision of HOPR |
 | Process Facilitator | A HOPR member which ensures agreed processes are followed                                                  |
-| Representantives    | Two tech members who act as the bridge between tech team and Project Owner                              |
+| Representantives    | Two tech members who act as the bridge between tech team and Project Owner                                 |
 | Trifecta            | Representantives + Project Owner                                                                           |
 | Issue tracker       | The sole issue tracker is [GitHub](https://github.com/hoprnet)                                             |
 
