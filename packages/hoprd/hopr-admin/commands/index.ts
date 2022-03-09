@@ -1,23 +1,22 @@
 import { AbstractCommand } from './abstractCommand'
-// import FundChannel from './fundChannel'
 import CloseChannel from './closeChannel'
 import ListCommands from './listCommands'
 import ListOpenChannels from './listOpenChannels'
 // import ListConnectedPeers from './listConnected'
-// import { OpenChannel } from './openChannel'
-// import Ping from './ping'
-// import Sign from './sign'
+import { OpenChannel } from './openChannel'
+import Ping from './ping'
+import Sign from './sign'
 import PrintAddress from './printAddress'
 import PrintBalance from './printBalance'
-// import { SendMessage } from './sendMessage'
+import { SendMessage } from './sendMessage'
 // import StopNode from './stopNode'
-// import Version from './version'
-// import Tickets from './tickets'
-// import RedeemTickets from './redeemTickets'
-// import Settings from './settings'
-// import Withdraw from './withdraw'
+import Version from './version'
+import Tickets from './tickets'
+import RedeemTickets from './redeemTickets'
+import Settings from './settings'
+import Withdraw from './withdraw'
 import { Alias } from './alias'
-// import { Info } from './info'
+import { Info } from './info'
 import Addresses from './addresses'
 
 export class Commands {
@@ -29,23 +28,22 @@ export class Commands {
       new Addresses(),
       new Alias(),
       new CloseChannel(),
-      // new Info(),
+      new Info(),
       // new ListConnectedPeers(),
       new ListCommands(() => this.commands),
       new ListOpenChannels(),
-      // new Ping(),
+      new Ping(),
       new PrintAddress(),
       new PrintBalance(),
-      // new RedeemTickets(),
-      // new Sign(),
+      new RedeemTickets(),
+      new Sign(),
       // new StopNode(),
-      // new Version(),
-      // new Tickets(),
-      // new SendMessage(),
-      // new Settings(),
-      // new Withdraw(),
-      // new OpenChannel(),
-      // new FundChannel()
+      new Version(),
+      new Tickets(),
+      new SendMessage(),
+      new Settings(),
+      new Withdraw(),
+      new OpenChannel(),
     ]
 
     this.commandMap = new Map()

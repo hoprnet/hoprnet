@@ -1,6 +1,6 @@
 import { getPaddingLength, styleValue } from './utils'
 import { AbstractCommand } from './abstractCommand'
-import { PassiveStrategy, PromiscuousStrategy } from '@hoprnet/hopr-core'
+import { getSettings, setSettings } from '../fetch'
 
 function booleanSetter(name: string) {
   return function setter(query: string, state: State): string {
@@ -21,26 +21,32 @@ export default class Settings extends AbstractCommand {
       includeRecipient: ['Prepends your address to all messages (true|false)', booleanSetter('includeRecipient')],
       strategy: [
         'Set an automatic strategy for the node. (passive|promiscuous)',
-        this.setStrategy.bind(this),
-        this.getStrategy.bind(this)
+        Settings.setStrategy,
+        Settings.getStrategy,
       ]
     }
   }
 
-  private setStrategy(query: string): string {
+  private static async setStrategy(query: string): Promise<string> {
     if (query == 'passive') {
-      this.node.setChannelStrategy(new PassiveStrategy())
+      await setSettings({
+        "key": "strategy",
+        "value": "passive"
+      })
       return 'Strategy is now passive'
     }
     if (query == 'promiscuous') {
-      this.node.setChannelStrategy(new PromiscuousStrategy())
+      await setSettings({
+        "key": "strategy",
+        "value": "promiscuous"
+      })
       return 'Strategy is now promiscuous'
     }
     return 'Could not set strategy. Try PASSIVE or PROMISCUOUS'
   }
 
-  private getStrategy(): string {
-    return this.node.getChannelStrategy()
+  private static async getStrategy(): Promise<string> {
+    return await getSettings().then(res => res.strategy)
   }
 
   public name() {
@@ -55,9 +61,11 @@ export default class Settings extends AbstractCommand {
     return Object.keys(this.settings)
   }
 
-  private listSettings(state: State): string {
+  private listSettings(): string {
+    console.log(this.settingsKeys, "dhh")
+
     const entries = this.settingsKeys.map((setting) => {
-      return [setting, this.getSingleState(setting, state)]
+      return [setting, this.getSingleState(setting)]
     })
 
     const results: string[] = []
@@ -69,25 +77,23 @@ export default class Settings extends AbstractCommand {
     return results.join('\n')
   }
 
-  private getSingleState(setting: string, state: State): string {
+  private getSingleState(setting: string): string {
     if (this.settings[setting] && this.settings[setting][2]) {
       // Use getter
       return this.settings[setting][2]()
     }
-    return state.settings[setting]
   }
 
   public async execute(log, query: string): Promise<void> {
     if (!query) {
-      // log(this.listSettings(state))
-      return
+      log(this.listSettings())
     }
 
     const [setting, ...optionArray] = query.split(' ')
     const option = optionArray.join(' ')
 
     if (!option) {
-      log(setting + ': ' + this.getSingleState(setting, state))
+      log(setting + ': ' + this.getSingleState(setting))
       return
     }
 
@@ -96,9 +102,8 @@ export default class Settings extends AbstractCommand {
       return s === setting
     })
     if (typeof matchesASetting !== 'undefined') {
-      state.settings[setting] = setting === 'includeRecipient' ? !!option : option
-      setState(state)
-      return log(this.settings[matchesASetting][1](option, state))
+      this.settings[setting] = setting === 'includeRecipient' ? !!option : option
+      return log(this.settings[matchesASetting][1](option))
     }
 
     return log(styleValue(`Setting “${styleValue(setting)}” does not exist.`, 'failure'))

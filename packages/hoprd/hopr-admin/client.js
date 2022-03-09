@@ -19,7 +19,18 @@ export const postReq = (apiSuffix, jsonBody) => {
       'x-auth-token': API_SECURITY_TOKEN,
     },
     body: JSON.stringify(jsonBody)
-  }).then(res => res.json())
+  })
+}
+
+export const putReq = (apiSuffix, jsonBody) => {
+  return fetch(API_ENDPOINT + apiSuffix, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-auth-token': API_SECURITY_TOKEN,
+    },
+    body: JSON.stringify(jsonBody)
+  }).then(res => res)
 }
 
 export const delReq = (apiSuffix) => {

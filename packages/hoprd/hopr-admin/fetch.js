@@ -2,7 +2,7 @@
  * Single file for re-usability purposes of API in hopr-admin
  */
 
-import { getReq, postReq, delReq } from './client'
+import { getReq, postReq, delReq, putReq } from './client'
 
 /*
  * Account API
@@ -44,13 +44,13 @@ export const redeemTickets = () => postReq(`tickets/redeem`)
 
 export const getTickets = () =>  getReq(`tickets`)
 
+export const getTicketStats = () => getReq(`tickets/statistics`)
 
 /*
  * Messages API
  */
-export const signAddress = (msg) => {
-  postReq("messages/sign", {message: msg})
-}
+export const signMessage = (msg) => postReq("messages/sign", {message: msg})
+
 
 export const sendMessage = (body, recepient, path) => {
   postReq("messages", {body: body, recepient: recepient, path: path})
@@ -69,3 +69,5 @@ export const pingNodePeer = (peerId) => postReq("node/ping", {peerId: peerId})
  * Settings API
  */
 export const getSettings = () => getReq("settings")
+
+export const setSettings = () => putReq(`settings`)

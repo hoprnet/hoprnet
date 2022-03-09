@@ -1,4 +1,5 @@
 import { AbstractCommand } from './abstractCommand'
+import { getNodeVer } from '../fetch'
 
 export default class Version extends AbstractCommand {
   constructor() {
@@ -13,6 +14,6 @@ export default class Version extends AbstractCommand {
   }
 
   public async execute(log): Promise<void> {
-    log(this.node.getVersion())
+    await getNodeVer().then(version => log(version))
   }
 }

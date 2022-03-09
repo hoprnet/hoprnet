@@ -1,6 +1,5 @@
 import type PeerId from 'peer-id'
 import { INTERMEDIATE_HOPS } from '@hoprnet/hopr-core/lib/constants'
-import { PublicKey } from '@hoprnet/hopr-utils'
 import { checkPeerIdInput, encodeMessage, styleValue } from './utils'
 import { AbstractCommand } from './abstractCommand'
 

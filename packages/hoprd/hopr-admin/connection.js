@@ -152,43 +152,36 @@ export class Connection {
                 cmds.execute(this.logger, text);
                 break
               case "info":
-                getNodeInfo()
+                cmds.execute(this.logger, text);
                 break
               case "open":
                 // Test cmd: open 16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 1000000
-                // FIXME: debug UNKNOWN_FAILURE
-                if (options.length) {
-                  setChannels(options[0], options[1]);
-                }
+                cmds.execute(this.logger, text);
                 break
               case "redeemTickets":
-                // Test cmd: redeemTickets 16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12
-                // FIXME: Debug err code 422
-                redeemTickets()
+                cmds.execute(this.logger, text);
                 break
               case "tickets":
                 // Test cmd: tickets 16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12
-                getTickets()
+                cmds.execute(this.logger, text);
                 break
               case "version":
-                getNodeVer()
+                cmds.execute(this.logger, text);
                 break
               case "ping":
                 // Test cmd: ping 16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12
-                pingNodePeer(options[0])
+                cmds.execute(this.logger, text);
                 break
               case "settings":
-                getSettings();
+                cmds.execute(this.logger, text);
                 break
               case "sign":
                 // Test cmd: sign 16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12
-                signAddress(options[0]);
+                cmds.execute(this.logger, text);
                 break
               case "send":
                 // Test cmd: send Hello 16Uiu2HAm2SF8EdwwUaaSoYTiZSddnG4hLVF7dizh32QFTNWMic2b [16Uiu2HAm1uV82HyD1iJ5DmwJr4LftmJUeMfj8zFypBRACmrJc16n]
-                // FIXME: 400 Bad request
-                // console.log(options)
-                sendMessage(options[0], options[1], options[2])
+                cmds.execute(this.logger, text);
                 break
               case "peers":
                 // TODO: See https://github.com/hoprnet/hoprnet/pull/3617

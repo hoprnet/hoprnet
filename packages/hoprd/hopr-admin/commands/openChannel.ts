@@ -1,9 +1,9 @@
 import type PeerId from 'peer-id'
-import { moveDecimalPoint, Balance } from '@hoprnet/hopr-utils'
-import BN from 'bn.js'
 import chalk from 'chalk'
 import { checkPeerIdInput, styleValue } from './utils'
 import { AbstractCommand } from './abstractCommand'
+import { getBalances, setChannels } from '../fetch'
+import { hoprToWei } from './utils/util'
 
 export class OpenChannel extends AbstractCommand {
   constructor() {
@@ -34,8 +34,9 @@ export class OpenChannel extends AbstractCommand {
       return log(styleValue(err.message, 'failure'))
     }
 
-    const amountToFund = new BN(moveDecimalPoint(amountToFundStr, Balance.DECIMALS))
-    const myAvailableTokens = await this.node.getBalance()
+    const amountToFund = hoprToWei(amountToFundStr)
+    console.log(amountToFund, "Djhdj")
+    const myAvailableTokens = await getBalances()
     if (amountToFund.lten(0)) {
       return log(`Invalid 'amountToFund' provided: ${amountToFund.toString(10)}`)
     } else if (amountToFund.gt(myAvailableTokens.toBN())) {
@@ -43,12 +44,13 @@ export class OpenChannel extends AbstractCommand {
     }
 
     log('Opening channel...')
-
-    try {
-      const { channelId } = await this.node.openChannel(counterparty, amountToFund)
-      return log(`${chalk.green(`Successfully opened channel`)} ${styleValue(channelId.toHex(), 'hash')}`)
-    } catch (err) {
-      return log(styleValue(err.message, 'failure'))
-    }
+    //
+    // try {
+    //   // const { peerId, amount } = await setChannels(counterparty.id, 1000);
+    //   const { channelId } = await this.node.openChannel(counterparty, amountToFund)
+    //   return log(`${chalk.green(`Successfully opened channel`)} ${styleValue(channelId.toHex(), 'hash')}`)
+    // } catch (err) {
+    //   return log(styleValue(err.message, 'failure'))
+    // }
   }
 }

@@ -2,7 +2,7 @@ import type PeerId from 'peer-id'
 import chalk from 'chalk'
 import { AbstractCommand } from './abstractCommand'
 import { checkPeerIdInput, styleValue } from './utils'
-import { closeChannel } from '../fetch'
+import { closeChannel, getNodeInfo } from '../fetch'
 import { ChannelStatus } from './utils/types'
 
 export default class CloseChannel extends AbstractCommand {
@@ -34,13 +34,14 @@ export default class CloseChannel extends AbstractCommand {
 
     try {
       const { receipt, channelStatus } = await closeChannel(peerId)
+      const nodeInfo = await getNodeInfo()
 
       if (channelStatus === ChannelStatus.PendingToClose) {
         return log(`${chalk.green(`Closing channel. Receipt: ${styleValue(receipt, 'hash')}`)}.`)
       } else {
         return log(
           `${chalk.green(
-            `Initiated channel closure, the channel must remain open for at least ${channelClosureMins} minutes. Please send the close command again once the cool-off has passed. Receipt: ${styleValue(
+            `Initiated channel closure, the channel must remain open for at least ${nodeInfo.channelClosurePeriod} minutes. Please send the close command again once the cool-off has passed. Receipt: ${styleValue(
               receipt,
               'hash'
             )}`

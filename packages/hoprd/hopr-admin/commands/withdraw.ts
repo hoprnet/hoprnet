@@ -1,4 +1,3 @@
-import { moveDecimalPoint } from '@hoprnet/hopr-utils'
 import { AbstractCommand } from './abstractCommand'
 import { styleValue } from './utils'
 import { Balance, NativeBalance } from '@hoprnet/hopr-utils'

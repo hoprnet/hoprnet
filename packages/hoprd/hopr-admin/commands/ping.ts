@@ -1,6 +1,7 @@
 import type PeerId from 'peer-id'
 import { AbstractCommand } from './abstractCommand'
 import { checkPeerIdInput, styleValue } from './utils'
+import { pingNodePeer } from '../fetch'
 
 export default class Ping extends AbstractCommand {
   constructor() {
@@ -22,7 +23,7 @@ export default class Ping extends AbstractCommand {
 
     let peerId: PeerId
     try {
-      peerId = checkPeerIdInput(query, getState())
+      peerId = checkPeerIdInput(query)
     } catch (err) {
       return log(styleValue(err.message, 'failure'))
     }
@@ -34,7 +35,7 @@ export default class Ping extends AbstractCommand {
     let error: any
 
     try {
-      pingResult = await this.node.ping(peerId)
+      pingResult = await pingNodePeer(peerId)
     } catch (err) {
       error = err
     }

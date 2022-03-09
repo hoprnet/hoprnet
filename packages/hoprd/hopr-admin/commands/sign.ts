@@ -1,7 +1,6 @@
-import { u8aToHex } from '@hoprnet/hopr-utils'
-
 import { AbstractCommand } from './abstractCommand'
 import { styleValue } from './utils'
+import { signMessage } from '../fetch'
 
 export default class Sign extends AbstractCommand {
   constructor() {
@@ -22,8 +21,9 @@ export default class Sign extends AbstractCommand {
     }
 
     try {
-      const signature = await this.node.signMessage(new TextEncoder().encode(query))
-      return log(`Signed message: ${u8aToHex(signature)}`)
+      const signature = await signMessage(query).then(res => res.json()).then(res => res.signature)
+
+      return log(`Signed message: ${signature}`)
     } catch (err) {
       return log(styleValue(err.message, 'failure'))
     }
