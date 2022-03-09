@@ -62,6 +62,19 @@ For example, if you want to ping the address `16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1d
 ping Bob
 ```
 
+You can also check all your alias by typing command:
+
+```
+alias
+```
+
+Output will look similar to this:
+
+```
+me ->  16Uiu2HAm1HQ9f5g1DC75Un92MDDHaEmggNEiiiDHSasR2kWXzoij
+Bob -> 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV
+```
+
 :::info
 
 Note that these aliases are not available publicly, and will reset when you restart your node.
