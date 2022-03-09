@@ -489,7 +489,7 @@ class Hopr extends EventEmitter {
     for (const destination of closeChannelDestinations) {
       verbose(`closing ${destination}`)
       try {
-        await this.closeChannel(destination.toPeerId())
+        await this.closeChannel(destination.toPeerId(), 'outgoing')
         verbose(`closed channel to ${destination.toString()}`)
         this.emit('hopr:channel:closed', destination.toPeerId())
       } catch (e) {
@@ -941,9 +941,15 @@ class Hopr extends EventEmitter {
     }
   }
 
-  public async closeChannel(counterparty: PeerId): Promise<{ receipt: string; status: ChannelStatus }> {
+  public async closeChannel(
+    counterparty: PeerId,
+    direction: 'incoming' | 'outgoing'
+  ): Promise<{ receipt: string; status: ChannelStatus }> {
     const counterpartyPubKey = PublicKey.fromPeerId(counterparty)
-    const channel = await this.db.getChannelX(this.pubKey, counterpartyPubKey)
+    const channel =
+      direction === 'outgoing'
+        ? await this.db.getChannelX(this.pubKey, counterpartyPubKey)
+        : await this.db.getChannelX(counterpartyPubKey, this.pubKey)
 
     // TODO: should we wait for confirmation?
     if (channel.status === ChannelStatus.Closed) {
@@ -992,7 +998,7 @@ class Hopr extends EventEmitter {
   public async getTickets(peerId: PeerId): Promise<Ticket[]> {
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(peerId.pubKey.marshal())
-    const channel = await this.db.getChannelX(selfPubKey, counterpartyPubKey)
+    const channel = await this.db.getChannelX(counterpartyPubKey, selfPubKey)
     return this.db
       .getAcknowledgedTickets({
         channel
@@ -1028,8 +1034,18 @@ class Hopr extends EventEmitter {
   public async redeemTicketsInChannel(peerId: PeerId) {
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(peerId.pubKey.marshal())
-    const channel = await this.db.getChannelX(selfPubKey, counterpartyPubKey)
+    const channel = await this.db.getChannelX(counterpartyPubKey, selfPubKey)
     await this.connector.redeemTicketsInChannel(channel)
+  }
+
+  /**
+   * Get the channel entry between source and destination node.
+   * @param src PeerId
+   * @param dest PeerId
+   * @returns the channel entry of those two nodes
+   */
+  public async getChannel(src: PeerId, dest: PeerId): Promise<ChannelEntry> {
+    return await this.db.getChannelX(new PublicKey(src.pubKey.marshal()), new PublicKey(dest.pubKey.marshal()))
   }
 
   public async getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {
