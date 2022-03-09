@@ -2715,7 +2715,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ethersproject/providers@hoprnet/ethers-js-provider#978bf69847eb8709543d2ec1723bd621ca3989be":
+"@ethersproject/providers@hoprnet/ethers-js-provider":
   version: 5.5.3
   resolution: "@ethersproject/providers@https://github.com/hoprnet/ethers-js-provider.git#commit=978bf69847eb8709543d2ec1723bd621ca3989be"
   dependencies:
