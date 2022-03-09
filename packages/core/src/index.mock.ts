@@ -9,5 +9,5 @@ export const sampleOptions: Partial<HoprOptions> = {
       port: 0
     }
   },
-  dataPath: 'hoprd-data'
+  dataPath: '/tmp/hoprd-data'
 }
