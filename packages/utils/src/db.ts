@@ -19,7 +19,7 @@ import {
   UINT256
 } from './types'
 import BN from 'bn.js'
-import { u8aEquals, u8aToNumber } from './u8a'
+import { u8aToNumber } from './u8a'
 
 const log = debug(`hopr-core:db`)
 const encoder = new TextEncoder()
@@ -40,8 +40,8 @@ const LATEST_BLOCK_NUMBER_KEY = encoder.encode('latestBlockNumber')
 const LATEST_CONFIRMED_SNAPSHOT_KEY = encoder.encode('latestConfirmedSnapshot')
 const ACCOUNT_PREFIX = encoder.encode('account-')
 const CHANNEL_PREFIX = encoder.encode('channel-')
-const createChannelKey = (channelId: Hash): Uint8Array => u8aConcat(CHANNEL_PREFIX, encoder.encode(channelId.toHex()))
-const createAccountKey = (address: Address): Uint8Array => u8aConcat(ACCOUNT_PREFIX, encoder.encode(address.toHex()))
+const createChannelKey = (channelId: Hash): Uint8Array => u8aConcat(CHANNEL_PREFIX, channelId.serialize())
+const createAccountKey = (address: Address): Uint8Array => u8aConcat(ACCOUNT_PREFIX, address.serialize())
 const COMMITMENT_PREFIX = encoder.encode('commitment:')
 const TICKET_INDEX_PREFIX = encoder.encode('ticketIndex:')
 const CURRENT = encoder.encode('current')
@@ -200,21 +200,27 @@ export class HoprDB {
   }
 
   private async getAll<T>(
-    prefix: Uint8Array,
+    first: Uint8Array,
+    last: Uint8Array,
     deserialize: (u: Uint8Array) => T,
     filter?: (o: T) => boolean,
     sorter?: (e1: T, e2: T) => number
   ): Promise<T[]> {
     const res: T[] = []
-    const prefixKeyed = this.keyOf(prefix)
+    const firstPrefixed = this.keyOf(first)
+    const lastPrefixed = this.keyOf(last)
+
+    console.log(firstPrefixed, lastPrefixed)
+
     return new Promise<T[]>((resolve, reject) => {
       this.db
-        .createReadStream()
+        .createKeyStream({
+          gte: firstPrefixed,
+          lt: lastPrefixed
+        })
         .on('error', reject)
-        .on('data', async ({ key, value }: { key: Buffer; value: Buffer }) => {
-          if (!u8aEquals(key.subarray(0, prefixKeyed.length), prefixKeyed)) {
-            return
-          }
+        .on('data', ({ value }: { key: Buffer; value: Buffer }) => {
+          console.log(arguments)
           const obj = deserialize(Uint8Array.from(value))
           // filter if a filter function was given
           if (filter) {
@@ -297,7 +303,8 @@ export class HoprDB {
 
     return (
       await this.getAll<WaitingAsRelayer>(
-        PENDING_ACKNOWLEDGEMENTS_PREFIX,
+        pendingAcknowledgement(HalfKeyChallenge.deserialize(new Uint8Array(HalfKeyChallenge.SIZE).fill(0))),
+        pendingAcknowledgement(HalfKeyChallenge.deserialize(new Uint8Array(HalfKeyChallenge.SIZE).fill(0xff))),
         this.deserializePendingAcknowledgement as any,
         filterFunc
       )
@@ -358,7 +365,14 @@ export class HoprDB {
     const sortFunc = (t1: AcknowledgedTicket, t2: AcknowledgedTicket): number => t1.ticket.index.cmp(t2.ticket.index)
 
     return this.getAll<AcknowledgedTicket>(
-      ACKNOWLEDGED_TICKETS_PREFIX,
+      acknowledgedTicketKey(
+        EthereumChallenge.deserialize(new Uint8Array(EthereumChallenge.SIZE).fill(0)),
+        UINT256.deserialize(new Uint8Array(UINT256.SIZE).fill(0))
+      ),
+      acknowledgedTicketKey(
+        EthereumChallenge.deserialize(new Uint8Array(EthereumChallenge.SIZE).fill(0xff)),
+        UINT256.deserialize(new Uint8Array(UINT256.SIZE).fill(0xff))
+      ),
       AcknowledgedTicket.deserialize,
       filterFunc,
       sortFunc
@@ -500,7 +514,12 @@ export class HoprDB {
   }
 
   async getChannels(filter?: (channel: ChannelEntry) => boolean): Promise<ChannelEntry[]> {
-    return this.getAll<ChannelEntry>(CHANNEL_PREFIX, ChannelEntry.deserialize, filter)
+    return this.getAll<ChannelEntry>(
+      createChannelKey(Hash.deserialize(new Uint8Array(Hash.SIZE).fill(0))),
+      createChannelKey(Hash.deserialize(new Uint8Array(Hash.SIZE).fill(0xff))),
+      ChannelEntry.deserialize,
+      filter
+    )
   }
 
   async updateChannel(channelId: Hash, channel: ChannelEntry, snapshot: Snapshot): Promise<void> {
@@ -525,7 +544,12 @@ export class HoprDB {
   }
 
   async getAccounts(filter?: (account: AccountEntry) => boolean) {
-    return this.getAll<AccountEntry>(ACCOUNT_PREFIX, AccountEntry.deserialize, filter)
+    return this.getAll<AccountEntry>(
+      createAccountKey(Address.deserialize(new Uint8Array(Address.SIZE).fill(0))),
+      createAccountKey(Address.deserialize(new Uint8Array(Address.SIZE).fill(0xff))),
+      AccountEntry.deserialize,
+      filter
+    )
   }
 
   public async getRedeemedTicketsValue(): Promise<Balance> {
