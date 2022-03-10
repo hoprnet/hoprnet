@@ -45,12 +45,12 @@ As an alternative, you an also run a single HOPR node following our [monorepo](h
     <h3>Node 1</h3>
     <br/>
     <pre>
-    export HOPR_NODE_1_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_1_WS_URL=http://127.0.0.1:19501
+    export HOPR_NODE_1_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_1_WS_URL=ws://127.0.0.1:19501
     </pre>
     <h3>API token & Node 1</h3>
     <br/>
     <pre>
-    export apiToken=^^LOCAL-testing-123^^ HOPR_NODE_1_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_1_WS_URL=http://127.0.0.1:19501
+    export apiToken=^^LOCAL-testing-123^^ HOPR_NODE_1_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_1_WS_URL=ws://127.0.0.1:19501
     </pre>
     </div>
     <br/>
@@ -64,12 +64,12 @@ As an alternative, you an also run a single HOPR node following our [monorepo](h
     <h3>Node 1</h3>
     <br/>
     <pre>
-    export HOPR_NODE_1_HTTP_URL=http://127.0.0.1:3001 HOPR_NODE_1_WS_URL=http://127.0.0.1:3000
+    export HOPR_NODE_1_HTTP_URL=http://127.0.0.1:3001 HOPR_NODE_1_WS_URL=ws://127.0.0.1:3000
     </pre>
     <h3>API token & Node 1</h3>
     <br/>
     <pre>
-    export apiToken=^^LOCAL-testing-123^^ HOPR_NODE_1_HTTP_URL=http://127.0.0.1:3001 HOPR_NODE_1_WS_URL=http://127.0.0.1:3000
+    export apiToken=^^LOCAL-testing-123^^ HOPR_NODE_1_HTTP_URL=http://127.0.0.1:3001 HOPR_NODE_1_WS_URL=ws://127.0.0.1:3000
     </pre>
     </div>
     <br/>
