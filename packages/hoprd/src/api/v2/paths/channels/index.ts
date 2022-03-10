@@ -1,6 +1,6 @@
 import type { Operation } from 'express-openapi'
 import type Hopr from '@hoprnet/hopr-core'
-import { ChannelStatus, PublicKey } from '@hoprnet/hopr-utils'
+import { ChannelEntry, ChannelStatus, PublicKey } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import BN from 'bn.js'
 import { STATUS_CODES } from '../../utils'
@@ -21,6 +21,26 @@ export const channelStatusToString = (status: ChannelStatus): string => {
   return 'Unknown'
 }
 
+export const formatOutgoingChannel = (channel: ChannelEntry): ChannelInfo => {
+  return {
+    type: 'outgoing',
+    channelId: channel.getId().toHex(),
+    peerId: channel.source.toPeerId().toB58String(),
+    status: channelStatusToString(channel.status),
+    balance: channel.balance.toBN().toString()
+  }
+}
+
+export const formatIncomingChannel = (channel: ChannelEntry): ChannelInfo => {
+  return {
+    type: 'incoming',
+    channelId: channel.getId().toHex(),
+    peerId: channel.destination.toPeerId().toB58String(),
+    status: channelStatusToString(channel.status),
+    balance: channel.balance.toBN().toString()
+  }
+}
+
 /**
  * @returns List of incoming and outgoing channels associated with the node.
  */
@@ -30,23 +50,11 @@ export const getChannels = async (node: Hopr, includingClosed: boolean) => {
 
   const channelsFrom: ChannelInfo[] = (await node.getChannelsFrom(selfAddress))
     .filter((channel) => includingClosed || channel.status !== ChannelStatus.Closed)
-    .map((channel) => ({
-      type: 'incoming',
-      channelId: channel.getId().toHex(),
-      peerId: channel.destination.toPeerId().toB58String(),
-      status: channelStatusToString(channel.status),
-      balance: channel.balance.toBN().toString()
-    }))
+    .map(formatIncomingChannel)
 
   const channelsTo: ChannelInfo[] = (await node.getChannelsTo(selfAddress))
     .filter((channel) => includingClosed || channel.status !== ChannelStatus.Closed)
-    .map((channel) => ({
-      type: 'outgoing',
-      channelId: channel.getId().toHex(),
-      peerId: channel.source.toPeerId().toB58String(),
-      status: channelStatusToString(channel.status),
-      balance: channel.balance.toBN().toString()
-    }))
+    .map(formatOutgoingChannel)
 
   return { incoming: channelsFrom, outgoing: channelsTo }
 }

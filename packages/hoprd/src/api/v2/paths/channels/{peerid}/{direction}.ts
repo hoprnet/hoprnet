@@ -1,14 +1,14 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 import PeerId from 'peer-id'
-import { STATUS_CODES } from '../../utils'
-import { channelStatusToString, getChannels } from '.'
+import { STATUS_CODES } from '../../../utils'
+import { ChannelInfo, channelStatusToString, formatIncomingChannel, formatOutgoingChannel } from '..'
 
 /**
  * Closes a channel with provided peerId.
  * @returns Channel status and receipt.
  */
-export const closeChannel = async (node: Hopr, peerIdStr: string) => {
+export const closeChannel = async (node: Hopr, peerIdStr: string, direction: ChannelInfo['type']) => {
   let peerId: PeerId
   try {
     peerId = PeerId.createFromB58String(peerIdStr)
@@ -16,7 +16,7 @@ export const closeChannel = async (node: Hopr, peerIdStr: string) => {
     throw Error(STATUS_CODES.INVALID_PEERID)
   }
 
-  const { status: channelStatus, receipt } = await node.closeChannel(peerId)
+  const { status: channelStatus, receipt } = await node.closeChannel(peerId, direction)
 
   return {
     channelStatus,
@@ -27,10 +27,10 @@ export const closeChannel = async (node: Hopr, peerIdStr: string) => {
 export const DELETE: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
-    const { peerid } = req.params
+    const { peerid, direction } = req.params
 
     try {
-      const { receipt, channelStatus } = await closeChannel(node, peerid)
+      const { receipt, channelStatus } = await closeChannel(node, peerid, direction as any)
       return res.status(200).send({ receipt, channelStatus: channelStatusToString(channelStatus) })
     } catch (err) {
       return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
@@ -53,6 +53,16 @@ DELETE.apiDoc = {
         type: 'string',
         description: 'PeerId attached to the channel that we want to close.',
         example: '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12'
+      }
+    },
+    {
+      in: 'path',
+      name: 'direction',
+      description: 'Specify which channel should be fetched, incoming or outgoing.',
+      required: true,
+      schema: {
+        type: 'string',
+        enum: ['incoming', 'outgoing'] as ChannelInfo['type'][]
       }
     }
   ],
@@ -106,29 +116,50 @@ DELETE.apiDoc = {
   }
 }
 
+/**
+ * Fetches channel between node and counterparty in the direction provided.
+ * @returns the channel between node and counterparty
+ */
+export const getChannel = async (
+  node: Hopr,
+  counterparty: string,
+  direction: ChannelInfo['type']
+): Promise<ChannelInfo> => {
+  let counterpartyPeerId: PeerId
+  try {
+    counterpartyPeerId = PeerId.createFromB58String(counterparty)
+  } catch (err) {
+    throw Error(STATUS_CODES.INVALID_PEERID)
+  }
+
+  const selfPeerId = node.getId()
+
+  try {
+    return direction === 'outgoing'
+      ? await node.getChannel(selfPeerId, counterpartyPeerId).then(formatOutgoingChannel)
+      : await node.getChannel(counterpartyPeerId, selfPeerId).then(formatIncomingChannel)
+  } catch {
+    throw Error(STATUS_CODES.CHANNEL_NOT_FOUND)
+  }
+}
+
 export const GET: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
-    const { peerid } = req.params
-
-    let peerIdStr: string
-    try {
-      peerIdStr = PeerId.createFromB58String(peerid).toB58String()
-    } catch (err) {
-      return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID })
-    }
+    const { peerid, direction } = req.params
 
     try {
-      const channels = await getChannels(node, true)
-      const incoming = channels.incoming.filter((channel) => channel.peerId === peerIdStr)
-      const outgoing = channels.outgoing.filter((channel) => channel.peerId === peerIdStr)
-      const channel = incoming[0] || outgoing[0]
-      if (!channel) {
-        return res.status(404).send({ status: STATUS_CODES.CHANNEL_NOT_FOUND })
-      }
+      const channel = await getChannel(node, peerid, direction as any)
       return res.status(200).send(channel)
     } catch (err) {
-      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+      console.log(err)
+      if (err.message === STATUS_CODES.INVALID_PEERID) {
+        return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID })
+      } else if (err.message === STATUS_CODES.CHANNEL_NOT_FOUND) {
+        return res.status(404).send({ status: STATUS_CODES.CHANNEL_NOT_FOUND })
+      } else {
+        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+      }
     }
   }
 ]
@@ -142,8 +173,19 @@ GET.apiDoc = {
       in: 'path',
       name: 'peerid',
       description: 'Counterparty peerId assigned to the channel you want to fetch.',
+      required: true,
       schema: {
         $ref: '#/components/schemas/HoprAddress'
+      }
+    },
+    {
+      in: 'path',
+      name: 'direction',
+      description: 'Specify which channel should be fetched, incoming or outgoing.',
+      required: true,
+      schema: {
+        type: 'string',
+        enum: ['incoming', 'outgoing'] as ChannelInfo['type'][]
       }
     }
   ],
@@ -153,7 +195,9 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/Channel'
+            items: {
+              $ref: '#/components/schemas/Channel'
+            }
           }
         }
       }

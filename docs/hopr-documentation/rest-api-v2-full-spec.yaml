@@ -403,6 +403,177 @@
                 }
             }
         },
+      '/node/peers':
+        {
+          'parameters': [],
+          'get':
+            {
+              'description': "Lists information for `connected peers` and `announced peers`.\nConnected peers are nodes which are connected to the node while announced peers are nodes which have announced to the network.\nOptionally, you can pass `quality` parameter which would filter out peers with lower quality to the one specified.",
+              'tags': ['Node'],
+              'operationId': 'nodeGetPeers',
+              'parameters':
+                [
+                  {
+                    'in': 'query',
+                    'name': 'quality',
+                    'description': 'When quality is passed, the response will only include peers with higher or equal quality to the one specified.',
+                    'schema': { 'type': 'number', 'example': '0.5' }
+                  }
+                ],
+              'responses':
+                {
+                  '200':
+                    {
+                      'description': 'Peers information fetched successfuly.',
+                      'content':
+                        {
+                          'application/json':
+                            {
+                              'schema':
+                                {
+                                  'type': 'object',
+                                  'properties':
+                                    {
+                                      'connected':
+                                        {
+                                          'type': 'array',
+                                          'items':
+                                            {
+                                              'type': 'object',
+                                              'properties':
+                                                {
+                                                  'peerId': { '$ref': '#/components/schemas/HoprAddress' },
+                                                  'multiAddr': { '$ref': '#/components/schemas/MultiAddress' },
+                                                  'heartbeats':
+                                                    {
+                                                      'type': 'object',
+                                                      'properties':
+                                                        {
+                                                          'sent':
+                                                            {
+                                                              'type': 'number',
+                                                              'description': 'Heartbeats sent to the node',
+                                                              'example': 10
+                                                            },
+                                                          'success':
+                                                            {
+                                                              'type': 'number',
+                                                              'description': 'Successful heartbeats sent to the node',
+                                                              'example': 8
+                                                            }
+                                                        }
+                                                    },
+                                                  'lastSeen':
+                                                    {
+                                                      'type': 'number',
+                                                      'description': 'Timestamp on when the node was last seen (in milliseconds)',
+                                                      'example': 1646410980793
+                                                    },
+                                                  'quality':
+                                                    {
+                                                      'type': 'number',
+                                                      'description': "A float between 0 (completely unreliable) and 1 (completely reliable) estimating the quality of service of a peer's network connection",
+                                                      'example': 0.8
+                                                    },
+                                                  'backoff': { 'type': 'number' },
+                                                  'isNew':
+                                                    {
+                                                      'type': 'boolean',
+                                                      'description': 'True if the node is new (no heartbeats sent yet).'
+                                                    }
+                                                }
+                                            }
+                                        },
+                                      'announced':
+                                        {
+                                          'type': 'array',
+                                          'items':
+                                            {
+                                              'type': 'object',
+                                              'properties':
+                                                {
+                                                  'peerId': { '$ref': '#/components/schemas/HoprAddress' },
+                                                  'multiAddr': { '$ref': '#/components/schemas/MultiAddress' },
+                                                  'heartbeats':
+                                                    {
+                                                      'type': 'object',
+                                                      'properties':
+                                                        {
+                                                          'sent':
+                                                            {
+                                                              'type': 'number',
+                                                              'description': 'Heartbeats sent to the node',
+                                                              'example': 10
+                                                            },
+                                                          'success':
+                                                            {
+                                                              'type': 'number',
+                                                              'description': 'Successful heartbeats sent to the node',
+                                                              'example': 8
+                                                            }
+                                                        }
+                                                    },
+                                                  'lastSeen':
+                                                    {
+                                                      'type': 'number',
+                                                      'description': 'Timestamp on when the node was last seen (in milliseconds)',
+                                                      'example': 1646410980793
+                                                    },
+                                                  'quality':
+                                                    {
+                                                      'type': 'number',
+                                                      'description': "A float between 0 (completely unreliable) and 1 (completely reliable) estimating the quality of service of a peer's network connection",
+                                                      'example': 0.8
+                                                    },
+                                                  'backoff': { 'type': 'number' },
+                                                  'isNew':
+                                                    {
+                                                      'type': 'boolean',
+                                                      'description': 'True if the node is new (no heartbeats sent yet).'
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                  '400':
+                    {
+                      'description': 'Invalid input. One of the parameters passed is in an incorrect format.',
+                      'content':
+                        {
+                          'application/json':
+                            {
+                              'schema': { '$ref': '#/components/schemas/RequestStatus' },
+                              'example': { 'status': 'INVALID_QUALITY' }
+                            }
+                        }
+                    },
+                  '422':
+                    {
+                      'description': 'Unknown failure.',
+                      'content':
+                        {
+                          'application/json':
+                            {
+                              'schema':
+                                {
+                                  'type': 'object',
+                                  'properties':
+                                    {
+                                      'status': { 'type': 'string', 'example': 'UNKNOWN_FAILURE' },
+                                      'error': { 'type': 'string', 'example': 'Full error message.' }
+                                    }
+                                },
+                              'example': { 'status': 'UNKNOWN_FAILURE', 'error': 'Full error message.' }
+                            }
+                        }
+                    }
+                }
+            }
+        },
       '/node/info':
         {
           'parameters': [],
@@ -1520,7 +1691,7 @@
                 }
             }
         },
-      '/channels/{peerid}':
+      '/channels/{peerid}/{direction}':
         {
           'parameters': [],
           'delete':
@@ -1540,6 +1711,13 @@
                         'description': 'PeerId attached to the channel that we want to close.',
                         'example': '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12'
                       }
+                  },
+                  {
+                    'in': 'path',
+                    'name': 'direction',
+                    'description': 'Specify which channel should be fetched, incoming or outgoing.',
+                    'required': true,
+                    'schema': { 'type': 'string', 'enum': ['incoming', 'outgoing'] }
                   }
                 ],
               'responses':
@@ -1618,7 +1796,15 @@
                     'in': 'path',
                     'name': 'peerid',
                     'description': 'Counterparty peerId assigned to the channel you want to fetch.',
+                    'required': true,
                     'schema': { '$ref': '#/components/schemas/HoprAddress' }
+                  },
+                  {
+                    'in': 'path',
+                    'name': 'direction',
+                    'description': 'Specify which channel should be fetched, incoming or outgoing.',
+                    'required': true,
+                    'schema': { 'type': 'string', 'enum': ['incoming', 'outgoing'] }
                   }
                 ],
               'responses':
@@ -1626,7 +1812,8 @@
                   '200':
                     {
                       'description': 'Channel fetched succesfully.',
-                      'content': { 'application/json': { 'schema': { '$ref': '#/components/schemas/Channel' } } }
+                      'content':
+                        { 'application/json': { 'schema': { 'items': { '$ref': '#/components/schemas/Channel' } } } }
                     },
                   '400':
                     {
@@ -1794,6 +1981,18 @@
               'type': 'object',
               'properties': { 'signature': { 'type': 'string', 'description': 'Signature from requested message.' } },
               'example': '0x304402201065a95fd22fc3e48266c3b270ace032489b0177e07d33c59e0d13dccc89108402205f41fb911bcfe485a8e58162ebce90382dc96ccafff378e5c8960e07efcf9e92'
+            },
+          'MultiAddress':
+            {
+              'type': 'string',
+              'description': 'A multi address is a composable and future-proof network address, usually announced by Public HOPR nodes.',
+              'example':
+                [
+                  '/ip4/128.0.215.32/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit',
+                  '/p2p/16Uiu2HAmLpqczAGfgmJchVgVk233rmB2T3DSn2gPG6JMa5brEHZ1/p2p-circuit/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit',
+                  '/ip4/127.0.0.1/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit',
+                  '/ip4/192.168.178.56/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit'
+                ]
             },
           'Currency':
             {
