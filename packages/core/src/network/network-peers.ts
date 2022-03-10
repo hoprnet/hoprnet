@@ -10,6 +10,7 @@ type Entry = {
   lastSeen: number
   backoff: number // between 2 and MAX_BACKOFF
   quality: number
+  origin: string
 }
 
 const MIN_DELAY = 1000 // 1 sec (because this is multiplied by backoff, it will be half the actual minimum value.
@@ -33,7 +34,7 @@ class NetworkPeers {
     this.peers = []
 
     for (const peer of existingPeers) {
-      this.register(peer)
+      this.register(peer, 'network peers initialization')
     }
   }
 
@@ -86,7 +87,8 @@ class NetworkPeers {
         lastSeen: Date.now(),
         heartbeatsSuccess: previousEntry.heartbeatsSuccess,
         backoff: Math.min(MAX_BACKOFF, Math.pow(previousEntry.backoff, BACKOFF_EXPONENT)),
-        quality: Math.max(0, previousEntry.quality - 0.1)
+        quality: Math.max(0, previousEntry.quality - 0.1),
+        origin: previousEntry.origin
       }
       if (newEntry.quality < NETWORK_QUALITY_THRESHOLD) {
         // trigger callback first to cut connections
@@ -108,7 +110,8 @@ class NetworkPeers {
         lastSeen: Date.now(),
         heartbeatsSuccess: previousEntry.heartbeatsSuccess + 1,
         backoff: 2, // RESET - to back down: Math.pow(entry.backoff, 1/BACKOFF_EXPONENT)
-        quality: Math.min(1, previousEntry.quality + 0.1)
+        quality: Math.min(1, previousEntry.quality + 0.1),
+        origin: previousEntry.origin
       }
     }
 
@@ -125,7 +128,7 @@ class NetworkPeers {
     ).map((e: Entry) => e.id)
   }
 
-  public register(id: PeerId) {
+  public register(id: PeerId, origin: string) {
     if (!this.has(id) && this.exclude.findIndex((x: PeerId) => id.equals(x)) < 0) {
       this.peers.push({
         id,
@@ -133,7 +136,8 @@ class NetworkPeers {
         heartbeatsSuccess: 0,
         lastSeen: Date.now(),
         backoff: 2,
-        quality: BAD_QUALITY
+        quality: BAD_QUALITY,
+        origin
       })
     }
   }
@@ -160,17 +164,16 @@ class NetworkPeers {
     // Sort a copy of peers in-place
     peers.sort((a, b) => this.qualityOf(b) - this.qualityOf(a))
 
-    const goodAvailabilityIndex = peers.findIndex((peer) => this.qualityOf(peer).toFixed(1) === '1.0')
-    const worstAvailabilityIndex = peers.findIndex((peer) => this.qualityOf(peer).toFixed(1) === '0.0')
+    const bestAvailabilityIndex = peers.findIndex((peer) => this.qualityOf(peer).toFixed(1) === '1.0')
+    const badAvailabilityIndex = peers.findIndex((peer) => this.qualityOf(peer) < NETWORK_QUALITY_THRESHOLD)
 
-    const goodAvailabilityNodes = goodAvailabilityIndex < 0 ? 0 : goodAvailabilityIndex + 1
-    const worstAvailabilityNodes = worstAvailabilityIndex < 0 ? 0 : peers.length - worstAvailabilityIndex
+    const bestAvailabilityNodes = bestAvailabilityIndex < 0 ? 0 : bestAvailabilityIndex + 1
+    const badAvailabilityNodes = badAvailabilityIndex < 0 ? 0 : peers.length - badAvailabilityIndex
+    const msgTotalNodes = `${peers.length} node${peers.length == 1 ? '' : 's'} in total`
+    const msgBestNodes = `${bestAvailabilityNodes} node${bestAvailabilityNodes == 1 ? '' : 's'} with quality 1.0`
+    const msgBadNodes = `${badAvailabilityNodes} node${badAvailabilityNodes == 1 ? '' : 's'} with quality below 0.5`
 
-    let out = `current: ${peers.length} node${peers.length == 1 ? '' : 's'} and ${goodAvailabilityNodes} node${
-      goodAvailabilityNodes == 1 ? '' : 's'
-    } with availability 1.0 and ${worstAvailabilityNodes} node${
-      worstAvailabilityNodes == 1 ? '' : 's'
-    } with availability 0.0:\n`
+    let out = `network peers status: ${msgTotalNodes}, ${msgBestNodes}, ${msgBadNodes}\n`
 
     for (const peer of peers) {
       const entryIndex = this.findIndex(peer)
@@ -183,9 +186,11 @@ class NetworkPeers {
 
       const success =
         entry.heartbeatsSent > 0 ? ((entry.heartbeatsSuccess / entry.heartbeatsSent) * 100).toFixed() + '%' : '<new>'
-      out += `- id: ${entry.id.toB58String()}, quality: ${this.qualityOf(entry.id).toFixed(
-        2
-      )} (backoff ${entry.backoff.toFixed()}, ${success} of ${entry.heartbeatsSent}) \n`
+      out += `- id: ${entry.id.toB58String()}, `
+      out += `quality: ${this.qualityOf(entry.id).toFixed(2)}, `
+      out += `backoff: ${entry.backoff.toFixed()} (${success} of ${entry.heartbeatsSent}), `
+      out += `origin: ${entry.origin}`
+      out += '\n'
     }
 
     return out

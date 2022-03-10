@@ -155,7 +155,7 @@ describe('unit test heartbeat', async () => {
 
     assert.equal(peerA.peers.qualityOf(Bob).toFixed(1), '0.2')
 
-    peerA.peers.register(Bob)
+    peerA.peers.register(Bob, 'test')
 
     assert.equal(peerA.peers.qualityOf(Bob).toFixed(1), '0.2')
 
@@ -172,7 +172,7 @@ describe('unit test heartbeat', async () => {
 
     assert.equal(peerA.peers.qualityOf(Charly).toFixed(1), '0.2')
 
-    peerA.peers.register(Charly)
+    peerA.peers.register(Charly, 'test')
 
     assert.equal(peerA.peers.qualityOf(Charly).toFixed(1), '0.2')
 
@@ -191,8 +191,8 @@ describe('unit test heartbeat', async () => {
     const peerB = await getPeer(Bob, network)
     const peerC = await getPeer(Charly, network)
 
-    peerA.peers.register(Bob)
-    peerA.peers.register(Charly)
+    peerA.peers.register(Bob, 'test')
+    peerA.peers.register(Charly, 'test')
 
     assert(peerA.peers.has(Charly), `Alice should know about Charly now.`)
     assert(peerA.peers.has(Bob), `Alice should know about Bob now.`)

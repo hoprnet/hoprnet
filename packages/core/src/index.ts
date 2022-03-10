@@ -261,7 +261,7 @@ class Hopr extends EventEmitter {
     this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessage, hangup, this.environment.id, this.options)
 
     this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
-      this.networkPeers.register(conn.remotePeer)
+      this.networkPeers.register(conn.remotePeer, 'libp2p peer connect')
     })
 
     const protocolMsg = `/hopr/${this.environment.id}/msg`
@@ -464,7 +464,7 @@ class Hopr extends EventEmitter {
     }
 
     for (const channel of currentChannels) {
-      this.networkPeers.register(channel.destination.toPeerId()) // Make sure current channels are 'interesting'
+      this.networkPeers.register(channel.destination.toPeerId(), 'channel strategy tick (existing channel)') // Make sure current channels are 'interesting'
     }
 
     let balance: Balance
@@ -519,7 +519,7 @@ class Hopr extends EventEmitter {
 
     for (let i = 0; i < nextChannelDestinations.length; i++) {
       const channel = nextChannelDestinations[i]
-      this.networkPeers.register(channel[0].toPeerId())
+      this.networkPeers.register(channel[0].toPeerId(), 'channel strategy tick (new channel)')
       try {
         // Opening channels can fail if we can't establish a connection.
         const hash = await this.openChannel(channel[0].toPeerId(), channel[1])
@@ -722,7 +722,7 @@ class Hopr extends EventEmitter {
       if (this.networkPeers.has(destination)) {
         this.networkPeers.updateRecord(pingResult)
       } else {
-        this.networkPeers.register(destination)
+        this.networkPeers.register(destination, 'manual ping')
       }
       return { latency: pingResult.lastSeen - start }
     } else {

@@ -81,7 +81,7 @@ export default class Heartbeat {
         lastSeen: Date.now()
       })
     } else {
-      this.networkPeers.register(remotePeer)
+      this.networkPeers.register(remotePeer, 'incoming heartbeat')
     }
 
     log(`received heartbeat from ${remotePeer.toB58String()}`)
