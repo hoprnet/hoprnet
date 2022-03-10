@@ -11,6 +11,7 @@ type Entry = {
   backoff: number // between 2 and MAX_BACKOFF
   quality: number
   origin: string
+  ignoredAt?: number
 }
 
 const MIN_DELAY = 1000 // 1 sec (because this is multiplied by backoff, it will be half the actual minimum value.
@@ -18,13 +19,11 @@ const MAX_DELAY = 5 * 60 * 1000 // 5mins
 const BACKOFF_EXPONENT = 1.5
 export const MAX_BACKOFF = MAX_DELAY / MIN_DELAY
 const BAD_QUALITY = 0.2 // Default quality for nodes we don't know about or which are considered offline.
+const IGNORE_TIMEFRAME = 10 * 60 * 1000 // 10mins
 
 class NetworkPeers {
   private peers: Entry[]
-
-  private findIndex(peer: PeerId): number {
-    return this.peers.findIndex((entry: Entry) => entry.id.equals(peer))
-  }
+  private ignoredPeers: Entry[]
 
   constructor(
     existingPeers: Array<PeerId>,
@@ -32,16 +31,11 @@ class NetworkPeers {
     private onPeerOffline?: (peer: PeerId) => void
   ) {
     this.peers = []
+    this.ignoredPeers = []
 
     for (const peer of existingPeers) {
       this.register(peer, 'network peers initialization')
     }
-  }
-
-  private nextPing(e: Entry): number {
-    // Exponential backoff
-    const delay = Math.min(MAX_DELAY, Math.pow(e.backoff, BACKOFF_EXPONENT) * MIN_DELAY)
-    return e.lastSeen + delay
   }
 
   // @returns a float between 0 (completely unreliable) and 1 (completely
@@ -98,6 +92,8 @@ class NetworkPeers {
         if (newEntry.quality < BAD_QUALITY) {
           // delete peer from internal store
           this.peers.splice(entryIndex, 1)
+          // add entry to temporarily ignored peers
+          this.ignorePeer(newEntry)
           // done, return early so the rest can update the entry instead
           return
         }
@@ -129,17 +125,40 @@ class NetworkPeers {
   }
 
   public register(id: PeerId, origin: string) {
-    if (!this.has(id) && this.exclude.findIndex((x: PeerId) => id.equals(x)) < 0) {
-      this.peers.push({
-        id,
-        heartbeatsSent: 0,
-        heartbeatsSuccess: 0,
-        lastSeen: Date.now(),
-        backoff: 2,
-        quality: BAD_QUALITY,
-        origin
-      })
+    if (this.has(id)) {
+      // the peer is already registered
+      return
     }
+
+    if (this.exclude.findIndex((x: PeerId) => id.equals(x)) >= 0) {
+      // the peer is explicitely ignored
+      return
+    }
+
+    const ignoredIndex = this.ignoredPeers.findIndex((e: Entry) => e.id.equals(id) && e.origin == origin)
+    const now = Date.now()
+
+    if (ignoredIndex >= 0) {
+      // the peer is temporarily ignored, release if time has passed
+      const ignoredEntry = this.ignoredPeers[ignoredIndex]
+      if (ignoredEntry.ignoredAt + IGNORE_TIMEFRAME < now) {
+        // release and continue
+        this.unignorePeer(ignoredEntry)
+      } else {
+        // ignore still valid, thus skipping this registration
+        return
+      }
+    }
+
+    this.peers.push({
+      id,
+      heartbeatsSent: 0,
+      heartbeatsSuccess: 0,
+      lastSeen: now,
+      backoff: 2,
+      quality: BAD_QUALITY,
+      origin
+    })
   }
 
   public length(): number {
@@ -194,6 +213,33 @@ class NetworkPeers {
     }
 
     return out
+  }
+
+  private nextPing(e: Entry): number {
+    // Exponential backoff
+    const delay = Math.min(MAX_DELAY, Math.pow(e.backoff, BACKOFF_EXPONENT) * MIN_DELAY)
+    return e.lastSeen + delay
+  }
+
+  private findIndex(peer: PeerId): number {
+    return this.peers.findIndex((entry: Entry) => entry.id.equals(peer))
+  }
+
+  private ignorePeer(entry: Entry): void {
+    const index = this.ignoredPeers.findIndex((e: Entry) => e.id.equals(entry.id) && e.origin == entry.origin)
+
+    if (index < 0) {
+      entry.ignoredAt = Date.now()
+      this.ignoredPeers.push(entry)
+    }
+  }
+
+  private unignorePeer(entry: Entry): void {
+    const index = this.ignoredPeers.findIndex((e: Entry) => e.id.equals(entry.id) && e.origin == entry.origin)
+
+    if (index >= 0) {
+      this.ignoredPeers.splice(index, 1)
+    }
   }
 }
 
