@@ -51,7 +51,6 @@ const sidebars = {
         'core/proof-of-relay',
         'core/tickets-and-payment-channels',
         'core/probabilistic-payments',
-        'core/incentives',
         'core/cover-traffic',
         'core/cover-traffic-nodes',
         'core/balancing-cover-traffic'
