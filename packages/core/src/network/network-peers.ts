@@ -9,14 +9,14 @@ type Entry = {
   heartbeatsSuccess: number
   lastSeen: number
   backoff: number // between 2 and MAX_BACKOFF
-  lastTen: number
+  quality: number
 }
 
 const MIN_DELAY = 1000 // 1 sec (because this is multiplied by backoff, it will be half the actual minimum value.
 const MAX_DELAY = 5 * 60 * 1000 // 5mins
 const BACKOFF_EXPONENT = 1.5
 export const MAX_BACKOFF = MAX_DELAY / MIN_DELAY
-const UNKNOWN_Q = 0.2 // Default quality for nodes we don't know about.
+const BAD_QUALITY = 0.2 // Default quality for nodes we don't know about or which are considered offline.
 
 class NetworkPeers {
   private peers: Entry[]
@@ -51,9 +51,9 @@ class NetworkPeers {
       /*
       return entry.heartbeatsSuccess / entry.heartbeatsSent
       */
-      return this.peers[entryIndex].lastTen
+      return this.peers[entryIndex].quality
     }
-    return UNKNOWN_Q
+    return BAD_QUALITY
   }
 
   public pingSince(thresholdTime: number): PeerId[] {
@@ -78,30 +78,41 @@ class NetworkPeers {
 
     let newEntry: Entry
 
-    if (pingResult.lastSeen >= 0) {
-      newEntry = {
-        id: pingResult.destination,
-        heartbeatsSent: previousEntry.heartbeatsSent + 1,
-        lastSeen: Date.now(),
-        heartbeatsSuccess: previousEntry.heartbeatsSuccess + 1,
-        backoff: 2, // RESET - to back down: Math.pow(entry.backoff, 1/BACKOFF_EXPONENT)
-        lastTen: Math.min(1, previousEntry.lastTen + 0.1)
-      }
-    } else {
+    if (pingResult.lastSeen < 0) {
+      // failed ping
       newEntry = {
         id: pingResult.destination,
         heartbeatsSent: previousEntry.heartbeatsSent + 1,
         lastSeen: Date.now(),
         heartbeatsSuccess: previousEntry.heartbeatsSuccess,
         backoff: Math.min(MAX_BACKOFF, Math.pow(previousEntry.backoff, BACKOFF_EXPONENT)),
-        lastTen: Math.max(0, previousEntry.lastTen - 0.1)
+        quality: Math.max(0, previousEntry.quality - 0.1)
       }
-
-      if (newEntry.lastTen < NETWORK_QUALITY_THRESHOLD) {
+      if (newEntry.quality < NETWORK_QUALITY_THRESHOLD) {
+        // trigger callback first to cut connections
         this.onPeerOffline?.(pingResult.destination)
+
+        // check if this node is considered offline and should be removed
+        if (newEntry.quality < BAD_QUALITY) {
+          // delete peer from internal store
+          this.peers.splice(entryIndex, 1)
+          // done, return early so the rest can update the entry instead
+          return
+        }
+      }
+    } else {
+      // successful ping
+      newEntry = {
+        id: pingResult.destination,
+        heartbeatsSent: previousEntry.heartbeatsSent + 1,
+        lastSeen: Date.now(),
+        heartbeatsSuccess: previousEntry.heartbeatsSuccess + 1,
+        backoff: 2, // RESET - to back down: Math.pow(entry.backoff, 1/BACKOFF_EXPONENT)
+        quality: Math.min(1, previousEntry.quality + 0.1)
       }
     }
 
+    // update peer entry if still considered ok to keep
     this.peers[entryIndex] = newEntry
   }
 
@@ -122,7 +133,7 @@ class NetworkPeers {
         heartbeatsSuccess: 0,
         lastSeen: Date.now(),
         backoff: 2,
-        lastTen: UNKNOWN_Q
+        quality: BAD_QUALITY
       })
     }
   }

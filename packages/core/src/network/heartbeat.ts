@@ -1,4 +1,6 @@
-import type NetworkPeerStore from './network-peers'
+import { setImmediate } from 'timers/promises'
+
+import type NetworkPeers from './network-peers'
 import type PeerId from 'peer-id'
 import { randomInteger, u8aEquals, debug, retimer, nAtATime, u8aToHex } from '@hoprnet/hopr-utils'
 import { HEARTBEAT_INTERVAL, HEARTBEAT_TIMEOUT, HEARTBEAT_INTERVAL_VARIANCE } from '../constants'
@@ -37,7 +39,7 @@ export default class Heartbeat {
   private config: HeartbeatConfig
 
   constructor(
-    private networkPeers: NetworkPeerStore,
+    private networkPeers: NetworkPeers,
     private subscribe: Subscribe,
     protected sendMessage: SendMessage,
     private hangUp: (addr: PeerId) => Promise<void>,
@@ -115,7 +117,11 @@ export default class Heartbeat {
 
     if (pingResponse == null || pingResponse.length != 1 || !u8aEquals(expectedResponse, pingResponse[0])) {
       log(`Mismatched challenge. Got ${u8aToHex(pingResponse[0])} but expected ${u8aToHex(expectedResponse)}`)
-      await this.hangUp(destination)
+      try {
+        await this.hangUp(destination)
+      } catch (err) {
+        log(`Hang up connection to ${destination.toB58String()} failed: ${err?.message}`)
+      }
 
       return {
         destination,
@@ -159,10 +165,15 @@ export default class Heartbeat {
 
     finished = true
 
-    for (const pingResult of pingResults) {
-      // Filter unexpected network errors
+    for (let [resultIndex, pingResult] of pingResults.entries()) {
+      await setImmediate()
       if (pingResult instanceof Error) {
-        continue
+        // we need to get the destination so we can map a ping error properly
+        const [destination, _abortSignal] = pingWork[resultIndex]
+        pingResult = {
+          destination,
+          lastSeen: -1
+        }
       }
       this.networkPeers.updateRecord(pingResult)
     }

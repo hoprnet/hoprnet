@@ -1,5 +1,5 @@
 import Heartbeat, { type HeartbeatConfig } from './heartbeat'
-import NetworkPeerStore from './network-peers'
+import NetworkPeers from './network-peers'
 import { assert } from 'chai'
 import { type LibP2PHandlerFunction, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { EventEmitter, once } from 'events'
@@ -102,8 +102,11 @@ function createFakeNetwork() {
   }
 }
 
-function getPeer(self: PeerId, network: ReturnType<typeof createFakeNetwork>) {
-  const peers = new NetworkPeerStore([], [self])
+async function getPeer(
+  self: PeerId,
+  network: ReturnType<typeof createFakeNetwork>
+): Promise<{ heartbeat: TestingHeartbeat; peers: NetworkPeers }> {
+  const peers = new NetworkPeers([], [self])
 
   const heartbeat = new TestingHeartbeat(
     peers,
@@ -120,7 +123,7 @@ function getPeer(self: PeerId, network: ReturnType<typeof createFakeNetwork>) {
     }
   )
 
-  heartbeat.start()
+  await heartbeat.start()
 
   return { heartbeat, peers }
 }
@@ -128,7 +131,7 @@ function getPeer(self: PeerId, network: ReturnType<typeof createFakeNetwork>) {
 describe('unit test heartbeat', async () => {
   it('check nodes is noop with empty store', async () => {
     const heartbeat = new TestingHeartbeat(
-      new NetworkPeerStore([], [Alice]),
+      new NetworkPeers([], [Alice]),
       (() => {}) as any,
       (async () => {
         assert.fail(`must not call send`)
@@ -146,9 +149,9 @@ describe('unit test heartbeat', async () => {
 
   it('check nodes does not change quality of newly registered peers', async () => {
     const network = createFakeNetwork()
-    const peerA = getPeer(Alice, network)
+    const peerA = await getPeer(Alice, network)
 
-    const peerB = getPeer(Bob, network)
+    const peerB = await getPeer(Bob, network)
 
     assert.equal(peerA.peers.qualityOf(Bob).toFixed(1), '0.2')
 
@@ -158,14 +161,14 @@ describe('unit test heartbeat', async () => {
 
     await peerA.heartbeat.checkNodes()
 
-    assert.equal(peerA.peers.qualityOf(Bob).toFixed(1), '0.2')
+    assert.equal(peerA.peers.qualityOf(Bob).toFixed(1), '0.3')
     ;[peerA, peerB].map((peer) => peer.heartbeat.stop())
     network.close()
   })
 
   it('check nodes does not change quality of offline peer', async () => {
     const network = createFakeNetwork()
-    const peerA = getPeer(Alice, network)
+    const peerA = await getPeer(Alice, network)
 
     assert.equal(peerA.peers.qualityOf(Charly).toFixed(1), '0.2')
 
@@ -184,9 +187,9 @@ describe('unit test heartbeat', async () => {
   it('test heartbeat flow', async () => {
     const network = createFakeNetwork()
 
-    const peerA = getPeer(Alice, network)
-    const peerB = getPeer(Bob, network)
-    const peerC = getPeer(Charly, network)
+    const peerA = await getPeer(Alice, network)
+    const peerB = await getPeer(Bob, network)
+    const peerC = await getPeer(Charly, network)
 
     peerA.peers.register(Bob)
     peerA.peers.register(Charly)
@@ -194,7 +197,6 @@ describe('unit test heartbeat', async () => {
     assert(peerA.peers.has(Charly), `Alice should know about Charly now.`)
     assert(peerA.peers.has(Bob), `Alice should know about Bob now.`)
 
-    await peerA.heartbeat.checkNodes()
     await peerA.heartbeat.checkNodes()
     await peerA.heartbeat.checkNodes()
     await peerA.heartbeat.checkNodes()
