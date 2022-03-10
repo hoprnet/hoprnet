@@ -23,7 +23,7 @@ export default class Addresses extends AbstractCommand {
 
     let peerId: PeerId
     try {
-      peerId = checkPeerIdInput(query, getState())
+      peerId = checkPeerIdInput(query)
     } catch (err) {
       return log(styleValue(err.message, 'failure'))
     }

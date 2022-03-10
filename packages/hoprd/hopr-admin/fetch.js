@@ -20,9 +20,8 @@ export const getAddresses = () => getReq("account/addresses")
  */
 export const getAliases = () => getReq("aliases")
 
-export const setAliases = (peerId, alias) => {
-  postReq("aliases/", {"peerId": peerId, "alias": alias})
-}
+export const setAliases = (peerId, alias) => postReq("aliases/", {"peerId": peerId, "alias": alias})
+
 
 /*
  * Channels API
@@ -52,8 +51,8 @@ export const getTicketStats = () => getReq(`tickets/statistics`)
 export const signMessage = (msg) => postReq("messages/sign", {message: msg})
 
 
-export const sendMessage = (body, recepient, path) => {
-  postReq("messages", {body: body, recepient: recepient, path: path})
+export const sendMessage = (body, recipient, path) => {
+  return postReq("messages", {body: body, recipient: recipient, path: path})
 }
 
 /*
@@ -70,4 +69,4 @@ export const pingNodePeer = (peerId) => postReq("node/ping", {peerId: peerId})
  */
 export const getSettings = () => getReq("settings")
 
-export const setSettings = () => putReq(`settings`)
+export const setSettings = (key, value) => putReq(`settings/${key}`, {key: key, value: value})

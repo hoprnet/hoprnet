@@ -2,14 +2,13 @@ import { AbstractCommand } from './abstractCommand'
 import CloseChannel from './closeChannel'
 import ListCommands from './listCommands'
 import ListOpenChannels from './listOpenChannels'
-// import ListConnectedPeers from './listConnected'
+import ListConnectedPeers from './listConnected'
 import { OpenChannel } from './openChannel'
 import Ping from './ping'
 import Sign from './sign'
 import PrintAddress from './printAddress'
 import PrintBalance from './printBalance'
 import { SendMessage } from './sendMessage'
-// import StopNode from './stopNode'
 import Version from './version'
 import Tickets from './tickets'
 import RedeemTickets from './redeemTickets'
@@ -29,7 +28,7 @@ export class Commands {
       new Alias(),
       new CloseChannel(),
       new Info(),
-      // new ListConnectedPeers(),
+      new ListConnectedPeers(),
       new ListCommands(() => this.commands),
       new ListOpenChannels(),
       new Ping(),
@@ -37,7 +36,6 @@ export class Commands {
       new PrintBalance(),
       new RedeemTickets(),
       new Sign(),
-      // new StopNode(),
       new Version(),
       new Tickets(),
       new SendMessage(),

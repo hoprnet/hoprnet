@@ -21,9 +21,14 @@ export default class Sign extends AbstractCommand {
     }
 
     try {
-      const signature = await signMessage(query).then(res => res.json()).then(res => res.signature)
+      const response = await signMessage(query)
+      const signature = await response.json()
+      if (response.status === 200 || response.status === 422){
+        return log(`Signed message: ${signature.signature}`)
+      } else {
+        return log(`Status: ${signature.status}`)
+      }
 
-      return log(`Signed message: ${signature}`)
     } catch (err) {
       return log(styleValue(err.message, 'failure'))
     }

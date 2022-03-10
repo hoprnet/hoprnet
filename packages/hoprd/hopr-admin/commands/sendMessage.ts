@@ -1,7 +1,7 @@
 import type PeerId from 'peer-id'
-import { INTERMEDIATE_HOPS } from '@hoprnet/hopr-core/lib/constants'
 import { checkPeerIdInput, encodeMessage, styleValue } from './utils'
 import { AbstractCommand } from './abstractCommand'
+import { getAddresses, getSettings, sendMessage } from '../fetch'
 
 export class SendMessage extends AbstractCommand {
   constructor() {
@@ -16,21 +16,22 @@ export class SendMessage extends AbstractCommand {
     return 'Sends a message to another party'
   }
 
-  private insertMyAddress(message: string): string {
-    const myAddress = this.node.getId().toB58String()
+  private static async insertMyAddress(message: string): string {
+    // TODO: .toB58String() needed???
+    const myAddress = await getAddresses().then(res => res.hoprAddress)
     return `${myAddress}:${message}`
   }
 
   protected async sendMessage(
-    state: State,
     recipient: PeerId,
     rawMessage: string,
     path?: PublicKey[]
   ): Promise<string> {
-    const message = state.settings.includeRecipient ? this.insertMyAddress(rawMessage) : rawMessage
+    const includeRecipientValue = await getSettings().then(res => res.includeRecipient)
+    const message = includeRecipientValue ? SendMessage.insertMyAddress(rawMessage) : rawMessage
 
     try {
-      await this.node.sendMessage(encodeMessage(message), recipient, path)
+      await sendMessage(encodeMessage(message), recipient, path)
       return 'Message sent'
     } catch (err) {
       return styleValue(`Could not send message. (${err.message})`, 'failure')
@@ -52,7 +53,7 @@ export class SendMessage extends AbstractCommand {
       const path: PublicKey[] = []
       for (const pIdString of peerIdStrings) {
         try {
-          path.push(PublicKey.fromPeerId(checkPeerIdInput(pIdString, state)))
+          path.push(PublicKey.fromPeerId(checkPeerIdInput(pIdString)))
         } catch (err) {
           log(styleValue(`<${pIdString}> is neither a valid alias nor a valid Hopr address string`))
           return
@@ -71,20 +72,20 @@ export class SendMessage extends AbstractCommand {
           .map((current) => styleValue(current.toString(), 'peerId'))
           .join(',')} ...`
       )
-      log(await this.sendMessage(state, recipient.toPeerId(), message, intermediateNodes))
+      log(await this.sendMessage(recipient.toPeerId(), message, intermediateNodes))
 
       return
     }
 
     let destination: PeerId
     try {
-      destination = checkPeerIdInput(peerIdString, state)
+      destination = checkPeerIdInput(peerIdString)
     } catch (err) {
       log(styleValue(`<${peerIdString}> is neither a valid alias nor a valid Hopr address string`))
       return
     }
 
     console.log(`Sending message to ${styleValue(destination.toB58String(), 'peerId')} ...`)
-    log(await this.sendMessage(state, destination, message))
+    log(await this.sendMessage(destination, message))
   }
 }

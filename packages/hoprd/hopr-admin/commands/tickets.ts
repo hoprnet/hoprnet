@@ -1,6 +1,8 @@
 import { AbstractCommand } from './abstractCommand'
 import { styleValue } from './utils'
 import { getTicketStats } from '../fetch'
+import { toFormattedString } from './utils/formatting'
+import { BalanceSymbols } from './utils/util'
 
 export default class Tickets extends AbstractCommand {
   constructor() {
@@ -24,14 +26,14 @@ export default class Tickets extends AbstractCommand {
 Tickets:
 - Pending:          ${stats.pending}
 - Unredeemed:       ${stats.unredeemed}
-- Unredeemed Value: ${stats.unredeemedValue}
+- Unredeemed Value: ${toFormattedString(stats.unredeemedValue, BalanceSymbols.Balance)}
 - Redeemed:         ${stats.redeemed}
-- Redeemed Value:   ${stats.redeemedValue}
+- Redeemed Value:   ${toFormattedString(stats.redeemedValue, BalanceSymbols.Balance)}
 - Losing Tickets:   ${stats.losingTickets}
 - Win Proportion:   ${stats.winProportion * 100}% 
 - Neglected:        ${stats.neglected} 
 - Rejected:         ${stats.rejected}
-- Rejected Value:   ${stats.rejectedValue}
+- Rejected Value:   ${toFormattedString(stats.rejectedValue, BalanceSymbols.Balance)}
           `)
     } catch (err) {
       log(styleValue(err.message, 'failure'))

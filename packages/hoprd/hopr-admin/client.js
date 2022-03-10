@@ -30,16 +30,17 @@ export const putReq = (apiSuffix, jsonBody) => {
       'x-auth-token': API_SECURITY_TOKEN,
     },
     body: JSON.stringify(jsonBody)
-  }).then(res => res)
+  })
 }
 
 export const delReq = (apiSuffix) => {
   return fetch(API_ENDPOINT + apiSuffix, {
+    method: 'DELETE',
     headers: {
       'Accept': 'application/json',
       'x-auth-token': API_SECURITY_TOKEN,
     },
-  }).then(res => res.json())
+  })
 }
 
 export const parseCmd = (cmdInput) => {

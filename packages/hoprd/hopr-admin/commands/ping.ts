@@ -30,12 +30,12 @@ export default class Ping extends AbstractCommand {
 
     let out = ''
 
-    let pingResult: Awaited<ReturnType<Hopr['ping']>>
+    let pingResult: any
 
     let error: any
 
     try {
-      pingResult = await pingNodePeer(peerId)
+      pingResult = await pingNodePeer(query).then(res => res.json())
     } catch (err) {
       error = err
     }

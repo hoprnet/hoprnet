@@ -1,6 +1,8 @@
 import { AbstractCommand } from './abstractCommand'
 import { styleValue } from './utils'
-import { Balance, NativeBalance } from '@hoprnet/hopr-utils'
+import { accountWithdraw } from '../fetch'
+import { moveDecimalPoint } from './utils/moveDecimal'
+import { BalanceDecimals, BalanceSymbols } from './utils/util'
 
 export default class Withdraw extends AbstractCommand {
   private arguments = ['amount (ETH, HOPR)', 'currency (native, hopr)', 'recipient (blockchain address)']
@@ -37,8 +39,8 @@ export default class Withdraw extends AbstractCommand {
 
     const weiAmount =
       currency === 'NATIVE'
-        ? moveDecimalPoint(amount, NativeBalance.DECIMALS)
-        : moveDecimalPoint(amount, Balance.DECIMALS)
+        ? moveDecimalPoint(amount, BalanceDecimals.Native)
+        : moveDecimalPoint(amount, BalanceDecimals.Balance)
 
     return {
       amount,
@@ -63,15 +65,25 @@ export default class Withdraw extends AbstractCommand {
   public async execute(log, query: string): Promise<void> {
     try {
       const { amount, weiAmount, currency, recipient } = await this.checkArgs(query ?? '')
-      const symbol = currency === 'NATIVE' ? NativeBalance.SYMBOL : Balance.SYMBOL
+      const symbol = currency === 'NATIVE' ? BalanceSymbols.Native : BalanceSymbols.Balance
 
-      const receipt = await this.node.withdraw(currency, recipient, weiAmount)
-      log(
-        `Withdrawing ${styleValue(amount, 'number')} ${symbol} to ${styleValue(
-          recipient,
-          'peerId'
-        )}, receipt ${styleValue(receipt, 'hash')}.`
-      )
+      const withdraw = await accountWithdraw({
+        "amount": weiAmount,
+        "currency": currency,
+        "recipient": recipient
+      })
+
+      if (withdraw.status === 200){
+        const receipt = withdraw.json().then(res => res.receipt)
+        log(
+          `Withdrawing ${styleValue(amount, 'number')} ${symbol} to ${styleValue(
+            recipient,
+            'peerId'
+          )}, receipt ${styleValue(receipt, 'hash')}.`
+        )
+      } else {
+        withdraw.json().then(res => log(res.STATUS))
+      }
     } catch (err) {
       log(styleValue(err.message, 'failure'))
     }

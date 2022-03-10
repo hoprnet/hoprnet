@@ -40,16 +40,20 @@ export class Alias extends AbstractCommand {
       )
     }
 
-    // sets aliases
     const [error, id, name] = this._assertUsage(query, this.parameters)
     if (error) return log(styleValue(error, 'failure'))
 
+    // sets aliases
     try {
       let peerId = checkPeerIdInput(id)
-      // TODO: Handle responses
-      setAliases(name, peerId)
 
-      return log(`Set alias '${styleValue(name, 'highlight')}' to '${styleValue(peerId, 'peerId')}'.`)
+      const response = await setAliases(peerId.toB58String(), name)
+
+      if (response.status == 201){
+        return log(`Set alias '${styleValue(name, 'highlight')}' to '${styleValue(peerId.toB58String(), 'peerId')}'.`)
+      } else {
+        return log(styleValue(response.status, 'failure'))
+      }
     } catch (error) {
       return log(styleValue(error.message, 'failure'))
     }

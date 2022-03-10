@@ -1,6 +1,5 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
-import type { StateOps, State } from '../types'
 import { INTERMEDIATE_HOPS } from '@hoprnet/hopr-core/lib/constants'
 import { PublicKey } from '@hoprnet/hopr-utils'
 import { checkPeerIdInput, encodeMessage, styleValue } from './utils'

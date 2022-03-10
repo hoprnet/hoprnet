@@ -3,7 +3,9 @@ import chalk from 'chalk'
 import { checkPeerIdInput, styleValue } from './utils'
 import { AbstractCommand } from './abstractCommand'
 import { getBalances, setChannels } from '../fetch'
-import { hoprToWei } from './utils/util'
+import { BalanceDecimals, hoprToWei } from './utils/util'
+import {  moveDecimalPoint } from './utils/moveDecimal'
+import BN from 'bn.js'
 
 export class OpenChannel extends AbstractCommand {
   constructor() {
@@ -34,10 +36,12 @@ export class OpenChannel extends AbstractCommand {
       return log(styleValue(err.message, 'failure'))
     }
 
-    const amountToFund = hoprToWei(amountToFundStr)
-    console.log(amountToFund, "Djhdj")
+    // TODO: Add hoprToWei function ??
+    const amountToFund = new BN(moveDecimalPoint(amountToFundStr, BalanceDecimals.Balance))
+
     const myAvailableTokens = await getBalances()
-    if (amountToFund.lten(0)) {
+    // TODO: if (amountToFund.lten(0))
+    if (amountToFund) {
       return log(`Invalid 'amountToFund' provided: ${amountToFund.toString(10)}`)
     } else if (amountToFund.gt(myAvailableTokens.toBN())) {
       return log(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toBN().toString(10)}`)

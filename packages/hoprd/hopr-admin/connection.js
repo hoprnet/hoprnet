@@ -2,15 +2,8 @@
  * Maintain a websocket connection
  */
 
-import Cookies from 'js-cookie'
 import { parseCmd } from './client'
-import {
-  accountWithdraw,
-  closeChannel,
-  getNodeInfo, getNodeVer, getSettings, getTickets, pingNodePeer, redeemTickets, sendMessage, setChannels, signAddress
-} from './fetch'
 import { Commands } from './commands'
-
 
 const MAX_MESSAGES_CACHED = 50
 
@@ -114,83 +107,30 @@ export class Connection {
         if (e.keyCode == 13) {
           var text = e.target.value
           if (text.length > 0) {
-            // v1 websocket way
-            // client.send(text)
-            // this.prevLog = text
-
             const userInput = parseCmd(text)
-            // let options = []
-            // if (userInput.query != '') {
-            //   options = userInput.query.trim().split(/\s+/)
-            // }
-
             const cmds = new Commands();
             switch (userInput.cmd) {
-              // Test cmd: withdraw 1337 NATIVE 0xEA9eDAE5CfC794B75C45c8fa89b605508A03742a
               case "withdraw":
-                // accountWithdraw({
-                //   "amount": options[0],
-                //   "currency": options[1],
-                //   "recipient": options[2]
-                // })
-                break
               case "balance":
-                cmds.execute(this.logger, text);
-                break
               case "address":
-                cmds.execute(this.logger, text);
-                break
               case "alias":
-                // Test cmd: alias 16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 Alice
-                cmds.execute(this.logger, text);
-                break
               case "channels":
-                cmds.execute(this.logger, text);
-                break
               case "close":
-                // Test cmd: close 16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12
-                cmds.execute(this.logger, text);
-                break
               case "info":
-                cmds.execute(this.logger, text);
-                break
               case "open":
-                // Test cmd: open 16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 1000000
-                cmds.execute(this.logger, text);
-                break
               case "redeemTickets":
-                cmds.execute(this.logger, text);
-                break
               case "tickets":
-                // Test cmd: tickets 16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12
-                cmds.execute(this.logger, text);
-                break
               case "version":
-                cmds.execute(this.logger, text);
-                break
               case "ping":
-                // Test cmd: ping 16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12
-                cmds.execute(this.logger, text);
-                break
               case "settings":
-                cmds.execute(this.logger, text);
-                break
               case "sign":
-                // Test cmd: sign 16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12
-                cmds.execute(this.logger, text);
-                break
               case "send":
-                // Test cmd: send Hello 16Uiu2HAm2SF8EdwwUaaSoYTiZSddnG4hLVF7dizh32QFTNWMic2b [16Uiu2HAm1uV82HyD1iJ5DmwJr4LftmJUeMfj8zFypBRACmrJc16n]
-                cmds.execute(this.logger, text);
-                break
               case "peers":
-                // TODO: See https://github.com/hoprnet/hoprnet/pull/3617
-                break
               case "help":
                 cmds.execute(this.logger, text);
                 break
               default:
-                console.log("Command not found.")
+                this.logger("Command not found.")
                 break
             }
             e.target.value = ''
