@@ -52,7 +52,9 @@ Responsibilities:
 _Roles:_
 
 - [Tino](https://github.com/tolbrino) acting as Tech Coordinator
-- [Steven](https://github.com/robertkiel) acting as Process and DevRel Coordinator
+- [Steven](https://github.com/nioni) acting as Process, Bounty and DevRel Coordinator
+
+__DevRel__ cover specifically covers how the tech team interacts with the HOPR community in regards to technical support.
 
 ### Trifecta
 
