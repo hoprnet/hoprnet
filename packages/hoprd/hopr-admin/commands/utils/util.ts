@@ -1,9 +1,9 @@
-export enum ChannelStatus {
-  Closed = 0,
-  WaitingForCommitment = 1,
-  Open = 2,
-  PendingToClose = 3
-}
+// export enum ChannelStatus {
+//   Closed = "Closed",
+//   WaitingForCommitment = "WaitingForCommitment",
+//   Open = "Open",
+//   PendingToClose = "PendingToClose"
+// }
 
 export enum BalanceDecimals {
   Native = 18,
@@ -16,7 +16,7 @@ export enum BalanceSymbols {
 }
 
 // HOPR -> weiHOPR
-export const hoprToWei = (value: string) => Math.floor(Number((BigInt(value) * 10n ** 18n).toString()))
+// export const hoprToWei = (value: string) => Math.floor(Number((BigInt(value) * 10n ** 18n).toString()))
 
 // weiHOPR -> HOPR
 // export const weiToHopr = ()

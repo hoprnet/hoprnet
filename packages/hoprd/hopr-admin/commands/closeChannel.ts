@@ -3,7 +3,6 @@ import chalk from 'chalk'
 import { AbstractCommand } from './abstractCommand'
 import { checkPeerIdInput, styleValue } from './utils'
 import { closeChannel, getNodeInfo } from '../fetch'
-import { ChannelStatus } from './utils/util'
 
 export default class CloseChannel extends AbstractCommand {
   constructor() {
@@ -36,10 +35,17 @@ export default class CloseChannel extends AbstractCommand {
       const response = await closeChannel(peerId.toB58String())
       const nodeInfo = await getNodeInfo()
 
-
-      if (response.status === ChannelStatus.PendingToClose) {
-        return log(`${chalk.green(`Closing channel. Receipt: ${styleValue(response.receipt, 'hash')}`)}.`)
-      } else {
+      if (response.status === 200) {
+        const { receipt } = await response.json()
+        return log(`${chalk.green(`Closing channel. Receipt: ${styleValue(receipt, 'hash')}`)}.`)
+      } else if (response.status === 400) {
+        const { status } = await response.json()
+        return log(`Status: ${status}`)
+      } else if (response.status === 422) {
+        const { status, error } = await response.json()
+        return log(`${status}\n${error}`)
+      }
+      else {
         return log(
           `${chalk.green(
             `Initiated channel closure, the channel must remain open for at least ${nodeInfo.channelClosurePeriod} minutes. Please send the close command again once the cool-off has passed. Receipt: ${styleValue(

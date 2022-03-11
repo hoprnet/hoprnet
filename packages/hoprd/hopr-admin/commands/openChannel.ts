@@ -36,25 +36,29 @@ export class OpenChannel extends AbstractCommand {
       return log(styleValue(err.message, 'failure'))
     }
 
-    // TODO: Add hoprToWei function ??
     const amountToFund = new BN(moveDecimalPoint(amountToFundStr, BalanceDecimals.Balance))
+    const myAvailableTokens = await getBalances().then(d => new BN(d.hopr))
 
-    const myAvailableTokens = await getBalances()
-    // TODO: if (amountToFund.lten(0))
-    if (amountToFund) {
+    if (amountToFund.lten(0)) {
       return log(`Invalid 'amountToFund' provided: ${amountToFund.toString(10)}`)
-    } else if (amountToFund.gt(myAvailableTokens.toBN())) {
-      return log(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toBN().toString(10)}`)
+    } else if (amountToFund.gt(myAvailableTokens)) {
+      return log(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toString(10)}`)
     }
 
     log('Opening channel...')
-    //
-    // try {
-    //   // const { peerId, amount } = await setChannels(counterparty.id, 1000);
-    //   const { channelId } = await this.node.openChannel(counterparty, amountToFund)
-    //   return log(`${chalk.green(`Successfully opened channel`)} ${styleValue(channelId.toHex(), 'hash')}`)
-    // } catch (err) {
-    //   return log(styleValue(err.message, 'failure'))
-    // }
+
+    try {
+      const response = await setChannels(counterparty.toB58String(), amountToFund.toString())
+      if (response.status == 201) {
+        const channelId = response.json().then(res => res.channelId)
+        // TODO: channelId.toHex()
+        return log(`${chalk.green(`Successfully opened channel`)} ${styleValue(channelId, 'hash')}`)
+      } else {
+        const status = response.json().then(res => res.status)
+        return log(status)
+      }
+    } catch (err) {
+      return log(styleValue(err.message, 'failure'))
+    }
   }
 }

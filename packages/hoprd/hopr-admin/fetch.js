@@ -33,7 +33,7 @@ export const closeChannel = (peerId) => delReq("channels/" + peerId)
 
 // open cmd Opens a payment channel between this node and the counter party provided.
 export const setChannels = (peerId, amount) => {
-  postReq("channels/", {"peerId": peerId, "amount": amount})
+  return postReq("channels/", {"peerId": peerId, "amount": amount})
 }
 
 /*
