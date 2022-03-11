@@ -94,18 +94,20 @@ send_message(){
   fi
 }
 
-# $1 = endpoint
-# $2 = Hopr command
-# $3 = OPTIONAL: positive assertion message
-# $4 = OPTIONAL: maximum wait time in seconds during which we busy try
+# $1 = node api address (origin)
+# $2 = api endpoint to call
+# $3 = rest method for cURL (GET,POST...)
+# $4 = request body as json string
+# $5 = OPTIONAL: positive assertion message
+# $6 = OPTIONAL: maximum wait time in seconds during which we busy try
 # afterwards we fail, defaults to 0
-# $4 = OPTIONAL: step time between retries in seconds, defaults to 25 seconds
+# $7 = OPTIONAL: step time between retries in seconds, defaults to 25 seconds
 # (8 blocks with 1-3 s/block in ganache)
-# $5 = OPTIONAL: end time for busy wait in nanoseconds since epoch, has higher
+# $8 = OPTIONAL: end time for busy wait in nanoseconds since epoch, has higher
 # priority than wait time, defaults to 0
 run_command(){
   local result now
-  local origin="${1}"
+  local node_api="${1}"
   local endpoint="${2}"
   local rest_method="${3}"
   local request_body="${4}"
@@ -114,7 +116,7 @@ run_command(){
   local step_time=${7:-25}
   local end_time_ns=${8:-0}
   # no timeout set since the test execution environment should cancel the test if it takes too long
-  local cmd="curl -X ${rest_method} -m ${step_time} --connect-timeout ${step_time} -s -H X-Auth-Token:${api_token} -H Content-Type:application/json --url ${origin}/api/v2${endpoint} -d "
+  local cmd="curl -X ${rest_method} -m ${step_time} --connect-timeout ${step_time} -s -H X-Auth-Token:${api_token} -H Content-Type:application/json --url ${node_api}/api/v2${endpoint} -d "
 
   # if no end time was given we need to calculate it once
   if [ ${end_time_ns} -eq 0 ]; then
@@ -136,7 +138,7 @@ run_command(){
     else
       log "${YELLOW}run_command (${cmd} \"${request_body}\") FAILED, received: ${result}, retrying in ${step_time} seconds${NOFORMAT}"
       sleep ${step_time}
-      run_command "${origin}" "${endpoint}" "${rest_method}" "${request_body}" "${assertion}" "${wait_time}" \
+      run_command "${node_api}" "${endpoint}" "${rest_method}" "${request_body}" "${assertion}" "${wait_time}" \
         "${step_time}" "${end_time_ns}"
     fi
   fi
@@ -164,21 +166,23 @@ validate_node_balance_gt0() {
 # $2 = destination node id
 # $3 = channel source api endpoint
 # $4 = channel destination peer id
-# $5 = OPTIONAL: verify closure strictly
+# $5 = channel direction, either incoming or outgoing
+# $6 = OPTIONAL: verify closure strictly
 close_channel() {
   local source_id="${1}"
   local destination_id="${2}"
   local source_api="${3}"
   local destination_peer_id="${4}"
-  local close_check="${5:-false}"
+  local channel_direction="${5}"
+  local close_check="${6:-false}"
   local result
 
   log "Node ${source_id} close channel to Node ${destination_id}"
 
   if [ "${close_check}" = "true" ]; then
-    result="$(run_command ${source_api} "/channels/${destination_peer_id}" "DELETE" "" "PendingToClose" 600)"
+    result="$(run_command ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" "PendingToClose" 600)"
   else
-    result="$(run_command ${source_api} "/channels/${destination_peer_id}" "DELETE" "" "Open" 20 20)"
+    result="$(run_command ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" "Open" 20 20)"
   fi
 
   log "Node ${source_id} close channel to Node ${destination_id} result -- ${result}"
@@ -324,7 +328,8 @@ redeem_tickets_in_channel() {
   local node_api="${1}"
   local peer_id="${2}"
 
-  result=$(run_command ${node_api} "/channels/${peer_id}/tickets/redeem" "POST" "" "" 600)
+  log "redeeming tickets in specific channel, this can take up to 5 minutes depending on the amount of uredeemed tickets in that channel"
+  result=$(run_command ${node_api} "/channels/${peer_id}/tickets/redeem" "POST" "" "" 600 600)
   echo "${result}"
 }
 
@@ -398,6 +403,7 @@ test_withdraw() {
   hopr_balance=$(echo ${balances} | jq -r .hopr)
 
   withdraw ${node_api} "NATIVE" 10 0x858aa354db6ae5ea1217c5018c90403bde94e09e
+  log "waiting 30 secunds for withdraw transaction to complete"
   sleep 30
 
   balances=$(get_balances ${node_api})
@@ -405,11 +411,13 @@ test_withdraw() {
   [[ "${native_balance}" == "${new_native_balance}" ]] && { msg "Native withdraw failed, pre: ${native_balance}, post: ${new_native_balance}"; exit 1; }
 
   withdraw ${node_api} "HOPR" 10 0x858aa354db6ae5ea1217c5018c90403bde94e09e
+  log "waiting 30 secunds for withdraw transaction to complete"
   sleep 30
 
   balances=$(get_balances ${node_api})
   new_hopr_balance=$(echo ${balances} | jq -r .hopr)
-  [[ "${hoprBalance}" == "${new_hopr_balance}" ]] && { msg "Hopr withdraw failed, pre: ${hoprBalance}, post: ${new_hopr_balance}"; exit 1; }
+  [[ "${hopr_balance}" == "${new_hopr_balance}" ]] && { msg "Hopr withdraw failed, pre: ${hopr_balance}, post: ${new_hopr_balance}"; exit 1; }
+  echo "withdraw successfull"
 }
 
 test_withdraw ${api1}
@@ -429,11 +437,6 @@ test_aliases() {
 }
 
 test_aliases ${api1} ${addr2}
-
-# NO APIv2 ENDPOINT EQUIVALENT
-log "Check peers"
-result=$(run_command ${api1} "peers" 'peers have announced themselves' 600)
-log "-- ${result}"
 
 for node in ${addr2} ${addr3} ${addr4} ${addr5}; do
   log "Node 1 ping other node ${node}"
@@ -472,10 +475,7 @@ open_channel 1 5 "${api1}" "${addr5}" &
 
 log "Waiting for nodes to finish open channel (long running)"
 wait
-
-log "quick nap"
 sleep 20
-log "we back"
 
 for i in `seq 1 10`; do
   log "Node 1 send 1 hop message to self via node 2"
@@ -521,7 +521,7 @@ for i in `seq 1 10`; do
   send_message "${api5}" "${addr2}" 'hello, world' "${addr1}" 
 done
 
-for the last send tests we use Rest API v2 instead of the older command-based Rest API v1
+# for the last send tests we use Rest API v2 instead of the older command-based Rest API v1
 
 for i in `seq 1 10`; do
   log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4"
@@ -533,42 +533,37 @@ for i in `seq 1 10`; do
   send_message "${api1}" "${addr5}" "hello, world" "" 
 done
 
-# PROBLEM HERE
-# test_redeem_in_specific_channel() {
-#   local node_id="${1}"
-#   local second_node_id="${2}"
-#   local node_api="${3}"
-#   local second_node_api="${4}"
+test_redeem_in_specific_channel() {
+  local node_id="${1}"
+  local second_node_id="${2}"
+  local node_api="${3}"
+  local second_node_api="${4}"
 
-#   peer_id=$(get_hopr_address ${api_token}@${node_api})
-#   second_peer_id=$(get_hopr_address ${api_token}@${second_node_api})
+  peer_id=$(get_hopr_address ${api_token}@${node_api})
+  second_peer_id=$(get_hopr_address ${api_token}@${second_node_api})
 
-#   open_channel ${node_id} ${second_node_id} ${node_api} ${second_peer_id}
+  open_channel ${node_id} ${second_node_id} ${node_api} ${second_peer_id}
 
-#   sleep 20
+  sleep 20
 
-#   for i in `seq 1 3`; do
-#     log "Node ${node_id} send 1 hop message to self via node ${second_node_id}"
-#     send_message "${node_api}" "${peer_id}" "hello, world" "${second_peer_id}" 
-#   done
+  for i in `seq 1 3`; do
+    log "Node ${node_id} send 1 hop message to self via node ${second_node_id}"
+    send_message "${node_api}" "${peer_id}" "hello, world" "${second_peer_id}" 
+  done
 
-#   initial_all_tickets_amount=$(get_tickets_statistics ${node_api} "winProportion" | jq -r .unredeemed)
+  sleep 2
+  ticket_amount=$(get_tickets_in_channel ${second_node_api} ${peer_id} | jq '. | length')
+  [[ "${ticket_amount}" != "3" ]] && { msg "Ticket ammount is different than expected: ${ticket_amount} != 3"; exit 1; }
 
-#   ticket_amount=$(get_tickets_in_channel ${second_node_api} ${peer_id} | jq '. | length')
-#   [[ "${ticket_amount}" != "3" ]] && { msg "Ticket ammount is different than expected: ${ticket_amount} != 3"; exit 1; }
+  redeem_tickets_in_channel ${second_node_api} ${peer_id}  
 
-#   redeem_tickets_in_channel ${second_node_api} ${peer_id}  
+  get_tickets_in_channel ${second_node_api} ${peer_id} "TICKETS_NOT_FOUND"
 
-#   get_tickets_in_channel ${second_node_api} ${peer_id} "TICKETS_NOT_FOUND"
+  close_channel ${node_id} ${second_node_id} ${node_api} ${second_peer_id} "outgoing"
+  echo "all good"
+}
 
-#   all_tickets_amount=$(get_tickets_statistics ${node_api} "winProportion" | jq -r .unredeemed)
-#   [[ "${all_tickets_amount}" != $((${initial_all_tickets_amount}-3)) ]] && { msg "Amount of tickets after redemption doesn't add up: ${all_tickets_amount} != ${initial_all_tickets_amount} - 3"; exit 1; }
-
-#   close_channel "1" "3" ${node_api} ${second_peer_id}
-#   echo "all good"
-# }
-
-# test_redeem_in_specific_channel "1" "3" ${api1} ${api3}
+test_redeem_in_specific_channel "1" "3" ${api1} ${api3}
 
 redeem_tickets "2" "${api2}" &
 redeem_tickets "3" "${api2}" &
@@ -580,15 +575,15 @@ wait
 
 # initiate channel closures, but don't wait because this will trigger ticket
 # redemption as well
-close_channel 1 2 "${api1}" "${addr2}" &
-close_channel 2 3 "${api2}" "${addr3}" &
-close_channel 3 4 "${api3}" "${addr4}" &
-close_channel 4 5 "${api4}" "${addr5}" &
-close_channel 5 1 "${api5}" "${addr1}" &
+close_channel 1 2 "${api1}" "${addr2}" "outgoing" &
+close_channel 2 3 "${api2}" "${addr3}" "outgoing" &
+close_channel 3 4 "${api3}" "${addr4}" "outgoing" &
+close_channel 4 5 "${api4}" "${addr5}" "outgoing" &
+close_channel 5 1 "${api5}" "${addr1}" "outgoing" &
 
 # initiate channel closures for channels without tickets so we can check
 # completeness
-close_channel 1 5 "${api1}" "${addr5}" &
+close_channel 1 5 "${api1}" "${addr5}" "outgoing" &
 
 log "Waiting for nodes to finish handling close channels calls"
 wait
@@ -598,18 +593,23 @@ log "Waiting 70 seconds for cool-off period"
 sleep 70
 
 # verify channel has been closed
-close_channel 1 5 "${api1}" "${addr5}" "true"
+close_channel 1 5 "${api1}" "${addr5}" "outgoing" "true"
 
-# it takes the channels a lot of time to go from PendingToClose to Closed state
-sleep 70
+log "Waiting 120 seconds for channels to completely close"
+sleep 120
 
 test_get_all_channels() {
   local node_api=${1}
 
   channels=$(get_all_channels ${node_api} false)
-  [[ "${channels}" == *"channelId"* ]] && { msg "There are still channels open: ${channels}"; exit 1; }
-  channels=$(get_all_channels ${node_api} true)
-  [[ "${channels}" != *"channelId"* ]] && { msg "There are no closed channels: ${channels}"; exit 1; }
+  channels_count=$(echo ${channels} | jq '.outgoing | length')
+
+  channels_with_closed=$(get_all_channels ${node_api} true)
+  channels_with_closed_count=$(echo ${channels_with_closed} | jq '.outgoing | length')
+
+  [[ "${channels_count}" -ge "${channels_with_closed_count}" ]] && { msg "There should be more channels returned with includeClosed flag: ${channels_count} !< ${channels_with_closed_count}"; exit 1; }
+  [[ "${channels_with_closed}" != *"Closed"* ]] && { msg "Channels fetched with includeClosed flag should return channels with closed status: ${channels_with_closed}"; exit 1; }
+  echo "Get all channels successfull"
 }
 
 test_get_all_channels ${api1}
@@ -621,16 +621,16 @@ test_strategy_setting() {
   strategy=$(echo ${settings} | jq -r .strategy)
   [[ "${strategy}" != "passive" ]] && { msg "Default strategy should be passive, got: ${strategy}"; exit 1; }
 
-  channels=$(get_all_channels ${node_api} false)
-  [[ "${channels}" == *"channelId"* ]] && { msg "To test strategy setting all channels must be closed: ${channels}"; exit 1; }
+  channels_count_pre=$(get_all_channels ${node_api} false | jq '.incoming | length')
 
   set_setting ${node_api} "strategy" "promiscuous"
 
   log "Waiting 100 seconds for the node to make connections to other nodes"
   sleep 100
 
-  channels=$(get_all_channels ${node_api} false)
-  [[ "${channels}" != *"channelId"* ]] && { msg "Node didn't open any connections by itself even when strategy was set to promiscuous: ${channels}"; exit 1; }
+  channels_count_post=$(get_all_channels ${node_api} false | jq '.incoming | length')
+  [[ "${channels_count_pre}" -ge "${channels_count_post}" ]] && { msg "Node didn't open any connections by itself even when strategy was set to promiscuous: ${channels_count_pre} !>= ${channels_count_post}"; exit 1; }
+  echo "Strategy setting successfull"
 }
 
-test_strategy_setting ${api1}
+test_strategy_setting ${api4}
