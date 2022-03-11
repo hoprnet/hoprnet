@@ -87,7 +87,7 @@
     "access": "public"
   },
   "resolutions": {
-    "@ethersproject/providers": "hoprnet/ethers-js-provider",
+    "@ethersproject/providers": "hoprnet/ethers-js-provider#41feae79c102f17b5509600dd9dcfa236eda2707",
     "@overnightjs/logger": "1.2.1",
     "colors": "1.3.3"
   },
