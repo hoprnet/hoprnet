@@ -2,6 +2,7 @@ import { AbstractCommand } from './abstractCommand'
 import type PeerId from 'peer-id'
 import { checkPeerIdInput, styleValue } from './utils'
 
+// TODO: Missing getObservedAddresses API for now
 export default class Addresses extends AbstractCommand {
   constructor() {
     super()
@@ -23,7 +24,7 @@ export default class Addresses extends AbstractCommand {
 
     let peerId: PeerId
     try {
-      peerId = checkPeerIdInput(query)
+      peerId = await checkPeerIdInput(query)
     } catch (err) {
       return log(styleValue(err.message, 'failure'))
     }

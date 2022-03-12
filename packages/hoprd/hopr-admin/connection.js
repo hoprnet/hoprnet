@@ -87,15 +87,16 @@ export class Connection {
     var client
     try {
       // See https://stackoverflow.com/a/55487820
-      var client = navigator.clipboard
+      client = navigator.clipboard
         ? await fetch(`https://${window.location.host}/api/ssl`).then(
             (_) => new WebSocket('wss://' + window.location.host)
           )
-        : new WebSocket('ws://' + 'localhost:19501/')
+        : new WebSocket("ws://localhost:13301/api/v2/node/stream/websocket/?apiToken=^^LOCAL-testing-123^^")
     } catch (err) {
       console.log('Invalid SSL or non-SSL support')
-      client = new WebSocket('ws://' + "localhost:19501/")
+      client = new WebSocket("ws://localhost:13301/api/v2/node/stream/websocket/?apiToken=^^LOCAL-testing-123^^")
     }
+
     console.log('Web socket created')
 
     client.onopen = () => {

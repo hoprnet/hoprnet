@@ -16,7 +16,7 @@ import Settings from './settings'
 import Withdraw from './withdraw'
 import { Alias } from './alias'
 import { Info } from './info'
-import Addresses from './addresses'
+// import Addresses from './addresses'
 
 export class Commands {
   readonly commands: AbstractCommand[]
@@ -24,7 +24,7 @@ export class Commands {
 
   constructor() {
     this.commands = [
-      new Addresses(),
+      // new Addresses(),
       new Alias(),
       new CloseChannel(),
       new Info(),
