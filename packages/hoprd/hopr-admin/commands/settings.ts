@@ -2,6 +2,17 @@ import { getPaddingLength, styleValue } from './utils'
 import { AbstractCommand } from './abstractCommand'
 import { getSettings, setSettings } from '../fetch'
 
+// TODO: refactor old code better
+// function booleanSetter(name: string) {
+//   return function setter(query: string, state: State): string {
+//     if (!query.match(/true|false/i)) {
+//       return styleValue(`Invalid option.`, 'failure')
+//     }
+//     state[name] = !!query.match(/true/i)
+//     return `You have set your “${styleValue(name, 'highlight')}” settings to “${styleValue(state[name])}”.`
+//   }
+// }
+
 const booleanSetter = (name: string) => {
   return function setter(query: string): string {
     if (!query.match(/true|false/i)) {
