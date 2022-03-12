@@ -43,21 +43,12 @@ export const POST: Operation = [
       const txHash = await withdraw(node, currency, recipient, amount)
       return res.status(200).send({ receipt: txHash })
     } catch (err) {
-      const INVALID_ARG = [
-        STATUS_CODES.INVALID_CURRENCY,
-        STATUS_CODES.INVALID_AMOUNT,
-        STATUS_CODES.INVALID_ADDRESS
-      ].find((arg) => err.message.includes(arg))
-      if (INVALID_ARG) {
-        return res.status(400).send({ STATUS: INVALID_ARG, error: err.message })
-      } else {
-        return res.status(422).send({
-          STATUS: err.message.includes(STATUS_CODES.NOT_ENOUGH_BALANCE)
-            ? STATUS_CODES.NOT_ENOUGH_BALANCE
-            : STATUS_CODES.UNKNOWN_FAILURE,
-          error: err.message
-        })
-      }
+      return res.status(422).send({
+        status: err.message.includes(STATUS_CODES.NOT_ENOUGH_BALANCE)
+          ? STATUS_CODES.NOT_ENOUGH_BALANCE
+          : STATUS_CODES.UNKNOWN_FAILURE,
+        error: err.message
+      })
     }
   }
 ]
@@ -79,6 +70,7 @@ POST.apiDoc = {
             },
             amount: {
               type: 'string',
+              format: 'amount',
               description: "Amount to withdraw in the currency's smallest unit.",
               example: '1337'
             },
@@ -125,11 +117,18 @@ POST.apiDoc = {
     },
     '422': {
       description:
-        'Withdraw amount exeeds current balance. You can check current balance using /account/balance endpoint.',
+        'Withdraw amount exeeds current balance or unknown error. You can check current balance using /account/balance endpoint.',
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/RequestStatus'
+            type: 'object',
+            properties: {
+              status: {
+                type: 'string',
+                example: `${STATUS_CODES.NOT_ENOUGH_BALANCE} | ${STATUS_CODES.UNKNOWN_FAILURE}`
+              },
+              error: { type: 'string', example: 'NOT_ENOUGH_BALANCE' }
+            }
           },
           example: {
             status: `${STATUS_CODES.NOT_ENOUGH_BALANCE}`

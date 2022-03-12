@@ -39,18 +39,12 @@ export const POST: Operation = [
     const { node } = req.context
     const { peerId } = req.body
 
-    if (!peerId) {
-      return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID })
-    }
-
     try {
-      const pingRes = await ping({ peerId: peerId as string, node })
+      const pingRes = await ping({ peerId, node })
       return res.status(200).send(pingRes)
     } catch (error) {
       if (STATUS_CODES[error.message]) {
-        return res
-          .status(error.message.includes(STATUS_CODES.INVALID_PEERID) ? 400 : 422)
-          .send({ status: STATUS_CODES[error.message] })
+        return res.status(422).send({ status: STATUS_CODES[error.message] })
       } else {
         return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
       }
@@ -70,6 +64,7 @@ POST.apiDoc = {
           required: ['peerId'],
           properties: {
             peerId: {
+              format: 'peerId',
               type: 'string',
               description: 'PeerId associated to the other node that we want to ping.'
             }
