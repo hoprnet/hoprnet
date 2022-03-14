@@ -2715,9 +2715,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ethersproject/providers@hoprnet/ethers-js-provider#41feae79c102f17b5509600dd9dcfa236eda2707":
+"@ethersproject/providers@hoprnet/ethers-js-provider#fa6b1f743ff3fe67c1e9a2207a67d79a854fc34c":
   version: 5.5.3
-  resolution: "@ethersproject/providers@https://github.com/hoprnet/ethers-js-provider.git#commit=41feae79c102f17b5509600dd9dcfa236eda2707"
+  resolution: "@ethersproject/providers@https://github.com/hoprnet/ethers-js-provider.git#commit=fa6b1f743ff3fe67c1e9a2207a67d79a854fc34c"
   dependencies:
     "@ethersproject/abstract-provider": ^5.5.0
     "@ethersproject/abstract-signer": ^5.5.0
@@ -2738,7 +2738,7 @@ __metadata:
     "@ethersproject/web": ^5.5.0
     bech32: 1.1.4
     ws: 7.4.6
-  checksum: b6384e05daa888e819ba2508fda4ab1067e14087a8c069ac9d337b47277b7630ec0368d13b4790b045728fc0c63cdfff0b5356168fee84d6d501f8e9f8199afd
+  checksum: b83a987f456f1a5b93667c4c4b3c35768c33415d224e5454a306e4f68de0455a532be84d7dd8bb91c7d052fcb7afd42b52267d0cd5bfafd379823615447c7f09
   languageName: node
   linkType: hard
 
