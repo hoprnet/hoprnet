@@ -57,7 +57,8 @@ export function setupRestApi(service: Application, urlPath: string, node: Hopr, 
     errorMiddleware: function (err, req, res, next) {
       req
       if (err.status === 400) {
-        res.status(err.status).send({ status: getStatusCodeForInvalidInputInRequest(err.errors[0].path) })
+        const path = String(err.errors[0].path) || ''
+        res.status(err.status).send({ status: getStatusCodeForInvalidInputInRequest(path) })
       } else {
         next(err)
       }

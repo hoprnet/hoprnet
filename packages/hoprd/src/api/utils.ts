@@ -70,23 +70,18 @@ export const removeQueryParams = (path: string): string => {
 }
 
 export const getStatusCodeForInvalidInputInRequest = (inputPath: string) => {
-  switch (inputPath) {
+  switch (inputPath.toLocaleLowerCase()) {
     case 'currency':
       return STATUS_CODES.INVALID_CURRENCY
     case 'amount':
       return STATUS_CODES.INVALID_AMOUNT
     case 'recipient':
       return STATUS_CODES.INVALID_ADDRESS
-    case 'peerId':
-      return STATUS_CODES.INVALID_PEERID
-    case 'peerId':
     case 'peerid':
-      return STATUS_CODES.INVALID_PEERID
-    case 'peerId':
       return STATUS_CODES.INVALID_PEERID
     case 'setting':
       return STATUS_CODES.INVALID_SETTING
-    case 'settingValue':
+    case 'settingvalue':
       return STATUS_CODES.INVALID_SETTING_VALUE
     default:
       return 'INVALID_INPUT'
