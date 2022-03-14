@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# HOPR interaction tests via HOPRd API v2
 
 # prevent souring of this script, only allow execution
 $(return >/dev/null 2>&1)
@@ -64,6 +65,7 @@ validate_node_balance_gt0() {
   fi
 }
 
+# Run API endpoint and assert
 # $1 = node api address (origin)
 # $2 = api endpoint to call
 # $3 = rest method for cURL (GET,POST...)
@@ -253,7 +255,7 @@ redeem_tickets() {
   [[ ${redeemed} -gt 0 && ${redeemed} -gt ${last_redeemed} ]] || { msg "redeemed tickets count on node ${node_id} is ${redeemed}, previously ${last_redeemed}"; exit 1; }
 }
 
-# $1 = source node id
+# $1 = node api endpoint
 # $2 = currency to withdraw
 # $3 = amount to withdraw
 # $4 = where to send the funds to
@@ -267,7 +269,7 @@ withdraw() {
   echo "${result}"
 }
 
-# $1 = source node id
+# $1 = node api endpoint
 get_balances() {
   local origin=${1}
   echo $(run_api ${1} "/account/balances" "GET" "" "native" 600)
@@ -275,6 +277,9 @@ get_balances() {
 
 # get addresses is in the utils file
 
+# $1 = node api endpoint
+# $2 = peerId to alias
+# $3 = alias name
 set_alias() {
   local node_api="${1}"
   local peer_id="${2}"
@@ -284,6 +289,8 @@ set_alias() {
   echo "${result}"
 }
 
+# $1 = node api endpoint
+# $2 = assertion
 get_aliases() {
   local node_api="${1}"
   local assertion="${2}"
@@ -292,6 +299,8 @@ get_aliases() {
   echo "${result}"
 }
 
+# $1 = node api endpoint
+# $2 = assertion
 get_alias() {
   local node_api="${1}"
   local alias="${2}"
@@ -301,6 +310,8 @@ get_alias() {
   echo "${result}"
 }
 
+# $1 = node api endpoint
+# $2 = alias name to remove
 remove_alias() {
   local node_api="${1}"
   local alias="${2}"
@@ -309,6 +320,8 @@ remove_alias() {
   echo "${result}"
 }
 
+# $1 = node api endpoint
+# $2 = include closing (true/false)
 get_all_channels() {
   local node_api="${1}"
   local including_closed=${2}
@@ -317,6 +330,7 @@ get_all_channels() {
   echo "${result}"
 }
 
+# $1 = node api endpoint
 get_settings() {
   local node_api="${1}"
 
@@ -324,6 +338,9 @@ get_settings() {
   echo "${result}"
 }
 
+# $1 = node api endpoint
+# $2 = key of the setting
+# $3 = value of the setting
 set_setting() {
   local node_api="${1}"
   local key="${2}"
@@ -333,6 +350,8 @@ set_setting() {
   echo "${result}"
 }
 
+# $1 = node api endpoint
+# $2 = counterparty peer id
 redeem_tickets_in_channel() {
   local node_api="${1}"
   local peer_id="${2}"
@@ -342,6 +361,9 @@ redeem_tickets_in_channel() {
   echo "${result}"
 }
 
+# $1 = node api endpoint
+# $2 = counterparty peer id
+# $3 = assertion
 get_tickets_in_channel() {
   local node_api="${1}"
   local peer_id="${2}"
@@ -351,6 +373,9 @@ get_tickets_in_channel() {
   echo "${result}"
 }
 
+# $1 = node api endpoint
+# $2 = counterparty peer id
+# $3 = assertion
 ping() {
   local origin=${1:-localhost:3001}
   local peer_id="${2}" 
@@ -360,6 +385,8 @@ ping() {
   echo "${result}"
 }
 
+# $1 = node api endpoint
+# $2 = assertion
 get_tickets_statistics() {
   local origin=${1:-localhost:3001}
   local assertion="${2}"
@@ -478,8 +505,7 @@ open_channel 2 3 "${api2}" "${addr3}" &
 open_channel 3 4 "${api3}" "${addr4}" &
 open_channel 4 5 "${api4}" "${addr5}" &
 open_channel 5 1 "${api5}" "${addr1}" &
-
-#used for channel close test later
+# used for channel close test later
 open_channel 1 5 "${api1}" "${addr5}" &
 
 log "Waiting for nodes to finish open channel (long running)"
@@ -529,8 +555,6 @@ for i in `seq 1 10`; do
   log "Node 5 send 1 hop message to node 2 via node 1"
   send_message "${api5}" "${addr2}" 'hello, world' "${addr1}" 
 done
-
-# for the last send tests we use Rest API v2 instead of the older command-based Rest API v1
 
 for i in `seq 1 10`; do
   log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4"
