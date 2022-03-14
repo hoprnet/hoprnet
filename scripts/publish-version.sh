@@ -123,6 +123,9 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
     "${mydir}/../packages/cover-traffic-daemon/yarn.lock" \
     "${mydir}/../packages/hoprd/yarn.lock"
 
+  # Don't commit changed package.json files as package resolutions are
+  # supposed to interfer with workspaces according to https://yarnpkg.com/configuration/manifest#resolutions
+
   # delete default environments
   rm -f \
     "${mydir}/../packages/hoprd/default-environment.json" \

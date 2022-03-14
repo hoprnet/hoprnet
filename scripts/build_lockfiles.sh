@@ -43,7 +43,7 @@ log "Install workspace package in temporary directory"
 declare package_npm_name=$(jq -r '.name' "${package_dir}/package.json")
 
 # Resolve workspace links by packing a NPM package
-yarn workspace ${package_npm_name} pack
+yarn workspace "${package_npm_name}" pack
 
 cd "${build_dir}"
 
@@ -76,7 +76,7 @@ mv "${build_dir}/yarn.lock" "${package_dir}"
 # No need for package.json anymore
 rm "${build_dir}/package.json"
 
-log "Patching resolution overrides in ${package_dir}/package.json"
+log "Patching resolution overrides in ${package_dir}/package.json for Yarn and NPM"
 
 # Create package.json file without resolved versions version but with resolution overrides
 jq -s '.[1] * (.[0].resolutions | { "overrides": . ,"resolutions": . })' "${mydir}/../package.json ${package_dir}/package.json" > "${build_dir}/package.json"
