@@ -80,13 +80,13 @@ git pull origin "${branch}" --rebase --tags
 # now tag and proceed
 git tag v${new_version}
 
-# we push changes back onto origin
-git push origin "${branch}"
-# we only push the tag if we succeeded to push the changes onto master
-git push origin tag "v${new_version}"
-
 # only make remote changes if running in CI
 if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
+  # we push changes back onto origin
+  git push origin "${branch}"
+  # we only push the tag if we succeeded to push the changes onto master
+  git push origin tag "v${new_version}"
+
   # publish each workspace package to npm
   if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
     yarn config set npmAuthToken "${NODE_AUTH_TOKEN:-}"
@@ -105,6 +105,7 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   ${mydir}/wait_for_npm_package core
 
   # set default environments
+  log "adding default environments to packages"
   echo "{\"id\": \"${environment_id}\"}" > "${mydir}/../packages/hoprd/default-environment.json"
   echo "{\"id\": \"${environment_id}\"}" > "${mydir}/../packages/cover-traffic-daemon/default-environment.json"
 
@@ -125,6 +126,8 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
 
   # Don't commit changed package.json files as package resolutions are
   # supposed to interfer with workspaces according to https://yarnpkg.com/configuration/manifest#resolutions
+  git restore packages/hoprd/package.json
+  git restore packages/cover-traffic-daemon/package.json
 
   # delete default environments
   rm -f \
