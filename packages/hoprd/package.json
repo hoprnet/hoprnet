@@ -9,6 +9,7 @@
   "bin": "lib/index.js",
   "files": [
     "lib",
+    "package-lock.json",
     "hopr-admin/.next/**",
     "hoprd-default.sh",
     "releases.json",

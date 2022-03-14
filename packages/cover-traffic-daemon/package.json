@@ -22,7 +22,8 @@
   },
   "files": [
     "lib",
-    "unreleasedTokens.json"
+    "unreleasedTokens.json",
+    "package-lock.json"
   ],
   "dependencies": {
     "@hoprnet/hopr-core": "workspace:packages/core",
