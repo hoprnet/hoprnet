@@ -45,9 +45,7 @@ describe('relay connection', function () {
     const relayShaker = handshake(RelayAlice)
 
     relayShaker.write(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PING))
-    console.log('before read')
     const msg = await relayShaker.read()
-    console.log('after read')
     const expectedMsg = Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PONG)
 
     assert(u8aEquals(msg.slice(), expectedMsg))

@@ -3076,7 +3076,6 @@ __metadata:
     it-pair: 1.0.0
     it-pipe: 1.1.0
     it-pushable: 1.4.2
-    it-stream-types: ^1.0.4
     libp2p: 0.36.2
     libp2p-interfaces: 4.0.6
     libp2p-mplex: 0.10.7
@@ -14955,13 +14954,6 @@ __metadata:
   dependencies:
     it-all: ^1.0.6
   checksum: f10ec26a3f20380d4092f785d76cb027ac336cedbd95d7f0b54bd5cfd4e45be88921f715b4851f739fad9f5707ca54356bf9b7fc496cd817f676439074ea8b2c
-  languageName: node
-  linkType: hard
-
-"it-stream-types@npm:^1.0.4":
-  version: 1.0.4
-  resolution: "it-stream-types@npm:1.0.4"
-  checksum: efd1ff5fa968ff11b39c47ed1ce8131e44c61c5adc811d627c3149da1e08c83f3e73fe33942dad94bceb225b9ea4c4056eb24d9cf4f0c15313ab50c86ece35c9
   languageName: node
   linkType: hard
 

@@ -56,7 +56,6 @@
     "it-pair": "1.0.0",
     "it-pipe": "1.1.0",
     "it-pushable": "1.4.2",
-    "it-stream-types": "^1.0.4",
     "libp2p": "0.36.2",
     "libp2p-interfaces": "4.0.6",
     "libp2p-mplex": "0.10.7",

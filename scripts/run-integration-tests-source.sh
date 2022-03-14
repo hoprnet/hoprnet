@@ -340,16 +340,6 @@ for node_dir in ${node1_dir} ${node2_dir} ${node3_dir} ${node4_dir} ${node5_dir}
 done
 # }}}
 
-wait_for_regex ${node1_log} "STARTED NODE"
-wait_for_regex ${node2_log} "STARTED NODE"
-wait_for_regex ${node3_log} "STARTED NODE"
-wait_for_regex ${node4_log} "STARTED NODE"
-wait_for_regex ${node5_log} "STARTED NODE"
-# no need to wait for node 6 since that will stop right away
-wait_for_port 19097 "127.0.0.1" "${node7_log}"
-# }}}
-
-
 log "All nodes came up online"
 
 # --- Run security tests --- {{{
