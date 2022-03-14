@@ -70,7 +70,20 @@ yarn workspaces foreach -piv --topological-dev \
 declare new_version
 new_version=$(${mydir}/get-package-version.sh)
 
+# commit changes and create Git tag
+git add packages/*/package.json
+git commit -m "chore(release): publish ${new_version}"
 
+# in the meantime new changes might have come in which we need to rebase on before pushing
+git pull origin "${branch}" --rebase --tags
+
+# now tag and proceed
+git tag v${new_version}
+
+# we push changes back onto origin
+git push origin "${branch}"
+# we only push the tag if we succeeded to push the changes onto master
+git push origin tag "v${new_version}"
 
 # only make remote changes if running in CI
 if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
@@ -78,10 +91,6 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
     yarn config set npmAuthToken "${NODE_AUTH_TOKEN:-}"
   fi
-
-  # set default environments
-  echo "{\"id\": \"${environment_id}\"}" > "${mydir}/../packages/hoprd/default-environment.json"
-  echo "{\"id\": \"${environment_id}\"}" > "${mydir}/../packages/cover-traffic-daemon/default-environment.json"
 
   # pack and publish packages
   yarn workspaces foreach -piv --topological-dev \
@@ -95,31 +104,24 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   ${mydir}/wait_for_npm_package core-ethereum
   ${mydir}/wait_for_npm_package core
 
-  # special treatment for frontend packages
-  # to create NPM lockfiles with resolution overrides
+  # set default environments
+  echo "{\"id\": \"${environment_id}\"}" > "${mydir}/../packages/hoprd/default-environment.json"
+  echo "{\"id\": \"${environment_id}\"}" > "${mydir}/../packages/cover-traffic-daemon/default-environment.json"
+
+  # special treatment for end-of-chain packages
+  # to create lockfiles with resolution overrides
   ${mydir}/build_npm_lockfile.sh hoprd
   ${mydir}/build_npm_lockfile.sh hopr-cover-traffic-daemon
 
   yarn workspace @hoprnet/hoprd npm publish --access public
   yarn workspace @hoprnet/hopr-cover-traffic-daemon npm publish --access public
 
-  git add packages/cover-traffic-daemon/package-lock.json
-  git add packages/hoprd/package-lock.json
-
-  # commit changes and create Git tag
-  git add packages/*/package.json
-  git commit -m "chore(release): publish ${new_version}"
-
-  # in the meantime new changes might have come in which we need to rebase on before pushing
-  git pull origin "${branch}" --rebase --tags
-
-  # now tag and proceed
-  git tag v${new_version}
-
-  # we push changes back onto origin
-  git push origin "${branch}"
-  # we only push the tag if we succeeded to push the changes onto master
-  git push origin tag "v${new_version}"
+  # Remove lock files due to conflicts with workspaces
+  rm -f \
+    "${mydir}/../packages/cover-traffic-daemon/package-lock.json" \
+    "${mydir}/../packages/hoprd/package-lock.json" \
+    "${mydir}/../packages/cover-traffic-daemon/yarn.lock" \
+    "${mydir}/../packages/hoprd/yarn.lock"
 
   # delete default environments
   rm -f \

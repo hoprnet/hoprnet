@@ -10,6 +10,7 @@
   "files": [
     "lib",
     "package-lock.json",
+    "yarn.lock",
     "hopr-admin/.next/**",
     "hoprd-default.sh",
     "releases.json",
