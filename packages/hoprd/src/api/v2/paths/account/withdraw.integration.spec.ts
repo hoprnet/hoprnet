@@ -2,8 +2,8 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
-import { createTestApiInstance, testEthAddress } from '../../fixtures'
-import { Balance, NativeBalance } from '@hoprnet/hopr-utils'
+import { createTestApiInstance, ALICE_PEER_ID } from '../../fixtures'
+import { Balance, NativeBalance, PublicKey } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { STATUS_CODES } from '../../utils'
 
@@ -16,11 +16,13 @@ const { api, service } = createTestApiInstance(node)
 chai.use(chaiResponseValidator(api.apiDoc))
 
 describe('POST /account/withdraw', () => {
+  const ALICE_ETH_ADDRESS = PublicKey.fromPeerId(ALICE_PEER_ID).toAddress()
+
   it('should withdraw NATIVE successfuly', async () => {
     const res = await request(service).post('/api/v2/account/withdraw').send({
       currency: 'NATIVE',
       amount: '1',
-      recipient: testEthAddress
+      recipient: ALICE_ETH_ADDRESS.toString()
     })
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
@@ -32,7 +34,7 @@ describe('POST /account/withdraw', () => {
     const res = await request(service).post('/api/v2/account/withdraw').send({
       currency: 'HOPR',
       amount: '1',
-      recipient: testEthAddress
+      recipient: ALICE_ETH_ADDRESS.toString()
     })
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
@@ -44,7 +46,7 @@ describe('POST /account/withdraw', () => {
     const res = await request(service).post('/api/v2/account/withdraw').send({
       currency: 'invalidCurrency',
       amount: '1',
-      recipient: testEthAddress
+      recipient: ALICE_ETH_ADDRESS.toString()
     })
     expect(res.status).to.equal(400)
     expect(res).to.satisfyApiSpec
@@ -54,7 +56,7 @@ describe('POST /account/withdraw', () => {
     const res2 = await request(service).post('/api/v2/account/withdraw').send({
       currency: 'NATIVE',
       amount: 'invalidAmount',
-      recipient: testEthAddress
+      recipient: ALICE_ETH_ADDRESS.toString()
     })
     expect(res2.status).to.equal(400)
     expect(res2).to.satisfyApiSpec
@@ -77,7 +79,7 @@ describe('POST /account/withdraw', () => {
     const res = await request(service).post('/api/v2/account/withdraw').send({
       currency: 'NATIVE',
       amount: '100000000000000000000000000000000000000000000000000000000000000',
-      recipient: testEthAddress
+      recipient: ALICE_ETH_ADDRESS.toString()
     })
     expect(res.status).to.equal(422)
     expect(res).to.satisfyApiSpec

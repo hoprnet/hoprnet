@@ -2,16 +2,18 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
-import { createTestApiInstance, invalidTestPeerId, testChannelId, testPeerId, testPeerIdInstance } from '../../fixtures'
+import { createTestApiInstance, ALICE_PEER_ID, INVALID_PEER_ID } from '../../fixtures'
 import { Balance, ChannelEntry, NativeBalance } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { STATUS_CODES } from '../../utils'
 
 let node = sinon.fake() as any
-node.getId = sinon.fake.returns(testPeerIdInstance)
+node.getId = sinon.fake.returns(ALICE_PEER_ID)
 
 const { api, service } = createTestApiInstance(node)
 chai.use(chaiResponseValidator(api.apiDoc))
+
+const CHANNEL_ID = ChannelEntry.createMock().getId()
 
 describe('GET /channels', function () {
   const testChannel = ChannelEntry.createMock()
@@ -38,7 +40,7 @@ node.getNativeBalance = sinon.fake.returns(new NativeBalance(new BN(10)))
 node.getBalance = sinon.fake.returns(new Balance(new BN(1)))
 node.openChannel = sinon.fake.returns(
   Promise.resolve({
-    channelId: testChannelId,
+    channelId: CHANNEL_ID,
     receipt: 'testReceipt'
   })
 )
@@ -46,20 +48,20 @@ node.openChannel = sinon.fake.returns(
 describe('POST /channels', () => {
   it('should open channel', async () => {
     const res = await request(service).post('/api/v2/channels').send({
-      peerId: testPeerId,
+      peerId: ALICE_PEER_ID.toB58String(),
       amount: '1'
     })
     expect(res.status).to.equal(201)
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({
-      channelId: testChannelId.toHex(),
+      channelId: CHANNEL_ID.toHex(),
       receipt: 'testReceipt'
     })
   })
 
   it('should fail on invalid peerId or amountToFund', async () => {
     const res = await request(service).post('/api/v2/channels').send({
-      peerId: invalidTestPeerId,
+      peerId: INVALID_PEER_ID,
       amount: '1'
     })
     expect(res.status).to.equal(400)
@@ -68,7 +70,7 @@ describe('POST /channels', () => {
       status: STATUS_CODES.INVALID_PEERID
     })
     const res2 = await request(service).post('/api/v2/channels').send({
-      peerId: testPeerId,
+      peerId: ALICE_PEER_ID.toB58String(),
       amount: 'abc'
     })
     expect(res2.status).to.equal(400)
@@ -80,7 +82,7 @@ describe('POST /channels', () => {
 
   it('should fail when out of balance', async () => {
     const res = await request(service).post('/api/v2/channels').send({
-      peerId: testPeerId,
+      peerId: ALICE_PEER_ID.toB58String(),
       amount: '10000000'
     })
     expect(res.status).to.equal(403)
@@ -94,7 +96,7 @@ describe('POST /channels', () => {
     node.openChannel = sinon.fake.throws('Channel is already opened')
 
     const res = await request(service).post('/api/v2/channels').send({
-      peerId: testPeerId,
+      peerId: ALICE_PEER_ID.toB58String(),
       amount: '1'
     })
     expect(res.status).to.equal(403)

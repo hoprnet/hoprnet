@@ -2,13 +2,7 @@ import sinon from 'sinon'
 import assert from 'assert'
 import { getPeers } from './peers'
 import { STATUS_CODES } from '../../utils'
-import {
-  ALICE_PEER_ID,
-  ALICE_MULTI_ADDR,
-  BOB_PEER_ID,
-  BOB_MULTI_ADDR,
-  testPeerIdInstance as CHARLIE_PEER_ID
-} from '../../fixtures'
+import { ALICE_PEER_ID, ALICE_MULTI_ADDR, BOB_PEER_ID, BOB_MULTI_ADDR, CHARLIE_PEER_ID } from '../../fixtures'
 
 const ALICE_ENTRY = {
   id: ALICE_PEER_ID,
@@ -21,18 +15,18 @@ const ALICE_ENTRY = {
 const BOB_ENTRY = {
   id: BOB_PEER_ID,
   heartbeatsSent: 10,
-  heartbeatsSuccess: 2,
+  heartbeatsSuccess: 9,
   lastSeen: 1646410680793,
   backoff: 0,
-  lastTen: 0.1
+  lastTen: 0.9
 }
 const CHARLIE_ENTRY = {
   id: CHARLIE_PEER_ID,
   heartbeatsSent: 10,
-  heartbeatsSuccess: 9,
+  heartbeatsSuccess: 2,
   lastSeen: 1646410980993,
   backoff: 0,
-  lastTen: 0.9
+  lastTen: 0.1
 }
 
 let node = sinon.fake() as any

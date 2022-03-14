@@ -2,12 +2,14 @@ import assert from 'assert'
 import sinon from 'sinon'
 import { getChannels, openChannel } from '.'
 import { Balance, ChannelEntry, NativeBalance } from '@hoprnet/hopr-utils'
-import { invalidTestPeerId, testChannelId, testPeerId, testPeerIdInstance } from '../../fixtures'
+import { ALICE_PEER_ID, INVALID_PEER_ID } from '../../fixtures'
 import BN from 'bn.js'
 import { STATUS_CODES } from '../../utils'
 
 let node = sinon.fake() as any
-node.getId = sinon.fake.returns(testPeerIdInstance)
+node.getId = sinon.fake.returns(ALICE_PEER_ID)
+
+const CHANNEL_ID = ChannelEntry.createMock().getId()
 
 describe('getChannels', function () {
   const testChannel = ChannelEntry.createMock()
@@ -31,16 +33,16 @@ node.getNativeBalance = sinon.fake.returns(new NativeBalance(new BN(10)))
 node.getBalance = sinon.fake.returns(new Balance(new BN(1)))
 node.openChannel = sinon.fake.returns(
   Promise.resolve({
-    channelId: testChannelId,
+    channelId: CHANNEL_ID,
     receipt: 'testReceipt'
   })
 )
 
 describe('openChannel', () => {
   it('should open channel', async () => {
-    const channel = await openChannel(node, testPeerId, '1')
+    const channel = await openChannel(node, ALICE_PEER_ID.toB58String(), '1')
     assert.deepEqual(channel, {
-      channelId: testChannelId.toHex(),
+      channelId: CHANNEL_ID.toHex(),
       receipt: 'testReceipt'
     })
   })
@@ -48,7 +50,7 @@ describe('openChannel', () => {
   it('should fail on invalid peerId or amountToFund', async () => {
     assert.rejects(
       () => {
-        return openChannel(node, invalidTestPeerId, '1')
+        return openChannel(node, INVALID_PEER_ID, '1')
       },
       (err: Error) => {
         return err.message.includes(STATUS_CODES.INVALID_PEERID)
@@ -56,7 +58,7 @@ describe('openChannel', () => {
     )
     assert.rejects(
       () => {
-        return openChannel(node, testPeerId, 'abc')
+        return openChannel(node, ALICE_PEER_ID.toB58String(), 'abc')
       },
       (err: Error) => {
         return err.message.includes(STATUS_CODES.INVALID_AMOUNT)
@@ -64,7 +66,7 @@ describe('openChannel', () => {
     )
     assert.rejects(
       () => {
-        return openChannel(node, testPeerId, '10000000')
+        return openChannel(node, ALICE_PEER_ID.toB58String(), '10000000')
       },
       (err: Error) => {
         return err.message.includes(STATUS_CODES.NOT_ENOUGH_BALANCE)
@@ -77,7 +79,7 @@ describe('openChannel', () => {
 
     assert.rejects(
       () => {
-        return openChannel(node, testPeerId, '1')
+        return openChannel(node, ALICE_PEER_ID.toB58String(), '1')
       },
       (err: Error) => {
         return err.message.includes(STATUS_CODES.CHANNEL_ALREADY_OPEN)
