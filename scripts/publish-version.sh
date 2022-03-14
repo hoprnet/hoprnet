@@ -70,23 +70,10 @@ yarn workspaces foreach -piv --topological-dev \
 declare new_version
 new_version=$(${mydir}/get-package-version.sh)
 
-# commit changes and create Git tag
-git add packages/*/package.json
-git commit -m "chore(release): publish ${new_version}"
 
-# in the meantime new changes might have come in which we need to rebase on before pushing
-git pull origin "${branch}" --rebase --tags
-
-# now tag and proceed
-git tag v${new_version}
 
 # only make remote changes if running in CI
 if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
-  # we push changes back onto origin
-  git push origin "${branch}"
-  # we only push the tag if we succeeded to push the changes onto master
-  git push origin tag "v${new_version}"
-
   # publish each workspace package to npm
   if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
     yarn config set npmAuthToken "${NODE_AUTH_TOKEN:-}"
@@ -99,7 +86,40 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   # pack and publish packages
   yarn workspaces foreach -piv --topological-dev \
     --exclude hoprnet --exclude hopr-docs \
+    --exclude @hoprnet/hoprd --exclude @hoprnet/hopr-cover-traffic-daemon \
     npm publish --access public
+
+  ${mydir}/wait_for_npm_package utils
+  ${mydir}/wait_for_npm_package connect
+  ${mydir}/wait_for_npm_package ethereum
+  ${mydir}/wait_for_npm_package core-ethereum
+  ${mydir}/wait_for_npm_package core
+
+  # special treatment for frontend packages
+  # to create NPM lockfiles with resolution overrides
+  ${mydir}/build_npm_lockfile.sh hoprd
+  ${mydir}/build_npm_lockfile.sh hopr-cover-traffic-daemon
+
+  yarn workspace @hoprnet/hoprd npm publish --access public
+  yarn workspace @hoprnet/hopr-cover-traffic-daemon npm publish --access public
+
+  git add packages/cover-traffic-daemon/package-lock.json
+  git add packages/hoprd/package-lock.json
+
+  # commit changes and create Git tag
+  git add packages/*/package.json
+  git commit -m "chore(release): publish ${new_version}"
+
+  # in the meantime new changes might have come in which we need to rebase on before pushing
+  git pull origin "${branch}" --rebase --tags
+
+  # now tag and proceed
+  git tag v${new_version}
+
+  # we push changes back onto origin
+  git push origin "${branch}"
+  # we only push the tag if we succeeded to push the changes onto master
+  git push origin tag "v${new_version}"
 
   # delete default environments
   rm -f \
