@@ -1,8 +1,8 @@
-# Development Processes
+# Development Process
 
-The HOPR Association _tech_ members and [Project Owner](#legend) have agreed on the following development processes to streamline the implementation of the HOPR protocol.
+The purpose of this process is to streamline the development of the HOPR protocol.
 
-- [Development Processes](#development-processes)
+- [Development Process](#development-process)
   - [Legend](#legend)
     - [Representantives](#representantives)
     - [Trifecta](#trifecta)
@@ -52,9 +52,7 @@ Responsibilities:
 _Roles:_
 
 - [Tino](https://github.com/tolbrino) acting as Tech Coordinator
-- [Steven](https://github.com/nionis) acting as Process, Bounty and DevRel Coordinator
-
-**DevRel** cover specifically covers how the tech team interacts with the HOPR community in regards to technical support.
+- [Steven](https://github.com/nionis) acting as Process and Bounty Coordinator
 
 ### Trifecta
 
@@ -337,7 +335,7 @@ Since PRs should link to an issue, it's not necessary to label PRs. However, som
 
 #### Releases
 
-See [Release Processes](./release.md)
+See [Release Process](./release.md)
 
 ### Branches
 
@@ -346,4 +344,4 @@ See [Release Processes](./release.md)
 
 - `release/**`: On new internal release, we cut a `release/**`
   branch, using an internal **city** name to identify the release.
-  See [Release Processes](./release.md) for more info.
+  See [Release Process](./release.md) for more info.

@@ -1,8 +1,10 @@
-# Community Processes
+# DevRel Process
 
-The HOPR Association _tech_ members, _community_ members and [Project Owner](./development.md#legend) have agreed on the following interaction processes to streamline allocation of _tech_ resources.
+The purpose of this process is to streamline the interaction and resource sharing between HOPR's _tech_ team and other departments at HOPR.
 
-## Creating Issues
+## Community Team
+
+### Allocating tech's resources
 
 Community team is expected to create github issues in [this repository](https://github.com/hoprnet/hopr-devrel).
 
@@ -15,3 +17,14 @@ Community team is expected to create github issues in [this repository](https://
 - issues should be created as early as possible to provide time for scheduling work
 
 Once the issue is created, community team must share the github issue in element channel `community` and tag both [representantives](./development.md#representantives).
+
+## HOPR Community
+
+### Usage of various communication tools
+
+| Tool                                  | Usage                                |
+| ------------------------------------- | ------------------------------------ |
+| Element                               | _Internal_ team chat                 |
+| [Github](https://www.github.com)      | Tracking software issues and PRs     |
+| [Forum](https://forum.hoprnet.org)    | Main technical discussion space      |
+| [Discord](https://discord.gg/dEAWC4G) | Direct technical topics to the forum |
