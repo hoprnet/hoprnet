@@ -79,7 +79,7 @@ rm "${build_dir}/package.json"
 log "Patching resolution overrides in ${package_dir}/package.json for Yarn and NPM"
 
 # Create package.json file without resolved versions version but with resolution overrides
-jq -s '.[1] * (.[0].resolutions | { "overrides": . ,"resolutions": . })' "${mydir}/../package.json ${package_dir}/package.json" > "${build_dir}/package.json"
+jq -s '.[1] * (.[0].resolutions | { "overrides": . ,"resolutions": . })' "${mydir}/../package.json" "${package_dir}/package.json" > "${build_dir}/package.json"
 cp "${build_dir}/package.json" "${package_dir}"
 
 log "Successfully copied lockfiles to ${package_dir}/"
