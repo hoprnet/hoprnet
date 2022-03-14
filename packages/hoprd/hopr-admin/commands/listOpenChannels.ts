@@ -1,10 +1,10 @@
 import { AbstractCommand } from './abstractCommand'
 import { styleValue } from './utils'
-import { getChannels } from '../fetch'
+import HoprFetcher from '../fetch'
 
 export default class ListOpenChannels extends AbstractCommand {
-  constructor() {
-    super()
+  constructor(fetcher: HoprFetcher) {
+    super(fetcher)
   }
 
   public name() {
@@ -30,7 +30,7 @@ Balance:                ${styleValue(channel.balance, 'number')}
   async execute(log: (str: string) => void): Promise<void> {
     log('fetching channels...')
     try {
-      const channels = await getChannels()
+      const channels = await this.hoprFetcher.getChannels()
       const channelsFrom = channels.incoming.filter((channel) => channel.status !== "Closed")
 
       if (channelsFrom.length == 0) {

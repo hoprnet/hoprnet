@@ -25,6 +25,10 @@ export function LogLine(props) {
   let lastIndex = 0
   const idRegex = /(\b\w{53})\b/g // NB: Cannot be global variable, has state!
 
+  if (raw === undefined){
+    return null
+  }
+
   while ((match = idRegex.exec(raw)) !== null) {
     console.log('>', match, msg)
     ids.push(match[0])
@@ -66,8 +70,8 @@ export function Logs(props) {
       <div ref={container}>
         {props.connecting && <span>Attempting to connect</span>}
         {props.authRequired && <span>Auth Required</span>}
-        {props.messages.map((x) => (
-          <LogLine value={x} />
+        {props.messages.map((x, number) => (
+          <LogLine value={x} key={number} />
         ))}
       </div>
     </div>

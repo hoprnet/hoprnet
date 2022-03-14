@@ -1,9 +1,9 @@
 import { AbstractCommand } from './abstractCommand'
-import { getNodeInfo } from '../fetch'
+import HoprFetcher from '../fetch'
 
 export class Info extends AbstractCommand {
-  constructor() {
-    super()
+  constructor(fetcher: HoprFetcher) {
+    super(fetcher)
   }
 
   public name() {
@@ -15,7 +15,7 @@ export class Info extends AbstractCommand {
   }
 
   public async execute(log): Promise<void> {
-    const nodeInfo = await getNodeInfo()
+    const nodeInfo = await this.hoprFetcher.getNodeInfo()
 
     // @TODO Add connector info etc.
     return log(

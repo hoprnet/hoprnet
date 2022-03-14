@@ -1,14 +1,14 @@
 import { AbstractCommand } from './abstractCommand'
 import { styleValue } from './utils'
-import { accountWithdraw } from '../fetch'
+import HoprFetcher from '../fetch'
 import { moveDecimalPoint } from './utils/moveDecimal'
-import { BalanceDecimals, BalanceSymbols } from './utils/util'
+import { BalanceDecimals, BalanceSymbols } from './utils/types'
 
 export default class Withdraw extends AbstractCommand {
   private arguments = ['amount (ETH, HOPR)', 'currency (native, hopr)', 'recipient (blockchain address)']
 
-  constructor() {
-    super()
+  constructor(fetcher: HoprFetcher) {
+    super(fetcher)
   }
 
   /**
@@ -67,14 +67,14 @@ export default class Withdraw extends AbstractCommand {
       const { amount, weiAmount, currency, recipient } = await this.checkArgs(query ?? '')
       const symbol = currency === 'NATIVE' ? BalanceSymbols.Native : BalanceSymbols.Balance
 
-      const withdraw = await accountWithdraw({
-        "amount": weiAmount,
-        "currency": currency,
-        "recipient": recipient
+      const withdraw = await this.hoprFetcher.accountWithdraw({
+        amount: weiAmount,
+        currency: currency,
+        recipient: recipient
       })
 
-      if (withdraw.status === 200){
-        const receipt = withdraw.json().then(res => res.receipt)
+      if (withdraw.status === 200) {
+        const receipt = withdraw.json().then((res) => res.receipt)
         log(
           `Withdrawing ${styleValue(amount, 'number')} ${symbol} to ${styleValue(
             recipient,
@@ -82,7 +82,7 @@ export default class Withdraw extends AbstractCommand {
           )}, receipt ${styleValue(receipt, 'hash')}.`
         )
       } else {
-        withdraw.json().then(res => log(res.STATUS))
+        withdraw.json().then((res) => log(res.STATUS))
       }
     } catch (err) {
       log(styleValue(err.message, 'failure'))

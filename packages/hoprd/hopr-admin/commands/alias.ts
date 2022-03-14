@@ -1,12 +1,12 @@
 import { AbstractCommand } from './abstractCommand'
-import { checkPeerIdInput, getPaddingLength, styleValue } from './utils'
-import { getAliases, setAliases } from '../fetch'
+import {  getPaddingLength, styleValue } from './utils'
+import HoprFetcher from '../fetch'
 
 export class Alias extends AbstractCommand {
   private parameters = ['PeerId', 'Name']
 
-  constructor() {
-    super()
+  constructor(fetcher: HoprFetcher) {
+    super(fetcher)
   }
 
   public name() {
@@ -20,7 +20,7 @@ export class Alias extends AbstractCommand {
   async execute(log, query: string): Promise<void> {
     // view aliases
     if (!query) {
-      const aliases = await getAliases()
+      const aliases = await this.hoprFetcher.getAliases()
       const names = Object.entries(aliases).map(([name]) => `${name} -> `)
 
       // no aliases found
@@ -45,9 +45,9 @@ export class Alias extends AbstractCommand {
 
     // sets aliases
     try {
-      let peerId = checkPeerIdInput(id)
+      let peerId = await this.checkPeerIdInput(id)
 
-      const response = await setAliases(peerId.toB58String(), name)
+      const response = await this.hoprFetcher.setAliases(peerId.toB58String(), name)
 
       if (response.status == 201){
         return log(`Set alias '${styleValue(name, 'highlight')}' to '${styleValue(peerId.toB58String(), 'peerId')}'.`)

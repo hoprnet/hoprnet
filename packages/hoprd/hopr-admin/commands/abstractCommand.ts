@@ -1,8 +1,15 @@
 import { styleValue } from './utils'
+import HoprFetcher from '../fetch'
+import PeerId from 'peer-id'
 
 // REPL Command
 export abstract class AbstractCommand {
   public hidden = false
+  public hoprFetcher: HoprFetcher
+
+  protected constructor(fetcher: HoprFetcher) {
+    this.hoprFetcher = fetcher
+  }
 
   // The command, for example 'ping' or 'foo'
   abstract name(): string
@@ -44,4 +51,26 @@ export abstract class AbstractCommand {
     //@ts-ignore : The first element is a string|undefined, but typing this is a nightmare
     return [undefined].concat(parameters.map((x, i) => match[i]))
   }
+
+  /**
+   * Takes a string, and checks whether it's an alias or a valid peerId,
+   * then it generates a PeerId instance and returns it.
+   *
+   * @param peerIdString query that contains the peerId
+   * @returns a 'PeerId' instance
+   */
+  public async checkPeerIdInput(peerIdString: string): Promise<PeerId> {
+    const aliases: string[] = await this.hoprFetcher.getAliases().then(res => Object.values(res))
+
+    try {
+      if (typeof aliases !== 'undefined' && aliases && aliases.includes(peerIdString)) {
+        return PeerId.createFromB58String(peerIdString)
+      }
+
+      return PeerId.createFromB58String(peerIdString)
+    } catch (err) {
+      throw Error(`Invalid peerId. ${err.message}`)
+    }
+  }
+
 }

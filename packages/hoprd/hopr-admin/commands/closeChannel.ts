@@ -1,12 +1,12 @@
 import type PeerId from 'peer-id'
 import chalk from 'chalk'
 import { AbstractCommand } from './abstractCommand'
-import { checkPeerIdInput, styleValue } from './utils'
-import { closeChannel, getNodeInfo } from '../fetch'
+import { styleValue } from './utils'
+import HoprFetcher from '../fetch'
 
 export default class CloseChannel extends AbstractCommand {
-  constructor() {
-    super()
+  constructor(fetcher: HoprFetcher) {
+    super(fetcher)
   }
 
   public name() {
@@ -24,7 +24,7 @@ export default class CloseChannel extends AbstractCommand {
 
     let peerId: PeerId
     try {
-      peerId = checkPeerIdInput(query)
+      peerId = await this.checkPeerIdInput(query)
     } catch (err) {
       return log(styleValue(err.message, 'failure'))
     }
@@ -32,8 +32,8 @@ export default class CloseChannel extends AbstractCommand {
     log('Closing channel...')
 
     try {
-      const response = await closeChannel(peerId.toB58String())
-      const nodeInfo = await getNodeInfo()
+      const response = await this.hoprFetcher.closeChannel(peerId.toB58String())
+      const nodeInfo = await this.hoprFetcher.getNodeInfo()
 
       if (response.status === 200) {
         const { receipt } = await response.json()

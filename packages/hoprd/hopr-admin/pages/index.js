@@ -6,6 +6,7 @@ import { Logs } from '../components/log'
 import { Connection } from '../connection'
 import dynamic from 'next/dynamic'
 import Cookies from 'js-cookie'
+import { useRouter } from 'next/router'
 
 const Jazzicon = dynamic(() => import('../components/jazzicon'), { ssr: false })
 const gitHash = process.env.NEXT_PUBLIC_GIT_COMMIT
@@ -41,6 +42,8 @@ class TokenInput extends React.Component {
 }
 
 export default function Home() {
+  const router = useRouter()
+
   let connection
 
   const [showConnected, setShowConnected] = useState(false)
@@ -61,11 +64,12 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      connection = new Connection(setConnecting, setReady, setMessages, setConnectedPeers, handleAuthFailed)
+    if (router.isReady && typeof window !== 'undefined') {
+      const { port, apiToken } = router.query
+      connection = new Connection(setConnecting, setReady, setMessages, setConnectedPeers, handleAuthFailed, port, apiToken)
       return Connection.disconnect
-      }
-  }, [])
+    }
+  }, [router.isReady])
 
   const cookie = Cookies.get('X-Auth-Token')
 

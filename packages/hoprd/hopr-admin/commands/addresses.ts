@@ -1,11 +1,12 @@
 import { AbstractCommand } from './abstractCommand'
 import type PeerId from 'peer-id'
-import { checkPeerIdInput, styleValue } from './utils'
+import {  styleValue } from './utils'
+import HoprFetcher from '../fetch'
 
 // TODO: Missing getObservedAddresses API for now
 export default class Addresses extends AbstractCommand {
-  constructor() {
-    super()
+  constructor(fetcher: HoprFetcher) {
+    super(fetcher)
     this.hidden = true
   }
 
@@ -24,7 +25,7 @@ export default class Addresses extends AbstractCommand {
 
     let peerId: PeerId
     try {
-      peerId = await checkPeerIdInput(query)
+      peerId = await this.checkPeerIdInput(query)
     } catch (err) {
       return log(styleValue(err.message, 'failure'))
     }

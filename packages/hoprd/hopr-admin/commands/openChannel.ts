@@ -1,15 +1,16 @@
 import type PeerId from 'peer-id'
 import chalk from 'chalk'
-import { checkPeerIdInput, styleValue } from './utils'
+import { styleValue } from './utils'
 import { AbstractCommand } from './abstractCommand'
-import { getBalances, setChannels } from '../fetch'
-import { BalanceDecimals, hoprToWei } from './utils/util'
+import { BalanceDecimals } from './utils/types'
 import {  moveDecimalPoint } from './utils/moveDecimal'
 import BN from 'bn.js'
+import HoprFetcher from '../fetch'
 
 export class OpenChannel extends AbstractCommand {
-  constructor() {
-    super()
+
+  constructor(fetcher: HoprFetcher) {
+    super(fetcher)
   }
 
   public name() {
@@ -31,13 +32,13 @@ export class OpenChannel extends AbstractCommand {
 
     let counterparty: PeerId
     try {
-      counterparty = checkPeerIdInput(counterpartyStr)
+      counterparty = await this.checkPeerIdInput(counterpartyStr)
     } catch (err) {
       return log(styleValue(err.message, 'failure'))
     }
 
     const amountToFund = new BN(moveDecimalPoint(amountToFundStr, BalanceDecimals.Balance))
-    const myAvailableTokens = await getBalances().then(d => new BN(d.hopr))
+    const myAvailableTokens = await this.hoprFetcher.getBalances().then(d => new BN(d.hopr))
 
     if (amountToFund.lten(0)) {
       return log(`Invalid 'amountToFund' provided: ${amountToFund.toString(10)}`)
@@ -48,7 +49,7 @@ export class OpenChannel extends AbstractCommand {
     log('Opening channel...')
 
     try {
-      const response = await setChannels(counterparty.toB58String(), amountToFund.toString())
+      const response = await this.hoprFetcher.setChannels(counterparty.toB58String(), amountToFund.toString())
       if (response.status == 201) {
         const channelId = response.json().then(res => res.channelId)
         // TODO: channelId.toHex()

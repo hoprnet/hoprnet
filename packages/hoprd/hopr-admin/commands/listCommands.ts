@@ -1,5 +1,6 @@
 import { AbstractCommand } from './abstractCommand'
 import { getPaddingLength, styleValue } from './utils'
+import HoprFetcher from '../fetch'
 
 function getOptions(
   options: { value: any; description?: string }[],
@@ -26,8 +27,8 @@ function getOptions(
   }
 }
 export default class ListCommands extends AbstractCommand {
-  constructor(private getCommands: () => AbstractCommand[]) {
-    super()
+  constructor(fetcher: HoprFetcher, private getCommands: () => AbstractCommand[]) {
+    super(fetcher)
   }
 
   public name() {

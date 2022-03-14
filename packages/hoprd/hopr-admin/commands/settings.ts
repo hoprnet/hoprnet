@@ -1,6 +1,6 @@
 import { getPaddingLength, styleValue } from './utils'
 import { AbstractCommand } from './abstractCommand'
-import { getSettings, setSettings } from '../fetch'
+import HoprFetcher from '../fetch'
 
 // TODO: refactor old code better
 // function booleanSetter(name: string) {
@@ -13,48 +13,50 @@ import { getSettings, setSettings } from '../fetch'
 //   }
 // }
 
-const booleanSetter = (name: string) => {
-  return function setter(query: string): string {
-    if (!query.match(/true|false/i)) {
-      return styleValue(`Invalid option.`, 'failure')
-    }
 
-    // TODO: debug here
-    let settings = getSettings()
-    settings[name] = !!query.match(/true/i)
-    return `You have set your “${styleValue(name, 'highlight')}” settings to “${styleValue(settings[name])}”.`
-  }
-}
 
 export default class Settings extends AbstractCommand {
   private settings
 
-  constructor() {
-    super()
+  constructor(fetcher: HoprFetcher) {
+    super(fetcher)
     this.settings = {
-      includeRecipient: ['Prepends your address to all messages (true|false)', booleanSetter('includeRecipient')],
+      includeRecipient: ['Prepends your address to all messages (true|false)', this.booleanSetter('includeRecipient')],
       strategy: [
         'Set an automatic strategy for the node. (passive|promiscuous)',
-        Settings.setStrategy,
-        Settings.getStrategy,
+        this.setStrategy,
+        this.getStrategy,
       ]
     }
   }
 
-  private static async getStrategy(): Promise<string> {
-    return await getSettings().then(res => res.strategy)
+  private booleanSetter(name: string) {
+    return function setter(query: string): string {
+      if (!query.match(/true|false/i)) {
+        return styleValue(`Invalid option.`, 'failure')
+      }
+
+      // TODO: debug here
+      let nodeSettings = this.hoprFetcher.getSettings()
+      // settings[name] = !!query.match(/true/i)
+      return `You have set your “${styleValue(name, 'highlight')}” settings to “${styleValue(nodeSettings[name])}”.`
+    }
   }
 
-  private static async setStrategy(query: string): Promise<string> {
+  private async getStrategy(): Promise<string> {
+    return await this.hoprFetcher.getSettings().then(res => res.strategy)
+  }
+
+  private async setStrategy(query: string): Promise<string> {
     if (query == 'passive') {
-        const response = await setSettings("strategy", "passive")
+        const response = await this.hoprFetcher.setSettings("strategy", "passive")
         if (response.status === 204) {
           return 'Strategy is now passive'
         }
     }
 
     if (query == 'promiscuous') {
-      const response = await setSettings("strategy", "promiscuous")
+      const response = await this.hoprFetcher.setSettings("strategy", "promiscuous")
       if (response.status === 204) {
         return 'Strategy is now promiscuous'
       }

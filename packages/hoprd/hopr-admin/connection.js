@@ -2,22 +2,35 @@
  * Maintain a websocket connection
  */
 
-import { parseCmd } from './client'
 import { Commands } from './commands'
 
 const MAX_MESSAGES_CACHED = 50
+
+const parseCmd = (cmdInput) => {
+  const split = cmdInput.trim().split(/\s+/)
+  const command = split[0]
+  const query = split.slice(1).join(' ')
+
+  if (command == null) {
+    return undefined
+  }
+
+  return {cmd: command, query: query}
+}
 
 export class Connection {
   logs = []
   prevLog = ''
   authFailed = false
 
-  constructor(setConnecting, setReady, setMessages, setConnectedPeers, onAuthFailed) {
+  constructor(setConnecting, setReady, setMessages, setConnectedPeers, onAuthFailed, port = 13301, apiToken = "^^LOCAL-testing-123^^") {
     this.setConnecting = setConnecting
     this.setReady = setReady
     this.setMessages = setMessages
     this.setConnectedPeers = setConnectedPeers
     this.onAuthFailed = onAuthFailed
+    this.port = port
+    this.apiToken = apiToken
     this.connect()
   }
 
@@ -84,6 +97,7 @@ export class Connection {
 
   async connect() {
     console.log('Connecting ...')
+    console.log(`Using... API PORT: ${this.port}, API_TOKEN: ${this.apiToken}`)
     var client
     try {
       // See https://stackoverflow.com/a/55487820
@@ -91,10 +105,10 @@ export class Connection {
         ? await fetch(`https://${window.location.host}/api/ssl`).then(
             (_) => new WebSocket('wss://' + window.location.host)
           )
-        : new WebSocket("ws://localhost:13301/api/v2/node/stream/websocket/?apiToken=^^LOCAL-testing-123^^")
+        : new WebSocket(`ws://${window.location.hostname}:${this.port}/api/v2/node/stream/websocket/?apiToken=${this.apiToken}`)
     } catch (err) {
       console.log('Invalid SSL or non-SSL support')
-      client = new WebSocket("ws://localhost:13301/api/v2/node/stream/websocket/?apiToken=^^LOCAL-testing-123^^")
+      client = new WebSocket(`ws://${window.location.hostname}:${this.port}/api/v2/node/stream/websocket/?apiToken=${this.apiToken}`)
     }
 
     console.log('Web socket created')
@@ -109,7 +123,7 @@ export class Connection {
           var text = e.target.value
           if (text.length > 0) {
             const userInput = parseCmd(text)
-            const cmds = new Commands();
+            const cmds = new Commands(this.port, this.apiToken);
             switch (userInput.cmd) {
               case "withdraw":
               case "balance":

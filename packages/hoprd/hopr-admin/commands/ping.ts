@@ -1,11 +1,11 @@
 import type PeerId from 'peer-id'
 import { AbstractCommand } from './abstractCommand'
 import { checkPeerIdInput, styleValue } from './utils'
-import { pingNodePeer } from '../fetch'
+import HoprFetcher from '../fetch'
 
 export default class Ping extends AbstractCommand {
-  constructor() {
-    super()
+  constructor(fetcher: HoprFetcher) {
+    super(fetcher)
   }
 
   public name() {
@@ -35,7 +35,7 @@ export default class Ping extends AbstractCommand {
     let error: any
 
     try {
-      pingResult = await pingNodePeer(query).then(res => res.json())
+      pingResult = await this.hoprFetcher.pingNodePeer(query).then(res => res.json())
     } catch (err) {
       error = err
     }

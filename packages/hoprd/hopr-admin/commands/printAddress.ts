@@ -1,10 +1,10 @@
 import { AbstractCommand } from './abstractCommand'
-import { getAddresses } from '../fetch'
 import { styleValue } from './utils'
+import HoprFetcher from '../fetch'
 
 export default class PrintAddress extends AbstractCommand {
-  constructor() {
-    super()
+  constructor(fetcher: HoprFetcher) {
+    super(fetcher)
   }
 
   public name() {
@@ -21,7 +21,7 @@ export default class PrintAddress extends AbstractCommand {
    * @notice triggered by the CLI
    */
   public async execute(log, query: string): Promise<void> {
-    const addresses = await getAddresses()
+    const addresses = await this.hoprFetcher.getAddresses()
 
     const hoprPrefix = 'HOPR Address:'
     const hoprAddress = addresses.hoprAddress

@@ -33,7 +33,7 @@ export default function setupAPI(
     const service = express()
     const server = http.createServer(service)
 
-    apiV1.setupRestApi(service, '/api/v1', node, logs, stateOps, options)
+    // apiV1.setupRestApi(service, '/api/v1', node, logs, stateOps, options)
     apiV2.setupRestApi(service, '/api/v2', node, stateOps, options)
     apiV2.setupWsApi(server, new ws.Server({ noServer: true }), node, logs, options)
 
@@ -51,10 +51,10 @@ export default function setupAPI(
   }
 
   // deprecated: creates WS v1 server for hopr-admin
-  if (options.admin && adminServer?.server) {
-    debugLog('Enabling WS v1')
-    apiV1.setupWsApi(new ws.Server({ server: adminServer.server }), logs, options, adminServer)
-
-    logs.log(`deprecated WS admin API server on ${options.adminHost} listening on port ${options.adminPort}`)
-  }
+  // if (options.admin && adminServer?.server) {
+  //   debugLog('Enabling WS v1')
+  //   apiV1.setupWsApi(new ws.Server({ server: adminServer.server }), logs, options, adminServer)
+  //
+  //   logs.log(`deprecated WS admin API server on ${options.adminHost} listening on port ${options.adminPort}`)
+  // }
 }

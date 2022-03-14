@@ -1,10 +1,10 @@
 import { styleValue } from './utils'
 import { AbstractCommand } from './abstractCommand'
-import { redeemTickets } from '../fetch'
+import HoprFetcher from '../fetch'
 
 export default class RedeemTickets extends AbstractCommand {
-  constructor() {
-    super()
+  constructor(fetcher: HoprFetcher) {
+    super(fetcher)
   }
 
   public name() {
@@ -21,7 +21,7 @@ export default class RedeemTickets extends AbstractCommand {
   public async execute(log: (str: string) => void): Promise<void> {
     try {
       log('Redeeming all tickets...')
-      await redeemTickets()
+      await this.hoprFetcher.redeemTickets()
 
       log(`Redeemed all tickets. Run 'tickets' for details`)
     } catch (err) {

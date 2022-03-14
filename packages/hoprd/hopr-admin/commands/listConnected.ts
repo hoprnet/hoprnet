@@ -1,8 +1,9 @@
 import { AbstractCommand } from './abstractCommand'
+import HoprFetcher from '../fetch'
 
 export default class ListConnectedPeers extends AbstractCommand {
-  constructor() {
-    super()
+  constructor(fetcher: HoprFetcher) {
+    super(fetcher)
   }
 
   public name() {

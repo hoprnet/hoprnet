@@ -1,10 +1,10 @@
 import { AbstractCommand } from './abstractCommand'
 import { styleValue } from './utils'
-import { getBalances } from '../fetch'
+import HoprFetcher from '../fetch'
 
 export default class PrintBalance extends AbstractCommand {
-  constructor() {
-    super()
+  constructor(fetcher: HoprFetcher) {
+    super(fetcher)
   }
 
   public name() {
@@ -19,8 +19,8 @@ export default class PrintBalance extends AbstractCommand {
    * Prints the balance of our account.
    * @notice triggered by the CLI
    */
-  public async execute(log): Promise<void> {
-    const balances = await getBalances()
+  public async execute( log): Promise<void> {
+    const balances = await this.hoprFetcher.getBalances()
 
     const hoprPrefix = 'HOPR Balance:'
     // TODO: toFormattedString()

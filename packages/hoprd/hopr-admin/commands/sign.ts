@@ -1,10 +1,10 @@
 import { AbstractCommand } from './abstractCommand'
 import { styleValue } from './utils'
-import { signMessage } from '../fetch'
+import HoprFetcher from '../fetch'
 
 export default class Sign extends AbstractCommand {
-  constructor() {
-    super()
+  constructor(fetcher: HoprFetcher) {
+    super(fetcher)
   }
 
   public name() {
@@ -21,7 +21,7 @@ export default class Sign extends AbstractCommand {
     }
 
     try {
-      const response = await signMessage(query)
+      const response = await this.hoprFetcher.signMessage(query)
       const signature = await response.json()
       if (response.status === 200 || response.status === 422){
         return log(`Signed message: ${signature.signature}`)
