@@ -65,30 +65,31 @@ validate_node_balance_gt0() {
   fi
 }
 
-# Run API endpoint and assert
-# $1 = node api address (origin)
-# $2 = api endpoint to call
+# Run API endpoint and assert response or status code
+# $1 = source api url (http://localhost:13001)
+# $2 = api_endpoint (/channels)
 # $3 = rest method for cURL (GET,POST...)
 # $4 = request body as json string
 # $5 = OPTIONAL: positive assertion message
-# $6 = OPTIONAL: maximum wait time in seconds during which we busy try
-# afterwards we fail, defaults to 0
-# $7 = OPTIONAL: step time between retries in seconds, defaults to 25 seconds
-# (8 blocks with 1-3 s/block in ganache)
-# $8 = OPTIONAL: end time for busy wait in nanoseconds since epoch, has higher
-# priority than wait time, defaults to 0
+# $6 = OPTIONAL: maximum wait time in seconds during which we busy try afterwards we fail, defaults to 0
+# $7 = OPTIONAL: step time between retries in seconds, defaults to 25 seconds (8 blocks with 1-3 s/block in ganache)
+# $8 = OPTIONAL: end time for busy wait in nanoseconds since epoch, has higher priority than wait time, defaults to 0
+# $9 = OPTIONAL: should assert status code
 run_api(){
   local result now
-  local node_api="${1}"
-  local endpoint="${2}"
+  local source_api="${1}"
+  local api_endpoint="${2}"
   local rest_method="${3}"
   local request_body="${4}"
   local assertion="${5:-}"
   local wait_time=${6:-0}
   local step_time=${7:-25}
   local end_time_ns=${8:-0}
+  local should_assert_status_code=${9:-false}
+
   # no timeout set since the test execution environment should cancel the test if it takes too long
-  local cmd="curl -X ${rest_method} -m ${step_time} --connect-timeout ${step_time} -s -H X-Auth-Token:${api_token} -H Content-Type:application/json --url ${node_api}/api/v2${endpoint} -d "
+  local response_type="-d" && [[ "$should_assert_status_code" = true ]] && response_type="-o /dev/null -w %{http_code} -d"
+  local cmd="curl -X ${rest_method} -m ${step_time} --connect-timeout ${step_time} -s -H X-Auth-Token:${api_token} -H Content-Type:application/json --url ${source_api}/api/v2${api_endpoint} ${response_type}"
 
   # if no end time was given we need to calculate it once
   if [ ${end_time_ns} -eq 0 ]; then
@@ -110,59 +111,26 @@ run_api(){
     else
       log "${YELLOW}run_api (${cmd} \"${request_body}\") FAILED, received: ${result}, retrying in ${step_time} seconds${NOFORMAT}"
       sleep ${step_time}
-      run_api "${node_api}" "${endpoint}" "${rest_method}" "${request_body}" "${assertion}" "${wait_time}" \
+      run_api "${source_api}" "${api_endpoint}" "${rest_method}" "${request_body}" "${assertion}" "${wait_time}" \
         "${step_time}" "${end_time_ns}"
     fi
   fi
 }
 
-# $1 = endpoint
+# $1 = source api url
 # $2 = recipient peer id
 # $3 = message
 # $4 = OPTIONAL: peers in the message path
-# $5 = OPTIONAL: maximum wait time in seconds during which we busy try
-# afterwards we fail, defaults to 0
-# $6 = OPTIONAL: step time between retries in seconds, defaults to 25 seconds
-# (8 blocks with 1-3 s/block in ganache)
-# $7 = OPTIONAL: end time for busy wait in nanoseconds since epoch, has higher
-# priority than wait time, defaults to 0
 send_message(){
   local result now
-  local endpoint="${1}"
+  local source_api="${1}"
   local recipient="${2}"
   local msg="${3}"
   local peers="${4}"
-  local wait_time=${5:-0}
-  local step_time=${6:-25}
-  local end_time_ns=${7:-0}
-  # no timeout set since the test execution environment should cancel the test if it takes too long
-  local cmd="curl -m ${step_time} --connect-timeout ${step_time} -s -H X-Auth-Token:${api_token} -H Content-Type:application/json --url ${endpoint}/api/v2/messages -o /dev/null -w %{http_code} -d "
-
-  # if no end time was given we need to calculate it once
-  if [ ${end_time_ns} -eq 0 ]; then
-    now=$(node -e "console.log(process.hrtime.bigint().toString());")
-    # need to calculate in nanoseconds
-    ((end_time_ns=now+wait_time*1000000000))
-  fi
 
   local path=$(echo ${peers} | tr -d '\n' | jq -R -s 'split(" ")')
-  local message='{"body":"'${msg}'","path":'${path}',"recipient":"'${recipient}'"}'
-  result=$(${cmd} "${message}")
-
-  # we fail if the HTTP status code is anything but 204
-  if [ "${result}" = "204" ]; then
-    echo "${result}"
-  else
-    now=$(node -e "console.log(process.hrtime.bigint().toString());")
-    if [ ${end_time_ns} -lt ${now} ]; then
-      log "${RED}send_message (${cmd} \"${message}\") FAILED, received: ${result}${NOFORMAT}"
-      exit 1
-    else
-      log "${YELLOW}send_message (${cmd} \"${message}\") FAILED, retrying in ${step_time} seconds${NOFORMAT}"
-      sleep ${step_time}
-      send_message "${endpoint}" "${recipient}" "${msg}" "${peers}" "${wait_time}" "${step_time}" "${end_time_ns}"
-    fi
-  fi
+  local payload='{"body":"'${msg}'","path":'${path}',"recipient":"'${recipient}'"}'
+  result="$(run_api ${source_api} "/messages" "POST" ${payload} 204 "" "" "" true)"
 }
 
 # $1 = source node id
@@ -439,7 +407,7 @@ test_withdraw() {
   hopr_balance=$(echo ${balances} | jq -r .hopr)
 
   withdraw ${node_api} "NATIVE" 10 0x858aa354db6ae5ea1217c5018c90403bde94e09e
-  log "waiting 30 secunds for withdraw transaction to complete"
+  log "waiting 30 seconds for withdraw transaction to complete"
   sleep 30
 
   balances=$(get_balances ${node_api})
@@ -447,7 +415,7 @@ test_withdraw() {
   [[ "${native_balance}" == "${new_native_balance}" ]] && { msg "Native withdraw failed, pre: ${native_balance}, post: ${new_native_balance}"; exit 1; }
 
   withdraw ${node_api} "HOPR" 10 0x858aa354db6ae5ea1217c5018c90403bde94e09e
-  log "waiting 30 secunds for withdraw transaction to complete"
+  log "waiting 30 seconds for withdraw transaction to complete"
   sleep 30
 
   balances=$(get_balances ${node_api})
