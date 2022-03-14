@@ -83,6 +83,8 @@ export const getStatusCodeForInvalidInputInRequest = (inputPath: string) => {
       return STATUS_CODES.INVALID_SETTING
     case 'settingvalue':
       return STATUS_CODES.INVALID_SETTING_VALUE
+    case 'quality':
+      return STATUS_CODES.INVALID_QUALITY
     default:
       return 'INVALID_INPUT'
   }

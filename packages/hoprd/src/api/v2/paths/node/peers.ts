@@ -1,4 +1,5 @@
 import type { Operation } from 'express-openapi'
+import type { Multiaddr } from 'multiaddr'
 import Hopr from '@hoprnet/hopr-core'
 import PeerId from 'peer-id'
 import { STATUS_CODES } from '../../utils'
@@ -15,6 +16,25 @@ export type PeerInfo = {
   backoff: number
   isNew: boolean
 }
+
+/**
+ * Convert `info` taken from `core` to our preferred response format.
+ * @param info `entry` information taken from `core`
+ * @param multiaddr
+ * @returns PeerInfo
+ */
+const toPeerInfoFormat = (info: ReturnType<Hopr['getConnectionInfo']>, multiaddr?: Multiaddr): PeerInfo => ({
+  peerId: info.id.toB58String(),
+  multiAddr: multiaddr ? multiaddr.toString() : undefined,
+  heartbeats: {
+    sent: info.heartbeatsSent,
+    success: info.heartbeatsSuccess
+  },
+  lastSeen: info.lastSeen,
+  quality: info.lastTen,
+  backoff: info.backoff,
+  isNew: info.heartbeatsSent === 0
+})
 
 /**
  * @param node a hopr instance
@@ -36,19 +56,7 @@ export const getPeers = async (
         const info = node.getConnectionInfo(peerId)
         // exclude if quality is lesser than the one wanted
         if (info.lastTen < quality) return result
-        const isNew = info.heartbeatsSent === 0
-
-        result.push({
-          peerId: info.id.toB58String(),
-          heartbeats: {
-            sent: info.heartbeatsSent,
-            success: info.heartbeatsSuccess
-          },
-          lastSeen: info.lastSeen,
-          quality: info.lastTen,
-          backoff: info.backoff,
-          isNew
-        })
+        result.push(toPeerInfoFormat(info))
       } catch {}
       return result
     }, [])
@@ -60,20 +68,7 @@ export const getPeers = async (
           const info = node.getConnectionInfo(peerId)
           // exclude if quality is lesser than the one wanted
           if (info.lastTen < quality) return result
-          const isNew = info.heartbeatsSent === 0
-
-          result.push({
-            peerId: info.id.toB58String(),
-            multiAddr: addr.toString(),
-            heartbeats: {
-              sent: info.heartbeatsSent,
-              success: info.heartbeatsSuccess
-            },
-            lastSeen: info.lastSeen,
-            quality: info.lastTen,
-            backoff: info.backoff,
-            isNew
-          })
+          result.push(toPeerInfoFormat(info, addr))
         } catch {}
         return result
       }, [])
