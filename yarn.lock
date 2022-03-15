@@ -3261,7 +3261,6 @@ __metadata:
   resolution: "@hoprnet/hopr-utils@workspace:packages/utils"
   dependencies:
     "@chainsafe/libp2p-noise": 5.0.2
-    "@types/levelup": 5.1.0
     "@types/mocha": 9.1.0
     "@types/pino": 7.0.4
     abort-controller: ~3.0.0
@@ -4779,17 +4778,6 @@ __metadata:
   version: 3.0.0
   resolution: "@types/level-errors@npm:3.0.0"
   checksum: ad9392663439306677ac9cb704f8fa0b64c300dfea4f3494369eb78a2e09c194156cbab2b52c71a361a09b735d54a2de65195dcadba0ec7db1d14a320198133e
-  languageName: node
-  linkType: hard
-
-"@types/levelup@npm:5.1.0":
-  version: 5.1.0
-  resolution: "@types/levelup@npm:5.1.0"
-  dependencies:
-    "@types/abstract-leveldown": "*"
-    "@types/level-errors": "*"
-    "@types/node": "*"
-  checksum: 0259f6869e3ffa2797a1f885be25a7c13a8e2b2d9383024ddeca7a355870cf3e85a073f0ca542ebac6c07b9dd71a34cb3a9921ae4e9fe3b0cdceb64cae87133e
   languageName: node
   linkType: hard
 

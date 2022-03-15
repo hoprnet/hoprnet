@@ -144,7 +144,7 @@ describe(`database tests`, function () {
     assert(u8aEquals(MAPPED_VALUE, resultMapped[0]))
   })
 
-  it.only('getAll - sort', async function () {
+  it('getAll - sort', async function () {
     const TEST_KEY = new TextEncoder().encode(`test key`)
     const TEST_VALUE_FIRST = Uint8Array.from([...new TextEncoder().encode(`test value`), 0])
     const TEST_VALUE_MIDDLE = Uint8Array.from([...new TextEncoder().encode(`test value`), 1])
@@ -223,7 +223,7 @@ describe(`database tests`, function () {
   it('should store ChannelEntry', async function () {
     const channelEntry = ChannelEntry.createMock()
 
-    await db.updateChannel(channelEntry.getId(), channelEntry, TestingSnapshot)
+    await db.updateChannelAndSnapshot(channelEntry.getId(), channelEntry, TestingSnapshot)
 
     assert(!!(await db.getChannel(channelEntry.getId())), 'did not find channel')
     assert((await db.getChannels()).length === 1, 'did not find channel')

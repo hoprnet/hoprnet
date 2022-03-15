@@ -23,48 +23,56 @@ import {
   generateChannelId
 } from '../types'
 import BN from 'bn.js'
-import { u8aToNumber, u8aConcat } from '../u8a'
+import { u8aToNumber, u8aConcat, toU8a } from '../u8a'
 
 const log = debug(`hopr-core:db`)
+
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
-const SEPARATOR = encoder.encode(':')
+// key seperator:    `:`
+// key query prefix: `-`
 
-const TICKET_PREFIX = encoder.encode('tickets-')
-const PENDING_ACKNOWLEDGEMENTS_PREFIX = Uint8Array.from([
-  ...TICKET_PREFIX,
-  ...encoder.encode('pending-acknowledgement-')
-])
-const ACKNOWLEDGED_TICKETS_PREFIX = Uint8Array.from([...TICKET_PREFIX, ...encoder.encode('acknowledged-')])
+const ACCOUNT_PREFIX = encoder.encode('account-')
+const CHANNEL_PREFIX = encoder.encode('channel-')
+const COMMITMENT_PREFIX = encoder.encode('commitment-')
+const CURRENT_COMMITMENT_PREFIX = encoder.encode('commitment:current-')
+const TICKET_INDEX_PREFIX = encoder.encode('ticketIndex-')
+const PENDING_TICKETS_COUNT = encoder.encode('statistics:pending:value-')
+const ACKNOWLEDGED_TICKETS_PREFIX = encoder.encode('tickets:acknowledged-')
+const PENDING_ACKNOWLEDGEMENTS_PREFIX = encoder.encode('tickets:pending-acknowledgement-')
 
-export const pendingAcknowledgement = (halfKey: HalfKeyChallenge) => {
+function createChannelKey(channelId: Hash): Uint8Array {
+  return Uint8Array.from([...CHANNEL_PREFIX, ...channelId.serialize()])
+}
+function createAccountKey(address: Address): Uint8Array {
+  return Uint8Array.from([...ACCOUNT_PREFIX, ...address.serialize()])
+}
+function createCommitmentKey(channelId: Hash, iteration: number) {
+  return Uint8Array.from([...COMMITMENT_PREFIX, ...channelId.serialize(), ...toU8a(iteration, 4)])
+}
+function createCurrentCommitmentKey(channelId: Hash) {
+  return Uint8Array.from([...CURRENT_COMMITMENT_PREFIX, ...channelId.serialize()])
+}
+function createCurrentTicketIndexKey(channelId: Hash) {
+  return Uint8Array.from([...TICKET_INDEX_PREFIX, ...channelId.serialize()])
+}
+function createPendingTicketsCountKey(address: Address) {
+  return Uint8Array.from([...PENDING_TICKETS_COUNT, ...address.serialize()])
+}
+function createAcknowledgedTicketKey(challenge: EthereumChallenge, channelEpoch: UINT256) {
+  return Uint8Array.from([...ACKNOWLEDGED_TICKETS_PREFIX, ...channelEpoch.serialize(), ...challenge.serialize()])
+}
+export const createPendingAcknowledgement = (halfKey: HalfKeyChallenge) => {
   return Uint8Array.from([...PENDING_ACKNOWLEDGEMENTS_PREFIX, ...halfKey.serialize()])
 }
 
-const acknowledgedTicketKey = (challenge: EthereumChallenge, channelEpoch: UINT256) => {
-  return Uint8Array.from([
-    ...ACKNOWLEDGED_TICKETS_PREFIX,
-    ...channelEpoch.serialize(),
-    ...SEPARATOR,
-    ...challenge.serialize()
-  ])
-}
-const PACKET_TAG_PREFIX: Uint8Array = encoder.encode('packets-tag-')
+const PACKET_TAG_PREFIX: Uint8Array = encoder.encode('packets-tag')
 const LATEST_BLOCK_NUMBER_KEY = encoder.encode('latestBlockNumber')
 const LATEST_CONFIRMED_SNAPSHOT_KEY = encoder.encode('latestConfirmedSnapshot')
-const ACCOUNT_PREFIX = encoder.encode('account-')
-const CHANNEL_PREFIX = encoder.encode('channel-')
-const createChannelKey = (channelId: Hash): Uint8Array => Uint8Array.from([...CHANNEL_PREFIX, ...channelId.serialize()])
-const createAccountKey = (address: Address): Uint8Array => Uint8Array.from([...ACCOUNT_PREFIX, ...address.serialize()])
-const COMMITMENT_PREFIX = encoder.encode('commitment:')
-const TICKET_INDEX_PREFIX = encoder.encode('ticketIndex:')
-const CURRENT = encoder.encode('current')
 const REDEEMED_TICKETS_COUNT = encoder.encode('statistics:redeemed:count')
 const REDEEMED_TICKETS_VALUE = encoder.encode('statistics:redeemed:value')
 const LOSING_TICKET_COUNT = encoder.encode('statistics:losing:count')
-const PENDING_TICKETS_VALUE = (address: Address) =>
-  u8aConcat(encoder.encode('statistics:pending:value:'), encoder.encode(address.toHex()))
 const NEGLECTED_TICKET_COUNT = encoder.encode('statistics:neglected:count')
 const REJECTED_TICKETS_COUNT = encoder.encode('statistics:rejected:count')
 const REJECTED_TICKETS_VALUE = encoder.encode('statistics:rejected:value')
@@ -86,6 +94,28 @@ export type WaitingAsRelayer = {
 }
 
 export type PendingAckowledgement = WaitingAsSender | WaitingAsRelayer
+
+function serializePendingAcknowledgement(isMessageSender: boolean, unackTicket?: UnacknowledgedTicket) {
+  if (isMessageSender) {
+    return Uint8Array.from([PendingAcknowledgementPrefix.MessageSender])
+  } else {
+    return Uint8Array.from([PendingAcknowledgementPrefix.Relayer, ...unackTicket.serialize()])
+  }
+}
+
+function deserializePendingAcknowledgement(data: Uint8Array): PendingAckowledgement {
+  switch (data[0] as PendingAcknowledgementPrefix) {
+    case PendingAcknowledgementPrefix.MessageSender:
+      return {
+        isMessageSender: true
+      }
+    case PendingAcknowledgementPrefix.Relayer:
+      return {
+        isMessageSender: false,
+        ticket: UnacknowledgedTicket.deserialize(data.slice(1))
+      }
+  }
+}
 
 export class HoprDB {
   private db: LevelUp
@@ -140,7 +170,7 @@ export class HoprDB {
         throw new Error('Database does not exist: ' + dbPath)
       }
     }
-    this.db = (levelup as any)(leveldown(dbPath))
+    this.db = levelup(leveldown(dbPath))
 
     // Fully initialize database
     await this.db.open()
@@ -265,35 +295,13 @@ export class HoprDB {
   }
 
   private async addBalance(key: Uint8Array, amount: Balance): Promise<void> {
-    let val = await this.getCoercedOrDefault<Balance>(key, Balance.deserialize, Balance.ZERO())
+    let val = await this.getCoercedOrDefault<Balance>(key, Balance.deserialize, Balance.ZERO)
     await this.put(key, val.add(amount).serialize())
   }
 
   private async subBalance(key: Uint8Array, amount: Balance): Promise<void> {
-    let val = await this.getCoercedOrDefault<Balance>(key, Balance.deserialize, Balance.ZERO())
+    let val = await this.getCoercedOrDefault<Balance>(key, Balance.deserialize, Balance.ZERO)
     await this.put(key, new Balance(val.toBN().sub(amount.toBN())).serialize())
-  }
-
-  private serializePendingAcknowledgement(isMessageSender: boolean, unackTicket?: UnacknowledgedTicket) {
-    if (isMessageSender) {
-      return Uint8Array.from([PendingAcknowledgementPrefix.MessageSender])
-    } else {
-      return Uint8Array.from([PendingAcknowledgementPrefix.Relayer, ...unackTicket.serialize()])
-    }
-  }
-
-  private deserializePendingAcknowledgement(data: Uint8Array): PendingAckowledgement {
-    switch (data[0] as PendingAcknowledgementPrefix) {
-      case PendingAcknowledgementPrefix.MessageSender:
-        return {
-          isMessageSender: true
-        }
-      case PendingAcknowledgementPrefix.Relayer:
-        return {
-          isMessageSender: false,
-          ticket: UnacknowledgedTicket.deserialize(data.slice(1))
-        }
-    }
   }
 
   /**
@@ -314,21 +322,19 @@ export class HoprDB {
       return true
     }
 
-    return await this.getAll<WaitingAsRelayer, UnacknowledgedTicket>(
+    return await this.getAll<PendingAckowledgement, UnacknowledgedTicket>(
       {
         prefix: PENDING_ACKNOWLEDGEMENTS_PREFIX,
         suffixLength: HalfKeyChallenge.SIZE
       },
-      this.deserializePendingAcknowledgement as any,
+      deserializePendingAcknowledgement,
       filterFunc,
       (pending: WaitingAsRelayer) => pending.ticket
     )
   }
 
   public async getPendingAcknowledgement(halfKeyChallenge: HalfKeyChallenge): Promise<PendingAckowledgement> {
-    const data = await this.get(pendingAcknowledgement(halfKeyChallenge))
-
-    return this.deserializePendingAcknowledgement(data)
+    return await this.getCoerced(createPendingAcknowledgement(halfKeyChallenge), deserializePendingAcknowledgement)
   }
 
   public async storePendingAcknowledgement(halfKeyChallenge: HalfKeyChallenge, isMessageSender: true): Promise<void>
@@ -344,8 +350,8 @@ export class HoprDB {
     unackTicket?: UnacknowledgedTicket
   ): Promise<void> {
     await this.put(
-      pendingAcknowledgement(halfKeyChallenge),
-      this.serializePendingAcknowledgement(isMessageSender, unackTicket)
+      createPendingAcknowledgement(halfKeyChallenge),
+      serializePendingAcknowledgement(isMessageSender, unackTicket)
     )
   }
 
@@ -398,7 +404,7 @@ export class HoprDB {
     const batch = this.db.batch()
 
     for (const ack of tickets) {
-      batch.del(Buffer.from(this.keyOf(acknowledgedTicketKey(ack.ticket.challenge, ack.ticket.channelEpoch))))
+      batch.del(Buffer.from(this.keyOf(createAcknowledgedTicketKey(ack.ticket.challenge, ack.ticket.channelEpoch))))
     }
 
     batch.put(Buffer.from(this.keyOf(NEGLECTED_TICKET_COUNT)), Uint8Array.of(neglectedTickets + 1))
@@ -411,12 +417,12 @@ export class HoprDB {
    * @param index Uint8Array
    */
   public async delAcknowledgedTicket(ack: AcknowledgedTicket): Promise<void> {
-    await this.del(acknowledgedTicketKey(ack.ticket.challenge, ack.ticket.channelEpoch))
+    await this.del(createAcknowledgedTicketKey(ack.ticket.challenge, ack.ticket.channelEpoch))
   }
 
   public async replaceUnAckWithAck(halfKeyChallenge: HalfKeyChallenge, ackTicket: AcknowledgedTicket): Promise<void> {
-    const unAcknowledgedDbKey = pendingAcknowledgement(halfKeyChallenge)
-    const acknowledgedDbKey = acknowledgedTicketKey(ackTicket.ticket.challenge, ackTicket.ticket.channelEpoch)
+    const unAcknowledgedDbKey = createPendingAcknowledgement(halfKeyChallenge)
+    const acknowledgedDbKey = createAcknowledgedTicketKey(ackTicket.ticket.challenge, ackTicket.ticket.channelEpoch)
 
     await this.db
       .batch()
@@ -432,13 +438,14 @@ export class HoprDB {
    * @returns an array of signed tickets
    */
   public async getTickets(filter?: { signer: PublicKey }): Promise<Ticket[]> {
-    return Promise.all([this.getUnacknowledgedTickets(filter), this.getAcknowledgedTickets(filter)]).then(
-      async ([unAcks, acks]) => {
-        const unAckTickets = await Promise.all(unAcks.map((o) => o.ticket))
-        const ackTickets = await Promise.all(acks.map((o) => o.ticket))
-        return [...unAckTickets, ...ackTickets]
-      }
-    )
+    const [unAcks, acks] = await Promise.all([
+      this.getUnacknowledgedTickets(filter),
+      this.getAcknowledgedTickets(filter)
+    ])
+
+    const unAckTickets = unAcks.map((o: UnacknowledgedTicket) => o.ticket)
+    const ackTickets = acks.map((o: AcknowledgedTicket) => o.ticket)
+    return [...unAckTickets, ...ackTickets]
   }
 
   /**
@@ -458,53 +465,47 @@ export class HoprDB {
     return present
   }
 
-  public close() {
+  public async close() {
     log('Closing database')
-    return this.db.close()
+    return await this.db.close()
   }
 
   async storeHashIntermediaries(channelId: Hash, intermediates: Intermediate[]): Promise<void> {
     let dbBatch = this.db.batch()
-    const keyFor = (iteration: number) =>
-      this.keyOf(u8aConcat(COMMITMENT_PREFIX, channelId.serialize(), Uint8Array.of(iteration)))
+
     for (const intermediate of intermediates) {
-      dbBatch = dbBatch.put(Buffer.from(keyFor(intermediate.iteration)), Buffer.from(intermediate.preImage))
+      dbBatch = dbBatch.put(
+        Buffer.from(this.keyOf(createCommitmentKey(channelId, intermediate.iteration))),
+        Buffer.from(intermediate.preImage)
+      )
     }
     await dbBatch.write()
   }
 
   async getCommitment(channelId: Hash, iteration: number) {
-    return await this.maybeGet(u8aConcat(COMMITMENT_PREFIX, channelId.serialize(), Uint8Array.of(iteration)))
+    return await this.maybeGet(createCommitmentKey(channelId, iteration))
   }
 
   async getCurrentCommitment(channelId: Hash): Promise<Hash> {
-    return new Hash(await this.get(Uint8Array.from([...COMMITMENT_PREFIX, ...CURRENT, ...channelId.serialize()])))
+    return new Hash(await this.get(createCurrentCommitmentKey(channelId)))
   }
 
-  setCurrentCommitment(channelId: Hash, commitment: Hash): Promise<void> {
-    return this.put(
-      Uint8Array.from([...COMMITMENT_PREFIX, ...CURRENT, ...channelId.serialize()]),
-      commitment.serialize()
-    )
+  async setCurrentCommitment(channelId: Hash, commitment: Hash): Promise<void> {
+    return this.put(createCurrentCommitmentKey(channelId), commitment.serialize())
   }
 
   async getCurrentTicketIndex(channelId: Hash): Promise<UINT256 | undefined> {
-    return await this.getCoercedOrDefault(
-      Uint8Array.from([...TICKET_INDEX_PREFIX, ...CURRENT, ...channelId.serialize()]),
-      UINT256.deserialize,
-      undefined
-    )
+    return await this.getCoercedOrDefault(createCurrentTicketIndexKey(channelId), UINT256.deserialize, undefined)
   }
 
   setCurrentTicketIndex(channelId: Hash, ticketIndex: UINT256): Promise<void> {
-    return this.put(
-      Uint8Array.from([...TICKET_INDEX_PREFIX, ...CURRENT, ...channelId.serialize()]),
-      ticketIndex.serialize()
-    )
+    return this.put(createCurrentTicketIndexKey(channelId), ticketIndex.serialize())
   }
 
   async getLatestBlockNumber(): Promise<number> {
-    if (!(await this.has(LATEST_BLOCK_NUMBER_KEY))) return 0
+    if (!(await this.has(LATEST_BLOCK_NUMBER_KEY))) {
+      return 0
+    }
     return new BN(await this.get(LATEST_BLOCK_NUMBER_KEY)).toNumber()
   }
 
@@ -535,7 +536,7 @@ export class HoprDB {
     )
   }
 
-  async updateChannel(channelId: Hash, channel: ChannelEntry, snapshot: Snapshot): Promise<void> {
+  async updateChannelAndSnapshot(channelId: Hash, channel: ChannelEntry, snapshot: Snapshot): Promise<void> {
     await this.db
       .batch()
       .put(Buffer.from(this.keyOf(createChannelKey(channelId))), Buffer.from(channel.serialize()))
@@ -544,11 +545,10 @@ export class HoprDB {
   }
 
   async getAccount(address: Address): Promise<AccountEntry | undefined> {
-    const data = await this.maybeGet(createAccountKey(address))
-    return data ? AccountEntry.deserialize(data) : undefined
+    return await this.getCoercedOrDefault(createAccountKey(address), AccountEntry.deserialize, undefined)
   }
 
-  async updateAccount(account: AccountEntry, snapshot: Snapshot): Promise<void> {
+  async updateAccountAndSnapshot(account: AccountEntry, snapshot: Snapshot): Promise<void> {
     await this.db
       .batch()
       .put(Buffer.from(this.keyOf(createAccountKey(account.address))), Buffer.from(account.serialize()))
@@ -568,7 +568,7 @@ export class HoprDB {
   }
 
   public async getRedeemedTicketsValue(): Promise<Balance> {
-    return await this.getCoercedOrDefault(REDEEMED_TICKETS_VALUE, Balance.deserialize, Balance.ZERO())
+    return await this.getCoercedOrDefault(REDEEMED_TICKETS_VALUE, Balance.deserialize, Balance.ZERO)
   }
   public async getRedeemedTicketsCount(): Promise<number> {
     return this.getCoercedOrDefault(REDEEMED_TICKETS_COUNT, u8aToNumber, 0)
@@ -583,27 +583,30 @@ export class HoprDB {
   }
 
   public async getPendingBalanceTo(counterparty: Address): Promise<Balance> {
-    return await this.getCoercedOrDefault(PENDING_TICKETS_VALUE(counterparty), Balance.deserialize, Balance.ZERO())
+    return await this.getCoercedOrDefault(createPendingTicketsCountKey(counterparty), Balance.deserialize, Balance.ZERO)
   }
 
   public async getLosingTicketCount(): Promise<number> {
-    return this.getCoercedOrDefault(LOSING_TICKET_COUNT, u8aToNumber, 0)
+    return await this.getCoercedOrDefault(LOSING_TICKET_COUNT, u8aToNumber, 0)
   }
 
   public async markPending(ticket: Ticket) {
-    await this.addBalance(PENDING_TICKETS_VALUE(ticket.counterparty), ticket.amount)
+    return await this.addBalance(createPendingTicketsCountKey(ticket.counterparty), ticket.amount)
   }
 
   public async resolvePending(ticket: Partial<Ticket>, snapshot: Snapshot) {
     let val = await this.getCoercedOrDefault<Balance>(
-      PENDING_TICKETS_VALUE(ticket.counterparty),
+      createPendingTicketsCountKey(ticket.counterparty),
       Balance.deserialize,
-      Balance.ZERO()
+      Balance.ZERO
     )
 
     await this.db
       .batch()
-      .put(Buffer.from(this.keyOf(PENDING_TICKETS_VALUE(ticket.counterparty))), Buffer.from(val.sub(val).serialize()))
+      .put(
+        Buffer.from(this.keyOf(createPendingTicketsCountKey(ticket.counterparty))),
+        Buffer.from(val.sub(val).serialize())
+      )
       .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
       .write()
   }
@@ -612,17 +615,17 @@ export class HoprDB {
     await this.increment(REDEEMED_TICKETS_COUNT)
     await this.delAcknowledgedTicket(a)
     await this.addBalance(REDEEMED_TICKETS_VALUE, a.ticket.amount)
-    await this.subBalance(PENDING_TICKETS_VALUE(a.ticket.counterparty), a.ticket.amount)
+    await this.subBalance(createPendingTicketsCountKey(a.ticket.counterparty), a.ticket.amount)
   }
 
   public async markLosing(t: UnacknowledgedTicket): Promise<void> {
     await this.increment(LOSING_TICKET_COUNT)
-    await this.del(pendingAcknowledgement(t.getChallenge()))
-    await this.subBalance(PENDING_TICKETS_VALUE(t.ticket.counterparty), t.ticket.amount)
+    await this.del(createPendingAcknowledgement(t.getChallenge()))
+    await this.subBalance(createPendingTicketsCountKey(t.ticket.counterparty), t.ticket.amount)
   }
 
   public async getRejectedTicketsValue(): Promise<Balance> {
-    return await this.getCoercedOrDefault(REJECTED_TICKETS_VALUE, Balance.deserialize, Balance.ZERO())
+    return await this.getCoercedOrDefault(REJECTED_TICKETS_VALUE, Balance.deserialize, Balance.ZERO)
   }
   public async getRejectedTicketsCount(): Promise<number> {
     return this.getCoercedOrDefault(REJECTED_TICKETS_COUNT, u8aToNumber, 0)
@@ -630,16 +633,6 @@ export class HoprDB {
   public async markRejected(t: Ticket): Promise<void> {
     await this.increment(REJECTED_TICKETS_COUNT)
     await this.addBalance(REJECTED_TICKETS_VALUE, t.amount)
-  }
-
-  static createMock(id?: PublicKey): HoprDB {
-    const mock: HoprDB = {
-      id: id ?? PublicKey.createMock(),
-      db: (levelup as any)(MemDown())
-    } as any
-    Object.setPrototypeOf(mock, HoprDB.prototype)
-
-    return mock
   }
 
   public async getChannelX(src: PublicKey, dest: PublicKey): Promise<ChannelEntry> {
@@ -685,7 +678,7 @@ export class HoprDB {
   }
 
   public async getHoprBalance(): Promise<Balance> {
-    return this.getCoercedOrDefault(HOPR_BALANCE_KEY, Balance.deserialize, Balance.ZERO())
+    return this.getCoercedOrDefault(HOPR_BALANCE_KEY, Balance.deserialize, Balance.ZERO)
   }
 
   public async setHoprBalance(value: Balance): Promise<void> {
@@ -693,7 +686,7 @@ export class HoprDB {
   }
 
   public async addHoprBalance(value: Balance, snapshot: Snapshot): Promise<void> {
-    let val = await this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, Balance.deserialize, Balance.ZERO())
+    let val = await this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, Balance.deserialize, Balance.ZERO)
 
     await this.db
       .batch()
@@ -703,12 +696,22 @@ export class HoprDB {
   }
 
   public async subHoprBalance(value: Balance, snapshot: Snapshot): Promise<void> {
-    let val = await this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, Balance.deserialize, Balance.ZERO())
+    let val = await this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, Balance.deserialize, Balance.ZERO)
 
     await this.db
       .batch()
       .put(Buffer.from(this.keyOf(HOPR_BALANCE_KEY)), Buffer.from(val.sub(value).serialize()))
       .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
       .write()
+  }
+
+  static createMock(id?: PublicKey): HoprDB {
+    const mock: HoprDB = {
+      id: id ?? PublicKey.createMock(),
+      db: levelup(MemDown())
+    } as any
+    Object.setPrototypeOf(mock, HoprDB.prototype)
+
+    return mock
   }
 }
