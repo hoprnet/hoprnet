@@ -133,7 +133,7 @@ describe('Commands', () => {
 
   it('info', async () => {
     let mockNode: any = sinon.fake()
-    mockNode.getAnnouncedAddresses = async () => []
+    mockNode.getAddressesAnnouncedToDHT = async () => []
     mockNode.getListeningAddresses = () => []
     mockNode.smartContractInfo = () => ({
       channelClosureSecs: 300

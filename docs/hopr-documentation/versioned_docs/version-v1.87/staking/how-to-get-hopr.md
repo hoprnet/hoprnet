@@ -29,9 +29,9 @@ If you have **HOPR** and want to convert to **xHOPR**, find more details [here](
 
 Before buying, always double check HOPR token smart contract:
 
-xHOPR (xDai chain): [0xD057604A14982FE8D88c5fC25Aac3267eA142a08](https://blockscout.com/xdai/mainnet/token/0xD057604A14982FE8D88c5fC25Aac3267eA142a08/token-transfers)
+xHOPR (Gnosis chain): [0xD057604A14982FE8D88c5fC25Aac3267eA142a08](https://blockscout.com/xdai/mainnet/token/0xD057604A14982FE8D88c5fC25Aac3267eA142a08/token-transfers)
 
-wxHOPR (xDai chain): [0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1](https://blockscout.com/xdai/mainnet/token/0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1/token-transfers)
+wxHOPR (Gnosis chain): [0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1](https://blockscout.com/xdai/mainnet/token/0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1/token-transfers)
 
 :::
 
