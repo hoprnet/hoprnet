@@ -2,19 +2,6 @@ import { getPaddingLength, styleValue } from './utils'
 import { AbstractCommand } from './abstractCommand'
 import HoprFetcher from '../fetch'
 
-// TODO: refactor old code better
-// function booleanSetter(name: string) {
-//   return function setter(query: string, state: State): string {
-//     if (!query.match(/true|false/i)) {
-//       return styleValue(`Invalid option.`, 'failure')
-//     }
-//     state[name] = !!query.match(/true/i)
-//     return `You have set your “${styleValue(name, 'highlight')}” settings to “${styleValue(state[name])}”.`
-//   }
-// }
-
-
-
 export default class Settings extends AbstractCommand {
   private settings
 
@@ -24,21 +11,20 @@ export default class Settings extends AbstractCommand {
       includeRecipient: ['Prepends your address to all messages (true|false)', this.booleanSetter('includeRecipient')],
       strategy: [
         'Set an automatic strategy for the node. (passive|promiscuous)',
-        this.setStrategy,
-        this.getStrategy,
+        this.setStrategy.bind(this),
+        this.getStrategy.bind(this),
       ]
     }
   }
 
   private booleanSetter(name: string) {
-    return function setter(query: string): string {
+    return async (query: string): Promise<string> => {
       if (!query.match(/true|false/i)) {
         return styleValue(`Invalid option.`, 'failure')
       }
 
-      // TODO: debug here
-      let nodeSettings = this.hoprFetcher.getSettings()
-      // settings[name] = !!query.match(/true/i)
+      let nodeSettings = await this.hoprFetcher.getSettings()
+      nodeSettings[name] = !!query.match(/true/i)
       return `You have set your “${styleValue(name, 'highlight')}” settings to “${styleValue(nodeSettings[name])}”.`
     }
   }
@@ -82,7 +68,6 @@ export default class Settings extends AbstractCommand {
       return [setting, await this.getSingleState(setting)]
     }))
 
-    console.log(entries, "entries")
     const results: string[] = []
     const keyPadding = getPaddingLength(Object.keys(this.settings))
     const valuePadding = getPaddingLength(entries.map((x) => x[1] + ''))
@@ -93,26 +78,29 @@ export default class Settings extends AbstractCommand {
     return results.join('\n')
   }
 
-  // returns value for each key in settingsKeys array
+  // returns function to compute to get value of key in the array
   private async getSingleState(setting: string): Promise<any> {
     if (this.settings[setting] && this.settings[setting][2]) {
       // Use getter
       return this.settings[setting][2]()
     }
-    return this.settings[setting]
+
+    let nodeSettings = await this.hoprFetcher.getSettings()
+    return nodeSettings[setting]
   }
 
   public async execute(log, query: string): Promise<void> {
-    // display settings
+    // cmd settings
     if (!query) {
-      await this.listSettings().then(settngs => log(settngs))
+      log(await this.listSettings())
+      return
     }
 
     const [setting, ...optionArray] = query.split(' ')
     const option = optionArray.join(' ')
 
     if (!option) {
-      log(setting + ': ' + this.getSingleState(setting))
+      log(setting + ': ' + await this.getSingleState(setting))
       return
     }
 
