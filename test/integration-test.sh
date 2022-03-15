@@ -421,7 +421,7 @@ test_withdraw() {
   balances=$(get_balances ${node_api})
   new_hopr_balance=$(echo ${balances} | jq -r .hopr)
   [[ "${hopr_balance}" == "${new_hopr_balance}" ]] && { msg "Hopr withdraw failed, pre: ${hopr_balance}, post: ${new_hopr_balance}"; exit 1; }
-  echo "withdraw successfull"
+  echo "withdraw successful"
 }
 
 test_withdraw ${api1}
