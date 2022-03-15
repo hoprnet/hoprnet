@@ -28,7 +28,7 @@ describe('POST /node/ping', () => {
     expect(res.body).to.deep.equal({ status: STATUS_CODES.INVALID_PEERID })
   })
 
-  it('should return propper error on ping fail', async () => {
+  it('should return proper error on ping fail', async () => {
     node.ping = sinon.fake.throws('')
 
     const res = await request(service).post(`/api/v2/node/ping`).send({ peerId: ALICE_PEER_ID.toB58String() })
