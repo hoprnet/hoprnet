@@ -9,7 +9,7 @@
   "main": "lib/index.js",
   "scripts": {
     "clean": "rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
-    "test": "mocha --parallel",
+    "test": "mocha",
     "dev": "yarn clean && tsc -w",
     "build": "yarn clean && tsc -p .",
     "docs:generate": "typedoc",
@@ -47,6 +47,7 @@
   },
   "devDependencies": {
     "@chainsafe/libp2p-noise": "5.0.2",
+    "@types/levelup": "5.1.0",
     "@types/mocha": "9.1.0",
     "@types/pino": "7.0.4",
     "bl": "5.0.0",

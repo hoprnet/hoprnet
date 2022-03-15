@@ -1,4 +1,5 @@
-import { debug, HoprDB } from '.'
+import { HoprDB } from '.'
+import { debug } from '../process'
 
 const dbLogger = debug(`hopr:mocks:db`)
 

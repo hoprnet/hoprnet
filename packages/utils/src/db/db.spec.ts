@@ -16,11 +16,39 @@ import {
   PublicKey,
   Address,
   Snapshot
-} from './types'
+} from '../types'
 import BN from 'bn.js'
-import { SECP256K1_CONSTANTS } from './crypto'
+import { SECP256K1_CONSTANTS } from '../crypto'
+import { u8aEquals } from '../u8a'
 
 const TestingSnapshot = new Snapshot(new BN(0), new BN(0), new BN(0))
+
+class TestingDB extends HoprDB {
+  public async get(key: Uint8Array) {
+    return await super.get(key)
+  }
+
+  public async put(key: Uint8Array, value: Uint8Array) {
+    return await super.put(key, value)
+  }
+
+  public async getAll<T, U = T>(
+    range: {
+      prefix: Uint8Array
+      suffixLength: number
+    },
+    deserialize: (chunk: Uint8Array) => T,
+    filter?: (o: T) => boolean,
+    map?: (i: T) => U,
+    sort?: (e1: U, e2: U) => number
+  ) {
+    return await super.getAll<T, U>(range, deserialize, filter, map, sort)
+  }
+
+  public static createMock(id?: PublicKey) {
+    return super.createMock(id) as TestingDB
+  }
+}
 
 function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address) {
   return Ticket.create(
@@ -36,13 +64,105 @@ function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address) {
 }
 
 describe(`database tests`, function () {
-  let db: HoprDB
+  let db: TestingDB
 
   beforeEach(function () {
-    db = HoprDB.createMock()
+    db = TestingDB.createMock()
   })
+
   afterEach(async function () {
     await db.close()
+  })
+
+  it('getAll - basic', async function () {
+    const TEST_KEY = new TextEncoder().encode(`test key`)
+    const TEST_VALUE = new TextEncoder().encode(`test value`)
+    await db.put(TEST_KEY, TEST_VALUE)
+
+    const resultSingle = await db.getAll({ prefix: TEST_KEY, suffixLength: 0 }, (x) => x)
+
+    assert(resultSingle.length == 1)
+    assert(u8aEquals(TEST_VALUE, resultSingle[0]))
+
+    const TEST_KEY_RANGE = Uint8Array.from([...TEST_KEY, 23])
+
+    await db.put(TEST_KEY_RANGE, TEST_VALUE)
+
+    const resultRange = await db.getAll({ prefix: TEST_KEY, suffixLength: 1 }, (x) => x)
+
+    assert(resultRange.length == 1)
+    assert(u8aEquals(TEST_VALUE, resultRange[0]))
+
+    assert((await db.getAll({ prefix: TEST_KEY, suffixLength: 0 }, (x) => x)).length == 1)
+  })
+
+  it('getAll - filter', async function () {
+    const TEST_KEY = new TextEncoder().encode(`test key`)
+    const TEST_VALUE = Uint8Array.from([...new TextEncoder().encode(`test value`), 23])
+
+    await db.put(TEST_KEY, TEST_VALUE)
+
+    const resultTrue = await db.getAll(
+      { prefix: TEST_KEY, suffixLength: 0 },
+      (x) => x,
+      (value: Uint8Array) => value[value.length - 1] == 23
+    )
+
+    assert(resultTrue.length == 1)
+    assert(u8aEquals(TEST_VALUE, resultTrue[0]))
+
+    const resultFalse = await db.getAll(
+      { prefix: TEST_KEY, suffixLength: 0 },
+      (x) => x,
+      (value: Uint8Array) => value[value.length - 1] == 24
+    )
+
+    assert(resultFalse.length == 0)
+  })
+
+  it('getAll - map', async function () {
+    const TEST_KEY = new TextEncoder().encode(`test key`)
+    const TEST_VALUE = Uint8Array.from([...new TextEncoder().encode(`test value`), 23])
+    const MAPPED_VALUE = new TextEncoder().encode(`mapped value`)
+
+    await db.put(TEST_KEY, TEST_VALUE)
+
+    const resultMapped = await db.getAll(
+      { prefix: TEST_KEY, suffixLength: 0 },
+      (x) => x,
+      undefined,
+      (input: Uint8Array) => {
+        if (u8aEquals(input, TEST_VALUE)) {
+          return MAPPED_VALUE
+        } else {
+          return input
+        }
+      }
+    )
+
+    assert(resultMapped.length == 1)
+    assert(u8aEquals(MAPPED_VALUE, resultMapped[0]))
+  })
+
+  it.only('getAll - sort', async function () {
+    const TEST_KEY = new TextEncoder().encode(`test key`)
+    const TEST_VALUE_FIRST = Uint8Array.from([...new TextEncoder().encode(`test value`), 0])
+    const TEST_VALUE_MIDDLE = Uint8Array.from([...new TextEncoder().encode(`test value`), 1])
+    const TEST_VALUE_LAST = Uint8Array.from([...new TextEncoder().encode(`test value`), 2])
+
+    await db.put(Uint8Array.from([...TEST_KEY, 0]), TEST_VALUE_LAST)
+    await db.put(Uint8Array.from([...TEST_KEY, 1]), TEST_VALUE_FIRST)
+    await db.put(Uint8Array.from([...TEST_KEY, 2]), TEST_VALUE_MIDDLE)
+
+    const resultSorted = await db.getAll(
+      { prefix: TEST_KEY, suffixLength: 1 },
+      (x) => x,
+      undefined,
+      undefined,
+      (a: Uint8Array, b: Uint8Array) => a[a.length - 1] - b[b.length - 1]
+    )
+
+    assert(resultSorted.every((value: Uint8Array, index: number) => value[value.length - 1] == index))
   })
 
   it('hasPacket', async function () {

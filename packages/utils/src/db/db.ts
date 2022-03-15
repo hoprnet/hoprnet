@@ -4,8 +4,8 @@ import leveldown from 'leveldown'
 import MemDown from 'memdown'
 import { stat, mkdir, rm } from 'fs/promises'
 import path from 'path'
-import { debug } from './process'
-import { Hash, u8aConcat, Address, Intermediate, Ticket, generateChannelId } from '.'
+import { debug } from '../process'
+import { Intermediate } from '../crypto'
 import {
   AcknowledgedTicket,
   UnacknowledgedTicket,
@@ -16,32 +16,47 @@ import {
   Balance,
   HalfKeyChallenge,
   EthereumChallenge,
-  UINT256
-} from './types'
+  UINT256,
+  Ticket,
+  Address,
+  Hash,
+  generateChannelId
+} from '../types'
 import BN from 'bn.js'
-import { u8aToNumber } from './u8a'
+import { u8aToNumber, u8aConcat } from '../u8a'
 
 const log = debug(`hopr-core:db`)
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
-const TICKET_PREFIX = encoder.encode('tickets-')
 const SEPARATOR = encoder.encode(':')
-const PENDING_ACKNOWLEDGEMENTS_PREFIX = u8aConcat(TICKET_PREFIX, encoder.encode('pending-acknowledgement-'))
-const ACKNOWLEDGED_TICKETS_PREFIX = u8aConcat(TICKET_PREFIX, encoder.encode('acknowledged-'))
+
+const TICKET_PREFIX = encoder.encode('tickets-')
+const PENDING_ACKNOWLEDGEMENTS_PREFIX = Uint8Array.from([
+  ...TICKET_PREFIX,
+  ...encoder.encode('pending-acknowledgement-')
+])
+const ACKNOWLEDGED_TICKETS_PREFIX = Uint8Array.from([...TICKET_PREFIX, ...encoder.encode('acknowledged-')])
+
 export const pendingAcknowledgement = (halfKey: HalfKeyChallenge) => {
-  return u8aConcat(PENDING_ACKNOWLEDGEMENTS_PREFIX, halfKey.serialize())
+  return Uint8Array.from([...PENDING_ACKNOWLEDGEMENTS_PREFIX, ...halfKey.serialize()])
 }
+
 const acknowledgedTicketKey = (challenge: EthereumChallenge, channelEpoch: UINT256) => {
-  return u8aConcat(ACKNOWLEDGED_TICKETS_PREFIX, channelEpoch.serialize(), SEPARATOR, challenge.serialize())
+  return Uint8Array.from([
+    ...ACKNOWLEDGED_TICKETS_PREFIX,
+    ...channelEpoch.serialize(),
+    ...SEPARATOR,
+    ...challenge.serialize()
+  ])
 }
 const PACKET_TAG_PREFIX: Uint8Array = encoder.encode('packets-tag-')
 const LATEST_BLOCK_NUMBER_KEY = encoder.encode('latestBlockNumber')
 const LATEST_CONFIRMED_SNAPSHOT_KEY = encoder.encode('latestConfirmedSnapshot')
 const ACCOUNT_PREFIX = encoder.encode('account-')
 const CHANNEL_PREFIX = encoder.encode('channel-')
-const createChannelKey = (channelId: Hash): Uint8Array => u8aConcat(CHANNEL_PREFIX, channelId.serialize())
-const createAccountKey = (address: Address): Uint8Array => u8aConcat(ACCOUNT_PREFIX, address.serialize())
+const createChannelKey = (channelId: Hash): Uint8Array => Uint8Array.from([...CHANNEL_PREFIX, ...channelId.serialize()])
+const createAccountKey = (address: Address): Uint8Array => Uint8Array.from([...ACCOUNT_PREFIX, ...address.serialize()])
 const COMMITMENT_PREFIX = encoder.encode('commitment:')
 const TICKET_INDEX_PREFIX = encoder.encode('ticketIndex:')
 const CURRENT = encoder.encode('current')
@@ -125,7 +140,7 @@ export class HoprDB {
         throw new Error('Database does not exist: ' + dbPath)
       }
     }
-    this.db = levelup(leveldown(dbPath))
+    this.db = (levelup as any)(leveldown(dbPath))
 
     // Fully initialize database
     await this.db.open()
@@ -163,7 +178,7 @@ export class HoprDB {
     }
   }
 
-  private async put(key: Uint8Array, value: Uint8Array): Promise<void> {
+  protected async put(key: Uint8Array, value: Uint8Array): Promise<void> {
     await this.db.put(Buffer.from(this.keyOf(key)), Buffer.from(value))
   }
 
@@ -171,7 +186,7 @@ export class HoprDB {
     return await this.put(key, new Uint8Array())
   }
 
-  private async get(key: Uint8Array): Promise<Uint8Array> {
+  protected async get(key: Uint8Array): Promise<Uint8Array> {
     return Uint8Array.from(await this.db.get(Buffer.from(this.keyOf(key))))
   }
 
@@ -199,46 +214,44 @@ export class HoprDB {
     return coerce(u8a)
   }
 
-  private async getAll<T>(
-    first: Uint8Array,
-    last: Uint8Array,
+  protected async getAll<T, U = T>(
+    range: {
+      prefix: Uint8Array
+      suffixLength: number
+    },
     deserialize: (u: Uint8Array) => T,
-    filter?: (o: T) => boolean,
-    sorter?: (e1: T, e2: T) => number
-  ): Promise<T[]> {
-    const res: T[] = []
-    const firstPrefixed = this.keyOf(first)
-    const lastPrefixed = this.keyOf(last)
+    filter?: ((o: T) => boolean) | undefined,
+    map?: (i: T) => U,
+    sorter?: (e1: U, e2: U) => number
+  ): Promise<U[]> {
+    const firstPrefixed = this.keyOf(range.prefix, new Uint8Array(range.suffixLength).fill(0x00))
+    const lastPrefixed = this.keyOf(range.prefix, new Uint8Array(range.suffixLength).fill(0xff))
 
-    console.log(firstPrefixed, lastPrefixed)
+    const results: U[] = []
 
-    return new Promise<T[]>((resolve, reject) => {
-      this.db
-        .createKeyStream({
-          gte: firstPrefixed,
-          lt: lastPrefixed
-        })
-        .on('error', reject)
-        .on('data', ({ value }: { key: Buffer; value: Buffer }) => {
-          console.log(arguments)
-          const obj = deserialize(Uint8Array.from(value))
-          // filter if a filter function was given
-          if (filter) {
-            if (filter(obj)) {
-              res.push(obj)
-            }
-          } else {
-            res.push(obj)
-          }
-        })
-        .on('end', () => {
-          // sort if a sorter function was given
-          if (sorter) {
-            res.sort(sorter)
-          }
-          resolve(res)
-        })
-    })
+    // @TODO fix types in @types/levelup package
+    for await (const [_key, chunk] of this.db.iterator({
+      gte: Buffer.from(firstPrefixed),
+      lte: Buffer.from(lastPrefixed),
+      keys: false
+    }) as any) {
+      const obj: T = deserialize(Uint8Array.from(chunk))
+
+      if (!filter || filter(obj)) {
+        if (map) {
+          results.push(map(obj))
+        } else {
+          results.push(obj as unknown as U)
+        }
+      }
+    }
+
+    if (sorter) {
+      // sort in-place
+      results.sort(sorter)
+    }
+
+    return results
   }
 
   private async del(key: Uint8Array): Promise<void> {
@@ -301,14 +314,15 @@ export class HoprDB {
       return true
     }
 
-    return (
-      await this.getAll<WaitingAsRelayer>(
-        pendingAcknowledgement(HalfKeyChallenge.deserialize(new Uint8Array(HalfKeyChallenge.SIZE).fill(0))),
-        pendingAcknowledgement(HalfKeyChallenge.deserialize(new Uint8Array(HalfKeyChallenge.SIZE).fill(0xff))),
-        this.deserializePendingAcknowledgement as any,
-        filterFunc
-      )
-    ).map((pending: WaitingAsRelayer) => pending.ticket)
+    return await this.getAll<WaitingAsRelayer, UnacknowledgedTicket>(
+      {
+        prefix: PENDING_ACKNOWLEDGEMENTS_PREFIX,
+        suffixLength: HalfKeyChallenge.SIZE
+      },
+      this.deserializePendingAcknowledgement as any,
+      filterFunc,
+      (pending: WaitingAsRelayer) => pending.ticket
+    )
   }
 
   public async getPendingAcknowledgement(halfKeyChallenge: HalfKeyChallenge): Promise<PendingAckowledgement> {
@@ -365,16 +379,13 @@ export class HoprDB {
     const sortFunc = (t1: AcknowledgedTicket, t2: AcknowledgedTicket): number => t1.ticket.index.cmp(t2.ticket.index)
 
     return this.getAll<AcknowledgedTicket>(
-      acknowledgedTicketKey(
-        EthereumChallenge.deserialize(new Uint8Array(EthereumChallenge.SIZE).fill(0)),
-        UINT256.deserialize(new Uint8Array(UINT256.SIZE).fill(0))
-      ),
-      acknowledgedTicketKey(
-        EthereumChallenge.deserialize(new Uint8Array(EthereumChallenge.SIZE).fill(0xff)),
-        UINT256.deserialize(new Uint8Array(UINT256.SIZE).fill(0xff))
-      ),
+      {
+        prefix: ACKNOWLEDGED_TICKETS_PREFIX,
+        suffixLength: EthereumChallenge.SIZE
+      },
       AcknowledgedTicket.deserialize,
       filterFunc,
+      undefined,
       sortFunc
     )
   }
@@ -515,8 +526,10 @@ export class HoprDB {
 
   async getChannels(filter?: (channel: ChannelEntry) => boolean): Promise<ChannelEntry[]> {
     return this.getAll<ChannelEntry>(
-      createChannelKey(Hash.deserialize(new Uint8Array(Hash.SIZE).fill(0))),
-      createChannelKey(Hash.deserialize(new Uint8Array(Hash.SIZE).fill(0xff))),
+      {
+        prefix: CHANNEL_PREFIX,
+        suffixLength: Hash.SIZE
+      },
       ChannelEntry.deserialize,
       filter
     )
@@ -545,8 +558,10 @@ export class HoprDB {
 
   async getAccounts(filter?: (account: AccountEntry) => boolean) {
     return this.getAll<AccountEntry>(
-      createAccountKey(Address.deserialize(new Uint8Array(Address.SIZE).fill(0))),
-      createAccountKey(Address.deserialize(new Uint8Array(Address.SIZE).fill(0xff))),
+      {
+        prefix: ACCOUNT_PREFIX,
+        suffixLength: Address.SIZE
+      },
       AccountEntry.deserialize,
       filter
     )
@@ -620,7 +635,7 @@ export class HoprDB {
   static createMock(id?: PublicKey): HoprDB {
     const mock: HoprDB = {
       id: id ?? PublicKey.createMock(),
-      db: new levelup(MemDown())
+      db: (levelup as any)(MemDown())
     } as any
     Object.setPrototypeOf(mock, HoprDB.prototype)
 
