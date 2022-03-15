@@ -22,6 +22,7 @@ const ALICE_ENTRY = {
 }
 const ALICE_PEER_INFO = {
   peerId: ALICE_PEER_ID.toB58String(),
+  multiAddr: ALICE_MULTI_ADDR.toString(),
   heartbeats: {
     sent: ALICE_ENTRY.heartbeatsSent,
     success: ALICE_ENTRY.heartbeatsSuccess
@@ -30,10 +31,6 @@ const ALICE_PEER_INFO = {
   quality: ALICE_ENTRY.lastTen,
   backoff: ALICE_ENTRY.backoff,
   isNew: false
-}
-const ALICE_PEER_INFO_ANNOUNCED = {
-  ...ALICE_PEER_INFO,
-  multiaddr: ALICE_MULTI_ADDR.toString()
 }
 
 const BOB_ENTRY = {
@@ -46,6 +43,7 @@ const BOB_ENTRY = {
 }
 const BOB_PEER_INFO = {
   peerId: BOB_PEER_ID.toB58String(),
+  multiAddr: BOB_MULTI_ADDR.toString(),
   heartbeats: {
     sent: BOB_ENTRY.heartbeatsSent,
     success: BOB_ENTRY.heartbeatsSuccess
@@ -54,10 +52,6 @@ const BOB_PEER_INFO = {
   quality: BOB_ENTRY.lastTen,
   backoff: BOB_ENTRY.backoff,
   isNew: true
-}
-const BOB_PEER_INFO_ANNOUNCED = {
-  ...BOB_PEER_INFO,
-  multiaddr: BOB_MULTI_ADDR.toString()
 }
 
 const CHARLIE_ENTRY = {
@@ -84,14 +78,15 @@ let node = sinon.fake() as any
 node.getConnectedPeers = sinon.fake.returns([ALICE_PEER_ID, BOB_PEER_ID, CHARLIE_PEER_ID])
 node.getAddressesAnnouncedOnChain = sinon.fake.resolves([ALICE_MULTI_ADDR, BOB_MULTI_ADDR])
 node.getConnectionInfo = sinon.stub()
-node.getConnectionInfo.withArgs(ALICE_PEER_ID).returns(ALICE_ENTRY)
-node.getConnectionInfo.withArgs(BOB_PEER_ID).returns(BOB_ENTRY)
-node.getConnectionInfo.withArgs(CHARLIE_PEER_ID).returns(CHARLIE_ENTRY)
+// we must use `sinon.match.has` as passing the plain PeerId in `withArgs` fails to work
+node.getConnectionInfo.withArgs(sinon.match.has('_idB58String', ALICE_PEER_ID.toB58String())).returns(ALICE_ENTRY)
+node.getConnectionInfo.withArgs(sinon.match.has('_idB58String', BOB_PEER_ID.toB58String())).returns(BOB_ENTRY)
+node.getConnectionInfo.withArgs(sinon.match.has('_idB58String', CHARLIE_PEER_ID.toB58String())).returns(CHARLIE_ENTRY)
 
 const { api, service } = createTestApiInstance(node)
 chai.use(chaiResponseValidator(api.apiDoc))
 
-describe.only('GET /node/peers', function () {
+describe('GET /node/peers', function () {
   it('should return invalid quality when quality is not a number', async function () {
     const res = await request(service).get(`/api/v2/node/peers?quality=abc`).send()
     expect(res.status).to.equal(400)
@@ -106,6 +101,13 @@ describe.only('GET /node/peers', function () {
     expect(res.body.status).to.equal(STATUS_CODES.INVALID_QUALITY)
   })
 
+  it('should return invalid quality when quality is less than 0', async function () {
+    const res = await request(service).get(`/api/v2/node/peers?quality=-1`).send()
+    expect(res.status).to.equal(400)
+    expect(res).to.satisfyApiSpec
+    expect(res.body.status).to.equal(STATUS_CODES.INVALID_QUALITY)
+  })
+
   it('should resolve with all data', async function () {
     const res = await request(service).get(`/api/v2/node/peers`).send()
 
@@ -113,7 +115,7 @@ describe.only('GET /node/peers', function () {
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({
       connected: [ALICE_PEER_INFO, BOB_PEER_INFO, CHARLIE_PEER_INFO],
-      announced: [ALICE_PEER_INFO_ANNOUNCED, BOB_PEER_INFO_ANNOUNCED]
+      announced: [ALICE_PEER_INFO, BOB_PEER_INFO]
     })
   })
 
@@ -124,7 +126,7 @@ describe.only('GET /node/peers', function () {
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({
       connected: [ALICE_PEER_INFO, CHARLIE_PEER_INFO],
-      announced: [ALICE_PEER_INFO_ANNOUNCED]
+      announced: [ALICE_PEER_INFO]
     })
   })
 })

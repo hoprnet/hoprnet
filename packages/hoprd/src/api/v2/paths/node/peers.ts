@@ -48,35 +48,43 @@ export const getPeers = async (
   announced: PeerInfo[]
   connected: PeerInfo[]
 }> => {
-  if (isNaN(quality) || quality > 1) throw new Error(STATUS_CODES.INVALID_QUALITY)
+  if (isNaN(quality) || quality < 0 || quality > 1) throw new Error(STATUS_CODES.INVALID_QUALITY)
 
   try {
-    const connected = node.getConnectedPeers().reduce<PeerInfo[]>((result, peerId) => {
-      try {
-        const info = node.getConnectionInfo(peerId)
-        // exclude if quality is lesser than the one wanted
-        if (info.lastTen < quality) return result
-        result.push(toPeerInfoFormat(info))
-      } catch {}
-      return result
-    }, [])
-
     const announced = await node.getAddressesAnnouncedOnChain().then((addrs) => {
-      return addrs.reduce<PeerInfo[]>((result, addr) => {
+      return addrs.reduce<Map<string, PeerInfo>>((result, addr) => {
         const peerId = PeerId.createFromB58String(addr.getPeerId())
         try {
           const info = node.getConnectionInfo(peerId)
           // exclude if quality is lesser than the one wanted
           if (info.lastTen < quality) return result
-          result.push(toPeerInfoFormat(info, addr))
+          result.set(peerId.toB58String(), toPeerInfoFormat(info, addr))
         } catch {}
         return result
-      }, [])
+      }, new Map())
     })
+
+    const connected = node.getConnectedPeers().reduce<PeerInfo[]>((result, peerId) => {
+      const peerIdStr = peerId.toB58String()
+
+      // already exists in announced, we use this because it contains multiaddr already
+      if (announced.has(peerIdStr)) {
+        result.push(announced.get(peerIdStr))
+      } else {
+        try {
+          const info = node.getConnectionInfo(peerId)
+          // exclude if quality is lesser than the one wanted
+          if (info.lastTen < quality) return result
+          result.push(toPeerInfoFormat(info))
+        } catch {}
+      }
+
+      return result
+    }, [])
 
     return {
       connected,
-      announced
+      announced: Array.from(announced.values())
     }
   } catch (error) {
     throw new Error(STATUS_CODES.UNKNOWN_FAILURE + ' ' + error.message)
