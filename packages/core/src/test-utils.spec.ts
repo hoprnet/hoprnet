@@ -27,11 +27,13 @@ export function fakeAddress(id: PeerId): Multiaddr {
 }
 
 export function showBackoff(networkPeers: NetworkPeers): number {
-  const matches = networkPeers.debugLog().match(/(?<=\(backoff\s)(.*)(?=\,)/g)
+  const matches = networkPeers.debugLog().match(/(?<=\,\sbackoff:\s)(.*)(?=\s\()/g)
 
   if (matches.length == 0) {
     return MAX_BACKOFF
   }
 
-  return parseFloat(matches[0])
+  const backoffs = matches.map((m) => parseFloat(m))
+
+  return backoffs.sort().pop()
 }

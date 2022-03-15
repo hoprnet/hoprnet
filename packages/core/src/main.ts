@@ -1,4 +1,8 @@
+import path from 'path'
+import { mkdir } from 'fs/promises'
+
 import { default as LibP2P, type Connection } from 'libp2p'
+import { LevelDatastore } from 'datastore-level'
 import { type AddressSorter, expandVars, HoprDB, localAddressesFirst, PublicKey } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import MPLEX from 'libp2p-mplex'
@@ -6,7 +10,7 @@ import KadDHT from 'libp2p-kad-dht'
 import { NOISE } from '@chainsafe/libp2p-noise'
 import type PeerId from 'peer-id'
 import { debug } from '@hoprnet/hopr-utils'
-import Hopr, { type HoprOptions, VERSION } from '.'
+import Hopr, { type HoprOptions } from '.'
 import { getAddrs } from './identity'
 import HoprConnect, { type HoprConnectConfig, type PublicNodesEmitter } from '@hoprnet/hopr-connect'
 import type { Multiaddr } from 'multiaddr'
@@ -41,6 +45,15 @@ export async function createLibp2pInstance(
     log('Addresses are sorted by default')
   }
 
+  // Store the peerstore on-disk under the main data path. Ensure store is
+  // opened before passing it to libp2p.
+  const datastorePath = path.join(options.dataPath, 'peerstore')
+  await mkdir(datastorePath, { recursive: true })
+  const datastore = new LevelDatastore(datastorePath, { createIfMissing: true })
+  await datastore.open()
+
+  log(`using peerstore at ${datastorePath}`)
+
   const libp2p = await LibP2P.create({
     peerId,
     addresses: { listen: getAddrs(peerId, options).map((x) => x.toString()) },
@@ -50,6 +63,12 @@ export async function createLibp2pInstance(
       streamMuxer: [MPLEX],
       connEncryption: [NOISE as any],
       dht: KadDHT
+    },
+    // Configure peerstore to be persisted using LevelDB, also requires config
+    // persistence to be set.
+    datastore,
+    peerStore: {
+      persistence: true
     },
     config: {
       protocolPrefix: `hopr/${options.environment.id}`,
@@ -154,7 +173,8 @@ export async function createHoprNode(
   const db = new HoprDB(PublicKey.fromPrivKey(peerId.privKey.marshal()))
 
   try {
-    await db.init(options.createDbIfNotExist, VERSION, options.dbPath, options.forceCreateDB, options.environment.id)
+    const dbPath = path.join(options.dataPath, 'db')
+    await db.init(options.createDbIfNotExist, dbPath, options.forceCreateDB, options.environment.id)
   } catch (err: unknown) {
     log(`failed init db:`, err)
     throw err

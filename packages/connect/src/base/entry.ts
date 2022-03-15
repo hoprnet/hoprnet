@@ -12,7 +12,7 @@ import {
   OK,
   DEFAULT_DHT_ENTRY_RENEWAL
 } from '../constants'
-import type { Connection } from 'libp2p-interfaces/connection'
+import type Connection from 'libp2p-interfaces/src/connection/connection'
 
 import type PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'

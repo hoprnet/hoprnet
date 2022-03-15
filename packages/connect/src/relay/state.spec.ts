@@ -48,11 +48,11 @@ describe('relay state management', function () {
       initiator,
       destination,
       {
-        source: initiatorToRelay.source,
+        source: initiatorToRelay.source as any,
         sink: relayToInitiator.sink
       },
       {
-        source: destinationToRelay.source,
+        source: destinationToRelay.source as any,
         sink: relayToDestination.sink
       }
     )
@@ -99,12 +99,12 @@ describe('relay state management', function () {
     const relayToInitiatorAfterUpdate = Pair<StreamType>()
 
     state.updateExisting(initiator, destination, {
-      source: initiatorToRelayAfterUpdate.source,
+      source: initiatorToRelayAfterUpdate.source as any,
       sink: relayToInitiatorAfterUpdate.sink
     })
 
     const initiatorShakerAfterUpdate = handshake({
-      source: relayToInitiatorAfterUpdate.source,
+      source: relayToInitiatorAfterUpdate.source as any,
       sink: initiatorToRelayAfterUpdate.sink
     })
 
@@ -150,11 +150,11 @@ describe('relay state management', function () {
       initiator,
       destination,
       {
-        source: initiatorToRelay.source,
+        source: initiatorToRelay.source as any,
         sink: relayToInitiator.sink
       },
       {
-        source: destinationToRelay.source,
+        source: destinationToRelay.source as any,
         sink: relayToDestination.sink
       }
     )
