@@ -617,8 +617,7 @@ class Hopr extends EventEmitter {
    */
   public async getObservedAddresses(peer: PeerId): Promise<Multiaddr[]> {
     const addresses = await this.libp2p.peerStore.addressBook.get(peer)
-    const multiAddresses = addresses.map((addr) => addr.multiaddr)
-    return multiAddresses
+    return addresses.map((addr) => addr.multiaddr)
   }
 
   /**

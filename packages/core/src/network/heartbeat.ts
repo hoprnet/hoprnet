@@ -165,17 +165,19 @@ export default class Heartbeat {
 
     finished = true
 
-    for (let [resultIndex, pingResult] of pingResults.entries()) {
+    for (const [resultIndex, pingResult] of pingResults.entries()) {
       await setImmediate()
       if (pingResult instanceof Error) {
         // we need to get the destination so we can map a ping error properly
         const [destination, _abortSignal] = pingWork[resultIndex]
-        pingResult = {
+        const failedPingResult = {
           destination,
           lastSeen: -1
         }
+        this.networkPeers.updateRecord(failedPingResult)
+      } else {
+        this.networkPeers.updateRecord(pingResult)
       }
-      this.networkPeers.updateRecord(pingResult)
     }
 
     log(`finished checking nodes since ${thresholdTime} ${this.networkPeers.length()} nodes`)
