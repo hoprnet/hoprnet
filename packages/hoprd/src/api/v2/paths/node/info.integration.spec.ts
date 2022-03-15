@@ -21,7 +21,7 @@ describe('GET /node/info', () => {
     node.getListeningAddresses = sinon.fake.returns([3, 4])
 
     const res = await request(service).get(`/api/v2/node/info`)
-    // expect(res.status).to.equal(200)
+    expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({
       environment: 'hardhat-localhost',
