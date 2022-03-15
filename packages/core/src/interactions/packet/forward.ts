@@ -1,9 +1,13 @@
-import { Packet } from '../../messages'
+import { setImmediate } from 'timers/promises'
+
 import type PeerId from 'peer-id'
+
 import { durations, pubKeyToPeerId, HoprDB } from '@hoprnet/hopr-utils'
+import { debug } from '@hoprnet/hopr-utils'
+
+import { Packet } from '../../messages'
 import { Mixer } from '../../mixer'
 import { sendAcknowledgement } from './acknowledgement'
-import { debug } from '@hoprnet/hopr-utils'
 import type { SendMessage, Subscribe } from '../../index'
 
 const log = debug('hopr-core:packet:forward')
@@ -51,6 +55,9 @@ export class PacketForwardInteraction {
 
     if (packet.isReceiver) {
       this.emitMessage(packet.plaintext)
+      // defer processing to end of event loop since we are making another
+      // network operation
+      await setImmediate()
       await sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey, this.protocolAck)
       // Nothing else to do
       return
@@ -80,6 +87,9 @@ export class PacketForwardInteraction {
       return
     }
 
+    // defer processing to end of event loop since we are making another
+    // network operation
+    await setImmediate()
     await sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey, this.protocolAck)
   }
 }

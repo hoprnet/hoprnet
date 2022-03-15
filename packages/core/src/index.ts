@@ -416,13 +416,17 @@ class Hopr extends EventEmitter {
       return tuples.length > 1 && tuples[0][0] != protocols('p2p').code
     })
 
-    const pubKey = convertPubKeyFromPeerId(peer.id)
-    await this.libp2p.peerStore.keyBook.set(peer.id, pubKey)
+    try {
+      const pubKey = convertPubKeyFromPeerId(peer.id)
+      await this.libp2p.peerStore.keyBook.set(peer.id, pubKey)
 
-    if (dialables.length > 0) {
-      this.publicNodesEmitter.emit('addPublicNode', { id: peer.id, multiaddrs: dialables })
+      if (dialables.length > 0) {
+        this.publicNodesEmitter.emit('addPublicNode', { id: peer.id, multiaddrs: dialables })
 
-      await this.libp2p.peerStore.addressBook.add(peer.id, dialables)
+        await this.libp2p.peerStore.addressBook.add(peer.id, dialables)
+      }
+    } catch (err) {
+      log(`Failed to update peer-store with new peer ${peer.id.toB58String()} info`, err)
     }
   }
 

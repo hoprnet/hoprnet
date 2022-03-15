@@ -21,6 +21,12 @@ export const MAX_BACKOFF = MAX_DELAY / MIN_DELAY
 const BAD_QUALITY = 0.2 // Default quality for nodes we don't know about or which are considered offline.
 const IGNORE_TIMEFRAME = 10 * 60 * 1000 // 10mins
 
+function nextPing(e: Entry): number {
+  // Exponential backoff
+  const delay = Math.min(MAX_DELAY, Math.pow(e.backoff, BACKOFF_EXPONENT) * MIN_DELAY)
+  return e.lastSeen + delay
+}
+
 class NetworkPeers {
   private peers: Entry[]
   private ignoredPeers: Entry[]
@@ -54,7 +60,7 @@ class NetworkPeers {
   public pingSince(thresholdTime: number): PeerId[] {
     const toPing: PeerId[] = []
     for (const entry of this.peers) {
-      if (this.nextPing(entry) < thresholdTime) {
+      if (nextPing(entry) < thresholdTime) {
         toPing.push(entry.id)
       }
     }
@@ -213,12 +219,6 @@ class NetworkPeers {
     }
 
     return out
-  }
-
-  private nextPing(e: Entry): number {
-    // Exponential backoff
-    const delay = Math.min(MAX_DELAY, Math.pow(e.backoff, BACKOFF_EXPONENT) * MIN_DELAY)
-    return e.lastSeen + delay
   }
 
   private findIndex(peer: PeerId): number {
