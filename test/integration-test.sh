@@ -65,7 +65,7 @@ validate_node_balance_gt0() {
   fi
 }
 
-# Run API endpoint and assert response or status code
+# Call API endpoint and assert response or status code
 # $1 = source api url (http://localhost:13001)
 # $2 = api_endpoint (/channels)
 # $3 = rest method for cURL (GET,POST...)
@@ -75,7 +75,7 @@ validate_node_balance_gt0() {
 # $7 = OPTIONAL: step time between retries in seconds, defaults to 25 seconds (8 blocks with 1-3 s/block in ganache)
 # $8 = OPTIONAL: end time for busy wait in nanoseconds since epoch, has higher priority than wait time, defaults to 0
 # $9 = OPTIONAL: should assert status code
-run_api(){
+call_api(){
   local result now
   local source_api="${1}"
   local api_endpoint="${2}"
@@ -106,12 +106,12 @@ run_api(){
   else
     now=$(node -e "console.log(process.hrtime.bigint().toString());")
     if [ ${end_time_ns} -lt ${now} ]; then
-      log "${RED}run_api (${cmd} \"${request_body}\") FAILED, received: ${result}${NOFORMAT}"
+      log "${RED}call_api (${cmd} \"${request_body}\") FAILED, received: ${result}${NOFORMAT}"
       exit 1
     else
-      log "${YELLOW}run_api (${cmd} \"${request_body}\") FAILED, received: ${result}, retrying in ${step_time} seconds${NOFORMAT}"
+      log "${YELLOW}call_api (${cmd} \"${request_body}\") FAILED, received: ${result}, retrying in ${step_time} seconds${NOFORMAT}"
       sleep ${step_time}
-      run_api "${source_api}" "${api_endpoint}" "${rest_method}" "${request_body}" "${assertion}" "${wait_time}" \
+      call_api "${source_api}" "${api_endpoint}" "${rest_method}" "${request_body}" "${assertion}" "${wait_time}" \
         "${step_time}" "${end_time_ns}"
     fi
   fi
@@ -130,7 +130,7 @@ send_message(){
 
   local path=$(echo ${peers} | tr -d '\n' | jq -R -s 'split(" ")')
   local payload='{"body":"'${msg}'","path":'${path}',"recipient":"'${recipient}'"}'
-  result="$(run_api ${source_api} "/messages" "POST" ${payload} 204 "" "" "" true)"
+  result="$(call_api ${source_api} "/messages" "POST" ${payload} 204 "" "" "" true)"
 }
 
 # $1 = source node id
@@ -151,9 +151,9 @@ close_channel() {
   log "Node ${source_id} close channel to Node ${destination_id}"
 
   if [ "${close_check}" = "true" ]; then
-    result="$(run_api ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" "PendingToClose" 600)"
+    result="$(call_api ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" "PendingToClose" 600)"
   else
-    result="$(run_api ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" "Open" 20 20)"
+    result="$(call_api ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" "Open" 20 20)"
   fi
 
   log "Node ${source_id} close channel to Node ${destination_id} result -- ${result}"
@@ -171,7 +171,7 @@ open_channel() {
   local result
                                                                  
   log "Node ${source_id} open channel to Node ${destination_id}"
-  result=$(run_api ${source_api} "/channels" "POST" "{\"peerId\": \"${destination_peer_id}\", \"amount\": \"100000000000000000000\"}" "channelId" 600 60)
+  result=$(call_api ${source_api} "/channels" "POST" "{\"peerId\": \"${destination_peer_id}\", \"amount\": \"100000000000000000000\"}" "channelId" 600 60)
   log "Node ${source_id} open channel to Node ${destination_id} result -- ${result}"
 }
 
@@ -194,7 +194,7 @@ redeem_tickets() {
   # progress, not redeeem all tickets which takes too long.
   log "Node ${node_id} should redeem all tickets"
   # add 60 second timeout 
-  result=$(run_api ${node_api} "/tickets/redeem" "POST" "" "" 60 60)
+  result=$(call_api ${node_api} "/tickets/redeem" "POST" "" "" 60 60)
   log "--${result}"
 
   # Get ticket statistics again and compare with previous state. Ensure we
@@ -211,7 +211,7 @@ redeem_tickets() {
   # progress, not redeeem all tickets which takes too long.
   log "Node ${node_id} should redeem all tickets (again to ensure re-run of operation)"
   # add 60 second timeout 
-  result=$(run_api ${node_api} "/tickets/redeem" "POST" "" "" 60 60)
+  result=$(call_api ${node_api} "/tickets/redeem" "POST" "" "" 60 60)
   log "--${result}"
 
   # Get final ticket statistics
@@ -233,14 +233,14 @@ withdraw() {
   local amount="${3}"
   local recipient="${4}"
 
-  result=$(run_api ${node_api} "/account/withdraw" "POST" "{\"currency\": \"${currency}\", \"amount\": \"${amount}\", \"recipient\": \"${recipient}\"}" "receipt" 600)
+  result=$(call_api ${node_api} "/account/withdraw" "POST" "{\"currency\": \"${currency}\", \"amount\": \"${amount}\", \"recipient\": \"${recipient}\"}" "receipt" 600)
   echo "${result}"
 }
 
 # $1 = node api endpoint
 get_balances() {
   local origin=${1}
-  echo $(run_api ${1} "/account/balances" "GET" "" "native" 600)
+  echo $(call_api ${1} "/account/balances" "GET" "" "native" 600)
 }
 
 # get addresses is in the utils file
@@ -253,7 +253,7 @@ set_alias() {
   local peer_id="${2}"
   local alias="${3}"
 
-  result=$(run_api ${node_api} "/aliases" "POST" "{\"peerId\": \"${peer_id}\", \"alias\": \"${alias}\"}" "" 600)
+  result=$(call_api ${node_api} "/aliases" "POST" "{\"peerId\": \"${peer_id}\", \"alias\": \"${alias}\"}" "" 600)
   echo "${result}"
 }
 
@@ -263,7 +263,7 @@ get_aliases() {
   local node_api="${1}"
   local assertion="${2}"
 
-  result=$(run_api ${node_api} "/aliases" "GET" "" "${assertion}" 600)
+  result=$(call_api ${node_api} "/aliases" "GET" "" "${assertion}" 600)
   echo "${result}"
 }
 
@@ -274,7 +274,7 @@ get_alias() {
   local alias="${2}"
   local assertion="${3}"
 
-  result=$(run_api ${node_api} "/aliases/${alias}" "GET" "" "${assertion}" 600)
+  result=$(call_api ${node_api} "/aliases/${alias}" "GET" "" "${assertion}" 600)
   echo "${result}"
 }
 
@@ -284,7 +284,7 @@ remove_alias() {
   local node_api="${1}"
   local alias="${2}"
 
-  result=$(run_api ${node_api} "/aliases/${alias}" "DELETE" "" "" 600)
+  result=$(call_api ${node_api} "/aliases/${alias}" "DELETE" "" "" 600)
   echo "${result}"
 }
 
@@ -294,7 +294,7 @@ get_all_channels() {
   local node_api="${1}"
   local including_closed=${2}
 
-  result=$(run_api ${node_api} "/channels?includingClosed=${including_closed}" "GET" "" "incoming" 600)
+  result=$(call_api ${node_api} "/channels?includingClosed=${including_closed}" "GET" "" "incoming" 600)
   echo "${result}"
 }
 
@@ -302,7 +302,7 @@ get_all_channels() {
 get_settings() {
   local node_api="${1}"
 
-  result=$(run_api ${node_api} "/settings" "GET" "" "includeRecipient" 600)
+  result=$(call_api ${node_api} "/settings" "GET" "" "includeRecipient" 600)
   echo "${result}"
 }
 
@@ -314,7 +314,7 @@ set_setting() {
   local key="${2}"
   local value="${3}"
 
-  result=$(run_api ${node_api} "/settings/${key}" "PUT" "{\"settingValue\": \"${value}\"}" "" 600)
+  result=$(call_api ${node_api} "/settings/${key}" "PUT" "{\"settingValue\": \"${value}\"}" "" 600)
   echo "${result}"
 }
 
@@ -325,7 +325,7 @@ redeem_tickets_in_channel() {
   local peer_id="${2}"
 
   log "redeeming tickets in specific channel, this can take up to 5 minutes depending on the amount of uredeemed tickets in that channel"
-  result=$(run_api ${node_api} "/channels/${peer_id}/tickets/redeem" "POST" "" "" 600 600)
+  result=$(call_api ${node_api} "/channels/${peer_id}/tickets/redeem" "POST" "" "" 600 600)
   echo "${result}"
 }
 
@@ -337,7 +337,7 @@ get_tickets_in_channel() {
   local peer_id="${2}"
   local assertion="${3:-"counterparty"}"
 
-  result=$(run_api ${node_api} "/channels/${peer_id}/tickets" "GET" "" "${assertion}" 600)
+  result=$(call_api ${node_api} "/channels/${peer_id}/tickets" "GET" "" "${assertion}" 600)
   echo "${result}"
 }
 
@@ -349,7 +349,7 @@ ping() {
   local peer_id="${2}" 
   local assertion="${3}"
 
-  result=$(run_api ${1} "/node/ping" "POST" "{\"peerId\": \"${peer_id}\"}" ${assertion} 600)
+  result=$(call_api ${1} "/node/ping" "POST" "{\"peerId\": \"${peer_id}\"}" ${assertion} 600)
   echo "${result}"
 }
 
@@ -359,7 +359,7 @@ get_tickets_statistics() {
   local origin=${1:-localhost:3001}
   local assertion="${2}"
 
-  echo $(run_api ${1} "/tickets/statistics" "GET" "" ${assertion} 600)
+  echo $(call_api ${1} "/tickets/statistics" "GET" "" ${assertion} 600)
 }
 
 log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5}, ${api6}, ${api7}"
