@@ -14,7 +14,7 @@ export default class Version extends AbstractCommand {
     return 'Displays the version'
   }
 
-  public async execute( log): Promise<void> {
-    await this.hoprFetcher.getNodeVer().then(version => log(version))
+  public async execute(log): Promise<void> {
+    await this.hoprFetcher.getNodeVer().then((version) => log(version))
   }
 }

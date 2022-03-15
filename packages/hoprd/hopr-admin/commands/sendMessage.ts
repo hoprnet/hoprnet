@@ -17,16 +17,12 @@ export class SendMessage extends AbstractCommand {
   }
 
   private async insertMyAddress(message: string): string {
-    const myAddress: string = await this.hoprFetcher.getAddresses().then(res => res.hoprAddress)
+    const myAddress: string = await this.hoprFetcher.getAddresses().then((res) => res.hoprAddress)
     return `${myAddress}:${message}`
   }
 
-  protected async sendMessage(
-    recipient: string,
-    rawMessage: string,
-    path?: string[]
-  ): Promise<string> {
-    const includeRecipientValue = await this.hoprFetcher.getSettings().then(res => res.includeRecipient)
+  protected async sendMessage(recipient: string, rawMessage: string, path?: string[]): Promise<string> {
+    const includeRecipientValue = await this.hoprFetcher.getSettings().then((res) => res.includeRecipient)
     const message = includeRecipientValue ? this.insertMyAddress(rawMessage) : rawMessage
 
     try {
@@ -42,7 +38,7 @@ export class SendMessage extends AbstractCommand {
     }
   }
 
-  public async execute( log: (str: string) => void, query: string): Promise<void> {
+  public async execute(log: (str: string) => void, query: string): Promise<void> {
     let [err, peerIdString, message] = this._assertUsage(query, ['PeerId', 'Message'], /([A-Za-z0-9_,]+)\s(.*)/)
     if (err) {
       log(styleValue(err, 'failure'))
@@ -57,7 +53,7 @@ export class SendMessage extends AbstractCommand {
       const path: string[] = []
       for (const pIdString of peerIdStrings) {
         try {
-          path.push(await this.checkPeerIdInput(pIdString).then(peerId => peerId.toB58String()))
+          path.push(await this.checkPeerIdInput(pIdString).then((peerId) => peerId.toB58String()))
         } catch (err) {
           log(styleValue(`<${pIdString}> is neither a valid alias nor a valid Hopr address string`))
           return
@@ -71,7 +67,7 @@ export class SendMessage extends AbstractCommand {
           .map((current) => styleValue(current.toString(), 'peerId'))
           .join(',')} ...`
       )
-      log(await this.sendMessage( recipient, message, intermediateNodes))
+      log(await this.sendMessage(recipient, message, intermediateNodes))
 
       return
     }

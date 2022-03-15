@@ -25,7 +25,7 @@ export function LogLine(props) {
   let lastIndex = 0
   const idRegex = /(\b\w{53})\b/g // NB: Cannot be global variable, has state!
 
-  if (raw === undefined){
+  if (raw === undefined) {
     return null
   }
 

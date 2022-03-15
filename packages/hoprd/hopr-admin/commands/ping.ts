@@ -35,7 +35,7 @@ export default class Ping extends AbstractCommand {
     let error: any
 
     try {
-      pingResult = await this.hoprFetcher.pingNodePeer(query).then(res => res.json())
+      pingResult = await this.hoprFetcher.pingNodePeer(query).then((res) => res.json())
     } catch (err) {
       error = err
     }

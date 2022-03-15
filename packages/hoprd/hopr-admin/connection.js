@@ -15,7 +15,7 @@ const parseCmd = (cmdInput) => {
     return undefined
   }
 
-  return {cmd: command, query: query}
+  return { cmd: command, query: query }
 }
 
 export class Connection {
@@ -23,7 +23,15 @@ export class Connection {
   prevLog = ''
   authFailed = false
 
-  constructor(setConnecting, setReady, setMessages, setConnectedPeers, onAuthFailed, port = 13301, apiToken = "^^LOCAL-testing-123^^") {
+  constructor(
+    setConnecting,
+    setReady,
+    setMessages,
+    setConnectedPeers,
+    onAuthFailed,
+    port = 13301,
+    apiToken = '^^LOCAL-testing-123^^'
+  ) {
     this.setConnecting = setConnecting
     this.setReady = setReady
     this.setMessages = setMessages
@@ -88,7 +96,7 @@ export class Connection {
 
   logger = (msg) => {
     try {
-      this.logs.push({type: "log", msg: msg, ts: ""})
+      this.logs.push({ type: 'log', msg: msg, ts: '' })
       this.setMessages(this.logs.slice(0)) // Need a clone
     } catch (e) {
       console.log('ERR', e)
@@ -105,10 +113,14 @@ export class Connection {
         ? await fetch(`https://${window.location.host}/api/ssl`).then(
             (_) => new WebSocket('wss://' + window.location.host)
           )
-        : new WebSocket(`ws://${window.location.hostname}:${this.port}/api/v2/node/stream/websocket/?apiToken=${this.apiToken}`)
+        : new WebSocket(
+            `ws://${window.location.hostname}:${this.port}/api/v2/node/stream/websocket/?apiToken=${this.apiToken}`
+          )
     } catch (err) {
       console.log('Invalid SSL or non-SSL support')
-      client = new WebSocket(`ws://${window.location.hostname}:${this.port}/api/v2/node/stream/websocket/?apiToken=${this.apiToken}`)
+      client = new WebSocket(
+        `ws://${window.location.hostname}:${this.port}/api/v2/node/stream/websocket/?apiToken=${this.apiToken}`
+      )
     }
 
     console.log('Web socket created')
@@ -123,29 +135,29 @@ export class Connection {
           var text = e.target.value
           if (text.length > 0) {
             const userInput = parseCmd(text)
-            const cmds = new Commands(this.port, this.apiToken);
+            const cmds = new Commands(this.port, this.apiToken)
             switch (userInput.cmd) {
-              case "withdraw":
-              case "balance":
-              case "address":
-              case "alias":
-              case "channels":
-              case "close":
-              case "info":
-              case "open":
-              case "redeemTickets":
-              case "tickets":
-              case "version":
-              case "ping":
-              case "settings":
-              case "sign":
-              case "send":
-              case "peers":
-              case "help":
-                cmds.execute(this.logger, text);
+              case 'withdraw':
+              case 'balance':
+              case 'address':
+              case 'alias':
+              case 'channels':
+              case 'close':
+              case 'info':
+              case 'open':
+              case 'redeemTickets':
+              case 'tickets':
+              case 'version':
+              case 'ping':
+              case 'settings':
+              case 'sign':
+              case 'send':
+              case 'peers':
+              case 'help':
+                cmds.execute(this.logger, text)
                 break
               default:
-                this.logger("Command not found.")
+                this.logger('Command not found.')
                 break
             }
             e.target.value = ''

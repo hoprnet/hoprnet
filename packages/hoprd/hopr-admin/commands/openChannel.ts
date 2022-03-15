@@ -3,12 +3,11 @@ import chalk from 'chalk'
 import { styleValue } from './utils'
 import { AbstractCommand } from './abstractCommand'
 import { BalanceDecimals } from './utils/types'
-import {  moveDecimalPoint } from './utils/moveDecimal'
+import { moveDecimalPoint } from './utils/moveDecimal'
 import BN from 'bn.js'
 import HoprFetcher from '../fetch'
 
 export class OpenChannel extends AbstractCommand {
-
   constructor(fetcher: HoprFetcher) {
     super(fetcher)
   }
@@ -38,7 +37,7 @@ export class OpenChannel extends AbstractCommand {
     }
 
     const amountToFund = new BN(moveDecimalPoint(amountToFundStr, BalanceDecimals.Balance))
-    const myAvailableTokens = await this.hoprFetcher.getBalances().then(d => new BN(d.hopr))
+    const myAvailableTokens = await this.hoprFetcher.getBalances().then((d) => new BN(d.hopr))
 
     if (amountToFund.lten(0)) {
       return log(`Invalid 'amountToFund' provided: ${amountToFund.toString(10)}`)
@@ -51,11 +50,11 @@ export class OpenChannel extends AbstractCommand {
     try {
       const response = await this.hoprFetcher.setChannels(counterparty.toB58String(), amountToFund.toString())
       if (response.status == 201) {
-        const channelId = response.json().then(res => res.channelId)
+        const channelId = response.json().then((res) => res.channelId)
         // TODO: channelId.toHex()
         return log(`${chalk.green(`Successfully opened channel`)} ${styleValue(channelId, 'hash')}`)
       } else {
-        const status = response.json().then(res => res.status)
+        const status = response.json().then((res) => res.status)
         return log(status)
       }
     } catch (err) {

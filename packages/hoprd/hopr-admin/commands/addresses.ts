@@ -1,6 +1,6 @@
 import { AbstractCommand } from './abstractCommand'
 import type PeerId from 'peer-id'
-import {  styleValue } from './utils'
+import { styleValue } from './utils'
 import HoprFetcher from '../fetch'
 
 // TODO: Missing getObservedAddresses API for now
@@ -39,6 +39,6 @@ export default class Addresses extends AbstractCommand {
     //       .map((addr) => `${addr.toString()}`)
     //       .join(`\n- `)}`
     // )
-    return log("TODO: Missing getObservedAddresses API")
+    return log('TODO: Missing getObservedAddresses API')
   }
 }

@@ -19,7 +19,7 @@ export default class PrintBalance extends AbstractCommand {
    * Prints the balance of our account.
    * @notice triggered by the CLI
    */
-  public async execute( log): Promise<void> {
+  public async execute(log): Promise<void> {
     const balances = await this.hoprFetcher.getBalances()
 
     const hoprPrefix = 'HOPR Balance:'

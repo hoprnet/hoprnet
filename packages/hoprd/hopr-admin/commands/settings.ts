@@ -12,7 +12,7 @@ export default class Settings extends AbstractCommand {
       strategy: [
         'Set an automatic strategy for the node. (passive|promiscuous)',
         this.setStrategy.bind(this),
-        this.getStrategy.bind(this),
+        this.getStrategy.bind(this)
       ]
     }
   }
@@ -30,19 +30,19 @@ export default class Settings extends AbstractCommand {
   }
 
   private async getStrategy(): Promise<string> {
-    return await this.hoprFetcher.getSettings().then(res => res.strategy)
+    return await this.hoprFetcher.getSettings().then((res) => res.strategy)
   }
 
   private async setStrategy(query: string): Promise<string> {
     if (query == 'passive') {
-        const response = await this.hoprFetcher.setSettings("strategy", "passive")
-        if (response.status === 204) {
-          return 'Strategy is now passive'
-        }
+      const response = await this.hoprFetcher.setSettings('strategy', 'passive')
+      if (response.status === 204) {
+        return 'Strategy is now passive'
+      }
     }
 
     if (query == 'promiscuous') {
-      const response = await this.hoprFetcher.setSettings("strategy", "promiscuous")
+      const response = await this.hoprFetcher.setSettings('strategy', 'promiscuous')
       if (response.status === 204) {
         return 'Strategy is now promiscuous'
       }
@@ -64,9 +64,11 @@ export default class Settings extends AbstractCommand {
 
   private async listSettings(): Promise<string> {
     // return key-value, for each key in settingsKeys array
-    const entries = await Promise.all(this.settingsKeys.map(async (setting) => {
-      return [setting, await this.getSingleState(setting)]
-    }))
+    const entries = await Promise.all(
+      this.settingsKeys.map(async (setting) => {
+        return [setting, await this.getSingleState(setting)]
+      })
+    )
 
     const results: string[] = []
     const keyPadding = getPaddingLength(Object.keys(this.settings))
@@ -100,7 +102,7 @@ export default class Settings extends AbstractCommand {
     const option = optionArray.join(' ')
 
     if (!option) {
-      log(setting + ': ' + await this.getSingleState(setting))
+      log(setting + ': ' + (await this.getSingleState(setting)))
       return
     }
 

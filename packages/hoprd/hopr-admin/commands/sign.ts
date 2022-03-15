@@ -23,12 +23,11 @@ export default class Sign extends AbstractCommand {
     try {
       const response = await this.hoprFetcher.signMessage(query)
       const signature = await response.json()
-      if (response.status === 200 || response.status === 422){
+      if (response.status === 200 || response.status === 422) {
         return log(`Signed message: ${signature.signature}`)
       } else {
         return log(`Status: ${signature.status}`)
       }
-
     } catch (err) {
       return log(styleValue(err.message, 'failure'))
     }

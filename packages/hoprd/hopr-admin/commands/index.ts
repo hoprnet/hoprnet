@@ -24,7 +24,7 @@ export class Commands {
   private commandMap: Map<string, AbstractCommand>
   readonly hoprFetcher: HoprFetcher
 
-  constructor(apiPort:number, apiToken: string) {
+  constructor(apiPort: number, apiToken: string) {
     this.hoprFetcher = new HoprFetcher(apiPort, apiToken)
 
     this.commands = [
@@ -33,7 +33,7 @@ export class Commands {
       new CloseChannel(this.hoprFetcher),
       new Info(this.hoprFetcher),
       new ListConnectedPeers(this.hoprFetcher),
-      new ListCommands(this.hoprFetcher,() => this.commands),
+      new ListCommands(this.hoprFetcher, () => this.commands),
       new ListOpenChannels(this.hoprFetcher),
       new Ping(this.hoprFetcher),
       new PrintAddress(this.hoprFetcher),
@@ -45,7 +45,7 @@ export class Commands {
       new SendMessage(this.hoprFetcher),
       new Settings(this.hoprFetcher),
       new Withdraw(this.hoprFetcher),
-      new OpenChannel(this.hoprFetcher),
+      new OpenChannel(this.hoprFetcher)
     ]
 
     this.commandMap = new Map()
@@ -65,7 +65,7 @@ export class Commands {
     return this.commandMap.get(command.trim())
   }
 
-  public async execute(log: (string), message: string): Promise<void> {
+  public async execute(log: string, message: string): Promise<void> {
     const split: (string | undefined)[] = message.trim().split(/\s+/)
     const command = split[0]
     const query = split.slice(1).join(' ')

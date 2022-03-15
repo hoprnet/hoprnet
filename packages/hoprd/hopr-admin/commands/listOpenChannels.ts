@@ -31,7 +31,7 @@ Balance:                ${styleValue(channel.balance, 'number')}
     log('fetching channels...')
     try {
       const channels = await this.hoprFetcher.getChannels()
-      const channelsFrom = channels.incoming.filter((channel) => channel.status !== "Closed")
+      const channelsFrom = channels.incoming.filter((channel) => channel.status !== 'Closed')
 
       if (channelsFrom.length == 0) {
         log(`\nNo open channels from node.`)
@@ -41,7 +41,7 @@ Balance:                ${styleValue(channel.balance, 'number')}
         log(ListOpenChannels.consoleOutput(channel))
       }
 
-      const channelsTo = channels.outgoing.filter((channel) => channel.status !== "Closed")
+      const channelsTo = channels.outgoing.filter((channel) => channel.status !== 'Closed')
       if (channelsTo.length == 0) {
         log(`\nNo open channels to node.`)
       }

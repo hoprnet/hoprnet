@@ -1,5 +1,5 @@
 import { AbstractCommand } from './abstractCommand'
-import {  getPaddingLength, styleValue } from './utils'
+import { getPaddingLength, styleValue } from './utils'
 import HoprFetcher from '../fetch'
 
 export class Alias extends AbstractCommand {
@@ -49,7 +49,7 @@ export class Alias extends AbstractCommand {
 
       const response = await this.hoprFetcher.setAliases(peerId.toB58String(), name)
 
-      if (response.status == 201){
+      if (response.status == 201) {
         return log(`Set alias '${styleValue(name, 'highlight')}' to '${styleValue(peerId.toB58String(), 'peerId')}'.`)
       } else {
         return log(styleValue(response.status, 'failure'))

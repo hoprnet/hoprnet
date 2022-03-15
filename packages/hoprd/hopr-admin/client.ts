@@ -12,10 +12,10 @@ export default class HoprClient {
   public getReq = (apiSuffix: string) => {
     return fetch(this.apiEndpoint + apiSuffix, {
       headers: {
-        'Accept': 'application/json',
-        'x-auth-token': this.apiToken,
-      },
-    }).then(res => res.json())
+        Accept: 'application/json',
+        'x-auth-token': this.apiToken
+      }
+    }).then((res) => res.json())
   }
 
   postReq = (apiSuffix: string, jsonBody: object) => {
@@ -23,27 +23,30 @@ export default class HoprClient {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-auth-token': this.apiToken,
+        'x-auth-token': this.apiToken
       },
       body: JSON.stringify(jsonBody)
-    })}
+    })
+  }
 
   putReq = (apiSuffix: string, jsonBody: object) => {
     return fetch(this.apiEndpoint + apiSuffix, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'x-auth-token': this.apiToken,
+        'x-auth-token': this.apiToken
       },
       body: JSON.stringify(jsonBody)
-    })}
+    })
+  }
 
   delReq = (apiSuffix: string) => {
     return fetch(this.apiEndpoint + apiSuffix, {
       method: 'DELETE',
       headers: {
-        'Accept': 'application/json',
-        'x-auth-token': this.apiToken,
-      },
-    })}
+        Accept: 'application/json',
+        'x-auth-token': this.apiToken
+      }
+    })
+  }
 }

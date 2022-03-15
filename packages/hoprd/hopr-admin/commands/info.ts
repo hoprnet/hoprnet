@@ -20,7 +20,7 @@ export class Info extends AbstractCommand {
     // @TODO Add connector info etc.
     return log(
       [
-        `Announcing to other nodes as: ${(nodeInfo.announcedAddress).map((ma) => ma.toString())}`,
+        `Announcing to other nodes as: ${nodeInfo.announcedAddress.map((ma) => ma.toString())}`,
         `Listening on: ${nodeInfo.listeningAddress.map((ma) => ma.toString())}`,
         `Running on: ${nodeInfo.network}`,
         `HOPR Token: ${nodeInfo.hoprToken}`,

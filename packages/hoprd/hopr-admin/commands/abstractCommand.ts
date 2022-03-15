@@ -60,7 +60,7 @@ export abstract class AbstractCommand {
    * @returns a 'PeerId' instance
    */
   public async checkPeerIdInput(peerIdString: string): Promise<PeerId> {
-    const aliases: string[] = await this.hoprFetcher.getAliases().then(res => Object.values(res))
+    const aliases: string[] = await this.hoprFetcher.getAliases().then((res) => Object.values(res))
 
     try {
       if (typeof aliases !== 'undefined' && aliases && aliases.includes(peerIdString)) {
@@ -72,5 +72,4 @@ export abstract class AbstractCommand {
       throw Error(`Invalid peerId. ${err.message}`)
     }
   }
-
 }

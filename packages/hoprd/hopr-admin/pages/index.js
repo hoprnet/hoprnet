@@ -66,7 +66,15 @@ export default function Home() {
   useEffect(() => {
     if (router.isReady && typeof window !== 'undefined') {
       const { port, apiToken } = router.query
-      connection = new Connection(setConnecting, setReady, setMessages, setConnectedPeers, handleAuthFailed, port, apiToken)
+      connection = new Connection(
+        setConnecting,
+        setReady,
+        setMessages,
+        setConnectedPeers,
+        handleAuthFailed,
+        port,
+        apiToken
+      )
       return Connection.disconnect
     }
   }, [router.isReady])

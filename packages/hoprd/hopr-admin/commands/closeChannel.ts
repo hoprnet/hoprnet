@@ -44,11 +44,12 @@ export default class CloseChannel extends AbstractCommand {
       } else if (response.status === 422) {
         const { status, error } = await response.json()
         return log(`${status}\n${error}`)
-      }
-      else {
+      } else {
         return log(
           `${chalk.green(
-            `Initiated channel closure, the channel must remain open for at least ${nodeInfo.channelClosurePeriod} minutes. Please send the close command again once the cool-off has passed. Receipt: ${styleValue(
+            `Initiated channel closure, the channel must remain open for at least ${
+              nodeInfo.channelClosurePeriod
+            } minutes. Please send the close command again once the cool-off has passed. Receipt: ${styleValue(
               response.receipt,
               'hash'
             )}`
