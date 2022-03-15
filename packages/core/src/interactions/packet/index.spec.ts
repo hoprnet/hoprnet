@@ -115,12 +115,12 @@ async function createMinimalChannelTopology(dbs: HoprDB[], nodes: PeerId[]): Pro
       channel = getDummyChannel(peerId, nodes[index + 1])
 
       // Store channel entry at source
-      await dbs[index].updateChannel(channel.getId(), channel, TestingSnapshot)
+      await dbs[index].updateChannelAndSnapshot(channel.getId(), channel, TestingSnapshot)
     }
 
     if (index > 0) {
       // Store channel entry at destination
-      await dbs[index].updateChannel(previousChannel.getId(), previousChannel, TestingSnapshot)
+      await dbs[index].updateChannelAndSnapshot(previousChannel.getId(), previousChannel, TestingSnapshot)
 
       const channelInfo = new ChannelCommitmentInfo(
         1,

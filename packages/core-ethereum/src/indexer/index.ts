@@ -650,7 +650,7 @@ class Indexer extends EventEmitter {
     }
     log('New node announced', account.address.toHex(), account.multiAddr.toString())
 
-    await this.db.updateAccount(account, lastSnapshot)
+    await this.db.updateAccountAndSnapshot(account, lastSnapshot)
 
     this.emit('peer', {
       id: account.getPeerId(),
@@ -669,7 +669,7 @@ class Indexer extends EventEmitter {
       // Channel is new
     }
 
-    await this.db.updateChannel(channel.getId(), channel, lastSnapshot)
+    await this.db.updateChannelAndSnapshot(channel.getId(), channel, lastSnapshot)
 
     if (prevState && channel.status == ChannelStatus.Closed && prevState.status != ChannelStatus.Closed) {
       log('channel was closed')
