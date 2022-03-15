@@ -38,6 +38,17 @@ mkdir "${build_dir}"
 
 declare package_dir="${mydir}/../packages/${package_name}"
 
+restore() {
+  log "Restoring previous state"
+  rm -Rf "${build_dir}"
+  rm -f "${package_dir}/yarn.lock"
+  rm -f "${package_dir}/package-lock.json"
+  rm -f "${package_dir}/package.tgz"
+}
+
+# Remove temporary build dir if failed
+trap restore SIGINT SIGTERM ERR EXIT
+
 log "Install workspace package in temporary directory"
 
 declare package_npm_name=$(jq -r '.name' "${package_dir}/package.json")
@@ -54,9 +65,8 @@ tar -xf "${package_dir}/package.tgz"
 jq -s '.[1] * (.[0].resolutions | { "overrides": . ,"resolutions": . })' "${mydir}/../package.json" "${build_dir}/package/package.json" > "${build_dir}/package.json"
  
 # # NPM package is now useless
-rm \
-  "${package_dir}/package.tgz" \
-  -R "${build_dir}/package"
+rm "${package_dir}/package.tgz"
+rm -R "${build_dir}/package"
 
 log "Creating NPM lock file for ${package_name} package"
 
@@ -84,5 +94,5 @@ cp "${build_dir}/package.json" "${package_dir}"
 
 log "Successfully copied lockfiles to ${package_dir}/"
 
-# Cleanup
+log "Removing temporary build dir"
 rm -Rf "${build_dir}"

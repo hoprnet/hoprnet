@@ -21,6 +21,25 @@ usage() {
   msg
 }
 
+cleanup() {
+  # Remove lock files due to conflicts with workspaces
+  rm -f \
+    "${mydir}/../packages/cover-traffic-daemon/package-lock.json" \
+    "${mydir}/../packages/hoprd/package-lock.json" \
+    "${mydir}/../packages/cover-traffic-daemon/yarn.lock" \
+    "${mydir}/../packages/hoprd/yarn.lock"
+
+  # Don't commit changed package.json files as package resolutions are
+  # supposed to interfer with workspaces according to https://yarnpkg.com/configuration/manifest#resolutions
+  git restore packages/hoprd/package.json
+  git restore packages/cover-traffic-daemon/package.json
+
+  # delete default environments
+  rm -f \
+    "${mydir}/../packages/hoprd/default-environment.json" \
+    "${mydir}/../packages/cover-traffic-daemon/default-environment.json"
+}
+
 # return early with help info when requested
 ([ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]) && { usage; exit 0; }
 
@@ -104,6 +123,8 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   ${mydir}/wait_for_npm_package core-ethereum
   ${mydir}/wait_for_npm_package core
 
+  trap cleanup SIGINT SIGTERM ERR EXIT
+
   # set default environments
   log "adding default environments to packages"
   echo "{\"id\": \"${environment_id}\"}" > "${mydir}/../packages/hoprd/default-environment.json"
@@ -117,20 +138,5 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   yarn workspace @hoprnet/hoprd npm publish --access public
   yarn workspace @hoprnet/hopr-cover-traffic-daemon npm publish --access public
 
-  # Remove lock files due to conflicts with workspaces
-  rm -f \
-    "${mydir}/../packages/cover-traffic-daemon/package-lock.json" \
-    "${mydir}/../packages/hoprd/package-lock.json" \
-    "${mydir}/../packages/cover-traffic-daemon/yarn.lock" \
-    "${mydir}/../packages/hoprd/yarn.lock"
-
-  # Don't commit changed package.json files as package resolutions are
-  # supposed to interfer with workspaces according to https://yarnpkg.com/configuration/manifest#resolutions
-  git restore packages/hoprd/package.json
-  git restore packages/cover-traffic-daemon/package.json
-
-  # delete default environments
-  rm -f \
-    "${mydir}/../packages/hoprd/default-environment.json" \
-    "${mydir}/../packages/cover-traffic-daemon/default-environment.json"
+  cleanup
 fi
