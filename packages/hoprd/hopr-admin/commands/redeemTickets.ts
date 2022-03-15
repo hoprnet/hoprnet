@@ -1,10 +1,10 @@
-import type Hopr from '@hoprnet/hopr-core'
 import { styleValue } from './utils'
 import { AbstractCommand } from './abstractCommand'
+import HoprFetcher from '../fetch'
 
 export default class RedeemTickets extends AbstractCommand {
-  constructor(public node: Hopr) {
-    super()
+  constructor(fetcher: HoprFetcher) {
+    super(fetcher)
   }
 
   public name() {
@@ -21,7 +21,8 @@ export default class RedeemTickets extends AbstractCommand {
   public async execute(log: (str: string) => void): Promise<void> {
     try {
       log('Redeeming all tickets...')
-      await this.node.redeemAllTickets()
+      await this.hoprFetcher.redeemTickets()
+
       log(`Redeemed all tickets. Run 'tickets' for details`)
     } catch (err) {
       return log(styleValue(err.message, 'failure'))

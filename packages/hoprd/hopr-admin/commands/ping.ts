@@ -1,12 +1,11 @@
-import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
 import { AbstractCommand } from './abstractCommand'
-import type { StateOps } from '../types'
 import { checkPeerIdInput, styleValue } from './utils'
+import HoprFetcher from '../fetch'
 
 export default class Ping extends AbstractCommand {
-  constructor(public node: Hopr) {
-    super()
+  constructor(fetcher: HoprFetcher) {
+    super(fetcher)
   }
 
   public name() {
@@ -17,26 +16,26 @@ export default class Ping extends AbstractCommand {
     return 'Pings another node to check its availability'
   }
 
-  public async execute(log, query: string, { getState }: StateOps): Promise<void> {
+  public async execute(log, query: string): Promise<void> {
     if (!query) {
       return log(`Invalid arguments. Expected 'ping <peerId>'. Received '${query}'`)
     }
 
     let peerId: PeerId
     try {
-      peerId = checkPeerIdInput(query, getState())
+      peerId = checkPeerIdInput(query)
     } catch (err) {
       return log(styleValue(err.message, 'failure'))
     }
 
     let out = ''
 
-    let pingResult: Awaited<ReturnType<Hopr['ping']>>
+    let pingResult: any
 
     let error: any
 
     try {
-      pingResult = await this.node.ping(peerId)
+      pingResult = await this.hoprFetcher.pingNodePeer(query).then(res => res.json())
     } catch (err) {
       error = err
     }

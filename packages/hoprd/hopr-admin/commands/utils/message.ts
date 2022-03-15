@@ -1,5 +1,5 @@
 import { encode, decode } from 'rlp'
-import { u8aToHex } from '@hoprnet/hopr-utils'
+// import { u8aToHex } from '@hoprnet/hopr-utils'
 import { styleValue } from '.'
 
 /**

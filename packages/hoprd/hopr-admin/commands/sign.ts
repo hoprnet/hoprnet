@@ -1,12 +1,10 @@
-import type Hopr from '@hoprnet/hopr-core'
-import { u8aToHex } from '@hoprnet/hopr-utils'
-
 import { AbstractCommand } from './abstractCommand'
 import { styleValue } from './utils'
+import HoprFetcher from '../fetch'
 
 export default class Sign extends AbstractCommand {
-  constructor(public node: Hopr) {
-    super()
+  constructor(fetcher: HoprFetcher) {
+    super(fetcher)
   }
 
   public name() {
@@ -23,8 +21,14 @@ export default class Sign extends AbstractCommand {
     }
 
     try {
-      const signature = await this.node.signMessage(new TextEncoder().encode(query))
-      return log(`Signed message: ${u8aToHex(signature)}`)
+      const response = await this.hoprFetcher.signMessage(query)
+      const signature = await response.json()
+      if (response.status === 200 || response.status === 422){
+        return log(`Signed message: ${signature.signature}`)
+      } else {
+        return log(`Status: ${signature.status}`)
+      }
+
     } catch (err) {
       return log(styleValue(err.message, 'failure'))
     }

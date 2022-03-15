@@ -15,7 +15,7 @@ import type { State } from './types'
 import setupAPI from './api'
 import setupHealthcheck from './healthcheck'
 import { AdminServer } from './admin'
-import { Commands } from './commands'
+// import { Commands } from './commands'
 import { LogStream } from './logs'
 import { getIdentity } from './identity'
 

@@ -1,9 +1,9 @@
-import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from './abstractCommand'
+import HoprFetcher from '../fetch'
 
 export default class ListConnectedPeers extends AbstractCommand {
-  constructor(public node: Hopr) {
-    super()
+  constructor(fetcher: HoprFetcher) {
+    super(fetcher)
   }
 
   public name() {

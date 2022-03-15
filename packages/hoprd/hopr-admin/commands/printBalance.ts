@@ -1,10 +1,10 @@
-import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from './abstractCommand'
 import { styleValue } from './utils'
+import HoprFetcher from '../fetch'
 
 export default class PrintBalance extends AbstractCommand {
-  constructor(public node: Hopr) {
-    super()
+  constructor(fetcher: HoprFetcher) {
+    super(fetcher)
   }
 
   public name() {
@@ -19,12 +19,15 @@ export default class PrintBalance extends AbstractCommand {
    * Prints the balance of our account.
    * @notice triggered by the CLI
    */
-  public async execute(log): Promise<void> {
+  public async execute( log): Promise<void> {
+    const balances = await this.hoprFetcher.getBalances()
+
     const hoprPrefix = 'HOPR Balance:'
-    const hoprBalance = (await this.node.getBalance()).toFormattedString()
+    // TODO: toFormattedString()
+    const hoprBalance = balances.hopr
 
     const nativePrefix = 'ETH Balance:'
-    const nativeBalance = (await this.node.getNativeBalance()).toFormattedString()
+    const nativeBalance = balances.native
 
     const prefixLength = Math.max(hoprPrefix.length, nativePrefix.length) + 2
 

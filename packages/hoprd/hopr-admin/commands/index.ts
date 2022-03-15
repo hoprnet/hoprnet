@@ -1,7 +1,4 @@
-import type Hopr from '@hoprnet/hopr-core'
-import type { StateOps } from '../types'
 import { AbstractCommand } from './abstractCommand'
-import FundChannel from './fundChannel'
 import CloseChannel from './closeChannel'
 import ListCommands from './listCommands'
 import ListOpenChannels from './listOpenChannels'
@@ -12,7 +9,6 @@ import Sign from './sign'
 import PrintAddress from './printAddress'
 import PrintBalance from './printBalance'
 import { SendMessage } from './sendMessage'
-import StopNode from './stopNode'
 import Version from './version'
 import Tickets from './tickets'
 import RedeemTickets from './redeemTickets'
@@ -20,34 +16,36 @@ import Settings from './settings'
 import Withdraw from './withdraw'
 import { Alias } from './alias'
 import { Info } from './info'
+import HoprFetcher from '../fetch'
 import Addresses from './addresses'
 
 export class Commands {
   readonly commands: AbstractCommand[]
   private commandMap: Map<string, AbstractCommand>
+  readonly hoprFetcher: HoprFetcher
 
-  constructor(public node: Hopr, public stateOps: StateOps) {
+  constructor(apiPort:number, apiToken: string) {
+    this.hoprFetcher = new HoprFetcher(apiPort, apiToken)
+
     this.commands = [
-      new Addresses(node),
-      new Alias(node),
-      new CloseChannel(node),
-      new Info(node),
-      new ListConnectedPeers(node),
-      new ListCommands(() => this.commands),
-      new ListOpenChannels(node),
-      new Ping(node),
-      new PrintAddress(node),
-      new PrintBalance(node),
-      new RedeemTickets(node),
-      new Sign(node),
-      new StopNode(node),
-      new Version(node),
-      new Tickets(node),
-      new SendMessage(node),
-      new Settings(node),
-      new Withdraw(node),
-      new OpenChannel(node),
-      new FundChannel(node)
+      new Addresses(this.hoprFetcher),
+      new Alias(this.hoprFetcher),
+      new CloseChannel(this.hoprFetcher),
+      new Info(this.hoprFetcher),
+      new ListConnectedPeers(this.hoprFetcher),
+      new ListCommands(this.hoprFetcher,() => this.commands),
+      new ListOpenChannels(this.hoprFetcher),
+      new Ping(this.hoprFetcher),
+      new PrintAddress(this.hoprFetcher),
+      new PrintBalance(this.hoprFetcher),
+      new RedeemTickets(this.hoprFetcher),
+      new Sign(this.hoprFetcher),
+      new Version(this.hoprFetcher),
+      new Tickets(this.hoprFetcher),
+      new SendMessage(this.hoprFetcher),
+      new Settings(this.hoprFetcher),
+      new Withdraw(this.hoprFetcher),
+      new OpenChannel(this.hoprFetcher),
     ]
 
     this.commandMap = new Map()
@@ -67,7 +65,7 @@ export class Commands {
     return this.commandMap.get(command.trim())
   }
 
-  public async execute(log, message: string): Promise<void> {
+  public async execute(log: (string), message: string): Promise<void> {
     const split: (string | undefined)[] = message.trim().split(/\s+/)
     const command = split[0]
     const query = split.slice(1).join(' ')
@@ -80,7 +78,7 @@ export class Commands {
 
     if (cmd) {
       try {
-        return await cmd.execute(log, query || '', this.stateOps)
+        return await cmd.execute(log, query || '')
       } catch (err) {
         return log(`${cmd} execution failed with error: ${err.message}`)
       }

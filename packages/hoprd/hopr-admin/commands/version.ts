@@ -1,10 +1,11 @@
 import { AbstractCommand } from './abstractCommand'
-import type Hopr from '@hoprnet/hopr-core'
+import HoprFetcher from '../fetch'
 
 export default class Version extends AbstractCommand {
-  constructor(public node: Hopr) {
-    super()
+  constructor(fetcher: HoprFetcher) {
+    super(fetcher)
   }
+
   public name() {
     return 'version'
   }
@@ -13,7 +14,7 @@ export default class Version extends AbstractCommand {
     return 'Displays the version'
   }
 
-  public async execute(log): Promise<void> {
-    log(this.node.getVersion())
+  public async execute( log): Promise<void> {
+    await this.hoprFetcher.getNodeVer().then(version => log(version))
   }
 }

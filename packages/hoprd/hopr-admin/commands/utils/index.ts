@@ -1,4 +1,3 @@
-export * from './checkPeerId'
 export * from './message'
 
 const EXTRA_PADDING = 2

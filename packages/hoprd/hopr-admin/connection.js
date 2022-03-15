@@ -2,21 +2,35 @@
  * Maintain a websocket connection
  */
 
-import Cookies from 'js-cookie'
+import { Commands } from './commands'
 
 const MAX_MESSAGES_CACHED = 50
+
+const parseCmd = (cmdInput) => {
+  const split = cmdInput.trim().split(/\s+/)
+  const command = split[0]
+  const query = split.slice(1).join(' ')
+
+  if (command == null) {
+    return undefined
+  }
+
+  return {cmd: command, query: query}
+}
 
 export class Connection {
   logs = []
   prevLog = ''
   authFailed = false
 
-  constructor(setConnecting, setReady, setMessages, setConnectedPeers, onAuthFailed) {
+  constructor(setConnecting, setReady, setMessages, setConnectedPeers, onAuthFailed, port = 13301, apiToken = "^^LOCAL-testing-123^^") {
     this.setConnecting = setConnecting
     this.setReady = setReady
     this.setMessages = setMessages
     this.setConnectedPeers = setConnectedPeers
     this.onAuthFailed = onAuthFailed
+    this.port = port
+    this.apiToken = apiToken
     this.connect()
   }
 
@@ -72,20 +86,31 @@ export class Connection {
     }
   }
 
+  logger = (msg) => {
+    try {
+      this.logs.push({type: "log", msg: msg, ts: ""})
+      this.setMessages(this.logs.slice(0)) // Need a clone
+    } catch (e) {
+      console.log('ERR', e)
+    }
+  }
+
   async connect() {
     console.log('Connecting ...')
+    console.log(`Using... API PORT: ${this.port}, API_TOKEN: ${this.apiToken}`)
     var client
     try {
       // See https://stackoverflow.com/a/55487820
-      var client = navigator.clipboard
+      client = navigator.clipboard
         ? await fetch(`https://${window.location.host}/api/ssl`).then(
             (_) => new WebSocket('wss://' + window.location.host)
           )
-        : new WebSocket('ws://' + window.location.host)
+        : new WebSocket(`ws://${window.location.hostname}:${this.port}/api/v2/node/stream/websocket/?apiToken=${this.apiToken}`)
     } catch (err) {
       console.log('Invalid SSL or non-SSL support')
-      client = new WebSocket('ws://' + window.location.host)
+      client = new WebSocket(`ws://${window.location.hostname}:${this.port}/api/v2/node/stream/websocket/?apiToken=${this.apiToken}`)
     }
+
     console.log('Web socket created')
 
     client.onopen = () => {
@@ -93,13 +118,36 @@ export class Connection {
       this.setConnecting(false)
 
       document.querySelector('#command').onkeydown = (e) => {
+        // enter
         if (e.keyCode == 13) {
-          // enter
           var text = e.target.value
-          console.log('Command: ', text)
           if (text.length > 0) {
-            client.send(text)
-            this.prevLog = text
+            const userInput = parseCmd(text)
+            const cmds = new Commands(this.port, this.apiToken);
+            switch (userInput.cmd) {
+              case "withdraw":
+              case "balance":
+              case "address":
+              case "alias":
+              case "channels":
+              case "close":
+              case "info":
+              case "open":
+              case "redeemTickets":
+              case "tickets":
+              case "version":
+              case "ping":
+              case "settings":
+              case "sign":
+              case "send":
+              case "peers":
+              case "help":
+                cmds.execute(this.logger, text);
+                break
+              default:
+                this.logger("Command not found.")
+                break
+            }
             e.target.value = ''
           }
         }

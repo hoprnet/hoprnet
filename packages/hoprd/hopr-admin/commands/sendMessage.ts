@@ -1,14 +1,11 @@
-import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
-import type { StateOps, State } from '../types'
-import { INTERMEDIATE_HOPS } from '@hoprnet/hopr-core/lib/constants'
-import { PublicKey } from '@hoprnet/hopr-utils'
-import { checkPeerIdInput, encodeMessage, styleValue } from './utils'
+import { styleValue } from './utils'
 import { AbstractCommand } from './abstractCommand'
+import HoprFetcher from '../fetch'
 
 export class SendMessage extends AbstractCommand {
-  constructor(public node: Hopr) {
-    super()
+  constructor(fetcher: HoprFetcher) {
+    super(fetcher)
   }
 
   public name() {
@@ -19,29 +16,33 @@ export class SendMessage extends AbstractCommand {
     return 'Sends a message to another party'
   }
 
-  private insertMyAddress(message: string): string {
-    const myAddress = this.node.getId().toB58String()
+  private async insertMyAddress(message: string): string {
+    const myAddress: string = await this.hoprFetcher.getAddresses().then(res => res.hoprAddress)
     return `${myAddress}:${message}`
   }
 
   protected async sendMessage(
-    state: State,
-    recipient: PeerId,
+    recipient: string,
     rawMessage: string,
-    path?: PublicKey[]
+    path?: string[]
   ): Promise<string> {
-    const message = state.settings.includeRecipient ? this.insertMyAddress(rawMessage) : rawMessage
+    const includeRecipientValue = await this.hoprFetcher.getSettings().then(res => res.includeRecipient)
+    const message = includeRecipientValue ? this.insertMyAddress(rawMessage) : rawMessage
 
     try {
-      await this.node.sendMessage(encodeMessage(message), recipient, path)
-      return 'Message sent'
+      const response = await this.hoprFetcher.sendMessage(message, recipient, path)
+      const { status, error } = await response.json()
+      if (response.status === 204) {
+        return 'Message sent'
+      } else {
+        return styleValue(`Could not send message. (${error})`, 'failure')
+      }
     } catch (err) {
       return styleValue(`Could not send message. (${err.message})`, 'failure')
     }
   }
 
-  public async execute(log: (str: string) => void, query: string, { getState }: StateOps): Promise<void> {
-    const state = getState()
+  public async execute( log: (str: string) => void, query: string): Promise<void> {
     let [err, peerIdString, message] = this._assertUsage(query, ['PeerId', 'Message'], /([A-Za-z0-9_,]+)\s(.*)/)
     if (err) {
       log(styleValue(err, 'failure'))
@@ -53,19 +54,14 @@ export class SendMessage extends AbstractCommand {
       // Direct routing can be done with ,recipient
       const peerIdStrings = peerIdString.split(',').filter(Boolean)
 
-      const path: PublicKey[] = []
+      const path: string[] = []
       for (const pIdString of peerIdStrings) {
         try {
-          path.push(PublicKey.fromPeerId(checkPeerIdInput(pIdString, state)))
+          path.push(await this.checkPeerIdInput(pIdString).then(peerId => peerId.toB58String()))
         } catch (err) {
           log(styleValue(`<${pIdString}> is neither a valid alias nor a valid Hopr address string`))
           return
         }
-      }
-
-      if (path.length > INTERMEDIATE_HOPS + 1) {
-        log(styleValue('Cannot create path longer than INTERMEDIATE_HOPS', 'failure'))
-        return
       }
 
       const [intermediateNodes, recipient] = [path.slice(0, path.length - 1), path[path.length - 1]]
@@ -75,20 +71,20 @@ export class SendMessage extends AbstractCommand {
           .map((current) => styleValue(current.toString(), 'peerId'))
           .join(',')} ...`
       )
-      log(await this.sendMessage(state, recipient.toPeerId(), message, intermediateNodes))
+      log(await this.sendMessage( recipient, message, intermediateNodes))
 
       return
     }
 
     let destination: PeerId
     try {
-      destination = checkPeerIdInput(peerIdString, state)
+      destination = await this.checkPeerIdInput(peerIdString)
     } catch (err) {
       log(styleValue(`<${peerIdString}> is neither a valid alias nor a valid Hopr address string`))
       return
     }
 
     console.log(`Sending message to ${styleValue(destination.toB58String(), 'peerId')} ...`)
-    log(await this.sendMessage(state, destination, message))
+    log(await this.sendMessage(destination.toB58String(), message))
   }
 }
