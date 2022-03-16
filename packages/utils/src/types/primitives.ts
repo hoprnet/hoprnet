@@ -22,15 +22,26 @@ export class PublicKey {
       throw new Error('Incorrect size Uint8Array for private key')
     }
 
-    return new PublicKey(publicKeyCreate(privKey, true))
+    return new PublicKey(publicKeyCreate(privKey, false))
   }
 
-  static fromUncompressedPubKey(arr: Uint8Array): PublicKey {
-    if (arr.length !== 65) {
-      throw new Error('Incorrect size Uint8Array for uncompressed public key')
+  static deserialize(arr: Uint8Array) {
+    switch (arr.length) {
+      case 65:
+        if (arr[0] != 4) {
+          throw Error(`Invalid uncompressed public key`)
+        }
+        return new PublicKey(arr)
+      case 64:
+        return new PublicKey(Uint8Array.from([4, ...arr]))
+      case 33:
+        if (![2, 3].includes(arr[0])) {
+          throw Error(`Invalid compressed public key`)
+        }
+        return new PublicKey(arr)
+      default:
+        throw Error(`Invalid length ${arr.length} of public key`)
     }
-
-    return new PublicKey(publicKeyConvert(arr, true))
   }
 
   static fromPeerId(peerId: PeerId): PublicKey {
@@ -42,47 +53,73 @@ export class PublicKey {
   }
 
   static fromSignature(hash: string, r: string, s: string, v: number): PublicKey {
-    return PublicKey.fromUncompressedPubKey(
+    return new PublicKey(
       ecdsaRecover(Uint8Array.from([...stringToU8a(r), ...stringToU8a(s)]), v, stringToU8a(hash), false)
     )
+  }
+
+  static fromString(str: string): PublicKey {
+    if (!str || str.length == 0) {
+      throw new Error('Cannot determine address from empty string')
+    }
+    return new PublicKey(stringToU8a(str))
+  }
+
+  static get SIZE(): number {
+    return 64
   }
 
   toAddress(): Address {
     if (this._address != undefined) {
       return this._address
     }
-    // Expensive EC-operation
-    this._address = new Address(Hash.create(publicKeyConvert(this.arr, false).slice(1)).serialize().slice(12))
+
+    if ([2, 3].includes(this.arr[0])) {
+      // Expensive EC-operation, only do if necessary
+      this.arr = publicKeyConvert(this.arr, false)
+    }
+
+    this._address = new Address(Hash.create(this.arr.slice(1)).serialize().slice(12))
 
     return this._address
   }
 
   toUncompressedPubKeyHex(): string {
-    // Needed in only a few cases for interacting with secp256k1
-    return u8aToHex(publicKeyConvert(this.arr, false).slice(1))
+    if ([2, 3].includes(this.arr[0])) {
+      // Expensive EC-operation, only do if necessary
+      this.arr = publicKeyConvert(this.arr, false)
+    }
+
+    return u8aToHex(this.arr)
+  }
+
+  toCompressedPubKeyHex(): string {
+    if (this.arr[0] == 4) {
+      return u8aToHex(publicKeyConvert(this.arr, true))
+    } else {
+      return u8aToHex(this.arr)
+    }
   }
 
   toPeerId(): PeerId {
-    return pubKeyToPeerId(this.serialize())
+    return pubKeyToPeerId(this.serializeCompressed())
   }
 
-  static fromString(str: string): PublicKey {
-    if (!str) {
-      throw new Error('Cannot make address from empty string')
+  public serializeCompressed(): Uint8Array {
+    if (this.arr[0] == 4) {
+      return publicKeyConvert(this.arr, true)
+    } else {
+      return this.arr
     }
-    return new PublicKey(stringToU8a(str))
   }
 
-  static get SIZE(): number {
-    return 33
-  }
+  public serializeUncompressed() {
+    if ([2, 3].includes(this.arr[0])) {
+      // Expensive EC-operation, only do if necessary
+      this.arr = publicKeyConvert(this.arr, false)
+    }
 
-  serialize() {
     return this.arr
-  }
-
-  toHex(): string {
-    return u8aToHex(this.arr)
   }
 
   toString(): string {
@@ -94,11 +131,13 @@ export class PublicKey {
   }
 
   eq(b: PublicKey) {
-    return u8aEquals(this.arr, b.serialize())
-  }
-
-  static deserialize(arr: Uint8Array) {
-    return new PublicKey(arr)
+    if (this.arr[0] == b.arr[0]) {
+      return u8aEquals(this.arr, b.arr)
+    } else if (this.arr[0] == 4) {
+      return u8aEquals(this.serializeCompressed(), b.arr)
+    } else {
+      return u8aEquals(this.arr, b.serializeCompressed())
+    }
   }
 
   static createMock(): PublicKey {
@@ -108,10 +147,8 @@ export class PublicKey {
 
 export class Address {
   constructor(private arr: Uint8Array) {
-    if (arr.length !== Address.SIZE) {
+    if (arr.length != Address.SIZE) {
       throw new Error('Incorrect size Uint8Array for address')
-    } else if (!ethers.utils.isAddress(u8aToHex(arr))) {
-      throw new Error('Incorrect Uint8Array for address')
     }
   }
 

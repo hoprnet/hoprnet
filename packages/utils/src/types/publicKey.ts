@@ -1,0 +1,143 @@
+import { publicKeyConvert, publicKeyCreate, ecdsaRecover } from 'secp256k1'
+import { u8aToHex, u8aEquals, stringToU8a } from '../u8a'
+import PeerId from 'peer-id'
+import { pubKeyToPeerId } from '../libp2p'
+import type { Address } from '.'
+
+export class PublicKey {
+  // Cache expensive computation result
+  private _address: Address
+  // @TODO use uncompressed public key internally
+  constructor(private arr: Uint8Array) {
+    if (arr.length !== PublicKey.SIZE) {
+      throw new Error('Incorrect size Uint8Array for compressed public key')
+    }
+  }
+
+  static fromPrivKey(privKey: Uint8Array): PublicKey {
+    if (privKey.length !== 32) {
+      throw new Error('Incorrect size Uint8Array for private key')
+    }
+
+    return new PublicKey(publicKeyCreate(privKey, false))
+  }
+
+  static deserialize(arr: Uint8Array) {
+    switch (arr.length) {
+      case 65:
+        if (arr[0] != 4) {
+          throw Error(`Invalid uncompressed public key`)
+        }
+        return new PublicKey(arr)
+      case 64:
+        return new PublicKey(Uint8Array.from([4, ...arr]))
+      case 33:
+        if (![2, 3].includes(arr[0])) {
+          throw Error(`Invalid compressed public key`)
+        }
+        return new PublicKey(arr)
+      default:
+        throw Error(`Invalid length ${arr.length} of public key`)
+    }
+  }
+
+  static fromPeerId(peerId: PeerId): PublicKey {
+    return new PublicKey(peerId.pubKey.marshal())
+  }
+
+  static fromPeerIdString(peerIdString: string) {
+    return PublicKey.fromPeerId(PeerId.createFromB58String(peerIdString))
+  }
+
+  static fromSignature(hash: string, r: string, s: string, v: number): PublicKey {
+    return new PublicKey(
+      ecdsaRecover(Uint8Array.from([...stringToU8a(r), ...stringToU8a(s)]), v, stringToU8a(hash), false)
+    )
+  }
+
+  static fromString(str: string): PublicKey {
+    if (!str || str.length == 0) {
+      throw new Error('Cannot determine address from empty string')
+    }
+    return new PublicKey(stringToU8a(str))
+  }
+
+  static get SIZE(): number {
+    return 64
+  }
+
+  toAddress(): Address {
+    if (this._address != undefined) {
+      return this._address
+    }
+
+    if ([2, 3].includes(this.arr[0])) {
+      // Expensive EC-operation, only do if necessary
+      this.arr = publicKeyConvert(this.arr, false)
+    }
+
+    this._address = new Address(Hash.create(this.arr.slice(1)).serialize().slice(12))
+
+    return this._address
+  }
+
+  toUncompressedPubKeyHex(): string {
+    if ([2, 3].includes(this.arr[0])) {
+      // Expensive EC-operation, only do if necessary
+      this.arr = publicKeyConvert(this.arr, false)
+    }
+
+    return u8aToHex(this.arr)
+  }
+
+  toCompressedPubKeyHex(): string {
+    if (this.arr[0] == 4) {
+      return u8aToHex(publicKeyConvert(this.arr, true))
+    } else {
+      return u8aToHex(this.arr)
+    }
+  }
+
+  toPeerId(): PeerId {
+    return pubKeyToPeerId(this.serializeCompressed())
+  }
+
+  public serializeCompressed(): Uint8Array {
+    if (this.arr[0] == 4) {
+      return publicKeyConvert(this.arr, true)
+    } else {
+      return this.arr
+    }
+  }
+
+  public serializeUncompressed() {
+    if ([2, 3].includes(this.arr[0])) {
+      // Expensive EC-operation, only do if necessary
+      this.arr = publicKeyConvert(this.arr, false)
+    }
+
+    return this.arr
+  }
+
+  toString(): string {
+    return `<PubKey:${this.toB58String()}>`
+  }
+
+  toB58String(): string {
+    return this.toPeerId().toB58String()
+  }
+
+  eq(b: PublicKey) {
+    if (this.arr[0] == b.arr[0]) {
+      return u8aEquals(this.arr, b.arr)
+    } else if (this.arr[0] == 4) {
+      return u8aEquals(this.serializeCompressed(), b.arr)
+    } else {
+      return u8aEquals(this.arr, b.serializeCompressed())
+    }
+  }
+
+  static createMock(): PublicKey {
+    return PublicKey.fromString('0x021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8')
+  }
+}
