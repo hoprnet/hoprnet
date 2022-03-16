@@ -1,3 +1,4 @@
+import assert from 'assert'
 import LibP2P from 'libp2p'
 import Hopr, { type HoprOptions } from '@hoprnet/hopr-core'
 import { debug, PublicKey, wait, dbMock, privKeyToPeerId } from '@hoprnet/hopr-utils'
@@ -36,6 +37,7 @@ describe('cover-traffic daemon', async function () {
   })
 
   it('should run and stop properly', async function () {
+    assert(node instanceof Hopr)
     log('starting stubbed hopr node')
     await node.start()
     log('completed stubbed hopr node, starting cover-traffic strategy')

@@ -1,8 +1,8 @@
 import type { Stream, StreamType } from '../types'
 import type { AddressInfo, Server as TCPServer } from 'net'
 import type { Socket as UDPSocket } from 'dgram'
-import type { MultiaddrConnection } from 'libp2p-interfaces/transport'
-import type { Connection } from 'libp2p-interfaces/connection'
+import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
+import type Connection from 'libp2p-interfaces/src/connection/connection'
 import PeerId from 'peer-id'
 
 import { isAnyAddress } from '@hoprnet/hopr-utils'

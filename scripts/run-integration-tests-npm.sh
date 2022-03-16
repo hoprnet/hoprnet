@@ -363,6 +363,15 @@ wait_for_regex ${node5_log} "STARTED NODE"
 wait_for_port 19097 "127.0.0.1" "${node7_log}"
 # }}}
 
+#  --- Ensure data directories are used --- {{{
+for node_dir in ${node1_dir} ${node2_dir} ${node3_dir} ${node4_dir} ${node5_dir}; do
+  declare node_dir_db="${node_dir}/db/LOG"
+  declare node_dir_peerstore="${node_dir}/peerstore/LOG"
+  [ -f "${node_dir_db}" ] || { echo "Data file ${node_dir_db} missing"; exit 1; }
+  [ -f "${node_dir_peerstore}" ] || { echo "Data file ${node_dir_peerstore} missing"; exit 1; }
+done
+# }}}
+
 # --- Run security tests --- {{{
 ${mydir}/../test/security-test.sh \
   127.0.0.1 13301 19501 19502 "${api_token}"

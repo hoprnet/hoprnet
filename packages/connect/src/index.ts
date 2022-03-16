@@ -3,8 +3,8 @@ import { CODE_DNS4, CODE_DNS6, CODE_IP4, CODE_IP6, CODE_P2P } from './constants'
 import { AbortError } from 'abortable-iterator'
 import type { Multiaddr } from 'multiaddr'
 import PeerId from 'peer-id'
-import type { Connection } from 'libp2p-interfaces/connection'
-import type { Upgrader, Transport, ConnectionHandler } from 'libp2p-interfaces/transport'
+import type Connection from 'libp2p-interfaces/src/connection/connection'
+import type { Upgrader, Transport } from 'libp2p-interfaces/src/transport/types'
 import type libp2p from 'libp2p'
 import chalk from 'chalk'
 import { TCPConnection, Listener } from './base'
@@ -84,7 +84,7 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
     this.relay = new Relay(this._libp2p, this._dialDirectly, this.filter.bind(this), this.options, this.testingOptions)
 
     // Assign event handler after relay object has been constructed
-    this.relay.start()
+    setImmediate(async () => await this.relay.start())
 
     try {
       const { version } = require('../package.json')
@@ -183,7 +183,7 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
    * @param handler
    * @returns A TCP listener
    */
-  createListener(_options: HoprConnectListeningOptions, _handler?: ConnectionHandler): Listener {
+  createListener(_options: HoprConnectListeningOptions, _handler?: Function): Listener {
     return new Listener(
       this._dialDirectly,
       this._upgradeInbound,

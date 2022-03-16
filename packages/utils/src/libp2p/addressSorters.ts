@@ -1,4 +1,4 @@
-import { type Address } from 'libp2p/src/peer-store'
+import type { Address } from 'libp2p/src/peer-store/address-book'
 import { isPrivateAddress, isLocalhost, ipToU8aAddress } from '../network'
 import { type Multiaddr } from 'multiaddr'
 import type { NetworkInterfaceInfo } from 'os'

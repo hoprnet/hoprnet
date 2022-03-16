@@ -83,7 +83,7 @@ ___
 | `announce?` | `boolean` |
 | `connector?` | `HoprCoreEthereum` |
 | `createDbIfNotExist?` | `boolean` |
-| `dbPath?` | `string` |
+| `dataPath` | `string` |
 | `environment` | [`ResolvedEnvironment`](modules.md#resolvedenvironment) |
 | `forceCreateDB?` | `boolean` |
 | `heartbeatInterval?` | `number` |
@@ -102,7 +102,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:78](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L78)
+[packages/core/src/index.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L82)
 
 ___
 
@@ -112,7 +112,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L119)
+[packages/core/src/index.ts:123](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L123)
 
 ___
 
@@ -142,7 +142,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:134](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L134)
+[packages/core/src/index.ts:138](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L138)
 
 ___
 
@@ -152,7 +152,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:121](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L121)
+[packages/core/src/index.ts:125](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L125)
 
 ## Variables
 
@@ -334,7 +334,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/main.ts:149](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L149)
+[packages/core/src/main.ts:168](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L168)
 
 ___
 
@@ -354,7 +354,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/libp2p.mock.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/libp2p.mock.ts#L8)
+[packages/core/src/libp2p.mock.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/libp2p.mock.ts#L11)
 
 ___
 

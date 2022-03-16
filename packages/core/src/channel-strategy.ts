@@ -140,7 +140,7 @@ export class PromiscuousStrategy extends SaneDefaults implements ChannelStrategy
         break
       }
       log('evaluating', randomChannel.source.toString())
-      peers.register(randomChannel.source.toPeerId())
+      peers.register(randomChannel.source.toPeerId(), 'promiscuous channel strategy')
       if (
         !toOpen.find((x) => x[0].eq(randomChannel.source)) &&
         !currentChannels.find((x) => x.destination.eq(randomChannel.source)) &&

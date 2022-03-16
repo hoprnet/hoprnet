@@ -9,21 +9,27 @@ type Entry = {
   heartbeatsSuccess: number
   lastSeen: number
   backoff: number // between 2 and MAX_BACKOFF
-  lastTen: number
+  quality: number
+  origin: string
+  ignoredAt?: number
 }
 
 const MIN_DELAY = 1000 // 1 sec (because this is multiplied by backoff, it will be half the actual minimum value.
 const MAX_DELAY = 5 * 60 * 1000 // 5mins
 const BACKOFF_EXPONENT = 1.5
 export const MAX_BACKOFF = MAX_DELAY / MIN_DELAY
-const UNKNOWN_Q = 0.2 // Default quality for nodes we don't know about.
+const BAD_QUALITY = 0.2 // Default quality for nodes we don't know about or which are considered offline.
+const IGNORE_TIMEFRAME = 10 * 60 * 1000 // 10mins
+
+function nextPing(e: Entry): number {
+  // Exponential backoff
+  const delay = Math.min(MAX_DELAY, Math.pow(e.backoff, BACKOFF_EXPONENT) * MIN_DELAY)
+  return e.lastSeen + delay
+}
 
 class NetworkPeers {
   private peers: Entry[]
-
-  private findIndex(peer: PeerId): number {
-    return this.peers.findIndex((entry: Entry) => entry.id.equals(peer))
-  }
+  private ignoredPeers: Entry[]
 
   constructor(
     existingPeers: Array<PeerId>,
@@ -31,16 +37,11 @@ class NetworkPeers {
     private onPeerOffline?: (peer: PeerId) => void
   ) {
     this.peers = []
+    this.ignoredPeers = []
 
     for (const peer of existingPeers) {
-      this.register(peer)
+      this.register(peer, 'network peers initialization')
     }
-  }
-
-  private nextPing(e: Entry): number {
-    // Exponential backoff
-    const delay = Math.min(MAX_DELAY, Math.pow(e.backoff, BACKOFF_EXPONENT) * MIN_DELAY)
-    return e.lastSeen + delay
   }
 
   // @returns a float between 0 (completely unreliable) and 1 (completely
@@ -51,15 +52,15 @@ class NetworkPeers {
       /*
       return entry.heartbeatsSuccess / entry.heartbeatsSent
       */
-      return this.peers[entryIndex].lastTen
+      return this.peers[entryIndex].quality
     }
-    return UNKNOWN_Q
+    return BAD_QUALITY
   }
 
   public pingSince(thresholdTime: number): PeerId[] {
     const toPing: PeerId[] = []
     for (const entry of this.peers) {
-      if (this.nextPing(entry) < thresholdTime) {
+      if (nextPing(entry) < thresholdTime) {
         toPing.push(entry.id)
       }
     }
@@ -78,30 +79,45 @@ class NetworkPeers {
 
     let newEntry: Entry
 
-    if (pingResult.lastSeen >= 0) {
-      newEntry = {
-        id: pingResult.destination,
-        heartbeatsSent: previousEntry.heartbeatsSent + 1,
-        lastSeen: Date.now(),
-        heartbeatsSuccess: previousEntry.heartbeatsSuccess + 1,
-        backoff: 2, // RESET - to back down: Math.pow(entry.backoff, 1/BACKOFF_EXPONENT)
-        lastTen: Math.min(1, previousEntry.lastTen + 0.1)
-      }
-    } else {
+    if (pingResult.lastSeen < 0) {
+      // failed ping
       newEntry = {
         id: pingResult.destination,
         heartbeatsSent: previousEntry.heartbeatsSent + 1,
         lastSeen: Date.now(),
         heartbeatsSuccess: previousEntry.heartbeatsSuccess,
         backoff: Math.min(MAX_BACKOFF, Math.pow(previousEntry.backoff, BACKOFF_EXPONENT)),
-        lastTen: Math.max(0, previousEntry.lastTen - 0.1)
+        quality: Math.max(0, previousEntry.quality - 0.1),
+        origin: previousEntry.origin
       }
-
-      if (newEntry.lastTen < NETWORK_QUALITY_THRESHOLD) {
+      if (newEntry.quality < NETWORK_QUALITY_THRESHOLD) {
+        // trigger callback first to cut connections
         this.onPeerOffline?.(pingResult.destination)
+
+        // check if this node is considered offline and should be removed
+        if (newEntry.quality < BAD_QUALITY) {
+          // delete peer from internal store
+          this.peers.splice(entryIndex, 1)
+          // add entry to temporarily ignored peers
+          this.ignorePeer(newEntry)
+          // done, return early so the rest can update the entry instead
+          return
+        }
+      }
+    } else {
+      // successful ping
+      newEntry = {
+        id: pingResult.destination,
+        heartbeatsSent: previousEntry.heartbeatsSent + 1,
+        lastSeen: Date.now(),
+        heartbeatsSuccess: previousEntry.heartbeatsSuccess + 1,
+        backoff: 2, // RESET - to back down: Math.pow(entry.backoff, 1/BACKOFF_EXPONENT)
+        quality: Math.min(1, previousEntry.quality + 0.1),
+        origin: previousEntry.origin
       }
     }
 
+    // update peer entry if still considered ok to keep
     this.peers[entryIndex] = newEntry
   }
 
@@ -114,17 +130,41 @@ class NetworkPeers {
     ).map((e: Entry) => e.id)
   }
 
-  public register(id: PeerId) {
-    if (!this.has(id) && this.exclude.findIndex((x: PeerId) => id.equals(x)) < 0) {
-      this.peers.push({
-        id,
-        heartbeatsSent: 0,
-        heartbeatsSuccess: 0,
-        lastSeen: Date.now(),
-        backoff: 2,
-        lastTen: UNKNOWN_Q
-      })
+  public register(id: PeerId, origin: string) {
+    if (this.has(id)) {
+      // the peer is already registered
+      return
     }
+
+    if (this.exclude.findIndex((x: PeerId) => id.equals(x)) >= 0) {
+      // the peer is explicitely ignored
+      return
+    }
+
+    const ignoredIndex = this.ignoredPeers.findIndex((e: Entry) => e.id.equals(id) && e.origin == origin)
+    const now = Date.now()
+
+    if (ignoredIndex >= 0) {
+      // the peer is temporarily ignored, release if time has passed
+      const ignoredEntry = this.ignoredPeers[ignoredIndex]
+      if (ignoredEntry.ignoredAt + IGNORE_TIMEFRAME < now) {
+        // release and continue
+        this.unignorePeer(ignoredEntry)
+      } else {
+        // ignore still valid, thus skipping this registration
+        return
+      }
+    }
+
+    this.peers.push({
+      id,
+      heartbeatsSent: 0,
+      heartbeatsSuccess: 0,
+      lastSeen: now,
+      backoff: 2,
+      quality: BAD_QUALITY,
+      origin
+    })
   }
 
   public length(): number {
@@ -149,17 +189,16 @@ class NetworkPeers {
     // Sort a copy of peers in-place
     peers.sort((a, b) => this.qualityOf(b) - this.qualityOf(a))
 
-    const goodAvailabilityIndex = peers.findIndex((peer) => this.qualityOf(peer).toFixed(1) === '1.0')
-    const worstAvailabilityIndex = peers.findIndex((peer) => this.qualityOf(peer).toFixed(1) === '0.0')
+    const bestAvailabilityIndex = peers.reverse().findIndex((peer) => this.qualityOf(peer).toFixed(1) === '1.0')
+    const badAvailabilityIndex = peers.findIndex((peer) => this.qualityOf(peer) < NETWORK_QUALITY_THRESHOLD)
 
-    const goodAvailabilityNodes = goodAvailabilityIndex < 0 ? 0 : goodAvailabilityIndex + 1
-    const worstAvailabilityNodes = worstAvailabilityIndex < 0 ? 0 : peers.length - worstAvailabilityIndex
+    const bestAvailabilityNodes = bestAvailabilityIndex < 0 ? 0 : peers.length - bestAvailabilityIndex
+    const badAvailabilityNodes = badAvailabilityIndex < 0 ? 0 : peers.length - badAvailabilityIndex
+    const msgTotalNodes = `${peers.length} node${peers.length == 1 ? '' : 's'} in total`
+    const msgBestNodes = `${bestAvailabilityNodes} node${bestAvailabilityNodes == 1 ? '' : 's'} with quality 1.0`
+    const msgBadNodes = `${badAvailabilityNodes} node${badAvailabilityNodes == 1 ? '' : 's'} with quality below 0.5`
 
-    let out = `current: ${peers.length} node${peers.length == 1 ? '' : 's'} and ${goodAvailabilityNodes} node${
-      goodAvailabilityNodes == 1 ? '' : 's'
-    } with availability 1.0 and ${worstAvailabilityNodes} node${
-      worstAvailabilityNodes == 1 ? '' : 's'
-    } with availability 0.0:\n`
+    let out = `network peers status: ${msgTotalNodes}, ${msgBestNodes}, ${msgBadNodes}\n`
 
     for (const peer of peers) {
       const entryIndex = this.findIndex(peer)
@@ -172,12 +211,35 @@ class NetworkPeers {
 
       const success =
         entry.heartbeatsSent > 0 ? ((entry.heartbeatsSuccess / entry.heartbeatsSent) * 100).toFixed() + '%' : '<new>'
-      out += `- id: ${entry.id.toB58String()}, quality: ${this.qualityOf(entry.id).toFixed(
-        2
-      )} (backoff ${entry.backoff.toFixed()}, ${success} of ${entry.heartbeatsSent}) \n`
+      out += `- id: ${entry.id.toB58String()}, `
+      out += `quality: ${this.qualityOf(entry.id).toFixed(2)}, `
+      out += `backoff: ${entry.backoff.toFixed()} (${success} of ${entry.heartbeatsSent}), `
+      out += `origin: ${entry.origin}`
+      out += '\n'
     }
 
     return out
+  }
+
+  private findIndex(peer: PeerId): number {
+    return this.peers.findIndex((entry: Entry) => entry.id.equals(peer))
+  }
+
+  private ignorePeer(entry: Entry): void {
+    const index = this.ignoredPeers.findIndex((e: Entry) => e.id.equals(entry.id) && e.origin == entry.origin)
+
+    if (index < 0) {
+      entry.ignoredAt = Date.now()
+      this.ignoredPeers.push(entry)
+    }
+  }
+
+  private unignorePeer(entry: Entry): void {
+    const index = this.ignoredPeers.findIndex((e: Entry) => e.id.equals(entry.id) && e.origin == entry.origin)
+
+    if (index >= 0) {
+      this.ignoredPeers.splice(index, 1)
+    }
   }
 }
 
