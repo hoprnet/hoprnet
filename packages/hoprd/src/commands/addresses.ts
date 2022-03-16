@@ -27,15 +27,13 @@ export default class Addresses extends AbstractCommand {
         return log(styleValue(err.message, 'failure'))
       }
     }
+    const announcedAddresses = await this.node.getAnnouncedAddresses(peerId)
+    const announcedAddressesStr = announcedAddresses.map((a) => `\n- ${a.toString()}`)
+    const observedAddresses = await this.node.getObservedAddresses(peerId)
+    const observedAddressesStr = observedAddresses.map((a) => `\n- ${a.toString()}`)
+    const msgAnnounced = `Announced addresses for ${query}:${announcedAddressesStr.join('')}`
+    const msgObserved = `Observed addresses for ${query}:${observedAddressesStr.join('')}`
 
-    return log(
-      `Announced addresses for ${query}:\n- ${(await this.node.getAnnouncedAddresses(peerId))
-        .map((ma) => ma.toString())
-        .join('\n- ')}` +
-        `\nObserved addresses for ${query}:\n- ${this.node
-          .getObservedAddresses(peerId)
-          .map((addr) => `${addr.toString()}`)
-          .join(`\n- `)}`
-    )
+    return log(`${msgAnnounced}\n${msgObserved}`)
   }
 }
