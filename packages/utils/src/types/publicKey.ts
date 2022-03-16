@@ -2,17 +2,13 @@ import { publicKeyConvert, publicKeyCreate, ecdsaRecover } from 'secp256k1'
 import { u8aToHex, u8aEquals, stringToU8a } from '../u8a'
 import PeerId from 'peer-id'
 import { pubKeyToPeerId } from '../libp2p'
-import type { Address } from '.'
+import { Address, Hash } from './primitives'
 
 export class PublicKey {
   // Cache expensive computation result
   private _address: Address
   // @TODO use uncompressed public key internally
-  constructor(private arr: Uint8Array) {
-    if (arr.length !== PublicKey.SIZE) {
-      throw new Error('Incorrect size Uint8Array for compressed public key')
-    }
-  }
+  constructor(private arr: Uint8Array) {}
 
   static fromPrivKey(privKey: Uint8Array): PublicKey {
     if (privKey.length !== 32) {
@@ -42,7 +38,7 @@ export class PublicKey {
   }
 
   static fromPeerId(peerId: PeerId): PublicKey {
-    return new PublicKey(peerId.pubKey.marshal())
+    return PublicKey.deserialize(peerId.pubKey.marshal())
   }
 
   static fromPeerIdString(peerIdString: string) {
@@ -59,7 +55,7 @@ export class PublicKey {
     if (!str || str.length == 0) {
       throw new Error('Cannot determine address from empty string')
     }
-    return new PublicKey(stringToU8a(str))
+    return PublicKey.deserialize(stringToU8a(str))
   }
 
   static get SIZE(): number {
