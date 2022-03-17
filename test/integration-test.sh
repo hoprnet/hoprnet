@@ -88,7 +88,7 @@ call_api(){
   local should_assert_status_code=${9:-false}
 
   # no timeout set since the test execution environment should cancel the test if it takes too long
-  local response_type="-d" && [[ "$should_assert_status_code" = true ]] && response_type="-o /dev/null -w %{http_code} -d"
+  local response_type="-d" && [[ "$should_assert_status_code" == true ]] && response_type="-o /dev/null -w %{http_code} -d"
   local cmd="curl -X ${rest_method} -m ${step_time} --connect-timeout ${step_time} -s -H X-Auth-Token:${api_token} -H Content-Type:application/json --url ${source_api}/api/v2${api_endpoint} ${response_type}"
   # if no end time was given we need to calculate it once
   if [ ${end_time_ns} -eq 0 ]; then
@@ -111,7 +111,7 @@ call_api(){
       log "${YELLOW}call_api (${cmd} \"${request_body}\") FAILED, received: ${result}, retrying in ${step_time} seconds${NOFORMAT}"
       sleep ${step_time}
       call_api "${source_api}" "${api_endpoint}" "${rest_method}" "${request_body}" "${assertion}" "${wait_time}" \
-        "${step_time}" "${end_time_ns}"
+        "${step_time}" "${end_time_ns}" "${should_assert_status_code}"
     fi
   fi
 }
@@ -129,7 +129,7 @@ send_message(){
 
   local path=$(echo ${peers} | tr -d '\n' | jq -R -s 'split(" ")')
   local payload='{"body":"'${msg}'","path":'${path}',"recipient":"'${recipient}'"}'
-  result="$(call_api ${source_api} "/messages" "POST" ${payload} "204" 10 30 "" true)"
+  result="$(call_api ${source_api} "/messages" "POST" "${payload}" 204 60 15 "" true)"
 }
 
 # $1 = source node id
@@ -387,227 +387,227 @@ log "hopr addr5: ${addr5}"
 # we don't need node6 because it's short-living
 log "hopr addr7: ${addr7}"
 
-# # running withdraw and checking it results at the end of this test run
-# balances=$(get_balances ${api1})
-# native_balance=$(echo ${balances} | jq -r .native)
-# hopr_balance=$(echo ${balances} | jq -r .hopr)
-# withdraw ${api1} "NATIVE" 10 0x858aa354db6ae5ea1217c5018c90403bde94e09e
-# withdraw ${api1} "HOPR" 10 0x858aa354db6ae5ea1217c5018c90403bde94e09e
+# running withdraw and checking it results at the end of this test run
+balances=$(get_balances ${api1})
+native_balance=$(echo ${balances} | jq -r .native)
+hopr_balance=$(echo ${balances} | jq -r .hopr)
+withdraw ${api1} "NATIVE" 10 0x858aa354db6ae5ea1217c5018c90403bde94e09e
+withdraw ${api1} "HOPR" 10 0x858aa354db6ae5ea1217c5018c90403bde94e09e
 
-# # this 2 functions are runned at the end of the tests when withdraw transaction should clear on blockchain and we don't have to block and wait for it
-# check_native_withdraw_results() {
-#   local initial_native_balance="${1}"
+# this 2 functions are runned at the end of the tests when withdraw transaction should clear on blockchain and we don't have to block and wait for it
+check_native_withdraw_results() {
+  local initial_native_balance="${1}"
 
-#   balances=$(get_balances ${api1})
-#   new_native_balance=$(echo ${balances} | jq -r .native)
-#   [[ "${initial_native_balance}" == "${new_native_balance}" ]] && { msg "Native withdraw failed, pre: ${initial_native_balance}, post: ${new_native_balance}"; exit 1; }
+  balances=$(get_balances ${api1})
+  new_native_balance=$(echo ${balances} | jq -r .native)
+  [[ "${initial_native_balance}" == "${new_native_balance}" ]] && { msg "Native withdraw failed, pre: ${initial_native_balance}, post: ${new_native_balance}"; exit 1; }
 
-#   echo "withdraw native successful"
-# }
-# check_hopr_withdraw_results() {
-#   local initial_hopr_balance="${1}"
+  echo "withdraw native successful"
+}
+check_hopr_withdraw_results() {
+  local initial_hopr_balance="${1}"
 
-#   balances=$(get_balances ${api1})
-#   new_hopr_balance=$(echo ${balances} | jq -r .hopr)
-#   [[ "${initial_hopr_balance}" == "${new_hopr_balance}" ]] && { msg "Hopr withdraw failed, pre: ${initial_hopr_balance}, post: ${new_hopr_balance}"; exit 1; }
+  balances=$(get_balances ${api1})
+  new_hopr_balance=$(echo ${balances} | jq -r .hopr)
+  [[ "${initial_hopr_balance}" == "${new_hopr_balance}" ]] && { msg "Hopr withdraw failed, pre: ${initial_hopr_balance}, post: ${new_hopr_balance}"; exit 1; }
 
-#   echo "withdraw hopr successful"
-# }
+  echo "withdraw hopr successful"
+}
 
-# test_aliases() {
-#   local node_api="${1}"
-#   local peer_id="${2}"
+test_aliases() {
+  local node_api="${1}"
+  local peer_id="${2}"
 
-#   aliases=$(get_aliases ${node_api} "\"me\"")
-#   set_alias ${node_api} ${peer_id} "Alice"
-#   aliases=$(get_aliases ${node_api} "\"Alice\"")
-#   get_alias ${node_api} "Alice" "${peer_id}"
-#   remove_alias ${node_api} "Alice"
-#   aliases=$(get_aliases ${node_api} "\"me\"")
-#   [[ "${aliases}" == *"Alice"* ]] && { msg "Alias removal failed: ${aliases}"; exit 1; }
-#   echo ${aliases}
-# }
+  aliases=$(get_aliases ${node_api} "\"me\"")
+  set_alias ${node_api} ${peer_id} "Alice"
+  aliases=$(get_aliases ${node_api} "\"Alice\"")
+  get_alias ${node_api} "Alice" "${peer_id}"
+  remove_alias ${node_api} "Alice"
+  aliases=$(get_aliases ${node_api} "\"me\"")
+  [[ "${aliases}" == *"Alice"* ]] && { msg "Alias removal failed: ${aliases}"; exit 1; }
+  echo ${aliases}
+}
 
-# test_aliases ${api1} ${addr2}
+test_aliases ${api1} ${addr2}
 
-# for node in ${addr2} ${addr3} ${addr4} ${addr5}; do
-#   log "Node 1 ping other node ${node}"
-#   result=$(ping "${api1}" ${node} "\"latency\":")
-#   log "-- ${result}"
-# done
+for node in ${addr2} ${addr3} ${addr4} ${addr5}; do
+  log "Node 1 ping other node ${node}"
+  result=$(ping "${api1}" ${node} "\"latency\":")
+  log "-- ${result}"
+done
 
-# log "Node 2 ping node 3"
-# result=$(ping "${api2}" ${addr3} "\"latency\":")
-# log "-- ${result}"
+log "Node 2 ping node 3"
+result=$(ping "${api2}" ${addr3} "\"latency\":")
+log "-- ${result}"
 
-# log "Node 7 should not be able to talk to Node 1 (different environment id)"
-# result=$(ping "${api7}" ${addr1} "TIMEOUT")
-# log "-- ${result}"
+log "Node 7 should not be able to talk to Node 1 (different environment id)"
+result=$(ping "${api7}" ${addr1} "TIMEOUT")
+log "-- ${result}"
 
-# log "Node 1 should not be able to talk to Node 7 (different environment id)"
-# result=$(ping "${api1}" ${addr7} "TIMEOUT")
-# log "-- ${result}"
+log "Node 1 should not be able to talk to Node 7 (different environment id)"
+result=$(ping "${api1}" ${addr7} "TIMEOUT")
+log "-- ${result}"
 
-# log "Node 2 has no unredeemed ticket value"
-# result=$(get_tickets_statistics "${api2}" "\"unredeemedValue\":\"0\"")
-# log "-- ${result}"
+log "Node 2 has no unredeemed ticket value"
+result=$(get_tickets_statistics "${api2}" "\"unredeemedValue\":\"0\"")
+log "-- ${result}"
 
-# log "Node 1 send 0-hop message to node 2"
-# send_message "${api1}" "${addr2}" "hello, world" "" 600
+log "Node 1 send 0-hop message to node 2"
+send_message "${api1}" "${addr2}" "hello, world" "" 600
 
 # opening channels in parallel
-# open_channel 1 2 "${api1}" "${addr2}" & #_open_channel_wait_1=$!
-# open_channel 2 3 "${api2}" "${addr3}" & #_open_channel_wait_2=$!
-# open_channel 3 4 "${api3}" "${addr4}" & #_open_channel_wait_3=$!
-# open_channel 4 5 "${api4}" "${addr5}" & #_open_channel_wait_4=$!
-# open_channel 5 1 "${api5}" "${addr1}" & #_open_channel_wait_5=$!
-# # used for channel close test later
-# open_channel 1 5 "${api1}" "${addr5}" & #_open_channel_wait_6=$!
+open_channel 1 2 "${api1}" "${addr2}" &
+open_channel 2 3 "${api2}" "${addr3}" &
+open_channel 3 4 "${api3}" "${addr4}" &
+open_channel 4 5 "${api4}" "${addr5}" &
+open_channel 5 1 "${api5}" "${addr1}" &
+# used for channel close test later
+open_channel 1 5 "${api1}" "${addr5}" &
+
+# opening temporary channel just to test get all channels later on
+open_channel 1 4 "${api1}" "${addr4}" &
 
 log "Waiting for nodes to finish open channel (long running)"
-wait #$_open_channel_wait_1
-# wait $_open_channel_wait_2
-# wait $_open_channel_wait_3
-# wait $_open_channel_wait_4
-# wait $_open_channel_wait_5
-# wait $_open_channel_wait_6
-# sleep 20
+wait
+
+# closing temporary channel just to test get all channels later on
+close_channel 1 4 "${api1}" "${addr4}" "outgoing" "true" &
 
 for i in `seq 1 10`; do
-  # log "Node 1 send 1 hop message to self via node 2"
-  # send_message "${api1}" "${addr1}" 'hello, world' "${addr2}" 
+  log "Node 1 send 1 hop message to self via node 2"
+  send_message "${api1}" "${addr1}" 'hello, world' "${addr2}" 
 
-  # log "Node 2 send 1 hop message to self via node 3"
-  # send_message "${api2}" "${addr2}" 'hello, world' "${addr3}" 
+  log "Node 2 send 1 hop message to self via node 3"
+  send_message "${api2}" "${addr2}" 'hello, world' "${addr3}" 
 
   log "Node 3 send 1 hop message to self via node 4"
   send_message "${api3}" "${addr3}" 'hello, world' "${addr4}" 
 
-  # log "Node 4 send 1 hop message to self via node 5"
-  # send_message "${api4}" "${addr4}" 'hello, world' "${addr5}" 
+  log "Node 4 send 1 hop message to self via node 5"
+  send_message "${api4}" "${addr4}" 'hello, world' "${addr5}" 
 done
 
-# log "Node 2 should now have a ticket"
-# result=$(get_tickets_statistics "${api2}" "\"winProportion\":1") 
-# log "-- ${result}"
+log "Node 2 should now have a ticket"
+result=$(get_tickets_statistics "${api2}" "\"winProportion\":1") 
+log "-- ${result}"
 
-# log "Node 3 should now have a ticket"
-# result=$(get_tickets_statistics "${api3}" "\"winProportion\":1") 
-# log "-- ${result}"
+log "Node 3 should now have a ticket"
+result=$(get_tickets_statistics "${api3}" "\"winProportion\":1") 
+log "-- ${result}"
 
-# log "Node 4 should now have a ticket"
-# result=$(get_tickets_statistics "${api4}" "\"winProportion\":1") 
-# log "-- ${result}"
+log "Node 4 should now have a ticket"
+result=$(get_tickets_statistics "${api4}" "\"winProportion\":1") 
+log "-- ${result}"
 
-# log "Node 5 should now have a ticket"
-# result=$(get_tickets_statistics "${api5}" "\"winProportion\":1") 
-# log "-- ${result}"
+log "Node 5 should now have a ticket"
+result=$(get_tickets_statistics "${api5}" "\"winProportion\":1") 
+log "-- ${result}"
 
-# for i in `seq 1 10`; do
-#   log "Node 1 send 1 hop message to node 3 via node 2"
-#   send_message "${api1}" "${addr3}" 'hello, world' "${addr2}" 
+for i in `seq 1 10`; do
+  log "Node 1 send 1 hop message to node 3 via node 2"
+  send_message "${api1}" "${addr3}" 'hello, world' "${addr2}" 
 
-#   log "Node 2 send 1 hop message to node 4 via node 3"
-#   send_message "${api2}" "${addr4}" 'hello, world' "${addr3}" 
+  log "Node 2 send 1 hop message to node 4 via node 3"
+  send_message "${api2}" "${addr4}" 'hello, world' "${addr3}" 
 
-#   log "Node 3 send 1 hop message to node 5 via node 4"
-#   send_message "${api3}" "${addr5}" 'hello, world' "${addr4}" 
+  log "Node 3 send 1 hop message to node 5 via node 4"
+  send_message "${api3}" "${addr5}" 'hello, world' "${addr4}" 
 
-#   log "Node 5 send 1 hop message to node 2 via node 1"
-#   send_message "${api5}" "${addr2}" 'hello, world' "${addr1}" 
-# done
+  log "Node 5 send 1 hop message to node 2 via node 1"
+  send_message "${api5}" "${addr2}" 'hello, world' "${addr1}" 
+done
 
-# for i in `seq 1 10`; do
-#   log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4"
-#   send_message "${api1}" "${addr5}" "hello, world" "${addr2} ${addr3} ${addr4}" 
-# done
+for i in `seq 1 10`; do
+  log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4"
+  send_message "${api1}" "${addr5}" "hello, world" "${addr2} ${addr3} ${addr4}" 
+done
 
-# for i in `seq 1 10`; do
-#   log "Node 1 send message to node 5"
-#   send_message "${api1}" "${addr5}" "hello, world" "" 
-# done
+for i in `seq 1 10`; do
+  log "Node 1 send message to node 5"
+  send_message "${api1}" "${addr5}" "hello, world" "" 
+done
 
-# test_redeem_in_specific_channel() {
-#   local node_id="${1}"
-#   local second_node_id="${2}"
-#   local node_api="${3}"
-#   local second_node_api="${4}"
+test_redeem_in_specific_channel() {
+  local node_id="${1}"
+  local second_node_id="${2}"
+  local node_api="${3}"
+  local second_node_api="${4}"
 
-#   peer_id=$(get_hopr_address ${api_token}@${node_api})
-#   second_peer_id=$(get_hopr_address ${api_token}@${second_node_api})
+  peer_id=$(get_hopr_address ${api_token}@${node_api})
+  second_peer_id=$(get_hopr_address ${api_token}@${second_node_api})
 
-#   open_channel ${node_id} ${second_node_id} ${node_api} ${second_peer_id}
+  open_channel ${node_id} ${second_node_id} ${node_api} ${second_peer_id}
 
-#   sleep 20
+  for i in `seq 1 3`; do
+    log "Node ${node_id} send 1 hop message to self via node ${second_node_id}"
+    send_message "${node_api}" "${peer_id}" "hello, world" "${second_peer_id}" 
+  done
 
-#   for i in `seq 1 3`; do
-#     log "Node ${node_id} send 1 hop message to self via node ${second_node_id}"
-#     send_message "${node_api}" "${peer_id}" "hello, world" "${second_peer_id}" 
-#   done
+  # seems like there's slight delay needed for tickets endpoint to return up to date tickets, probably because of blockchain sync delay
+  sleep 2
+  ticket_amount=$(get_tickets_in_channel ${second_node_api} ${peer_id} | jq '. | length')
+  [[ "${ticket_amount}" != "3" ]] && { msg "Ticket ammount is different than expected: ${ticket_amount} != 3"; exit 1; }
 
-#   sleep 2
-#   ticket_amount=$(get_tickets_in_channel ${second_node_api} ${peer_id} | jq '. | length')
-#   [[ "${ticket_amount}" != "3" ]] && { msg "Ticket ammount is different than expected: ${ticket_amount} != 3"; exit 1; }
+  redeem_tickets_in_channel ${second_node_api} ${peer_id}  
 
-#   redeem_tickets_in_channel ${second_node_api} ${peer_id}  
+  get_tickets_in_channel ${second_node_api} ${peer_id} "TICKETS_NOT_FOUND"
 
-#   get_tickets_in_channel ${second_node_api} ${peer_id} "TICKETS_NOT_FOUND"
+  close_channel ${node_id} ${second_node_id} ${node_api} ${second_peer_id} "outgoing"
+  echo "all good"
+}
 
-#   close_channel ${node_id} ${second_node_id} ${node_api} ${second_peer_id} "outgoing"
-#   echo "all good"
-# }
+test_redeem_in_specific_channel "1" "3" ${api1} ${api3} &
 
-# test_redeem_in_specific_channel "1" "3" ${api1} ${api3}
+redeem_tickets "2" "${api2}" &
+redeem_tickets "3" "${api2}" &
+redeem_tickets "4" "${api2}" &
+redeem_tickets "5" "${api2}" &
 
-# redeem_tickets "2" "${api2}" &
-# redeem_tickets "3" "${api2}" &
-# redeem_tickets "4" "${api2}" &
-# redeem_tickets "5" "${api2}" &
+log "Waiting for nodes to finish ticket redemption (long running)"
+wait
 
-# log "Waiting for nodes to finish ticket redemption (long running)"
-# wait
+# initiate channel closures, but don't wait because this will trigger ticket
+# redemption as well
+close_channel 1 2 "${api1}" "${addr2}" "outgoing" &
+close_channel 2 3 "${api2}" "${addr3}" "outgoing" &
+close_channel 3 4 "${api3}" "${addr4}" "outgoing" &
+close_channel 4 5 "${api4}" "${addr5}" "outgoing" &
+close_channel 5 1 "${api5}" "${addr1}" "outgoing" &
 
-# # initiate channel closures, but don't wait because this will trigger ticket
-# # redemption as well
-# close_channel 1 2 "${api1}" "${addr2}" "outgoing" &
-# close_channel 2 3 "${api2}" "${addr3}" "outgoing" &
-# close_channel 3 4 "${api3}" "${addr4}" "outgoing" &
-# close_channel 4 5 "${api4}" "${addr5}" "outgoing" &
-# close_channel 5 1 "${api5}" "${addr1}" "outgoing" &
+# initiate channel closures for channels without tickets so we can check
+# completeness
+close_channel 1 5 "${api1}" "${addr5}" "outgoing" &
 
-# # initiate channel closures for channels without tickets so we can check
-# # completeness
-# close_channel 1 5 "${api1}" "${addr5}" "outgoing" &
+log "Waiting for nodes to finish handling close channels calls"
+wait
 
-# log "Waiting for nodes to finish handling close channels calls"
-# wait
+#  # fully closing temporary channel just to test get all channels
+# close_channel 1 4 "${api1}" "${addr4}" "outgoing" "true" &
 
-# # Also add confirmation time
-# log "Waiting 70 seconds for cool-off period"
-# sleep 70
+# Also add confirmation time
+log "Waiting 70 seconds for cool-off period"
+sleep 70
 
-# # verify channel has been closed
-# close_channel 1 5 "${api1}" "${addr5}" "outgoing" "true"
+# verify channel has been closed
+close_channel 1 5 "${api1}" "${addr5}" "outgoing" "true"
 
-# log "Waiting 120 seconds for channels to completely close"
-# sleep 120
+test_get_all_channels() {
+  local node_api=${1}
 
-# test_get_all_channels() {
-#   local node_api=${1}
+  channels=$(get_all_channels ${node_api} false)
+  channels_count=$(echo ${channels} | jq '.incoming | length')
 
-#   channels=$(get_all_channels ${node_api} false)
-#   channels_count=$(echo ${channels} | jq '.outgoing | length')
+  channels_with_closed=$(get_all_channels ${node_api} true)
+  channels_with_closed_count=$(echo ${channels_with_closed} | jq '.incoming | length')
 
-#   channels_with_closed=$(get_all_channels ${node_api} true)
-#   channels_with_closed_count=$(echo ${channels_with_closed} | jq '.outgoing | length')
+  [[ "${channels_count}" -ge "${channels_with_closed_count}" ]] && { msg "There should be more channels returned with includeClosed flag: ${channels_count} !< ${channels_with_closed_count}"; exit 1; }
+  [[ "${channels_with_closed}" != *"Closed"* ]] && { msg "Channels fetched with includeClosed flag should return channels with closed status: ${channels_with_closed}"; exit 1; }
+  echo "Get all channels successfull"
+}
 
-#   [[ "${channels_count}" -ge "${channels_with_closed_count}" ]] && { msg "There should be more channels returned with includeClosed flag: ${channels_count} !< ${channels_with_closed_count}"; exit 1; }
-#   [[ "${channels_with_closed}" != *"Closed"* ]] && { msg "Channels fetched with includeClosed flag should return channels with closed status: ${channels_with_closed}"; exit 1; }
-#   echo "Get all channels successfull"
-# }
+test_get_all_channels ${api1}
 
-# test_get_all_channels ${api1}
-
+# NOTE: strategy testing will require separate setup so commented out for now until moved
 # test_strategy_setting() {
 #   local node_api="${1}"
 
@@ -629,14 +629,7 @@ done
 
 # test_strategy_setting ${api4}
 
-# # checking statuses of the long running tests
-# check_native_withdraw_results ${native_balance}
-# check_hopr_withdraw_results ${hopr_balance}
 
-
-# # if ! wait $_withdraw_native_wait; then
-# #   log "Withdraw native test failed. Check the logs for more info."
-# # fi
-# # if ! wait $_withdraw_hopr_wait; then
-# #   log "Withdraw hopr test failed. Check the logs for more info."
-# # fi
+# checking statuses of the long running tests
+check_native_withdraw_results ${native_balance}
+check_hopr_withdraw_results ${hopr_balance}

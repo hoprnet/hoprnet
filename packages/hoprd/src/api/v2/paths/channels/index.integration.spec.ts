@@ -102,7 +102,7 @@ describe('POST /channels', () => {
       peerId: ALICE_PEER_ID.toB58String(),
       amount: '1'
     })
-    expect(res.status).to.equal(403)
+    expect(res.status).to.equal(409)
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({
       status: STATUS_CODES.CHANNEL_ALREADY_OPEN
