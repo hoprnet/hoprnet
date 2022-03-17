@@ -97,8 +97,8 @@ async function handleAcknowledgement(
   try {
     await db.replaceUnAckWithAck(acknowledgement.ackChallenge, ack)
     log(`Stored winning ticket`)
-  } catch (e) {
-    log(`ERROR: commitment could not be bumped ${e}, thus dropping ticket`)
+  } catch (err) {
+    log(`ERROR: commitment could not be bumped, thus dropping ticket`, err)
   }
 
   // store commitment in db
@@ -107,7 +107,7 @@ async function handleAcknowledgement(
   onWinningTicket(ack)
 }
 
-export function subscribeToAcknowledgements(
+export async function subscribeToAcknowledgements(
   subscribe: Subscribe,
   db: HoprDB,
   pubKey: PeerId,
@@ -117,7 +117,7 @@ export function subscribeToAcknowledgements(
   protocolAck: string
 ) {
   const limitConcurrency = oneAtATime<void>()
-  subscribe(
+  await subscribe(
     protocolAck,
     (msg: Uint8Array, remotePeer: PeerId) =>
       limitConcurrency(
@@ -131,24 +131,22 @@ export function subscribeToAcknowledgements(
   )
 }
 
-export function sendAcknowledgement(
+export async function sendAcknowledgement(
   packet: Packet,
   destination: PeerId,
   sendMessage: SendMessage,
   privKey: PeerId,
   protocolAck: string
-): void {
-  ;(async () => {
-    const ack = packet.createAcknowledgement(privKey)
+): Promise<void> {
+  const ack = packet.createAcknowledgement(privKey)
 
-    try {
-      await sendMessage(destination, protocolAck, ack.serialize(), false, {
-        timeout: ACKNOWLEDGEMENT_TIMEOUT
-      })
-    } catch (err) {
-      // Currently unclear how to proceed if sending acknowledgements
-      // fails
-      log(`Error: could not send acknowledgement`, err)
-    }
-  })()
+  try {
+    await sendMessage(destination, protocolAck, ack.serialize(), false, {
+      timeout: ACKNOWLEDGEMENT_TIMEOUT
+    })
+  } catch (err) {
+    // Currently unclear how to proceed if sending acknowledgements
+    // fails
+    log(`Error: could not send acknowledgement`, err)
+  }
 }

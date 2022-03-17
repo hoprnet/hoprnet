@@ -1,6 +1,8 @@
 import { nAtATime } from './parallel'
 import assert from 'assert'
 
+type TestFunctionParameters = [timeout: number, result: number, throwException: boolean]
+
 function testFunction(timeout: number, result: number, throwException: boolean): Promise<number> {
   return new Promise<number>((resolve, reject) =>
     setTimeout(
@@ -18,7 +20,7 @@ describe('test nAtATime', function () {
     const CALLS = 3
     const result = await nAtATime(
       testFunction,
-      Array.from({ length: CALLS }, (_, index) => [20, index, false]),
+      Array.from<any, TestFunctionParameters>({ length: CALLS }, (_, index) => [20, index, false]),
       1
     )
 
@@ -33,7 +35,7 @@ describe('test nAtATime', function () {
     const CALLS = 3
     const result = await nAtATime(
       testFunction,
-      Array.from({ length: CALLS }, (_, index) => [20 * index, index, false]),
+      Array.from<any, TestFunctionParameters>({ length: CALLS }, (_, index) => [20 * index, index, false]),
       2
     )
 
@@ -48,7 +50,11 @@ describe('test nAtATime', function () {
     const CALLS = 3
     const result = await nAtATime(
       testFunction,
-      Array.from({ length: CALLS }, (_, index) => [20 * (CALLS - index - 1), index, false]),
+      Array.from<any, TestFunctionParameters>({ length: CALLS }, (_, index) => [
+        20 * (CALLS - index - 1),
+        index,
+        false
+      ]),
       2
     )
 
@@ -63,7 +69,7 @@ describe('test nAtATime', function () {
     const CALLS = 1
     const result = await nAtATime(
       testFunction,
-      Array.from({ length: CALLS }, (_, index) => [20 * index, index, true]),
+      Array.from<any, TestFunctionParameters>({ length: CALLS }, (_, index) => [20 * index, index, true]),
       1
     )
 
@@ -73,10 +79,16 @@ describe('test nAtATime', function () {
 
   it('test concurrency - edge cases', async function () {
     // Must return immediately
-    assert((await nAtATime(testFunction, [], Infinity)).length == 0)
+    assert((await nAtATime(testFunction, [], Infinity)).length == 0, `Zero work must return immediately`)
 
     // Must return immediately
-    assert((await nAtATime(testFunction, [[10e3, 0, false]], 0)).length == 0)
-    assert((await nAtATime(testFunction, [[10e3, 0, false]], -1)).length == 0)
+    assert(
+      (await nAtATime(testFunction, [[10e3, 0, false]], 0)).length == 0,
+      `Zero concurrency must return immediately`
+    )
+    assert(
+      (await nAtATime(testFunction, [[10e3, 0, false]], -1)).length == 0,
+      `Negative concurrency must return immediately`
+    )
   })
 })

@@ -90,6 +90,12 @@ describe('test TCP connection', function () {
 
     const start = Date.now()
     const closePromise = once(conn.conn, 'close')
+
+    // Overwrite end method to mimic half-open stream
+    Object.assign(conn.conn, {
+      end: () => {}
+    })
+
     // @dev produces a half-open socket on the other side
     conn.close()
 

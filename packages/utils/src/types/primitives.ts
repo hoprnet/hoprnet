@@ -8,6 +8,8 @@ import PeerId from 'peer-id'
 import { pubKeyToPeerId } from '../libp2p'
 
 export class PublicKey {
+  // Cache expensive computation result
+  private _address: Address
   // @TODO use uncompressed public key internally
   constructor(private arr: Uint8Array) {
     if (arr.length !== PublicKey.SIZE) {
@@ -46,7 +48,13 @@ export class PublicKey {
   }
 
   toAddress(): Address {
-    return new Address(Hash.create(publicKeyConvert(this.arr, false).slice(1)).serialize().slice(12))
+    if (this._address != undefined) {
+      return this._address
+    }
+    // Expensive EC-operation
+    this._address = new Address(Hash.create(publicKeyConvert(this.arr, false).slice(1)).serialize().slice(12))
+
+    return this._address
   }
 
   toUncompressedPubKeyHex(): string {
@@ -129,6 +137,10 @@ export class Address {
 
   toString(): string {
     return this.toHex()
+  }
+
+  toBytes32(): Uint8Array {
+    return Uint8Array.from([...new Uint8Array(12).fill(0), ...this.arr])
   }
 
   eq(b: Address) {

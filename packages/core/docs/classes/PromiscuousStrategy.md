@@ -52,7 +52,7 @@ ChannelStrategy.name
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:86](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L86)
+[packages/core/src/channel-strategy.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L90)
 
 ___
 
@@ -70,7 +70,7 @@ ChannelStrategy.tickInterval
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L72)
+[packages/core/src/channel-strategy.ts:76](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L76)
 
 ## Methods
 
@@ -134,13 +134,13 @@ ___
 
 ### shouldCommitToChannel
 
-▸ **shouldCommitToChannel**(`_c`): `Promise`<`boolean`\>
+▸ **shouldCommitToChannel**(`c`): `Promise`<`boolean`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `_c` | `ChannelEntry` |
+| `c` | `ChannelEntry` |
 
 #### Returns
 
@@ -156,7 +156,7 @@ ChannelStrategy.shouldCommitToChannel
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L67)
+[packages/core/src/channel-strategy.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L71)
 
 ___
 
@@ -183,4 +183,4 @@ ChannelStrategy.tick
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:88](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L88)
+[packages/core/src/channel-strategy.ts:92](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L92)

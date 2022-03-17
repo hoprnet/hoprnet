@@ -397,7 +397,7 @@ ___
 
 #### Defined in
 
-[db.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L73)
+[db.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L72)
 
 ___
 
@@ -441,7 +441,7 @@ ___
 
 #### Defined in
 
-[db.ts:68](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L68)
+[db.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L67)
 
 ___
 
@@ -457,7 +457,7 @@ ___
 
 #### Defined in
 
-[db.ts:64](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L64)
+[db.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L63)
 
 ___
 
@@ -505,7 +505,7 @@ and feeds them to the given handler.
 
 #### Defined in
 
-[libp2p/index.ts:237](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L237)
+[libp2p/index.ts:244](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L244)
 
 ## Variables
 
@@ -1025,7 +1025,7 @@ ___
 
 ### convertPubKeyFromB58String
 
-▸ **convertPubKeyFromB58String**(`b58string`): `Promise`<`PublicKey`\>
+▸ **convertPubKeyFromB58String**(`b58string`): `PublicKey`
 
 Takes a B58String and converts them to a PublicKey
 
@@ -1037,7 +1037,7 @@ Takes a B58String and converts them to a PublicKey
 
 #### Returns
 
-`Promise`<`PublicKey`\>
+`PublicKey`
 
 #### Defined in
 
@@ -1047,7 +1047,7 @@ ___
 
 ### convertPubKeyFromPeerId
 
-▸ **convertPubKeyFromPeerId**(`peerId`): `Promise`<`PublicKey`\>
+▸ **convertPubKeyFromPeerId**(`peerId`): `PublicKey`
 
 Takes a peerId and returns its corresponding public key.
 
@@ -1059,7 +1059,7 @@ Takes a peerId and returns its corresponding public key.
 
 #### Returns
 
-`Promise`<`PublicKey`\>
+`PublicKey`
 
 #### Defined in
 
@@ -1362,7 +1362,7 @@ Contains a baseline protection against dialing same addresses twice.
 
 #### Defined in
 
-[libp2p/dialHelper.ts:273](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L273)
+[libp2p/dialHelper.ts:296](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L296)
 
 ___
 
@@ -2086,7 +2086,7 @@ ___
 
 ### libp2pSubscribe
 
-▸ **libp2pSubscribe**(`libp2p`, `protocol`, `handler`, `errHandler`, `includeReply?`): `void`
+▸ **libp2pSubscribe**(`libp2p`, `protocol`, `handler`, `errHandler`, `includeReply?`): `Promise`<`void`\>
 
 #### Parameters
 
@@ -2100,11 +2100,11 @@ ___
 
 #### Returns
 
-`void`
+`Promise`<`void`\>
 
 #### Defined in
 
-[libp2p/index.ts:252](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L252)
+[libp2p/index.ts:259](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L259)
 
 ___
 
@@ -2242,7 +2242,7 @@ an array containing the results
 
 #### Defined in
 
-[async/parallel.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/parallel.ts#L43)
+[async/parallel.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/parallel.ts#L37)
 
 ___
 
@@ -2404,7 +2404,7 @@ ___
 
 #### Defined in
 
-[db.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L32)
+[db.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L31)
 
 ___
 

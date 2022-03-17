@@ -1,29 +1,29 @@
+import { setImmediate } from 'timers/promises'
 import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
 import { ChainWrapper, createChainWrapper, Receipt } from './ethereum'
 import chalk from 'chalk'
 import {
   AcknowledgedTicket,
-  PublicKey,
   Balance,
   Address,
   NativeBalance,
   cacheNoArgAsyncFunction,
   HoprDB,
-  ChannelEntry,
   ChannelStatus,
   generateChannelId,
   Hash,
   debug,
-  DeferType,
-  privKeyToPeerId
+  privKeyToPeerId,
+  type ChannelEntry,
+  type DeferType,
+  type PublicKey
 } from '@hoprnet/hopr-utils'
 import Indexer from './indexer'
 import { CONFIRMATIONS, INDEXER_BLOCK_RANGE, PROVIDER_CACHE_TTL } from './constants'
 import { EventEmitter } from 'events'
 import { initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCommitmentInfo } from './commitment'
-import { IndexerEvents } from './indexer/types'
-import ChainWrapperSingleton from './chain'
+import type { IndexerEvents } from './indexer/types'
 
 const log = debug('hopr-core-ethereum')
 
@@ -73,33 +73,38 @@ export default class HoprCoreEthereum extends EventEmitter {
     protected automaticChainCreation = true
   ) {
     super()
+
     this.indexer = new Indexer(
       this.publicKey.toAddress(),
       this.db,
       this.options?.maxConfirmations ?? CONFIRMATIONS,
       INDEXER_BLOCK_RANGE
     )
+  }
+
+  async initializeChainWrapper() {
     // In some cases, we want to make sure the chain within the connector is not triggered
     // automatically but instead via an event. This is the case for `hoprd`, where we need
     // to get notified after ther chain was properly created, and we can't get setup the
     // listeners before the node was actually created.
-    if (automaticChainCreation) {
-      this.createChain()
+    if (this.automaticChainCreation) {
+      await this.createChain()
     } else {
-      this.once('connector:create', this.createChain)
+      this.once('connector:create', this.createChain.bind(this))
     }
   }
 
   private async createChain(): Promise<void> {
     try {
-      this.chain = await ChainWrapperSingleton.create(this.options, this.privateKey)
-      // Emit event to make sure connector is aware the chain was created properly.
-      this.emit('connector:created')
+      this.chain = await createChainWrapper(this.options, this.privateKey, true)
     } catch (err) {
       const errMsg = 'failed to create provider chain wrapper'
       log(`error: ${errMsg}`, err)
       throw Error(errMsg)
     }
+
+    // Emit event to make sure connector is aware the chain was created properly.
+    this.emit('hopr:connector:created')
   }
 
   async start(): Promise<HoprCoreEthereum> {
@@ -129,10 +134,6 @@ export default class HoprCoreEthereum extends EventEmitter {
     return this.started
   }
 
-  public getChain(): ChainWrapper {
-    return this.chain
-  }
-
   readonly CHAIN_NAME = 'HOPR on Ethereum'
 
   /**
@@ -144,13 +145,13 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   announce(multiaddr: Multiaddr): Promise<string> {
-    return this.chain.announce(multiaddr, (tx: string) => this.setTxHandler('announce', tx))
+    return this.chain.announce(multiaddr, (txHash: string) => this.setTxHandler(`announce-${txHash}`, txHash))
   }
 
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
     // promise of tx hash gets resolved when the tx is mined.
     return this.chain.withdraw(currency, recipient, amount, (tx: string) =>
-      this.setTxHandler(currency === 'NATIVE' ? 'withdraw-native' : 'withdraw-hopr', tx)
+      this.setTxHandler(currency === 'NATIVE' ? `withdraw-native-${tx}` : `withdraw-hopr-${tx}`, tx)
     )
   }
 
@@ -217,10 +218,11 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   public async commitToChannel(c: ChannelEntry): Promise<void> {
-    log('committing to channel', c)
+    log(`committing to channel ${c.getId().toHex()}`)
+    log(c.toString())
     const setCommitment = async (commitment: Hash) => {
-      return this.chain.setCommitment(c.source.toAddress(), commitment, (tx: string) =>
-        this.setTxHandler('channel-updated', tx)
+      return this.chain.setCommitment(c.source.toAddress(), commitment, (txHash: string) =>
+        this.setTxHandler(`channel-updated-${txHash}`, txHash)
       )
     }
     const getCommitment = async () => (await this.db.getChannel(c.getId())).commitment
@@ -253,8 +255,16 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   private async redeemAllTicketsInternalLoop(): Promise<void> {
     try {
-      for (const ce of await this.db.getChannelsTo(this.publicKey.toAddress())) {
-        await this.redeemTicketsInChannel(ce)
+      const channels = await this.db.getChannelsTo(this.publicKey.toAddress())
+
+      for (let i = 0; i < channels.length; i++) {
+        await this.redeemTicketsInChannel(channels[i])
+
+        if (i + 1 < channels.length) {
+          // Give other tasks CPU time to happen
+          // Push next loop iteration to end of next event loop iteration
+          await setImmediate()
+        }
       }
     } catch (err) {
       log(`error during redeeming all tickets`, err)
@@ -305,13 +315,26 @@ export default class HoprCoreEthereum extends EventEmitter {
     // reduce the chance for race-conditions with db write operations on
     // those tickets.
     let tickets = await this.db.getAcknowledgedTickets({ channel })
+
+    let ticket: AcknowledgedTicket
     while (tickets.length > 0) {
-      const ticket = tickets[0]
+      if (ticket != undefined && ticket.ticket.index.eq(tickets[0].ticket.index)) {
+        // @TODO handle errors
+        log(
+          `Could not redeem ticket with index ${ticket.ticket.index
+            .toBN()
+            .toString()} in channel ${channelId}. Giving up.`
+        )
+        break
+      }
+      ticket = tickets[0]
+
       log(
-        `redeeming ticket in channel from ${channel.source} to ${channel.destination}`,
-        ticket,
-        ticket.ticket.toString()
+        `redeeming ticket ${ticket.response.toHex()} in channel from ${channel.source} to ${
+          channel.destination
+        }, preImage ${ticket.preImage.toHex()}, porSecret ${ticket.response.toHex()}`
       )
+      log(ticket.ticket.toString())
       const result = await this.redeemTicket(channel.source, ticket)
 
       if (result.status !== 'SUCCESS') {
@@ -322,9 +345,19 @@ export default class HoprCoreEthereum extends EventEmitter {
         if (result.status === 'ERROR') throw result.error
         return
       }
-      log('ticket was redeemed')
+      log(`ticket ${ticket.response.toHex()} was redeemed`)
+
+      // Give other tasks CPU time to happen
+      // Push database query to end of next event loop iteration
+      await setImmediate()
 
       tickets = await this.db.getAcknowledgedTickets({ channel })
+
+      if (tickets.length > 0) {
+        // Give other tasks CPU time to happen
+        // Push next loop iteration to end of next event loop iteration
+        await setImmediate()
+      }
     }
 
     log(`redemption of tickets from ${channel.source.toB58String()} is complete`)
@@ -340,6 +373,8 @@ export default class HoprCoreEthereum extends EventEmitter {
         message: 'Invalid response to acknowledgement'
       }
     }
+
+    let receipt: string
 
     try {
       const ticket = ackTicket.ticket
@@ -365,18 +400,9 @@ export default class HoprCoreEthereum extends EventEmitter {
         }
       }
 
-      const receipt = await this.chain.redeemTicket(counterparty.toAddress(), ackTicket, ticket, (tx: string) =>
-        this.setTxHandler('channel-updated', tx)
+      receipt = await this.chain.redeemTicket(counterparty.toAddress(), ackTicket, (txHash: string) =>
+        this.setTxHandler(`channel-updated-${txHash}`, txHash)
       )
-
-      log('Successfully submitted ticket', ackTicket.response.toHex())
-      await this.db.markRedeemeed(ackTicket)
-      this.emit('ticket:redeemed', ackTicket)
-      return {
-        status: 'SUCCESS',
-        receipt,
-        ackTicket
-      }
     } catch (err) {
       // TODO delete ackTicket -- check if it's due to gas!
       log('Unexpected error when redeeming ticket', ackTicket.response.toHex(), err)
@@ -385,6 +411,15 @@ export default class HoprCoreEthereum extends EventEmitter {
         error: err
       }
     }
+
+    log('Successfully submitted ticket', ackTicket.response.toHex())
+    await this.db.markRedeemeed(ackTicket)
+    this.emit('ticket:redeemed', ackTicket)
+    return {
+      status: 'SUCCESS',
+      receipt,
+      ackTicket
+    }
   }
 
   async initializeClosure(dest: PublicKey): Promise<string> {
@@ -392,7 +427,9 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
-    return this.chain.initiateChannelClosure(dest.toAddress(), (tx: string) => this.setTxHandler('channel-updated', tx))
+    return this.chain.initiateChannelClosure(dest.toAddress(), (txHash: string) =>
+      this.setTxHandler(`channel-updated-${txHash}`, txHash)
+    )
   }
 
   public async finalizeClosure(dest: PublicKey): Promise<string> {
@@ -400,8 +437,8 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (c.status !== ChannelStatus.PendingToClose) {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
-    return await this.chain.finalizeChannelClosure(dest.toAddress(), (tx: string) =>
-      this.setTxHandler('channel-updated', tx)
+    return await this.chain.finalizeChannelClosure(dest.toAddress(), (txHash: string) =>
+      this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
   }
 
@@ -436,7 +473,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       dest.toAddress(),
       myFund,
       counterpartyFund,
-      (tx: string) => this.setTxHandler('channel-updated', tx)
+      (txHash: string) => this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
   }
 }
@@ -449,7 +486,6 @@ export {
   ChannelEntry,
   ChannelCommitmentInfo,
   Indexer,
-  ChainWrapperSingleton,
   ChainWrapper,
   createChainWrapper,
   initializeCommitment,

@@ -38,6 +38,12 @@ function defaultEnvironment(): string {
   }
 }
 
+// Replace default process name (`node`) by `hoprd`
+process.title = 'hoprd'
+
+// Use environment-specific default data path
+const defaultDataPath = path.join(process.cwd(), 'hoprd-db', defaultEnvironment())
+
 const argv = yargs(process.argv.slice(2))
   .option('environment', {
     string: true,
@@ -146,8 +152,8 @@ const argv = yargs(process.argv.slice(2))
   })
   .option('data', {
     string: true,
-    describe: 'manually specify the database directory to use',
-    default: ''
+    describe: 'manually specify the data directory to use',
+    default: defaultDataPath
   })
   .option('init', {
     boolean: true,
@@ -212,6 +218,16 @@ const argv = yargs(process.argv.slice(2))
     default: false,
     hidden: true
   })
+  .option('heartbeatInterval', {
+    number: true,
+    describe: 'Interval in milliseconds in which the availability of other nodes get measured',
+    default: undefined
+  })
+  .option('heartbeatVariance', {
+    number: true,
+    describe: 'Upper bound for variance applied to heartbeat interval in milliseconds',
+    default: undefined
+  })
   .wrap(Math.min(120, terminalWidth()))
   .parseSync()
 
@@ -236,9 +252,12 @@ function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
   let options: HoprOptions = {
     createDbIfNotExist: argv.init,
     announce: argv.announce,
+    dataPath: argv.data,
     hosts: parseHosts(),
     environment,
     allowLocalConnections: argv.allowLocalNodeConnections,
+    heartbeatInterval: argv.heartbeatInterval,
+    heartbeatVariance: argv.heartbeatVariance,
     testing: {
       announceLocalAddresses: argv.testAnnounceLocalAddresses,
       preferLocalAddresses: argv.testPreferLocalAddresses,
@@ -252,9 +271,6 @@ function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
     options.password = argv.password as string
   }
 
-  if (argv.data && argv.data !== '') {
-    options.dbPath = argv.data
-  }
   return options
 }
 
@@ -358,17 +374,16 @@ async function main() {
     })
 
     // 2. Create node instance
-
     logs.log('Creating HOPR Node')
     node = await createHoprNode(peerId, options, false)
     logs.logStatus('PENDING')
     node.on('hopr:message', logMessageToNode)
-    node.on('hopr:connector:created', () => {
+    node.subscribeOnConnector('hopr:connector:created', () => {
       // 2.b - Connector has been created, and we can now trigger the next set of steps.
       logs.log('Connector has been loaded properly.')
       node.emit('hopr:monitoring:start')
     })
-    node.on('hopr:monitoring:start', async () => {
+    node.once('hopr:monitoring:start', async () => {
       // 3. start all monitoring services, and continue with the rest of the setup.
 
       if (argv.api || argv.admin) {
@@ -441,7 +456,6 @@ async function main() {
 
     // 2.a - Setup connector listener to bubble up to node. Emit connector creation.
     logs.log(`Ready to request on-chain connector to connect to provider.`)
-    node.subscribeOnConnector('connector:created', () => node.emit('hopr:connector:created'))
     node.emitOnConnector('connector:create')
   } catch (e) {
     logs.log('Node failed to start:')
