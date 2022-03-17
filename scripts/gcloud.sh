@@ -105,8 +105,8 @@ gcloud_update_container_with_image() {
     --container-arg="--init" \
     --container-arg="--password" --container-arg="${password}" \
     --container-arg="--environment" --container-arg="${environment_id}" \
-    --container-arg="--rest" \
-    --container-arg="--restHost" --container-arg="0.0.0.0" \
+    --container-arg="--api" \
+    --container-arg="--apiHost" --container-arg="0.0.0.0" \
     --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
     --container-restart-policy=always
 }
@@ -262,8 +262,8 @@ gcloud_create_or_update_instance_template() {
       --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
       --container-arg="--identity" --container-arg="${mount_path}/.hopr-identity" \
       --container-arg="--init" \
-      --container-arg="--rest" \
-      --container-arg="--restHost" --container-arg="0.0.0.0" \
+      --container-arg="--api" \
+      --container-arg="--apiHost" --container-arg="0.0.0.0" \
       ${args} \
       ${extra_args}
   fi

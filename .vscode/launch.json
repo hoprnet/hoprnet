@@ -13,7 +13,7 @@
       "args": [
         "--admin",
         "--init",
-        "--rest",
+        "--api",
         "--password='d3f4uL+%'",
         "--testNoAuthentication",
         "--data=/tmp/debug",

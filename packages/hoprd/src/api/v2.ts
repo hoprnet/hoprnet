@@ -1,3 +1,9 @@
+import type { Server } from 'http'
+import type { Application, Request } from 'express'
+import type { WebSocketServer } from 'ws'
+import type Hopr from '@hoprnet/hopr-core'
+import type { StateOps } from '../types'
+import type { LogStream } from '../logs'
 import process from 'process'
 import path from 'path'
 import fs from 'fs'
@@ -9,13 +15,6 @@ import { initialize } from 'express-openapi'
 import PeerId from 'peer-id'
 import { debug, Address } from '@hoprnet/hopr-utils'
 import { authenticateWsConnection, removeQueryParams } from './utils'
-
-import type { Server } from 'http'
-import type { Application, Request } from 'express'
-import type { WebSocketServer } from 'ws'
-import type Hopr from '@hoprnet/hopr-core'
-import type { StateOps } from '../types'
-import type { LogStream } from './../logs'
 
 const debugLog = debug('hoprd:api:v2')
 
@@ -76,9 +75,13 @@ export function setupRestApi(service: Application, urlPath: string, node: Hopr, 
       // TODO: We assume the handlers are always called in order. This isn't a
       // given and might change in the future. Thus, they should be made order-erindependent.
       keyScheme: function (req: Request, _scopes, _securityDefinition) {
+        // skip checks if authentication is disabled
+        if (!options.testNoAuthentication) return true
+
         const apiToken = decodeURI(req.get('x-auth-token') || '')
 
-        if (!options.testNoAuthentication && options.apiToken !== undefined && apiToken !== options.apiToken) {
+        // tokens must match & not be falsy
+        if (!options.apiToken || !apiToken || apiToken !== options.apiToken) {
           // because this is not the last auth check, we just indicate that
           // the authentication failed so the auth chain can continue
           return false
@@ -88,11 +91,15 @@ export function setupRestApi(service: Application, urlPath: string, node: Hopr, 
         return true
       },
       passwordScheme: function (req: Request, _scopes, _securityDefinition) {
+        // skip checks if authentication is disabled
+        if (!options.testNoAuthentication) return true
+
         const authEncoded = (req.get('authorization') || '').replace('Basic ', '')
         // we only expect a single value here, instead of the usual user:password
-        const [apiToken, ..._rest] = decodeURI(Buffer.from(authEncoded, 'base64').toString('binary')).split(':')
+        const [apiToken] = decodeURI(Buffer.from(authEncoded, 'base64').toString('binary')).split(':')
 
-        if (!options.testNoAuthentication && options.apiToken !== undefined && apiToken !== options.apiToken) {
+        // tokens must match & not be falsy
+        if (!options.apiToken || !apiToken || apiToken !== options.apiToken) {
           // because this is the last auth check, we must throw the appropriate
           // error to be sent back to the user
           throw {

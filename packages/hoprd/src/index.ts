@@ -5,7 +5,6 @@ import { decode } from 'rlp'
 import path from 'path'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
-import { setTimeout } from 'timers/promises'
 
 import Hopr, { createHoprNode } from '@hoprnet/hopr-core'
 import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
@@ -15,7 +14,6 @@ import type { State } from './types'
 import setupAPI from './api'
 import setupHealthcheck from './healthcheck'
 import { AdminServer } from './admin'
-// import { Commands } from './commands'
 import { LogStream } from './logs'
 import { getIdentity } from './identity'
 
@@ -57,7 +55,7 @@ const argv = yargs(process.argv.slice(2))
   })
   .option('admin', {
     boolean: true,
-    describe: 'Run an admin interface on localhost:3000, requires --apiToken',
+    describe: 'Run an admin interface on localhost:3000',
     default: false
   })
   .option('adminHost', {
@@ -72,22 +70,18 @@ const argv = yargs(process.argv.slice(2))
   })
   .option('api', {
     boolean: true,
-    describe:
-      'Expose the Rest (V1, V2) and Websocket (V2) API on localhost:3001, requires --apiToken. "--rest" is deprecated.',
-    default: false,
-    alias: 'rest'
+    describe: 'Expose the Rest (V2) and Websocket (V2) API on localhost:3001, requires --apiToken.',
+    default: false
   })
   .option('apiHost', {
     string: true,
-    describe: 'Set host IP to which the Rest and Websocket API server will bind. "--restHost" is deprecated.',
-    default: 'localhost',
-    alias: 'restHost'
+    describe: 'Set host IP to which the Rest and Websocket API server will bind.',
+    default: 'localhost'
   })
   .option('apiPort', {
     number: true,
-    describe: 'Set host port to which the Rest and Websocket API server will bind. "--restPort" is deprecated.',
-    default: 3001,
-    alias: 'restPort'
+    describe: 'Set host port to which the Rest and Websocket API server will bind.',
+    default: 3001
   })
   .option('healthCheck', {
     boolean: true,
@@ -276,10 +270,6 @@ async function main() {
   let node: Hopr
   let logs = new LogStream(argv.forwardLogs)
   let adminServer: AdminServer = undefined
-  let cmds: Commands
-  // As the daemon aims to maintain for the time being
-  // both APIv1 and APIv2 (hopr-admin / myne-chat), we need
-  // to ensure that daemon's state can be used by both APIs.
   let state: State = {
     aliases: new Map(),
     settings: {
@@ -316,9 +306,9 @@ async function main() {
     logs.startLoggingQueue()
   }
 
-  if (!argv.testNoAuthentication && (argv.api || argv.admin)) {
+  if (!argv.testNoAuthentication && argv.api) {
     if (argv.apiToken == null) {
-      throw Error(`Must provide --apiToken when --api, --rest or --admin is specified`)
+      throw Error(`Must provide --apiToken when --api is specified`)
     }
     const { contains: hasSymbolTypes, length }: { contains: string[]; length: number } = passwordStrength(argv.apiToken)
     for (const requiredSymbolType of ['uppercase', 'lowercase', 'symbol', 'number']) {
@@ -371,22 +361,18 @@ async function main() {
     node.on('hopr:monitoring:start', async () => {
       // 3. start all monitoring services, and continue with the rest of the setup.
 
-      if (argv.api || argv.admin) {
-        /*
-          When `--api` is used, we turn on Rest API v1, v2 and WS API v2.
-          When `--admin` is used, we turn on WS API v1 only.
-        */
-        setupAPI(
-          node,
-          logs,
-          { getState, setState },
-          {
-            ...argv,
-            apiToken
-          },
-          adminServer // api V1: required by hopr-admin
-        )
-      }
+      const startApiListen = setupAPI(
+        node,
+        logs,
+        { getState, setState },
+        {
+          apiHost: argv.apiHost,
+          apiPort: argv.apiPort,
+          apiToken
+        }
+      )
+      // start API server only if API flag is true
+      if (argv.api) startApiListen()
 
       if (argv.healthCheck) {
         setupHealthcheck(node, logs, argv.healthCheckHost, argv.healthCheckPort)
@@ -405,38 +391,38 @@ async function main() {
 
       // 3. Start the node.
       await node.start()
-      cmds = new Commands(node, { setState, getState })
 
       if (adminServer) {
-        adminServer.registerNode(node, cmds)
+        adminServer.registerNode(node)
       }
 
       logs.logStatus('READY')
       logs.log('Node has started!')
 
-      if (argv.run && argv.run !== '') {
-        // Run a single command and then exit.
-        // We support multiple semicolon separated commands
-        let toRun = argv.run.split(';').map((c: string) =>
-          // Remove obsolete ' and "
-          c.replace(/"/g, '')
-        )
+      // TODO: replace with API v2 ?
+      // if (argv.run && argv.run !== '') {
+      //   // Run a single command and then exit.
+      //   // We support multiple semicolon separated commands
+      //   let toRun = argv.run.split(';').map((c: string) =>
+      //     // Remove obsolete ' and "
+      //     c.replace(/"/g, '')
+      //   )
 
-        for (let c of toRun) {
-          console.error('$', c)
-          if (c === 'daemonize') {
-            return
-          }
+      //   for (let c of toRun) {
+      //     console.error('$', c)
+      //     if (c === 'daemonize') {
+      //       return
+      //     }
 
-          await cmds.execute((msg) => {
-            logs.log(msg)
-          }, c)
-        }
-        // Wait for actions to take place
-        await setTimeout(1e3)
-        await node.stop()
-        return
-      }
+      //     await cmds.execute((msg) => {
+      //       logs.log(msg)
+      //     }, c)
+      //   }
+      //   // Wait for actions to take place
+      //   await setTimeout(1e3)
+      //   await node.stop()
+      //   return
+      // }
     })
 
     // 2.a - Setup connector listener to bubble up to node. Emit connector creation.

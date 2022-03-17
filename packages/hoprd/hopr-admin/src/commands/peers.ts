@@ -1,0 +1,29 @@
+import type API from '../utils/api'
+import { toPaddedString } from '../utils'
+import { Command } from '../utils/command'
+
+export default class Peers extends Command {
+  constructor(api: API, extra: { getCachedAliases: () => Record<string, string> }) {
+    super({}, api, extra)
+  }
+
+  public name() {
+    return 'peers'
+  }
+
+  public description() {
+    return 'Lists connected and interesting HOPR nodes'
+  }
+
+  public async execute(log): Promise<void> {
+    const peers = await this.api.getPeers()
+    const announced = peers.announced.map<[string, string]>((p) => [p.peerId, String(p.quality)])
+    const connected = peers.connected.map<[string, string]>((p) => [p.peerId, String(p.quality)])
+
+    if (announced.length === 0 && connected.length === 0) {
+      return log('No peers found.')
+    } else {
+      return log(toPaddedString([...announced, ...connected]))
+    }
+  }
+}
