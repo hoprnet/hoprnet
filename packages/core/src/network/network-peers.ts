@@ -149,7 +149,7 @@ class NetworkPeers {
         lastSeen: now,
         backoff: 2,
         quality: BAD_QUALITY,
-	origin
+        origin
       })
     }
 
