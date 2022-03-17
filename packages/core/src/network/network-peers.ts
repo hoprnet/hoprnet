@@ -201,7 +201,7 @@ class NetworkPeers {
   public debugLog(): string {
     if (this.peers.size === 0) return 'no connected peers'
 
-    const peers = this.peers.entries().map((entry) => entry.id)
+    const peers = this.all()
 
     // Sort a copy of peers in-place
     peers.sort((a, b) => this.qualityOf(b) - this.qualityOf(a))
