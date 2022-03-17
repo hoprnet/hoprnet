@@ -29,7 +29,7 @@ export default class Addresses extends AbstractCommand {
     } catch (err) {
       return log(styleValue(err.message, 'failure'))
     }
-    const announcedAddresses = await this.node.getAnnouncedAddresses(peerId)
+    const announcedAddresses = await this.node.getAddressesAnnouncedToDHT(peerId)
     const announcedAddressesStr = announcedAddresses.map((a) => `\n- ${a.toString()}`)
     const observedAddresses = await this.node.getObservedAddresses(peerId)
     const observedAddressesStr = observedAddresses.map((a) => `\n- ${a.toString()}`)
