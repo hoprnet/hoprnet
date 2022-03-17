@@ -7,8 +7,12 @@ import { Address, Hash } from './primitives'
 export class PublicKey {
   // Cache expensive computation result
   private _address: Address
-  // @TODO use uncompressed public key internally
-  constructor(private arr: Uint8Array) {}
+
+  private constructor(private arr: Uint8Array) {}
+
+  static fromPrivKeyString(privKey: string) {
+    return PublicKey.fromPrivKey(stringToU8a(privKey))
+  }
 
   static fromPrivKey(privKey: Uint8Array): PublicKey {
     if (privKey.length !== 32) {
@@ -58,16 +62,24 @@ export class PublicKey {
     return PublicKey.deserialize(stringToU8a(str))
   }
 
-  static get SIZE(): number {
-    return 64
+  static get SIZE_COMPRESSED(): number {
+    return 33
   }
 
-  toAddress(): Address {
+  static get SIZE_UNCOMPRESSED(): number {
+    return 65
+  }
+
+  public get isCompressed(): boolean {
+    return [2, 3].includes(this.arr[0])
+  }
+
+  public toAddress(): Address {
     if (this._address != undefined) {
       return this._address
     }
 
-    if ([2, 3].includes(this.arr[0])) {
+    if (this.isCompressed) {
       // Expensive EC-operation, only do if necessary
       this.arr = publicKeyConvert(this.arr, false)
     }
@@ -77,37 +89,28 @@ export class PublicKey {
     return this._address
   }
 
-  toUncompressedPubKeyHex(): string {
-    if ([2, 3].includes(this.arr[0])) {
-      // Expensive EC-operation, only do if necessary
-      this.arr = publicKeyConvert(this.arr, false)
-    }
-
-    return u8aToHex(this.arr)
+  public toUncompressedPubKeyHex(): string {
+    return u8aToHex(this.serializeUncompressed())
   }
 
-  toCompressedPubKeyHex(): string {
-    if (this.arr[0] == 4) {
-      return u8aToHex(publicKeyConvert(this.arr, true))
-    } else {
-      return u8aToHex(this.arr)
-    }
+  public toCompressedPubKeyHex(): string {
+    return u8aToHex(this.serializeCompressed())
   }
 
-  toPeerId(): PeerId {
+  public toPeerId(): PeerId {
     return pubKeyToPeerId(this.serializeCompressed())
   }
 
   public serializeCompressed(): Uint8Array {
-    if (this.arr[0] == 4) {
-      return publicKeyConvert(this.arr, true)
-    } else {
+    if (this.isCompressed) {
       return this.arr
+    } else {
+      return publicKeyConvert(this.arr, true)
     }
   }
 
   public serializeUncompressed() {
-    if ([2, 3].includes(this.arr[0])) {
+    if (this.isCompressed) {
       // Expensive EC-operation, only do if necessary
       this.arr = publicKeyConvert(this.arr, false)
     }
@@ -126,10 +129,10 @@ export class PublicKey {
   eq(b: PublicKey) {
     if (this.arr[0] == b.arr[0]) {
       return u8aEquals(this.arr, b.arr)
-    } else if (this.arr[0] == 4) {
-      return u8aEquals(this.serializeCompressed(), b.arr)
-    } else {
+    } else if (this.isCompressed) {
       return u8aEquals(this.arr, b.serializeCompressed())
+    } else {
+      return u8aEquals(this.serializeCompressed(), b.arr)
     }
   }
 

@@ -631,7 +631,7 @@ class Indexer extends EventEmitter {
 
   private async onAnnouncement(event: Event<'Announcement'>, blockNumber: BN, lastSnapshot: Snapshot): Promise<void> {
     // publicKey given by the SC is verified
-    const publicKey = PublicKey.fromUncompressedPubKey(
+    const publicKey = PublicKey.deserialize(
       // add uncompressed key identifier
       Uint8Array.from([4, ...stringToU8a(event.args.publicKey)])
     )
@@ -640,15 +640,12 @@ class Indexer extends EventEmitter {
       .decapsulateCode(421)
       // add new peerID
       .encapsulate(`/p2p/${publicKey.toPeerId().toB58String()}`)
-    const address = Address.fromString(event.args.account)
-    const account = new AccountEntry(address, multiaddr, blockNumber)
-    if (!account.getPublicKey().toAddress().eq(address)) {
-      throw Error("Multiaddr in announcement does not match sender's address")
-    }
+    const account = new AccountEntry(publicKey, multiaddr, blockNumber)
+
     if (!account.getPeerId() || !PeerId.isPeerId(account.getPeerId())) {
       throw Error('Peer ID in multiaddr is null')
     }
-    log('New node announced', account.address.toHex(), account.multiAddr.toString())
+    log('New node announced', account.getAddress().toHex(), account.multiAddr.toString())
 
     await this.db.updateAccountAndSnapshot(account, lastSnapshot)
 
@@ -753,7 +750,7 @@ class Indexer extends EventEmitter {
   public async getPublicKeyOf(address: Address): Promise<PublicKey> {
     const account = await this.db.getAccount(address)
     if (account) {
-      return account.getPublicKey()
+      return account.publicKey
     }
     throw new Error('Could not find public key for address - have they announced? -' + address.toHex())
   }

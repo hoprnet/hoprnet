@@ -1,7 +1,8 @@
 import assert from 'assert'
 import { utils } from 'ethers'
 import BN from 'bn.js'
-import { Address, PublicKey, Hash, Balance, NativeBalance, Signature } from './primitives'
+import { Address, Hash, Balance, NativeBalance, Signature } from './primitives'
+import { PublicKey } from './publicKey'
 
 const privateKey = '0xe17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8'
 const publicKey = '0x021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8'
