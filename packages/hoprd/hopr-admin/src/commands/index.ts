@@ -78,6 +78,7 @@ export default class Commands {
 
     if (!cmdName) return log(`Command not provided!`)
 
+    log('> ' + userInput)
     let cmd = this.commandMap.get(cmdName)
 
     if (cmd) {

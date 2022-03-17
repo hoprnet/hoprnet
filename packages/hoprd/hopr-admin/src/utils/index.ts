@@ -91,3 +91,5 @@ export type Settings = {
  * API paths should start with `/api/v2/`
  */
 export type ApiPath = `/api/v2/${string}`
+
+export type Log = { id: string; msg: string; ts: number }

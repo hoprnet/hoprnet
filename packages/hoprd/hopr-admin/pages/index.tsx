@@ -9,6 +9,7 @@ import styles from '../styles/Home.module.css'
 // import { Connection } from '../src/connection'
 import Commands from '../src/commands'
 import useAppState from '../src/state'
+import type { Log } from '../src/utils'
 
 const Jazzicon = dynamic(() => import('../src/components/jazzicon'), { ssr: false })
 const GIT_HASH = process.env.NEXT_PUBLIC_GIT_COMMIT
@@ -20,18 +21,10 @@ export default function Home() {
   const cmds = new Commands(app.api.apiRef.current)
 
   // store logs
-  const [logs, setLogs] = useState<{ id: string; log: string }[]>([])
-  const addLogs = (log: string) => {
-    setLogs((s) => {
-      console.log(log)
-      s.push({
-        id: String(Math.random()),
-        log
-      })
-      if (s.length > 50) s.length = 50
-      console.log('s', s)
-      return s
-    })
+  const [logs, setLogs] = useState<Log[]>([])
+  const addLog = (log: Log) => {
+    logs.push(log)
+    setLogs(logs)
   }
 
   // toggles connected panel
@@ -62,7 +55,14 @@ export default function Home() {
   }
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
-      cmds.execute(addLogs, (event.target as HTMLInputElement).value)
+      event.stopPropagation()
+      cmds.execute((msg) => {
+        addLog({
+          msg,
+          id: String(Math.random()),
+          ts: +new Date()
+        })
+      }, input)
       setInput('')
     }
   }
