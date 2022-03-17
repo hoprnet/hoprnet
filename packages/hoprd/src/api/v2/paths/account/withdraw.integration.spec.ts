@@ -42,7 +42,7 @@ describe('POST /account/withdraw', () => {
       receipt: 'receipt'
     })
   })
-  it('should return 400 on incorrect body values', async () => {
+  it('should return 400 on incorrect currency in body', async () => {
     const res = await request(service).post('/api/v2/account/withdraw').send({
       currency: 'invalidCurrency',
       amount: '1',
@@ -53,29 +53,33 @@ describe('POST /account/withdraw', () => {
     expect(res.body).to.deep.equal({
       status: STATUS_CODES.INVALID_CURRENCY
     })
-    const res2 = await request(service).post('/api/v2/account/withdraw').send({
+  })
+  it('should return 400 on incorrect amount in body', async () => {
+    const res = await request(service).post('/api/v2/account/withdraw').send({
       currency: 'NATIVE',
       amount: 'invalidAmount',
       recipient: ALICE_ETH_ADDRESS.toString()
     })
-    expect(res2.status).to.equal(400)
-    expect(res2).to.satisfyApiSpec
-    expect(res2.body).to.deep.equal({
+    expect(res.status).to.equal(400)
+    expect(res).to.satisfyApiSpec
+    expect(res.body).to.deep.equal({
       status: STATUS_CODES.INVALID_AMOUNT
     })
-    const res3 = await request(service).post('/api/v2/account/withdraw').send({
+  })
+  it('should return 400 on incorrect address in body', async () => {
+    const res = await request(service).post('/api/v2/account/withdraw').send({
       currency: 'NATIVE',
       amount: '1',
       recipient: 'invalidAddress'
     })
-    expect(res3.status).to.equal(400)
-    expect(res3).to.satisfyApiSpec
-    expect(res3.body).to.deep.equal({
+    expect(res.status).to.equal(400)
+    expect(res).to.satisfyApiSpec
+    expect(res.body).to.deep.equal({
       status: STATUS_CODES.INVALID_ADDRESS
     })
   })
 
-  it('should return 422 when withdrawing more than balance or address incorrect', async () => {
+  it('should return 422 when withdrawing more than current balance', async () => {
     const res = await request(service).post('/api/v2/account/withdraw').send({
       currency: 'NATIVE',
       amount: '100000000000000000000000000000000000000000000000000000000000000',

@@ -103,14 +103,14 @@ POST.apiDoc = {
       }
     },
     '400': {
-      description: `Incorrect data in request body. Make sure to provide valid currency ('NATIVE' | 'HOPR'), amount, and ethereum address.`,
+      description: `Incorrect data in request body. Make sure to provide valid currency ('NATIVE' | 'HOPR') or amount.`,
       content: {
         'application/json': {
           schema: {
             $ref: '#/components/schemas/RequestStatus'
           },
           example: {
-            status: `${STATUS_CODES.INVALID_CURRENCY} | ${STATUS_CODES.INVALID_AMOUNT} | ${STATUS_CODES.INVALID_ADDRESS}`
+            status: `${STATUS_CODES.INVALID_CURRENCY} | ${STATUS_CODES.INVALID_AMOUNT}`
           }
         }
       }
