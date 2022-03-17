@@ -354,26 +354,24 @@ wait_for_port 19097 "127.0.0.1" "${node7_log}"
 
 log "All nodes came up online"
 
-sleep infinity
+# --- Run security tests --- {{{
+${mydir}/../test/security-test.sh \
+  127.0.0.1 13301 13302 19501 19502 "${api_token}"
+# }}}
 
-# # --- Run security tests --- {{{
-# ${mydir}/../test/security-test.sh \
-#   127.0.0.1 13301 13302 19501 19502 "${api_token}"
-# # }}}
+# --- Run protocol test --- {{{
+HOPRD_API_TOKEN="${api_token}" ${mydir}/../test/integration-test.sh \
+  "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305" "localhost:13306" "localhost:13307"
+# }}}
 
-# # --- Run protocol test --- {{{
-# HOPRD_API_TOKEN="${api_token}" ${mydir}/../test/integration-test.sh \
-#   "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305" "localhost:13306" "localhost:13307"
-# # }}}
+# -- Verify node6 has executed the commands {{{
+log "Verifying node6 log output"
+grep -E "HOPR Balance: +20000 txHOPR" "${node6_log}"
+grep -E "ETH Balance: +10 xDAI" "${node6_log}"
+grep -E "Running on: hardhat" "${node6_log}"
+# }}}
 
-# # -- Verify node6 has executed the commands {{{
-# log "Verifying node6 log output"
-# grep -E "HOPR Balance: +20000 txHOPR" "${node6_log}"
-# grep -E "ETH Balance: +10 xDAI" "${node6_log}"
-# grep -E "Running on: hardhat" "${node6_log}"
-# # }}}
-
-# # -- CT test {{{
-# ${mydir}/../test/ct-test.sh \
-#   "${ct_node1_log}" "127.0.0.1" 20000
-# # }}}
+# -- CT test {{{
+${mydir}/../test/ct-test.sh \
+  "${ct_node1_log}" "127.0.0.1" 20000
+# }}}
