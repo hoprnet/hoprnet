@@ -581,9 +581,6 @@ close_channel 1 5 "${api1}" "${addr5}" "outgoing" &
 log "Waiting for nodes to finish handling close channels calls"
 wait
 
-#  # fully closing temporary channel just to test get all channels
-# close_channel 1 4 "${api1}" "${addr4}" "outgoing" "true" &
-
 # Also add confirmation time
 log "Waiting 70 seconds for cool-off period"
 sleep 70
