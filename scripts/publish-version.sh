@@ -117,11 +117,11 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
     --exclude @hoprnet/hoprd --exclude @hoprnet/hopr-cover-traffic-daemon \
     npm publish --access public
 
-  ${mydir}/wait_for_npm_package utils
-  ${mydir}/wait_for_npm_package connect
-  ${mydir}/wait_for_npm_package ethereum
-  ${mydir}/wait_for_npm_package core-ethereum
-  ${mydir}/wait_for_npm_package core
+  ${mydir}/wait-for-npm-package utils
+  ${mydir}/wait-for-npm-package connect
+  ${mydir}/wait-for-npm-package ethereum
+  ${mydir}/wait-for-npm-package core-ethereum
+  ${mydir}/wait-for-npm-package core
 
   trap cleanup SIGINT SIGTERM ERR EXIT
 
