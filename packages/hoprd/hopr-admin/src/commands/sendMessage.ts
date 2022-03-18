@@ -1,4 +1,3 @@
-import type PeerId from 'peer-id'
 import type API from '../utils/api'
 import { Command, CMD_PARAMS } from '../utils/command'
 
@@ -34,68 +33,59 @@ export default class SendMessage extends Command {
     return 'Sends a message to another party'
   }
 
-  private async insertMyAddress(message: string): Promise<string> {
-    const myAddress: string = await this.api.getAddresses().then((res) => res.hopr)
-    return `${myAddress}:${message}`
-  }
+  private parsePathStr(
+    pathStr: string
+  ): [valid: boolean, error: string | undefined, path?: { intermediateNodes: string[]; recipient: string }] {
+    const peerIdStrings = pathStr.split(',').filter(Boolean)
 
-  private async sendMessage(recipient: string, rawMessage: string, path?: string[]): Promise<string> {
-    const includeRecipient = await this.api.getSettings().then((res) => res.includeRecipient)
-    const message = includeRecipient ? await this.insertMyAddress(rawMessage) : rawMessage
+    const validatePeerIdOrAlias = CMD_PARAMS.hoprAddressOrAlias[1]
+    const aliases = this.extra.getCachedAliases()
 
-    try {
-      const response = await this.api.sendMessage(message, recipient, path)
-      if (response.status === 204) {
-        return 'Message sent'
-      } else {
-        return `Could not send message. ${response.status}`
+    const path: string[] = []
+    for (const pIdString of peerIdStrings) {
+      try {
+        const [valid, peerId] = validatePeerIdOrAlias(pIdString, { aliases })
+        if (!valid) throw Error()
+        path.push(peerId.toB58String())
+      } catch (err) {
+        return [false, `<${pIdString}> is neither a valid alias nor a valid Hopr address string`, undefined]
       }
-    } catch (err) {
-      return `Could not send message.`
     }
+
+    const [intermediateNodes, recipient] = [path.slice(0, path.length - 1), path[path.length - 1]]
+    return [true, undefined, { intermediateNodes, recipient }]
   }
 
-  public async execute(log, query: string): Promise<void> {
+  public async execute(log: (msg: string) => void, query: string): Promise<void> {
     const [error, use, pathOrRecipeint, message] = this.assertUsage(query) as [string | undefined, string, any, string]
     if (error) return log(error)
 
+    let path: string[] | undefined
+    let recipient: string = pathOrRecipeint
+
     if (use === 'manual') {
-      const pathStr: string = pathOrRecipeint
+      const [valid, error, result] = this.parsePathStr(pathOrRecipeint)
+      if (!valid) return log(`${error}\n${this.usage()}`)
+      path = result.intermediateNodes
+      recipient = result.recipient
+    }
 
-      if (pathStr.includes(',')) {
-        // Direct routing can be done with ,recipient
-        const peerIdStrings = pathStr.split(',').filter(Boolean)
+    const [settingsRes, addressesRes] = await Promise.all([this.api.getSettings(), this.api.getAddresses()])
+    if (!settingsRes.ok || !addressesRes.ok) {
+      return log(this.invalidResponse('send message'))
+    }
+    const settings = await settingsRes.json()
+    const addresses = await addressesRes.json()
 
-        const validatePeerIdOrAlias = CMD_PARAMS.hoprAddressOrAlias[1]
-        const aliases = this.extra.getCachedAliases()
+    log(`Sending message to ${recipient} ..`)
 
-        const path: string[] = []
-        for (const pIdString of peerIdStrings) {
-          try {
-            const [valid, peerId] = validatePeerIdOrAlias(pIdString, { aliases })
-            if (!valid) throw Error()
-            path.push(peerId.toB58String())
-          } catch (err) {
-            return log(`<${pIdString}> is neither a valid alias nor a valid Hopr address string`)
-          }
-        }
+    const payload = settings.includeRecipient ? `${addresses.hopr}:${message}` : message
+    const response = await this.api.sendMessage(payload, recipient, path)
 
-        const [intermediateNodes, recipient] = [path.slice(0, path.length - 1), path[path.length - 1]]
-        console.log(
-          `Sending message to ${recipient.toString()} via ${path
-            .slice(0, path.length - 1)
-            .map((current) => current.toString())
-            .join(',')} ...`
-        )
-
-        return log(await this.sendMessage(recipient, message, intermediateNodes))
-      } else {
-        return log(this.invalidUsage(query))
-      }
+    if (!response.ok) {
+      return log(this.invalidResponse('send message'))
     } else {
-      const receiver: PeerId = pathOrRecipeint
-      console.log(`Sending message to ${receiver.toB58String()} ..`)
-      log(await this.sendMessage(receiver.toB58String(), message))
+      return log(`Message to ${recipient} sent`)
     }
   }
 }

@@ -21,11 +21,12 @@ export default class Tickets extends Command {
     return 'Displays information about your redeemed and unredeemed tickets'
   }
 
-  public async execute(log): Promise<void> {
-    log('finding information about tickets...')
-    try {
-      const stats: any = await this.api.getTicketStats()
-
+  public async execute(log: (msg: string) => void, _query: string): Promise<void> {
+    const response = await this.api.getTicketStats()
+    if (!response.ok) {
+      return log(this.invalidResponse('get ticket statistics'))
+    } else {
+      const stats = await response.json()
       return log(
         toPaddedString([
           ['Tickets:', ''],
@@ -41,8 +42,6 @@ export default class Tickets extends Command {
           ['- Rejected Value:', `${stats.rejectedValue} xHOPR`]
         ])
       )
-    } catch (err) {
-      return log(`Unexpected error: ${err.message}`)
     }
   }
 }

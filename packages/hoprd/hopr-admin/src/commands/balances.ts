@@ -27,11 +27,14 @@ export default class Balances extends Command {
    * Prints the balance of our account.
    * @notice triggered by the CLI
    */
-  public async execute(log, query): Promise<void> {
+  public async execute(log: (msg: string) => void, query: string): Promise<void> {
     const [error, use, type] = this.assertUsage(query) as [string | undefined, string, string]
     if (error) return log(error)
 
-    const balances = await this.api.getBalances()
+    const balancesRes = await this.api.getBalances()
+    if (!balancesRes.ok) return log(this.invalidResponse('get balances'))
+    const balances = await balancesRes.json()
+
     const hoprPrefix = 'HOPR Balance:'
     const hoprBalance = ethersUtils.formatEther(balances.hopr)
     const nativePrefix = 'Native Balance:'

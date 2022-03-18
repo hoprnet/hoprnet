@@ -21,34 +21,34 @@ export default class CloseChannel extends Command {
     return 'Close an open channel'
   }
 
-  async execute(log, query: string): Promise<void> {
+  async execute(log: (msg: string) => void, query: string): Promise<void> {
     const [error, , counterparty] = this.assertUsage(query) as [string | undefined, string, PeerId]
     if (error) return log(error)
 
     log(`Closing channel to "${counterparty}"..`)
 
-    try {
-      const [response, info] = await Promise.all([
-        this.api.closeChannel(counterparty.toB58String()),
-        this.api.getInfo()
-      ])
+    let channelClosurePeriod: any = '?'
 
-      if (response.status === 200) {
-        const { receipt, channelStatus } = await response.json()
+    const [closeChannelRes, infoRes] = await Promise.all([
+      this.api.closeChannel(counterparty.toB58String()),
+      this.api.getInfo()
+    ])
 
-        if (channelStatus === 'Open') {
-          return log(
-            `Initiated channel closure, the channel must remain open for at least ${info.channelClosurePeriod} minutes. Please send the close command again once the cool-off has passed. Receipt: "${receipt}".`
-          )
-        } else {
-          return log(`Closing channel. Receipt: ${receipt}`)
-        }
-      } else {
-        const { status, error } = (await response.json()) as any
-        return log(`Unable to close channel with status code "${response.status}". ${status} ${error}`)
-      }
-    } catch (error) {
-      return log(error.message)
+    if (!closeChannelRes.ok) {
+      return log('close channel')
+    }
+    if (infoRes.ok) {
+      channelClosurePeriod = (await infoRes.json()).channelClosurePeriod
+    }
+
+    const { receipt, channelStatus } = await closeChannelRes.json()
+
+    if (channelStatus === 'Open') {
+      return log(
+        `Initiated channel closure, the channel must remain open for at least ${channelClosurePeriod} minutes. Please send the close command again once the cool-off has passed. Receipt: "${receipt}".`
+      )
+    } else {
+      return log(`Closing channel. Receipt: ${receipt}`)
     }
   }
 }

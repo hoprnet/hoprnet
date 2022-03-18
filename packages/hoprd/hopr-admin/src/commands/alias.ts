@@ -29,7 +29,7 @@ export default class Alias extends Command {
     return 'View aliases or alias an address with a more memorable name'
   }
 
-  public async execute(log, query): Promise<void> {
+  public async execute(log: (msg: string) => void, query: string): Promise<void> {
     const [error, use, peerId, name] = this.assertUsage(query) as [string | undefined, string, PeerId, string]
     if (error) return log(error)
 
@@ -47,16 +47,12 @@ export default class Alias extends Command {
       return log(toPaddedString(entries.map<[string, string]>(([name, peerId]) => [name, `-> ${peerId}`])))
     } else {
       // sets aliases
-      try {
-        const response = await this.api.setAlias(peerId.toB58String(), name)
+      const response = await this.api.setAlias(peerId.toB58String(), name)
 
-        if (response.status == 201) {
-          return log(`Set alias '${name}' to '${peerId.toB58String()}'.`)
-        } else {
-          return log(`Failed to set alias with status code ${response.status}.`)
-        }
-      } catch (error: any) {
-        return log(`Failed to set alias with unexpected error ${error.message}.`)
+      if (response.status == 201) {
+        return log(`Set alias '${name}' to '${peerId.toB58String()}'.`)
+      } else {
+        return log(this.invalidResponse('set alias'))
       }
     }
   }

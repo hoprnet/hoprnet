@@ -14,8 +14,9 @@ export default class Version extends Command {
     return 'Displays the version the HOPRd node is running.'
   }
 
-  public async execute(log): Promise<void> {
-    const version = await this.api.getVersion()
-    return log(version)
+  public async execute(log: (msg: string) => void, _query: string): Promise<void> {
+    const response = await this.api.getVersion()
+    if (!response.ok) return log(this.invalidResponse('get version'))
+    return log(await response.text())
   }
 }

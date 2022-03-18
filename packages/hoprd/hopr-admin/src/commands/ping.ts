@@ -21,28 +21,21 @@ export default class Ping extends Command {
     return 'Pings another node to check its availability'
   }
 
-  public async execute(log, query: string): Promise<void> {
+  public async execute(log: (msg: string) => void, query: string): Promise<void> {
     const [error, , peerId] = this.assertUsage(query) as [string | undefined, string, PeerId]
     if (error) {
       return log(error)
     }
 
-    let out = ''
-    let pingResult: any
-    let pingError: any
+    const peerIdStr = peerId.toB58String()
+    const pingRes = await this.api.ping(peerIdStr)
+    if (!pingRes.ok) return log(`ping "${peerIdStr}"`)
+    const ping = await pingRes.json()
 
-    try {
-      pingResult = await this.api.ping(peerId.toB58String()).then((res) => res.json())
-    } catch (error) {
-      pingError = error.message
-    }
-
-    if (pingResult.latency >= 0) {
-      return log(`${out}Pong received in: ${pingResult.latency} ms ${pingResult?.info ?? ''}`)
-    } else if (pingError) {
-      return log(`${out}Could not ping node. Error was: ${pingError}`)
+    if (ping.latency >= 0) {
+      return log(`Pong received in ${ping.latency} ms`)
     } else {
-      return log(`${out}Could not ping node. Timeout.`)
+      return log(`Could not ping node. Timeout.`)
     }
   }
 }

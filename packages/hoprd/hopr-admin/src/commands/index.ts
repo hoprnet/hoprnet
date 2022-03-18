@@ -60,7 +60,7 @@ export default class Commands {
     return Array.from(this.commandMap.keys())
   }
 
-  public async execute(log, userInput: string): Promise<void> {
+  public async execute(log: (msg: string) => void, userInput: string): Promise<void> {
     const split: string[] = userInput.trim().split(' ')
     const [cmdName, ...params] = split
     const query = params.join(' ')
@@ -74,7 +74,8 @@ export default class Commands {
       try {
         return await cmd.execute(log, query)
       } catch (error: any) {
-        return log(`${cmdName} execution failed with error: ${error.message}`)
+        console.error(error)
+        return log(`${cmdName}: Unexpected error executing command.\n${cmd.usage()}`)
       }
     }
 

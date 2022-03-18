@@ -27,11 +27,13 @@ export default class Addresses extends Command {
    * identity that we have on that chain.
    * @notice triggered by the CLI
    */
-  public async execute(log, query: string): Promise<void> {
+  public async execute(log: (msg: string) => void, query: string): Promise<void> {
     const [error, use, type] = this.assertUsage(query) as [string | undefined, string, string]
     if (error) return log(error)
 
-    const addresses = await this.api.getAddresses()
+    const addressesRes = await this.api.getAddresses()
+    if (!addressesRes.ok) return log(this.invalidResponse('get addresses'))
+    const addresses = await addressesRes.json()
 
     const hoprPrefix = 'HOPR Address:'
     const hoprAddress = addresses.hopr

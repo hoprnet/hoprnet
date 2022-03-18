@@ -71,6 +71,14 @@ export abstract class Command {
   }
 
   /**
+   * @param task what has failed
+   * @returns Generic error message when request has failed.
+   */
+  protected invalidResponse(task: string): string {
+    return `Failed to ${task}.`
+  }
+
+  /**
    * Validates user's query.
    * @param query the query written by the user
    * @returns an array containing the error message (if there is one) and the query parameters

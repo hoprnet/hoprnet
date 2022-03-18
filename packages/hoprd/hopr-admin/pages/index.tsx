@@ -23,7 +23,14 @@ export default function Home() {
     const interval = setInterval(() => {
       const api = app.api.apiRef.current
       if (api && app.status === 'CONNECTED') {
-        api.getAliases().then(app.updateAliases)
+        try {
+          api
+            .getAliases()
+            .then((res) => res.json())
+            .then(app.updateAliases)
+        } catch (error) {
+          console.error(error)
+        }
       }
     }, 5e3)
 
@@ -46,14 +53,18 @@ export default function Home() {
   // fetches connected peers
   useEffect(() => {
     const updatePeers = async () => {
-      const api = app.api.apiRef.current
-      const peers: {
-        connected: {
-          peerId: string
-        }[]
-      } = await api.getPeers()
+      try {
+        const api = app.api.apiRef.current
+        const peers: {
+          connected: {
+            peerId: string
+          }[]
+        } = await api.getPeers().then((res) => res.json())
 
-      setPeers(peers.connected.map((o) => o.peerId))
+        setPeers(peers.connected.map((o) => o.peerId))
+      } catch (error) {
+        console.error(error)
+      }
     }
 
     if (showConnectedPanel) {

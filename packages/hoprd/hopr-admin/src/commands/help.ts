@@ -22,7 +22,7 @@ export default class Help extends Command {
     return 'Displays all the command options.'
   }
 
-  public async execute(log, query): Promise<void> {
+  public async execute(log: (msg: string) => void, query: string): Promise<void> {
     const [error, showHidden] = this.assertUsage(query)
     if (error) return log(error)
 

@@ -15,8 +15,11 @@ export default class Peers extends Command {
     return 'Lists connected and interesting HOPR nodes'
   }
 
-  public async execute(log): Promise<void> {
-    const peers = await this.api.getPeers()
+  public async execute(log: (msg: string) => void, _query: string): Promise<void> {
+    const peersRes = await this.api.getPeers()
+    if (!peersRes.ok) return log(this.invalidResponse('get peers'))
+    const peers = await peersRes.json()
+
     const announced = peers.announced.map<[string, string]>((p) => [p.peerId, String(p.quality)])
     const connected = peers.connected.map<[string, string]>((p) => [p.peerId, String(p.quality)])
 

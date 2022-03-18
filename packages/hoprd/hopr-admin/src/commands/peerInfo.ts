@@ -22,24 +22,19 @@ export default class PeerInfo extends Command {
     return 'Get information of a peer'
   }
 
-  public async execute(log, query: string): Promise<void> {
-    try {
-      const [error, , peerId] = this.assertUsage(query) as [string | undefined, string, PeerId]
-      if (error) return log(error)
+  public async execute(log: (msg: string) => void, query: string): Promise<void> {
+    const [error, , peerId] = this.assertUsage(query) as [string | undefined, string, PeerId]
+    if (error) return log(error)
 
-      const peerIdStr = peerId.toB58String()
-      const { announced, observed } = await this.api.getPeerInfo(peerIdStr)
+    const peerIdStr = peerId.toB58String()
+    const peerInfoRes = await this.api.getPeerInfo(peerIdStr)
+    if (!peerInfoRes.ok) return log(this.invalidResponse("get peer's information"))
+    const { announced, observed } = await peerInfoRes.json()
 
-      return log(
-        [
-          `Announced addresses for ${peerIdStr}:`,
-          ...announced,
-          `Observed addresses for ${peerIdStr}:`,
-          ...observed
-        ].join('\n')
+    return log(
+      [`Announced addresses for ${peerIdStr}:`, ...announced, `Observed addresses for ${peerIdStr}:`, ...observed].join(
+        '\n'
       )
-    } catch {
-      log(this.invalidUsage(query))
-    }
+    )
   }
 }

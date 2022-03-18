@@ -21,8 +21,10 @@ export default class Info extends Command {
     return 'Information about the HOPR Node, including any options it started with'
   }
 
-  public async execute(log): Promise<void> {
-    const nodeInfo = await this.api.getInfo()
+  public async execute(log: (msg: string) => void, _query: string): Promise<void> {
+    const nodeInfoRes = await this.api.getInfo()
+    if (!nodeInfoRes.ok) return log(this.invalidResponse('get node information'))
+    const nodeInfo = await nodeInfoRes.json()
 
     return log(
       toPaddedString([
