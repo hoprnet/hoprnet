@@ -18,7 +18,8 @@ import {
   privKeyToPeerId,
   stringToU8a,
   Hash,
-  PRICE_PER_PACKET
+  PRICE_PER_PACKET,
+  Snapshot
 } from '@hoprnet/hopr-utils'
 import type { HalfKeyChallenge } from '@hoprnet/hopr-utils'
 import assert from 'assert'
@@ -44,6 +45,8 @@ const RELAY2 = privKeyToPeerId(stringToU8a('0xdb7e3e8fcac4c817aa4cecee1d6e2b4d53
 const COUNTERPARTY = privKeyToPeerId(stringToU8a('0x0726a9704d56a013980a9077d195520a61b5aed28f92d89c50bca6e0e0c48cfc'))
 
 const nodes: PeerId[] = [SELF, RELAY0, RELAY1, RELAY2, COUNTERPARTY]
+
+const TestingSnapshot = new Snapshot(new BN(0), new BN(0), new BN(0))
 
 /**
  * Creates a mocked network to send and receive acknowledgements and packets
@@ -112,12 +115,12 @@ async function createMinimalChannelTopology(dbs: HoprDB[], nodes: PeerId[]): Pro
       channel = getDummyChannel(peerId, nodes[index + 1])
 
       // Store channel entry at source
-      await dbs[index].updateChannel(channel.getId(), channel)
+      await dbs[index].updateChannelAndSnapshot(channel.getId(), channel, TestingSnapshot)
     }
 
     if (index > 0) {
       // Store channel entry at destination
-      await dbs[index].updateChannel(previousChannel.getId(), previousChannel)
+      await dbs[index].updateChannelAndSnapshot(previousChannel.getId(), previousChannel, TestingSnapshot)
 
       const channelInfo = new ChannelCommitmentInfo(
         1,

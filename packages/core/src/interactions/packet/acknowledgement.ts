@@ -74,7 +74,7 @@ async function handleAcknowledgement(
   }
   const response = unacknowledged.getResponse(acknowledgement.ackKeyShare)
   const ticket = unacknowledged.ticket
-  let opening
+  let opening: Hash
   try {
     opening = await findCommitmentPreImage(db, channelId)
   } catch (err) {

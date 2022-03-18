@@ -1052,7 +1052,7 @@ class Hopr extends EventEmitter {
     const pending = await this.db.getPendingTicketCount()
     const losing = await this.db.getLosingTicketCount()
     const totalValue = (ackTickets: AcknowledgedTicket[]): Balance =>
-      ackTickets.map((a) => a.ticket.amount).reduce((x, y) => x.add(y), Balance.ZERO())
+      ackTickets.map((a) => a.ticket.amount).reduce((x, y) => x.add(y), Balance.ZERO)
 
     return {
       pending,

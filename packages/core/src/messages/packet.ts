@@ -145,7 +145,7 @@ export async function validateUnacknowledgedTicket(
   channel: ChannelEntry,
   getTickets: () => Promise<Ticket[]>
 ): Promise<void> {
-  const them = new PublicKey(themPeerId.pubKey.marshal())
+  const them = PublicKey.fromPeerId(themPeerId)
   const requiredTicketWinProb = UINT256.fromInverseProbability(reqInverseTicketWinProb).toBN()
 
   // ticket signer MUST be the sender
@@ -305,7 +305,7 @@ export class Packet {
     }
 
     const challenge = AcknowledgementChallenge.create(ackChallenge, privKey)
-    const nextPeer = new PublicKey(path[0].pubKey.marshal())
+    const nextPeer = PublicKey.fromPeerId(path[0])
     const packet = createPacket(secrets, alpha, msg, path, INTERMEDIATE_HOPS + 1, POR_STRING_LENGTH, porStrings)
 
     let ticket: Ticket
@@ -452,7 +452,7 @@ export class Packet {
       throw Error(`Invalid state`)
     }
 
-    const nextPeer = new PublicKey(this.nextHop)
+    const nextPeer = PublicKey.deserialize(this.nextHop)
 
     const pathPosition = this.ticket.getPathPosition()
     if (pathPosition == 1) {

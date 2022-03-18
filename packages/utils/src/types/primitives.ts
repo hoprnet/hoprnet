@@ -329,7 +329,7 @@ export class Balance extends BalanceBase {
     return new Balance(new BN(arr))
   }
 
-  static ZERO(): Balance {
+  static get ZERO(): Balance {
     return new Balance(new BN('0'))
   }
 }
