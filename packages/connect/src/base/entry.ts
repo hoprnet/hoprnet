@@ -138,7 +138,7 @@ export class EntryNodes extends EventEmitter {
    * @returns a list of peer IDs of used relays.
    */
   private getUsedRelayPeerIds() {
-    return this.getUsedRelayAddresses().map((ma => relayFromRelayAddress(ma)));
+    return this.getUsedRelayAddresses().map((ma) => relayFromRelayAddress(ma))
   }
 
   /**
@@ -296,9 +296,7 @@ export class EntryNodes extends EventEmitter {
 
     const positiveOnes = results.findIndex((result: ConnectionResult) => result.entry.latency >= 0)
 
-    const previous = new Set<string>(
-      this.getUsedRelayPeerIds().map((p) => p.toB58String())
-    )
+    const previous = new Set<string>(this.getUsedRelayPeerIds().map((p) => p.toB58String()))
 
     if (positiveOnes >= 0) {
       // Close all unnecessary connections

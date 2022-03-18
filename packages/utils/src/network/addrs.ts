@@ -278,6 +278,5 @@ export function getLocalHosts(_iface?: string): Network[] {
  * @param destination Destination peer ID
  */
 export function createCircuitAddress(relay: PeerId, destination: PeerId) {
-  return new Multiaddr(
-    `/p2p/${relay.toB58String()}/p2p-circuit/p2p/${destination.toB58String()}`)
+  return new Multiaddr(`/p2p/${relay.toB58String()}/p2p-circuit/p2p/${destination.toB58String()}`)
 }
