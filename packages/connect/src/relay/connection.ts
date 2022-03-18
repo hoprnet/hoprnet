@@ -3,7 +3,7 @@ import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
 import type { Stream, StreamSink, StreamSource, StreamSourceAsync, StreamResult, StreamType } from '../types'
 import { randomBytes } from 'crypto'
 import { RelayPrefix, ConnectionStatusMessages, StatusMessages } from '../constants'
-import { u8aEquals, u8aToHex, defer, type DeferType } from '@hoprnet/hopr-utils'
+import { u8aEquals, u8aToHex, defer, createCircuitAddress, type DeferType } from '@hoprnet/hopr-utils'
 import Heap from 'heap-js'
 
 import type { Instance as SimplePeer } from 'simple-peer'
@@ -138,10 +138,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
     this._id = u8aToHex(randomBytes(4), false)
 
-    this.localAddr = new Multiaddr(`/p2p/${opts.relay.toB58String()}/p2p-circuit/p2p/${opts.self.toB58String()}`)
-    this.remoteAddr = new Multiaddr(
-      `/p2p/${opts.relay.toB58String()}/p2p-circuit/p2p/${opts.counterparty.toB58String()}`
-    )
+    this.localAddr = createCircuitAddress(opts.relay, opts.self)
+    this.remoteAddr = createCircuitAddress(opts.relay, opts.counterparty)
 
     this.webRTC = opts.webRTC
 

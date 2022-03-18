@@ -46,7 +46,8 @@ import {
   type HalfKeyChallenge,
   type Ticket,
   multiaddressCompareByClassFunction,
-  createRelayerKey
+  createRelayerKey,
+  createCircuitAddress
 } from '@hoprnet/hopr-utils'
 import { type default as HoprCoreEthereum, type Indexer } from '@hoprnet/hopr-core-ethereum'
 
@@ -595,7 +596,7 @@ class Hopr extends EventEmitter {
       for await (const relayer of this.libp2p.contentRouting.findProviders(await createRelayerKey(peer), {
         timeout
       })) {
-        const relayAddress = new Multiaddr(`/p2p/${relayer.id.toB58String()}/p2p-circuit/p2p/${peer.toB58String()}`)
+        const relayAddress = createCircuitAddress(relayer.id, peer)
         if (knownAddresses.findIndex((ma) => ma.equals(relayAddress)) < 0) {
           knownAddresses.push(relayAddress)
         }

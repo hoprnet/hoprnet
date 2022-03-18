@@ -17,9 +17,10 @@ import type Connection from 'libp2p-interfaces/src/connection/connection'
 import type PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'
 
-import { nAtATime, oneAtATime, retimer, u8aEquals } from '@hoprnet/hopr-utils'
+import { createCircuitAddress, nAtATime, oneAtATime, retimer, u8aEquals } from '@hoprnet/hopr-utils'
 import type HoprConnect from '..'
 import { attemptClose, relayFromRelayAddress } from '../utils'
+import { compareDirectConnectionInfo } from '../utils/addrs'
 
 const DEBUG_PREFIX = 'hopr-connect:entry'
 const log = Debug(DEBUG_PREFIX)
@@ -47,6 +48,11 @@ function isUsableRelay(ma: Multiaddr) {
   )
 }
 
+type UsedRelay = {
+  relayDirectAddress: Multiaddr
+  ourCircuitAddress: Multiaddr
+}
+
 export const RELAY_CHANGED_EVENT = 'relay:changed'
 
 export const ENTRY_NODES_MAX_PARALLEL_DIALS = 14
@@ -56,7 +62,7 @@ export class EntryNodes extends EventEmitter {
   protected uncheckedEntryNodes: PeerStoreType[]
   private stopDHTRenewal: (() => void) | undefined
 
-  protected usedRelays: Multiaddr[]
+  protected usedRelays: UsedRelay[]
 
   private _onNewRelay: ((peer: PeerStoreType) => void) | undefined
   private _onRemoveRelay: ((peer: PeerId) => void) | undefined
@@ -118,8 +124,7 @@ export class EntryNodes extends EventEmitter {
   private startDHTRenewInterval() {
     const renewDHTEntries = async function (this: EntryNodes) {
       const work: [id: PeerId, mulitaddr: Multiaddr, timeout: number][] = []
-      for (const usedRelay of this.getUsedRelays()) {
-        const relay = relayFromRelayAddress(usedRelay)
+      for (const relay of this.getUsedRelayPeerIds()) {
         const relayEntry = this.availableEntryNodes.find((entry: EntryNodeData) => entry.id.equals(relay))
 
         if (relayEntry == undefined) {
@@ -139,10 +144,18 @@ export class EntryNodes extends EventEmitter {
   }
 
   /**
-   * @returns a list of entry nodes that are currently used
+   * @returns a list of entry nodes that are currently used (as relay circuit addresses with us)
    */
-  public getUsedRelays() {
-    return this.usedRelays
+  public getUsedRelayAddresses() {
+    return this.usedRelays.map((ur) => ur.ourCircuitAddress)
+  }
+
+  /**
+   * Convenience method to retrieved used relay peer IDs.
+   * @returns a list of peer IDs of used relays.
+   */
+  private getUsedRelayPeerIds() {
+    return this.getUsedRelayAddresses().map((ma) => relayFromRelayAddress(ma))
   }
 
   /**
@@ -208,9 +221,9 @@ export class EntryNodes extends EventEmitter {
     }
 
     let inUse = false
-    for (const relayAddr of this.usedRelays) {
+    for (const relayPeer of this.getUsedRelayPeerIds()) {
       // remove second part of relay address to get relay peerId
-      if (relayFromRelayAddress(relayAddr).equals(peer)) {
+      if (relayPeer.equals(peer)) {
         inUse = true
       }
     }
@@ -254,9 +267,19 @@ export class EntryNodes extends EventEmitter {
       }
 
       // Ignore if entry nodes have more than one address
+      const firstUsableAddress = usableAddresses[0]
+
+      // Ignore if we're already connected to the address
+      if (
+        this.usedRelays.some((usedRelay) =>
+          compareDirectConnectionInfo(usedRelay.relayDirectAddress, firstUsableAddress)
+        )
+      )
+        continue
+
       nodesToCheck.push({
         id: uncheckedNode.id,
-        multiaddrs: [usableAddresses[0]]
+        multiaddrs: [firstUsableAddress]
       })
     }
 
@@ -293,7 +316,7 @@ export class EntryNodes extends EventEmitter {
 
     const positiveOnes = results.findIndex((result: ConnectionResult) => result.entry.latency >= 0)
 
-    const previous = new Set<string>(this.usedRelays.map((ma) => relayFromRelayAddress(ma).toB58String()))
+    const previous = new Set<string>(this.getUsedRelayPeerIds().map((p) => p.toB58String()))
 
     if (positiveOnes >= 0) {
       // Close all unnecessary connections
@@ -311,10 +334,12 @@ export class EntryNodes extends EventEmitter {
       this.usedRelays = this.availableEntryNodes
         // select only those entry nodes with smallest latencies
         .slice(0, MAX_RELAYS_PER_NODE)
-        .map(
-          (entry: EntryNodeData) =>
-            new Multiaddr(`/p2p/${entry.id.toB58String()}/p2p-circuit/p2p/${this.peerId.toB58String()}`)
-        )
+        .map((entry: EntryNodeData) => {
+          return {
+            relayDirectAddress: entry.multiaddrs[0],
+            ourCircuitAddress: createCircuitAddress(entry.id, this.peerId)
+          }
+        })
     } else {
       log(`Could not connect to any entry node. Other nodes may not or no longer be able to connect to this node.`)
       // Reset to initial state
@@ -330,8 +355,8 @@ export class EntryNodes extends EventEmitter {
     if (this.usedRelays.length != previous.size) {
       isDifferent = true
     } else {
-      for (const usedRelay of this.usedRelays) {
-        if (!previous.has(relayFromRelayAddress(usedRelay).toB58String())) {
+      for (const usedRelayPeerIds of this.getUsedRelayPeerIds()) {
+        if (!previous.has(usedRelayPeerIds.toB58String())) {
           isDifferent = true
           break
         }
