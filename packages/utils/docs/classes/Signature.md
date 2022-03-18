@@ -46,7 +46,7 @@ as this makes interop with the underlying ECDSA library simpler.
 
 #### Defined in
 
-[types/primitives.ts:221](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L221)
+[types/primitives.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L119)
 
 ## Properties
 
@@ -68,7 +68,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:264](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L264)
+[types/primitives.ts:162](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L162)
 
 ## Methods
 
@@ -82,7 +82,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:249](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L249)
+[types/primitives.ts:147](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L147)
 
 ___
 
@@ -96,7 +96,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:260](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L260)
+[types/primitives.ts:158](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L158)
 
 ___
 
@@ -117,7 +117,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:256](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L256)
+[types/primitives.ts:154](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L154)
 
 ___
 
@@ -138,7 +138,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:244](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L244)
+[types/primitives.ts:142](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L142)
 
 ___
 
@@ -158,4 +158,4 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:230](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L230)
+[types/primitives.ts:128](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L128)

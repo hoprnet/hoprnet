@@ -108,6 +108,7 @@
 - [FIFO](modules.md#fifo)
 - [abortableTimeout](modules.md#abortabletimeout)
 - [cacheNoArgAsyncFunction](modules.md#cachenoargasyncfunction)
+- [channelStatusToString](modules.md#channelstatustostring)
 - [checkNetworks](modules.md#checknetworks)
 - [convertPubKeyFromB58String](modules.md#convertpubkeyfromb58string)
 - [convertPubKeyFromPeerId](modules.md#convertpubkeyfrompeerid)
@@ -994,6 +995,26 @@ ___
 
 ___
 
+### channelStatusToString
+
+▸ **channelStatusToString**(`status`): `string`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `status` | [`ChannelStatus`](enums/ChannelStatus.md) |
+
+#### Returns
+
+`string`
+
+#### Defined in
+
+[types/channelEntry.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L35)
+
+___
+
 ### checkNetworks
 
 ▸ **checkNetworks**(`networks`, `address`, `family`): `boolean`
@@ -1460,7 +1481,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L14)
+[types/channelEntry.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L16)
 
 ___
 
