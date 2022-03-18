@@ -141,10 +141,10 @@ Options:
   --password                     A password to encrypt your keys  [string] [default: ""]
   --apiToken                     A REST API token and admin panel password for user authentication  [string]
   --privateKey                   A private key to be used for your HOPR node  [string]
-  --identity                     The path to the identity file  [string] [default: "/home/tino/.hopr-identity"]
+  --identity                     The path to the identity file  [string] [default: "$HOME"]
   --run                          Run a single hopr command, same syntax as in hopr-admin  [string] [default: ""]
   --dryRun                       List all the options used to run the HOPR node, but quit instead of starting  [boolean] [default: false]
-  --data                         manually specify the database directory to use  [string] [default: ""]
+  --data                         manually specify the data directory to use  [string] [default: "$PWD/hoprd-db"]
   --init                         initialize a database if it doesn't already exist  [boolean] [default: false]
   --allowLocalNodeConnections    Allow connections to other nodes running on localhost.  [boolean] [default: false]
   --allowPrivateNodeConnections  Allow connections to other nodes running on private addresses.  [boolean] [default: false]
@@ -152,6 +152,8 @@ Options:
   --testPreferLocalAddresses     For testing local testnets. Prefer local peers to remote.  [boolean] [default: false]
   --testUseWeakCrypto            weaker crypto for faster node startup  [boolean] [default: false]
   --testNoAuthentication         no remote authentication for easier testing  [boolean] [default: false]
+  --heartbeatInterval            Interval in milliseconds in which the availability of other nodes get measured  [number]
+  --heartbeatVariance            Upper bound for variance applied to heartbeat interval in milliseconds  [number]
 ```
 
 As you might have noticed running the node without any command-line argument might not work depending on the installation method used. Here are examples to run a node with some safe configurations set.

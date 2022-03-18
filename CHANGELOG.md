@@ -51,6 +51,7 @@
 - Fixed locking issues in transaction processing ([#3568](https://github.com/hoprnet/hoprnet/pull/3568))
 - Publish `hoprd` and `cover-traffic-daemon` NPM packages with lockfiles for `npm` and `yarn` ([#3646](https://github.com/hoprnet/hoprnet/pull/3646))
 - Upgraded libp2p to v0.36.2 which includes multiple memory-usage improvements ([#3620](https://github.com/hoprnet/hoprnet/pull/3620))
+- Added new CLI parameters `--heartbeatInterval` and `--heartbeatVariance` to configure heartbeat behaviour ([#3515](https://github.com/hoprnet/hoprnet/pull/3515))
 
 ---
 
