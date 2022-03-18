@@ -22,6 +22,10 @@
 - [SIZE](Balance.md#size)
 - [SYMBOL](Balance.md#symbol)
 
+### Accessors
+
+- [ZERO](Balance.md#zero)
+
 ### Methods
 
 - [add](Balance.md#add)
@@ -35,7 +39,6 @@
 - [toFormattedString](Balance.md#toformattedstring)
 - [toHex](Balance.md#tohex)
 - [toString](Balance.md#tostring)
-- [ZERO](Balance.md#zero)
 - [deserialize](Balance.md#deserialize)
 
 ## Constructors
@@ -119,6 +122,20 @@ ___
 #### Defined in
 
 [types/primitives.ts:317](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L317)
+
+## Accessors
+
+### ZERO
+
+• `Static` `get` **ZERO**(): [`Balance`](Balance.md)
+
+#### Returns
+
+[`Balance`](Balance.md)
+
+#### Defined in
+
+[types/primitives.ts:332](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L332)
 
 ## Methods
 
@@ -353,20 +370,6 @@ BalanceBase.toString
 #### Defined in
 
 [types/primitives.ts:306](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L306)
-
-___
-
-### ZERO
-
-▸ `Static` **ZERO**(): [`Balance`](Balance.md)
-
-#### Returns
-
-[`Balance`](Balance.md)
-
-#### Defined in
-
-[types/primitives.ts:332](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L332)
 
 ___
 

@@ -21,6 +21,7 @@
 - [toHex](HalfKeyChallenge.md#tohex)
 - [toPeerId](HalfKeyChallenge.md#topeerid)
 - [toUncompressedCurvePoint](HalfKeyChallenge.md#touncompressedcurvepoint)
+- [deserialize](HalfKeyChallenge.md#deserialize)
 - [fromExponent](HalfKeyChallenge.md#fromexponent)
 - [fromPeerId](HalfKeyChallenge.md#frompeerid)
 - [fromString](HalfKeyChallenge.md#fromstring)
@@ -68,7 +69,7 @@
 
 #### Defined in
 
-[types/halfKeyChallenge.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L67)
+[types/halfKeyChallenge.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L71)
 
 ___
 
@@ -88,7 +89,7 @@ ___
 
 #### Defined in
 
-[types/halfKeyChallenge.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L71)
+[types/halfKeyChallenge.ts:75](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L75)
 
 ___
 
@@ -102,7 +103,7 @@ ___
 
 #### Defined in
 
-[types/halfKeyChallenge.ts:59](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L59)
+[types/halfKeyChallenge.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L63)
 
 ___
 
@@ -130,7 +131,7 @@ ___
 
 #### Defined in
 
-[types/halfKeyChallenge.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L63)
+[types/halfKeyChallenge.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L67)
 
 ___
 
@@ -159,6 +160,26 @@ ___
 #### Defined in
 
 [types/halfKeyChallenge.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L42)
+
+___
+
+### deserialize
+
+▸ `Static` **deserialize**(`arr`): [`HalfKeyChallenge`](HalfKeyChallenge.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `arr` | `Uint8Array` |
+
+#### Returns
+
+[`HalfKeyChallenge`](HalfKeyChallenge.md)
+
+#### Defined in
+
+[types/halfKeyChallenge.ts:59](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L59)
 
 ___
 
