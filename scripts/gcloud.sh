@@ -20,8 +20,8 @@ source "${mydir}/utils.sh"
 
 GCLOUD_INCLUDED=1 # So we can test for inclusion
 # using Belgium for better access to more VM types
-ZONE="--zone=europe-west1-d"
-declare gcloud_region="--region=europe-west1"
+ZONE="--zone=europe-west4-c"
+declare gcloud_region="--region=europe-west4"
 declare gcloud_disk_name="hoprd-data-disk"
 
 # use CPU optimized machine type
