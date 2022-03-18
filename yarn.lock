@@ -1705,9 +1705,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@chainsafe/libp2p-noise@npm:5.0.2":
-  version: 5.0.2
-  resolution: "@chainsafe/libp2p-noise@npm:5.0.2"
+"@chainsafe/libp2p-noise@npm:5.0.3":
+  version: 5.0.3
+  resolution: "@chainsafe/libp2p-noise@npm:5.0.3"
   dependencies:
     "@stablelib/chacha20poly1305": ^1.0.1
     "@stablelib/hkdf": ^1.0.1
@@ -1723,7 +1723,7 @@ __metadata:
     peer-id: ^0.16.0
     protobufjs: ^6.11.2
     uint8arrays: ^3.0.0
-  checksum: 9e462469ebc8eebcbba4f31c3424b862b5788bf0a627fd1e799cc5cc9caf10899e37e572004976b0e30d88836f713526f502617433cefeb57997903d1966ae29
+  checksum: 74fd550869e2a29356879c72c769cfb1c01cc25048215312a149c4173be0811887c62fe56ef416a02505100d2245d43472aeb7f9688c2f0d584e182453ed3d57
   languageName: node
   linkType: hard
 
@@ -3426,7 +3426,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-connect@workspace:packages/connect"
   dependencies:
-    "@chainsafe/libp2p-noise": 5.0.2
+    "@chainsafe/libp2p-noise": 5.0.3
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@types/bl": 5.0.2
     "@types/chai": 4.3.0
@@ -3500,7 +3500,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-core@workspace:packages/core"
   dependencies:
-    "@chainsafe/libp2p-noise": 5.0.2
+    "@chainsafe/libp2p-noise": 5.0.3
     "@google-cloud/profiler": 4.1.7
     "@hoprnet/hopr-connect": "workspace:packages/connect"
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum"
@@ -3605,7 +3605,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-utils@workspace:packages/utils"
   dependencies:
-    "@chainsafe/libp2p-noise": 5.0.2
+    "@chainsafe/libp2p-noise": 5.0.3
     "@types/mocha": 9.1.0
     "@types/pino": 7.0.4
     abort-controller: ~3.0.0
