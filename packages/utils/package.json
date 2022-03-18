@@ -25,7 +25,6 @@
     "abort-controller": "~3.0.0",
     "bignumber.js": "9.0.2",
     "bn.js": "5.2.0",
-    "bs58": "4.0.1",
     "chalk": "4.1.2",
     "debug": "4.3.3",
     "ethers": "5.5.2",

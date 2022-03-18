@@ -3241,7 +3241,6 @@ __metadata:
     bignumber.js: 9.0.2
     bl: 5.0.0
     bn.js: 5.2.0
-    bs58: 4.0.1
     chai: 4.3.4
     chalk: 4.1.2
     debug: 4.3.3
@@ -3289,7 +3288,6 @@ __metadata:
     "@types/yargs": 17.0.8
     bn.js: 5.2.0
     body-parser: 1.19.1
-    bs58: 4.0.1
     chalk: 4.1.2
     check-password-strength: 2.0.3
     cookie: 0.4.1
@@ -7366,7 +7364,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bs58@npm:4.0.1, bs58@npm:^4.0.0":
+"bs58@npm:^4.0.0":
   version: 4.0.1
   resolution: "bs58@npm:4.0.1"
   dependencies:

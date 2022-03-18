@@ -244,8 +244,8 @@ export class PersistedState {
 
     // for all the nodes in the network, set importance score as its weight and calculate the sum of all weights
     for (const p of Object.values(s.nodes)) {
-      weights[p.pub.toHex()] = importance(p.pub, s)
-      total = total.add(weights[p.pub.toHex()])
+      weights[p.pub.toUncompressedPubKeyHex()] = importance(p.pub, s)
+      total = total.add(weights[p.pub.toUncompressedPubKeyHex()])
     }
 
     if (total.lten(0)) {

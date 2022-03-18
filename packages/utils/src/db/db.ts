@@ -3,7 +3,6 @@ import levelup from 'levelup'
 import leveldown from 'leveldown'
 import MemDown from 'memdown'
 import { stat, mkdir, rm } from 'fs/promises'
-import path from 'path'
 import { debug } from '../process'
 import { Intermediate } from '../crypto'
 import {
@@ -63,7 +62,7 @@ function createPendingTicketsCountKey(address: Address) {
 function createAcknowledgedTicketKey(challenge: EthereumChallenge, channelEpoch: UINT256) {
   return Uint8Array.from([...ACKNOWLEDGED_TICKETS_PREFIX, ...channelEpoch.serialize(), ...challenge.serialize()])
 }
-export const createPendingAcknowledgement = (halfKey: HalfKeyChallenge) => {
+function createPendingAcknowledgement(halfKey: HalfKeyChallenge) {
   return Uint8Array.from([...PENDING_ACKNOWLEDGEMENTS_PREFIX, ...halfKey.serialize()])
 }
 
@@ -122,22 +121,7 @@ export class HoprDB {
 
   constructor(private id: PublicKey) {}
 
-  async init(
-    initialize: boolean,
-    version: string,
-    dbPath: string,
-    forceCreate: boolean = false,
-    environmentId: string
-  ) {
-    if (!dbPath) {
-      if (!environmentId) {
-        throw new Error(`must provide environmentId if no dbPath is given`)
-      }
-      dbPath = path.join(process.cwd(), 'db', environmentId, version)
-    }
-
-    dbPath = path.resolve(dbPath)
-
+  async init(initialize: boolean, dbPath: string, forceCreate: boolean = false, environmentId: string) {
     let setEnvironment = false
 
     log(`using db at ${dbPath}`)

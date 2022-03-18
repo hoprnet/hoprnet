@@ -631,10 +631,8 @@ class Indexer extends EventEmitter {
 
   private async onAnnouncement(event: Event<'Announcement'>, blockNumber: BN, lastSnapshot: Snapshot): Promise<void> {
     // publicKey given by the SC is verified
-    const publicKey = PublicKey.deserialize(
-      // add uncompressed key identifier
-      Uint8Array.from([4, ...stringToU8a(event.args.publicKey)])
-    )
+    const publicKey = PublicKey.fromString(event.args.publicKey)
+
     const multiaddr = new Multiaddr(stringToU8a(event.args.multiaddr))
       // remove "p2p" and corresponding peerID
       .decapsulateCode(421)
@@ -642,9 +640,6 @@ class Indexer extends EventEmitter {
       .encapsulate(`/p2p/${publicKey.toPeerId().toB58String()}`)
     const account = new AccountEntry(publicKey, multiaddr, blockNumber)
 
-    if (!account.getPeerId() || !PeerId.isPeerId(account.getPeerId())) {
-      throw Error('Peer ID in multiaddr is null')
-    }
     log('New node announced', account.getAddress().toHex(), account.multiAddr.toString())
 
     await this.db.updateAccountAndSnapshot(account, lastSnapshot)
@@ -760,7 +755,7 @@ class Indexer extends EventEmitter {
   }
 
   public async getPublicNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
-    const accounts = await this.db.getAccounts((account: AccountEntry) => account.containsRouting())
+    const accounts = await this.db.getAccounts((account: AccountEntry) => account.containsRouting)
 
     const result: { id: PeerId; multiaddrs: Multiaddr[] }[] = Array.from({ length: accounts.length })
 

@@ -1,7 +1,22 @@
 import assert from 'assert'
 import { findPath } from '.'
 import BN from 'bn.js'
-import { Balance, PublicKey } from '@hoprnet/hopr-utils'
+import { Balance, type ChannelEntry, PublicKey } from '@hoprnet/hopr-utils'
+
+const pubKeys = [
+  '0x0443a3958ac66a3b2ab89fcf90bc948a8b8be0e0478d21574d077ddeb11f4b1e9f2ca21d90bd66cee037255480a514b91afae89e20f7f7fa7353891cc90a52bf6e',
+  '0x04f16fd6701aea01032716377d52d8213497c118f99cdd1c3c621b2795cac8681606b7221f32a8c5d2ef77aa783bec8d96c11480acccabba9e8ee324ae2dfe92bb',
+  '0x04613ec6ef4bf62b9b1132d3f515e51cc6cb4101c4ad6b63b8a18915257985dbdf035156e2a35a9818ccfa263c5777e77ce5cbb7f71ae4275c4accb4d72c010985',
+  '0x045b1e46f70628d6ab2436b4dd6120a85dff3ef3077035a1eb07f09f96f47e9ed7876d22fb3cdf6232f89e31080c96f075d0b2819be990206076bbae9486b1b3b6',
+  '0x047610d3509dcfd799132470a812cd2862259f711ebcde5b3057a4a18beb9fa79a0ca3c367e6b79fcb13f72adca90c6af0788fc57c903f80175dac11037f4a485c',
+  '0x04c4d09dbf7233bdc7e27d7ef7f13c924a8dc95f295ef462484cff03030478b18de0e4cae3d9e1d4280ef3aded0f8d366f10f4513482d3972221a8586bf0dce439'
+]
+
+const TEST_NODES = Array.from({ length: 6 }, (_, index: number) => PublicKey.fromString(pubKeys[index]))
+
+function testNodeId(pKey: PublicKey) {
+  return TEST_NODES.findIndex((testKey) => testKey.eq(pKey))
+}
 
 function checkPath(path: PublicKey[], edges: Map<PublicKey, PublicKey[]>) {
   for (let i = 0; i < path.length - 1; i++) {
@@ -18,29 +33,16 @@ function checkPath(path: PublicKey[], edges: Map<PublicKey, PublicKey[]>) {
   }
 }
 
-async function weight(c): Promise<BN> {
+async function weight(c: ChannelEntry): Promise<BN> {
   return c.balance.toBN().addn(1)
 }
 
-export function fakePublicKey(i: number | string): PublicKey {
-  return {
-    //@ts-ignore
-    id: i,
-    //@ts-ignore
-    eq: (x: PublicKey) => x.id == i,
-    toB58String: () => i,
-    toPeerId: () => {},
-    toHex: () => '' + i
-  } as unknown as PublicKey
-}
-
 describe('test pathfinder with some simple topologies', function () {
-  const TEST_NODES = Array.from({ length: 5 }).map((_, i) => fakePublicKey(i))
-  const RELIABLE_NETWORK = (_p: any) => 1
-  const UNRELIABLE_NETWORK = (p: any) => ((p.id as any) % 3 == 0 ? 0 : 1) // Node 3 is down
+  const RELIABLE_NETWORK = (_p: PublicKey) => 1
+  const UNRELIABLE_NETWORK = (pubKey: PublicKey) => (testNodeId(pubKey) % 3 == 0 ? 0 : 1) // Node 3 is down
   const STAKE_1 = () => new Balance(new BN(1))
-  // @ts-ignore
-  const STAKE_N = (x: PublicKey) => new Balance(new BN(x.id + 0.1))
+
+  const STAKE_N = (pubKey: PublicKey) => new Balance(new BN(testNodeId(pubKey) + 0.1))
 
   // Bidirectional star, all pass through node 0
   const STAR = new Map<PublicKey, PublicKey[]>()
@@ -58,68 +60,45 @@ describe('test pathfinder with some simple topologies', function () {
   function fakeChannels(
     edges: Map<PublicKey, PublicKey[]>,
     stakes: (i: PublicKey) => Balance
-  ): (p: PublicKey) => Promise<any[]> {
+  ): (p: PublicKey) => Promise<ChannelEntry[]> {
     return (a: PublicKey) =>
-      Promise.resolve((edges.get(a) || []).map((b) => ({ source: a, destination: b, balance: stakes(b) as any })))
+      Promise.resolve(
+        (edges.get(a) || []).map((b) => ({ source: a, destination: b, balance: stakes(b) })) as ChannelEntry[]
+      )
   }
 
   it('should find a path through a reliable star', async function () {
-    const path = await findPath(
-      TEST_NODES[1],
-      fakePublicKey(6),
-      2,
-      RELIABLE_NETWORK,
-      fakeChannels(STAR, STAKE_1),
-      weight
-    )
+    const path = await findPath(TEST_NODES[1], TEST_NODES[5], 2, RELIABLE_NETWORK, fakeChannels(STAR, STAKE_1), weight)
     checkPath(path, STAR)
     assert(path.length == 2, 'Should find a valid acyclic path')
   })
 
   it('should find the most valuable path through a reliable star', async function () {
-    const path = await findPath(
-      TEST_NODES[1],
-      fakePublicKey(6),
-      2,
-      RELIABLE_NETWORK,
-      fakeChannels(STAR, STAKE_N),
-      weight
-    )
+    const path = await findPath(TEST_NODES[1], TEST_NODES[5], 2, RELIABLE_NETWORK, fakeChannels(STAR, STAKE_N), weight)
     checkPath(path, STAR)
     // @ts-ignore
-    assert(path[1].id == 4, 'Last hop should be 4 (most valuable choice)')
+    assert(testNodeId(path[1]) == 4, 'Last hop should be 4 (most valuable choice)')
   })
 
   it('should not find a path if it doesnt exist', async () => {
-    let thrown = false
-    try {
-      await findPath(TEST_NODES[1], fakePublicKey(6), 4, RELIABLE_NETWORK, fakeChannels(STAR, STAKE_1), weight)
-    } catch (e) {
-      thrown = true
-    }
-    assert(thrown, 'should throw if there is no possible path')
+    await assert.rejects(
+      async () =>
+        await findPath(TEST_NODES[1], TEST_NODES[5], 4, RELIABLE_NETWORK, fakeChannels(STAR, STAKE_1), weight),
+      'should throw if there is no possible path'
+    )
   })
 
   it('should find a path through a reliable arrow', async () => {
-    const path = await findPath(
-      TEST_NODES[0],
-      fakePublicKey(6),
-      3,
-      RELIABLE_NETWORK,
-      fakeChannels(ARROW, STAKE_1),
-      weight
-    )
+    const path = await findPath(TEST_NODES[0], TEST_NODES[5], 3, RELIABLE_NETWORK, fakeChannels(ARROW, STAKE_1), weight)
     checkPath(path, ARROW)
     assert(path.length == 3, 'Should find a valid acyclic path')
   })
 
   it('should not find a path if a node is unreliable', async () => {
-    let thrown = false
-    try {
-      await findPath(TEST_NODES[0], fakePublicKey(6), 3, UNRELIABLE_NETWORK, fakeChannels(ARROW, STAKE_1), weight)
-    } catch (e) {
-      thrown = true
-    }
-    assert(thrown, 'should throw if there is no possible path')
+    await assert.rejects(
+      async () =>
+        await findPath(TEST_NODES[0], TEST_NODES[5], 3, UNRELIABLE_NETWORK, fakeChannels(ARROW, STAKE_1), weight),
+      'should throw if there is no possible path'
+    )
   })
 })

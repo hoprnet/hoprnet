@@ -119,7 +119,7 @@ describe('test indexer', function () {
     await indexer.start(chain, 0)
 
     const pubKey = await indexer.getPublicKeyOf(fixtures.PARTY_A.toAddress())
-    assert.strictEqual(pubKey.toHex(), fixtures.PARTY_A.toHex())
+    assert(pubKey.eq(fixtures.PARTY_A))
   })
 
   it('should get all data from DB', async function () {

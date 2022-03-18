@@ -1,9 +1,12 @@
 import { type Address, ChannelEntry, PublicKey } from '.'
 import assert from 'assert'
-import BN from 'bn.js'
 
-const PARTY_A = PublicKey.fromPrivKeyString('0x0f1b0de97ef1e907d8152bdfdaa39b4bb5879d5d48d152a84421bd2f9ccb3877')
-const PARTY_B = PublicKey.fromPrivKeyString('0x4c6a00ceb8e3c0c4c528839f88f2eff948dd8df37e067a8b6f222c6496bdb7b0')
+const PARTY_A = PublicKey.fromString(
+  '0x0443a3958ac66a3b2ab89fcf90bc948a8b8be0e0478d21574d077ddeb11f4b1e9f2ca21d90bd66cee037255480a514b91afae89e20f7f7fa7353891cc90a52bf6e'
+)
+const PARTY_B = PublicKey.fromString(
+  '0x04f16fd6701aea01032716377d52d8213497c118f99cdd1c3c621b2795cac8681606b7221f32a8c5d2ef77aa783bec8d96c11480acccabba9e8ee324ae2dfe92bb'
+)
 
 const COMMITMENT = '0xffab46f058090de082a086ea87c535d34525a48871c5a2024f80d0ac850f81ef'
 
@@ -23,13 +26,13 @@ describe('ChannelEntry', function () {
           source: PARTY_A.toAddress().toHex(),
           destination: PARTY_B.toAddress().toHex(),
           newState: {
-            balance: new BN(2),
+            balance: '2',
             commitment: COMMITMENT,
-            ticketEpoch: new BN(3),
-            ticketIndex: new BN(4),
+            ticketEpoch: '3',
+            ticketIndex: '4',
             status: 1,
-            channelEpoch: new BN(5),
-            closureTime: new BN(6)
+            channelEpoch: '5',
+            closureTime: '6'
           }
         }
       },

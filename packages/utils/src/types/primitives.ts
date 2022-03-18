@@ -173,6 +173,10 @@ abstract class BalanceBase {
   abstract add(b: BalanceBase): BalanceBase
   abstract sub(b: BalanceBase): BalanceBase
 
+  public eq(b: Balance): boolean {
+    return this.bn.eq(b.bn)
+  }
+
   public toBN(): BN {
     return this.bn
   }
@@ -182,19 +186,19 @@ abstract class BalanceBase {
   }
 
   public lt(b: BalanceBase): boolean {
-    return this.toBN().lt(b.toBN())
+    return this.bn.lt(b.bn)
   }
 
   public gt(b: BalanceBase): boolean {
-    return this.toBN().gt(b.toBN())
+    return this.bn.gt(b.bn)
   }
 
   public gte(b: BalanceBase): boolean {
-    return this.toBN().gte(b.toBN())
+    return this.bn.gte(b.bn)
   }
 
   public lte(b: BalanceBase): boolean {
-    return this.toBN().lte(b.toBN())
+    return this.bn.lte(b.bn)
   }
 
   public serialize(): Uint8Array {
@@ -223,10 +227,6 @@ export class Balance extends BalanceBase {
     return new Balance(this.bn.sub(b.bn))
   }
 
-  public eq(b: Balance): boolean {
-    return this.bn.eq(b.bn)
-  }
-
   static deserialize(arr: Uint8Array): Balance {
     return new Balance(new BN(arr))
   }
@@ -251,7 +251,7 @@ export class NativeBalance extends BalanceBase {
   static deserialize(arr: Uint8Array): NativeBalance {
     return new NativeBalance(new BN(arr))
   }
-  static ZERO(): NativeBalance {
+  static get ZERO(): NativeBalance {
     return new NativeBalance(new BN('0'))
   }
 }

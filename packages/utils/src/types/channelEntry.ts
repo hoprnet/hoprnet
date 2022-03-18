@@ -4,6 +4,7 @@ import { PublicKey } from './publicKey'
 import { UINT256 } from './solidity'
 import BN from 'bn.js'
 import chalk from 'chalk'
+import type { BigNumberish } from 'ethers'
 
 export enum ChannelStatus {
   Closed = 0,
@@ -31,7 +32,7 @@ function numberToChannelStatus(i: number): ChannelStatus {
   }
 }
 
-function channelStatusToString(status: ChannelStatus): string {
+export function channelStatusToString(status: ChannelStatus): string {
   switch (status) {
     case ChannelStatus.Closed:
       return 'Closed'
@@ -59,19 +60,19 @@ type ChannelUpdateEvent = {
     source: string
     destination: string
     newState: {
-      balance: BN
+      balance: BigNumberish
       commitment: string
-      ticketEpoch: BN
-      ticketIndex: BN
+      ticketEpoch: BigNumberish
+      ticketIndex: BigNumberish
       status: number
-      channelEpoch: BN
-      closureTime: BN
+      channelEpoch: BigNumberish
+      closureTime: BigNumberish
     }
   }
 }
 
 export class ChannelEntry {
-  private constructor(
+  constructor(
     public readonly source: PublicKey,
     public readonly destination: PublicKey,
     public readonly balance: Balance,

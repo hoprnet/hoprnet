@@ -1,15 +1,7 @@
 import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from './abstractCommand'
 import { styleValue } from './utils'
-import { PublicKey, ChannelStatus } from '@hoprnet/hopr-utils'
-
-const channelStatusToString = (status: ChannelStatus): string => {
-  if (status === 0) return 'Closed'
-  else if (status === 1) return 'WaitingForCommitment'
-  else if (status === 2) return 'Open'
-  else if (status === 3) return 'PendingToClose'
-  return 'Unknown'
-}
+import { PublicKey, ChannelStatus, channelStatusToString } from '@hoprnet/hopr-utils'
 
 export default class ListOpenChannels extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -30,7 +22,7 @@ export default class ListOpenChannels extends AbstractCommand {
   async execute(log: (str: string) => void): Promise<void> {
     log('fetching channels...')
     try {
-      const selfPubKey = new PublicKey(this.node.getId().pubKey.marshal())
+      const selfPubKey = PublicKey.fromPeerId(this.node.getId())
       const selfAddress = selfPubKey.toAddress()
 
       const channelsFrom = (await this.node.getChannelsFrom(selfAddress)).filter(
@@ -41,12 +33,12 @@ export default class ListOpenChannels extends AbstractCommand {
       }
       // find counterpartys' peerIds
       for (const channel of channelsFrom) {
-        log(`
-Outgoing Channel:       ${styleValue(channel.getId().toHex(), 'hash')}
-To:                     ${styleValue(channel.destination.toPeerId().toB58String(), 'peerId')}
-Status:                 ${styleValue(channelStatusToString(channel.status), 'highlight')}
-Balance:                ${styleValue(channel.balance.toFormattedString(), 'number')}
-`)
+        const out =
+          `Outgoing Channel:       ${styleValue(channel.getId().toHex(), 'hash')}\n` +
+          `To:                     ${styleValue(channel.destination.toPeerId().toB58String(), 'peerId')}\n` +
+          `Status:                 ${styleValue(channelStatusToString(channel.status), 'highlight')}\n` +
+          `Balance:                ${styleValue(channel.balance.toFormattedString(), 'number')}`
+        log(out)
       }
 
       const channelsTo = (await this.node.getChannelsTo(selfAddress)).filter(
@@ -57,12 +49,12 @@ Balance:                ${styleValue(channel.balance.toFormattedString(), 'numbe
       }
       // find counterpartys' peerIds
       for (const channel of channelsTo) {
-        log(`
-Incoming Channel:       ${styleValue(channel.getId().toHex(), 'hash')}
-From:                   ${styleValue(channel.source.toPeerId().toB58String(), 'peerId')}
-Status:                 ${styleValue(channelStatusToString(channel.status), 'highlight')}
-Balance:                ${styleValue(channel.balance.toFormattedString(), 'number')}
-`)
+        const out =
+          `Incoming Channel:       ${styleValue(channel.getId().toHex(), 'hash')}\n` +
+          `From:                   ${styleValue(channel.source.toPeerId().toB58String(), 'peerId')}\n` +
+          `Status:                 ${styleValue(channelStatusToString(channel.status), 'highlight')}\n` +
+          `Balance:                ${styleValue(channel.balance.toFormattedString(), 'number')}\n`
+        log(out)
       }
       return
     } catch (err) {
