@@ -15,7 +15,7 @@ describe('getInfo', () => {
     })
     node.getAddressesAnnouncedToDHT = sinon.fake.returns([1, 2])
     node.getListeningAddresses = sinon.fake.returns([3, 4])
-    const info = await getInfo({ node })
+    const info = await getInfo(node)
     assert.deepEqual(info, {
       environment: 'hardhat-localhost',
       announcedAddress: ['1', '2'],

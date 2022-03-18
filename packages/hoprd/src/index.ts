@@ -4,6 +4,7 @@ import { passwordStrength } from 'check-password-strength'
 import { decode } from 'rlp'
 import path from 'path'
 import yargs from 'yargs/yargs'
+import { setTimeout } from 'timers/promises'
 import { terminalWidth } from 'yargs'
 
 import Hopr, { createHoprNode } from '@hoprnet/hopr-core'
@@ -16,6 +17,7 @@ import setupHealthcheck from './healthcheck'
 import { AdminServer } from './admin'
 import { LogStream } from './logs'
 import { getIdentity } from './identity'
+import runCommand, { isSupported as isSupportedCommand } from './run'
 
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import { setLogger } from 'trace-unhandled'
@@ -136,7 +138,7 @@ const argv = yargs(process.argv.slice(2))
   })
   .option('run', {
     string: true,
-    describe: 'Run a single hopr command, same syntax as in hopr-admin',
+    describe: 'Run a command once the node has started. Available commands: [info,balance,daemonize]',
     default: ''
   })
   .option('dryRun', {
@@ -417,29 +419,30 @@ async function main() {
       logs.logStatus('READY')
       logs.log('Node has started!')
 
-      // if (argv.run && argv.run !== '') {
-      //   // Run a single command and then exit.
-      //   // We support multiple semicolon separated commands
-      //   let toRun = argv.run.split(';').map((c: string) =>
-      //     // Remove obsolete ' and "
-      //     c.replace(/"/g, '')
-      //   )
+      // Run a single command and then exit.
+      if (argv.run && argv.run !== '') {
+        // We support multiple semicolon separated commands
+        const toRun: string[] = argv.run.split(';').map((cmd: string) =>
+          // Remove obsolete ' and "
+          cmd.replace(/"/g, '')
+        )
 
-      //   for (let c of toRun) {
-      //     console.error('$', c)
-      //     if (c === 'daemonize') {
-      //       return
-      //     }
+        for (let cmd of toRun) {
+          console.error('$', cmd)
+          if (!isSupportedCommand(cmd)) {
+            throw new Error(`Unsupported command: "${cmd}"`)
+          }
 
-      //     await cmds.execute((msg) => {
-      //       logs.log(msg)
-      //     }, c)
-      //   }
-      //   // Wait for actions to take place
-      //   await setTimeout(1e3)
-      //   await node.stop()
-      //   return
-      // }
+          const [shouldExit, output] = await runCommand(node, cmd as any)
+          if (shouldExit) return
+          else logs.log(JSON.stringify(output, null, 2))
+        }
+
+        // Wait for actions to take place
+        setTimeout(1e3)
+        await node.stop()
+        return
+      }
     })
 
     // 2.a - Setup connector listener to bubble up to node. Emit connector creation.

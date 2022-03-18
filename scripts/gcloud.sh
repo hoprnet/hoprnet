@@ -108,7 +108,6 @@ gcloud_update_container_with_image() {
     --container-arg="--environment" --container-arg="${environment_id}" \
     --container-arg="--api" \
     --container-arg="--apiHost" --container-arg="0.0.0.0" \
-    --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
     --container-restart-policy=always
 }
 

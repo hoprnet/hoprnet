@@ -5,7 +5,7 @@ import { STATUS_CODES } from '../../utils'
 
 export const getPeerInfo = async (node: Hopr, peerId: PeerId) => {
   const announced = await node.getAddressesAnnouncedToDHT(peerId)
-  const observed = node.getObservedAddresses(peerId)
+  const observed = await node.getObservedAddresses(peerId)
 
   return {
     announced: announced.map((v) => v.toString()),
