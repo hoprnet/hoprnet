@@ -1,3 +1,7 @@
+### Next
+
+- Enhanced database queries through range queries and batched operations ([#3648](https://github.com/hoprnet/hoprnet/pull/3648))
+
 <a name="1.86"></a>
 
 ## [1.86](https://github.com/hoprnet/hoprnet/compare/release/budapest...hoprnet:release/athens) (2022-01-26)

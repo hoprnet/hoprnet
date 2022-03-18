@@ -228,20 +228,31 @@ export class HoprDB {
     return coerce(u8a)
   }
 
-  protected async getAll<T, U = T>(
+  /**
+   * Gets a elements from the database of a kind.
+   * Optionally applies `filter`then `map` then `sort` to the result.
+   * @param range.prefix key prefix, such as `channels-`
+   * @param range.suffixLength length of the appended identifier to distinguish elements
+   * @param deserialize function to parse serialized objects
+   * @param filter [optional] filter deserialized objects
+   * @param map [optional] transform deserialized and filtered objects
+   * @param sorter [optional] sort deserialized, filtered and transformed objects
+   * @returns a Promises that resolves with the found elements
+   */
+  protected async getAll<Element, TransformedElement = Element>(
     range: {
       prefix: Uint8Array
       suffixLength: number
     },
-    deserialize: (u: Uint8Array) => T,
-    filter?: ((o: T) => boolean) | undefined,
-    map?: (i: T) => U,
-    sorter?: (e1: U, e2: U) => number
-  ): Promise<U[]> {
+    deserialize: (u: Uint8Array) => Element,
+    filter?: ((o: Element) => boolean) | undefined,
+    map?: (i: Element) => TransformedElement,
+    sorter?: (e1: TransformedElement, e2: TransformedElement) => number
+  ): Promise<TransformedElement[]> {
     const firstPrefixed = this.keyOf(range.prefix, new Uint8Array(range.suffixLength).fill(0x00))
     const lastPrefixed = this.keyOf(range.prefix, new Uint8Array(range.suffixLength).fill(0xff))
 
-    const results: U[] = []
+    const results: TransformedElement[] = []
 
     // @TODO fix types in @types/levelup package
     for await (const [_key, chunk] of this.db.iterator({
@@ -249,13 +260,13 @@ export class HoprDB {
       lte: Buffer.from(lastPrefixed),
       keys: false
     }) as any) {
-      const obj: T = deserialize(Uint8Array.from(chunk))
+      const obj: Element = deserialize(Uint8Array.from(chunk))
 
       if (!filter || filter(obj)) {
         if (map) {
           results.push(map(obj))
         } else {
-          results.push(obj as unknown as U)
+          results.push(obj as unknown as TransformedElement)
         }
       }
     }
