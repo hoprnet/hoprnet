@@ -1,6 +1,7 @@
 /node_modules
 /lib
 /db
+/hopr-db
 
 # Exclude built npm packages
 /*.tgz
