@@ -37,7 +37,7 @@ export function LogLine({ log }: { log: Log }) {
 
   return (
     <div key={log.ts} className={styles.logline}>
-      <time>{String(log.ts).slice(11)}</time>
+      <time>{new Date(log.ts).toISOString().slice(11)}</time>
       <pre>{output}</pre>
       <div className={styles.loglineicons}>
         {ids.slice(0, 1).map((x) => (
@@ -49,7 +49,7 @@ export function LogLine({ log }: { log: Log }) {
   )
 }
 
-export function Logs(props: { connecting: boolean; messages: Log[]; authRequired: boolean }) {
+export function Logs(props: { connecting: boolean; messages: Log[] }) {
   let container = useRef(null)
 
   useEffect(() => {
@@ -61,8 +61,7 @@ export function Logs(props: { connecting: boolean; messages: Log[]; authRequired
   return (
     <div className={cls}>
       <div ref={container}>
-        {props.connecting && <span>Attempting to connect</span>}
-        {props.authRequired && <span>Auth Required</span>}
+        {props.connecting && <span>Attempting to connect, please ensure correct settings are set!</span>}
         {props.messages.map((log) => (
           <LogLine log={log} key={log.id} />
         ))}

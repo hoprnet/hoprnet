@@ -57,7 +57,7 @@ export abstract class Command {
         use.push('<none>')
       }
 
-      items.push([use.join(''), desc])
+      items.push([use.join(' '), desc])
     }
 
     return toPaddedString(items)

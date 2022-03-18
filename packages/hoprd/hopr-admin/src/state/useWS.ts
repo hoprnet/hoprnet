@@ -8,7 +8,7 @@ import { type Settings, type ApiPath, isSSR } from '../utils'
 
 export type ConnectionStatus = 'CONNECTED' | 'DISCONNECTED'
 
-const useWebsocket = (settings: Settings, path: ApiPath) => {
+const useWebsocket = (settings: Settings, apiPath: ApiPath) => {
   // update timestamp when you want to reconnect to the websocket
   const [reconnectTmsp, setReconnectTmsp] = useState<number>()
   const [state, setState] = useState<{
@@ -60,8 +60,8 @@ const useWebsocket = (settings: Settings, path: ApiPath) => {
     }
 
     // need to set the token in the query parameters, to enable websocket authentication
-    const wsUrl = new URL(settings.apiEndpoint + path)
-    wsUrl.protocol = 'ws'
+    const wsUrl = new URL(apiPath, settings.apiEndpoint)
+    wsUrl.protocol = wsUrl.protocol === 'https' ? 'wss' : 'ws'
     if (settings.apiToken) {
       wsUrl.search = `?apiToken=${settings.apiToken}`
     }

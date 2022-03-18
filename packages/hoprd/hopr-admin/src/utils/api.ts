@@ -31,13 +31,13 @@ export default class API {
     this.apiToken = apiToken
   }
 
-  private async getReq(apiPath: ApiPath): Promise<Response> {
+  public async getReq(apiPath: ApiPath): Promise<Response> {
     return fetch(this.getEndpoint(apiPath), {
       headers: this.getHeaders()
     })
   }
 
-  private async postReq(apiPath: ApiPath, payload: any): Promise<Response> {
+  public async postReq(apiPath: ApiPath, payload: any): Promise<Response> {
     return fetch(this.getEndpoint(apiPath), {
       method: 'POST',
       headers: this.getHeaders(),
@@ -45,7 +45,7 @@ export default class API {
     })
   }
 
-  private async putReq(apiPath: ApiPath, payload: any): Promise<Response> {
+  public async putReq(apiPath: ApiPath, payload: any): Promise<Response> {
     return fetch(this.getEndpoint(apiPath), {
       method: 'PUT',
       headers: this.getHeaders(),
@@ -53,7 +53,7 @@ export default class API {
     })
   }
 
-  private async delReq(apiPath: ApiPath): Promise<Response> {
+  public async delReq(apiPath: ApiPath): Promise<Response> {
     return fetch(this.getEndpoint(apiPath), {
       method: 'DELETE',
       headers: this.getHeaders()
@@ -78,7 +78,7 @@ export default class API {
   }
 
   // aliases API
-  public async getAliases() {
+  public async getAliases(): Promise<Record<string, string>> {
     return this.getReq('/api/v2/aliases').then((res) => res.json())
   }
   public async setAlias(peerId: string, alias: string) {

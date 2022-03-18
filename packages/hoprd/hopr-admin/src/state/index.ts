@@ -16,11 +16,13 @@ const useAppState = () => {
 
   const [state, setState] = useState<{
     settings: Settings
+    aliases: Record<string, string>
   }>({
     settings: {
       apiEndpoint: urlParams.apiEndpoint || 'http://localhost:3001/',
       apiToken: urlParams.apiToken || apiTokenFromCookies || undefined
-    }
+    },
+    aliases: {}
   })
 
   // initialize API
@@ -44,10 +46,23 @@ const useAppState = () => {
   }
 
   /**
+   * Updates the app's aliases.
+   */
+  const updateAliases = (newAliases: Record<string, string>) => {
+    setState((state) => {
+      for (const [k, v] of Object.entries(newAliases)) {
+        state.aliases[k] = v
+      }
+      return state
+    })
+  }
+
+  /**
    * Connection status of the app.
    * Takes into account all WS connections.
    */
   const status = useMemo<'DISCONNECTED' | 'CONNECTED'>(() => {
+    console.log('USE MEMO', streamWS.state.status, messagesWS.state.status)
     if (streamWS.state.status === 'CONNECTED' && messagesWS.state.status === 'CONNECTED') return 'CONNECTED'
     return 'DISCONNECTED'
   }, [streamWS.state.status, messagesWS.state.status])
@@ -58,6 +73,7 @@ const useAppState = () => {
     streamWS,
     messagesWS,
     updateSettings,
+    updateAliases,
     status
   }
 }

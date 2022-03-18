@@ -83,7 +83,10 @@
     "extension": [
       "ts"
     ],
-    "spec": "src/**/*.spec.ts",
+    "spec": [
+      "src/**/*.spec.ts",
+      "hopr-admin/**/*.spec.ts"
+    ],
     "require": "ts-node/register"
   },
   "publishConfig": {

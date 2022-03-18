@@ -1,6 +1,6 @@
 import type { Command } from '../utils/command'
 import API from '../utils/api'
-
+// commands
 import Alias from './alias'
 import Addresses from './addresses'
 import Balances from './balances'
@@ -21,21 +21,11 @@ import Help from './help'
 // TODO: restore dev command
 // import Addresses from './addresses'
 
-type Aliases = Record<string, string>
-
 export default class Commands {
   private commandMap: Map<string, Command> = new Map()
-  private aliases: Aliases = {}
 
-  private getCachedAliases(): Aliases {
-    this.api.getAliases().then((aliases) => {
-      this.aliases = aliases
-    })
-    return this.aliases
-  }
-
-  constructor(private api: API) {
-    const extra = { getCachedAliases: this.getCachedAliases.bind(this) }
+  constructor(private api: API, getCachedAliases: () => Record<string, string>) {
+    const extra = { getCachedAliases }
 
     // TODO: restore dev command Addresses
     const commands: Command[] = [

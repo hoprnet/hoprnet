@@ -37,15 +37,14 @@ export default class Alias extends Command {
     const aliases = this.extra.getCachedAliases()
 
     if (use === 'default') {
-      const names = Object.entries(aliases).map(([name]) => `${name} -> `)
+      const entries = Object.entries(aliases)
 
       // no aliases found
-      if (names.length === 0) {
+      if (entries.length === 0) {
         return log(`No aliases found.\nTo set an alias use, ${this.usage()}`)
       }
 
-      const peerIds = Object.entries(aliases).map(([, alias]) => `${alias}`)
-      return log(toPaddedString(names.map<[string, string]>((name, index) => [name, peerIds[index]])))
+      return log(toPaddedString(entries.map<[string, string]>(([name, peerId]) => [name, `-> ${peerId}`])))
     } else {
       // sets aliases
       try {

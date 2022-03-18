@@ -93,3 +93,11 @@ export type Settings = {
 export type ApiPath = `/api/v2/${string}`
 
 export type Log = { id: string; msg: string; ts: number }
+
+export const createLog = (msg: string, ts?: number): Log => {
+  return {
+    msg,
+    id: String(Math.random()),
+    ts: ts || +new Date()
+  }
+}
