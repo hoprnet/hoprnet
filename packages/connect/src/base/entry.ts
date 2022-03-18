@@ -17,7 +17,7 @@ import type { Connection } from 'libp2p-interfaces/connection'
 import type PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'
 
-import { nAtATime, retimer, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
+import { createCircuitAddress, nAtATime, retimer, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 import type HoprConnect from '..'
 import { attemptClose, relayFromRelayAddress } from '../utils'
 import { compareDirectConnectionInfo } from '../utils/addrs'
@@ -127,10 +127,18 @@ export class EntryNodes extends EventEmitter {
   }
 
   /**
-   * @returns a list of entry nodes that are currently used (as circuit addresses with us)
+   * @returns a list of entry nodes that are currently used (as relay circuit addresses with us)
    */
-  public getUsedRelays() {
+  public getUsedRelayAddresses() {
     return this.usedRelays.map((ur) => ur.ourCircuitAddress)
+  }
+
+  /**
+   * Convenience method to retrieved used relay peer IDs.
+   * @returns a list of peer IDs of used relays.
+   */
+  private getUsedRelayPeerIds() {
+    return this.getUsedRelayAddresses().map((ma => relayFromRelayAddress(ma)));
   }
 
   /**
@@ -196,9 +204,9 @@ export class EntryNodes extends EventEmitter {
     }
 
     let inUse = false
-    for (const relayAddr of this.usedRelays) {
+    for (const relayPeer of this.getUsedRelayPeerIds()) {
       // remove second part of relay address to get relay peerId
-      if (relayFromRelayAddress(relayAddr.ourCircuitAddress).equals(peer)) {
+      if (relayPeer.equals(peer)) {
         inUse = true
       }
     }
@@ -289,7 +297,7 @@ export class EntryNodes extends EventEmitter {
     const positiveOnes = results.findIndex((result: ConnectionResult) => result.entry.latency >= 0)
 
     const previous = new Set<string>(
-      this.usedRelays.map((ma) => relayFromRelayAddress(ma.ourCircuitAddress).toB58String())
+      this.getUsedRelayPeerIds().map((p) => p.toB58String())
     )
 
     if (positiveOnes >= 0) {
@@ -311,9 +319,7 @@ export class EntryNodes extends EventEmitter {
         .map((entry: EntryNodeData) => {
           return {
             relayDirectAddress: entry.multiaddrs[0],
-            ourCircuitAddress: new Multiaddr(
-              `/p2p/${entry.id.toB58String()}/p2p-circuit/p2p/${this.peerId.toB58String()}`
-            )
+            ourCircuitAddress: createCircuitAddress(entry.id, this.peerId)
           }
         })
     } else {
@@ -331,8 +337,8 @@ export class EntryNodes extends EventEmitter {
     if (this.usedRelays.length != previous.size) {
       isDifferent = true
     } else {
-      for (const usedRelay of this.usedRelays) {
-        if (!previous.has(relayFromRelayAddress(usedRelay.ourCircuitAddress).toB58String())) {
+      for (const usedRelayPeerIds of this.getUsedRelayPeerIds()) {
+        if (!previous.has(usedRelayPeerIds.toB58String())) {
           isDifferent = true
           break
         }

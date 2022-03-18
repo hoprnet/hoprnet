@@ -371,7 +371,7 @@ class Listener extends EventEmitter implements InterfaceListener {
    * @returns list of addresses under which the node is available
    */
   getAddrs(): Multiaddr[] {
-    return [...this.addrs.external, ...this.entry.getUsedRelays(), ...this.addrs.interface]
+    return [...this.addrs.external, ...this.entry.getUsedRelayAddresses(), ...this.addrs.interface]
   }
 
   /**

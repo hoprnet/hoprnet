@@ -6,11 +6,12 @@ import type LibP2P from 'libp2p'
 import type { Address } from 'libp2p/src/peer-store/address-book'
 import { Multiaddr } from 'multiaddr'
 
-import { abortableTimeout, type TimeoutOpts } from '../async/abortableTimeout'
+import { abortableTimeout, type TimeoutOpts } from '../async'
 
 import { debug } from '../process'
 import { green } from 'chalk'
 import { createRelayerKey } from './relayCode'
+import { createCircuitAddress } from '../network'
 
 const DEBUG_PREFIX = `hopr-core:libp2p`
 
@@ -157,7 +158,7 @@ async function queryDHT(
   return {
     status: InternalDialStatus.CONTINUE,
     relayers: relayers.map(
-      (relay: Relayers) => new Multiaddr(`/p2p/${relay.id.toB58String()}/p2p-circuit/p2p/${destination.toB58String()}`)
+      (relay: Relayers) => createCircuitAddress(relay.id, destination)
     )
   }
 }
@@ -247,7 +248,7 @@ async function doDial(
         break
       }
     } catch (err) {
-      continue
+      logError(`Dialing error while contacting relay: ${err}`)
     }
   }
 
@@ -267,7 +268,7 @@ async function doDial(
  * Contains a baseline protection against dialing same addresses twice.
  * @param libp2p a libp2p instance
  * @param destination PeerId of the destination
- * @param protocols protocols to use
+ * @param protocol protocols to use
  * @param opts
  */
 export async function dial(

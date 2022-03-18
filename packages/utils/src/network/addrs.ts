@@ -2,6 +2,8 @@ import { stringToU8a, u8aToHex } from '..'
 import { PRIVATE_NETWORK, LINK_LOCAL_NETWORKS, LOOPBACK_ADDRS, RESERVED_ADDRS, type Network } from './constants'
 
 import { networkInterfaces, type NetworkInterfaceInfo } from 'os'
+import PeerId from 'peer-id'
+import { Multiaddr } from 'multiaddr'
 
 /**
  * Checks if given address is any address
@@ -268,4 +270,14 @@ export function getPublicAddresses(_iface?: string): Network[] {
 
 export function getLocalHosts(_iface?: string): Network[] {
   return getAddresses(isLocalhost)
+}
+
+/**
+ * Create a multiaddress that is a circuit address using given relay to the given destination.
+ * @param relay Relay peer ID
+ * @param destination Destination peer ID
+ */
+export function createCircuitAddress(relay: PeerId, destination: PeerId) {
+  return new Multiaddr(
+    `/p2p/${relay.toB58String()}/p2p-circuit/p2p/${destination.toB58String()}`)
 }

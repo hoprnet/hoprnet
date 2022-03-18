@@ -96,7 +96,7 @@ describe('entry node functionality', function () {
     assert(uncheckedNodes[0].id.equals(peerStoreEntry.id), `id must match the generated one`)
     assert(uncheckedNodes[0].multiaddrs.length == peerStoreEntry.multiaddrs.length, `must not contain more multiaddrs`)
 
-    const usedRelays = entryNodes.getUsedRelays()
+    const usedRelays = entryNodes.getUsedRelayAddresses()
     assert(usedRelays == undefined || usedRelays.length == 0, `must not expose any internal addrs`)
 
     entryNodes.stop()
@@ -123,7 +123,7 @@ describe('entry node functionality', function () {
     const availablePublicNodes = entryNodes.getAvailabeEntryNodes()
     assert(availablePublicNodes.length == 0, `must remove node from public nodes`)
 
-    const usedRelays = entryNodes.getUsedRelays()
+    const usedRelays = entryNodes.getUsedRelayAddresses()
     assert(usedRelays == undefined || usedRelays.length == 0, `must not expose any internal addrs`)
 
     entryNodes.stop()
@@ -157,7 +157,7 @@ describe('entry node functionality', function () {
     assert(availableEntryNodes[0].id.equals(relay.id), `must contain correct peerId`)
     assert(availableEntryNodes[0].latency >= 0, `latency must be non-negative`)
 
-    const usedRelays = entryNodes.getUsedRelays()
+    const usedRelays = entryNodes.getUsedRelayAddresses()
     assert(usedRelays != undefined, `must expose relay addrs`)
     assert(usedRelays.length == 1, `must expose exactly one relay addrs`)
     assert(
@@ -202,7 +202,7 @@ describe('entry node functionality', function () {
 
     await Promise.all(relayNodes.map((relayNode) => relayNode[0]))
 
-    const usedRelays = entryNodes.getUsedRelays()
+    const usedRelays = entryNodes.getUsedRelayAddresses()
     assert(usedRelays != undefined, `must expose relay addresses`)
     assert(usedRelays.length == MAX_RELAYS_PER_NODE, `must expose ${MAX_RELAYS_PER_NODE} relay addresses`)
 
@@ -247,7 +247,7 @@ describe('entry node functionality', function () {
     entryNodes.usedRelays.push(usedRelay)
 
     // Should have one unchecked node and one relay node
-    assert(entryNodes.getUsedRelays().length == 1)
+    assert(entryNodes.getUsedRelayAddresses().length == 1)
     assert(entryNodes.getUncheckedEntryNodes().length == 1)
 
     const connectPromise = once(newNodeListener, 'connected')
@@ -260,8 +260,8 @@ describe('entry node functionality', function () {
 
     assert(entryNodes.getAvailabeEntryNodes().length == 1)
 
-    const usedRelays = entryNodes.getUsedRelays()
-    assert(entryNodes.getUsedRelays().length == 1)
+    const usedRelays = entryNodes.getUsedRelayAddresses()
+    assert(entryNodes.getUsedRelayAddresses().length == 1)
 
     assert(
       usedRelays[0].equals(new Multiaddr(`/p2p/${newNode.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`))
@@ -301,7 +301,7 @@ describe('entry node functionality', function () {
     assert(availableEntryNodes.length == 1)
     assert(availableEntryNodes[0].id.equals(relay.id))
 
-    const usedRelays = entryNodes.getUsedRelays()
+    const usedRelays = entryNodes.getUsedRelayAddresses()
     assert(usedRelays.length == 1)
     assert(
       usedRelays[0].equals(new Multiaddr(`/p2p/${relay.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`))
@@ -329,7 +329,7 @@ describe('entry node functionality', function () {
 
     await entryNodes.updatePublicNodes()
 
-    const usedRelays = entryNodes.getUsedRelays()
+    const usedRelays = entryNodes.getUsedRelayAddresses()
     assert(usedRelays.length == 0)
 
     network.close()
@@ -360,7 +360,7 @@ describe('entry node functionality', function () {
     const availableEntryNodes = entryNodes.getAvailabeEntryNodes()
     assert(availableEntryNodes.length == 0)
 
-    const usedRelays = entryNodes.getUsedRelays()
+    const usedRelays = entryNodes.getUsedRelayAddresses()
     assert(usedRelays.length == 0)
 
     entryNodes.stop()
@@ -467,7 +467,7 @@ describe('entry node functionality', function () {
     assert(uncheckedNodes[0].id.equals(peerStoreEntry.id), `id must match the generated one`)
     assert(uncheckedNodes[0].multiaddrs.length == peerStoreEntry.multiaddrs.length, `must not contain more multiaddrs`)
 
-    const usedRelays = entryNodes.getUsedRelays()
+    const usedRelays = entryNodes.getUsedRelayAddresses()
     assert(usedRelays.length == 1, `must not expose any internal addrs`)
 
     entryNodes.stop()

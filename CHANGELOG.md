@@ -5,6 +5,7 @@
 ### Changes
 
 - New API v2 endpoint `/api/v2/node/stream/websockets` ([#3514](https://github.com/hoprnet/hoprnet/issues/3514))
+- Do not attempt to reconnect to relays we already have a connection to ([#3411](https://github.com/hoprnet/hoprnet/issues/3411))
 
 ---
 
