@@ -1,4 +1,8 @@
+import path from 'path'
+import { mkdir } from 'fs/promises'
+
 import { default as LibP2P, type Connection } from 'libp2p'
+import { LevelDatastore } from 'datastore-level'
 import { type AddressSorter, expandVars, HoprDB, localAddressesFirst, PublicKey } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 const Mplex = require('libp2p-mplex')
@@ -6,7 +10,7 @@ import KadDHT from 'libp2p-kad-dht'
 import { NOISE } from '@chainsafe/libp2p-noise'
 import type PeerId from 'peer-id'
 import { debug } from '@hoprnet/hopr-utils'
-import Hopr, { type HoprOptions, VERSION } from '.'
+import Hopr, { type HoprOptions } from '.'
 import { getAddrs } from './identity'
 import HoprConnect, { type HoprConnectConfig, type PublicNodesEmitter } from '@hoprnet/hopr-connect'
 import type { Multiaddr } from 'multiaddr'
@@ -41,6 +45,15 @@ export async function createLibp2pInstance(
     log('Addresses are sorted by default')
   }
 
+  // Store the peerstore on-disk under the main data path. Ensure store is
+  // opened before passing it to libp2p.
+  const datastorePath = path.join(options.dataPath, 'peerstore')
+  await mkdir(datastorePath, { recursive: true })
+  const datastore = new LevelDatastore(datastorePath, { createIfMissing: true })
+  await datastore.open()
+
+  log(`using peerstore at ${datastorePath}`)
+
   const libp2p = await LibP2P.create({
     peerId,
     addresses: { listen: getAddrs(peerId, options).map((x) => x.toString()) },
@@ -51,6 +64,12 @@ export async function createLibp2pInstance(
       connEncryption: [NOISE as any],
       dht: KadDHT
     },
+    // Configure peerstore to be persisted using LevelDB, also requires config
+    // persistence to be set.
+    datastore,
+    peerStore: {
+      persistence: true
+    },
     config: {
       protocolPrefix: `hopr/${options.environment.id}`,
       transport: {
@@ -60,7 +79,9 @@ export async function createLibp2pInstance(
             publicNodes,
             environment: options.environment.id,
             allowLocalConnections: options.allowLocalConnections,
-            allowPrivateConnections: options.allowPrivateConnections
+            allowPrivateConnections: options.allowPrivateConnections,
+            // Amount of nodes for which we are willing to act as a relay
+            maxRelayedConnections: 50_000
           },
           testing: {
             // Treat local and private addresses as public addresses
@@ -95,8 +116,16 @@ export async function createLibp2pInstance(
       }
     },
     dialer: {
+      // Use custom sorting to prevent from problems with libp2p
+      // and HOPR's relay addresses
       addressSorter,
-      maxDialsPerPeer: 100
+      // Don't try to dial a peer using multiple addresses in parallel
+      maxDialsPerPeer: 1,
+      // If we are a public node, assume that our system is able to handle
+      // more connections
+      maxParallelDials: options.announce ? 250 : 50,
+      // default timeout of 30s appears to be too long
+      dialTimeout: 10e3
     }
   })
 
@@ -144,9 +173,10 @@ export async function createHoprNode(
   const db = new HoprDB(PublicKey.fromPrivKey(peerId.privKey.marshal()))
 
   try {
-    await db.init(options.createDbIfNotExist, VERSION, options.dbPath, options.forceCreateDB, options.environment.id)
-  } catch (err) {
-    log(`failed init db: ${err.toString()}`)
+    const dbPath = path.join(options.dataPath, 'db')
+    await db.init(options.createDbIfNotExist, dbPath, options.forceCreateDB, options.environment.id)
+  } catch (err: unknown) {
+    log(`failed init db:`, err)
     throw err
   }
 
@@ -165,6 +195,10 @@ export async function createHoprNode(
     },
     automaticChainCreation
   )
+
+  // Initialize connection to the blockchain
+  await chain.initializeChainWrapper()
+
   const node = new Hopr(peerId, db, chain, options)
   return node
 }

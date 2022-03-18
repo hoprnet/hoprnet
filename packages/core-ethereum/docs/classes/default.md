@@ -41,13 +41,13 @@
 - [fundChannel](default.md#fundchannel)
 - [getAccount](default.md#getaccount)
 - [getBalance](default.md#getbalance)
-- [getChain](default.md#getchain)
 - [getMaxListeners](default.md#getmaxlisteners)
 - [getNativeBalance](default.md#getnativebalance)
 - [getOpenChannelsFrom](default.md#getopenchannelsfrom)
 - [getPublicKey](default.md#getpublickey)
 - [getPublicKeyOf](default.md#getpublickeyof)
 - [getRandomOpenChannel](default.md#getrandomopenchannel)
+- [initializeChainWrapper](default.md#initializechainwrapper)
 - [initializeClosure](default.md#initializeclosure)
 - [listenerCount](default.md#listenercount)
 - [listeners](default.md#listeners)
@@ -111,7 +111,7 @@ EventEmitter.constructor
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:136](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L136)
+[packages/core-ethereum/src/index.ts:137](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L137)
 
 ___
 
@@ -135,7 +135,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:198](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L198)
+[packages/core-ethereum/src/index.ts:199](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L199)
 
 ___
 
@@ -149,27 +149,24 @@ ___
 | :------ | :------ |
 | `announce` | (`multiaddr`: `Multiaddr`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
 | `finalizeChannelClosure` | (`counterparty`: `Address`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
-| `fundChannel` | (`me`: `Address`, `counterparty`: `Address`, `myTotal`: `Balance`, `theirTotal`: `Balance`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
+| `fundChannel` | (`partyA`: `Address`, `partyB`: `Address`, `fundsA`: `Balance`, `fundsB`: `Balance`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
 | `getAllQueuingTransactionRequests` | () => `TransactionRequest`[] |
-| `getBalance` | (`address`: `Address`) => `Promise`<`Balance`\> |
+| `getBalance` | (`accountAddress`: `Address`) => `Promise`<`Balance`\> |
 | `getChannels` | () => `HoprChannels` |
 | `getGenesisBlock` | () => `number` |
 | `getInfo` | () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `string` = networkInfo.network } |
-| `getLatestBlockNumber` | `any` |
-| `getNativeBalance` | (`address`: `Address`) => `Promise`<`NativeBalance`\> |
-| `getNativeTokenTransactionInBlock` | (`blockNumber`: `number`, `isOutgoing`: `boolean`) => `Promise`<`string`[]\> |
+| `getLatestBlockNumber` | () => `Promise`<`number`\> |
+| `getNativeBalance` | (`accountAddress`: `Address`) => `Promise`<`Balance`\> |
 | `getPrivateKey` | () => `Uint8Array` |
 | `getPublicKey` | () => `PublicKey` |
 | `getToken` | () => `HoprToken` |
-| `getWallet` | () => `Wallet` |
+| `getTransactionsInBlock` | (`blockNumber`: `number`) => `Promise`<`string`[]\> |
 | `initiateChannelClosure` | (`counterparty`: `Address`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
-| `openChannel` | (`me`: `Address`, `counterparty`: `Address`, `amount`: `Balance`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
-| `redeemTicket` | (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `ticket`: `Ticket`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
-| `setCommitment` | (`counterparty`: `Address`, `comm`: `Hash`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
+| `redeemTicket` | (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
+| `sendTransaction` | (`signedTransaction`: `string` \| `Promise`<`string`\>) => `Promise`<`TransactionResponse`\> |
+| `setCommitment` | (`counterparty`: `Address`, `commitment`: `Hash`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
 | `subscribeBlock` | (`cb`: (`blockNumber`: `number`) => `void` \| `Promise`<`void`\>) => () => `void` |
-| `subscribeChannelEvents` | (`cb`: (`event`: `TypedEvent`<`any`, `any`\>) => `void` \| `Promise`<`void`\>) => () => `void` |
 | `subscribeError` | (`cb`: (`err`: `any`) => `void` \| `Promise`<`void`\>) => () => `void` |
-| `subscribeTokenEvents` | (`cb`: (`event`: `TypedEvent`<`any`, `any`\>) => `void` \| `Promise`<`void`\>) => () => `void` |
 | `unsubscribe` | () => `void` |
 | `updateConfirmedTransaction` | (`hash`: `string`) => `void` |
 | `waitUntilReady` | () => `Promise`<`Network`\> |
@@ -332,7 +329,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:146](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L146)
+[packages/core-ethereum/src/index.ts:147](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L147)
 
 ___
 
@@ -352,7 +349,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:219](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L219)
+[packages/core-ethereum/src/index.ts:220](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L220)
 
 ___
 
@@ -366,7 +363,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:93](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L93)
+[packages/core-ethereum/src/index.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L97)
 
 ___
 
@@ -487,7 +484,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:398](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L398)
+[packages/core-ethereum/src/index.ts:435](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L435)
 
 ___
 
@@ -509,7 +506,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:428](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L428)
+[packages/core-ethereum/src/index.ts:463](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L463)
 
 ___
 
@@ -529,7 +526,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:165](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L165)
+[packages/core-ethereum/src/index.ts:166](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L166)
 
 ___
 
@@ -555,51 +552,7 @@ HOPR balance
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:183](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L183)
-
-___
-
-### getChain
-
-▸ **getChain**(): `Object`
-
-#### Returns
-
-`Object`
-
-| Name | Type |
-| :------ | :------ |
-| `announce` | (`multiaddr`: `Multiaddr`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
-| `finalizeChannelClosure` | (`counterparty`: `Address`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
-| `fundChannel` | (`me`: `Address`, `counterparty`: `Address`, `myTotal`: `Balance`, `theirTotal`: `Balance`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
-| `getAllQueuingTransactionRequests` | () => `TransactionRequest`[] |
-| `getBalance` | (`address`: `Address`) => `Promise`<`Balance`\> |
-| `getChannels` | () => `HoprChannels` |
-| `getGenesisBlock` | () => `number` |
-| `getInfo` | () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `string` = networkInfo.network } |
-| `getLatestBlockNumber` | `any` |
-| `getNativeBalance` | (`address`: `Address`) => `Promise`<`NativeBalance`\> |
-| `getNativeTokenTransactionInBlock` | (`blockNumber`: `number`, `isOutgoing`: `boolean`) => `Promise`<`string`[]\> |
-| `getPrivateKey` | () => `Uint8Array` |
-| `getPublicKey` | () => `PublicKey` |
-| `getToken` | () => `HoprToken` |
-| `getWallet` | () => `Wallet` |
-| `initiateChannelClosure` | (`counterparty`: `Address`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
-| `openChannel` | (`me`: `Address`, `counterparty`: `Address`, `amount`: `Balance`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
-| `redeemTicket` | (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `ticket`: `Ticket`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
-| `setCommitment` | (`counterparty`: `Address`, `comm`: `Hash`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
-| `subscribeBlock` | (`cb`: (`blockNumber`: `number`) => `void` \| `Promise`<`void`\>) => () => `void` |
-| `subscribeChannelEvents` | (`cb`: (`event`: `TypedEvent`<`any`, `any`\>) => `void` \| `Promise`<`void`\>) => () => `void` |
-| `subscribeError` | (`cb`: (`err`: `any`) => `void` \| `Promise`<`void`\>) => () => `void` |
-| `subscribeTokenEvents` | (`cb`: (`event`: `TypedEvent`<`any`, `any`\>) => `void` \| `Promise`<`void`\>) => () => `void` |
-| `unsubscribe` | () => `void` |
-| `updateConfirmedTransaction` | (`hash`: `string`) => `void` |
-| `waitUntilReady` | () => `Promise`<`Network`\> |
-| `withdraw` | (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: `string`, `amount`: `string`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
-
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:132](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L132)
+[packages/core-ethereum/src/index.ts:184](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L184)
 
 ___
 
@@ -642,7 +595,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:202](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L202)
+[packages/core-ethereum/src/index.ts:203](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L203)
 
 ___
 
@@ -662,7 +615,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:161](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L161)
+[packages/core-ethereum/src/index.ts:162](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L162)
 
 ___
 
@@ -676,7 +629,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:187](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L187)
+[packages/core-ethereum/src/index.ts:188](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L188)
 
 ___
 
@@ -696,7 +649,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:169](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L169)
+[packages/core-ethereum/src/index.ts:170](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L170)
 
 ___
 
@@ -710,7 +663,21 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:173](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L173)
+[packages/core-ethereum/src/index.ts:174](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L174)
+
+___
+
+### initializeChainWrapper
+
+▸ **initializeChainWrapper**(): `Promise`<`void`\>
+
+#### Returns
+
+`Promise`<`void`\>
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:85](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L85)
 
 ___
 
@@ -730,7 +697,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:390](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L390)
+[packages/core-ethereum/src/index.ts:425](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L425)
 
 ___
 
@@ -948,7 +915,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:408](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L408)
+[packages/core-ethereum/src/index.ts:445](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L445)
 
 ___
 
@@ -1093,7 +1060,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:239](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L239)
+[packages/core-ethereum/src/index.ts:241](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L241)
 
 ___
 
@@ -1107,7 +1074,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:254](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L254)
+[packages/core-ethereum/src/index.ts:256](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L256)
 
 ___
 
@@ -1128,7 +1095,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:336](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L336)
+[packages/core-ethereum/src/index.ts:369](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L369)
 
 ___
 
@@ -1148,7 +1115,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:272](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L272)
+[packages/core-ethereum/src/index.ts:282](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L282)
 
 ___
 
@@ -1168,7 +1135,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:267](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L267)
+[packages/core-ethereum/src/index.ts:277](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L277)
 
 ___
 
@@ -1188,7 +1155,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:294](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L294)
+[packages/core-ethereum/src/index.ts:304](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L304)
 
 ___
 
@@ -1380,7 +1347,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:157](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L157)
+[packages/core-ethereum/src/index.ts:158](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L158)
 
 ___
 
@@ -1401,7 +1368,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:206](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L206)
+[packages/core-ethereum/src/index.ts:207](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L207)
 
 ___
 
@@ -1415,7 +1382,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:105](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L105)
+[packages/core-ethereum/src/index.ts:110](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L110)
 
 ___
 
@@ -1431,25 +1398,25 @@ Stops the connector.
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:141](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L141)
+[packages/core-ethereum/src/index.ts:142](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L142)
 
 ___
 
 ### uncachedGetNativeBalance
 
-▸ `Private` **uncachedGetNativeBalance**(): `Promise`<`NativeBalance`\>
+▸ `Private` **uncachedGetNativeBalance**(): `Promise`<`Balance`\>
 
 Retrieves ETH balance, optionally uses the cache.
 
 #### Returns
 
-`Promise`<`NativeBalance`\>
+`Promise`<`Balance`\>
 
 ETH balance
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:195](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L195)
+[packages/core-ethereum/src/index.ts:196](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L196)
 
 ___
 
@@ -1463,7 +1430,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:215](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L215)
+[packages/core-ethereum/src/index.ts:216](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L216)
 
 ___
 
@@ -1485,7 +1452,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:150](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L150)
+[packages/core-ethereum/src/index.ts:151](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L151)
 
 ___
 

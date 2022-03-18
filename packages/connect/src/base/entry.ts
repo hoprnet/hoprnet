@@ -12,12 +12,12 @@ import {
   OK,
   DEFAULT_DHT_ENTRY_RENEWAL
 } from '../constants'
-import type { Connection } from 'libp2p-interfaces/connection'
+import type Connection from 'libp2p-interfaces/src/connection/connection'
 
 import type PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'
 
-import { createCircuitAddress, nAtATime, retimer, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
+import { createCircuitAddress, nAtATime, oneAtATime, retimer, u8aEquals } from '@hoprnet/hopr-utils'
 import type HoprConnect from '..'
 import { attemptClose, relayFromRelayAddress } from '../utils'
 import { compareDirectConnectionInfo } from '../utils/addrs'
@@ -64,8 +64,8 @@ export class EntryNodes extends EventEmitter {
 
   protected usedRelays: UsedRelay[]
 
-  private _onNewRelay: EntryNodes['onNewRelay'] | undefined
-  private _onRemoveRelay: EntryNodes['onRemoveRelay'] | undefined
+  private _onNewRelay: ((peer: PeerStoreType) => void) | undefined
+  private _onRemoveRelay: ((peer: PeerId) => void) | undefined
   private _connectToRelay: EntryNodes['connectToRelay'] | undefined
 
   constructor(
@@ -87,8 +87,19 @@ export class EntryNodes extends EventEmitter {
   public start() {
     this._connectToRelay = this.connectToRelay.bind(this)
     if (this.options.publicNodes != undefined) {
-      this._onNewRelay = this.onNewRelay.bind(this)
-      this._onRemoveRelay = this.onRemoveRelay.bind(this)
+      const limiter = oneAtATime()
+      this._onNewRelay = (peer: PeerStoreType) => {
+        limiter(async () => {
+          log(`peer online`, peer.id.toB58String())
+          await this.onNewRelay(peer)
+        })
+      }
+      this._onRemoveRelay = (peer: PeerId) => {
+        limiter(async () => {
+          log(`peer offline`, peer.toB58String())
+          await this.onRemoveRelay(peer)
+        })
+      }
 
       this.options.publicNodes.on('addPublicNode', this._onNewRelay)
       this.options.publicNodes.on('removePublicNode', this._onRemoveRelay)
@@ -102,9 +113,9 @@ export class EntryNodes extends EventEmitter {
    */
   public stop() {
     if (this.options.publicNodes != undefined && this._onNewRelay != undefined && this._onRemoveRelay != undefined) {
-      this.options.publicNodes.removeListener('addPublicNode', this._onNewRelay as EntryNodes['onNewRelay'])
+      this.options.publicNodes.removeListener('addPublicNode', this._onNewRelay)
 
-      this.options.publicNodes.removeListener('removePublicNode', this._onRemoveRelay as EntryNodes['onRemoveRelay'])
+      this.options.publicNodes.removeListener('removePublicNode', this._onRemoveRelay)
     }
 
     this.stopDHTRenewal?.()
@@ -112,15 +123,21 @@ export class EntryNodes extends EventEmitter {
 
   private startDHTRenewInterval() {
     const renewDHTEntries = async function (this: EntryNodes) {
-      for (const usedRelay of this.usedRelays) {
-        const relay = relayFromRelayAddress(usedRelay.ourCircuitAddress)
+      const work: [id: PeerId, mulitaddr: Multiaddr, timeout: number][] = []
+      for (const relay of this.getUsedRelayPeerIds()) {
         const relayEntry = this.availableEntryNodes.find((entry: EntryNodeData) => entry.id.equals(relay))
 
         if (relayEntry == undefined) {
-          throw Error(`Unknown relay`)
+          log(
+            `Relay ${relay.toB58String()} has been removed from list of available entry nodes. Not renewing that entry`
+          )
+          continue
         }
-        await this.connectToRelay(relay, relayEntry.multiaddrs[0], 5e3)
+
+        work.push([relay, relayEntry.multiaddrs[0], 5e3])
       }
+
+      await nAtATime(this._connectToRelay as EntryNodes['connectToRelay'], work, ENTRY_NODES_MAX_PARALLEL_DIALS)
     }.bind(this)
 
     this.stopDHTRenewal = retimer(renewDHTEntries, () => this.options.dhtRenewalTimeout ?? DEFAULT_DHT_ENTRY_RENEWAL)
@@ -160,7 +177,7 @@ export class EntryNodes extends EventEmitter {
    * Called once there is a new relay opportunity known
    * @param ma Multiaddr of node that is added as a relay opportunity
    */
-  protected onNewRelay(peer: PeerStoreType) {
+  protected async onNewRelay(peer: PeerStoreType): Promise<void> {
     if (peer.id.equals(this.peerId)) {
       return
     }
@@ -187,7 +204,7 @@ export class EntryNodes extends EventEmitter {
     // Once a relay goes offline, the node will try to replace the offline relay.
     if (this.usedRelays.length < MAX_RELAYS_PER_NODE) {
       // Rebuild list of relay nodes later
-      setImmediate(this.updatePublicNodes.bind(this))
+      await this.updatePublicNodes()
     }
   }
 
@@ -195,7 +212,7 @@ export class EntryNodes extends EventEmitter {
    * Called once a node is considered to be offline
    * @param ma Multiaddr of node that is considered to be offline now
    */
-  protected onRemoveRelay(peer: PeerId) {
+  protected async onRemoveRelay(peer: PeerId) {
     for (const [index, publicNode] of this.availableEntryNodes.entries()) {
       if (publicNode.id.equals(peer)) {
         // Remove node without changing order
@@ -215,7 +232,7 @@ export class EntryNodes extends EventEmitter {
     // offline node
     if (inUse) {
       // Rebuild list of relay nodes later
-      setImmediate(this.updatePublicNodes.bind(this))
+      await this.updatePublicNodes()
     }
   }
 
@@ -285,6 +302,7 @@ export class EntryNodes extends EventEmitter {
       args[index] = [nodeToCheck.id, nodeToCheck.multiaddrs[0], TIMEOUT]
     }
 
+    const start = Date.now()
     const results = (
       await nAtATime(this._connectToRelay as EntryNodes['connectToRelay'], args, ENTRY_NODES_MAX_PARALLEL_DIALS)
     )
@@ -293,6 +311,8 @@ export class EntryNodes extends EventEmitter {
         (value): value is { entry: EntryNodeData; conn: Connection | undefined } => !(value instanceof Error)
       )
       .sort(latencyCompare)
+
+    log(`Checking ${args.length} potential entry nodes done in ${Date.now() - start} ms.`)
 
     const positiveOnes = results.findIndex((result: ConnectionResult) => result.entry.latency >= 0)
 
@@ -348,7 +368,7 @@ export class EntryNodes extends EventEmitter {
     if (isDifferent) {
       log(`Current relay addresses:`)
       for (const ma of this.usedRelays) {
-        log(`\t${ma.toString()}`)
+        log(` - ${ma.toString()}`)
       }
 
       this.emit(RELAY_CHANGED_EVENT)
@@ -369,10 +389,10 @@ export class EntryNodes extends EventEmitter {
   ): Promise<{ entry: EntryNodeData; conn?: Connection }> {
     const abort = new AbortController()
     const start = Date.now()
-    let finished = false
+    let connectionEstablished = false
 
     setTimeout(() => {
-      if (!finished) {
+      if (!connectionEstablished) {
         abort.abort()
       }
     }, timeout)
@@ -381,10 +401,11 @@ export class EntryNodes extends EventEmitter {
     try {
       conn = await this.dialDirectly(relay, { signal: abort.signal })
     } catch (err: any) {
-      error(`error while contacting entry node.`, err.message)
+      error(`error while contacting entry node ${id.toB58String()}.`, err.message)
+      conn && (await attemptClose(conn, error))
     } finally {
       // Prevent timeout from doing anything
-      finished = true
+      connectionEstablished = true
     }
 
     if (conn == undefined) {
@@ -401,7 +422,8 @@ export class EntryNodes extends EventEmitter {
     try {
       stream = (await conn.newStream([CAN_RELAY_PROTCOL(this.options.environment)]))?.stream as any
     } catch (err) {
-      error(`Cannot use relay. ${err}`)
+      error(`Cannot use relay.`, err)
+      await attemptClose(conn, error)
     }
 
     if (stream == undefined) {
@@ -415,12 +437,23 @@ export class EntryNodes extends EventEmitter {
     }
 
     let done = false
+
+    // calls the iterator, thereby starts the stream and
+    // consumes the first messages, afterwards closes the stream
     for await (const msg of stream.source) {
-      verbose(`can relay received msg ${u8aToHex(msg.slice())}`)
+      verbose(`can relay received ${new TextDecoder().decode(msg.slice())} from ${id.toB58String()}`)
       if (u8aEquals(msg.slice(), OK)) {
         done = true
-        break
       }
+      // End receive stream after first message
+      break
+    }
+
+    try {
+      // End the send stream by sending nothing
+      stream.sink((async function* () {})()).catch(error)
+    } catch (err) {
+      error(err)
     }
 
     if (done) {

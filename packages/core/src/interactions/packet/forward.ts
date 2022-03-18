@@ -1,9 +1,13 @@
-import { Packet } from '../../messages'
+import { setImmediate } from 'timers/promises'
+
 import type PeerId from 'peer-id'
+
 import { durations, pubKeyToPeerId, HoprDB } from '@hoprnet/hopr-utils'
+import { debug } from '@hoprnet/hopr-utils'
+
+import { Packet } from '../../messages'
 import { Mixer } from '../../mixer'
 import { sendAcknowledgement } from './acknowledgement'
-import { debug } from '@hoprnet/hopr-utils'
 import type { SendMessage, Subscribe } from '../../index'
 
 const log = debug('hopr-core:packet:forward')
@@ -24,9 +28,14 @@ export class PacketForwardInteraction {
     private protocolAck: string
   ) {
     this.mixer = new Mixer(this.handleMixedPacket.bind(this))
-    this.subscribe(protocolMsg, this.handlePacket.bind(this), false, (err: any) => {
-      error(`Error while receiving packet`, err)
-    })
+  }
+
+  private errHandler(err: any) {
+    error(`Error while receiving packet`, err)
+  }
+
+  async start() {
+    await this.subscribe(this.protocolMsg, this.handlePacket.bind(this), false, this.errHandler)
   }
 
   async interact(counterparty: PeerId, packet: Packet): Promise<void> {
@@ -46,7 +55,10 @@ export class PacketForwardInteraction {
 
     if (packet.isReceiver) {
       this.emitMessage(packet.plaintext)
-      sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey, this.protocolAck)
+      // defer processing to end of event loop since we are making another
+      // network operation
+      await setImmediate()
+      await sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey, this.protocolAck)
       // Nothing else to do
       return
     }
@@ -75,6 +87,9 @@ export class PacketForwardInteraction {
       return
     }
 
-    sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey, this.protocolAck)
+    // defer processing to end of event loop since we are making another
+    // network operation
+    await setImmediate()
+    await sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey, this.protocolAck)
   }
 }

@@ -13,9 +13,13 @@ import Debug from 'debug'
 import { networkInterfaces, type NetworkInterfaceInfo } from 'os'
 
 import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP } from '../constants'
-import type { MultiaddrConnection, Upgrader, Listener as InterfaceListener } from 'libp2p-interfaces/transport'
+import type {
+  MultiaddrConnection,
+  Upgrader,
+  Listener as InterfaceListener
+} from 'libp2p-interfaces/src/transport/types'
 
-import type PeerId from 'peer-id'
+import PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'
 
 import { handleStunRequest, getExternalIp } from './stun'
@@ -26,6 +30,8 @@ import { EntryNodes, RELAY_CHANGED_EVENT } from './entry'
 import { bindToPort, attemptClose, nodeToMultiaddr } from '../utils'
 import type HoprConnect from '..'
 import { UpnpManager } from './upnp'
+import type { Filter } from '../filter'
+import type { Relay } from '../relay'
 
 const log = Debug('hopr-connect:listener')
 const error = Debug('hopr-connect:listener:error')
@@ -76,7 +82,9 @@ class Listener extends EventEmitter implements InterfaceListener {
     private upgradeInbound: Upgrader['upgradeInbound'],
     private peerId: PeerId,
     private options: HoprConnectOptions,
-    private testingOptions: HoprConnectTestingOptions
+    private testingOptions: HoprConnectTestingOptions,
+    private filter: Filter,
+    private relay: Relay
   ) {
     super()
 
@@ -101,6 +109,23 @@ class Listener extends EventEmitter implements InterfaceListener {
     }
 
     this._emitListening = function (this: Listener) {
+      // hopr-connect does not enable IPv6 connections right now, therefore we can set `listeningAddrs` statically
+      // to `/ip4/0.0.0.0/tcp/0`, meaning listening on IPv4 using a canonical port
+      // TODO check IPv6
+      this.filter.setAddrs(this.getAddrs(), [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${this.peerId.toB58String()}`)])
+
+      const usedRelays = this.entry.getUsedRelays()
+
+      if (usedRelays && usedRelays.length > 0) {
+        const relayPeerIds = this.entry.getUsedRelays().map((ma: Multiaddr) => {
+          const tuples = ma.tuples()
+
+          return PeerId.createFromBytes((tuples[0][1] as any).slice(1))
+        })
+
+        this.relay.setUsedRelays(relayPeerIds)
+      }
+
       this.emit('listening')
     }.bind(this)
 

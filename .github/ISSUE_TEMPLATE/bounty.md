@@ -13,7 +13,22 @@ assignees: ''
 
 ### Description
 
+<!--
+Add milestones if applicable:
+
+On large bounties, it might make sense to include various milestones, so to encourage early PRs and minimize delayed / last minute work.
+-->
+
 ### Definition of Done
+
+<!--
+Various definition of done points that could be added if they are applicable:
+
+- include a README.md file in project repository
+  - include a description of the submission
+- host submission using a service such as vercel, include previewable URL in the README.md
+  - if hosting submission is not possible, insert screenshots
+-->
 
 ### Developing HOPR
 

@@ -13,7 +13,7 @@ describe('getInfo', () => {
       hoprChannelsAddress: 'c',
       channelClosureSecs: 60
     })
-    node.getAnnouncedAddresses = sinon.fake.returns([1, 2])
+    node.getAddressesAnnouncedToDHT = sinon.fake.returns([1, 2])
     node.getListeningAddresses = sinon.fake.returns([3, 4])
     const info = await getInfo({ node })
     assert.deepEqual(info, {

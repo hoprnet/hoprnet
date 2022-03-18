@@ -1,8 +1,8 @@
-# Development Processes
+# Development Process
 
-The HOPR Association _tech_ members and [Project Owner](#legend) have agreed on the following development processes to streamline the implementation of the HOPR protocol.
+The purpose of this process is to streamline the development of the HOPR protocol.
 
-- [Development Processes](#development-processes)
+- [Development Process](#development-process)
   - [Legend](#legend)
     - [Representantives](#representantives)
     - [Trifecta](#trifecta)
@@ -36,13 +36,11 @@ The HOPR Association _tech_ members and [Project Owner](#legend) have agreed on 
 | ------------------- | ---------------------------------------------------------------------------------------------------------- |
 | Project Owner       | A HOPR member which ensures epics prioritized are in line with both the short and long term vision of HOPR |
 | Process Facilitator | A HOPR member which ensures agreed processes are followed                                                  |
-| Representantives    | Two tech members elected to be the bridge between tech team and Project Owner                              |
+| Representantives    | Two tech members who act as the bridge between tech team and Project Owner                                 |
 | Trifecta            | Representantives + Project Owner                                                                           |
 | Issue tracker       | The sole issue tracker is [GitHub](https://github.com/hoprnet)                                             |
 
 ### Representatives
-
-Each individual representantive is elected for a period of `3 months`. The periods are overlapped to create a staggered schedule during which new representatives can be guided by their co-representatives who have already served half of their election period. Previous representatives may be re-elected.
 
 Responsibilities:
 
@@ -51,17 +49,10 @@ Responsibilities:
 - daily check for new [unreleased tokens](../UNRELEASED_TOKENS.md) emails send to `tech@hoprnet.org`
 - review tech related bounties ([read more](./bounty.md))
 
-_Current:_
+_Roles:_
 
-- [Tino](https://github.com/tolbrino) until 06/05/2022
-- [Robert](https://github.com/robertkiel) until 04/03/2022
-
-#### Electing a new representantive
-
-- every election should begin 5 working days prior to the representantive's replacement
-- voting is done via google form similar to [this](https://docs.google.com/forms/d/1CA_C_NgI9M_drHFqOOVlBVdfuiWsg64xE_wE1V1pgyw)
-- email login is required but emails should not be collected
-- only tech _members_ may vote
+- [Tino](https://github.com/tolbrino) acting as Tech Coordinator
+- [Steven](https://github.com/nionis) acting as Process and Bounty Coordinator
 
 ### Trifecta
 
@@ -344,7 +335,7 @@ Since PRs should link to an issue, it's not necessary to label PRs. However, som
 
 #### Releases
 
-See [Release Processes](./release.md)
+See [Release Process](./release.md)
 
 ### Branches
 
@@ -353,4 +344,4 @@ See [Release Processes](./release.md)
 
 - `release/**`: On new internal release, we cut a `release/**`
   branch, using an internal **city** name to identify the release.
-  See [Release Processes](./release.md) for more info.
+  See [Release Process](./release.md) for more info.

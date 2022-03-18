@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import path from 'path'
+
 import BN from 'bn.js'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
@@ -36,6 +38,12 @@ function defaultEnvironment(): string {
   }
 }
 
+// Replace default process name (`node`) by `hopr-cover-traffic-daemon`
+process.title = 'hopr-cover-traffic-daemon'
+
+// Use environment-specific default data path
+const defaultDataPath = path.join(process.cwd(), 'hopr-cover-traffic-daemon-db', defaultEnvironment())
+
 const argv = yargs(process.argv.slice(2))
   .option('environment', {
     string: true,
@@ -54,8 +62,9 @@ const argv = yargs(process.argv.slice(2))
     default: './ct.json'
   })
   .option('data', {
+    string: true,
     describe: 'manually specify the database directory to use',
-    default: ''
+    default: defaultDataPath
   })
   .option('healthCheck', {
     boolean: true,
@@ -79,11 +88,8 @@ async function generateNodeOptions(environment: ResolvedEnvironment): Promise<Ho
     createDbIfNotExist: true,
     environment,
     forceCreateDB: false,
-    password: ''
-  }
-
-  if (argv.data && argv.data !== '') {
-    options.dbPath = argv.data
+    password: '',
+    dataPath: argv.data
   }
 
   return options
@@ -135,7 +141,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   await node.start()
   log('node is running')
 
-  log(node.getVersion())
+  log('hopr-core version: ', node.getVersion())
   log(node.smartContractInfo())
 
   const channels = await node.getChannelsFrom(selfAddr)

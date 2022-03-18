@@ -1,8 +1,8 @@
 import assert from 'assert'
 import { Listener } from './listener'
 import { Multiaddr } from 'multiaddr'
-import type { MultiaddrConnection } from 'libp2p-interfaces/transport'
-import type { Connection } from 'libp2p-interfaces/connection'
+import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
+import type Connection from 'libp2p-interfaces/src/connection/connection'
 import dgram, { type Socket } from 'dgram'
 import { createConnection, type AddressInfo } from 'net'
 import * as stun from 'webrtc-stun'
@@ -89,7 +89,13 @@ async function startNode(
       publicNodes,
       initialNodes
     },
-    localHostCheckingNAT
+    localHostCheckingNAT,
+    {
+      setAddrs: () => {}
+    } as any,
+    {
+      setUsedRelays: () => {}
+    } as any
   )
 
   await listener.listen(new Multiaddr(`/ip4/127.0.0.1/tcp/0/p2p/${peerId.toB58String()}`))
@@ -131,7 +137,13 @@ describe('check listening to sockets', function () {
         {
           initialNodes: [peerStoreEntry, getPeerStoreEntry(`/ip4/127.0.0.1/udp/${secondStunServer.address().port}`)]
         },
-        localHostCheckingNAT
+        localHostCheckingNAT,
+        {
+          setAddrs: () => {}
+        } as any,
+        {
+          setUsedRelays: () => {}
+        } as any
       )
 
       let listeningMultiaddr: Multiaddr
@@ -249,7 +261,13 @@ describe('check listening to sockets', function () {
         interface: firstUsableInterfaceName,
         initialNodes: [getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)]
       },
-      localHostBeingExposed
+      localHostBeingExposed,
+      {
+        setAddrs: () => {}
+      } as any,
+      {
+        setUsedRelays: () => {}
+      } as any
     )
 
     await assert.rejects(
@@ -394,7 +412,13 @@ describe('check listening to sockets', function () {
           getPeerStoreEntry(`/ip4/127.0.0.1/udp/${secondStunServer.address().port}`)
         ]
       },
-      localHostCheckingNAT
+      localHostCheckingNAT,
+      {
+        setAddrs: () => {}
+      } as any,
+      {
+        setUsedRelays: () => {}
+      } as any
     )
     await listener.bind(new Multiaddr(`/ip4/0.0.0.0/tcp/9091`))
     await assert.doesNotReject(async () => await listener.checkNATSituation(`127.0.0.1`, 9091))
@@ -415,7 +439,13 @@ describe('check listening to sockets', function () {
           getPeerStoreEntry(`/ip4/127.0.0.1/udp/${secondStunServer.address().port}`)
         ]
       },
-      localHostBeingExposed
+      localHostBeingExposed,
+      {
+        setAddrs: () => {}
+      } as any,
+      {
+        setUsedRelays: () => {}
+      } as any
     )
 
     await listener.bind(new Multiaddr(`/ip4/0.0.0.0/tcp/9091`))

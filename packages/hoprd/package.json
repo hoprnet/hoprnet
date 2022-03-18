@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.88.0-next.12",
+  "version": "1.88.0-next.34",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -9,6 +9,8 @@
   "bin": "lib/index.js",
   "files": [
     "lib",
+    "package-lock.json",
+    "yarn.lock",
     "hopr-admin/.next/**",
     "hoprd-default.sh",
     "releases.json",
@@ -87,6 +89,7 @@
     "access": "public"
   },
   "resolutions": {
+    "@ethersproject/providers": "hoprnet/ethers-js-provider#fa6b1f743ff3fe67c1e9a2207a67d79a854fc34c",
     "@overnightjs/logger": "1.2.1",
     "colors": "1.4.0"
   },

@@ -18,7 +18,7 @@ declare branch cluster_size package_version docker_image
 
 : ${HOPRD_API_TOKEN:?"env var missing"}
 : ${HOPRD_PASSWORD:?"env var missing"}
-: ${FUNDING_PRIV_KEY:?"env var missing"}
+: ${FAUCET_SECRET_API_KEY:?"env var missing"}
 
 # docker_image and cluster_size are configurable through script arguments
 docker_image="${1:-gcr.io/hoprassociation/hoprd}"

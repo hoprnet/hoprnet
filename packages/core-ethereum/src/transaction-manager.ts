@@ -1,4 +1,4 @@
-import { TransactionRequest } from '@ethersproject/abstract-provider'
+import type { TransactionRequest } from '@ethersproject/abstract-provider'
 import { debug } from '@hoprnet/hopr-utils'
 import { BigNumber } from 'ethers'
 import { isDeepStrictEqual } from 'util'

@@ -11,7 +11,7 @@ export const getInfo = async ({ node }: { node: Hopr }) => {
 
     return {
       environment: node.environment.id,
-      announcedAddress: (await node.getAnnouncedAddresses()).map((ma) => ma.toString()),
+      announcedAddress: (await node.getAddressesAnnouncedToDHT()).map((ma) => ma.toString()),
       listeningAddress: node.getListeningAddresses().map((ma) => ma.toString()),
       network: network,
       hoprToken: hoprTokenAddress,

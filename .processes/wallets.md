@@ -1,8 +1,8 @@
-# Wallets
+# Wallet Process
 
-At HOPR we create and use multiple Ethereum addresses that are under the control and supervision of the HOPR Association.
+The purpose of this process is to document how crypto wallets are created and stored.
 
-Here are some of these wallets:
+## Wallets
 
 | Wallet Address                               | Alias                              | Description                                                                       |
 | -------------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------- |
@@ -17,6 +17,7 @@ Here are some of these wallets:
 | `0x752af2bf9dbbc1105a83d2ca1ee8f1046d85b702` | HOPR Association Gnosis Safe       | Same as “HOPR Association Gnosis Wallet” wallet but using the new Gnosis Safe     |
 | `0xE9131488563776DE7FEa238d6112c5dA46be9a9F` | HOPR Association xDAI Gnosis Safe  | Same as “HOPR Association Gnosis Safe” wallet but on the xDAI network             |
 | `0x2D8E358487FeDa42629274CE041F98629Bf65cF3` | HOPR DAO main net Gnosis Safe      | Used to ratify actions on behalf of HOPR's DAO and holding Uniswap Liquidity fees |
+| `0xE9131488563776DE7FEa238d6112c5dA46be9a9F` | HOPR DAO Gnosis chain Gnosis Safe  | Used to ratify actions on behalf of HOPR's DAO                                    |
 | `0x8f7a2AbbC8741572427e3426538cD516A41102f3` | HOPR Deployer                      | Main net minter account & HOPR Association and DAO multisig representative        |
 | `0x5AB4f2a41DEb3B925B23a3f7E00F206BED18ABB3` | Multisig #1                        | HOPR Association representative #1 (both Gnosis Wallet + Gnosis Safe              |
 | `0x93bC372b4cC142dA75a365C5cB45be996347bfeC` | Multisig #2                        | HOPR Association representative #2 (only Gnosis Safe)                             |
@@ -27,7 +28,7 @@ Here are some of these wallets:
 
 There are some additional wallets used for testing, that had been label `[ Unknown ]`. They will be handled in https://github.com/hoprnet/hoprnet/issues/2893.
 
-# Policy
+## Policy
 
 HOPR Association [multi-sig](https://etherscan.io/address/0x4f50ab4e931289344a57f2fe4bbd10546a6fdc17) is the main address where all HOPR related funds are stored and controlled.
 
@@ -39,7 +40,7 @@ Additional wallets that are not defined under the [wallets](#Wallets) have no co
 
 No HD-derived wallets (e.g. mnemonics) are used for HOPR Association as having the seed of this wallet would grant access to private keys that could be used further down the line w/o being aware of that being the case.
 
-# Generation
+## Generating new wallet
 
 There are multiple ways to safely create wallets, but for quick and dirty (disposable) wallets which require not much scrutiny, feel free to use the following JS script runnable in a web console:
 

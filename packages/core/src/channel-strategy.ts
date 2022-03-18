@@ -60,12 +60,16 @@ export abstract class SaneDefaults {
     const selfPubKey = chain.getPublicKey()
     if (!counterparty.eq(selfPubKey)) {
       log(`auto redeeming tickets in channel to ${counterparty.toPeerId().toB58String()}`)
-      await chain.redeemTicketsInChannel(channel)
+      try {
+        await chain.redeemTicketsInChannel(channel)
+      } catch (err) {
+        log(`Could not redeem tickets in channel ${channel.getId().toHex()}`, err)
+      }
     }
   }
 
-  async shouldCommitToChannel(_c: ChannelEntry): Promise<boolean> {
-    log('committing to channel')
+  async shouldCommitToChannel(c: ChannelEntry): Promise<boolean> {
+    log(`committing to channel ${c.getId().toHex()}`)
     return true
   }
 
@@ -136,7 +140,7 @@ export class PromiscuousStrategy extends SaneDefaults implements ChannelStrategy
         break
       }
       log('evaluating', randomChannel.source.toString())
-      peers.register(randomChannel.source.toPeerId())
+      peers.register(randomChannel.source.toPeerId(), 'promiscuous channel strategy')
       if (
         !toOpen.find((x) => x[0].eq(randomChannel.source)) &&
         !currentChannels.find((x) => x.destination.eq(randomChannel.source)) &&

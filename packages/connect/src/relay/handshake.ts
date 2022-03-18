@@ -220,22 +220,22 @@ class RelayHandshake {
       }
     }
 
-    let toDestination: Stream | undefined
+    let toDestinationStruct: Awaited<ReturnType<typeof getStreamToCounterparty>>
     try {
-      toDestination = await getStreamToCounterparty(destination, DELIVERY_PROTOCOL(this.options.environment))
+      toDestinationStruct = await getStreamToCounterparty(destination, DELIVERY_PROTOCOL(this.options.environment))
     } catch (err) {
       error(err)
     }
 
     // Anything can happen while attempting to connect
-    if (toDestination == null) {
+    if (toDestinationStruct == null) {
       error(`Cannot establish a relayed connection from ${source.toB58String()} to ${destination.toB58String()}`)
       this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY))
       this.shaker.rest()
       return
     }
 
-    const destinationShaker = handshake(toDestination)
+    const destinationShaker = handshake(toDestinationStruct.stream)
 
     destinationShaker.write(source.pubKey.marshal())
 
@@ -252,6 +252,11 @@ class RelayHandshake {
       this.shaker.rest()
 
       destinationShaker.rest()
+      try {
+        await toDestinationStruct.conn.close()
+      } catch (err) {
+        error(`Error while closing connection to destination ${destination.toB58String()}.`, err)
+      }
       return
     }
 
