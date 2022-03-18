@@ -4,6 +4,10 @@
 
 ## Table of contents
 
+### Namespaces
+
+- [HoprChannels](modules/HoprChannels.md)
+
 ### Interfaces
 
 - [HoprChannels](interfaces/HoprChannels.md)

@@ -114,7 +114,7 @@ ___
 
 ### SYMBOL
 
-▪ `Static` **SYMBOL**: `string` = `'wxHOPR'`
+▪ `Static` **SYMBOL**: `string` = `'txHOPR'`
 
 #### Defined in
 

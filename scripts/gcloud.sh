@@ -45,7 +45,7 @@ wait_until_node_is_ready() {
 
   # try every 10 seconds for 5 minutes
   log "waiting for VM with IP $1 to have HOPR node up and running"
-  try_cmd "${cmd}" 30 10 true
+  try_cmd "${cmd}" 30 10
 }
 
 # Get external IP for running node or die
@@ -244,7 +244,7 @@ gcloud_create_or_update_instance_template() {
       ${extra_args}
   else
     eval gcloud compute instance-templates create-with-container "${name}" \
-      --machine-type=c2-standard-4 \
+      --machine-type=c2d-highcpu-2 \
       --metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true \
       --maintenance-policy=MIGRATE \
       --tags=hopr-node,web-client,rest-client,portainer,healthcheck \
@@ -288,11 +288,28 @@ gcloud_create_or_update_managed_instance_group() {
 
   log "checking for managed instance group ${name}"
   if gcloud compute instance-groups managed describe "${name}" ${gcloud_region} --quiet; then
+    # get current instance template name
+    local group_instance_name="$(gcloud compute instance-groups list-instances \
+      "${name}" ${gcloud_region} --format=json | jq '.[1].instance' | tr -d '"')"
+    local previous_template="$(gcloud compute instances describe \
+      ${group_instance_name} --format=json | \
+      jq '.metadata.items[] | select(.key=="instance-template") | .value' | \
+      tr -d '"' | awk -F'/' '{ print $5; }')"
+
     log "managed instance group ${name} already present, updating..."
-    gcloud compute instance-groups managed rolling-action start-update \
+
+    # ensure instances are not replaced to prevent IP re-assignments
+    gcloud beta compute instance-groups managed rolling-action start-update \
       "${name}"\
       --version=template=${template} \
+      --minimal-action=refresh \
+      --most-disruptive-allowed-action=restart \
       ${gcloud_region}
+
+    # delete previous template if different
+    if [ "${previous_template}" != "${template}"]; then
+      gcloud_delete_instance_template "${previous_template}"
+    fi
   else
     log "creating managed instance group ${name}"
     gcloud compute instance-groups managed create "${name}" \

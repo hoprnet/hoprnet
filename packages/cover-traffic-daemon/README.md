@@ -48,14 +48,15 @@ yarn build
 ```sh
 $ yarn hopr-cover-traffic-daemon --help
 Options:
-  --help            Show help  [boolean]
-  --version         Show version number  [boolean]
-  --provider        A provider url for the network this node shall operate on  [default: "https://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/"]
-  --privateKey      A private key to be used for the node  [string]
-  --dbFile          Path to DB file for persistent storage
-  --healthCheckHost Host to listen on for health check
-  --healthCheckPort Port to listen on for health check
-  --environment     Choose the environment where this node runs in. "hardhat-localhost", "hardhat-localhost2", "master-goerli", "master-xdai"
+  --help             Show help  [boolean]
+  --version          Show version number  [boolean]
+  --environment      Environment id which the node shall run on  [string] [choices: "hardhat-localhost", "hardhat-localhost2", "master-goerli", "debug-goerli", "tuttlingen", "prague", "budapest", "athens", "lisbon"] [default: ""]
+  --privateKey       A private key to be used for the node  [string] [required]
+  --dbFile           A path to DB file for persistent storage  [string] [default: "./ct.json"]
+  --data             manually specify the database directory to use  [default: ""]
+  --healthCheck      Run a health check end point on localhost:8080  [boolean] [default: false]
+  --healthCheckHost  Host to listen on for health check  [default: "localhost"]
+  --healthCheckPort  Port to listen on for health check  [default: 8080]
 ```
 
 Example

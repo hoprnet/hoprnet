@@ -758,7 +758,7 @@ class Indexer extends EventEmitter {
     throw new Error('Could not find public key for address - have they announced? -' + address.toHex())
   }
 
-  public async getAnnouncedAddresses(): Promise<Multiaddr[]> {
+  public async getAddressesAnnouncedOnChain(): Promise<Multiaddr[]> {
     return (await this.db.getAccounts()).map((account: AccountEntry) => account.multiAddr)
   }
 

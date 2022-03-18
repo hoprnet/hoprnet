@@ -1,7 +1,7 @@
 import { setImmediate } from 'timers/promises'
 import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
-import { ChainWrapper, createChainWrapper } from './ethereum'
+import { ChainWrapper, createChainWrapper, Receipt } from './ethereum'
 import chalk from 'chalk'
 import {
   AcknowledgedTicket,
@@ -24,7 +24,6 @@ import { CONFIRMATIONS, INDEXER_BLOCK_RANGE, PROVIDER_CACHE_TTL } from './consta
 import { EventEmitter } from 'events'
 import { initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCommitmentInfo } from './commitment'
 import type { IndexerEvents } from './indexer/types'
-import BN from 'bn.js'
 
 const log = debug('hopr-core-ethereum')
 
@@ -244,8 +243,14 @@ export default class HoprCoreEthereum extends EventEmitter {
       log('skipping redeemAllTickets because another operation is still in progress')
       return this.redeemingAll
     }
-    this.redeemingAll = this.redeemAllTicketsInternalLoop()
-    return this.redeemingAll
+
+    return new Promise((resolve, reject) => {
+      try {
+        this.redeemingAll = this.redeemAllTicketsInternalLoop().then(resolve, reject)
+      } catch (err) {
+        reject(err)
+      }
+    })
   }
 
   private async redeemAllTicketsInternalLoop(): Promise<void> {
@@ -284,8 +289,16 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
 
     // start new operation and store it
-    this.ticketRedemtionInChannelOperations[channelId] = this.redeemTicketsInChannelLoop(channel)
-    return this.ticketRedemtionInChannelOperations[channelId]
+    return new Promise((resolve, reject) => {
+      try {
+        this.ticketRedemtionInChannelOperations[channelId] = this.redeemTicketsInChannelLoop(channel).then(
+          resolve,
+          reject
+        )
+      } catch (err) {
+        reject(err)
+      }
+    })
   }
 
   private async redeemTicketsInChannelLoop(channel: ChannelEntry): Promise<void> {
@@ -429,7 +442,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     )
   }
 
-  public async openChannel(dest: PublicKey, amount: Balance): Promise<Hash> {
+  public async openChannel(dest: PublicKey, amount: Balance): Promise<{ channelId: Hash; receipt: Receipt }> {
     // channel may not exist, we can still open it
     let c: ChannelEntry
     try {
@@ -443,17 +456,11 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (myBalance.lt(amount)) {
       throw Error('We do not have enough balance to open a channel')
     }
-    await this.chain.fundChannel(
-      this.publicKey.toAddress(),
-      dest.toAddress(),
-      amount,
-      new Balance(new BN(0)),
-      (txHash: string) => this.setTxHandler(`channel-updated-${txHash}`, txHash)
-    )
-    return generateChannelId(this.publicKey.toAddress(), dest.toAddress())
+    const receipt = await this.fundChannel(dest, amount, Balance.ZERO())
+    return { channelId: generateChannelId(this.publicKey.toAddress(), dest.toAddress()), receipt }
   }
 
-  public async fundChannel(dest: PublicKey, myFund: Balance, counterpartyFund: Balance) {
+  public async fundChannel(dest: PublicKey, myFund: Balance, counterpartyFund: Balance): Promise<Receipt> {
     const totalFund = myFund.add(counterpartyFund)
     const myBalance = await this.getBalance()
     if (totalFund.gt(myBalance)) {

@@ -176,7 +176,7 @@ describe(`test libp2pSendMessage with response`, function () {
 
     const results = await Promise.all([
       msgReceived.promise,
-      await libp2pSendMessage(fakeLibp2p as any, desintation, 'demo protocol', msgToReceive, true, {
+      libp2pSendMessage(fakeLibp2p as any, desintation, 'demo protocol', msgToReceive, true, {
         timeout: 5000
       })
     ])

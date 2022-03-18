@@ -15,8 +15,9 @@ import type { HoprConnectConfig } from '@hoprnet/hopr-connect'
 
 import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants'
 
-import NetworkPeers from './network/network-peers'
+import NetworkPeers, { Entry } from './network/network-peers'
 import Heartbeat, { type HeartbeatPingResult } from './network/heartbeat'
+
 import { findPath } from './path'
 
 import {
@@ -43,6 +44,7 @@ import {
   type DialOpts,
   type Hash,
   type HalfKeyChallenge,
+  type Ticket,
   multiaddressCompareByClassFunction,
   createRelayerKey
 } from '@hoprnet/hopr-utils'
@@ -63,6 +65,7 @@ import { PacketForwardInteraction } from './interactions/packet/forward'
 import { Packet } from './messages'
 import type { ResolvedEnvironment } from './environment'
 import { createLibp2pInstance } from './main'
+import { Receipt } from '@hoprnet/hopr-core-ethereum/src/ethereum'
 
 const DEBUG_PREFIX = `hopr-core`
 const log = debug(DEBUG_PREFIX)
@@ -505,7 +508,7 @@ class Hopr extends EventEmitter {
       const destination = closeChannelDestinations[i]
       verbose(`closing channel to ${destination.toB58String()}`)
       try {
-        await this.closeChannel(destination.toPeerId())
+        await this.closeChannel(destination.toPeerId(), 'outgoing')
         verbose(`closed channel to ${destination.toString()}`)
         this.emit('hopr:channel:closed', destination.toPeerId())
       } catch (e) {
@@ -581,7 +584,7 @@ class Hopr extends EventEmitter {
    * @param peer peer to query for, default self
    * @param timeout [optional] custom timeout for DHT query
    */
-  public async getAnnouncedAddresses(peer: PeerId = this.getId(), timeout = 5e3): Promise<Multiaddr[]> {
+  public async getAddressesAnnouncedToDHT(peer: PeerId = this.getId(), timeout = 5e3): Promise<Multiaddr[]> {
     if (peer.equals(this.getId())) {
       return this.libp2p.multiaddrs
     }
@@ -733,6 +736,9 @@ class Hopr extends EventEmitter {
     }
   }
 
+  /**
+   * @returns a list connected peerIds
+   */
   public getConnectedPeers(): PeerId[] {
     if (!this.networkPeers) {
       return []
@@ -740,12 +746,33 @@ class Hopr extends EventEmitter {
     return this.networkPeers.all()
   }
 
+  /**
+   * Takes a look into the indexer.
+   * @returns a list of announced multi addresses
+   */
+  public async getAddressesAnnouncedOnChain(): Promise<Multiaddr[]> {
+    return this.indexer.getAddressesAnnouncedOnChain()
+  }
+
+  /**
+   * @param peerId of the node we want to get the connection info for
+   * @returns various information about the connection
+   */
+  public getConnectionInfo(peerId: PeerId): Entry {
+    return this.networkPeers.getConnectionInfo(peerId)
+  }
+
+  /**
+   * @deprecated Used by API v1
+   * @returns a string describing the connection status between
+   * us and various nodes
+   */
   public async connectionReport(): Promise<string> {
     if (!this.networkPeers) {
       return 'Node has not started yet'
     }
     const connected = this.networkPeers.debugLog()
-    const announced = await this.connector.indexer.getAnnouncedAddresses()
+    const announced = await this.connector.indexer.getAddressesAnnouncedOnChain()
     return `${connected}
     \n${announced.length} peers have announced themselves on chain:
     \n${announced.map((ma: Multiaddr) => ma.toString()).join('\n')}`
@@ -796,7 +823,7 @@ class Hopr extends EventEmitter {
     let addrToAnnounce: Multiaddr
 
     if (announceRoutableAddress) {
-      let multiaddrs = await this.getAnnouncedAddresses()
+      let multiaddrs = await this.getAddressesAnnouncedToDHT()
 
       if (this.options.testing?.announceLocalAddresses) {
         multiaddrs = multiaddrs.filter((ma) => isMultiaddrLocal(ma))
@@ -900,6 +927,7 @@ class Hopr extends EventEmitter {
     amountToFund: BN
   ): Promise<{
     channelId: Hash
+    receipt: Receipt
   }> {
     const counterpartyPubKey = PublicKey.fromPeerId(counterparty)
     const myAvailableTokens = await this.connector.getBalance(true)
@@ -916,9 +944,7 @@ class Hopr extends EventEmitter {
     }
 
     try {
-      return {
-        channelId: await this.connector.openChannel(counterpartyPubKey, new Balance(amountToFund))
-      }
+      return this.connector.openChannel(counterpartyPubKey, new Balance(amountToFund))
     } catch (err) {
       this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to openChannel: ${err}`)
@@ -956,9 +982,15 @@ class Hopr extends EventEmitter {
     }
   }
 
-  public async closeChannel(counterparty: PeerId): Promise<{ receipt: string; status: ChannelStatus }> {
+  public async closeChannel(
+    counterparty: PeerId,
+    direction: 'incoming' | 'outgoing'
+  ): Promise<{ receipt: string; status: ChannelStatus }> {
     const counterpartyPubKey = PublicKey.fromPeerId(counterparty)
-    const channel = await this.db.getChannelX(this.pubKey, counterpartyPubKey)
+    const channel =
+      direction === 'outgoing'
+        ? await this.db.getChannelX(this.pubKey, counterpartyPubKey)
+        : await this.db.getChannelX(counterpartyPubKey, this.pubKey)
 
     // TODO: should we wait for confirmation?
     if (channel.status === ChannelStatus.Closed) {
@@ -1000,6 +1032,21 @@ class Hopr extends EventEmitter {
     return { receipt: txHash, status: channel.status }
   }
 
+  public async getAllTickets(): Promise<Ticket[]> {
+    return this.db.getAcknowledgedTickets().then((list) => list.map((t) => t.ticket))
+  }
+
+  public async getTickets(peerId: PeerId): Promise<Ticket[]> {
+    const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
+    const counterpartyPubKey = new PublicKey(peerId.pubKey.marshal())
+    const channel = await this.db.getChannelX(counterpartyPubKey, selfPubKey)
+    return this.db
+      .getAcknowledgedTickets({
+        channel
+      })
+      .then((list) => list.map((t) => t.ticket))
+  }
+
   public async getTicketStatistics() {
     const ack = await this.db.getAcknowledgedTickets()
     const pending = await this.db.getPendingTicketCount()
@@ -1023,6 +1070,23 @@ class Hopr extends EventEmitter {
 
   public async redeemAllTickets() {
     await this.connector.redeemAllTickets()
+  }
+
+  public async redeemTicketsInChannel(peerId: PeerId) {
+    const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
+    const counterpartyPubKey = new PublicKey(peerId.pubKey.marshal())
+    const channel = await this.db.getChannelX(counterpartyPubKey, selfPubKey)
+    await this.connector.redeemTicketsInChannel(channel)
+  }
+
+  /**
+   * Get the channel entry between source and destination node.
+   * @param src PeerId
+   * @param dest PeerId
+   * @returns the channel entry of those two nodes
+   */
+  public async getChannel(src: PeerId, dest: PeerId): Promise<ChannelEntry> {
+    return await this.db.getChannelX(new PublicKey(src.pubKey.marshal()), new PublicKey(dest.pubKey.marshal()))
   }
 
   public async getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {
