@@ -200,7 +200,7 @@ export class HoprDB {
   }
 
   private async touch(key: Uint8Array): Promise<void> {
-    return await this.put(Buffer.from(this.keyOf(key)), new Uint8Array())
+    return await this.put(key, new Uint8Array())
   }
 
   protected async get(key: Uint8Array): Promise<Uint8Array> {
