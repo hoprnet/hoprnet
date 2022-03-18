@@ -2,19 +2,19 @@ import { u8aSplit, serializeToU8a, validatePoRHalfKeys } from '..'
 import { HalfKeyChallenge, HalfKey, PublicKey, Ticket, Response } from '.'
 
 export class UnacknowledgedTicket {
-  constructor(readonly ticket: Ticket, readonly ownKey: HalfKey, readonly signer: PublicKey) {
+  constructor(public readonly ticket: Ticket, public readonly ownKey: HalfKey, public readonly signer: PublicKey) {
     if (signer.toAddress().eq(this.ticket.counterparty)) {
       throw Error(`Given signer public key must be different from counterparty`)
     }
   }
 
   static deserialize(arr: Uint8Array): UnacknowledgedTicket {
-    const components = u8aSplit(arr, [Ticket.SIZE, HalfKey.SIZE, PublicKey.SIZE])
+    const components = u8aSplit(arr, [Ticket.SIZE, HalfKey.SIZE, PublicKey.SIZE_UNCOMPRESSED])
 
     return new UnacknowledgedTicket(
       Ticket.deserialize(components[0]),
-      new HalfKey(components[1]),
-      new PublicKey(components[2])
+      HalfKey.deserialize(components[1]),
+      PublicKey.deserialize(components[2])
     )
   }
 
@@ -22,7 +22,7 @@ export class UnacknowledgedTicket {
     return serializeToU8a([
       [this.ticket.serialize(), Ticket.SIZE],
       [this.ownKey.serialize(), HalfKey.SIZE],
-      [this.signer.serialize(), PublicKey.SIZE]
+      [this.signer.serializeUncompressed(), PublicKey.SIZE_UNCOMPRESSED]
     ])
   }
 
@@ -43,6 +43,6 @@ export class UnacknowledgedTicket {
   }
 
   static SIZE(): number {
-    return Ticket.SIZE + Response.SIZE
+    return Ticket.SIZE + Response.SIZE + PublicKey.SIZE_UNCOMPRESSED
   }
 }

@@ -45,7 +45,7 @@ export const formatIncomingChannel = (channel: ChannelEntry): ChannelInfo => {
  * @returns List of incoming and outgoing channels associated with the node.
  */
 export const getChannels = async (node: Hopr, includingClosed: boolean) => {
-  const selfPubKey = new PublicKey(node.getId().pubKey.marshal())
+  const selfPubKey = PublicKey.fromPeerId(node.getId())
   const selfAddress = selfPubKey.toAddress()
 
   const channelsFrom: ChannelInfo[] = (await node.getChannelsFrom(selfAddress))

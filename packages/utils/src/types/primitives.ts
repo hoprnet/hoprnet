@@ -1,117 +1,15 @@
-import { utils, ethers } from 'ethers'
+import { utils } from 'ethers'
 import BN from 'bn.js'
-import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaVerify, ecdsaRecover } from 'secp256k1'
+import { ecdsaSign, ecdsaVerify } from 'secp256k1'
 import { moveDecimalPoint } from '../math'
 import { u8aToHex, u8aEquals, stringToU8a, u8aConcat } from '../u8a'
 import { ADDRESS_LENGTH, HASH_LENGTH, SIGNATURE_LENGTH } from '../constants'
-import PeerId from 'peer-id'
-import { pubKeyToPeerId } from '../libp2p'
-
-export class PublicKey {
-  // Cache expensive computation result
-  private _address: Address
-  // @TODO use uncompressed public key internally
-  constructor(private arr: Uint8Array) {
-    if (arr.length !== PublicKey.SIZE) {
-      throw new Error('Incorrect size Uint8Array for compressed public key')
-    }
-  }
-
-  static fromPrivKey(privKey: Uint8Array): PublicKey {
-    if (privKey.length !== 32) {
-      throw new Error('Incorrect size Uint8Array for private key')
-    }
-
-    return new PublicKey(publicKeyCreate(privKey, true))
-  }
-
-  static fromUncompressedPubKey(arr: Uint8Array): PublicKey {
-    if (arr.length !== 65) {
-      throw new Error('Incorrect size Uint8Array for uncompressed public key')
-    }
-
-    return new PublicKey(publicKeyConvert(arr, true))
-  }
-
-  static fromPeerId(peerId: PeerId): PublicKey {
-    return new PublicKey(peerId.pubKey.marshal())
-  }
-
-  static fromPeerIdString(peerIdString: string) {
-    return PublicKey.fromPeerId(PeerId.createFromB58String(peerIdString))
-  }
-
-  static fromSignature(hash: string, r: string, s: string, v: number): PublicKey {
-    return PublicKey.fromUncompressedPubKey(
-      ecdsaRecover(Uint8Array.from([...stringToU8a(r), ...stringToU8a(s)]), v, stringToU8a(hash), false)
-    )
-  }
-
-  toAddress(): Address {
-    if (this._address != undefined) {
-      return this._address
-    }
-    // Expensive EC-operation
-    this._address = new Address(Hash.create(publicKeyConvert(this.arr, false).slice(1)).serialize().slice(12))
-
-    return this._address
-  }
-
-  toUncompressedPubKeyHex(): string {
-    // Needed in only a few cases for interacting with secp256k1
-    return u8aToHex(publicKeyConvert(this.arr, false).slice(1))
-  }
-
-  toPeerId(): PeerId {
-    return pubKeyToPeerId(this.serialize())
-  }
-
-  static fromString(str: string): PublicKey {
-    if (!str) {
-      throw new Error('Cannot make address from empty string')
-    }
-    return new PublicKey(stringToU8a(str))
-  }
-
-  static get SIZE(): number {
-    return 33
-  }
-
-  serialize() {
-    return this.arr
-  }
-
-  toHex(): string {
-    return u8aToHex(this.arr)
-  }
-
-  toString(): string {
-    return `<PubKey:${this.toB58String()}>`
-  }
-
-  toB58String(): string {
-    return this.toPeerId().toB58String()
-  }
-
-  eq(b: PublicKey) {
-    return u8aEquals(this.arr, b.serialize())
-  }
-
-  static deserialize(arr: Uint8Array) {
-    return new PublicKey(arr)
-  }
-
-  static createMock(): PublicKey {
-    return PublicKey.fromString('0x021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8')
-  }
-}
+import type { PublicKey } from './publicKey'
 
 export class Address {
   constructor(private arr: Uint8Array) {
-    if (arr.length !== Address.SIZE) {
+    if (arr.length != Address.SIZE) {
       throw new Error('Incorrect size Uint8Array for address')
-    } else if (!ethers.utils.isAddress(u8aToHex(arr))) {
-      throw new Error('Incorrect Uint8Array for address')
     }
   }
 
@@ -132,7 +30,7 @@ export class Address {
   }
 
   toHex(): string {
-    return ethers.utils.getAddress(u8aToHex(this.arr, false))
+    return utils.getAddress(u8aToHex(this.arr, false))
   }
 
   toString(): string {
@@ -178,7 +76,7 @@ export class Hash {
   static SIZE = HASH_LENGTH
 
   static create(...inputs: Uint8Array[]) {
-    return new Hash(utils.arrayify(utils.keccak256(u8aConcat(...inputs))))
+    return new Hash(stringToU8a(utils.keccak256(u8aConcat(...inputs))))
   }
 
   static deserialize(arr: Uint8Array) {
@@ -223,7 +121,7 @@ export class Signature {
       throw new Error('Incorrect size Uint8Array for signature')
     }
     if (![0, 1].includes(recovery)) {
-      throw new Error('Recovery must be either 1 or 0, got ${recovery}')
+      throw new Error(`Recovery must be either 1 or 0, got ${recovery}`)
     }
   }
 
@@ -254,7 +152,7 @@ export class Signature {
   }
 
   verify(msg: Uint8Array, pubKey: PublicKey): boolean {
-    return ecdsaVerify(this.signature, msg, pubKey.serialize())
+    return ecdsaVerify(this.signature, msg, pubKey.serializeUncompressed())
   }
 
   toHex(): string {
@@ -275,6 +173,10 @@ abstract class BalanceBase {
   abstract add(b: BalanceBase): BalanceBase
   abstract sub(b: BalanceBase): BalanceBase
 
+  public eq(b: Balance): boolean {
+    return this.bn.eq(b.bn)
+  }
+
   public toBN(): BN {
     return this.bn
   }
@@ -284,19 +186,19 @@ abstract class BalanceBase {
   }
 
   public lt(b: BalanceBase): boolean {
-    return this.toBN().lt(b.toBN())
+    return this.bn.lt(b.bn)
   }
 
   public gt(b: BalanceBase): boolean {
-    return this.toBN().gt(b.toBN())
+    return this.bn.gt(b.bn)
   }
 
   public gte(b: BalanceBase): boolean {
-    return this.toBN().gte(b.toBN())
+    return this.bn.gte(b.bn)
   }
 
   public lte(b: BalanceBase): boolean {
-    return this.toBN().lte(b.toBN())
+    return this.bn.lte(b.bn)
   }
 
   public serialize(): Uint8Array {
@@ -318,11 +220,11 @@ export class Balance extends BalanceBase {
   readonly symbol: string = Balance.SYMBOL
 
   public add(b: Balance): Balance {
-    return new Balance(this.bn.add(b.toBN()))
+    return new Balance(this.bn.add(b.bn))
   }
 
   public sub(b: Balance): Balance {
-    return new Balance(this.bn.sub(b.toBN()))
+    return new Balance(this.bn.sub(b.bn))
   }
 
   static deserialize(arr: Uint8Array): Balance {
@@ -339,17 +241,17 @@ export class NativeBalance extends BalanceBase {
   readonly symbol: string = NativeBalance.SYMBOL
 
   public add(b: NativeBalance): NativeBalance {
-    return new NativeBalance(this.bn.add(b.toBN()))
+    return new NativeBalance(this.bn.add(b.bn))
   }
 
   public sub(b: NativeBalance): NativeBalance {
-    return new NativeBalance(this.bn.sub(b.toBN()))
+    return new NativeBalance(this.bn.sub(b.bn))
   }
 
   static deserialize(arr: Uint8Array): NativeBalance {
     return new NativeBalance(new BN(arr))
   }
-  static ZERO(): NativeBalance {
+  static get ZERO(): NativeBalance {
     return new NativeBalance(new BN('0'))
   }
 }

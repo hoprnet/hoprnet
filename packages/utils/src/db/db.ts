@@ -162,7 +162,7 @@ export class HoprDB {
     // Fully initialize database
     await this.db.open()
 
-    log(`namespacing db by native address: ${this.id.toAddress().toHex()}`)
+    log(`namespacing db by native address: ${this.id.toCompressedPubKeyHex()}`)
     if (setEnvironment) {
       log(`setting environment id ${environmentId} to db`)
       await this.setEnvironmentId(environmentId)
@@ -178,7 +178,7 @@ export class HoprDB {
   }
 
   private keyOf(...segments: Uint8Array[]): Uint8Array {
-    return u8aConcat(encoder.encode(this.id.toHex()), ...segments)
+    return u8aConcat(this.id.serializeUncompressed().slice(1), ...segments)
   }
 
   private async has(key: Uint8Array): Promise<boolean> {
@@ -549,7 +549,7 @@ export class HoprDB {
   async updateAccountAndSnapshot(account: AccountEntry, snapshot: Snapshot): Promise<void> {
     await this.db
       .batch()
-      .put(Buffer.from(this.keyOf(createAccountKey(account.address))), Buffer.from(account.serialize()))
+      .put(Buffer.from(this.keyOf(createAccountKey(account.getAddress()))), Buffer.from(account.serialize()))
       .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
       .write()
   }

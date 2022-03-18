@@ -1,9 +1,8 @@
 import BN from 'bn.js'
 import { stringToU8a, u8aSplit, serializeToU8a } from '..'
 import { Address, Balance, Hash, Signature, UINT256, PublicKey, Response } from '.'
-import { ecdsaRecover, ecdsaSign } from 'secp256k1'
 import { ethers } from 'ethers'
-import { Challenge } from './challenge'
+import type { Challenge } from './challenge'
 import { EthereumChallenge } from './ethereumChallenge'
 import { PRICE_PER_PACKET, INVERSE_TICKET_WIN_PROB } from '../constants'
 
@@ -83,8 +82,7 @@ export class Ticket {
     )
 
     const message = toEthSignedMessageHash(hashedTicket)
-    const sig = ecdsaSign(message.serialize(), signPriv)
-    const signature = new Signature(sig.signature, sig.recid)
+    const signature = Signature.create(message.serialize(), signPriv)
     return new Ticket(counterparty, encodedChallenge, epoch, index, amount, winProb, channelEpoch, signature)
   }
 
@@ -151,7 +149,7 @@ export class Ticket {
   }
 
   recoverSigner() {
-    return new PublicKey(ecdsaRecover(this.signature.signature, this.signature.recovery, this.getHash().serialize()))
+    return PublicKey.fromSignature(this.getHash().serialize(), this.signature.signature, this.signature.recovery)
   }
 
   verify(pubKey: PublicKey): boolean {

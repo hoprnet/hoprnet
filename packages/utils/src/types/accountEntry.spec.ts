@@ -1,47 +1,75 @@
 import assert from 'assert'
 import { Multiaddr } from 'multiaddr'
-import { Address, AccountEntry } from '.'
-import { encode } from 'bs58'
+import { AccountEntry } from './accountEntry'
 import BN from 'bn.js'
-import { publicKeyVerify } from 'secp256k1'
+import { PublicKey } from './publicKey'
 
 // TODO: move these & similar into constants file
-const EMPTY_ADDRESS = new Address(new Uint8Array({ length: Address.SIZE }))
-
-const PARTY_A_ADDRESS = Address.fromString('0x55CfF15a5159239002D57C591eF4ACA7f2ACAfE6')
-const PARTY_A_MULTI_ADDR = new Multiaddr(
-  '/ip4/34.65.237.196/tcp/9091/p2p/16Uiu2HAmThyWP5YWutPmYk9yUZ48ryWyZ7Cf6pMTQduvHUS9sGE7'
+const PARTY_A = PublicKey.fromPrivKeyString('0xc14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260')
+const PARTY_A_PEERID = PARTY_A.toPeerId()
+const PARTY_A_ADDRESS = PARTY_A.toAddress()
+const PARTY_A_MULTI_ADDR = new Multiaddr('/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk')
+const PARTY_A_MULTI_ADDR_WITH_ROUTING = new Multiaddr(
+  '/ip4/34.65.237.196/tcp/9091/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk'
 )
 
 describe('AccountEntry', function () {
-  it('should be empty', function () {
-    const accountEntry = AccountEntry.deserialize(new Uint8Array({ length: AccountEntry.SIZE }))
+  it('create, serialize, deserialize - without routable address', function () {
+    const accountEntry = new AccountEntry(PARTY_A, PARTY_A_MULTI_ADDR, new BN(1))
 
-    assert(accountEntry.address.eq(EMPTY_ADDRESS))
-    assert(accountEntry.multiAddr === undefined)
+    assert(!accountEntry.containsRouting)
+    assert(accountEntry.hasAnnounced)
+
+    assert(accountEntry.getPeerId().equals(PARTY_A_PEERID))
+    assert(accountEntry.getAddress().eq(PARTY_A_ADDRESS))
+
+    const serialized = accountEntry.serialize()
+
+    assert(serialized.length == AccountEntry.SIZE)
+
+    const deserialized = AccountEntry.deserialize(serialized)
+
+    assert(accountEntry.publicKey.eq(deserialized.publicKey))
+    assert(accountEntry.multiAddr.equals(deserialized.multiAddr))
+    assert(accountEntry.updatedBlock.eq(deserialized.updatedBlock))
   })
 
-  it('should contain the right values', function () {
-    const accountEntry = AccountEntry.deserialize(
-      new AccountEntry(PARTY_A_ADDRESS, PARTY_A_MULTI_ADDR, new BN('1')).serialize()
-    )
+  it('create, serialize, deserialize - with routable address', function () {
+    const accountEntry = new AccountEntry(PARTY_A, PARTY_A_MULTI_ADDR_WITH_ROUTING, new BN(1))
 
-    assert(accountEntry.address.eq(PARTY_A_ADDRESS))
-    assert(accountEntry.multiAddr.equals(PARTY_A_MULTI_ADDR))
+    assert(accountEntry.containsRouting)
+    assert(accountEntry.hasAnnounced)
+
+    assert(accountEntry.getPeerId().equals(PARTY_A_PEERID))
+    assert(accountEntry.getAddress().eq(PARTY_A_ADDRESS))
+
+    const serialized = accountEntry.serialize()
+
+    assert(serialized.length == AccountEntry.SIZE)
+
+    const deserialized = AccountEntry.deserialize(serialized)
+
+    assert(accountEntry.publicKey.eq(deserialized.publicKey))
+    assert(accountEntry.multiAddr.equals(deserialized.multiAddr))
+    assert(accountEntry.updatedBlock.eq(deserialized.updatedBlock))
   })
 
-  it('should fail on invalid public keys', function () {
-    const INVALID_PUBLIC_KEY = Uint8Array.from([0x03, ...new Uint8Array(32).fill(0xff)])
+  it('create, serialize, deserialize - without an address', function () {
+    const accountEntry = new AccountEntry(PARTY_A, undefined, new BN(1))
 
-    assert(!publicKeyVerify(INVALID_PUBLIC_KEY), 'Public key must not be invalid')
+    assert(!accountEntry.containsRouting)
+    assert(!accountEntry.hasAnnounced)
 
-    const MULTIHASH_PREFIX = Uint8Array.from([0x00, 0x25, 0x08, 0x02, 0x12, 0x21])
-    const INVALID_ENCODED_KEY = encode(Uint8Array.from([...MULTIHASH_PREFIX, ...INVALID_PUBLIC_KEY]))
+    assert(accountEntry.getPeerId().equals(PARTY_A_PEERID))
+    assert(accountEntry.getAddress().eq(PARTY_A_ADDRESS))
 
-    assert.throws(
-      () =>
-        new AccountEntry(PARTY_A_ADDRESS, new Multiaddr(`/ip4/1.2.3.4/tcp/0/p2p/${INVALID_ENCODED_KEY}`), new BN('1')),
-      Error('Multiaddr does not contain a valid public key.')
-    )
+    const serialized = accountEntry.serialize()
+
+    assert(serialized.length == AccountEntry.SIZE)
+
+    const deserialized = AccountEntry.deserialize(serialized)
+
+    assert(accountEntry.publicKey.eq(deserialized.publicKey))
+    assert(accountEntry.updatedBlock.eq(deserialized.updatedBlock))
   })
 })
