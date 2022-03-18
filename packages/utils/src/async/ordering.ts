@@ -64,7 +64,6 @@ export function ordered<T>() {
       currentIndex++
     }
 
-    // console.log(queue.toArray())
     if (queue.peek().value != undefined) {
       resolve(false)
     }

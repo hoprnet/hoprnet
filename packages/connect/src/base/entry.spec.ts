@@ -56,7 +56,12 @@ function createFakeNetwork() {
             stream: {
               source: (async function* () {
                 yield OK
-              })()
+              })(),
+              sink: async (source: AsyncIterableIterator<any>) => {
+                // consume the send stream
+                for await (const _sth of source) {
+                }
+              }
             }
           })
       })

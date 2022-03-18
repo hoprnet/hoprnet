@@ -40,7 +40,7 @@
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L72)
+[packages/core/src/channel-strategy.ts:76](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L76)
 
 ## Methods
 
@@ -88,13 +88,13 @@ ___
 
 ### shouldCommitToChannel
 
-▸ **shouldCommitToChannel**(`_c`): `Promise`<`boolean`\>
+▸ **shouldCommitToChannel**(`c`): `Promise`<`boolean`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `_c` | `ChannelEntry` |
+| `c` | `ChannelEntry` |
 
 #### Returns
 
@@ -102,4 +102,4 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L67)
+[packages/core/src/channel-strategy.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L71)

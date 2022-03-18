@@ -1,28 +1,22 @@
-type WorkerType<Return> = Promise<{
-  resultIndex: number
-  workerIndex: number
-  value: Return | Error
-}>
-
 /**
- * Decorates the call of the worker function to return the
- * index in the array of workers.
+ * Runs the asynchronous task and fetches synchronous and asynchronously thrown errors
+ * and performs the callback at the end of the next iteration of the event loop.
  * @param fn worker function
  * @param arg a single argument to pass to the worker function
- * @param workerIndex index in the worker array
- * @param workerIndex index in the results array
+ * @param resultIndex index in the results array
  * @returns a decorated worker result
  */
-async function decorateWorker<ArgType, Return, Args extends Array<ArgType>>(
+async function runTask<ArgType, Return, Args extends Array<ArgType>>(
   fn: (...args: Args) => Promise<Return>,
   arg: Args,
-  workerIndex: number,
-  resultIndex: number
-): WorkerType<Return> {
+  resultIndex: number,
+  update: (resultIndex: number, result: Return | Error) => void
+): Promise<void> {
   try {
-    return { resultIndex, workerIndex, value: await fn(...arg) }
+    const value = await fn(...arg)
+    setImmediate(update, resultIndex, value)
   } catch (err) {
-    return { resultIndex, workerIndex, value: err }
+    setImmediate(update, resultIndex, err)
   }
 }
 
@@ -40,48 +34,43 @@ async function decorateWorker<ArgType, Return, Args extends Array<ArgType>>(
  * const result = await nAtaTime(setTimeout, [[300, 'one'], [200, 'two'], [100, 'three']], 2)
  * // => ['two', 'one', 'three']
  */
-export async function nAtATime<ArgType, Return, Args extends Array<ArgType>>(
+export function nAtATime<ArgType, Return, Args extends Array<ArgType>>(
   fn: (...args: Args) => Promise<Return>,
   args: Args[],
   concurrency: number
 ): Promise<(Return | Error)[]> {
-  if (concurrency <= 0) {
-    return []
+  if (concurrency <= 0 || args.length == 0) {
+    return Promise.resolve([])
   }
 
-  let currentIndex = Math.min(concurrency, args.length)
+  return new Promise<(Return | Error)[]>((resolve) => {
+    const results = new Array<Return | Error>(args.length)
 
-  const workers: (WorkerType<Return> | undefined)[] = Array.from({ length: currentIndex }, (_, index: number) =>
-    decorateWorker(fn, args[index], index, index)
-  )
+    let currentIndex = 0
+    let activeWorkers = 0
 
-  let activeWorkers = currentIndex
+    const update = (resultIndex: number, result: Return | Error) => {
+      // console.log(
+      //   `updating: resultIndex ${resultIndex} currentIndex ${currentIndex} activeWorkers ${activeWorkers}`,
+      //   results
+      // )
+      results[resultIndex] = result
 
-  const results = new Array<Return | Error>(args.length)
-
-  while (activeWorkers > 0) {
-    let functionResult: Awaited<WorkerType<Return>>
-    if (activeWorkers == concurrency) {
-      functionResult = await Promise.race(workers)
-    } else {
-      functionResult = await Promise.race(workers.filter((worker: WorkerType<Return>) => worker))
+      if (currentIndex < args.length) {
+        runTask(fn, args[currentIndex], currentIndex, update)
+        currentIndex++
+      } else {
+        if (activeWorkers == 1) {
+          resolve(results)
+        } else {
+          activeWorkers--
+        }
+      }
     }
 
-    results[functionResult.resultIndex] = functionResult.value
-
-    if (currentIndex < args.length) {
-      workers[functionResult.workerIndex] = decorateWorker(
-        fn,
-        args[currentIndex],
-        functionResult.workerIndex,
-        currentIndex
-      )
-      currentIndex++
-    } else {
-      workers[functionResult.workerIndex] = undefined
-      activeWorkers--
+    for (; currentIndex < Math.min(concurrency, args.length); currentIndex++) {
+      activeWorkers++
+      runTask(fn, args[currentIndex], currentIndex, update)
     }
-  }
-
-  return results
+  })
 }

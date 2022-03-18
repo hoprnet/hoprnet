@@ -24,7 +24,8 @@ ZONE="--zone=europe-west1-d"
 declare gcloud_region="--region=europe-west1"
 declare gcloud_disk_name="hoprd-data-disk"
 
-GCLOUD_MACHINE="--machine-type=e2-medium"
+# use CPU optimized machine type
+GCLOUD_MACHINE="--machine-type=c2d-highcpu-2"
 GCLOUD_META="--metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true --maintenance-policy=MIGRATE"
 GCLOUD_TAGS="--tags=hopr-node,web-client,rest-client,portainer,healthcheck"
 GCLOUD_BOOTDISK="--boot-disk-size=20GB --boot-disk-type=pd-standard"
@@ -226,7 +227,7 @@ gcloud_create_or_update_instance_template() {
 
   if [ "${no_args}" = "true" ]; then
     eval gcloud compute instance-templates create-with-container "${name}" \
-      --machine-type=n2-standard-4 \
+      --machine-type=c2d-highcpu-2 \
       --metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true \
       --maintenance-policy=MIGRATE \
       --tags=hopr-node,web-client,rest-client,portainer,healthcheck \
@@ -243,7 +244,7 @@ gcloud_create_or_update_instance_template() {
       ${extra_args}
   else
     eval gcloud compute instance-templates create-with-container "${name}" \
-      --machine-type=n2-standard-4 \
+      --machine-type=c2d-highcpu-2 \
       --metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true \
       --maintenance-policy=MIGRATE \
       --tags=hopr-node,web-client,rest-client,portainer,healthcheck \

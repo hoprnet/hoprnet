@@ -77,7 +77,9 @@ export async function createTicket(
   const outstandingTicketBalance = await db.getPendingBalanceTo(dest.toAddress())
   const balance = channel.balance.toBN().sub(outstandingTicketBalance.toBN())
   log(
-    `balances ${channel.balance.toString()} - ${outstandingTicketBalance.toString()} = ${balance.toString()} should >= ${amount.toString()} in channel open to ${
+    `balances ${channel.balance.toFormattedString()} - ${outstandingTicketBalance.toFormattedString()} = ${new Balance(
+      balance
+    ).toFormattedString()} should >= ${amount.toFormattedString()} in channel open to ${
       !channel.destination ? '' : channel.destination.toB58String()
     }`
   )
@@ -425,7 +427,7 @@ export class Packet {
           })
       )
     } catch (e) {
-      log(`mark ticket as rejected`, this.ticket)
+      log(`mark ticket as rejected`, this.ticket.toString())
       await db.markRejected(this.ticket)
       throw e
     }

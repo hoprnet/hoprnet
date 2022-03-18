@@ -16,7 +16,7 @@ const ALICE_ENTRY = {
   heartbeatsSuccess: 10,
   lastSeen: 1646410980793,
   backoff: 0,
-  lastTen: 1
+  quality: 1
 }
 const BOB_ENTRY = {
   id: BOB_PEER_ID,
@@ -24,7 +24,7 @@ const BOB_ENTRY = {
   heartbeatsSuccess: 2,
   lastSeen: 1646410680793,
   backoff: 0,
-  lastTen: 0.1
+  quality: 0.1
 }
 const CHARLIE_ENTRY = {
   id: CHARLIE_PEER_ID,
@@ -32,7 +32,7 @@ const CHARLIE_ENTRY = {
   heartbeatsSuccess: 9,
   lastSeen: 1646410980993,
   backoff: 0,
-  lastTen: 0.9
+  quality: 0.9
 }
 
 let node = sinon.fake() as any
@@ -61,13 +61,13 @@ describe('peers', function () {
 
   it('should resolve with all data', async function () {
     const peers = await getPeers(node, 0)
-    assert.equal(peers.connected.length, 3, 'getPeers did not return correct amount of connected peers')
-    assert.equal(peers.announced.length, 2, 'getPeers did not return correct amount of announced peers')
+    assert.equal(peers.connected.length, 3)
+    assert.equal(peers.announced.length, 2)
   })
 
   it('should resolve with active nodes', async function () {
     const peers = await getPeers(node, 0.5)
-    assert.equal(peers.connected.length, 2, 'getPeers did not return correct amount of active connected peers')
-    assert.equal(peers.announced.length, 1, 'getPeers did not return correct amount of active announced peers')
+    assert.equal(peers.connected.length, 2)
+    assert.equal(peers.announced.length, 1)
   })
 })

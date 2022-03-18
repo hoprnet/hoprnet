@@ -11,13 +11,13 @@ describe('test PeerStore', async function () {
     const networkPeers = new PeerStore([], [SELF])
     assert(networkPeers.length() == 0, 'networkPeers must be empty')
 
-    networkPeers.register(SELF)
+    networkPeers.register(SELF, 'test')
     assert(networkPeers.length() == 0, 'networkPeers must be empty after inserting self')
 
-    networkPeers.register(IDS[0])
-    networkPeers.register(IDS[1])
+    networkPeers.register(IDS[0], 'test')
+    networkPeers.register(IDS[1], 'test')
     assert(networkPeers.length() == 2, 'now has 2 peers')
-    networkPeers.register(IDS[0])
+    networkPeers.register(IDS[0], 'test')
     assert(networkPeers.length() == 2, `Updating a peer should not increase len`)
   })
 
@@ -32,7 +32,7 @@ describe('test PeerStore', async function () {
     assert(networkPeers.length() == 0, 'networkPeers must be empty')
     assert(networkPeers.pingSince(123).length === 0, 'no peers yet')
 
-    networkPeers.register(id)
+    networkPeers.register(id, 'test')
     assert(networkPeers.qualityOf(id) < Q, 'initial peers have low quality')
     assert(networkPeers.length() === 1)
 
@@ -82,7 +82,7 @@ describe('test PeerStore', async function () {
     const networkPeers = new PeerStore([], [SELF], onPeerOffline)
 
     const id = fakePeerId(5)
-    networkPeers.register(id)
+    networkPeers.register(id, 'test')
 
     while (networkPeers.qualityOf(id) <= NETWORK_QUALITY_THRESHOLD) {
       networkPeers.updateRecord({
