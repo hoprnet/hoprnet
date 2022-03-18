@@ -55,7 +55,7 @@
     "libp2p-kad-dht": "0.28.6",
     "libp2p-mplex": "0.10.7",
     "libp2p-tcp": "0.17.2",
-    "mocha": "9.2.0",
+    "mocha": "9.2.2",
     "rewiremock": "3.14.3",
     "rimraf": "3.0.2",
     "sinon": "12.0.1",
