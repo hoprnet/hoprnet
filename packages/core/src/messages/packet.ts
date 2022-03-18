@@ -1,4 +1,5 @@
 import {
+  Hash,
   Ticket,
   UINT256,
   PublicKey,
@@ -20,7 +21,7 @@ import {
   PRICE_PER_PACKET,
   INVERSE_TICKET_WIN_PROB
 } from '@hoprnet/hopr-utils'
-import type { HalfKey, HalfKeyChallenge, ChannelEntry, Challenge, Hash } from '@hoprnet/hopr-utils'
+import type { HalfKey, HalfKeyChallenge, ChannelEntry, Challenge } from '@hoprnet/hopr-utils'
 import { AcknowledgementChallenge } from './acknowledgementChallenge'
 import type PeerId from 'peer-id'
 import BN from 'bn.js'
@@ -239,7 +240,7 @@ export class Packet {
 
   public plaintext: Uint8Array
 
-  public packetTag: Uint8Array
+  public packetTag: Hash
   public previousHop: PublicKey
   public nextHop: Uint8Array
   public ownShare: HalfKeyChallenge
@@ -258,7 +259,7 @@ export class Packet {
     return this
   }
 
-  private setFinal(plaintext: Uint8Array, packetTag: Uint8Array, ackKey: HalfKey, previousHop: PublicKey) {
+  private setFinal(plaintext: Uint8Array, packetTag: Hash, ackKey: HalfKey, previousHop: PublicKey) {
     this.packetTag = packetTag
     this.ackKey = ackKey
     this.isReceiver = true
@@ -277,7 +278,7 @@ export class Packet {
     previousHop: PublicKey,
     nextChallenge: Challenge,
     ackChallenge: HalfKeyChallenge,
-    packetTag: Uint8Array
+    packetTag: Hash
   ) {
     this.isReceiver = false
     this.isReadyToForward = false
@@ -355,7 +356,7 @@ export class Packet {
     if (transformedOutput.lastNode == true) {
       return new Packet(packet, challenge, ticket).setFinal(
         transformedOutput.plaintext,
-        transformedOutput.packetTag,
+        new Hash(transformedOutput.packetTag),
         ackKey,
         PublicKey.fromPeerId(pubKeySender)
       )
@@ -379,7 +380,7 @@ export class Packet {
       PublicKey.fromPeerId(pubKeySender),
       verificationOutput.nextTicketChallenge,
       verificationOutput.ackChallenge,
-      transformedOutput.packetTag
+      new Hash(transformedOutput.packetTag)
     )
   }
 

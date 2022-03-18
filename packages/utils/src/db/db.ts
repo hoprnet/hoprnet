@@ -40,6 +40,7 @@ const TICKET_INDEX_PREFIX = encoder.encode('ticketIndex-')
 const PENDING_TICKETS_COUNT = encoder.encode('statistics:pending:value-')
 const ACKNOWLEDGED_TICKETS_PREFIX = encoder.encode('tickets:acknowledged-')
 const PENDING_ACKNOWLEDGEMENTS_PREFIX = encoder.encode('tickets:pending-acknowledgement-')
+const PACKET_TAG_PREFIX: Uint8Array = encoder.encode('packets:tag-')
 
 function createChannelKey(channelId: Hash): Uint8Array {
   return Uint8Array.from([...CHANNEL_PREFIX, ...channelId.serialize()])
@@ -62,11 +63,13 @@ function createPendingTicketsCountKey(address: Address) {
 function createAcknowledgedTicketKey(challenge: EthereumChallenge, channelEpoch: UINT256) {
   return Uint8Array.from([...ACKNOWLEDGED_TICKETS_PREFIX, ...channelEpoch.serialize(), ...challenge.serialize()])
 }
-export const createPendingAcknowledgement = (halfKey: HalfKeyChallenge) => {
+function createPendingAcknowledgement(halfKey: HalfKeyChallenge) {
   return Uint8Array.from([...PENDING_ACKNOWLEDGEMENTS_PREFIX, ...halfKey.serialize()])
 }
+function createPacketTagKey(tag: Hash) {
+  return Uint8Array.from([...PACKET_TAG_PREFIX, ...tag.serialize()])
+}
 
-const PACKET_TAG_PREFIX: Uint8Array = encoder.encode('packets-tag')
 const LATEST_BLOCK_NUMBER_KEY = encoder.encode('latestBlockNumber')
 const LATEST_CONFIRMED_SNAPSHOT_KEY = encoder.encode('latestConfirmedSnapshot')
 const REDEEMED_TICKETS_COUNT = encoder.encode('statistics:redeemed:count')
@@ -197,7 +200,7 @@ export class HoprDB {
   }
 
   private async touch(key: Uint8Array): Promise<void> {
-    return await this.put(key, new Uint8Array())
+    return await this.put(Buffer.from(this.keyOf(key)), new Uint8Array())
   }
 
   protected async get(key: Uint8Array): Promise<Uint8Array> {
@@ -450,11 +453,11 @@ export class HoprDB {
    * @param packetTag packet tag to check for
    * @returns a Promise that resolves to true if packet tag is present in db
    */
-  async checkAndSetPacketTag(packetTag: Uint8Array) {
-    let present = await this.has(this.keyOf(PACKET_TAG_PREFIX, packetTag))
+  async checkAndSetPacketTag(packetTag: Hash) {
+    let present = await this.has(createPacketTagKey(packetTag))
 
     if (!present) {
-      await this.touch(this.keyOf(PACKET_TAG_PREFIX, packetTag))
+      await this.touch(createPacketTagKey(packetTag))
     }
 
     return present

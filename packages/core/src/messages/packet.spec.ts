@@ -1,4 +1,4 @@
-import { HoprDB, UINT256, u8aEquals, u8aToHex, Balance } from '@hoprnet/hopr-utils'
+import { type Hash, HoprDB, UINT256, u8aEquals, Balance } from '@hoprnet/hopr-utils'
 import { PRICE_PER_PACKET } from '@hoprnet/hopr-utils'
 import { Packet, INTERMEDIATE_HOPS } from './packet'
 import PeerId from 'peer-id'
@@ -16,8 +16,8 @@ function createMockTickets() {
     }),
     getCurrentTicketIndex: () => {},
     setCurrentTicketIndex: () => {},
-    checkAndSetPacketTag: async (tag: Uint8Array) => {
-      const tagString = u8aToHex(tag)
+    checkAndSetPacketTag: async (tag: Hash) => {
+      const tagString = tag.toHex()
       if (tags.has(tagString)) {
         return true
       }
