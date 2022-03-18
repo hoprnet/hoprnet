@@ -9,6 +9,7 @@
 - Bug fix endpoint `/api/v2/channels/{peerId}` ([#3627](https://github.com/hoprnet/hoprnet/issues/3627))
 - Various bug fixes in `core`
 - Performance improvements in `core`
+- Enhanced database queries through range queries and batched operations ([#3648](https://github.com/hoprnet/hoprnet/pull/3648))
 
 ---
 

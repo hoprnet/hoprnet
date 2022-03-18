@@ -40,6 +40,7 @@ const TICKET_INDEX_PREFIX = encoder.encode('ticketIndex-')
 const PENDING_TICKETS_COUNT = encoder.encode('statistics:pending:value-')
 const ACKNOWLEDGED_TICKETS_PREFIX = encoder.encode('tickets:acknowledged-')
 const PENDING_ACKNOWLEDGEMENTS_PREFIX = encoder.encode('tickets:pending-acknowledgement-')
+const PACKET_TAG_PREFIX: Uint8Array = encoder.encode('packets:tag-')
 
 function createChannelKey(channelId: Hash): Uint8Array {
   return Uint8Array.from([...CHANNEL_PREFIX, ...channelId.serialize()])
@@ -65,8 +66,10 @@ function createAcknowledgedTicketKey(challenge: EthereumChallenge, channelEpoch:
 function createPendingAcknowledgement(halfKey: HalfKeyChallenge) {
   return Uint8Array.from([...PENDING_ACKNOWLEDGEMENTS_PREFIX, ...halfKey.serialize()])
 }
+function createPacketTagKey(tag: Uint8Array) {
+  return Uint8Array.from([...PACKET_TAG_PREFIX, ...tag])
+}
 
-const PACKET_TAG_PREFIX: Uint8Array = encoder.encode('packets-tag')
 const LATEST_BLOCK_NUMBER_KEY = encoder.encode('latestBlockNumber')
 const LATEST_CONFIRMED_SNAPSHOT_KEY = encoder.encode('latestConfirmedSnapshot')
 const REDEEMED_TICKETS_COUNT = encoder.encode('statistics:redeemed:count')
@@ -228,20 +231,31 @@ export class HoprDB {
     return coerce(u8a)
   }
 
-  protected async getAll<T, U = T>(
+  /**
+   * Gets a elements from the database of a kind.
+   * Optionally applies `filter`then `map` then `sort` to the result.
+   * @param range.prefix key prefix, such as `channels-`
+   * @param range.suffixLength length of the appended identifier to distinguish elements
+   * @param deserialize function to parse serialized objects
+   * @param filter [optional] filter deserialized objects
+   * @param map [optional] transform deserialized and filtered objects
+   * @param sorter [optional] sort deserialized, filtered and transformed objects
+   * @returns a Promises that resolves with the found elements
+   */
+  protected async getAll<Element, TransformedElement = Element>(
     range: {
       prefix: Uint8Array
       suffixLength: number
     },
-    deserialize: (u: Uint8Array) => T,
-    filter?: ((o: T) => boolean) | undefined,
-    map?: (i: T) => U,
-    sorter?: (e1: U, e2: U) => number
-  ): Promise<U[]> {
+    deserialize: (u: Uint8Array) => Element,
+    filter?: ((o: Element) => boolean) | undefined,
+    map?: (i: Element) => TransformedElement,
+    sorter?: (e1: TransformedElement, e2: TransformedElement) => number
+  ): Promise<TransformedElement[]> {
     const firstPrefixed = this.keyOf(range.prefix, new Uint8Array(range.suffixLength).fill(0x00))
     const lastPrefixed = this.keyOf(range.prefix, new Uint8Array(range.suffixLength).fill(0xff))
 
-    const results: U[] = []
+    const results: TransformedElement[] = []
 
     // @TODO fix types in @types/levelup package
     for await (const [_key, chunk] of this.db.iterator({
@@ -249,13 +263,13 @@ export class HoprDB {
       lte: Buffer.from(lastPrefixed),
       keys: false
     }) as any) {
-      const obj: T = deserialize(Uint8Array.from(chunk))
+      const obj: Element = deserialize(Uint8Array.from(chunk))
 
       if (!filter || filter(obj)) {
         if (map) {
           results.push(map(obj))
         } else {
-          results.push(obj as unknown as U)
+          results.push(obj as unknown as TransformedElement)
         }
       }
     }
@@ -440,10 +454,10 @@ export class HoprDB {
    * @returns a Promise that resolves to true if packet tag is present in db
    */
   async checkAndSetPacketTag(packetTag: Uint8Array) {
-    let present = await this.has(this.keyOf(PACKET_TAG_PREFIX, packetTag))
+    let present = await this.has(createPacketTagKey(packetTag))
 
     if (!present) {
-      await this.touch(this.keyOf(PACKET_TAG_PREFIX, packetTag))
+      await this.touch(createPacketTagKey(packetTag))
     }
 
     return present

@@ -163,7 +163,6 @@
 - [ordered](modules.md#ordered)
 - [parseHosts](modules.md#parsehosts)
 - [parseJSON](modules.md#parsejson)
-- [pendingAcknowledgement](modules.md#pendingacknowledgement)
 - [pickVersion](modules.md#pickversion)
 - [preVerify](modules.md#preverify)
 - [prefixLength](modules.md#prefixlength)
@@ -397,7 +396,7 @@ ___
 
 #### Defined in
 
-[db.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L72)
+[db/db.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L98)
 
 ___
 
@@ -424,7 +423,7 @@ ___
 
 #### Defined in
 
-[u8a/index.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L20)
+[u8a/index.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L21)
 
 ___
 
@@ -441,7 +440,7 @@ ___
 
 #### Defined in
 
-[db.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L67)
+[db/db.ts:93](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L93)
 
 ___
 
@@ -457,7 +456,7 @@ ___
 
 #### Defined in
 
-[db.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L63)
+[db/db.ts:89](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L89)
 
 ___
 
@@ -883,7 +882,7 @@ ___
 
 #### Defined in
 
-[db.mock.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.mock.ts#L12)
+[db/db.mock.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.mock.ts#L13)
 
 ___
 
@@ -2388,26 +2387,6 @@ Parse JSON while recovering all Buffer elements
 
 ___
 
-### pendingAcknowledgement
-
-▸ `Const` **pendingAcknowledgement**(`halfKey`): `Uint8Array`
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `halfKey` | [`HalfKeyChallenge`](classes/HalfKeyChallenge.md) |
-
-#### Returns
-
-`Uint8Array`
-
-#### Defined in
-
-[db.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L31)
-
-___
-
 ### pickVersion
 
 ▸ `Const` **pickVersion**(`full_version`): `string`
@@ -2870,7 +2849,7 @@ ___
 
 #### Defined in
 
-[u8a/index.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L22)
+[u8a/index.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L23)
 
 ___
 
@@ -3252,7 +3231,7 @@ ___
 
 #### Defined in
 
-[u8a/index.ts:36](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L36)
+[u8a/index.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L37)
 
 ___
 
