@@ -114,10 +114,10 @@ class Listener extends EventEmitter implements InterfaceListener {
       // TODO check IPv6
       this.filter.setAddrs(this.getAddrs(), [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${this.peerId.toB58String()}`)])
 
-      const usedRelays = this.entry.getUsedRelays()
+      const usedRelays = this.entry.getUsedRelayAddresses()
 
       if (usedRelays && usedRelays.length > 0) {
-        const relayPeerIds = this.entry.getUsedRelays().map((ma: Multiaddr) => {
+        const relayPeerIds = this.entry.getUsedRelayAddresses().map((ma: Multiaddr) => {
           const tuples = ma.tuples()
 
           return PeerId.createFromBytes((tuples[0][1] as any).slice(1))
