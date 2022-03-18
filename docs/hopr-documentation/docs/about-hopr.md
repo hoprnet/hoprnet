@@ -7,7 +7,9 @@ The HOPR network is a decentralised and incentivized peer-to-peer network open t
 
 Decentralisation ensures that the network is independent, with no one in a position to unduly infuence its development or manipulate outcomes to their advantage. (Not even members of the HOPR Association, who are tasked with managing the network, can control, censor or intercept its traffc.) It also makes the network resilient, able to keep running even if a majority of nodes are damaged or compromised and very diffcult, if not impossible, to shut down.
 
-<iframe width="100%" height="415" src="https://www.youtube.com/embed/2ftZdR09KbU" title="HOPR Token and the HOPR Network" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen=""></iframe>
+<div class="embed-container">
+<iframe src="https://player.vimeo.com/video/508840889" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
+</div>
 
 ## Message Layer
 

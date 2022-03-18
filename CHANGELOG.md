@@ -1,3 +1,31 @@
+<a name="1.88"></a>
+
+## [1.88](https://github.com/hoprnet/hoprnet/compare/release/lisbon...hoprnet:master) (2022-02-14)
+
+### Changes
+
+- New API v2 endpoint `/api/v2/node/stream/websockets` ([#3514](https://github.com/hoprnet/hoprnet/issues/3514))
+- New API v2 endpoint `/api/v2/node/peers` ([#3617](https://github.com/hoprnet/hoprnet/pull/3617))
+- Bug fix endpoint `/api/v2/channels/{peerId}` ([#3627](https://github.com/hoprnet/hoprnet/issues/3627))
+- Various bug fixes in `core`
+- Performance improvements in `core`
+
+---
+
+<a name="1.87"></a>
+
+## [1.87](https://github.com/hoprnet/hoprnet/compare/release/athens...hoprnet:release/lisbon) (2022-02-10)
+
+### Changes
+
+- Expanded API v2, covering most of the legacy hopr-admin commands ([#3367](https://github.com/hoprnet/hoprnet/pull/3367))
+- New API v2 endpoints allow fetching and redeeming tickets from specific channels ([#3367](https://github.com/hoprnet/hoprnet/pull/3367))
+- Flags `--rest`, `--restHost`, and `--restPort` are being deprecated in favor of `--api`, `--apiHost`, and `--apiPort`
+- Fixed automatic and manual ticket redemption ([#3395](https://github.com/hoprnet/hoprnet/pull/3395))
+- In-order processing of blocks and in-order processing of on-chain events ([#3392](https://github.com/hoprnet/hoprnet/pull/3392))
+
+---
+
 <a name="1.86"></a>
 
 ## [1.86](https://github.com/hoprnet/hoprnet/compare/release/budapest...hoprnet:release/athens) (2022-01-26)
@@ -16,14 +44,14 @@
 - Do not dial localhost unless the port is different from the ones we're listening on ([#3321](https://github.com/hoprnet/hoprnet/pull/3321))
 - Add CLI parameter `--allowLocalNodeConnections` to explicitly allow connections to localhost ([#3349](https://github.com/hoprnet/hoprnet/pull/3349))
 - Add CLI parameter `--allowPrivateNodeConnections` to explicitly allow connections to private nodes ([#3390](https://github.com/hoprnet/hoprnet/pull/3390))
-- Fixed automatic and manual ticket redemption ([#3395](https://github.com/hoprnet/hoprnet/pull/3395))
-- In-order processing of blocks and in-order processing of on-chain events ([#3392](https://github.com/hoprnet/hoprnet/pull/3392))
 - Normalize protocol version before checking the relay usability ([#3442](https://github.com/hoprnet/hoprnet/pull/3442))
 - Fix connection parameters to prevent stalling of the Node.js process and update maximal number of relays ([#3471](https://github.com/hoprnet/hoprnet/pull/3471))
 - Fix locking issues in various parts of the code ([#3515](https://github.com/hoprnet/hoprnet/pull/3515))
 - Fix unhandled promise rejection in strategy code and infinite loop in ticket redemption logic ([#3515](https://github.com/hoprnet/hoprnet/pull/3515))
 - Fixed locking issues in transaction processing ([#3568](https://github.com/hoprnet/hoprnet/pull/3568))
+- Publish `hoprd` and `cover-traffic-daemon` NPM packages with lockfiles for `npm` and `yarn` ([#3646](https://github.com/hoprnet/hoprnet/pull/3646))
 - Upgraded libp2p to v0.36.2 which includes multiple memory-usage improvements ([#3620](https://github.com/hoprnet/hoprnet/pull/3620))
+- Added new CLI parameters `--heartbeatInterval` and `--heartbeatVariance` to configure heartbeat behaviour ([#3515](https://github.com/hoprnet/hoprnet/pull/3515))
 
 ---
 

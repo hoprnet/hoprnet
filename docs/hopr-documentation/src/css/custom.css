@@ -34,6 +34,23 @@ body {
 .footer {
   background: linear-gradient(#000050, #0000b4) !important;
 }
+.theme-doc-version-banner {
+  /* Temp FIX to hide docs version notification */
+  display: none !important;
+}
+.embed-container {
+  padding: 56.25% 0 0 0;
+  position: relative;
+}
+.embed-container iframe,
+.embed-container object,
+.embed-container embed {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
 a {
   color: #414141;
   text-decoration: none;
@@ -73,6 +90,12 @@ h2 {
 }
 .highlightPanel .mb-2 {
   margin: 0px !important;
+}
+.prism-code > code {
+  white-space: pre-wrap;
+}
+.admonition-content > p {
+  margin-bottom: 0.5rem;
 }
 .markdown a,
 .markdown ul li a {
@@ -149,4 +172,31 @@ html[data-theme='dark'] .docusaurus-highlight-code-line {
 .highlightPanel:hover {
   /** transform: translateY(4px);**/
   --ifm-box-shadow-color: rgb(0, 0, 0, 0.3);
+}
+
+summary {
+  list-style-type: none;
+}
+
+.footnotes {
+  font-size: 0.9em;
+}
+.footnotes li {
+  margin-bottom: 20px;
+}
+
+.prism-code {
+  counter-reset: line-number;
+}
+
+.prism-code .token-line::marker {
+  color: var(--ifm-color-gray-700);
+  content: counter(line-number);
+}
+
+.prism-code .token-line {
+  counter-increment: line-number;
+  display: list-item;
+  padding-left: var(--ifm-pre-padding);
+  margin-left: var(--ifm-global-spacing);
 }

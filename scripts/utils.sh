@@ -105,15 +105,13 @@ msg() {
 # $1 command to execute
 # $2 optional: number of retries, defaults to 0
 # $3 optional: seconds between retries, defaults to 1
-# $4 optional: print command before execution, defaults to false
 try_cmd() {
   local cmd="${1}"
   local retries_left=${2:-0}
   local wait_in_sec="${3:-1}"
-  local verbose="${4:-false}"
   local cmd_exit_code result
 
-  if [ "${verbose}" = "true" ]; then
+  if [ "${HOPR_VERBOSE:-false}" = "true" ]; then
     log "Executing command: ${cmd}"
   fi
 
@@ -141,7 +139,7 @@ try_cmd() {
         sleep ${wait_in_sec}
       fi
       log "Retrying command ${retries_left} more time(s)"
-      try_cmd "${cmd}" ${retries_left} ${wait_in_sec} ${verbose}
+      try_cmd "${cmd}" ${retries_left} ${wait_in_sec}
     fi
   fi
 }
@@ -203,25 +201,25 @@ function find_tmp_dir() {
 # $1 = optional: endpoint, defaults to http://localhost:3001
 get_native_address(){
   local endpoint=${1:-localhost:3001}
-  local cmd="curl --silent --max-time 5 ${endpoint}/api/v2/account/address"
+  local cmd="curl --silent --max-time 5 ${endpoint}/api/v2/account/addresses"
 
   # try every 5 seconds for 5 minutes
   local result
-  result=$(try_cmd "${cmd}" 30 5 true)
+  result=$(try_cmd "${cmd}" 30 5)
 
-  echo $(echo ${result} | jq -r ".nativeAddress")
+  echo $(echo ${result} | jq -r ".native")
 }
 
 # $1 = optional: endpoint, defaults to http://localhost:3001
 get_hopr_address() {
   local endpoint=${1:-localhost:3001}
-  local cmd="curl --silent --max-time 5 ${endpoint}/api/v2/account/address"
+  local cmd="curl --silent --max-time 5 ${endpoint}/api/v2/account/addresses"
 
   # try every 5 seconds for 5 minutes
   local result
-  result=$(try_cmd "${cmd}" 30 5 true)
+  result=$(try_cmd "${cmd}" 30 5)
 
-  echo $(echo ${result} | jq -r ".hoprAddress")
+  echo $(echo ${result} | jq -r ".hopr")
 }
 
 # $1 = endpoint
@@ -237,7 +235,7 @@ validate_native_address() {
     exit 1
   fi
 
-  is_valid_native_address="$(node -e "const ethers = require('ethers'); console.log(ethers.utils.isAddress('${native_address}'))")"
+  is_valid_native_address="$(curl --silent https://api.hoprnet.org/api/validate/$native_address/get\?text=true)"
   if [ "${is_valid_native_address}" == "false" ]; then
     log "--⛔️ Node returns an invalidddress: ${native_address} derived from endpoint ${endpoint}"
     exit 1

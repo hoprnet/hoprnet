@@ -112,29 +112,51 @@ function cleanup {
   rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${node7_dir}" "${npm_install_dir}"
 
   log "Cleaning up processes"
-  for port in 8545 13301 13302 13303 13304 13305 13306 13307 19091 19092 19093 19094 19095 19096 19097; do
+  for port in 8545 13301 13302 13303 13304 13305 13306 13307 19091 19092 19093 19094 19095 19096 19097 20000; do
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
 
   log "Remove default environment setting"
   rm -f "${mydir}/../packages/hoprd/default-environment.json"
 
-  exit $EXIT_CODE
+  local log exit_code non_zero
+  for node_log in "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}" "${node5_log}" "${node6_log}" "${node7_log}"; do
+    log=$(wait_for_regex ${node_log} "Process exiting with signal [0-9]")
+
+    if [ -z "${log}" ]; then
+      log "${node_log}"
+      log "Process did not exit properly"
+      exit 1
+    fi
+
+    exit_code=$(echo ${log} | sed -E "s/.*signal[ ]([0-9]+).*/\1/")
+    if [ ${exit_code} != "0" ]; then
+      non_zero=true
+      log "${node_log}"
+      log "terminated with non-zero exit code ${exit_code}"
+    fi
+  done
+
+  if [ ${non_zero} ]; then
+    exit 1
+  else
+    exit $EXIT_CODE
+  fi
 }
 
 if [ "${skip_cleanup}" != "1" ] && [ "${skip_cleanup}" != "true" ]; then
   trap cleanup SIGINT SIGTERM ERR EXIT
 fi
 
-# $1 = rest port
+# $1 = api port
 # $2 = node port
 # $3 = admin port
 # $4 = node data directory
 # $5 = node log file
 # $6 = node id file
-# $7 = OPTIONAL: additions args to hoprd
+# $7 = OPTIONAL: additional args to hoprd
 function setup_node() {
-  local rest_port=${1}
+  local api_port=${1}
   local node_port=${2}
   local admin_port=${3}
   local dir=${4}
@@ -142,7 +164,7 @@ function setup_node() {
   local id=${6}
   local additional_args=${7:-""}
 
-  log "Run node ${id} on rest port ${rest_port}"
+  log "Run node ${id} on API port ${api_port} -> ${log}"
 
   if [ -n "${additional_args}" ]; then
     log "Additional args: \"${additional_args}\""
@@ -161,8 +183,8 @@ function setup_node() {
     --identity="${id}" \
     --init \
     --password="${password}" \
-    --rest \
-    --restPort "${rest_port}" \
+    --api \
+    --apiPort "${api_port}" \
     --testAnnounceLocalAddresses \
     --testPreferLocalAddresses \
     --testUseWeakCrypto \
@@ -374,7 +396,7 @@ done
 
 # --- Run security tests --- {{{
 ${mydir}/../test/security-test.sh \
-  127.0.0.1 13301 19501 19502 "${api_token}"
+  127.0.0.1 13301 13302 19501 19502 "${api_token}"
 #}}}
 
 # --- Run test --- {{{
@@ -384,7 +406,7 @@ HOPRD_API_TOKEN="${api_token}" ${mydir}/../test/integration-test.sh \
 
 # -- Verify node6 has executed the commands {{{
 log "Verifying node6 log output"
-grep -E "HOPR Balance: +20 txHOPR" "${node6_log}"
-grep -E "ETH Balance: +1 xDAI" "${node6_log}"
+grep -E "HOPR Balance: +20000 txHOPR" "${node6_log}"
+grep -E "ETH Balance: +10 xDAI" "${node6_log}"
 grep -E "Running on: hardhat" "${node6_log}"
 # }}}

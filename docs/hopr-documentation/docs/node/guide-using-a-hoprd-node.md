@@ -3,7 +3,7 @@ id: guide-using-a-hoprd-node
 title: Guide using a hoprd node
 ---
 
-We will provide you an example, how simply you can use hoprd. Provided example is just a one scenario which you can follow. There are no strict rules how to use hoprd.
+We will provide you an example on how to use `hoprd`. Provided example is just a one scenario which you can follow. There are no strict rules how to use `hoprd`.
 
 :::caution Warning
 
@@ -11,7 +11,11 @@ The HOPR client software (hoprd) is still under heavy development. Please do not
 
 :::
 
-This is a hoprd admin user interface, which is browser based. To get the access to it you have to setup and run a hoprd node, details [here](start-here).
+This is a hoprd admin user interface, which is browser based. To get the access to it you have to setup and run a `hoprd` node, details [here](start-here).
+
+:::info Tip
+Please be aware that it can take up to `10` minutes for your `hoprd` node instance to boot up.
+:::
 
 Access to the admin UI: [http://localhost:3000](http://localhost:3000)
 
@@ -19,7 +23,24 @@ Access to the admin UI: [http://localhost:3000](http://localhost:3000)
 
 (**1**) Enter the password you specified in the command.
 
-(**2**) Fund your node (fund the address you see on admin UI, which starts with **0x...**) with xDai tokens, you will find details [here](https://www.xdaichain.com/for-users/get-xdai-tokens) and wxHOPR tokens, you will find details [here](/staking/how-to-get-hopr).
+(**2**) Fund your node (fund the address you see on admin UI, which starts with **0x...**) with **xDai** tokens (details [here](https://www.xdaichain.com/for-users/get-xdai-tokens)) and **wxHOPR tokens** (details [here](/staking/how-to-get-hopr)).
+
+We recommend you to fund your node with **0.01 xDai & 10 wxHOPR**.
+
+**Note:** After funding your node, please wait until your node will start and you will see this message: **Node has started!**
+
+:::info Tip
+
+Please be aware that we have two types of tokens, both live in the **xDAI/Gnosis Chain network**:
+
+- `wxHOPR`, the ERC-777 token needed to run your `hoprd` instance and,
+- `xHOPR`, the ERC-677 token, the xDAI/Ethereum bridged `HOPR` instance
+
+You can use [cross-chains](/staking/convert-hopr) bridge to convert from HOPR to xHOPR or vice versa.
+
+You can always use our [token wrapper](https://wrapper.hoprnet.org/) to see your balances and swap tokens between each other.
+
+:::
 
 Brief look at the admin UI:
 
@@ -35,7 +56,11 @@ Brief look at the admin UI:
 
 :::info
 
-Note: All the addresses mentioned bellow are just for example. These addresses may no longer be working in the time you will be trying a new hoprd release.
+Before we start, you can find all the commands explained here: [HOPRd commands](hoprd-commands).
+
+Mentioned HOPR addresses and ETH addresses are **examples**.
+
+Search HOPR addresses on your HOPR node by using command: `peers` and search for **current nodes**. Use two of the **current nodes** instead of the examples.
 
 :::
 
@@ -94,7 +119,7 @@ balance
 The output will look similar to this:
 
 ```
-HOPR Balance:  0.12 txHOPR
+HOPR Balance:  0.12 wxHOPR
 ETH Balance:   0.9915287 xDAI
 ```
 
@@ -197,7 +222,7 @@ fetching channels...
 Outgoing Channel:       0xb0e3f7d81f0bd6d1783f3d44cf11653128e4f9ee95b98d49a07e4a8323cceb01
 To:                     jTzjV
 Status:                 Open
-Balance:                0.03 txHOPR
+Balance:                0.03 wxHOPR
 
 No open channels to node.
 ```
@@ -215,7 +240,7 @@ Between comma sign (**,**) and HOPR addresses can't be any space.
 :::
 
 ```
-send 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV,16Uiu2HAkuiKZnPRoeV8qjXNJaazo2D6G89UG4bLoyUmza1hM6psb This is a feature message for me!
+send 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV,me This is a feature message for me!
 ```
 
 Output will look similar to this:
@@ -248,14 +273,14 @@ finding information about tickets...
 Tickets:
 - Pending:          0
 - Unredeemed:       1
-- Unredeemed Value: 0.01 txHOPR
+- Unredeemed Value: 0.01 wxHOPR
 - Redeemed:         0
-- Redeemed Value:   0.00 txHOPR
+- Redeemed Value:   0.00 wxHOPR
 - Losing Tickets:   0
 - Win Proportion:   0%
 - Neglected:        0
 - Rejected:         0
-- Rejected Value:   0 txHOPR
+- Rejected Value:   0 wxHOPR
 ```
 
 This will show Tickets statistics on a Bob's node. On the previous step we sent a message through a Bob's node, this means we used his node to relay data packets. For this Bob got 1 ticket reward for relaying data. It will be automatically auto redeemed and Bob will receive 0.01 HOPR token.
@@ -299,7 +324,7 @@ Output will look similar to this:
 Outgoing Channel:       0xdc657b66661f2fafdafb6c81da80e928af149ac80a12291564c9195d4d7f52d9
 To:                     FskLs
 Status:                 Open
-Balance:                2 txHOPR
+Balance:                2 wxHOPR
 ```
 
 Now let's fund payment channel with Alice, this time we will fund Alice side.
@@ -331,12 +356,12 @@ Output will look similar to this:
 Outgoing Channel:       0xdc657b66661f2fafdafb6c81da80e928af149ac80a12291564c9195d4d7f52d9
 To:                     FskLs
 Status:                 Open
-Balance:                2 txHOPR
+Balance:                2 wxHOPR
 
 Incoming Channel:       0x80181642b23f69f94298f4240e2cbff85fd0410c2d80262417c728a84c87c0d2
 From:                   FskLs
 Status:                 Open
-Balance:                3 txHOPR
+Balance:                3 wxHOPR
 ```
 
 From the output above you can see that we have now incoming and outgoing payment channel with Alice. This means we can use Alice node as a HOP node and Alice can use our node as a HOP node.
@@ -358,7 +383,9 @@ Note: Between comma sign (**,**) and HOPR addresses can't be any space.
 :::
 
 ```
-send 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV,16Uiu2HAm35DuQk2Cvp9aLpRTD43ZubLqtbAwf242w2YmAe8FskLs,16Uiu2HAkuiKZnPRoeV8qjXNJaazo2D6G89UG4bLoyUmza1hM6psb This is a feature message for me, but this time I used Bob and Alice nodes to relay data packets!
+send 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV,
+16Uiu2HAm35DuQk2Cvp9aLpRTD43ZubLqtbAwf242w2YmAe8FskLs,
+me This is a feature message for me, but this time I used Bob and Alice nodes to relay data packets!
 ```
 
 Output will look similar to this:

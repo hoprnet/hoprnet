@@ -307,7 +307,7 @@ class RelayContext extends EventEmitter {
             this.emit('upgrade')
             next()
             continue
-          } else if ((SUFFIX[0] = ConnectionStatusMessages.RESTART)) {
+          } else if (SUFFIX[0] == ConnectionStatusMessages.RESTART) {
             this.verbose(`RESTART relayed`)
             this.flow(`FLOW: relay_incoming: RESTART relayed, break`)
           }

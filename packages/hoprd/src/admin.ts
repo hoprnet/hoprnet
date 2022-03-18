@@ -1,9 +1,8 @@
 import type Hopr from '@hoprnet/hopr-core'
 import http from 'http'
 import fs from 'fs'
-import ws from 'ws'
 import path from 'path'
-import { parse, URL } from 'url'
+import { parse } from 'url'
 import next from 'next'
 import type { Server as HttpServer } from 'http'
 import stripAnsi from 'strip-ansi'
@@ -18,7 +17,7 @@ import {
   startResourceUsageLogger
 } from '@hoprnet/hopr-utils'
 import { Commands } from './commands'
-import cookie from 'cookie'
+import type { WebSocket } from 'ws'
 
 let debugLog = debug('hoprd:admin')
 
@@ -27,61 +26,11 @@ const MIN_NATIVE_BALANCE = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormatt
 
 export class AdminServer {
   private app: ReturnType<typeof next>
-  private server: HttpServer | undefined
+  public server: HttpServer | undefined
   private node: Hopr | undefined
-  private wsServer: ws.Server
   private cmds: Commands
 
-  constructor(private logs: LogStream, private host: string, private port: number, private apiToken?: string) {}
-
-  authenticate(req): boolean {
-    if (!this.apiToken) {
-      this.logs.log('ws client connected [ authentication DISABLED ]')
-      return true
-    }
-
-    // Other clients different to `hoprd` might pass the `apiToken` via a
-    // query param since they won't be on the same domain the node is hosted,
-    // and thus, unable to set the `apiToken` via cookies. Using `req.url` we
-    // can detect these cases and provide the ability for any client that
-    // knows the `apiToken` to reach your HOPR node.
-    if (req.url) {
-      try {
-        // NB: We use a placeholder domain since req.url only passes query params
-        const url = new URL(`https://hoprnet.org${req.url}`)
-        const apiToken = url.searchParams?.get('apiToken') || ''
-        if (decodeURI(apiToken) == this.apiToken) {
-          this.logs.log('ws client connected [ authentication ENABLED ]')
-          return true
-        }
-      } catch (e) {
-        this.logs.error('invalid URL queried', e)
-      }
-    }
-
-    if (req.headers.cookie == undefined) {
-      return false
-    }
-
-    let cookies: ReturnType<typeof cookie.parse> | undefined
-    try {
-      cookies = cookie.parse(req.headers.cookie)
-    } catch (e) {
-      this.logs.error(`failed parsing cookies`, e)
-    }
-
-    if (
-      !cookies ||
-      (decodeURI(cookies['X-Auth-Token'] || '') !== this.apiToken &&
-        decodeURI(cookies['x-auth-token'] || '') !== this.apiToken)
-    ) {
-      this.logs.log('ws client failed authentication')
-      return false
-    }
-
-    this.logs.log('ws client connected [ authentication ENABLED ]')
-    return true
-  }
+  constructor(private logs: LogStream, private host: string, private port: number) {}
 
   async setup() {
     let adminPath
@@ -130,49 +79,13 @@ export class AdminServer {
 
     this.server.listen(this.port, this.host)
     this.logs.log('Admin server listening on port ' + this.port)
-
-    this.wsServer = new ws.Server({ server: this.server })
-
-    this.wsServer.on('connection', (socket: any, req: any) => {
-      if (!this.authenticate(req)) {
-        socket.send(
-          JSON.stringify({
-            type: 'auth-failed',
-            msg: 'authentication failed',
-            ts: new Date().toISOString()
-          })
-        )
-        socket.close()
-        return
-      }
-
-      socket.on('message', (message: string) => {
-        debugLog('Message from client', message)
-        this.logs.logFullLine(`admin > ${message}`)
-        if (this.cmds) {
-          this.cmds.execute((resp: string) => {
-            if (resp) {
-              // Strings may have ansi stuff in it, get rid of it:
-              resp = stripAnsi(resp)
-              this.logs.logFullLine(resp)
-            }
-          }, message.toString())
-        }
-      })
-
-      socket.on('error', (err: string) => {
-        debugLog('Error', err)
-        this.logs.log('Websocket error', err.toString())
-      })
-      this.logs.subscribe(socket)
-    })
   }
 
   registerNode(node: Hopr, cmds: any, settings?: any) {
     this.node = node
     this.cmds = cmds
     if (settings) {
-      this.cmds.setState(settings)
+      this.cmds.stateOps.setState(settings)
     }
 
     this.node.on('hopr:channel:opened', (channel) => {
@@ -208,6 +121,29 @@ export class AdminServer {
     process.env.NODE_ENV == 'production' && showDisclaimer(this.logs)
 
     this.cmds.execute(() => {}, `alias ${node.getId().toB58String()} me`)
+  }
+
+  public onConnection(socket: WebSocket) {
+    socket.on('message', (message: string) => {
+      debugLog('Message from client', message)
+      this.logs.logFullLine(`admin > ${message}`)
+
+      if (this.cmds) {
+        this.cmds.execute((resp: string) => {
+          if (resp) {
+            // Strings may have ansi stuff in it, get rid of it:
+            resp = stripAnsi(resp)
+            this.logs.logFullLine(resp)
+          }
+        }, message.toString())
+      }
+    })
+
+    socket.on('error', (err: string) => {
+      debugLog('Error', err)
+      this.logs.log('Websocket error', err.toString())
+    })
+    this.logs.subscribe(socket)
   }
 }
 

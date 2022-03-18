@@ -3,13 +3,13 @@ name: HOPR Connect integration tests
 on:
   push:
     branches: ['**']
-    paths-ignore: 
+    paths-ignore:
       - '.processes/**/*'
       - 'docs/**/*'
       - 'packages/*/docs/**/*'
       - 'packages/**/*'
       - '!packages/connect/**/*'
-      
+
 jobs:
   integration-test:
     runs-on: ${{ matrix.os }}
@@ -47,7 +47,6 @@ jobs:
           name: hopr-linux-e2e-source-node-logs
           path: |
             /tmp/hopr-connect-*.log
-
 
       - name: Upload node logs (macOS)
         uses: actions/upload-artifact@v2

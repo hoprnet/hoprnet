@@ -41,6 +41,15 @@ jobs:
       - name: Generate docs
         run: ./scripts/regenerate-typedocs.sh
 
+      - name: Generate OpenAPI spec file
+        run: ./scripts/build-rest-api-spec.sh
+
+      - name: Format newly created files
+        run: yarn lint:fix
+
+      - name: Move OpenAPI spec file into documentation directory
+        run: mv packages/hoprd/rest-api-v2-full-spec.yaml docs/hopr-documentation/
+
       - name: Commit docs changes
         # only commit changes when not running via act and when on final branch<Plug>_es
         if: |
@@ -51,4 +60,4 @@ jobs:
           ) && !env.ACT
         run: ./scripts/commit-and-push-all-changes.sh
         env:
-          HOPR_GIT_MSG: "Re-generate API docs for packages"
+          HOPR_GIT_MSG: 'Re-generate API docs for packages'
