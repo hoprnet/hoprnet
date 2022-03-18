@@ -118,7 +118,7 @@ trap cleanup SIGINT SIGTERM ERR EXIT
 # $6 = node id file
 # $7 = OPTIONAL: additional args to hoprd
 function setup_node() {
-  local rest_port=${1}
+  local api_port=${1}
   local node_port=${2}
   local admin_port=${3}
   local healthcheck_port=${4}
@@ -127,7 +127,7 @@ function setup_node() {
   local id=${7}
   local additional_args=${8:-""}
 
-  log "Run node ${id} on rest port ${rest_port} -> ${log}"
+  log "Run node ${id} on rest port ${api_port} -> ${log}"
 
   if [[ "${additional_args}" != *"--environment "* ]]; then
     additional_args="--environment hardhat-localhost ${additional_args}"
@@ -149,8 +149,8 @@ function setup_node() {
     --identity="${id}" \
     --init \
     --password="${password}" \
-    --rest \
-    --restPort "${rest_port}" \
+    --api \
+    --apiPort "${api_port}" \
     --testAnnounceLocalAddresses \
     --testPreferLocalAddresses \
     --testUseWeakCrypto \

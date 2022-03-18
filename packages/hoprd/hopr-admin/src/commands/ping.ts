@@ -1,0 +1,41 @@
+import type API from '../utils/api'
+import { Command } from '../utils/command'
+import PeerId from 'peer-id'
+
+export default class Ping extends Command {
+  constructor(api: API, extra: { getCachedAliases: () => Record<string, string> }) {
+    super(
+      {
+        default: [[['hoprAddressOrAlias', "node's hopr address or alias", false]], '']
+      },
+      api,
+      extra
+    )
+  }
+
+  public name() {
+    return 'ping'
+  }
+
+  public description() {
+    return 'Pings another node to check its availability'
+  }
+
+  public async execute(log: (msg: string) => void, query: string): Promise<void> {
+    const [error, , peerId] = this.assertUsage(query) as [string | undefined, string, PeerId]
+    if (error) {
+      return log(error)
+    }
+
+    const peerIdStr = peerId.toB58String()
+    const pingRes = await this.api.ping(peerIdStr)
+    if (!pingRes.ok) return log(`ping "${peerIdStr}"`)
+    const ping = await pingRes.json()
+
+    if (ping.latency >= 0) {
+      return log(`Pong received in ${ping.latency} ms`)
+    } else {
+      return log(`Could not ping node. Timeout.`)
+    }
+  }
+}

@@ -1,8 +1,16 @@
 import type { Operation } from 'express-openapi'
 import PeerId from 'peer-id'
+import { encode } from 'rlp'
 import { PublicKey } from '@hoprnet/hopr-utils'
-import { encodeMessage } from '../../../../commands/utils'
 import { STATUS_CODES } from '../../utils'
+
+/**
+ * Adds the current timestamp to the message in order to measure the latency.
+ * @param msg the message
+ */
+export function encodeMessage(msg: string): Uint8Array {
+  return encode([msg, Date.now()])
+}
 
 export const POST: Operation = [
   async (req, res, _next) => {

@@ -65,7 +65,7 @@ $ npm install @hoprnet/hoprd@1.86.20
 Before starting a HOPR node, please create your own **Secret Token**. Replace "**<YOUR_SECRET_TOKEN\>**" with your own Secret Token and only then paste the command.
 
 ```bash
-DEBUG="hopr*" npx hoprd --init --admin --identity ./hoprd-id-athens --data ./hoprd-db-athens --password='open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --rest --restHost "0.0.0.0" --restPort 3001 --apiToken='<YOUR_SECRET_TOKEN>'
+DEBUG="hopr*" npx hoprd --init --admin --identity ./hoprd-id-athens --data ./hoprd-db-athens --password='open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --api --apiHost "0.0.0.0" --apiPort 3001 --apiToken='<YOUR_SECRET_TOKEN>'
 ```
 
 :::danger Important

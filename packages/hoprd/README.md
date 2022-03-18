@@ -7,7 +7,7 @@ the Rest API v2 at:
 
 http://localhost:3001/api/v2/\_swagger
 
-NOTE: Hostname and port can be different, since they depend on the settings `--restHost` and `--restPort`.
+NOTE: Hostname and port can be different, since they depend on the settings `--apiHost` and `--apiPort`.
 
 ## Usage
 
@@ -30,9 +30,9 @@ Options:
   --admin                        Run an admin interface on localhost:3000, requires --apiToken  [boolean] [default: false]
   --adminHost                    Host to listen to for admin console  [string] [default: "localhost"]
   --adminPort                    Port to listen to for admin console  [string] [default: 3000]
-  --api, --rest                  Expose the Rest (V1, V2) and Websocket (V2) API on localhost:3001, requires --apiToken. "--rest" is deprecated.  [boolean] [default: false]
-  --apiHost, --restHost          Set host IP to which the Rest and Websocket API server will bind. "--restHost" is deprecated.  [string] [default: "localhost"]
-  --apiPort, --restPort          Set host port to which the Rest and Websocket API server will bind. "--restPort" is deprecated.  [number] [default: 3001]
+  --api                          Expose the Rest (V1, V2) and Websocket (V2) API on localhost:3001, requires --apiToken.  [boolean] [default: false]
+  --apiHost                      Set host IP to which the Rest and Websocket API server will bind.  [string] [default: "localhost"]
+  --apiPort                      Set host port to which the Rest and Websocket API server will bind.  [number] [default: 3001]
   --healthCheck                  Run a health check end point on localhost:8080  [boolean] [default: false]
   --healthCheckHost              Updates the host for the healthcheck server  [string] [default: "localhost"]
   --healthCheckPort              Updates the port for the healthcheck server  [number] [default: 8080]
