@@ -48,4 +48,16 @@ describe('DELETE /aliases/{alias}', () => {
     expect(res).to.satisfyApiSpec
     expect(res.body).to.be.empty
   })
+  it("should return 204 even if the alias doesn't exist", async () => {
+    await request(service).post('/api/v2/aliases').send({
+      peerId: ALICE_PEER_ID.toB58String(),
+      alias: 'nonExistingAlias'
+    })
+
+    const res = await request(service).delete(`/api/v2/aliases/${ALIAS}`)
+
+    expect(res.status).to.equal(204)
+    expect(res).to.satisfyApiSpec
+    expect(res.body).to.be.empty
+  })
 })

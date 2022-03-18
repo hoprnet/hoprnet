@@ -88,9 +88,8 @@ call_api(){
   local should_assert_status_code=${9:-false}
 
   # no timeout set since the test execution environment should cancel the test if it takes too long
-  local response_type="-d" && [[ "$should_assert_status_code" = true ]] && response_type="-o /dev/null -w %{http_code} -d"
+  local response_type="-d" && [[ "$should_assert_status_code" == true ]] && response_type="-o /dev/null -w %{http_code} -d"
   local cmd="curl -X ${rest_method} -m ${step_time} --connect-timeout ${step_time} -s -H X-Auth-Token:${api_token} -H Content-Type:application/json --url ${source_api}/api/v2${api_endpoint} ${response_type}"
-
   # if no end time was given we need to calculate it once
   if [ ${end_time_ns} -eq 0 ]; then
     now=$(node -e "console.log(process.hrtime.bigint().toString());")
@@ -112,7 +111,7 @@ call_api(){
       log "${YELLOW}call_api (${cmd} \"${request_body}\") FAILED, received: ${result}, retrying in ${step_time} seconds${NOFORMAT}"
       sleep ${step_time}
       call_api "${source_api}" "${api_endpoint}" "${rest_method}" "${request_body}" "${assertion}" "${wait_time}" \
-        "${step_time}" "${end_time_ns}"
+        "${step_time}" "${end_time_ns}" "${should_assert_status_code}"
     fi
   fi
 }
@@ -130,7 +129,7 @@ send_message(){
 
   local path=$(echo ${peers} | tr -d '\n' | jq -R -s 'split(" ")')
   local payload='{"body":"'${msg}'","path":'${path}',"recipient":"'${recipient}'"}'
-  result="$(call_api ${source_api} "/messages" "POST" ${payload} 204 "" "" "" true)"
+  result="$(call_api ${source_api} "/messages" "POST" "${payload}" 204 60 15 "" true)"
 }
 
 # $1 = source node id
@@ -233,8 +232,7 @@ withdraw() {
   local amount="${3}"
   local recipient="${4}"
 
-  result=$(call_api ${node_api} "/account/withdraw" "POST" "{\"currency\": \"${currency}\", \"amount\": \"${amount}\", \"recipient\": \"${recipient}\"}" "receipt" 600)
-  echo "${result}"
+  echo $(call_api ${node_api} "/account/withdraw" "POST" "{\"currency\": \"${currency}\", \"amount\": \"${amount}\", \"recipient\": \"${recipient}\"}" "receipt" 600)
 }
 
 # $1 = node api endpoint
@@ -253,8 +251,7 @@ set_alias() {
   local peer_id="${2}"
   local alias="${3}"
 
-  result=$(call_api ${node_api} "/aliases" "POST" "{\"peerId\": \"${peer_id}\", \"alias\": \"${alias}\"}" "" 600)
-  echo "${result}"
+  echo $(call_api ${node_api} "/aliases" "POST" "{\"peerId\": \"${peer_id}\", \"alias\": \"${alias}\"}" "" 600)
 }
 
 # $1 = node api endpoint
@@ -263,8 +260,7 @@ get_aliases() {
   local node_api="${1}"
   local assertion="${2}"
 
-  result=$(call_api ${node_api} "/aliases" "GET" "" "${assertion}" 600)
-  echo "${result}"
+  echo $(call_api ${node_api} "/aliases" "GET" "" "${assertion}" 600)
 }
 
 # $1 = node api endpoint
@@ -274,8 +270,7 @@ get_alias() {
   local alias="${2}"
   local assertion="${3}"
 
-  result=$(call_api ${node_api} "/aliases/${alias}" "GET" "" "${assertion}" 600)
-  echo "${result}"
+  echo $(call_api ${node_api} "/aliases/${alias}" "GET" "" "${assertion}" 600)
 }
 
 # $1 = node api endpoint
@@ -284,8 +279,7 @@ remove_alias() {
   local node_api="${1}"
   local alias="${2}"
 
-  result=$(call_api ${node_api} "/aliases/${alias}" "DELETE" "" "" 600)
-  echo "${result}"
+  echo $(call_api ${node_api} "/aliases/${alias}" "DELETE" "" "" 600)
 }
 
 # $1 = node api endpoint
@@ -294,16 +288,14 @@ get_all_channels() {
   local node_api="${1}"
   local including_closed=${2}
 
-  result=$(call_api ${node_api} "/channels?includingClosed=${including_closed}" "GET" "" "incoming" 600)
-  echo "${result}"
+  echo $(call_api ${node_api} "/channels?includingClosed=${including_closed}" "GET" "" "incoming" 600)
 }
 
 # $1 = node api endpoint
 get_settings() {
   local node_api="${1}"
 
-  result=$(call_api ${node_api} "/settings" "GET" "" "includeRecipient" 600)
-  echo "${result}"
+  echo $(call_api ${node_api} "/settings" "GET" "" "includeRecipient" 600)
 }
 
 # $1 = node api endpoint
@@ -314,8 +306,7 @@ set_setting() {
   local key="${2}"
   local value="${3}"
 
-  result=$(call_api ${node_api} "/settings/${key}" "PUT" "{\"settingValue\": \"${value}\"}" "" 600)
-  echo "${result}"
+  echo $(call_api ${node_api} "/settings/${key}" "PUT" "{\"settingValue\": \"${value}\"}" "" 600)
 }
 
 # $1 = node api endpoint
@@ -325,8 +316,7 @@ redeem_tickets_in_channel() {
   local peer_id="${2}"
 
   log "redeeming tickets in specific channel, this can take up to 5 minutes depending on the amount of uredeemed tickets in that channel"
-  result=$(call_api ${node_api} "/channels/${peer_id}/tickets/redeem" "POST" "" "" 600 600)
-  echo "${result}"
+  echo $(call_api ${node_api} "/channels/${peer_id}/tickets/redeem" "POST" "" "" 600 600)
 }
 
 # $1 = node api endpoint
@@ -337,8 +327,7 @@ get_tickets_in_channel() {
   local peer_id="${2}"
   local assertion="${3:-"counterparty"}"
 
-  result=$(call_api ${node_api} "/channels/${peer_id}/tickets" "GET" "" "${assertion}" 600)
-  echo "${result}"
+  echo $(call_api ${node_api} "/channels/${peer_id}/tickets" "GET" "" "${assertion}" 600)
 }
 
 # $1 = node api endpoint
@@ -349,8 +338,7 @@ ping() {
   local peer_id="${2}" 
   local assertion="${3}"
 
-  result=$(call_api ${1} "/node/ping" "POST" "{\"peerId\": \"${peer_id}\"}" ${assertion} 600)
-  echo "${result}"
+  echo $(call_api ${1} "/node/ping" "POST" "{\"peerId\": \"${peer_id}\"}" ${assertion} 600)
 }
 
 # $1 = node api endpoint
@@ -399,32 +387,32 @@ log "hopr addr5: ${addr5}"
 # we don't need node6 because it's short-living
 log "hopr addr7: ${addr7}"
 
-test_withdraw() {
-  local node_api="${1}"
+# running withdraw and checking it results at the end of this test run
+balances=$(get_balances ${api1})
+native_balance=$(echo ${balances} | jq -r .native)
+hopr_balance=$(echo ${balances} | jq -r .hopr)
+withdraw ${api1} "NATIVE" 10 0x858aa354db6ae5ea1217c5018c90403bde94e09e
+withdraw ${api1} "HOPR" 10 0x858aa354db6ae5ea1217c5018c90403bde94e09e
 
-  balances=$(get_balances ${node_api})
-  native_balance=$(echo ${balances} | jq -r .native)
-  hopr_balance=$(echo ${balances} | jq -r .hopr)
+# this 2 functions are runned at the end of the tests when withdraw transaction should clear on blockchain and we don't have to block and wait for it
+check_native_withdraw_results() {
+  local initial_native_balance="${1}"
 
-  withdraw ${node_api} "NATIVE" 10 0x858aa354db6ae5ea1217c5018c90403bde94e09e
-  log "waiting 30 seconds for withdraw transaction to complete"
-  sleep 30
-
-  balances=$(get_balances ${node_api})
+  balances=$(get_balances ${api1})
   new_native_balance=$(echo ${balances} | jq -r .native)
-  [[ "${native_balance}" == "${new_native_balance}" ]] && { msg "Native withdraw failed, pre: ${native_balance}, post: ${new_native_balance}"; exit 1; }
+  [[ "${initial_native_balance}" == "${new_native_balance}" ]] && { msg "Native withdraw failed, pre: ${initial_native_balance}, post: ${new_native_balance}"; exit 1; }
 
-  withdraw ${node_api} "HOPR" 10 0x858aa354db6ae5ea1217c5018c90403bde94e09e
-  log "waiting 30 seconds for withdraw transaction to complete"
-  sleep 30
-
-  balances=$(get_balances ${node_api})
-  new_hopr_balance=$(echo ${balances} | jq -r .hopr)
-  [[ "${hopr_balance}" == "${new_hopr_balance}" ]] && { msg "Hopr withdraw failed, pre: ${hopr_balance}, post: ${new_hopr_balance}"; exit 1; }
-  echo "withdraw successful"
+  echo "withdraw native successful"
 }
+check_hopr_withdraw_results() {
+  local initial_hopr_balance="${1}"
 
-test_withdraw ${api1}
+  balances=$(get_balances ${api1})
+  new_hopr_balance=$(echo ${balances} | jq -r .hopr)
+  [[ "${initial_hopr_balance}" == "${new_hopr_balance}" ]] && { msg "Hopr withdraw failed, pre: ${initial_hopr_balance}, post: ${new_hopr_balance}"; exit 1; }
+
+  echo "withdraw hopr successful"
+}
 
 test_aliases() {
   local node_api="${1}"
@@ -476,9 +464,14 @@ open_channel 5 1 "${api5}" "${addr1}" &
 # used for channel close test later
 open_channel 1 5 "${api1}" "${addr5}" &
 
+# opening temporary channel just to test get all channels later on
+open_channel 1 4 "${api1}" "${addr4}" &
+
 log "Waiting for nodes to finish open channel (long running)"
 wait
-sleep 20
+
+# closing temporary channel just to test get all channels later on
+close_channel 1 4 "${api1}" "${addr4}" "outgoing" "true" &
 
 for i in `seq 1 10`; do
   log "Node 1 send 1 hop message to self via node 2"
@@ -545,13 +538,12 @@ test_redeem_in_specific_channel() {
 
   open_channel ${node_id} ${second_node_id} ${node_api} ${second_peer_id}
 
-  sleep 20
-
   for i in `seq 1 3`; do
     log "Node ${node_id} send 1 hop message to self via node ${second_node_id}"
     send_message "${node_api}" "${peer_id}" "hello, world" "${second_peer_id}" 
   done
 
+  # seems like there's slight delay needed for tickets endpoint to return up to date tickets, probably because of blockchain sync delay
   sleep 2
   ticket_amount=$(get_tickets_in_channel ${second_node_api} ${peer_id} | jq '. | length')
   [[ "${ticket_amount}" != "3" ]] && { msg "Ticket ammount is different than expected: ${ticket_amount} != 3"; exit 1; }
@@ -564,7 +556,7 @@ test_redeem_in_specific_channel() {
   echo "all good"
 }
 
-test_redeem_in_specific_channel "1" "3" ${api1} ${api3}
+test_redeem_in_specific_channel "1" "3" ${api1} ${api3} &
 
 redeem_tickets "2" "${api2}" &
 redeem_tickets "3" "${api2}" &
@@ -596,17 +588,14 @@ sleep 70
 # verify channel has been closed
 close_channel 1 5 "${api1}" "${addr5}" "outgoing" "true"
 
-log "Waiting 120 seconds for channels to completely close"
-sleep 120
-
 test_get_all_channels() {
   local node_api=${1}
 
   channels=$(get_all_channels ${node_api} false)
-  channels_count=$(echo ${channels} | jq '.outgoing | length')
+  channels_count=$(echo ${channels} | jq '.incoming | length')
 
   channels_with_closed=$(get_all_channels ${node_api} true)
-  channels_with_closed_count=$(echo ${channels_with_closed} | jq '.outgoing | length')
+  channels_with_closed_count=$(echo ${channels_with_closed} | jq '.incoming | length')
 
   [[ "${channels_count}" -ge "${channels_with_closed_count}" ]] && { msg "There should be more channels returned with includeClosed flag: ${channels_count} !< ${channels_with_closed_count}"; exit 1; }
   [[ "${channels_with_closed}" != *"Closed"* ]] && { msg "Channels fetched with includeClosed flag should return channels with closed status: ${channels_with_closed}"; exit 1; }
@@ -615,23 +604,29 @@ test_get_all_channels() {
 
 test_get_all_channels ${api1}
 
-test_strategy_setting() {
-  local node_api="${1}"
+# NOTE: strategy testing will require separate setup so commented out for now until moved
+# test_strategy_setting() {
+#   local node_api="${1}"
 
-  settings=$(get_settings ${node_api})
-  strategy=$(echo ${settings} | jq -r .strategy)
-  [[ "${strategy}" != "passive" ]] && { msg "Default strategy should be passive, got: ${strategy}"; exit 1; }
+#   settings=$(get_settings ${node_api})
+#   strategy=$(echo ${settings} | jq -r .strategy)
+#   [[ "${strategy}" != "passive" ]] && { msg "Default strategy should be passive, got: ${strategy}"; exit 1; }
 
-  channels_count_pre=$(get_all_channels ${node_api} false | jq '.incoming | length')
+#   channels_count_pre=$(get_all_channels ${node_api} false | jq '.incoming | length')
 
-  set_setting ${node_api} "strategy" "promiscuous"
+#   set_setting ${node_api} "strategy" "promiscuous"
 
-  log "Waiting 100 seconds for the node to make connections to other nodes"
-  sleep 100
+#   log "Waiting 100 seconds for the node to make connections to other nodes"
+#   sleep 100
 
-  channels_count_post=$(get_all_channels ${node_api} false | jq '.incoming | length')
-  [[ "${channels_count_pre}" -ge "${channels_count_post}" ]] && { msg "Node didn't open any connections by itself even when strategy was set to promiscuous: ${channels_count_pre} !>= ${channels_count_post}"; exit 1; }
-  echo "Strategy setting successfull"
-}
+#   channels_count_post=$(get_all_channels ${node_api} false | jq '.incoming | length')
+#   [[ "${channels_count_pre}" -ge "${channels_count_post}" ]] && { msg "Node didn't open any connections by itself even when strategy was set to promiscuous: ${channels_count_pre} !>= ${channels_count_post}"; exit 1; }
+#   echo "Strategy setting successfull"
+# }
 
-test_strategy_setting ${api4}
+# test_strategy_setting ${api4}
+
+
+# checking statuses of the long running tests
+check_native_withdraw_results ${native_balance}
+check_hopr_withdraw_results ${hopr_balance}

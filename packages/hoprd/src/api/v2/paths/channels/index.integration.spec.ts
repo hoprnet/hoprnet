@@ -59,7 +59,7 @@ describe('POST /channels', () => {
     })
   })
 
-  it('should fail on invalid peerId or amountToFund', async () => {
+  it('should fail on invalid peerId', async () => {
     const res = await request(service).post('/api/v2/channels').send({
       peerId: INVALID_PEER_ID,
       amount: '1'
@@ -69,13 +69,16 @@ describe('POST /channels', () => {
     expect(res.body).to.deep.equal({
       status: STATUS_CODES.INVALID_PEERID
     })
-    const res2 = await request(service).post('/api/v2/channels').send({
+  })
+
+  it('should fail on invalid amountToFund', async () => {
+    const res = await request(service).post('/api/v2/channels').send({
       peerId: ALICE_PEER_ID.toB58String(),
       amount: 'abc'
     })
-    expect(res2.status).to.equal(400)
-    expect(res2).to.satisfyApiSpec
-    expect(res2.body).to.deep.equal({
+    expect(res.status).to.equal(400)
+    expect(res).to.satisfyApiSpec
+    expect(res.body).to.deep.equal({
       status: STATUS_CODES.INVALID_AMOUNT
     })
   })
@@ -99,7 +102,7 @@ describe('POST /channels', () => {
       peerId: ALICE_PEER_ID.toB58String(),
       amount: '1'
     })
-    expect(res.status).to.equal(403)
+    expect(res.status).to.equal(409)
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({
       status: STATUS_CODES.CHANNEL_ALREADY_OPEN

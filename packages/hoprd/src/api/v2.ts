@@ -6,6 +6,7 @@ import cors from 'cors'
 import swaggerUi from 'swagger-ui-express'
 import bodyParser from 'body-parser'
 import { initialize } from 'express-openapi'
+import OpenAPIFramework from 'openapi-framework'
 import PeerId from 'peer-id'
 import { debug, Address } from '@hoprnet/hopr-utils'
 import { authenticateWsConnection, getStatusCodeForInvalidInputInRequest, removeQueryParams } from './utils'
@@ -22,7 +23,13 @@ const debugLog = debug('hoprd:api:v2')
 // The Rest API v2 is uses JSON for input and output, is validated through a
 // Swagger schema which is also accessible for testing at:
 // http://localhost:3001/api/v2/_swagger
-export function setupRestApi(service: Application, urlPath: string, node: Hopr, stateOps: StateOps, options: any) {
+export function setupRestApi(
+  service: Application,
+  urlPath: string,
+  node: Hopr,
+  stateOps: StateOps,
+  options: any
+): OpenAPIFramework {
   // this API uses JSON data only
   service.use(urlPath, bodyParser.json())
 
@@ -54,8 +61,7 @@ export function setupRestApi(service: Application, urlPath: string, node: Hopr, 
     paths: apiPathsPath,
     // since we pass the spec directly we don't need to expose it via HTTP
     exposeApiDocs: false,
-    errorMiddleware: function (err, req, res, next) {
-      req
+    errorMiddleware: function (err, _, res, next) {
       if (err.status === 400) {
         const path = String(err.errors[0].path) || ''
         res.status(err.status).send({ status: getStatusCodeForInvalidInputInRequest(path) })
