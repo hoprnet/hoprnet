@@ -119,7 +119,7 @@ describe('test PublicKey primitive', function () {
 
     const hash = '0xfac7acad27047640b069e8157b61623e3cb6bb86e6adf97151f93817c291f3cf'
 
-    assert(PublicKey.fromSignature(hash, r, s, v).toAddress().eq(address))
+    assert(PublicKey.fromSignatureString(hash, r, s, v).toAddress().eq(address))
   })
 
   it('to uncompressed hex', function () {

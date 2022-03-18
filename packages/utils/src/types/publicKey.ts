@@ -49,10 +49,12 @@ export class PublicKey {
     return PublicKey.fromPeerId(PeerId.createFromB58String(peerIdString))
   }
 
-  static fromSignature(hash: string, r: string, s: string, v: number): PublicKey {
-    return new PublicKey(
-      ecdsaRecover(Uint8Array.from([...stringToU8a(r), ...stringToU8a(s)]), v, stringToU8a(hash), false)
-    )
+  static fromSignature(hash: Uint8Array, signature: Uint8Array, v: number): PublicKey {
+    return new PublicKey(ecdsaRecover(signature, v, hash, false))
+  }
+
+  static fromSignatureString(hash: string, r: string, s: string, v: number): PublicKey {
+    return PublicKey.fromSignature(stringToU8a(hash), Uint8Array.from([...stringToU8a(r), ...stringToU8a(s)]), v)
   }
 
   static fromString(str: string): PublicKey {
