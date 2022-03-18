@@ -173,7 +173,7 @@ const recoverPublicKeyFromSigner = async (deployer: providers.JsonRpcSigner): Pr
   const hash = ethers.utils.keccak256(utils.serializeTransaction(tx))
   const txReceipt = await deployer.sendTransaction(tx)
 
-  return PublicKey.fromSignature(hash, txReceipt.r, txReceipt.s, txReceipt.v)
+  return PublicKey.fromSignatureString(hash, txReceipt.r, txReceipt.s, txReceipt.v)
 }
 
 const abiEncoder = ethers.utils.Interface.getAbiCoder()
