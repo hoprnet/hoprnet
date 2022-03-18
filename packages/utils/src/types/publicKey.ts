@@ -90,7 +90,7 @@ export class PublicKey {
   }
 
   public toUncompressedPubKeyHex(): string {
-    return u8aToHex(this.serializeUncompressed())
+    return u8aToHex(this.serializeUncompressed().slice(1))
   }
 
   public toCompressedPubKeyHex(): string {

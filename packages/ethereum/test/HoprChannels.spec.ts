@@ -23,7 +23,7 @@ import {
   ChannelStatus
 } from '@hoprnet/hopr-utils'
 import { BigNumber, utils } from 'ethers'
-import type { providers } from 'ethers'
+import type { providers, BigNumberish } from 'ethers'
 
 type TicketValues = {
   recipient: string
@@ -35,7 +35,7 @@ type TicketValues = {
   ticketEpoch: string
 }
 
-const percentToUint256 = (percent: any) => ethers.constants.MaxUint256.mul(percent).div(100)
+const percentToUint256 = (percent: BigNumberish) => ethers.constants.MaxUint256.mul(percent).div(100)
 
 export const redeemArgs = (ticket: AcknowledgedTicket): Parameters<HoprChannels['redeemTicket']> => [
   ticket.signer.toAddress().toHex(),
@@ -125,7 +125,7 @@ export const createTicket = async (
     ticket,
     new Response(stringToU8a(ticketValues.proofOfRelaySecret, Response.SIZE)),
     new Hash(stringToU8a(nextCommitment, Hash.SIZE)),
-    PublicKey.fromPrivKey(stringToU8a(counterparty.privateKey))
+    PublicKey.fromPrivKeyString(counterparty.privateKey)
   )
 
   return {
@@ -184,9 +184,9 @@ const useFixtures = deployments.createFixture(
 
     const deployerPubKey = await recoverPublicKeyFromSigner(deployer)
     const accountA = new ethers.Wallet(ACCOUNT_A.privateKey).connect(ethers.provider)
-    const accountAPubKey = PublicKey.fromPrivKey(ethers.utils.arrayify(accountA.privateKey))
+    const accountAPubKey = PublicKey.fromPrivKeyString(accountA.privateKey)
     const accountB = new ethers.Wallet(ACCOUNT_B.privateKey).connect(ethers.provider)
-    const accountBPubKey = PublicKey.fromPrivKey(ethers.utils.arrayify(accountB.privateKey))
+    const accountBPubKey = PublicKey.fromPrivKeyString(accountB.privateKey)
 
     // run migrations
     const contracts = await deployments.fixture()
@@ -204,14 +204,16 @@ const useFixtures = deployments.createFixture(
     const minterRole = await token.MINTER_ROLE()
     await token.connect(deployer).grantRole(minterRole, await deployer.getAddress())
 
-    const fundEther = async (addr, amount) => await deployer.sendTransaction({ to: addr, value: amount })
+    const fundEther = async (addr: string, amount: BigNumberish) =>
+      await deployer.sendTransaction({ to: addr, value: amount })
 
-    const fund = async (addr, amount) =>
+    const fund = async (addr: string, amount: BigNumberish) =>
       await token.connect(deployer).mint(addr, amount + '', ethers.constants.HashZero, ethers.constants.HashZero)
 
-    const approve = async (account, amount) => await token.connect(account).approve(channels.address, amount)
+    const approve = async (account: Wallet, amount: BigNumberish) =>
+      await token.connect(account).approve(channels.address, amount)
 
-    const fundAndApprove = async (account, amount) => {
+    const fundAndApprove = async (account: Wallet, amount: BigNumberish) => {
       await fund(account.address, amount)
       await approve(account, amount)
     }
@@ -235,10 +237,10 @@ const useFixtures = deployments.createFixture(
 
     // announce
     if (!ops?.skipAnnounceForAccountA) {
-      await channels.connect(accountA).announce(ethers.utils.arrayify(accountAPubKey.toUncompressedPubKeyHex()), [])
+      await channels.connect(accountA).announce(accountAPubKey.toUncompressedPubKeyHex(), [])
     }
     if (!ops?.skipAnnounceForAccountB) {
-      await channels.connect(accountB).announce(ethers.utils.arrayify(accountBPubKey.toUncompressedPubKeyHex()), [])
+      await channels.connect(accountB).announce(accountBPubKey.toUncompressedPubKeyHex(), [])
     }
 
     return {
@@ -274,10 +276,7 @@ describe('announce user', function () {
     await expect(
       channels
         .connect(deployer)
-        .announce(
-          PublicKey.fromPrivKey(ethers.utils.arrayify(accountA.privateKey)).toUncompressedPubKeyHex(),
-          MULTI_ADDR
-        )
+        .announce(PublicKey.fromPrivKeyString(accountA.privateKey).toUncompressedPubKeyHex(), MULTI_ADDR)
     ).to.be.revertedWith("publicKey's address does not match senders")
   })
 })

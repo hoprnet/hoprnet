@@ -175,7 +175,7 @@ export class HoprDB {
   }
 
   private keyOf(...segments: Uint8Array[]): Uint8Array {
-    return u8aConcat(encoder.encode(this.id.toUncompressedPubKeyHex()), ...segments)
+    return u8aConcat(this.id.serializeUncompressed().slice(1), ...segments)
   }
 
   private async has(key: Uint8Array): Promise<boolean> {

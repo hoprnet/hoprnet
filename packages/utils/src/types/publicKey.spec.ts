@@ -126,8 +126,8 @@ describe('test PublicKey primitive', function () {
     const pKeyFromUncompressed = PublicKey.fromString(uncompressedPubKey)
     const pKeyFromCompressed = PublicKey.fromString(compressedPubKey)
 
-    assert(pKeyFromCompressed.toUncompressedPubKeyHex() === uncompressedPubKey)
-    assert(pKeyFromUncompressed.toUncompressedPubKeyHex() === uncompressedPubKey)
+    assert(pKeyFromCompressed.toUncompressedPubKeyHex() === uncompressedPubKeyWithoutPrefix)
+    assert(pKeyFromUncompressed.toUncompressedPubKeyHex() === uncompressedPubKeyWithoutPrefix)
   })
 
   it('to compressed hex', function () {
