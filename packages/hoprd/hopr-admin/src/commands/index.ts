@@ -18,8 +18,6 @@ import Settings from './settings'
 import Info from './info'
 import Version from './version'
 import Help from './help'
-// TODO: restore dev command
-// import Addresses from './addresses'
 
 export default class Commands {
   private commandMap: Map<string, Command> = new Map()
@@ -27,7 +25,6 @@ export default class Commands {
   constructor(private api: API, getCachedAliases: () => Record<string, string>) {
     const extra = { getCachedAliases }
 
-    // TODO: restore dev command Addresses
     const commands: Command[] = [
       new Alias(this.api, extra),
       new Addresses(this.api, extra),

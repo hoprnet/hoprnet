@@ -34,7 +34,6 @@ export default class SendMessage extends Command {
     return 'Sends a message to another party'
   }
 
-  // TODO: optimize
   private async insertMyAddress(message: string): Promise<string> {
     const myAddress: string = await this.api.getAddresses().then((res) => res.hopr)
     return `${myAddress}:${message}`

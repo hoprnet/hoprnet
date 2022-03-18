@@ -24,7 +24,6 @@ export default class Info extends Command {
   public async execute(log): Promise<void> {
     const nodeInfo = await this.api.getInfo()
 
-    // TODO: Add connector info etc.
     return log(
       toPaddedString([
         ['Announcing to other nodes as', nodeInfo.announcedAddress.join('\n')],

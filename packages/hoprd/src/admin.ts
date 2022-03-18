@@ -115,9 +115,6 @@ export class AdminServer {
     startResourceUsageLogger(debugLog)
 
     process.env.NODE_ENV == 'production' && showDisclaimer(this.logs)
-
-    // TODO: auto alias
-    // this.cmds.execute(() => {}, `alias ${node.getId().toB58String()} me`)
   }
 
   public onConnection(socket: WebSocket) {

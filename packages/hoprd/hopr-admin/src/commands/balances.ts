@@ -37,7 +37,6 @@ export default class Balances extends Command {
     const nativePrefix = 'Native Balance:'
     const nativeBalance = ethersUtils.formatEther(balances.native)
 
-    // TODO: API respond with symbols
     if (use === 'onlyOne') {
       if (type === 'hopr') {
         return log(toPaddedString([[hoprPrefix, hoprBalance]]))

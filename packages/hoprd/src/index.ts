@@ -396,10 +396,12 @@ async function main() {
         adminServer.registerNode(node)
       }
 
+      // alias self
+      state.aliases.set('me', node.getId())
+
       logs.logStatus('READY')
       logs.log('Node has started!')
 
-      // TODO: replace with API v2 ?
       // if (argv.run && argv.run !== '') {
       //   // Run a single command and then exit.
       //   // We support multiple semicolon separated commands

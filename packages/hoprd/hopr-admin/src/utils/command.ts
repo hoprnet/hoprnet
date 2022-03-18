@@ -72,7 +72,6 @@ export abstract class Command {
 
   /**
    * Validates user's query.
-   * TODO: dynamically type `parsedParams`.
    * @param query the query written by the user
    * @returns an array containing the error message (if there is one) and the query parameters
    */
