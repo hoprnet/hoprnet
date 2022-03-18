@@ -35,7 +35,7 @@ export const getPeers = async (
       try {
         const info = node.getConnectionInfo(peerId)
         // exclude if quality is lesser than the one wanted
-        if (info.lastTen < quality) return result
+        if (info.quality < quality) return result
         const isNew = info.heartbeatsSent === 0
 
         result.push({
@@ -45,7 +45,7 @@ export const getPeers = async (
             success: info.heartbeatsSuccess
           },
           lastSeen: info.lastSeen,
-          quality: info.lastTen,
+          quality: info.quality,
           backoff: info.backoff,
           isNew
         })
@@ -59,7 +59,7 @@ export const getPeers = async (
         try {
           const info = node.getConnectionInfo(peerId)
           // exclude if quality is lesser than the one wanted
-          if (info.lastTen < quality) return result
+          if (info.quality < quality) return result
           const isNew = info.heartbeatsSent === 0
 
           result.push({
@@ -70,7 +70,7 @@ export const getPeers = async (
               success: info.heartbeatsSuccess
             },
             lastSeen: info.lastSeen,
-            quality: info.lastTen,
+            quality: info.quality,
             backoff: info.backoff,
             isNew
           })

@@ -91,7 +91,7 @@ BaseContract.\_deployedPromise
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:98
+node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ___
 
@@ -109,7 +109,7 @@ BaseContract.\_runningEvents
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:99
+node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:99
 
 ___
 
@@ -127,7 +127,7 @@ BaseContract.\_wrappedEmits
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:102
+node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:102
 
 ___
 
@@ -141,7 +141,7 @@ BaseContract.address
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:77
+node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:77
 
 ___
 
@@ -216,7 +216,7 @@ BaseContract.deployTransaction
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:97
+node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:97
 
 ___
 
@@ -478,7 +478,7 @@ BaseContract.provider
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:80
+node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:80
 
 ___
 
@@ -506,7 +506,7 @@ BaseContract.resolvedAddress
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:96
+node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:96
 
 ___
 
@@ -520,7 +520,7 @@ BaseContract.signer
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:79
+node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:79
 
 ## Methods
 
@@ -584,7 +584,7 @@ BaseContract.\_checkRunningEvents
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:119
+node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:119
 
 ___
 
@@ -608,7 +608,7 @@ BaseContract.\_deployed
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:112
+node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:112
 
 ___
 
@@ -634,7 +634,7 @@ BaseContract.\_wrapEvent
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:120
+node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:120
 
 ___
 
@@ -917,7 +917,7 @@ BaseContract.emit
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:125
+node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:125
 
 ___
 
@@ -941,7 +941,7 @@ BaseContract.fallback
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:113
+node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:113
 
 ___
 
@@ -1115,7 +1115,7 @@ BaseContract.listenerCount
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:126
+node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:126
 
 ___
 

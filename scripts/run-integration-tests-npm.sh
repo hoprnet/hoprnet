@@ -191,6 +191,8 @@ function setup_node() {
     --testNoUPNP \
     --allowLocalNodeConnections \
     --allowPrivateNodeConnections \
+    --heartbeatInterval 2500 \
+    --heartbeatVariance 1000 \
     ${additional_args} \
     > "${log}" 2>&1 &
 
@@ -381,6 +383,15 @@ wait_for_regex ${node4_log} "STARTED NODE"
 wait_for_regex ${node5_log} "STARTED NODE"
 # no need to wait for node 6 since that will stop right away
 wait_for_port 19097 "127.0.0.1" "${node7_log}"
+# }}}
+
+#  --- Ensure data directories are used --- {{{
+for node_dir in ${node1_dir} ${node2_dir} ${node3_dir} ${node4_dir} ${node5_dir}; do
+  declare node_dir_db="${node_dir}/db/LOG"
+  declare node_dir_peerstore="${node_dir}/peerstore/LOG"
+  [ -f "${node_dir_db}" ] || { echo "Data file ${node_dir_db} missing"; exit 1; }
+  [ -f "${node_dir_peerstore}" ] || { echo "Data file ${node_dir_peerstore} missing"; exit 1; }
+done
 # }}}
 
 # --- Run security tests --- {{{

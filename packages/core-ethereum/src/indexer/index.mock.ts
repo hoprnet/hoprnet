@@ -53,7 +53,7 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
   const channels: any = {}
   const pubkeys: any = {}
 
-  const handleEvent = (ev) => {
+  const handleEvent = (ev: TypedEvent<any, any>) => {
     if (ev.event == 'ChannelUpdated') {
       const updateEvent = ev as Event<'ChannelUpdated'>
 
@@ -125,6 +125,7 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
     }
   }
 }
+
 const createHoprTokenMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
   const pastEvents = ops.pastEvents ?? []
 
@@ -230,7 +231,8 @@ const createChainMock = (
         hoprToken.off('*', cb)
       }
     },
-    getNativeTokenTransactionInBlock: (_blockNumber: number, _isOutgoing: boolean = true) => [],
+    getNativeTokenTransactionInBlock: (_blockNumber: number, _isOutgoing: boolean = true) =>
+      Promise.resolve<string[]>([]),
     updateConfirmedTransaction: (_hash: string) => {},
     getNativeBalance: () => new NativeBalance(SUGGESTED_NATIVE_BALANCE),
     getChannels: () => hoprChannels,
@@ -240,7 +242,7 @@ const createChainMock = (
       chainLogger('getAccount method was called')
       return Promise.resolve(
         new AccountEntry(
-          fixtures.PARTY_A.toAddress(),
+          fixtures.PARTY_A,
           new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${fixtures.PARTY_A.toB58String()}`),
           new BN('1')
         )

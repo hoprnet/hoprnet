@@ -54,6 +54,7 @@
     "yargs": "17.3.1"
   },
   "resolutions": {
+    "@ethersproject/providers": "hoprnet/ethers-js-provider#fa6b1f743ff3fe67c1e9a2207a67d79a854fc34c",
     "@overnightjs/logger": "1.2.1",
     "colors": "1.4.0",
     "eth-sig-util": "3.0.1"

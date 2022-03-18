@@ -1,7 +1,6 @@
-# Bounty Processes
+# Bounty Process
 
-The HOPR Association _tech_ members, _community_ members, and [Project Owner](#legend) have agreed on the following bounty processes.
-The purpose of these processes is to follow a consistent way of creating, funding, and publishing bounties at HOPR.
+The purpose of this process is to follow a consistent way of creating, funding, publishing, and marketing bounties at HOPR.
 
 ## The bounty
 

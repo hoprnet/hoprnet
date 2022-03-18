@@ -1,9 +1,9 @@
 import { Multiaddr } from 'multiaddr'
-import type { MultiaddrConnection } from 'libp2p-interfaces/transport'
-import type { Stream, StreamResult, StreamType } from '../types'
+import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
+import type { Stream, StreamSink, StreamSource, StreamSourceAsync, StreamResult, StreamType } from '../types'
 import { randomBytes } from 'crypto'
 import { RelayPrefix, ConnectionStatusMessages, StatusMessages } from '../constants'
-import { u8aEquals, u8aToHex, defer, type DeferType } from '@hoprnet/hopr-utils'
+import { u8aEquals, u8aToHex, defer, createCircuitAddress, type DeferType } from '@hoprnet/hopr-utils'
 import Heap from 'heap-js'
 
 import type { Instance as SimplePeer } from 'simple-peer'
@@ -69,7 +69,7 @@ export function statusMessagesCompare(a: Uint8Array, b: Uint8Array): -1 | 0 | 1 
 /**
  * Encapsulates the client-side state management of a relayed connection
  */
-class RelayConnection extends EventEmitter implements MultiaddrConnection<StreamType> {
+class RelayConnection extends EventEmitter implements MultiaddrConnection {
   private _stream: Stream
   private _sourceIterator: AsyncIterator<StreamType>
   private _sinkSourceAttached: boolean
@@ -84,7 +84,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection<Stream
   private _id: string
 
   // Mutexes
-  private _sinkSourceAttachedPromise: DeferType<Stream['source']>
+  private _sinkSourceAttachedPromise: DeferType<StreamSource>
   private _sinkSwitchPromise: DeferType<void>
   private _sourceSwitchPromise: DeferType<void>
   private _migrationDone: DeferType<void> | undefined
@@ -103,9 +103,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection<Stream
 
   private _counterparty: PeerId
 
-  public source: Stream['source']
-  // @ts-ignore
-  public sink: Stream['sink']
+  public source: StreamSourceAsync
+  public sink: StreamSink
 
   public conn: Stream
 
@@ -139,10 +138,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection<Stream
 
     this._id = u8aToHex(randomBytes(4), false)
 
-    this.localAddr = new Multiaddr(`/p2p/${opts.relay.toB58String()}/p2p-circuit/p2p/${opts.self.toB58String()}`)
-    this.remoteAddr = new Multiaddr(
-      `/p2p/${opts.relay.toB58String()}/p2p-circuit/p2p/${opts.counterparty.toB58String()}`
-    )
+    this.localAddr = createCircuitAddress(opts.relay, opts.self)
+    this.remoteAddr = createCircuitAddress(opts.relay, opts.counterparty)
 
     this.webRTC = opts.webRTC
 
@@ -154,7 +151,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection<Stream
     this._streamClosed = false
 
     this._closePromise = defer<void>()
-    this._sinkSourceAttachedPromise = defer<Stream['source']>()
+    this._sinkSourceAttachedPromise = defer<StreamSource>()
     this._destroyedPromise = defer<void>()
     this._statusMessagePromise = defer<void>()
     this._sinkSwitchPromise = defer<void>()
@@ -162,12 +159,15 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection<Stream
 
     this._sourceIterator = (this._stream.source as AsyncIterable<StreamType>)[Symbol.asyncIterator]()
 
+    // FIXME: The type between iterator/async-iterator cannot be matched in
+    // this case easily.
+    // @ts-ignore
     this.source = this.createSource()
 
     // Auto-start sink stream and declare variable in advance
     // to make sure we can attach an error handler to it
     let sinkCreator: Promise<void>
-    this.sink = async (source: Stream['source']) => {
+    this.sink = async (source: StreamSource) => {
       if (this._migrationDone != undefined) {
         await this._migrationDone.promise
       }
@@ -285,6 +285,9 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection<Stream
       this.webRTC.channel = this.webRTC.upgradeInbound()
     }
 
+    // FIXME: The type between iterator/async-iterator cannot be matched in
+    // this case easily.
+    // @ts-ignore
     this.source = this.createSource()
 
     return this
@@ -304,8 +307,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection<Stream
    * and control messages.
    * Once a source is attached, forward the messages from the source to the relay.
    */
-  private async *sinkFunction(): Stream['source'] {
-    type SinkType = Stream['source'] | StreamResult | undefined | void
+  private async *sinkFunction(): StreamSource {
+    type SinkType = StreamSource | StreamResult | undefined | void
 
     let currentSource: AsyncIterator<StreamType> | undefined
     let streamPromise: Promise<StreamResult> | undefined
@@ -368,7 +371,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection<Stream
 
         // Make sure that we don't create hanging promises
         this._sinkSourceAttachedPromise.resolve()
-        this._sinkSourceAttachedPromise = defer<Stream['source']>()
+        this._sinkSourceAttachedPromise = defer<StreamSource>()
         result = undefined
         currentSource = undefined
         streamPromise = undefined

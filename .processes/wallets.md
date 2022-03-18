@@ -1,8 +1,8 @@
-# Wallets
+# Wallet Process
 
-At HOPR we create and use multiple Ethereum addresses that are under the control and supervision of the HOPR Association.
+The purpose of this process is to document how crypto wallets are created and stored.
 
-Here are some of these wallets:
+## Wallets
 
 | Wallet Address                               | Alias                              | Description                                                                       |
 | -------------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------- |
@@ -28,7 +28,7 @@ Here are some of these wallets:
 
 There are some additional wallets used for testing, that had been label `[ Unknown ]`. They will be handled in https://github.com/hoprnet/hoprnet/issues/2893.
 
-# Policy
+## Policy
 
 HOPR Association [multi-sig](https://etherscan.io/address/0x4f50ab4e931289344a57f2fe4bbd10546a6fdc17) is the main address where all HOPR related funds are stored and controlled.
 
@@ -40,7 +40,7 @@ Additional wallets that are not defined under the [wallets](#Wallets) have no co
 
 No HD-derived wallets (e.g. mnemonics) are used for HOPR Association as having the seed of this wallet would grant access to private keys that could be used further down the line w/o being aware of that being the case.
 
-# Generation
+## Generating new wallet
 
 There are multiple ways to safely create wallets, but for quick and dirty (disposable) wallets which require not much scrutiny, feel free to use the following JS script runnable in a web console:
 

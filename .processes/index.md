@@ -1,10 +1,11 @@
 # HOPR Processes
 
-The HOPR Association _tech_ members and [Project Owner](./development.md#legend) have agreed on the following processes to streamline the whole development cycle of HOPR.
+The HOPR processes act as the single source of truth on how HOPR's _tech_ team operates.
+Before processes are committed and thus made official, they need to be approved by the [Representatives](./development.md#representatives) and the [Project Owner](./development.md#legend).
 
 1. [Development Process](./development.md)
 2. [Release Process](./release.md)
-3. [Community Process](./community.md)
+3. [DevRel Process](./devrel.md)
 4. [Wallets Process](./wallets.md)
 5. [Bounty Process](./bounty.md)
 
