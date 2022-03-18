@@ -180,9 +180,7 @@ async function queryDHT(
 
   return {
     status: InternalDialStatus.CONTINUE,
-    relayers: relayers.map(
-      (relay: Relayers) => createCircuitAddress(relay.id, destination)
-    )
+    relayers: relayers.map((relay: Relayers) => createCircuitAddress(relay.id, destination))
   }
 }
 
