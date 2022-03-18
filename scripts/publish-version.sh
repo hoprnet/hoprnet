@@ -133,7 +133,7 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   # special treatment for end-of-chain packages
   # to create lockfiles with resolution overrides
   ${mydir}/build_lockfiles.sh hoprd
-  ${mydir}/build_lockfiles.sh hopr-cover-traffic-daemon
+  ${mydir}/build_lockfiles.sh cover-traffic-daemon
 
   yarn workspace @hoprnet/hoprd npm publish --access public
   yarn workspace @hoprnet/hopr-cover-traffic-daemon npm publish --access public
