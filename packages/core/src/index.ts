@@ -1037,8 +1037,8 @@ class Hopr extends EventEmitter {
   }
 
   public async getTickets(peerId: PeerId): Promise<Ticket[]> {
-    const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
-    const counterpartyPubKey = new PublicKey(peerId.pubKey.marshal())
+    const selfPubKey = PublicKey.fromPeerId(this.getId())
+    const counterpartyPubKey = PublicKey.fromPeerId(peerId)
     const channel = await this.db.getChannelX(counterpartyPubKey, selfPubKey)
     return this.db
       .getAcknowledgedTickets({
@@ -1073,8 +1073,8 @@ class Hopr extends EventEmitter {
   }
 
   public async redeemTicketsInChannel(peerId: PeerId) {
-    const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
-    const counterpartyPubKey = new PublicKey(peerId.pubKey.marshal())
+    const selfPubKey = PublicKey.fromPeerId(this.getId())
+    const counterpartyPubKey = PublicKey.fromPeerId(peerId)
     const channel = await this.db.getChannelX(counterpartyPubKey, selfPubKey)
     await this.connector.redeemTicketsInChannel(channel)
   }
@@ -1086,7 +1086,7 @@ class Hopr extends EventEmitter {
    * @returns the channel entry of those two nodes
    */
   public async getChannel(src: PeerId, dest: PeerId): Promise<ChannelEntry> {
-    return await this.db.getChannelX(new PublicKey(src.pubKey.marshal()), new PublicKey(dest.pubKey.marshal()))
+    return await this.db.getChannelX(PublicKey.fromPeerId(src), PublicKey.fromPeerId(dest))
   }
 
   public async getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {
