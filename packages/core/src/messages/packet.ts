@@ -1,5 +1,4 @@
 import {
-  Hash,
   Ticket,
   UINT256,
   PublicKey,
@@ -21,7 +20,7 @@ import {
   PRICE_PER_PACKET,
   INVERSE_TICKET_WIN_PROB
 } from '@hoprnet/hopr-utils'
-import type { HalfKey, HalfKeyChallenge, ChannelEntry, Challenge } from '@hoprnet/hopr-utils'
+import type { HalfKey, HalfKeyChallenge, ChannelEntry, Challenge, Hash } from '@hoprnet/hopr-utils'
 import { AcknowledgementChallenge } from './acknowledgementChallenge'
 import type PeerId from 'peer-id'
 import BN from 'bn.js'
@@ -146,7 +145,7 @@ export async function validateUnacknowledgedTicket(
   channel: ChannelEntry,
   getTickets: () => Promise<Ticket[]>
 ): Promise<void> {
-  const them = new PublicKey(themPeerId.pubKey.marshal())
+  const them = PublicKey.fromPeerId(themPeerId)
   const requiredTicketWinProb = UINT256.fromInverseProbability(reqInverseTicketWinProb).toBN()
 
   // ticket signer MUST be the sender
@@ -240,7 +239,7 @@ export class Packet {
 
   public plaintext: Uint8Array
 
-  public packetTag: Hash
+  public packetTag: Uint8Array
   public previousHop: PublicKey
   public nextHop: Uint8Array
   public ownShare: HalfKeyChallenge
@@ -259,7 +258,7 @@ export class Packet {
     return this
   }
 
-  private setFinal(plaintext: Uint8Array, packetTag: Hash, ackKey: HalfKey, previousHop: PublicKey) {
+  private setFinal(plaintext: Uint8Array, packetTag: Uint8Array, ackKey: HalfKey, previousHop: PublicKey) {
     this.packetTag = packetTag
     this.ackKey = ackKey
     this.isReceiver = true
@@ -278,7 +277,7 @@ export class Packet {
     previousHop: PublicKey,
     nextChallenge: Challenge,
     ackChallenge: HalfKeyChallenge,
-    packetTag: Hash
+    packetTag: Uint8Array
   ) {
     this.isReceiver = false
     this.isReadyToForward = false
@@ -306,7 +305,7 @@ export class Packet {
     }
 
     const challenge = AcknowledgementChallenge.create(ackChallenge, privKey)
-    const nextPeer = new PublicKey(path[0].pubKey.marshal())
+    const nextPeer = PublicKey.fromPeerId(path[0])
     const packet = createPacket(secrets, alpha, msg, path, INTERMEDIATE_HOPS + 1, POR_STRING_LENGTH, porStrings)
 
     let ticket: Ticket
@@ -356,7 +355,7 @@ export class Packet {
     if (transformedOutput.lastNode == true) {
       return new Packet(packet, challenge, ticket).setFinal(
         transformedOutput.plaintext,
-        new Hash(transformedOutput.packetTag),
+        transformedOutput.packetTag,
         ackKey,
         PublicKey.fromPeerId(pubKeySender)
       )
@@ -380,7 +379,7 @@ export class Packet {
       PublicKey.fromPeerId(pubKeySender),
       verificationOutput.nextTicketChallenge,
       verificationOutput.ackChallenge,
-      new Hash(transformedOutput.packetTag)
+      transformedOutput.packetTag
     )
   }
 
@@ -453,7 +452,7 @@ export class Packet {
       throw Error(`Invalid state`)
     }
 
-    const nextPeer = new PublicKey(this.nextHop)
+    const nextPeer = PublicKey.deserialize(this.nextHop)
 
     const pathPosition = this.ticket.getPathPosition()
     if (pathPosition == 1) {

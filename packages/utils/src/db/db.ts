@@ -66,8 +66,8 @@ function createAcknowledgedTicketKey(challenge: EthereumChallenge, channelEpoch:
 function createPendingAcknowledgement(halfKey: HalfKeyChallenge) {
   return Uint8Array.from([...PENDING_ACKNOWLEDGEMENTS_PREFIX, ...halfKey.serialize()])
 }
-function createPacketTagKey(tag: Hash) {
-  return Uint8Array.from([...PACKET_TAG_PREFIX, ...tag.serialize()])
+function createPacketTagKey(tag: Uint8Array) {
+  return Uint8Array.from([...PACKET_TAG_PREFIX, ...tag])
 }
 
 const LATEST_BLOCK_NUMBER_KEY = encoder.encode('latestBlockNumber')
@@ -453,7 +453,7 @@ export class HoprDB {
    * @param packetTag packet tag to check for
    * @returns a Promise that resolves to true if packet tag is present in db
    */
-  async checkAndSetPacketTag(packetTag: Hash) {
+  async checkAndSetPacketTag(packetTag: Uint8Array) {
     let present = await this.has(createPacketTagKey(packetTag))
 
     if (!present) {

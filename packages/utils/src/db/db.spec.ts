@@ -166,7 +166,7 @@ describe(`database tests`, function () {
   })
 
   it('hasPacket', async function () {
-    const packetTag = new Hash(Uint8Array.from(randomBytes(32)))
+    const packetTag = Uint8Array.from(randomBytes(16))
 
     const present = await db.checkAndSetPacketTag(packetTag)
 
