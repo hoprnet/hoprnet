@@ -70,8 +70,8 @@
     "ouagadougou": {
       "network_id": "xdai",
       "channel_contract_deploy_block": 0,
-      "token_contract_address": "",
-      "channels_contract_address": "",
+      "token_contract_address": "0x978D91ddFdb0c6eaCC22A258fE498957a79c5F4C",
+      "channels_contract_address": "0x0BB1Ff7A9b3f2c87267626630aa0195cAE3ed5E3",
       "tags": ["production"]
     }
   },
