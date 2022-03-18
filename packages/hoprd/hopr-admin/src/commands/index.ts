@@ -15,6 +15,7 @@ import Tickets from './tickets'
 import RedeemTickets from './redeemTickets'
 import Withdraw from './withdraw'
 import Settings from './settings'
+import PeerInfo from './peerInfo'
 import Info from './info'
 import Version from './version'
 import Help from './help'
@@ -40,6 +41,7 @@ export default class Commands {
       new RedeemTickets(this.api, extra),
       new Withdraw(this.api, extra),
       new Settings(this.api, extra),
+      new PeerInfo(this.api, extra),
       new Info(this.api, extra),
       new Version(this.api, extra)
     ]

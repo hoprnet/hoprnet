@@ -67,7 +67,7 @@ export abstract class Command {
    * @returns Generic invalid query message.
    */
   protected invalidUsage(query: string): string {
-    return `Invalid arguments, received ${query}.\n${this.usage()}`
+    return `Invalid arguments, received "${query}".\n${this.usage()}`
   }
 
   /**

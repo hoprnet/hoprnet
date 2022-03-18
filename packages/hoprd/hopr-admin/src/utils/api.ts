@@ -155,6 +155,12 @@ export default class API {
   }> {
     return this.getReq('/api/v2/node/peers').then((res) => res.json())
   }
+  public async getPeerInfo(peerId: string): Promise<{
+    announced: string[]
+    observed: string[]
+  }> {
+    return this.getReq(`/api/v2/peerInfo/${peerId}`).then((res) => res.json())
+  }
 
   // settings API
   public async getSettings(): Promise<{
