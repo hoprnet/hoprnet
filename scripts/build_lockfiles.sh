@@ -21,7 +21,7 @@ usage() {
 }
 
 # return early with help info when requested
-{[ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]} && { usage; exit 0; }
+{ [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
 
 if [ -z "${1:-}" ]; then
   msg "Missing package name"
