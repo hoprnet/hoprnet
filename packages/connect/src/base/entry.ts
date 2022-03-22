@@ -296,7 +296,7 @@ export class EntryNodes extends EventEmitter {
   async updatePublicNodes(): Promise<void> {
     while (!this.libp2p.connectionManager._started) {
       // Make sure that libp2p is started
-      await setTimeoutPromise(500)
+      await setTimeoutPromise(250)
     }
     log(`Updating list of used relay nodes ...`)
     const nodesToCheck = this.filterUncheckedNodes()
