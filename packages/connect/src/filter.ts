@@ -10,13 +10,15 @@ import {
   checkNetworks,
   isLinkLocaleAddress,
   u8aAddrToString,
-  getPrivateAddresses
+  getPrivateAddresses,
+  isLocalhost,
+  u8aAddressToCIDR
 } from '@hoprnet/hopr-utils'
 import { parseAddress } from './utils'
 
 import Debug from 'debug'
-import { green } from 'chalk'
 import assert from 'assert'
+import { HoprConnectOptions } from './types'
 
 const log = Debug('hopr-connect:filter')
 
@@ -25,11 +27,13 @@ const INVALID_PORTS = [0]
 export class Filter {
   private announcedAddrs?: ValidAddress[]
   private listeningFamilies?: NetworkInterfaceInfo['family'][]
+  private myPublicKey: Uint8Array
 
   protected myPrivateNetworks: Network[]
 
-  constructor(private peerId: PeerId) {
+  constructor(peerId: PeerId, private opts: HoprConnectOptions) {
     this.myPrivateNetworks = getPrivateAddresses()
+    this.myPublicKey = peerId.marshalPubKey()
   }
 
   /**
@@ -46,11 +50,6 @@ export class Filter {
    * @param listeningAddrs Addresses to which we are listening
    */
   setAddrs(announcedAddrs: Multiaddr[], listeningAddrs: Multiaddr[]): void {
-    log(`announcedAddrs:`)
-    announcedAddrs.forEach((ma: Multiaddr) => log(` ${green(ma.toString())}`))
-    log(`listeningAddrs:`)
-    listeningAddrs.forEach((ma: Multiaddr) => log(` ${green(ma.toString())}`))
-
     this.announcedAddrs = []
     for (const announcedAddr of announcedAddrs) {
       const parsed = parseAddress(announcedAddr)
@@ -71,13 +70,14 @@ export class Filter {
           if (!this.listeningFamilies.includes(parsed.address.type)) {
             this.listeningFamilies.push(parsed.address.type)
           }
+          break
         case 'p2p':
           continue
       }
     }
   }
 
-  public filter(ma: Multiaddr) {
+  public filter(ma: Multiaddr): boolean {
     if (this.addrsSet) {
       return this.filterDial(ma)
     } else {
@@ -90,7 +90,7 @@ export class Filter {
    * @param ma Multiaddr to check
    * @returns true if address is usable
    */
-  public filterListening(ma: Multiaddr): boolean {
+  private filterListening(ma: Multiaddr): boolean {
     const parsed = parseAddress(ma)
 
     if (!parsed.valid || !['IPv4', 'IPv6'].includes(parsed.address.type)) {
@@ -98,7 +98,7 @@ export class Filter {
       return false
     }
 
-    if (parsed.address.node != undefined && !u8aEquals(parsed.address.node, this.peerId.marshalPubKey())) {
+    if (parsed.address.node != undefined && !u8aEquals(parsed.address.node, this.myPublicKey)) {
       log(`Cannot listen to multiaddrs with other peerId than our own. Given addr: ${ma.toString()}`)
       return false
     }
@@ -111,22 +111,23 @@ export class Filter {
    * @param ma Multiaddress to check
    * @returns true if considered dialable
    */
-  public filterDial(ma: Multiaddr): boolean {
+  private filterDial(ma: Multiaddr): boolean {
     const parsed = parseAddress(ma)
 
     if (!parsed.valid) {
       return false
     }
 
+    // Resolve p2p addresses first
     if (parsed.address.type === 'p2p') {
-      const address = parsed.address
+      const p2pAddress = parsed.address
 
-      if (u8aEquals(address.node, this.peerId.marshalPubKey())) {
+      if (u8aEquals(p2pAddress.node, this.myPublicKey)) {
         log(`Prevented self-dial using circuit addr. Used addr: ${ma.toString()}`)
         return false
       }
 
-      if (u8aEquals(address.relayer, this.peerId.marshalPubKey())) {
+      if (u8aEquals(p2pAddress.relayer, this.myPublicKey)) {
         log(`Prevented dial using self as relay node. Used addr: ${ma.toString()}`)
         return false
       }
@@ -136,8 +137,20 @@ export class Filter {
 
     const address = parsed.address
 
-    if (address.node != undefined && u8aEquals(address.node, this.peerId.marshalPubKey())) {
+    if (address.node != undefined && u8aEquals(address.node, this.myPublicKey)) {
       log(`Prevented self-dial. Used addr: ${ma.toString()}`)
+      return false
+    }
+
+    // If localhost connections are explicitly allowed, do not dial them
+    if (isLocalhost(address.address, address.type) && !this.opts.allowLocalConnections) {
+      // Do not pollute logs by rejecting localhost connections attempts
+      return false
+    }
+
+    // If private address connections are explicitly allowed, do not dial them
+    if (isPrivateAddress(address.address, address.type) && !this.opts.allowPrivateConnections) {
+      // Do not pollute logs by rejecting private address connections attempts
       return false
     }
 
@@ -151,6 +164,21 @@ export class Filter {
 
     if (INVALID_PORTS.includes(address.port)) {
       log(`Tried to dial invalid port ${address.port}`)
+      return false
+    }
+
+    // Allow to dial localhost only if the port is different from all of those we're listening on
+    if (
+      isLocalhost(address.address, address.type) &&
+      this.announcedAddrs.some(
+        (announced: ValidAddress) =>
+          announced.type !== 'p2p' &&
+          isLocalhost(announced.address, announced.type) &&
+          announced.type === address.type &&
+          announced.port == address.port
+      )
+    ) {
+      // Do not log anything to prevent too much log pollution
       return false
     }
 
@@ -187,7 +215,7 @@ export class Filter {
           `Prevented dialing private address ${u8aAddrToString(address.address, address.type)}:${
             address.port
           } because not in our network(s): ${this.myPrivateNetworks
-            .map((network) => `${u8aAddrToString(network.networkPrefix, network.family)}`)
+            .map((network) => `${u8aAddressToCIDR(network.networkPrefix, network.subnet, network.family)}`)
             .join(', ')}`
         )
         return false

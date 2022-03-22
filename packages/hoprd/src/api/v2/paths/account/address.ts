@@ -1,31 +1,12 @@
-import { Operation } from 'express-openapi'
+/*
+    Deprecated endpoint.
+    Endpoint "/api/v2/addresses" should be used instead.
+*/
 
-export const parameters = []
+import type { Operation } from 'express-openapi'
+import { GET as original } from './addresses'
 
-export const GET: Operation = [
-  async (req, res, _next) => {
-    const nativeAddress = (await req.context.node.getEthereumAddress()).toHex()
-    const hoprAddress = req.context.node.getId().toB58String()
-
-    res.status(200).json({ nativeAddress, hoprAddress })
-  }
-]
-
-GET.apiDoc = {
-  description: 'Get the native and hopr addresses of the account associated with the node',
-  tags: ['account'],
-  operationId: 'accountGetAddress',
-  parameters: [],
-  responses: {
-    '200': {
-      description: 'Returns the native and hopr addresses of the account associated with the node',
-      content: {
-        'application/json': {
-          schema: {
-            $ref: '#/components/schemas/Address'
-          }
-        }
-      }
-    }
-  }
-}
+export const GET: Operation = [original[0].bind()]
+GET.apiDoc = JSON.parse(JSON.stringify(original.apiDoc))
+GET.apiDoc.deprecated = true
+GET.apiDoc.operationId = 'accountGetAddress'

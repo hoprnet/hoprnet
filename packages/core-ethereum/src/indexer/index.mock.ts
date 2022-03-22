@@ -1,5 +1,5 @@
 import EventEmitter from 'events'
-import { providers as Providers, Wallet, BigNumber } from 'ethers'
+import { providers as Providers, Wallet, BigNumber, utils } from 'ethers'
 import type { HoprChannels, HoprToken, TypedEvent } from '@hoprnet/hopr-ethereum'
 import {
   Address,
@@ -53,7 +53,7 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
   const channels: any = {}
   const pubkeys: any = {}
 
-  const handleEvent = (ev) => {
+  const handleEvent = (ev: TypedEvent<any, any>) => {
     if (ev.event == 'ChannelUpdated') {
       const updateEvent = ev as Event<'ChannelUpdated'>
 
@@ -99,11 +99,18 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
         } as any
       } as Event<'ChannelUpdated'>
       handleEvent(newEvent)
-      this.emit('*', newEvent)
+      pastEvents.push(newEvent)
     }
 
     async queryFilter() {
       return pastEvents
+    }
+
+    interface = {
+      // Dummy event topic but different for every event
+      getEventTopic: (arg: string) => utils.keccak256(utils.toUtf8Bytes(arg)),
+      // Events are already correctly formatted
+      parseLog: (arg: any) => arg
     }
   }
 
@@ -118,7 +125,10 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
     }
   }
 }
-const createHoprTokenMock = () => {
+
+const createHoprTokenMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
+  const pastEvents = ops.pastEvents ?? []
+
   class FakeToken extends EventEmitter {
     async transfer() {
       let newEvent = {
@@ -133,7 +143,18 @@ const createHoprTokenMock = () => {
           balance: BigNumber.from('1')
         } as any
       } as TokenEvent<'Transfer'>
-      this.emit('*', newEvent)
+      pastEvents.push(newEvent)
+    }
+
+    async queryFilter() {
+      return pastEvents
+    }
+
+    interface = {
+      // Dummy event topic but different for every event
+      getEventTopic: (arg: string) => utils.keccak256(utils.toUtf8Bytes(arg)),
+      // Events are already correctly formatted
+      parseLog: (arg: any) => arg
     }
   }
 
@@ -142,7 +163,7 @@ const createHoprTokenMock = () => {
   return {
     hoprToken,
     newEvent(event: Event<any>) {
-      hoprToken.emit('*', event)
+      pastEvents.push(event)
     }
   }
 }
@@ -210,16 +231,18 @@ const createChainMock = (
         hoprToken.off('*', cb)
       }
     },
-    getNativeTokenTransactionInBlock: (_blockNumber: number, _isOutgoing: boolean = true) => [],
+    getNativeTokenTransactionInBlock: (_blockNumber: number, _isOutgoing: boolean = true) =>
+      Promise.resolve<string[]>([]),
     updateConfirmedTransaction: (_hash: string) => {},
     getNativeBalance: () => new NativeBalance(SUGGESTED_NATIVE_BALANCE),
     getChannels: () => hoprChannels,
+    getToken: () => hoprToken,
     getWallet: () => account ?? fixtures.ACCOUNT_A,
     getAccount: () => {
       chainLogger('getAccount method was called')
       return Promise.resolve(
         new AccountEntry(
-          fixtures.PARTY_A.toAddress(),
+          fixtures.PARTY_A,
           new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${fixtures.PARTY_A.toB58String()}`),
           new BN('1')
         )
@@ -232,7 +255,7 @@ const createChainMock = (
   } as unknown as ChainWrapper
 }
 
-class TestingIndexer extends Indexer {
+export class TestingIndexer extends Indexer {
   public restart(): Promise<void> {
     return super.restart()
   }
@@ -247,7 +270,7 @@ export const useFixtures = async (
   const db = HoprDB.createMock(ops.id)
   const { provider, newBlock } = createProviderMock({ latestBlockNumber })
   const { hoprChannels, newEvent } = createHoprChannelsMock({ pastEvents })
-  const { hoprToken } = createHoprTokenMock()
+  const { hoprToken, newEvent: newTokenEvent } = createHoprTokenMock()
   const chain = createChainMock(provider, hoprChannels, hoprToken)
   return {
     db,
@@ -256,6 +279,7 @@ export const useFixtures = async (
     hoprChannels,
     hoprToken,
     newEvent,
+    newTokenEvent,
     indexer: new TestingIndexer(!ops.id ? PublicKey.createMock().toAddress() : ops.id.toAddress(), db, 1, 5),
     chain,
     OPENED_CHANNEL: await ChannelEntry.fromSCEvent(fixtures.OPENED_EVENT, (a: Address) =>

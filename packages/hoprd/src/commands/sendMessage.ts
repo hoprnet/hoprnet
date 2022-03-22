@@ -1,9 +1,10 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
+import type { StateOps, State } from '../types'
 import { INTERMEDIATE_HOPS } from '@hoprnet/hopr-core/lib/constants'
 import { PublicKey } from '@hoprnet/hopr-utils'
 import { checkPeerIdInput, encodeMessage, styleValue } from './utils'
-import { AbstractCommand, GlobalState } from './abstractCommand'
+import { AbstractCommand } from './abstractCommand'
 
 export class SendMessage extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -24,12 +25,12 @@ export class SendMessage extends AbstractCommand {
   }
 
   protected async sendMessage(
-    state: GlobalState,
+    state: State,
     recipient: PeerId,
     rawMessage: string,
     path?: PublicKey[]
   ): Promise<string> {
-    const message = state.includeRecipient ? this.insertMyAddress(rawMessage) : rawMessage
+    const message = state.settings.includeRecipient ? this.insertMyAddress(rawMessage) : rawMessage
 
     try {
       await this.node.sendMessage(encodeMessage(message), recipient, path)
@@ -39,45 +40,55 @@ export class SendMessage extends AbstractCommand {
     }
   }
 
-  public async execute(log: (str: string) => void, query: string, state: GlobalState): Promise<void> {
-    try {
-      let [err, peerIdString, message] = this._assertUsage(query, ['PeerId', 'Message'], /([A-Za-z0-9_,]+)\s(.*)/)
-      if (err) throw Error(err)
+  public async execute(log: (str: string) => void, query: string, { getState }: StateOps): Promise<void> {
+    const state = getState()
+    let [err, peerIdString, message] = this._assertUsage(query, ['PeerId', 'Message'], /([A-Za-z0-9_,]+)\s(.*)/)
+    if (err) {
+      log(styleValue(err, 'failure'))
+      return
+    }
 
-      if (peerIdString.includes(',')) {
-        // Manual routing
-        // Direct routing can be done with ,recipient
-        const path = (
-          await Promise.all(
-            peerIdString
-              .split(',')
-              .filter(Boolean)
-              .map((x) => checkPeerIdInput(x, state))
-          )
-        ).map((x) => PublicKey.fromPeerId(x))
+    if (peerIdString.includes(',')) {
+      // Manual routing
+      // Direct routing can be done with ,recipient
+      const peerIdStrings = peerIdString.split(',').filter(Boolean)
 
-        if (path.length > INTERMEDIATE_HOPS + 1) {
-          throw new Error('Cannot create path longer than INTERMEDIATE_HOPS')
+      const path: PublicKey[] = []
+      for (const pIdString of peerIdStrings) {
+        try {
+          path.push(PublicKey.fromPeerId(checkPeerIdInput(pIdString, state)))
+        } catch (err) {
+          log(styleValue(`<${pIdString}> is neither a valid alias nor a valid Hopr address string`))
+          return
         }
+      }
 
-        const [intermediateNodes, recipient] = [path.slice(0, path.length - 1), path[path.length - 1]]
-        console.log(
-          `Sending message to ${styleValue(recipient.toString(), 'peerId')} via ${path
-            .slice(0, path.length - 1)
-            .map((current) => styleValue(current.toString(), 'peerId'))
-            .join(',')} ...`
-        )
-        log(await this.sendMessage(state, recipient.toPeerId(), message, intermediateNodes))
-
+      if (path.length > INTERMEDIATE_HOPS + 1) {
+        log(styleValue('Cannot create path longer than INTERMEDIATE_HOPS', 'failure'))
         return
       }
 
-      let peerId = await checkPeerIdInput(peerIdString, state)
+      const [intermediateNodes, recipient] = [path.slice(0, path.length - 1), path[path.length - 1]]
+      console.log(
+        `Sending message to ${styleValue(recipient.toString(), 'peerId')} via ${path
+          .slice(0, path.length - 1)
+          .map((current) => styleValue(current.toString(), 'peerId'))
+          .join(',')} ...`
+      )
+      log(await this.sendMessage(state, recipient.toPeerId(), message, intermediateNodes))
 
-      console.log(`Sending message to ${styleValue(peerId.toB58String(), 'peerId')} ...`)
-      log(await this.sendMessage(state, peerId, message))
-    } catch (err) {
-      log(styleValue(`Could not send message. Error was: ${err.message}`, 'failure'))
+      return
     }
+
+    let destination: PeerId
+    try {
+      destination = checkPeerIdInput(peerIdString, state)
+    } catch (err) {
+      log(styleValue(`<${peerIdString}> is neither a valid alias nor a valid Hopr address string`))
+      return
+    }
+
+    console.log(`Sending message to ${styleValue(destination.toB58String(), 'peerId')} ...`)
+    log(await this.sendMessage(state, destination, message))
   }
 }

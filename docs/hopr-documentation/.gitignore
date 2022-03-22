@@ -1,2 +1,4 @@
 # ignore generated folders
-_*/
+build/
+.docusaurus/
+node_modules

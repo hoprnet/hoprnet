@@ -1,4 +1,3 @@
-import { defer } from './defer'
 import { debug } from '../process'
 
 const logError = debug('hopr:lateTimeout')
@@ -8,60 +7,77 @@ export type TimeoutOpts = {
   signal?: AbortSignal
 }
 
-export async function abortableTimeout<Result, AbortMsg, TimeoutMsg>(
+/**
+ * Cals the worker function with a timeout. Once the timeout is done
+ * abort the call using an abort controller.
+ * If the caller aims to end the call before the tiemout has happened
+ * it can pass an AbortController and end the call prematurely.
+ * @param fn worker function to dial
+ * @param abortMsg value to be returned if aborted
+ * @param timeoutMsg value to be returned on timeout
+ * @param opts options to pass to worker function
+ * @returns
+ */
+export function abortableTimeout<Result, AbortMsg, TimeoutMsg>(
   fn: (opts: Required<TimeoutOpts>) => Promise<Result>,
   abortMsg: AbortMsg,
   timeoutMsg: TimeoutMsg,
   opts: TimeoutOpts
 ): Promise<Result | AbortMsg | TimeoutMsg> {
-  const abort = new AbortController()
+  return new Promise<Result | AbortMsg | TimeoutMsg>(async (resolve, reject) => {
+    const abort = new AbortController()
 
-  // forward abort request
-  const onOuterAbort = () => abort.abort()
-  opts.signal?.addEventListener('abort', () => {
-    onOuterAbort()
-    opts.signal?.removeEventListener('abort', onOuterAbort)
-  })
+    let result: Result
 
-  let done = false
+    let done = false
 
-  let onAbort: () => void
-  let cleanUp: () => void
+    // forward outer abort
+    const innerAbort = abort.abort.bind(abort)
 
-  const abortableTimeout = defer<AbortMsg | TimeoutMsg>()
+    const cleanUp = () => {
+      done = true
+      abort.signal.removeEventListener('abort', onInnerAbort)
+      opts.signal?.removeEventListener('abort', innerAbort)
+    }
 
-  const timeout = setTimeout(() => {
-    done = true
-    cleanUp()
-    abort.abort()
-    abortableTimeout.resolve(timeoutMsg)
-  }, opts.timeout)
+    const onTimeout = () => {
+      if (done) {
+        return
+      }
+      cleanUp()
+      innerAbort()
+      resolve(timeoutMsg)
+    }
 
-  onAbort = () => {
-    done = true
-    cleanUp()
-    abortableTimeout.resolve(abortMsg)
-  }
+    const onInnerAbort = () => {
+      if (done) {
+        return
+      }
+      cleanUp()
+      resolve(abortMsg)
+    }
 
-  cleanUp = () => {
-    clearTimeout(timeout)
-    abort.signal.removeEventListener('abort', onAbort)
-  }
+    abort.signal.addEventListener('abort', onInnerAbort)
 
-  abort.signal.addEventListener('abort', onAbort)
+    opts.signal?.addEventListener('abort', innerAbort)
 
-  const resultFunction = async (): Promise<Result> => {
+    // Let the timeout run through and let the handler do nothing, i.e. `done = true`
+    // instead of clearing the timeout with `clearTimeout` which becomes an expensive
+    // operation when using many timeouts
+    setTimeout(onTimeout, opts.timeout)
+
     try {
-      const result = await fn({
+      result = await fn({
         timeout: opts.timeout,
         signal: abort.signal
       })
-      cleanUp()
-      return result
     } catch (err) {
       if (!done) {
-        throw err
+        cleanUp()
+        reject(err)
+        return
       } else {
+        cleanUp()
         // The function has thrown an error after there
         // was a timeout or the call has been aborted.
         // The abortableTimeout has returned a value, hence
@@ -70,11 +86,16 @@ export async function abortableTimeout<Result, AbortMsg, TimeoutMsg>(
         // to prevent from uncaught promise rejection, the error
         // are logged.
         logError(`Function has thrown an error after the timeout happend or the function got aborted`, err)
+        return
       }
     }
 
-    return
-  }
+    if (done) {
+      return
+    }
 
-  return Promise.race([abortableTimeout.promise, resultFunction()])
+    cleanUp()
+
+    resolve(result)
+  })
 }

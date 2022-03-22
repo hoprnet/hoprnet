@@ -73,11 +73,11 @@ export function stringToU8a(str: string, length?: number): Uint8Array {
     strLength++
   }
 
-  if (length != null && str.length >> 1 > length) {
+  if (length != null && strLength >> 1 > length) {
     throw Error('Input argument has too many hex decimals.')
   }
 
-  if (length != null && str.length >> 1 < length) {
+  if (length != null && strLength >> 1 < length) {
     str = str.padStart(length << 1, '0')
     strLength = length << 1
   }

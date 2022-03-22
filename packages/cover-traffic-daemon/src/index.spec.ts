@@ -1,12 +1,13 @@
+import assert from 'assert'
 import LibP2P from 'libp2p'
-import Hopr from '@hoprnet/hopr-core'
+import Hopr, { type HoprOptions } from '@hoprnet/hopr-core'
 import { debug, PublicKey, wait, dbMock, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import sinon from 'sinon'
 import { PersistedState } from './state'
 import { CoverTrafficStrategy } from './strategy'
 import { sampleData } from './state.mock'
-import { sampleOptions, libp2pMock } from '@hoprnet/hopr-core'
-import { connectorMock } from '@hoprnet/hopr-core-ethereum'
+import { sampleOptions, createLibp2pMock } from '@hoprnet/hopr-core'
+import { createConnectorMock } from '@hoprnet/hopr-core-ethereum'
 
 const namespace = 'hopr:test:cover-traffic'
 const log = debug(namespace)
@@ -21,13 +22,14 @@ describe('cover-traffic daemon', async function () {
     function stubLibp2p() {
       sinon.stub(LibP2P, 'create').callsFake(() => {
         log('libp2p stub started')
-        return Promise.resolve(libp2pMock)
+        return Promise.resolve(createLibp2pMock(mockPeerId))
       })
     }
     data = sampleData
     stubLibp2p()
+    const connectorMock = createConnectorMock(mockPeerId)
     log('Mocked chain', connectorMock)
-    node = new Hopr(mockPeerId, dbMock, connectorMock, sampleOptions)
+    node = new Hopr(mockPeerId, dbMock, connectorMock, sampleOptions as HoprOptions)
   })
 
   afterEach(function () {
@@ -35,6 +37,7 @@ describe('cover-traffic daemon', async function () {
   })
 
   it('should run and stop properly', async function () {
+    assert(node instanceof Hopr)
     log('starting stubbed hopr node')
     await node.start()
     log('completed stubbed hopr node, starting cover-traffic strategy')

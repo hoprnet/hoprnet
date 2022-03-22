@@ -390,15 +390,15 @@ export function intepreteResults(results: RequestWithResponse[]):
  *
  * @param multiAddrs Multiaddrs to use as STUN servers
  * @param socket Node.JS socket to use for the STUN request
- * @param runningLocally set to true when running a local testnet
+ * @param __preferLocalAddress [testing] assume that all nodes run in a local network
  */
 export async function getExternalIp(
   multiAddrs: Multiaddr[] | undefined,
   socket: Socket,
-  runningLocally = false
+  __preferLocalAddress = false
 ): Promise<Interface | undefined> {
   let responses: RequestWithResponse[] = []
-  if (runningLocally) {
+  if (__preferLocalAddress) {
     if (multiAddrs == undefined || multiAddrs.length == 0) {
       const socketAddress = socket.address() as Interface | null
       if (socketAddress == null) {

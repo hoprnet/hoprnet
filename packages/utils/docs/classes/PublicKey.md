@@ -8,17 +8,24 @@
 
 - [constructor](PublicKey.md#constructor)
 
+### Properties
+
+- [\_address](PublicKey.md#_address)
+
 ### Accessors
 
-- [SIZE](PublicKey.md#size)
+- [isCompressed](PublicKey.md#iscompressed)
+- [SIZE\_COMPRESSED](PublicKey.md#size_compressed)
+- [SIZE\_UNCOMPRESSED](PublicKey.md#size_uncompressed)
 
 ### Methods
 
 - [eq](PublicKey.md#eq)
-- [serialize](PublicKey.md#serialize)
+- [serializeCompressed](PublicKey.md#serializecompressed)
+- [serializeUncompressed](PublicKey.md#serializeuncompressed)
 - [toAddress](PublicKey.md#toaddress)
 - [toB58String](PublicKey.md#tob58string)
-- [toHex](PublicKey.md#tohex)
+- [toCompressedPubKeyHex](PublicKey.md#tocompressedpubkeyhex)
 - [toPeerId](PublicKey.md#topeerid)
 - [toString](PublicKey.md#tostring)
 - [toUncompressedPubKeyHex](PublicKey.md#touncompressedpubkeyhex)
@@ -27,15 +34,16 @@
 - [fromPeerId](PublicKey.md#frompeerid)
 - [fromPeerIdString](PublicKey.md#frompeeridstring)
 - [fromPrivKey](PublicKey.md#fromprivkey)
+- [fromPrivKeyString](PublicKey.md#fromprivkeystring)
 - [fromSignature](PublicKey.md#fromsignature)
+- [fromSignatureString](PublicKey.md#fromsignaturestring)
 - [fromString](PublicKey.md#fromstring)
-- [fromUncompressedPubKey](PublicKey.md#fromuncompressedpubkey)
 
 ## Constructors
 
 ### constructor
 
-• **new PublicKey**(`arr`)
+• `Private` **new PublicKey**(`arr`)
 
 #### Parameters
 
@@ -45,13 +53,37 @@
 
 #### Defined in
 
-[types/primitives.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L12)
+[types/publicKey.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L11)
+
+## Properties
+
+### \_address
+
+• `Private` **\_address**: [`Address`](Address.md)
+
+#### Defined in
+
+[types/publicKey.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L9)
 
 ## Accessors
 
-### SIZE
+### isCompressed
 
-• `Static` `get` **SIZE**(): `number`
+• `get` **isCompressed**(): `boolean`
+
+#### Returns
+
+`boolean`
+
+#### Defined in
+
+[types/publicKey.ts:75](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L75)
+
+___
+
+### SIZE\_COMPRESSED
+
+• `Static` `get` **SIZE_COMPRESSED**(): `number`
 
 #### Returns
 
@@ -59,7 +91,21 @@
 
 #### Defined in
 
-[types/primitives.ts:68](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L68)
+[types/publicKey.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L67)
+
+___
+
+### SIZE\_UNCOMPRESSED
+
+• `Static` `get` **SIZE_UNCOMPRESSED**(): `number`
+
+#### Returns
+
+`number`
+
+#### Defined in
+
+[types/publicKey.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L71)
 
 ## Methods
 
@@ -79,13 +125,13 @@
 
 #### Defined in
 
-[types/primitives.ts:88](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L88)
+[types/publicKey.ts:131](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L131)
 
 ___
 
-### serialize
+### serializeCompressed
 
-▸ **serialize**(): `Uint8Array`
+▸ **serializeCompressed**(): `Uint8Array`
 
 #### Returns
 
@@ -93,7 +139,21 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L72)
+[types/publicKey.ts:106](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L106)
+
+___
+
+### serializeUncompressed
+
+▸ **serializeUncompressed**(): `Uint8Array`
+
+#### Returns
+
+`Uint8Array`
+
+#### Defined in
+
+[types/publicKey.ts:114](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L114)
 
 ___
 
@@ -107,7 +167,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L48)
+[types/publicKey.ts:79](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L79)
 
 ___
 
@@ -121,13 +181,13 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L84)
+[types/publicKey.ts:127](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L127)
 
 ___
 
-### toHex
+### toCompressedPubKeyHex
 
-▸ **toHex**(): `string`
+▸ **toCompressedPubKeyHex**(): `string`
 
 #### Returns
 
@@ -135,7 +195,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:76](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L76)
+[types/publicKey.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L98)
 
 ___
 
@@ -149,7 +209,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:57](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L57)
+[types/publicKey.ts:102](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L102)
 
 ___
 
@@ -163,7 +223,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:80](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L80)
+[types/publicKey.ts:123](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L123)
 
 ___
 
@@ -177,7 +237,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L52)
+[types/publicKey.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L94)
 
 ___
 
@@ -191,7 +251,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:96](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L96)
+[types/publicKey.ts:141](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L141)
 
 ___
 
@@ -211,7 +271,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:92](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L92)
+[types/publicKey.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L25)
 
 ___
 
@@ -231,7 +291,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L34)
+[types/publicKey.ts:44](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L44)
 
 ___
 
@@ -251,7 +311,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L38)
+[types/publicKey.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L48)
 
 ___
 
@@ -271,13 +331,55 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L18)
+[types/publicKey.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L17)
+
+___
+
+### fromPrivKeyString
+
+▸ `Static` **fromPrivKeyString**(`privKey`): [`PublicKey`](PublicKey.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `privKey` | `string` |
+
+#### Returns
+
+[`PublicKey`](PublicKey.md)
+
+#### Defined in
+
+[types/publicKey.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L13)
 
 ___
 
 ### fromSignature
 
-▸ `Static` **fromSignature**(`hash`, `r`, `s`, `v`): [`PublicKey`](PublicKey.md)
+▸ `Static` **fromSignature**(`hash`, `signature`, `v`): [`PublicKey`](PublicKey.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `hash` | `Uint8Array` |
+| `signature` | `Uint8Array` |
+| `v` | `number` |
+
+#### Returns
+
+[`PublicKey`](PublicKey.md)
+
+#### Defined in
+
+[types/publicKey.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L52)
+
+___
+
+### fromSignatureString
+
+▸ `Static` **fromSignatureString**(`hash`, `r`, `s`, `v`): [`PublicKey`](PublicKey.md)
 
 #### Parameters
 
@@ -294,7 +396,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L42)
+[types/publicKey.ts:56](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L56)
 
 ___
 
@@ -314,24 +416,4 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L61)
-
-___
-
-### fromUncompressedPubKey
-
-▸ `Static` **fromUncompressedPubKey**(`arr`): [`PublicKey`](PublicKey.md)
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `arr` | `Uint8Array` |
-
-#### Returns
-
-[`PublicKey`](PublicKey.md)
-
-#### Defined in
-
-[types/primitives.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L26)
+[types/publicKey.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L60)

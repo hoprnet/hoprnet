@@ -22,7 +22,7 @@ async function handleAcknowledgement(
   onAcknowledgement: OnAcknowledgement,
   onWinningTicket: OnWinningTicket,
   onOutOfCommitments: OnOutOfCommitments
-) {
+): Promise<void> {
   const acknowledgement = Acknowledgement.deserialize(msg, pubKey, remotePeer)
 
   // There are three cases:
@@ -74,7 +74,15 @@ async function handleAcknowledgement(
   }
   const response = unacknowledged.getResponse(acknowledgement.ackKeyShare)
   const ticket = unacknowledged.ticket
-  const opening = await findCommitmentPreImage(db, channelId)
+  let opening: Hash
+  try {
+    opening = await findCommitmentPreImage(db, channelId)
+  } catch (err) {
+    log(`Channel ${channelId.toHex()} is out of commitments`)
+    onOutOfCommitments(channelId)
+    // TODO: How should we handle this ticket?
+    return
+  }
 
   if (!ticket.isWinningTicket(opening, response, ticket.winProb)) {
     log(`Got a ticket that is not a win. Dropping ticket.`)
@@ -89,21 +97,17 @@ async function handleAcknowledgement(
   try {
     await db.replaceUnAckWithAck(acknowledgement.ackChallenge, ack)
     log(`Stored winning ticket`)
-  } catch (e) {
-    log(`ERROR: commitment could not be bumped ${e}, thus dropping ticket`)
+  } catch (err) {
+    log(`ERROR: commitment could not be bumped, thus dropping ticket`, err)
   }
 
-  try {
-    await bumpCommitment(db, channelId)
-  } catch (err) {
-    log(`Channel ${channelId.toHex()} is out of commitments`)
-    onOutOfCommitments(channelId)
-  }
+  // store commitment in db
+  await bumpCommitment(db, channelId, opening)
 
   onWinningTicket(ack)
 }
 
-export function subscribeToAcknowledgements(
+export async function subscribeToAcknowledgements(
   subscribe: Subscribe,
   db: HoprDB,
   pubKey: PeerId,
@@ -112,12 +116,13 @@ export function subscribeToAcknowledgements(
   onOutOfCommitments: OnOutOfCommitments,
   protocolAck: string
 ) {
-  const limitConcurrency = oneAtATime()
-  subscribe(
+  const limitConcurrency = oneAtATime<void>()
+  await subscribe(
     protocolAck,
     (msg: Uint8Array, remotePeer: PeerId) =>
-      limitConcurrency(() =>
-        handleAcknowledgement(msg, remotePeer, pubKey, db, onAcknowledgement, onWinningTicket, onOutOfCommitments)
+      limitConcurrency(
+        (): Promise<void> =>
+          handleAcknowledgement(msg, remotePeer, pubKey, db, onAcknowledgement, onWinningTicket, onOutOfCommitments)
       ),
     false,
     (err: any) => {
@@ -126,24 +131,22 @@ export function subscribeToAcknowledgements(
   )
 }
 
-export function sendAcknowledgement(
+export async function sendAcknowledgement(
   packet: Packet,
   destination: PeerId,
   sendMessage: SendMessage,
   privKey: PeerId,
   protocolAck: string
-): void {
-  ;(async () => {
-    const ack = packet.createAcknowledgement(privKey)
+): Promise<void> {
+  const ack = packet.createAcknowledgement(privKey)
 
-    try {
-      await sendMessage(destination, protocolAck, ack.serialize(), false, {
-        timeout: ACKNOWLEDGEMENT_TIMEOUT
-      })
-    } catch (err) {
-      // Currently unclear how to proceed if sending acknowledgements
-      // fails
-      log(`Error: could not send acknowledgement`, err)
-    }
-  })()
+  try {
+    await sendMessage(destination, protocolAck, ack.serialize(), false, {
+      timeout: ACKNOWLEDGEMENT_TIMEOUT
+    })
+  } catch (err) {
+    // Currently unclear how to proceed if sending acknowledgements
+    // fails
+    log(`Error: could not send acknowledgement`, err)
+  }
 }

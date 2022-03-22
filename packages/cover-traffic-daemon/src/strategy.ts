@@ -40,7 +40,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
   async tick(
     balance: BN,
     currentChannels: ChannelEntry[],
-    peers: any,
+    peers: Hopr['networkPeers'],
     _getRandomChannel: () => Promise<ChannelEntry>
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
     log(`tick, balance ${balance.toString()}`)
@@ -54,7 +54,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
       if (c.status === ChannelStatus.Closed) {
         continue
       }
-      const q = await peers.qualityOf(c.destination)
+      const q = peers.qualityOf(c.destination.toPeerId())
       ctChannels.push({
         destination: c.destination,
         latestQualityOf: q,
@@ -67,7 +67,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
         toClose.push(c.destination)
       }
       // If the HOPR token balance of the current CT node is no larger than the `MINIMUM_STAKE_BEFORE_CLOSURE`, close all the non-closed channels.
-      if (c.balance.toBN().lte(MINIMUM_STAKE_BEFORE_CLOSURE)) {
+      if (c.balance.toBN().lt(MINIMUM_STAKE_BEFORE_CLOSURE)) {
         log(`closing channel with balance too low ${c.destination.toB58String()}`)
         toClose.push(c.destination)
       }
@@ -94,8 +94,8 @@ export class CoverTrafficStrategy extends SaneDefaults {
           sendCTMessage(
             openChannel.destination,
             this.selfPub,
-            async (path: PublicKey[]) => {
-              await this.node.sendMessage(new Uint8Array(1), this.selfPub.toPeerId(), path)
+            async (message: Uint8Array, path: PublicKey[]) => {
+              await this.node.sendMessage(message, this.selfPub.toPeerId(), path)
             },
             this.data
           ).then((success) => {
@@ -106,40 +106,44 @@ export class CoverTrafficStrategy extends SaneDefaults {
                 )}`
               )
               this.data.incrementMessageFails(openChannel.destination)
+            } else {
+              this.data.incrementMessageTotalSuccess()
             }
           })
-        } else if (
-          channel &&
-          channel.status == ChannelStatus.WaitingForCommitment &&
-          Date.now() - openChannel.openFrom >= CT_CHANNEL_STALL_TIMEOUT
-        ) {
-          // handle waiting for commitment stalls
-          log('channel is stalled in WAITING_FOR_COMMITMENT, closing', openChannel.destination.toB58String())
-          toClose.push(openChannel.destination)
+        } else if (channel && channel.status == ChannelStatus.WaitingForCommitment) {
+          if (Date.now() - openChannel.openFrom >= CT_CHANNEL_STALL_TIMEOUT) {
+            // handle waiting for commitment stalls
+            log('channel is stalled in WAITING_FOR_COMMITMENT, closing', openChannel.destination.toB58String())
+            toClose.push(openChannel.destination)
+          } else {
+            log('channel is WAITING_FOR_COMMITMENT, waiting', openChannel.destination.toB58String())
+          }
         } else {
           log(
-            `Unknown error in sending traffic. Channel is ${channel.status}; openChannel is ${JSON.stringify({
-              ...openChannel,
-              destination: openChannel.destination.toB58String()
-            })}`
+            `Unknown error with open CT channels. Channel is ${
+              channel.status
+            }; openChannel is to ${openChannel.destination.toB58String()} since ${openChannel.openFrom} with quality ${
+              openChannel.latestQualityOf
+            }`
           )
         }
       }
     } else {
       log('aborting send messages - less channels in network than hops required')
     }
-    log('message send phase complete')
+    log(`message send phase complete for ${state.ctChannels.length} ctChannels`)
 
     let attempts = 0
+    let currentChannelNum = currentChannels.length
     // When there is no enough cover traffic channels, providing node exists and adequete past attempts, the node will open some channels.
     while (
-      currentChannels.length < CHANNELS_PER_COVER_TRAFFIC_NODE &&
+      currentChannelNum < CHANNELS_PER_COVER_TRAFFIC_NODE &&
       Object.keys(state.nodes).length > 0 &&
       attempts < 100
     ) {
       attempts++
       const c = this.data.weightedRandomChoice()
-      const q = await peers.qualityOf(c)
+      const q = peers.qualityOf(c.toPeerId())
       // Ignore the randomly chosen node, if it's the cover traffic node itself, or a non-closed channel exists
       if (
         ctChannels.find((x) => x.destination.eq(c)) ||
@@ -157,6 +161,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
       }
 
       log(`opening ${c.toB58String()}`)
+      currentChannelNum++
       toOpen.push([c, CHANNEL_STAKE])
     }
 

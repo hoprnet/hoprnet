@@ -105,7 +105,7 @@ function parseCircuitAddress(maTuples: [code: number, addr: Uint8Array][]): Pars
 }
 
 /**
- * Checks and parses a given direct address
+ * Checks and parses a given direct TCP address
  * @param maTuples tuples of a Multiaddr
  */
 function parseDirectAddress(maTuples: [code: number, addr: Uint8Array][]): ParseResult<DirectAddress> {
@@ -114,7 +114,7 @@ function parseDirectAddress(maTuples: [code: number, addr: Uint8Array][]): Parse
     maTuples[0].length < 2 ||
     ![CODE_IP4, CODE_IP6].includes(maTuples[0][0]) ||
     maTuples[1].length < 2 ||
-    maTuples[1][0] != CODE_TCP ||
+    maTuples[1][0] != CODE_TCP || // TODO: We should also consider UDP a valid direct address here
     maTuples[1][1].length == 0
   ) {
     return { valid: false }
@@ -172,4 +172,27 @@ export function parseAddress(ma: Multiaddr): ParseResult<ValidAddress> {
     default:
       return { valid: false }
   }
+}
+
+/**
+ * Compares the IP addresses and destination ports of two direct multi-addresses (non-circuit ones).
+ * @param a Multiaddr 1
+ * @param b Multiaddr 2
+ */
+export function compareDirectConnectionInfo(a: Multiaddr, b: Multiaddr): boolean {
+  const va1 = parseAddress(a)
+  const va2 = parseAddress(b)
+
+  if (!va1.valid || !va2.valid) return false
+
+  if (va1.address.type != va2.address.type) return false
+
+  if (va1.address.type == 'p2p') return false
+
+  if (va1.address.type == va2.address.type)
+    return Buffer.compare(va1.address.address, va2.address.address) == 0 && va1.address.port == va2.address.port
+
+  // TODO: We should also compare protocol (TCP/UDP)
+
+  return false
 }

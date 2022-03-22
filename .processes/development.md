@@ -1,8 +1,8 @@
-# Development Processes
+# Development Process
 
-The HOPR Association _tech_ members and [Project Owner](#legend) have agreed on the following development processes to streamline the implementation of the HOPR protocol.
+The purpose of this process is to streamline the development of the HOPR protocol.
 
-- [Development Processes](#development-processes)
+- [Development Process](#development-process)
   - [Legend](#legend)
     - [Representantives](#representantives)
     - [Trifecta](#trifecta)
@@ -36,24 +36,23 @@ The HOPR Association _tech_ members and [Project Owner](#legend) have agreed on 
 | ------------------- | ---------------------------------------------------------------------------------------------------------- |
 | Project Owner       | A HOPR member which ensures epics prioritized are in line with both the short and long term vision of HOPR |
 | Process Facilitator | A HOPR member which ensures agreed processes are followed                                                  |
-| Representantives    | Two tech members elected to be the bridge between tech team and Project Owner                              |
+| Representantives    | Two tech members who act as the bridge between tech team and Project Owner                                 |
 | Trifecta            | Representantives + Project Owner                                                                           |
 | Issue tracker       | The sole issue tracker is [GitHub](https://github.com/hoprnet)                                             |
 
 ### Representatives
-
-Each individual representantive is elected for a period of `3 months`. The periods are overlapped to create a staggered schedule during which new representatives can be guided by their co-representatives who have already served half of their election period. Previous representatives may be re-elected.
 
 Responsibilities:
 
 - to be the bridge between tech team and Project Owner
 - daily check for community created tasks in [hopr-devrel](https://github.com/hoprnet/hopr-devrel)
 - daily check for new [unreleased tokens](../UNRELEASED_TOKENS.md) emails send to `tech@hoprnet.org`
+- review tech related bounties ([read more](./bounty.md))
 
-_Current:_
+_Roles:_
 
-- [Tino](https://github.com/tolbrino) until 05/02/2022
-- [Robert](https://github.com/robertkiel) until 04/03/2022
+- [Tino](https://github.com/tolbrino) acting as Tech Coordinator
+- [Steven](https://github.com/nionis) acting as Process and Bounty Coordinator
 
 ### Trifecta
 
@@ -94,9 +93,9 @@ _Where:_ Google meet
 
 ### End of working day
 
-At the end of every working day, members may write an update on what they have accomplished during the day.
+At the end of every working day, members write an update on what they have accomplished during the day.
 
-_Required:_ `False`
+_Required:_ `True`
 
 _When:_ Every day, at end of work
 
@@ -259,6 +258,7 @@ All HOPR repositories must support at most these issue templates, more templates
 - [Bug Template](./.github/ISSUE_TEMPLATE/bug.md)
 - [Feature Template](./.github/ISSUE_TEMPLATE/feature.md)
 - [Custom Template](./.github/ISSUE_TEMPLATE/custom.md)
+- [Bounty Template](./.github/ISSUE_TEMPLATE/bounty.md) ([learn more](./bounty.md))
 
 - A _tech_ member, or an external contributor creates an issue using one of our templates, these templates may add some labels by default.
 - All new issues created by external contributors will contain a `new issue` label.
@@ -287,6 +287,7 @@ Since PRs should link to an issue, it's not necessary to label PRs. However, som
 - All PR‘s must pass all status checks/tests before merging.
 - Releases can be merged back to `master`, but not always necessary.
 - When in conflict, chat and engage with the team.
+- When creating a PR, also update the changelog at `CHANGELOG.md` with a one-line high level summary and a reference to the PR or respective issue on Github.
 
 ### Workflow
 
@@ -334,7 +335,7 @@ Since PRs should link to an issue, it's not necessary to label PRs. However, som
 
 #### Releases
 
-See [Release Processes](./release.md)
+See [Release Process](./release.md)
 
 ### Branches
 
@@ -343,4 +344,4 @@ See [Release Processes](./release.md)
 
 - `release/**`: On new internal release, we cut a `release/**`
   branch, using an internal **city** name to identify the release.
-  See [Release Processes](./release.md) for more info.
+  See [Release Process](./release.md) for more info.

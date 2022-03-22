@@ -1,9 +1,6 @@
-import { networkInterfaces } from 'os'
-import type { NetworkInterfaceInfo } from 'os'
+import { networkInterfaces, type NetworkInterfaceInfo } from 'os'
 import { isLocalhost, ipToU8aAddress, isPrivateAddress, isLinkLocaleAddress } from '@hoprnet/hopr-utils'
 
-import { nodeToMultiaddr } from '../utils'
-import { Multiaddr } from 'multiaddr'
 import Debug from 'debug'
 const log = Debug('hopr-connect')
 
@@ -14,6 +11,12 @@ type AddrOptions = {
   includePrivateIPv4?: boolean
   includeLocalhostIPv4?: boolean
   includeLocalhostIPv6?: boolean
+}
+
+type AddressType = {
+  address: string
+  family: 'IPv4' | 'IPv6'
+  port: number
 }
 
 function validateOptions(opts: AddrOptions) {
@@ -34,8 +37,14 @@ function validateOptions(opts: AddrOptions) {
   }
 }
 
-function getAddrsOfInterface(iface: string) {
-  let ifaceAddrs = networkInterfaces()[iface]
+/**
+ * Checks the OS's network interfaces and returns the addresses of the requested interface
+ * @param iface interface to use, e.g. `eth0`
+ * @param __fakeInterfaces [testing] overwrite Node.js library function with test input
+ * @returns
+ */
+function getAddrsOfInterface(iface: string, __fakeInterfaces?: ReturnType<typeof networkInterfaces>) {
+  let ifaceAddrs = __fakeInterfaces ? __fakeInterfaces[iface] : networkInterfaces()[iface]
 
   if (ifaceAddrs == undefined) {
     log(
@@ -46,26 +55,33 @@ function getAddrsOfInterface(iface: string) {
     return []
   }
 
-  return ifaceAddrs
+  return ifaceAddrs ?? []
 }
 
+/**
+ * Checks the OS's network interfaces and return all desired addresses, such as local IPv4 addresses,
+ * public IPv6 addresses etc.
+ * @param port port to use
+ * @param options which addresses to use
+ * @param __fakeInterfaces [testing] overwrite Node.js library function with test input
+ * @returns
+ */
 export function getAddrs(
   port: number,
-  peerId: string,
   options: AddrOptions,
   __fakeInterfaces?: ReturnType<typeof networkInterfaces>
-) {
+): AddressType[] {
   validateOptions(options)
 
   let interfaces: (NetworkInterfaceInfo[] | undefined)[]
 
   if (options?.interface) {
-    interfaces = [getAddrsOfInterface(options.interface)]
+    interfaces = [getAddrsOfInterface(options.interface, __fakeInterfaces)]
   } else {
     interfaces = Object.values(__fakeInterfaces ?? networkInterfaces())
   }
 
-  const multiaddrs: Multiaddr[] = []
+  const multiaddrs: AddressType[] = []
 
   for (const iface of interfaces) {
     if (iface == undefined) {
@@ -102,9 +118,7 @@ export function getAddrs(
         continue
       }
 
-      multiaddrs.push(
-        Multiaddr.fromNodeAddress(nodeToMultiaddr({ ...address, port }), 'tcp').encapsulate(`/p2p/${peerId}`)
-      )
+      multiaddrs.push({ ...address, port })
     }
   }
 

@@ -6,7 +6,6 @@
 
 ### Classes
 
-- [HoprOptions](classes/HoprOptions.md)
 - [PassiveStrategy](classes/PassiveStrategy.md)
 - [PromiscuousStrategy](classes/PromiscuousStrategy.md)
 - [SaneDefaults](classes/SaneDefaults.md)
@@ -16,6 +15,7 @@
 
 - [ChannelsToClose](modules.md#channelstoclose)
 - [ChannelsToOpen](modules.md#channelstoopen)
+- [HoprOptions](modules.md#hoproptions)
 - [NodeStatus](modules.md#nodestatus)
 - [ResolvedEnvironment](modules.md#resolvedenvironment)
 - [SendMessage](modules.md#sendmessage)
@@ -25,7 +25,6 @@
 
 - [ACKNOWLEDGEMENT\_TIMEOUT](modules.md#acknowledgement_timeout)
 - [CHECK\_TIMEOUT](modules.md#check_timeout)
-- [DEFAULT\_STUN\_PORT](modules.md#default_stun_port)
 - [FULL\_VERSION](modules.md#full_version)
 - [HEARTBEAT\_INTERVAL](modules.md#heartbeat_interval)
 - [HEARTBEAT\_INTERVAL\_VARIANCE](modules.md#heartbeat_interval_variance)
@@ -34,18 +33,17 @@
 - [MAX\_HOPS](modules.md#max_hops)
 - [MAX\_NEW\_CHANNELS\_PER\_TICK](modules.md#max_new_channels_per_tick)
 - [MAX\_PACKET\_DELAY](modules.md#max_packet_delay)
-- [MAX\_PARALLEL\_CONNECTIONS](modules.md#max_parallel_connections)
 - [MAX\_PATH\_ITERATIONS](modules.md#max_path_iterations)
 - [NETWORK\_QUALITY\_THRESHOLD](modules.md#network_quality_threshold)
 - [PACKET\_SIZE](modules.md#packet_size)
 - [PATH\_RANDOMNESS](modules.md#path_randomness)
 - [VERSION](modules.md#version)
-- [libp2pMock](modules.md#libp2pmock)
 - [sampleOptions](modules.md#sampleoptions)
 
 ### Functions
 
 - [createHoprNode](modules.md#createhoprnode)
+- [createLibp2pMock](modules.md#createlibp2pmock)
 - [findPath](modules.md#findpath)
 - [resolveEnvironment](modules.md#resolveenvironment)
 - [supportedEnvironments](modules.md#supportedenvironments)
@@ -72,13 +70,49 @@ ___
 
 ___
 
+### HoprOptions
+
+Ƭ **HoprOptions**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `allowLocalConnections?` | `boolean` |
+| `allowPrivateConnections?` | `boolean` |
+| `announce?` | `boolean` |
+| `connector?` | `HoprCoreEthereum` |
+| `createDbIfNotExist?` | `boolean` |
+| `dataPath` | `string` |
+| `environment` | [`ResolvedEnvironment`](modules.md#resolvedenvironment) |
+| `forceCreateDB?` | `boolean` |
+| `heartbeatInterval?` | `number` |
+| `heartbeatVariance?` | `number` |
+| `hosts?` | { `ip4?`: `NetOptions` ; `ip6?`: `NetOptions`  } |
+| `hosts.ip4?` | `NetOptions` |
+| `hosts.ip6?` | `NetOptions` |
+| `password?` | `string` |
+| `strategy?` | `ChannelStrategy` |
+| `testing?` | { `announceLocalAddresses?`: `boolean` ; `noDirectConnections?`: `boolean` ; `noUPNP?`: `boolean` ; `noWebRTCUpgrade?`: `boolean` ; `preferLocalAddresses?`: `boolean`  } |
+| `testing.announceLocalAddresses?` | `boolean` |
+| `testing.noDirectConnections?` | `boolean` |
+| `testing.noUPNP?` | `boolean` |
+| `testing.noWebRTCUpgrade?` | `boolean` |
+| `testing.preferLocalAddresses?` | `boolean` |
+
+#### Defined in
+
+[packages/core/src/index.ts:86](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L86)
+
+___
+
 ### NodeStatus
 
 Ƭ **NodeStatus**: ``"UNINITIALIZED"`` \| ``"INITIALIZING"`` \| ``"RUNNING"`` \| ``"DESTROYED"``
 
 #### Defined in
 
-[packages/core/src/index.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L97)
+[packages/core/src/index.ts:127](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L127)
 
 ___
 
@@ -98,7 +132,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/environment.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L28)
+[packages/core/src/environment.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L27)
 
 ___
 
@@ -108,17 +142,17 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:112](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L112)
+[packages/core/src/index.ts:142](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L142)
 
 ___
 
 ### Subscribe
 
-Ƭ **Subscribe**: (`protocol`: `string`, `handler`: `LibP2PHandlerFunction`<`Promise`<`void`\>\>, `includeReply`: ``false``, `errHandler`: (`err`: `any`) => `void`) => `void` & (`protocol`: `string`, `handler`: `LibP2PHandlerFunction`<`Promise`<`Uint8Array`\>\>, `includeReply`: ``true``, `errHandler`: (`err`: `any`) => `void`) => `void`
+Ƭ **Subscribe**: (`protocol`: `string`, `handler`: `LibP2PHandlerFunction`<`Promise`<`void`\> \| `void`\>, `includeReply`: ``false``, `errHandler`: (`err`: `any`) => `void`) => `void` & (`protocol`: `string`, `handler`: `LibP2PHandlerFunction`<`Promise`<`Uint8Array`\>\>, `includeReply`: ``true``, `errHandler`: (`err`: `any`) => `void`) => `void`
 
 #### Defined in
 
-[packages/core/src/index.ts:99](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L99)
+[packages/core/src/index.ts:129](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L129)
 
 ## Variables
 
@@ -128,7 +162,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L29)
+[packages/core/src/constants.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L26)
 
 ___
 
@@ -138,17 +172,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L28)
-
-___
-
-### DEFAULT\_STUN\_PORT
-
-• **DEFAULT\_STUN\_PORT**: ``3478``
-
-#### Defined in
-
-[packages/core/src/constants.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L10)
+[packages/core/src/constants.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L25)
 
 ___
 
@@ -164,11 +188,11 @@ ___
 
 ### HEARTBEAT\_INTERVAL
 
-• **HEARTBEAT\_INTERVAL**: ``3000``
+• **HEARTBEAT\_INTERVAL**: ``30000``
 
 #### Defined in
 
-[packages/core/src/constants.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L12)
+[packages/core/src/constants.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L13)
 
 ___
 
@@ -178,17 +202,17 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L13)
+[packages/core/src/constants.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L14)
 
 ___
 
 ### HEARTBEAT\_TIMEOUT
 
-• **HEARTBEAT\_TIMEOUT**: ``4000``
+• **HEARTBEAT\_TIMEOUT**: ``6000``
 
 #### Defined in
 
-[packages/core/src/constants.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L17)
+[packages/core/src/constants.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L12)
 
 ___
 
@@ -198,7 +222,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L21)
+[packages/core/src/constants.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L18)
 
 ___
 
@@ -208,7 +232,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L26)
+[packages/core/src/constants.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L23)
 
 ___
 
@@ -218,7 +242,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L25)
+[packages/core/src/constants.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L22)
 
 ___
 
@@ -228,17 +252,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L19)
-
-___
-
-### MAX\_PARALLEL\_CONNECTIONS
-
-• **MAX\_PARALLEL\_CONNECTIONS**: ``5``
-
-#### Defined in
-
-[packages/core/src/constants.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L15)
+[packages/core/src/constants.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L16)
 
 ___
 
@@ -248,7 +262,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L23)
+[packages/core/src/constants.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L20)
 
 ___
 
@@ -258,7 +272,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L24)
+[packages/core/src/constants.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L21)
 
 ___
 
@@ -278,7 +292,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L22)
+[packages/core/src/constants.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L19)
 
 ___
 
@@ -292,19 +306,9 @@ ___
 
 ___
 
-### libp2pMock
-
-• **libp2pMock**: `Libp2p` = `libp2p`
-
-#### Defined in
-
-[packages/core/src/libp2p.mock.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/libp2p.mock.ts#L45)
-
-___
-
 ### sampleOptions
 
-• **sampleOptions**: [`HoprOptions`](classes/HoprOptions.md)
+• **sampleOptions**: `Partial`<[`HoprOptions`](modules.md#hoproptions)\>
 
 #### Defined in
 
@@ -321,7 +325,7 @@ ___
 | Name | Type | Default value |
 | :------ | :------ | :------ |
 | `peerId` | `PeerId` | `undefined` |
-| `options` | [`HoprOptions`](classes/HoprOptions.md) | `undefined` |
+| `options` | [`HoprOptions`](modules.md#hoproptions) | `undefined` |
 | `automaticChainCreation` | `boolean` | `true` |
 
 #### Returns
@@ -330,7 +334,27 @@ ___
 
 #### Defined in
 
-[packages/core/src/main.ts:91](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L91)
+[packages/core/src/main.ts:168](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L168)
+
+___
+
+### createLibp2pMock
+
+▸ **createLibp2pMock**(`peerId`): `LibP2P`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `peerId` | `PeerId` |
+
+#### Returns
+
+`LibP2P`
+
+#### Defined in
+
+[packages/core/src/libp2p.mock.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/libp2p.mock.ts#L11)
 
 ___
 
@@ -382,7 +406,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/environment.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L42)
+[packages/core/src/environment.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L41)
 
 ___
 
@@ -396,4 +420,4 @@ ___
 
 #### Defined in
 
-[packages/core/src/environment.ts:36](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L36)
+[packages/core/src/environment.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L35)

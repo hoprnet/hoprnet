@@ -273,6 +273,42 @@ describe('test webrtc connection', function () {
       )
     )
   })
+
+  it('use abortController to end stream', async function () {
+    const AliceBob = Pair<StreamType>()
+    const BobAlice = Pair<StreamType>()
+
+    const webRTCInstance = new EventEmitter()
+
+    Object.assign(webRTCInstance, {
+      destroy: () => {}
+    })
+
+    const abort = new AbortController()
+
+    const conn = new WebRTCConnection(
+      Bob,
+      { connections: new Map() } as any,
+      {
+        source: BobAlice.source,
+        sink: AliceBob.sink
+      } as any,
+      webRTCInstance as any,
+      {
+        signal: abort.signal
+      }
+    )
+
+    await assert.doesNotReject(
+      async () =>
+        await conn.sink(
+          (async function* () {
+            abort.abort()
+            yield new TextEncoder().encode('dummy message')
+          })()
+        )
+    )
+  })
 })
 
 describe('webrtc connection - stream error propagation', function () {

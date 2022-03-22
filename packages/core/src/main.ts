@@ -1,14 +1,18 @@
-import LibP2P from 'libp2p'
-import { AddressSorter, expandVars, HoprDB, localAddressesFirst, PublicKey } from '@hoprnet/hopr-utils'
+import path from 'path'
+import { mkdir } from 'fs/promises'
+
+import { default as LibP2P, type Connection } from 'libp2p'
+import { LevelDatastore } from 'datastore-level'
+import { type AddressSorter, expandVars, HoprDB, localAddressesFirst, PublicKey } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
-import MPLEX from 'libp2p-mplex'
+const Mplex = require('libp2p-mplex')
 import KadDHT from 'libp2p-kad-dht'
 import { NOISE } from '@chainsafe/libp2p-noise'
 import type PeerId from 'peer-id'
 import { debug } from '@hoprnet/hopr-utils'
-import Hopr, { HoprOptions, VERSION } from '.'
+import Hopr, { type HoprOptions } from '.'
 import { getAddrs } from './identity'
-import HoprConnect, { type HoprConnectOptions, type PublicNodesEmitter } from '@hoprnet/hopr-connect'
+import HoprConnect, { type HoprConnectConfig, type PublicNodesEmitter } from '@hoprnet/hopr-connect'
 import type { Multiaddr } from 'multiaddr'
 
 const log = debug(`hopr-core:create-hopr`)
@@ -26,58 +30,131 @@ export async function createLibp2pInstance(
   peerId: PeerId,
   options: HoprOptions,
   initialNodes: { id: PeerId; multiaddrs: Multiaddr[] }[],
-  publicNodesEmitter: PublicNodesEmitter
+  publicNodes: PublicNodesEmitter
 ): Promise<LibP2P> {
   let addressSorter: AddressSorter
-  if (options.preferLocalAddresses) {
+
+  if (options.testing?.preferLocalAddresses) {
     addressSorter = localAddressesFirst
     log('Preferring local addresses')
   } else {
-    // Overwrite libp2p's default addressSorter to make
-    // sure it doesn't fail on HOPR-flavored addresses
-    addressSorter = (x) => x
+    // Overwrite address sorter with identity function since
+    // libp2p's own address sorter function is unable to handle
+    // p2p addresses, e.g. /p2p/<RELAY>/p2p-circuit/p2p/<DESTINATION>
+    addressSorter = (addr) => addr
     log('Addresses are sorted by default')
   }
+
+  // Store the peerstore on-disk under the main data path. Ensure store is
+  // opened before passing it to libp2p.
+  const datastorePath = path.join(options.dataPath, 'peerstore')
+  await mkdir(datastorePath, { recursive: true })
+  const datastore = new LevelDatastore(datastorePath, { createIfMissing: true })
+  await datastore.open()
+
+  log(`using peerstore at ${datastorePath}`)
+
   const libp2p = await LibP2P.create({
     peerId,
     addresses: { listen: getAddrs(peerId, options).map((x) => x.toString()) },
     // libp2p modules
     modules: {
-      transport: [HoprConnect as any], // TODO re https://github.com/hoprnet/hopr-connect/issues/78
-      streamMuxer: [MPLEX],
-      connEncryption: [NOISE],
+      transport: [HoprConnect as any],
+      streamMuxer: [Mplex],
+      connEncryption: [NOISE as any],
       dht: KadDHT
     },
+    // Configure peerstore to be persisted using LevelDB, also requires config
+    // persistence to be set.
+    datastore,
+    peerStore: {
+      persistence: true
+    },
     config: {
-      // @ts-ignore
-      protocolPrefix: 'hopr',
+      protocolPrefix: `hopr/${options.environment.id}`,
       transport: {
         HoprConnect: {
-          initialNodes,
-          publicNodes: publicNodesEmitter,
-          // Tells hopr-connect to treat local and private addresses
-          // as public addresses
-          __useLocalAddresses: options.announceLocalAddresses
-          // @dev Use these settings to simulate NAT behavior
-          // __noDirectConnections: true,
-          // __noWebRTCUpgrade: false
-        } as HoprConnectOptions
+          config: {
+            initialNodes,
+            publicNodes,
+            environment: options.environment.id,
+            allowLocalConnections: options.allowLocalConnections,
+            allowPrivateConnections: options.allowPrivateConnections,
+            // Amount of nodes for which we are willing to act as a relay
+            maxRelayedConnections: 50_000
+          },
+          testing: {
+            // Treat local and private addresses as public addresses
+            __useLocalAddresses: options.testing?.announceLocalAddresses,
+            // Use local addresses to dial other nodes and reply to
+            // STUN queries with local and private addresses
+            __preferLocalAddresses: options.testing?.preferLocalAddresses,
+            // Prevent nodes from dialing each other directly
+            // but allow direct connection towards relays
+            __noDirectConnections: options.testing?.noDirectConnections,
+            // Do not upgrade to a direct WebRTC connection, even if it
+            // is available. Used to test behavior of bidirectional NATs
+            __noWebRTCUpgrade: options.testing?.noWebRTCUpgrade,
+            // Prevent usage of UPNP to determine external IP address
+            __noUPNP: options.testing?.noUPNP
+          }
+        } as HoprConnectConfig
       },
       dht: {
-        enabled: true
+        enabled: true,
+        // Feed DHT with all previously announced nodes
+        // @ts-ignore
+        bootstrapPeers: initialNodes
       },
       relay: {
+        // Conflicts with HoprConnect's own mechanism
         enabled: false
       },
-      peerDiscovery: {
-        autoDial: false
+      nat: {
+        // Conflicts with HoprConnect's own mechanism
+        enabled: false
       }
     },
     dialer: {
+      // Use custom sorting to prevent from problems with libp2p
+      // and HOPR's relay addresses
       addressSorter,
-      maxDialsPerPeer: 100
+      // Don't try to dial a peer using multiple addresses in parallel
+      maxDialsPerPeer: 1,
+      // If we are a public node, assume that our system is able to handle
+      // more connections
+      maxParallelDials: options.announce ? 250 : 50,
+      // default timeout of 30s appears to be too long
+      dialTimeout: 10e3
     }
   })
+
+  // Isolate DHTs
+  const DHT_WAN_PREFIX = libp2p._dht._wan._protocol
+  const DHT_LAN_PREFIX = libp2p._dht._lan._protocol
+
+  if (DHT_WAN_PREFIX !== '/ipfs/kad/1.0.0' || DHT_LAN_PREFIX !== '/ipfs/lan/kad/1.0.0') {
+    throw Error(`Libp2p DHT implementation has changed. Cannot set DHT environments`)
+  }
+
+  const HOPR_DHT_WAN_PROTOCOL = `/hopr/${options.environment.id}/kad/1.0.0`
+  libp2p._dht._wan._protocol = HOPR_DHT_WAN_PROTOCOL
+  libp2p._dht._wan._network._protocol = HOPR_DHT_WAN_PROTOCOL
+  libp2p._dht._wan._topologyListener._protocol = HOPR_DHT_WAN_PROTOCOL
+
+  const HOPR_DHT_LAN_PROTOCOL = `/hopr/${options.environment.id}/lan/kad/1.0.0`
+  libp2p._dht._lan._protocol = HOPR_DHT_LAN_PROTOCOL
+  libp2p._dht._lan._network._protocol = HOPR_DHT_LAN_PROTOCOL
+  libp2p._dht._lan._topologyListener._protocol = HOPR_DHT_LAN_PROTOCOL
+
+  const onConnection = libp2p.upgrader.onConnection
+
+  // @TODO implement whitelisting support
+  libp2p.upgrader.onConnection = (conn: Connection) => {
+    // if (isWhitelisted()) {
+    onConnection(conn)
+    // }
+  }
   return libp2p
 }
 
@@ -96,16 +173,10 @@ export async function createHoprNode(
   const db = new HoprDB(PublicKey.fromPrivKey(peerId.privKey.marshal()))
 
   try {
-    await db.init(options.createDbIfNotExist, VERSION, options.dbPath, options.forceCreateDB, options.environment.id)
-  } catch (err) {
-    log(`failed init db: ${err.toString()}`)
-    throw err
-  }
-
-  try {
-    await db.verifyEnvironmentId(options.environment.id)
-  } catch (err) {
-    log(`failed to verify db: ${err.toString()}`)
+    const dbPath = path.join(options.dataPath, 'db')
+    await db.init(options.createDbIfNotExist, dbPath, options.forceCreateDB, options.environment.id)
+  } catch (err: unknown) {
+    log(`failed init db:`, err)
     throw err
   }
 
@@ -118,12 +189,16 @@ export async function createHoprNode(
     {
       chainId: options.environment.network.chain_id,
       environment: options.environment.id,
-      gasPrice: options.environment.network.gasPrice,
+      gasPrice: options.environment.network.gas_price,
       network: options.environment.network.id,
       provider
     },
     automaticChainCreation
   )
+
+  // Initialize connection to the blockchain
+  await chain.initializeChainWrapper()
+
   const node = new Hopr(peerId, db, chain, options)
   return node
 }

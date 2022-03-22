@@ -1,14 +1,12 @@
-import libp2p from 'libp2p'
-import type { Connection, HandlerProps } from 'libp2p'
+import { default as libp2p, type Connection, type HandlerProps } from 'libp2p'
 import { durations } from '@hoprnet/hopr-utils'
 import fs from 'fs'
+import { setTimeout } from 'timers/promises'
 
 import { NOISE } from '@chainsafe/libp2p-noise'
+const Mplex = require('libp2p-mplex')
 
-const MPLEX = require('libp2p-mplex')
-
-import HoprConnect from '@hoprnet/hopr-connect'
-import type { HoprConnectOptions } from '@hoprnet/hopr-connect'
+import { default as HoprConnect, type HoprConnectConfig } from '@hoprnet/hopr-connect'
 import { Multiaddr } from 'multiaddr'
 import pipe from 'it-pipe'
 import yargs from 'yargs/yargs'
@@ -61,36 +59,25 @@ function createDeadEnd(remoteIdentityname: string, pipeFileStream?: WriteStream)
   }
 }
 
-async function startNode({
-  peerId,
-  port,
-  bootstrapAddress,
-  noDirectConnections,
-  noWebRTCUpgrade,
-  pipeFileStream,
-  maxRelayedConnections,
-  relayFreeTimeout,
-  useLocalAddresses
-}: {
-  peerId: PeerId
-  port: number
-  bootstrapAddress?: PeerStoreType
-  noDirectConnections: boolean
-  noWebRTCUpgrade: boolean
-  pipeFileStream?: WriteStream
-  maxRelayedConnections?: number
-  relayFreeTimeout?: number
-  useLocalAddresses?: boolean
-}) {
-  console.log(`starting node, bootstrap address ${bootstrapAddress ? bootstrapAddress.id.toB58String() : 'undefined'}`)
-  const connectOpts: HoprConnectOptions = {
-    initialNodes: bootstrapAddress ? [bootstrapAddress] : [],
-    __noDirectConnections: noDirectConnections,
-    __noWebRTCUpgrade: noWebRTCUpgrade,
-    maxRelayedConnections,
-    __relayFreeTimeout: relayFreeTimeout,
-    __useLocalAddresses: useLocalAddresses
-  }
+async function startNode(
+  {
+    peerId,
+    port,
+    pipeFileStream
+  }: {
+    peerId: PeerId
+    port: number
+    pipeFileStream?: WriteStream
+  },
+  options: HoprConnectConfig
+) {
+  console.log(
+    `starting node, bootstrap address ${
+      options.config?.initialNodes != undefined && options.config?.initialNodes.length > 0
+        ? options.config.initialNodes[0].id.toB58String()
+        : 'undefined'
+    }`
+  )
 
   const node = await libp2p.create({
     peerId,
@@ -99,20 +86,24 @@ async function startNode({
     },
     modules: {
       transport: [HoprConnect as any],
-      streamMuxer: [MPLEX],
-      connEncryption: [NOISE]
+      streamMuxer: [Mplex],
+      connEncryption: [NOISE as any]
     },
     config: {
       transport: {
-        HoprConnect: connectOpts
+        HoprConnect: options
       },
       peerDiscovery: {
         autoDial: false
+      },
+      relay: {
+        // Conflicts with HoprConnect's own mechanism
+        enabled: false
+      },
+      nat: {
+        // Conflicts with HoprConnect's own mechanism
+        enabled: false
       }
-    },
-    dialer: {
-      // Temporary fix
-      addressSorter: (ma: any) => ma
     }
   })
 
@@ -170,12 +161,12 @@ async function executeCommands({
     switch (cmdDef.cmd) {
       case 'wait': {
         console.log(`waiting ${cmdDef.waitForSecs} secs`)
-        await new Promise((resolve) => setTimeout(resolve, durations.seconds(cmdDef.waitForSecs)))
+        await setTimeout(durations.seconds(cmdDef.waitForSecs))
         console.log(`finished waiting`)
         break
       }
       case 'dial': {
-        const targetPeerId = await peerIdForIdentity(cmdDef.targetIdentityName)
+        const targetPeerId = peerIdForIdentity(cmdDef.targetIdentityName)
         const targetAddress = new Multiaddr(`/ip4/127.0.0.1/tcp/${cmdDef.targetPort}/p2p/${targetPeerId.toB58String()}`)
         console.log(`dialing ${cmdDef.targetIdentityName}`)
         await node.dial(targetAddress)
@@ -184,8 +175,8 @@ async function executeCommands({
         break
       }
       case 'msg': {
-        const targetPeerId = await peerIdForIdentity(cmdDef.targetIdentityName)
-        const relayPeerId = await peerIdForIdentity(cmdDef.relayIdentityName)
+        const targetPeerId = peerIdForIdentity(cmdDef.targetIdentityName)
+        const relayPeerId = peerIdForIdentity(cmdDef.relayIdentityName)
 
         console.log(`msg: dialing ${cmdDef.targetIdentityName} though relay ${cmdDef.relayIdentityName}`)
         const { stream } = await node
@@ -210,7 +201,7 @@ async function executeCommands({
         break
       }
       case 'hangup': {
-        const targetPeerId = await peerIdForIdentity(cmdDef.targetIdentityName)
+        const targetPeerId = peerIdForIdentity(cmdDef.targetIdentityName)
         console.log(`hanging up on ${cmdDef.targetIdentityName}`)
         await node.hangUp(targetPeerId)
         console.log(`hanged up`)
@@ -253,10 +244,30 @@ function parseCLIOptions() {
       type: 'boolean',
       demandOption: true
     })
-    .option('useLocalAddress', {
+    .option('noUPNP', {
+      describe: '[testing] do not check UPNP',
+      type: 'boolean',
+      default: true
+    })
+    .option('preferLocalAddresses', {
       describe: '[testing] treat local address as public IP addresses',
       type: 'boolean',
       demandOption: true
+    })
+    .option('runningLocally', {
+      describe: '[testing] consider localhost as exposed host',
+      type: 'boolean',
+      default: false
+    })
+    .option('allowLocalNodeConnections', {
+      boolean: true,
+      describe: 'Allow connections to other nodes running on localhost.',
+      default: false
+    })
+    .option('allowPrivateNodeConnections', {
+      boolean: true,
+      describe: 'Allow connections to other nodes running on private addresses.',
+      default: false
     })
     .option('command', {
       describe: 'example: --command.name dial --command.targetIdentityName charly',
@@ -287,13 +298,13 @@ async function main() {
   let bootstrapAddress: PeerStoreType | undefined
 
   if (parsedOpts.bootstrapPort != null && parsedOpts.bootstrapIdentityName != null) {
-    const bootstrapPeerId = await peerIdForIdentity(parsedOpts.bootstrapIdentityName)
+    const bootstrapPeerId = peerIdForIdentity(parsedOpts.bootstrapIdentityName)
     bootstrapAddress = {
       id: bootstrapPeerId,
       multiaddrs: [new Multiaddr(`/ip4/127.0.0.1/tcp/${parsedOpts.bootstrapPort}/p2p/${bootstrapPeerId.toB58String()}`)]
     }
   }
-  const peerId = await peerIdForIdentity(parsedOpts.identityName)
+  const peerId = peerIdForIdentity(parsedOpts.identityName)
 
   let pipeFileStream: WriteStream | undefined
   if (parsedOpts.pipeFile) {
@@ -301,17 +312,28 @@ async function main() {
   }
 
   console.log(`running node ${parsedOpts.identityName} on port ${parsedOpts.port}`)
-  const node = await startNode({
-    peerId,
-    port: parsedOpts.port,
-    bootstrapAddress,
-    noDirectConnections: parsedOpts.noDirectConnections,
-    noWebRTCUpgrade: parsedOpts.noWebRTCUpgrade,
-    pipeFileStream,
-    maxRelayedConnections: parsedOpts.maxRelayedConnections,
-    relayFreeTimeout: parsedOpts.relayFreeTimeout,
-    useLocalAddresses: parsedOpts.useLocalAddress
-  })
+  const node = await startNode(
+    {
+      peerId,
+      port: parsedOpts.port,
+      pipeFileStream
+    },
+    {
+      config: {
+        initialNodes: bootstrapAddress ? [bootstrapAddress] : undefined,
+        maxRelayedConnections: parsedOpts.maxRelayedConnections,
+        relayFreeTimeout: parsedOpts.relayFreeTimeout,
+        allowLocalConnections: parsedOpts.allowLocalNodeConnections,
+        allowPrivateConnections: parsedOpts.allowPrivateNodeConnections
+      },
+      testing: {
+        __noDirectConnections: parsedOpts.noDirectConnections,
+        __noWebRTCUpgrade: parsedOpts.noWebRTCUpgrade,
+        __noUPNP: parsedOpts.noUPNP,
+        __preferLocalAddresses: parsedOpts.preferLocalAddresses
+      }
+    } as HoprConnectConfig
+  )
 
   await executeCommands({ node, cmds: parsedOpts.script, pipeFileStream })
 

@@ -32,6 +32,6 @@ pkg_path="${mydir}/../packages/${pkg}/package.json"
 log "Get package version for ${pkg} from ${pkg_path}"
 
 # get full version info from package description
-version=$(node -p -e "require('${pkg_path}').version")
+version=$(jq -r '.version' ${pkg_path})
 
 echo "${version}"

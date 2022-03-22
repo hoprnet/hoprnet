@@ -30,7 +30,7 @@ describe('commitment', function () {
     assert.strictEqual(fakeGet.callCount, 1, 'should look on chain')
     assert(fakeSet.callCount == 1, 'should set a new commitment on chain')
 
-    await bumpCommitment(fakeDB, fakeCommInfo.channelId)
+    await bumpCommitment(fakeDB, fakeCommInfo.channelId, c1)
     let c2 = await findCommitmentPreImage(fakeDB, fakeCommInfo.channelId)
     assert(c2, 'gives current commitment')
     assert(c2.hash().eq(c1), 'c2 is commitment of c1')

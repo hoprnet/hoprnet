@@ -2,6 +2,7 @@ import { RelayContext, DEFAULT_PING_TIMEOUT } from './context'
 import { ConnectionStatusMessages, RelayPrefix, StatusMessages } from '../constants'
 import { u8aEquals, defer } from '@hoprnet/hopr-utils'
 import Pair from 'it-pair'
+import DuplexPair from 'it-pair/duplex'
 import handshake from 'it-handshake'
 
 import type { StreamType } from '../types'
@@ -9,18 +10,11 @@ import assert from 'assert'
 
 describe('relay swtich context', function () {
   it('forward payload messages', async function () {
-    const nodeToRelay = Pair<StreamType>()
-    const relayToNode = Pair<StreamType>()
+    const [relayToNode, nodeToRelay] = DuplexPair<StreamType>()
 
-    const ctx = new RelayContext({
-      source: nodeToRelay.source,
-      sink: relayToNode.sink
-    })
+    const ctx = new RelayContext(nodeToRelay)
 
-    const nodeShaker = handshake({
-      source: relayToNode.source,
-      sink: nodeToRelay.sink
-    })
+    const nodeShaker = handshake(relayToNode)
     const destinationShaker = handshake(ctx)
 
     const firstMessage = new TextEncoder().encode('first message')
@@ -35,18 +29,11 @@ describe('relay swtich context', function () {
   })
 
   it('ping comes back in time', async function () {
-    const nodeToRelay = Pair<StreamType>()
-    const relayToNode = Pair<StreamType>()
+    const [relayToNode, nodeToRelay] = DuplexPair<StreamType>()
 
-    const ctx = new RelayContext({
-      source: nodeToRelay.source,
-      sink: relayToNode.sink
-    })
+    const ctx = new RelayContext(nodeToRelay)
 
-    const nodeShaker = handshake({
-      source: relayToNode.source,
-      sink: nodeToRelay.sink
-    })
+    const nodeShaker = handshake(relayToNode)
 
     const pingPromise = ctx.ping()
 
@@ -61,18 +48,11 @@ describe('relay swtich context', function () {
   it('ping timeout', async function () {
     this.timeout(DEFAULT_PING_TIMEOUT + 2e3)
 
-    const nodeToRelay = Pair<StreamType>()
-    const relayToNode = Pair<StreamType>()
+    const [relayToNode, nodeToRelay] = DuplexPair<StreamType>()
 
-    const ctx = new RelayContext({
-      source: nodeToRelay.source,
-      sink: relayToNode.sink
-    })
+    const ctx = new RelayContext(nodeToRelay)
 
-    const nodeShaker = handshake({
-      source: relayToNode.source,
-      sink: nodeToRelay.sink
-    })
+    const nodeShaker = handshake(relayToNode)
 
     const pingPromise = ctx.ping()
 
@@ -93,18 +73,11 @@ describe('relay swtich context', function () {
   })
 
   it('stop a stream', async function () {
-    const nodeToRelay = Pair<StreamType>()
-    const relayToNode = Pair<StreamType>()
+    const [relayToNode, nodeToRelay] = DuplexPair<StreamType>()
 
-    const ctx = new RelayContext({
-      source: nodeToRelay.source,
-      sink: relayToNode.sink
-    })
+    const ctx = new RelayContext(nodeToRelay)
 
-    const nodeShaker = handshake({
-      source: relayToNode.source,
-      sink: nodeToRelay.sink
-    })
+    const nodeShaker = handshake(relayToNode)
 
     nodeShaker.write(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP))
 
@@ -121,18 +94,11 @@ describe('relay swtich context', function () {
   })
 
   it('update stream', async function () {
-    const nodeToRelay = Pair<StreamType>()
-    const relayToNode = Pair<StreamType>()
+    const [relayToNode, nodeToRelay] = DuplexPair<StreamType>()
 
-    const ctx = new RelayContext({
-      source: nodeToRelay.source,
-      sink: relayToNode.sink
-    })
+    const ctx = new RelayContext(nodeToRelay)
 
-    const nodeShaker = handshake({
-      source: relayToNode.source,
-      sink: nodeToRelay.sink
-    })
+    const nodeShaker = handshake(relayToNode)
     const destinationShaker = handshake(ctx)
 
     // Sending messages should work before stream switching
@@ -152,18 +118,11 @@ describe('relay swtich context', function () {
     const UPDATE_ATTEMPTS = 5
 
     for (let i = 0; i < UPDATE_ATTEMPTS; i++) {
-      const nodeToRelayAfterUpdate = Pair<StreamType>()
-      const relayToNodeAfterUpdate = Pair<StreamType>()
+      const [relayToNodeAfterUpdate, nodeToRelayAfterUpdate] = DuplexPair<StreamType>()
 
-      ctx.update({
-        source: nodeToRelayAfterUpdate.source,
-        sink: relayToNodeAfterUpdate.sink
-      })
+      ctx.update(nodeToRelayAfterUpdate)
 
-      const nodeShakerAfterUpdate = handshake({
-        source: relayToNodeAfterUpdate.source,
-        sink: nodeToRelayAfterUpdate.sink
-      })
+      const nodeShakerAfterUpdate = handshake(relayToNodeAfterUpdate)
 
       const firstMessageAfterUpdate = new TextEncoder().encode('first message after update')
       nodeShakerAfterUpdate.write(Uint8Array.from([RelayPrefix.PAYLOAD, ...firstMessageAfterUpdate]))
@@ -198,14 +157,10 @@ describe('relay swtich context', function () {
 
 describe('relay switch context - falsy streams', function () {
   it('falsy sink source', async function () {
-    const nodeToRelay = Pair<StreamType>()
-    const relayToNode = Pair<StreamType>()
+    const [relayToNode, nodeToRelay] = DuplexPair<StreamType>()
 
     const errorInSource = 'error in source'
-    const ctx = new RelayContext({
-      source: nodeToRelay.source,
-      sink: relayToNode.sink
-    })
+    const ctx = new RelayContext(nodeToRelay)
 
     const sinkPromise = ctx.sink(
       (async function* () {

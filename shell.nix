@@ -31,6 +31,7 @@ mkShell {
     # testing utilities
     websocat
     jq
+    vagrant
 
     # custom pkg groups
     macosPkgs

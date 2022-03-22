@@ -1,13 +1,16 @@
-import type { Stream, StreamType } from '../types'
-import handshake, { Handshake } from 'it-handshake'
+import type { HoprConnectOptions, Stream, StreamType } from '../types'
+import handshake from 'it-handshake'
+import type { Handshake } from 'it-handshake'
 import type PeerId from 'peer-id'
 
 import { green, yellow } from 'chalk'
 import { pubKeyToPeerId } from '@hoprnet/hopr-utils'
 
 import { RelayState } from './state'
+import type { Relay } from '.'
 
 import debug from 'debug'
+import { DELIVERY_PROTOCOL } from '../constants'
 
 export enum RelayHandshakeMessage {
   OK,
@@ -71,7 +74,7 @@ type HandleResponse =
 class RelayHandshake {
   private shaker: Handshake<StreamType>
 
-  constructor(stream: Stream) {
+  constructor(stream: Stream, private options: HoprConnectOptions = {}) {
     this.shaker = handshake(stream)
   }
 
@@ -101,14 +104,8 @@ class RelayHandshake {
     let chunk: StreamType | undefined
     try {
       chunk = await this.shaker.read()
-    } catch (err) {
-      error(`Error while reading answer from ${green(relay.toB58String())}.`)
-      if (err instanceof Error) {
-        error(err.message)
-      } else {
-        console.trace()
-        error(`Non-error instance was thrown.`, err)
-      }
+    } catch (err: any) {
+      error(`Error while reading answer from ${green(relay.toB58String())}.`, err.message)
     }
 
     if (chunk == null || chunk.length == 0) {
@@ -162,11 +159,8 @@ class RelayHandshake {
    */
   async negotiate(
     source: PeerId,
-    getStreamToCounterparty: (peerId: PeerId) => Promise<Stream | undefined>,
-    exists: InstanceType<typeof RelayState>['exists'],
-    isActive: InstanceType<typeof RelayState>['isActive'],
-    updateExisting: InstanceType<typeof RelayState>['updateExisting'],
-    createNew: InstanceType<typeof RelayState>['createNew'],
+    getStreamToCounterparty: InstanceType<typeof Relay>['dialNodeDirectly'],
+    state: Pick<RelayState, 'exists' | 'isActive' | 'updateExisting' | 'createNew'>,
     __relayFreeTimeout?: number
   ): Promise<void> {
     log(`handling relay request`)
@@ -210,38 +204,38 @@ class RelayHandshake {
       return
     }
 
-    const relayedConnectionExists = exists(source, destination)
+    const relayedConnectionExists = state.exists(source, destination)
 
     if (relayedConnectionExists) {
       // Relay could exist but connection is dead
-      const connectionIsActive = await isActive(source, destination)
+      const connectionIsActive = await state.isActive(source, destination)
 
       if (connectionIsActive) {
         this.shaker.write(Uint8Array.of(RelayHandshakeMessage.OK))
         this.shaker.rest()
 
-        updateExisting(source, destination, this.shaker.stream)
+        state.updateExisting(source, destination, this.shaker.stream)
 
         return
       }
     }
 
-    let toDestination: Stream | undefined
+    let toDestinationStruct: Awaited<ReturnType<typeof getStreamToCounterparty>>
     try {
-      toDestination = await getStreamToCounterparty(destination)
+      toDestinationStruct = await getStreamToCounterparty(destination, DELIVERY_PROTOCOL(this.options.environment))
     } catch (err) {
       error(err)
     }
 
     // Anything can happen while attempting to connect
-    if (toDestination == null) {
+    if (toDestinationStruct == null) {
       error(`Cannot establish a relayed connection from ${source.toB58String()} to ${destination.toB58String()}`)
       this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY))
       this.shaker.rest()
       return
     }
 
-    const destinationShaker = handshake(toDestination)
+    const destinationShaker = handshake(toDestinationStruct.stream)
 
     destinationShaker.write(source.pubKey.marshal())
 
@@ -258,6 +252,11 @@ class RelayHandshake {
       this.shaker.rest()
 
       destinationShaker.rest()
+      try {
+        await toDestinationStruct.conn.close()
+      } catch (err) {
+        error(`Error while closing connection to destination ${destination.toB58String()}.`, err)
+      }
       return
     }
 
@@ -269,7 +268,22 @@ class RelayHandshake {
         this.shaker.rest()
         destinationShaker.rest()
 
-        createNew(source, destination, this.shaker.stream, destinationShaker.stream, __relayFreeTimeout)
+        try {
+          await state.createNew(
+            source,
+            destination,
+            this.shaker.stream,
+            destinationShaker.stream,
+            this.options.relayFreeTimeout
+          )
+        } catch (err) {
+          error(
+            `Cannot established relayed connection between ${destination.toB58String()} and ${source.toB58String()}`,
+            err
+          )
+          // @TODO find a way how to forward the error to source and destination
+          return
+        }
         break
       default:
         this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY))
@@ -309,14 +323,8 @@ class RelayHandshake {
 
     try {
       initiator = pubKeyToPeerId(chunk.slice())
-    } catch (err) {
-      error(`Could not decode sender peerId.`)
-      if (err instanceof Error) {
-        error(err.message)
-      } else {
-        console.trace()
-        error(`Non-error instance was thrown.`, err)
-      }
+    } catch (err: any) {
+      error(`Could not decode sender peerId.`, err.message)
     }
 
     if (initiator == null) {

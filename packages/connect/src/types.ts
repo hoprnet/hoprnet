@@ -1,6 +1,6 @@
 import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
-import type BL from 'bl'
+import type BufferList from 'bl/BufferList'
 
 type Suffix = 'PublicNode'
 type AddEventName = `add${Suffix}`
@@ -46,15 +46,48 @@ export interface PublicNodesEmitter {
   removeListener(event: string | symbol, listener: (...args: any[]) => void): this
 }
 
-export type StreamType = Buffer | BL | Uint8Array
+export type StreamType = BufferList | Uint8Array
 
-type SourceType<T> = AsyncIterable<T> | Iterable<T>
+export type StreamSourceAsync<T = StreamType> = AsyncIterable<T>
+export type StreamSource<T = StreamType> = AsyncIterable<T> | Iterable<T>
+export type StreamSink<T = StreamType> = (source: StreamSource<T>) => Promise<void>
 
 export type Stream<T = StreamType> = {
-  sink: (source: SourceType<T>) => Promise<void>
-  source: SourceType<T>
+  sink: StreamSink<T>
+  source: StreamSource<T>
 }
 
-export type StreamResult = IteratorResult<StreamType>
+export type StreamResult = IteratorResult<StreamType, any>
 
-export type DialOptions = { signal?: AbortSignal }
+export type HoprConnectOptions = {
+  publicNodes?: PublicNodesEmitter
+  allowLocalConnections?: boolean
+  allowPrivateConnections?: boolean
+  initialNodes?: PeerStoreType[]
+  interface?: string
+  maxRelayedConnections?: number
+  environment?: string
+  relayFreeTimeout?: number
+  dhtRenewalTimeout?: number
+}
+
+export type HoprConnectTestingOptions = {
+  // Simulated NAT: only connect directly to relays
+  __noDirectConnections?: boolean
+  // Simulated NAT: ignore WebRTC upgrade
+  __noWebRTCUpgrade?: boolean
+  // Local mode: only use local address, i.e. don't try to
+  // determine any external / public IP addresses
+  __preferLocalAddresses?: boolean
+  // Local mode: running a local testnet on the same machine
+  // hence the local interface is treated as an exposed host
+  __runningLocally?: boolean
+  // Disable UPNP support
+  __noUPNP?: boolean
+}
+
+export type HoprConnectListeningOptions = undefined
+
+export type HoprConnectDialOptions = {
+  signal?: AbortSignal
+}

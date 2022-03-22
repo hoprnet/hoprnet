@@ -1,6 +1,7 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
-import { AbstractCommand, GlobalState } from './abstractCommand'
+import { AbstractCommand } from './abstractCommand'
+import type { StateOps } from '../types'
 import { checkPeerIdInput, styleValue } from './utils'
 
 export default class Ping extends AbstractCommand {
@@ -16,24 +17,21 @@ export default class Ping extends AbstractCommand {
     return 'Pings another node to check its availability'
   }
 
-  public async execute(log, query: string, state: GlobalState): Promise<void> {
+  public async execute(log, query: string, { getState }: StateOps): Promise<void> {
     if (!query) {
       return log(`Invalid arguments. Expected 'ping <peerId>'. Received '${query}'`)
     }
 
     let peerId: PeerId
     try {
-      peerId = await checkPeerIdInput(query, state)
+      peerId = checkPeerIdInput(query, getState())
     } catch (err) {
       return log(styleValue(err.message, 'failure'))
     }
 
     let out = ''
 
-    let pingResult: {
-      info: string
-      latency: number
-    }
+    let pingResult: Awaited<ReturnType<Hopr['ping']>>
 
     let error: any
 
@@ -44,7 +42,7 @@ export default class Ping extends AbstractCommand {
     }
 
     if (pingResult.latency >= 0) {
-      return log(`${out}Pong received in: ${styleValue(pingResult.latency)} ms ${pingResult.info}`)
+      return log(`${out}Pong received in: ${styleValue(pingResult.latency)} ms ${pingResult?.info ?? ''}`)
     }
 
     if (error && error.message) {

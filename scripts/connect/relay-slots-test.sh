@@ -19,6 +19,21 @@ source "${mydir}/common.sh"
 
 setup "relay-slots"
 
+# run charly
+# should able to serve as a bootstrap
+# should be able to relay 1 connection at a time
+start_node tests/node "${charly_log}" \
+  "[]" \
+  --port ${charly_port} \
+  --identityName 'charly' \
+  --noDirectConnections false \
+  --noWebRTCUpgrade false \
+  --maxRelayedConnections 1 \
+  --preferLocalAddresses true \
+  --relayFreeTimeout 2000 \
+  --allowLocalNodeConnections true \
+  --allowPrivateNodeConnections true
+
 # run alice (client)
 # should be able to send 'test from alice' to bob through relay charly
 # should be ablt to get 'echo: test' back from bob
@@ -27,7 +42,7 @@ start_node tests/node \
   "[ 
       {
         'cmd': 'wait',
-        'waitForSecs': 2
+        'waitForSecs': 5
       },
       {
         'cmd': 'dial',
@@ -56,7 +71,9 @@ start_node tests/node \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
   --noWebRTCUpgrade false \
-  --useLocalAddress true
+  --preferLocalAddresses true \
+  --allowLocalNodeConnections true \
+  --allowPrivateNodeConnections true
 
 # run bob (client)
 # should be able to receive 'test' from alice through charly
@@ -64,7 +81,7 @@ start_node tests/node \
 start_node tests/node "${bob_log}" \
   "[ {
         'cmd': 'wait',
-        'waitForSecs': 2
+        'waitForSecs': 5
       },
       {
         'cmd': 'dial',
@@ -79,27 +96,16 @@ start_node tests/node "${bob_log}" \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
   --noWebRTCUpgrade false \
-  --useLocalAddress true
-
-# run charly
-# should able to serve as a bootstrap
-# should be able to relay 1 connection at a time
-start_node tests/node "${charly_log}" \
-  "[]" \
-  --port ${charly_port} \
-  --identityName 'charly' \
-  --noDirectConnections true \
-  --noWebRTCUpgrade false \
-  --maxRelayedConnections 1 \
-  --useLocalAddress true \
-  --relayFreeTimeout 2000 # to simulate relay being busy
+  --preferLocalAddresses true \
+  --allowLocalNodeConnections true \
+  --allowPrivateNodeConnections true
 
 # run dave (client)
 # should try connecting to bob through relay charly and get RELAY_FULL error
 start_node tests/node "${dave_log}" \
   "[ {
         'cmd': 'wait',
-        'waitForSecs': 3
+        'waitForSecs': 8
       },
       {
         'cmd': 'dial',
@@ -119,14 +125,16 @@ start_node tests/node "${dave_log}" \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
   --noWebRTCUpgrade false \
-  --useLocalAddress true
+  --preferLocalAddresses true \
+  --allowLocalNodeConnections true \
+  --allowPrivateNodeConnections true
 
 # run ed (client)
 # should try connecting to bob through relay charly after alice finishes talking to bob and succeed
 start_node tests/node "${ed_log}" \
   "[ {
         'cmd': 'wait',
-        'waitForSecs': 6
+        'waitForSecs': 10
       },
       {
         'cmd': 'dial',
@@ -146,7 +154,9 @@ start_node tests/node "${ed_log}" \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
   --noWebRTCUpgrade false \
-  --useLocalAddress true
+  --preferLocalAddresses true \
+  --allowLocalNodeConnections true \
+  --allowPrivateNodeConnections true
 
 # wait till nodes finish communicating
 wait_for_regex "${alice_log}" "all tasks executed"

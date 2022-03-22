@@ -2,7 +2,10 @@
 build/
 lib/
 dist/
-docs/
+docs/hips
+docs/yellowpaper
+docs/hopr-documentation/build
+docs/hopr-documentation/.docusaurus
 packages/*/build/
 packages/*/dist/
 packages/*/lib/
