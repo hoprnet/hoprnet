@@ -191,7 +191,8 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
       this.options,
       this.testingOptions,
       this._addressFilter,
-      this.relay
+      this.relay,
+      this._libp2p
     )
   }
 
@@ -249,6 +250,7 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
    * @param options optional dial options
    */
   public async dialDirectly(ma: Multiaddr, options?: HoprConnectDialOptions): Promise<Connection> {
+    console.trace(`dialDirectly`)
     log(`Attempting to dial ${chalk.yellow(ma.toString())} directly`)
 
     const maConn = await TCPConnection.create(ma, this._peerId, options)
