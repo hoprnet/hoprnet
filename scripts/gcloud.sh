@@ -307,7 +307,7 @@ gcloud_create_or_update_managed_instance_group() {
       ${gcloud_region}
 
     # delete previous template if different
-    if [ "${previous_template}" != "${template}"]; then
+    if [ "${previous_template}" != "${template}" ]; then
       gcloud_delete_instance_template "${previous_template}"
     fi
   else

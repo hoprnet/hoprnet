@@ -200,20 +200,41 @@ function find_tmp_dir() {
 
 # $1 = optional: endpoint, defaults to http://localhost:3001
 get_native_address(){
-  local endpoint=${1:-localhost:3001}
+  local with_token_endpoint=${1:-localhost:3001}
+  # split string into api token and endpoint
+  local api_token=${with_token_endpoint%\@*}
+  local endpoint=${with_token_endpoint#*\@}
+  local api_token_encoded="$(echo "$api_token" | base64)"
   local cmd="curl --silent --max-time 5 ${endpoint}/api/v2/account/addresses"
+  if [[ -n $api_token ]]; then
+    cmd="$cmd --header 'Authorization: Basic ${api_token_encoded}'"
+  fi
+
+  # echo "cmd=$cmd"
+  echo "with_token_endpoint=$with_token_endpoint"
+  echo "api_token=$api_token"
+  echo "api_token_encoded=$api_token_encoded"
+  echo "endpoint=$endpoint"
 
   # try every 5 seconds for 5 minutes
   local result
   result=$(try_cmd "${cmd}" 30 5)
+  echo "$result"
 
   echo $(echo ${result} | jq -r ".native")
 }
 
 # $1 = optional: endpoint, defaults to http://localhost:3001
 get_hopr_address() {
-  local endpoint=${1:-localhost:3001}
+  local with_token_endpoint=${1:-localhost:3001}
+  # split string into api token and endpoint
+  local api_token=${with_token_endpoint%\@*}
+  local endpoint=${with_token_endpoint#*\@}
+  local api_token_encoded="$(echo "$api_token" | base64)"
   local cmd="curl --silent --max-time 5 ${endpoint}/api/v2/account/addresses"
+  if [[ -n $api_token ]]; then
+    cmd="$cmd --header 'Authorization: Basic ${api_token_encoded}'"
+  fi
 
   # try every 5 seconds for 5 minutes
   local result
