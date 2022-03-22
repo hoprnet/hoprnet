@@ -3,6 +3,7 @@ import assert from 'assert'
 import { createConnectorMock } from '@hoprnet/hopr-core-ethereum'
 import { dbMock, debug, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import Hopr, { type HoprOptions, sampleOptions } from '.'
+import { setTimeout } from 'timers/promises'
 
 const log = debug('hopr-core:test:index')
 
@@ -23,6 +24,9 @@ describe('hopr core (instance)', async function () {
 
     log('Starting node')
     await node.start()
+
+    // Give libp2p some time to initialize
+    await setTimeout(1000)
 
     await assert.doesNotReject(async () => await node.stop())
 

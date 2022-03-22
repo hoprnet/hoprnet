@@ -21,6 +21,8 @@ import { createCircuitAddress, nAtATime, oneAtATime, retimer, u8aEquals } from '
 import type HoprConnect from '..'
 import { attemptClose, relayFromRelayAddress } from '../utils'
 import { compareDirectConnectionInfo } from '../utils/addrs'
+import type Libp2p from 'libp2p'
+import { setTimeout as setTimeoutPromise } from 'timers/promises'
 
 const DEBUG_PREFIX = 'hopr-connect:entry'
 const log = Debug(DEBUG_PREFIX)
@@ -70,6 +72,7 @@ export class EntryNodes extends EventEmitter {
 
   constructor(
     private peerId: PeerId,
+    private libp2p: Libp2p,
     private dialDirectly: HoprConnect['dialDirectly'],
     private options: HoprConnectOptions
   ) {
@@ -291,6 +294,10 @@ export class EntryNodes extends EventEmitter {
    * Called at startup and once an entry node is considered offline.
    */
   async updatePublicNodes(): Promise<void> {
+    while (!this.libp2p.connectionManager._started) {
+      // Make sure that libp2p is started
+      await setTimeoutPromise(250)
+    }
     log(`Updating list of used relay nodes ...`)
     const nodesToCheck = this.filterUncheckedNodes()
     const TIMEOUT = 3e3
@@ -366,7 +373,7 @@ export class EntryNodes extends EventEmitter {
     if (isDifferent) {
       log(`Current relay addresses:`)
       for (const ma of this.usedRelays) {
-        log(` - ${ma.toString()}`)
+        log(` - ${ma.ourCircuitAddress.toString()}`)
       }
 
       this.emit(RELAY_CHANGED_EVENT)
