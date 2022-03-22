@@ -210,12 +210,6 @@ get_native_address(){
     cmd="$cmd --header 'Authorization: Basic ${api_token_encoded}'"
   fi
 
-  # echo "cmd=$cmd"
-  echo "with_token_endpoint=$with_token_endpoint"
-  echo "api_token=$api_token"
-  echo "api_token_encoded=$api_token_encoded"
-  echo "endpoint=$endpoint"
-
   # try every 5 seconds for 5 minutes
   local result
   result=$(try_cmd "${cmd}" 30 5)
