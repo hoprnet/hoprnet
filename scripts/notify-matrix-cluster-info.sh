@@ -34,7 +34,7 @@ usage() {
 }
 
 # return early with help info when requested
-([ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]) && { usage; exit 0; }
+{ [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
 
 # do work
 which curl > /dev/null || { msg "Required binary 'curl' not found in PATH"; exit 1; }
@@ -56,7 +56,7 @@ _jq() {
 for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | .value.git_ref" | uniq); do
   if [[ "${branch}" =~ ${git_ref} ]]; then
     for row in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\") | @base64"); do
-      declare release_id deprecated version_major version_minor cluster_name version_maj_min msg now
+      declare release_id version_major version_minor cluster_name version_maj_min msg now
 
       release_id=$(_jq "${row}" ".key")
       version_major=$(_jq "${row}" ".value.version_major")
@@ -64,6 +64,7 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
 
       cluster_name="${release_id}${cluster_tag}"
       if [ "${version_major}" != "null" ] && [ "${version_minor}" != "null" ]; then
+        version_maj_min="$version_major.$version_minor"
         cluster_name="${cluster_name}-${version_maj_min//./-}"
       fi
 
