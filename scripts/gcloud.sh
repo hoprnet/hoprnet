@@ -322,7 +322,7 @@ gcloud_create_or_update_managed_instance_group() {
 
   log "waiting for managed instance group ${name}"
   gcloud compute instance-groups managed wait-until "${name}" \
-    --version-target-reached \
+    --stable \
     ${gcloud_region}
 
   log "reserve all external addresses of the instance group ${name} instances"
