@@ -43,6 +43,7 @@ restore() {
   rm -Rf "${build_dir}"
   rm -f "${package_dir}/yarn.lock"
   rm -f "${package_dir}/package-lock.json"
+  rm -f "${package_dir}/npm-shrinkwrap.json"
   rm -f "${package_dir}/package.tgz"
 }
 
@@ -75,6 +76,12 @@ npm install --package-lock-only
 
 # Copy NPM lockfile back to workspace
 mv "${build_dir}/package-lock.json" "${package_dir}"
+
+# Create shrinkwrap version of package.json
+npm shrinkwrap
+
+# Copy also npm-shrinkwrap.json, which will take precedence over package-lock.json while publishing
+mv "${build_dir}/npm-shrinkwrap.json" "${package_dir}"
 
 log "Creating Yarn lock file for ${package_name} package"
 # Create Yarn lockfile but do not build the entire package

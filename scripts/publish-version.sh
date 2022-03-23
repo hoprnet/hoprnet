@@ -25,7 +25,9 @@ cleanup() {
   # Remove lock files due to conflicts with workspaces
   rm -f \
     "${mydir}/../packages/cover-traffic-daemon/package-lock.json" \
+    "${mydir}/../packages/cover-traffic-daemon/npm-shrinkwrap.json" \
     "${mydir}/../packages/hoprd/package-lock.json" \
+    "${mydir}/../packages/hoprd/npm-shrinkwrap.json" \
     "${mydir}/../packages/cover-traffic-daemon/yarn.lock" \
     "${mydir}/../packages/hoprd/yarn.lock"
 
