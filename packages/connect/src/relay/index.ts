@@ -46,7 +46,7 @@ type ReducedPeerStore = {
 type ReducedDHT = { contentRouting: Pick<LibP2P['contentRouting'], 'provide'> }
 type ReducedDialer = { dialer: Pick<LibP2P['dialer'], '_pendingDials'> }
 type ReducedUpgrader = { upgrader: Pick<LibP2P['upgrader'], 'upgradeInbound' | 'upgradeOutbound'> }
-type ReducedConnectionManager = { connectionManager: Pick<LibP2P['connectionManager'], 'connections' | 'get'> }
+type ReducedConnectionManager = { connectionManager: Pick<LibP2P['connectionManager'], 'getAll' | 'onDisconnect'> }
 type ReducedLibp2p = ReducedPeerStore &
   ReducedDialer &
   ReducedConnectionManager &
@@ -199,7 +199,7 @@ class Relay {
         relay,
         counterparty: destination,
         onReconnect: this._onReconnect
-      }) as any
+      })
     } else {
       let channel = this.webRTCUpgrader.upgradeOutbound()
 
@@ -215,10 +215,10 @@ class Relay {
         }
       })
 
-      return new WebRTCConnection(destination, this.libp2p.connectionManager, newConn, channel, {
+      return new WebRTCConnection(newConn, channel, {
         __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade,
         ...opts
-      }) as any
+      })
     }
   }
 
@@ -246,7 +246,7 @@ class Relay {
         }
       })
 
-      return new WebRTCConnection(initiator, this.libp2p.connectionManager, newConn, channel, {
+      return new WebRTCConnection(newConn, channel, {
         __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade
       })
     }
@@ -288,7 +288,7 @@ class Relay {
       return
     }
 
-    const shaker = new RelayHandshake(conn.stream as any, this.options)
+    const shaker = new RelayHandshake(conn.stream as Stream, this.options)
 
     log(`handling relay request from ${conn.connection.remotePeer.toB58String()}`)
     log(`relayed connection count: ${this.relayState.relayedConnectionCount()}`)
@@ -315,7 +315,7 @@ class Relay {
       return
     }
 
-    const handShakeResult = await new RelayHandshake(conn.stream as any, this.options).handle(
+    const handShakeResult = await new RelayHandshake(conn.stream as Stream, this.options).handle(
       conn.connection.remotePeer
     )
 
@@ -333,7 +333,7 @@ class Relay {
 
     try {
       // Will call internal libp2p event handler, so no further action required
-      await this.libp2p.upgrader.upgradeInbound(newConn as any)
+      await this.libp2p.upgrader.upgradeInbound(newConn)
     } catch (err) {
       error(`Could not upgrade relayed connection. Error was: ${err}`)
       return
@@ -355,22 +355,29 @@ class Relay {
 
     try {
       if (!!this.testingOptions.__noWebRTCUpgrade) {
-        newConn = (await this.libp2p.upgrader.upgradeInbound(newStream as any)) as any
+        newConn = await this.libp2p.upgrader.upgradeInbound(newStream)
       } else {
-        newConn = (await this.libp2p.upgrader.upgradeInbound(
-          new WebRTCConnection(counterparty, this.libp2p.connectionManager, newStream, newStream.webRTC!.channel, {
+        newConn = await this.libp2p.upgrader.upgradeInbound(
+          new WebRTCConnection(newStream, newStream.webRTC!.channel, {
             __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade
-          }) as any
-        )) as any
+          })
+        )
       }
     } catch (err) {
       error(err)
       return
     }
 
-    // @TODO remove this
+    // @TODO remove this (1/2 done)
     this.libp2p.dialer._pendingDials?.get(counterparty.toB58String())?.destroy()
-    this.libp2p.connectionManager.connections?.set(counterparty.toB58String(), [newConn as any])
+
+    const existingConnections = this.libp2p.connectionManager.getAll(counterparty)
+    for (const existingConnection of existingConnections) {
+      if (existingConnection.id === newConn.id) {
+        continue
+      }
+      this.libp2p.connectionManager.onDisconnect(existingConnection)
+    }
   }
 
   /**
@@ -382,7 +389,7 @@ class Relay {
     destination: PeerId,
     protocol: string,
     opts?: HoprConnectDialOptions
-  ): Promise<ConnResult | undefined> {
+  ): Promise<ConnResult | void> {
     let connResult = await this.tryExistingConnection(destination, protocol)
 
     // Only establish a new connection if we don't have any.
@@ -435,7 +442,7 @@ class Relay {
 
       if (conn != undefined) {
         try {
-          stream = (await conn.newStream([protocol]))?.stream as any
+          stream = (await conn.newStream([protocol]))?.stream as Stream
         } catch (err) {
           continue
         }
@@ -463,21 +470,34 @@ class Relay {
    * @param protocol desired protocol
    * @returns a stream to the given peer
    */
-  private async tryExistingConnection(destination: PeerId, protocol: string): Promise<ConnResult | undefined> {
-    const existingConnection = this.libp2p.connectionManager.get(destination)
+  private async tryExistingConnection(destination: PeerId, protocol: string): Promise<ConnResult | void> {
+    const existingConnections = this.libp2p.connectionManager.getAll(destination)
 
-    if (existingConnection == null) {
+    if (existingConnections == undefined || existingConnections.length == 0) {
       return
     }
 
-    let stream: Stream
-    try {
-      stream = (await existingConnection.newStream(protocol))?.stream as any
-    } catch (err) {
-      return
+    let stream: Stream | undefined
+    let conn: Connection | undefined
+    const deadConnections: Connection[] = []
+
+    for (const existingConnection of existingConnections) {
+      try {
+        stream = (await existingConnection.newStream(protocol))?.stream as Stream
+        conn = existingConnection
+      } catch (err) {
+        deadConnections.push(existingConnection)
+        continue
+      }
     }
 
-    return stream != undefined ? { conn: existingConnection as any, stream } : undefined
+    for (const deadConnection of deadConnections) {
+      this.libp2p.connectionManager.onDisconnect(deadConnection)
+    }
+
+    if (stream != undefined && conn != undefined) {
+      return { conn, stream }
+    }
   }
 }
 

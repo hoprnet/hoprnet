@@ -1,6 +1,13 @@
-import { EventEmitter } from 'events'
 import type { HoprConnectOptions, PeerStoreType, Stream } from '../types'
+import type Connection from 'libp2p-interfaces/src/connection/connection'
+import type PeerId from 'peer-id'
+import type { Multiaddr } from 'multiaddr'
+import type HoprConnect from '..'
+import type Libp2p from 'libp2p'
+
+import { EventEmitter } from 'events'
 import Debug from 'debug'
+import { setTimeout as setTimeoutPromise } from 'timers/promises'
 
 import {
   CODE_IP4,
@@ -12,17 +19,10 @@ import {
   OK,
   DEFAULT_DHT_ENTRY_RENEWAL
 } from '../constants'
-import type Connection from 'libp2p-interfaces/src/connection/connection'
-
-import type PeerId from 'peer-id'
-import { Multiaddr } from 'multiaddr'
 
 import { createCircuitAddress, nAtATime, oneAtATime, retimer, u8aEquals } from '@hoprnet/hopr-utils'
-import type HoprConnect from '..'
 import { attemptClose, relayFromRelayAddress } from '../utils'
 import { compareDirectConnectionInfo } from '../utils/addrs'
-import type Libp2p from 'libp2p'
-import { setTimeout as setTimeoutPromise } from 'timers/promises'
 
 const DEBUG_PREFIX = 'hopr-connect:entry'
 const log = Debug(DEBUG_PREFIX)
@@ -36,6 +36,11 @@ type EntryNodeData = PeerStoreType & {
 type ConnectionResult = {
   entry: EntryNodeData
   conn?: Connection
+}
+
+type ConnResult = {
+  conn: Connection
+  stream: Stream
 }
 
 function latencyCompare(a: ConnectionResult, b: ConnectionResult) {
@@ -59,6 +64,10 @@ export const RELAY_CHANGED_EVENT = 'relay:changed'
 
 export const ENTRY_NODES_MAX_PARALLEL_DIALS = 14
 
+type ReducedLibp2p = {
+  connectionManager: Pick<Libp2p['connectionManager'], '_started' | 'getAll' | 'onDisconnect'>
+}
+
 export class EntryNodes extends EventEmitter {
   protected availableEntryNodes: EntryNodeData[]
   protected uncheckedEntryNodes: PeerStoreType[]
@@ -72,7 +81,7 @@ export class EntryNodes extends EventEmitter {
 
   constructor(
     private peerId: PeerId,
-    private libp2p: Libp2p,
+    private libp2p: ReducedLibp2p,
     private dialDirectly: HoprConnect['dialDirectly'],
     private options: HoprConnectOptions
   ) {
@@ -380,6 +389,82 @@ export class EntryNodes extends EventEmitter {
     }
   }
 
+  private async tryExistingConnections(destination: PeerId): Promise<ConnResult | void> {
+    const existingConnections = this.libp2p.connectionManager.getAll(destination)
+
+    if (existingConnections == undefined || existingConnections.length == 0) {
+      return
+    }
+
+    let stream: Stream | undefined
+    let conn: Connection | undefined
+
+    const deadConnections: Connection[] = []
+
+    for (const existingConnection of existingConnections) {
+      try {
+        stream = (await existingConnection.newStream(CAN_RELAY_PROTCOL(this.options.environment)))?.stream as Stream
+        conn = existingConnection
+      } catch (err) {
+        deadConnections.push(existingConnection)
+        continue
+      }
+    }
+
+    for (const deadConnection of deadConnections) {
+      this.libp2p.connectionManager.onDisconnect(deadConnection)
+    }
+
+    if (stream != undefined && conn != undefined) {
+      return { conn, stream }
+    }
+  }
+
+  private async establishNewConnection(
+    destination: PeerId,
+    destinationAddress: Multiaddr,
+    timeout: number
+  ): Promise<ConnResult | void> {
+    const abort = new AbortController()
+    let done = false
+
+    setTimeout(() => {
+      if (!done) {
+        abort.abort()
+      }
+    }, timeout)
+
+    let conn: Connection | undefined
+    try {
+      conn = await this.dialDirectly(destinationAddress, { signal: abort.signal })
+    } catch (err: any) {
+      error(`error while contacting entry node ${destination.toB58String()}.`, err.message)
+      await attemptClose(conn, error)
+    }
+
+    // Prevent timeout from doing anything
+    done = true
+
+    if (conn == undefined) {
+      return
+    }
+
+    let stream: Stream | undefined
+    try {
+      stream = (await conn.newStream([CAN_RELAY_PROTCOL(this.options.environment)]))?.stream as any
+    } catch (err) {
+      error(`Cannot use relay.`, err)
+      await attemptClose(conn, error)
+    }
+
+    if (conn != undefined && stream != undefined) {
+      return {
+        conn,
+        stream
+      }
+    }
+  }
+
   /**
    * Attempts to connect to a relay node
    * @param id peerId of the node to dial
@@ -392,46 +477,15 @@ export class EntryNodes extends EventEmitter {
     relay: Multiaddr,
     timeout: number
   ): Promise<{ entry: EntryNodeData; conn?: Connection }> {
-    const abort = new AbortController()
     const start = Date.now()
-    let connectionEstablished = false
 
-    setTimeout(() => {
-      if (!connectionEstablished) {
-        abort.abort()
-      }
-    }, timeout)
+    let conn = await this.tryExistingConnections(id)
 
-    let conn: Connection | undefined
-    try {
-      conn = await this.dialDirectly(relay, { signal: abort.signal })
-    } catch (err: any) {
-      error(`error while contacting entry node ${id.toB58String()}.`, err.message)
-      conn && (await attemptClose(conn, error))
-    } finally {
-      // Prevent timeout from doing anything
-      connectionEstablished = true
+    if (!conn) {
+      conn = await this.establishNewConnection(id, relay, timeout)
     }
 
     if (conn == undefined) {
-      return {
-        entry: {
-          id,
-          multiaddrs: [relay],
-          latency: -1
-        }
-      }
-    }
-
-    let stream: Stream | undefined
-    try {
-      stream = (await conn.newStream([CAN_RELAY_PROTCOL(this.options.environment)]))?.stream as any
-    } catch (err) {
-      error(`Cannot use relay.`, err)
-      await attemptClose(conn, error)
-    }
-
-    if (stream == undefined) {
       return {
         entry: {
           id,
@@ -445,7 +499,7 @@ export class EntryNodes extends EventEmitter {
 
     // calls the iterator, thereby starts the stream and
     // consumes the first messages, afterwards closes the stream
-    for await (const msg of stream.source) {
+    for await (const msg of conn.stream.source) {
       verbose(`can relay received ${new TextDecoder().decode(msg.slice())} from ${id.toB58String()}`)
       if (u8aEquals(msg.slice(), OK)) {
         done = true
@@ -456,14 +510,14 @@ export class EntryNodes extends EventEmitter {
 
     try {
       // End the send stream by sending nothing
-      stream.sink((async function* () {})()).catch(error)
+      conn.stream.sink((async function* () {})()).catch(error)
     } catch (err) {
       error(err)
     }
 
     if (done) {
       return {
-        conn,
+        conn: conn.conn,
         entry: {
           id,
           multiaddrs: [relay],

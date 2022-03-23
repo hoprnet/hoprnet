@@ -1,12 +1,10 @@
 import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
 import type { Instance as SimplePeer } from 'simple-peer'
-import type PeerId from 'peer-id'
 import { durations, u8aToHex, defer, type DeferType } from '@hoprnet/hopr-utils'
 
 import toIterable from 'stream-to-it'
 import Debug from 'debug'
 import type { RelayConnection } from '../relay/connection'
-import type Libp2p from 'libp2p'
 import { randomBytes } from 'crypto'
 import { toU8aStream, encodeWithLengthPrefix, decodeWithLengthPrefix, eagerIterator } from '../utils'
 import abortable from 'abortable-iterator'
@@ -71,8 +69,6 @@ class WebRTCConnection implements MultiaddrConnection {
   public timeline: MultiaddrConnection['timeline']
 
   constructor(
-    private counterparty: PeerId,
-    private connectionManager: Pick<Libp2p['connectionManager'], 'connections'>,
     private relayConn: RelayConnection,
     private channel: SimplePeer,
     private options?: HoprConnectDialOptions & { __noWebRTCUpgrade?: boolean }
@@ -109,10 +105,8 @@ class WebRTCConnection implements MultiaddrConnection {
     // and remove stale connection from internal libp2p state
     this.channel.on('iceStateChange', (iceConnectionState: string, iceGatheringState: string) => {
       if (iceConnectionState === 'disconnected' && iceGatheringState === 'complete') {
-        this.timeline.close = Date.now()
         this.destroyed = true
-        // HACK, @TODO remove this
-        this.connectionManager.connections.delete(this.counterparty.toB58String())
+        this.timeline.close = this.timeline.close ?? Date.now()
       }
     })
 
