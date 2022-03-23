@@ -360,13 +360,10 @@ gcloud_delete_managed_instance_group() {
 gcloud_get_managed_instance_group_instances_ips() {
   local name="${1}"
   local nproc_cmd
-  declare kernel 
 
-  kernel=$(uname -s)
-  
-  if [ "${kernel}" = "Linux" ] && command -v nproc ; then
+  if command -v nproc ; then
     nproc_cmd="nproc"
-  elif [ "${kernel}" = "Darwin" ] && command -v sysctl ; then
+  elif command -v sysctl ; then
     nproc_cmd="sysctl -n hw.logicalcpu"
   else
     log "⛔️ don't know how to get virtual cores count for kernel ${kernel}"
