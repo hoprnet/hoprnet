@@ -409,7 +409,12 @@ export class EntryNodes extends EventEmitter {
         deadConnections.push(existingConnection)
         continue
       }
+      if (stream == undefined) {
+        deadConnections.push(existingConnection)
+      }
     }
+
+    log(`dead connection`, deadConnections)
 
     for (const deadConnection of deadConnections) {
       this.libp2p.connectionManager.onDisconnect(deadConnection)
