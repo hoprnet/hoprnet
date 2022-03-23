@@ -366,8 +366,7 @@ gcloud_get_managed_instance_group_instances_ips() {
   elif command -v sysctl ; then
     nproc_cmd="sysctl -n hw.logicalcpu"
   else
-    log "⛔️ don't know how to get virtual cores count for kernel ${kernel}"
-    exit 1
+    nproc_cmd="echo 1"
   fi
 
   gcloud compute instance-groups list-instances "${name}" \
