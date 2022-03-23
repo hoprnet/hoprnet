@@ -64,6 +64,7 @@ export async function createLibp2pInstance(
       connEncryption: [NOISE as any],
       dht: KadDHT
     },
+    // Currently disabled due to problems with serialization and deserialization
     // Configure peerstore to be persisted using LevelDB, also requires config
     // persistence to be set.
     // datastore,
