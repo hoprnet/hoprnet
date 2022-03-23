@@ -1,8 +1,8 @@
 import path from 'path'
-import { mkdir } from 'fs/promises'
+// import { mkdir } from 'fs/promises'
 
 import { default as LibP2P, type Connection } from 'libp2p'
-import { LevelDatastore } from 'datastore-level'
+// import { LevelDatastore } from 'datastore-level'
 import { type AddressSorter, expandVars, HoprDB, localAddressesFirst, PublicKey } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 const Mplex = require('libp2p-mplex')
