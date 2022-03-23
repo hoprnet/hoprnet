@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "1.88.7",
+  "version": "1.88.11",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -28,7 +28,7 @@
     "lib"
   ],
   "dependencies": {
-    "@chainsafe/libp2p-noise": "5.0.2",
+    "@chainsafe/libp2p-noise": "5.0.3",
     "@google-cloud/profiler": "4.1.7",
     "@hoprnet/hopr-connect": "workspace:packages/connect",
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum",

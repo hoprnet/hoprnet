@@ -1,8 +1,8 @@
 import path from 'path'
-import { mkdir } from 'fs/promises'
+// import { mkdir } from 'fs/promises'
 
 import { default as LibP2P, type Connection } from 'libp2p'
-import { LevelDatastore } from 'datastore-level'
+// import { LevelDatastore } from 'datastore-level'
 import { type AddressSorter, expandVars, HoprDB, localAddressesFirst, PublicKey } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 const Mplex = require('libp2p-mplex')
@@ -47,12 +47,12 @@ export async function createLibp2pInstance(
 
   // Store the peerstore on-disk under the main data path. Ensure store is
   // opened before passing it to libp2p.
-  const datastorePath = path.join(options.dataPath, 'peerstore')
-  await mkdir(datastorePath, { recursive: true })
-  const datastore = new LevelDatastore(datastorePath, { createIfMissing: true })
-  await datastore.open()
+  // const datastorePath = path.join(options.dataPath, 'peerstore')
+  // await mkdir(datastorePath, { recursive: true })
+  // const datastore = new LevelDatastore(datastorePath, { createIfMissing: true })
+  // await datastore.open()
 
-  log(`using peerstore at ${datastorePath}`)
+  // log(`using peerstore at ${datastorePath}`)
 
   const libp2p = await LibP2P.create({
     peerId,
@@ -64,11 +64,12 @@ export async function createLibp2pInstance(
       connEncryption: [NOISE as any],
       dht: KadDHT
     },
+    // Currently disabled due to problems with serialization and deserialization
     // Configure peerstore to be persisted using LevelDB, also requires config
     // persistence to be set.
-    datastore,
+    // datastore,
     peerStore: {
-      persistence: true
+      persistence: false
     },
     config: {
       protocolPrefix: `hopr/${options.environment.id}`,
