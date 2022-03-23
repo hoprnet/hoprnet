@@ -89,11 +89,11 @@ gcloud_update_container_with_image() {
   local password="${BS_PASSWORD}"
 
   log "${vm_name}"
-  log "${container_name}"
+  log "${container_image}"
   log "${disk_image}"
   log "${mount_path}"
 
-  log "Updating container on vm:${vm_name} - ${$container_name} (disk: ${disk_image}:${mount_path})"
+  log "Updating container on vm:${vm_name} - ${container_image} (disk: ${disk_image}:${mount_path})"
   gcloud compute instances update-container $1 $ZONE \
     --container-image=${container_image} --container-mount-disk name=${disk_image},mount-path="${mount_path}" \
     --container-arg="--admin" \
@@ -307,7 +307,7 @@ gcloud_create_or_update_managed_instance_group() {
       ${gcloud_region}
 
     # delete previous template if different
-    if [ "${previous_template}" != "${template}"]; then
+    if [ "${previous_template}" != "${template}" ]; then
       gcloud_delete_instance_template "${previous_template}"
     fi
   else
@@ -364,9 +364,9 @@ gcloud_get_managed_instance_group_instances_ips() {
 
   kernel=$(uname -s)
   
-  if [ "${kernel}" = "Linux" ]; then
+  if [ "${kernel}" = "Linux" ] && command -v nproc ; then
     nproc_cmd="nproc"
-  elif [ "${kernel}" = "Darwin" ]; then
+  elif [ "${kernel}" = "Darwin" ] && command -v sysctl ; then
     nproc_cmd="sysctl -n hw.logicalcpu"
   else
     log "⛔️ don't know how to get virtual cores count for kernel ${kernel}"
