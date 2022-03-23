@@ -68,7 +68,7 @@ export async function createLibp2pInstance(
     // persistence to be set.
     datastore,
     peerStore: {
-      persistence: true
+      persistence: false
     },
     config: {
       protocolPrefix: `hopr/${options.environment.id}`,
