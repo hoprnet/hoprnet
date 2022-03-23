@@ -20,7 +20,7 @@ import {
   DEFAULT_DHT_ENTRY_RENEWAL
 } from '../constants'
 
-import { createCircuitAddress, nAtATime, oneAtATime, retimer, u8aEquals } from '@hoprnet/hopr-utils'
+import { createCircuitAddress, nAtATime, oneAtATime, retimer, u8aEquals, timeout } from '@hoprnet/hopr-utils'
 import { attemptClose, relayFromRelayAddress } from '../utils'
 import { compareDirectConnectionInfo } from '../utils/addrs'
 
@@ -403,7 +403,8 @@ export class EntryNodes extends EventEmitter {
 
     for (const existingConnection of existingConnections) {
       try {
-        stream = (await existingConnection.newStream(CAN_RELAY_PROTCOL(this.options.environment)))?.stream as Stream
+        stream = (await timeout(1000, () => existingConnection.newStream(CAN_RELAY_PROTCOL(this.options.environment))))
+          ?.stream as Stream
         conn = existingConnection
       } catch (err) {
         deadConnections.push(existingConnection)

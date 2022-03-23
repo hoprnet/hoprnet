@@ -17,7 +17,7 @@ import { RELAY_CIRCUIT_TIMEOUT, RELAY_PROTCOL, DELIVERY_PROTOCOL, CODE_P2P, OK, 
 import { RelayConnection } from './connection'
 import { RelayHandshake, RelayHandshakeMessage } from './handshake'
 import { RelayState } from './state'
-import { createRelayerKey } from '@hoprnet/hopr-utils'
+import { createRelayerKey, timeout } from '@hoprnet/hopr-utils'
 
 import type HoprConnect from '..'
 
@@ -483,7 +483,7 @@ class Relay {
 
     for (const existingConnection of existingConnections) {
       try {
-        stream = (await existingConnection.newStream(protocol))?.stream as Stream
+        stream = (await timeout(1000, () => existingConnection.newStream(protocol)))?.stream as Stream
         conn = existingConnection
       } catch (err) {
         deadConnections.push(existingConnection)

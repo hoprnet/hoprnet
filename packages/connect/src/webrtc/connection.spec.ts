@@ -1,5 +1,6 @@
 import type { StreamType } from '../types'
 import type { Instance as SimplePeerInstance } from 'simple-peer'
+import type { RelayConnection } from '../relay/connection'
 
 import handshake from 'it-handshake'
 import Pair from 'it-pair'
@@ -71,7 +72,7 @@ describe('test webrtc connection', function () {
         sendUpgraded: () => {
           upgradeCalls++
         }
-      } as any,
+      } as RelayConnection,
       webRTCInstance
     )
 
@@ -98,7 +99,7 @@ describe('test webrtc connection', function () {
         source: BobAlice.source,
         sink: AliceBob.sink,
         sendUpgraded: () => {}
-      } as any,
+      } as RelayConnection,
       webRTCInstance
     )
 
@@ -126,7 +127,7 @@ describe('test webrtc connection', function () {
       {
         source: BobAlice.source,
         sink: AliceBob.sink
-      } as any,
+      } as RelayConnection,
       webRTCInstance
     )
 
@@ -160,7 +161,7 @@ describe('test webrtc connection', function () {
         source: BobAlice.source,
         sink: AliceBob.sink,
         sendUpgraded: () => {}
-      } as any,
+      } as RelayConnection,
       webRTCInstance
     )
 
@@ -218,7 +219,7 @@ describe('test webrtc connection', function () {
         sink: AliceBob.sink,
         remoteAddr: new Multiaddr(`/p2p/${Bob.toB58String()}`),
         sendUpgraded: () => {}
-      } as any,
+      } as RelayConnection,
       webRTCInstance
     )
 
@@ -255,7 +256,7 @@ describe('test webrtc connection', function () {
 
     assert(
       u8aEquals(
-        (await (AliceBobWebRTC as any).next()).value,
+        (await AliceBobWebRTC[Symbol.asyncIterator]().next()).value,
         encodeWithLengthPrefix(Uint8Array.from([MigrationStatus.NOT_DONE, ...msgSentBackThroughWebRTC]))
       )
     )
@@ -277,7 +278,7 @@ describe('test webrtc connection', function () {
       {
         source: BobAlice.source,
         sink: AliceBob.sink
-      } as any,
+      } as RelayConnection,
       webRTCInstance,
       {
         signal: abort.signal
