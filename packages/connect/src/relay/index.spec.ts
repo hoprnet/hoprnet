@@ -90,7 +90,7 @@ function getPeer(peerId: PeerId, network: EventEmitter) {
       },
       dialer: {} as any,
       connectionManager: {
-        get: () => null
+        getAll: () => []
       } as any,
       contentRouting: {
         provide: (_key: any) => Promise.resolve()
