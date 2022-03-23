@@ -47,12 +47,12 @@ export async function createLibp2pInstance(
 
   // Store the peerstore on-disk under the main data path. Ensure store is
   // opened before passing it to libp2p.
-  const datastorePath = path.join(options.dataPath, 'peerstore')
-  await mkdir(datastorePath, { recursive: true })
-  const datastore = new LevelDatastore(datastorePath, { createIfMissing: true })
-  await datastore.open()
+  // const datastorePath = path.join(options.dataPath, 'peerstore')
+  // await mkdir(datastorePath, { recursive: true })
+  // const datastore = new LevelDatastore(datastorePath, { createIfMissing: true })
+  // await datastore.open()
 
-  log(`using peerstore at ${datastorePath}`)
+  // log(`using peerstore at ${datastorePath}`)
 
   const libp2p = await LibP2P.create({
     peerId,
@@ -66,7 +66,7 @@ export async function createLibp2pInstance(
     },
     // Configure peerstore to be persisted using LevelDB, also requires config
     // persistence to be set.
-    datastore,
+    // datastore,
     peerStore: {
       persistence: false
     },
