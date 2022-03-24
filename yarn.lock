@@ -1746,28 +1746,11 @@ __metadata:
 "@defi-wonderland/smock@npm:^2.0.7":
   version: 2.0.7
   resolution: "@defi-wonderland/smock@npm:2.0.7"
-  dependencies:
-    "@nomiclabs/ethereumjs-vm": ^4.2.2
-    diff: ^5.0.0
-    lodash.isequal: ^4.5.0
-    lodash.isequalwith: ^4.4.0
-    rxjs: ^7.2.0
-    semver: ^7.3.5
-  peerDependencies:
-    "@ethersproject/abi": ^5
-    "@ethersproject/abstract-provider": ^5
-    "@ethersproject/abstract-signer": ^5
-    "@nomiclabs/hardhat-ethers": ^2
-    ethers: ^5
-    hardhat: ^2
-  checksum: 2f4aa6c4a95f889d14c02c6b6041434b5a5f1b1558344e8d613246168b89d9f60f1cc0431d5bd0123d59a779f9f3f147e05048cefdabbab0e397215bbf8d3f2a
-  languageName: node
-  linkType: hard
-
-"@docsearch/css@npm:3.0.0-alpha.42":
+	@@ -1768,6 +1769,12 @@ __metadata:
   version: 3.0.0-alpha.42
   resolution: "@docsearch/css@npm:3.0.0-alpha.42"
   checksum: 83ddb4e3fd1ff4969a2f474857df58eca88c0246b6e0d3ca4a6e028e4ad26712258534ed0030a5071e232f89e59b535c36c6af2de11a30e539df4a53825e41fc
+  
 "@docsearch/css@npm:3.0.0":
   version: 3.0.0
   resolution: "@docsearch/css@npm:3.0.0"
@@ -3596,7 +3579,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-ethereum@workspace:packages/ethereum"
   dependencies:
-    "@defi-wonderland/smock": ^2.0.7
     "@ethersproject/wallet": 5.5.0
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@nomiclabs/hardhat-ethers": 2.0.5
@@ -22384,15 +22366,6 @@ __metadata:
   dependencies:
     tslib: ^2.1.0
   checksum: e034f60805210cce756dd2f49664a8108780b117cf5d0e2281506e9e6387f7b4f1532d974a8c8b09314fa7a16dd2f6cff3462072a5789672b5dcb45c4173f3c6
-  languageName: node
-  linkType: hard
-
-"rxjs@npm:^7.2.0":
-  version: 7.5.2
-  resolution: "rxjs@npm:7.5.2"
-  dependencies:
-    tslib: ^2.1.0
-  checksum: daf1fe7289de500b25d822fd96cde3c138c7902e8bf0e6aa12a3e70847a5cabeeb4d677f10e19387e1db44b12c5b1be0ff5c79b8cd63ed6ce891d765e566cf4d
   languageName: node
   linkType: hard
 
