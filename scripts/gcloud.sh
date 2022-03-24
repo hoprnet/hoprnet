@@ -89,11 +89,11 @@ gcloud_update_container_with_image() {
   local password="${BS_PASSWORD}"
 
   log "${vm_name}"
-  log "${container_name}"
+  log "${container_image}"
   log "${disk_image}"
   log "${mount_path}"
 
-  log "Updating container on vm:${vm_name} - ${$container_name} (disk: ${disk_image}:${mount_path})"
+  log "Updating container on vm:${vm_name} - ${container_image} (disk: ${disk_image}:${mount_path})"
   gcloud compute instances update-container $1 $ZONE \
     --container-image=${container_image} --container-mount-disk name=${disk_image},mount-path="${mount_path}" \
     --container-arg="--admin" \
@@ -359,10 +359,20 @@ gcloud_delete_managed_instance_group() {
 # $1=group name
 gcloud_get_managed_instance_group_instances_ips() {
   local name="${1}"
+  local nproc_cmd
+
+  if command -v nproc ; then
+    nproc_cmd="nproc"
+  elif command -v sysctl ; then
+    nproc_cmd="sysctl -n hw.logicalcpu"
+  else
+    # Default to single core
+    nproc_cmd="echo 1"
+  fi
 
   gcloud compute instance-groups list-instances "${name}" \
     ${gcloud_region} --uri | \
-    xargs -P `nproc` -I '{}' gcloud compute instances describe '{}' \
+    xargs -P `${nproc_cmd}` -I '{}' gcloud compute instances describe '{}' \
       --flatten 'networkInterfaces[].accessConfigs[]' \
       --format 'csv[no-heading](networkInterfaces.accessConfigs.natIP)'
 }

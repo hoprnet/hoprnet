@@ -32,6 +32,7 @@ import type HoprConnect from '..'
 import { UpnpManager } from './upnp'
 import type { Filter } from '../filter'
 import type { Relay } from '../relay'
+import type Libp2p from 'libp2p'
 
 const log = Debug('hopr-connect:listener')
 const error = Debug('hopr-connect:listener:error')
@@ -84,7 +85,8 @@ class Listener extends EventEmitter implements InterfaceListener {
     private options: HoprConnectOptions,
     private testingOptions: HoprConnectTestingOptions,
     private filter: Filter,
-    private relay: Relay
+    private relay: Relay,
+    libp2p: Libp2p
   ) {
     super()
 
@@ -129,7 +131,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       this.emit('listening')
     }.bind(this)
 
-    this.entry = new EntryNodes(this.peerId, dialDirectly, this.options)
+    this.entry = new EntryNodes(this.peerId, libp2p, dialDirectly, this.options)
 
     this.upnpManager = new UpnpManager()
   }
@@ -361,7 +363,8 @@ class Listener extends EventEmitter implements InterfaceListener {
       // Finish startup
       this.entry.start()
 
-      await this.entry.updatePublicNodes()
+      // Initiate update but don't await its result
+      this.entry.updatePublicNodes()
     }
 
     this.state = State.LISTENING

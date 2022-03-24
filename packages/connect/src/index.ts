@@ -191,7 +191,8 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
       this.options,
       this.testingOptions,
       this._addressFilter,
-      this.relay
+      this.relay,
+      this._libp2p
     )
   }
 
