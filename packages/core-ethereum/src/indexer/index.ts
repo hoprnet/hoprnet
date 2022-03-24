@@ -25,7 +25,15 @@ import {
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum'
-import type { Event, EventNames, IndexerEvents, TokenEvent, TokenEventNames } from './types'
+import type {
+  Event,
+  EventNames,
+  IndexerEvents,
+  TokenEvent,
+  TokenEventNames,
+  RegistryEvent,
+  RegistryEventNames
+} from './types'
 import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils'
 import { Contract, errors } from 'ethers'
 import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants'
@@ -578,7 +586,7 @@ class Indexer extends EventEmitter {
       }
 
       // @TODO: fix type clash
-      const eventName = event.event as EventNames | TokenEventNames
+      const eventName = event.event as EventNames | TokenEventNames | RegistryEventNames
 
       lastDatabaseSnapshot = new Snapshot(
         new BN(event.blockNumber),
@@ -612,6 +620,10 @@ class Indexer extends EventEmitter {
         case 'TicketRedeemed(address,address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)':
           // if unlock `outstandingTicketBalance`, if applicable
           await this.onTicketRedeemed(event as Event<'TicketRedeemed'>, lastDatabaseSnapshot)
+          break
+        case 'EligibilityUpdated':
+        case 'EligibilityUpdated(address,bool)':
+          await this.onEligibilityUpdated(event as RegistryEvent<'EligibilityUpdated'>, lastDatabaseSnapshot)
           break
         default:
           log(`ignoring event '${String(eventName)}'`)
@@ -721,6 +733,13 @@ class Indexer extends EventEmitter {
   private async onChannelClosed(channel: ChannelEntry) {
     await this.db.deleteAcknowledgedTicketsFromChannel(channel)
     this.emit('channel-closed', channel)
+  }
+
+  private async onEligibilityUpdated(
+    event: RegistryEvent<'EligibilityUpdated'>,
+    lastSnapshot: Snapshot
+  ): Promise<void> {
+    await this.db.setElegibleAccount(Address.fromString(event.args.account), event.args.eligibility, lastSnapshot)
   }
 
   private async onTransfer(event: TokenEvent<'Transfer'>, lastSnapshot: Snapshot) {

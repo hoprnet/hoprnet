@@ -475,6 +475,14 @@ export default class HoprCoreEthereum extends EventEmitter {
       (txHash: string) => this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
   }
+
+  /**
+   * @param id the public key of the account we want to check if it's whitelisted
+   * @returns true if whitelisted
+   */
+  public async isWhitelisted(id: PublicKey): Promise<boolean> {
+    return this.db.hasElegibleAccount(id.toAddress())
+  }
 }
 
 export { createConnectorMock } from './index.mock'

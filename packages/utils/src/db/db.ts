@@ -41,6 +41,7 @@ const PENDING_TICKETS_COUNT = encoder.encode('statistics:pending:value-')
 const ACKNOWLEDGED_TICKETS_PREFIX = encoder.encode('tickets:acknowledged-')
 const PENDING_ACKNOWLEDGEMENTS_PREFIX = encoder.encode('tickets:pending-acknowledgement-')
 const PACKET_TAG_PREFIX: Uint8Array = encoder.encode('packets:tag-')
+const REGISTRY_ELEGIBLE_ACCOUNT_PREFIX: Uint8Array = encoder.encode('registry:account-')
 
 function createChannelKey(channelId: Hash): Uint8Array {
   return Uint8Array.from([...CHANNEL_PREFIX, ...channelId.serialize()])
@@ -68,6 +69,9 @@ function createPendingAcknowledgement(halfKey: HalfKeyChallenge) {
 }
 function createPacketTagKey(tag: Uint8Array) {
   return Uint8Array.from([...PACKET_TAG_PREFIX, ...tag])
+}
+function createRegistryAccount(address: Address) {
+  return Uint8Array.from([...REGISTRY_ELEGIBLE_ACCOUNT_PREFIX, ...address.serialize()])
 }
 
 const LATEST_BLOCK_NUMBER_KEY = encoder.encode('latestBlockNumber')
@@ -701,6 +705,36 @@ export class HoprDB {
       .put(Buffer.from(this.keyOf(HOPR_BALANCE_KEY)), Buffer.from(val.sub(value).serialize()))
       .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
       .write()
+  }
+
+  /**
+   * Store entry if account is elegible, if not delete entry.
+   */
+  public async setElegibleAccount(account: Address, elegible: boolean, snapshot: Snapshot): Promise<void> {
+    // if elegible create entry
+    if (elegible) {
+      await this.db
+        .batch()
+        .put(Buffer.from(this.keyOf(createRegistryAccount(account))), Buffer.from(new Uint8Array()))
+        .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
+        .write()
+    }
+    // if not elegible, delete entry
+    else {
+      await this.db
+        .batch()
+        .del(Buffer.from(this.keyOf(createRegistryAccount(account))))
+        .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
+        .write()
+    }
+  }
+
+  /**
+   * Checks whether we have stored elegible account, defaults to false.
+   * @returns true if account is stored as elegible
+   */
+  public async hasElegibleAccount(account: Address): Promise<boolean> {
+    return this.getCoercedOrDefault(createRegistryAccount(account), () => true, false)
   }
 
   static createMock(id?: PublicKey): HoprDB {

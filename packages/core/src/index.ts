@@ -1134,6 +1134,14 @@ class Hopr extends EventEmitter {
   }
 
   /**
+   * @param id the public key of the account we want to check if it's whitelisted
+   * @returns true if whitelisted
+   */
+  public async isWhitelisted(id: PublicKey): Promise<boolean> {
+    return this.connector.isWhitelisted(id)
+  }
+
+  /**
    * Takes a destination and samples randomly intermediate nodes
    * that will relay that message before it reaches its destination.
    *
