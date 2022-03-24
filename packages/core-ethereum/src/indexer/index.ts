@@ -128,15 +128,6 @@ class Indexer extends EventEmitter {
     this.unsubscribeErrors = this.chain.subscribeError(async (error: any) => {
       await this.onProviderError(error) // exceptions are handled
     })
-    this.unsubscribeRegistryEvents = this.chain.subscribeRegistryEvents((registryEvent: TypedEvent<any, any>) => {
-      if (registryEvent.event === 'AddedToWhitelist' || registryEvent.event === 'OwnerAddedToWhitelist') {
-        // TODO: validate HoprMultiaddr string
-        // if valid
-        this.onNewEvents([registryEvent])
-      } else {
-        this.onNewEvents([registryEvent])
-      }
-    })
 
     // get past events
     fromBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, this.blockRange)

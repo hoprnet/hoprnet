@@ -1,7 +1,7 @@
 import chai, { expect } from 'chai'
 import { deployments, ethers } from 'hardhat'
-import { FakeContract, smock } from '@defi-wonderland/smock'
-import { constants, Contract, Signer } from 'ethers'
+import { smock } from '@defi-wonderland/smock'
+import { Contract, Signer } from 'ethers'
 import { HoprStakingProxyForNetworkRegistry } from '../../src/types'
 import { INITIAL_MIN_STAKE } from '../../deploy/06_HoprNetworkRegistry'
 
@@ -13,7 +13,6 @@ const NFT_RANK = [123, 456]
 const HIGH_STAKE = 2000
 const LOW_STAKE = 100
 
-const hoprAddress = (i: number) => `16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x${i}`
 
 const createFakeStakeV2Contract = async (participants: string[]) => {
   const stakeV2Fake = await smock.fake([
@@ -119,13 +118,12 @@ const useFixtures = deployments.createFixture(async (_hre) => {
 
 describe('Registry proxy for stake v2', () => {
   let owner: Signer
-  let participants: Signer[]
   let participantAddresses: string[]
   let hoprStakingProxyForNetworkRegistry: Contract
 
   describe('Self whitelist', () => {
     before(async () => {
-      ;({ owner, participants, participantAddresses, hoprStakingProxyForNetworkRegistry } = await useFixtures())
+      ;({ owner, participantAddresses, hoprStakingProxyForNetworkRegistry } = await useFixtures())
       //   add eligible NFT
       await hoprStakingProxyForNetworkRegistry.connect(owner).ownerAddNftTypeAndRank(NFT_TYPE[0], NFT_RANK[1])
     })

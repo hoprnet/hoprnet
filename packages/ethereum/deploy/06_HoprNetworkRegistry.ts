@@ -18,7 +18,6 @@ const main = async function (hre: HardhatRuntimeEnvironment) {
 
   const environmentConfig = PROTOCOL_CONFIG.environments[environment]
   const deployer = await getNamedAccounts().then((o) => ethers.getSigner(o.deployer))
-  const deploymentType = Object.keys(network.tags).find((tag) => minStakes[tag])
 
   const adminAddress =
     network.name == 'hardhat' ? deployer.address : environmentConfig['network_registry_admin_address']
