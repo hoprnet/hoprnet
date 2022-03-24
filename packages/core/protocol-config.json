@@ -7,7 +7,7 @@
       "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}",
       "minted_token_receiver_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "stake_v2_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
-      "registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
       "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["development"]
     },
@@ -18,7 +18,7 @@
       "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}",
       "minted_token_receiver_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "stake_v2_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
-      "registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
       "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["development"]
     },
@@ -29,7 +29,7 @@
       "channels_contract_address": "0x6308AfA141d0ab05049422527E12b2db5B0E247A",
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
       "stake_v2_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
-      "registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
       "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["development"]
     },
@@ -40,7 +40,7 @@
       "channels_contract_address": "0x5daae235eEAeA72D9116702A615c2Be89D00D91b",
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
       "stake_v2_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
-      "registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
       "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["development"]
     },
@@ -50,7 +50,7 @@
       "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
       "channels_contract_address": "0xd2229d5d54bE8ABC9A2b2d5cFdEd22B48FB8ce2c",
       "stake_v2_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
-      "registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
       "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["production"]
     },
@@ -60,7 +60,7 @@
       "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
       "channels_contract_address": "0x4f98F01cb02083eb5457CA0DDC6B37073ec5388a",
       "stake_v2_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
-      "registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
       "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["production"]
     },
@@ -70,7 +70,7 @@
       "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
       "channels_contract_address": "0xEee8AB66b7169b3f9024676165fB1D2a25E472c5",
       "stake_v2_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
-      "registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
       "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["production"]
     }
