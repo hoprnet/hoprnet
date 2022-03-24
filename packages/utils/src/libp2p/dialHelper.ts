@@ -4,9 +4,11 @@
 import type PeerId from 'peer-id'
 import type LibP2P from 'libp2p'
 import type { Address } from 'libp2p/src/peer-store/address-book'
+import type { Connection } from 'libp2p/src/connection-manager'
+import type { MuxedStream } from 'libp2p/src/upgrader'
 import { Multiaddr } from 'multiaddr'
 
-import { abortableTimeout, type TimeoutOpts } from '../async'
+import { timeout, abortableTimeout, type TimeoutOpts } from '../async'
 
 import { debug } from '../process'
 import { green } from 'chalk'
@@ -73,6 +75,49 @@ function printPeerStoreAddresses(msg: string, addresses: Address[]): void {
   }
 }
 
+async function tryExistingConnections(
+  libp2p: LibP2P,
+  destination: PeerId,
+  protocol: string
+): Promise<void | {
+  conn: Connection
+  stream: MuxedStream
+}> {
+  const existingConnections = libp2p.connectionManager.getAll(destination)
+
+  if (existingConnections == undefined || existingConnections.length == 0) {
+    return
+  }
+
+  let stream: MuxedStream | undefined
+  let conn: Connection | undefined
+
+  const deadConnections: Connection[] = []
+
+  for (const existingConnection of existingConnections) {
+    try {
+      stream = (await timeout(1000, () => existingConnection.newStream(protocol)))?.stream
+    } catch (err) {}
+
+    if (stream == undefined) {
+      deadConnections.push(existingConnection)
+    } else {
+      conn = existingConnection
+      break
+    }
+  }
+
+  log(`dead connection`, deadConnections)
+
+  for (const deadConnection of deadConnections) {
+    libp2p.connectionManager.onDisconnect(deadConnection)
+  }
+
+  if (stream != undefined && conn != undefined) {
+    return { conn, stream }
+  }
+}
+
 /**
  * Performs a dial attempt and handles possible errors.
  * @param libp2p Libp2p instance
@@ -80,25 +125,28 @@ function printPeerStoreAddresses(msg: string, addresses: Address[]): void {
  * @param protocol which protocol to use
  * @param opts timeout options
  */
-async function attemptDial(
-  libp2p: Pick<LibP2P, 'dialProtocol'>,
+async function establishNewConnection(
+  libp2p: LibP2P,
   destination: PeerId,
   protocol: string,
   opts: Required<TimeoutOpts>
-): Promise<
-  | DialResponse
-  | {
-      status: InternalDialStatus.CONTINUE
-    }
-> {
+): Promise<{
+  stream: MuxedStream
+  protocol: string
+} | void> {
   const start = Date.now()
-  let struct: Awaited<ReturnType<LibP2P['dialProtocol']>> | null
+
+  let struct: {
+    stream: MuxedStream
+    protocol: string
+  } | null
 
   let aborted = false
 
   const onAbort = () => {
     aborted = true
   }
+
   opts.signal.addEventListener('abort', onAbort)
 
   try {
@@ -123,15 +171,10 @@ async function attemptDial(
       } catch (err) {
         logError(`Error while ending obsolete write stream`, err)
       }
+    } else {
+      return struct
     }
-    return { status: DialStatus.SUCCESS, resp: struct }
   }
-
-  if (aborted) {
-    return { status: DialStatus.ABORTED }
-  }
-
-  return { status: InternalDialStatus.CONTINUE }
 }
 
 type Relayers = {
@@ -198,7 +241,7 @@ async function queryDHT(
  * @returns
  */
 async function doDial(
-  libp2p: ReducedLibp2p,
+  libp2p: LibP2P,
   destination: PeerId,
   protocol: string,
   opts: Required<TimeoutOpts>
