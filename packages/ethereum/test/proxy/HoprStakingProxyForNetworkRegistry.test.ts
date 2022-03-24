@@ -13,7 +13,6 @@ const NFT_RANK = [123, 456]
 const HIGH_STAKE = 2000
 const LOW_STAKE = 100
 
-
 const createFakeStakeV2Contract = async (participants: string[]) => {
   const stakeV2Fake = await smock.fake([
     {
