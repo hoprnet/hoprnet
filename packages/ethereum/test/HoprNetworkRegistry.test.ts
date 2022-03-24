@@ -86,9 +86,9 @@ describe('HoprNetworkRegistry', () => {
         .withArgs(constants.AddressZero)
     })
     it('fail to update the registry', async () => {
-      await expect(
-        hoprNetworkRegistry.updateRequirementImplementation(constants.AddressZero)
-      ).to.be.revertedWith('Ownable: caller is not the owner')
+      await expect(hoprNetworkRegistry.updateRequirementImplementation(constants.AddressZero)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
+      )
     })
   })
   describe('Register contract', () => {
@@ -96,25 +96,35 @@ describe('HoprNetworkRegistry', () => {
       ;({ owner, participants, participantAddresses, registryFake, hoprNetworkRegistry } = await useFixtures())
     })
     it('can self-register when the requirement is fulfilled and emits false', async () => {
-      const participantIndex = 1;
-      await expect(hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister(hoprAddress(participantIndex)))
+      const participantIndex = 1
+      await expect(
+        hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister(hoprAddress(participantIndex))
+      )
         .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
         .withArgs(participantAddresses[participantIndex], true)
         .to.emit(hoprNetworkRegistry, 'Registered')
         .withArgs(participantAddresses[participantIndex], hoprAddress(participantIndex))
     })
     it('can self-register when the requirement is not fulfilled, but emits nothing', async () => {
-      const participantIndex = 3;
-      const tx = await hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister(hoprAddress(participantIndex));
+      const participantIndex = 3
+      const tx = await hoprNetworkRegistry
+        .connect(participants[participantIndex])
+        .selfRegister(hoprAddress(participantIndex))
       expect(tx.value.toString()).to.be.equal('0')
     })
     it('fail to when array length does not match', async () => {
       await expect(
-        hoprNetworkRegistry.connect(owner).ownerRegister([participantAddresses[5], participantAddresses[6]], [hoprAddress(5)])
+        hoprNetworkRegistry
+          .connect(owner)
+          .ownerRegister([participantAddresses[5], participantAddresses[6]], [hoprAddress(5)])
       ).to.be.revertedWith('HoprNetworkRegistry: hoprAddresses and accounts lengths mismatch')
     })
     it('can register by the owner', async () => {
-      await expect(hoprNetworkRegistry.connect(owner).ownerRegister([participantAddresses[5], participantAddresses[6]], [hoprAddress(5), hoprAddress(6)]))
+      await expect(
+        hoprNetworkRegistry
+          .connect(owner)
+          .ownerRegister([participantAddresses[5], participantAddresses[6]], [hoprAddress(5), hoprAddress(6)])
+      )
         .to.emit(hoprNetworkRegistry, 'RegisteredByOwner')
         .withArgs(participantAddresses[5], hoprAddress(5))
         .to.emit(hoprNetworkRegistry, 'RegisteredByOwner')
@@ -133,7 +143,7 @@ describe('HoprNetworkRegistry', () => {
     })
   })
   describe('Sync with when criteria change', () => {
-    const participantIndex = 1;
+    const participantIndex = 1
     beforeEach(async () => {
       ;({ owner, participants, participantAddresses, registryFake, hoprNetworkRegistry } = await useFixtures())
       // // first time call - requirement is reverted
@@ -142,15 +152,23 @@ describe('HoprNetworkRegistry', () => {
       await hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister(hoprAddress(participantIndex))
     })
     it('owner can sync the criteria, before criteria change', async () => {
-      await expect(hoprNetworkRegistry.connect(owner).sync([participantAddresses[participantIndex], participantAddresses[0], participantAddresses[4]]))
-      .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
-      .withArgs(participantAddresses[participantIndex], true)
+      await expect(
+        hoprNetworkRegistry
+          .connect(owner)
+          .sync([participantAddresses[participantIndex], participantAddresses[0], participantAddresses[4]])
+      )
+        .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
+        .withArgs(participantAddresses[participantIndex], true)
     })
     it('owner can sync the criteria, after criteria change', async () => {
       // second time call - requirement is reverted
       registryFake.isRequirementFulfilled.whenCalledWith(participantAddresses[participantIndex]).returns(false)
 
-      await expect(hoprNetworkRegistry.connect(owner).sync([participantAddresses[participantIndex], participantAddresses[0], participantAddresses[4]]))
+      await expect(
+        hoprNetworkRegistry
+          .connect(owner)
+          .sync([participantAddresses[participantIndex], participantAddresses[0], participantAddresses[4]])
+      )
         // only participant[participantIndex] is registered
         .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
         .withArgs(participantAddresses[participantIndex], false)
@@ -164,40 +182,44 @@ describe('HoprNetworkRegistry', () => {
         .withArgs(participantAddresses[participantIndex], false)
     })
     it('anyone can check the eligibility', async () => {
-      expect(await hoprNetworkRegistry.isAccountRegisteredAndEligible(participantAddresses[participantIndex])).to.be.true;
+      expect(await hoprNetworkRegistry.isAccountRegisteredAndEligible(participantAddresses[participantIndex])).to.be
+        .true
     })
     it('anyone can check the eligibility, it returns false although it meets criteria but not registered', async () => {
-      expect(await hoprNetworkRegistry.isAccountRegisteredAndEligible(participantAddresses[0])).to.be.false;
+      expect(await hoprNetworkRegistry.isAccountRegisteredAndEligible(participantAddresses[0])).to.be.false
     })
     it('anyone can check the eligibility, it returns false when the criteria is not met', async () => {
-      expect(await hoprNetworkRegistry.isAccountRegisteredAndEligible(participantAddresses[4])).to.be.false;
+      expect(await hoprNetworkRegistry.isAccountRegisteredAndEligible(participantAddresses[4])).to.be.false
     })
     it('anyone can check the eligibility, it returns false the criteria changes', async () => {
       // second time call - requirement is reverted
       registryFake.isRequirementFulfilled.whenCalledWith(participantAddresses[participantIndex]).returns(false)
-      expect(await hoprNetworkRegistry.isAccountRegisteredAndEligible(participantAddresses[participantIndex])).to.be.false;
+      expect(await hoprNetworkRegistry.isAccountRegisteredAndEligible(participantAddresses[participantIndex])).to.be
+        .false
     })
     it('self-registered account emits false when the requirement is not fulfilled', async () => {
       // second time call - requirement is reverted
       registryFake.isRequirementFulfilled.whenCalledWith(participantAddresses[participantIndex]).returns(false)
 
-      await expect(hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister(hoprAddress(participantIndex)))
+      await expect(
+        hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister(hoprAddress(participantIndex))
+      )
         .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
         .withArgs(participantAddresses[participantIndex], false)
     })
     it('anyone can check the node eligibility', async () => {
-      expect(await hoprNetworkRegistry.isNodeRegisteredAndEligible(hoprAddress(participantIndex))).to.be.true;
+      expect(await hoprNetworkRegistry.isNodeRegisteredAndEligible(hoprAddress(participantIndex))).to.be.true
     })
     it('anyone can check the node eligibility, it returns false although it meets criteria but not registered', async () => {
-      expect(await hoprNetworkRegistry.isNodeRegisteredAndEligible(hoprAddress(0))).to.be.false;
+      expect(await hoprNetworkRegistry.isNodeRegisteredAndEligible(hoprAddress(0))).to.be.false
     })
     it('anyone can check the node eligibility, it returns false when the criteria is not met', async () => {
-      expect(await hoprNetworkRegistry.isNodeRegisteredAndEligible(hoprAddress(4))).to.be.false;
+      expect(await hoprNetworkRegistry.isNodeRegisteredAndEligible(hoprAddress(4))).to.be.false
     })
     it('anyone can check the node eligibility, it returns false the criteria changes', async () => {
       // second time call - requirement is reverted
       registryFake.isRequirementFulfilled.whenCalledWith(participantAddresses[participantIndex]).returns(false)
-      expect(await hoprNetworkRegistry.isNodeRegisteredAndEligible(hoprAddress(participantIndex))).to.be.false;
+      expect(await hoprNetworkRegistry.isNodeRegisteredAndEligible(hoprAddress(participantIndex))).to.be.false
     })
   })
 })
