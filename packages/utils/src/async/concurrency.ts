@@ -13,16 +13,21 @@ const log = debug('hopr:concurrency-limitter')
  */
 export function oneAtATime<ReturnType>(): (fn: () => Promise<ReturnType>) => void {
   const queue = FIFO<() => Promise<ReturnType>>()
+  let isRunning: boolean = false
 
   function push(fn: () => Promise<ReturnType>): void {
     queue.push(fn)
+    maybeStart()
+  }
 
-    if (queue.size() == 1) {
+  function maybeStart(): void {
+    if (queue.size() == 1 && !isRunning) {
       start()
     }
   }
 
   async function start(): Promise<void> {
+    isRunning = true
     while (queue.size() > 0) {
       try {
         await queue.shift()()
@@ -30,6 +35,7 @@ export function oneAtATime<ReturnType>(): (fn: () => Promise<ReturnType>) => voi
         log(err)
       }
     }
+    isRunning = false
   }
 
   return push

@@ -1,7 +1,8 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
 import chalk from 'chalk'
-import { AbstractCommand, GlobalState } from './abstractCommand'
+import type { StateOps } from '../types'
+import { AbstractCommand } from './abstractCommand'
 import { checkPeerIdInput, styleValue } from './utils'
 import { ChannelStatus } from '@hoprnet/hopr-utils'
 
@@ -18,14 +19,14 @@ export default class CloseChannel extends AbstractCommand {
     return 'Close an open channel'
   }
 
-  async execute(log, query: string, state: GlobalState): Promise<void> {
+  async execute(log, query: string, { getState }: StateOps): Promise<void> {
     if (query == null) {
       return log(styleValue(`Invalid arguments. Expected 'close <peerId>'. Received '${query}'`, 'failure'))
     }
 
     let peerId: PeerId
     try {
-      peerId = await checkPeerIdInput(query, state)
+      peerId = checkPeerIdInput(query, getState())
     } catch (err) {
       return log(styleValue(err.message, 'failure'))
     }
@@ -33,7 +34,7 @@ export default class CloseChannel extends AbstractCommand {
     log('Closing channel...')
 
     try {
-      const { status, receipt } = await this.node.closeChannel(peerId)
+      const { status, receipt } = await this.node.closeChannel(peerId, 'outgoing')
       const smartContractInfo = this.node.smartContractInfo()
       const channelClosureMins = Math.ceil(smartContractInfo.channelClosureSecs / 60) // convert to minutes
 

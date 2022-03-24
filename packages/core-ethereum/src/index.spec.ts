@@ -1,6 +1,6 @@
 import { dbMock, debug, stringToU8a } from '@hoprnet/hopr-utils'
 import sinon from 'sinon'
-import HoprCoreEthereum, { ChainWrapperSingleton, Indexer, useFixtures } from '.'
+import HoprCoreEthereum, { Indexer, useFixtures } from '.'
 import { sampleChainOptions } from './ethereum.mock'
 import { ACCOUNT_A, PARTY_A } from './fixtures'
 
@@ -9,12 +9,8 @@ const log = debug(namespace)
 
 describe(`HoprEthereum`, function () {
   beforeEach(async () => {
-    const { chain, indexer } = await useFixtures()
+    const { indexer } = await useFixtures()
     log('ChainWrapper obtained from fixtures')
-    sinon.stub(ChainWrapperSingleton, 'create').callsFake(() => {
-      log('chainwrapper singleton stub started')
-      return Promise.resolve(chain)
-    })
     sinon.stub(Indexer, 'prototype').callsFake(() => {
       log('indexer constructor started')
       return indexer

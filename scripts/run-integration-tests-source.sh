@@ -108,14 +108,36 @@ function cleanup {
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
 
-  exit $EXIT_CODE
+  local log exit_code non_zero
+  for node_log in "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}" "${node5_log}" "${node6_log}" "${node7_log}"; do
+    log=$(wait_for_regex ${node_log} "Process exiting with signal [0-9]")
+
+    if [ -z "${log}" ]; then
+      log "${node_log}"
+      log "Process did not exit properly"
+      exit 1
+    fi
+
+    exit_code=$(echo ${log} | sed -E "s/.*signal[ ]([0-9]+).*/\1/")
+    if [ ${exit_code} != "0" ]; then
+      non_zero=true
+      log "${node_log}"
+      log "terminated with non-zero exit code ${exit_code}"
+    fi
+  done
+
+  if [ ${non_zero} ]; then
+    exit 1
+  else
+    exit $EXIT_CODE
+  fi
 }
 
 if [ "${skip_cleanup}" != "1" ] && [ "${skip_cleanup}" != "true" ]; then
   trap cleanup SIGINT SIGTERM ERR EXIT
 fi
 
-# $1 = rest port
+# $1 = api port
 # $2 = node port
 # $3 = admin port
 # $4 = node data directory
@@ -123,7 +145,7 @@ fi
 # $6 = node id file
 # $7 = OPTIONAL: additional args to hoprd
 function setup_node() {
-  local rest_port=${1}
+  local api_port=${1}
   local node_port=${2}
   local admin_port=${3}
   local dir=${4}
@@ -131,7 +153,7 @@ function setup_node() {
   local id=${6}
   local additional_args=${7:-""}
 
-  log "Run node ${id} on rest port ${rest_port} -> ${log}"
+  log "Run node ${id} on API port ${api_port} -> ${log}"
 
   if [[ "${additional_args}" != *"--environment "* ]]; then
     additional_args="--environment hardhat-localhost ${additional_args}"
@@ -152,12 +174,16 @@ function setup_node() {
     --identity="${id}" \
     --init \
     --password="${password}" \
-    --rest \
-    --restPort "${rest_port}" \
+    --api \
+    --apiPort "${api_port}" \
     --testAnnounceLocalAddresses \
     --testPreferLocalAddresses \
     --testUseWeakCrypto \
     --testNoUPNP \
+    --allowLocalNodeConnections \
+    --allowPrivateNodeConnections \
+    --heartbeatInterval 2500 \
+    --heartbeatVariance 1000 \
     ${additional_args} \
     > "${log}" 2>&1 &
 }
@@ -249,7 +275,7 @@ ensure_port_is_free 20000
 
 # --- Cleanup old contract deployments {{{
 log "Removing artifacts from old contract deployments"
-rm -Rfv \
+rm -Rf \
   "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
   "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
 # }}}
@@ -275,6 +301,9 @@ cp -R \
   "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
 # }}}
 
+# static address because static private key
+declare ct_node1_address="0xDe913EeED23Bce5274eAD3dE8c196A41176fbd49"
+
 #  --- Run nodes --- {{{
 setup_node 13301 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}" "--announce"
 setup_node 13302 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "--announce --testNoAuthentication"
@@ -282,15 +311,25 @@ setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}" "--anno
 setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}" "--testNoDirectConnections"
 setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}" "--testNoDirectConnections"
 setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--announce --run \"info;balance\""
-setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--announce --environment hardhat-localhost2" # should not be able to talk to the rest
-setup_ct_node "${ct_node1_log}" "0xa08666bca1363cb00b5402bbeb6d47f6b84296f3bba0f2f95b1081df5588a613" 20000 "${ct_node1_dir}"
+# should not be able to talk to the rest
+setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--announce --environment hardhat-localhost2"
+setup_ct_node "${ct_node1_log}" "0xa08666bca1363cb00b5402bbeb6d47f6b84296f3bba0f2f95b1081df5588a613" 20000 "${ct_node1_dir}" 
 # }}}
 
-declare ct_node1_address=$(wait_for_regex ${ct_node1_log} "Address: " | cut -d " " -f 4)
 log "CT node1 address: ${ct_node1_address}"
 
-log "Funding nodes"
+# DO NOT MOVE THIS STEP
+#  --- Wait until private key has been created or recovered --- {{{
+wait_for_regex ${node1_log} "please fund this node"
+wait_for_regex ${node2_log} "please fund this node"
+wait_for_regex ${node3_log} "please fund this node"
+wait_for_regex ${node4_log} "please fund this node"
+wait_for_regex ${node5_log} "please fund this node"
+wait_for_regex ${node6_log} "please fund this node"
+wait_for_regex ${node7_log} "please fund this node"
+# }}}
 
+log "Funding nodes"
 #  --- Fund nodes --- {{{
 HOPR_ENVIRONMENT_ID=hardhat-localhost \
 TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
@@ -301,19 +340,6 @@ yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
   --network hardhat \
   --address "${ct_node1_address}" \
   --password "${password}"
-# }}}
-
-log "Waiting for nodes startup"
-
-#  --- Wait until started --- {{{
-# Wait until node has recovered its private key
-wait_for_regex ${node1_log} "using blockchain address"
-wait_for_regex ${node2_log} "using blockchain address"
-wait_for_regex ${node3_log} "using blockchain address"
-wait_for_regex ${node4_log} "using blockchain address"
-wait_for_regex ${node5_log} "using blockchain address"
-wait_for_regex ${node6_log} "using blockchain address"
-wait_for_regex ${node7_log} "using blockchain address"
 # }}}
 
 log "Waiting for port binding"
@@ -328,11 +354,20 @@ wait_for_regex ${node5_log} "STARTED NODE"
 wait_for_port 19097 "127.0.0.1" "${node7_log}"
 # }}}
 
+#  --- Ensure data directories are used --- {{{
+for node_dir in ${node1_dir} ${node2_dir} ${node3_dir} ${node4_dir} ${node5_dir}; do
+  declare node_dir_db="${node_dir}/db/LOG"
+  declare node_dir_peerstore="${node_dir}/peerstore/LOG"
+  [ -f "${node_dir_db}" ] || { echo "Data file ${node_dir_db} missing"; exit 1; }
+  [ -f "${node_dir_peerstore}" ] || { echo "Data file ${node_dir_peerstore} missing"; exit 1; }
+done
+# }}}
+
 log "All nodes came up online"
 
 # --- Run security tests --- {{{
 ${mydir}/../test/security-test.sh \
-  127.0.0.1 13301 19501 19502 "${api_token}"
+  127.0.0.1 13301 13302 19501 19502 "${api_token}"
 # }}}
 
 # --- Run protocol test --- {{{
@@ -342,8 +377,8 @@ HOPRD_API_TOKEN="${api_token}" ${mydir}/../test/integration-test.sh \
 
 # -- Verify node6 has executed the commands {{{
 log "Verifying node6 log output"
-grep -E "HOPR Balance: +10 txHOPR" "${node6_log}"
-grep -E "ETH Balance: +1 xDAI" "${node6_log}"
+grep -E "HOPR Balance: +20000 txHOPR" "${node6_log}"
+grep -E "ETH Balance: +10 xDAI" "${node6_log}"
 grep -E "Running on: hardhat" "${node6_log}"
 # }}}
 

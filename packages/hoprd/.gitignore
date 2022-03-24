@@ -1,6 +1,7 @@
 /node_modules
 /lib
 /db
+/hoprd-db
 
 # Exclude built npm packages
 /*.tgz
@@ -9,3 +10,6 @@
 
 # used only in release and should not be tracked
 /default-environment.json
+
+# auto-generated file
+/rest-api-v2-full-spec.yaml

@@ -4,8 +4,7 @@ import fs from 'fs'
 import { setTimeout } from 'timers/promises'
 
 import { NOISE } from '@chainsafe/libp2p-noise'
-
-const MPLEX = require('libp2p-mplex')
+const Mplex = require('libp2p-mplex')
 
 import { default as HoprConnect, type HoprConnectConfig } from '@hoprnet/hopr-connect'
 import { Multiaddr } from 'multiaddr'
@@ -87,7 +86,7 @@ async function startNode(
     },
     modules: {
       transport: [HoprConnect as any],
-      streamMuxer: [MPLEX],
+      streamMuxer: [Mplex],
       connEncryption: [NOISE as any]
     },
     config: {
@@ -260,6 +259,16 @@ function parseCLIOptions() {
       type: 'boolean',
       default: false
     })
+    .option('allowLocalNodeConnections', {
+      boolean: true,
+      describe: 'Allow connections to other nodes running on localhost.',
+      default: false
+    })
+    .option('allowPrivateNodeConnections', {
+      boolean: true,
+      describe: 'Allow connections to other nodes running on private addresses.',
+      default: false
+    })
     .option('command', {
       describe: 'example: --command.name dial --command.targetIdentityName charly',
       type: 'string'
@@ -313,16 +322,17 @@ async function main() {
       config: {
         initialNodes: bootstrapAddress ? [bootstrapAddress] : undefined,
         maxRelayedConnections: parsedOpts.maxRelayedConnections,
-        relayFreeTimeout: parsedOpts.relayFreeTimeout
+        relayFreeTimeout: parsedOpts.relayFreeTimeout,
+        allowLocalConnections: parsedOpts.allowLocalNodeConnections,
+        allowPrivateConnections: parsedOpts.allowPrivateNodeConnections
       },
       testing: {
         __noDirectConnections: parsedOpts.noDirectConnections,
         __noWebRTCUpgrade: parsedOpts.noWebRTCUpgrade,
         __noUPNP: parsedOpts.noUPNP,
-        __preferLocalAddresses: parsedOpts.preferLocalAddresses,
-        __runningLocally: false
+        __preferLocalAddresses: parsedOpts.preferLocalAddresses
       }
-    }
+    } as HoprConnectConfig
   )
 
   await executeCommands({ node, cmds: parsedOpts.script, pipeFileStream })

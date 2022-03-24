@@ -11,13 +11,13 @@ describe('test PeerStore', async function () {
     const networkPeers = new PeerStore([], [SELF])
     assert(networkPeers.length() == 0, 'networkPeers must be empty')
 
-    networkPeers.register(SELF)
+    networkPeers.register(SELF, 'test')
     assert(networkPeers.length() == 0, 'networkPeers must be empty after inserting self')
 
-    networkPeers.register(IDS[0])
-    networkPeers.register(IDS[1])
+    networkPeers.register(IDS[0], 'test')
+    networkPeers.register(IDS[1], 'test')
     assert(networkPeers.length() == 2, 'now has 2 peers')
-    networkPeers.register(IDS[0])
+    networkPeers.register(IDS[0], 'test')
     assert(networkPeers.length() == 2, `Updating a peer should not increase len`)
   })
 
@@ -32,21 +32,43 @@ describe('test PeerStore', async function () {
     assert(networkPeers.length() == 0, 'networkPeers must be empty')
     assert(networkPeers.pingSince(123).length === 0, 'no peers yet')
 
-    networkPeers.register(id)
+    networkPeers.register(id, 'test')
     assert(networkPeers.qualityOf(id) < Q, 'initial peers have low quality')
     assert(networkPeers.length() === 1)
 
-    await networkPeers.ping(id, () => Promise.resolve(true)) // 0.3
-    await networkPeers.ping(id, () => Promise.resolve(true)) // 0.4
-    await networkPeers.ping(id, () => Promise.resolve(true)) // 0.5
-    await networkPeers.ping(id, () => Promise.resolve(true)) // 0.6
+    networkPeers.updateRecord({
+      destination: id,
+      lastSeen: Date.now()
+    }) // 0.3
+    networkPeers.updateRecord({
+      destination: id,
+      lastSeen: Date.now()
+    }) // 0.4
+    networkPeers.updateRecord({
+      destination: id,
+      lastSeen: Date.now()
+    }) // 0.5
+    networkPeers.updateRecord({
+      destination: id,
+      lastSeen: Date.now()
+    }) // 0.6
     assert(networkPeers.qualityOf(id) > Q, 'after 4 successful ping, peer is good quality')
 
-    await networkPeers.ping(id, () => Promise.resolve(false)) //0.5
+    networkPeers.updateRecord({
+      destination: id,
+      lastSeen: -1
+    }) // 0.5
     assert(networkPeers.qualityOf(id) <= Q, 'after 1 failed pings, peer is bad quality')
 
-    await networkPeers.ping(id, () => Promise.resolve(true))
-    await networkPeers.ping(id, () => Promise.resolve(true))
+    networkPeers.updateRecord({
+      destination: id,
+      lastSeen: Date.now()
+    }) // 0.5
+
+    networkPeers.updateRecord({
+      destination: id,
+      lastSeen: Date.now()
+    }) // 0.6
     assert(networkPeers.qualityOf(id) > Q, 'after 2 more pings, peer is good again')
   })
 
@@ -60,20 +82,27 @@ describe('test PeerStore', async function () {
     const networkPeers = new PeerStore([], [SELF], onPeerOffline)
 
     const id = fakePeerId(5)
-    networkPeers.register(id)
-    console.log('at start', networkPeers.debugLog())
+    networkPeers.register(id, 'test')
 
     while (networkPeers.qualityOf(id) <= NETWORK_QUALITY_THRESHOLD) {
-      await networkPeers.ping(id, () => Promise.resolve(true))
+      networkPeers.updateRecord({
+        destination: id,
+        lastSeen: Date.now()
+      })
     }
 
-    await networkPeers.ping(id, () => Promise.resolve(true))
+    networkPeers.updateRecord({
+      destination: id,
+      lastSeen: Date.now()
+    })
 
     while (networkPeers.qualityOf(id) >= NETWORK_QUALITY_THRESHOLD) {
-      await networkPeers.ping(id, () => Promise.resolve(false))
+      networkPeers.updateRecord({
+        destination: id,
+        lastSeen: -1
+      })
     }
 
-    console.log('at end', networkPeers.debugLog())
     assert(peerConsideredOffline, 'peer should be considered offline since quality fell below threshold')
     assert(showBackoff(networkPeers) < MAX_BACKOFF, 'even offline, backoff does not reach max')
   })

@@ -26,7 +26,9 @@
 
 ### Methods
 
+- [closureTimePassed](ChannelEntry.md#closuretimepassed)
 - [getId](ChannelEntry.md#getid)
+- [getRemainingClosureTime](ChannelEntry.md#getremainingclosuretime)
 - [serialize](ChannelEntry.md#serialize)
 - [toString](ChannelEntry.md#tostring)
 - [createMock](ChannelEntry.md#createmock)
@@ -55,7 +57,7 @@
 
 #### Defined in
 
-[types/channelEntry.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L55)
+[types/channelEntry.ts:75](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L75)
 
 ## Properties
 
@@ -123,9 +125,23 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L67)
+[types/channelEntry.ts:87](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L87)
 
 ## Methods
+
+### closureTimePassed
+
+▸ **closureTimePassed**(): `boolean`
+
+#### Returns
+
+`boolean`
+
+#### Defined in
+
+[types/channelEntry.ts:185](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L185)
+
+___
 
 ### getId
 
@@ -137,7 +153,27 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:128](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L128)
+[types/channelEntry.ts:176](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L176)
+
+___
+
+### getRemainingClosureTime
+
+▸ **getRemainingClosureTime**(): `BN`
+
+Computes the remaining time in seconds until the channel can be closed.
+Outputs `0` if there is no waiting time, and `-1` if the
+closure time of this channel is unknown.
+
+**`dev`** used to create more comprehensive debug logs
+
+#### Returns
+
+`BN`
+
+#### Defined in
+
+[types/channelEntry.ts:197](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L197)
 
 ___
 
@@ -151,7 +187,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L98)
+[types/channelEntry.ts:146](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L146)
 
 ___
 
@@ -165,7 +201,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:112](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L112)
+[types/channelEntry.ts:160](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L160)
 
 ___
 
@@ -179,7 +215,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:132](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L132)
+[types/channelEntry.ts:208](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L208)
 
 ___
 
@@ -199,7 +235,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L71)
+[types/channelEntry.ts:101](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L101)
 
 ___
 
@@ -211,7 +247,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `event` | `any` |
+| `event` | `ChannelUpdateEvent` |
 | `keyFor` | (`a`: [`Address`](Address.md)) => `Promise`<[`PublicKey`](PublicKey.md)\> |
 
 #### Returns
@@ -220,4 +256,4 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L82)
+[types/channelEntry.ts:127](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L127)

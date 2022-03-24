@@ -18,7 +18,7 @@ declare branch cluster_size package_version docker_image
 
 : ${HOPRD_API_TOKEN:?"env var missing"}
 : ${HOPRD_PASSWORD:?"env var missing"}
-: ${FUNDING_PRIV_KEY:?"env var missing"}
+: ${FAUCET_SECRET_API_KEY:?"env var missing"}
 
 # docker_image and cluster_size are configurable through script arguments
 docker_image="${1:-gcr.io/hoprassociation/hoprd}"
@@ -75,37 +75,24 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
 
       if [ "${cluster_tag}" = "-nat" ]; then
         log "\tNATed node, no announcements"
-        gcloud_create_or_update_instance_template "${cluster_template_name}" \
-          "${docker_image_full}" \
+        ${mydir}/setup-gcloud-cluster.sh \
           "${environment_id}" \
-          "${api_token}" \
-          "${password}"
-      else 
+          "" \
+          "${cluster_name}" \
+          "${docker_image_full}" \
+          "2" \
+          "${cluster_template_name}"
+      else
         # announce on-chain with routable address
-        gcloud_create_or_update_instance_template "${cluster_template_name}" \
-          "${docker_image_full}" \
+        ${mydir}/setup-gcloud-cluster.sh \
           "${environment_id}" \
-          "${api_token}" \
-          "${password}" \
+          "" \
+          "${cluster_name}" \
+          "${docker_image_full}" \
+          "3" \
+          "${cluster_template_name}" \
           "true"
       fi
-
-      gcloud_create_or_update_managed_instance_group "${cluster_name}" \
-        ${cluster_size} \
-        "${cluster_template_name}"
-
-      # get IPs of VMs which run hoprd
-      declare node_ips
-      node_ips=$(gcloud_get_managed_instance_group_instances_ips "${cluster_name}")
-      declare node_ips_arr=( ${node_ips} )
-
-      # fund nodes
-      declare eth_address
-      for ip in ${node_ips}; do
-        wait_until_node_is_ready "${ip}"
-        eth_address=$(get_native_address "${api_token}@${ip}:3001")
-        fund_if_empty "${eth_address}" "${environment_id}"
-      done
     done
   fi
 done

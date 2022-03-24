@@ -15,4 +15,8 @@ export type RegistryEventNames = keyof HoprNetworkRegistry['filters']
 export type RegistryEvent<T extends RegistryEventNames> = extractEventArgs<
   ReturnType<Pick<HoprNetworkRegistry['filters'], T>[T]>
 >
-export type IndexerEvents = 'announce' | 'withdraw-hopr' | 'withdraw-native' | 'channel-updated'
+export type IndexerEvents =
+  | `announce-${string}`
+  | `withdraw-hopr-${string}`
+  | `withdraw-native-${string}`
+  | `channel-updated-${string}`

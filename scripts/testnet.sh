@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# API used for funding the calls, ideally https://api.hoprnet.org. Source code in https://github.com/hoprnet/api
+declare API_ENDPOINT="https://api-hopr-oxbs3v49y-jjperezaguinaga.vercel.app"
+
 # prevent execution of this script, only allow sourcing
 $(return >/dev/null 2>&1)
 test "$?" -eq "0" || { echo "This script should only be sourced." >&2; exit 1; }
@@ -46,23 +49,85 @@ get_rpc() {
   echo "${unresolved_rpc}" | envsubst
 }
 
+# $1 = environment
+# $2 = token (native | hopr)
+funding_wallet_info() {
+  local environment="${1}"
+  local token="${2}"
+  curl --silent "$API_ENDPOINT/api/faucet/$environment/info?text=$token"
+}
+
+# $1 = environment
+# $2 = address
+# $3 = token
+wallet_balance() {
+  local environment="${1}"
+  local address="${2}"
+  local token="${3}"
+  curl --silent "$API_ENDPOINT/api/balance/$environment/$address/$token?text=true"
+}
+
+# $1 = environment
+# $2 = address
+# $3 = token (native | hopr)
+faucet_to_address() {
+  local environment="${1}"
+  local address="${2}"
+  local token="${3}"
+  local secret="${FAUCET_SECRET_API_KEY}"
+
+  curl --silent --request POST \
+  "$API_ENDPOINT/api/faucet/$environment/$address/$token?text=true" \
+  --header 'Content-Type: application/json' \
+  --data-raw "{\"secret\": \"$secret\"}"
+}
+
 # $1=account (hex)
 # $2=environment
 fund_if_empty() {
   local address="${1}"
   local environment="${2}"
 
-  # start funding in sequence (nonce-tracker will not be able to keep track of nonce in two processes)
-  # we need to use yarn explicitely to ensure packages can be resolved properly
-  PRIVATE_KEY="${FUNDING_PRIV_KEY}" yarn --silent run ts-node ${mydir}/fund-address.ts \
-	  --environment ${environment} --address ${address} --target ${min_funds}
+  local faucet_address
+  faucet_address=$(funding_wallet_info "${environment}" "address")
 
-  sleep 10
+  local faucet_native_balance faucet_hopr_balance
+  faucet_native_balance=$(funding_wallet_info "${environment}" "native")
+  faucet_hopr_balance=$(funding_wallet_info "${environment}" "hopr")
 
-  PRIVATE_KEY="${FUNDING_PRIV_KEY}" yarn --silent run ts-node ${mydir}/fund-address.ts \
-	  --environment ${environment} --address ${address} --target ${min_funds_hopr} --erc20
+  if [ "${faucet_native_balance}" = '0.0' ]; then
+    log "Wallet ${faucet_address} has zero balance and cannot fund node ${address}"
+    exit 1
+  fi;
 
-  sleep 10
+  if [ "${faucet_hopr_balance}" = '0.0' ]; then
+    log "Wallet ${faucet_address} has no HOPR tokens and cannot fund node ${address}"
+    exit 1
+  fi;
+
+  log "Funding wallet ${faucet_address} has enough funds: ${faucet_native_balance}"
+  log "Funding wallet ${faucet_address} has HOPR tokens: ${faucet_hopr_balance}"
+
+  local address_native_balance address_hopr_balance
+  log "Checking balance of the address to fund: ${address}"
+  address_native_balance=$(wallet_balance "${environment}" "${address}" "native")
+  log "Checking balance of the address to fund: ${address}"
+  address_hopr_balance=$(wallet_balance "${environment}" "${address}" "native")
+
+  log "Native balance of ${address} is ${address_native_balance}"
+  log "HOPR balance of ${address} is ${address_hopr_balance}"
+
+  if [ "${address_native_balance}" = '0.0' ]; then
+    # @TODO: Provide retry by checking balance again.
+    log "${address} has no native balance. Funding native tokens..."
+    faucet_to_address "${environment}" "${address}" "native"
+  fi
+
+  if [ "${address_hopr_balance}" = '0.0' ]; then
+    # @TODO: Provide retry by checking balance again.
+    log "${address} has no HOPR tokens. Funding HOPR tokens..."
+    faucet_to_address "${environment}" "${address}" "hopr"
+  fi
 }
 
 # $1=IP

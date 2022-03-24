@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 
 import Libp2p from 'libp2p'
 import TCP from 'libp2p-tcp'
-import MPLEX from 'libp2p-mplex'
+const Mplex = require('libp2p-mplex')
 import { NOISE } from '@chainsafe/libp2p-noise'
 import KadDHT from 'libp2p-kad-dht'
 import { Multiaddr } from 'multiaddr'
@@ -38,7 +38,7 @@ async function getNode(id = getPeerId()): Promise<Libp2p> {
     peerId: id,
     modules: {
       transport: [TCP],
-      streamMuxer: [MPLEX],
+      streamMuxer: [Mplex as any],
       connEncryption: [NOISE as any],
       dht: KadDHT
     },
@@ -95,6 +95,33 @@ describe('relay code generation', function () {
     }
 
     assert(fetchedFromNodeC.length > 0, `Node C must be able to perform the DHT query`)
+
+    await Promise.all([nodeA.stop(), nodeB.stop(), nodeC.stop()])
+  })
+
+  // Check that nodes can renew keys in the DHT
+  it('renew CID key', async function () {
+    const nodeA = await getNode(peerA)
+    const nodeB = await getNode(peerB)
+    const nodeC = await getNode(peerC)
+
+    await nodeA.dial(nodeB.multiaddrs[0])
+    await nodeB.dial(nodeC.multiaddrs[0])
+
+    const CIDA = await createRelayerKey(nodeA.peerId)
+
+    const ATTEMPTS = 3
+
+    for (let i = 0; i < ATTEMPTS; i++) {
+      await nodeA.contentRouting.provide(CIDA)
+
+      const fetchedFromNodeC = []
+      for await (const resultC of nodeC.contentRouting.findProviders(CIDA)) {
+        fetchedFromNodeC.push(resultC)
+      }
+
+      assert(fetchedFromNodeC.length > 0, `Node C must be able to perform the DHT query. Attempt #${i + 1}`)
+    }
 
     await Promise.all([nodeA.stop(), nodeB.stop(), nodeC.stop()])
   })

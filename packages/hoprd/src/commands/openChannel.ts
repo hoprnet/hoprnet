@@ -4,7 +4,8 @@ import { moveDecimalPoint, Balance } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import chalk from 'chalk'
 import { checkPeerIdInput, styleValue } from './utils'
-import { AbstractCommand, GlobalState } from './abstractCommand'
+import type { StateOps } from '../types'
+import { AbstractCommand } from './abstractCommand'
 
 export class OpenChannel extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -24,13 +25,13 @@ export class OpenChannel extends AbstractCommand {
    * with another party.
    * @param query peerId string to send message to
    */
-  public async execute(log, query: string, state: GlobalState): Promise<void> {
+  public async execute(log, query: string, { getState }: StateOps): Promise<void> {
     const [err, counterpartyStr, amountToFundStr] = this._assertUsage(query, ["counterParty's PeerId", 'amountToFund'])
     if (err) return log(styleValue(err, 'failure'))
 
     let counterparty: PeerId
     try {
-      counterparty = await checkPeerIdInput(counterpartyStr, state)
+      counterparty = checkPeerIdInput(counterpartyStr, getState())
     } catch (err) {
       return log(styleValue(err.message, 'failure'))
     }

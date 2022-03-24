@@ -47,7 +47,9 @@ start_node tests/node \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
   --noWebRTCUpgrade true \
-  --preferLocalAddresses true
+  --preferLocalAddresses true \
+  --allowLocalNodeConnections true \
+  --allowPrivateNodeConnections true
 
 # run bob (client)
 # should be able to receive 'test' from alice through charly
@@ -70,7 +72,9 @@ start_node tests/node "${bob_log}" \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
   --noWebRTCUpgrade true \
-  --preferLocalAddresses true
+  --preferLocalAddresses true \
+  --allowLocalNodeConnections true \
+  --allowPrivateNodeConnections true
 
 # run charly
 # should able to serve as a bootstrap
@@ -82,7 +86,9 @@ start_node tests/node "${charly_log}" \
   --noWebRTCUpgrade true \
   --preferLocalAddresses true \
   --noWebRTCUpgrade true \
-  --noDirectConnections false
+  --noDirectConnections false \
+  --allowLocalNodeConnections true \
+  --allowPrivateNodeConnections true
 
 # wait till nodes finish communicating
 wait_for_regex "${alice_log}" "all tasks executed"
@@ -118,7 +124,9 @@ start_node tests/node \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
   --noWebRTCUpgrade true \
-  --preferLocalAddresses true
+  --preferLocalAddresses true \
+  --allowLocalNodeConnections true \
+  --allowPrivateNodeConnections true
 
 # wait for the second alice to finish sending
 wait_for_regex "${alice2_log}" "all tasks executed"

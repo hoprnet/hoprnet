@@ -18,7 +18,8 @@ import {
   privKeyToPeerId,
   stringToU8a,
   Hash,
-  PRICE_PER_PACKET
+  PRICE_PER_PACKET,
+  Snapshot
 } from '@hoprnet/hopr-utils'
 import type { HalfKeyChallenge } from '@hoprnet/hopr-utils'
 import assert from 'assert'
@@ -45,6 +46,8 @@ const COUNTERPARTY = privKeyToPeerId(stringToU8a('0x0726a9704d56a013980a9077d195
 
 const nodes: PeerId[] = [SELF, RELAY0, RELAY1, RELAY2, COUNTERPARTY]
 
+const TestingSnapshot = new Snapshot(new BN(0), new BN(0), new BN(0))
+
 /**
  * Creates a mocked network to send and receive acknowledgements and packets
  * @param events simulates an Ethernet connection
@@ -55,7 +58,7 @@ function createFakeSendReceive(events: EventEmitter, self: PeerId) {
     events.emit('msg', msg, self, destination, protocol)
   }
 
-  const subscribe = (protocol: string, onPacket: (msg: Uint8Array, sender: PeerId) => any) => {
+  const subscribe = async (protocol: string, onPacket: (msg: Uint8Array, sender: PeerId) => any) => {
     events.on('msg', (msg: Uint8Array, sender: PeerId, destination: PeerId, protocolSubscription: string) => {
       if (self.equals(destination) && protocol === protocolSubscription) {
         onPacket(msg, sender)
@@ -112,12 +115,12 @@ async function createMinimalChannelTopology(dbs: HoprDB[], nodes: PeerId[]): Pro
       channel = getDummyChannel(peerId, nodes[index + 1])
 
       // Store channel entry at source
-      await dbs[index].updateChannel(channel.getId(), channel)
+      await dbs[index].updateChannelAndSnapshot(channel.getId(), channel, TestingSnapshot)
     }
 
     if (index > 0) {
       // Store channel entry at destination
-      await dbs[index].updateChannel(previousChannel.getId(), previousChannel)
+      await dbs[index].updateChannelAndSnapshot(previousChannel.getId(), previousChannel, TestingSnapshot)
 
       const channelInfo = new ChannelCommitmentInfo(
         1,
@@ -192,7 +195,7 @@ describe('packet acknowledgement', function () {
 
     await dbs[0].storePendingAcknowledgement(ackChallenge, true)
 
-    subscribeToAcknowledgements(
+    await subscribeToAcknowledgements(
       libp2pSelf.subscribe,
       dbs[0],
       SELF,
@@ -214,7 +217,7 @@ describe('packet acknowledgement', function () {
       `acknowledgement key must be sufficient to solve acknowledgement challenge`
     )
 
-    sendAcknowledgement(
+    await sendAcknowledgement(
       {
         createAcknowledgement: (privKey: PeerId) => {
           return Acknowledgement.create(ackMessage, ackKey, privKey)
@@ -236,13 +239,15 @@ describe('packet acknowledgement', function () {
   // The acknowledgement *must* be received and the half key
   // *must* be sufficient to solve the challenge.
   it('acknowledgement workflow as relayer', async function () {
-    const packet = await Packet.create(TEST_MESSAGE, [RELAY0, COUNTERPARTY], SELF, dbs[0])
+    const nodes: PeerId[] = [RELAY0, COUNTERPARTY]
+
+    const packet = await Packet.create(TEST_MESSAGE, nodes, SELF, dbs[0])
 
     const libp2pRelay0 = createFakeSendReceive(events, RELAY0)
 
     const ackReceived = defer<void>()
 
-    subscribeToAcknowledgements(
+    await subscribeToAcknowledgements(
       libp2pRelay0.subscribe,
       dbs[1],
       RELAY0,
@@ -270,8 +275,8 @@ describe('packet acknowledgement', function () {
 
     const libp2pCounterparty = createFakeSendReceive(events, COUNTERPARTY)
 
-    libp2pCounterparty.subscribe('protocolMsg', (msg: Uint8Array) => {
-      sendAcknowledgement(
+    await libp2pCounterparty.subscribe('protocolMsg', async (msg: Uint8Array) => {
+      await sendAcknowledgement(
         Packet.deserialize(msg, COUNTERPARTY, RELAY0),
         RELAY0,
         libp2pCounterparty.send as any,
@@ -280,7 +285,7 @@ describe('packet acknowledgement', function () {
       )
     })
 
-    interaction.handleMixedPacket(Packet.deserialize(packet.serialize(), RELAY0, SELF))
+    await interaction.handleMixedPacket(Packet.deserialize(packet.serialize(), RELAY0, SELF))
 
     await ackReceived.promise
   })
@@ -310,48 +315,49 @@ describe('packet relaying interaction', function () {
 
   it('packet-acknowledgement multi-relay workflow', async function () {
     const msgDefer = defer<void>()
-    const nodes: PeerId[] = [SELF, RELAY0, RELAY1, RELAY2, COUNTERPARTY]
-
+    const nodes: PeerId[] = [RELAY0, RELAY1, RELAY2, COUNTERPARTY]
+    const allNodes: PeerId[] = [SELF].concat(nodes)
     let senderInteraction: TestingForwardInteraction
 
-    for (const [index, pId] of nodes.entries()) {
+    const packet = await Packet.create(TEST_MESSAGE, nodes, SELF, dbs[0])
+    await packet.storePendingAcknowledgement(dbs[0])
+
+    for (const [index, pId] of allNodes.entries()) {
       const { subscribe, send } = createFakeSendReceive(events, pId)
 
-      let receive: (msg: Uint8Array) => void
-
-      if (pId.equals(COUNTERPARTY)) {
-        receive = (msg: Uint8Array) => {
-          if (u8aEquals(msg, TEST_MESSAGE)) {
+      const receiveHandler = (msg: Uint8Array): void => {
+        if (u8aEquals(msg, TEST_MESSAGE)) {
+          if (pId.equals(COUNTERPARTY)) {
             msgDefer.resolve()
+          } else {
+            console.log(`Peer ${pId} relaying message`)
           }
+        } else {
+          console.log(`Received unhandled message`, msg)
         }
-      } else {
-        receive = console.log
       }
 
       const interaction = new TestingForwardInteraction(
         subscribe,
         send as any,
         pId,
-        receive,
+        receiveHandler,
         dbs[index],
         'protocolMsg',
         'protocolAck'
       )
       interaction.useMockMixer()
+      await interaction.start()
 
       if (pId.equals(SELF)) {
         senderInteraction = interaction
       }
     }
 
-    const packet = await Packet.create(TEST_MESSAGE, [RELAY0, RELAY1, RELAY2, COUNTERPARTY], SELF, dbs[0])
-
-    await packet.storePendingAcknowledgement(dbs[0])
-
-    // Wait for acknowledgement
+    // Sending packet from self to relay0, which should further forward until counterparty
     await senderInteraction.interact(RELAY0, packet)
 
+    // The counterparty will resolve this once the message has been received
     await msgDefer.promise
   })
 })

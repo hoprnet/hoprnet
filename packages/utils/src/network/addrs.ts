@@ -1,9 +1,9 @@
 import { stringToU8a, u8aToHex } from '..'
-import type { Network } from './constants'
-import { PRIVATE_NETWORK, LINK_LOCAL_NETWORKS, LOOPBACK_ADDRS, RESERVED_ADDRS } from './constants'
+import { PRIVATE_NETWORK, LINK_LOCAL_NETWORKS, LOOPBACK_ADDRS, RESERVED_ADDRS, type Network } from './constants'
 
-import type { NetworkInterfaceInfo } from 'os'
-import { networkInterfaces } from 'os'
+import { networkInterfaces, type NetworkInterfaceInfo } from 'os'
+import PeerId from 'peer-id'
+import { Multiaddr } from 'multiaddr'
 
 /**
  * Checks if given address is any address
@@ -126,6 +126,38 @@ export function ipToU8aAddress(address: string, family: NetworkInterfaceInfo['fa
 }
 
 /**
+ * Returns the prefix length of a network prefix
+ * @param prefix network prefix, e.g. `new Uint8Array([255,255,255,0])`
+ * @returns the prefix length, e.g. 24
+ */
+export function prefixLength(prefix: Uint8Array) {
+  const masks: number[] = [128, 192, 224, 240, 248, 252, 254, 255]
+
+  let prefixLength = 0
+
+  for (let i = 0; i < prefix.length; i++) {
+    let bit = 0
+    for (; (prefix[i] & masks[bit]) == masks[bit]; bit++) {}
+
+    prefixLength += bit
+  }
+
+  return prefixLength
+}
+
+/**
+ * Takes a network prefix, a subnet and a IP address family and
+ * returns a CIDR string
+ * @param prefix network prefix, e.g. `new Uint8Array([10,0,0,0])
+ * @param subnet subnet, e.g. `new Uint8Array([255,255,255,0])
+ * @param family IP address family, `IPv4` or `IPv6`
+ * @returns a CIDR string, such as `192.168.1.0/24`
+ */
+export function u8aAddressToCIDR(prefix: Uint8Array, subnet: Uint8Array, family: NetworkInterfaceInfo['family']) {
+  return `${u8aAddrToString(prefix, family)}/${prefixLength(subnet)}`
+}
+
+/**
  * Converts ip address from byte representation to string
  * @param address ip addr given as Uint8Array
  * @param family ip address family, 'IPv4' or 'IPv6'
@@ -238,4 +270,13 @@ export function getPublicAddresses(_iface?: string): Network[] {
 
 export function getLocalHosts(_iface?: string): Network[] {
   return getAddresses(isLocalhost)
+}
+
+/**
+ * Create a multiaddress that is a circuit address using given relay to the given destination.
+ * @param relay Relay peer ID
+ * @param destination Destination peer ID
+ */
+export function createCircuitAddress(relay: PeerId, destination: PeerId) {
+  return new Multiaddr(`/p2p/${relay.toB58String()}/p2p-circuit/p2p/${destination.toB58String()}`)
 }

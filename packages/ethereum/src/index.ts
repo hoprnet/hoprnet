@@ -10,6 +10,7 @@ export type ContractData = {
   address: string
   transactionHash: string
   abi: any
+  blockNumber: string
 }
 
 export const getContractData = (network: string, environmentId: string, contract: ContractNames): ContractData => {

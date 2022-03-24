@@ -22,8 +22,6 @@ describe('test indexer', function () {
     await indexer.start(chain, 0)
 
     // Make sure that it assigns event listeners
-    assert(hoprChannels.listeners('*').length > 0)
-    assert(hoprToken.listeners('*').length > 0)
     assert(hoprChannels.listeners('error').length > 0)
     assert(hoprToken.listeners('error').length > 0)
     assert(provider.listeners('error').length > 0)
@@ -32,8 +30,6 @@ describe('test indexer', function () {
     indexer.stop()
 
     // Make sure that it does the cleanup properly
-    assert(hoprChannels.listeners('*').length == 0)
-    assert(hoprToken.listeners('*').length == 0)
     assert(hoprChannels.listeners('error').length == 0)
     assert(hoprToken.listeners('error').length == 0)
     assert(provider.listeners('error').length == 0)
@@ -54,8 +50,6 @@ describe('test indexer', function () {
     indexer.stop()
 
     // Make sure that it does the cleanup properly
-    assert(hoprChannels.listeners('*').length == 0)
-    assert(hoprToken.listeners('*').length == 0)
     assert(hoprChannels.listeners('error').length == 0)
     assert(hoprToken.listeners('error').length == 0)
     assert(provider.listeners('error').length == 0)
@@ -65,7 +59,7 @@ describe('test indexer', function () {
   it('should process 1 past event', async function () {
     const { indexer, OPENED_CHANNEL, chain, db } = await useFixtures({
       latestBlockNumber: 2,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
     await indexer.start(chain, 0)
 
@@ -96,16 +90,21 @@ describe('test indexer', function () {
     })
     await indexer.start(chain, 0)
 
+    const blockProcessed = defer<void>()
+
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber == 4) {
+        blockProcessed.resolve()
+      }
+    })
+
+    // confirmations == 1
+    newBlock()
+
     newEvent(fixtures.OPENED_EVENT)
     newBlock()
 
-    const blockMined = defer<void>()
-
-    indexer.on('block-processed', (blockNumber: number) => {
-      if (blockNumber === 4) blockMined.resolve()
-    })
-
-    await blockMined.promise
+    await blockProcessed.promise
 
     const channel = await db.getChannel(OPENED_CHANNEL.getId())
     expectChannelsToBeEqual(channel, OPENED_CHANNEL)
@@ -120,7 +119,7 @@ describe('test indexer', function () {
     await indexer.start(chain, 0)
 
     const pubKey = await indexer.getPublicKeyOf(fixtures.PARTY_A.toAddress())
-    assert.strictEqual(pubKey.toHex(), fixtures.PARTY_A.toHex())
+    assert(pubKey.eq(fixtures.PARTY_A))
   })
 
   it('should get all data from DB', async function () {
@@ -191,7 +190,7 @@ describe('test indexer', function () {
   it('should contract error by restarting', async function () {
     const { indexer, hoprChannels, chain } = await useFixtures({
       latestBlockNumber: 4,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
 
     await indexer.start(chain, 0)
@@ -325,6 +324,15 @@ describe('test indexer', function () {
     })
     await indexer.start(chain, 0)
 
+    const blockProcessed = defer<void>()
+
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber === 4) blockProcessed.resolve()
+    })
+
+    // confirmations == 1
+    newBlock()
+
     newEvent(fixtures.PARTY_A_INITIALIZED_EVENT)
     newEvent(fixtures.PARTY_B_INITIALIZED_EVENT)
     newEvent(fixtures.COMMITTED_EVENT) // setting commited first to test event sorting
@@ -332,13 +340,7 @@ describe('test indexer', function () {
 
     newBlock()
 
-    const blockMined = defer<void>()
-
-    indexer.on('block-processed', (blockNumber: number) => {
-      if (blockNumber === 4) blockMined.resolve()
-    })
-
-    await blockMined.promise
+    await blockProcessed.promise
 
     const channel = await db.getChannel(COMMITTED_CHANNEL.getId())
     expectChannelsToBeEqual(channel, COMMITTED_CHANNEL)
@@ -362,14 +364,17 @@ describe('test indexer', function () {
 
     const blockMined = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
-      if (blockNumber === 7) blockMined.resolve()
+      if (blockNumber == 5) {
+        blockMined.resolve()
+      }
     })
     await indexer.start(chain, 0)
 
+    // confirmations == 1
+    newBlock()
+
     newEvent(fixtures.UPDATED_WHEN_REDEEMED_EVENT)
     newEvent(fixtures.TICKET_REDEEMED_EVENT)
-    newBlock()
-    newBlock()
     newBlock()
 
     await blockMined.promise
@@ -392,19 +397,22 @@ describe('test indexer', function () {
     assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
     assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
 
-    const blockMined = defer<void>()
+    const blockProcessed = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
-      if (blockNumber === 7) blockMined.resolve()
+      if (blockNumber == 5) {
+        blockProcessed.resolve()
+      }
     })
     await indexer.start(chain, 0)
+
+    // confirmations == 1
+    newBlock()
 
     newEvent(fixtures.UPDATED_WHEN_REDEEMED_EVENT)
     newEvent(fixtures.TICKET_REDEEMED_EVENT)
     newBlock()
-    newBlock()
-    newBlock()
 
-    await blockMined.promise
+    await blockProcessed.promise
     assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
     assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
   })
@@ -424,19 +432,23 @@ describe('test indexer', function () {
     assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
     assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
 
-    const blockMined = defer<void>()
+    const blockProcessed = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
-      if (blockNumber === 7) blockMined.resolve()
+      if (blockNumber == 5) {
+        blockProcessed.resolve()
+      }
     })
+
     await indexer.start(chain, 0)
+
+    // confirmations == 1
+    newBlock()
 
     newEvent(fixtures.UPDATED_WHEN_REDEEMED_EVENT)
     newEvent(fixtures.TICKET_REDEEMED_EVENT)
     newBlock()
-    newBlock()
-    newBlock()
 
-    await blockMined.promise
+    await blockProcessed.promise
 
     assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
     assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
@@ -456,19 +468,22 @@ describe('test indexer', function () {
     assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
     assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
 
-    const blockMined = defer<void>()
+    const blockProcessed = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
-      if (blockNumber === 7) blockMined.resolve()
+      if (blockNumber == 5) {
+        blockProcessed.resolve()
+      }
     })
     await indexer.start(chain, 0)
+
+    // confirmations == 1
+    newBlock()
 
     newEvent(fixtures.UPDATED_WHEN_REDEEMED_EVENT)
     newEvent(fixtures.TICKET_REDEEMED_EVENT)
     newBlock()
-    newBlock()
-    newBlock()
 
-    await blockMined.promise
+    await blockProcessed.promise
 
     assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
     assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
@@ -490,19 +505,20 @@ describe('test indexer', function () {
     assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
     assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '1')
 
-    const blockMined = defer<void>()
+    const blockProcessed = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
-      if (blockNumber === 7) blockMined.resolve()
+      if (blockNumber == 5) blockProcessed.resolve()
     })
     await indexer.start(chain, 0)
+
+    // confirmations == 1
+    newBlock()
 
     newEvent(fixtures.UPDATED_WHEN_REDEEMED_EVENT)
     newEvent(fixtures.TICKET_REDEEMED_EVENT)
     newBlock()
-    newBlock()
-    newBlock()
 
-    await blockMined.promise
+    await blockProcessed.promise
     assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
     assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
   })
@@ -514,28 +530,33 @@ describe('test indexer', function () {
       id: fixtures.PARTY_A
     })
 
-    const secondBlockMined = defer<void>()
-    const thirdBlockMined = defer<void>()
+    const secondBlockProcessed = defer<void>()
+    const thirdBlockProcessed = defer<void>()
+
     indexer.on('block-processed', (blockNumber: number) => {
-      if (blockNumber === 2) secondBlockMined.resolve()
-      else if (blockNumber === 3) thirdBlockMined.resolve()
+      if (blockNumber == 1) {
+        secondBlockProcessed.resolve()
+      } else if (blockNumber == 2) {
+        thirdBlockProcessed.resolve()
+      }
     })
 
     await indexer.start(chain, 0)
 
     assert.equal((await db.getHoprBalance()).toString(), '0')
 
-    newTokenEvent(fixtures.PARTY_A_TRANSFER_INCOMING) // +3
-    newBlock()
+    // confirmations == 1
     newBlock()
 
-    await secondBlockMined.promise
+    newTokenEvent(fixtures.PARTY_A_TRANSFER_INCOMING) // +3
+    newBlock()
+
+    await secondBlockProcessed.promise
 
     newTokenEvent(fixtures.PARTY_A_TRANSFER_OUTGOING) // -1
     newBlock()
-    newBlock()
 
-    await thirdBlockMined.promise
+    await thirdBlockProcessed.promise
 
     assert.equal((await db.getHoprBalance()).toString(), '2')
   })

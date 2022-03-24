@@ -1,8 +1,8 @@
-# Release Processes
+# Release Process
 
-The HOPR Association _tech_ members and [Project Owner](./development.md#legend) have agreed on the following release processes to streamline the releases of HOPRd.
+The purpose of this process is to streamline the releases of HOPR packages.
 
-- [Release Processes](#release-processes)
+- [Release Process](#release-process)
   - [Types of release](#types-of-release)
     - [Internal release](#internal-release)
     - [Public release](#public-release)
@@ -56,7 +56,7 @@ The HOPR Association _tech_ members and [Project Owner](./development.md#legend)
 ### Milestone based releases
 
 At the end of a sprint, if a sufficient amount of features / bug fixes were implemented since last release, the [Trifecta](./development.md#trifecta) may queue and prioritize a new release for the **upcoming** sprint, this happens during [epic prioritization](./development.md#epic-prioritization).
-This new release is considered an [internal release](#internal-release) and may be [promoted](#release-promotion) to a [public release](#public-release) if [testing phases](#testing-phases) are succesful.
+This new release is considered an [internal release](#internal-release) and may be [promoted](#release-promotion) to a [public release](#public-release) if [testing phases](#testing-phases) are successful.
 
 ### Deadline based releases
 
@@ -116,6 +116,8 @@ This requirement will become simpler once [#2140](https://github.com/hoprnet/hop
 
 ## On a new release
 
+Before a new release is started, a release owner is picked by the [Tech Representatives](./development.md#representatives).
+
 To release, we do a code-freeze in our codebase by branching out a specific
 release by naming the branch `release/*`. New patches are then merged on that
 particular branch to deploy on every change.
@@ -150,8 +152,8 @@ particular branch to deploy on every change.
 4. (on `release/${RELEASE_NAME}`) Before pushing the branch to Github, some release-specific changes should be applied to ensure the resulting CD artifacts actually are proper release artifacts.
 
    1. Change all occurences of the last release name to the new release name within documentation files and Docker files. Don't touch the `protocol-config.json` and `releases.json` files in this step. Changes should be committed locally.
-   2. Change use of `master-goerli` in `packages/avado/Dockerfile` to the new release name. Changes should be committed locally.
-   3. Update `CHANGELOG.md` with the new release's information. Changes should be committed locally.
+   2. Update `CHANGELOG.md` with the new release's information. Changes should be committed locally.
+   3. Release owner checks if docs are correctly updated by comparing with the changes in `CHANGELOG.md`.
    4. Copy contract deployment files from the old release. This can be done doing
 
    ```
@@ -247,7 +249,7 @@ The following are a series of manual tasks that are needed to be executed for th
 
 ```
 CT_PRIV_KEY=14e6...a6a5 \
-  ./scripts/setup-ct-gcloud-cluster.sh budapest
+  ./scripts/setup-ct-gcloud-cluster.sh athens
 ```
 
 #### `topology` deployment script
@@ -256,5 +258,6 @@ CT_PRIV_KEY=14e6...a6a5 \
 HOPRD_PERFORM_CLEANUP=false \
 FUNDING_PRIV_KEY=0xa77a...21b8 \
 HOPRD_SHOW_PRESTART_INFO=true \
-  ./scripts/setup-gcloud-cluster.sh budapest `pwd`/scripts/topologies/full_interconnected_cluster.sh
+  ./scripts/setup-gcloud-cluster.sh athens `pwd`/scripts/topologies/full_interconnected_cluster.sh \
+    athens-topology-1-86 gcr.io/hoprassociation/hoprd:athens 6 athens-topology-1-86 true
 ```

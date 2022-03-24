@@ -1,5 +1,6 @@
 import type Hopr from '@hoprnet/hopr-core'
-import { AbstractCommand, GlobalState } from './abstractCommand'
+import type { StateOps } from '../types'
+import { AbstractCommand } from './abstractCommand'
 import { checkPeerIdInput, getPaddingLength, styleValue } from './utils'
 
 export class Alias extends AbstractCommand {
@@ -17,7 +18,9 @@ export class Alias extends AbstractCommand {
     return 'Alias an address with a more memorable name'
   }
 
-  async execute(log, query: string, state: GlobalState): Promise<void> {
+  async execute(log, query: string, { getState, setState }: StateOps): Promise<void> {
+    const state = getState()
+
     // view aliases
     if (!query) {
       const names = Array.from(state.aliases.keys()).map((name) => `${name} -> `)
@@ -43,8 +46,9 @@ export class Alias extends AbstractCommand {
     if (error) return log(styleValue(error, 'failure'))
 
     try {
-      let peerId = await checkPeerIdInput(id)
+      let peerId = checkPeerIdInput(id)
       state.aliases.set(name, peerId)
+      setState(state)
 
       return log(`Set alias '${styleValue(name, 'highlight')}' to '${styleValue(peerId.toB58String(), 'peerId')}'.`)
     } catch (error) {

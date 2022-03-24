@@ -99,7 +99,7 @@ send_message(){
 # $3 = OPTIONAL: positive assertion message
 # $4 = OPTIONAL: maximum wait time in seconds during which we busy try
 # afterwards we fail, defaults to 0
-# $4 = OPTIONAL: step time between retries in seconds, defaults to 25 seconds 
+# $4 = OPTIONAL: step time between retries in seconds, defaults to 25 seconds
 # (8 blocks with 1-3 s/block in ganache)
 # $5 = OPTIONAL: end time for busy wait in nanoseconds since epoch, has higher
 # priority than wait time, defaults to 0
@@ -156,6 +156,92 @@ validate_node_balance_gt0() {
     exit 1
   fi
 }
+
+# $1 = source node id
+# $2 = destination node id
+# $3 = channel source api endpoint
+# $4 = channel destination peer id
+# $5 = OPTIONAL: verify closure strictly
+close_channel() {
+  local source_id="${1}"
+  local destination_id="${2}"
+  local source_api="${3}"
+  local destination_peer_id="${4}"
+  local strict_check="${5:-false}"
+  local result
+
+  log "Node ${source_id} close channel to Node ${destination_id}"
+  if [ "${strict_check}" = "true" ]; then
+    result=$(run_command "${source_api}" "close ${destination_peer_id}" "Channel is already closed" 600)
+  else
+    result=$(run_command "${source_api}" "close ${destination_peer_id}" "" 20 20)
+  fi
+  log "Node ${source_id} close channel to Node ${destination_id} result -- ${result}"
+}
+
+# $1 = source node id
+# $2 = destination node id
+# $3 = channel source api endpoint
+# $4 = channel destination peer id
+open_channel() {
+  local source_id="${1}"
+  local destination_id="${2}"
+  local source_api="${3}"
+  local destination_peer_id="${4}"
+  local result
+
+  log "Node ${source_id} open channel to Node ${destination_id}"
+  result=$(run_command "${source_api}" "open ${destination_peer_id} 2" "Successfully opened channel" 600 60)
+  log "Node ${source_id} open channel to Node ${destination_id} result -- ${result}"
+}
+
+
+# $1 = node id
+# $2 = node api endpoint
+redeem_tickets() {
+  local node_id="${1}"
+  local node_api="${2}"
+  local rejected redeemed prev_redeemed
+
+  # First get the inital ticket statistics for reference
+  result=$(run_command "${node_api}" "tickets" "" 600)
+  log "Node ${node_id} ticket information (before redemption) -- ${result}"
+  rejected=$(echo "${result}" | grep "Rejected:" | awk '{ print $3; }' | tr -d '\n')
+  redeemed=$(echo "${result}" | grep "Redeemed:" | awk '{ print $3; }' | tr -d '\n')
+  [[ ${rejected} -gt 0 ]] && { msg "rejected tickets count on node ${node_id} is ${rejected}"; exit 1; }
+  last_redeemed="${redeemed}"
+
+  # Trigger a redemption run, but cap it at 1 minute. We only want to measure
+  # progress, not redeeem all tickets which takes too long.
+  log "Node ${node_id} should redeem all tickets"
+  result=$(run_command "${node_api}" "redeemTickets" "" 60 60)
+  log "--${result}"
+
+  # Get ticket statistics again and compare with previous state. Ensure we
+  # redeemed tickets.
+  result=$(run_command "${node_api}" "tickets" "" 600)
+  log "Node ${node_id} ticket information (after redemption) -- ${result}"
+  rejected=$(echo "${result}" | grep "Rejected:" | awk '{ print $3; }' | tr -d '\n')
+  redeemed=$(echo "${result}" | grep "Redeemed:" | awk '{ print $3; }' | tr -d '\n')
+  [[ ${rejected} -gt 0 ]] && { msg "rejected tickets count on node ${node_id} is ${rejected}"; exit 1; }
+  [[ ${redeemed} -gt 0 && ${redeemed} -gt ${last_redeemed} ]] || { msg "redeemed tickets count on node ${node_id} is ${redeemed}, previously ${last_redeemed}"; exit 1; }
+  last_redeemed="${redeemed}"
+
+  # Trigger another redemption run, but cap it at 1 minute. We only want to measure
+  # progress, not redeeem all tickets which takes too long.
+  log "Node ${node_id} should redeem all tickets (again to ensure re-run of operation)"
+  result=$(run_command "${node_api}" "redeemTickets" "" 60 60)
+  log "--${result}"
+
+  # Get final ticket statistics
+  result=$(run_command "${node_api}" "tickets" "" 600)
+  log "Node ${node_id} ticket information (after second redemption) -- ${result}"
+  rejected=$(echo "${result}" | grep "Rejected:" | awk '{ print $3; }' | tr -d '\n')
+  redeemed=$(echo "${result}" | grep "Redeemed:" | awk '{ print $3; }' | tr -d '\n')
+  [[ ${rejected} -gt 0 ]] && { msg "rejected tickets count on node ${node_id} is ${rejected}"; exit 1; }
+  [[ ${redeemed} -gt 0 && ${redeemed} -gt ${last_redeemed} ]] || { msg "redeemed tickets count on node ${node_id} is ${redeemed}, previously ${last_redeemed}"; exit 1; }
+}
+
 
 log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5}, ${api6}, ${api7}"
 
@@ -223,25 +309,18 @@ log "-- ${result}"
 log "Node 1 send 0-hop message to node 2"
 run_command "${api1}" "send ,${addr2} 'hello, world'" "Message sent" 600
 
-log "Node 1 open channel to Node 2"
-result=$(run_command "${api1}" "open ${addr2} 1" "Successfully opened channel" 600)
-log "-- ${result}"
+# opening channels in parallel
+open_channel 1 2 "${api1}" "${addr2}" &
+open_channel 2 3 "${api2}" "${addr3}" &
+open_channel 3 4 "${api3}" "${addr4}" &
+open_channel 4 5 "${api4}" "${addr5}" &
+open_channel 5 1 "${api5}" "${addr1}" &
 
-log "Node 2 open channel to Node 3"
-result=$(run_command "${api2}" "open ${addr3} 1" "Successfully opened channel" 600)
-log "-- ${result}"
+#used for channel close test later
+open_channel 1 5 "${api1}" "${addr5}" &
 
-log "Node 3 open channel to Node 4"
-result=$(run_command "${api3}" "open ${addr4} 1" "Successfully opened channel" 600)
-log "-- ${result}"
-
-log "Node 4 open channel to Node 5"
-result=$(run_command "${api4}" "open ${addr5} 1" "Successfully opened channel" 600)
-log "-- ${result}"
-
-log "Node 5 open channel to Node 1"
-result=$(run_command "${api5}" "open ${addr1} 0.001" "Successfully opened channel" 600)
-log "-- ${result}"
+log "Waiting for nodes to finish open channel (long running)"
+wait
 
 for i in `seq 1 10`; do
   log "Node 1 send 1 hop message to self via node 2"
@@ -284,7 +363,7 @@ for i in `seq 1 10`; do
   run_command "${api3}" "send ${addr4},${addr5} 'hello, world'" "Message sent" 600
 
   log "Node 5 send 1 hop message to node 2 via node 1"
-  run_command "${api5}" "send ${addr1},${addr2} 'hello, world'" "Could not send message" 600
+  run_command "${api5}" "send ${addr1},${addr2} 'hello, world'" "Message sent" 600
 done
 
 # for the last send tests we use Rest API v2 instead of the older command-based Rest API v1
@@ -298,3 +377,33 @@ for i in `seq 1 10`; do
   log "Node 1 send message to node 5"
   send_message "${api1}" "${addr5}" "hello, world" "" 600
 done
+
+redeem_tickets "2" "${api2}" &
+redeem_tickets "3" "${api2}" &
+redeem_tickets "4" "${api2}" &
+redeem_tickets "5" "${api2}" &
+
+log "Waiting for nodes to finish ticket redemption (long running)"
+wait
+
+# initiate channel closures, but don't wait because this will trigger ticket
+# redemption as well
+close_channel 1 2 "${api1}" "${addr2}" &
+close_channel 2 3 "${api2}" "${addr3}" &
+close_channel 3 4 "${api3}" "${addr4}" &
+close_channel 4 5 "${api4}" "${addr5}" &
+close_channel 5 1 "${api5}" "${addr1}" &
+
+# initiate channel closures for channels without tickets so we can check
+# completeness
+close_channel 1 5 "${api1}" "${addr5}" &
+
+log "Waiting for nodes to finish handling close channels calls"
+wait
+
+# Also add confirmation time
+log "Waiting 70 seconds for cool-off period"
+sleep 70
+
+# verify channel has been closed
+close_channel 1 5 "${api1}" "${addr5}" "true"

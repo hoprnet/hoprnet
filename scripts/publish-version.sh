@@ -21,6 +21,25 @@ usage() {
   msg
 }
 
+cleanup() {
+  # Remove lock files due to conflicts with workspaces
+  rm -f \
+    "${mydir}/../packages/cover-traffic-daemon/package-lock.json" \
+    "${mydir}/../packages/hoprd/package-lock.json" \
+    "${mydir}/../packages/cover-traffic-daemon/yarn.lock" \
+    "${mydir}/../packages/hoprd/yarn.lock"
+
+  # Don't commit changed package.json files as package resolutions are
+  # supposed to interfer with workspaces according to https://yarnpkg.com/configuration/manifest#resolutions
+  git restore packages/hoprd/package.json
+  git restore packages/cover-traffic-daemon/package.json
+
+  # delete default environments
+  rm -f \
+    "${mydir}/../packages/hoprd/default-environment.json" \
+    "${mydir}/../packages/cover-traffic-daemon/default-environment.json"
+}
+
 # return early with help info when requested
 ([ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]) && { usage; exit 0; }
 
@@ -59,18 +78,7 @@ fi
 
 log "get default environment id"
 
-declare environment_id
-for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | .value.git_ref" | uniq); do
-  if [[ "${branch}" =~ ${git_ref} ]]; then
-    environment_id=$(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\" and .value.default==true) | .key")
-    # if no default is set we take the first entry
-    if [ -z "${environment_id}" ]; then
-      environment_id=$(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\") | .key" | sed q)
-    fi
-    break
-  fi
-done
-: ${environment_id:?"Could not read value for default environment id"}
+declare environment_id="$(${mydir}/get-default-environment.sh)"
 
 log "creating new version ${current_version} + ${version_type}"
 
@@ -103,17 +111,32 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
     yarn config set npmAuthToken "${NODE_AUTH_TOKEN:-}"
   fi
 
-  # set default environments
-  echo "{\"id\": \"${environment_id}\"}" > "${mydir}/../packages/hoprd/default-environment.json"
-  echo "{\"id\": \"${environment_id}\"}" > "${mydir}/../packages/cover-traffic-daemon/default-environment.json"
-
   # pack and publish packages
   yarn workspaces foreach -piv --topological-dev \
     --exclude hoprnet --exclude hopr-docs \
+    --exclude @hoprnet/hoprd --exclude @hoprnet/hopr-cover-traffic-daemon \
     npm publish --access public
 
-  # delete default environments
-  rm -f \
-    "${mydir}/../packages/hoprd/default-environment.json" \
-    "${mydir}/../packages/cover-traffic-daemon/default-environment.json"
+  ${mydir}/wait-for-npm-package.sh utils
+  ${mydir}/wait-for-npm-package.sh connect
+  ${mydir}/wait-for-npm-package.sh ethereum
+  ${mydir}/wait-for-npm-package.sh core-ethereum
+  ${mydir}/wait-for-npm-package.sh core
+
+  trap cleanup SIGINT SIGTERM ERR EXIT
+
+  # set default environments
+  log "adding default environments to packages"
+  echo "{\"id\": \"${environment_id}\"}" > "${mydir}/../packages/hoprd/default-environment.json"
+  echo "{\"id\": \"${environment_id}\"}" > "${mydir}/../packages/cover-traffic-daemon/default-environment.json"
+
+  # special treatment for end-of-chain packages
+  # to create lockfiles with resolution overrides
+  ${mydir}/build_lockfiles.sh hoprd
+  ${mydir}/build_lockfiles.sh cover-traffic-daemon
+
+  yarn workspace @hoprnet/hoprd npm publish --access public
+  yarn workspace @hoprnet/hopr-cover-traffic-daemon npm publish --access public
+
+  cleanup
 fi

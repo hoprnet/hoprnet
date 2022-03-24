@@ -32,7 +32,7 @@ const sidebars = {
     {
       type: 'category',
       label: 'Installing a hoprd node',
-      items: ['node/start-here', 'node/using-script', 'node/using-avado', 'node/using-npm', 'node/using-docker']
+      items: ['node/start-here', 'node/using-avado', 'node/using-docker']
     },
     {
       type: 'category',
@@ -51,7 +51,6 @@ const sidebars = {
         'core/proof-of-relay',
         'core/tickets-and-payment-channels',
         'core/probabilistic-payments',
-        'core/incentives',
         'core/cover-traffic',
         'core/cover-traffic-nodes',
         'core/balancing-cover-traffic'
@@ -62,9 +61,25 @@ const sidebars = {
       label: 'Staking',
       items: ['staking/how-to-get-hopr', 'staking/how-to-stake', 'staking/convert-hopr']
     },
+    {
+      type: 'category',
+      label: 'Developers',
+      link: { type: 'doc', id: 'developers/intro' },
+      items: [
+        'developers/starting-local-cluster',
+        'developers/connecting-node',
+        'developers/tutorial-hello-world',
+        'developers/demo-boomerang-chat',
+        'developers/demo-rps-game',
+        'developers/rest-api',
+        'developers/smart-contract',
+        'developers/snippets',
+        'developers/visualising-hopr-network-topology'
+      ]
+    },
     /*{
         type: 'doc',
-	id: 'staking',
+  id: 'staking',
         label: 'Staking',
     },*/
     {

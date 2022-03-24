@@ -9,7 +9,7 @@ import type LibP2P from 'libp2p'
 
 import { debug } from '../process'
 import pipe from 'it-pipe'
-import { dial } from './dialHelper'
+import { dial, type DialOpts } from './dialHelper'
 
 export * from './addressSorters'
 export * from './dialHelper'
@@ -30,7 +30,7 @@ export const b58StringRegex = /16Uiu2HA[A-Za-z0-9]{1,45}/i
  *
  * @param peerId the PeerId used to generate a public key
  */
-export async function convertPubKeyFromPeerId(peerId: PeerId): Promise<PublicKey> {
+export function convertPubKeyFromPeerId(peerId: PeerId): PublicKey {
   return keys.unmarshalPublicKey(multihashes.decode(peerId.toBytes()).digest)
 }
 
@@ -40,8 +40,8 @@ export async function convertPubKeyFromPeerId(peerId: PeerId): Promise<PublicKey
  *
  * @param string the B58String used to represent the PeerId
  */
-export async function convertPubKeyFromB58String(b58string: string): Promise<PublicKey> {
-  return await convertPubKeyFromPeerId(PeerId.createFromB58String(b58string))
+export function convertPubKeyFromB58String(b58string: string): PublicKey {
+  return convertPubKeyFromPeerId(PeerId.createFromB58String(b58string))
 }
 
 /**
@@ -90,10 +90,6 @@ export function isSecp256k1PeerId(peer: PeerId): boolean {
 }
 
 const logError = debug(`hopr-core:libp2p:error`)
-
-export type DialOpts = {
-  timeout: number
-}
 
 /**
  * Asks libp2p to establish a connection to another node and
@@ -171,7 +167,7 @@ export async function libp2pSendMessage(
 export type LibP2PHandlerArgs = { connection: Connection; stream: MuxedStream; protocol: string }
 export type LibP2PHandlerFunction<T> = (msg: Uint8Array, remotePeer: PeerId) => T
 
-type HandlerFunction<T> = (args: LibP2PHandlerArgs) => T
+type HandlerFunction<T> = (props: LibP2PHandlerArgs) => T
 
 type ErrHandler = (msg: any) => void
 
@@ -194,18 +190,18 @@ function generateHandler(
   // Return a function to be consumed by Libp2p.handle()
 
   if (includeReply) {
-    return async function libP2PHandler(args: LibP2PHandlerArgs): Promise<void> {
+    return async function libP2PHandler(props: LibP2PHandlerArgs): Promise<void> {
       try {
         await pipe(
           // prettier-ignore
-          args.stream,
+          props.stream,
           async function* pipeToHandler(source: AsyncIterable<Uint8Array>) {
             for await (const msg of source) {
               // Convert from BufferList to Uint8Array
-              yield await handlerFunction(Uint8Array.from(msg.slice()), args.connection.remotePeer)
+              yield await handlerFunction(Uint8Array.from(msg.slice()), props.connection.remotePeer)
             }
           },
-          args.stream
+          props.stream
         )
       } catch (err) {
         // Mostly used to capture send errors
@@ -213,14 +209,21 @@ function generateHandler(
       }
     }
   } else {
-    return function libP2PHandler(args: LibP2PHandlerArgs): void {
+    return function libP2PHandler(props: LibP2PHandlerArgs): void {
+      try {
+        // End the send stream by sending nothing
+        props.stream.sink((async function* () {})()).catch(errHandler)
+      } catch (err) {
+        errHandler(err)
+      }
+
       pipe(
         // prettier-ignore
-        args.stream,
+        props.stream,
         async function collect(source: AsyncIterable<Uint8Array>) {
           for await (const msg of source) {
             // Convert from BufferList to Uint8Array
-            await handlerFunction(Uint8Array.from(msg.slice()), args.connection.remotePeer)
+            await handlerFunction(Uint8Array.from(msg.slice()), props.connection.remotePeer)
           }
         }
       )
@@ -253,12 +256,12 @@ export type libp2pSubscribe = ((
     includeReply: true
   ) => void)
 
-export function libp2pSubscribe(
+export async function libp2pSubscribe(
   libp2p: LibP2P,
   protocol: string,
   handler: LibP2PHandlerFunction<Promise<void | Uint8Array> | void>,
   errHandler: ErrHandler,
   includeReply = false
-): void {
-  libp2p.handle([protocol], generateHandler(handler, errHandler, includeReply))
+): Promise<void> {
+  await libp2p.handle([protocol], generateHandler(handler, errHandler, includeReply))
 }

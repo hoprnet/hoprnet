@@ -4,14 +4,14 @@
 import type PeerId from 'peer-id'
 import type LibP2P from 'libp2p'
 import type { Address } from 'libp2p/src/peer-store/address-book'
-import type { TimeoutOpts } from '../async'
 import { Multiaddr } from 'multiaddr'
 
-import { abortableTimeout } from '../async'
+import { abortableTimeout, type TimeoutOpts } from '../async'
 
 import { debug } from '../process'
 import { green } from 'chalk'
-import { createRelayerKey } from '.'
+import { createRelayerKey } from './relayCode'
+import { createCircuitAddress } from '../network'
 
 const DEBUG_PREFIX = `hopr-core:libp2p`
 
@@ -19,11 +19,6 @@ const log = debug(DEBUG_PREFIX)
 const logError = debug(DEBUG_PREFIX.concat(`:error`))
 
 const DEFAULT_DHT_QUERY_TIMEOUT = 10000
-
-export type DialOpts = {
-  timeout?: number
-  signal?: AbortSignal
-}
 
 export enum DialStatus {
   SUCCESS = 'SUCCESS',
@@ -58,9 +53,12 @@ export type DialResponse =
     }
 
 // Make sure that Typescript fails to build tests if libp2p API changes
+type ReducedAddressBook = {
+  get: (peerId: PeerId) => ReturnType<LibP2P['peerStore']['addressBook']['get']>
+}
 type ReducedPeerStore = {
   peerStore: {
-    get: (peer: PeerId) => Pick<NonNullable<ReturnType<LibP2P['peerStore']['get']>>, 'addresses'> | undefined
+    addressBook: ReducedAddressBook
   }
 }
 type ReducedDHT = { contentRouting: Pick<LibP2P['contentRouting'], 'routers' | 'findProviders'> }
@@ -93,23 +91,43 @@ async function attemptDial(
       status: InternalDialStatus.CONTINUE
     }
 > {
+  const start = Date.now()
   let struct: Awaited<ReturnType<LibP2P['dialProtocol']>> | null
+
+  let aborted = false
+
+  const onAbort = () => {
+    aborted = true
+  }
+  opts.signal.addEventListener('abort', onAbort)
 
   try {
     struct = await libp2p.dialProtocol(destination, protocol, { signal: opts.signal })
   } catch (err) {
     logError(`Error while dialing ${destination.toB58String()} directly.`)
     if (err?.message) {
-      logError(`Dial error: ${err.message}`)
+      logError(`Dial error:`, err)
     }
   }
 
+  opts.signal.removeEventListener('abort', onAbort)
+
   // Libp2p's return types tend to change every now and then
   if (struct != null) {
+    if (aborted) {
+      console.log(`ending obsolete write stream after ${Date.now() - start} ms`)
+      try {
+        struct.stream
+          .sink((async function* () {})())
+          .catch((err: any) => logError(`Error while ending obsolete write stream`, err))
+      } catch (err) {
+        logError(`Error while ending obsolete write stream`, err)
+      }
+    }
     return { status: DialStatus.SUCCESS, resp: struct }
   }
 
-  if (opts.signal.aborted) {
+  if (aborted) {
     return { status: DialStatus.ABORTED }
   }
 
@@ -162,9 +180,7 @@ async function queryDHT(
 
   return {
     status: InternalDialStatus.CONTINUE,
-    relayers: relayers.map(
-      (relay: Relayers) => new Multiaddr(`/p2p/${relay.id.toB58String()}/p2p-circuit/p2p/${destination.toB58String()}`)
-    )
+    relayers: relayers.map((relay: Relayers) => createCircuitAddress(relay.id, destination))
   }
 }
 
@@ -188,7 +204,7 @@ async function doDial(
   opts: Required<TimeoutOpts>
 ): Promise<DialResponse> {
   let dialResult: Awaited<ReturnType<typeof attemptDial>>
-  let knownAddresses = libp2p.peerStore.get(destination)?.addresses ?? []
+  let knownAddresses = await libp2p.peerStore.addressBook.get(destination)
 
   // Try to use known addresses
   if (knownAddresses.length > 0) {
@@ -212,10 +228,10 @@ async function doDial(
   const dhtResult = await queryDHT(libp2p, destination, opts)
 
   if (dhtResult.status !== InternalDialStatus.CONTINUE) {
-    knownAddresses = libp2p.peerStore.get(destination)?.addresses ?? []
+    knownAddresses = await libp2p.peerStore.addressBook.get(destination)
 
     printPeerStoreAddresses(
-      `Could not dial ${destination.toB58String()} directly and libp2p was started without a DHT.`,
+      `Direct dial attempt to ${destination.toB58String()} failed and DHT query has not brought any new addresses. Giving up`,
       knownAddresses
     )
     return dhtResult
@@ -232,7 +248,7 @@ async function doDial(
 
   // Only start a dial attempt if we have received new addresses
   if (newAddresses == 0) {
-    knownAddresses = libp2p.peerStore.get(destination)?.addresses ?? []
+    knownAddresses = await libp2p.peerStore.addressBook.get(destination)
 
     printPeerStoreAddresses(
       `Querying the DHT for ${green(destination.toB58String())} did not lead to any new addresses. Giving up.`,
@@ -253,7 +269,7 @@ async function doDial(
         break
       }
     } catch (err) {
-      continue
+      logError(`Dialing error while contacting relay: ${err}`)
     }
   }
 
@@ -273,14 +289,14 @@ async function doDial(
  * Contains a baseline protection against dialing same addresses twice.
  * @param libp2p a libp2p instance
  * @param destination PeerId of the destination
- * @param protocols protocols to use
+ * @param protocol protocols to use
  * @param opts
  */
 export async function dial(
   libp2p: ReducedLibp2p,
   destination: PeerId,
   protocol: string,
-  opts?: DialOpts
+  opts?: TimeoutOpts
 ): Promise<DialResponse> {
   return abortableTimeout(
     (timeoutOpts: Required<TimeoutOpts>) => doDial(libp2p, destination, protocol, timeoutOpts),
@@ -292,3 +308,5 @@ export async function dial(
     }
   )
 }
+
+export type { TimeoutOpts as DialOpts }

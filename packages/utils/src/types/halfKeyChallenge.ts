@@ -56,6 +56,10 @@ export class HalfKeyChallenge {
     return SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH
   }
 
+  static deserialize(arr: Uint8Array) {
+    return new HalfKeyChallenge(arr)
+  }
+
   serialize() {
     return this.arr
   }

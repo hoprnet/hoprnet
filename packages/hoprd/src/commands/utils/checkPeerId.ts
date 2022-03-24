@@ -1,5 +1,5 @@
 import type Hopr from '@hoprnet/hopr-core'
-import type { GlobalState } from '../abstractCommand'
+import type { State } from '../../types'
 import PeerId from 'peer-id'
 
 /**
@@ -9,7 +9,7 @@ import PeerId from 'peer-id'
  * @param peerIdString query that contains the peerId
  * @returns a 'PeerId' instance
  */
-export async function checkPeerIdInput(peerIdString: string, state?: GlobalState): Promise<PeerId> {
+export function checkPeerIdInput(peerIdString: string, state?: State): PeerId {
   try {
     if (typeof state !== 'undefined' && state.aliases && state.aliases.has(peerIdString)) {
       return state.aliases.get(peerIdString)!
@@ -33,7 +33,7 @@ export async function checkPeerIdInput(peerIdString: string, state?: GlobalState
  */
 export function getPeerIdsAndAliases(
   node: Hopr,
-  state: GlobalState,
+  state: State,
   ops: {
     returnAlias: boolean
     mustBeOnline: boolean

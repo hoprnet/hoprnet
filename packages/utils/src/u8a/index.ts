@@ -15,6 +15,7 @@ export * from './toHex'
 export * from './u8aToNumber'
 
 export * from './equals'
+export * from './u8aAdd'
 export * from './u8aCompare'
 
 export type U8aAndSize = [Uint8Array, number]
