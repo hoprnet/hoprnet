@@ -198,23 +198,28 @@ function find_tmp_dir() {
   echo ${tmp}
 }
 
+# encode API token
+# $1 = api token
+encode_api_token(){
+  local api_token=${1}
+  # ideally we would use base64's option -w but it's not available in all envs
+  echo -n "$api_token" | base64 | tr -d \\n
+}
+
 # $1 = optional: endpoint, defaults to http://localhost:3001
 get_native_address(){
   local with_token_endpoint=${1:-localhost:3001}
   # split string into api token and endpoint
   local api_token=${with_token_endpoint%\@*}
   local endpoint=${with_token_endpoint#*\@}
-  local api_token_encoded="$(echo "$api_token" | base64)"
+  local api_token_encoded=$(encode_api_token $api_token)
+
   local cmd="curl --silent --max-time 5 ${endpoint}/api/v2/account/addresses"
   if [[ -n $api_token ]]; then
     cmd="$cmd --header 'Authorization: Basic ${api_token_encoded}'"
   fi
 
-  # try every 5 seconds for 5 minutes
-  local result
-  result=$(try_cmd "${cmd}" 30 5)
-  echo "$result"
-
+  local result=$(eval "$cmd")
   echo $(echo ${result} | jq -r ".native")
 }
 
@@ -224,16 +229,14 @@ get_hopr_address() {
   # split string into api token and endpoint
   local api_token=${with_token_endpoint%\@*}
   local endpoint=${with_token_endpoint#*\@}
-  local api_token_encoded="$(echo "$api_token" | base64)"
+  local api_token_encoded=$(encode_api_token $api_token)
+
   local cmd="curl --silent --max-time 5 ${endpoint}/api/v2/account/addresses"
   if [[ -n $api_token ]]; then
     cmd="$cmd --header 'Authorization: Basic ${api_token_encoded}'"
   fi
 
-  # try every 5 seconds for 5 minutes
-  local result
-  result=$(try_cmd "${cmd}" 30 5)
-
+  local result=$(eval "$cmd")
   echo $(echo ${result} | jq -r ".hopr")
 }
 
