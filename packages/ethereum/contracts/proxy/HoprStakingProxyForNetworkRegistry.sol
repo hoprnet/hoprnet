@@ -4,6 +4,11 @@ pragma solidity ^0.8.0;
 import '@openzeppelin/contracts/access/Ownable.sol';
 import '../IHoprNetworkRegistryRequirement.sol';
 
+/**
+ * @dev Interface for staking contract
+ * source code at https://github.com/hoprnet/hopr-stake/tree/main/contracts
+ * staking v2 is deployed at https://blockscout.com/xdai/mainnet/address/0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E
+ */
 contract IStake {
   function stakedHoprTokens(address _account) public view returns (uint256) {}
 
@@ -14,6 +19,9 @@ contract IStake {
   ) external view returns (bool) {}
 }
 
+/**
+ * @dev Proxy for staking (v2) contract, which an "whitelist requirement" is implemented
+ */
 contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Ownable {
   struct NftTypeAndRank {
     uint256 nftType;
@@ -36,7 +44,7 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
     STAKE_CONTRACT = IStake(stakeContract);
     stakeThreshold = minStake;
     emit UpdatedThreshold(stakeThreshold);
-    transferOwnership(newOwner);
+    _transferOwnership(newOwner);
   }
 
   /**
