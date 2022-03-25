@@ -48,7 +48,7 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   }
 
   /**
-   * @dev Checks if the msg.sender has staked any NFT of eligibleNftTypeAndRank and
+   * @dev Checks if the provided account has staked any NFT of eligibleNftTypeAndRank and
    * if staked token amount is above `threshold` of staked HOPR tokens
    * @param account staker address that has a hopr nodes running
    */
