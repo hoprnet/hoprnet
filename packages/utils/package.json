@@ -32,7 +32,7 @@
     "hjson": "3.2.2",
     "it-pipe": "1.1.0",
     "jsonschema": "1.4.0",
-    "leveldown": "6.1.0",
+    "leveldown": "6.1.1",
     "levelup": "5.1.1",
     "libp2p-crypto": "0.21.2",
     "memdown": "6.1.1",

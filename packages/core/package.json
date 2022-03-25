@@ -39,7 +39,7 @@
     "datastore-level": "^8.0.0",
     "debug": "4.3.4",
     "heap-js": "2.1.6",
-    "leveldown": "6.1.0",
+    "leveldown": "6.1.1",
     "levelup": "5.1.1",
     "libp2p": "0.36.2",
     "libp2p-kad-dht": "0.28.6",

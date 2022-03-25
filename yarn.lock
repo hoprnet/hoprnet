@@ -2960,9 +2960,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ethersproject/providers@hoprnet/ethers-js-provider":
+"@ethersproject/providers@https://github.com/hoprnet/ethers-js-provider/archive/refs/tags/fixed-memory-leak.tar.gz":
   version: 5.5.3
-  resolution: "@ethersproject/providers@https://github.com/hoprnet/ethers-js-provider.git#commit=fa6b1f743ff3fe67c1e9a2207a67d79a854fc34c"
+  resolution: "@ethersproject/providers@https://github.com/hoprnet/ethers-js-provider/archive/refs/tags/fixed-memory-leak.tar.gz"
   dependencies:
     "@ethersproject/abstract-provider": ^5.5.0
     "@ethersproject/abstract-signer": ^5.5.0
@@ -2983,7 +2983,7 @@ __metadata:
     "@ethersproject/web": ^5.5.0
     bech32: 1.1.4
     ws: 7.4.6
-  checksum: d18a52c0fcd49c5add1e8ab24142db3b1c5be799f3e2dc33d81d231a77d9669de5d6f64fea8752843d8687ed1a67897c8e4f8b448ec888e0de05cc25d1aeae34
+  checksum: ef5312ecf80d3cfa4b4f4d08280e8fc4e56b012aac2be68e8649ce2289dd6ff3fe734e3634b36c92ff9218117c2ad4f0067aa12fa0acb9e9d1681e4c72c6c8ab
   languageName: node
   linkType: hard
 
@@ -3517,7 +3517,7 @@ __metadata:
     datastore-level: ^8.0.0
     debug: 4.3.4
     heap-js: 2.1.6
-    leveldown: 6.1.0
+    leveldown: 6.1.1
     levelup: 5.1.1
     libp2p: 0.36.2
     libp2p-kad-dht: 0.28.6
@@ -3621,7 +3621,7 @@ __metadata:
     hjson: 3.2.2
     it-pipe: 1.1.0
     jsonschema: 1.4.0
-    leveldown: 6.1.0
+    leveldown: 6.1.1
     levelup: 5.1.1
     libp2p: 0.36.2
     libp2p-crypto: 0.21.2
@@ -16169,15 +16169,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"leveldown@npm:6.1.0, leveldown@npm:^6.1.0":
-  version: 6.1.0
-  resolution: "leveldown@npm:6.1.0"
+"leveldown@npm:6.1.1, leveldown@npm:^6.1.0":
+  version: 6.1.1
+  resolution: "leveldown@npm:6.1.1"
   dependencies:
     abstract-leveldown: ^7.2.0
     napi-macros: ~2.0.0
     node-gyp: latest
     node-gyp-build: ^4.3.0
-  checksum: e984b61e9fbe057cfd5c81ac0afe5d7e35d695ff130a95991e0ecb66390e4c4ff6aa3980a65b6c53edaba80527a47790bb26e3cfbd52a054957b3546d9941fe4
+  checksum: 00ba086f83c930683271aae35c89ce684bd31afcc4ba15912a071865f21d86000c48eb83b55ae554b6d328e0ba82a08868dd3b64abed750db89f38b8718c84af
   languageName: node
   linkType: hard
 
