@@ -31,3 +31,6 @@ packages/ethereum/deployments
 
 # Breaks github actions with recursive commits
 .github
+
+# Yarn - conflict with yarn builtin linter
+.yarnrc.yaml
