@@ -30,7 +30,7 @@ contract HoprNetworkRegistry is Ownable {
   }
 
   /**
-   * Specify NetworkRegistry logic implemntation
+   * Specify NetworkRegistry logic implementation
    * _requirementImplementation address of the network registry logic implementation
    */
   function updateRequirementImplementation(address _requirementImplementation) external onlyOwner {
