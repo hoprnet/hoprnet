@@ -42,7 +42,7 @@
     "check-password-strength": "2.0.4",
     "cookie": "0.4.2",
     "cors": "2.8.5",
-    "debug": "4.3.3",
+    "debug": "4.3.4",
     "dids": "2.4.3",
     "express": "4.17.3",
     "express-openapi": "9.3.1",
@@ -73,7 +73,7 @@
     "rimraf": "3.0.2",
     "sinon": "12.0.1",
     "ts-node": "10.7.0",
-    "typedoc": "0.22.11",
+    "typedoc": "0.22.13",
     "typedoc-plugin-markdown": "3.11.14",
     "typescript": "4.6.3"
   },
@@ -86,11 +86,6 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "resolutions": {
-    "@ethersproject/providers": "hoprnet/ethers-js-provider#fa6b1f743ff3fe67c1e9a2207a67d79a854fc34c",
-    "@overnightjs/logger": "1.2.1",
-    "colors": "1.4.0"
   },
   "stableVersion": "1.76.0-next.31"
 }

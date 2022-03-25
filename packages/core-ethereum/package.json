@@ -29,7 +29,7 @@
     "async-mutex": "0.3.2",
     "bn.js": "5.2.0",
     "chalk": "4.1.2",
-    "debug": "4.3.3",
+    "debug": "4.3.4",
     "ethers": "5.5.4",
     "heap-js": "2.1.6",
     "multiaddr": "10.0.1",
@@ -46,7 +46,7 @@
     "rimraf": "3.0.2",
     "sinon": "12.0.1",
     "ts-node": "10.7.0",
-    "typedoc": "0.22.11",
+    "typedoc": "0.22.13",
     "typedoc-plugin-markdown": "3.11.14",
     "typescript": "4.6.3"
   },
