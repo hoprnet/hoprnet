@@ -1,5 +1,4 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
-import { DeploymentTypes } from '../src'
 
 export const INITIAL_MIN_STAKE = 1500
 
