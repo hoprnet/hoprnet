@@ -137,7 +137,7 @@ export function prefixLength(prefix: Uint8Array) {
 
   for (let i = 0; i < prefix.length; i++) {
     let bit = 0
-    for (; (prefix[i] & masks[bit]) == masks[bit]; bit++) { }
+    for (; (prefix[i] & masks[bit]) == masks[bit]; bit++) {}
 
     prefixLength += bit
   }
