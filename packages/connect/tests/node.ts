@@ -72,10 +72,9 @@ async function startNode(
   options: HoprConnectConfig
 ) {
   console.log(
-    `starting node, bootstrap address ${
-      options.config?.initialNodes != undefined && options.config?.initialNodes.length > 0
-        ? options.config.initialNodes[0].id.toB58String()
-        : 'undefined'
+    `starting node, bootstrap address ${options.config?.initialNodes != undefined && options.config?.initialNodes.length > 0
+      ? options.config.initialNodes[0].id.toB58String()
+      : 'undefined'
     }`
   )
 
@@ -87,7 +86,7 @@ async function startNode(
     modules: {
       transport: [HoprConnect as any],
       streamMuxer: [Mplex],
-      connEncryption: [NOISE as any]
+      connEncryption: [NOISE]
     },
     config: {
       transport: {
@@ -129,24 +128,24 @@ async function startNode(
 
 type CmdDef =
   | {
-      cmd: 'wait'
-      waitForSecs: number
-    }
+    cmd: 'wait'
+    waitForSecs: number
+  }
   | {
-      cmd: 'dial'
-      targetIdentityName: string
-      targetPort: number
-    }
+    cmd: 'dial'
+    targetIdentityName: string
+    targetPort: number
+  }
   | {
-      cmd: 'msg'
-      msg: string
-      targetIdentityName: string
-      relayIdentityName: string
-    }
+    cmd: 'msg'
+    msg: string
+    targetIdentityName: string
+    relayIdentityName: string
+  }
   | {
-      cmd: 'hangup'
-      targetIdentityName: string
-    }
+    cmd: 'hangup'
+    targetIdentityName: string
+  }
 
 async function executeCommands({
   node,

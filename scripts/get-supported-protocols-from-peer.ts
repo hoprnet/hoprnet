@@ -93,7 +93,7 @@ async function main() {
   })
 
   // As used by other HOPR nodes
-  upgrader.cryptos.set(NOISE.protocol, NOISE as any)
+  upgrader.cryptos.set(NOISE.protocol, NOISE)
   upgrader.muxers.set(Mplex.multicodec, Mplex as any)
 
   // Use minimal configuration for hopr-connect
@@ -101,7 +101,7 @@ async function main() {
     upgrader,
     libp2p: {
       peerId: self,
-      handle: () => {}
+      handle: () => { }
     }
   })
 
@@ -118,8 +118,7 @@ async function main() {
   const protocols = await _conn.getProtocols()
 
   console.log(
-    `Node identified as ${chalk.blue(_conn.remotePeer.toB58String())}, supported protocol${
-      protocols.length == 1 ? '' : 's'
+    `Node identified as ${chalk.blue(_conn.remotePeer.toB58String())}, supported protocol${protocols.length == 1 ? '' : 's'
     }:\n  ${protocols.map((str) => chalk.green(str)).join('\n  ')}`
   )
 

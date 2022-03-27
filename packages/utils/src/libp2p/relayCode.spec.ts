@@ -39,7 +39,7 @@ async function getNode(id = getPeerId()): Promise<Libp2p> {
     modules: {
       transport: [TCP],
       streamMuxer: [Mplex as any],
-      connEncryption: [NOISE as any],
+      connEncryption: [NOISE],
       dht: KadDHT
     },
     metrics: {
