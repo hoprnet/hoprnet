@@ -144,11 +144,6 @@ async function establishNewConnection(
 
   const start = Date.now()
 
-  let struct: {
-    stream: MuxedStream
-    conn: Connection
-  } | null
-
   let aborted = false
 
   const onAbort = () => {
@@ -167,13 +162,19 @@ async function establishNewConnection(
     }
   }
 
+  if (!conn) {
+    return
+  }
+
+  const stream = (await timeout(1000, () => conn.newStream(protocol)))?.stream
+
   opts.signal.removeEventListener('abort', onAbort)
 
   // Libp2p's return types tend to change every now and then
-  if (struct != null && aborted) {
+  if (stream != null && aborted) {
     log(`ending obsolete write stream after ${Date.now() - start} ms`)
     try {
-      struct.stream
+      stream
         .sink((async function* () {})())
         .catch((err: any) => logError(`Error while ending obsolete write stream`, err))
     } catch (err) {
@@ -181,8 +182,6 @@ async function establishNewConnection(
     }
     return
   }
-
-  const stream = (await timeout(1000, () => conn.newStream(protocol)))?.stream
 
   if (!stream) {
     return
@@ -207,11 +206,6 @@ async function establishNewRelayedConnection(
 }> {
   const start = Date.now()
 
-  let struct: {
-    stream: MuxedStream
-    conn: Connection
-  } | null
-
   let aborted = false
 
   const onAbort = () => {
@@ -230,13 +224,19 @@ async function establishNewRelayedConnection(
     }
   }
 
+  if (!conn) {
+    return
+  }
+
+  const stream = (await timeout(1000, () => conn.newStream(protocol)))?.stream
+
   opts.signal.removeEventListener('abort', onAbort)
 
   // Libp2p's return types tend to change every now and then
-  if (struct != null && aborted) {
+  if (stream != null && aborted) {
     log(`ending obsolete write stream after ${Date.now() - start} ms`)
     try {
-      struct.stream
+      stream
         .sink((async function* () {})())
         .catch((err: any) => logError(`Error while ending obsolete write stream`, err))
     } catch (err) {
@@ -244,8 +244,6 @@ async function establishNewRelayedConnection(
     }
     return
   }
-
-  const stream = (await timeout(1000, () => conn.newStream(protocol)))?.stream
 
   if (!stream) {
     return
