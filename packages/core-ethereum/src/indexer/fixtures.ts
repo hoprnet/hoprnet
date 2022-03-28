@@ -1,4 +1,4 @@
-import type { Event, TokenEvent } from './types'
+import type { Event, TokenEvent, RegistryEvent } from './types'
 import BN from 'bn.js'
 import assert from 'assert'
 import { BigNumber } from 'ethers'
@@ -199,3 +199,27 @@ export const PARTY_A_TRANSFER_OUTGOING = {
     value: BigNumber.from('1')
   } as any
 } as TokenEvent<'Transfer'>
+
+export const PARTY_A_ELEGIBLE = {
+  event: 'EligibilityUpdated',
+  transactionHash: '',
+  blockNumber: 1,
+  transactionIndex: 0,
+  logIndex: 0,
+  args: {
+    account: PARTY_A.toAddress().toHex(),
+    eligibility: true
+  } as any
+} as RegistryEvent<'EligibilityUpdated'>
+
+export const PARTY_A_NOT_ELEGIBLE = {
+  event: 'EligibilityUpdated',
+  transactionHash: '',
+  blockNumber: 4,
+  transactionIndex: 0,
+  logIndex: 0,
+  args: {
+    account: PARTY_A.toAddress().toHex(),
+    eligibility: false
+  } as any
+} as RegistryEvent<'EligibilityUpdated'>

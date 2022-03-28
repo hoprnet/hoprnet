@@ -236,6 +236,7 @@ class Indexer extends EventEmitter {
       }
     ]
 
+    // Token events
     // Actively query for logs to prevent polling done by Ethers.js
     // that don't retry on failed attempts and thus makes the indexer
     // handle errors produced by internal Ethers.js provider calls
@@ -262,6 +263,19 @@ class Indexer extends EventEmitter {
         }
       })
     }
+
+    // HoprNetworkRegistry events
+    queries.push({
+      contract: this.chain.getNetworkRegistry(),
+      filter: {
+        topics: [
+          [
+            // Relevant HoprNetworkRegistry events
+            this.chain.getNetworkRegistry().interface.getEventTopic('EligibilityUpdated')
+          ]
+        ]
+      }
+    })
 
     for (const query of queries) {
       let tmpEvents: TypedEvent<any, any>[]
@@ -484,7 +498,7 @@ class Indexer extends EventEmitter {
    * @dev ignores events that have been processed before.
    * @param events new unprocessed events
    */
-  private onNewEvents(events: Event<any>[] | TokenEvent<any>[] | undefined): void {
+  private onNewEvents(events: Event<any>[] | TokenEvent<any>[] | RegistryEvent<any>[] | undefined): void {
     if (events == undefined || events.length == 0) {
       // Nothing to do
       return
