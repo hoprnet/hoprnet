@@ -74,11 +74,11 @@ log "Creating NPM lock file for ${package_name} package"
 # Create NPM lockfile but do not download (or build) entire package
 npm install --package-lock-only
 
-# Copy NPM lockfile back to workspace
-mv "${build_dir}/package-lock.json" "${package_dir}"
-
 # Create shrinkwrap version of package.json
 npm shrinkwrap
+
+# Copy NPM lockfile back to workspace
+mv "${build_dir}/package-lock.json" "${package_dir}"
 
 # Copy also npm-shrinkwrap.json, which will take precedence over package-lock.json while publishing
 mv "${build_dir}/npm-shrinkwrap.json" "${package_dir}"
