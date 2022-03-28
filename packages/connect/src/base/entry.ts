@@ -1,9 +1,9 @@
-import type { HoprConnectOptions, PeerStoreType, Stream } from '../types'
+import type { HoprConnectOptions, PeerStoreType } from '../types'
 import type Connection from 'libp2p-interfaces/src/connection/connection'
 import type PeerId from 'peer-id'
 import type { Multiaddr } from 'multiaddr'
 import type HoprConnect from '..'
-import type Libp2p from 'libp2p'
+import { type default as Libp2p, MuxedStream } from 'libp2p'
 
 import { EventEmitter } from 'events'
 import Debug from 'debug'
@@ -20,7 +20,14 @@ import {
   DEFAULT_DHT_ENTRY_RENEWAL
 } from '../constants'
 
-import { createCircuitAddress, nAtATime, oneAtATime, retimer, u8aEquals, timeout } from '@hoprnet/hopr-utils'
+import {
+  createCircuitAddress,
+  nAtATime,
+  oneAtATime,
+  retimer,
+  u8aEquals,
+  tryExistingConnections
+} from '@hoprnet/hopr-utils'
 import { attemptClose, relayFromRelayAddress } from '../utils'
 import { compareDirectConnectionInfo } from '../utils/addrs'
 
@@ -40,7 +47,8 @@ type ConnectionResult = {
 
 type ConnResult = {
   conn: Connection
-  stream: Stream
+  stream: MuxedStream
+  protocol: string
 }
 
 function latencyCompare(a: ConnectionResult, b: ConnectionResult) {
@@ -309,7 +317,7 @@ export class EntryNodes extends EventEmitter {
     }
     log(`Updating list of used relay nodes ...`)
     const nodesToCheck = this.filterUncheckedNodes()
-    const TIMEOUT = 3e3
+    const TIMEOUT = 5e3
 
     const toCheck = nodesToCheck.concat(this.availableEntryNodes)
     const args: Parameters<EntryNodes['connectToRelay']>[] = new Array(toCheck.length)
@@ -389,43 +397,6 @@ export class EntryNodes extends EventEmitter {
     }
   }
 
-  private async tryExistingConnections(destination: PeerId): Promise<ConnResult | void> {
-    const existingConnections = this.libp2p.connectionManager.getAll(destination)
-
-    if (existingConnections == undefined || existingConnections.length == 0) {
-      return
-    }
-
-    let stream: Stream | undefined
-    let conn: Connection | undefined
-
-    const deadConnections: Connection[] = []
-
-    for (const existingConnection of existingConnections) {
-      try {
-        stream = (await timeout(1000, () => existingConnection.newStream(CAN_RELAY_PROTCOL(this.options.environment))))
-          ?.stream as Stream
-        conn = existingConnection
-      } catch (err) {
-        deadConnections.push(existingConnection)
-        continue
-      }
-      if (stream == undefined) {
-        deadConnections.push(existingConnection)
-      }
-    }
-
-    log(`dead connection`, deadConnections)
-
-    for (const deadConnection of deadConnections) {
-      this.libp2p.connectionManager.onDisconnect(deadConnection)
-    }
-
-    if (stream != undefined && conn != undefined) {
-      return { conn, stream }
-    }
-  }
-
   private async establishNewConnection(
     destination: PeerId,
     destinationAddress: Multiaddr,
@@ -455,9 +426,11 @@ export class EntryNodes extends EventEmitter {
       return
     }
 
-    let stream: Stream | undefined
+    const protocol = CAN_RELAY_PROTCOL(this.options.environment)
+
+    let stream: MuxedStream | undefined
     try {
-      stream = (await conn.newStream([CAN_RELAY_PROTCOL(this.options.environment)]))?.stream as any
+      stream = (await conn.newStream([protocol]))?.stream
     } catch (err) {
       error(`Cannot use relay.`, err)
       await attemptClose(conn, error)
@@ -466,7 +439,8 @@ export class EntryNodes extends EventEmitter {
     if (conn != undefined && stream != undefined) {
       return {
         conn,
-        stream
+        stream,
+        protocol
       }
     }
   }
@@ -485,7 +459,7 @@ export class EntryNodes extends EventEmitter {
   ): Promise<{ entry: EntryNodeData; conn?: Connection }> {
     const start = Date.now()
 
-    let conn = await this.tryExistingConnections(id)
+    let conn = await tryExistingConnections(this.libp2p, id, CAN_RELAY_PROTCOL(this.options.environment))
 
     if (!conn) {
       conn = await this.establishNewConnection(id, relay, timeout)

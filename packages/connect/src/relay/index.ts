@@ -1,10 +1,10 @@
-import type LibP2P from 'libp2p'
+import { type default as LibP2P, MuxedStream, HandlerProps } from 'libp2p'
 import type PeerId from 'peer-id'
-import type { HandlerProps } from 'libp2p'
 import type Connection from 'libp2p-interfaces/src/connection/connection'
 import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
 import { type Multiaddr } from 'multiaddr'
 import type { Address } from 'libp2p/src/peer-store/address-book'
+import type HoprConnect from '..'
 
 import type { Stream, HoprConnectOptions, HoprConnectDialOptions, HoprConnectTestingOptions } from '../types'
 
@@ -17,9 +17,9 @@ import { RELAY_CIRCUIT_TIMEOUT, RELAY_PROTCOL, DELIVERY_PROTOCOL, CODE_P2P, OK, 
 import { RelayConnection } from './connection'
 import { RelayHandshake, RelayHandshakeMessage } from './handshake'
 import { RelayState } from './state'
-import { createRelayerKey, timeout } from '@hoprnet/hopr-utils'
+import { createRelayerKey, tryExistingConnections } from '@hoprnet/hopr-utils'
 
-import type HoprConnect from '..'
+import { attemptClose } from '../utils'
 
 const DEBUG_PREFIX = 'hopr-connect:relay'
 const DEFAULT_MAX_RELAYED_CONNECTIONS = 10
@@ -30,7 +30,8 @@ const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
 
 type ConnResult = {
   conn: Connection
-  stream: Stream
+  stream: MuxedStream
+  protocol: string
 }
 
 // Specify which libp2p methods this class uses
@@ -159,7 +160,10 @@ class Relay {
       return
     }
 
-    const handshakeResult = await new RelayHandshake(baseConnection.stream, this.options).initiate(relay, destination)
+    const handshakeResult = await new RelayHandshake(baseConnection.stream as any, this.options).initiate(
+      relay,
+      destination
+    )
 
     if (!handshakeResult.success) {
       error(`Handshake led to empty stream. Giving up.`)
@@ -390,7 +394,7 @@ class Relay {
     protocol: string,
     opts?: HoprConnectDialOptions
   ): Promise<ConnResult | void> {
-    let connResult = await this.tryExistingConnection(destination, protocol)
+    let connResult = await tryExistingConnections(this.libp2p, destination, protocol)
 
     // Only establish a new connection if we don't have any.
     // Don't establish a new direct connection to the recipient when using
@@ -431,19 +435,22 @@ class Relay {
       return
     }
 
-    let stream: Stream | undefined
+    let stream: MuxedStream | undefined
     let conn: Connection | undefined
+
     for (const usable of usableAddresses) {
       try {
         conn = await this.dialDirectly(usable, opts)
       } catch (err) {
+        await attemptClose(conn, error)
         continue
       }
 
       if (conn != undefined) {
         try {
-          stream = (await conn.newStream([protocol]))?.stream as Stream
+          stream = (await conn.newStream([protocol]))?.stream
         } catch (err) {
+          await attemptClose(conn, error)
           continue
         }
 
@@ -452,56 +459,12 @@ class Relay {
           // Only close the connection if we are not using this peer as a relay
           this.usedRelays.findIndex((usedRelay: PeerId) => usedRelay.equals(destination)) < 0
         ) {
-          try {
-            await conn.close()
-          } catch {
-            error(`Error while close unused connection to ${destination.toB58String()}`)
-          }
+          await attemptClose(conn, error)
+          continue
         }
       }
     }
-    return conn != undefined && stream != undefined ? { conn, stream } : undefined
-  }
-
-  /**
-   * Checks if there are any existing connections to the given peer
-   * and establishes a stream for the given protocol tag.
-   * @param destination peer to connect to
-   * @param protocol desired protocol
-   * @returns a stream to the given peer
-   */
-  private async tryExistingConnection(destination: PeerId, protocol: string): Promise<ConnResult | void> {
-    const existingConnections = this.libp2p.connectionManager.getAll(destination)
-
-    if (existingConnections == undefined || existingConnections.length == 0) {
-      return
-    }
-
-    let stream: Stream | undefined
-    let conn: Connection | undefined
-    const deadConnections: Connection[] = []
-
-    for (const existingConnection of existingConnections) {
-      try {
-        stream = (await timeout(1000, () => existingConnection.newStream(protocol)))?.stream as Stream
-        conn = existingConnection
-      } catch (err) {
-        deadConnections.push(existingConnection)
-        continue
-      }
-      if (stream == undefined) {
-        deadConnections.push(existingConnection)
-      }
-    }
-
-    log(`dead connection`, deadConnections)
-    for (const deadConnection of deadConnections) {
-      this.libp2p.connectionManager.onDisconnect(deadConnection)
-    }
-
-    if (stream != undefined && conn != undefined) {
-      return { conn, stream }
-    }
+    return conn != undefined && stream != undefined ? { conn, stream, protocol } : undefined
   }
 }
 

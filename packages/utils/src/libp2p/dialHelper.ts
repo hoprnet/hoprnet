@@ -76,7 +76,7 @@ async function printPeerStoreAddresses(msg: string, destination: PeerId, peerSto
 }
 
 export async function tryExistingConnections(
-  libp2p: ReducedLibp2p,
+  libp2p: Pick<ReducedLibp2p, 'connectionManager'>,
   destination: PeerId,
   protocol: string
 ): Promise<void | {
@@ -108,7 +108,10 @@ export async function tryExistingConnections(
     }
   }
 
-  log(`dead connection`, deadConnections)
+  log(
+    `dead connection`,
+    deadConnections.map((conn: Connection) => conn.id)
+  )
 
   for (const deadConnection of deadConnections) {
     libp2p.connectionManager.onDisconnect(deadConnection)
@@ -126,8 +129,8 @@ export async function tryExistingConnections(
  * @param protocol which protocol to use
  * @param opts timeout options
  */
-async function establishNewConnection(
-  libp2p: ReducedLibp2p,
+export async function establishNewConnection(
+  libp2p: Pick<ReducedLibp2p, 'peerStore' | 'dial'>,
   destination: PeerId,
   protocol: string,
   opts: Required<TimeoutOpts>
@@ -195,7 +198,7 @@ async function establishNewConnection(
 }
 
 async function establishNewRelayedConnection(
-  libp2p: ReducedLibp2p,
+  libp2p: Pick<ReducedLibp2p, 'dial'>,
   addr: Multiaddr,
   protocol: string,
   opts: Required<TimeoutOpts>
