@@ -19,7 +19,7 @@ contract HoprNetworkRegistry is Ownable {
   event EligibilityUpdated(address indexed account, bool indexed eligibility);
 
   /**
-   * Specify NetworkRegistry logic implemntation and transfer the ownership
+   * Specify NetworkRegistry logic implementation and transfer the ownership
    * _requirementImplementation address of the network registry logic implementation
    * _newOwner address of the contract owner
    */
@@ -30,7 +30,7 @@ contract HoprNetworkRegistry is Ownable {
   }
 
   /**
-   * Specify NetworkRegistry logic implemntation
+   * Specify NetworkRegistry logic implementation
    * _requirementImplementation address of the network registry logic implementation
    */
   function updateRequirementImplementation(address _requirementImplementation) external onlyOwner {
