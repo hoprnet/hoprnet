@@ -155,8 +155,8 @@ In `Retrospective` we aim to summarize the results of the last spring, in order 
 
 For a `Retrospective` a moderator is chosen:
 
-1. If `Process Facilitator` is present, they are chosen.
-2. Otherwise, any member of `Trifecta` can self-declare themselves as a moderator.
+1. If [representatives](#representatives) are present, one of them is are chosen.
+2. Otherwise, one of the tech members must take on the role of the moderator.
 
 The process is using [EasyRetro](https://easyretro.io/). `Retrospective` follows this schedule:
 
@@ -173,7 +173,7 @@ The process is using [EasyRetro](https://easyretro.io/). `Retrospective` follows
 - defines `What` has to be done
 - defines `When` it has to be completed
 - defines `Who` is responsible for completing it
-- must be created as an issue in the repository to be trackable
+- moderator ensures that the all action items are created as an issue
 
 _Who:_ all tech members within a meeting
 
