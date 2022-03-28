@@ -30,7 +30,8 @@ export async function createLibp2pInstance(
   peerId: PeerId,
   options: HoprOptions,
   initialNodes: { id: PeerId; multiaddrs: Multiaddr[] }[],
-  publicNodes: PublicNodesEmitter
+  publicNodes: PublicNodesEmitter,
+  isAllowedToConnect: (id: PeerId) => Promise<boolean>
 ): Promise<LibP2P> {
   let addressSorter: AddressSorter
 
@@ -147,13 +148,15 @@ export async function createLibp2pInstance(
   libp2p._dht._lan._network._protocol = HOPR_DHT_LAN_PROTOCOL
   libp2p._dht._lan._topologyListener._protocol = HOPR_DHT_LAN_PROTOCOL
 
-  const onConnection = libp2p.upgrader.onConnection
-
-  // @TODO implement whitelisting support
+  const onConnectionOriginal = libp2p.upgrader.onConnection
+  const onConnection = async (conn: Connection) => {
+    // ensure peer is allowed to connect
+    if (await isAllowedToConnect(conn.remotePeer)) {
+      onConnectionOriginal(conn)
+    }
+  }
   libp2p.upgrader.onConnection = (conn: Connection) => {
-    // if (isWhitelisted()) {
     onConnection(conn)
-    // }
   }
   return libp2p
 }

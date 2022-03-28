@@ -241,7 +241,15 @@ class Hopr extends EventEmitter {
     this.connector.on('peer', pushToRecentlyAnnouncedNodes)
 
     // Initialize libp2p object and pass configuration
-    this.libp2p = await createLibp2pInstance(this.id, this.options, initialNodes, this.publicNodesEmitter)
+    this.libp2p = await createLibp2pInstance(
+      this.id,
+      this.options,
+      initialNodes,
+      this.publicNodesEmitter,
+      async (peerId: PeerId) => {
+        return this.connector.isWhitelisted(PublicKey.fromPeerId(peerId))
+      }
+    )
 
     // Subscribe to p2p events from libp2p. Wraps our instance of libp2p.
     const subscribe = ((
