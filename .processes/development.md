@@ -155,7 +155,7 @@ In `Retrospective` we aim to summarize the results of the last spring, in order 
 
 For a `Retrospective` a moderator is chosen:
 
-1. If [representatives](#representatives) are present, one of them is are chosen.
+1. If [representatives](#representatives) are present, one of them are chosen.
 2. Otherwise, one of the tech members must take on the role of the moderator.
 
 The process is using [EasyRetro](https://easyretro.io/). `Retrospective` follows this schedule:
@@ -173,7 +173,7 @@ The process is using [EasyRetro](https://easyretro.io/). `Retrospective` follows
 - defines `What` has to be done
 - defines `When` it has to be completed
 - defines `Who` is responsible for completing it
-- moderator ensures that the all action items are created as an issue
+- moderator ensures that all action items are created as an issue
 
 _Who:_ all tech members within a meeting
 
@@ -193,7 +193,7 @@ Priorities are captured on the [Roadmap](https://github.com/orgs/hoprnet/project
 - ensure newly created [epics](#issue-creation) are well created
   - must use the [epic issue template](../.github/ISSUE_TEMPLATE/epic.md)
 - adapt epic priorities
-- make an epic if necessary for issues created by comm in [hopr-devrel](https://github.com/hoprnet/hopr-devrel)
+- make an epic if necessary for issues created by comm team in [hopr-devrel](https://github.com/hoprnet/hopr-devrel)
 
 #### The Roadmap columns
 
@@ -232,7 +232,7 @@ _When:_ first day of the sprint
 
 #### Once sprint has ended
 
-The [representative](#representatives) create a [recap](./devrel.md#tech-recap) of what was completed in the sprint.
+The [representatives](#representatives) create a [recap](./devrel.md#tech-recap) of what was completed in the sprint.
 
 ### Fire alarm
 
