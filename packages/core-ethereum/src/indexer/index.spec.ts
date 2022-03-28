@@ -1,6 +1,6 @@
 import { BigNumber } from 'ethers'
 import assert from 'assert'
-import { ChannelEntry, Hash, ChannelStatus, defer } from '@hoprnet/hopr-utils'
+import { ChannelEntry, Hash, ChannelStatus, defer, Address } from '@hoprnet/hopr-utils'
 
 import { expectAccountsToBeEqual, expectChannelsToBeEqual } from './fixtures'
 import * as fixtures from './fixtures'
@@ -559,5 +559,41 @@ describe('test indexer', function () {
     await thirdBlockProcessed.promise
 
     assert.equal((await db.getHoprBalance()).toString(), '2')
+  })
+
+  it('event and update ElegibleAccount', async function () {
+    const { db, chain, indexer, newBlock } = await useFixtures({
+      latestBlockNumber: 10,
+      pastHoprRegistryEvents: [fixtures.PARTY_A_ELEGIBLE],
+      id: fixtures.PARTY_A
+    })
+
+    const processed = defer<void>()
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber == 10) processed.resolve()
+    })
+    await indexer.start(chain, 0)
+
+    newBlock()
+    await processed.promise
+    assert(await db.hasElegibleAccount(Address.fromString(fixtures.PARTY_A_ELEGIBLE.args.account)))
+  })
+
+  it('should process two EligibilityUpdated events and update ElegibleAccount', async function () {
+    const { db, chain, indexer, newBlock } = await useFixtures({
+      latestBlockNumber: 10,
+      pastHoprRegistryEvents: [fixtures.PARTY_A_ELEGIBLE, fixtures.PARTY_A_NOT_ELEGIBLE],
+      id: fixtures.PARTY_A
+    })
+
+    const processed = defer<void>()
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber == 10) processed.resolve()
+    })
+    await indexer.start(chain, 0)
+
+    newBlock()
+    await processed.promise
+    assert((await db.hasElegibleAccount(Address.fromString(fixtures.PARTY_A_ELEGIBLE.args.account))) === false)
   })
 })

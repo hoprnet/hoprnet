@@ -626,11 +626,13 @@ export async function createChainWrapper(
       provider.on('error', cb)
       channels.on('error', cb)
       token.on('error', cb)
+      networkRegistry.on('error', cb)
 
       return () => {
         provider.off('error', cb)
         channels.off('error', cb)
         token.off('error', cb)
+        networkRegistry.off('error', cb)
       }
     },
     unsubscribe: () => {
@@ -641,6 +643,7 @@ export async function createChainWrapper(
     },
     getChannels: () => channels,
     getToken: () => token,
+    getNetworkRegistry: () => networkRegistry,
     getPrivateKey: () => privateKey,
     getPublicKey: () => PublicKey.fromPrivKey(privateKey),
     getInfo: () => ({

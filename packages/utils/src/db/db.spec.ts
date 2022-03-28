@@ -288,4 +288,23 @@ describe(`database tests`, function () {
     await db.subHoprBalance(new Balance(new BN(2)), TestingSnapshot)
     assert.equal((await db.getHoprBalance()).toString(), '9')
   })
+
+  it('should store elegible account', async function () {
+    const account = Address.createMock()
+
+    // should be false by default
+    assert((await db.hasElegibleAccount(account)) === false, 'account is not false by default')
+
+    // should remain false
+    await db.setElegibleAccount(account, false, TestingSnapshot)
+    assert((await db.hasElegibleAccount(account)) === false, 'account did not remain false')
+
+    // should be true once set
+    await db.setElegibleAccount(account, true, TestingSnapshot)
+    assert((await db.hasElegibleAccount(account)) === true, "account didn't become elegible")
+
+    // should go back to false
+    await db.setElegibleAccount(account, false, TestingSnapshot)
+    assert((await db.hasElegibleAccount(account)) === false, 'account remained elegible')
+  })
 })

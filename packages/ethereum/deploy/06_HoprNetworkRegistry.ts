@@ -1,8 +1,7 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 
-export const INITIAL_MIN_STAKE = 1500
-
 const PROTOCOL_CONFIG = require('../../core/protocol-config.json')
+
 // Deploy directly a whitelist contract, using hardcoded staking contract.
 const main = async function (hre: HardhatRuntimeEnvironment) {
   const { ethers, deployments, getNamedAccounts, network, environment } = hre
