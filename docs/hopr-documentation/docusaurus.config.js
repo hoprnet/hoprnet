@@ -27,7 +27,6 @@ const redocusaurus = [
       {
         id: 'placerholder-rest-api',
         spec: 'rest-api-v2-full-spec.yaml',
-        routePath: '/developers/placeholder-rest-api/'
       }
     ],
     theme: {
