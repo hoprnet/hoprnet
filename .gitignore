@@ -1,6 +1,7 @@
 /node_modules
 **/.DS_Store
 /.bin
+/build
 
 # Exclude databases resulting from local execution of hoprd
 /db
