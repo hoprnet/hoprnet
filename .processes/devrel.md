@@ -2,11 +2,11 @@
 
 The purpose of this process is to streamline the interaction and resource sharing between HOPR's _tech_ team and other departments at HOPR.
 
-## Community Team
+## Comm Team
 
 ### Allocating tech's resources
 
-Community team is expected to create github issues in [this repository](https://github.com/hoprnet/hopr-devrel).
+Comm team is expected to create github issues in [this repository](https://github.com/hoprnet/hopr-devrel).
 
 - should use [RFM](https://github.com/hoprnet/hopr-devrel/blob/main/.github/ISSUE_TEMPLATE/request-for-minting-hoprboost-nft.md) template for minting NFTs
 - should use [Request Tech Work](https://github.com/hoprnet/hopr-devrel/blob/main/.github/ISSUE_TEMPLATE/request-for-tech-work.md) template for other work
@@ -16,9 +16,7 @@ Community team is expected to create github issues in [this repository](https://
 - tech members are encouraged to ask questions to get more information from the issue author
 - issues should be created as early as possible to provide time for scheduling work
 
-Once the issue is created, community team must share the github issue in element channel `community` and tag both [representantives](./development.md#representantives).
-
-## HOPR Community
+Once the issue is created, comm team must share the github issue in element channel `community` and tag both [representantives](./development.md#representantives).
 
 ### Usage of various communication tools
 

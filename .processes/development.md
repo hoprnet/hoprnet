@@ -45,7 +45,7 @@ The purpose of this process is to streamline the development of the HOPR protoco
 Responsibilities:
 
 - to be the bridge between tech team and Project Owner
-- daily check for community created tasks in [hopr-devrel](https://github.com/hoprnet/hopr-devrel)
+- daily check for comm created tasks in [hopr-devrel](https://github.com/hoprnet/hopr-devrel)
 - daily check for new [unreleased tokens](../UNRELEASED_TOKENS.md) emails send to `tech@hoprnet.org`
 - review tech related bounties ([read more](./bounty.md))
 
@@ -192,7 +192,7 @@ Priorities are captured on the [Roadmap](https://github.com/orgs/hoprnet/project
 - ensure newly created [epics](#issue-creation) are well created
   - must use the [epic issue template](../.github/ISSUE_TEMPLATE/epic.md)
 - adapt epic priorities
-- make an epic if necessary for issues created by community in [hopr-devrel](https://github.com/hoprnet/hopr-devrel)
+- make an epic if necessary for issues created by comm in [hopr-devrel](https://github.com/hoprnet/hopr-devrel)
 
 #### The Roadmap columns
 
