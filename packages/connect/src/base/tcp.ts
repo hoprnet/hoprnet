@@ -189,7 +189,14 @@ class TCPConnection implements MultiaddrConnection {
     }
 
     // Catch error from *incoming* socket
-    socket.on('error', error)
+    socket.on('error', (err: any) => {
+      error(`Error in incoming socket`, err)
+      try {
+        socket.destroy()
+      } catch (internalError: any) {
+        error(`Error while destroying incoming socket that threw an error`, internalError)
+      }
+    })
 
     // PeerId of remote peer is not yet known,
     // will be available after encryption is set up
