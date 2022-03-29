@@ -123,7 +123,7 @@ try_cmd() {
     # also exit on error needs to be disabled for execution of the command and re-enabled afterwards again
     local output_file=$(mktemp -q)
     set +Eeo pipefail
-    if ${cmd} > ${output_file}; then
+    if eval ${cmd} > ${output_file}; then
       # command succeeded, return the output
       set -Eeo pipefail
       local result
@@ -208,35 +208,21 @@ encode_api_token(){
 
 # $1 = optional: endpoint, defaults to http://localhost:3001
 get_native_address(){
-  local with_token_endpoint=${1:-localhost:3001}
-  # split string into api token and endpoint
-  local api_token=${with_token_endpoint%\@*}
-  local endpoint=${with_token_endpoint#*\@}
-  local api_token_encoded=$(encode_api_token $api_token)
+  local endpoint="${1:-localhost:3001}"
+  local url="${endpoint}/api/v2/account/addresses"
+  local cmd="$(get_authenticated_curl_cmd ${url})"
 
-  local cmd="curl --silent --max-time 5 ${endpoint}/api/v2/account/addresses"
-  if [[ -n $api_token ]]; then
-    cmd="$cmd --header 'Authorization: Basic ${api_token_encoded}'"
-  fi
-
-  local result=$(eval "$cmd")
+  result=$(try_cmd "${cmd}" 30 5)
   echo $(echo ${result} | jq -r ".native")
 }
 
 # $1 = optional: endpoint, defaults to http://localhost:3001
 get_hopr_address() {
-  local with_token_endpoint=${1:-localhost:3001}
-  # split string into api token and endpoint
-  local api_token=${with_token_endpoint%\@*}
-  local endpoint=${with_token_endpoint#*\@}
-  local api_token_encoded=$(encode_api_token $api_token)
+  local endpoint="${1:-localhost:3001}"
+  local url="${endpoint}/api/v2/account/addresses"
+  local cmd="$(get_authenticated_curl_cmd ${url})"
 
-  local cmd="curl --silent --max-time 5 ${endpoint}/api/v2/account/addresses"
-  if [[ -n $api_token ]]; then
-    cmd="$cmd --header 'Authorization: Basic ${api_token_encoded}'"
-  fi
-
-  local result=$(eval "$cmd")
+  result=$(try_cmd "${cmd}" 30 5)
   echo $(echo ${result} | jq -r ".hopr")
 }
 
@@ -260,6 +246,55 @@ validate_native_address() {
   fi
 
   echo "${native_address}"
+}
+
+# $1 = endpoint
+get_authenticated_curl_cmd() {
+  # the following checks must handle endpoints like:
+  #   - myendpoint.com
+  #   - myendpoint.com:3001
+  #   - apitoken@myendpoint.com
+  #   - apitoken@myendpoint.com:3001
+  #   - http(s)://myendpoint.com
+  #   - http(s)://myendpoint.com:3001
+  #   - http(s)://apitoken@myendpoint.com
+  #   - http(s)://apitoken@myendpoint.com:3001
+
+  # trim whitespaces which are not allowed anywhere in the url
+  local full_endpoint="${1// /}"
+
+  # extract protocol prefix incl. separator ://
+  local protocol="$(echo ${full_endpoint} |
+    grep :// | sed -e's,^\(.*://\).*,\1,g')"
+
+  # set default protocol if none was found
+  if [ -z "${protocol}" ]; then
+      protocol="http://"
+  fi
+
+  # remove protocol from endpoint
+  local endpoint_wo_protocol="${full_endpoint#$protocol}"
+
+  # extract host:port/url portion of endpoint
+  local host_w_port="${endpoint_wo_protocol#*@}"
+
+  # extract auth portion of endpoint
+  local api_token="${endpoint_wo_protocol%@*}"
+
+  # re-create endpoint with correct protocol
+  local endpoint="${protocol}${host_w_port}"
+
+  # set up base curl command
+  local cmd="curl --silent --max-time 5 ${endpoint}"
+
+  # add auth info if token was found previously
+  if [ -n "${api_token}" ]; then
+    local api_token_encoded="$(encode_api_token $api_token)"
+    cmd+=" --header \"Authorization: Basic ${api_token_encoded}\""
+  fi
+
+  # return full command
+  echo "${cmd}"
 }
 
 setup_colors
