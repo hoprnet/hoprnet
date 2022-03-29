@@ -361,9 +361,9 @@ gcloud_get_managed_instance_group_instances_ips() {
   local name="${1}"
   local nproc_cmd
 
-  if command -v nproc ; then
+  if command -v nproc 1> /dev/null ; then
     nproc_cmd="nproc"
-  elif command -v sysctl ; then
+  elif command -v sysctl 1> /dev/null ; then
     nproc_cmd="sysctl -n hw.logicalcpu"
   else
     # Default to single core
