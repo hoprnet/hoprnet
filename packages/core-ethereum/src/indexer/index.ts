@@ -6,6 +6,7 @@ import { EventEmitter } from 'events'
 import { Multiaddr } from 'multiaddr'
 import {
   randomChoice,
+  defer,
   HoprDB,
   stringToU8a,
   ChannelStatus,
@@ -53,6 +54,8 @@ class Indexer extends EventEmitter {
   private chain: ChainWrapper
   private genesisBlock: number
   private lastSnapshot: IndexerSnapshot | undefined
+
+  private blockProcessingLock: DeferType<void> | undefined
 
   private unsubscribeErrors: () => void
   private unsubscribeBlock: () => void
@@ -149,7 +152,7 @@ class Indexer extends EventEmitter {
   /**
    * Stops indexing.
    */
-  public stop(): void {
+  public async stop(): Promise<void> {
     if (this.status === 'stopped') {
       return
     }
@@ -158,6 +161,8 @@ class Indexer extends EventEmitter {
 
     this.unsubscribeBlock()
     this.unsubscribeErrors()
+
+    this.blockProcessingLock && (await this.blockProcessingLock.promise)
 
     this.status = 'stopped'
     this.emit('status', 'stopped')
@@ -394,6 +399,12 @@ class Indexer extends EventEmitter {
     // NOTE: This function is also used in event handlers
     // where it cannot be 'awaited', so all exceptions need to be caught.
 
+    // Set a lock during block processing to make sure database does not get closed
+    if (this.blockProcessingLock) {
+      this.blockProcessingLock.resolve()
+    }
+    this.blockProcessingLock = defer<void>()
+
     const currentBlock = blockNumber - this.maxConfirmations
 
     if (currentBlock < 0) {
@@ -467,6 +478,9 @@ class Indexer extends EventEmitter {
     } catch (err) {
       log(`error: failed to update database with latest block number ${blockNumber}`, err)
     }
+
+    this.blockProcessingLock.resolve()
+    this.blockProcessingLock = undefined
 
     this.emit('block-processed', currentBlock)
   }
