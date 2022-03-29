@@ -40,6 +40,7 @@ const getSyncPercentage = (start: number, current: number, end: number) =>
 const backoffOption: Parameters<typeof retryWithBackoff>[1] = { maxDelay: MAX_TRANSACTION_BACKOFF }
 
 export enum IndexerStatus {
+  STARTING = 'starting',
   STARTED = 'started',
   RESTARTING = 'restarting',
   STOPPED = 'stopped'
@@ -84,6 +85,8 @@ class Indexer extends EventEmitter {
     if (this.status === IndexerStatus.STARTED) {
       return
     }
+    this.status = IndexerStatus.STARTING
+
     log(`Starting indexer...`)
     this.chain = chain
     this.genesisBlock = genesisBlock
@@ -406,7 +409,7 @@ class Indexer extends EventEmitter {
     // where it cannot be 'awaited', so all exceptions need to be caught.
 
     // Don't process any block if indexer was stopped.
-    if (this.status === IndexerStatus.STOPPED) {
+    if (![IndexerStatus.STARTING, IndexerStatus.STARTED].includes(this.status)) {
       return
     }
 
