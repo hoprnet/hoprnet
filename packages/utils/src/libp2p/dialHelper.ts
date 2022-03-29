@@ -75,6 +75,8 @@ async function printPeerStoreAddresses(msg: string, destination: PeerId, peerSto
   }
 }
 
+const PROTOCOL_SELECT_TIMEOUT = 2e3
+
 export async function tryExistingConnections(
   libp2p: Pick<ReducedLibp2p, 'connectionManager'>,
   destination: PeerId,
@@ -97,7 +99,7 @@ export async function tryExistingConnections(
 
   for (const existingConnection of existingConnections) {
     try {
-      stream = (await timeout(1000, () => existingConnection.newStream(protocol)))?.stream
+      stream = (await timeout(PROTOCOL_SELECT_TIMEOUT, () => existingConnection.newStream(protocol)))?.stream
     } catch (err) {}
 
     if (stream == undefined) {
