@@ -34,3 +34,14 @@ jobs:
         run: ./scripts/commit-and-push-all-changes.sh
         env:
           HOPR_GIT_MSG: 'chore(build): apply linter changes'
+  shellcheck:
+    name: Shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Check shell scripts (not enforced for now)
+        continue-on-error: true
+        run:
+          shellcheck -a --norc -s bash -x scripts/*.sh
+

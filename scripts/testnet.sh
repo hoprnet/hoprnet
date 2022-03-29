@@ -105,14 +105,14 @@ fund_if_empty() {
     exit 1
   fi;
 
-  log "Funding wallet ${faucet_address} has enough funds: ${faucet_native_balance}"
-  log "Funding wallet ${faucet_address} has HOPR tokens: ${faucet_hopr_balance}"
+  log "Funding wallet ${faucet_address} has native funds: ${faucet_native_balance}"
+  log "Funding wallet ${faucet_address} has HOPR funds: ${faucet_hopr_balance}"
 
   local address_native_balance address_hopr_balance
   log "Checking balance of the address to fund: ${address}"
   address_native_balance=$(wallet_balance "${environment}" "${address}" "native")
   log "Checking balance of the address to fund: ${address}"
-  address_hopr_balance=$(wallet_balance "${environment}" "${address}" "native")
+  address_hopr_balance=$(wallet_balance "${environment}" "${address}" "hopr")
 
   log "Native balance of ${address} is ${address_native_balance}"
   log "HOPR balance of ${address} is ${address_hopr_balance}"
