@@ -7,13 +7,14 @@ import * as fixtures from './fixtures'
 import { PARTY_A, PARTY_B } from '../fixtures'
 import type { Event } from './types'
 import { useFixtures } from './index.mock'
+import { IndexerStatus } from '.'
 
 describe('test indexer', function () {
   it('should start indexer', async function () {
     const { indexer, chain } = await useFixtures()
 
     await indexer.start(chain, 0)
-    assert.strictEqual(indexer.status, 'started')
+    assert.strictEqual(indexer.status, IndexerStatus.STARTED)
   })
 
   it('should stop indexer', async function () {
@@ -35,7 +36,7 @@ describe('test indexer', function () {
     assert(provider.listeners('error').length == 0)
     assert(provider.listeners('block').length == 0)
 
-    assert.strictEqual(indexer.status, 'stopped')
+    assert.strictEqual(indexer.status, IndexerStatus.STOPPED)
   })
 
   it('should restart the indexer', async function () {
@@ -159,14 +160,14 @@ describe('test indexer', function () {
     provider.emit('error', new Error('MOCK'))
 
     // Indexer is either stopped or restarting
-    assert(['stopped', 'restarting'].includes(indexer.status))
+    assert([IndexerStatus.STOPPED, IndexerStatus.RESTARTING].includes(indexer.status))
 
     const started = defer<void>()
     indexer.on('status', (status: string) => {
       if (status === 'started') started.resolve()
     })
     await started.promise
-    assert.strictEqual(indexer.status, 'started')
+    assert.strictEqual(indexer.status, IndexerStatus.STARTED)
   })
 
   it('should handle provider error and resend queuing transactions', async function () {
@@ -179,14 +180,14 @@ describe('test indexer', function () {
     provider.emit('error', new Error('ECONNRESET'))
 
     // Indexer is either stopped or restarting
-    assert(['stopped', 'restarting'].includes(indexer.status))
+    assert([IndexerStatus.STOPPED, IndexerStatus.RESTARTING].includes(indexer.status))
 
     const started = defer<void>()
     indexer.on('status', (status: string) => {
       if (status === 'started') started.resolve()
     })
     await started.promise
-    assert.strictEqual(indexer.status, 'started')
+    assert.strictEqual(indexer.status, IndexerStatus.STARTED)
   })
 
   it('should contract error by restarting', async function () {
@@ -204,7 +205,7 @@ describe('test indexer', function () {
       if (status === 'started') started.resolve()
     })
     await started.promise
-    assert.strictEqual(indexer.status, 'started')
+    assert.strictEqual(indexer.status, IndexerStatus.STARTED)
   })
 
   it('should emit events on updated channels', async function () {
