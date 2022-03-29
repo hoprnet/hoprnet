@@ -188,6 +188,9 @@ class TCPConnection implements MultiaddrConnection {
       throw Error(`Could not determine remote address`)
     }
 
+    // Catch error from *incoming* socket
+    socket.on('error', error)
+
     // PeerId of remote peer is not yet known,
     // will be available after encryption is set up
     const remoteAddr = nodeToMultiaddr(
