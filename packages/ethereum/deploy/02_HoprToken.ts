@@ -26,8 +26,6 @@ const main: DeployFunction = async function ({
     const MINTER_ROLE = await hoprToken.MINTER_ROLE()
     const isDeployerMinter = await hoprToken.hasRole(MINTER_ROLE, deployer.address)
 
-    // on "testing" networks, we cannot wait 10 blocks as there is no auto-mine
-    // on "development" networks, we must wait 10 blocks since hardhat is not aware of the txs
     if (!isDeployerMinter) {
       console.log('Granting MINTER role to', deployer.address)
       await hoprToken.grantRole(MINTER_ROLE, deployer.address)
