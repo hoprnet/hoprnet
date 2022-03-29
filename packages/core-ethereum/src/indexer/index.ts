@@ -399,6 +399,7 @@ class Indexer extends EventEmitter {
     // NOTE: This function is also used in event handlers
     // where it cannot be 'awaited', so all exceptions need to be caught.
 
+    // Set a lock during block processing to make sure database does not get closed
     if (this.blockProcessingLock) {
       this.blockProcessingLock.resolve()
     }
