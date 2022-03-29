@@ -61,7 +61,7 @@ export async function createLibp2pInstance(
     modules: {
       transport: [HoprConnect as any],
       streamMuxer: [Mplex],
-      connEncryption: [NOISE as any],
+      connEncryption: [NOISE],
       dht: KadDHT
     },
     // Currently disabled due to problems with serialization and deserialization
