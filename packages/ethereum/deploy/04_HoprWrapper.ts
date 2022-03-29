@@ -17,7 +17,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 // this smart contract should not be redeployed on a production network
 // or if it's not on xdai chain
-main.skip = async (env) => !!env.network.tags.production || env.network.name !== 'xdai'
+main.skip = async (env: HardhatRuntimeEnvironment) => !!env.network.tags.production || env.network.name !== 'xdai'
 main.dependencies = ['preDeploy', 'HoprToken']
 main.tags = ['HoprWrapper']
 
