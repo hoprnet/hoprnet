@@ -480,7 +480,6 @@ class Indexer extends EventEmitter {
     }
 
     this.blockProcessingLock.resolve()
-    this.blockProcessingLock = undefined
 
     this.emit('block-processed', currentBlock)
   }

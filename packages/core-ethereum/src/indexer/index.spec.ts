@@ -158,7 +158,8 @@ describe('test indexer', function () {
 
     provider.emit('error', new Error('MOCK'))
 
-    assert.strictEqual(indexer.status, 'stopped')
+    // Indexer is either stopped or restarting
+    assert(['stopped', 'restarting'].includes(indexer.status))
 
     const started = defer<void>()
     indexer.on('status', (status: string) => {
@@ -177,7 +178,8 @@ describe('test indexer', function () {
     await indexer.start(chain, 0)
     provider.emit('error', new Error('ECONNRESET'))
 
-    assert.strictEqual(indexer.status, 'stopped')
+    // Indexer is either stopped or restarting
+    assert(['stopped', 'restarting'].includes(indexer.status))
 
     const started = defer<void>()
     indexer.on('status', (status: string) => {
