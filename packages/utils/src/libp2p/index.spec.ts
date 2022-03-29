@@ -12,7 +12,7 @@ import {
 import type { Connection } from 'libp2p/src/connection-manager'
 import type { LibP2PHandlerArgs } from './index'
 import BL from 'bl'
-import { defer } from '../async'
+import { defer, type DeferType } from '../async'
 import { u8aEquals } from '../u8a'
 import { Multiaddr } from 'multiaddr'
 
