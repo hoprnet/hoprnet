@@ -14,8 +14,6 @@ import pushable from 'it-pushable'
 import { EventEmitter } from 'events'
 import assert from 'assert'
 
-chai.use(spies)
-
 // const Alice = privKeyToPeerId(stringToU8a(`0xf8860ccb336f4aad751f55765b4adbefc538f8560c21eed6fbc9940d0584eeca`))
 const Bob = privKeyToPeerId(stringToU8a(`0xf8860ccb336f4aad751f55765b4adbefc538f8560c21eed6fbc9940d0584eeca`))
 
