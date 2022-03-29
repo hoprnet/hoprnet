@@ -110,10 +110,12 @@ export async function tryExistingConnections(
     }
   }
 
-  log(
-    `dead connection`,
-    deadConnections.map((conn: Connection) => conn.id)
-  )
+  if (deadConnections.length > 0) {
+    log(
+      `dead connection${deadConnections.length == 1 ? '' : 's'} to ${destination.toB58String()}`,
+      deadConnections.map((conn: Connection) => conn.id)
+    )
+  }
 
   for (const deadConnection of deadConnections) {
     libp2p.connectionManager.onDisconnect(deadConnection)
