@@ -106,7 +106,7 @@ ___
 
 ### getContractData
 
-▸ `Const` **getContractData**(`network`, `environmentId`, `contract`): [`ContractData`](modules.md#contractdata)
+▸ **getContractData**(`network`, `environmentId`, `contract`): [`ContractData`](modules.md#contractdata)
 
 #### Parameters
 
