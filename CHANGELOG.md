@@ -17,6 +17,7 @@
 - Various bug fixes in `core`
 - Performance improvements in `core`
 - Enhanced database queries through range queries and batched operations ([#3648](https://github.com/hoprnet/hoprnet/pull/3648))
+- Automatically cleanup stale connections to correctly handle reconnects ([#3688](https://github.com/hoprnet/hoprnet/pull/3688))
 
 ---
 
