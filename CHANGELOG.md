@@ -2,6 +2,8 @@
 
 ## [1.89](https://github.com/hoprnet/hoprnet/compare/release/ouagadougou...hoprnet:master)
 
+- Use npm-shrinkwrap to publish correct lockfiles
+
 ---
 
 <a name="1.88"></a>
