@@ -24,8 +24,7 @@
   "files": [
     "lib",
     "unreleasedTokens.json",
-    "package-lock.json",
-    "yarn.lock"
+    "npm-shrinkwrap.json"
   ],
   "dependencies": {
     "@hoprnet/hopr-core": "workspace:packages/core",

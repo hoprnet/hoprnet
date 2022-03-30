@@ -9,8 +9,7 @@
   "bin": "lib/index.js",
   "files": [
     "lib",
-    "package-lock.json",
-    "yarn.lock",
+    "npm-shrinkwrap.json",
     "hopr-admin/.next/**",
     "hoprd-default.sh",
     "releases.json",
