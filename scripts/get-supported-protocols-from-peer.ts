@@ -94,7 +94,7 @@ async function main() {
 
   // As used by other HOPR nodes
   upgrader.cryptos.set(NOISE.protocol, NOISE)
-  upgrader.muxers.set(Mplex.multicodec, Mplex as any)
+  upgrader.muxers.set(Mplex.multicodec, Mplex)
 
   // Use minimal configuration for hopr-connect
   const Transport = new HoprConnect({
