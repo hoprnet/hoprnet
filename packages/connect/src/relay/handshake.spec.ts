@@ -5,6 +5,7 @@ import type PeerId from 'peer-id'
 import assert from 'assert'
 import type { Stream, StreamType } from '../types'
 import type Connection from 'libp2p-interfaces/src/connection/connection'
+import type { MuxedStream } from 'libp2p/src/upgrader'
 
 const initiator = privKeyToPeerId('0x695a1ad048d12a1a82f827a38815ab33aa4464194fa0bdb99f78d9c66ec21505')
 const relay = privKeyToPeerId('0xf0b8e814c3594d0c552d72fb3dfda7f0d9063458a7792369e7c044eda10f3b52')
@@ -46,7 +47,7 @@ describe('test relay handshake', function () {
           stream: {
             source: (async function* () {
               yield Uint8Array.from([RelayHandshakeMessage.OK])
-            })(),
+            })() as AsyncIterable<Uint8Array>,
             sink: async function (source: Stream['source']) {
               for await (const msg of source) {
                 if (u8aEquals(msg.slice(), initiator.pubKey.marshal())) {
@@ -54,7 +55,7 @@ describe('test relay handshake', function () {
                 }
               }
             }
-          } as any,
+          } as MuxedStream,
           conn: {
             close: async () => {}
           } as Connection,
@@ -91,7 +92,7 @@ describe('test relay handshake', function () {
       initiator,
       async () => {
         return {
-          stream: destinationToRelay as any,
+          stream: destinationToRelay as MuxedStream,
           conn: {
             close: async () => {}
           } as Connection,
@@ -119,7 +120,7 @@ describe('test relay handshake', function () {
       initiator,
       async () => {
         return {
-          stream: destinationToRelay as any,
+          stream: destinationToRelay as MuxedStream,
           conn: {
             close: async () => {}
           } as Connection,
