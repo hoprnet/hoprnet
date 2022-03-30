@@ -184,11 +184,12 @@
 - [serializeToU8a](modules.md#serializetou8a)
 - [startResourceUsageLogger](modules.md#startresourceusagelogger)
 - [stringToU8a](modules.md#stringtou8a)
-- [timeoutAfter](modules.md#timeoutafter)
+- [timeout](modules.md#timeout)
 - [timer](modules.md#timer)
 - [toLengthPrefixedU8a](modules.md#tolengthprefixedu8a)
 - [toNetworkPrefix](modules.md#tonetworkprefix)
 - [toU8a](modules.md#tou8a)
+- [tryExistingConnections](modules.md#tryexistingconnections)
 - [u8aAdd](modules.md#u8aadd)
 - [u8aAddrToString](modules.md#u8aaddrtostring)
 - [u8aAddressToCIDR](modules.md#u8aaddresstocidr)
@@ -266,11 +267,11 @@ ___
 
 ### DialResponse
 
-Ƭ **DialResponse**: { `resp`: `Awaited`<`ReturnType`<`LibP2P`[``"dialProtocol"``]\>\> ; `status`: [`SUCCESS`](enums/DialStatus.md#success)  } \| { `status`: [`TIMEOUT`](enums/DialStatus.md#timeout)  } \| { `status`: [`ABORTED`](enums/DialStatus.md#aborted)  } \| { `dhtContacted`: `boolean` ; `status`: [`DIAL_ERROR`](enums/DialStatus.md#dial_error)  } \| { `query`: `PeerId` ; `status`: [`DHT_ERROR`](enums/DialStatus.md#dht_error)  }
+Ƭ **DialResponse**: { `resp`: { `conn`: `Connection` ; `protocol`: `string` ; `stream`: `MuxedStream`  } ; `status`: [`SUCCESS`](enums/DialStatus.md#success)  } \| { `status`: [`TIMEOUT`](enums/DialStatus.md#timeout)  } \| { `status`: [`ABORTED`](enums/DialStatus.md#aborted)  } \| { `dhtContacted`: `boolean` ; `status`: [`DIAL_ERROR`](enums/DialStatus.md#dial_error)  } \| { `query`: `string` ; `status`: [`DHT_ERROR`](enums/DialStatus.md#dht_error)  } \| { `status`: [`NO_DHT`](enums/DialStatus.md#no_dht)  }
 
 #### Defined in
 
-[libp2p/dialHelper.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L35)
+[libp2p/dialHelper.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L32)
 
 ___
 
@@ -1406,7 +1407,7 @@ Contains a baseline protection against dialing same addresses twice.
 
 #### Defined in
 
-[libp2p/dialHelper.ts:295](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L295)
+[libp2p/dialHelper.ts:341](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L341)
 
 ___
 
@@ -2962,9 +2963,11 @@ stringToU8a('0xDEadBeeF') // Uint8Array [ 222, 173, 190, 239 ]
 
 ___
 
-### timeoutAfter
+### timeout
 
-▸ **timeoutAfter**<`T`\>(`body`, `timeout`): `Promise`<`T`\>
+▸ **timeout**<`T`\>(`timeout`, `work`): `Promise`<`T`\>
+
+Races a timeout against some work
 
 #### Type parameters
 
@@ -2974,18 +2977,20 @@ ___
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `body` | (`abortSignal`: `AbortSignal`) => `Promise`<`T`\> |
-| `timeout` | `number` |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `timeout` | `number` | return after timeout in ms |
+| `work` | () => `Promise`<`T`\> | function that returns a Promise that resolves once the work is done |
 
 #### Returns
 
 `Promise`<`T`\>
 
+a Promise that resolves once the timeout is due or the work is done
+
 #### Defined in
 
-[async/timeout.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/timeout.ts#L5)
+[async/timeout.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/timeout.ts#L7)
 
 ___
 
@@ -3074,6 +3079,28 @@ the desired size.
 #### Defined in
 
 [u8a/toU8a.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/toU8a.ts#L7)
+
+___
+
+### tryExistingConnections
+
+▸ **tryExistingConnections**(`libp2p`, `destination`, `protocol`): `Promise`<`void` \| { `conn`: `Connection` ; `protocol`: `string` ; `stream`: `MuxedStream`  }\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `libp2p` | `Pick`<`ReducedLibp2p`, ``"connectionManager"``\> |
+| `destination` | `PeerId` |
+| `protocol` | `string` |
+
+#### Returns
+
+`Promise`<`void` \| { `conn`: `Connection` ; `protocol`: `string` ; `stream`: `MuxedStream`  }\>
+
+#### Defined in
+
+[libp2p/dialHelper.ts:80](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L80)
 
 ___
 
