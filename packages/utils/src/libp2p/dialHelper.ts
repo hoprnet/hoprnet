@@ -1,7 +1,7 @@
 /*
  * Add a more usable API on top of LibP2P
  */
-import type PeerId from 'peer-id'
+import PeerId from 'peer-id'
 import type LibP2P from 'libp2p'
 import type { Connection } from 'libp2p/src/connection-manager'
 import type { MuxedStream } from 'libp2p/src/upgrader'
@@ -113,7 +113,7 @@ export async function tryExistingConnections(
   if (deadConnections.length > 0) {
     log(
       `dead connection${deadConnections.length == 1 ? '' : 's'} to ${destination.toB58String()}`,
-      deadConnections.map((conn: Connection) => conn.id)
+      deadConnections.map((deadConnection: Connection) => deadConnection.id)
     )
   }
 
@@ -133,22 +133,12 @@ export async function tryExistingConnections(
  * @param protocol which protocol to use
  * @param opts timeout options
  */
-export async function establishNewConnection(
-  libp2p: Pick<ReducedLibp2p, 'peerStore' | 'dial'>,
-  destination: PeerId,
+async function establishNewConnection(
+  libp2p: Pick<ReducedLibp2p, 'dial'>,
+  destination: PeerId | Multiaddr,
   protocol: string,
   opts: Required<TimeoutOpts>
-): Promise<{
-  stream: MuxedStream
-  conn: Connection
-  protocol: string
-} | void> {
-  const knownAddresses = await libp2p.peerStore.addressBook.get(destination)
-
-  if (knownAddresses.length == 0) {
-    return
-  }
-
+) {
   const start = Date.now()
 
   let aborted = false
@@ -163,69 +153,11 @@ export async function establishNewConnection(
   try {
     conn = await libp2p.dial(destination, { signal: opts.signal })
   } catch (err) {
-    logError(`Error while dialing ${destination.toB58String()} directly.`)
-    if (err?.message) {
-      logError(`Dial error:`, err)
-    }
-  }
-
-  if (!conn) {
-    return
-  }
-
-  const stream = (await timeout(1000, () => conn.newStream(protocol)))?.stream
-
-  opts.signal.removeEventListener('abort', onAbort)
-
-  // Libp2p's return types tend to change every now and then
-  if (stream != null && aborted) {
-    log(`ending obsolete write stream after ${Date.now() - start} ms`)
-    try {
-      stream
-        .sink((async function* () {})())
-        .catch((err: any) => logError(`Error while ending obsolete write stream`, err))
-    } catch (err) {
-      logError(`Error while ending obsolete write stream`, err)
-    }
-    return
-  }
-
-  if (!stream) {
-    return
-  }
-
-  return {
-    conn,
-    stream,
-    protocol
-  }
-}
-
-async function establishNewRelayedConnection(
-  libp2p: Pick<ReducedLibp2p, 'dial'>,
-  addr: Multiaddr,
-  protocol: string,
-  opts: Required<TimeoutOpts>
-): Promise<{
-  stream: MuxedStream
-  conn: Connection
-  protocol: string
-}> {
-  const start = Date.now()
-
-  let aborted = false
-
-  const onAbort = () => {
-    aborted = true
-  }
-
-  opts.signal.addEventListener('abort', onAbort)
-
-  let conn: Connection
-  try {
-    conn = await libp2p.dial(addr, { signal: opts.signal })
-  } catch (err) {
-    logError(`Error while establising relayed connection using ${addr.toString()}.`)
+    logError(
+      `Error while establising relayed connection using ${
+        PeerId.isPeerId(destination) ? destination.toB58String() : destination.toString()
+      }.`
+    )
     if (err?.message) {
       logError(`Dial error:`, err)
     }
@@ -328,7 +260,11 @@ async function doDial(
   let struct = await tryExistingConnections(libp2p, destination, protocol)
 
   if (!struct) {
-    struct = await establishNewConnection(libp2p, destination, protocol, opts)
+    const knownAddresses = await libp2p.peerStore.addressBook.get(destination)
+
+    if (knownAddresses.length > 0) {
+      struct = await establishNewConnection(libp2p, destination, protocol, opts)
+    }
   }
 
   if (struct) {
@@ -381,7 +317,7 @@ async function doDial(
 
       // Only establish new connection if not yet successful
       if (!relayStruct) {
-        relayStruct = await establishNewRelayedConnection(libp2p, cirtcuitAddress, protocol, opts)
+        relayStruct = await establishNewConnection(libp2p, cirtcuitAddress, protocol, opts)
       }
     }
   }

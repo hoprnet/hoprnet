@@ -459,7 +459,6 @@ class Relay {
           this.usedRelays.findIndex((usedRelay: PeerId) => usedRelay.equals(destination)) < 0
         ) {
           await attemptClose(conn, error)
-          continue
         }
       }
     }
