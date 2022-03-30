@@ -481,6 +481,7 @@ export default class HoprCoreEthereum extends EventEmitter {
    * @returns true if whitelisted
    */
   public async isWhitelisted(id: PublicKey): Promise<boolean> {
+    // TODO: check smart contract global whitelist toggle
     return this.db.isWhitelisted(id)
   }
 }
