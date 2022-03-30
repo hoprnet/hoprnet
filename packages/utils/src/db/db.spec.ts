@@ -306,27 +306,17 @@ describe(`database tests`, function () {
   })
 
   it('should test eligible', async function () {
-    const hoprNode = PublicKey.createMock()
     const account = Address.createMock()
 
     // should be false by default
-    assert((await db.isWhitelisted(hoprNode)) === false, 'hoprNode is not eligible by default')
-
-    // should remain false
-    await db.addToRegistry(hoprNode, account, TestingSnapshot)
-    assert((await db.isWhitelisted(hoprNode)) === false, 'eligibility should remain false when not marked')
+    assert((await db.isEligible(account)) === false, 'account is not eligible by default')
 
     // should be true once set
     await db.setEligible(account, true, TestingSnapshot)
-    assert((await db.isWhitelisted(hoprNode)) === true, 'hoprNode should be eligible')
+    assert((await db.isEligible(account)) === true, 'account should be eligible')
 
     // should be false once unset
     await db.setEligible(account, false, TestingSnapshot)
-    assert((await db.isWhitelisted(hoprNode)) === false, 'hoprNode should be uneligible')
-
-    // should be false when registry is removed
-    await db.setEligible(account, true, TestingSnapshot)
-    await db.removeFromRegistry(account, TestingSnapshot)
-    assert((await db.isWhitelisted(hoprNode)) === false, 'hoprNode should not be eligible anymore')
+    assert((await db.isEligible(account)) === false, 'account should be uneligible')
   })
 })

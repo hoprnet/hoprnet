@@ -804,16 +804,11 @@ export class HoprDB {
 
   /**
    * Hopr Network Registry
-   * @param hoprNode the node registered
-   * @returns true if node is whitelisted
+   * @param account the account that made the transaction
+   * @returns true if account is eligible
    */
-  public async isWhitelisted(hoprNode: PublicKey): Promise<boolean> {
-    try {
-      const account = await this.getAccountFromRegistry(hoprNode)
-      return this.getCoercedOrDefault(createWhitelistEligibleKey(account), () => true, false)
-    } catch {
-      return false
-    }
+  public async isEligible(account: Address): Promise<boolean> {
+    return this.getCoercedOrDefault(createWhitelistEligibleKey(account), () => true, false)
   }
 
   static createMock(id?: PublicKey): HoprDB {

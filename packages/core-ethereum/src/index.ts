@@ -477,12 +477,17 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   /**
-   * @param id the public key of the account we want to check if it's whitelisted
+   * @param hoprNode the public key of the account we want to check if it's whitelisted
    * @returns true if whitelisted
    */
-  public async isWhitelisted(id: PublicKey): Promise<boolean> {
-    // TODO: check smart contract global whitelist toggle
-    return this.db.isWhitelisted(id)
+  public async isWhitelisted(hoprNode: PublicKey): Promise<boolean> {
+    try {
+      // TODO: check smart contract global whitelist toggle
+      const account = await this.db.getAccountFromRegistry(hoprNode)
+      return this.db.isEligible(account)
+    } catch {
+      return false
+    }
   }
 }
 
