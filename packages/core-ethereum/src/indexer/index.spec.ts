@@ -1,6 +1,6 @@
 import { BigNumber } from 'ethers'
 import assert from 'assert'
-import { ChannelEntry, Hash, ChannelStatus, defer, Address, PublicKey } from '@hoprnet/hopr-utils'
+import { ChannelEntry, Hash, ChannelStatus, defer, PublicKey } from '@hoprnet/hopr-utils'
 
 import { expectAccountsToBeEqual, expectChannelsToBeEqual } from './fixtures'
 import * as fixtures from './fixtures'
@@ -561,7 +561,7 @@ describe('test indexer', function () {
     assert.equal((await db.getHoprBalance()).toString(), '2')
   })
 
-  it('should process first 2 registry events and account be whitelisted', async function () {
+  it('should process first 2 registry events and account be registered and eligible', async function () {
     const { db, chain, indexer, newBlock } = await useFixtures({
       latestBlockNumber: 10,
       pastHoprRegistryEvents: [fixtures.PARTY_A_REGISTERED, fixtures.PARTY_A_ELEGIBLE],
@@ -576,10 +576,11 @@ describe('test indexer', function () {
 
     newBlock()
     await processed.promise
-    assert(await db.isWhitelisted(PublicKey.fromPeerIdString(PARTY_B_MULTIADDR.getPeerId())))
+    assert(await db.getAccountFromRegistry(PublicKey.fromPeerIdString(PARTY_B_MULTIADDR.getPeerId())))
+    assert(await db.isEligible(fixtures.PARTY_A.toAddress()))
   })
 
-  it('should process first 4 registry events and account not be whitelisted', async function () {
+  it('should process first 4 registry events and account not be eligible', async function () {
     const { db, chain, indexer, newBlock } = await useFixtures({
       latestBlockNumber: 10,
       pastHoprRegistryEvents: [fixtures.PARTY_A_REGISTERED, fixtures.PARTY_A_ELEGIBLE, fixtures.PARTY_A_NOT_ELEGIBLE],
@@ -594,10 +595,11 @@ describe('test indexer', function () {
 
     newBlock()
     await processed.promise
-    assert((await db.isWhitelisted(PublicKey.fromPeerIdString(PARTY_B_MULTIADDR.getPeerId()))) === false)
+    assert(await db.getAccountFromRegistry(PublicKey.fromPeerIdString(PARTY_B_MULTIADDR.getPeerId())))
+    assert((await db.isEligible(fixtures.PARTY_A.toAddress())) === false)
   })
 
-  it('should process all registry events and account not be whitelisted', async function () {
+  it('should process all registry events and account not be registered or but be eligible', async function () {
     const { db, chain, indexer, newBlock } = await useFixtures({
       latestBlockNumber: 10,
       pastHoprRegistryEvents: [
@@ -618,6 +620,7 @@ describe('test indexer', function () {
 
     newBlock()
     await processed.promise
-    assert((await db.isWhitelisted(PublicKey.fromPeerIdString(PARTY_B_MULTIADDR.getPeerId()))) === false)
+    assert.rejects(() => db.getAccountFromRegistry(PublicKey.fromPeerIdString(PARTY_B_MULTIADDR.getPeerId())))
+    assert(await db.isEligible(fixtures.PARTY_A.toAddress()))
   })
 })
