@@ -27,7 +27,7 @@ function createConnectorMock(peer: PeerId): HoprCoreEthereum {
       connectorLogger('getAccount method was called')
       return Promise.resolve(
         new AccountEntry(
-          PublicKey.fromPeerId(peer).toAddress(),
+          PublicKey.fromPeerId(peer),
           new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${peer.toB58String()}`),
           new BN('1')
         )

@@ -31,7 +31,7 @@ const toPeerInfoFormat = (info: ReturnType<Hopr['getConnectionInfo']>, multiaddr
     success: info.heartbeatsSuccess
   },
   lastSeen: info.lastSeen,
-  quality: info.lastTen,
+  quality: info.quality,
   backoff: info.backoff,
   isNew: info.heartbeatsSent === 0
 })
@@ -57,7 +57,7 @@ export const getPeers = async (
         try {
           const info = node.getConnectionInfo(peerId)
           // exclude if quality is lesser than the one wanted
-          if (info.lastTen < quality) return result
+          if (info.quality < quality) return result
           result.set(peerId.toB58String(), toPeerInfoFormat(info, addr))
         } catch {}
         return result
@@ -74,7 +74,7 @@ export const getPeers = async (
         try {
           const info = node.getConnectionInfo(peerId)
           // exclude if quality is lesser than the one wanted
-          if (info.lastTen < quality) return result
+          if (info.quality < quality) return result
           result.push(toPeerInfoFormat(info))
         } catch {}
       }

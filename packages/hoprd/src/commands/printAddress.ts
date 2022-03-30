@@ -31,7 +31,7 @@ export default class PrintAddress extends AbstractCommand {
 
     // @TODO: use 'NativeBalance' and 'Balance' to display currencies
     const nativePrefix = 'ETH Address:'
-    const nativeAddress = new PublicKey(this.node.getId().pubKey.marshal()).toAddress().toHex()
+    const nativeAddress = PublicKey.fromPeerId(this.node.getId()).toAddress().toHex()
 
     if (query.trim() === 'native') {
       return log(nativeAddress)

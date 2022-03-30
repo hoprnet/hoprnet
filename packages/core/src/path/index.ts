@@ -72,13 +72,13 @@ export async function findPath(
         !destination.eq(c.destination) &&
         networkQualityOf(c.destination) > NETWORK_QUALITY_THRESHOLD &&
         filterCycles(c, currentPath) &&
-        !deadEnds.has(c.destination.toHex())
+        !deadEnds.has(c.destination.toUncompressedPubKeyHex())
       )
     })
 
     if (newChannels.length == 0) {
       queue.pop()
-      deadEnds.add(lastPeer.toHex())
+      deadEnds.add(lastPeer.toUncompressedPubKeyHex())
     } else {
       for (let c of newChannels) {
         const toPush = Array.from(currentPath.path)

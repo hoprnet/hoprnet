@@ -1,8 +1,8 @@
-# Release Processes
+# Release Process
 
-The HOPR Association _tech_ members and [Project Owner](./development.md#legend) have agreed on the following release processes to streamline the releases of HOPRd.
+The purpose of this process is to streamline the releases of HOPR packages.
 
-- [Release Processes](#release-processes)
+- [Release Process](#release-process)
   - [Types of release](#types-of-release)
     - [Internal release](#internal-release)
     - [Public release](#public-release)
@@ -56,7 +56,7 @@ The HOPR Association _tech_ members and [Project Owner](./development.md#legend)
 ### Milestone based releases
 
 At the end of a sprint, if a sufficient amount of features / bug fixes were implemented since last release, the [Trifecta](./development.md#trifecta) may queue and prioritize a new release for the **upcoming** sprint, this happens during [epic prioritization](./development.md#epic-prioritization).
-This new release is considered an [internal release](#internal-release) and may be [promoted](#release-promotion) to a [public release](#public-release) if [testing phases](#testing-phases) are succesful.
+This new release is considered an [internal release](#internal-release) and may be [promoted](#release-promotion) to a [public release](#public-release) if [testing phases](#testing-phases) are successful.
 
 ### Deadline based releases
 
@@ -98,7 +98,7 @@ This is optional in the possibility we want to gather more data points and/or a 
 
 - All releases start by being internal releases.
 - An [internal release](#internal-release) may be promoted to a [public release](#public-release) when all [testing phases](#testing-phases) are succesful.
-- Before promoting, release owner ensures that community team actually needs this to be public.
+- Before promoting, release owner ensures that comm team actually needs this to be public.
 
 An [internal release](#internal-release) is promoted to a [public release](#public-release) by tagging it's binaries with the public facing release name. See [Deployment checklist](#deployment-checklist).
 
@@ -115,6 +115,8 @@ When an epic is prioritized to switch the default `HOPRd` chain to a new one, [t
 This requirement will become simpler once [#2140](https://github.com/hoprnet/hoprnet/issues/2140) is completed.
 
 ## On a new release
+
+Before a new release is started, a release owner is picked by the [Tech Representatives](./development.md#representatives).
 
 To release, we do a code-freeze in our codebase by branching out a specific
 release by naming the branch `release/*`. New patches are then merged on that
@@ -151,7 +153,8 @@ particular branch to deploy on every change.
 
    1. Change all occurences of the last release name to the new release name within documentation files and Docker files. Don't touch the `protocol-config.json` and `releases.json` files in this step. Changes should be committed locally.
    2. Update `CHANGELOG.md` with the new release's information. Changes should be committed locally.
-   3. Copy contract deployment files from the old release. This can be done doing
+   3. Release owner checks if docs are correctly updated by comparing with the changes in `CHANGELOG.md`.
+   4. Copy contract deployment files from the old release. This can be done doing
 
    ```
    mkdir -p packages/ethereum/deployments/${RELEASE_NAME}/xdai

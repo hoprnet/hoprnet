@@ -1,4 +1,6 @@
-import type NetworkPeerStore from './network-peers'
+import { setImmediate } from 'timers/promises'
+
+import type NetworkPeers from './network-peers'
 import type PeerId from 'peer-id'
 import { randomInteger, u8aEquals, debug, retimer, nAtATime, u8aToHex } from '@hoprnet/hopr-utils'
 import { HEARTBEAT_INTERVAL, HEARTBEAT_TIMEOUT, HEARTBEAT_INTERVAL_VARIANCE } from '../constants'
@@ -37,8 +39,8 @@ export default class Heartbeat {
   private config: HeartbeatConfig
 
   constructor(
-    private networkPeers: NetworkPeerStore,
-    subscribe: Subscribe,
+    private networkPeers: NetworkPeers,
+    private subscribe: Subscribe,
     protected sendMessage: SendMessage,
     private hangUp: (addr: PeerId) => Promise<void>,
     environmentId: string,
@@ -52,17 +54,36 @@ export default class Heartbeat {
       heartbeatVariance: config?.heartbeatVariance ?? HEARTBEAT_INTERVAL_VARIANCE,
       maxParallelHeartbeats: config?.maxParallelHeartbeats ?? MAX_PARALLEL_HEARTBEATS
     }
-    const errHandler = (err: any) => {
-      error(`Error while processing heartbeat request`, err)
-    }
-
     this.protocolHeartbeat = `/hopr/${environmentId}/heartbeat`
+  }
 
-    subscribe(this.protocolHeartbeat, this.handleHeartbeatRequest.bind(this), true, errHandler)
+  private errHandler(err: any) {
+    error(`Error while processing heartbeat request`, err)
+  }
+
+  public async start() {
+    await this.subscribe(this.protocolHeartbeat, this.handleHeartbeatRequest.bind(this), true, this.errHandler)
+
+    this._pingNode = this.pingNode.bind(this)
+    this.startHeartbeatInterval()
+    log(`Heartbeat started`)
+  }
+
+  public stop() {
+    this.stopHeartbeatInterval?.()
+    log(`Heartbeat stopped`)
   }
 
   public handleHeartbeatRequest(msg: Uint8Array, remotePeer: PeerId): Promise<Uint8Array> {
-    this.networkPeers.register(remotePeer)
+    if (this.networkPeers.has(remotePeer)) {
+      this.networkPeers.updateRecord({
+        destination: remotePeer,
+        lastSeen: Date.now()
+      })
+    } else {
+      this.networkPeers.register(remotePeer, 'incoming heartbeat')
+    }
+
     log(`received heartbeat from ${remotePeer.toB58String()}`)
     return Promise.resolve(Heartbeat.calculatePingResponse(msg))
   }
@@ -77,8 +98,6 @@ export default class Heartbeat {
     log('ping', destination.toB58String())
 
     const challenge = randomBytes(16)
-    const expectedResponse = Heartbeat.calculatePingResponse(challenge)
-
     let pingResponse: Uint8Array[] | undefined
 
     try {
@@ -94,9 +113,15 @@ export default class Heartbeat {
       }
     }
 
+    const expectedResponse = Heartbeat.calculatePingResponse(challenge)
+
     if (pingResponse == null || pingResponse.length != 1 || !u8aEquals(expectedResponse, pingResponse[0])) {
       log(`Mismatched challenge. Got ${u8aToHex(pingResponse[0])} but expected ${u8aToHex(expectedResponse)}`)
-      await this.hangUp(destination)
+      try {
+        await this.hangUp(destination)
+      } catch (err) {
+        log(`Hang up connection to ${destination.toB58String()} failed: ${err?.message}`)
+      }
 
       return {
         destination,
@@ -133,16 +158,26 @@ export default class Heartbeat {
       .pingSince(thresholdTime)
       .map<[destination: PeerId, signal: AbortSignal]>((peerToPing: PeerId) => [peerToPing, abort.signal])
 
+    const start = Date.now()
     const pingResults = await nAtATime(this._pingNode, pingWork, this.config.maxParallelHeartbeats)
+
+    log(`Heartbeat run pinging ${pingWork.length} nodes took ${Date.now() - start} ms`)
 
     finished = true
 
-    for (const pingResult of pingResults) {
-      // Filter unexpected network errors
+    for (const [resultIndex, pingResult] of pingResults.entries()) {
+      await setImmediate()
       if (pingResult instanceof Error) {
-        continue
+        // we need to get the destination so we can map a ping error properly
+        const [destination, _abortSignal] = pingWork[resultIndex]
+        const failedPingResult = {
+          destination,
+          lastSeen: -1
+        }
+        this.networkPeers.updateRecord(failedPingResult)
+      } else {
+        this.networkPeers.updateRecord(pingResult)
       }
-      this.networkPeers.updateRecord(pingResult)
     }
 
     log(`finished checking nodes since ${thresholdTime} ${this.networkPeers.length()} nodes`)
@@ -166,17 +201,6 @@ export default class Heartbeat {
       // Prevent nodes from querying each other at the very same time
       () => randomInteger(this.config.heartbeatInterval, this.config.heartbeatInterval + this.config.heartbeatVariance)
     )
-  }
-
-  public start() {
-    this._pingNode = this.pingNode.bind(this)
-    this.startHeartbeatInterval()
-    log(`Heartbeat started`)
-  }
-
-  public stop() {
-    this.stopHeartbeatInterval?.()
-    log(`Heartbeat stopped`)
   }
 
   public static calculatePingResponse(challenge: Uint8Array): Uint8Array {

@@ -1,10 +1,10 @@
-# Development Processes
+# Development Process
 
-The HOPR Association _tech_ members and [Project Owner](#legend) have agreed on the following development processes to streamline the implementation of the HOPR protocol.
+The purpose of this process is to streamline the development of the HOPR protocol.
 
-- [Development Processes](#development-processes)
+- [Development Process](#development-process)
   - [Legend](#legend)
-    - [Representantives](#representantives)
+    - [representatives](#representatives)
     - [Trifecta](#trifecta)
   - [Daily updates](#daily-updates)
     - [Start of work](#start-of-work)
@@ -36,8 +36,8 @@ The HOPR Association _tech_ members and [Project Owner](#legend) have agreed on 
 | ------------------- | ---------------------------------------------------------------------------------------------------------- |
 | Project Owner       | A HOPR member which ensures epics prioritized are in line with both the short and long term vision of HOPR |
 | Process Facilitator | A HOPR member which ensures agreed processes are followed                                                  |
-| Representantives    | Two tech members who act as the bridge between tech team and Project Owner                                 |
-| Trifecta            | Representantives + Project Owner                                                                           |
+| representatives     | Two tech members who act as the bridge between tech team and Project Owner                                 |
+| Trifecta            | representatives + Project Owner                                                                            |
 | Issue tracker       | The sole issue tracker is [GitHub](https://github.com/hoprnet)                                             |
 
 ### Representatives
@@ -45,20 +45,19 @@ The HOPR Association _tech_ members and [Project Owner](#legend) have agreed on 
 Responsibilities:
 
 - to be the bridge between tech team and Project Owner
-- daily check for community created tasks in [hopr-devrel](https://github.com/hoprnet/hopr-devrel)
+- daily check for comm created tasks in [hopr-devrel](https://github.com/hoprnet/hopr-devrel)
 - daily check for new [unreleased tokens](../UNRELEASED_TOKENS.md) emails send to `tech@hoprnet.org`
 - review tech related bounties ([read more](./bounty.md))
+- create tech recap at the end of the sprint ([read more](./devrel.md#tech-recap))
 
 _Roles:_
 
 - [Tino](https://github.com/tolbrino) acting as Tech Coordinator
-- [Steven](https://github.com/nionis) acting as Process, Bounty and DevRel Coordinator
-
-**DevRel** cover specifically covers how the tech team interacts with the HOPR community in regards to technical support.
+- [Steven](https://github.com/nionis) acting as Process and Bounty Coordinator
 
 ### Trifecta
 
-Trifecta is made up by the [Representantives](#representantives) and Project Owner.
+Trifecta is made up by the [representatives](#representatives) and Project Owner.
 
 Responsibilities:
 
@@ -67,7 +66,7 @@ Responsibilities:
 - [file alarm](#fire-alarm) management
 - [release](./release.md#internal-release) management
 
-_Current:_ [Representantives](#representantives), [Sebastian](https://github.com/SCBuergel)
+_Current:_ [representatives](#representatives), [Sebastian](https://github.com/SCBuergel)
 
 ## Daily updates
 
@@ -145,7 +144,7 @@ _When:_ last day of the sprint or before a vacation
 
 #### External issues
 
-Newly created issues ([labelled as](#labels): `new issue`) may not all have been replied to, the [Representantives](#representantives) may reply or assign a tech member to follow up on the issue.
+Newly created issues ([labelled as](#labels): `new issue`) may not all have been replied to, the [representatives](#representatives) may reply or assign a tech member to follow up on the issue.
 
 - closing duplicates
 - issues are properly labelled
@@ -156,8 +155,8 @@ In `Retrospective` we aim to summarize the results of the last spring, in order 
 
 For a `Retrospective` a moderator is chosen:
 
-1. If `Process Facilitator` is present, they are chosen.
-2. Otherwise, any member of `Trifecta` can self-declare themselves as a moderator.
+1. If [representatives](#representatives) are present, one of them are chosen.
+2. Otherwise, one of the tech members must take on the role of the moderator.
 
 The process is using [EasyRetro](https://easyretro.io/). `Retrospective` follows this schedule:
 
@@ -174,7 +173,7 @@ The process is using [EasyRetro](https://easyretro.io/). `Retrospective` follows
 - defines `What` has to be done
 - defines `When` it has to be completed
 - defines `Who` is responsible for completing it
-- must be created as an issue in the repository to be trackable
+- moderator ensures that all action items are created as an issue
 
 _Who:_ all tech members within a meeting
 
@@ -194,7 +193,7 @@ Priorities are captured on the [Roadmap](https://github.com/orgs/hoprnet/project
 - ensure newly created [epics](#issue-creation) are well created
   - must use the [epic issue template](../.github/ISSUE_TEMPLATE/epic.md)
 - adapt epic priorities
-- make an epic if necessary for issues created by community in [hopr-devrel](https://github.com/hoprnet/hopr-devrel)
+- make an epic if necessary for issues created by comm team in [hopr-devrel](https://github.com/hoprnet/hopr-devrel)
 
 #### The Roadmap columns
 
@@ -231,11 +230,15 @@ _Who:_ all tech members within a meeting
 
 _When:_ first day of the sprint
 
+#### Once sprint has ended
+
+The [representatives](#representatives) create a [recap](./devrel.md#tech-recap) of what was completed in the sprint.
+
 ### Fire alarm
 
 It's possible that throughout the planned sprint, we encounter a bag of issues that need to be resolved ASAP.
 
-1. As soon issue is detected, a [representantive](#representantives) needs to take up the task of coordinating how the issue is tackled
+1. As soon issue is detected, a [representative](#representatives) needs to take up the task of coordinating how the issue is tackled
 2. Member appointed then is responsible for finding the right member within the tech team that has the most knowledge on the current issue, let's say that's Alice
 3. Alice investigates issue and may ask other members for help
 4. Alice patches issue
@@ -337,7 +340,7 @@ Since PRs should link to an issue, it's not necessary to label PRs. However, som
 
 #### Releases
 
-See [Release Processes](./release.md)
+See [Release Process](./release.md)
 
 ### Branches
 
@@ -346,4 +349,4 @@ See [Release Processes](./release.md)
 
 - `release/**`: On new internal release, we cut a `release/**`
   branch, using an internal **city** name to identify the release.
-  See [Release Processes](./release.md) for more info.
+  See [Release Process](./release.md) for more info.
