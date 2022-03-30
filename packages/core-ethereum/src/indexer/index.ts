@@ -221,6 +221,7 @@ class Indexer extends EventEmitter {
     let rawEvents: TypedEvent<any, any>[] = []
 
     const queries: { contract: Contract; filter: TypedEventFilter<any> }[] = [
+      // HoprChannels
       {
         contract: this.chain.getChannels(),
         filter: {
@@ -230,6 +231,21 @@ class Indexer extends EventEmitter {
               this.chain.getChannels().interface.getEventTopic('Announcement'),
               this.chain.getChannels().interface.getEventTopic('ChannelUpdated'),
               this.chain.getChannels().interface.getEventTopic('TicketRedeemed')
+            ]
+          ]
+        }
+      },
+      // HoprNetworkRegistry
+      {
+        contract: this.chain.getNetworkRegistry(),
+        filter: {
+          topics: [
+            [
+              // Relevant HoprNetworkRegistry events
+              this.chain.getNetworkRegistry().interface.getEventTopic('Registered'),
+              this.chain.getNetworkRegistry().interface.getEventTopic('RegisteredByOwner'),
+              this.chain.getNetworkRegistry().interface.getEventTopic('DeregisteredByOwner'),
+              this.chain.getNetworkRegistry().interface.getEventTopic('EligibilityUpdated')
             ]
           ]
         }
@@ -263,19 +279,6 @@ class Indexer extends EventEmitter {
         }
       })
     }
-
-    // HoprNetworkRegistry events
-    queries.push({
-      contract: this.chain.getNetworkRegistry(),
-      filter: {
-        topics: [
-          [
-            // Relevant HoprNetworkRegistry events
-            this.chain.getNetworkRegistry().interface.getEventTopic('EligibilityUpdated')
-          ]
-        ]
-      }
-    })
 
     for (const query of queries) {
       let tmpEvents: TypedEvent<any, any>[]
