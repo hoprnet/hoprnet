@@ -232,7 +232,7 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
     let conn: Connection
 
     try {
-      conn = await this._upgradeOutbound(maConn as any)
+      conn = await this._upgradeOutbound(maConn)
       log(`Successfully established relayed connection to ${destination.toB58String()}`)
     } catch (err) {
       error(err)
@@ -257,7 +257,7 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
     verbose(
       `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshake.`
     )
-    return await this._upgradeOutbound(maConn as any)
+    return await this._upgradeOutbound(maConn)
   }
 }
 

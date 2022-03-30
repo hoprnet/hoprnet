@@ -1,4 +1,5 @@
 import type { Network } from '@hoprnet/hopr-utils'
+import type { NetworkInterfaceInfo } from 'os'
 
 import { Multiaddr } from 'multiaddr'
 import { Filter } from './filter'
@@ -111,12 +112,12 @@ describe('test addr filtering', function () {
         address: '10.0.0.1',
         netmask: '255.0.0.0',
         family: 'IPv4'
-      } as any),
+      } as NetworkInterfaceInfo),
       toNetworkPrefix({
         address: '192.168.1.0',
         netmask: '255.255.255.0',
         family: 'IPv4'
-      } as any)
+      } as NetworkInterfaceInfo)
     ])
 
     filter_no_local._setLocalAddressesForTesting([
@@ -124,12 +125,12 @@ describe('test addr filtering', function () {
         address: '10.0.0.1',
         netmask: '255.0.0.0',
         family: 'IPv4'
-      } as any),
+      } as NetworkInterfaceInfo),
       toNetworkPrefix({
         address: '192.168.1.0',
         netmask: '255.255.255.0',
         family: 'IPv4'
-      } as any)
+      } as NetworkInterfaceInfo)
     ])
 
     assert(
@@ -303,12 +304,12 @@ describe('test addr filtering', function () {
         address: '10.0.0.1',
         netmask: '255.0.0.0',
         family: 'IPv4'
-      } as any),
+      } as NetworkInterfaceInfo),
       toNetworkPrefix({
         address: '192.168.1.0',
         netmask: '255.255.255.0',
         family: 'IPv4'
-      } as any)
+      } as NetworkInterfaceInfo)
     ])
 
     assert(filter.filter(new Multiaddr(`/ip4/10.0.0.2/tcp/1/p2p/${secondPeer.toB58String()}`)) == true)

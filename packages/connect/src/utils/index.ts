@@ -229,7 +229,10 @@ export function bindToPort(
  * @private
  * @param maConn
  */
-export async function attemptClose(maConn: MultiaddrConnection | Connection, logError: (...args: any[]) => void) {
+export async function attemptClose(
+  maConn: MultiaddrConnection | Connection | null,
+  logError: (...args: any[]) => void
+) {
   if (maConn == null) {
     return
   }

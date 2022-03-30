@@ -148,7 +148,7 @@ class TCPConnection implements MultiaddrConnection {
       let rawSocket: Socket
 
       const onError = (err: Error) => {
-        verbose(`Error connecting to ${ma.toString()}.`, err.message)
+        verbose(`Error connecting to ${ma.toString()}.`, err)
         done(err)
       }
 

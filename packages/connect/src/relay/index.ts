@@ -199,7 +199,7 @@ class Relay {
         relay,
         counterparty: destination,
         onReconnect: this._onReconnect
-      }) as any
+      })
     } else {
       let channel = this.webRTCUpgrader.upgradeOutbound()
 
@@ -218,7 +218,7 @@ class Relay {
       return new WebRTCConnection(destination, this.libp2p.connectionManager, newConn, channel, {
         __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade,
         ...opts
-      }) as any
+      })
     }
   }
 
@@ -288,7 +288,7 @@ class Relay {
       return
     }
 
-    const shaker = new RelayHandshake(conn.stream as any, this.options)
+    const shaker = new RelayHandshake(conn.stream as Stream, this.options)
 
     log(`handling relay request from ${conn.connection.remotePeer.toB58String()}`)
     log(`relayed connection count: ${this.relayState.relayedConnectionCount()}`)
@@ -315,7 +315,7 @@ class Relay {
       return
     }
 
-    const handShakeResult = await new RelayHandshake(conn.stream as any, this.options).handle(
+    const handShakeResult = await new RelayHandshake(conn.stream as Stream, this.options).handle(
       conn.connection.remotePeer
     )
 
@@ -355,13 +355,13 @@ class Relay {
 
     try {
       if (!!this.testingOptions.__noWebRTCUpgrade) {
-        newConn = (await this.libp2p.upgrader.upgradeInbound(newStream as any)) as any
+        newConn = await this.libp2p.upgrader.upgradeInbound(newStream)
       } else {
-        newConn = (await this.libp2p.upgrader.upgradeInbound(
+        newConn = await this.libp2p.upgrader.upgradeInbound(
           new WebRTCConnection(counterparty, this.libp2p.connectionManager, newStream, newStream.webRTC!.channel, {
             __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade
-          }) as any
-        )) as any
+          })
+        )
       }
     } catch (err) {
       error(err)
@@ -435,7 +435,7 @@ class Relay {
 
       if (conn != undefined) {
         try {
-          stream = (await conn.newStream([protocol]))?.stream as any
+          stream = (await conn.newStream([protocol]))?.stream as Stream
         } catch (err) {
           continue
         }

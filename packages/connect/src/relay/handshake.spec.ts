@@ -4,6 +4,7 @@ import DuplexPair from 'it-pair/duplex'
 import type PeerId from 'peer-id'
 import assert from 'assert'
 import type { Stream, StreamType } from '../types'
+import type Connection from 'libp2p-interfaces/src/connection/connection'
 
 const initiator = privKeyToPeerId('0x695a1ad048d12a1a82f827a38815ab33aa4464194fa0bdb99f78d9c66ec21505')
 const relay = privKeyToPeerId('0xf0b8e814c3594d0c552d72fb3dfda7f0d9063458a7792369e7c044eda10f3b52')
@@ -56,7 +57,7 @@ describe('test relay handshake', function () {
           },
           conn: {
             close: async () => {}
-          } as any
+          } as Connection
         }
       },
       getRelayState()
@@ -92,7 +93,7 @@ describe('test relay handshake', function () {
           stream: destinationToRelay,
           conn: {
             close: async () => {}
-          } as any
+          } as Connection
         }
       },
       getRelayState()
@@ -119,7 +120,7 @@ describe('test relay handshake', function () {
           stream: destinationToRelay,
           conn: {
             close: async () => {}
-          } as any
+          } as Connection
         }
       },
       getRelayState(true)

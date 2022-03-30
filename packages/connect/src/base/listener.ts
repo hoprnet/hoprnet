@@ -122,7 +122,7 @@ class Listener extends EventEmitter implements InterfaceListener {
         const relayPeerIds = this.entry.getUsedRelayAddresses().map((ma: Multiaddr) => {
           const tuples = ma.tuples()
 
-          return PeerId.createFromBytes((tuples[0][1] as any).slice(1))
+          return PeerId.createFromBytes((tuples[0][1] as Uint8Array).slice(1))
         })
 
         this.relay.setUsedRelays(relayPeerIds)
@@ -441,7 +441,7 @@ class Listener extends EventEmitter implements InterfaceListener {
     let maConn: MultiaddrConnection | undefined
 
     try {
-      maConn = TCPConnection.fromSocket(socket, this.peerId) as any
+      maConn = TCPConnection.fromSocket(socket, this.peerId)
     } catch (err: any) {
       error(`inbound connection failed. ${err.message}`)
     }

@@ -235,7 +235,7 @@ class RelayHandshake {
       return
     }
 
-    const destinationShaker = handshake(toDestinationStruct.stream)
+    const destinationShaker = handshake(toDestinationStruct.stream as Stream)
 
     destinationShaker.write(source.pubKey.marshal())
 
