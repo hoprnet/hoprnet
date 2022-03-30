@@ -25,9 +25,7 @@ cleanup() {
   # Remove lock files due to conflicts with workspaces
   rm -f \
     "${mydir}/../packages/cover-traffic-daemon/npm-shrinkwrap.json" \
-    "${mydir}/../packages/hoprd/npm-shrinkwrap.json" \
-    "${mydir}/../packages/cover-traffic-daemon/yarn.lock" \
-    "${mydir}/../packages/hoprd/yarn.lock"
+    "${mydir}/../packages/hoprd/npm-shrinkwrap.json"
 
   # Don't commit changed package.json files as package resolutions are
   # supposed to interfer with workspaces according to https://yarnpkg.com/configuration/manifest#resolutions
