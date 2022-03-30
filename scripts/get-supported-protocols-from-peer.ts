@@ -10,7 +10,7 @@ import { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
 import { NOISE } from '@chainsafe/libp2p-noise'
 import Upgrader from 'libp2p/src/upgrader'
-const Mplex = require('libp2p-mplex')
+import Mplex from 'libp2p-mplex'
 const Multistream = require('multistream-select')
 
 const { HoprConnect } = require('@hoprnet/hopr-connect')

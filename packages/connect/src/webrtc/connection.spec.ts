@@ -33,7 +33,7 @@ describe('test webrtc connection', function () {
         source: BobAlice.source,
         sink: AliceBob.sink,
         sendUpgraded: () => {}
-      } as any,
+      } as RelayConnection,
       fakedWebRTCInstance
     )
 
@@ -303,7 +303,7 @@ describe('webrtc connection - stream error propagation', function () {
 
     const falsySinkError = 'falsy sink error'
 
-    const waitForSinkAttach = defer<Uint8Array>()
+    const waitForSinkAttach = defer<void>()
 
     const fakedWebRTCInstance = new EventEmitter() as SimplePeerInstance
 
@@ -314,9 +314,9 @@ describe('webrtc connection - stream error propagation', function () {
     const conn = new WebRTCConnection(
       {
         source: BobAlice.source,
-        sink: () => waitForSinkAttach.promise,
+        sink: (_source: AsyncIterable<Uint8Array>) => waitForSinkAttach.promise,
         sendUpgraded: () => {}
-      } as any,
+      } as RelayConnection,
       fakedWebRTCInstance
     )
 
@@ -347,12 +347,12 @@ describe('webrtc connection - stream error propagation', function () {
     new WebRTCConnection(
       {
         source: BobAlice.source,
-        sink: () => {
+        sink: (_source: AsyncIterable<Uint8Array>) => {
           waitForError.resolve()
           return Promise.reject(Error(falsySinkError))
         },
         sendUpgraded: () => {}
-      } as any,
+      } as RelayConnection,
       fakedWebRTCInstance
     )
 
@@ -376,7 +376,7 @@ describe('webrtc connection - stream error propagation', function () {
         source: BobAlice.source,
         sink: AliceBob.sink,
         sendUpgraded: () => {}
-      } as any,
+      } as RelayConnection,
       fakedWebRTCInstance
     )
 
@@ -404,10 +404,10 @@ describe('webrtc connection - stream error propagation', function () {
       {
         source: (async function* () {
           throw Error(errorInSource)
-        })(),
+        })() as AsyncIterable<Uint8Array>,
         sink: AliceBob.sink,
         sendUpgraded: () => {}
-      } as any,
+      } as RelayConnection,
       fakedWebRTCInstance
     )
 

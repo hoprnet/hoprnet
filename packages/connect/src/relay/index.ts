@@ -1,4 +1,4 @@
-import { type default as LibP2P, MuxedStream, HandlerProps } from 'libp2p'
+import type { default as LibP2P, MuxedStream, HandlerProps } from 'libp2p'
 import type PeerId from 'peer-id'
 import type Connection from 'libp2p-interfaces/src/connection/connection'
 import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
@@ -448,7 +448,7 @@ class Relay {
 
       if (conn != undefined) {
         try {
-          stream = (await conn.newStream([protocol]))?.stream
+          stream = (await conn.newStream([protocol]))?.stream as MuxedStream
         } catch (err) {
           await attemptClose(conn, error)
           continue
