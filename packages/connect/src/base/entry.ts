@@ -317,6 +317,9 @@ export class EntryNodes extends EventEmitter {
     }
     log(`Updating list of used relay nodes ...`)
     const nodesToCheck = this.filterUncheckedNodes()
+
+    // Contacting entry nodes includes establishing an entirely new
+    // connection which might take longer than reestablishing an existing connection.
     const TIMEOUT = 5e3
 
     const toCheck = nodesToCheck.concat(this.availableEntryNodes)
@@ -405,6 +408,7 @@ export class EntryNodes extends EventEmitter {
     const abort = new AbortController()
     let done = false
 
+    // Abort (direct) connection attempt once timeout is due
     setTimeout(() => {
       if (!done) {
         abort.abort()

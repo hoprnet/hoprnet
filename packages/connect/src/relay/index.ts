@@ -160,10 +160,9 @@ class Relay {
       return
     }
 
-    const handshakeResult = await new RelayHandshake(baseConnection.stream as any, this.options).initiate(
-      relay,
-      destination
-    )
+    const shaker = new RelayHandshake(baseConnection.stream as Stream, this.options)
+
+    const handshakeResult = await shaker.initiate(relay, destination)
 
     if (!handshakeResult.success) {
       error(`Handshake led to empty stream. Giving up.`)
