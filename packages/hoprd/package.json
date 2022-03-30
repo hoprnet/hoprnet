@@ -9,8 +9,7 @@
   "bin": "lib/index.js",
   "files": [
     "lib",
-    "package-lock.json",
-    "yarn.lock",
+    "npm-shrinkwrap.json",
     "hopr-admin/.next/**",
     "hoprd-default.sh",
     "releases.json",
@@ -87,5 +86,17 @@
   "publishConfig": {
     "access": "public"
   },
-  "stableVersion": "1.76.0-next.31"
+  "stableVersion": "1.76.0-next.31",
+  "overrides": {
+    "@ethersproject/providers": "https://github.com/hoprnet/ethers-js-provider/archive/refs/tags/fixed-memory-leak.tar.gz",
+    "@overnightjs/logger": "1.2.1",
+    "colors": "1.4.0",
+    "eth-sig-util": "3.0.1"
+  },
+  "resolutions": {
+    "@ethersproject/providers": "https://github.com/hoprnet/ethers-js-provider/archive/refs/tags/fixed-memory-leak.tar.gz",
+    "@overnightjs/logger": "1.2.1",
+    "colors": "1.4.0",
+    "eth-sig-util": "3.0.1"
+  }
 }
