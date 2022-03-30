@@ -289,22 +289,44 @@ describe(`database tests`, function () {
     assert.equal((await db.getHoprBalance()).toString(), '9')
   })
 
-  it('should store elegible account', async function () {
+  it('should test registry', async function () {
+    const hoprNode = PublicKey.createMock()
+    const account = Address.createMock()
+
+    // should be throw when not added
+    assert.rejects(() => db.getAccountFromRegistry(hoprNode), 'should throw when account is not registered')
+
+    // should be set
+    await db.addToRegistry(hoprNode, account, TestingSnapshot)
+    assert((await db.getAccountFromRegistry(hoprNode)).eq(account), 'should match account added')
+
+    // should be removed
+    await db.removeFromRegistry(account, TestingSnapshot)
+    assert.rejects(() => db.getAccountFromRegistry(hoprNode), 'should throw when account is deregistered')
+  })
+
+  it('should test eligible', async function () {
+    const hoprNode = PublicKey.createMock()
     const account = Address.createMock()
 
     // should be false by default
-    assert((await db.hasElegibleAccount(account)) === false, 'account is not false by default')
+    assert((await db.isWhitelisted(hoprNode)) === false, 'hoprNode is not eligible by default')
 
     // should remain false
-    await db.setElegibleAccount(account, false, TestingSnapshot)
-    assert((await db.hasElegibleAccount(account)) === false, 'account did not remain false')
+    await db.addToRegistry(hoprNode, account, TestingSnapshot)
+    assert((await db.isWhitelisted(hoprNode)) === false, 'eligibility should remain false when not marked')
 
     // should be true once set
-    await db.setElegibleAccount(account, true, TestingSnapshot)
-    assert((await db.hasElegibleAccount(account)) === true, "account didn't become elegible")
+    await db.setEligible(account, true, TestingSnapshot)
+    assert((await db.isWhitelisted(hoprNode)) === true, 'hoprNode should be eligible')
 
-    // should go back to false
-    await db.setElegibleAccount(account, false, TestingSnapshot)
-    assert((await db.hasElegibleAccount(account)) === false, 'account remained elegible')
+    // should be false once unset
+    await db.setEligible(account, false, TestingSnapshot)
+    assert((await db.isWhitelisted(hoprNode)) === false, 'hoprNode should be uneligible')
+
+    // should be false when registry is removed
+    await db.setEligible(account, true, TestingSnapshot)
+    await db.removeFromRegistry(account, TestingSnapshot)
+    assert((await db.isWhitelisted(hoprNode)) === false, 'hoprNode should not be eligible anymore')
   })
 })

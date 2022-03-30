@@ -481,7 +481,7 @@ export default class HoprCoreEthereum extends EventEmitter {
    * @returns true if whitelisted
    */
   public async isWhitelisted(id: PublicKey): Promise<boolean> {
-    return this.db.hasElegibleAccount(id.toAddress())
+    return this.db.isWhitelisted(id)
   }
 }
 

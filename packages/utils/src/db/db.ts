@@ -41,7 +41,8 @@ const PENDING_TICKETS_COUNT = encoder.encode('statistics:pending:value-')
 const ACKNOWLEDGED_TICKETS_PREFIX = encoder.encode('tickets:acknowledged-')
 const PENDING_ACKNOWLEDGEMENTS_PREFIX = encoder.encode('tickets:pending-acknowledgement-')
 const PACKET_TAG_PREFIX: Uint8Array = encoder.encode('packets:tag-')
-const REGISTRY_ELEGIBLE_ACCOUNT_PREFIX: Uint8Array = encoder.encode('registry:account-')
+const WHITELIST_REGISTRY_PREFIX: Uint8Array = encoder.encode('whitelist:registry:')
+const WHITELIST_ELIGIBLE_PREFIX: Uint8Array = encoder.encode('whitelist:eligible:')
 
 function createChannelKey(channelId: Hash): Uint8Array {
   return Uint8Array.from([...CHANNEL_PREFIX, ...channelId.serialize()])
@@ -70,8 +71,11 @@ function createPendingAcknowledgement(halfKey: HalfKeyChallenge) {
 function createPacketTagKey(tag: Uint8Array) {
   return Uint8Array.from([...PACKET_TAG_PREFIX, ...tag])
 }
-function createRegistryAccount(address: Address) {
-  return Uint8Array.from([...REGISTRY_ELEGIBLE_ACCOUNT_PREFIX, ...address.serialize()])
+function createWhitelistRegistryKey(publicKey: PublicKey) {
+  return Uint8Array.from([...WHITELIST_REGISTRY_PREFIX, ...publicKey.serializeCompressed()])
+}
+function createWhitelistEligibleKey(address: Address) {
+  return Uint8Array.from([...WHITELIST_ELIGIBLE_PREFIX, ...address.serialize()])
 }
 
 const LATEST_BLOCK_NUMBER_KEY = encoder.encode('latestBlockNumber')
@@ -708,33 +712,108 @@ export class HoprDB {
   }
 
   /**
-   * Store entry if account is elegible, if not delete entry.
+   * Hopr Network Registry
+   * Link hoprNode to an ETH address.
+   * @param hoprNode the node to register
+   * @param account the account that made the transaction
+   * @param snapshot
    */
-  public async setElegibleAccount(account: Address, elegible: boolean, snapshot: Snapshot): Promise<void> {
-    // if elegible create entry
-    if (elegible) {
+  public async addToRegistry(hoprNode: PublicKey, account: Address, snapshot: Snapshot): Promise<void> {
+    await this.db
+      .batch()
+      .put(Buffer.from(this.keyOf(createWhitelistRegistryKey(hoprNode))), Buffer.from(account.serialize()))
+      .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
+      .write()
+  }
+
+  /**
+   * Hopr Network Registry
+   * Unlink hoprNode to an ETH address by removing the entry.
+   * @param hoprNode the node to register
+   * @param snapshot
+   */
+  public async removeFromRegistry(account: Address, snapshot: Snapshot): Promise<void> {
+    // range of keys to search
+    const from = this.keyOf(
+      Uint8Array.from([...WHITELIST_REGISTRY_PREFIX, ...new Uint8Array(PublicKey.SIZE_COMPRESSED).fill(0x00)])
+    )
+    const to = this.keyOf(
+      Uint8Array.from([...WHITELIST_REGISTRY_PREFIX, ...new Uint8Array(PublicKey.SIZE_COMPRESSED).fill(0xff)])
+    )
+
+    // create iterable stream to search all registered nodes
+    const iterable = this.db.iterator({
+      gte: Buffer.from(from),
+      lte: Buffer.from(to),
+      keys: true,
+      values: true
+    })
+
+    let entryKey: Buffer | undefined
+    // search for a matching account
+    for await (const [key, val] of iterable as any) {
+      try {
+        if (account.eq(Address.deserialize(Buffer.from(val)))) {
+          // get hoprNode from key
+          entryKey = Buffer.from(key)
+          break
+        }
+      } catch {}
+    }
+
+    await this.db
+      .batch()
+      .del(entryKey)
+      .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
+      .write()
+  }
+
+  /**
+   * Hopr Network Registry
+   * Get address associated with hoprNode.
+   * @param hoprNode the node to register
+   * @returns ETH address
+   */
+  public async getAccountFromRegistry(hoprNode: PublicKey): Promise<Address> {
+    return this.getCoerced<Address>(createWhitelistRegistryKey(hoprNode), Address.deserialize)
+  }
+
+  /**
+   * Hopr Network Registry
+   * Set address as eligible.
+   * @param account the account that made the transaction
+   * @param snapshot
+   */
+  public async setEligible(account: Address, eligible: boolean, snapshot: Snapshot): Promise<void> {
+    const key = Buffer.from(this.keyOf(createWhitelistEligibleKey(account)))
+
+    if (eligible) {
       await this.db
         .batch()
-        .put(Buffer.from(this.keyOf(createRegistryAccount(account))), Buffer.from(new Uint8Array()))
+        .put(key, Buffer.from([]))
         .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
         .write()
-    }
-    // if not elegible, delete entry
-    else {
+    } else {
       await this.db
         .batch()
-        .del(Buffer.from(this.keyOf(createRegistryAccount(account))))
+        .del(key)
         .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
         .write()
     }
   }
 
   /**
-   * Checks whether we have stored elegible account, defaults to false.
-   * @returns true if account is stored as elegible
+   * Hopr Network Registry
+   * @param hoprNode the node registered
+   * @returns true if node is whitelisted
    */
-  public async hasElegibleAccount(account: Address): Promise<boolean> {
-    return this.getCoercedOrDefault(createRegistryAccount(account), () => true, false)
+  public async isWhitelisted(hoprNode: PublicKey): Promise<boolean> {
+    try {
+      const account = await this.getAccountFromRegistry(hoprNode)
+      return this.getCoercedOrDefault(createWhitelistEligibleKey(account), () => true, false)
+    } catch {
+      return false
+    }
   }
 
   static createMock(id?: PublicKey): HoprDB {

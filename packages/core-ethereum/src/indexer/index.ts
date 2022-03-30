@@ -639,6 +639,19 @@ class Indexer extends EventEmitter {
         case 'EligibilityUpdated(address,bool)':
           await this.onEligibilityUpdated(event as RegistryEvent<'EligibilityUpdated'>, lastDatabaseSnapshot)
           break
+        case 'Registered':
+        case 'Registered(address,string)':
+        case 'RegisteredByOwner':
+        case 'RegisteredByOwner(address,string)':
+          await this.onRegistered(
+            event as RegistryEvent<'Registered'> | RegistryEvent<'RegisteredByOwner'>,
+            lastDatabaseSnapshot
+          )
+          break
+        case 'DeregisteredByOwner':
+        case 'DeregisteredByOwner(address)':
+          await this.onDeregistered(event as RegistryEvent<'DeregisteredByOwner'>, lastDatabaseSnapshot)
+          break
         default:
           log(`ignoring event '${String(eventName)}'`)
       }
@@ -753,7 +766,18 @@ class Indexer extends EventEmitter {
     event: RegistryEvent<'EligibilityUpdated'>,
     lastSnapshot: Snapshot
   ): Promise<void> {
-    await this.db.setElegibleAccount(Address.fromString(event.args.account), event.args.eligibility, lastSnapshot)
+    await this.db.setEligible(Address.fromString(event.args.account), event.args.eligibility, lastSnapshot)
+  }
+
+  private async onRegistered(event: RegistryEvent<'Registered'>, lastSnapshot: Snapshot): Promise<void> {
+    const multiaddr = new Multiaddr(event.args.HoprMultiaddr)
+    const hoprNode = PublicKey.fromPeerIdString(multiaddr.getPeerId())
+    const account = Address.fromString(event.args.account)
+    await this.db.addToRegistry(hoprNode, account, lastSnapshot)
+  }
+
+  private async onDeregistered(event: RegistryEvent<'DeregisteredByOwner'>, lastSnapshot: Snapshot): Promise<void> {
+    await this.db.removeFromRegistry(Address.fromString(event.args.account), lastSnapshot)
   }
 
   private async onTransfer(event: TokenEvent<'Transfer'>, lastSnapshot: Snapshot) {

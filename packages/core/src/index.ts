@@ -247,7 +247,8 @@ class Hopr extends EventEmitter {
       initialNodes,
       this.publicNodesEmitter,
       async (peerId: PeerId) => {
-        return this.connector.isWhitelisted(PublicKey.fromPeerId(peerId))
+        const isWhitelisted = await this.connector.isWhitelisted(PublicKey.fromPeerId(peerId))
+        return !isWhitelisted
       }
     )
 
