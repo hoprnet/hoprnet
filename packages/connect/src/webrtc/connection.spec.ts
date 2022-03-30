@@ -29,8 +29,6 @@ describe('test webrtc connection', function () {
     })
 
     const conn = new WebRTCConnection(
-      Bob,
-      { connections: new Map() } as any,
       {
         source: BobAlice.source,
         sink: AliceBob.sink,
@@ -68,8 +66,6 @@ describe('test webrtc connection', function () {
 
     let upgradeCalls = 0
     new WebRTCConnection(
-      Bob,
-      { connections: new Map() } as any,
       {
         source: BobAlice.source,
         sink: AliceBob.sink,
@@ -99,8 +95,6 @@ describe('test webrtc connection', function () {
     const webRTCInstance = new EventEmitter() as SimplePeerInstance
 
     new WebRTCConnection(
-      Bob,
-      { connections: new Map() } as any,
       {
         source: BobAlice.source,
         sink: AliceBob.sink,
@@ -130,8 +124,6 @@ describe('test webrtc connection', function () {
     })
 
     const conn = new WebRTCConnection(
-      Bob,
-      { connections: new Map() } as any,
       {
         source: BobAlice.source,
         sink: AliceBob.sink
@@ -165,8 +157,6 @@ describe('test webrtc connection', function () {
     const webRTCInstance = new EventEmitter() as SimplePeerInstance
 
     const conn = new WebRTCConnection(
-      Bob,
-      { connections: new Map() } as any,
       {
         source: BobAlice.source,
         sink: AliceBob.sink,
@@ -224,8 +214,6 @@ describe('test webrtc connection', function () {
     })
 
     const conn = new WebRTCConnection(
-      Bob,
-      { connections: new Map() } as any,
       {
         source: BobAlice.source,
         sink: AliceBob.sink,
@@ -287,8 +275,6 @@ describe('test webrtc connection', function () {
     const abort = new AbortController()
 
     const conn = new WebRTCConnection(
-      Bob,
-      { connections: new Map() } as any,
       {
         source: BobAlice.source,
         sink: AliceBob.sink
@@ -326,8 +312,6 @@ describe('webrtc connection - stream error propagation', function () {
     })
 
     const conn = new WebRTCConnection(
-      Bob,
-      { connections: new Map() } as any,
       {
         source: BobAlice.source,
         sink: (_source: AsyncIterable<Uint8Array>) => waitForSinkAttach.promise,
@@ -361,8 +345,6 @@ describe('webrtc connection - stream error propagation', function () {
     })
 
     new WebRTCConnection(
-      Bob,
-      { connections: new Map() } as any,
       {
         source: BobAlice.source,
         sink: (_source: AsyncIterable<Uint8Array>) => {
@@ -390,8 +372,6 @@ describe('webrtc connection - stream error propagation', function () {
 
     const errorInSinkSource = 'error in sink source'
     const conn = new WebRTCConnection(
-      Bob,
-      { connections: new Map() } as any,
       {
         source: BobAlice.source,
         sink: AliceBob.sink,
@@ -421,8 +401,6 @@ describe('webrtc connection - stream error propagation', function () {
 
     const errorInSource = 'error in source'
     const conn = new WebRTCConnection(
-      Bob,
-      { connections: new Map() } as any,
       {
         source: (async function* () {
           throw Error(errorInSource)

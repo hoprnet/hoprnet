@@ -39,13 +39,20 @@ const getSyncPercentage = (start: number, current: number, end: number) =>
   (((current - start) / (end - start)) * 100).toFixed(2)
 const backoffOption: Parameters<typeof retryWithBackoff>[1] = { maxDelay: MAX_TRANSACTION_BACKOFF }
 
+export enum IndexerStatus {
+  STARTING = 'starting',
+  STARTED = 'started',
+  RESTARTING = 'restarting',
+  STOPPED = 'stopped'
+}
+
 /**
  * Indexes HoprChannels smart contract and stores to the DB,
  * all channels in the network.
  * Also keeps track of the latest block number.
  */
 class Indexer extends EventEmitter {
-  public status: 'started' | 'restarting' | 'stopped' = 'stopped'
+  public status: IndexerStatus = IndexerStatus.STOPPED
   public latestBlock: number = 0 // latest known on-chain block number
 
   // Use FIFO + sliding window for many events
@@ -75,9 +82,11 @@ class Indexer extends EventEmitter {
    * Starts indexing.
    */
   public async start(chain: ChainWrapper, genesisBlock: number): Promise<void> {
-    if (this.status === 'started') {
+    if (this.status === IndexerStatus.STARTED) {
       return
     }
+    this.status = IndexerStatus.STARTING
+
     log(`Starting indexer...`)
     this.chain = chain
     this.genesisBlock = genesisBlock
@@ -144,7 +153,7 @@ class Indexer extends EventEmitter {
 
     log('Subscribing to events from block %d', fromBlock)
 
-    this.status = 'started'
+    this.status = IndexerStatus.STARTED
     this.emit('status', 'started')
     log(chalk.green('Indexer started!'))
   }
@@ -153,7 +162,7 @@ class Indexer extends EventEmitter {
    * Stops indexing.
    */
   public async stop(): Promise<void> {
-    if (this.status === 'stopped') {
+    if (this.status === IndexerStatus.STOPPED) {
       return
     }
 
@@ -164,7 +173,7 @@ class Indexer extends EventEmitter {
 
     this.blockProcessingLock && (await this.blockProcessingLock.promise)
 
-    this.status = 'stopped'
+    this.status = IndexerStatus.STOPPED
     this.emit('status', 'stopped')
     log(chalk.green('Indexer stopped!'))
   }
@@ -182,12 +191,12 @@ class Indexer extends EventEmitter {
     log('Indexer restaring')
 
     try {
-      this.status = 'restarting'
+      this.status = IndexerStatus.RESTARTING
 
       this.stop()
       await this.start(this.chain, this.genesisBlock)
     } catch (err) {
-      this.status = 'stopped'
+      this.status = IndexerStatus.STOPPED
       this.emit('status', 'stopped')
       log(chalk.red('Failed to restart: %s', err.message))
       throw err
@@ -398,6 +407,11 @@ class Indexer extends EventEmitter {
   ): Promise<void> {
     // NOTE: This function is also used in event handlers
     // where it cannot be 'awaited', so all exceptions need to be caught.
+
+    // Don't process any block if indexer was stopped.
+    if (![IndexerStatus.STARTING, IndexerStatus.STARTED].includes(this.status)) {
+      return
+    }
 
     // Set a lock during block processing to make sure database does not get closed
     if (this.blockProcessingLock) {
