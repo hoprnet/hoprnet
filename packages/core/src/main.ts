@@ -105,7 +105,9 @@ export async function createLibp2pInstance(
         enabled: true,
         // Feed DHT with all previously announced nodes
         // @ts-ignore
-        bootstrapPeers: initialNodes
+        bootstrapPeers: initialNodes,
+        // Answer requests from other peers
+        clientMode: false
       },
       relay: {
         // Conflicts with HoprConnect's own mechanism
