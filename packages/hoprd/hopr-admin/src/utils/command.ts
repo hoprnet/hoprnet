@@ -39,14 +39,13 @@ export abstract class Command {
   abstract execute(log: (...args: any[]) => void, query: string): Promise<void>
 
   /**
-   * @param full show detailed usage
    * @returns the usage of the command
    */
   public usage(): string {
     let items: [string, string][] = []
 
     for (const [params, desc] of Object.values(this.uses)) {
-      let use: string[] = ['- usage: ']
+      let use: string[] = ['- usage:']
 
       if (params.length > 0) {
         for (const [type, name, optional] of params) {
@@ -130,7 +129,7 @@ export abstract class Command {
   }
 }
 
-type CmdParameter = [type: CmdTypes, name: string, optional?: boolean]
+export type CmdParameter = [type: CmdTypes, name: string, optional?: boolean]
 type CmdTypes =
   | 'hoprAddress'
   | 'nativeAddress'

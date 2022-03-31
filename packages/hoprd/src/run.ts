@@ -8,6 +8,12 @@ export const isSupported = (command: any): boolean => {
   return COMMANDS.includes(command)
 }
 
+/**
+ * Run a limited supported set of commands.
+ * @param node HOPR instance
+ * @param command the command
+ * @returns a promise that resolves into a tuple
+ */
 const run = async (node: Hopr, command: typeof COMMANDS[number]): Promise<[shouldExit: boolean, result: string]> => {
   if (command === 'balance') {
     const output = await getBalances(node)
