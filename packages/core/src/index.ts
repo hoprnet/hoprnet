@@ -265,7 +265,7 @@ class Hopr extends EventEmitter {
         this.publicNodesEmitter.emit('removePublicNode', peer)
       }
     )
-    peers.forEach(peer => log(`peer store: loaded peer ${peer.id.toB58String()}`))
+    peers.forEach((peer) => log(`peer store: loaded peer ${peer.id.toB58String()}`))
 
     this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessage, hangup, this.environment.id, this.options)
 
