@@ -29,3 +29,5 @@ logs.txt
 # Typescript build info resulting from Typescript Project References
 # see https://www.typescriptlang.org/docs/handbook/project-references.html
 **/*.tsbuildinfo
+
+/docs/architecture/.structurizr

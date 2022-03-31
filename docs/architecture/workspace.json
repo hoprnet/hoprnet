@@ -1,0 +1,321 @@
+{
+  "id" : 1,
+  "name" : "HOPRd",
+  "description" : "Architecture and CI/CD documentation for all HOPRd-related topics.",
+  "lastModifiedDate" : "2022-03-31T14:40:48Z",
+  "properties" : {
+    "structurizr.dsl" : "d29ya3NwYWNlICJIT1BSZCIgIkFyY2hpdGVjdHVyZSBhbmQgQ0kvQ0QgZG9jdW1lbnRhdGlvbiBmb3IgYWxsIEhPUFJkLXJlbGF0ZWQgdG9waWNzLiIgewogICAgIWRvY3MgZG9jcwoKICAgIG1vZGVsIHsKICAgICAgICBnaXRodWJBY3Rpb25zID0gc29mdHdhcmVTeXN0ZW0gIkdpdGh1YiBBY3Rpb25zIiB7CiAgICAgICAgICAgIGRlcGxveTEgPSBjb250YWluZXIgIldvcmtmbG93OiBEZXBsb3kgKEpvYiAxKSIKICAgICAgICAgICAgZGVwbG95MiA9IGNvbnRhaW5lciAiV29ya2Zsb3c6IERlcGxveSAoSm9iIDIpIgogICAgICAgICAgICBkZXBsb3kzID0gY29udGFpbmVyICJXb3JrZmxvdzogRGVwbG95IChKb2IgMykiCiAgICAgICAgfQoKICAgICAgICBob3ByZCA9IHNvZnR3YXJlU3lzdGVtICJob3ByZCIgewogICAgICAgICAgICBob3ByZElkZW50aXR5ID0gY29udGFpbmVyICJob3ByZCBpZGVudGl0eSBhY2NvdW50IgogICAgICAgICAgICBob3ByZElkZW50aXR5MSA9IGNvbnRhaW5lciAiaG9wcmQgaWRlbnRpdHkgYWNjb3VudCAxIgogICAgICAgICAgICBob3ByZElkZW50aXR5MiA9IGNvbnRhaW5lciAiaG9wcmQgaWRlbnRpdHkgYWNjb3VudCAyIgogICAgICAgICAgICBob3ByZElkZW50aXR5MyA9IGNvbnRhaW5lciAiaG9wcmQgaWRlbnRpdHkgYWNjb3VudCAzIgogICAgICAgIH0KCiAgICAgICAgYXBpID0gc29mdHdhcmVTeXN0ZW0gIkFQSSIgewogICAgICAgIH0KCiAgICAgICAgZ2Nsb3VkID0gZGVwbG95bWVudEVudmlyb25tZW50ICJHb29nbGUgQ2xvdWQgRW5naW5lIiB7CiAgICAgICAgICAgIGRlcGxveW1lbnROb2RlICJtYXN0ZXItZ29lcmxpIiB7CiAgICAgICAgICAgICAgICBkZXBsb3ltZW50Tm9kZSAibWFzdGVyLWdvZXJsaS0xIiB7CiAgICAgICAgICAgICAgICAgICAgbWFzdGVyX2dvZXJsaV8xX2lkID0gY29udGFpbmVySW5zdGFuY2UgaG9wcmRJZGVudGl0eQogICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgZGVwbG95bWVudE5vZGUgIm1hc3Rlci1nb2VybGktMiIgewogICAgICAgICAgICAgICAgICAgIG1hc3Rlcl9nb2VybGlfMl9pZCA9IGNvbnRhaW5lckluc3RhbmNlIGhvcHJkSWRlbnRpdHkKICAgICAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICBkZXBsb3ltZW50Tm9kZSAibWFzdGVyLWdvZXJsaS0zIiB7CiAgICAgICAgICAgICAgICAgICAgbWFzdGVyX2dvZXJsaV8zX2lkID0gY29udGFpbmVySW5zdGFuY2UgaG9wcmRJZGVudGl0eQogICAgICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgfQogICAgICAgICAgICBkZXBsb3ltZW50Tm9kZSAicmVsZWFzZS1hIiB7CiAgICAgICAgICAgICAgICBkZXBsb3ltZW50Tm9kZSAicmVsZWFzZS1hLTEiCiAgICAgICAgICAgICAgICBkZXBsb3ltZW50Tm9kZSAicmVsZWFzZS1hLTIiCiAgICAgICAgICAgICAgICBkZXBsb3ltZW50Tm9kZSAicmVsZWFzZS1hLTMiCiAgICAgICAgICAgIH0KICAgICAgICAgICAgZGVwbG95bWVudE5vZGUgInJlbGVhc2UtYiIgewogICAgICAgICAgICAgICAgZGVwbG95bWVudE5vZGUgInJlbGVhc2UtYi0xIgogICAgICAgICAgICAgICAgZGVwbG95bWVudE5vZGUgInJlbGVhc2UtYi0yIgogICAgICAgICAgICAgICAgZGVwbG95bWVudE5vZGUgInJlbGVhc2UtYi0zIgogICAgICAgICAgICB9CiAgICAgICAgfQogICAgfQoKICAgIHZpZXdzIHsKICAgICAgICBkeW5hbWljIGdpdGh1YkFjdGlvbnMgImdoLWZ1bmRpbmciIHsKICAgICAgICAgICAgdGl0bGUgIkZ1bmRpbmcgcHJvY2VzcyBkdXJpbmcgbXVsdGlwbGUgR2l0aHViIEFjdGlvbnMgd29ya2Zsb3cgZXhlY3V0aW9ucyIKCiAgICAgICAgICAgIGRlcGxveTEgLT4gYXBpICJSZXF1ZXN0cyBmdW5kcyBmb3IgYWNjb3VudCAxIgogICAgICAgICAgICBkZXBsb3kyIC0+IGFwaSAiUmVxdWVzdHMgZnVuZHMgZm9yIGFjY291bnQgMSIKICAgICAgICAgICAgZGVwbG95MyAtPiBhcGkgIlJlcXVlc3RzIGZ1bmRzIGZvciBhY2NvdW50IDEiCgogICAgICAgICAgICBhcGkgLT4gaG9wcmRJZGVudGl0eTEgIkZ1bmRzIG9uLWNoYWluIGFjY291bnQiCiAgICAgICAgICAgIGFwaSAtPiBkZXBsb3kxICJSZXR1cm5zIG9rIG9yIGVycm9yIgoKICAgICAgICAgICAgYXBpIC0+IGhvcHJkSWRlbnRpdHkyICJGdW5kcyBvbi1jaGFpbiBhY2NvdW50IgogICAgICAgICAgICBhcGkgLT4gZGVwbG95MiAiUmV0dXJucyBvayBvciBlcnJvciIKCiAgICAgICAgICAgIGFwaSAtPiBob3ByZElkZW50aXR5MyAiRnVuZHMgb24tY2hhaW4gYWNjb3VudCIKICAgICAgICAgICAgYXBpIC0+IGRlcGxveTMgIlJldHVybnMgb2sgb3IgZXJyb3IiCgogICAgICAgICAgICBhdXRvTGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICB0aGVtZSBkZWZhdWx0CiAgICB9Cn0K"
+  },
+  "configuration" : { },
+  "model" : {
+    "softwareSystems" : [ {
+      "id" : "1",
+      "tags" : "Element,Software System",
+      "name" : "Github Actions",
+      "relationships" : [ {
+        "id" : "27",
+        "sourceId" : "1",
+        "destinationId" : "10",
+        "description" : "Requests funds for account 1",
+        "linkedRelationshipId" : "26"
+      } ],
+      "location" : "Unspecified",
+      "containers" : [ {
+        "id" : "3",
+        "tags" : "Element,Container",
+        "name" : "Workflow: Deploy (Job 2)",
+        "relationships" : [ {
+          "id" : "28",
+          "tags" : "Relationship",
+          "sourceId" : "3",
+          "destinationId" : "10",
+          "description" : "Requests funds for account 1"
+        } ]
+      }, {
+        "id" : "4",
+        "tags" : "Element,Container",
+        "name" : "Workflow: Deploy (Job 3)",
+        "relationships" : [ {
+          "id" : "29",
+          "tags" : "Relationship",
+          "sourceId" : "4",
+          "destinationId" : "10",
+          "description" : "Requests funds for account 1"
+        } ]
+      }, {
+        "id" : "2",
+        "tags" : "Element,Container",
+        "name" : "Workflow: Deploy (Job 1)",
+        "relationships" : [ {
+          "id" : "26",
+          "tags" : "Relationship",
+          "sourceId" : "2",
+          "destinationId" : "10",
+          "description" : "Requests funds for account 1"
+        } ]
+      } ],
+      "documentation" : { }
+    }, {
+      "id" : "5",
+      "tags" : "Element,Software System",
+      "name" : "hoprd",
+      "location" : "Unspecified",
+      "containers" : [ {
+        "id" : "9",
+        "tags" : "Element,Container",
+        "name" : "hoprd identity account 3"
+      }, {
+        "id" : "8",
+        "tags" : "Element,Container",
+        "name" : "hoprd identity account 2"
+      }, {
+        "id" : "7",
+        "tags" : "Element,Container",
+        "name" : "hoprd identity account 1"
+      }, {
+        "id" : "6",
+        "tags" : "Element,Container",
+        "name" : "hoprd identity account"
+      } ],
+      "documentation" : { }
+    }, {
+      "id" : "10",
+      "tags" : "Element,Software System",
+      "name" : "API",
+      "relationships" : [ {
+        "id" : "30",
+        "tags" : "Relationship",
+        "sourceId" : "10",
+        "destinationId" : "7",
+        "description" : "Funds on-chain account"
+      }, {
+        "id" : "31",
+        "sourceId" : "10",
+        "destinationId" : "5",
+        "description" : "Funds on-chain account",
+        "linkedRelationshipId" : "30"
+      }, {
+        "id" : "32",
+        "tags" : "Relationship",
+        "sourceId" : "10",
+        "destinationId" : "8",
+        "description" : "Funds on-chain account"
+      }, {
+        "id" : "33",
+        "tags" : "Relationship",
+        "sourceId" : "10",
+        "destinationId" : "9",
+        "description" : "Funds on-chain account"
+      } ],
+      "location" : "Unspecified",
+      "documentation" : { }
+    } ],
+    "deploymentNodes" : [ {
+      "id" : "11",
+      "tags" : "Element,Deployment Node",
+      "name" : "master-goerli",
+      "environment" : "Google Cloud Engine",
+      "instances" : 1,
+      "children" : [ {
+        "id" : "16",
+        "tags" : "Element,Deployment Node",
+        "name" : "master-goerli-3",
+        "environment" : "Google Cloud Engine",
+        "instances" : 1,
+        "containerInstances" : [ {
+          "id" : "17",
+          "tags" : "Container Instance",
+          "environment" : "Google Cloud Engine",
+          "deploymentGroups" : [ "Default" ],
+          "instanceId" : 1,
+          "containerId" : "6"
+        } ]
+      }, {
+        "id" : "12",
+        "tags" : "Element,Deployment Node",
+        "name" : "master-goerli-1",
+        "environment" : "Google Cloud Engine",
+        "instances" : 1,
+        "containerInstances" : [ {
+          "id" : "13",
+          "tags" : "Container Instance",
+          "environment" : "Google Cloud Engine",
+          "deploymentGroups" : [ "Default" ],
+          "instanceId" : 1,
+          "containerId" : "6"
+        } ]
+      }, {
+        "id" : "14",
+        "tags" : "Element,Deployment Node",
+        "name" : "master-goerli-2",
+        "environment" : "Google Cloud Engine",
+        "instances" : 1,
+        "containerInstances" : [ {
+          "id" : "15",
+          "tags" : "Container Instance",
+          "environment" : "Google Cloud Engine",
+          "deploymentGroups" : [ "Default" ],
+          "instanceId" : 1,
+          "containerId" : "6"
+        } ]
+      } ]
+    }, {
+      "id" : "18",
+      "tags" : "Element,Deployment Node",
+      "name" : "release-a",
+      "environment" : "Google Cloud Engine",
+      "instances" : 1,
+      "children" : [ {
+        "id" : "20",
+        "tags" : "Element,Deployment Node",
+        "name" : "release-a-2",
+        "environment" : "Google Cloud Engine",
+        "instances" : 1
+      }, {
+        "id" : "21",
+        "tags" : "Element,Deployment Node",
+        "name" : "release-a-3",
+        "environment" : "Google Cloud Engine",
+        "instances" : 1
+      }, {
+        "id" : "19",
+        "tags" : "Element,Deployment Node",
+        "name" : "release-a-1",
+        "environment" : "Google Cloud Engine",
+        "instances" : 1
+      } ]
+    }, {
+      "id" : "22",
+      "tags" : "Element,Deployment Node",
+      "name" : "release-b",
+      "environment" : "Google Cloud Engine",
+      "instances" : 1,
+      "children" : [ {
+        "id" : "24",
+        "tags" : "Element,Deployment Node",
+        "name" : "release-b-2",
+        "environment" : "Google Cloud Engine",
+        "instances" : 1
+      }, {
+        "id" : "25",
+        "tags" : "Element,Deployment Node",
+        "name" : "release-b-3",
+        "environment" : "Google Cloud Engine",
+        "instances" : 1
+      }, {
+        "id" : "23",
+        "tags" : "Element,Deployment Node",
+        "name" : "release-b-1",
+        "environment" : "Google Cloud Engine",
+        "instances" : 1
+      } ]
+    } ]
+  },
+  "documentation" : {
+    "sections" : [ {
+      "title" : "Continuous Deployment",
+      "content" : "## Continuous Deployment\n\nOur continuous deployment pipeline is built using Github Actions.\nMost logic is encapsuled in the Workflow: Deploy.\n\n### Funding Nodes\n\nAn essential step of deployment is funding the on-chain accounts of the nodes\nwhich have been started. This may be done in parallel for multiple nodes,\ndepending on how often the workflow is run in parallel.\n\nTherefore, all funding calls are handled by a central API, which acts as a\nhot-wallet. It tracks nonce-use and processes funding requests sequentially.\n\nThis setup prevents race-conditions between multiple funding calls to lead to\nperpetually failing funding calls.\n\n![](embed:gh-funding)\n",
+      "format" : "Markdown",
+      "order" : 1
+    } ]
+  },
+  "views" : {
+    "dynamicViews" : [ {
+      "key" : "gh-funding",
+      "order" : 1,
+      "automaticLayout" : {
+        "implementation" : "Graphviz",
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 300,
+        "nodeSeparation" : 300,
+        "edgeSeparation" : 0,
+        "vertices" : false
+      },
+      "title" : "Funding process during multiple Github Actions workflow executions",
+      "elementId" : "1",
+      "externalBoundariesVisible" : true,
+      "relationships" : [ {
+        "id" : "26",
+        "description" : "Requests funds for account 1",
+        "order" : "1",
+        "response" : false
+      }, {
+        "id" : "28",
+        "description" : "Requests funds for account 1",
+        "order" : "2",
+        "response" : false
+      }, {
+        "id" : "29",
+        "description" : "Requests funds for account 1",
+        "order" : "3",
+        "response" : false
+      }, {
+        "id" : "30",
+        "description" : "Funds on-chain account",
+        "order" : "4",
+        "response" : false
+      }, {
+        "id" : "26",
+        "description" : "Returns ok or error",
+        "order" : "5",
+        "response" : true
+      }, {
+        "id" : "32",
+        "description" : "Funds on-chain account",
+        "order" : "6",
+        "response" : false
+      }, {
+        "id" : "28",
+        "description" : "Returns ok or error",
+        "order" : "7",
+        "response" : true
+      }, {
+        "id" : "33",
+        "description" : "Funds on-chain account",
+        "order" : "8",
+        "response" : false
+      }, {
+        "id" : "29",
+        "description" : "Returns ok or error",
+        "order" : "9",
+        "response" : true
+      } ],
+      "elements" : [ {
+        "id" : "2",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "3",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "4",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "7",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "8",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "9",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "10",
+        "x" : 0,
+        "y" : 0
+      } ]
+    } ],
+    "configuration" : {
+      "branding" : { },
+      "styles" : { },
+      "themes" : [ "https://static.structurizr.com/themes/default/theme.json" ],
+      "terminology" : { },
+      "lastSavedView" : "gh-funding"
+    }
+  }
+}
