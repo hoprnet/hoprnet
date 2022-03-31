@@ -13,14 +13,14 @@ export enum AddressType {
   P2P = 'p2p'
 }
 
-type DirectAddress = {
+export type DirectAddress = {
   type: AddressType.IPv4 | AddressType.IPv6
   address: Uint8Array
   port: number
   node?: Uint8Array
 }
 
-type CircuitAddress = {
+export type CircuitAddress = {
   type: AddressType.P2P
   relayer: Uint8Array
   node: Uint8Array

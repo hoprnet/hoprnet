@@ -14,7 +14,7 @@ import {
   u8aAddressToCIDR,
   type Network
 } from '@hoprnet/hopr-utils'
-import { AddressType, parseAddress } from './utils'
+import { AddressType, parseAddress, type DirectAddress, type CircuitAddress } from './utils'
 
 import Debug from 'debug'
 import { HoprConnectOptions } from './types'
@@ -38,7 +38,7 @@ export class Filter {
   /**
    * Used to check whether addresses have already been attached
    */
-  get addrsSet(): boolean {
+  public get addrsSet(): boolean {
     return this.announcedAddrs != undefined && this.listeningFamilies != undefined
   }
 
@@ -48,7 +48,7 @@ export class Filter {
    * @param announcedAddrs Addresses that are announced to other nodes
    * @param listeningAddrs Addresses to which we are listening
    */
-  setAddrs(announcedAddrs: Multiaddr[], listeningAddrs: Multiaddr[]): void {
+  public setAddrs(announcedAddrs: Multiaddr[], listeningAddrs: Multiaddr[]): void {
     this.announcedAddrs = []
     for (const announcedAddr of announcedAddrs) {
       const parsed = parseAddress(announcedAddr)
@@ -130,104 +130,130 @@ export class Filter {
 
     switch (parsed.address.type) {
       case AddressType.P2P:
-        if (u8aEquals(parsed.address.node, this.myPublicKey)) {
-          log(`Prevented self-dial using circuit addr. Used addr: ${ma.toString()}`)
-          return false
-        }
-
-        if (u8aEquals(parsed.address.relayer, this.myPublicKey)) {
-          log(`Prevented dial using self as relay node. Used addr: ${ma.toString()}`)
-          return false
-        }
-
-        break
+        return this.filterCircuitDial(parsed.address, ma)
       case AddressType.IPv4:
       case AddressType.IPv6:
-        if (parsed.address.node != undefined && u8aEquals(parsed.address.node, this.myPublicKey)) {
-          log(`Prevented self-dial. Used addr: ${ma.toString()}`)
-          return false
-        }
+        return this.filterDirectDial(parsed.address, ma)
+    }
+  }
 
-        if (!this.listeningFamilies!.includes(parsed.address.type)) {
-          // Prevent dialing IPv6 addresses when only listening to IPv4 and vice versa
-          log(`Tried to dial ${parsed.address.type} address but listening to ${this.listeningFamilies!.join(', ')}`)
-          return false
-        }
+  /**
+   * Filter dial attempts using ciruit addresses
+   * @param address parsed circuit address
+   * @param ma original Multiaddr for logging
+   * @returns
+   */
+  private filterCircuitDial(address: CircuitAddress, ma: Multiaddr): boolean {
+    if (u8aEquals(address.node, this.myPublicKey)) {
+      log(`Prevented self-dial using circuit addr. Used addr: ${ma.toString()}`)
+      return false
+    }
 
-        if (INVALID_PORTS.includes(parsed.address.port)) {
-          log(`Tried to dial invalid port ${parsed.address.port}`)
-          return false
-        }
+    if (u8aEquals(address.relayer, this.myPublicKey)) {
+      log(`Prevented dial using self as relay node. Used addr: ${ma.toString()}`)
+      return false
+    }
 
-        if (
-          isLinkLocaleAddress(parsed.address.address, parsed.address.type) ||
-          isReservedAddress(parsed.address.address, parsed.address.type)
-        ) {
-          // Prevent dialing any link-locale addresses or reserved addresses
-          return false
-        } else if (isLocalhost(parsed.address.address, parsed.address.type)) {
-          // If localhost connections are explicitly allowed, do not dial them
-          if (!this.opts.allowLocalConnections) {
-            // Do not pollute logs by rejecting localhost connections attempts
-            return false
+    return true
+  }
+
+  /**
+   * Filter dial attempts using direct addresses
+   * @param address parsed direct address
+   * @param ma original Multiaddr for logging
+   * @returns
+   */
+  private filterDirectDial(address: DirectAddress, ma: Multiaddr): boolean {
+    if (address.node != undefined && u8aEquals(address.node, this.myPublicKey)) {
+      log(`Prevented self-dial. Used addr: ${ma.toString()}`)
+      return false
+    }
+
+    if (!this.listeningFamilies!.includes(address.type)) {
+      // Prevent dialing IPv6 addresses when only listening to IPv4 and vice versa
+      log(`Tried to dial ${address.type} address but listening to ${this.listeningFamilies!.join(', ')}`)
+      return false
+    }
+
+    if (INVALID_PORTS.includes(address.port)) {
+      log(`Tried to dial invalid port ${address.port}`)
+      return false
+    }
+
+    if (isLinkLocaleAddress(address.address, address.type) || isReservedAddress(address.address, address.type)) {
+      // Prevent dialing any link-locale addresses or reserved addresses
+      return false
+    } else if (isLocalhost(address.address, address.type)) {
+      // If localhost connections are explicitly allowed, do not dial them
+      if (!this.opts.allowLocalConnections) {
+        // Do not pollute logs by rejecting localhost connections attempts
+        return false
+      }
+
+      // Allow to dial localhost only if the port is different from all of those we're listening on
+      if (
+        this.announcedAddrs!.some(
+          (announced: ValidAddress) =>
+            announced.type !== AddressType.P2P &&
+            isLocalhost(announced.address, announced.type) &&
+            announced.type === address.type &&
+            announced.port == address.port
+        )
+      ) {
+        // Do not log anything to prevent too much log pollution
+        return false
+      }
+    } else if (isPrivateAddress(address.address, address.type)) {
+      // If private address connections are explicitly allowed, do not dial them
+      if (!this.opts.allowPrivateConnections) {
+        // Do not pollute logs by rejecting private address connections attempts
+        return false
+      }
+
+      // If different private network, there is most likely no chance to establish a connection
+      if (!checkNetworks(this.myPrivateNetworks, address.address, address.type)) {
+        log(
+          `Prevented dialing private address ${u8aAddrToString(address.address, address.type)}:${
+            address.port
+          } because not in our network(s): ${this.myPrivateNetworks
+            .map((network) => `${u8aAddressToCIDR(network.networkPrefix, network.subnet, network.family)}`)
+            .join(', ')}`
+        )
+        return false
+      }
+    }
+
+    return this.filterSameHostDial(address, ma)
+  }
+
+  /**
+   * Filter dial attempts to other nodes on same host
+   * @param address parsed direct address
+   * @param ma original Multiaddr for logging
+   * @returns
+   */
+  private filterSameHostDial(address: DirectAddress, ma: Multiaddr) {
+    // Allow multiple nodes on same host - independent of address type
+    for (const announcedAddr of this.announcedAddrs!) {
+      switch (announcedAddr.type) {
+        case AddressType.P2P:
+          continue
+        case AddressType.IPv4:
+        case AddressType.IPv6:
+          if (u8aEquals(announcedAddr.address, address.address)) {
+            // Always allow dials to own address whenever port is different
+            // and block if port is identical
+            if (address.port == announcedAddr.port) {
+              log(
+                `Prevented dialing ${ma.toString()} because self listening on ${u8aAddrToString(
+                  announcedAddr.address,
+                  announcedAddr.type
+                )}:${announcedAddr.port}`
+              )
+              return false
+            }
           }
-
-          // Allow to dial localhost only if the port is different from all of those we're listening on
-          if (
-            this.announcedAddrs!.some(
-              (announced: ValidAddress) =>
-                announced.type !== AddressType.P2P &&
-                isLocalhost(announced.address, announced.type) &&
-                announced.type === parsed.address.type &&
-                announced.port == parsed.address.port
-            )
-          ) {
-            // Do not log anything to prevent too much log pollution
-            return false
-          }
-        } else if (isPrivateAddress(parsed.address.address, parsed.address.type)) {
-          // If private address connections are explicitly allowed, do not dial them
-          if (!this.opts.allowPrivateConnections) {
-            // Do not pollute logs by rejecting private address connections attempts
-            return false
-          }
-
-          // If different private network, there is most likely no chance to establish a connection
-          if (!checkNetworks(this.myPrivateNetworks, parsed.address.address, parsed.address.type)) {
-            log(
-              `Prevented dialing private address ${u8aAddrToString(parsed.address.address, parsed.address.type)}:${
-                parsed.address.port
-              } because not in our network(s): ${this.myPrivateNetworks
-                .map((network) => `${u8aAddressToCIDR(network.networkPrefix, network.subnet, network.family)}`)
-                .join(', ')}`
-            )
-            return false
-          }
-        }
-
-        // Allow multiple nodes on same host - independent of address type
-        for (const announcedAddr of this.announcedAddrs!) {
-          switch (announcedAddr.type) {
-            case AddressType.P2P:
-              continue
-            case AddressType.IPv4:
-            case AddressType.IPv6:
-              if (u8aEquals(announcedAddr.address, parsed.address.address)) {
-                // Always allow dials to own address whenever port is different
-                // and block if port is identical
-                if (parsed.address.port == announcedAddr.port) {
-                  log(
-                    `Prevented dialing ${u8aAddrToString(parsed.address.address, parsed.address.type)}:${
-                      parsed.address.port
-                    } because self listening on ${u8aAddrToString(announcedAddr.address, announcedAddr.type)}:${
-                      announcedAddr.port
-                    }`
-                  )
-                  return false
-                }
-              }
-          }
-        }
+      }
     }
 
     return true
