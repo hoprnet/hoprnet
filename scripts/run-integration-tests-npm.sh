@@ -390,8 +390,7 @@ for node_dir in ${node1_dir} ${node2_dir} ${node3_dir} ${node4_dir} ${node5_dir}
   declare node_dir_db="${node_dir}/db/LOG"
   declare node_dir_peerstore="${node_dir}/peerstore/LOG"
   [ -f "${node_dir_db}" ] || { echo "Data file ${node_dir_db} missing"; exit 1; }
-  # See https://github.com/hoprnet/hoprnet/issues/3692
-  # [ -f "${node_dir_peerstore}" ] || { echo "Data file ${node_dir_peerstore} missing"; exit 1; }
+  [ -f "${node_dir_peerstore}" ] || { echo "Data file ${node_dir_peerstore} missing"; exit 1; }
 done
 # }}}
 
