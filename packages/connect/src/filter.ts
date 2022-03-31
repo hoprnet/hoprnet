@@ -159,15 +159,13 @@ export class Filter {
           return false
         }
 
-        // Prevent dialing any link-locale addresses or reserved addresses
         if (
           isLinkLocaleAddress(parsed.address.address, parsed.address.type) ||
           isReservedAddress(parsed.address.address, parsed.address.type)
         ) {
+          // Prevent dialing any link-locale addresses or reserved addresses
           return false
-        }
-
-        if (isLocalhost(parsed.address.address, parsed.address.type)) {
+        } else if (isLocalhost(parsed.address.address, parsed.address.type)) {
           // If localhost connections are explicitly allowed, do not dial them
           if (!this.opts.allowLocalConnections) {
             // Do not pollute logs by rejecting localhost connections attempts
@@ -187,9 +185,7 @@ export class Filter {
             // Do not log anything to prevent too much log pollution
             return false
           }
-        }
-
-        if (isPrivateAddress(parsed.address.address, parsed.address.type)) {
+        } else if (isPrivateAddress(parsed.address.address, parsed.address.type)) {
           // If private address connections are explicitly allowed, do not dial them
           if (!this.opts.allowPrivateConnections) {
             // Do not pollute logs by rejecting private address connections attempts
