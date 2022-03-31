@@ -21,7 +21,7 @@ usage() {
 }
 
 # return early with help info when requested
-{[ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]} && { usage; exit 0; }
+{ [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
 
 if [ -z "${1:-}" ]; then
   msg "Missing package name"
@@ -41,13 +41,12 @@ declare package_dir="${mydir}/../packages/${package_name}"
 restore() {
   log "Restoring previous state"
   rm -Rf "${build_dir}"
-  rm -f "${package_dir}/yarn.lock"
-  rm -f "${package_dir}/package-lock.json"
+  rm -f "${package_dir}/npm-shrinkwrap.json"
   rm -f "${package_dir}/package.tgz"
 }
 
 # Remove temporary build dir if failed
-trap restore SIGINT SIGTERM ERR EXIT
+trap restore SIGINT SIGTERM ERR
 
 log "Install workspace package in temporary directory"
 
@@ -73,15 +72,11 @@ log "Creating NPM lock file for ${package_name} package"
 # Create NPM lockfile but do not download (or build) entire package
 npm install --package-lock-only
 
-# Copy NPM lockfile back to workspace
-mv "${build_dir}/package-lock.json" "${package_dir}"
+# Create shrinkwrap version of package.json
+npm shrinkwrap
 
-log "Creating Yarn lock file for ${package_name} package"
-# Create Yarn lockfile but do not build the entire package
-yarn install --prod --ignore-scripts
-
-# Copy Yarn lockfile back to workspace
-mv "${build_dir}/yarn.lock" "${package_dir}"
+# Copy also npm-shrinkwrap.json, which will take precedence over package-lock.json while publishing
+mv "${build_dir}/npm-shrinkwrap.json" "${package_dir}"
 
 # No need for package.json anymore
 rm "${build_dir}/package.json"
@@ -92,7 +87,7 @@ log "Patching resolution overrides in ${package_dir}/package.json for Yarn and N
 jq -s '.[1] * (.[0].resolutions | { "overrides": . ,"resolutions": . })' "${mydir}/../package.json" "${package_dir}/package.json" > "${build_dir}/package.json"
 cp "${build_dir}/package.json" "${package_dir}"
 
-log "Successfully copied lockfiles to ${package_dir}/"
+log "Successfully copied lockfile to ${package_dir}/"
 
 log "Removing temporary build dir"
 rm -Rf "${build_dir}"

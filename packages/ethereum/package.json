@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "1.88.0-next.38",
+  "version": "1.89.0-next.5",
   "description": "On-chain logic for hoprnet.org",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "license": "GPL-3.0",
@@ -52,14 +52,11 @@
     "rimraf": "3.0.2",
     "solidity-coverage": "0.7.18",
     "ts-generator": "0.1.1",
-    "ts-node": "10.5.0",
-    "typechain": "7.0.0",
-    "typedoc": "0.22.11",
+    "ts-node": "10.7.0",
+    "typechain": "7.0.1",
+    "typedoc": "0.22.13",
     "typedoc-plugin-markdown": "3.11.14",
-    "typescript": "4.5.5"
-  },
-  "resolutions": {
-    "eth-sig-util": "3.0.1"
+    "typescript": "4.6.3"
   },
   "engines": {
     "node": "16"

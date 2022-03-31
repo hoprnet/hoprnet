@@ -50,7 +50,7 @@ $ yarn hopr-cover-traffic-daemon --help
 Options:
   --help             Show help  [boolean]
   --version          Show version number  [boolean]
-  --environment      Environment id which the node shall run on  [string] [choices: "hardhat-localhost", "hardhat-localhost2", "master-goerli", "debug-goerli", "tuttlingen", "prague", "budapest", "athens", "lisbon"] [default: ""]
+  --environment      Environment id which the node shall run on  [string] [choices: "hardhat-localhost", "hardhat-localhost2", "master-goerli", "debug-goerli", "tuttlingen", "prague", "budapest", "athens", "lisbon", "ouagadougou"] [default: ""]
   --privateKey       A private key to be used for the node  [string] [required]
   --dbFile           A path to DB file for persistent storage  [string] [default: "./ct.json"]
   --data             manually specify the database directory to use  [default: ""]

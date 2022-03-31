@@ -7,7 +7,7 @@ The purpose of this process is to follow a consistent way of creating, funding, 
 A bounty usually serves multiple goals.
 
 1. Takes away workload from the _tech_ team as it allows external developers improve the HOPR protocol and the various applications/tools we maintain.
-2. Gives the _community_ team the opportunity to showcase HOPR's involvement in open source.
+2. Gives the _comm_ team the opportunity to showcase HOPR's involvement in open source.
 3. Allows us to build a relationship between HOPR and the bounty hunter (tech community).
 
 The primary goal of a bounty creator is to take into account all 3 aspects, and depending on the bounty, adjust accordingly.
@@ -22,7 +22,7 @@ The primary goal of a bounty creator is to take into account all 3 aspects, and 
 - Creator makes a comment in the PR with an estimate of:
   1. Prize of the bounty (in dollars).
   2. Time required to complete the bounty (in days).
-- Bounty is sent to be reviewed by the [tech representatives](./development#tech-representantives), most importantly to make sure that:
+- Bounty is sent to be reviewed by the [tech representatives](./development#tech-representatives), most importantly to make sure that:
   1. Bounty does not disturb tech's roadmap.
   2. Prize and time required make sense.
 
@@ -48,13 +48,13 @@ Depending on the medium used the process may vary.
   2. Creator sets prize of the bounty.
   3. Operator wallet is the one created in [Funding the bounty](#funding-the-bounty).
 
-### Community
+### Comm
 
 As soon as the bounty is ready to be promoted, the following must happen:
 
 1. Creator pastes bounty URL within `bounties` channel in element.
 2. Creator pastes bounty URL within `bounties (TBD)` channel in discord.
-3. Community may use the bounty the way they see fit, with the help of the creator.
+3. Comm team may use the bounty the way they see fit, with the help of the creator.
 
 ## Deadlines
 
@@ -84,7 +84,7 @@ Depending on the prize's currency, there might be fluctuations in the price rela
 
 ## Awarding the prize
 
-Before the bounty is awarded, one of the [tech representatives](./development#tech-representantives) has to approve the PR which was created to resolve the bounty.
+Before the bounty is awarded, one of the [tech representatives](./development#tech-representatives) has to approve the PR which was created to resolve the bounty.
 
 ## The Bounty Program
 

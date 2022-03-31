@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-utils",
   "description": "HOPR-based utilities to process multiple data structures",
-  "version": "1.88.0-next.38",
+  "version": "1.89.0-next.5",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
@@ -26,13 +26,13 @@
     "bignumber.js": "9.0.2",
     "bn.js": "5.2.0",
     "chalk": "4.1.2",
-    "debug": "4.3.3",
+    "debug": "4.3.4",
     "ethers": "5.5.4",
     "futoin-hkdf": "1.5.0",
     "hjson": "3.2.2",
     "it-pipe": "1.1.0",
     "jsonschema": "1.4.0",
-    "leveldown": "6.1.0",
+    "leveldown": "6.1.1",
     "levelup": "5.1.1",
     "libp2p-crypto": "0.21.2",
     "memdown": "6.1.1",
@@ -45,7 +45,7 @@
     "secp256k1": "4.0.3"
   },
   "devDependencies": {
-    "@chainsafe/libp2p-noise": "5.0.2",
+    "@chainsafe/libp2p-noise": "5.0.3",
     "@types/mocha": "9.1.0",
     "@types/pino": "7.0.4",
     "bl": "5.0.0",
@@ -54,14 +54,14 @@
     "libp2p-kad-dht": "0.28.6",
     "libp2p-mplex": "0.10.7",
     "libp2p-tcp": "0.17.2",
-    "mocha": "9.2.0",
+    "mocha": "9.2.2",
     "rewiremock": "3.14.3",
     "rimraf": "3.0.2",
     "sinon": "12.0.1",
-    "ts-node": "10.5.0",
-    "typedoc": "0.22.11",
+    "ts-node": "10.7.0",
+    "typedoc": "0.22.13",
     "typedoc-plugin-markdown": "3.11.14",
-    "typescript": "4.5.5"
+    "typescript": "4.6.3"
   },
   "mocha": {
     "extension": [
