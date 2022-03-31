@@ -1,10 +1,9 @@
-import type { Network } from '@hoprnet/hopr-utils'
 import type { NetworkInterfaceInfo } from 'os'
 
 import { Multiaddr } from 'multiaddr'
 import { Filter } from './filter'
 import assert from 'assert'
-import { toNetworkPrefix, privKeyToPeerId } from '@hoprnet/hopr-utils'
+import { toNetworkPrefix, privKeyToPeerId, type Network } from '@hoprnet/hopr-utils'
 
 let firstPeer = privKeyToPeerId(`0x22f7c3c101db7a73c42d3adecbd2700173f19a249b5ef115c25020b091822083`)
 let secondPeer = privKeyToPeerId(`0xbb25701334f6f989ab51322d0064b3755fc3a65770e4a240df163c355bd8cd26`)
@@ -14,7 +13,7 @@ class TestFilter extends Filter {
   /**
    * THIS METHOD IS ONLY USED FOR TESTING
    * @dev Used to set falsy local network
-   * @param mAddrs new local addresses
+   * @param networks new local addresses
    */
   _setLocalAddressesForTesting(networks: Network[]): void {
     this.myPrivateNetworks = networks
@@ -194,6 +193,14 @@ describe('test addr filtering', function () {
   })
 
   it(`dial on same host`, function () {
+    filter._setLocalAddressesForTesting([
+      toNetworkPrefix({
+        address: '10.0.0.1',
+        netmask: '255.0.0.0',
+        family: 'IPv4'
+      } as NetworkInterfaceInfo)
+    ])
+
     filter.setAddrs(
       [
         // localhost
@@ -217,10 +224,6 @@ describe('test addr filtering', function () {
     // private address
     assert(filter.filter(new Multiaddr(`/ip4/10.0.0.1/tcp/1/p2p/${secondPeer.toB58String()}`)) == true)
     assert(filter.filter(new Multiaddr(`/ip4/10.0.0.1/tcp/2/p2p/${secondPeer.toB58String()}`)) == false)
-
-    // link-locale address
-    assert(filter.filter(new Multiaddr(`/ip4/169.254.0.1/tcp/1/p2p/${secondPeer.toB58String()}`)) == true)
-    assert(filter.filter(new Multiaddr(`/ip4/169.254.0.1/tcp/2/p2p/${secondPeer.toB58String()}`)) == false)
 
     // public address
     assert(filter.filter(new Multiaddr(`/ip4/1.2.3.4/tcp/1/p2p/${secondPeer.toB58String()}`)) == true)

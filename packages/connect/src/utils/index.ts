@@ -10,7 +10,7 @@ import { isAnyAddress } from '@hoprnet/hopr-utils'
 import { Multiaddr } from 'multiaddr'
 import { CODE_CIRCUIT, CODE_P2P } from '../constants'
 
-export { parseAddress, type ValidAddress } from './addrs'
+export * from './addrs'
 export { encodeWithLengthPrefix, decodeWithLengthPrefix } from './lengthPrefix'
 
 function isAsyncStream<T>(iterator: AsyncIterable<T> | Iterable<T>): iterator is AsyncIterable<T> {
