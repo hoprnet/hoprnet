@@ -55,20 +55,17 @@ contract HoprNetworkRegistry is Ownable {
    * Enable globally the network registry by the owner
    */
   function enableRegistry() external onlyOwner {
-    if (!enabled) {
-      enabled = true;
-      emit EnabledNetworkRegistry(true);
-    }
+    require(!enabled, 'HoprNetworkRegistry: Registry is enabled');
+    enabled = true;
+    emit EnabledNetworkRegistry(true);
   }
 
   /**
    * Disanable globally the network registry by the owner
    */
-  function disableRegistry() external onlyOwner {
-    if (enabled) {
-      enabled = false;
-      emit EnabledNetworkRegistry(false);
-    }
+  function disableRegistry() external onlyOwner mustBeEnabled {
+    enabled = false;
+    emit EnabledNetworkRegistry(false);
   }
 
   /**
