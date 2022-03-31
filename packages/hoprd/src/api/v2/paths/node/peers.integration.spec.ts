@@ -18,7 +18,7 @@ const ALICE_ENTRY = {
   heartbeatsSuccess: 10,
   lastSeen: 1646410980793,
   backoff: 0,
-  lastTen: 1
+  quality: 1
 }
 const ALICE_PEER_INFO = {
   peerId: ALICE_PEER_ID.toB58String(),
@@ -28,7 +28,7 @@ const ALICE_PEER_INFO = {
     success: ALICE_ENTRY.heartbeatsSuccess
   },
   lastSeen: ALICE_ENTRY.lastSeen,
-  quality: ALICE_ENTRY.lastTen,
+  quality: ALICE_ENTRY.quality,
   backoff: ALICE_ENTRY.backoff,
   isNew: false
 }
@@ -39,7 +39,7 @@ const BOB_ENTRY = {
   heartbeatsSuccess: 0,
   lastSeen: 1646410680793,
   backoff: 0,
-  lastTen: 0.2
+  quality: 0.2
 }
 const BOB_PEER_INFO = {
   peerId: BOB_PEER_ID.toB58String(),
@@ -49,7 +49,7 @@ const BOB_PEER_INFO = {
     success: BOB_ENTRY.heartbeatsSuccess
   },
   lastSeen: BOB_ENTRY.lastSeen,
-  quality: BOB_ENTRY.lastTen,
+  quality: BOB_ENTRY.quality,
   backoff: BOB_ENTRY.backoff,
   isNew: true
 }
@@ -60,7 +60,7 @@ const CHARLIE_ENTRY = {
   heartbeatsSuccess: 8,
   lastSeen: 1646410980993,
   backoff: 0,
-  lastTen: 0.8
+  quality: 0.8
 }
 const CHARLIE_PEER_INFO = {
   peerId: CHARLIE_PEER_ID.toB58String(),
@@ -69,7 +69,7 @@ const CHARLIE_PEER_INFO = {
     success: CHARLIE_ENTRY.heartbeatsSuccess
   },
   lastSeen: CHARLIE_ENTRY.lastSeen,
-  quality: CHARLIE_ENTRY.lastTen,
+  quality: CHARLIE_ENTRY.quality,
   backoff: CHARLIE_ENTRY.backoff,
   isNew: false
 }
