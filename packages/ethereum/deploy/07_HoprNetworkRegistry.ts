@@ -11,17 +11,20 @@ const main = async function (hre: HardhatRuntimeEnvironment) {
 
   const adminAddress =
     network.name == 'hardhat' ? deployer.address : environmentConfig['network_registry_admin_address']
+  const registryProxy = environmentConfig['network_id'] == 'xdai' 
+  ? await deployments.get('HoprStakingProxyForNetworkRegistry')
+  : await deployments.get('HoprDummyProxyForNetworkRegistry')
 
   const networkRegistry = await deployments.deploy('HoprNetworkRegistry', {
     from: deployer.address,
     log: true,
-    args: [environmentConfig['stake_v2_contract_address'], adminAddress]
+    args: [registryProxy.address, adminAddress]
   })
 
   console.log(`"HoprNetworkRegistry" deployed at ${networkRegistry.address}`)
 }
 
-main.dependencies = ['preDeploy']
+main.dependencies = ['preDeploy', 'HoprNetworkRegistryProxy']
 main.tags = ['HoprNetworkRegistry']
 
 export default main
