@@ -7,7 +7,6 @@ import { HoprDummyProxyForNetworkRegistry } from '../../src/types'
 chai.should() // if you like should syntax
 chai.use(smock.matchers)
 
-
 const useFixtures = deployments.createFixture(async (_hre) => {
   const [_deployer, owner, ...signers] = await ethers.getSigners()
   const participants = signers.slice(3, 10) // 7 participants
@@ -36,43 +35,53 @@ describe('Registry proxy for stake v2', () => {
 
   describe('Add account(s)', () => {
     beforeEach(async () => {
-        ;({ owner, participantAddresses, hoprDummyProxyForNetworkRegistry } = await useFixtures())
+      ;({ owner, participantAddresses, hoprDummyProxyForNetworkRegistry } = await useFixtures())
     })
     it('fails to add account by non-owner', async () => {
-        await expect(hoprDummyProxyForNetworkRegistry.ownerAddAccount(participantAddresses[3])).to.be.revertedWith('Ownable: caller is not the owner')
+      await expect(hoprDummyProxyForNetworkRegistry.ownerAddAccount(participantAddresses[3])).to.be.revertedWith(
+        'Ownable: caller is not the owner'
+      )
     })
     it('add an account by owner', async () => {
-        await expect(hoprDummyProxyForNetworkRegistry.connect(owner).ownerAddAccount(participantAddresses[3]))
+      await expect(hoprDummyProxyForNetworkRegistry.connect(owner).ownerAddAccount(participantAddresses[3]))
         .to.emit(hoprDummyProxyForNetworkRegistry.connect(owner), 'AccountRegistered')
         .withArgs(participantAddresses[3])
     })
     it('add accounts by owner', async () => {
-        await hoprDummyProxyForNetworkRegistry.connect(owner).ownerAddAccount(participantAddresses[3]);
-        await expect(hoprDummyProxyForNetworkRegistry.connect(owner).ownerBatchAddAccounts(participantAddresses.slice(3, 6)))
-        .to.emit(hoprDummyProxyForNetworkRegistry.connect(owner), 'AccountRegistered').withArgs(participantAddresses[4])
-        .to.emit(hoprDummyProxyForNetworkRegistry.connect(owner), 'AccountRegistered').withArgs(participantAddresses[5])
+      await hoprDummyProxyForNetworkRegistry.connect(owner).ownerAddAccount(participantAddresses[3])
+      await expect(
+        hoprDummyProxyForNetworkRegistry.connect(owner).ownerBatchAddAccounts(participantAddresses.slice(3, 6))
+      )
+        .to.emit(hoprDummyProxyForNetworkRegistry.connect(owner), 'AccountRegistered')
+        .withArgs(participantAddresses[4])
+        .to.emit(hoprDummyProxyForNetworkRegistry.connect(owner), 'AccountRegistered')
+        .withArgs(participantAddresses[5])
     })
   })
   describe('Remove account', () => {
     beforeEach(async () => {
-        ;({ owner, participantAddresses, hoprDummyProxyForNetworkRegistry } = await useFixtures())
-        await hoprDummyProxyForNetworkRegistry.connect(owner).ownerAddAccount(participantAddresses[3]);
+      ;({ owner, participantAddresses, hoprDummyProxyForNetworkRegistry } = await useFixtures())
+      await hoprDummyProxyForNetworkRegistry.connect(owner).ownerAddAccount(participantAddresses[3])
     })
     it(`participant is still eligible`, async () => {
-        expect(await hoprDummyProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[3])).to
-          .be.true
-      })
+      expect(await hoprDummyProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[3])).to.be.true
+    })
     it('fails to remove account by non-owner', async () => {
-        await expect(hoprDummyProxyForNetworkRegistry.ownerRemoveAccount(participantAddresses[3])).to.be.revertedWith('Ownable: caller is not the owner')
+      await expect(hoprDummyProxyForNetworkRegistry.ownerRemoveAccount(participantAddresses[3])).to.be.revertedWith(
+        'Ownable: caller is not the owner'
+      )
     })
     it('remove an account by owner', async () => {
-        await expect(hoprDummyProxyForNetworkRegistry.connect(owner).ownerRemoveAccount(participantAddresses[3]))
+      await expect(hoprDummyProxyForNetworkRegistry.connect(owner).ownerRemoveAccount(participantAddresses[3]))
         .to.emit(hoprDummyProxyForNetworkRegistry.connect(owner), 'AccountDeregistered')
         .withArgs(participantAddresses[3])
     })
     it('remove accounts by owner', async () => {
-        await expect(hoprDummyProxyForNetworkRegistry.connect(owner).ownerBatchRemoveAccounts(participantAddresses.slice(3, 6)))
-        .to.emit(hoprDummyProxyForNetworkRegistry.connect(owner), 'AccountDeregistered').withArgs(participantAddresses[3])
+      await expect(
+        hoprDummyProxyForNetworkRegistry.connect(owner).ownerBatchRemoveAccounts(participantAddresses.slice(3, 6))
+      )
+        .to.emit(hoprDummyProxyForNetworkRegistry.connect(owner), 'AccountDeregistered')
+        .withArgs(participantAddresses[3])
     })
   })
 })
