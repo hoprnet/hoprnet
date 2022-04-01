@@ -65,8 +65,10 @@ contract HoprDummyProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Ow
    * @param account address to be added into the registry
    */
   function _addAccount(address account) private {
-    registeredAccounts[account] = true;
-    emit AccountRegistered(account);
+    if (!registeredAccounts[account]) {
+      registeredAccounts[account] = true;
+      emit AccountRegistered(account);
+    }
   }
 
   /**
@@ -74,7 +76,9 @@ contract HoprDummyProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Ow
    * @param account address to be removed from the registry
    */
   function _removeAccount(address account) private {
-    delete registeredAccounts[account];
-    emit AccountDeregistered(account);
+    if (registeredAccounts[account]) {
+      delete registeredAccounts[account];
+      emit AccountDeregistered(account);
+    }
   }
 }
