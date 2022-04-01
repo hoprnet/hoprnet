@@ -334,7 +334,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/main.ts:171](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L171)
+[packages/core/src/main.ts:170](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L170)
 
 ___
 
