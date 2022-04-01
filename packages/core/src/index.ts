@@ -10,7 +10,6 @@ import type { default as LibP2P, Connection } from 'libp2p'
 import type { Peer } from 'libp2p/src/peer-store/types'
 import type PeerId from 'peer-id'
 
-import { convertPubKeyFromPeerId } from '@hoprnet/hopr-utils'
 import type { HoprConnectConfig } from '@hoprnet/hopr-connect'
 
 import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants'
@@ -47,7 +46,8 @@ import {
   type Ticket,
   multiaddressCompareByClassFunction,
   createRelayerKey,
-  createCircuitAddress
+  createCircuitAddress,
+  convertPubKeyFromPeerId
 } from '@hoprnet/hopr-utils'
 import { type default as HoprCoreEthereum, type Indexer } from '@hoprnet/hopr-core-ethereum'
 
@@ -260,8 +260,13 @@ class Hopr extends EventEmitter {
     this.networkPeers = new NetworkPeers(
       peers.map((p) => p.id),
       [this.id],
-      (peer: PeerId) => this.publicNodesEmitter.emit('removePublicNode', peer)
+      (peer: PeerId) => {
+        this.libp2p.peerStore.delete(peer)
+        this.publicNodesEmitter.emit('removePublicNode', peer)
+      }
     )
+    peers.forEach((peer) => log(`peer store: loaded peer ${peer.id.toB58String()}`))
+
     this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessage, hangup, this.environment.id, this.options)
 
     this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
