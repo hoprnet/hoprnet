@@ -127,7 +127,7 @@ export async function createLibp2pInstance(
       // more connections
       maxParallelDials: options.announce ? 250 : 50,
       // default timeout of 30s appears to be too long
-      dialTimeout: 30e3
+      dialTimeout: 10e3
     }
   })
 
