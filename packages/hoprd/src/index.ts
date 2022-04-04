@@ -135,6 +135,11 @@ const argv = yargs(process.argv.slice(2))
     describe: 'A private key to be used for your HOPR node',
     default: undefined
   })
+  .option('provider', {
+    string: true,
+    describe: 'A custom RPC provider to be used for your HOPR node to connect to blockchain',
+    default: 'http://127.0.0.1:8535/'
+  })
   .option('identity', {
     string: true,
     describe: 'The path to the identity file',
@@ -356,7 +361,7 @@ async function main() {
     await adminServer.setup()
   }
 
-  const environment = resolveEnvironment(argv.environment)
+  const environment = resolveEnvironment(argv.environment, argv.provider)
   let options = generateNodeOptions(environment)
   if (argv.dryRun) {
     console.log(JSON.stringify(options, undefined, 2))
