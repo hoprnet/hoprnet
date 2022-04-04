@@ -47,7 +47,6 @@ export async function createChainWrapper(
   const provider = networkInfo.provider.startsWith('http')
     ? new providers.StaticJsonRpcProvider(networkInfo.provider)
     : new providers.WebSocketProvider(networkInfo.provider)
-  log('Provider obtained from options', provider.network)
   const publicKey = PublicKey.fromPrivKey(privateKey)
   const address = publicKey.toAddress()
   const providerChainId = (await provider.getNetwork()).chainId
