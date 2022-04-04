@@ -32,7 +32,7 @@ export async function createLibp2pInstance(
   options: HoprOptions,
   initialNodes: { id: PeerId; multiaddrs: Multiaddr[] }[],
   publicNodes: PublicNodesEmitter,
-  isDenied?: (id: PeerId) => Promise<boolean>
+  isWhitelisted: (id: PeerId) => Promise<boolean>
 ): Promise<LibP2P> {
   let addressSorter: AddressSorter
 
@@ -151,8 +151,8 @@ export async function createLibp2pInstance(
 
   const onConnectionOriginal = libp2p.upgrader.onConnection
   libp2p.upgrader.onConnection = async (conn: Connection) => {
-    // check if we are denying connection to that peer
-    if (isDenied && (await isDenied(conn.remotePeer))) {
+    // check if connection is not whitelisted
+    if (!(await isWhitelisted(conn.remotePeer))) {
       try {
         await conn.close()
       } catch (err: any) {
