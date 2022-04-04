@@ -56,6 +56,11 @@ const argv = yargs(process.argv.slice(2))
     string: true,
     demandOption: true
   })
+  .option('provider', {
+    string: true,
+    describe: 'A custom RPC provider to be used for your HOPR node to connect to blockchain',
+    default: 'http://127.0.0.1:8535/'
+  })
   .option('dbFile', {
     describe: 'A path to DB file for persistent storage',
     string: true,
@@ -96,7 +101,7 @@ async function generateNodeOptions(environment: ResolvedEnvironment): Promise<Ho
 }
 
 export async function main(update: (State: State) => void, peerId?: PeerId) {
-  const environment = resolveEnvironment(argv.environment)
+  const environment = resolveEnvironment(argv.environment, argv.provider)
   const options = await generateNodeOptions(environment)
   if (!peerId) {
     peerId = privKeyToPeerId(argv.privateKey)
