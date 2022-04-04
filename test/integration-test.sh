@@ -287,7 +287,8 @@ log "hopr addr7: ${addr7}"
 log "hopr addr8: ${addr8}"
 
 # add nodes 1,2,3,4,5,7 in whitelist, do NOT add node 8
-source "${mydir}/../scripts/add-to-whitelist.sh" "$addr1" "$addr2" "$addr3" "$addr4" "$addr5" "$addr7"
+log "Adding nodes to whitelist"
+(cd "${mydir}/../packages/ethereum"; npx hardhat --network hardhat add-to-whitelist "$addr1" "$addr2" "$addr3" "$addr4" "$addr5" "$addr7")
 
 log "Check peers"
 result=$(run_command ${api1} "peers" 'peers have announced themselves' 600)
