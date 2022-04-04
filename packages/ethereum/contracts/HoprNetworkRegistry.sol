@@ -11,7 +11,9 @@ contract HoprNetworkRegistry is Ownable {
   IHoprNetworkRegistryRequirement public requirementImplementation;
   mapping(address => string) public accountToNodeMultiaddr;
   mapping(string => address) public nodeMultiaddrToAccount;
+  bool public enabled;
 
+  event EnabledNetworkRegistry(bool indexed isEnabled);
   event RequirementUpdated(address indexed requirementImplementation);
   event Registered(address indexed account, string HoprMultiaddr);
   event RegisteredByOwner(address indexed account, string HoprMultiaddr);
@@ -19,23 +21,51 @@ contract HoprNetworkRegistry is Ownable {
   event EligibilityUpdated(address indexed account, bool indexed eligibility);
 
   /**
+   * Network registry must be globally enabled to proceed
+   */
+  modifier mustBeEnabled() {
+    require(enabled, 'HoprNetworkRegistry: Registry is disabled');
+    _;
+  }
+
+  /**
    * Specify NetworkRegistry logic implementation and transfer the ownership
-   * _requirementImplementation address of the network registry logic implementation
-   * _newOwner address of the contract owner
+   * enable the network registry on deployment.
+   * @param _requirementImplementation address of the network registry logic implementation
+   * @param _newOwner address of the contract owner
    */
   constructor(address _requirementImplementation, address _newOwner) {
     requirementImplementation = IHoprNetworkRegistryRequirement(_requirementImplementation);
+    enabled = true;
     _transferOwnership(_newOwner);
     emit RequirementUpdated(_requirementImplementation);
+    emit EnabledNetworkRegistry(true);
   }
 
   /**
    * Specify NetworkRegistry logic implementation
-   * _requirementImplementation address of the network registry logic implementation
+   * @param _requirementImplementation address of the network registry logic implementation
    */
   function updateRequirementImplementation(address _requirementImplementation) external onlyOwner {
     requirementImplementation = IHoprNetworkRegistryRequirement(_requirementImplementation);
     emit RequirementUpdated(_requirementImplementation);
+  }
+
+  /**
+   * Enable globally the network registry by the owner
+   */
+  function enableRegistry() external onlyOwner {
+    require(!enabled, 'HoprNetworkRegistry: Registry is enabled');
+    enabled = true;
+    emit EnabledNetworkRegistry(true);
+  }
+
+  /**
+   * Disanable globally the network registry by the owner
+   */
+  function disableRegistry() external onlyOwner mustBeEnabled {
+    enabled = false;
+    emit EnabledNetworkRegistry(false);
   }
 
   /**
@@ -45,7 +75,7 @@ contract HoprNetworkRegistry is Ownable {
    * @notice It allows msg.sender to update registered node address.
    * @param hoprAddress Hopr nodes id. e.g. 16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x1
    */
-  function selfRegister(string calldata hoprAddress) external returns (bool) {
+  function selfRegister(string calldata hoprAddress) external mustBeEnabled returns (bool) {
     if (requirementImplementation.isRequirementFulfilled(msg.sender)) {
       accountToNodeMultiaddr[msg.sender] = hoprAddress;
       nodeMultiaddrToAccount[hoprAddress] = msg.sender;
@@ -69,7 +99,11 @@ contract HoprNetworkRegistry is Ownable {
    * @param accounts Array of Ethereum accounts, e.g. [0xf6A8b267f43998B890857f8d1C9AabC68F8556ee]
    * @param hoprAddresses Array of hopr nodes id. e.g. [16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x1]
    */
-  function ownerRegister(address[] calldata accounts, string[] calldata hoprAddresses) external onlyOwner {
+  function ownerRegister(address[] calldata accounts, string[] calldata hoprAddresses)
+    external
+    onlyOwner
+    mustBeEnabled
+  {
     require(
       hoprAddresses.length == accounts.length,
       'HoprNetworkRegistry: hoprAddresses and accounts lengths mismatch'
@@ -89,7 +123,7 @@ contract HoprNetworkRegistry is Ownable {
    * @notice Owner can even remove self-declared entries.
    * @param accounts Array of Ethereum accounts, e.g. 0xf6A8b267f43998B890857f8d1C9AabC68F8556ee
    */
-  function ownerDeregister(address[] calldata accounts) external onlyOwner {
+  function ownerDeregister(address[] calldata accounts) external onlyOwner mustBeEnabled {
     for (uint256 i = 0; i < accounts.length; i++) {
       address account = accounts[i];
       string memory hoprAddress = accountToNodeMultiaddr[account];
@@ -105,7 +139,7 @@ contract HoprNetworkRegistry is Ownable {
    * @notice If an account hasn't been registered, its eligibility is not going to be updated
    * @param accounts Array of Ethereum accounts, e.g. [0xf6A8b267f43998B890857f8d1C9AabC68F8556ee]
    */
-  function sync(address[] calldata accounts) external onlyOwner {
+  function sync(address[] calldata accounts) external onlyOwner mustBeEnabled {
     for (uint256 i = 0; i < accounts.length; i++) {
       address account = accounts[i];
       if (bytes(accountToNodeMultiaddr[account]).length == 0) {
