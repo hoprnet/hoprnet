@@ -221,7 +221,9 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
     destination: PeerId,
     options: HoprConnectDialOptions
   ): Promise<Connection> {
-    log(`Attempting to dial /p2p/${relay.toB58String()}/p2p-circuit/p2p/${destination.toB58String()}`)
+    log(
+      `Attempting to dial ${chalk.yellow(`/p2p/${relay.toB58String()}/p2p-circuit/p2p/${destination.toB58String()}`)}`
+    )
 
     let maConn = await this.relay.connect(relay, destination, options)
 

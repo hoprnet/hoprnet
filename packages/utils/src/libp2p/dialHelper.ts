@@ -62,9 +62,11 @@ type ReducedPeerStore = {
 }
 type ReducedConnectionManager = Pick<LibP2P['connectionManager'], 'getAll' | 'onDisconnect'>
 type ReducedDHT = { contentRouting: Pick<LibP2P['contentRouting'], 'routers' | 'findProviders'> }
-type ReducedLibp2p = ReducedDHT & { peerStore: ReducedPeerStore } & {
-  connectionManager: ReducedConnectionManager
-} & Pick<LibP2P, 'dial'>
+type ReducedTransportManager = { transportManager: Pick<LibP2P['transportManager'], 'dial'> }
+type ReducedLibp2p = ReducedDHT &
+  ReducedTransportManager & { peerStore: ReducedPeerStore } & {
+    connectionManager: ReducedConnectionManager
+  }
 
 async function printPeerStoreAddresses(msg: string, destination: PeerId, peerStore: ReducedPeerStore): Promise<void> {
   logError(msg)
@@ -134,8 +136,8 @@ export async function tryExistingConnections(
  * @param opts timeout options
  */
 async function establishNewConnection(
-  libp2p: Pick<ReducedLibp2p, 'dial'>,
-  destination: PeerId | Multiaddr,
+  libp2p: Pick<ReducedLibp2p, 'transportManager'>,
+  destination: Multiaddr,
   protocol: string,
   opts: Required<TimeoutOpts>
 ) {
@@ -151,7 +153,7 @@ async function establishNewConnection(
 
   let conn: Connection
   try {
-    conn = await libp2p.dial(destination, { signal: opts.signal })
+    conn = await libp2p.transportManager.dial(destination, { signal: opts.signal })
   } catch (err) {
     logError(
       `Error while establising relayed connection using ${
@@ -168,7 +170,6 @@ async function establishNewConnection(
   }
 
   const stream = (await timeout(1000, () => conn.newStream(protocol)))?.stream
-
   opts.signal.removeEventListener('abort', onAbort)
 
   // Libp2p's return types tend to change every now and then
@@ -262,8 +263,12 @@ async function doDial(
   if (!struct) {
     const knownAddresses = await libp2p.peerStore.addressBook.get(destination)
 
-    if (knownAddresses.length > 0) {
-      struct = await establishNewConnection(libp2p, destination, protocol, opts)
+    for (const knownAddress of knownAddresses) {
+      struct = await establishNewConnection(libp2p, knownAddress.multiaddr, protocol, opts)
+
+      if (struct) {
+        break
+      }
     }
   }
 
@@ -308,6 +313,7 @@ async function doDial(
     protocol: string
     conn: Connection
   }
+
   for (const relay of dhtResult) {
     const cirtcuitAddress = createCircuitAddress(relay, destination)
 
