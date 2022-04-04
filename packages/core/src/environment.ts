@@ -44,7 +44,7 @@ export function resolveEnvironment(environment_id: string, customProvider?: stri
   const network = protocolConfig.networks[environment?.network_id]
   if (environment && network) {
     network.id = environment?.network_id
-    network.default_provider = customProvider ?? environment?.default_provider
+    network.default_provider = customProvider?? network?.default_provider
     return {
       id: environment_id,
       network,
