@@ -265,7 +265,7 @@ class Relay {
 
           // Initiate the DHT query but does not await the result which easily
           // takes more than 10 seconds
-          (async function (this: Relay) {
+          ;(async function (this: Relay) {
             try {
               const key = await createRelayerKey(conn.connection.remotePeer)
 
