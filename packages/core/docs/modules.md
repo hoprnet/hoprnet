@@ -188,7 +188,7 @@ ___
 
 ### HEARTBEAT\_INTERVAL
 
-• **HEARTBEAT\_INTERVAL**: ``30000``
+• **HEARTBEAT\_INTERVAL**: ``60000``
 
 #### Defined in
 
@@ -208,7 +208,7 @@ ___
 
 ### HEARTBEAT\_TIMEOUT
 
-• **HEARTBEAT\_TIMEOUT**: ``6000``
+• **HEARTBEAT\_TIMEOUT**: ``20000``
 
 #### Defined in
 
