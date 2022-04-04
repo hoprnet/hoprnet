@@ -58,8 +58,7 @@ const argv = yargs(process.argv.slice(2))
   })
   .option('provider', {
     string: true,
-    describe: 'A custom RPC provider to be used for your HOPR node to connect to blockchain',
-    default: 'http://127.0.0.1:8535/'
+    describe: 'A custom RPC provider to be used for your HOPR node to connect to blockchain'
   })
   .option('dbFile', {
     describe: 'A path to DB file for persistent storage',
