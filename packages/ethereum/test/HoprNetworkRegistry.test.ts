@@ -90,6 +90,31 @@ describe('HoprNetworkRegistry', () => {
         'Ownable: caller is not the owner'
       )
     })
+    it('fail to enable the registry by non-owner account', async () => {
+      await expect(hoprNetworkRegistry.enableRegistry()).to.be.revertedWith('Ownable: caller is not the owner')
+    })
+    it('failed to enable the registry by owner', async () => {
+      await expect(hoprNetworkRegistry.connect(owner).enableRegistry()).to.be.revertedWith(
+        'HoprNetworkRegistry: Registry is enabled'
+      )
+    })
+    it('owner disable the registry', async () => {
+      await expect(hoprNetworkRegistry.connect(owner).disableRegistry())
+        .to.emit(hoprNetworkRegistry, 'EnabledNetworkRegistry')
+        .withArgs(false)
+    })
+    it('failed to disable the registry by owner', async () => {
+      await expect(hoprNetworkRegistry.connect(owner).disableRegistry())
+      await expect(hoprNetworkRegistry.connect(owner).disableRegistry()).to.be.revertedWith(
+        'HoprNetworkRegistry: Registry is disabled'
+      )
+    })
+    it('owner enable the registry', async () => {
+      await expect(hoprNetworkRegistry.connect(owner).disableRegistry())
+      await expect(hoprNetworkRegistry.connect(owner).enableRegistry())
+        .to.emit(hoprNetworkRegistry, 'EnabledNetworkRegistry')
+        .withArgs(true)
+    })
   })
   describe('Register contract', () => {
     beforeEach(async () => {
