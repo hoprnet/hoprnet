@@ -152,7 +152,14 @@ export async function createLibp2pInstance(
   const onConnectionOriginal = libp2p.upgrader.onConnection
   libp2p.upgrader.onConnection = async (conn: Connection) => {
     // check if we are denying connection to that peer
-    if (isDenied && (await isDenied(conn.remotePeer))) return
+    if (isDenied && (await isDenied(conn.remotePeer))) {
+      try {
+        await conn.close()
+      } catch (err: any) {
+        log(`Error while closing connection to non-whitelisted node`, err)
+      }
+      return
+    }
     // continue connection
     onConnectionOriginal(conn)
   }
