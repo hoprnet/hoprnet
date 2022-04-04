@@ -482,15 +482,17 @@ class WebRTCConnection implements MultiaddrConnection {
 
     try {
       this.channel.destroy()
-    } catch (err) {
-      this.error(`Error while destroying WebRTC instance: ${err}`)
+    } catch (e) {
+      this.error(`Error while destroying WebRTC instance: ${e}`)
     }
 
     try {
       await this.relayConn.close()
-    } catch (err) {
-      this.error(`Error while destroying relay connection: ${err}`)
+    } catch (e) {
+      this.error(`Error while destroying relay connection: ${e}`)
     }
+
+    this.log(`Connection to ${this.remoteAddr} has been destroyed`)
   }
 }
 
