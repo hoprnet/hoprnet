@@ -38,6 +38,14 @@ describe('test HoprEthereum', function () {
     assert((await connector.isWhitelisted(hoprNode)) === false, 'hoprNode is not eligible by default')
 
     // @ts-ignore
+    connector.db.isWhitelistEnabled = () => Promise.resolve(false)
+    assert((await connector.isWhitelisted(hoprNode)) === true, 'should become whitelisted when whitelist is disabled')
+
+    // @ts-ignore
+    connector.db.isWhitelistEnabled = () => Promise.resolve(true)
+    assert((await connector.isWhitelisted(hoprNode)) === false, 'should go back to being not eligible')
+
+    // @ts-ignore
     connector.db.getAccountFromRegistry = () => Promise.resolve(account)
     // should remain false
     assert((await connector.isWhitelisted(hoprNode)) === false, 'eligibility should remain false when not eligible')

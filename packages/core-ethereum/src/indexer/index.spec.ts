@@ -623,4 +623,40 @@ describe('test indexer', function () {
     assert.rejects(() => db.getAccountFromRegistry(PublicKey.fromPeerIdString(PARTY_B_MULTIADDR.getPeerId())))
     assert(await db.isEligible(fixtures.PARTY_A.toAddress()))
   })
+
+  it('should process whitelist enabled', async function () {
+    const { db, chain, indexer, newBlock } = await useFixtures({
+      latestBlockNumber: 3,
+      pastHoprRegistryEvents: [fixtures.WHITELIST_ENABLED],
+      id: fixtures.PARTY_A
+    })
+
+    const processed = defer<void>()
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber == 3) processed.resolve()
+    })
+    await indexer.start(chain, 0)
+
+    newBlock()
+    await processed.promise
+    assert(await db.isWhitelistEnabled())
+  })
+
+  it('should process whitelist disabled', async function () {
+    const { db, chain, indexer, newBlock } = await useFixtures({
+      latestBlockNumber: 3,
+      pastHoprRegistryEvents: [fixtures.WHITELIST_ENABLED, fixtures.WHITELIST_DISABLED],
+      id: fixtures.PARTY_A
+    })
+
+    const processed = defer<void>()
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber == 3) processed.resolve()
+    })
+    await indexer.start(chain, 0)
+
+    newBlock()
+    await processed.promise
+    assert((await db.isWhitelistEnabled()) === false)
+  })
 })

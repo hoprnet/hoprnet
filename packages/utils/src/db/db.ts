@@ -43,6 +43,7 @@ const PENDING_ACKNOWLEDGEMENTS_PREFIX = encoder.encode('tickets:pending-acknowle
 const PACKET_TAG_PREFIX: Uint8Array = encoder.encode('packets:tag-')
 const WHITELIST_REGISTRY_PREFIX: Uint8Array = encoder.encode('whitelist:registry:')
 const WHITELIST_ELIGIBLE_PREFIX: Uint8Array = encoder.encode('whitelist:eligible:')
+const WHITELIST_ENABLED_PREFIX: Uint8Array = encoder.encode('whitelist:enabled')
 
 function createChannelKey(channelId: Hash): Uint8Array {
   return Uint8Array.from([...CHANNEL_PREFIX, ...channelId.serialize()])
@@ -809,6 +810,26 @@ export class HoprDB {
    */
   public async isEligible(account: Address): Promise<boolean> {
     return this.getCoercedOrDefault(createWhitelistEligibleKey(account), () => true, false)
+  }
+
+  /**
+   * Hopr Network Registry
+   * @param enabled whether whitelist is enabled
+   */
+  public async setWhitelistEnabled(enabled: boolean, snapshot: Snapshot): Promise<void> {
+    await this.db
+      .batch()
+      .put(Buffer.from(this.keyOf(WHITELIST_ENABLED_PREFIX)), Buffer.from([Number(enabled)]))
+      .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
+      .write()
+  }
+
+  /**
+   * Hopr Network Registry
+   * @returns true if whitelist is enabled
+   */
+  public async isWhitelistEnabled(): Promise<boolean> {
+    return this.getCoercedOrDefault(WHITELIST_ENABLED_PREFIX, (v) => Boolean(v[0]), false)
   }
 
   static createMock(id?: PublicKey): HoprDB {

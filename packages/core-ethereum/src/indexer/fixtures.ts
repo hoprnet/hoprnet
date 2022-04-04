@@ -200,11 +200,33 @@ export const PARTY_A_TRANSFER_OUTGOING = {
   } as any
 } as TokenEvent<'Transfer'>
 
+export const WHITELIST_ENABLED = {
+  event: 'EnabledNetworkRegistry',
+  transactionHash: '',
+  blockNumber: 1,
+  transactionIndex: 0,
+  logIndex: 0,
+  args: {
+    isEnabled: true
+  } as any
+} as RegistryEvent<'EnabledNetworkRegistry'>
+
+export const WHITELIST_DISABLED = {
+  event: 'EnabledNetworkRegistry',
+  transactionHash: '',
+  blockNumber: 3,
+  transactionIndex: 0,
+  logIndex: 0,
+  args: {
+    isEnabled: false
+  } as any
+} as RegistryEvent<'EnabledNetworkRegistry'>
+
 export const PARTY_A_REGISTERED = {
   event: 'Registered',
   transactionHash: '',
   blockNumber: 1,
-  transactionIndex: 0,
+  transactionIndex: 1,
   logIndex: 0,
   args: {
     account: PARTY_A.toAddress().toHex(),

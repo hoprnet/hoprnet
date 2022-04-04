@@ -245,7 +245,8 @@ class Indexer extends EventEmitter {
               this.chain.getNetworkRegistry().interface.getEventTopic('Registered'),
               this.chain.getNetworkRegistry().interface.getEventTopic('RegisteredByOwner'),
               this.chain.getNetworkRegistry().interface.getEventTopic('DeregisteredByOwner'),
-              this.chain.getNetworkRegistry().interface.getEventTopic('EligibilityUpdated')
+              this.chain.getNetworkRegistry().interface.getEventTopic('EligibilityUpdated'),
+              this.chain.getNetworkRegistry().interface.getEventTopic('EnabledNetworkRegistry')
             ]
           ]
         }
@@ -655,6 +656,10 @@ class Indexer extends EventEmitter {
         case 'DeregisteredByOwner(address)':
           await this.onDeregistered(event as RegistryEvent<'DeregisteredByOwner'>, lastDatabaseSnapshot)
           break
+        case 'EnabledNetworkRegistry':
+        case 'EnabledNetworkRegistry(bool)':
+          await this.onEnabledNetworkRegistry(event as RegistryEvent<'EnabledNetworkRegistry'>, lastDatabaseSnapshot)
+          break
         default:
           log(`ignoring event '${String(eventName)}'`)
       }
@@ -781,6 +786,13 @@ class Indexer extends EventEmitter {
 
   private async onDeregistered(event: RegistryEvent<'DeregisteredByOwner'>, lastSnapshot: Snapshot): Promise<void> {
     await this.db.removeFromRegistry(Address.fromString(event.args.account), lastSnapshot)
+  }
+
+  private async onEnabledNetworkRegistry(
+    event: RegistryEvent<'EnabledNetworkRegistry'>,
+    lastSnapshot: Snapshot
+  ): Promise<void> {
+    await this.db.setWhitelistEnabled(event.args.isEnabled, lastSnapshot)
   }
 
   private async onTransfer(event: TokenEvent<'Transfer'>, lastSnapshot: Snapshot) {

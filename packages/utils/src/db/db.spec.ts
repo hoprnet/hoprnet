@@ -289,7 +289,7 @@ describe(`database tests`, function () {
     assert.equal((await db.getHoprBalance()).toString(), '9')
   })
 
-  it('should test registry', async function () {
+  it('should test whitelist:registry', async function () {
     const hoprNode = PublicKey.createMock()
     const account = Address.createMock()
 
@@ -305,7 +305,7 @@ describe(`database tests`, function () {
     assert.rejects(() => db.getAccountFromRegistry(hoprNode), 'should throw when account is deregistered')
   })
 
-  it('should test eligible', async function () {
+  it('should test whitelist:eligible', async function () {
     const account = Address.createMock()
 
     // should be false by default
@@ -318,5 +318,18 @@ describe(`database tests`, function () {
     // should be false once unset
     await db.setEligible(account, false, TestingSnapshot)
     assert((await db.isEligible(account)) === false, 'account should be uneligible')
+  })
+
+  it('should test whitelist:enabled', async function () {
+    // should be false by default
+    assert((await db.isWhitelistEnabled()) === false, 'whitelist should not be enabled by default')
+
+    // should be true once set
+    await db.setWhitelistEnabled(true, TestingSnapshot)
+    assert((await db.isWhitelistEnabled()) === true, 'whitelist should be enabled')
+
+    // should be false once unset
+    await db.setWhitelistEnabled(false, TestingSnapshot)
+    assert((await db.isWhitelistEnabled()) === false, 'whitelist should be disabled')
   })
 })
