@@ -77,7 +77,7 @@ async function printPeerStoreAddresses(msg: string, destination: PeerId, peerSto
   }
 }
 
-const PROTOCOL_SELECT_TIMEOUT = 2e3
+const PROTOCOL_SELECT_TIMEOUT = 10e3
 
 export async function tryExistingConnections(
   libp2p: Pick<ReducedLibp2p, 'connectionManager'>,
@@ -169,7 +169,8 @@ async function establishNewConnection(
     return
   }
 
-  const stream = (await timeout(1000, () => conn.newStream(protocol)))?.stream
+  const stream = (await timeout(10000, () => conn.newStream(protocol)))?.stream
+
   opts.signal.removeEventListener('abort', onAbort)
 
   // Libp2p's return types tend to change every now and then

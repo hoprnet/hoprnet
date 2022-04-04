@@ -25,7 +25,7 @@ const _verbose = Debug(`${DEBUG_PREFIX}:verbose`)
 const _flow = Debug(`flow:${DEBUG_PREFIX}:error`)
 const _error = Debug(`${DEBUG_PREFIX}:error`)
 
-export const WEBRTC_UPGRADE_TIMEOUT = durations.seconds(3)
+export const WEBRTC_UPGRADE_TIMEOUT = durations.seconds(10)
 
 export enum MigrationStatus {
   NOT_DONE,
