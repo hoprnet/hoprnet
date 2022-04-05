@@ -250,12 +250,12 @@ export async function attemptClose(
  * @returns
  */
 export function relayFromRelayAddress(ma: Multiaddr): PeerId {
-  const tuples = ma.tuples()
+  const tuples = ma.tuples() as [code: number, addr: Uint8Array][]
 
   if (tuples.length != 3 || tuples[0][0] != CODE_P2P || tuples[1][0] != CODE_CIRCUIT || tuples[2][0] != CODE_P2P) {
     throw Error(`Cannot extract relay from non-relay address. Given address ${ma.toString()}`)
   }
 
   // Remove length prefix
-  return PeerId.createFromBytes(tuples[0][1]?.slice(1) as Uint8Array)
+  return PeerId.createFromBytes(tuples[0][1].slice(1))
 }

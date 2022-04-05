@@ -1,5 +1,5 @@
 import { stringToU8a, u8aToHex } from '..'
-import { PRIVATE_NETWORK, LINK_LOCAL_NETWORKS, LOOPBACK_ADDRS, RESERVED_ADDRS, type Network } from './constants'
+import { PRIVATE_NETWORKS, LINK_LOCAL_NETWORKS, LOOPBACK_ADDRS, RESERVED_ADDRS, type Network } from './constants'
 
 import { networkInterfaces, type NetworkInterfaceInfo } from 'os'
 import PeerId from 'peer-id'
@@ -38,7 +38,7 @@ export function isLocalhost(address: Uint8Array, family: NetworkInterfaceInfo['f
  * @returns true if private address
  */
 export function isPrivateAddress(address: Uint8Array, family: NetworkInterfaceInfo['family']): boolean {
-  return checkNetworks(PRIVATE_NETWORK, address, family)
+  return checkNetworks(PRIVATE_NETWORKS, address, family)
 }
 
 /**

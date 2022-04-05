@@ -1,7 +1,7 @@
 import type { Multiaddr } from 'multiaddr'
 import { CODE_IP4, CODE_IP6, CODE_P2P, CODE_CIRCUIT, CODE_TCP } from '../constants'
 import { decode } from 'multihashes'
-import { u8aEquals, u8aToNumber } from '@hoprnet/hopr-utils'
+import { u8aEquals, u8aToNumber, u8aCompare } from '@hoprnet/hopr-utils'
 import Debug from 'debug'
 
 const MULTIHASH_LENGTH = 37
@@ -188,14 +188,21 @@ export function compareDirectConnectionInfo(a: Multiaddr, b: Multiaddr): boolean
   const va1 = parseAddress(a)
   const va2 = parseAddress(b)
 
-  if (!va1.valid || !va2.valid) return false
+  if (!va1.valid || !va2.valid) {
+    return false
+  }
 
-  if (va1.address.type != va2.address.type) return false
+  if (va1.address.type !== va2.address.type) {
+    return false
+  }
 
-  if (va1.address.type == 'p2p') return false
+  if (va1.address.type === AddressType.P2P) {
+    return false
+  }
 
-  if (va1.address.type == va2.address.type)
-    return Buffer.compare(va1.address.address, va2.address.address) == 0 && va1.address.port == va2.address.port
+  if (va1.address.type == va2.address.type) {
+    return u8aCompare(va1.address.address, va2.address.address) == 0 && va1.address.port == va2.address.port
+  }
 
   // TODO: We should also compare protocol (TCP/UDP)
 
