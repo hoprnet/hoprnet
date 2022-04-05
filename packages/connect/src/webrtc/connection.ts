@@ -184,7 +184,7 @@ class WebRTCConnection implements MultiaddrConnection {
     this._webRTCAvailable = false
     this._switchPromise.resolve()
 
-    setImmediate(() => this.channel.destroy.bind(this.channel))
+    setImmediate(this.channel.destroy.bind(this.channel))
   }
 
   /**
