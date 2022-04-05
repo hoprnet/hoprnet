@@ -8,6 +8,7 @@ import debug from 'debug'
 
 const DEBUG_PREFIX = 'hopr-connect:relay:state'
 
+const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
 const error = debug(DEBUG_PREFIX.concat(':error'))
 
 type State = {
@@ -65,9 +66,11 @@ class RelayState {
     }
 
     if (latency >= 0) {
+      verbose(`Connection ${source.toB58String()} is active ${destination.toB58String()} is not active.`)
       return true
     }
 
+    error(`Connection ${source.toB58String()} to ${destination.toB58String()} is NOT active.`)
     return false
   }
 

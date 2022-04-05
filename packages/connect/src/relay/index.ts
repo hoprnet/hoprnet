@@ -165,7 +165,7 @@ class Relay {
     const handshakeResult = await shaker.initiate(relay, destination)
 
     if (!handshakeResult.success) {
-      error(`Handshake led to empty stream. Giving up.`)
+      error(`Handshake with ${relay.toB58String()} led to empty stream. Giving up.`)
       // Only close the connection to the relay if it does not perform relay services
       // for us.
       if (this.usedRelays.findIndex((usedRelay: PeerId) => usedRelay.equals(relay)) < 0) {
@@ -265,7 +265,7 @@ class Relay {
 
           // Initiate the DHT query but does not await the result which easily
           // takes more than 10 seconds
-          ;(async function (this: Relay) {
+          (await async function(this: Relay) {
             try {
               const key = await createRelayerKey(conn.connection.remotePeer)
 
