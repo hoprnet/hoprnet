@@ -54,8 +54,10 @@ class TCPConnection implements MultiaddrConnection {
 
     this.sink = this._sink.bind(this)
 
-    // @ts-ignore
-    this.source = this._signal != undefined ? abortable(this._stream.source, this._signal) : this._stream.source
+    this.source =
+      this._signal != undefined
+        ? abortable(this._stream.source, this._signal)
+        : (this._stream.source as AsyncIterable<StreamType>)
   }
 
   public close(): Promise<void> {
