@@ -11,7 +11,6 @@ const wrtc = require('wrtc')
 
 const DEBUG_PREFIX = `hopr-connect:webrtc`
 
-const error = debug(DEBUG_PREFIX.concat(':error'))
 const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
 
 // @TODO adjust this
@@ -207,28 +206,38 @@ class WebRTCUpgrader {
       config: this.rtcConfig
     })
 
-    const onAbort = () => {
-      done(new AbortError())
-    }
-
-    const done = (err?: Error) => {
-      channel.removeListener('connect', done)
-      channel.removeListener('error', done)
-
-      signal?.removeEventListener('abort', onAbort)
-
-      if (err) {
-        error(`WebRTC connection update failed. Error was: ${err}`)
-        channel.destroy()
-      } else {
-        verbose('WebRTC execution completed')
+    if (signal) {
+      const onAbort = () => {
+        done(new AbortError())
       }
+
+      let finished = false
+
+      const done = (err?: Error) => {
+        if (finished) {
+          return
+        }
+        finished = true
+
+        channel.removeListener('close', done)
+        channel.removeListener('error', done)
+        channel.removeListener('connect', done)
+
+        signal?.removeEventListener('abort', onAbort)
+
+        if (err) {
+          channel.destroy()
+        }
+      }
+
+      // Unassign abort handler once connection attempt failed,
+      // connection got closed or connection succeeded
+      channel.on('close', done)
+      channel.on('error', done)
+      channel.on('connect', done)
+
+      signal?.addEventListener('abort', onAbort)
     }
-
-    channel.on('error', done)
-    channel.once('connect', done)
-
-    signal?.addEventListener('abort', onAbort)
 
     return channel
   }
