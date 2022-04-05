@@ -680,11 +680,19 @@ class Indexer extends EventEmitter {
     // publicKey given by the SC is verified
     const publicKey = PublicKey.fromString(event.args.publicKey)
 
-    const multiaddr = new Multiaddr(stringToU8a(event.args.multiaddr))
-      // remove "p2p" and corresponding peerID
-      .decapsulateCode(421)
-      // add new peerID
-      .encapsulate(`/p2p/${publicKey.toPeerId().toB58String()}`)
+    let multiaddr: Multiaddr
+    try {
+      multiaddr = new Multiaddr(stringToU8a(event.args.multiaddr))
+        // remove "p2p" and corresponding peerID
+        .decapsulateCode(421)
+        // add new peerID
+        .encapsulate(`/p2p/${publicKey.toPeerId().toB58String()}`)
+    } catch (error) {
+      log(`Invalid multiaddr '${event.args.multiaddr}' given in event 'onAnnouncement'`)
+      log(error)
+      return
+    }
+
     const account = new AccountEntry(publicKey, multiaddr, blockNumber)
 
     log('New node announced', account.getAddress().toHex(), account.multiAddr.toString())
@@ -778,7 +786,14 @@ class Indexer extends EventEmitter {
   }
 
   private async onRegistered(event: RegistryEvent<'Registered'>, lastSnapshot: Snapshot): Promise<void> {
-    const multiaddr = new Multiaddr(event.args.HoprMultiaddr)
+    let multiaddr: Multiaddr
+    try {
+      multiaddr = new Multiaddr(event.args.HoprMultiaddr)
+    } catch (error) {
+      log(`Invalid multiaddr '${event.args.HoprMultiaddr}' given in event 'onRegistered'`)
+      log(error)
+      return
+    }
     const hoprNode = PublicKey.fromPeerIdString(multiaddr.getPeerId())
     const account = Address.fromString(event.args.account)
     await this.db.addToRegistry(hoprNode, account, lastSnapshot)

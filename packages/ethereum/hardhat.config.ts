@@ -166,11 +166,9 @@ task<FaucetCLIOPts>('faucet', 'Faucets a local development HOPR node account wit
 
 task('accounts', 'View unlocked accounts', getAccounts)
 
-task<AddToWhitelistOpts>(
-  'add-to-whitelist',
-  'Adds address into the dummy proxy for the whitelist.',
-  addToWhitelist
-).addVariadicPositionalParam<string>('addresses', 'A list of addresses', [], types.string)
+task<AddToWhitelistOpts>('add-to-whitelist', 'Adds address into the dummy proxy for the whitelist.', addToWhitelist)
+  .addParam<string[]>('nativeAddresses', 'A list of native addresses', [], types.string)
+  .addParam<string[]>('multiaddresses', 'A list of multiaddresses', [], types.string)
 
 function getSortedFiles(dependenciesGraph) {
   const tsort = require('tsort')
