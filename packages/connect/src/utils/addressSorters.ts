@@ -119,10 +119,10 @@ function maToClass(ma: Multiaddr): AddressClass {
   }
 }
 
-export function compareLocal(addrA: Multiaddr, addrB: Multiaddr): number {
+export function compareAddressesLocalMode(addrA: Multiaddr, addrB: Multiaddr): number {
   return addressPriorityPublic(maToClass(addrB)) - addressPriorityPublic(maToClass(addrA))
 }
 
-export function comparePublic(addrA: Multiaddr, addrB: Multiaddr): number {
+export function compareAddressesPublicMode(addrA: Multiaddr, addrB: Multiaddr): number {
   return addressPriorityLocal(maToClass(addrB)) - addressPriorityLocal(maToClass(addrA))
 }
