@@ -94,8 +94,16 @@ class WebRTCConnection implements MultiaddrConnection {
     // Give each WebRTC connection instance a unique identifier
     this._id = u8aToHex(randomBytes(4), false)
 
-    this.channel.on('error', this.onWebRTCError.bind(this))
-    this.channel.once('connect', this.onWebRTCConnect.bind(this))
+    this.channel.on(
+      'error',
+      // not supposed to produce any errors
+      this.onWebRTCError.bind(this)
+    )
+    this.channel.once(
+      'connect',
+      // not supposed to produce any errors
+      this.onWebRTCConnect.bind(this)
+    )
 
     // Attach a listener to WebRTC to cleanup state
     // and remove stale connection from internal libp2p state
