@@ -35,11 +35,11 @@ usage() {
 { [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
 
 # verify and set parameters
-: ${HOPRD_API_TOKEN?"Missing environment variable HOPRD_API_TOKEN"}
+: "${HOPRD_API_TOKEN?"Missing environment variable HOPRD_API_TOKEN"}"
 
 declare instance_group="${1?"missing parameter <instance_group>"}"
 declare api_token="${HOPRD_API_TOKEN}"
-declare info_file=$(mktemp -q)
+declare info_file="$(mktemp -q)"
 
 function cleanup {
   local EXIT_CODE=$?
@@ -58,14 +58,14 @@ node_ips=$(gcloud_get_managed_instance_group_instances_ips "${instance_group}")
 declare node_ips_arr=( ${node_ips} )
 
 log "Gcloud machine information for cluster: ${instance_group}"
-echo "HOPR ADDRESS,NATIVE ADDRESS,IP" >> "${info_file}"
+echo "HOPR ADDRESS,NATIVE ADDRESS,IP" > "${info_file}"
 
 declare native_address hopr_address
 for ip in ${node_ips}; do
-  native_address=$(get_native_address "${api_token}@${ip}:3001")
-  hopr_address=$(get_hopr_address "${api_token}@${ip}:3001")
+  native_address="$(get_native_address "${api_token}@${ip}:3001")"
+  hopr_address="$(get_hopr_address "${api_token}@${ip}:3001")"
 
-  echo "${hopr_address},${native_address},${ip}" >> "${info_file}"
-done
+  echo "${hopr_address},${native_address},${ip}"
+done >> "${info_file}"
 
 column -t -s',' "${info_file}"
