@@ -52,6 +52,7 @@ class RelayState {
   async isActive(source: PeerId, destination: PeerId, timeout?: number): Promise<boolean> {
     const id = RelayState.getId(source, destination)
     if (!this.relayedConnections.has(id)) {
+      error(`Connection from ${source.toB58String()} to ${destination.toB58String()} does not exist.`)
       return false
     }
 
@@ -66,11 +67,11 @@ class RelayState {
     }
 
     if (latency >= 0) {
-      verbose(`Connection ${source.toB58String()} is active ${destination.toB58String()} is not active.`)
+      verbose(`Connection from ${source.toB58String()} to ${destination.toB58String()} is not active.`)
       return true
     }
 
-    error(`Connection ${source.toB58String()} to ${destination.toB58String()} is NOT active.`)
+    error(`Connection from ${source.toB58String()} to ${destination.toB58String()} is NOT active.`)
     return false
   }
 
@@ -91,6 +92,15 @@ class RelayState {
     const context = this.relayedConnections.get(id) as State
 
     context[source.toB58String()].update(toSource)
+  }
+
+  /**
+   * Performs an operation for each relay context in the current set.
+   * @param action
+   */
+  async forEach(action: (dst: string, ctx: RelayContext) => void) {
+    await Promise.all(Array.from(this.relayedConnections.values())
+      .map((s) => Object.entries(s).map(e => action(e[0], e[1]))))
   }
 
   /**

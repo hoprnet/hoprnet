@@ -68,15 +68,14 @@ class Listener extends EventEmitter implements InterfaceListener {
   }
 
   /**
-   * @param handler called on incoming connection
-   * @param upgrader inform libp2p about incoming connections
-   * @param publicNodes emits on new and dead entry nodes
-   * @param initialNodes array of entry nodes that is know at startup
+   * @param dialDirectly
+   * @param upgradeInbound
    * @param peerId own id
-   * @param iface interface to listen on, e.g. `eth0`
-   * @param __testingOptions.runningLocally [testing] assume that all nodes are running on localhost
-   * @param __testingOptions.preferLocalAddresses [testing] treat local addresses as public addresses
-   * @param __testingOptions.noUPNP [testing] disable UPNP support, speedup calls to checkNATSituation
+   * @param options
+   * @param testingOptions
+   * @param filter
+   * @param relay
+   * @param libp2p
    */
   constructor(
     dialDirectly: HoprConnect['dialDirectly'],
@@ -427,7 +426,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       }
     }
 
-    ;(maConn.conn as EventEmitter).once('close', untrackConn)
+    (maConn.conn as EventEmitter).once('close', untrackConn)
   }
 
   /**
