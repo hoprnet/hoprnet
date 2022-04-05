@@ -426,7 +426,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       }
     }
 
-    (maConn.conn as EventEmitter).once('close', untrackConn)
+    ;(maConn.conn as EventEmitter).once('close', untrackConn)
   }
 
   /**
