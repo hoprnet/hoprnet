@@ -1,15 +1,14 @@
 import path from 'path'
-// import { mkdir } from 'fs/promises'
+import { mkdir } from 'fs/promises'
 
 import { default as LibP2P, type Connection } from 'libp2p'
-// import { LevelDatastore } from 'datastore-level'
-import { type AddressSorter, expandVars, HoprDB, localAddressesFirst, PublicKey } from '@hoprnet/hopr-utils'
+import { LevelDatastore } from 'datastore-level'
+import { type AddressSorter, expandVars, HoprDB, localAddressesFirst, PublicKey, debug } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 const Mplex = require('libp2p-mplex')
 import KadDHT from 'libp2p-kad-dht'
 import { NOISE } from '@chainsafe/libp2p-noise'
 import type PeerId from 'peer-id'
-import { debug } from '@hoprnet/hopr-utils'
 import Hopr, { type HoprOptions } from '.'
 import { getAddrs } from './identity'
 import HoprConnect, { type HoprConnectConfig, type PublicNodesEmitter } from '@hoprnet/hopr-connect'
@@ -47,12 +46,12 @@ export async function createLibp2pInstance(
 
   // Store the peerstore on-disk under the main data path. Ensure store is
   // opened before passing it to libp2p.
-  // const datastorePath = path.join(options.dataPath, 'peerstore')
-  // await mkdir(datastorePath, { recursive: true })
-  // const datastore = new LevelDatastore(datastorePath, { createIfMissing: true })
-  // await datastore.open()
+  const datastorePath = path.join(options.dataPath, 'peerstore')
+  await mkdir(datastorePath, { recursive: true })
+  const datastore = new LevelDatastore(datastorePath, { createIfMissing: true })
+  await datastore.open()
 
-  // log(`using peerstore at ${datastorePath}`)
+  log(`using peerstore at ${datastorePath}`)
 
   const libp2p = await LibP2P.create({
     peerId,
@@ -67,9 +66,9 @@ export async function createLibp2pInstance(
     // Currently disabled due to problems with serialization and deserialization
     // Configure peerstore to be persisted using LevelDB, also requires config
     // persistence to be set.
-    // datastore,
+    datastore,
     peerStore: {
-      persistence: false
+      persistence: true
     },
     config: {
       protocolPrefix: `hopr/${options.environment.id}`,
@@ -105,7 +104,9 @@ export async function createLibp2pInstance(
         enabled: true,
         // Feed DHT with all previously announced nodes
         // @ts-ignore
-        bootstrapPeers: initialNodes
+        bootstrapPeers: initialNodes,
+        // Answer requests from other peers
+        clientMode: false
       },
       relay: {
         // Conflicts with HoprConnect's own mechanism
@@ -200,6 +201,5 @@ export async function createHoprNode(
   // Initialize connection to the blockchain
   await chain.initializeChainWrapper()
 
-  const node = new Hopr(peerId, db, chain, options)
-  return node
+  return new Hopr(peerId, db, chain, options)
 }

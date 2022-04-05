@@ -188,7 +188,7 @@ ___
 
 ### HEARTBEAT\_INTERVAL
 
-• **HEARTBEAT\_INTERVAL**: ``30000``
+• **HEARTBEAT\_INTERVAL**: ``60000``
 
 #### Defined in
 
@@ -208,7 +208,7 @@ ___
 
 ### HEARTBEAT\_TIMEOUT
 
-• **HEARTBEAT\_TIMEOUT**: ``6000``
+• **HEARTBEAT\_TIMEOUT**: ``20000``
 
 #### Defined in
 
@@ -334,7 +334,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/main.ts:169](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L169)
+[packages/core/src/main.ts:170](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L170)
 
 ___
 

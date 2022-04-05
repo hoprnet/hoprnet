@@ -212,8 +212,7 @@ get_native_address(){
   local url="${endpoint}/api/v2/account/addresses"
   local cmd="$(get_authenticated_curl_cmd ${url})"
 
-  result=$(try_cmd "${cmd}" 30 5)
-  echo $(echo ${result} | jq -r ".native")
+  try_cmd "${cmd}" 30 5 | jq -r ".native"
 }
 
 # $1 = optional: endpoint, defaults to http://localhost:3001
@@ -222,8 +221,7 @@ get_hopr_address() {
   local url="${endpoint}/api/v2/account/addresses"
   local cmd="$(get_authenticated_curl_cmd ${url})"
 
-  result=$(try_cmd "${cmd}" 30 5)
-  echo $(echo ${result} | jq -r ".hopr")
+  try_cmd "${cmd}" 30 5 | jq -r ".hopr"
 }
 
 # $1 = endpoint
@@ -263,13 +261,11 @@ get_authenticated_curl_cmd() {
   # trim whitespaces which are not allowed anywhere in the url
   local full_endpoint="${1// /}"
 
-  # extract protocol prefix incl. separator ://
-  local protocol="$(echo ${full_endpoint} |
-    grep :// | sed -e's,^\(.*://\).*,\1,g')"
-
   # set default protocol if none was found
-  if [ -z "${protocol}" ]; then
-      protocol="http://"
+  local protocol="http://"
+  # extract protocol prefix incl. separator ://
+  if [[ "${full_endpoint}" =~ "://" ]]; then
+    protocol="$(echo ${full_endpoint} | sed -e's,^\(.*://\).*,\1,g')"
   fi
 
   # remove protocol from endpoint
