@@ -9,7 +9,8 @@ import {
   isReservedAddress,
   PRIVATE_V4_CLASS_A,
   PRIVATE_V4_CLASS_B,
-  PRIVATE_V4_CLASS_C
+  PRIVATE_V4_CLASS_C,
+  CARRIER_GRADE_NAT_NETWORK
 } from '@hoprnet/hopr-utils'
 
 enum AddressClass {
@@ -95,7 +96,9 @@ function maToClass(ma: Multiaddr): AddressClass {
         return AddressClass.PrivateC
       } else if (isLocalhost(tuples[0][1], 'IPv4')) {
         return AddressClass.Loopback
-      } else if (inSameNetwork(tuples[0][1], PRIVATE_V4_CLASS_C.networkPrefix, PRIVATE_V4_CLASS_C.subnet, 'IPv4')) {
+      } else if (
+        inSameNetwork(tuples[0][1], CARRIER_GRADE_NAT_NETWORK.networkPrefix, CARRIER_GRADE_NAT_NETWORK.subnet, 'IPv4')
+      ) {
         return AddressClass.CarrierNAT
       } else if (
         !isPrivateAddress(tuples[0][1], 'IPv4') &&
