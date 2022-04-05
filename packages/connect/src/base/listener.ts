@@ -27,7 +27,13 @@ import { getAddrs } from './addrs'
 import { isAnyAddress, u8aEquals, defer } from '@hoprnet/hopr-utils'
 import { TCPConnection } from './tcp'
 import { EntryNodes, RELAY_CHANGED_EVENT } from './entry'
-import { bindToPort, attemptClose, nodeToMultiaddr } from '../utils'
+import {
+  bindToPort,
+  attemptClose,
+  nodeToMultiaddr,
+  compareAddressesLocalMode,
+  compareAddressesPublicMode
+} from '../utils'
 import type HoprConnect from '..'
 import { UpnpManager } from './upnp'
 import type { Filter } from '../filter'
@@ -348,9 +354,9 @@ class Listener extends EventEmitter implements InterfaceListener {
       ]
     }
 
-    this.addrs.interface = internalInterfaces.map((internalInterface) =>
-      nodeToMultiaddr(internalInterface, this.peerId)
-    )
+    this.addrs.interface = internalInterfaces
+      .map((internalInterface) => nodeToMultiaddr(internalInterface, this.peerId))
+      .sort(this.testingOptions.__preferLocalAddresses ? compareAddressesLocalMode : compareAddressesPublicMode)
 
     this.attachSocketHandlers()
 
