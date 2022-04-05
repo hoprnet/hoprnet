@@ -99,8 +99,9 @@ class RelayState {
    * @param action
    */
   async forEach(action: (dst: string, ctx: RelayContext) => void) {
-    await Promise.all(Array.from(this.relayedConnections.values())
-      .map((s) => Object.entries(s).map(e => action(e[0], e[1]))))
+    await Promise.all(
+      Array.from(this.relayedConnections.values()).map((s) => Object.entries(s).map((e) => action(e[0], e[1])))
+    )
   }
 
   /**
