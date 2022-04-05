@@ -1,6 +1,6 @@
 import type { Multiaddr } from 'multiaddr'
 
-import { CODE_IP4, CODE_IP6, CODE_CIRCUIT } from '../constants'
+import { CODE_IP4, CODE_IP6, CODE_P2P } from '../constants'
 import {
   inSameNetwork,
   isLinkLocaleAddress,
@@ -84,7 +84,7 @@ function maToClass(ma: Multiaddr): AddressClass {
   const tuples = ma.tuples() as [code: number, addr: Uint8Array][]
 
   switch (tuples[0][0]) {
-    case CODE_CIRCUIT:
+    case CODE_P2P:
       return AddressClass.Circuit
     case CODE_IP4:
       if (inSameNetwork(tuples[0][1], PRIVATE_V4_CLASS_A.networkPrefix, PRIVATE_V4_CLASS_A.subnet, 'IPv4')) {
