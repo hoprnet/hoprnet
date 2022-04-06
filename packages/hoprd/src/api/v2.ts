@@ -2,7 +2,6 @@ import type { Server } from 'http'
 import type { Application, Request } from 'express'
 import type { WebSocketServer } from 'ws'
 import type Hopr from '@hoprnet/hopr-core'
-import type { StateOps } from '../types'
 import type { LogStream } from '../logs'
 import process from 'process'
 import path from 'path'
@@ -16,13 +15,7 @@ import OpenAPIFramework from 'openapi-framework'
 import PeerId from 'peer-id'
 import { debug, Address } from '@hoprnet/hopr-utils'
 import { authenticateWsConnection, getStatusCodeForInvalidInputInRequest, removeQueryParams } from './utils'
-
-import type { Server } from 'http'
-import type { Application, Request } from 'express'
-import type { WebSocketServer } from 'ws'
-import type Hopr from '@hoprnet/hopr-core'
-import { SettingKey, StateOps } from '../types'
-import type { LogStream } from './../logs'
+import { StateOps, SettingKey } from '../types'
 
 const debugLog = debug('hoprd:api:v2')
 
