@@ -1,12 +1,12 @@
 import { type ApiPath } from '.'
 
-type ExpandedJsonResponse<R = any> = Promise<
+export type ExpandedJsonResponse<R = any> = Promise<
   {
     json: () => Promise<R>
   } & Response
 >
 
-type ExpandedTextResponse = Promise<Response>
+export type ExpandedTextResponse = Promise<Response>
 
 export type Channel = {
   type: string
