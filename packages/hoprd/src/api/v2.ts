@@ -41,7 +41,7 @@ export function setupRestApi(service: Application, urlPath: string, node: Hopr, 
   const packagePath = path.dirname(require.resolve('@hoprnet/hoprd/package.json'))
   const relPath = path.relative(cwd, packagePath)
   const apiBaseSpecPath = path.join(relPath, 'rest-api-v2-spec.yaml')
-  const apiFullSpecPath = path.join(relPath, 'rest-api-v2-full-spec.yaml')
+  const apiFullSpecPath = path.join(relPath, 'rest-api-v2-full-spec.json')
   const apiPathsPath = path.join(relPath, 'lib/api/v2/paths')
 
   // useful documentation for the configuration of express-openapi can be found at:

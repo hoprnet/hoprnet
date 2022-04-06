@@ -301,7 +301,7 @@ yarn workspace @hoprnet/hopr-ethereum hardhat node \
 wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
 log "Hardhat node started (127.0.0.1:8545)"
 
-# need to mirror contract data because of hardhat-deploy node only writing to localhost
+# need to mirror contract data because of hardhat-deploy node only writing to localhost {{{
 cp -R \
   "${mydir}/../packages/ethereum/deployments/hardhat-localhost/localhost" \
   "${mydir}/../packages/ethereum/deployments/hardhat-localhost/hardhat"
