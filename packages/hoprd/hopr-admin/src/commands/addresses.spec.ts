@@ -18,7 +18,7 @@ const createAddressesCommand = (
   return new Addresses(api, extra)
 }
 
-describe.only('test Addresses command', function () {
+describe('test Addresses command', function () {
   const cmdWithApi = createAddressesCommand({
     ok: true,
     json: async () => ({

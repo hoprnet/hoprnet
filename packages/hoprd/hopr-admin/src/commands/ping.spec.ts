@@ -18,7 +18,7 @@ const createAddressesCommand = (
   return new Ping(api, extra)
 }
 
-describe.only('test Addresses command', function () {
+describe('test Ping command', function () {
   const cmdWithApi = createAddressesCommand({
     ok: true,
     json: async () => ({
