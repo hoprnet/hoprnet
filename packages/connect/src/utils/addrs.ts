@@ -200,7 +200,7 @@ export function compareDirectConnectionInfo(a: Multiaddr, b: Multiaddr): boolean
     return false
   }
 
-  if (va1.address.type == va2.address.type) {
+  if (va1.address.type === va2.address.type) {
     return u8aCompare(va1.address.address, va2.address.address) == 0 && va1.address.port == va2.address.port
   }
 
