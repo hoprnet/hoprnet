@@ -364,8 +364,8 @@ wait_for_regex ${node4_log} "STARTED NODE"
 wait_for_regex ${node5_log} "STARTED NODE"
 # no need to wait for node 6 since that will stop right away
 wait_for_regex ${node7_log} "STARTED NODE"
-wait_for_regex ${node8_log} "STARTED NODE"
 wait_for_port 19097 "127.0.0.1" "${node7_log}"
+wait_for_regex ${node8_log} "STARTED NODE"
 # }}}
 
 #  --- Ensure data directories are used --- {{{
