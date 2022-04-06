@@ -33,7 +33,7 @@ describe('test address sorting', function () {
 
     const addrsPublicOrder = [PUBLLIC_ADDRESS, CIRCUIT_ADDRESS_1, LOCAL_B_ADDRESS, LOOPBACK_ADDRESS]
 
-    const addrsLocalOrder = [LOCAL_B_ADDRESS, LOOPBACK_ADDRESS, CIRCUIT_ADDRESS_1, PUBLLIC_ADDRESS]
+    const addrsLocalOrder = [LOOPBACK_ADDRESS, LOCAL_B_ADDRESS, CIRCUIT_ADDRESS_1, PUBLLIC_ADDRESS]
 
     assert(
       addrs

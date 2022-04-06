@@ -207,6 +207,7 @@ export class Filter {
       // If private address connections are explicitly allowed, do not dial them
       if (!this.opts.allowPrivateConnections) {
         // Do not pollute logs by rejecting private address connections attempts
+        console.log(`private connection ${ma.toString()}`)
         return false
       }
 
@@ -236,11 +237,9 @@ export class Filter {
     // Allow multiple nodes on same host - independent of address type
     for (const announcedAddr of this.announcedAddrs!) {
       switch (announcedAddr.type) {
-        case AddressType.P2P:
-          continue
         case AddressType.IPv4:
         case AddressType.IPv6:
-          if (u8aEquals(announcedAddr.address, address.address)) {
+          if (address.type === announcedAddr.type && u8aEquals(announcedAddr.address, address.address)) {
             // Always allow dials to own address whenever port is different
             // and block if port is identical
             if (address.port == announcedAddr.port) {

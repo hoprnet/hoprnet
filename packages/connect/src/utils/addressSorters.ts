@@ -56,15 +56,15 @@ function addressPriorityPublic(addrClass: AddressClass) {
 
 function addressPriorityLocal(addrClass: AddressClass) {
   switch (addrClass) {
-    case AddressClass.PrivateA:
-      return 0
-    case AddressClass.PrivateB:
-      return 1
-    case AddressClass.PrivateC:
-      return 2
     case AddressClass.Loopback:
-      return 3
+      return 0
     case AddressClass.Loopback6:
+      return 1
+    case AddressClass.PrivateA:
+      return 2
+    case AddressClass.PrivateB:
+      return 3
+    case AddressClass.PrivateC:
       return 4
     case AddressClass.Circuit:
       return 5

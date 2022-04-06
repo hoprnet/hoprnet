@@ -39,11 +39,15 @@ export async function createLibp2pInstance(
   let addressSorter: AddressSorter
 
   if (options.testing?.preferLocalAddresses) {
+    // @TODO use address.isCertified to treat signed peer records differently
+    // than observed addresses
     addressSorter = (addresses) => addresses.sort((a, b) => compareAddressesLocalMode(a.multiaddr, b.multiaddr))
     log('Preferring local addresses')
   } else {
     // Address sorter **must** be overwritten since libp2p
     // cannot handle Hopr's circuit addresses
+    // @TODO use address.isCertified to treat signed peer records differently
+    // than observed addresses
     addressSorter = (addresses) => addresses.sort((a, b) => compareAddressesPublicMode(a.multiaddr, b.multiaddr))
     log('Addresses are sorted by default')
   }
