@@ -13,7 +13,7 @@ import {
   CARRIER_GRADE_NAT_NETWORK
 } from '@hoprnet/hopr-utils'
 
-enum AddressClass {
+export enum AddressClass {
   Public,
   Public6,
   Circuit,
@@ -81,7 +81,7 @@ function addressPriorityLocal(addrClass: AddressClass) {
   }
 }
 
-function maToClass(ma: Multiaddr): AddressClass {
+export function maToClass(ma: Multiaddr): AddressClass {
   const tuples = ma.tuples() as [code: number, addr: Uint8Array][]
 
   switch (tuples[0][0]) {
@@ -123,9 +123,9 @@ function maToClass(ma: Multiaddr): AddressClass {
 }
 
 export function compareAddressesLocalMode(addrA: Multiaddr, addrB: Multiaddr): number {
-  return addressPriorityPublic(maToClass(addrB)) - addressPriorityPublic(maToClass(addrA))
+  return addressPriorityLocal(maToClass(addrA)) - addressPriorityLocal(maToClass(addrB))
 }
 
 export function compareAddressesPublicMode(addrA: Multiaddr, addrB: Multiaddr): number {
-  return addressPriorityLocal(maToClass(addrB)) - addressPriorityLocal(maToClass(addrA))
+  return addressPriorityPublic(maToClass(addrA)) - addressPriorityPublic(maToClass(addrB))
 }

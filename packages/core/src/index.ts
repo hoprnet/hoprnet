@@ -10,7 +10,7 @@ import type { default as LibP2P, Connection } from 'libp2p'
 import type { Peer } from 'libp2p/src/peer-store/types'
 import type PeerId from 'peer-id'
 
-import type { HoprConnectConfig } from '@hoprnet/hopr-connect'
+import { compareAddressesLocalMode, HoprConnectConfig } from '@hoprnet/hopr-connect'
 
 import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants'
 
@@ -44,7 +44,6 @@ import {
   type Hash,
   type HalfKeyChallenge,
   type Ticket,
-  multiaddressCompareByClassFunction,
   createRelayerKey,
   createCircuitAddress,
   convertPubKeyFromPeerId
@@ -835,7 +834,7 @@ class Hopr extends EventEmitter {
         multiaddrs = multiaddrs.filter((ma) => isMultiaddrLocal(ma))
       } else if (this.options.testing?.preferLocalAddresses) {
         // If we need local addresses, sort them first according to their class
-        multiaddrs.sort(multiaddressCompareByClassFunction)
+        multiaddrs.sort(compareAddressesLocalMode)
       } else {
         // If we don't need local addresses, just throw them away
         multiaddrs = multiaddrs.filter((ma) => !isMultiaddrLocal(ma))

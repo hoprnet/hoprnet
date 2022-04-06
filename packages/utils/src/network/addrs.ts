@@ -92,11 +92,17 @@ export function checkNetworks(
  * @returns Byte representation of the given ip address
  */
 export function ipToU8aAddress(address: string, family: NetworkInterfaceInfo['family']): Uint8Array {
+  let splitted: string[]
   switch (family.toLowerCase()) {
     case 'ipv4':
+      splitted = address.split('.')
+
+      if (splitted.length != 4) {
+        throw Error(`Invalid IPv4 address ${address}`)
+      }
       return Uint8Array.from(address.split('.').map((x) => parseInt(x)))
     case 'ipv6':
-      const splitted = address.split(':')
+      splitted = address.split(':')
       if (address.endsWith(':')) {
         splitted[splitted.length - 1] = '0'
       }
@@ -111,6 +117,10 @@ export function ipToU8aAddress(address: string, family: NetworkInterfaceInfo['fa
           1,
           ...Array.from({ length: 8 - splitted.length + 1 }, () => '0')
         )
+      }
+
+      if (splitted.length != 8) {
+        throw Error(`Invalid IPv6 address ${address}`)
       }
 
       const result = new Uint8Array(16)
