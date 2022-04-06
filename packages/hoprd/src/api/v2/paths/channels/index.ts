@@ -65,7 +65,7 @@ export const GET: Operation = [
     const { includingClosed } = req.query
 
     try {
-      const channels = await getChannels(node, !!includingClosed)
+      const channels = await getChannels(node, includingClosed === 'true')
       return res.status(200).send(channels)
     } catch (err) {
       return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
@@ -177,15 +177,10 @@ export const POST: Operation = [
       const { channelId, receipt } = await openChannel(node, peerId, amount)
       return res.status(201).send({ channelId, receipt })
     } catch (err) {
-      const INVALID_ARG = [STATUS_CODES.INVALID_AMOUNT, STATUS_CODES.INVALID_PEERID].find((arg) =>
-        err.message.includes(arg)
-      )
-      if (INVALID_ARG) {
-        return res.status(400).send({ status: INVALID_ARG })
-      } else if (err.message.includes(STATUS_CODES.CHANNEL_ALREADY_OPEN)) {
-        return res.status(403).send({ status: STATUS_CODES.CHANNEL_ALREADY_OPEN })
-      } else if (err.message.includes(STATUS_CODES.NOT_ENOUGH_BALANCE)) {
+      if (err.message.includes(STATUS_CODES.NOT_ENOUGH_BALANCE)) {
         return res.status(403).send({ status: STATUS_CODES.NOT_ENOUGH_BALANCE })
+      } else if (err.message.includes(STATUS_CODES.CHANNEL_ALREADY_OPEN)) {
+        return res.status(409).send({ status: STATUS_CODES.CHANNEL_ALREADY_OPEN })
       } else {
         return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
       }
@@ -207,10 +202,12 @@ POST.apiDoc = {
           required: ['peerId', 'amount'],
           properties: {
             peerId: {
+              format: 'peerId',
               type: 'string',
               description: 'PeerId that we want to transact with using this channel.'
             },
             amount: {
+              format: 'amount',
               type: 'string',
               description:
                 'Amount of HOPR tokens to fund the channel. It will be used to pay for sending messages through channel'
@@ -260,40 +257,41 @@ POST.apiDoc = {
       }
     },
     '403': {
-      description:
-        'Failed to open the channel either because of insufficient HOPR balance or because channel between this nodes already exists. Check response examples for more info.',
+      description: 'Failed to open the channel because of insufficient HOPR balance.',
       content: {
         'application/json': {
           schema: {
-            oneOf: [
-              {
-                type: 'object',
-                properties: {
-                  status: {
-                    type: 'string',
-                    example: STATUS_CODES.NOT_ENOUGH_BALANCE,
-                    description:
-                      'Insufficient balance to open channel. Amount passed in request body exeeds current balance.'
-                  }
-                }
-              },
-              {
-                type: 'object',
-                properties: {
-                  status: {
-                    type: 'string',
-                    example: STATUS_CODES.CHANNEL_ALREADY_OPEN,
-                    description: 'Channel already open. Cannot open more than one channel between two nodes.'
-                  }
-                }
+            type: 'object',
+            properties: {
+              status: {
+                type: 'string',
+                example: `${STATUS_CODES.NOT_ENOUGH_BALANCE}`,
+                description: `Insufficient balance to open channel. Amount passed in request body exeeds current balance.`
               }
-            ]
-          },
-          examples: {
-            NOT_ENOUGH_BALANCE: { value: { status: STATUS_CODES.NOT_ENOUGH_BALANCE } },
-            CHANNEL_ALREADY_OPEN: {
-              value: { status: STATUS_CODES.CHANNEL_ALREADY_OPEN }
             }
+          },
+          example: {
+            status: STATUS_CODES.NOT_ENOUGH_BALANCE
+          }
+        }
+      }
+    },
+    '409': {
+      description: 'Failed to open the channel because the channel between this nodes already exists.',
+      content: {
+        'application/json': {
+          schema: {
+            type: 'object',
+            properties: {
+              status: {
+                type: 'string',
+                example: `${STATUS_CODES.CHANNEL_ALREADY_OPEN}`,
+                description: `Channel already open. Cannot open more than one channel between two nodes.`
+              }
+            }
+          },
+          example: {
+            status: STATUS_CODES.CHANNEL_ALREADY_OPEN
           }
         }
       }

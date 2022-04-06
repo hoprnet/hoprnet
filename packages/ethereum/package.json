@@ -1,13 +1,13 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "1.89.0-next.5",
+  "version": "1.89.0-next.7",
   "description": "On-chain logic for hoprnet.org",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "license": "GPL-3.0",
   "homepage": "https://hoprnet.org",
   "main": "./lib/index.js",
   "scripts": {
-    "clean": "rimraf ./lib ./src/types ./tsconfig.tsbuildinfo ./tsconfig.hardhat.tsbuildinfo ./tsconfig.spec.tsbuildinfo ./hardhat ./deployments/default/localhost",
+    "clean": "rimraf ./lib ./src/types ./tsconfig.tsbuildinfo ./tsconfig.hardhat.tsbuildinfo ./tsconfig.spec.tsbuildinfo ./hardhat ./deployments/default/localhost ./deployments/hardhat*",
     "build": "yarn clean && yarn build:sol:types && yarn build:tsc",
     "build:tsc": "tsc -p .",
     "build:sol": "TS_NODE_PROJECT=./tsconfig.hardhat.json hardhat compile",

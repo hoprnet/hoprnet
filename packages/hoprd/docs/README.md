@@ -43,6 +43,7 @@ Options:
   --password                     A password to encrypt your keys  [string] [default: ""]
   --apiToken                     A REST API token and admin panel password for user authentication  [string]
   --privateKey                   A private key to be used for your HOPR node  [string]
+  --provider                     A custom RPC provider to be used for your HOPR node to connect to blockchain [string]
   --identity                     The path to the identity file  [string] [default: "/home/tino/.hopr-identity"]
   --run                          Run a single hopr command, same syntax as in hopr-admin  [string] [default: ""]
   --dryRun                       List all the options used to run the HOPR node, but quit instead of starting  [boolean] [default: false]

@@ -392,13 +392,14 @@ ___
 
 ### resolveEnvironment
 
-▸ **resolveEnvironment**(`environment_id`): [`ResolvedEnvironment`](modules.md#resolvedenvironment)
+▸ **resolveEnvironment**(`environment_id`, `customProvider?`): [`ResolvedEnvironment`](modules.md#resolvedenvironment)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `environment_id` | `string` |
+| `customProvider?` | `string` |
 
 #### Returns
 

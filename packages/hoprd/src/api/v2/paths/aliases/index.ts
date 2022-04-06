@@ -92,11 +92,7 @@ export const POST: Operation = [
       setAlias(stateOps, alias, peerId)
       return res.status(201).send()
     } catch (err) {
-      if (err.message.includes(STATUS_CODES.INVALID_PEERID)) {
-        return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID, error: err.message })
-      } else {
-        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
-      }
+      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
     }
   }
 ]
@@ -113,7 +109,7 @@ POST.apiDoc = {
           type: 'object',
           required: ['peerId', 'alias'],
           properties: {
-            peerId: { type: 'string', description: 'PeerId that we want to set alias to.' },
+            peerId: { format: 'peerId', type: 'string', description: 'PeerId that we want to set alias to.' },
             alias: { type: 'string', description: 'Alias that we want to attach to peerId.' }
           },
           example: {

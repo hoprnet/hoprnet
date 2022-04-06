@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.89.0-next.5",
+  "version": "1.89.0-next.7",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -67,13 +67,18 @@
     "yargs": "17.4.0"
   },
   "devDependencies": {
+    "@types/chai": "^4",
     "@types/cors": "2.8.12",
     "@types/js-cookie": "^3.0.1",
     "@types/mocha": "9.1.0",
+    "@types/supertest": "^2.0.11",
     "@types/yargs": "17.0.10",
+    "chai": "^4.3.6",
+    "chai-openapi-response-validator": "^0.14.2",
     "mocha": "9.2.2",
     "rimraf": "3.0.2",
     "sinon": "12.0.1",
+    "supertest": "^6.2.2",
     "ts-node": "10.7.0",
     "typedoc": "0.22.13",
     "typedoc-plugin-markdown": "3.11.14",
