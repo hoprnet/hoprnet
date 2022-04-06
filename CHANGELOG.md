@@ -3,6 +3,9 @@
 ## [1.89](https://github.com/hoprnet/hoprnet/compare/release/ouagadougou...hoprnet:master)
 
 - Use npm-shrinkwrap to publish correct lockfiles
+- Improvements in our API v2 unit tests ([#3643](https://github.com/hoprnet/hoprnet/pull/3643))
+- Improvements in our integration E2E tests ([#3643](https://github.com/hoprnet/hoprnet/pull/3643))
+- API v2 `/api/v2/node/peers` now returns `multiaddr` for connected peers ([#3643](https://github.com/hoprnet/hoprnet/pull/3643))
 
 ---
 
