@@ -97,7 +97,7 @@ export function setupRestApi(
       // given and might change in the future. Thus, they should be made order-erindependent.
       keyScheme: function (req: Request, _scopes, _securityDefinition) {
         // skip checks if authentication is disabled
-        if (!options.testNoAuthentication) return true
+        if (options.testNoAuthentication) return true
 
         const apiToken = decodeURI(req.get('x-auth-token') || '')
 
@@ -113,7 +113,7 @@ export function setupRestApi(
       },
       passwordScheme: function (req: Request, _scopes, _securityDefinition) {
         // skip checks if authentication is disabled
-        if (!options.testNoAuthentication) return true
+        if (options.testNoAuthentication) return true
 
         const authEncoded = (req.get('authorization') || '').replace('Basic ', '')
         // we only expect a single value here, instead of the usual user:password
