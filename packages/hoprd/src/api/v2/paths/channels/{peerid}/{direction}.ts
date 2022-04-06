@@ -33,11 +33,7 @@ export const DELETE: Operation = [
       const { receipt, channelStatus } = await closeChannel(node, peerid, direction as any)
       return res.status(200).send({ receipt, channelStatus: channelStatusToString(channelStatus) })
     } catch (err) {
-      if (err.message.includes(STATUS_CODES.INVALID_PEERID)) {
-        return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID })
-      } else {
-        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
-      }
+      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
     }
   }
 ]
@@ -53,6 +49,7 @@ DELETE.apiDoc = {
       name: 'peerid',
       required: true,
       schema: {
+        format: 'peerId',
         type: 'string',
         description: 'PeerId attached to the channel that we want to close.',
         example: '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12'
@@ -82,7 +79,7 @@ DELETE.apiDoc = {
                 description: 'Receipt of the closing transaction',
                 example: '0x37954ca4a630aa28f045df2e8e604cae22071046042e557355acf00f4ef20d2e'
               },
-              channelStatus: { type: 'number', description: 'Current status of the channel', example: 2 }
+              channelStatus: { type: 'string', description: 'Current status of the channel', example: 'Closed' }
             }
           }
         }

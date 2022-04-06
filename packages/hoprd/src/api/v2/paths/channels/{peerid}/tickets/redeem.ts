@@ -26,9 +26,36 @@ POST.apiDoc = {
     'Redeems your tickets for this channel. Redeeming will change your tickets into Hopr tokens if they are winning ones. You can check how much tickets given channel has by calling /channels/{peerid}/tickets endpoint. Do this before channel is closed as neglected tickets are no longer valid for redeeming.',
   tags: ['Channels'],
   operationId: 'channelsRedeemTickets',
+  parameters: [
+    {
+      in: 'path',
+      name: 'peerid',
+      example: '16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit',
+      required: true,
+      schema: {
+        format: 'peerId',
+        type: 'string',
+        description: 'PeerId attached to the channel.',
+        example: '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12'
+      }
+    }
+  ],
   responses: {
     '204': {
       description: 'Tickets redeemed succesfully.'
+    },
+    '400': {
+      description: 'Invalid peerId.',
+      content: {
+        'application/json': {
+          schema: {
+            $ref: '#/components/schemas/RequestStatus'
+          },
+          example: {
+            status: STATUS_CODES.INVALID_PEERID
+          }
+        }
+      }
     },
     '404': {
       description:
