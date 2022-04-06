@@ -48,7 +48,6 @@
     "@types/node": "16.11.25",
     "@types/simple-peer": "9.11.4",
     "@types/yargs": "17.0.8",
-    "abortable-iterator": "3.0.2",
     "it-pair": "1.0.0",
     "it-pipe": "1.1.0",
     "it-pushable": "1.4.2",
