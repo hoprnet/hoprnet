@@ -73,7 +73,7 @@ function createPacketTagKey(tag: Uint8Array) {
   return Uint8Array.from([...PACKET_TAG_PREFIX, ...tag])
 }
 function createWhitelistRegistryKey(publicKey: PublicKey) {
-  return Uint8Array.from([...WHITELIST_REGISTRY_PREFIX, ...publicKey.serializeCompressed()])
+  return Uint8Array.from([...WHITELIST_REGISTRY_PREFIX, ...publicKey.serializeUncompressed()])
 }
 function createWhitelistEligibleKey(address: Address) {
   return Uint8Array.from([...WHITELIST_ELIGIBLE_PREFIX, ...address.serialize()])
@@ -736,10 +736,10 @@ export class HoprDB {
   public async removeFromRegistry(account: Address, snapshot: Snapshot): Promise<void> {
     // range of keys to search
     const from = this.keyOf(
-      Uint8Array.from([...WHITELIST_REGISTRY_PREFIX, ...new Uint8Array(PublicKey.SIZE_COMPRESSED).fill(0x00)])
+      Uint8Array.from([...WHITELIST_REGISTRY_PREFIX, ...new Uint8Array(PublicKey.SIZE_UNCOMPRESSED).fill(0x00)])
     )
     const to = this.keyOf(
-      Uint8Array.from([...WHITELIST_REGISTRY_PREFIX, ...new Uint8Array(PublicKey.SIZE_COMPRESSED).fill(0xff)])
+      Uint8Array.from([...WHITELIST_REGISTRY_PREFIX, ...new Uint8Array(PublicKey.SIZE_UNCOMPRESSED).fill(0xff)])
     )
 
     // create iterable stream to search all registered nodes
@@ -752,6 +752,7 @@ export class HoprDB {
 
     let entryKey: Buffer | undefined
     // search for a matching account
+    // we are interested in finding the `key`, this `.getAll` can't be used
     for await (const [key, val] of iterable as any) {
       try {
         if (account.eq(Address.deserialize(Buffer.from(val)))) {
@@ -762,11 +763,13 @@ export class HoprDB {
       } catch {}
     }
 
-    await this.db
-      .batch()
-      .del(entryKey)
-      .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
-      .write()
+    if (entryKey) {
+      await this.db
+        .batch()
+        .del(entryKey)
+        .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
+        .write()
+    }
   }
 
   /**
