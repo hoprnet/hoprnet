@@ -3702,8 +3702,6 @@ __metadata:
     "@chainsafe/libp2p-noise": 5.0.3
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@types/bl": 5.0.2
-    "@types/chai": 4.3.0
-    "@types/chai-spies": 1.0.3
     "@types/debug": 4.1.7
     "@types/mocha": 9.1.0
     "@types/node": 16.11.25
@@ -3711,8 +3709,6 @@ __metadata:
     "@types/yargs": 17.0.8
     abortable-iterator: 3.0.2
     bl: 5.0.0
-    chai: 4.3.6
-    chai-spies: 1.0.0
     debug: 4.3.3
     heap-js: 2.1.6
     it-handshake: 2.0.0
@@ -5211,16 +5207,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/chai-spies@npm:1.0.3":
-  version: 1.0.3
-  resolution: "@types/chai-spies@npm:1.0.3"
-  dependencies:
-    "@types/chai": "*"
-  checksum: f88b1a021c1f6c37259adf4268b00401431633027995725a49c44658b0fedf7ec09aa4e26e59fdf6564df0767a0b105b26a4a9c8a7c6acaf9ba417b06a4c9c70
-  languageName: node
-  linkType: hard
-
-"@types/chai@npm:*, @types/chai@npm:4.3.0":
+"@types/chai@npm:*":
   version: 4.3.0
   resolution: "@types/chai@npm:4.3.0"
   checksum: 3e393e094263db65df28a0123dc13f342937c1bab6cd173eae913d593c5b9a16b555713a08c34863a1fbf079aa7222b96197c70380a5c130549d6b2f6845a989
@@ -8470,15 +8457,6 @@ __metadata:
   peerDependencies:
     chai: ">= 2.1.2 < 5"
   checksum: 7262868a5b51a12af4e432838ddf97a893109266a505808e1868ba63a12de7ee1166e9d43b5c501a190c377c1b11ecb9ff8e093c89f097ad96c397e8ec0f8d6a
-  languageName: node
-  linkType: hard
-
-"chai-spies@npm:1.0.0":
-  version: 1.0.0
-  resolution: "chai-spies@npm:1.0.0"
-  peerDependencies:
-    chai: "*"
-  checksum: c3a319d5671cf381029f2745e6330f897de4486e574b0d4fb92e6835268b0139f107295c8abf083949659a6a35dc6c8aa4ac0dc78db0aa16602a4987282b646a
   languageName: node
   linkType: hard
 
