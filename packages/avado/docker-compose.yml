@@ -10,7 +10,7 @@ services:
     volumes:
       - type: volume
         source: db
-        target: /app/db
+        target: /app/hoprd-db
     ports:
       - '9091'
       - '3000'

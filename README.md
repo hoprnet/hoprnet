@@ -82,7 +82,7 @@ docker pull gcr.io/hoprassociation/hoprd:ouagadougou
 For ease of use you can set up a shell alias to run the latest release as a docker container:
 
 ```sh
-alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:ouagadougou'
+alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/hoprd-db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:ouagadougou'
 ```
 
 **IMPORTANT:** Using the above command will map the database folder used by hoprd to a local folder called `.hoprd-db` in your home directory. You can customize the location of that folder further by executing the following command:
@@ -185,14 +185,14 @@ hoprd
 The following command assumes you've setup an alias like described in [Install via Docker](#install-via-docker).
 
 ```sh
-hoprd --identity /app/db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --admin --adminHost 0.0.0.0 --forwardLogs --apiToken <MY_TOKEN> --environment jungfrau
+hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --admin --adminHost 0.0.0.0 --forwardLogs --apiToken <MY_TOKEN> --environment jungfrau
 ```
 
 Here is a short break-down of each argument.
 
 ```sh
 hoprd
-  --identity /app/db/.hopr-identity      # store your node identity information in the persisted database folder
+  --identity /app/hoprd-db/.hopr-identity      # store your node identity information in the persisted database folder
   --password switzerland   		 # set the encryption password for your identity
   --init 				 # initialize the database and identity if not present
   --announce 				 # announce the node to other nodes in the network and act as relay if publicly reachable
