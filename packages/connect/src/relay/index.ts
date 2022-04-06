@@ -71,6 +71,7 @@ class Relay {
   private _dialNodeDirectly: Relay['dialNodeDirectly'] | undefined
 
   private stopKeepAlive: (() => void) | undefined
+  private connectionsToRelays: Map<string, Connection>
 
   constructor(
     public libp2p: ReducedLibp2p,
@@ -89,6 +90,8 @@ class Relay {
     // Stores all relays that we announce to other nodes
     // to make sure we don't close these connections
     this.usedRelays = []
+
+    this.connectionsToRelays = new Map()
   }
 
   /**
@@ -132,8 +135,13 @@ class Relay {
 
   protected async keepAliveRelayConnection(): Promise<void> {
     // TODO: perform ping as well
-    log(`Current relay connections: `)
-    await this.relayState.forEach((dst) => log(`- ${dst}`))
+    if (this.relayState.relayedConnectionCount() > 0) {
+      log(`Current relay connections: `)
+      await this.relayState.forEach((dst) => log(`- ${dst}`))
+    }
+
+    log(`Current connected relays: `)
+    this.connectionsToRelays.forEach((_, key) => log(`- ${key}`))
   }
 
   /**
@@ -142,6 +150,7 @@ class Relay {
   stop(): void {
     this.webRTCUpgrader.stop()
     this.stopKeepAlive?.()
+    this.connectionsToRelays.clear()
   }
 
   /**
