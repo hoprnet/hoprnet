@@ -20,6 +20,7 @@ import 'solidity-coverage'
 import '@typechain/hardhat'
 import { utils } from 'ethers'
 import faucet, { type FaucetCLIOPts } from './tasks/faucet'
+import addToWhitelist, { type AddToWhitelistOpts } from './tasks/addToWhitelist'
 import getAccounts from './tasks/getAccounts'
 
 import { expandVars } from '@hoprnet/hopr-utils'
@@ -164,6 +165,10 @@ task<FaucetCLIOPts>('faucet', 'Faucets a local development HOPR node account wit
   .addOptionalParam<string>('identityPrefix', `only use identity files with prefix`, undefined, types.string)
 
 task('accounts', 'View unlocked accounts', getAccounts)
+
+task<AddToWhitelistOpts>('add-to-whitelist', 'Adds address into the dummy proxy for the whitelist.', addToWhitelist)
+  .addParam<string[]>('nativeAddresses', 'A list of native addresses', [], types.string)
+  .addParam<string[]>('multiaddresses', 'A list of multiaddresses', [], types.string)
 
 function getSortedFiles(dependenciesGraph) {
   const tsort = require('tsort')

@@ -289,22 +289,47 @@ describe(`database tests`, function () {
     assert.equal((await db.getHoprBalance()).toString(), '9')
   })
 
-  it('should store elegible account', async function () {
+  it('should test whitelist:registry', async function () {
+    const hoprNode = PublicKey.createMock()
+    const account = Address.createMock()
+
+    // should be throw when not added
+    assert.rejects(() => db.getAccountFromRegistry(hoprNode), 'should throw when account is not registered')
+
+    // should be set
+    await db.addToRegistry(hoprNode, account, TestingSnapshot)
+    assert((await db.getAccountFromRegistry(hoprNode)).eq(account), 'should match account added')
+
+    // should be removed
+    await db.removeFromRegistry(account, TestingSnapshot)
+    assert.rejects(() => db.getAccountFromRegistry(hoprNode), 'should throw when account is deregistered')
+  })
+
+  it('should test whitelist:eligible', async function () {
     const account = Address.createMock()
 
     // should be false by default
-    assert((await db.hasElegibleAccount(account)) === false, 'account is not false by default')
-
-    // should remain false
-    await db.setElegibleAccount(account, false, TestingSnapshot)
-    assert((await db.hasElegibleAccount(account)) === false, 'account did not remain false')
+    assert((await db.isEligible(account)) === false, 'account is not eligible by default')
 
     // should be true once set
-    await db.setElegibleAccount(account, true, TestingSnapshot)
-    assert((await db.hasElegibleAccount(account)) === true, "account didn't become elegible")
+    await db.setEligible(account, true, TestingSnapshot)
+    assert((await db.isEligible(account)) === true, 'account should be eligible')
 
-    // should go back to false
-    await db.setElegibleAccount(account, false, TestingSnapshot)
-    assert((await db.hasElegibleAccount(account)) === false, 'account remained elegible')
+    // should be false once unset
+    await db.setEligible(account, false, TestingSnapshot)
+    assert((await db.isEligible(account)) === false, 'account should be uneligible')
+  })
+
+  it('should test whitelist:enabled', async function () {
+    // should be false by default
+    assert((await db.isWhitelistEnabled()) === false, 'whitelist should not be enabled by default')
+
+    // should be true once set
+    await db.setWhitelistEnabled(true, TestingSnapshot)
+    assert((await db.isWhitelistEnabled()) === true, 'whitelist should be enabled')
+
+    // should be false once unset
+    await db.setWhitelistEnabled(false, TestingSnapshot)
+    assert((await db.isWhitelistEnabled()) === false, 'whitelist should be disabled')
   })
 })

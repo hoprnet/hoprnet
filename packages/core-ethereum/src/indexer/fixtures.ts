@@ -200,10 +200,44 @@ export const PARTY_A_TRANSFER_OUTGOING = {
   } as any
 } as TokenEvent<'Transfer'>
 
+export const WHITELIST_ENABLED = {
+  event: 'EnabledNetworkRegistry',
+  transactionHash: '',
+  blockNumber: 1,
+  transactionIndex: 0,
+  logIndex: 0,
+  args: {
+    isEnabled: true
+  } as any
+} as RegistryEvent<'EnabledNetworkRegistry'>
+
+export const WHITELIST_DISABLED = {
+  event: 'EnabledNetworkRegistry',
+  transactionHash: '',
+  blockNumber: 3,
+  transactionIndex: 0,
+  logIndex: 0,
+  args: {
+    isEnabled: false
+  } as any
+} as RegistryEvent<'EnabledNetworkRegistry'>
+
+export const PARTY_A_REGISTERED = {
+  event: 'Registered',
+  transactionHash: '',
+  blockNumber: 1,
+  transactionIndex: 1,
+  logIndex: 0,
+  args: {
+    account: PARTY_A.toAddress().toHex(),
+    HoprMultiaddr: PARTY_B_MULTIADDR.toString()
+  } as any
+} as RegistryEvent<'Registered'>
+
 export const PARTY_A_ELEGIBLE = {
   event: 'EligibilityUpdated',
   transactionHash: '',
-  blockNumber: 1,
+  blockNumber: 3,
   transactionIndex: 0,
   logIndex: 0,
   args: {
@@ -215,7 +249,7 @@ export const PARTY_A_ELEGIBLE = {
 export const PARTY_A_NOT_ELEGIBLE = {
   event: 'EligibilityUpdated',
   transactionHash: '',
-  blockNumber: 4,
+  blockNumber: 5,
   transactionIndex: 0,
   logIndex: 0,
   args: {
@@ -223,3 +257,26 @@ export const PARTY_A_NOT_ELEGIBLE = {
     eligibility: false
   } as any
 } as RegistryEvent<'EligibilityUpdated'>
+
+export const PARTY_A_ELEGIBLE_2 = {
+  event: 'EligibilityUpdated',
+  transactionHash: '',
+  blockNumber: 7,
+  transactionIndex: 0,
+  logIndex: 0,
+  args: {
+    account: PARTY_A.toAddress().toHex(),
+    eligibility: true
+  } as any
+} as RegistryEvent<'EligibilityUpdated'>
+
+export const PARTY_A_DEREGISTERED = {
+  event: 'DeregisteredByOwner',
+  transactionHash: '',
+  blockNumber: 9,
+  transactionIndex: 0,
+  logIndex: 0,
+  args: {
+    account: PARTY_A.toAddress().toHex()
+  } as any
+} as RegistryEvent<'DeregisteredByOwner'>

@@ -221,6 +221,7 @@ class Indexer extends EventEmitter {
     let rawEvents: TypedEvent<any, any>[] = []
 
     const queries: { contract: Contract; filter: TypedEventFilter<any> }[] = [
+      // HoprChannels
       {
         contract: this.chain.getChannels(),
         filter: {
@@ -230,6 +231,22 @@ class Indexer extends EventEmitter {
               this.chain.getChannels().interface.getEventTopic('Announcement'),
               this.chain.getChannels().interface.getEventTopic('ChannelUpdated'),
               this.chain.getChannels().interface.getEventTopic('TicketRedeemed')
+            ]
+          ]
+        }
+      },
+      // HoprNetworkRegistry
+      {
+        contract: this.chain.getNetworkRegistry(),
+        filter: {
+          topics: [
+            [
+              // Relevant HoprNetworkRegistry events
+              this.chain.getNetworkRegistry().interface.getEventTopic('Registered'),
+              this.chain.getNetworkRegistry().interface.getEventTopic('RegisteredByOwner'),
+              this.chain.getNetworkRegistry().interface.getEventTopic('DeregisteredByOwner'),
+              this.chain.getNetworkRegistry().interface.getEventTopic('EligibilityUpdated'),
+              this.chain.getNetworkRegistry().interface.getEventTopic('EnabledNetworkRegistry')
             ]
           ]
         }
@@ -263,19 +280,6 @@ class Indexer extends EventEmitter {
         }
       })
     }
-
-    // HoprNetworkRegistry events
-    queries.push({
-      contract: this.chain.getNetworkRegistry(),
-      filter: {
-        topics: [
-          [
-            // Relevant HoprNetworkRegistry events
-            this.chain.getNetworkRegistry().interface.getEventTopic('EligibilityUpdated')
-          ]
-        ]
-      }
-    })
 
     for (const query of queries) {
       let tmpEvents: TypedEvent<any, any>[]
@@ -639,6 +643,23 @@ class Indexer extends EventEmitter {
         case 'EligibilityUpdated(address,bool)':
           await this.onEligibilityUpdated(event as RegistryEvent<'EligibilityUpdated'>, lastDatabaseSnapshot)
           break
+        case 'Registered':
+        case 'Registered(address,string)':
+        case 'RegisteredByOwner':
+        case 'RegisteredByOwner(address,string)':
+          await this.onRegistered(
+            event as RegistryEvent<'Registered'> | RegistryEvent<'RegisteredByOwner'>,
+            lastDatabaseSnapshot
+          )
+          break
+        case 'DeregisteredByOwner':
+        case 'DeregisteredByOwner(address)':
+          await this.onDeregistered(event as RegistryEvent<'DeregisteredByOwner'>, lastDatabaseSnapshot)
+          break
+        case 'EnabledNetworkRegistry':
+        case 'EnabledNetworkRegistry(bool)':
+          await this.onEnabledNetworkRegistry(event as RegistryEvent<'EnabledNetworkRegistry'>, lastDatabaseSnapshot)
+          break
         default:
           log(`ignoring event '${String(eventName)}'`)
       }
@@ -659,11 +680,19 @@ class Indexer extends EventEmitter {
     // publicKey given by the SC is verified
     const publicKey = PublicKey.fromString(event.args.publicKey)
 
-    const multiaddr = new Multiaddr(stringToU8a(event.args.multiaddr))
-      // remove "p2p" and corresponding peerID
-      .decapsulateCode(421)
-      // add new peerID
-      .encapsulate(`/p2p/${publicKey.toPeerId().toB58String()}`)
+    let multiaddr: Multiaddr
+    try {
+      multiaddr = new Multiaddr(stringToU8a(event.args.multiaddr))
+        // remove "p2p" and corresponding peerID
+        .decapsulateCode(421)
+        // add new peerID
+        .encapsulate(`/p2p/${publicKey.toPeerId().toB58String()}`)
+    } catch (error) {
+      log(`Invalid multiaddr '${event.args.multiaddr}' given in event 'onAnnouncement'`)
+      log(error)
+      return
+    }
+
     const account = new AccountEntry(publicKey, multiaddr, blockNumber)
 
     log('New node announced', account.getAddress().toHex(), account.multiAddr.toString())
@@ -753,7 +782,32 @@ class Indexer extends EventEmitter {
     event: RegistryEvent<'EligibilityUpdated'>,
     lastSnapshot: Snapshot
   ): Promise<void> {
-    await this.db.setElegibleAccount(Address.fromString(event.args.account), event.args.eligibility, lastSnapshot)
+    await this.db.setEligible(Address.fromString(event.args.account), event.args.eligibility, lastSnapshot)
+  }
+
+  private async onRegistered(event: RegistryEvent<'Registered'>, lastSnapshot: Snapshot): Promise<void> {
+    let multiaddr: Multiaddr
+    try {
+      multiaddr = new Multiaddr(event.args.HoprMultiaddr)
+    } catch (error) {
+      log(`Invalid multiaddr '${event.args.HoprMultiaddr}' given in event 'onRegistered'`)
+      log(error)
+      return
+    }
+    const hoprNode = PublicKey.fromPeerIdString(multiaddr.getPeerId())
+    const account = Address.fromString(event.args.account)
+    await this.db.addToRegistry(hoprNode, account, lastSnapshot)
+  }
+
+  private async onDeregistered(event: RegistryEvent<'DeregisteredByOwner'>, lastSnapshot: Snapshot): Promise<void> {
+    await this.db.removeFromRegistry(Address.fromString(event.args.account), lastSnapshot)
+  }
+
+  private async onEnabledNetworkRegistry(
+    event: RegistryEvent<'EnabledNetworkRegistry'>,
+    lastSnapshot: Snapshot
+  ): Promise<void> {
+    await this.db.setWhitelistEnabled(event.args.isEnabled, lastSnapshot)
   }
 
   private async onTransfer(event: TokenEvent<'Transfer'>, lastSnapshot: Snapshot) {

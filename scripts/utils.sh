@@ -222,6 +222,18 @@ get_hopr_address() {
   echo $(echo ${result} | jq -r ".hopr")
 }
 
+# $1 = optional: endpoint, defaults to http://localhost:3001
+get_multiaddress(){
+  local endpoint=${1:-localhost:3001}
+  local cmd="curl --silent --max-time 5 ${endpoint}/api/v2/node/info"
+
+  # try every 5 seconds for 5 minutes
+  local result
+  result=$(try_cmd "${cmd}" 30 5)
+
+  echo $(echo ${result} | jq -r ".announcedAddress[0]")
+}
+
 # $1 = endpoint
 # $1 = api token
 validate_native_address() {

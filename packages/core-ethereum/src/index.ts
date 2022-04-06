@@ -477,11 +477,24 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   /**
-   * @param id the public key of the account we want to check if it's whitelisted
+   * Checks whether a given `hoprNode` is whitelisted.
+   * When the whitelist is disabled, a `hoprNode` is seen as `whitelisted`,
+   * when the whitelist is enabled, a `hoprNode` needs to also be `eligible`.
+   * @param hoprNode the public key of the account we want to check if it's whitelisted
    * @returns true if whitelisted
    */
-  public async isWhitelisted(id: PublicKey): Promise<boolean> {
-    return this.db.hasElegibleAccount(id.toAddress())
+  public async isWhitelisted(hoprNode: PublicKey): Promise<boolean> {
+    try {
+      // if whitelist is disabled, all nodes are seen as "whitelisted"
+      const whitelistEnabled = await this.db.isWhitelistEnabled()
+      if (!whitelistEnabled) return true
+      // find hoprNode's linked account
+      const account = await this.db.getAccountFromRegistry(hoprNode)
+      // check if account is eligible
+      return this.db.isEligible(account)
+    } catch {
+      return false
+    }
   }
 }
 
