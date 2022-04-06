@@ -3,7 +3,7 @@ import { mkdir } from 'fs/promises'
 
 import { default as LibP2P, type Connection } from 'libp2p'
 import { LevelDatastore } from 'datastore-level'
-import { type AddressSorter, expandVars, HoprDB, localAddressesFirst, PublicKey } from '@hoprnet/hopr-utils'
+import { type AddressSorter, HoprDB, localAddressesFirst, PublicKey } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 const Mplex = require('libp2p-mplex')
 import KadDHT from 'libp2p-kad-dht'
@@ -180,8 +180,7 @@ export async function createHoprNode(
     throw err
   }
 
-  const provider = expandVars(options.environment.network.default_provider, process.env)
-  log(`using provider URL: ${provider}`)
+  log(`using provider URL: ${options.environment.network.default_provider}`)
   const chain = new HoprCoreEthereum(
     db,
     PublicKey.fromPeerId(peerId),
@@ -191,7 +190,7 @@ export async function createHoprNode(
       environment: options.environment.id,
       gasPrice: options.environment.network.gas_price,
       network: options.environment.network.id,
-      provider
+      provider: options.environment.network.default_provider
     },
     automaticChainCreation
   )
