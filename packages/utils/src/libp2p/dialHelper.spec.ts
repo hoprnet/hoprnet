@@ -159,6 +159,8 @@ describe('test dialHelper', function () {
   })
 
   it('regular dial with DHT', async function () {
+    this.timeout(5e3)
+
     const peerB = await getNode(Bob, true)
     const peerC = await getNode(Chris, true)
 

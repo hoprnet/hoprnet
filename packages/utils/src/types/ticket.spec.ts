@@ -1,5 +1,4 @@
 import assert from 'assert'
-import { expect } from 'chai'
 import { stringToU8a, SIGNATURE_LENGTH } from '..'
 import { Address, Ticket, Hash, Balance, PublicKey, Signature, UINT256, Response, Challenge } from '.'
 import BN from 'bn.js'
@@ -50,7 +49,7 @@ describe('test ticket construction', function () {
 
     const ticketA = new Ticket(counterparty, challenge, epoch, index, amount, winProb, channelEpoch, signature)
 
-    expect(expectedHash.toHex()).to.eq(ticketA.getHash().toHex(), 'ticket hash does not match the expected value')
+    assert(expectedHash.eq(ticketA.getHash()), 'ticket hash does not match the expected value')
 
     const wrongTicket = new Ticket(
       counterparty,
@@ -81,7 +80,7 @@ describe('test ticket construction', function () {
 
     const ticketA = new Ticket(counterparty, challenge, epoch, index, amount, winProb, channelEpoch, signature)
 
-    expect(expectedHash.toHex()).to.eq(ticketA.getHash().toHex(), 'ticket hash does not match the expected value')
+    assert(expectedHash.eq(ticketA.getHash()), 'ticket hash does not match the expected value')
 
     const wrongTicket = new Ticket(
       counterparty,

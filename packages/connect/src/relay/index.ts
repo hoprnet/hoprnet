@@ -268,7 +268,7 @@ class Relay {
 
               log(`announced in the DHT as relayer for node ${conn.connection.remotePeer.toB58String()}`, key)
             } catch (err) {
-              error(`error while attempting to provide relayer key for ${conn.connection.remotePeer}`)
+              error(`error while attempting to provide relayer key for ${conn.connection.remotePeer.toB58String()}`)
             }
           }.call(this))
 
