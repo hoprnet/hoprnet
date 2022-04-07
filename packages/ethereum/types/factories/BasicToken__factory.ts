@@ -2,130 +2,121 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import { Signer, utils, Contract, ContractFactory, Overrides } from "ethers";
-import { Provider, TransactionRequest } from "@ethersproject/providers";
-import type { BasicToken, BasicTokenInterface } from "../BasicToken";
+import { Signer, utils, Contract, ContractFactory, Overrides } from 'ethers'
+import { Provider, TransactionRequest } from '@ethersproject/providers'
+import type { BasicToken, BasicTokenInterface } from '../BasicToken'
 
 const _abi = [
   {
     constant: true,
     inputs: [],
-    name: "totalSupply",
+    name: 'totalSupply',
     outputs: [
       {
-        name: "",
-        type: "uint256",
-      },
+        name: '',
+        type: 'uint256'
+      }
     ],
     payable: false,
-    stateMutability: "view",
-    type: "function",
+    stateMutability: 'view',
+    type: 'function'
   },
   {
     constant: true,
     inputs: [
       {
-        name: "_owner",
-        type: "address",
-      },
+        name: '_owner',
+        type: 'address'
+      }
     ],
-    name: "balanceOf",
+    name: 'balanceOf',
     outputs: [
       {
-        name: "",
-        type: "uint256",
-      },
+        name: '',
+        type: 'uint256'
+      }
     ],
     payable: false,
-    stateMutability: "view",
-    type: "function",
+    stateMutability: 'view',
+    type: 'function'
   },
   {
     constant: false,
     inputs: [
       {
-        name: "_to",
-        type: "address",
+        name: '_to',
+        type: 'address'
       },
       {
-        name: "_value",
-        type: "uint256",
-      },
+        name: '_value',
+        type: 'uint256'
+      }
     ],
-    name: "transfer",
+    name: 'transfer',
     outputs: [
       {
-        name: "",
-        type: "bool",
-      },
+        name: '',
+        type: 'bool'
+      }
     ],
     payable: false,
-    stateMutability: "nonpayable",
-    type: "function",
+    stateMutability: 'nonpayable',
+    type: 'function'
   },
   {
     anonymous: false,
     inputs: [
       {
         indexed: true,
-        name: "from",
-        type: "address",
+        name: 'from',
+        type: 'address'
       },
       {
         indexed: true,
-        name: "to",
-        type: "address",
+        name: 'to',
+        type: 'address'
       },
       {
         indexed: false,
-        name: "value",
-        type: "uint256",
-      },
+        name: 'value',
+        type: 'uint256'
+      }
     ],
-    name: "Transfer",
-    type: "event",
-  },
-];
+    name: 'Transfer',
+    type: 'event'
+  }
+]
 
 const _bytecode =
-  "0x608060405234801561001057600080fd5b5061027a806100206000396000f3006080604052600436106100565763ffffffff7c010000000000000000000000000000000000000000000000000000000060003504166318160ddd811461005b57806370a0823114610082578063a9059cbb146100b0575b600080fd5b34801561006757600080fd5b506100706100f5565b60408051918252519081900360200190f35b34801561008e57600080fd5b5061007073ffffffffffffffffffffffffffffffffffffffff600435166100fb565b3480156100bc57600080fd5b506100e173ffffffffffffffffffffffffffffffffffffffff60043516602435610123565b604080519115158252519081900360200190f35b60015490565b73ffffffffffffffffffffffffffffffffffffffff1660009081526020819052604090205490565b3360009081526020819052604081205482111561013f57600080fd5b73ffffffffffffffffffffffffffffffffffffffff8316151561016157600080fd5b33600090815260208190526040902054610181908363ffffffff61022916565b336000908152602081905260408082209290925573ffffffffffffffffffffffffffffffffffffffff8516815220546101c0908363ffffffff61023b16565b73ffffffffffffffffffffffffffffffffffffffff8416600081815260208181526040918290209390935580518581529051919233927fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef9281900390910190a350600192915050565b60008282111561023557fe5b50900390565b8181018281101561024857fe5b929150505600a165627a7a72305820a20abaa1c7f797936fb740943b6dd87579b4b9b26d232977f7dd8399b32c32060029";
+  '0x608060405234801561001057600080fd5b5061027a806100206000396000f3006080604052600436106100565763ffffffff7c010000000000000000000000000000000000000000000000000000000060003504166318160ddd811461005b57806370a0823114610082578063a9059cbb146100b0575b600080fd5b34801561006757600080fd5b506100706100f5565b60408051918252519081900360200190f35b34801561008e57600080fd5b5061007073ffffffffffffffffffffffffffffffffffffffff600435166100fb565b3480156100bc57600080fd5b506100e173ffffffffffffffffffffffffffffffffffffffff60043516602435610123565b604080519115158252519081900360200190f35b60015490565b73ffffffffffffffffffffffffffffffffffffffff1660009081526020819052604090205490565b3360009081526020819052604081205482111561013f57600080fd5b73ffffffffffffffffffffffffffffffffffffffff8316151561016157600080fd5b33600090815260208190526040902054610181908363ffffffff61022916565b336000908152602081905260408082209290925573ffffffffffffffffffffffffffffffffffffffff8516815220546101c0908363ffffffff61023b16565b73ffffffffffffffffffffffffffffffffffffffff8416600081815260208181526040918290209390935580518581529051919233927fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef9281900390910190a350600192915050565b60008282111561023557fe5b50900390565b8181018281101561024857fe5b929150505600a165627a7a72305820a20abaa1c7f797936fb740943b6dd87579b4b9b26d232977f7dd8399b32c32060029'
 
 export class BasicToken__factory extends ContractFactory {
-  constructor(
-    ...args: [signer: Signer] | ConstructorParameters<typeof ContractFactory>
-  ) {
+  constructor(...args: [signer: Signer] | ConstructorParameters<typeof ContractFactory>) {
     if (args.length === 1) {
-      super(_abi, _bytecode, args[0]);
+      super(_abi, _bytecode, args[0])
     } else {
-      super(...args);
+      super(...args)
     }
   }
 
-  deploy(
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<BasicToken> {
-    return super.deploy(overrides || {}) as Promise<BasicToken>;
+  deploy(overrides?: Overrides & { from?: string | Promise<string> }): Promise<BasicToken> {
+    return super.deploy(overrides || {}) as Promise<BasicToken>
   }
-  getDeployTransaction(
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): TransactionRequest {
-    return super.getDeployTransaction(overrides || {});
+  getDeployTransaction(overrides?: Overrides & { from?: string | Promise<string> }): TransactionRequest {
+    return super.getDeployTransaction(overrides || {})
   }
   attach(address: string): BasicToken {
-    return super.attach(address) as BasicToken;
+    return super.attach(address) as BasicToken
   }
   connect(signer: Signer): BasicToken__factory {
-    return super.connect(signer) as BasicToken__factory;
+    return super.connect(signer) as BasicToken__factory
   }
-  static readonly bytecode = _bytecode;
-  static readonly abi = _abi;
+  static readonly bytecode = _bytecode
+  static readonly abi = _abi
   static createInterface(): BasicTokenInterface {
-    return new utils.Interface(_abi) as BasicTokenInterface;
+    return new utils.Interface(_abi) as BasicTokenInterface
   }
-  static connect(
-    address: string,
-    signerOrProvider: Signer | Provider
-  ): BasicToken {
-    return new Contract(address, _abi, signerOrProvider) as BasicToken;
+  static connect(address: string, signerOrProvider: Signer | Provider): BasicToken {
+    return new Contract(address, _abi, signerOrProvider) as BasicToken
   }
 }

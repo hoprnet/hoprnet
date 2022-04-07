@@ -2,192 +2,192 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import { Contract, Signer, utils } from "ethers";
-import { Provider } from "@ethersproject/providers";
-import type { ERC20, ERC20Interface } from "../ERC20";
+import { Contract, Signer, utils } from 'ethers'
+import { Provider } from '@ethersproject/providers'
+import type { ERC20, ERC20Interface } from '../ERC20'
 
 const _abi = [
   {
     constant: false,
     inputs: [
       {
-        name: "_spender",
-        type: "address",
+        name: '_spender',
+        type: 'address'
       },
       {
-        name: "_value",
-        type: "uint256",
-      },
+        name: '_value',
+        type: 'uint256'
+      }
     ],
-    name: "approve",
+    name: 'approve',
     outputs: [
       {
-        name: "",
-        type: "bool",
-      },
+        name: '',
+        type: 'bool'
+      }
     ],
     payable: false,
-    stateMutability: "nonpayable",
-    type: "function",
+    stateMutability: 'nonpayable',
+    type: 'function'
   },
   {
     constant: true,
     inputs: [],
-    name: "totalSupply",
+    name: 'totalSupply',
     outputs: [
       {
-        name: "",
-        type: "uint256",
-      },
+        name: '',
+        type: 'uint256'
+      }
     ],
     payable: false,
-    stateMutability: "view",
-    type: "function",
+    stateMutability: 'view',
+    type: 'function'
   },
   {
     constant: false,
     inputs: [
       {
-        name: "_from",
-        type: "address",
+        name: '_from',
+        type: 'address'
       },
       {
-        name: "_to",
-        type: "address",
+        name: '_to',
+        type: 'address'
       },
       {
-        name: "_value",
-        type: "uint256",
-      },
+        name: '_value',
+        type: 'uint256'
+      }
     ],
-    name: "transferFrom",
+    name: 'transferFrom',
     outputs: [
       {
-        name: "",
-        type: "bool",
-      },
+        name: '',
+        type: 'bool'
+      }
     ],
     payable: false,
-    stateMutability: "nonpayable",
-    type: "function",
+    stateMutability: 'nonpayable',
+    type: 'function'
   },
   {
     constant: true,
     inputs: [
       {
-        name: "_who",
-        type: "address",
-      },
+        name: '_who',
+        type: 'address'
+      }
     ],
-    name: "balanceOf",
+    name: 'balanceOf',
     outputs: [
       {
-        name: "",
-        type: "uint256",
-      },
+        name: '',
+        type: 'uint256'
+      }
     ],
     payable: false,
-    stateMutability: "view",
-    type: "function",
+    stateMutability: 'view',
+    type: 'function'
   },
   {
     constant: false,
     inputs: [
       {
-        name: "_to",
-        type: "address",
+        name: '_to',
+        type: 'address'
       },
       {
-        name: "_value",
-        type: "uint256",
-      },
+        name: '_value',
+        type: 'uint256'
+      }
     ],
-    name: "transfer",
+    name: 'transfer',
     outputs: [
       {
-        name: "",
-        type: "bool",
-      },
+        name: '',
+        type: 'bool'
+      }
     ],
     payable: false,
-    stateMutability: "nonpayable",
-    type: "function",
+    stateMutability: 'nonpayable',
+    type: 'function'
   },
   {
     constant: true,
     inputs: [
       {
-        name: "_owner",
-        type: "address",
+        name: '_owner',
+        type: 'address'
       },
       {
-        name: "_spender",
-        type: "address",
-      },
+        name: '_spender',
+        type: 'address'
+      }
     ],
-    name: "allowance",
+    name: 'allowance',
     outputs: [
       {
-        name: "",
-        type: "uint256",
-      },
+        name: '',
+        type: 'uint256'
+      }
     ],
     payable: false,
-    stateMutability: "view",
-    type: "function",
+    stateMutability: 'view',
+    type: 'function'
   },
   {
     anonymous: false,
     inputs: [
       {
         indexed: true,
-        name: "owner",
-        type: "address",
+        name: 'owner',
+        type: 'address'
       },
       {
         indexed: true,
-        name: "spender",
-        type: "address",
+        name: 'spender',
+        type: 'address'
       },
       {
         indexed: false,
-        name: "value",
-        type: "uint256",
-      },
+        name: 'value',
+        type: 'uint256'
+      }
     ],
-    name: "Approval",
-    type: "event",
+    name: 'Approval',
+    type: 'event'
   },
   {
     anonymous: false,
     inputs: [
       {
         indexed: true,
-        name: "from",
-        type: "address",
+        name: 'from',
+        type: 'address'
       },
       {
         indexed: true,
-        name: "to",
-        type: "address",
+        name: 'to',
+        type: 'address'
       },
       {
         indexed: false,
-        name: "value",
-        type: "uint256",
-      },
+        name: 'value',
+        type: 'uint256'
+      }
     ],
-    name: "Transfer",
-    type: "event",
-  },
-];
+    name: 'Transfer',
+    type: 'event'
+  }
+]
 
 export class ERC20__factory {
-  static readonly abi = _abi;
+  static readonly abi = _abi
   static createInterface(): ERC20Interface {
-    return new utils.Interface(_abi) as ERC20Interface;
+    return new utils.Interface(_abi) as ERC20Interface
   }
   static connect(address: string, signerOrProvider: Signer | Provider): ERC20 {
-    return new Contract(address, _abi, signerOrProvider) as ERC20;
+    return new Contract(address, _abi, signerOrProvider) as ERC20
   }
 }

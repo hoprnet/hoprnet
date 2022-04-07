@@ -12,193 +12,136 @@ import {
   BaseContract,
   ContractTransaction,
   Overrides,
-  CallOverrides,
-} from "ethers";
-import { BytesLike } from "@ethersproject/bytes";
-import { Listener, Provider } from "@ethersproject/providers";
-import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
-import type { TypedEventFilter, TypedEvent, TypedListener } from "./common";
+  CallOverrides
+} from 'ethers'
+import { BytesLike } from '@ethersproject/bytes'
+import { Listener, Provider } from '@ethersproject/providers'
+import { FunctionFragment, EventFragment, Result } from '@ethersproject/abi'
+import type { TypedEventFilter, TypedEvent, TypedListener } from './common'
 
 interface HoprWrapperInterface extends ethers.utils.Interface {
   functions: {
-    "TOKENS_RECIPIENT_INTERFACE_HASH()": FunctionFragment;
-    "canImplementInterfaceForAddress(bytes32,address)": FunctionFragment;
-    "onTokenTransfer(address,uint256,bytes)": FunctionFragment;
-    "owner()": FunctionFragment;
-    "recoverTokens()": FunctionFragment;
-    "renounceOwnership()": FunctionFragment;
-    "tokensReceived(address,address,address,uint256,bytes,bytes)": FunctionFragment;
-    "transferOwnership(address)": FunctionFragment;
-    "wxHOPR()": FunctionFragment;
-    "xHOPR()": FunctionFragment;
-    "xHoprAmount()": FunctionFragment;
-  };
+    'TOKENS_RECIPIENT_INTERFACE_HASH()': FunctionFragment
+    'canImplementInterfaceForAddress(bytes32,address)': FunctionFragment
+    'onTokenTransfer(address,uint256,bytes)': FunctionFragment
+    'owner()': FunctionFragment
+    'recoverTokens()': FunctionFragment
+    'renounceOwnership()': FunctionFragment
+    'tokensReceived(address,address,address,uint256,bytes,bytes)': FunctionFragment
+    'transferOwnership(address)': FunctionFragment
+    'wxHOPR()': FunctionFragment
+    'xHOPR()': FunctionFragment
+    'xHoprAmount()': FunctionFragment
+  }
 
+  encodeFunctionData(functionFragment: 'TOKENS_RECIPIENT_INTERFACE_HASH', values?: undefined): string
+  encodeFunctionData(functionFragment: 'canImplementInterfaceForAddress', values: [BytesLike, string]): string
+  encodeFunctionData(functionFragment: 'onTokenTransfer', values: [string, BigNumberish, BytesLike]): string
+  encodeFunctionData(functionFragment: 'owner', values?: undefined): string
+  encodeFunctionData(functionFragment: 'recoverTokens', values?: undefined): string
+  encodeFunctionData(functionFragment: 'renounceOwnership', values?: undefined): string
   encodeFunctionData(
-    functionFragment: "TOKENS_RECIPIENT_INTERFACE_HASH",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "canImplementInterfaceForAddress",
-    values: [BytesLike, string]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "onTokenTransfer",
-    values: [string, BigNumberish, BytesLike]
-  ): string;
-  encodeFunctionData(functionFragment: "owner", values?: undefined): string;
-  encodeFunctionData(
-    functionFragment: "recoverTokens",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "renounceOwnership",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "tokensReceived",
+    functionFragment: 'tokensReceived',
     values: [string, string, string, BigNumberish, BytesLike, BytesLike]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "transferOwnership",
-    values: [string]
-  ): string;
-  encodeFunctionData(functionFragment: "wxHOPR", values?: undefined): string;
-  encodeFunctionData(functionFragment: "xHOPR", values?: undefined): string;
-  encodeFunctionData(
-    functionFragment: "xHoprAmount",
-    values?: undefined
-  ): string;
+  ): string
+  encodeFunctionData(functionFragment: 'transferOwnership', values: [string]): string
+  encodeFunctionData(functionFragment: 'wxHOPR', values?: undefined): string
+  encodeFunctionData(functionFragment: 'xHOPR', values?: undefined): string
+  encodeFunctionData(functionFragment: 'xHoprAmount', values?: undefined): string
 
-  decodeFunctionResult(
-    functionFragment: "TOKENS_RECIPIENT_INTERFACE_HASH",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "canImplementInterfaceForAddress",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "onTokenTransfer",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(functionFragment: "owner", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "recoverTokens",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "renounceOwnership",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "tokensReceived",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "transferOwnership",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(functionFragment: "wxHOPR", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "xHOPR", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "xHoprAmount",
-    data: BytesLike
-  ): Result;
+  decodeFunctionResult(functionFragment: 'TOKENS_RECIPIENT_INTERFACE_HASH', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'canImplementInterfaceForAddress', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'onTokenTransfer', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'owner', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'recoverTokens', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'renounceOwnership', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'tokensReceived', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'transferOwnership', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'wxHOPR', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'xHOPR', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'xHoprAmount', data: BytesLike): Result
 
   events: {
-    "OwnershipTransferred(address,address)": EventFragment;
-    "Unwrapped(address,uint256)": EventFragment;
-    "Wrapped(address,uint256)": EventFragment;
-  };
+    'OwnershipTransferred(address,address)': EventFragment
+    'Unwrapped(address,uint256)': EventFragment
+    'Wrapped(address,uint256)': EventFragment
+  }
 
-  getEvent(nameOrSignatureOrTopic: "OwnershipTransferred"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "Unwrapped"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "Wrapped"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: 'OwnershipTransferred'): EventFragment
+  getEvent(nameOrSignatureOrTopic: 'Unwrapped'): EventFragment
+  getEvent(nameOrSignatureOrTopic: 'Wrapped'): EventFragment
 }
 
-export type OwnershipTransferredEvent = TypedEvent<
-  [string, string] & { previousOwner: string; newOwner: string }
->;
+export type OwnershipTransferredEvent = TypedEvent<[string, string] & { previousOwner: string; newOwner: string }>
 
-export type UnwrappedEvent = TypedEvent<
-  [string, BigNumber] & { account: string; amount: BigNumber }
->;
+export type UnwrappedEvent = TypedEvent<[string, BigNumber] & { account: string; amount: BigNumber }>
 
-export type WrappedEvent = TypedEvent<
-  [string, BigNumber] & { account: string; amount: BigNumber }
->;
+export type WrappedEvent = TypedEvent<[string, BigNumber] & { account: string; amount: BigNumber }>
 
 export class HoprWrapper extends BaseContract {
-  connect(signerOrProvider: Signer | Provider | string): this;
-  attach(addressOrName: string): this;
-  deployed(): Promise<this>;
+  connect(signerOrProvider: Signer | Provider | string): this
+  attach(addressOrName: string): this
+  deployed(): Promise<this>
 
   listeners<EventArgsArray extends Array<any>, EventArgsObject>(
     eventFilter?: TypedEventFilter<EventArgsArray, EventArgsObject>
-  ): Array<TypedListener<EventArgsArray, EventArgsObject>>;
+  ): Array<TypedListener<EventArgsArray, EventArgsObject>>
   off<EventArgsArray extends Array<any>, EventArgsObject>(
     eventFilter: TypedEventFilter<EventArgsArray, EventArgsObject>,
     listener: TypedListener<EventArgsArray, EventArgsObject>
-  ): this;
+  ): this
   on<EventArgsArray extends Array<any>, EventArgsObject>(
     eventFilter: TypedEventFilter<EventArgsArray, EventArgsObject>,
     listener: TypedListener<EventArgsArray, EventArgsObject>
-  ): this;
+  ): this
   once<EventArgsArray extends Array<any>, EventArgsObject>(
     eventFilter: TypedEventFilter<EventArgsArray, EventArgsObject>,
     listener: TypedListener<EventArgsArray, EventArgsObject>
-  ): this;
+  ): this
   removeListener<EventArgsArray extends Array<any>, EventArgsObject>(
     eventFilter: TypedEventFilter<EventArgsArray, EventArgsObject>,
     listener: TypedListener<EventArgsArray, EventArgsObject>
-  ): this;
+  ): this
   removeAllListeners<EventArgsArray extends Array<any>, EventArgsObject>(
     eventFilter: TypedEventFilter<EventArgsArray, EventArgsObject>
-  ): this;
+  ): this
 
-  listeners(eventName?: string): Array<Listener>;
-  off(eventName: string, listener: Listener): this;
-  on(eventName: string, listener: Listener): this;
-  once(eventName: string, listener: Listener): this;
-  removeListener(eventName: string, listener: Listener): this;
-  removeAllListeners(eventName?: string): this;
+  listeners(eventName?: string): Array<Listener>
+  off(eventName: string, listener: Listener): this
+  on(eventName: string, listener: Listener): this
+  once(eventName: string, listener: Listener): this
+  removeListener(eventName: string, listener: Listener): this
+  removeAllListeners(eventName?: string): this
 
   queryFilter<EventArgsArray extends Array<any>, EventArgsObject>(
     event: TypedEventFilter<EventArgsArray, EventArgsObject>,
     fromBlockOrBlockhash?: string | number | undefined,
     toBlock?: string | number | undefined
-  ): Promise<Array<TypedEvent<EventArgsArray & EventArgsObject>>>;
+  ): Promise<Array<TypedEvent<EventArgsArray & EventArgsObject>>>
 
-  interface: HoprWrapperInterface;
+  interface: HoprWrapperInterface
 
   functions: {
-    TOKENS_RECIPIENT_INTERFACE_HASH(
-      overrides?: CallOverrides
-    ): Promise<[string]>;
+    TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<[string]>
 
     canImplementInterfaceForAddress(
       interfaceHash: BytesLike,
       account: string,
       overrides?: CallOverrides
-    ): Promise<[string]>;
+    ): Promise<[string]>
 
     onTokenTransfer(
       from: string,
       amount: BigNumberish,
       data: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
-    owner(overrides?: CallOverrides): Promise<[string]>;
+    owner(overrides?: CallOverrides): Promise<[string]>
 
-    recoverTokens(
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
+    recoverTokens(overrides?: Overrides & { from?: string | Promise<string> }): Promise<ContractTransaction>
 
-    renounceOwnership(
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
+    renounceOwnership(overrides?: Overrides & { from?: string | Promise<string> }): Promise<ContractTransaction>
 
     tokensReceived(
       operator: string,
@@ -208,44 +151,36 @@ export class HoprWrapper extends BaseContract {
       userData: BytesLike,
       operatorData: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
     transferOwnership(
       newOwner: string,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
-    wxHOPR(overrides?: CallOverrides): Promise<[string]>;
+    wxHOPR(overrides?: CallOverrides): Promise<[string]>
 
-    xHOPR(overrides?: CallOverrides): Promise<[string]>;
+    xHOPR(overrides?: CallOverrides): Promise<[string]>
 
-    xHoprAmount(overrides?: CallOverrides): Promise<[BigNumber]>;
-  };
+    xHoprAmount(overrides?: CallOverrides): Promise<[BigNumber]>
+  }
 
-  TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<string>;
+  TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<string>
 
-  canImplementInterfaceForAddress(
-    interfaceHash: BytesLike,
-    account: string,
-    overrides?: CallOverrides
-  ): Promise<string>;
+  canImplementInterfaceForAddress(interfaceHash: BytesLike, account: string, overrides?: CallOverrides): Promise<string>
 
   onTokenTransfer(
     from: string,
     amount: BigNumberish,
     data: BytesLike,
     overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
-  owner(overrides?: CallOverrides): Promise<string>;
+  owner(overrides?: CallOverrides): Promise<string>
 
-  recoverTokens(
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  recoverTokens(overrides?: Overrides & { from?: string | Promise<string> }): Promise<ContractTransaction>
 
-  renounceOwnership(
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  renounceOwnership(overrides?: Overrides & { from?: string | Promise<string> }): Promise<ContractTransaction>
 
   tokensReceived(
     operator: string,
@@ -255,40 +190,35 @@ export class HoprWrapper extends BaseContract {
     userData: BytesLike,
     operatorData: BytesLike,
     overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
   transferOwnership(
     newOwner: string,
     overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
-  wxHOPR(overrides?: CallOverrides): Promise<string>;
+  wxHOPR(overrides?: CallOverrides): Promise<string>
 
-  xHOPR(overrides?: CallOverrides): Promise<string>;
+  xHOPR(overrides?: CallOverrides): Promise<string>
 
-  xHoprAmount(overrides?: CallOverrides): Promise<BigNumber>;
+  xHoprAmount(overrides?: CallOverrides): Promise<BigNumber>
 
   callStatic: {
-    TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<string>;
+    TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<string>
 
     canImplementInterfaceForAddress(
       interfaceHash: BytesLike,
       account: string,
       overrides?: CallOverrides
-    ): Promise<string>;
+    ): Promise<string>
 
-    onTokenTransfer(
-      from: string,
-      amount: BigNumberish,
-      data: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<boolean>;
+    onTokenTransfer(from: string, amount: BigNumberish, data: BytesLike, overrides?: CallOverrides): Promise<boolean>
 
-    owner(overrides?: CallOverrides): Promise<string>;
+    owner(overrides?: CallOverrides): Promise<string>
 
-    recoverTokens(overrides?: CallOverrides): Promise<void>;
+    recoverTokens(overrides?: CallOverrides): Promise<void>
 
-    renounceOwnership(overrides?: CallOverrides): Promise<void>;
+    renounceOwnership(overrides?: CallOverrides): Promise<void>
 
     tokensReceived(
       operator: string,
@@ -298,97 +228,70 @@ export class HoprWrapper extends BaseContract {
       userData: BytesLike,
       operatorData: BytesLike,
       overrides?: CallOverrides
-    ): Promise<void>;
+    ): Promise<void>
 
-    transferOwnership(
-      newOwner: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
+    transferOwnership(newOwner: string, overrides?: CallOverrides): Promise<void>
 
-    wxHOPR(overrides?: CallOverrides): Promise<string>;
+    wxHOPR(overrides?: CallOverrides): Promise<string>
 
-    xHOPR(overrides?: CallOverrides): Promise<string>;
+    xHOPR(overrides?: CallOverrides): Promise<string>
 
-    xHoprAmount(overrides?: CallOverrides): Promise<BigNumber>;
-  };
+    xHoprAmount(overrides?: CallOverrides): Promise<BigNumber>
+  }
 
   filters: {
-    "OwnershipTransferred(address,address)"(
+    'OwnershipTransferred(address,address)'(
       previousOwner?: string | null,
       newOwner?: string | null
-    ): TypedEventFilter<
-      [string, string],
-      { previousOwner: string; newOwner: string }
-    >;
+    ): TypedEventFilter<[string, string], { previousOwner: string; newOwner: string }>
 
     OwnershipTransferred(
       previousOwner?: string | null,
       newOwner?: string | null
-    ): TypedEventFilter<
-      [string, string],
-      { previousOwner: string; newOwner: string }
-    >;
+    ): TypedEventFilter<[string, string], { previousOwner: string; newOwner: string }>
 
-    "Unwrapped(address,uint256)"(
+    'Unwrapped(address,uint256)'(
       account?: string | null,
       amount?: null
-    ): TypedEventFilter<
-      [string, BigNumber],
-      { account: string; amount: BigNumber }
-    >;
+    ): TypedEventFilter<[string, BigNumber], { account: string; amount: BigNumber }>
 
     Unwrapped(
       account?: string | null,
       amount?: null
-    ): TypedEventFilter<
-      [string, BigNumber],
-      { account: string; amount: BigNumber }
-    >;
+    ): TypedEventFilter<[string, BigNumber], { account: string; amount: BigNumber }>
 
-    "Wrapped(address,uint256)"(
+    'Wrapped(address,uint256)'(
       account?: string | null,
       amount?: null
-    ): TypedEventFilter<
-      [string, BigNumber],
-      { account: string; amount: BigNumber }
-    >;
+    ): TypedEventFilter<[string, BigNumber], { account: string; amount: BigNumber }>
 
     Wrapped(
       account?: string | null,
       amount?: null
-    ): TypedEventFilter<
-      [string, BigNumber],
-      { account: string; amount: BigNumber }
-    >;
-  };
+    ): TypedEventFilter<[string, BigNumber], { account: string; amount: BigNumber }>
+  }
 
   estimateGas: {
-    TOKENS_RECIPIENT_INTERFACE_HASH(
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
+    TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<BigNumber>
 
     canImplementInterfaceForAddress(
       interfaceHash: BytesLike,
       account: string,
       overrides?: CallOverrides
-    ): Promise<BigNumber>;
+    ): Promise<BigNumber>
 
     onTokenTransfer(
       from: string,
       amount: BigNumberish,
       data: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
+    ): Promise<BigNumber>
 
-    owner(overrides?: CallOverrides): Promise<BigNumber>;
+    owner(overrides?: CallOverrides): Promise<BigNumber>
 
-    recoverTokens(
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
+    recoverTokens(overrides?: Overrides & { from?: string | Promise<string> }): Promise<BigNumber>
 
-    renounceOwnership(
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
+    renounceOwnership(overrides?: Overrides & { from?: string | Promise<string> }): Promise<BigNumber>
 
     tokensReceived(
       operator: string,
@@ -398,47 +301,38 @@ export class HoprWrapper extends BaseContract {
       userData: BytesLike,
       operatorData: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
+    ): Promise<BigNumber>
 
-    transferOwnership(
-      newOwner: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
+    transferOwnership(newOwner: string, overrides?: Overrides & { from?: string | Promise<string> }): Promise<BigNumber>
 
-    wxHOPR(overrides?: CallOverrides): Promise<BigNumber>;
+    wxHOPR(overrides?: CallOverrides): Promise<BigNumber>
 
-    xHOPR(overrides?: CallOverrides): Promise<BigNumber>;
+    xHOPR(overrides?: CallOverrides): Promise<BigNumber>
 
-    xHoprAmount(overrides?: CallOverrides): Promise<BigNumber>;
-  };
+    xHoprAmount(overrides?: CallOverrides): Promise<BigNumber>
+  }
 
   populateTransaction: {
-    TOKENS_RECIPIENT_INTERFACE_HASH(
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
+    TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<PopulatedTransaction>
 
     canImplementInterfaceForAddress(
       interfaceHash: BytesLike,
       account: string,
       overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
     onTokenTransfer(
       from: string,
       amount: BigNumberish,
       data: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
-    owner(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    owner(overrides?: CallOverrides): Promise<PopulatedTransaction>
 
-    recoverTokens(
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
+    recoverTokens(overrides?: Overrides & { from?: string | Promise<string> }): Promise<PopulatedTransaction>
 
-    renounceOwnership(
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
+    renounceOwnership(overrides?: Overrides & { from?: string | Promise<string> }): Promise<PopulatedTransaction>
 
     tokensReceived(
       operator: string,
@@ -448,17 +342,17 @@ export class HoprWrapper extends BaseContract {
       userData: BytesLike,
       operatorData: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
     transferOwnership(
       newOwner: string,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
-    wxHOPR(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    wxHOPR(overrides?: CallOverrides): Promise<PopulatedTransaction>
 
-    xHOPR(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    xHOPR(overrides?: CallOverrides): Promise<PopulatedTransaction>
 
-    xHoprAmount(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-  };
+    xHoprAmount(overrides?: CallOverrides): Promise<PopulatedTransaction>
+  }
 }

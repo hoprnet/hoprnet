@@ -12,320 +12,225 @@ import {
   BaseContract,
   ContractTransaction,
   Overrides,
-  CallOverrides,
-} from "ethers";
-import { BytesLike } from "@ethersproject/bytes";
-import { Listener, Provider } from "@ethersproject/providers";
-import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
-import type { TypedEventFilter, TypedEvent, TypedListener } from "./common";
+  CallOverrides
+} from 'ethers'
+import { BytesLike } from '@ethersproject/bytes'
+import { Listener, Provider } from '@ethersproject/providers'
+import { FunctionFragment, EventFragment, Result } from '@ethersproject/abi'
+import type { TypedEventFilter, TypedEvent, TypedListener } from './common'
 
 interface ERC777MockInterface extends ethers.utils.Interface {
   functions: {
-    "allowance(address,address)": FunctionFragment;
-    "approve(address,uint256)": FunctionFragment;
-    "approveInternal(address,address,uint256)": FunctionFragment;
-    "authorizeOperator(address)": FunctionFragment;
-    "balanceOf(address)": FunctionFragment;
-    "burn(uint256,bytes)": FunctionFragment;
-    "decimals()": FunctionFragment;
-    "defaultOperators()": FunctionFragment;
-    "granularity()": FunctionFragment;
-    "isOperatorFor(address,address)": FunctionFragment;
-    "mintInternal(address,uint256,bytes,bytes)": FunctionFragment;
-    "name()": FunctionFragment;
-    "operatorBurn(address,uint256,bytes,bytes)": FunctionFragment;
-    "operatorSend(address,address,uint256,bytes,bytes)": FunctionFragment;
-    "revokeOperator(address)": FunctionFragment;
-    "send(address,uint256,bytes)": FunctionFragment;
-    "symbol()": FunctionFragment;
-    "totalSupply()": FunctionFragment;
-    "transfer(address,uint256)": FunctionFragment;
-    "transferFrom(address,address,uint256)": FunctionFragment;
-  };
+    'allowance(address,address)': FunctionFragment
+    'approve(address,uint256)': FunctionFragment
+    'approveInternal(address,address,uint256)': FunctionFragment
+    'authorizeOperator(address)': FunctionFragment
+    'balanceOf(address)': FunctionFragment
+    'burn(uint256,bytes)': FunctionFragment
+    'decimals()': FunctionFragment
+    'defaultOperators()': FunctionFragment
+    'granularity()': FunctionFragment
+    'isOperatorFor(address,address)': FunctionFragment
+    'mintInternal(address,uint256,bytes,bytes)': FunctionFragment
+    'name()': FunctionFragment
+    'operatorBurn(address,uint256,bytes,bytes)': FunctionFragment
+    'operatorSend(address,address,uint256,bytes,bytes)': FunctionFragment
+    'revokeOperator(address)': FunctionFragment
+    'send(address,uint256,bytes)': FunctionFragment
+    'symbol()': FunctionFragment
+    'totalSupply()': FunctionFragment
+    'transfer(address,uint256)': FunctionFragment
+    'transferFrom(address,address,uint256)': FunctionFragment
+  }
 
+  encodeFunctionData(functionFragment: 'allowance', values: [string, string]): string
+  encodeFunctionData(functionFragment: 'approve', values: [string, BigNumberish]): string
+  encodeFunctionData(functionFragment: 'approveInternal', values: [string, string, BigNumberish]): string
+  encodeFunctionData(functionFragment: 'authorizeOperator', values: [string]): string
+  encodeFunctionData(functionFragment: 'balanceOf', values: [string]): string
+  encodeFunctionData(functionFragment: 'burn', values: [BigNumberish, BytesLike]): string
+  encodeFunctionData(functionFragment: 'decimals', values?: undefined): string
+  encodeFunctionData(functionFragment: 'defaultOperators', values?: undefined): string
+  encodeFunctionData(functionFragment: 'granularity', values?: undefined): string
+  encodeFunctionData(functionFragment: 'isOperatorFor', values: [string, string]): string
+  encodeFunctionData(functionFragment: 'mintInternal', values: [string, BigNumberish, BytesLike, BytesLike]): string
+  encodeFunctionData(functionFragment: 'name', values?: undefined): string
+  encodeFunctionData(functionFragment: 'operatorBurn', values: [string, BigNumberish, BytesLike, BytesLike]): string
   encodeFunctionData(
-    functionFragment: "allowance",
-    values: [string, string]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "approve",
-    values: [string, BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "approveInternal",
-    values: [string, string, BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "authorizeOperator",
-    values: [string]
-  ): string;
-  encodeFunctionData(functionFragment: "balanceOf", values: [string]): string;
-  encodeFunctionData(
-    functionFragment: "burn",
-    values: [BigNumberish, BytesLike]
-  ): string;
-  encodeFunctionData(functionFragment: "decimals", values?: undefined): string;
-  encodeFunctionData(
-    functionFragment: "defaultOperators",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "granularity",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "isOperatorFor",
-    values: [string, string]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "mintInternal",
-    values: [string, BigNumberish, BytesLike, BytesLike]
-  ): string;
-  encodeFunctionData(functionFragment: "name", values?: undefined): string;
-  encodeFunctionData(
-    functionFragment: "operatorBurn",
-    values: [string, BigNumberish, BytesLike, BytesLike]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "operatorSend",
+    functionFragment: 'operatorSend',
     values: [string, string, BigNumberish, BytesLike, BytesLike]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "revokeOperator",
-    values: [string]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "send",
-    values: [string, BigNumberish, BytesLike]
-  ): string;
-  encodeFunctionData(functionFragment: "symbol", values?: undefined): string;
-  encodeFunctionData(
-    functionFragment: "totalSupply",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "transfer",
-    values: [string, BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "transferFrom",
-    values: [string, string, BigNumberish]
-  ): string;
+  ): string
+  encodeFunctionData(functionFragment: 'revokeOperator', values: [string]): string
+  encodeFunctionData(functionFragment: 'send', values: [string, BigNumberish, BytesLike]): string
+  encodeFunctionData(functionFragment: 'symbol', values?: undefined): string
+  encodeFunctionData(functionFragment: 'totalSupply', values?: undefined): string
+  encodeFunctionData(functionFragment: 'transfer', values: [string, BigNumberish]): string
+  encodeFunctionData(functionFragment: 'transferFrom', values: [string, string, BigNumberish]): string
 
-  decodeFunctionResult(functionFragment: "allowance", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "approve", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "approveInternal",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "authorizeOperator",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(functionFragment: "balanceOf", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "burn", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "decimals", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "defaultOperators",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "granularity",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "isOperatorFor",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "mintInternal",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(functionFragment: "name", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "operatorBurn",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "operatorSend",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "revokeOperator",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(functionFragment: "send", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "symbol", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "totalSupply",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(functionFragment: "transfer", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "transferFrom",
-    data: BytesLike
-  ): Result;
+  decodeFunctionResult(functionFragment: 'allowance', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'approve', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'approveInternal', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'authorizeOperator', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'balanceOf', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'burn', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'decimals', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'defaultOperators', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'granularity', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'isOperatorFor', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'mintInternal', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'name', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'operatorBurn', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'operatorSend', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'revokeOperator', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'send', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'symbol', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'totalSupply', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'transfer', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'transferFrom', data: BytesLike): Result
 
   events: {
-    "Approval(address,address,uint256)": EventFragment;
-    "AuthorizedOperator(address,address)": EventFragment;
-    "Burned(address,address,uint256,bytes,bytes)": EventFragment;
-    "Minted(address,address,uint256,bytes,bytes)": EventFragment;
-    "RevokedOperator(address,address)": EventFragment;
-    "Sent(address,address,address,uint256,bytes,bytes)": EventFragment;
-    "Transfer(address,address,uint256)": EventFragment;
-  };
+    'Approval(address,address,uint256)': EventFragment
+    'AuthorizedOperator(address,address)': EventFragment
+    'Burned(address,address,uint256,bytes,bytes)': EventFragment
+    'Minted(address,address,uint256,bytes,bytes)': EventFragment
+    'RevokedOperator(address,address)': EventFragment
+    'Sent(address,address,address,uint256,bytes,bytes)': EventFragment
+    'Transfer(address,address,uint256)': EventFragment
+  }
 
-  getEvent(nameOrSignatureOrTopic: "Approval"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "AuthorizedOperator"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "Burned"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "Minted"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "RevokedOperator"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "Sent"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "Transfer"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: 'Approval'): EventFragment
+  getEvent(nameOrSignatureOrTopic: 'AuthorizedOperator'): EventFragment
+  getEvent(nameOrSignatureOrTopic: 'Burned'): EventFragment
+  getEvent(nameOrSignatureOrTopic: 'Minted'): EventFragment
+  getEvent(nameOrSignatureOrTopic: 'RevokedOperator'): EventFragment
+  getEvent(nameOrSignatureOrTopic: 'Sent'): EventFragment
+  getEvent(nameOrSignatureOrTopic: 'Transfer'): EventFragment
 }
 
 export type ApprovalEvent = TypedEvent<
   [string, string, BigNumber] & {
-    owner: string;
-    spender: string;
-    value: BigNumber;
+    owner: string
+    spender: string
+    value: BigNumber
   }
->;
+>
 
-export type AuthorizedOperatorEvent = TypedEvent<
-  [string, string] & { operator: string; tokenHolder: string }
->;
+export type AuthorizedOperatorEvent = TypedEvent<[string, string] & { operator: string; tokenHolder: string }>
 
 export type BurnedEvent = TypedEvent<
   [string, string, BigNumber, string, string] & {
-    operator: string;
-    from: string;
-    amount: BigNumber;
-    data: string;
-    operatorData: string;
+    operator: string
+    from: string
+    amount: BigNumber
+    data: string
+    operatorData: string
   }
->;
+>
 
 export type MintedEvent = TypedEvent<
   [string, string, BigNumber, string, string] & {
-    operator: string;
-    to: string;
-    amount: BigNumber;
-    data: string;
-    operatorData: string;
+    operator: string
+    to: string
+    amount: BigNumber
+    data: string
+    operatorData: string
   }
->;
+>
 
-export type RevokedOperatorEvent = TypedEvent<
-  [string, string] & { operator: string; tokenHolder: string }
->;
+export type RevokedOperatorEvent = TypedEvent<[string, string] & { operator: string; tokenHolder: string }>
 
 export type SentEvent = TypedEvent<
   [string, string, string, BigNumber, string, string] & {
-    operator: string;
-    from: string;
-    to: string;
-    amount: BigNumber;
-    data: string;
-    operatorData: string;
+    operator: string
+    from: string
+    to: string
+    amount: BigNumber
+    data: string
+    operatorData: string
   }
->;
+>
 
-export type TransferEvent = TypedEvent<
-  [string, string, BigNumber] & { from: string; to: string; value: BigNumber }
->;
+export type TransferEvent = TypedEvent<[string, string, BigNumber] & { from: string; to: string; value: BigNumber }>
 
 export class ERC777Mock extends BaseContract {
-  connect(signerOrProvider: Signer | Provider | string): this;
-  attach(addressOrName: string): this;
-  deployed(): Promise<this>;
+  connect(signerOrProvider: Signer | Provider | string): this
+  attach(addressOrName: string): this
+  deployed(): Promise<this>
 
   listeners<EventArgsArray extends Array<any>, EventArgsObject>(
     eventFilter?: TypedEventFilter<EventArgsArray, EventArgsObject>
-  ): Array<TypedListener<EventArgsArray, EventArgsObject>>;
+  ): Array<TypedListener<EventArgsArray, EventArgsObject>>
   off<EventArgsArray extends Array<any>, EventArgsObject>(
     eventFilter: TypedEventFilter<EventArgsArray, EventArgsObject>,
     listener: TypedListener<EventArgsArray, EventArgsObject>
-  ): this;
+  ): this
   on<EventArgsArray extends Array<any>, EventArgsObject>(
     eventFilter: TypedEventFilter<EventArgsArray, EventArgsObject>,
     listener: TypedListener<EventArgsArray, EventArgsObject>
-  ): this;
+  ): this
   once<EventArgsArray extends Array<any>, EventArgsObject>(
     eventFilter: TypedEventFilter<EventArgsArray, EventArgsObject>,
     listener: TypedListener<EventArgsArray, EventArgsObject>
-  ): this;
+  ): this
   removeListener<EventArgsArray extends Array<any>, EventArgsObject>(
     eventFilter: TypedEventFilter<EventArgsArray, EventArgsObject>,
     listener: TypedListener<EventArgsArray, EventArgsObject>
-  ): this;
+  ): this
   removeAllListeners<EventArgsArray extends Array<any>, EventArgsObject>(
     eventFilter: TypedEventFilter<EventArgsArray, EventArgsObject>
-  ): this;
+  ): this
 
-  listeners(eventName?: string): Array<Listener>;
-  off(eventName: string, listener: Listener): this;
-  on(eventName: string, listener: Listener): this;
-  once(eventName: string, listener: Listener): this;
-  removeListener(eventName: string, listener: Listener): this;
-  removeAllListeners(eventName?: string): this;
+  listeners(eventName?: string): Array<Listener>
+  off(eventName: string, listener: Listener): this
+  on(eventName: string, listener: Listener): this
+  once(eventName: string, listener: Listener): this
+  removeListener(eventName: string, listener: Listener): this
+  removeAllListeners(eventName?: string): this
 
   queryFilter<EventArgsArray extends Array<any>, EventArgsObject>(
     event: TypedEventFilter<EventArgsArray, EventArgsObject>,
     fromBlockOrBlockhash?: string | number | undefined,
     toBlock?: string | number | undefined
-  ): Promise<Array<TypedEvent<EventArgsArray & EventArgsObject>>>;
+  ): Promise<Array<TypedEvent<EventArgsArray & EventArgsObject>>>
 
-  interface: ERC777MockInterface;
+  interface: ERC777MockInterface
 
   functions: {
-    allowance(
-      holder: string,
-      spender: string,
-      overrides?: CallOverrides
-    ): Promise<[BigNumber]>;
+    allowance(holder: string, spender: string, overrides?: CallOverrides): Promise<[BigNumber]>
 
     approve(
       spender: string,
       value: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
     approveInternal(
       holder: string,
       spender: string,
       value: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
     authorizeOperator(
       operator: string,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
-    balanceOf(
-      tokenHolder: string,
-      overrides?: CallOverrides
-    ): Promise<[BigNumber]>;
+    balanceOf(tokenHolder: string, overrides?: CallOverrides): Promise<[BigNumber]>
 
     burn(
       amount: BigNumberish,
       data: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
-    decimals(overrides?: CallOverrides): Promise<[number]>;
+    decimals(overrides?: CallOverrides): Promise<[number]>
 
-    defaultOperators(overrides?: CallOverrides): Promise<[string[]]>;
+    defaultOperators(overrides?: CallOverrides): Promise<[string[]]>
 
-    granularity(overrides?: CallOverrides): Promise<[BigNumber]>;
+    granularity(overrides?: CallOverrides): Promise<[BigNumber]>
 
-    isOperatorFor(
-      operator: string,
-      tokenHolder: string,
-      overrides?: CallOverrides
-    ): Promise<[boolean]>;
+    isOperatorFor(operator: string, tokenHolder: string, overrides?: CallOverrides): Promise<[boolean]>
 
     mintInternal(
       to: string,
@@ -333,9 +238,9 @@ export class ERC777Mock extends BaseContract {
       userData: BytesLike,
       operatorData: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
-    name(overrides?: CallOverrides): Promise<[string]>;
+    name(overrides?: CallOverrides): Promise<[string]>
 
     operatorBurn(
       account: string,
@@ -343,7 +248,7 @@ export class ERC777Mock extends BaseContract {
       data: BytesLike,
       operatorData: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
     operatorSend(
       sender: string,
@@ -352,81 +257,73 @@ export class ERC777Mock extends BaseContract {
       data: BytesLike,
       operatorData: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
     revokeOperator(
       operator: string,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
     send(
       recipient: string,
       amount: BigNumberish,
       data: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
-    symbol(overrides?: CallOverrides): Promise<[string]>;
+    symbol(overrides?: CallOverrides): Promise<[string]>
 
-    totalSupply(overrides?: CallOverrides): Promise<[BigNumber]>;
+    totalSupply(overrides?: CallOverrides): Promise<[BigNumber]>
 
     transfer(
       recipient: string,
       amount: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
     transferFrom(
       holder: string,
       recipient: string,
       amount: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
-  };
+    ): Promise<ContractTransaction>
+  }
 
-  allowance(
-    holder: string,
-    spender: string,
-    overrides?: CallOverrides
-  ): Promise<BigNumber>;
+  allowance(holder: string, spender: string, overrides?: CallOverrides): Promise<BigNumber>
 
   approve(
     spender: string,
     value: BigNumberish,
     overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
   approveInternal(
     holder: string,
     spender: string,
     value: BigNumberish,
     overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
   authorizeOperator(
     operator: string,
     overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
-  balanceOf(tokenHolder: string, overrides?: CallOverrides): Promise<BigNumber>;
+  balanceOf(tokenHolder: string, overrides?: CallOverrides): Promise<BigNumber>
 
   burn(
     amount: BigNumberish,
     data: BytesLike,
     overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
-  decimals(overrides?: CallOverrides): Promise<number>;
+  decimals(overrides?: CallOverrides): Promise<number>
 
-  defaultOperators(overrides?: CallOverrides): Promise<string[]>;
+  defaultOperators(overrides?: CallOverrides): Promise<string[]>
 
-  granularity(overrides?: CallOverrides): Promise<BigNumber>;
+  granularity(overrides?: CallOverrides): Promise<BigNumber>
 
-  isOperatorFor(
-    operator: string,
-    tokenHolder: string,
-    overrides?: CallOverrides
-  ): Promise<boolean>;
+  isOperatorFor(operator: string, tokenHolder: string, overrides?: CallOverrides): Promise<boolean>
 
   mintInternal(
     to: string,
@@ -434,9 +331,9 @@ export class ERC777Mock extends BaseContract {
     userData: BytesLike,
     operatorData: BytesLike,
     overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
-  name(overrides?: CallOverrides): Promise<string>;
+  name(overrides?: CallOverrides): Promise<string>
 
   operatorBurn(
     account: string,
@@ -444,7 +341,7 @@ export class ERC777Mock extends BaseContract {
     data: BytesLike,
     operatorData: BytesLike,
     overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
   operatorSend(
     sender: string,
@@ -453,84 +350,57 @@ export class ERC777Mock extends BaseContract {
     data: BytesLike,
     operatorData: BytesLike,
     overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
   revokeOperator(
     operator: string,
     overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
   send(
     recipient: string,
     amount: BigNumberish,
     data: BytesLike,
     overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
-  symbol(overrides?: CallOverrides): Promise<string>;
+  symbol(overrides?: CallOverrides): Promise<string>
 
-  totalSupply(overrides?: CallOverrides): Promise<BigNumber>;
+  totalSupply(overrides?: CallOverrides): Promise<BigNumber>
 
   transfer(
     recipient: string,
     amount: BigNumberish,
     overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
   transferFrom(
     holder: string,
     recipient: string,
     amount: BigNumberish,
     overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
   callStatic: {
-    allowance(
-      holder: string,
-      spender: string,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
+    allowance(holder: string, spender: string, overrides?: CallOverrides): Promise<BigNumber>
 
-    approve(
-      spender: string,
-      value: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<boolean>;
+    approve(spender: string, value: BigNumberish, overrides?: CallOverrides): Promise<boolean>
 
-    approveInternal(
-      holder: string,
-      spender: string,
-      value: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
+    approveInternal(holder: string, spender: string, value: BigNumberish, overrides?: CallOverrides): Promise<void>
 
-    authorizeOperator(
-      operator: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
+    authorizeOperator(operator: string, overrides?: CallOverrides): Promise<void>
 
-    balanceOf(
-      tokenHolder: string,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
+    balanceOf(tokenHolder: string, overrides?: CallOverrides): Promise<BigNumber>
 
-    burn(
-      amount: BigNumberish,
-      data: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<void>;
+    burn(amount: BigNumberish, data: BytesLike, overrides?: CallOverrides): Promise<void>
 
-    decimals(overrides?: CallOverrides): Promise<number>;
+    decimals(overrides?: CallOverrides): Promise<number>
 
-    defaultOperators(overrides?: CallOverrides): Promise<string[]>;
+    defaultOperators(overrides?: CallOverrides): Promise<string[]>
 
-    granularity(overrides?: CallOverrides): Promise<BigNumber>;
+    granularity(overrides?: CallOverrides): Promise<BigNumber>
 
-    isOperatorFor(
-      operator: string,
-      tokenHolder: string,
-      overrides?: CallOverrides
-    ): Promise<boolean>;
+    isOperatorFor(operator: string, tokenHolder: string, overrides?: CallOverrides): Promise<boolean>
 
     mintInternal(
       to: string,
@@ -538,9 +408,9 @@ export class ERC777Mock extends BaseContract {
       userData: BytesLike,
       operatorData: BytesLike,
       overrides?: CallOverrides
-    ): Promise<void>;
+    ): Promise<void>
 
-    name(overrides?: CallOverrides): Promise<string>;
+    name(overrides?: CallOverrides): Promise<string>
 
     operatorBurn(
       account: string,
@@ -548,7 +418,7 @@ export class ERC777Mock extends BaseContract {
       data: BytesLike,
       operatorData: BytesLike,
       overrides?: CallOverrides
-    ): Promise<void>;
+    ): Promise<void>
 
     operatorSend(
       sender: string,
@@ -557,71 +427,45 @@ export class ERC777Mock extends BaseContract {
       data: BytesLike,
       operatorData: BytesLike,
       overrides?: CallOverrides
-    ): Promise<void>;
+    ): Promise<void>
 
-    revokeOperator(operator: string, overrides?: CallOverrides): Promise<void>;
+    revokeOperator(operator: string, overrides?: CallOverrides): Promise<void>
 
-    send(
-      recipient: string,
-      amount: BigNumberish,
-      data: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<void>;
+    send(recipient: string, amount: BigNumberish, data: BytesLike, overrides?: CallOverrides): Promise<void>
 
-    symbol(overrides?: CallOverrides): Promise<string>;
+    symbol(overrides?: CallOverrides): Promise<string>
 
-    totalSupply(overrides?: CallOverrides): Promise<BigNumber>;
+    totalSupply(overrides?: CallOverrides): Promise<BigNumber>
 
-    transfer(
-      recipient: string,
-      amount: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<boolean>;
+    transfer(recipient: string, amount: BigNumberish, overrides?: CallOverrides): Promise<boolean>
 
-    transferFrom(
-      holder: string,
-      recipient: string,
-      amount: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<boolean>;
-  };
+    transferFrom(holder: string, recipient: string, amount: BigNumberish, overrides?: CallOverrides): Promise<boolean>
+  }
 
   filters: {
-    "Approval(address,address,uint256)"(
+    'Approval(address,address,uint256)'(
       owner?: string | null,
       spender?: string | null,
       value?: null
-    ): TypedEventFilter<
-      [string, string, BigNumber],
-      { owner: string; spender: string; value: BigNumber }
-    >;
+    ): TypedEventFilter<[string, string, BigNumber], { owner: string; spender: string; value: BigNumber }>
 
     Approval(
       owner?: string | null,
       spender?: string | null,
       value?: null
-    ): TypedEventFilter<
-      [string, string, BigNumber],
-      { owner: string; spender: string; value: BigNumber }
-    >;
+    ): TypedEventFilter<[string, string, BigNumber], { owner: string; spender: string; value: BigNumber }>
 
-    "AuthorizedOperator(address,address)"(
+    'AuthorizedOperator(address,address)'(
       operator?: string | null,
       tokenHolder?: string | null
-    ): TypedEventFilter<
-      [string, string],
-      { operator: string; tokenHolder: string }
-    >;
+    ): TypedEventFilter<[string, string], { operator: string; tokenHolder: string }>
 
     AuthorizedOperator(
       operator?: string | null,
       tokenHolder?: string | null
-    ): TypedEventFilter<
-      [string, string],
-      { operator: string; tokenHolder: string }
-    >;
+    ): TypedEventFilter<[string, string], { operator: string; tokenHolder: string }>
 
-    "Burned(address,address,uint256,bytes,bytes)"(
+    'Burned(address,address,uint256,bytes,bytes)'(
       operator?: string | null,
       from?: string | null,
       amount?: null,
@@ -630,13 +474,13 @@ export class ERC777Mock extends BaseContract {
     ): TypedEventFilter<
       [string, string, BigNumber, string, string],
       {
-        operator: string;
-        from: string;
-        amount: BigNumber;
-        data: string;
-        operatorData: string;
+        operator: string
+        from: string
+        amount: BigNumber
+        data: string
+        operatorData: string
       }
-    >;
+    >
 
     Burned(
       operator?: string | null,
@@ -647,15 +491,15 @@ export class ERC777Mock extends BaseContract {
     ): TypedEventFilter<
       [string, string, BigNumber, string, string],
       {
-        operator: string;
-        from: string;
-        amount: BigNumber;
-        data: string;
-        operatorData: string;
+        operator: string
+        from: string
+        amount: BigNumber
+        data: string
+        operatorData: string
       }
-    >;
+    >
 
-    "Minted(address,address,uint256,bytes,bytes)"(
+    'Minted(address,address,uint256,bytes,bytes)'(
       operator?: string | null,
       to?: string | null,
       amount?: null,
@@ -664,13 +508,13 @@ export class ERC777Mock extends BaseContract {
     ): TypedEventFilter<
       [string, string, BigNumber, string, string],
       {
-        operator: string;
-        to: string;
-        amount: BigNumber;
-        data: string;
-        operatorData: string;
+        operator: string
+        to: string
+        amount: BigNumber
+        data: string
+        operatorData: string
       }
-    >;
+    >
 
     Minted(
       operator?: string | null,
@@ -681,31 +525,25 @@ export class ERC777Mock extends BaseContract {
     ): TypedEventFilter<
       [string, string, BigNumber, string, string],
       {
-        operator: string;
-        to: string;
-        amount: BigNumber;
-        data: string;
-        operatorData: string;
+        operator: string
+        to: string
+        amount: BigNumber
+        data: string
+        operatorData: string
       }
-    >;
+    >
 
-    "RevokedOperator(address,address)"(
+    'RevokedOperator(address,address)'(
       operator?: string | null,
       tokenHolder?: string | null
-    ): TypedEventFilter<
-      [string, string],
-      { operator: string; tokenHolder: string }
-    >;
+    ): TypedEventFilter<[string, string], { operator: string; tokenHolder: string }>
 
     RevokedOperator(
       operator?: string | null,
       tokenHolder?: string | null
-    ): TypedEventFilter<
-      [string, string],
-      { operator: string; tokenHolder: string }
-    >;
+    ): TypedEventFilter<[string, string], { operator: string; tokenHolder: string }>
 
-    "Sent(address,address,address,uint256,bytes,bytes)"(
+    'Sent(address,address,address,uint256,bytes,bytes)'(
       operator?: string | null,
       from?: string | null,
       to?: string | null,
@@ -715,14 +553,14 @@ export class ERC777Mock extends BaseContract {
     ): TypedEventFilter<
       [string, string, string, BigNumber, string, string],
       {
-        operator: string;
-        from: string;
-        to: string;
-        amount: BigNumber;
-        data: string;
-        operatorData: string;
+        operator: string
+        from: string
+        to: string
+        amount: BigNumber
+        data: string
+        operatorData: string
       }
-    >;
+    >
 
     Sent(
       operator?: string | null,
@@ -734,81 +572,61 @@ export class ERC777Mock extends BaseContract {
     ): TypedEventFilter<
       [string, string, string, BigNumber, string, string],
       {
-        operator: string;
-        from: string;
-        to: string;
-        amount: BigNumber;
-        data: string;
-        operatorData: string;
+        operator: string
+        from: string
+        to: string
+        amount: BigNumber
+        data: string
+        operatorData: string
       }
-    >;
+    >
 
-    "Transfer(address,address,uint256)"(
+    'Transfer(address,address,uint256)'(
       from?: string | null,
       to?: string | null,
       value?: null
-    ): TypedEventFilter<
-      [string, string, BigNumber],
-      { from: string; to: string; value: BigNumber }
-    >;
+    ): TypedEventFilter<[string, string, BigNumber], { from: string; to: string; value: BigNumber }>
 
     Transfer(
       from?: string | null,
       to?: string | null,
       value?: null
-    ): TypedEventFilter<
-      [string, string, BigNumber],
-      { from: string; to: string; value: BigNumber }
-    >;
-  };
+    ): TypedEventFilter<[string, string, BigNumber], { from: string; to: string; value: BigNumber }>
+  }
 
   estimateGas: {
-    allowance(
-      holder: string,
-      spender: string,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
+    allowance(holder: string, spender: string, overrides?: CallOverrides): Promise<BigNumber>
 
     approve(
       spender: string,
       value: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
+    ): Promise<BigNumber>
 
     approveInternal(
       holder: string,
       spender: string,
       value: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
+    ): Promise<BigNumber>
 
-    authorizeOperator(
-      operator: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
+    authorizeOperator(operator: string, overrides?: Overrides & { from?: string | Promise<string> }): Promise<BigNumber>
 
-    balanceOf(
-      tokenHolder: string,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
+    balanceOf(tokenHolder: string, overrides?: CallOverrides): Promise<BigNumber>
 
     burn(
       amount: BigNumberish,
       data: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
+    ): Promise<BigNumber>
 
-    decimals(overrides?: CallOverrides): Promise<BigNumber>;
+    decimals(overrides?: CallOverrides): Promise<BigNumber>
 
-    defaultOperators(overrides?: CallOverrides): Promise<BigNumber>;
+    defaultOperators(overrides?: CallOverrides): Promise<BigNumber>
 
-    granularity(overrides?: CallOverrides): Promise<BigNumber>;
+    granularity(overrides?: CallOverrides): Promise<BigNumber>
 
-    isOperatorFor(
-      operator: string,
-      tokenHolder: string,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
+    isOperatorFor(operator: string, tokenHolder: string, overrides?: CallOverrides): Promise<BigNumber>
 
     mintInternal(
       to: string,
@@ -816,9 +634,9 @@ export class ERC777Mock extends BaseContract {
       userData: BytesLike,
       operatorData: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
+    ): Promise<BigNumber>
 
-    name(overrides?: CallOverrides): Promise<BigNumber>;
+    name(overrides?: CallOverrides): Promise<BigNumber>
 
     operatorBurn(
       account: string,
@@ -826,7 +644,7 @@ export class ERC777Mock extends BaseContract {
       data: BytesLike,
       operatorData: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
+    ): Promise<BigNumber>
 
     operatorSend(
       sender: string,
@@ -835,85 +653,71 @@ export class ERC777Mock extends BaseContract {
       data: BytesLike,
       operatorData: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
+    ): Promise<BigNumber>
 
-    revokeOperator(
-      operator: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
+    revokeOperator(operator: string, overrides?: Overrides & { from?: string | Promise<string> }): Promise<BigNumber>
 
     send(
       recipient: string,
       amount: BigNumberish,
       data: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
+    ): Promise<BigNumber>
 
-    symbol(overrides?: CallOverrides): Promise<BigNumber>;
+    symbol(overrides?: CallOverrides): Promise<BigNumber>
 
-    totalSupply(overrides?: CallOverrides): Promise<BigNumber>;
+    totalSupply(overrides?: CallOverrides): Promise<BigNumber>
 
     transfer(
       recipient: string,
       amount: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
+    ): Promise<BigNumber>
 
     transferFrom(
       holder: string,
       recipient: string,
       amount: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
-  };
+    ): Promise<BigNumber>
+  }
 
   populateTransaction: {
-    allowance(
-      holder: string,
-      spender: string,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
+    allowance(holder: string, spender: string, overrides?: CallOverrides): Promise<PopulatedTransaction>
 
     approve(
       spender: string,
       value: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
     approveInternal(
       holder: string,
       spender: string,
       value: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
     authorizeOperator(
       operator: string,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
-    balanceOf(
-      tokenHolder: string,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
+    balanceOf(tokenHolder: string, overrides?: CallOverrides): Promise<PopulatedTransaction>
 
     burn(
       amount: BigNumberish,
       data: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
-    decimals(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    decimals(overrides?: CallOverrides): Promise<PopulatedTransaction>
 
-    defaultOperators(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    defaultOperators(overrides?: CallOverrides): Promise<PopulatedTransaction>
 
-    granularity(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    granularity(overrides?: CallOverrides): Promise<PopulatedTransaction>
 
-    isOperatorFor(
-      operator: string,
-      tokenHolder: string,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
+    isOperatorFor(operator: string, tokenHolder: string, overrides?: CallOverrides): Promise<PopulatedTransaction>
 
     mintInternal(
       to: string,
@@ -921,9 +725,9 @@ export class ERC777Mock extends BaseContract {
       userData: BytesLike,
       operatorData: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
-    name(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    name(overrides?: CallOverrides): Promise<PopulatedTransaction>
 
     operatorBurn(
       account: string,
@@ -931,7 +735,7 @@ export class ERC777Mock extends BaseContract {
       data: BytesLike,
       operatorData: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
     operatorSend(
       sender: string,
@@ -940,35 +744,35 @@ export class ERC777Mock extends BaseContract {
       data: BytesLike,
       operatorData: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
     revokeOperator(
       operator: string,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
     send(
       recipient: string,
       amount: BigNumberish,
       data: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
-    symbol(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    symbol(overrides?: CallOverrides): Promise<PopulatedTransaction>
 
-    totalSupply(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    totalSupply(overrides?: CallOverrides): Promise<PopulatedTransaction>
 
     transfer(
       recipient: string,
       amount: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
     transferFrom(
       holder: string,
       recipient: string,
       amount: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
-  };
+    ): Promise<PopulatedTransaction>
+  }
 }

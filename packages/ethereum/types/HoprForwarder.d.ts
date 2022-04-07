@@ -12,125 +12,99 @@ import {
   BaseContract,
   ContractTransaction,
   Overrides,
-  CallOverrides,
-} from "ethers";
-import { BytesLike } from "@ethersproject/bytes";
-import { Listener, Provider } from "@ethersproject/providers";
-import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
-import type { TypedEventFilter, TypedEvent, TypedListener } from "./common";
+  CallOverrides
+} from 'ethers'
+import { BytesLike } from '@ethersproject/bytes'
+import { Listener, Provider } from '@ethersproject/providers'
+import { FunctionFragment, EventFragment, Result } from '@ethersproject/abi'
+import type { TypedEventFilter, TypedEvent, TypedListener } from './common'
 
 interface HoprForwarderInterface extends ethers.utils.Interface {
   functions: {
-    "ERC1820_REGISTRY()": FunctionFragment;
-    "HOPR_TOKEN()": FunctionFragment;
-    "MULTISIG()": FunctionFragment;
-    "TOKENS_RECIPIENT_INTERFACE_HASH()": FunctionFragment;
-    "recoverTokens(address)": FunctionFragment;
-    "tokensReceived(address,address,address,uint256,bytes,bytes)": FunctionFragment;
-  };
+    'ERC1820_REGISTRY()': FunctionFragment
+    'HOPR_TOKEN()': FunctionFragment
+    'MULTISIG()': FunctionFragment
+    'TOKENS_RECIPIENT_INTERFACE_HASH()': FunctionFragment
+    'recoverTokens(address)': FunctionFragment
+    'tokensReceived(address,address,address,uint256,bytes,bytes)': FunctionFragment
+  }
 
+  encodeFunctionData(functionFragment: 'ERC1820_REGISTRY', values?: undefined): string
+  encodeFunctionData(functionFragment: 'HOPR_TOKEN', values?: undefined): string
+  encodeFunctionData(functionFragment: 'MULTISIG', values?: undefined): string
+  encodeFunctionData(functionFragment: 'TOKENS_RECIPIENT_INTERFACE_HASH', values?: undefined): string
+  encodeFunctionData(functionFragment: 'recoverTokens', values: [string]): string
   encodeFunctionData(
-    functionFragment: "ERC1820_REGISTRY",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "HOPR_TOKEN",
-    values?: undefined
-  ): string;
-  encodeFunctionData(functionFragment: "MULTISIG", values?: undefined): string;
-  encodeFunctionData(
-    functionFragment: "TOKENS_RECIPIENT_INTERFACE_HASH",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "recoverTokens",
-    values: [string]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "tokensReceived",
+    functionFragment: 'tokensReceived',
     values: [string, string, string, BigNumberish, BytesLike, BytesLike]
-  ): string;
+  ): string
 
-  decodeFunctionResult(
-    functionFragment: "ERC1820_REGISTRY",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(functionFragment: "HOPR_TOKEN", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "MULTISIG", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "TOKENS_RECIPIENT_INTERFACE_HASH",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "recoverTokens",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "tokensReceived",
-    data: BytesLike
-  ): Result;
+  decodeFunctionResult(functionFragment: 'ERC1820_REGISTRY', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'HOPR_TOKEN', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'MULTISIG', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'TOKENS_RECIPIENT_INTERFACE_HASH', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'recoverTokens', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'tokensReceived', data: BytesLike): Result
 
-  events: {};
+  events: {}
 }
 
 export class HoprForwarder extends BaseContract {
-  connect(signerOrProvider: Signer | Provider | string): this;
-  attach(addressOrName: string): this;
-  deployed(): Promise<this>;
+  connect(signerOrProvider: Signer | Provider | string): this
+  attach(addressOrName: string): this
+  deployed(): Promise<this>
 
   listeners<EventArgsArray extends Array<any>, EventArgsObject>(
     eventFilter?: TypedEventFilter<EventArgsArray, EventArgsObject>
-  ): Array<TypedListener<EventArgsArray, EventArgsObject>>;
+  ): Array<TypedListener<EventArgsArray, EventArgsObject>>
   off<EventArgsArray extends Array<any>, EventArgsObject>(
     eventFilter: TypedEventFilter<EventArgsArray, EventArgsObject>,
     listener: TypedListener<EventArgsArray, EventArgsObject>
-  ): this;
+  ): this
   on<EventArgsArray extends Array<any>, EventArgsObject>(
     eventFilter: TypedEventFilter<EventArgsArray, EventArgsObject>,
     listener: TypedListener<EventArgsArray, EventArgsObject>
-  ): this;
+  ): this
   once<EventArgsArray extends Array<any>, EventArgsObject>(
     eventFilter: TypedEventFilter<EventArgsArray, EventArgsObject>,
     listener: TypedListener<EventArgsArray, EventArgsObject>
-  ): this;
+  ): this
   removeListener<EventArgsArray extends Array<any>, EventArgsObject>(
     eventFilter: TypedEventFilter<EventArgsArray, EventArgsObject>,
     listener: TypedListener<EventArgsArray, EventArgsObject>
-  ): this;
+  ): this
   removeAllListeners<EventArgsArray extends Array<any>, EventArgsObject>(
     eventFilter: TypedEventFilter<EventArgsArray, EventArgsObject>
-  ): this;
+  ): this
 
-  listeners(eventName?: string): Array<Listener>;
-  off(eventName: string, listener: Listener): this;
-  on(eventName: string, listener: Listener): this;
-  once(eventName: string, listener: Listener): this;
-  removeListener(eventName: string, listener: Listener): this;
-  removeAllListeners(eventName?: string): this;
+  listeners(eventName?: string): Array<Listener>
+  off(eventName: string, listener: Listener): this
+  on(eventName: string, listener: Listener): this
+  once(eventName: string, listener: Listener): this
+  removeListener(eventName: string, listener: Listener): this
+  removeAllListeners(eventName?: string): this
 
   queryFilter<EventArgsArray extends Array<any>, EventArgsObject>(
     event: TypedEventFilter<EventArgsArray, EventArgsObject>,
     fromBlockOrBlockhash?: string | number | undefined,
     toBlock?: string | number | undefined
-  ): Promise<Array<TypedEvent<EventArgsArray & EventArgsObject>>>;
+  ): Promise<Array<TypedEvent<EventArgsArray & EventArgsObject>>>
 
-  interface: HoprForwarderInterface;
+  interface: HoprForwarderInterface
 
   functions: {
-    ERC1820_REGISTRY(overrides?: CallOverrides): Promise<[string]>;
+    ERC1820_REGISTRY(overrides?: CallOverrides): Promise<[string]>
 
-    HOPR_TOKEN(overrides?: CallOverrides): Promise<[string]>;
+    HOPR_TOKEN(overrides?: CallOverrides): Promise<[string]>
 
-    MULTISIG(overrides?: CallOverrides): Promise<[string]>;
+    MULTISIG(overrides?: CallOverrides): Promise<[string]>
 
-    TOKENS_RECIPIENT_INTERFACE_HASH(
-      overrides?: CallOverrides
-    ): Promise<[string]>;
+    TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<[string]>
 
     recoverTokens(
       token: string,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
     tokensReceived(
       operator: string,
@@ -140,21 +114,21 @@ export class HoprForwarder extends BaseContract {
       userData: BytesLike,
       operatorData: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
-  };
+    ): Promise<ContractTransaction>
+  }
 
-  ERC1820_REGISTRY(overrides?: CallOverrides): Promise<string>;
+  ERC1820_REGISTRY(overrides?: CallOverrides): Promise<string>
 
-  HOPR_TOKEN(overrides?: CallOverrides): Promise<string>;
+  HOPR_TOKEN(overrides?: CallOverrides): Promise<string>
 
-  MULTISIG(overrides?: CallOverrides): Promise<string>;
+  MULTISIG(overrides?: CallOverrides): Promise<string>
 
-  TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<string>;
+  TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<string>
 
   recoverTokens(
     token: string,
     overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
   tokensReceived(
     operator: string,
@@ -164,18 +138,18 @@ export class HoprForwarder extends BaseContract {
     userData: BytesLike,
     operatorData: BytesLike,
     overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
   callStatic: {
-    ERC1820_REGISTRY(overrides?: CallOverrides): Promise<string>;
+    ERC1820_REGISTRY(overrides?: CallOverrides): Promise<string>
 
-    HOPR_TOKEN(overrides?: CallOverrides): Promise<string>;
+    HOPR_TOKEN(overrides?: CallOverrides): Promise<string>
 
-    MULTISIG(overrides?: CallOverrides): Promise<string>;
+    MULTISIG(overrides?: CallOverrides): Promise<string>
 
-    TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<string>;
+    TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<string>
 
-    recoverTokens(token: string, overrides?: CallOverrides): Promise<void>;
+    recoverTokens(token: string, overrides?: CallOverrides): Promise<void>
 
     tokensReceived(
       operator: string,
@@ -185,26 +159,21 @@ export class HoprForwarder extends BaseContract {
       userData: BytesLike,
       operatorData: BytesLike,
       overrides?: CallOverrides
-    ): Promise<void>;
-  };
+    ): Promise<void>
+  }
 
-  filters: {};
+  filters: {}
 
   estimateGas: {
-    ERC1820_REGISTRY(overrides?: CallOverrides): Promise<BigNumber>;
+    ERC1820_REGISTRY(overrides?: CallOverrides): Promise<BigNumber>
 
-    HOPR_TOKEN(overrides?: CallOverrides): Promise<BigNumber>;
+    HOPR_TOKEN(overrides?: CallOverrides): Promise<BigNumber>
 
-    MULTISIG(overrides?: CallOverrides): Promise<BigNumber>;
+    MULTISIG(overrides?: CallOverrides): Promise<BigNumber>
 
-    TOKENS_RECIPIENT_INTERFACE_HASH(
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
+    TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<BigNumber>
 
-    recoverTokens(
-      token: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
+    recoverTokens(token: string, overrides?: Overrides & { from?: string | Promise<string> }): Promise<BigNumber>
 
     tokensReceived(
       operator: string,
@@ -214,24 +183,22 @@ export class HoprForwarder extends BaseContract {
       userData: BytesLike,
       operatorData: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
-  };
+    ): Promise<BigNumber>
+  }
 
   populateTransaction: {
-    ERC1820_REGISTRY(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    ERC1820_REGISTRY(overrides?: CallOverrides): Promise<PopulatedTransaction>
 
-    HOPR_TOKEN(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    HOPR_TOKEN(overrides?: CallOverrides): Promise<PopulatedTransaction>
 
-    MULTISIG(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    MULTISIG(overrides?: CallOverrides): Promise<PopulatedTransaction>
 
-    TOKENS_RECIPIENT_INTERFACE_HASH(
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
+    TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<PopulatedTransaction>
 
     recoverTokens(
       token: string,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
     tokensReceived(
       operator: string,
@@ -241,6 +208,6 @@ export class HoprForwarder extends BaseContract {
       userData: BytesLike,
       operatorData: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
-  };
+    ): Promise<PopulatedTransaction>
+  }
 }
