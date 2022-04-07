@@ -1,5 +1,5 @@
 import type { default as LibP2P, MuxedStream, HandlerProps } from 'libp2p'
-import type PeerId from 'peer-id'
+import PeerId from 'peer-id'
 import type Connection from 'libp2p-interfaces/src/connection/connection'
 import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
 import { type Multiaddr } from 'multiaddr'
@@ -70,7 +70,7 @@ class Relay {
   private _dialNodeDirectly: Relay['dialNodeDirectly'] | undefined
 
   private stopKeepAlive: (() => void) | undefined
-  private connectionsToRelays: Map<string, Connection>
+  private connectedToRelays: Set<string>
 
   constructor(
     public libp2p: ReducedLibp2p,
@@ -90,7 +90,7 @@ class Relay {
     // to make sure we don't close these connections
     this.usedRelays = []
 
-    this.connectionsToRelays = new Map()
+    this.connectedToRelays = new Set()
   }
 
   /**
@@ -139,8 +139,11 @@ class Relay {
       await this.relayState.forEach((dst) => log(`- ${dst}`))
     }
 
-    log(`Current connected relays: `)
-    this.connectionsToRelays.forEach((_, key) => log(`- ${key}`))
+    log(`Currently tracked connections to relays: `)
+    this.connectedToRelays.forEach((relayPeerId) => {
+      const countConns = this.libp2p.connectionManager.getAll(PeerId.createFromB58String(relayPeerId)).length
+      log(`- ${relayPeerId}: ${countConns} connections`)
+    })
   }
 
   /**
@@ -149,7 +152,7 @@ class Relay {
   stop(): void {
     this.webRTCUpgrader.stop()
     this.stopKeepAlive?.()
-    this.connectionsToRelays.clear()
+    this.connectedToRelays.clear()
   }
 
   /**
@@ -209,7 +212,7 @@ class Relay {
       return
     }
 
-    this.connectionsToRelays.set(relay.toB58String(), baseConnection.conn)
+    this.connectedToRelays.add(relay.toB58String())
 
     const conn = this.upgradeOutbound(relay, destination, handshakeResult.stream, options)
 
