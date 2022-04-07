@@ -271,7 +271,7 @@ class Hopr extends EventEmitter {
       (peer: PeerId) => this.publicNodesEmitter.emit('removePublicNode', peer)
     )
     // unignore all peers if whitelist is disabled
-    this.connector.on('enabled-network-registry', (enabled: boolean) => {
+    this.connector.on('network-registry-status-changed', (enabled: boolean) => {
       if (!enabled) this.networkPeers.unignoreAllPeers()
     })
     this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessage, hangup, this.environment.id, this.options)
