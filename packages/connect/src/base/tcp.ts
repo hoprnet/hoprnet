@@ -1,5 +1,5 @@
 import net, { type Socket, type AddressInfo } from 'net'
-import abortable, { AbortError } from 'abortable-iterator'
+import abortable from 'abortable-iterator'
 import Debug from 'debug'
 import { nodeToMultiaddr, toU8aStream } from '../utils'
 
@@ -53,8 +53,10 @@ class TCPConnection implements MultiaddrConnection {
 
     this.sink = this._sink.bind(this)
 
-    // @ts-ignore
-    this.source = this._signal != undefined ? abortable(this._stream.source, this._signal) : this._stream.source
+    this.source =
+      this._signal != undefined
+        ? abortable(this._stream.source, this._signal)
+        : (this._stream.source as AsyncIterable<StreamType>)
   }
 
   public close(): Promise<void> {
@@ -136,9 +138,6 @@ class TCPConnection implements MultiaddrConnection {
    * @returns Resolves a TCP Socket
    */
   public static create(ma: Multiaddr, self: PeerId, options?: HoprConnectDialOptions): Promise<TCPConnection> {
-    if (options?.signal?.aborted) {
-      return Promise.reject(new AbortError())
-    }
 
     return new Promise<TCPConnection>((resolve, reject) => {
       const start = Date.now()

@@ -8,7 +8,6 @@ import type HoprConnect from '..'
 
 import type { Stream, HoprConnectOptions, HoprConnectDialOptions, HoprConnectTestingOptions } from '../types'
 
-import { AbortError } from 'abortable-iterator'
 import debug from 'debug'
 
 import { WebRTCUpgrader, WebRTCConnection } from '../webrtc'
@@ -208,10 +207,6 @@ class Relay {
         }
       }
       return
-    }
-
-    if (options?.signal?.aborted) {
-      throw new AbortError()
     }
 
     const conn = this.upgradeOutbound(relay, destination, handshakeResult.stream, options)

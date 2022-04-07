@@ -2082,5 +2082,26 @@
     "uploadedTo": {
       "http://80.208.229.228:5001": "Mon, 04 Apr 2022 12:46:06 GMT"
     }
+  },
+  "1.88.23": {
+    "hash": "/ipfs/QmTNhJCuvp5E3o6kxRitXbp622qCcmgtzWbf4bqMcbkqiT",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Tue, 05 Apr 2022 07:26:52 GMT"
+    }
+  },
+  "1.88.24": {
+    "hash": "/ipfs/Qmeohg7sP1nEYrW5vQiWe8Dr3TVo8WqGvgWBToUjo4MRPS",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Tue, 05 Apr 2022 13:08:29 GMT"
+    }
+  },
+  "1.88.25": {
+    "hash": "/ipfs/QmTT3VCfKDcWfsSqPGoBkJrZNEifKLUHPyMtvfsJRumkKD",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Wed, 06 Apr 2022 07:49:45 GMT"
+    }
   }
 }

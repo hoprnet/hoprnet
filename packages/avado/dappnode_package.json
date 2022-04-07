@@ -1,13 +1,13 @@
 {
   "name": "hopr.avado.dnp.dappnode.eth",
-  "version": "1.88.22",
+  "version": "1.88.25",
   "description": "HOPR is an open incentivized mixnet which enables privacy-preserving point-to-point data exchange. HOPR is similar to Tor but actually private, decentralized and economically sustainable.",
   "avatar": "/ipfs/QmX8oTreTovBjr3QmV4UT5nfNbjYxJJJy3dswYVgcYattE",
   "type": "service",
   "autoupdate": true,
   "image": {
     "volumes": [
-      "db:/app/db"
+      "db:/app/hoprd-db"
     ],
     "environment": [
       "DEBUG=hopr*"
