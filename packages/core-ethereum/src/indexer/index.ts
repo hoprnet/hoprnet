@@ -807,6 +807,7 @@ class Indexer extends EventEmitter {
     event: RegistryEvent<'EnabledNetworkRegistry'>,
     lastSnapshot: Snapshot
   ): Promise<void> {
+    this.emit('enabled-network-registry', event.args.isEnabled)
     await this.db.setWhitelistEnabled(event.args.isEnabled, lastSnapshot)
   }
 

@@ -1,7 +1,9 @@
 import { type HeartbeatPingResult } from './heartbeat'
 import PeerId from 'peer-id'
-import { randomSubset } from '@hoprnet/hopr-utils'
+import { randomSubset, debug } from '@hoprnet/hopr-utils'
 import { NETWORK_QUALITY_THRESHOLD } from '../constants'
+
+const log = debug('hopr-core:network-peers')
 
 export type Entry = {
   id: PeerId
@@ -251,6 +253,11 @@ class NetworkPeers {
     if (index >= 0) {
       this.ignoredPeers.splice(index, 1)
     }
+  }
+
+  public unignoreAllPeers(): void {
+    log('Unignoring all peers')
+    this.ignoredPeers = []
   }
 }
 

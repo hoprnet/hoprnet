@@ -270,6 +270,10 @@ class Hopr extends EventEmitter {
       [this.id],
       (peer: PeerId) => this.publicNodesEmitter.emit('removePublicNode', peer)
     )
+    // unignore all peers if whitelist is disabled
+    this.connector.on('enabled-network-registry', (enabled: boolean) => {
+      if (!enabled) this.networkPeers.unignoreAllPeers()
+    })
     this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessage, hangup, this.environment.id, this.options)
 
     this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
