@@ -145,7 +145,6 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
    * @returns An upgraded Connection
    */
   async dial(ma: Multiaddr, options: HoprConnectDialOptions = {}): Promise<Connection> {
-
     const maTuples = ma.tuples()
 
     // This works because destination peerId is for both address

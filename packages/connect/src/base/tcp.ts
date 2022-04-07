@@ -139,7 +139,6 @@ class TCPConnection implements MultiaddrConnection {
    * @returns Resolves a TCP Socket
    */
   public static create(ma: Multiaddr, self: PeerId, options?: HoprConnectDialOptions): Promise<TCPConnection> {
-
     return new Promise<TCPConnection>((resolve, reject) => {
       const start = Date.now()
       const cOpts = ma.toOptions()
