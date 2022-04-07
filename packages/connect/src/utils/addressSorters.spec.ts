@@ -3,7 +3,7 @@ import assert from 'assert'
 
 import { maToClass, AddressClass, compareAddressesPublicMode, compareAddressesLocalMode } from './addressSorters'
 
-const PUBLLIC_ADDRESS = new Multiaddr(
+const PUBLIC_ADDRESS = new Multiaddr(
   `/ip4/84.148.73.225/tcp/62492/p2p/16Uiu2HAm85aCSXNVxwQPBsfHm2hZEvNRmYxvfBhHSQgNgKyKBnWG`
 )
 const CIRCUIT_ADDRESS_1 = new Multiaddr(
@@ -21,7 +21,7 @@ const LOOPBACK_ADDRESS = new Multiaddr(
 
 describe('test address sorting', function () {
   it('classification', function () {
-    assert(maToClass(PUBLLIC_ADDRESS) == AddressClass.Public)
+    assert(maToClass(PUBLIC_ADDRESS) == AddressClass.Public)
     assert(maToClass(CIRCUIT_ADDRESS_1) == AddressClass.Circuit)
     assert(maToClass(CIRCUIT_ADDRESS_2) == AddressClass.Circuit)
     assert(maToClass(LOCAL_B_ADDRESS) == AddressClass.PrivateB)
@@ -29,11 +29,11 @@ describe('test address sorting', function () {
   })
 
   it('sort', function () {
-    const addrs = [PUBLLIC_ADDRESS, CIRCUIT_ADDRESS_1, LOCAL_B_ADDRESS, LOOPBACK_ADDRESS]
+    const addrs = [PUBLIC_ADDRESS, CIRCUIT_ADDRESS_1, LOCAL_B_ADDRESS, LOOPBACK_ADDRESS]
 
-    const addrsPublicOrder = [PUBLLIC_ADDRESS, CIRCUIT_ADDRESS_1, LOCAL_B_ADDRESS, LOOPBACK_ADDRESS]
+    const addrsPublicOrder = [PUBLIC_ADDRESS, CIRCUIT_ADDRESS_1, LOCAL_B_ADDRESS, LOOPBACK_ADDRESS]
 
-    const addrsLocalOrder = [LOOPBACK_ADDRESS, LOCAL_B_ADDRESS, CIRCUIT_ADDRESS_1, PUBLLIC_ADDRESS]
+    const addrsLocalOrder = [LOOPBACK_ADDRESS, LOCAL_B_ADDRESS, CIRCUIT_ADDRESS_1, PUBLIC_ADDRESS]
 
     assert(
       addrs
