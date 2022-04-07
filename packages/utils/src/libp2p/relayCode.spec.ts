@@ -70,6 +70,7 @@ async function getNode(id = getPeerId()): Promise<Libp2p> {
 
 describe('relay code generation', function () {
   it('provide and fetch CID key', async function () {
+    this.timeout(5e3)
     const nodeA = await getNode(peerA)
     const nodeB = await getNode(peerB)
     const nodeC = await getNode(peerC)

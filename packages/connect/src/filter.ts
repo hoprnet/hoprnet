@@ -236,11 +236,9 @@ export class Filter {
     // Allow multiple nodes on same host - independent of address type
     for (const announcedAddr of this.announcedAddrs!) {
       switch (announcedAddr.type) {
-        case AddressType.P2P:
-          continue
         case AddressType.IPv4:
         case AddressType.IPv6:
-          if (u8aEquals(announcedAddr.address, address.address)) {
+          if (address.type === announcedAddr.type && u8aEquals(announcedAddr.address, address.address)) {
             // Always allow dials to own address whenever port is different
             // and block if port is identical
             if (address.port == announcedAddr.port) {

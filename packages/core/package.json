@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "1.88.26",
+  "version": "1.88.27",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -33,7 +33,6 @@
     "@hoprnet/hopr-connect": "workspace:packages/connect",
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
-    "abort-controller": "3.0.0",
     "bn.js": "5.2.0",
     "chalk": "4.1.2",
     "datastore-level": "^8.0.0",

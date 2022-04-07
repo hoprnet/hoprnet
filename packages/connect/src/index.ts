@@ -207,8 +207,8 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
 
   /**
    * Attempts to establish a relayed connection to one of the given relays.
-   * @param ma destination
-   * @param relays potential relays that we can use
+   * @param relay peerId of designated relay that we can use
+   * @param destination peerId of destination
    * @param options optional dial options
    */
   private async dialWithRelay(
@@ -257,5 +257,6 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
 }
 
 export type { PublicNodesEmitter, HoprConnectConfig, HoprConnectDialOptions, HoprConnectListeningOptions }
+export { compareAddressesLocalMode, compareAddressesPublicMode } from './utils'
 
 export default HoprConnect
