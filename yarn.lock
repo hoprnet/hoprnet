@@ -16666,9 +16666,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"libp2p@npm:0.36.2":
+"libp2p@https://github.com/hoprnet/js-libp2p/archive/refs/tags/v0.36.3.tar.gz":
   version: 0.36.2
-  resolution: "libp2p@npm:0.36.2"
+  resolution: "libp2p@https://github.com/hoprnet/js-libp2p/archive/refs/tags/v0.36.3.tar.gz"
   dependencies:
     "@vascosantos/moving-average": ^1.1.0
     abortable-iterator: ^3.0.0
@@ -16724,7 +16724,7 @@ __metadata:
     varint: ^6.0.0
     wherearewe: ^1.0.0
     xsalsa20: ^1.1.0
-  checksum: 66d9ed9f370cbfed65aab4c6085bba1fae220249f59f52bd3417b7b021b0efdd7cb8615cf57b5f760b11f44033854d1408bba025877bed771d40878bee45bf6b
+  checksum: 6ca574b491bf16a1b8ea50fe6cc744b71407498e86eb9cad91ff0751b834104bbc4f0d4ddfc94028c43c3f59f18e7b09c91b69211ba4ae3efa817a6070d82159
   languageName: node
   linkType: hard
 
