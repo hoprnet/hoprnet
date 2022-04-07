@@ -47,14 +47,14 @@ COPY --from=build /app .
 
 # create directory which is later used for the database, so that it inherits
 # permissions when mapped to a volume
-RUN mkdir db
+RUN mkdir hoprd-db
 
 # DISABLED temporarily until a migration path has been tested
 # switch to normal user, to prevent dangerous root access
 # RUN chown -R node:node .
 
 # set volume which can be mapped by users on the host system
-VOLUME ["/app/db"]
+VOLUME ["/app/hoprd-db"]
 
 # DISABLED temporarily until a migration path has been tested
 # finally set the non-root user so the process also run un-privilidged

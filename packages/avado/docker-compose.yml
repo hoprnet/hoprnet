@@ -2,7 +2,7 @@ version: '3.4'
 services:
   hopr.avado.dnp.dappnode.eth:
     build: ./build
-    image: 'hopr.avado.dnp.dappnode.eth:1.88.24'
+    image: 'hopr.avado.dnp.dappnode.eth:1.88.26'
     environment:
       DEBUG: hopr*
     restart: always
@@ -10,7 +10,7 @@ services:
     volumes:
       - type: volume
         source: db
-        target: /app/db
+        target: /app/hoprd-db
     ports:
       - '9091'
       - '3000'
