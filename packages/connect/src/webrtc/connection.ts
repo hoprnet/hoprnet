@@ -478,7 +478,7 @@ class WebRTCConnection implements MultiaddrConnection {
    */
   async close(err?: Error): Promise<void> {
     if (err) {
-      this.error(`Error while attempting to close stream: ${err}`)
+      this.error(`Error while attempting to close stream to ${this.remoteAddr}: ${err}`)
     }
     if (this.destroyed) {
       return
@@ -491,13 +491,13 @@ class WebRTCConnection implements MultiaddrConnection {
     try {
       this.channel.destroy()
     } catch (e) {
-      this.error(`Error while destroying WebRTC instance: ${e}`)
+      this.error(`Error while destroying WebRTC instance to ${this.remoteAddr}: ${e}`)
     }
 
     try {
       await this.relayConn.close()
     } catch (e) {
-      this.error(`Error while destroying relay connection: ${e}`)
+      this.error(`Error while destroying relay connection to ${this.remoteAddr}: ${e}`)
     }
 
     this.log(`Connection to ${this.remoteAddr} has been destroyed`)

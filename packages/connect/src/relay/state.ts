@@ -1,7 +1,7 @@
 import { Stream } from '../types'
 import type PeerId from 'peer-id'
 
-import { u8aCompare } from '@hoprnet/hopr-utils'
+import { nAtATime, u8aCompare } from '@hoprnet/hopr-utils'
 import { RelayContext } from './context'
 
 import debug from 'debug'
@@ -98,10 +98,11 @@ class RelayState {
    * Performs an operation for each relay context in the current set.
    * @param action
    */
-  async forEach(action: (dst: string, ctx: RelayContext) => void) {
-    await Promise.all(
-      Array.from(this.relayedConnections.values()).map((s) => Object.entries(s).map((e) => action(e[0], e[1])))
-    )
+  async forEach(action: (dst: string, ctx: RelayContext) => Promise<void>) {
+    await nAtATime((objEntries) => action(objEntries[0], objEntries[1]),
+      Array.from(this.relayedConnections.values()).map((s) => Object.entries(s)),
+      10 // TODO: Make this configurable or use an existing constant
+      )
   }
 
   /**

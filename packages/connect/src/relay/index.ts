@@ -136,7 +136,7 @@ class Relay {
     // TODO: perform ping as well
     if (this.relayState.relayedConnectionCount() > 0) {
       log(`Current relay connections: `)
-      await this.relayState.forEach((dst) => log(`- ${dst}`))
+      await this.relayState.forEach(async (dst) => log(`- ${dst}`))
     }
 
     log(`Currently tracked connections to relays: `)
@@ -150,9 +150,9 @@ class Relay {
    * Unassigns event listeners
    */
   stop(): void {
-    this.webRTCUpgrader.stop()
     this.stopKeepAlive?.()
     this.connectedToRelays.clear()
+    this.webRTCUpgrader.stop()
   }
 
   /**
