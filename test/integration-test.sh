@@ -413,16 +413,16 @@ log "hopr addr5: ${addr5} ${native_addr5} ${multiaddr5}"
 log "hopr addr7: ${addr7} ${native_addr7} ${multiaddr7}"
 log "hopr addr8: ${addr8} ${native_addr8} ${multiaddr8}"
 
-# add nodes 1,2,3,4,5,7 in whitelist, do NOT add node 8
-log "Adding nodes to whitelist"
+# add nodes 1,2,3,4,5,7 in register, do NOT add node 8
+log "Adding nodes to register"
 HOPR_ENVIRONMENT_ID=hardhat-localhost \
 TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-yarn workspace @hoprnet/hopr-ethereum hardhat whitelist \
+yarn workspace @hoprnet/hopr-ethereum hardhat register \
   --network hardhat \
   --task add \
   --native-addresses "$native_addr1,$native_addr2,$native_addr3,$native_addr4,$native_addr5,$native_addr7" \
   --multiaddresses "$multiaddr1,$multiaddr2,$multiaddr3,$multiaddr4,$multiaddr5,$multiaddr7"
-log "Nodes added to whitelist"
+log "Nodes added to register"
 
 # running withdraw and checking it results at the end of this test run
 balances=$(get_balances ${api1})
@@ -485,11 +485,11 @@ log "Node 1 should not be able to talk to Node 7 (different environment id)"
 result=$(ping "${api1}" ${addr7} "TIMEOUT")
 log "-- ${result}"
 
-log "Node 8 should not be able to talk to Node 1 (Node 8 is not in the whitelist)"
+log "Node 8 should not be able to talk to Node 1 (Node 8 is not in the register)"
 result=$(ping "${api8}" ${addr1} "TIMEOUT")
 log "-- ${result}"
 
-log "Node 1 should not be able to talk to Node 8 (Node 8 is not in the whitelist)"
+log "Node 1 should not be able to talk to Node 8 (Node 8 is not in the register)"
 result=$(ping "${api1}" ${addr8} "TIMEOUT")
 log "-- ${result}"
 

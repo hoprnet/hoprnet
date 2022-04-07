@@ -1,7 +1,7 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import { utils } from 'ethers'
 
-export type Whitelist =
+export type RegisterOpts =
   | {
       task: 'add'
       nativeAddresses: string
@@ -15,7 +15,7 @@ export type Whitelist =
  * Used by our E2E tests to interact with 'HoprNetworkRegistry' and 'HoprDummyProxyForNetworkRegistry'.
  */
 async function main(
-  opts: Whitelist,
+  opts: RegisterOpts,
   { network, ethers, deployments, environment }: HardhatRuntimeEnvironment,
   _runSuper: RunSuperFunction<any>
 ): Promise<void> {
@@ -25,7 +25,7 @@ async function main(
   }
 
   if (network.name !== 'hardhat') {
-    console.error('AddToWhitelist only works in a hardhat network.')
+    console.error('Register only works in a hardhat network.')
     process.exit(1)
   }
 

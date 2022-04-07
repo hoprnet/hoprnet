@@ -360,7 +360,7 @@ setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}" "--test
 setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--announce --run \"info;balance\""
 # should not be able to talk to the rest
 setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--announce --environment hardhat-localhost2"
-# node n8 will be the only one NOT whitelisted
+# node n8 will be the only one NOT registered
 setup_node 13308 19098 19508 "${node8_dir}" "${node8_log}" "${node8_id}" "--announce"
 # }}}
 

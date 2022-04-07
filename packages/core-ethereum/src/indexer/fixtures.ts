@@ -200,7 +200,7 @@ export const PARTY_A_TRANSFER_OUTGOING = {
   } as any
 } as TokenEvent<'Transfer'>
 
-export const WHITELIST_ENABLED = {
+export const REGISTER_ENABLED = {
   event: 'EnabledNetworkRegistry',
   transactionHash: '',
   blockNumber: 1,
@@ -211,7 +211,7 @@ export const WHITELIST_ENABLED = {
   } as any
 } as RegistryEvent<'EnabledNetworkRegistry'>
 
-export const WHITELIST_DISABLED = {
+export const REGISTER_DISABLED = {
   event: 'EnabledNetworkRegistry',
   transactionHash: '',
   blockNumber: 3,
