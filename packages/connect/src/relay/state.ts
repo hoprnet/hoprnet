@@ -99,10 +99,11 @@ class RelayState {
    * @param action
    */
   async forEach(action: (dst: string, ctx: RelayContext) => Promise<void>) {
-    await nAtATime((objEntries) => action(objEntries[0], objEntries[1]),
+    await nAtATime(
+      (objEntries) => action(objEntries[0], objEntries[1]),
       Array.from(this.relayedConnections.values()).map((s) => Object.entries(s)),
       10 // TODO: Make this configurable or use an existing constant
-      )
+    )
   }
 
   /**
