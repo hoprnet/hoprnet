@@ -90,6 +90,7 @@ class Relay {
     // to make sure we don't close these connections
     this.usedRelays = []
 
+    // Gathers relay peer IDs the node connected
     this.connectedToRelays = new Set()
   }
 
@@ -112,6 +113,7 @@ class Relay {
 
     this.webRTCUpgrader.start()
 
+    // Periodic function that prints relay connections (and will also do pings in future)
     const periodicKeepAlive = async function (this: Relay) {
       try {
         await this.keepAliveRelayConnection()
