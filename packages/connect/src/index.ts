@@ -1,6 +1,5 @@
 import Debug from 'debug'
 import { CODE_DNS4, CODE_DNS6, CODE_IP4, CODE_IP6, CODE_P2P } from './constants'
-import { AbortError } from 'abortable-iterator'
 import type { Multiaddr } from 'multiaddr'
 import PeerId from 'peer-id'
 import type Connection from 'libp2p-interfaces/src/connection/connection'
@@ -146,10 +145,6 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
    * @returns An upgraded Connection
    */
   async dial(ma: Multiaddr, options: HoprConnectDialOptions = {}): Promise<Connection> {
-    if (options.signal?.aborted) {
-      throw new AbortError()
-    }
-
     const maTuples = ma.tuples()
 
     // This works because destination peerId is for both address
