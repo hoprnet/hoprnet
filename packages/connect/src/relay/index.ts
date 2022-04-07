@@ -209,6 +209,8 @@ class Relay {
       return
     }
 
+    this.connectionsToRelays.set(relay.toB58String(), baseConnection.conn)
+
     const conn = this.upgradeOutbound(relay, destination, handshakeResult.stream, options)
 
     log(`successfully established relay connection to ${relay.toB58String()}`)
