@@ -207,7 +207,6 @@ export class Filter {
       // If private address connections are explicitly allowed, do not dial them
       if (!this.opts.allowPrivateConnections) {
         // Do not pollute logs by rejecting private address connections attempts
-        console.log(`private connection ${ma.toString()}`)
         return false
       }
 

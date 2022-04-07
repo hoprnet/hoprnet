@@ -10,7 +10,7 @@ import type { default as LibP2P, Connection } from 'libp2p'
 import type { Peer } from 'libp2p/src/peer-store/types'
 import type PeerId from 'peer-id'
 
-import { compareAddressesLocalMode, compareAddressesPublicMode, HoprConnectConfig } from '@hoprnet/hopr-connect'
+import { compareAddressesLocalMode, compareAddressesPublicMode, type HoprConnectConfig } from '@hoprnet/hopr-connect'
 
 import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants'
 
@@ -65,7 +65,6 @@ import { PacketForwardInteraction } from './interactions/packet/forward'
 import { Packet } from './messages'
 import type { ResolvedEnvironment } from './environment'
 import { createLibp2pInstance } from './main'
-import { Receipt } from '@hoprnet/hopr-core-ethereum/src/ethereum'
 
 const DEBUG_PREFIX = `hopr-core`
 const log = debug(DEBUG_PREFIX)
@@ -936,7 +935,7 @@ class Hopr extends EventEmitter {
     amountToFund: BN
   ): Promise<{
     channelId: Hash
-    receipt: Receipt
+    receipt: string
   }> {
     const counterpartyPubKey = PublicKey.fromPeerId(counterparty)
     const myAvailableTokens = await this.connector.getBalance(true)
