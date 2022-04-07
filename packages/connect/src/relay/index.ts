@@ -135,7 +135,7 @@ class Relay {
   }
 
   protected async keepAliveRelayConnection(): Promise<void> {
-    // TODO: perform ping as well
+    // TODO: perform ping as well, right now just prints out connection info
     if (this.relayState.relayedConnectionCount() > 0) {
       log(`Current relay connections: `)
       await this.relayState.forEach(async (dst) => log(`- ${dst}`))
