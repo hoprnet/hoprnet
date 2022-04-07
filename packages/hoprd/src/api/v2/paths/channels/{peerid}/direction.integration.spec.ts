@@ -2,7 +2,7 @@ import assert from 'assert'
 import sinon from 'sinon'
 import { ChannelEntry } from '@hoprnet/hopr-utils'
 import { STATUS_CODES } from '../../../utils'
-import { invalidTestPeerId, testPeerId, testPeerIdInstance, ALICE_PEER_ID as COUNTERPARTY } from '../../../fixtures'
+import { ALICE_PEER_ID, BOB_PEER_ID, INVALID_PEER_ID } from '../../../fixtures'
 import { getChannel, closeChannel } from './{direction}'
 import { formatIncomingChannel, formatOutgoingChannel } from '..'
 
@@ -11,12 +11,12 @@ let node = sinon.fake() as any
 describe('getChannel', function () {
   const outgoingMock = ChannelEntry.createMock()
   const incomingMock = ChannelEntry.createMock()
-  node.getId = sinon.fake.returns(testPeerIdInstance)
+  node.getId = sinon.fake.returns(ALICE_PEER_ID)
 
   it('should return no channels', async function () {
     assert.rejects(
       () => {
-        return getChannel(node, COUNTERPARTY.toB58String(), 'incoming')
+        return getChannel(node, BOB_PEER_ID.toB58String(), 'incoming')
       },
       (err: Error) => {
         return err.message.includes(STATUS_CODES.CHANNEL_NOT_FOUND)
@@ -24,7 +24,7 @@ describe('getChannel', function () {
     )
     assert.rejects(
       () => {
-        return getChannel(node, COUNTERPARTY.toB58String(), 'outgoing')
+        return getChannel(node, BOB_PEER_ID.toB58String(), 'outgoing')
       },
       (err: Error) => {
         return err.message.includes(STATUS_CODES.CHANNEL_NOT_FOUND)
@@ -34,22 +34,22 @@ describe('getChannel', function () {
 
   it('should return outgoing channel', async function () {
     node.getChannel = sinon.stub()
-    node.getChannel.withArgs(testPeerIdInstance, COUNTERPARTY).resolves(outgoingMock)
+    node.getChannel.withArgs(ALICE_PEER_ID, BOB_PEER_ID).resolves(outgoingMock)
 
-    const outgoing = await getChannel(node, COUNTERPARTY.toB58String(), 'outgoing')
+    const outgoing = await getChannel(node, BOB_PEER_ID.toB58String(), 'outgoing')
     assert.notEqual(outgoing, undefined)
     assert.deepEqual(outgoing, formatOutgoingChannel(outgoingMock))
   })
 
   it('should return outgoing and incoming channels', async function () {
     node.getChannel = sinon.stub()
-    node.getChannel.withArgs(testPeerIdInstance, COUNTERPARTY).resolves(outgoingMock)
-    node.getChannel.withArgs(COUNTERPARTY, testPeerIdInstance).resolves(incomingMock)
+    node.getChannel.withArgs(ALICE_PEER_ID, BOB_PEER_ID).resolves(outgoingMock)
+    node.getChannel.withArgs(BOB_PEER_ID, ALICE_PEER_ID).resolves(incomingMock)
 
-    const outgoing = await getChannel(node, COUNTERPARTY.toB58String(), 'outgoing')
+    const outgoing = await getChannel(node, BOB_PEER_ID.toB58String(), 'outgoing')
     assert.notEqual(outgoing, undefined)
     assert.deepEqual(outgoing, formatOutgoingChannel(outgoingMock))
-    const incoming = await getChannel(node, COUNTERPARTY.toB58String(), 'incoming')
+    const incoming = await getChannel(node, BOB_PEER_ID.toB58String(), 'incoming')
     assert.notEqual(incoming, undefined)
     assert.deepEqual(incoming, formatIncomingChannel(incomingMock))
   })
@@ -60,7 +60,7 @@ describe('closeChannel', () => {
     const expectedStatus = { channelStatus: 2, receipt: 'receipt' }
     node.closeChannel = sinon.fake.returns({ status: expectedStatus.channelStatus, receipt: expectedStatus.receipt })
 
-    const closureStatus = await closeChannel(node, testPeerId, 'outgoing')
+    const closureStatus = await closeChannel(node, ALICE_PEER_ID.toB58String(), 'outgoing')
     assert.deepEqual(closureStatus, expectedStatus)
   })
 
@@ -70,7 +70,7 @@ describe('closeChannel', () => {
 
     assert.rejects(
       () => {
-        return closeChannel(node, invalidTestPeerId, 'outgoing')
+        return closeChannel(node, INVALID_PEER_ID, 'outgoing')
       },
       (err: Error) => {
         return err.message.includes(STATUS_CODES.INVALID_PEERID)
@@ -83,7 +83,7 @@ describe('closeChannel', () => {
 
     assert.rejects(
       () => {
-        return closeChannel(node, testPeerId, 'outgoing')
+        return closeChannel(node, ALICE_PEER_ID.toB58String(), 'outgoing')
       },
       // we only care if it throws
       (_err: Error) => {
