@@ -417,8 +417,9 @@ log "hopr addr8: ${addr8} ${native_addr8} ${multiaddr8}"
 log "Adding nodes to whitelist"
 HOPR_ENVIRONMENT_ID=hardhat-localhost \
 TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-yarn workspace @hoprnet/hopr-ethereum hardhat add-to-whitelist \
+yarn workspace @hoprnet/hopr-ethereum hardhat whitelist \
   --network hardhat \
+  --task add \
   --native-addresses "$native_addr1,$native_addr2,$native_addr3,$native_addr4,$native_addr5,$native_addr7" \
   --multiaddresses "$multiaddr1,$multiaddr2,$multiaddr3,$multiaddr4,$multiaddr5,$multiaddr7"
 log "Nodes added to whitelist"
@@ -485,11 +486,11 @@ result=$(ping "${api1}" ${addr7} "TIMEOUT")
 log "-- ${result}"
 
 log "Node 8 should not be able to talk to Node 1 (Node 8 is not in the whitelist)"
-result=$(run_command ${api8} "ping ${addr1}" "Could not ping node. Timeout." 600)
+result=$(ping "${api8}" ${addr1} "TIMEOUT")
 log "-- ${result}"
 
 log "Node 1 should not be able to talk to Node 8 (Node 8 is not in the whitelist)"
-result=$(run_command ${api1} "ping ${addr8}" "Could not ping node. Timeout." 600)
+result=$(ping "${api1}" ${addr8} "TIMEOUT")
 log "-- ${result}"
 
 log "Node 2 has no unredeemed ticket value"

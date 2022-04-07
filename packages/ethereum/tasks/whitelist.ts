@@ -1,16 +1,21 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import { utils } from 'ethers'
 
-export type AddToWhitelistOpts = {
-  nativeAddresses: string
-  multiaddresses: string
-}
+export type Whitelist =
+  | {
+      task: 'add'
+      nativeAddresses: string
+      multiaddresses: string
+    }
+  | {
+      task: 'disable'
+    }
 
 /**
- * Used by our E2E tests to add addresses into the mocked whitelist.
+ * Used by our E2E tests to interact with 'HoprNetworkRegistry' and 'HoprDummyProxyForNetworkRegistry'.
  */
 async function main(
-  opts: AddToWhitelistOpts,
+  opts: Whitelist,
   { network, ethers, deployments, environment }: HardhatRuntimeEnvironment,
   _runSuper: RunSuperFunction<any>
 ): Promise<void> {
@@ -36,21 +41,6 @@ async function main(
     process.exit(1)
   }
 
-  const nativeAddresses = opts.nativeAddresses.split(',')
-  const multiaddresses = opts.multiaddresses.split(',')
-
-  // ensure lists match in length
-  if (nativeAddresses.length !== multiaddresses.length) {
-    console.error('Given native and multiaddress lists do not match in length.')
-    process.exit(1)
-  }
-
-  // ensure all native addresses are valid
-  if (nativeAddresses.some((a) => !utils.isAddress(a))) {
-    console.error(`Given address list '${nativeAddresses.join(',')}' contains an invalid address.`)
-    process.exit(1)
-  }
-
   // we use a custom ethers provider here instead of the ethers object from the
   // hre which is managed by hardhat-ethers, because that one seems to
   // run its own in-memory hardhat instance, which is undesirable
@@ -66,8 +56,27 @@ async function main(
     .attach(hoprNetworkRegistryAddress)
 
   try {
-    await (await hoprDummyProxy.ownerBatchAddAccounts(nativeAddresses)).wait()
-    await (await hoprNetworkRegistry.ownerRegister(nativeAddresses, multiaddresses)).wait()
+    if (opts.task === 'add') {
+      const nativeAddresses = opts.nativeAddresses.split(',')
+      const multiaddresses = opts.multiaddresses.split(',')
+
+      // ensure lists match in length
+      if (nativeAddresses.length !== multiaddresses.length) {
+        console.error('Given native and multiaddress lists do not match in length.')
+        process.exit(1)
+      }
+
+      // ensure all native addresses are valid
+      if (nativeAddresses.some((a) => !utils.isAddress(a))) {
+        console.error(`Given address list '${nativeAddresses.join(',')}' contains an invalid address.`)
+        process.exit(1)
+      }
+
+      await (await hoprDummyProxy.ownerBatchAddAccounts(nativeAddresses)).wait()
+      await (await hoprNetworkRegistry.ownerRegister(nativeAddresses, multiaddresses)).wait()
+    } else {
+      await (await hoprNetworkRegistry.disableRegistry()).wait()
+    }
   } catch (error) {
     console.error('Failed to add account with error:', error)
     process.exit(1)

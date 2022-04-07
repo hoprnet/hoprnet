@@ -20,6 +20,15 @@ declare ct_node1_log="${1}"
 declare healthcheck_host="${2}"
 declare healthcheck_port="${3}"
 
+# disable whitelist
+log "Disabling whitelist"
+HOPR_ENVIRONMENT_ID=hardhat-localhost \
+TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
+yarn workspace @hoprnet/hopr-ethereum hardhat whitelist \
+  --network hardhat \
+  --task disable
+log "Whitelist disabled"
+
 log "Running Cover Traffic test"
 
 log "Check CT daemon health"
