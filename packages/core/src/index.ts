@@ -247,7 +247,7 @@ class Hopr extends EventEmitter {
       initialNodes,
       this.publicNodesEmitter,
       async (peerId: PeerId) => {
-        return this.connector.isWhitelisted(PublicKey.fromPeerId(peerId))
+        return this.connector.isAllowedAccess(PublicKey.fromPeerId(peerId))
       }
     )
 
@@ -270,7 +270,7 @@ class Hopr extends EventEmitter {
       [this.id],
       (peer: PeerId) => this.publicNodesEmitter.emit('removePublicNode', peer)
     )
-    // unignore all peers if whitelist is disabled
+    // unignore all peers if registry is disabled
     this.connector.indexer.on('network-registry-status-changed', (enabled: boolean) => {
       if (!enabled) this.networkPeers.unignoreAllPeers()
     })
@@ -1146,11 +1146,11 @@ class Hopr extends EventEmitter {
   }
 
   /**
-   * @param id the public key of the account we want to check if it's whitelisted
-   * @returns true if whitelisted
+   * @param id the public key of the account we want to check if it's allowed access to the network
+   * @returns true if allowed access
    */
-  public async isWhitelisted(id: PublicKey): Promise<boolean> {
-    return this.connector.isWhitelisted(id)
+  public async isAllowedAccess(id: PublicKey): Promise<boolean> {
+    return this.connector.isAllowedAccess(id)
   }
 
   /**

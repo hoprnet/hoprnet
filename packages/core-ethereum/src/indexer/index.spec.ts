@@ -624,10 +624,10 @@ describe('test indexer', function () {
     assert(await db.isEligible(fixtures.PARTY_A.toAddress()))
   })
 
-  it('should process whitelist enabled', async function () {
+  it('should process register enabled', async function () {
     const { db, chain, indexer, newBlock } = await useFixtures({
       latestBlockNumber: 3,
-      pastHoprRegistryEvents: [fixtures.WHITELIST_ENABLED],
+      pastHoprRegistryEvents: [fixtures.REGISTER_ENABLED],
       id: fixtures.PARTY_A
     })
 
@@ -639,13 +639,13 @@ describe('test indexer', function () {
 
     newBlock()
     await processed.promise
-    assert(await db.isWhitelistEnabled())
+    assert(await db.isRegisterEnabled())
   })
 
-  it('should process whitelist disabled', async function () {
+  it('should process register disabled', async function () {
     const { db, chain, indexer, newBlock } = await useFixtures({
       latestBlockNumber: 3,
-      pastHoprRegistryEvents: [fixtures.WHITELIST_ENABLED, fixtures.WHITELIST_DISABLED],
+      pastHoprRegistryEvents: [fixtures.REGISTER_ENABLED, fixtures.REGISTER_DISABLED],
       id: fixtures.PARTY_A
     })
 
@@ -657,6 +657,6 @@ describe('test indexer', function () {
 
     newBlock()
     await processed.promise
-    assert((await db.isWhitelistEnabled()) === false)
+    assert((await db.isRegisterEnabled()) === false)
   })
 })

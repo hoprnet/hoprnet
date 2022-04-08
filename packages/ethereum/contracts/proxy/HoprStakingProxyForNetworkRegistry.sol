@@ -20,7 +20,7 @@ contract IStake {
 }
 
 /**
- * @dev Proxy for staking (v2) contract, which an "whitelist requirement" is implemented
+ * @dev Proxy for staking (v2) contract, which an "HoprNetworkRegistry requirement" is implemented
  */
 contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Ownable {
   struct NftTypeAndRank {
@@ -119,7 +119,7 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   }
 
   /**
-   * @dev Owner updates the minimal staking amount required for users to add themselves onto the whitelist
+   * @dev Owner updates the minimal staking amount required for users to add themselves onto the HoprNetworkRegistry
    * @param newThreshold Minimum stake of HOPR token
    */
   function ownerUpdateThreshold(uint256 newThreshold) external onlyOwner {

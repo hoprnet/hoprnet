@@ -32,7 +32,7 @@ export async function createLibp2pInstance(
   options: HoprOptions,
   initialNodes: { id: PeerId; multiaddrs: Multiaddr[] }[],
   publicNodes: PublicNodesEmitter,
-  isWhitelisted: (id: PeerId) => Promise<boolean>
+  isAllowedAccess: (id: PeerId) => Promise<boolean>
 ): Promise<LibP2P> {
   let addressSorter: AddressSorter
 
@@ -151,12 +151,12 @@ export async function createLibp2pInstance(
 
   const onConnectionOriginal = libp2p.upgrader.onConnection
   libp2p.upgrader.onConnection = async (conn: Connection) => {
-    // check if connection is not whitelisted
-    if (!(await isWhitelisted(conn.remotePeer))) {
+    // check if connection is not registered
+    if (!(await isAllowedAccess(conn.remotePeer))) {
       try {
         await conn.close()
       } catch (err: any) {
-        log(`Error while closing connection to non-whitelisted node`, err)
+        log(`Error while closing connection to non-registered node`, err)
       }
       return
     }

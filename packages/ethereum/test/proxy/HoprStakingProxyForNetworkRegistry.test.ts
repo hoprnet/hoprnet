@@ -120,22 +120,22 @@ describe('Registry proxy for stake v2', () => {
   let participantAddresses: string[]
   let hoprStakingProxyForNetworkRegistry: Contract
 
-  describe('Self whitelist', () => {
+  describe('Self register', () => {
     before(async () => {
       ;({ owner, participantAddresses, hoprStakingProxyForNetworkRegistry } = await useFixtures())
       //   add eligible NFT
       await hoprStakingProxyForNetworkRegistry.connect(owner).ownerAddNftTypeAndRank(NFT_TYPE[0], NFT_RANK[1])
     })
-    it('whitelist staker with stake of high threshold and eligible NFT', async () => {
+    it('register staker with stake of high threshold and eligible NFT', async () => {
       expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[0])).to.be.true
     })
-    it('fail to whitelist staker with stake of high threshold and non-eligible NFT', async () => {
+    it('fail to register staker with stake of high threshold and non-eligible NFT', async () => {
       expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[1])).to.be.false
     })
-    it('fail to whitelist staker with stake of low threshold and eligible NFT', async () => {
+    it('fail to register staker with stake of low threshold and eligible NFT', async () => {
       expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[2])).to.be.false
     })
-    it('fail to whitelist staker with stake of low threshold and non-eligible NFT', async () => {
+    it('fail to register staker with stake of low threshold and non-eligible NFT', async () => {
       expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[3])).to.be.false
     })
   })
@@ -148,13 +148,13 @@ describe('Registry proxy for stake v2', () => {
     const cannotSelfRegister = [1, 3, 4]
 
     canSelfRegister.forEach((accountIndex) => {
-      it(`participant ${accountIndex} is still whitelisted`, async () => {
+      it(`participant ${accountIndex} is still registered`, async () => {
         expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[accountIndex])).to
           .be.true
       })
     })
     cannotSelfRegister.forEach((accountIndex) => {
-      it(`participant ${accountIndex} is not whitelisted`, async () => {
+      it(`participant ${accountIndex} is not registered`, async () => {
         expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[accountIndex])).to
           .be.false
       })
@@ -168,13 +168,13 @@ describe('Registry proxy for stake v2', () => {
     const cannotSelfRegister = [1, 3, 4]
 
     canSelfRegister.forEach((accountIndex) => {
-      it(`participant ${accountIndex} is still whitelisted`, async () => {
+      it(`participant ${accountIndex} is still registered`, async () => {
         expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[accountIndex])).to
           .be.true
       })
     })
     cannotSelfRegister.forEach((accountIndex) => {
-      it(`participant ${accountIndex} is not whitelisted`, async () => {
+      it(`participant ${accountIndex} is not registered`, async () => {
         expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[accountIndex])).to
           .be.false
       })
@@ -198,13 +198,13 @@ describe('Registry proxy for stake v2', () => {
     const cannotSelfRegister = []
 
     canSelfRegister.forEach((accountIndex) => {
-      it(`participant ${accountIndex} is still whitelisted`, async () => {
+      it(`participant ${accountIndex} is still registered`, async () => {
         expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[accountIndex])).to
           .be.true
       })
     })
     cannotSelfRegister.forEach((accountIndex) => {
-      it(`participant ${accountIndex} is not whitelisted`, async () => {
+      it(`participant ${accountIndex} is not registered`, async () => {
         expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[accountIndex])).to
           .be.false
       })
@@ -219,13 +219,13 @@ describe('Registry proxy for stake v2', () => {
     const cannotSelfRegister = [0, 2, 5]
 
     canSelfRegister.forEach((accountIndex) => {
-      it(`participant ${accountIndex} is still whitelisted`, async () => {
+      it(`participant ${accountIndex} is still registered`, async () => {
         expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[accountIndex])).to
           .be.true
       })
     })
     cannotSelfRegister.forEach((accountIndex) => {
-      it(`participant ${accountIndex} is not whitelisted`, async () => {
+      it(`participant ${accountIndex} is not registered`, async () => {
         expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[accountIndex])).to
           .be.false
       })
@@ -249,13 +249,13 @@ describe('Registry proxy for stake v2', () => {
     const cannotSelfRegister = [0, 1, 2, 3, 4, 5]
 
     canSelfRegister.forEach((accountIndex) => {
-      it(`participant ${accountIndex} is still whitelisted`, async () => {
+      it(`participant ${accountIndex} is still registered`, async () => {
         expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[accountIndex])).to
           .be.true
       })
     })
     cannotSelfRegister.forEach((accountIndex) => {
-      it(`participant ${accountIndex} is not whitelisted`, async () => {
+      it(`participant ${accountIndex} is not registered`, async () => {
         expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[accountIndex])).to
           .be.false
       })

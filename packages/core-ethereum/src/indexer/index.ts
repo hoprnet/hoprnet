@@ -808,7 +808,7 @@ class Indexer extends EventEmitter {
     lastSnapshot: Snapshot
   ): Promise<void> {
     this.emit('network-registry-status-changed', event.args.isEnabled)
-    await this.db.setWhitelistEnabled(event.args.isEnabled, lastSnapshot)
+    await this.db.setRegisterEnabled(event.args.isEnabled, lastSnapshot)
   }
 
   private async onTransfer(event: TokenEvent<'Transfer'>, lastSnapshot: Snapshot) {
