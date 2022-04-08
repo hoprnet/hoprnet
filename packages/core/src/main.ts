@@ -32,7 +32,7 @@ export async function createLibp2pInstance(
   options: HoprOptions,
   initialNodes: { id: PeerId; multiaddrs: Multiaddr[] }[],
   publicNodes: PublicNodesEmitter,
-  isRegistered: (id: PeerId) => Promise<boolean>
+  isAllowedAccess: (id: PeerId) => Promise<boolean>
 ): Promise<LibP2P> {
   let addressSorter: AddressSorter
 
@@ -152,7 +152,7 @@ export async function createLibp2pInstance(
   const onConnectionOriginal = libp2p.upgrader.onConnection
   libp2p.upgrader.onConnection = async (conn: Connection) => {
     // check if connection is not registered
-    if (!(await isRegistered(conn.remotePeer))) {
+    if (!(await isAllowedAccess(conn.remotePeer))) {
       try {
         await conn.close()
       } catch (err: any) {

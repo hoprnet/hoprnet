@@ -247,7 +247,7 @@ class Hopr extends EventEmitter {
       initialNodes,
       this.publicNodesEmitter,
       async (peerId: PeerId) => {
-        return this.connector.isRegistered(PublicKey.fromPeerId(peerId))
+        return this.connector.isAllowedAccess(PublicKey.fromPeerId(peerId))
       }
     )
 
@@ -1146,11 +1146,11 @@ class Hopr extends EventEmitter {
   }
 
   /**
-   * @param id the public key of the account we want to check if it's registered
-   * @returns true if registered
+   * @param id the public key of the account we want to check if it's allowed access to the network
+   * @returns true if allowed access
    */
-  public async isRegistered(id: PublicKey): Promise<boolean> {
-    return this.connector.isRegistered(id)
+  public async isAllowedAccess(id: PublicKey): Promise<boolean> {
+    return this.connector.isAllowedAccess(id)
   }
 
   /**

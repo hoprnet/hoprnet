@@ -72,7 +72,7 @@ function createPendingAcknowledgement(halfKey: HalfKeyChallenge) {
 function createPacketTagKey(tag: Uint8Array) {
   return Uint8Array.from([...PACKET_TAG_PREFIX, ...tag])
 }
-function createRegistryKey(publicKey: PublicKey) {
+function createRegisterKey(publicKey: PublicKey) {
   return Uint8Array.from([...REGISTER_REGISTRY_PREFIX, ...publicKey.serializeUncompressed()])
 }
 function createEligibleKey(address: Address) {
@@ -722,7 +722,7 @@ export class HoprDB {
   public async addToRegistry(hoprNode: PublicKey, account: Address, snapshot: Snapshot): Promise<void> {
     await this.db
       .batch()
-      .put(Buffer.from(this.keyOf(createRegistryKey(hoprNode))), Buffer.from(account.serialize()))
+      .put(Buffer.from(this.keyOf(createRegisterKey(hoprNode))), Buffer.from(account.serialize()))
       .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
       .write()
   }
@@ -779,7 +779,7 @@ export class HoprDB {
    * @returns ETH address
    */
   public async getAccountFromRegistry(hoprNode: PublicKey): Promise<Address> {
-    return this.getCoerced<Address>(createRegistryKey(hoprNode), Address.deserialize)
+    return this.getCoerced<Address>(createRegisterKey(hoprNode), Address.deserialize)
   }
 
   /**
