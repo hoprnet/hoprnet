@@ -52,7 +52,7 @@ class RelayState {
   async isActive(source: PeerId, destination: PeerId, timeout?: number): Promise<boolean> {
     const id = RelayState.getId(source, destination)
     if (!this.relayedConnections.has(id)) {
-      error(`Connection from ${source.toB58String()} to ${destination.toB58String()} does not exist.`)
+      verbose(`Connection from ${source.toB58String()} to ${destination.toB58String()} does not exist.`)
       return false
     }
 
