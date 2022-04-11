@@ -82,9 +82,6 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
 
     this.relay = new Relay(this._libp2p, this._dialDirectly, this.filter.bind(this), this.options, this.testingOptions)
 
-    // Assign event handler after relay object has been constructed
-    setImmediate(async () => await this.relay.start())
-
     try {
       const { version } = require('../package.json')
 
@@ -171,6 +168,14 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
     }
   }
 
+  private onClose(): void {
+    this.relay.stop()
+  }
+
+  private onListening(): void {
+    this.relay.start()
+  }
+
   /**
    * Creates a TCP listener. The provided `handler` function will be called
    * anytime a new incoming Connection has been successfully upgraded via
@@ -178,8 +183,10 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
    * @param handler
    * @returns A TCP listener
    */
-  createListener(_options: HoprConnectListeningOptions, _handler?: Function): Listener {
+  public createListener(_options: HoprConnectListeningOptions, _handler?: Function): Listener {
     return new Listener(
+      this.onClose.bind(this),
+      this.onListening.bind(this),
       this._dialDirectly,
       this._upgradeInbound,
       this._peerId,

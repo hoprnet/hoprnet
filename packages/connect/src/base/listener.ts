@@ -78,6 +78,8 @@ class Listener extends EventEmitter implements InterfaceListener {
    * @param libp2p
    */
   constructor(
+    private onListening: () => void,
+    private onClose: () => void,
     dialDirectly: HoprConnect['dialDirectly'],
     private upgradeInbound: Upgrader['upgradeInbound'],
     private peerId: PeerId,
@@ -366,6 +368,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       this.entry.updatePublicNodes()
     }
 
+    this.onListening()
     this.state = State.LISTENING
   }
 
@@ -388,6 +391,7 @@ class Listener extends EventEmitter implements InterfaceListener {
     ])
 
     this.state = State.CLOSED
+    this.onClose()
     this.emit('close')
   }
 

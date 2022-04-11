@@ -9,7 +9,7 @@ const log = debug('hopr-core:test:index')
 
 const peerId = privKeyToPeerId('0x1c28c7f301658b4807a136e9fcf5798bc37e24b70f257fd3e6ee5adcf83a8c1f')
 
-describe('hopr core (instance)', async function () {
+describe.only('hopr core (instance)', async function () {
   it('should be able to start a hopr node instance without crashing', async function () {
     this.timeout(5000)
     log('Clean up data folder from previous attempts')
