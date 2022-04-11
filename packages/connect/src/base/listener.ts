@@ -78,8 +78,8 @@ class Listener extends EventEmitter implements InterfaceListener {
    * @param libp2p
    */
   constructor(
-    private onListening: () => void,
     private onClose: () => void,
+    private onListening: () => void,
     dialDirectly: HoprConnect['dialDirectly'],
     private upgradeInbound: Upgrader['upgradeInbound'],
     private peerId: PeerId,
@@ -355,6 +355,11 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     this.attachSocketHandlers()
 
+    // Need to be called before _emitListening
+    // because _emitListening() sets an attribute in
+    // the relay object
+    this.onListening()
+
     this._emitListening()
 
     // Only add relay nodes if node is not directly reachable or running locally
@@ -368,7 +373,6 @@ class Listener extends EventEmitter implements InterfaceListener {
       this.entry.updatePublicNodes()
     }
 
-    this.onListening()
     this.state = State.LISTENING
   }
 
