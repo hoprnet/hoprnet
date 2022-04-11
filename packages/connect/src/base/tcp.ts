@@ -1,4 +1,4 @@
-import net, { Socket, type AddressInfo } from 'net'
+import net, { type Socket, type AddressInfo } from 'net'
 import abortable from 'abortable-iterator'
 import Debug from 'debug'
 import { nodeToMultiaddr, toU8aStream } from '../utils'
