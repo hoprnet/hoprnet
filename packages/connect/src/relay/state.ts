@@ -1,13 +1,14 @@
 import { Stream } from '../types'
 import type PeerId from 'peer-id'
 
-import { u8aCompare } from '@hoprnet/hopr-utils'
+import { nAtATime, u8aCompare } from '@hoprnet/hopr-utils'
 import { RelayContext } from './context'
 
 import debug from 'debug'
 
 const DEBUG_PREFIX = 'hopr-connect:relay:state'
 
+const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
 const error = debug(DEBUG_PREFIX.concat(':error'))
 
 type State = {
@@ -51,6 +52,7 @@ class RelayState {
   async isActive(source: PeerId, destination: PeerId, timeout?: number): Promise<boolean> {
     const id = RelayState.getId(source, destination)
     if (!this.relayedConnections.has(id)) {
+      verbose(`Connection from ${source.toB58String()} to ${destination.toB58String()} does not exist.`)
       return false
     }
 
@@ -65,9 +67,11 @@ class RelayState {
     }
 
     if (latency >= 0) {
+      verbose(`Connection from ${source.toB58String()} to ${destination.toB58String()} is active.`)
       return true
     }
 
+    error(`Connection from ${source.toB58String()} to ${destination.toB58String()} is NOT active.`)
     return false
   }
 
@@ -88,6 +92,18 @@ class RelayState {
     const context = this.relayedConnections.get(id) as State
 
     context[source.toB58String()].update(toSource)
+  }
+
+  /**
+   * Performs an operation for each relay context in the current set.
+   * @param action
+   */
+  async forEach(action: (dst: string, ctx: RelayContext) => Promise<void>) {
+    await nAtATime(
+      (objEntries) => action(objEntries[0], objEntries[1]),
+      Array.from(this.relayedConnections.values()).map((s) => Object.entries(s)),
+      10 // TODO: Make this configurable or use an existing constant
+    )
   }
 
   /**

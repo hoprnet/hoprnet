@@ -1,5 +1,5 @@
 import type { default as LibP2P, MuxedStream, HandlerProps } from 'libp2p'
-import type PeerId from 'peer-id'
+import PeerId from 'peer-id'
 import type Connection from 'libp2p-interfaces/src/connection/connection'
 import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
 import { type Multiaddr } from 'multiaddr'
@@ -16,7 +16,7 @@ import { RELAY_CIRCUIT_TIMEOUT, RELAY_PROTCOL, DELIVERY_PROTOCOL, CODE_P2P, OK, 
 import { RelayConnection } from './connection'
 import { RelayHandshake, RelayHandshakeMessage } from './handshake'
 import { RelayState } from './state'
-import { createRelayerKey, tryExistingConnections } from '@hoprnet/hopr-utils'
+import { createRelayerKey, randomInteger, retimer, tryExistingConnections } from '@hoprnet/hopr-utils'
 
 import { attemptClose } from '../utils'
 
@@ -69,6 +69,9 @@ class Relay {
   private _onCanRelay: Relay['onCanRelay'] | undefined
   private _dialNodeDirectly: Relay['dialNodeDirectly'] | undefined
 
+  private stopKeepAlive: (() => void) | undefined
+  private connectedToRelays: Set<string>
+
   constructor(
     public libp2p: ReducedLibp2p,
     private dialDirectly: HoprConnect['dialDirectly'],
@@ -86,6 +89,9 @@ class Relay {
     // Stores all relays that we announce to other nodes
     // to make sure we don't close these connections
     this.usedRelays = []
+
+    // Gathers relay peer IDs the node connected
+    this.connectedToRelays = new Set()
   }
 
   /**
@@ -106,6 +112,21 @@ class Relay {
     await this.libp2p.handle(CAN_RELAY_PROTCOL(this.options.environment), this._onCanRelay)
 
     this.webRTCUpgrader.start()
+
+    // Periodic function that prints relay connections (and will also do pings in future)
+    const periodicKeepAlive = async function (this: Relay) {
+      try {
+        await this.keepAliveRelayConnection()
+      } catch (err) {
+        log('Fatal error during periodic keep-alive of relay connections', err)
+      }
+    }.bind(this)
+
+    this.stopKeepAlive = retimer(
+      periodicKeepAlive,
+      // TODO: Make these values configurable
+      () => randomInteger(10000, 10000 + 3000)
+    )
   }
 
   setUsedRelays(peers: PeerId[]) {
@@ -113,11 +134,27 @@ class Relay {
     this.usedRelays = peers
   }
 
+  protected async keepAliveRelayConnection(): Promise<void> {
+    // TODO: perform ping as well, right now just prints out connection info
+    if (this.relayState.relayedConnectionCount() > 0) {
+      log(`Current relay connections: `)
+      await this.relayState.forEach(async (dst) => log(`- ${dst}`))
+    }
+
+    log(`Currently tracked connections to relays: `)
+    this.connectedToRelays.forEach((relayPeerId) => {
+      const countConns = this.libp2p.connectionManager.getAll(PeerId.createFromB58String(relayPeerId)).length
+      log(`- ${relayPeerId}: ${countConns} connections`)
+    })
+  }
+
   /**
    * Unassigns event listeners
    */
   stop(): void {
-    this.webRTCUpgrader.start()
+    this.stopKeepAlive?.()
+    this.connectedToRelays.clear()
+    this.webRTCUpgrader.stop()
   }
 
   /**
@@ -164,7 +201,7 @@ class Relay {
     const handshakeResult = await shaker.initiate(relay, destination)
 
     if (!handshakeResult.success) {
-      error(`Handshake led to empty stream. Giving up.`)
+      error(`Handshake with ${relay.toB58String()} led to empty stream. Giving up.`)
       // Only close the connection to the relay if it does not perform relay services
       // for us.
       if (this.usedRelays.findIndex((usedRelay: PeerId) => usedRelay.equals(relay)) < 0) {
@@ -176,6 +213,8 @@ class Relay {
       }
       return
     }
+
+    this.connectedToRelays.add(relay.toB58String())
 
     const conn = this.upgradeOutbound(relay, destination, handshakeResult.stream, options)
 
@@ -342,7 +381,7 @@ class Relay {
   }
 
   /**
-   * Dialed once a reconnect happens
+   * Called once reconnect happens
    * @param newStream new relayed connection
    * @param counterparty counterparty of the relayed connection
    */
@@ -350,6 +389,8 @@ class Relay {
     log(`####### inside reconnect #######`)
 
     let newConn: Connection
+
+    log(`Handling reconnection to ${counterparty.toB58String()}`)
 
     try {
       if (!!this.testingOptions.__noWebRTCUpgrade) {
@@ -381,6 +422,8 @@ class Relay {
   /**
    * Attempts to establish a direct connection to the destination
    * @param destination peer to connect to
+   * @param protocol
+   * @param opts
    * @returns a stream to the given peer
    */
   private async dialNodeDirectly(

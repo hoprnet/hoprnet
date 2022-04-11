@@ -1,7 +1,7 @@
 import net, { type Socket, type AddressInfo } from 'net'
 import abortable from 'abortable-iterator'
 import Debug from 'debug'
-import { nodeToMultiaddr } from '../utils'
+import { nodeToMultiaddr, toU8aStream } from '../utils'
 
 const log = Debug('hopr-connect:tcp')
 const error = Debug('hopr-connect:tcp:error')
@@ -13,7 +13,6 @@ import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
 
 import type { Multiaddr } from 'multiaddr'
 import toIterable from 'stream-to-it'
-import { toU8aStream } from '../utils'
 import type PeerId from 'peer-id'
 import type { Stream, StreamSink, StreamSource, StreamSourceAsync, StreamType, HoprConnectDialOptions } from '../types'
 
@@ -87,7 +86,7 @@ class TCPConnection implements MultiaddrConnection {
         if (this.conn.destroyed) {
           log('%s:%s is already destroyed', cOptions.host, cOptions.port)
         } else {
-          log(`destroying connection`)
+          log(`destroying connection ${cOptions.host}:${cOptions.port}`)
           this.conn.destroy()
         }
 
@@ -134,8 +133,8 @@ class TCPConnection implements MultiaddrConnection {
 
   /**
    * @param ma
+   * @param self
    * @param options
-   * @param options.signal Used to abort dial requests
    * @returns Resolves a TCP Socket
    */
   public static create(ma: Multiaddr, self: PeerId, options?: HoprConnectDialOptions): Promise<TCPConnection> {
@@ -156,7 +155,7 @@ class TCPConnection implements MultiaddrConnection {
       }
 
       const onTimeout = () => {
-        verbose(`Connnection timeout while connecting to ${ma.toString()}`)
+        verbose(`Connection timeout while connecting to ${ma.toString()}`)
         done(new Error(`connection timeout after ${Date.now() - start}ms`))
       }
 
@@ -193,7 +192,7 @@ class TCPConnection implements MultiaddrConnection {
 
     // Catch error from *incoming* socket
     socket.on('error', (err: any) => {
-      error(`Error in incoming socket`, err)
+      error(`Error in incoming socket ${socket.remoteAddress}`, err)
       try {
         socket.destroy()
       } catch (internalError: any) {
