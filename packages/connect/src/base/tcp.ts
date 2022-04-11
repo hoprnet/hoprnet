@@ -7,6 +7,7 @@ const log = Debug('hopr-connect:tcp')
 const error = Debug('hopr-connect:tcp:error')
 const verbose = Debug('hopr-connect:verbose:tcp')
 
+// Timeout to wait for socket close before destroying it
 export const SOCKET_CLOSE_TIMEOUT = 1000
 
 import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
@@ -41,9 +42,9 @@ class TCPConnection implements MultiaddrConnection {
     }
 
     this.conn.once('close', () => {
-      // In instances where `close` was not explicitly called,
-      // such as an iterable stream ending, ensure we have set the close
-      // timeline
+      // Whenever the socket gets closed, mark the
+      // connection closed to cleanup data structures in
+      // ConnectionManager
       this.timeline.close ??= Date.now()
     })
 
@@ -89,10 +90,10 @@ class TCPConnection implements MultiaddrConnection {
           log(`destroying connection ${cOptions.host}:${cOptions.port}`)
           this.conn.destroy()
         }
-
-        resolve()
       }, SOCKET_CLOSE_TIMEOUT)
 
+      // Resolve once closed
+      // Could take place after timeout or as a result of `.end()` call
       this.conn.once('close', () => {
         if (done) {
           return
@@ -167,6 +168,7 @@ class TCPConnection implements MultiaddrConnection {
         }
         finished = true
 
+        // Make sure that `done` is called only once
         rawSocket?.removeListener('error', onError)
         rawSocket?.removeListener('timeout', onTimeout)
         rawSocket?.removeListener('connect', onConnect)
