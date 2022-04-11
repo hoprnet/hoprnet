@@ -180,7 +180,7 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
    * Creates a TCP listener. The provided `handler` function will be called
    * anytime a new incoming Connection has been successfully upgraded via
    * `upgrader.upgradeInbound`.
-   * @param handler
+   * @param _handler
    * @returns A TCP listener
    */
   public createListener(_options: HoprConnectListeningOptions, _handler?: Function): Listener {
