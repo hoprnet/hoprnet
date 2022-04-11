@@ -134,6 +134,10 @@ describe('test relay', function () {
       await new Promise((resolve) => setTimeout(resolve))
     }
 
+    Alice.stop()
+    Bob.stop()
+    Charly.stop()
+
     network.removeAllListeners()
   })
 
@@ -164,6 +168,10 @@ describe('test relay', function () {
       // Let I/O happen
       await new Promise((resolve) => setTimeout(resolve))
     }
+
+    Alice.stop()
+    Bob.stop()
+    Charly.stop()
 
     network.removeAllListeners()
   })
