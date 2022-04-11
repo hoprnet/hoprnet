@@ -67,7 +67,7 @@ class RelayState {
     }
 
     if (latency >= 0) {
-      verbose(`Connection from ${source.toB58String()} to ${destination.toB58String()} is not active.`)
+      verbose(`Connection from ${source.toB58String()} to ${destination.toB58String()} is active.`)
       return true
     }
 
