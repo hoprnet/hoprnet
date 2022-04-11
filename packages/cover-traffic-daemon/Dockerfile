@@ -46,10 +46,10 @@ COPY --from=build /app .
 
 # create directory which is later used for the database, so that it inherits
 # permissions when mapped to a volume
-RUN mkdir db
+RUN mkdir hoprd-db
 
 # set volume which can be mapped by users on the host system
-VOLUME ["/app/db"]
+VOLUME ["/app/hoprd-db"]
 
 # making sure some standard environment variables are set for production use
 ENV NODE_ENV production

@@ -8,7 +8,6 @@ import type HoprConnect from '..'
 
 import type { Stream, HoprConnectOptions, HoprConnectDialOptions, HoprConnectTestingOptions } from '../types'
 
-import { AbortError } from 'abortable-iterator'
 import debug from 'debug'
 
 import { WebRTCUpgrader, WebRTCConnection } from '../webrtc'
@@ -178,10 +177,6 @@ class Relay {
       return
     }
 
-    if (options?.signal?.aborted) {
-      throw new AbortError()
-    }
-
     const conn = this.upgradeOutbound(relay, destination, handshakeResult.stream, options)
 
     log(`successfully established relay connection to ${relay.toB58String()}`)
@@ -273,7 +268,7 @@ class Relay {
 
               log(`announced in the DHT as relayer for node ${conn.connection.remotePeer.toB58String()}`, key)
             } catch (err) {
-              error(`error while attempting to provide relayer key for ${conn.connection.remotePeer}`)
+              error(`error while attempting to provide relayer key for ${conn.connection.remotePeer.toB58String()}`)
             }
           }.call(this))
 

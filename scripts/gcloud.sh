@@ -208,7 +208,7 @@ gcloud_create_or_update_instance_template() {
     extra_args="${extra_args} --container-arg=\"--announce\""
   fi
 
-  mount_path="/app/db"
+  mount_path="/app/hoprd-db"
   host_path="/var/hoprd"
 
   log "checking for instance template ${name}"

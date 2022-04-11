@@ -46,7 +46,7 @@ fi
 docker stop ${container_name} > /dev/null 2>&1 || true && docker rm ${container_name} > /dev/null 2>&1 || true
 
 # Fork here and pass all the environment variables down into the forked image
-docker run -d --pull always -v /var/hoprd/:/app/db -p ${admin_port}:3000 -p ${rest_port}:3001 -p ${healthcheck_port}:8080 \
+docker run -d --pull always -v /var/hoprd/:/app/hoprd-db -p ${admin_port}:3000 -p ${rest_port}:3001 -p ${healthcheck_port}:8080 \
  --name=${container_name} --restart=on-failure \
  --network=${network_name} \
  --env-file <(env) \

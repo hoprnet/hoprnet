@@ -3,15 +3,20 @@ import { mkdir } from 'fs/promises'
 
 import { default as LibP2P, type Connection } from 'libp2p'
 import { LevelDatastore } from 'datastore-level'
-import { type AddressSorter, HoprDB, localAddressesFirst, PublicKey, debug } from '@hoprnet/hopr-utils'
+import { type AddressSorter, HoprDB, PublicKey, debug } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
-const Mplex = require('libp2p-mplex')
+import Mplex from 'libp2p-mplex'
 import KadDHT from 'libp2p-kad-dht'
 import { NOISE } from '@chainsafe/libp2p-noise'
 import type PeerId from 'peer-id'
 import Hopr, { type HoprOptions } from '.'
 import { getAddrs } from './identity'
-import HoprConnect, { type HoprConnectConfig, type PublicNodesEmitter } from '@hoprnet/hopr-connect'
+import HoprConnect, {
+  type HoprConnectConfig,
+  type PublicNodesEmitter,
+  compareAddressesLocalMode,
+  compareAddressesPublicMode
+} from '@hoprnet/hopr-connect'
 import type { Multiaddr } from 'multiaddr'
 
 const log = debug(`hopr-core:create-hopr`)
@@ -34,13 +39,16 @@ export async function createLibp2pInstance(
   let addressSorter: AddressSorter
 
   if (options.testing?.preferLocalAddresses) {
-    addressSorter = localAddressesFirst
+    // @TODO use address.isCertified to treat signed peer records differently
+    // than observed addresses
+    addressSorter = (addresses) => addresses.sort((a, b) => compareAddressesLocalMode(a.multiaddr, b.multiaddr))
     log('Preferring local addresses')
   } else {
-    // Overwrite address sorter with identity function since
-    // libp2p's own address sorter function is unable to handle
-    // p2p addresses, e.g. /p2p/<RELAY>/p2p-circuit/p2p/<DESTINATION>
-    addressSorter = (addr) => addr
+    // Address sorter **must** be overwritten since libp2p
+    // cannot handle Hopr's circuit addresses
+    // @TODO use address.isCertified to treat signed peer records differently
+    // than observed addresses
+    addressSorter = (addresses) => addresses.sort((a, b) => compareAddressesPublicMode(a.multiaddr, b.multiaddr))
     log('Addresses are sorted by default')
   }
 

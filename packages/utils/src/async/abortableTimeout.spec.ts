@@ -1,7 +1,6 @@
 import type { TimeoutOpts } from './abortableTimeout'
 
 import assert from 'assert'
-import AbortController from 'abort-controller'
 import { abortableTimeout } from './abortableTimeout'
 
 enum Messages {

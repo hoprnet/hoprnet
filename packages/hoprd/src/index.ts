@@ -174,16 +174,6 @@ const argv = yargs(process.argv.slice(2))
     describe: 'Allow connections to other nodes running on private addresses.',
     default: false
   })
-  .option('allowLocalNodeConnections', {
-    boolean: true,
-    describe: 'Allow connections to other nodes running on localhost.',
-    default: false
-  })
-  .option('allowPrivateNodeConnections', {
-    boolean: true,
-    describe: 'Allow connections to other nodes running on private addresses.',
-    default: false
-  })
   .option('testAnnounceLocalAddresses', {
     boolean: true,
     describe: 'For testing local testnets. Announce local addresses.',
@@ -260,6 +250,7 @@ function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
     hosts: parseHosts(),
     environment,
     allowLocalConnections: argv.allowLocalNodeConnections,
+    allowPrivateConnections: argv.allowPrivateNodeConnections,
     heartbeatInterval: argv.heartbeatInterval,
     heartbeatVariance: argv.heartbeatVariance,
     testing: {
