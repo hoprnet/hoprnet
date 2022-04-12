@@ -228,7 +228,7 @@ describe('entry node functionality', function () {
     entryNodes.stop()
   })
 
-  it.only('expose limited number of relay addresses', async function () {
+  it('expose limited number of relay addresses', async function () {
     const network = createFakeNetwork()
 
     const relayNodes = Array.from<undefined, [Promise<any>, PeerStoreType, EventEmitter]>(
