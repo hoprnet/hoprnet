@@ -20,6 +20,7 @@
 - Automatically cleanup stale connections to correctly handle reconnects ([#3688](https://github.com/hoprnet/hoprnet/pull/3688))
 - Add `--provider` flag for setting a custom blockchain RPC provider
 - Use a default address sorter for all address classes ([#3731](https://github.com/hoprnet/hoprnet/pull/3731))
+- Enhance TCP socket listening logic and cleanup keepAlice interval ([#3750]https://github.com/hoprnet/hoprnet/pull/3750))
 
 ---
 

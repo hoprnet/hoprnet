@@ -7,6 +7,7 @@ const log = Debug('hopr-connect:tcp')
 const error = Debug('hopr-connect:tcp:error')
 const verbose = Debug('hopr-connect:verbose:tcp')
 
+// Timeout to wait for socket close before destroying it
 export const SOCKET_CLOSE_TIMEOUT = 1000
 
 import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
@@ -41,9 +42,9 @@ class TCPConnection implements MultiaddrConnection {
     }
 
     this.conn.once('close', () => {
-      // In instances where `close` was not explicitly called,
-      // such as an iterable stream ending, ensure we have set the close
-      // timeline
+      // Whenever the socket gets closed, mark the
+      // connection closed to cleanup data structures in
+      // ConnectionManager
       this.timeline.close ??= Date.now()
     })
 
@@ -89,10 +90,10 @@ class TCPConnection implements MultiaddrConnection {
           log(`destroying connection ${cOptions.host}:${cOptions.port}`)
           this.conn.destroy()
         }
-
-        resolve()
       }, SOCKET_CLOSE_TIMEOUT)
 
+      // Resolve once closed
+      // Could take place after timeout or as a result of `.end()` call
       this.conn.once('close', () => {
         if (done) {
           return
@@ -102,15 +103,11 @@ class TCPConnection implements MultiaddrConnection {
         resolve()
       })
 
-      this.conn.end(() => {
-        if (done) {
-          return
-        }
-        done = true
-        this.timeline.close ??= Date.now()
-
-        resolve()
-      })
+      try {
+        this.conn.end()
+      } catch (err) {
+        this.conn.destroy()
+      }
     })
   }
 
@@ -143,9 +140,15 @@ class TCPConnection implements MultiaddrConnection {
       const cOpts = ma.toOptions()
 
       let rawSocket: Socket
+      let finished = false
 
-      const onError = (err: Error) => {
-        verbose(`Error connecting to ${ma.toString()}.`, err)
+      const onError = (err: any) => {
+        if (err.code === 'ABORT_ERR') {
+          verbose(`Abort to ${ma.toString()} after ${Date.now() - start} ms`, err)
+        } else {
+          verbose(`Error connecting to ${ma.toString()}.`, err)
+        }
+
         done(err)
       }
 
@@ -160,6 +163,16 @@ class TCPConnection implements MultiaddrConnection {
       }
 
       const done = (err?: Error) => {
+        if (finished) {
+          return
+        }
+        finished = true
+
+        // Make sure that `done` is called only once
+        rawSocket?.removeListener('error', onError)
+        rawSocket?.removeListener('timeout', onTimeout)
+        rawSocket?.removeListener('connect', onConnect)
+
         if (err) {
           rawSocket?.destroy()
           return reject(err)
@@ -174,7 +187,7 @@ class TCPConnection implements MultiaddrConnection {
           port: cOpts.port,
           signal: options?.signal
         })
-        .on('error', onError)
+        .once('error', onError)
         .once('timeout', onTimeout)
         .once('connect', onConnect)
     })
@@ -186,7 +199,7 @@ class TCPConnection implements MultiaddrConnection {
     }
 
     // Catch error from *incoming* socket
-    socket.on('error', (err: any) => {
+    socket.once('error', (err: any) => {
       error(`Error in incoming socket ${socket.remoteAddress}`, err)
       try {
         socket.destroy()

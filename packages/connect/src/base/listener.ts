@@ -68,16 +68,20 @@ class Listener extends EventEmitter implements InterfaceListener {
   }
 
   /**
-   * @param dialDirectly
-   * @param upgradeInbound
+   * @param onClose called once listener is closed
+   * @param onListening called once listener is listening
+   * @param dialDirectly utility to establish a direct connection
+   * @param upgradeInbound forward inbound connections to libp2p
    * @param peerId own id
-   * @param options
-   * @param testingOptions
-   * @param filter
-   * @param relay
-   * @param libp2p
+   * @param options connection Options, e.g. AbortSignal
+   * @param testingOptions turn on / off modules for testing
+   * @param filter allow Listener to populate address filter
+   * @param relay allow Listener to populate list of utilized relays
+   * @param libp2p libp2p instance for various purposes
    */
   constructor(
+    private onClose: () => void,
+    private onListening: () => void,
     dialDirectly: HoprConnect['dialDirectly'],
     private upgradeInbound: Upgrader['upgradeInbound'],
     private peerId: PeerId,
@@ -353,6 +357,11 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     this.attachSocketHandlers()
 
+    // Need to be called before _emitListening
+    // because _emitListening() sets an attribute in
+    // the relay object
+    this.onListening()
+
     this._emitListening()
 
     // Only add relay nodes if node is not directly reachable or running locally
@@ -388,6 +397,7 @@ class Listener extends EventEmitter implements InterfaceListener {
     ])
 
     this.state = State.CLOSED
+    this.onClose()
     this.emit('close')
   }
 
