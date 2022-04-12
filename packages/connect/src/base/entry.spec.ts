@@ -78,7 +78,7 @@ function createFakeNetwork() {
     const addr = ma.toString()
 
     if (opts.onDisconnect) {
-      network.once(disconnectEvent(addr), () => opts.onDisconnect(ma))
+      network.once(disconnectEvent(addr), () => opts?.onDisconnect?.(ma))
     }
 
     if (network.listeners(connectEvent(addr)).length >= 1) {
@@ -198,7 +198,7 @@ describe('entry node functionality', function () {
       {
         connectionManager: new FakeConnectionManager(true)
       },
-      network.connect,
+      network.connect as any,
       {
         initialNodes: [relay]
       }
@@ -251,7 +251,7 @@ describe('entry node functionality', function () {
       {
         connectionManager: new FakeConnectionManager(true)
       },
-      network.connect,
+      network.connect as any,
       {
         initialNodes: relayNodes.map((relayNode) => relayNode[1]).concat(additionalOfflineNodes)
       }
@@ -295,7 +295,7 @@ describe('entry node functionality', function () {
       {
         connectionManager: new FakeConnectionManager(true)
       },
-      network.connect,
+      network.connect as any,
       {}
     )
 
@@ -349,7 +349,7 @@ describe('entry node functionality', function () {
       {
         connectionManager: new FakeConnectionManager(true)
       },
-      network.connect,
+      network.connect as any,
       {}
     )
 
@@ -389,7 +389,7 @@ describe('entry node functionality', function () {
       {
         connectionManager: new FakeConnectionManager(true)
       },
-      network.connect,
+      network.connect as any,
       {}
     )
 
@@ -455,7 +455,7 @@ describe('entry node functionality', function () {
       {
         connectionManager: new FakeConnectionManager(true)
       },
-      network.connect,
+      network.connect as any,
       {
         publicNodes
       }
@@ -500,7 +500,7 @@ describe('entry node functionality', function () {
       {
         connectionManager: new FakeConnectionManager(true)
       },
-      network.connect,
+      network.connect as any,
       {
         dhtRenewalTimeout: CUSTOM_DHT_RENEWAL_TIMEOUT,
         publicNodes
@@ -572,7 +572,7 @@ describe('entry node functionality', function () {
       {
         connectionManager: new FakeConnectionManager(true)
       },
-      async (ma: Multiaddr, opts: any) => {
+      (async (ma: Multiaddr, opts: any) => {
         switch (connectAttempt++) {
           case 0:
             return network.connect(ma, opts)
@@ -584,7 +584,7 @@ describe('entry node functionality', function () {
           default:
             return
         }
-      },
+      }) as any,
       // Should be successful after second try
       {
         entryNodeReconnectBaseTimeout: 1,
@@ -631,14 +631,14 @@ describe('entry node functionality', function () {
       {
         connectionManager: new FakeConnectionManager(true)
       },
-      async (ma: Multiaddr, opts: any) => {
+      (async (ma: Multiaddr, opts: any) => {
         switch (connectAttempt++) {
           case 0:
             return network.connect(ma, opts)
           default:
             return
         }
-      },
+      }) as any,
       // Should fail after second try
       {
         entryNodeReconnectBaseTimeout: 1,
