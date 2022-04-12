@@ -36,6 +36,8 @@ const log = Debug(DEBUG_PREFIX)
 const error = Debug(DEBUG_PREFIX.concat(':error'))
 const verbose = Debug(DEBUG_PREFIX.concat(':verbose'))
 
+const ENTRY_NODE_CONTACT_TIMEOUT = 5e3
+
 type EntryNodeData = PeerStoreType & {
   latency: number
 }
@@ -56,7 +58,7 @@ function latencyCompare(a: ConnectionResult, b: ConnectionResult) {
 }
 
 function isUsableRelay(ma: Multiaddr) {
-  const tuples = ma.tuples()
+  const tuples = ma.tuples() as [code: number, addr: Uint8Array][]
 
   return (
     tuples[0].length >= 2 && [CODE_IP4, CODE_IP6].includes(tuples[0][0]) && [CODE_UDP, CODE_TCP].includes(tuples[1][0])
@@ -86,6 +88,7 @@ export class EntryNodes extends EventEmitter {
   private _onNewRelay: ((peer: PeerStoreType) => void) | undefined
   private _onRemoveRelay: ((peer: PeerId) => void) | undefined
   private _connectToRelay: EntryNodes['connectToRelay'] | undefined
+  private _onEntryNodeDisconnect: EntryNodes['onEntryDisconnect'] | undefined
 
   constructor(
     private peerId: PeerId,
@@ -106,6 +109,8 @@ export class EntryNodes extends EventEmitter {
    */
   public start() {
     this._connectToRelay = this.connectToRelay.bind(this)
+    this._onEntryNodeDisconnect = this.onEntryDisconnect.bind(this)
+
     if (this.options.publicNodes != undefined) {
       const limiter = oneAtATime()
       this._onNewRelay = (peer: PeerStoreType) => {
@@ -141,20 +146,40 @@ export class EntryNodes extends EventEmitter {
     this.stopDHTRenewal?.()
   }
 
+  private onEntryDisconnect(_ma: Multiaddr) {
+    // const tuples = ma.tuples() as [code: number, addr: Uint8Array][]
+    // for (const usedRelay of this.usedRelays) {
+    //   const relayTuples = usedRelay.relayDirectAddress.tuples()
+    //   if (u8aEquals(tuples[2][1], relayTuples[2][1])) {
+    //     this.connectToRelay(
+    //       PeerId.createFromBytes(tuples[2][1].slice(1)),
+    //       usedRelay.relayDirectAddress,
+    //       ENTRY_NODE_CONTACT_TIMEOUT,
+    //       this._onEntryNodeDisconnect as EntryNodes['onEntryDisconnect']
+    //     )
+    //   }
+    // }
+  }
+
   private startDHTRenewInterval() {
     const renewDHTEntries = async function (this: EntryNodes) {
-      const work: [id: PeerId, mulitaddr: Multiaddr, timeout: number][] = []
+      const work: Parameters<EntryNodes['connectToRelay']>[] = []
       for (const relay of this.getUsedRelayPeerIds()) {
         const relayEntry = this.availableEntryNodes.find((entry: EntryNodeData) => entry.id.equals(relay))
 
         if (relayEntry == undefined) {
           log(
-            `Relay ${relay.toB58String()} has been removed from list of available entry nodes. Not renewing that entry`
+            `Relay ${relay.toB58String()} has been removed from list of available entry nodes. Not renewing this entry`
           )
           continue
         }
 
-        work.push([relay, relayEntry.multiaddrs[0], 5e3])
+        work.push([
+          relay,
+          relayEntry.multiaddrs[0],
+          5e3,
+          this._onEntryNodeDisconnect as EntryNodes['onEntryDisconnect']
+        ])
       }
 
       await nAtATime(this._connectToRelay as EntryNodes['connectToRelay'], work, ENTRY_NODES_MAX_PARALLEL_DIALS)
@@ -315,6 +340,7 @@ export class EntryNodes extends EventEmitter {
       // Make sure that libp2p is started
       await setTimeoutPromise(250)
     }
+
     log(`Updating list of used relay nodes ...`)
     const nodesToCheck = this.filterUncheckedNodes()
 
@@ -326,7 +352,12 @@ export class EntryNodes extends EventEmitter {
     const args: Parameters<EntryNodes['connectToRelay']>[] = new Array(toCheck.length)
 
     for (const [index, nodeToCheck] of toCheck.entries()) {
-      args[index] = [nodeToCheck.id, nodeToCheck.multiaddrs[0], TIMEOUT]
+      args[index] = [
+        nodeToCheck.id,
+        nodeToCheck.multiaddrs[0],
+        TIMEOUT,
+        this._onEntryNodeDisconnect as EntryNodes['onEntryDisconnect']
+      ]
     }
 
     const start = Date.now()
@@ -403,7 +434,8 @@ export class EntryNodes extends EventEmitter {
   private async establishNewConnection(
     destination: PeerId,
     destinationAddress: Multiaddr,
-    timeout: number
+    timeout: number,
+    onDisconnect: (ma: Multiaddr) => void
   ): Promise<ConnResult | void> {
     const abort = new AbortController()
     let done = false
@@ -417,7 +449,7 @@ export class EntryNodes extends EventEmitter {
 
     let conn: Connection | undefined
     try {
-      conn = await this.dialDirectly(destinationAddress, { signal: abort.signal })
+      conn = await this.dialDirectly(destinationAddress, { signal: abort.signal, onDisconnect })
     } catch (err: any) {
       error(`error while contacting entry node ${destination.toB58String()}.`, err.message)
       await attemptClose(conn, error)
@@ -459,14 +491,15 @@ export class EntryNodes extends EventEmitter {
   private async connectToRelay(
     id: PeerId,
     relay: Multiaddr,
-    timeout: number
+    timeout: number,
+    onDisconnect: (ma: Multiaddr) => void
   ): Promise<{ entry: EntryNodeData; conn?: Connection }> {
     const start = Date.now()
 
     let conn = await tryExistingConnections(this.libp2p, id, CAN_RELAY_PROTCOL(this.options.environment))
 
     if (!conn) {
-      conn = await this.establishNewConnection(id, relay, timeout)
+      conn = await this.establishNewConnection(id, relay, timeout, onDisconnect)
     }
 
     if (conn == undefined) {

@@ -24,6 +24,7 @@ class TCPConnection implements MultiaddrConnection {
   public localAddr: Multiaddr
   public sink: StreamSink
   public source: StreamSourceAsync
+  private closed: boolean | undefined
 
   private _stream: Stream
 
@@ -42,6 +43,10 @@ class TCPConnection implements MultiaddrConnection {
     }
 
     this.conn.once('close', () => {
+      if (!this.closed) {
+        options?.onDisconnect?.(remoteAddr)
+      }
+
       // Whenever the socket gets closed, mark the
       // connection closed to cleanup data structures in
       // ConnectionManager
@@ -61,9 +66,10 @@ class TCPConnection implements MultiaddrConnection {
   }
 
   public close(): Promise<void> {
-    if (this.conn.destroyed) {
+    if (this.conn.destroyed || this.closed) {
       return Promise.resolve()
     }
+    this.closed = true
 
     return new Promise<void>((resolve) => {
       let done = false
@@ -178,7 +184,7 @@ class TCPConnection implements MultiaddrConnection {
           return reject(err)
         }
 
-        resolve(new TCPConnection(ma, self, rawSocket))
+        resolve(new TCPConnection(ma, self, rawSocket, options))
       }
 
       rawSocket = net
