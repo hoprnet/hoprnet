@@ -69,6 +69,8 @@ export type HoprConnectOptions = {
   environment?: string
   relayFreeTimeout?: number
   dhtRenewalTimeout?: number
+  entryNodeReconnectBaseTimeout?: number
+  entryNodeReconnectBackoff?: number
 }
 
 export type HoprConnectTestingOptions = {

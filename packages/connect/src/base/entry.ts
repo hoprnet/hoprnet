@@ -1,6 +1,6 @@
 import type { HoprConnectOptions, PeerStoreType } from '../types'
 import type Connection from 'libp2p-interfaces/src/connection/connection'
-import type PeerId from 'peer-id'
+import PeerId from 'peer-id'
 import type { Multiaddr } from 'multiaddr'
 import type HoprConnect from '..'
 import { type default as Libp2p, MuxedStream } from 'libp2p'
@@ -26,7 +26,8 @@ import {
   oneAtATime,
   retimer,
   u8aEquals,
-  tryExistingConnections
+  tryExistingConnections,
+  retryWithBackoff
 } from '@hoprnet/hopr-utils'
 import { attemptClose, relayFromRelayAddress } from '../utils'
 import { compareDirectConnectionInfo } from '../utils/addrs'
@@ -37,6 +38,11 @@ const error = Debug(DEBUG_PREFIX.concat(':error'))
 const verbose = Debug(DEBUG_PREFIX.concat(':verbose'))
 
 const ENTRY_NODE_CONTACT_TIMEOUT = 5e3
+
+const DEFAULT_ENTRY_NODE_RECONNECT_BASE_TIMEOUT = 10e3
+const DEFAULT_ENTRY_NODE_RECONNECT_BACKOFF = 2
+
+const KNOWN_DISCONNECT_ERROR = `Not successful`
 
 type EntryNodeData = PeerStoreType & {
   latency: number
@@ -146,19 +152,45 @@ export class EntryNodes extends EventEmitter {
     this.stopDHTRenewal?.()
   }
 
-  private onEntryDisconnect(_ma: Multiaddr) {
-    // const tuples = ma.tuples() as [code: number, addr: Uint8Array][]
-    // for (const usedRelay of this.usedRelays) {
-    //   const relayTuples = usedRelay.relayDirectAddress.tuples()
-    //   if (u8aEquals(tuples[2][1], relayTuples[2][1])) {
-    //     this.connectToRelay(
-    //       PeerId.createFromBytes(tuples[2][1].slice(1)),
-    //       usedRelay.relayDirectAddress,
-    //       ENTRY_NODE_CONTACT_TIMEOUT,
-    //       this._onEntryNodeDisconnect as EntryNodes['onEntryDisconnect']
-    //     )
-    //   }
-    // }
+  private onEntryDisconnect(ma: Multiaddr) {
+    const tuples = ma.tuples() as [code: number, addr: Uint8Array][]
+    const peer = PeerId.createFromBytes(tuples[2][1].slice(1))
+
+    for (const usedRelay of this.usedRelays) {
+      const relayTuples = usedRelay.relayDirectAddress.tuples()
+
+      if (u8aEquals(tuples[2][1], relayTuples[2][1])) {
+        retryWithBackoff(
+          async () => {
+            const result = await this.connectToRelay(
+              peer,
+              usedRelay.relayDirectAddress,
+              ENTRY_NODE_CONTACT_TIMEOUT,
+              this._onEntryNodeDisconnect as EntryNodes['onEntryDisconnect']
+            )
+
+            if (result.entry.latency < 0) {
+              throw Error(KNOWN_DISCONNECT_ERROR)
+            }
+          },
+          {
+            minDelay: this.options.entryNodeReconnectBaseTimeout ?? DEFAULT_ENTRY_NODE_RECONNECT_BASE_TIMEOUT,
+            maxDelay: 10 * (this.options.entryNodeReconnectBaseTimeout ?? DEFAULT_ENTRY_NODE_RECONNECT_BASE_TIMEOUT),
+            delayMultiple: this.options.entryNodeReconnectBackoff ?? DEFAULT_ENTRY_NODE_RECONNECT_BACKOFF
+          }
+        ).catch((err: any) => {
+          // Forward unexpected errors
+          if (err.message !== KNOWN_DISCONNECT_ERROR) {
+            throw err
+          } else {
+            // Remove relay because we certainly can't connect to it
+            this.onRemoveRelay(peer)
+          }
+        })
+
+        break
+      }
+    }
   }
 
   private startDHTRenewInterval() {
@@ -177,7 +209,7 @@ export class EntryNodes extends EventEmitter {
         work.push([
           relay,
           relayEntry.multiaddrs[0],
-          5e3,
+          ENTRY_NODE_CONTACT_TIMEOUT,
           this._onEntryNodeDisconnect as EntryNodes['onEntryDisconnect']
         ])
       }
@@ -220,13 +252,12 @@ export class EntryNodes extends EventEmitter {
 
   /**
    * Called once there is a new relay opportunity known
-   * @param ma Multiaddr of node that is added as a relay opportunity
+   * @param peer PeerInfo of node that is added as a relay opportunity
    */
   protected async onNewRelay(peer: PeerStoreType): Promise<void> {
     if (peer.id.equals(this.peerId)) {
       return
     }
-
     if (peer.multiaddrs == undefined || peer.multiaddrs.length == 0) {
       log(`Received entry node ${peer.id.toB58String()} without any multiaddr`)
       return
@@ -255,7 +286,7 @@ export class EntryNodes extends EventEmitter {
 
   /**
    * Called once a node is considered to be offline
-   * @param ma Multiaddr of node that is considered to be offline now
+   * @param peer PeerId of node that is considered to be offline now
    */
   protected async onRemoveRelay(peer: PeerId) {
     for (const [index, publicNode] of this.availableEntryNodes.entries()) {
@@ -338,6 +369,7 @@ export class EntryNodes extends EventEmitter {
   async updatePublicNodes(): Promise<void> {
     while (!this.libp2p.connectionManager._started) {
       // Make sure that libp2p is started
+      log(`Waiting for start of connection manager ...`)
       await setTimeoutPromise(250)
     }
 
