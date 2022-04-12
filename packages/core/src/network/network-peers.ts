@@ -173,16 +173,6 @@ class NetworkPeers {
         return
       }
     }
-
-    this.peers.set(id, {
-      id: peerId,
-      heartbeatsSent: 0,
-      heartbeatsSuccess: 0,
-      lastSeen: now,
-      backoff: 2,
-      quality: BAD_QUALITY,
-      origin
-    })
   }
 
   public has(peerId: PeerId): boolean {
