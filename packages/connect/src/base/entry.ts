@@ -346,7 +346,6 @@ export class EntryNodes extends EventEmitter {
 
     // Contacting entry nodes includes establishing an entirely new
     // connection which might take longer than reestablishing an existing connection.
-    const TIMEOUT = 5e3
 
     const toCheck = nodesToCheck.concat(this.availableEntryNodes)
     const args: Parameters<EntryNodes['connectToRelay']>[] = new Array(toCheck.length)
@@ -355,7 +354,7 @@ export class EntryNodes extends EventEmitter {
       args[index] = [
         nodeToCheck.id,
         nodeToCheck.multiaddrs[0],
-        TIMEOUT,
+        ENTRY_NODE_CONTACT_TIMEOUT,
         this._onEntryNodeDisconnect as EntryNodes['onEntryDisconnect']
       ]
     }

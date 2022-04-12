@@ -13,8 +13,8 @@ class FakeConnectionManager {
   public _started: boolean
   private connections: Map<string, Connection[]>
 
-  constructor() {
-    this._started = false
+  constructor(started = false) {
+    this._started = started
     this.connections = new Map<string, Connection[]>()
   }
 
@@ -68,7 +68,8 @@ function createFakeNetwork() {
     return emitter
   }
 
-  const connect = (addr: string) => {
+  const connect = (ma: Multiaddr) => {
+    const addr = ma.toString()
     if (network.listeners(connectEvent(addr)).length >= 1) {
       network.emit(connectEvent(addr))
       return Promise.resolve({
@@ -98,13 +99,13 @@ function createFakeNetwork() {
   }
 }
 
-describe('entry node functionality', function () {
+describe.only('entry node functionality', function () {
   const peerId = createPeerId()
   it('add public nodes', function () {
     const entryNodes = new TestingEntryNodes(
       peerId,
       {
-        connectionManager: new FakeConnectionManager()
+        connectionManager: new FakeConnectionManager(true)
       },
       // Make sure that call is indeed asynchronous
       (async () => new Promise((resolve) => setImmediate(resolve))) as any,
@@ -173,9 +174,9 @@ describe('entry node functionality', function () {
     const entryNodes = new TestingEntryNodes(
       peerId,
       {
-        connectionManager: new FakeConnectionManager()
+        connectionManager: new FakeConnectionManager(true)
       },
-      async (ma: Multiaddr) => (await network.connect(ma.toString())) as any,
+      async (ma: Multiaddr) => (await network.connect(ma)) as any,
       {
         initialNodes: [relay]
       }
@@ -205,61 +206,61 @@ describe('entry node functionality', function () {
     entryNodes.stop()
   })
 
-  it.skip('expose limited number of relay addresses', async function () {
-    const network = createFakeNetwork()
+  //   it('expose limited number of relay addresses', async function () {
+  //     const network = createFakeNetwork()
 
-    const relayNodes = Array.from<undefined, [Promise<any>, PeerStoreType, EventEmitter]>(
-      { length: ENTRY_NODES_MAX_PARALLEL_DIALS + 1 },
-      (_value: undefined, index: number) => {
-        const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/${index}`)
+  //     const relayNodes = Array.from<undefined, [Promise<any>, PeerStoreType, EventEmitter]>(
+  //       { length: ENTRY_NODES_MAX_PARALLEL_DIALS + 1 },
+  //       (_value: undefined, index: number) => {
+  //         const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/${index}`)
 
-        const relayListener = network.listen(relay.multiaddrs[0].toString())
+  //         const relayListener = network.listen(relay.multiaddrs[0].toString())
 
-        const connectPromise = once(relayListener, 'connected')
+  //         const connectPromise = once(relayListener, 'connected')
 
-        return [connectPromise, relay, relayListener]
-      }
-    )
+  //         return [connectPromise, relay, relayListener]
+  //       }
+  //     )
 
-    const additionalOfflineNodes = [getPeerStoreEntry(`/ip4/127.0.0.1/tcp/23`)]
+  //     const additionalOfflineNodes = [getPeerStoreEntry(`/ip4/127.0.0.1/tcp/23`)]
 
-    throw Error('TODO')
-    const entryNodes = new TestingEntryNodes(
-      peerId,
-      {
-        connectionManager: new FakeConnectionManager()
-      },
-      async (ma: Multiaddr) => (await network.connect(ma.toString())) as any,
-      {
-        // @TODO
-        initialNodes: relayNodes.map((relayNode) => relayNode[1]).concat(additionalOfflineNodes)
-      }
-    )
+  //     throw Error('TODO')
+  //     const entryNodes = new TestingEntryNodes(
+  //       peerId,
+  //       {
+  //         connectionManager: new FakeConnectionManager()
+  //       },
+  //       async (ma: Multiaddr) => (await network.connect(ma)) as any,
+  //       {
+  //         // @TODO
+  //         initialNodes: relayNodes.map((relayNode) => relayNode[1]).concat(additionalOfflineNodes)
+  //       }
+  //     )
 
-    entryNodes.start()
+  //     entryNodes.start()
 
-    await entryNodes.updatePublicNodes()
+  //     await entryNodes.updatePublicNodes()
 
-    await Promise.all(relayNodes.map((relayNode) => relayNode[0]))
+  //     await Promise.all(relayNodes.map((relayNode) => relayNode[0]))
 
-    const usedRelays = entryNodes.getUsedRelayAddresses()
-    assert(usedRelays != undefined, `must expose relay addresses`)
-    assert(usedRelays.length == MAX_RELAYS_PER_NODE, `must expose ${MAX_RELAYS_PER_NODE} relay addresses`)
+  //     const usedRelays = entryNodes.getUsedRelayAddresses()
+  //     assert(usedRelays != undefined, `must expose relay addresses`)
+  //     assert(usedRelays.length == MAX_RELAYS_PER_NODE, `must expose ${MAX_RELAYS_PER_NODE} relay addresses`)
 
-    const availableEntryNodes = entryNodes.getAvailabeEntryNodes()
-    assert(availableEntryNodes.length == ENTRY_NODES_MAX_PARALLEL_DIALS + 1)
-    assert(
-      relayNodes.every((relayNode) =>
-        availableEntryNodes.some((availableEntryNode) => availableEntryNode.id.equals(relayNode[1].id))
-      ),
-      `must contain all relay nodes`
-    )
+  //     const availableEntryNodes = entryNodes.getAvailabeEntryNodes()
+  //     assert(availableEntryNodes.length == ENTRY_NODES_MAX_PARALLEL_DIALS + 1)
+  //     assert(
+  //       relayNodes.every((relayNode) =>
+  //         availableEntryNodes.some((availableEntryNode) => availableEntryNode.id.equals(relayNode[1].id))
+  //       ),
+  //       `must contain all relay nodes`
+  //     )
 
-    // cleanup
-    relayNodes.forEach((relayNode) => relayNode[2].removeAllListeners())
-    network.close()
-    entryNodes.stop()
-  })
+  //     // cleanup
+  //     relayNodes.forEach((relayNode) => relayNode[2].removeAllListeners())
+  //     network.close()
+  //     entryNodes.stop()
+  //   })
 
   it('update nodes once node became offline', async function () {
     const network = createFakeNetwork()
@@ -272,9 +273,9 @@ describe('entry node functionality', function () {
     const entryNodes = new TestingEntryNodes(
       peerId,
       {
-        connectionManager: new FakeConnectionManager()
+        connectionManager: new FakeConnectionManager(true)
       },
-      async (ma: Multiaddr) => (await network.connect(ma.toString())) as any,
+      async (ma: Multiaddr) => (await network.connect(ma)) as any,
       {}
     )
 
@@ -326,9 +327,9 @@ describe('entry node functionality', function () {
     const entryNodes = new TestingEntryNodes(
       peerId,
       {
-        connectionManager: new FakeConnectionManager()
+        connectionManager: new FakeConnectionManager(true)
       },
-      async (ma: Multiaddr) => (await network.connect(ma.toString())) as any,
+      async (ma: Multiaddr) => (await network.connect(ma)) as any,
       {}
     )
 
@@ -366,9 +367,9 @@ describe('entry node functionality', function () {
     const entryNodes = new TestingEntryNodes(
       peerId,
       {
-        connectionManager: new FakeConnectionManager()
+        connectionManager: new FakeConnectionManager(true)
       },
-      async (ma: Multiaddr) => (await network.connect(ma.toString())) as any,
+      async (ma: Multiaddr) => (await network.connect(ma)) as any,
       {}
     )
 
@@ -389,7 +390,7 @@ describe('entry node functionality', function () {
     const entryNodes = new TestingEntryNodes(
       peerId,
       {
-        connectionManager: new FakeConnectionManager()
+        connectionManager: new FakeConnectionManager(true)
       },
       (async () => {}) as any,
       {}
@@ -432,9 +433,9 @@ describe('entry node functionality', function () {
     const entryNodes = new TestingEntryNodes(
       peerId,
       {
-        connectionManager: new FakeConnectionManager()
+        connectionManager: new FakeConnectionManager(true)
       },
-      async (ma: Multiaddr) => (await network.connect(ma.toString())) as any,
+      async (ma: Multiaddr) => (await network.connect(ma)) as any,
       {
         publicNodes
       }
@@ -477,9 +478,9 @@ describe('entry node functionality', function () {
     const entryNodes = new TestingEntryNodes(
       peerId,
       {
-        connectionManager: new FakeConnectionManager()
+        connectionManager: new FakeConnectionManager(true)
       },
-      async (ma: Multiaddr) => (await network.connect(ma.toString())) as any,
+      async (ma: Multiaddr) => (await network.connect(ma)) as any,
       {
         dhtRenewalTimeout: CUSTOM_DHT_RENEWAL_TIMEOUT,
         publicNodes
@@ -504,7 +505,7 @@ describe('entry node functionality', function () {
     const entryNodes = new TestingEntryNodes(
       peerId,
       {
-        connectionManager: new FakeConnectionManager()
+        connectionManager: new FakeConnectionManager(true)
       },
       // Make sure that call is indeed asynchronous
       (async () => new Promise((resolve) => setImmediate(resolve))) as any,
