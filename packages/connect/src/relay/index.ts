@@ -144,7 +144,7 @@ class Relay {
     log(`Currently tracked connections to relays: `)
     this.connectedToRelays.forEach((relayPeerId) => {
       const countConns = this.libp2p.connectionManager.getAll(PeerId.createFromB58String(relayPeerId)).length
-      log(`- ${relayPeerId}: ${countConns} connections`)
+      log(`- ${relayPeerId}: ${countConns} connection${countConns == 1 ? '' : 's'}`)
     })
   }
 
