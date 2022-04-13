@@ -137,7 +137,7 @@ async function establishNewConnection(
   libp2p: Pick<ReducedLibp2p, 'dial'>,
   destination: PeerId | Multiaddr,
   protocol: string,
-  opts: Required<TimeoutOpts>
+  opts: TimeoutOpts
 ) {
   const start = Date.now()
 
@@ -147,7 +147,7 @@ async function establishNewConnection(
     aborted = true
   }
 
-  opts.signal.addEventListener('abort', onAbort)
+  opts.signal?.addEventListener('abort', onAbort)
 
   let conn: Connection
   try {
@@ -169,7 +169,7 @@ async function establishNewConnection(
 
   const stream = (await timeout(10000, () => conn.newStream(protocol)))?.stream
 
-  opts.signal.removeEventListener('abort', onAbort)
+  opts.signal?.removeEventListener('abort', onAbort)
 
   // Libp2p's return types tend to change every now and then
   if (stream != null && aborted) {
@@ -282,7 +282,10 @@ async function doDial(
   }
 
   // Try to get some fresh addresses from the DHT
-  const dhtResult = await queryDHT(libp2p, destination, opts)
+  const dhtResult = await queryDHT(libp2p, destination, {
+    ...opts,
+    signal: undefined
+  })
 
   if (dhtResult.length == 0) {
     await printPeerStoreAddresses(
@@ -317,7 +320,10 @@ async function doDial(
 
       // Only establish new connection if not yet successful
       if (!relayStruct) {
-        relayStruct = await establishNewConnection(libp2p, cirtcuitAddress, protocol, opts)
+        relayStruct = await establishNewConnection(libp2p, cirtcuitAddress, protocol, {
+          ...opts,
+          signal: undefined
+        })
       }
     }
   }
