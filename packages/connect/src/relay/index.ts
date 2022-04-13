@@ -169,23 +169,10 @@ class Relay {
     destination: PeerId,
     options?: HoprConnectDialOptions
   ): Promise<MultiaddrConnection | undefined> {
-    const abort = new AbortController()
-    let connectDone = false
-
-    setTimeout(() => {
-      if (connectDone) {
-        return
-      }
-      connectDone = true
-
-      abort.abort()
-    }, RELAY_CIRCUIT_TIMEOUT)
 
     const baseConnection = await this.dialNodeDirectly(relay, RELAY_PROTCOL(this.options.environment), {
       signal: options?.signal
     }).catch(error)
-
-    connectDone = true
 
     if (baseConnection == undefined) {
       error(
