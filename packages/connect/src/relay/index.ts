@@ -12,7 +12,7 @@ import debug from 'debug'
 
 import { WebRTCUpgrader, WebRTCConnection } from '../webrtc'
 import chalk from 'chalk'
-import { RELAY_CIRCUIT_TIMEOUT, RELAY_PROTCOL, DELIVERY_PROTOCOL, CODE_P2P, OK, CAN_RELAY_PROTCOL } from '../constants'
+import { RELAY_PROTCOL, DELIVERY_PROTOCOL, CODE_P2P, OK, CAN_RELAY_PROTCOL } from '../constants'
 import { RelayConnection } from './connection'
 import { RelayHandshake, RelayHandshakeMessage } from './handshake'
 import { RelayState } from './state'
@@ -169,23 +169,9 @@ class Relay {
     destination: PeerId,
     options?: HoprConnectDialOptions
   ): Promise<MultiaddrConnection | undefined> {
-    const abort = new AbortController()
-    let connectDone = false
-
-    setTimeout(() => {
-      if (connectDone) {
-        return
-      }
-      connectDone = true
-
-      abort.abort()
-    }, RELAY_CIRCUIT_TIMEOUT)
-
     const baseConnection = await this.dialNodeDirectly(relay, RELAY_PROTCOL(this.options.environment), {
       signal: options?.signal
     }).catch(error)
-
-    connectDone = true
 
     if (baseConnection == undefined) {
       error(

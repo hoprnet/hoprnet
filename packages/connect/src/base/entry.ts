@@ -160,16 +160,26 @@ export class EntryNodes extends EventEmitter {
       const relayTuples = usedRelay.relayDirectAddress.tuples()
 
       if (u8aEquals(tuples[2][1], relayTuples[2][1])) {
+        let attempt = 0
+
         retryWithBackoff(
           async () => {
+            attempt++
             const result = await this.connectToRelay(
               peer,
               usedRelay.relayDirectAddress,
               ENTRY_NODE_CONTACT_TIMEOUT,
               this._onEntryNodeDisconnect as EntryNodes['onEntryDisconnect']
             )
+            log(
+              `Reconnect attempt ${attempt} to entry node ${peer.toB58String()} was ${
+                result.entry.latency >= 0 ? 'succesful' : 'not successful'
+              }`
+            )
 
             if (result.entry.latency < 0) {
+              // Throw error to signal `retryWithBackoff` that dial attempt
+              // was not successful
               throw Error(KNOWN_DISCONNECT_ERROR)
             }
           },
@@ -188,6 +198,7 @@ export class EntryNodes extends EventEmitter {
           }
         })
 
+        // Once found, quit loop
         break
       }
     }
