@@ -32,7 +32,8 @@ export async function createLibp2pInstance(
   options: HoprOptions,
   initialNodes: { id: PeerId; multiaddrs: Multiaddr[] }[],
   publicNodes: PublicNodesEmitter,
-  isAllowedAccess: (id: PeerId) => Promise<boolean>
+  isAllowedAccess: (id: PeerId) => Promise<boolean>,
+  connectionDenied: (id: PeerId) => void
 ): Promise<LibP2P> {
   let addressSorter: AddressSorter
 
@@ -150,19 +151,22 @@ export async function createLibp2pInstance(
   libp2p._dht._lan._topologyListener._protocol = HOPR_DHT_LAN_PROTOCOL
 
   const onConnectionOriginal = libp2p.upgrader.onConnection
+  // check if connection is not registered
   libp2p.upgrader.onConnection = async (conn: Connection) => {
-    // check if connection is not registered
-    if (!(await isAllowedAccess(conn.remotePeer))) {
+    const allowedAccess = await isAllowedAccess(conn.remotePeer)
+    if (allowedAccess) {
+      // continue connection
+      onConnectionOriginal(conn)
+    } else {
       try {
+        connectionDenied(conn.remotePeer)
         await conn.close()
       } catch (err: any) {
         log(`Error while closing connection to non-registered node`, err)
       }
-      return
     }
-    // continue connection
-    onConnectionOriginal(conn)
   }
+
   return libp2p
 }
 

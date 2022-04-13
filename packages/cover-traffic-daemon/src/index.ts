@@ -119,6 +119,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   }
 
   const peerUpdate = (peer: PeerData) => {
+    log('adding peer', peer.id.toB58String())
     data.setNode(peer)
   }
 

@@ -30,12 +30,14 @@ function nextPing(e: Entry): number {
 }
 
 class NetworkPeers {
-  private peers: Map<string, Entry> = new Map()
-  private ignoredPeers: Entry[] = []
+  private entries: Map<string, Entry> = new Map()
+  private ignoredEntries: Entry[] = []
+  // peers which were denied connection via the HoprNetworkRegistry
+  private deniedPeers: Map<string, PeerId> = new Map()
 
   constructor(
-    existingPeers: Array<PeerId>,
-    private exclude: PeerId[] = [],
+    existingPeers: PeerId[],
+    private excludedPeers: PeerId[] = [],
     private onPeerOffline?: (peer: PeerId) => void
   ) {
     // register all existing peers
@@ -47,7 +49,7 @@ class NetworkPeers {
   // @returns a float between 0 (completely unreliable) and 1 (completely
   // reliable) estimating the quality of service of a peer's network connection
   public qualityOf(peerId: PeerId): number {
-    const entry = this.peers.get(peerId.toB58String())
+    const entry = this.entries.get(peerId.toB58String())
     if (entry && entry.heartbeatsSent > 0) {
       /*
       return entry.heartbeatsSuccess / entry.heartbeatsSent
@@ -63,14 +65,14 @@ class NetworkPeers {
    */
   public getConnectionInfo(peerId: PeerId): Entry {
     const id = peerId.toB58String()
-    const entry = this.peers.get(id)
+    const entry = this.entries.get(id)
     if (entry) return entry
     throw Error(`Entry for ${id} does not exist`)
   }
 
   public pingSince(thresholdTime: number): PeerId[] {
     const toPing: PeerId[] = []
-    for (const entry of this.peers.values()) {
+    for (const entry of this.entries.values()) {
       if (nextPing(entry) < thresholdTime) {
         toPing.push(entry.id)
       }
@@ -81,7 +83,7 @@ class NetworkPeers {
 
   public updateRecord(pingResult: HeartbeatPingResult): void {
     const id = pingResult.destination.toB58String()
-    const previousEntry = this.peers.get(id)
+    const previousEntry = this.entries.get(id)
     if (!previousEntry) return
 
     let newEntry: Entry
@@ -104,9 +106,9 @@ class NetworkPeers {
         // check if this node is considered offline and should be removed
         if (newEntry.quality < BAD_QUALITY) {
           // delete peer from internal store
-          this.peers.delete(id)
+          this.entries.delete(id)
           // add entry to temporarily ignored peers
-          this.ignorePeer(newEntry)
+          this.ignoreEntry(newEntry)
           // done, return early so the rest can update the entry instead
           return
         }
@@ -125,12 +127,12 @@ class NetworkPeers {
     }
 
     // update peer entry if still considered ok to keep
-    this.peers.set(id, newEntry)
+    this.entries.set(id, newEntry)
   }
 
   // Get a random sample peers.
   public randomSubset(size: number, filter?: (peer: PeerId) => boolean): PeerId[] {
-    const peers = Array.from(this.peers.values())
+    const peers = Array.from(this.entries.values())
     return randomSubset(
       peers,
       Math.min(size, peers.length),
@@ -141,10 +143,15 @@ class NetworkPeers {
   public register(peerId: PeerId, origin: string) {
     const id = peerId.toB58String()
     const now = Date.now()
+    const hasEntry = this.entries.has(id)
+    const isExcluded = this.excludedPeers.some((p) => p.equals(peerId))
+    const isDenied = this.deniedPeers.has(id)
 
-    // does not have peer and it's not excluded
-    if (!this.peers.has(id) && this.exclude.findIndex((p: PeerId) => peerId.equals(p)) < 0) {
-      this.peers.set(id, {
+    log('registering peer', id, { hasEntry, isExcluded, isDenied })
+
+    // does not have peer and it's not excluded or denied
+    if (!hasEntry && !isExcluded && !isDenied) {
+      this.entries.set(id, {
         id: peerId,
         heartbeatsSent: 0,
         heartbeatsSuccess: 0,
@@ -155,19 +162,18 @@ class NetworkPeers {
       })
     }
 
-    if (this.exclude.findIndex((x: PeerId) => peerId.equals(x)) >= 0) {
-      // the peer is explicitely ignored
+    // the peer is excluded or denied
+    if (isExcluded || isDenied) {
       return
     }
 
-    const ignoredIndex = this.ignoredPeers.findIndex((e: Entry) => e.id.equals(peerId) && e.origin == origin)
-
+    const ignoredIndex = this.ignoredEntries.findIndex((e: Entry) => e.id.equals(peerId) && e.origin == origin)
     if (ignoredIndex >= 0) {
       // the peer is temporarily ignored, release if time has passed
-      const ignoredEntry = this.ignoredPeers[ignoredIndex]
+      const ignoredEntry = this.ignoredEntries[ignoredIndex]
       if (ignoredEntry.ignoredAt + IGNORE_TIMEFRAME < now) {
         // release and continue
-        this.unignorePeer(ignoredEntry)
+        this.unignoreEntry(ignoredEntry)
       } else {
         // ignore still valid, thus skipping this registration
         return
@@ -176,22 +182,22 @@ class NetworkPeers {
   }
 
   public has(peerId: PeerId): boolean {
-    return this.peers.has(peerId.toB58String())
+    return this.entries.has(peerId.toB58String())
   }
 
   public length(): number {
-    return this.peers.size
+    return this.entries.size
   }
 
   public all(): PeerId[] {
-    return Array.from(this.peers.values()).map((entry) => entry.id)
+    return Array.from(this.entries.values()).map((entry) => entry.id)
   }
 
   /**
    * @returns a string describing the connection quality of all connected peers
    */
   public debugLog(): string {
-    if (this.peers.size === 0) return 'no connected peers'
+    if (this.entries.size === 0) return 'no connected peers'
 
     const peers = this.all()
 
@@ -214,7 +220,7 @@ class NetworkPeers {
         continue
       }
 
-      const entry = this.peers.get(peer.toB58String())
+      const entry = this.entries.get(peer.toB58String())
 
       const success =
         entry.heartbeatsSent > 0 ? ((entry.heartbeatsSuccess / entry.heartbeatsSent) * 100).toFixed() + '%' : '<new>'
@@ -228,26 +234,40 @@ class NetworkPeers {
     return out
   }
 
-  private ignorePeer(entry: Entry): void {
-    const index = this.ignoredPeers.findIndex((e: Entry) => e.id.equals(entry.id) && e.origin == entry.origin)
+  private ignoreEntry(entry: Entry): void {
+    const index = this.ignoredEntries.findIndex((e: Entry) => e.id.equals(entry.id) && e.origin == entry.origin)
 
     if (index < 0) {
       entry.ignoredAt = Date.now()
-      this.ignoredPeers.push(entry)
+      this.ignoredEntries.push(entry)
     }
   }
 
-  private unignorePeer(entry: Entry): void {
-    const index = this.ignoredPeers.findIndex((e: Entry) => e.id.equals(entry.id) && e.origin == entry.origin)
+  private unignoreEntry(entry: Entry): void {
+    const index = this.ignoredEntries.findIndex((e: Entry) => e.id.equals(entry.id) && e.origin == entry.origin)
 
     if (index >= 0) {
-      this.ignoredPeers.splice(index, 1)
+      this.ignoredEntries.splice(index, 1)
     }
   }
 
-  public unignoreAllPeers(): void {
-    log('Unignoring all peers')
-    this.ignoredPeers = []
+  public getAllDeniedPeers(): PeerId[] {
+    return Array.from(this.deniedPeers.values())
+  }
+
+  public addPeerToDenied(peerId: PeerId): void {
+    log('adding peer to denied', peerId.toB58String())
+    this.deniedPeers.set(peerId.toB58String(), peerId)
+  }
+
+  public removePeerFromDenied(peerId: PeerId): void {
+    log('removing peer from denied', peerId.toB58String())
+    this.deniedPeers.delete(peerId.toB58String())
+  }
+
+  public removeAllDeniedPeers(): void {
+    log('removing all denied peers')
+    this.deniedPeers = new Map()
   }
 }
 

@@ -75,6 +75,9 @@ function createPacketTagKey(tag: Uint8Array) {
 function createRegisterKey(publicKey: PublicKey) {
   return Uint8Array.from([...REGISTER_REGISTRY_PREFIX, ...publicKey.serializeUncompressed()])
 }
+function parsePublicKeyFromRegisterKey(key: Uint8Array): PublicKey {
+  return PublicKey.deserialize(key.slice(REGISTER_ENABLED_PREFIX.length))
+}
 function createEligibleKey(address: Address) {
   return Uint8Array.from([...REGISTER_ELIGIBLE_PREFIX, ...address.serialize()])
 }
@@ -728,12 +731,12 @@ export class HoprDB {
   }
 
   /**
-   * Hopr Network Registry
-   * Unlink hoprNode to an ETH address by removing the entry.
-   * @param hoprNode the node to register
-   * @param snapshot
+   * Do a reverse find by searching the stored account to return
+   * the associated public key of the HoprNode.
+   * @param account
+   * @returns PublicKey of the associated HoprNode
    */
-  public async removeFromRegistry(account: Address, snapshot: Snapshot): Promise<void> {
+  public async findHoprNodeUsingAccount(account: Address): Promise<PublicKey> {
     // range of keys to search
     const from = this.keyOf(
       Uint8Array.from([...REGISTER_REGISTRY_PREFIX, ...new Uint8Array(PublicKey.SIZE_UNCOMPRESSED).fill(0x00)])
@@ -762,6 +765,19 @@ export class HoprDB {
         }
       } catch {}
     }
+
+    return parsePublicKeyFromRegisterKey(entryKey)
+  }
+
+  /**
+   * Hopr Network Registry
+   * Unlink hoprNode to an ETH address by removing the entry.
+   * @param account the account to use so we can search for the key in the database
+   * @param snapshot
+   */
+  public async removeFromRegistry(account: Address, snapshot: Snapshot): Promise<void> {
+    const hoprNode = await this.findHoprNodeUsingAccount(account)
+    const entryKey = createRegisterKey(hoprNode)
 
     if (entryKey) {
       await this.db

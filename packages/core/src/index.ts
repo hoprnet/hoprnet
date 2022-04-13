@@ -238,7 +238,7 @@ class Hopr extends EventEmitter {
     // Fetch all nodes that will announces themselves during startup
     const recentlyAnnouncedNodes: PeerStoreAddress[] = []
     const pushToRecentlyAnnouncedNodes = (peer: PeerStoreAddress) => recentlyAnnouncedNodes.push(peer)
-    this.connector.on('peer', pushToRecentlyAnnouncedNodes)
+    this.connector.indexer.on('peer', pushToRecentlyAnnouncedNodes)
 
     // Initialize libp2p object and pass configuration
     this.libp2p = await createLibp2pInstance(
@@ -248,6 +248,9 @@ class Hopr extends EventEmitter {
       this.publicNodesEmitter,
       async (peerId: PeerId) => {
         return this.connector.isAllowedAccess(PublicKey.fromPeerId(peerId))
+      },
+      (peerId: PeerId) => {
+        this.networkPeers.addPeerToDenied(peerId)
       }
     )
 
@@ -272,8 +275,23 @@ class Hopr extends EventEmitter {
     )
     // unignore all peers if registry is disabled
     this.connector.indexer.on('network-registry-status-changed', (enabled: boolean) => {
-      if (!enabled) this.networkPeers.unignoreAllPeers()
+      if (!enabled) {
+        const deniedPeers = this.networkPeers.getAllDeniedPeers()
+        // unignore them
+        this.networkPeers.removeAllDeniedPeers()
+        // register previously denied peers
+        for (const peer of deniedPeers) {
+          this.networkPeers.register(peer, 'denied list')
+        }
+      }
     })
+    this.connector.indexer.on(
+      'network-registry-eligibility-changed',
+      (_account: Address, node: PublicKey, eligible: boolean) => {
+        if (eligible) this.networkPeers.removePeerFromDenied(node.toPeerId())
+        else this.networkPeers.addPeerToDenied(node.toPeerId())
+      }
+    )
     this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessage, hangup, this.environment.id, this.options)
 
     this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
