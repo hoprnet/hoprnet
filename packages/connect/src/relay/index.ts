@@ -12,7 +12,7 @@ import debug from 'debug'
 
 import { WebRTCUpgrader, WebRTCConnection } from '../webrtc'
 import chalk from 'chalk'
-import { RELAY_CIRCUIT_TIMEOUT, RELAY_PROTCOL, DELIVERY_PROTOCOL, CODE_P2P, OK, CAN_RELAY_PROTCOL } from '../constants'
+import { RELAY_PROTCOL, DELIVERY_PROTOCOL, CODE_P2P, OK, CAN_RELAY_PROTCOL } from '../constants'
 import { RelayConnection } from './connection'
 import { RelayHandshake, RelayHandshakeMessage } from './handshake'
 import { RelayState } from './state'
