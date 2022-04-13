@@ -302,7 +302,7 @@ gcloud_create_or_update_managed_instance_group() {
     gcloud beta compute instance-groups managed rolling-action start-update \
       "${name}"\
       --version=template=${template} \
-      --minimal-action=refresh \
+      --minimal-action=restart \
       --most-disruptive-allowed-action=restart \
       ${gcloud_region}
 
