@@ -786,7 +786,7 @@ export class HoprDB {
     if (entryKey) {
       await this.db
         .batch()
-        .del(entryKey)
+        .del(Buffer.from(this.keyOf(entryKey)))
         .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
         .write()
     }

@@ -494,7 +494,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       return this.db.isEligible(account)
     } catch (error) {
       // log unexpected error
-      if (!error.notFound) log('error: could not determine whether node is is allowed access', error)
+      if (!error?.notFound) log('error: could not determine whether node is is allowed access', error)
       return false
     }
   }
