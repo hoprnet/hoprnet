@@ -773,7 +773,7 @@ class Hopr extends EventEmitter {
    * Closes all open connections to a peer. Used to temporarily or permanently
    * disconnect from a peer.
    * Similar to `libp2p.hangUp` but catching all errors.
-   * @param peer PeerId of the peer to whom we want to disconnect
+   * @param peer PeerId of the peer from whom we want to disconnect
    */
   private async closeConnectionsTo(peer: PeerId): Promise<void> {
     const connections = this.libp2p.connectionManager.getAll(peer)
