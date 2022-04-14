@@ -261,7 +261,22 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
     verbose(
       `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshake.`
     )
-    return await this._upgradeOutbound(maConn)
+
+    const conn = await this._upgradeOutbound(maConn)
+
+    // Assign disconnect handler once we're sure that public keys match,
+    // i.e. dialed node == desired destination
+    if (options && options.onDisconnect) {
+      maConn.conn.on('close', () => {
+        // Don't call the disconnect handler if connection has been closed intentionally
+        if (maConn.closed) {
+          return
+        }
+        options.onDisconnect!(ma)
+      })
+    }
+
+    return conn
   }
 }
 

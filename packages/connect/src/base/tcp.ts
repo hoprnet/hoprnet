@@ -24,7 +24,7 @@ class TCPConnection implements MultiaddrConnection {
   public localAddr: Multiaddr
   public sink: StreamSink
   public source: StreamSourceAsync
-  private closed: boolean | undefined
+  public closed: boolean
 
   private _stream: Stream
 
@@ -38,15 +38,12 @@ class TCPConnection implements MultiaddrConnection {
   constructor(public remoteAddr: Multiaddr, self: PeerId, public conn: Socket, options?: HoprConnectDialOptions) {
     this.localAddr = nodeToMultiaddr(this.conn.address() as AddressInfo, self)
 
+    this.closed = false
     this.timeline = {
       open: Date.now()
     }
 
     this.conn.once('close', () => {
-      if (!this.closed) {
-        options?.onDisconnect?.(remoteAddr)
-      }
-
       // Whenever the socket gets closed, mark the
       // connection closed to cleanup data structures in
       // ConnectionManager

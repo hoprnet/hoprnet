@@ -94,7 +94,7 @@ export class EntryNodes extends EventEmitter {
   private _onNewRelay: ((peer: PeerStoreType) => void) | undefined
   private _onRemoveRelay: ((peer: PeerId) => void) | undefined
   private _connectToRelay: EntryNodes['connectToRelay'] | undefined
-  private _onEntryNodeDisconnect: EntryNodes['onEntryDisconnect'] | undefined
+  public _onEntryNodeDisconnect: EntryNodes['onEntryDisconnect'] | undefined
 
   constructor(
     private peerId: PeerId,
@@ -165,12 +165,7 @@ export class EntryNodes extends EventEmitter {
         retryWithBackoff(
           async () => {
             attempt++
-            const result = await this.connectToRelay(
-              peer,
-              usedRelay.relayDirectAddress,
-              ENTRY_NODE_CONTACT_TIMEOUT,
-              this._onEntryNodeDisconnect as EntryNodes['onEntryDisconnect']
-            )
+            const result = await this.connectToRelay(peer, usedRelay.relayDirectAddress, ENTRY_NODE_CONTACT_TIMEOUT)
             log(
               `Reconnect attempt ${attempt} to entry node ${peer.toB58String()} was ${
                 result.entry.latency >= 0 ? 'succesful' : 'not successful'
@@ -217,12 +212,7 @@ export class EntryNodes extends EventEmitter {
           continue
         }
 
-        work.push([
-          relay,
-          relayEntry.multiaddrs[0],
-          ENTRY_NODE_CONTACT_TIMEOUT,
-          this._onEntryNodeDisconnect as EntryNodes['onEntryDisconnect']
-        ])
+        work.push([relay, relayEntry.multiaddrs[0], ENTRY_NODE_CONTACT_TIMEOUT])
       }
 
       await nAtATime(this._connectToRelay as EntryNodes['connectToRelay'], work, ENTRY_NODES_MAX_PARALLEL_DIALS)
@@ -235,15 +225,15 @@ export class EntryNodes extends EventEmitter {
    * @returns a list of entry nodes that are currently used (as relay circuit addresses with us)
    */
   public getUsedRelayAddresses() {
-    return this.usedRelays.map((ur) => ur.ourCircuitAddress)
+    return this.usedRelays.map((ur: UsedRelay) => ur.ourCircuitAddress)
   }
 
   /**
    * Convenience method to retrieved used relay peer IDs.
    * @returns a list of peer IDs of used relays.
    */
-  private getUsedRelayPeerIds() {
-    return this.getUsedRelayAddresses().map((ma) => relayFromRelayAddress(ma))
+  public getUsedRelayPeerIds() {
+    return this.getUsedRelayAddresses().map((ma: Multiaddr) => relayFromRelayAddress(ma))
   }
 
   /**
@@ -394,12 +384,7 @@ export class EntryNodes extends EventEmitter {
     const args: Parameters<EntryNodes['connectToRelay']>[] = new Array(toCheck.length)
 
     for (const [index, nodeToCheck] of toCheck.entries()) {
-      args[index] = [
-        nodeToCheck.id,
-        nodeToCheck.multiaddrs[0],
-        ENTRY_NODE_CONTACT_TIMEOUT,
-        this._onEntryNodeDisconnect as EntryNodes['onEntryDisconnect']
-      ]
+      args[index] = [nodeToCheck.id, nodeToCheck.multiaddrs[0], ENTRY_NODE_CONTACT_TIMEOUT]
     }
 
     const start = Date.now()
@@ -416,7 +401,7 @@ export class EntryNodes extends EventEmitter {
 
     const positiveOnes = results.findIndex((result: ConnectionResult) => result.entry.latency >= 0)
 
-    const previous = new Set<string>(this.getUsedRelayPeerIds().map((p) => p.toB58String()))
+    const previous = new Set<string>(this.getUsedRelayPeerIds().map((p: PeerId) => p.toB58String()))
 
     if (positiveOnes >= 0) {
       // Close all unnecessary connections
@@ -533,15 +518,19 @@ export class EntryNodes extends EventEmitter {
   private async connectToRelay(
     id: PeerId,
     relay: Multiaddr,
-    timeout: number,
-    onDisconnect: (ma: Multiaddr) => void
+    timeout: number
   ): Promise<{ entry: EntryNodeData; conn?: Connection }> {
     const start = Date.now()
 
     let conn = await tryExistingConnections(this.libp2p, id, CAN_RELAY_PROTCOL(this.options.environment))
 
     if (!conn) {
-      conn = await this.establishNewConnection(id, relay, timeout, onDisconnect)
+      conn = await this.establishNewConnection(
+        id,
+        relay,
+        timeout,
+        this._onEntryNodeDisconnect as EntryNodes['onEntryDisconnect']
+      )
     }
 
     if (conn == undefined) {

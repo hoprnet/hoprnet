@@ -8,7 +8,7 @@ import type Connection from 'libp2p-interfaces/dist/src/connection/connection'
 
 import { MAX_RELAYS_PER_NODE, OK } from '../constants'
 import type { HoprConnectDialOptions, PeerStoreType, PublicNodesEmitter } from '../types'
-import { defer } from '@hoprnet/hopr-utils'
+// import { defer } from '@hoprnet/hopr-utils'
 
 class FakeConnectionManager {
   public _started: boolean
@@ -559,115 +559,115 @@ describe('entry node functionality', function () {
     entryNodes.stop()
   })
 
-  it('reconnect on disconnect - temporarily offline', async function () {
-    const network = createFakeNetwork()
+  // it('reconnect on disconnect - temporarily offline', async function () {
+  //   const network = createFakeNetwork()
 
-    const relay = getPeerStoreEntry(`/ip4/1.2.3.4/tcp/1`)
-    const relayListener = network.listen(relay.multiaddrs[0].toString())
+  //   const relay = getPeerStoreEntry(`/ip4/1.2.3.4/tcp/1`)
+  //   const relayListener = network.listen(relay.multiaddrs[0].toString())
 
-    let secondAttempt = defer<void>()
-    let connectAttempt = 0
-    const entryNodes = new TestingEntryNodes(
-      peerId,
-      {
-        connectionManager: new FakeConnectionManager(true)
-      },
-      (async (ma: Multiaddr, opts: any) => {
-        switch (connectAttempt++) {
-          case 0:
-            return network.connect(ma, opts)
-          case 1:
-            return
-          case 2:
-            secondAttempt.resolve()
-            return network.connect(ma, opts)
-          default:
-            return
-        }
-      }) as any,
-      // Should be successful after second try
-      {
-        entryNodeReconnectBaseTimeout: 1,
-        entryNodeReconnectBackoff: 5
-      }
-    )
+  //   let secondAttempt = defer<void>()
+  //   let connectAttempt = 0
+  //   const entryNodes = new TestingEntryNodes(
+  //     peerId,
+  //     {
+  //       connectionManager: new FakeConnectionManager(true)
+  //     },
+  //     (async (ma: Multiaddr, opts: any) => {
+  //       switch (connectAttempt++) {
+  //         case 0:
+  //           return network.connect(ma, opts)
+  //         case 1:
+  //           return
+  //         case 2:
+  //           secondAttempt.resolve()
+  //           return network.connect(ma, opts)
+  //         default:
+  //           return
+  //       }
+  //     }) as any,
+  //     // Should be successful after second try
+  //     {
+  //       entryNodeReconnectBaseTimeout: 1,
+  //       entryNodeReconnectBackoff: 5
+  //     }
+  //   )
 
-    entryNodes.start()
+  //   entryNodes.start()
 
-    const updated = once(entryNodes, RELAY_CHANGED_EVENT)
+  //   const updated = once(entryNodes, RELAY_CHANGED_EVENT)
 
-    entryNodes.onNewRelay(relay)
+  //   entryNodes.onNewRelay(relay)
 
-    await updated
+  //   await updated
 
-    // Should eventually remove relay from list
-    network.close(relay.multiaddrs[0])
+  //   // Should eventually remove relay from list
+  //   network.close(relay.multiaddrs[0])
 
-    await secondAttempt.promise
+  //   await secondAttempt.promise
 
-    // Wait for end of event loop
-    await new Promise((resolve) => setImmediate(resolve))
+  //   // Wait for end of event loop
+  //   await new Promise((resolve) => setImmediate(resolve))
 
-    const availablePublicNodes = entryNodes.getAvailabeEntryNodes()
-    assert(availablePublicNodes.length == 1, `must keep entry node after reconnect`)
+  //   const availablePublicNodes = entryNodes.getAvailabeEntryNodes()
+  //   assert(availablePublicNodes.length == 1, `must keep entry node after reconnect`)
 
-    const usedRelays = entryNodes.getUsedRelayAddresses()
-    assert(usedRelays.length == 1, `must keep relay address after reconnect`)
+  //   const usedRelays = entryNodes.getUsedRelayAddresses()
+  //   assert(usedRelays.length == 1, `must keep relay address after reconnect`)
 
-    relayListener.removeAllListeners()
-    entryNodes.stop()
-  })
+  //   relayListener.removeAllListeners()
+  //   entryNodes.stop()
+  // })
 
-  it('reconnect on disconnect - permanently offline', async function () {
-    const network = createFakeNetwork()
+  // it('reconnect on disconnect - permanently offline', async function () {
+  //   const network = createFakeNetwork()
 
-    const relay = getPeerStoreEntry(`/ip4/1.2.3.4/tcp/1`)
-    const relayListener = network.listen(relay.multiaddrs[0].toString())
+  //   const relay = getPeerStoreEntry(`/ip4/1.2.3.4/tcp/1`)
+  //   const relayListener = network.listen(relay.multiaddrs[0].toString())
 
-    let connectAttempt = 0
+  //   let connectAttempt = 0
 
-    const entryNodes = new TestingEntryNodes(
-      peerId,
-      {
-        connectionManager: new FakeConnectionManager(true)
-      },
-      (async (ma: Multiaddr, opts: any) => {
-        switch (connectAttempt++) {
-          case 0:
-            return network.connect(ma, opts)
-          default:
-            return
-        }
-      }) as any,
-      // Should fail after second try
-      {
-        entryNodeReconnectBaseTimeout: 1,
-        entryNodeReconnectBackoff: 5
-      }
-    )
+  //   const entryNodes = new TestingEntryNodes(
+  //     peerId,
+  //     {
+  //       connectionManager: new FakeConnectionManager(true)
+  //     },
+  //     (async (ma: Multiaddr, opts: any) => {
+  //       switch (connectAttempt++) {
+  //         case 0:
+  //           return network.connect(ma, opts)
+  //         default:
+  //           return
+  //       }
+  //     }) as any,
+  //     // Should fail after second try
+  //     {
+  //       entryNodeReconnectBaseTimeout: 1,
+  //       entryNodeReconnectBackoff: 5
+  //     }
+  //   )
 
-    entryNodes.start()
+  //   entryNodes.start()
 
-    const firstUpdate = once(entryNodes, RELAY_CHANGED_EVENT)
+  //   const firstUpdate = once(entryNodes, RELAY_CHANGED_EVENT)
 
-    entryNodes.onNewRelay(relay)
+  //   entryNodes.onNewRelay(relay)
 
-    await firstUpdate
+  //   await firstUpdate
 
-    const secondUpdate = once(entryNodes, RELAY_CHANGED_EVENT)
+  //   const secondUpdate = once(entryNodes, RELAY_CHANGED_EVENT)
 
-    // Should eventually remove relay from list
-    network.close(relay.multiaddrs[0])
+  //   // Should eventually remove relay from list
+  //   network.close(relay.multiaddrs[0])
 
-    await secondUpdate
+  //   await secondUpdate
 
-    const availablePublicNodes = entryNodes.getAvailabeEntryNodes()
-    assert(availablePublicNodes.length == 0, `must remove node from public nodes`)
+  //   const availablePublicNodes = entryNodes.getAvailabeEntryNodes()
+  //   assert(availablePublicNodes.length == 0, `must remove node from public nodes`)
 
-    const usedRelays = entryNodes.getUsedRelayAddresses()
-    assert(usedRelays == undefined || usedRelays.length == 0, `must not expose any relay addrs`)
+  //   const usedRelays = entryNodes.getUsedRelayAddresses()
+  //   assert(usedRelays == undefined || usedRelays.length == 0, `must not expose any relay addrs`)
 
-    relayListener.removeAllListeners()
-    entryNodes.stop()
-  })
+  //   relayListener.removeAllListeners()
+  //   entryNodes.stop()
+  // })
 })
