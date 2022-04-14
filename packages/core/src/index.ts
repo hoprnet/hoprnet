@@ -264,7 +264,6 @@ class Hopr extends EventEmitter {
 
     const sendMessage = ((dest: PeerId, protocol: string, msg: Uint8Array, includeReply: boolean, opts: DialOpts) =>
       libp2pSendMessage(this.libp2p, dest, protocol, msg, includeReply, opts)) as SendMessage
-    const hangup = this.libp2p.hangUp.bind(this.libp2p)
 
     // Attach network health measurement functionality
     const peers: Peer[] = await all(this.libp2p.peerStore.getPeers())
@@ -275,9 +274,12 @@ class Hopr extends EventEmitter {
     )
     // unignore all peers if registry is disabled
     this.connector.indexer.on('network-registry-status-changed', (enabled: boolean) => {
-      if (!enabled) {
+      if (enabled) {
+        // go through current connected peers and close connections
+      } else {
+        // go through denied peers and register them
         const deniedPeers = this.networkPeers.getAllDeniedPeers()
-        // unignore them
+        // remove them from denied
         this.networkPeers.removeAllDeniedPeers()
         // register previously denied peers
         for (const peer of deniedPeers) {
@@ -288,11 +290,24 @@ class Hopr extends EventEmitter {
     this.connector.indexer.on(
       'network-registry-eligibility-changed',
       (_account: Address, node: PublicKey, eligible: boolean) => {
-        if (eligible) this.networkPeers.removePeerFromDenied(node.toPeerId())
-        else this.networkPeers.addPeerToDenied(node.toPeerId())
+        const peerId = node.toPeerId()
+        if (eligible) {
+          this.networkPeers.removePeerFromDenied(peerId)
+          this.networkPeers.register(peerId, 'denied list')
+        } else {
+          this.networkPeers.addPeerToDenied(peerId)
+          this.closeConnectionsTo(peerId)
+        }
       }
     )
-    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessage, hangup, this.environment.id, this.options)
+    this.heartbeat = new Heartbeat(
+      this.networkPeers,
+      subscribe,
+      sendMessage,
+      this.closeConnectionsTo.bind(this),
+      this.environment.id,
+      this.options
+    )
 
     this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.networkPeers.register(conn.remotePeer, 'libp2p peer connect')
@@ -791,6 +806,24 @@ class Hopr extends EventEmitter {
    */
   public getConnectionInfo(peerId: PeerId): Entry {
     return this.networkPeers.getConnectionInfo(peerId)
+  }
+
+  /**
+   * Closes all open connections to a peer. Used to temporarily or permanently
+   * disconnect from a peer.
+   * Similar to `libp2p.hangUp` but catching all errors.
+   * @param peer PeerId of the peer from whom we want to disconnect
+   */
+  private async closeConnectionsTo(peer: PeerId): Promise<void> {
+    const connections = this.libp2p.connectionManager.getAll(peer)
+
+    for (const conn of connections) {
+      try {
+        await conn.close()
+      } catch (err: any) {
+        error(`Error while intentionally closing connection to ${peer.toB58String()}`, err)
+      }
+    }
   }
 
   /**
