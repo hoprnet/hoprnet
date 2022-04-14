@@ -124,7 +124,16 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   }
 
   log('creating a node')
-  const node = await createHoprNode(peerId, options)
+  const node = await createHoprNode(peerId, {
+    ...options,
+    testing: {
+      announceLocalAddresses: true,
+      preferLocalAddresses: true,
+      noUPNP: true
+    },
+    allowLocalConnections: true,
+    allowPrivateConnections: true
+  })
 
   node.on('hopr:message', logMessageToNode)
 

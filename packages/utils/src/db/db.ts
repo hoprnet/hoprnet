@@ -76,7 +76,7 @@ function createRegisterKey(publicKey: PublicKey) {
   return Uint8Array.from([...REGISTER_REGISTRY_PREFIX, ...publicKey.serializeUncompressed()])
 }
 function parsePublicKeyFromRegisterKey(key: Uint8Array): PublicKey {
-  return PublicKey.deserialize(key.slice(REGISTER_ENABLED_PREFIX.length))
+  return PublicKey.deserialize(key.subarray(key.length - PublicKey.SIZE_UNCOMPRESSED, key.length))
 }
 function createEligibleKey(address: Address) {
   return Uint8Array.from([...REGISTER_ELIGIBLE_PREFIX, ...address.serialize()])
@@ -766,7 +766,11 @@ export class HoprDB {
       } catch {}
     }
 
-    return parsePublicKeyFromRegisterKey(entryKey)
+    if (!entryKey) {
+      throw Error('HoprNode not found')
+    }
+
+    return parsePublicKeyFromRegisterKey(new Uint8Array(entryKey))
   }
 
   /**
@@ -848,7 +852,7 @@ export class HoprDB {
    * @returns true if register is enabled
    */
   public async isRegisterEnabled(): Promise<boolean> {
-    return this.getCoercedOrDefault(REGISTER_ENABLED_PREFIX, (v) => Boolean(v[0]), false)
+    return this.getCoercedOrDefault(REGISTER_ENABLED_PREFIX, (v) => Boolean(v[0]), true)
   }
 
   static createMock(id?: PublicKey): HoprDB {

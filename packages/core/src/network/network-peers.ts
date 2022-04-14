@@ -264,11 +264,6 @@ class NetworkPeers {
     log('removing peer from denied', peerId.toB58String())
     this.deniedPeers.delete(peerId.toB58String())
   }
-
-  public removeAllDeniedPeers(): void {
-    log('removing all denied peers')
-    this.deniedPeers = new Map()
-  }
 }
 
 export default NetworkPeers

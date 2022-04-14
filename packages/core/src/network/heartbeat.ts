@@ -43,6 +43,7 @@ export default class Heartbeat {
     private subscribe: Subscribe,
     protected sendMessage: SendMessage,
     private closeConnectionsTo: (peer: PeerId) => Promise<void>,
+    private reviewAccess: (id: PeerId) => Promise<boolean>,
     environmentId: string,
     config?: Partial<HeartbeatConfig>
   ) {
@@ -96,6 +97,9 @@ export default class Heartbeat {
    */
   public async pingNode(destination: PeerId, signal?: AbortSignal): Promise<HeartbeatPingResult> {
     log('ping', destination.toB58String())
+
+    const allowed = await this.reviewAccess(destination)
+    if (!allowed) throw Error('Connection to node is not allowed')
 
     const challenge = randomBytes(16)
     let pingResponse: Uint8Array[] | undefined

@@ -115,6 +115,7 @@ async function getPeer(
     (async () => {
       assert.fail(`must not call hangUp`)
     }) as any,
+    () => Promise.resolve(true),
     TESTING_ENVIRONMENT,
     {
       ...SHORT_TIMEOUTS,
@@ -139,6 +140,7 @@ describe('unit test heartbeat', async () => {
       (async () => {
         assert.fail(`must not call hangUp`)
       }) as any,
+      () => Promise.resolve(true),
       TESTING_ENVIRONMENT,
       SHORT_TIMEOUTS
     )
