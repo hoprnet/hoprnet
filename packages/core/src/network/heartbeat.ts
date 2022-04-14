@@ -42,7 +42,7 @@ export default class Heartbeat {
     private networkPeers: NetworkPeers,
     private subscribe: Subscribe,
     protected sendMessage: SendMessage,
-    private hangUp: (addr: PeerId) => Promise<void>,
+    private closeConnectionsTo: (peer: PeerId) => Promise<void>,
     environmentId: string,
     config?: Partial<HeartbeatConfig>
   ) {
@@ -117,11 +117,8 @@ export default class Heartbeat {
 
     if (pingResponse == null || pingResponse.length != 1 || !u8aEquals(expectedResponse, pingResponse[0])) {
       log(`Mismatched challenge. Got ${u8aToHex(pingResponse[0])} but expected ${u8aToHex(expectedResponse)}`)
-      try {
-        await this.hangUp(destination)
-      } catch (err) {
-        log(`Hang up connection to ${destination.toB58String()} failed: ${err?.message}`)
-      }
+
+      await this.closeConnectionsTo(destination)
 
       return {
         destination,
