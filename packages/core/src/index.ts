@@ -15,6 +15,7 @@ import type { HoprConnectConfig } from '@hoprnet/hopr-connect'
 
 import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants'
 
+import AccessControl from './network/access-control'
 import NetworkPeers, { Entry } from './network/network-peers'
 import Heartbeat, { type HeartbeatPingResult } from './network/heartbeat'
 
@@ -246,8 +247,8 @@ class Hopr extends EventEmitter {
       this.options,
       initialNodes,
       this.publicNodesEmitter,
-      async (peerId: PeerId): Promise<boolean> => {
-        return reviewAccess(peerId)
+      async (peerId: PeerId, origin: string): Promise<boolean> => {
+        return accessControl.reviewConnection(peerId, origin)
       }
     )
 
@@ -270,61 +271,35 @@ class Hopr extends EventEmitter {
       (peer: PeerId) => this.publicNodesEmitter.emit('removePublicNode', peer)
     )
 
-    // adds peer to denied list and closes connection to it
-    const denyConnectionToPeer = async (peerId: PeerId): Promise<void> => {
-      this.networkPeers.addPeerToDenied(peerId)
-      await this.closeConnectionsTo(peerId)
-    }
+    // Initialize AccessControl
+    const accessControl = new AccessControl(
+      this.networkPeers,
+      this.isAllowedAccess.bind(this),
+      this.closeConnectionsTo.bind(this)
+    )
 
-    // removed peer from denied list and registers it
-    const allowConnectionToPeer = async (peerId: PeerId): Promise<void> => {
-      this.networkPeers.removePeerFromDenied(peerId)
-      this.networkPeers.register(peerId, 'denied list')
-    }
-
-    const reviewAccess = async (peerId: PeerId): Promise<boolean> => {
-      const allowed = await this.isAllowedAccess(PublicKey.fromPeerId(peerId))
-
-      if (allowed) allowConnectionToPeer(peerId)
-      else denyConnectionToPeer(peerId)
-      return allowed
-    }
-
-    // loop all peers and modify their connection status
-    const refreshConnections = async (registerEnabled?: boolean): Promise<void> => {
-      registerEnabled = registerEnabled || (await this.db.isRegisterEnabled())
-      const allPeers = [...this.networkPeers.all(), ...this.networkPeers.getAllDeniedPeers()]
-
-      for (const peerId of allPeers) {
-        const allowedAccess = this.isAllowedAccess(PublicKey.fromPeerId(peerId))
-
-        if (!registerEnabled || allowedAccess) {
-          await allowConnectionToPeer(peerId)
-        } else {
-          await denyConnectionToPeer(peerId)
-        }
-      }
-    }
-
-    this.connector.indexer.on('network-registry-status-changed', (enabled: boolean) => {
-      refreshConnections(enabled)
+    // react when network registry is enabled / disabled
+    this.connector.indexer.on('network-registry-status-changed', (_enabled: boolean) => {
+      accessControl.reviewConnections()
     })
+    // react when an account's eligibility has changed
     this.connector.indexer.on(
       'network-registry-eligibility-changed',
-      (_account: Address, node: PublicKey, eligible: boolean) => {
+      (_account: Address, node: PublicKey, _eligible: boolean) => {
         const peerId = node.toPeerId()
-        if (eligible) allowConnectionToPeer(peerId)
-        else denyConnectionToPeer(peerId)
+        const origin = this.networkPeers.has(peerId)
+          ? this.networkPeers.getConnectionInfo(peerId).origin
+          : 'network registry'
+        accessControl.reviewConnection(peerId, origin)
       }
     )
+
     this.heartbeat = new Heartbeat(
       this.networkPeers,
       subscribe,
       sendMessage,
       this.closeConnectionsTo.bind(this),
-      async (peerId: PeerId): Promise<boolean> => {
-        return reviewAccess(peerId)
-      },
+      accessControl.reviewConnection.bind(accessControl),
       this.environment.id,
       this.options
     )
@@ -1217,11 +1192,11 @@ class Hopr extends EventEmitter {
   }
 
   /**
-   * @param id the public key of the account we want to check if it's allowed access to the network
+   * @param id the peer id of the account we want to check if it's allowed access to the network
    * @returns true if allowed access
    */
-  public async isAllowedAccess(id: PublicKey): Promise<boolean> {
-    return this.connector.isAllowedAccess(id)
+  public async isAllowedAccess(id: PeerId): Promise<boolean> {
+    return this.connector.isAllowedAccess(PublicKey.fromPeerId(id))
   }
 
   /**

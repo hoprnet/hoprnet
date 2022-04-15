@@ -33,7 +33,7 @@ class NetworkPeers {
   private entries: Map<string, Entry> = new Map()
   private ignoredEntries: Entry[] = []
   // peers which were denied connection via the HoprNetworkRegistry
-  private deniedPeers: Map<string, PeerId> = new Map()
+  private deniedEntries: Map<string, Pick<Entry, 'id' | 'origin'>> = new Map()
 
   constructor(
     existingPeers: PeerId[],
@@ -144,8 +144,8 @@ class NetworkPeers {
     const id = peerId.toB58String()
     const now = Date.now()
     const hasEntry = this.entries.has(id)
-    const isExcluded = this.excludedPeers.some((p) => p.equals(peerId))
-    const isDenied = this.deniedPeers.has(id)
+    const isExcluded = !hasEntry && this.excludedPeers.some((p) => p.equals(peerId))
+    const isDenied = !hasEntry && this.deniedEntries.has(id)
 
     log('registering peer', id, { hasEntry, isExcluded, isDenied })
 
@@ -189,8 +189,12 @@ class NetworkPeers {
     return this.entries.size
   }
 
+  public allEntries(): Entry[] {
+    return Array.from(this.entries.values())
+  }
+
   public all(): PeerId[] {
-    return Array.from(this.entries.values()).map((entry) => entry.id)
+    return this.allEntries().map((entry) => entry.id)
   }
 
   /**
@@ -251,18 +255,20 @@ class NetworkPeers {
     }
   }
 
-  public getAllDeniedPeers(): PeerId[] {
-    return Array.from(this.deniedPeers.values())
+  public getAllDenied(): Pick<Entry, 'id' | 'origin'>[] {
+    return Array.from(this.deniedEntries.values())
   }
 
-  public addPeerToDenied(peerId: PeerId): void {
-    log('adding peer to denied', peerId.toB58String())
-    this.deniedPeers.set(peerId.toB58String(), peerId)
+  public addPeerToDenied(peerId: PeerId, origin: string): void {
+    const peerIdStr = peerId.toB58String()
+    log('adding peer to denied', peerIdStr)
+    this.deniedEntries.set(peerIdStr, { id: peerId, origin })
   }
 
   public removePeerFromDenied(peerId: PeerId): void {
-    log('removing peer from denied', peerId.toB58String())
-    this.deniedPeers.delete(peerId.toB58String())
+    const peerIdStr = peerId.toB58String()
+    log('removing peer from denied', peerIdStr)
+    this.deniedEntries.delete(peerIdStr)
   }
 }
 
