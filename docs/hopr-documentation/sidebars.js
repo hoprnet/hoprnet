@@ -80,7 +80,7 @@ const sidebars = {
     {
        type: 'category',
        label: 'dApps',
-       items: ['dapps/myne-chat']
+       items: ['dapps/myne-chat'],
      },
     /*{
         type: 'doc',
