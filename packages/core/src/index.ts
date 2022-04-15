@@ -15,6 +15,7 @@ import type { HoprConnectConfig } from '@hoprnet/hopr-connect'
 
 import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants'
 
+import AccessControl from './network/access-control'
 import NetworkPeers, { Entry } from './network/network-peers'
 import Heartbeat, { type HeartbeatPingResult } from './network/heartbeat'
 
@@ -238,7 +239,7 @@ class Hopr extends EventEmitter {
     // Fetch all nodes that will announces themselves during startup
     const recentlyAnnouncedNodes: PeerStoreAddress[] = []
     const pushToRecentlyAnnouncedNodes = (peer: PeerStoreAddress) => recentlyAnnouncedNodes.push(peer)
-    this.connector.on('peer', pushToRecentlyAnnouncedNodes)
+    this.connector.indexer.on('peer', pushToRecentlyAnnouncedNodes)
 
     // Initialize libp2p object and pass configuration
     this.libp2p = await createLibp2pInstance(
@@ -246,8 +247,8 @@ class Hopr extends EventEmitter {
       this.options,
       initialNodes,
       this.publicNodesEmitter,
-      async (peerId: PeerId) => {
-        return this.connector.isAllowedAccess(PublicKey.fromPeerId(peerId))
+      async (peerId: PeerId, origin: string): Promise<boolean> => {
+        return accessControl.reviewConnection(peerId, origin)
       }
     )
 
@@ -269,15 +270,36 @@ class Hopr extends EventEmitter {
       [this.id],
       (peer: PeerId) => this.publicNodesEmitter.emit('removePublicNode', peer)
     )
-    // unignore all peers if registry is disabled
-    this.connector.indexer.on('network-registry-status-changed', (enabled: boolean) => {
-      if (!enabled) this.networkPeers.unignoreAllPeers()
+
+    // Initialize AccessControl
+    const accessControl = new AccessControl(
+      this.networkPeers,
+      this.isAllowedAccess.bind(this),
+      this.closeConnectionsTo.bind(this)
+    )
+
+    // react when network registry is enabled / disabled
+    this.connector.indexer.on('network-registry-status-changed', (_enabled: boolean) => {
+      accessControl.reviewConnections()
     })
+    // react when an account's eligibility has changed
+    this.connector.indexer.on(
+      'network-registry-eligibility-changed',
+      (_account: Address, node: PublicKey, _eligible: boolean) => {
+        const peerId = node.toPeerId()
+        const origin = this.networkPeers.has(peerId)
+          ? this.networkPeers.getConnectionInfo(peerId).origin
+          : 'network registry'
+        accessControl.reviewConnection(peerId, origin)
+      }
+    )
+
     this.heartbeat = new Heartbeat(
       this.networkPeers,
       subscribe,
       sendMessage,
       this.closeConnectionsTo.bind(this),
+      accessControl.reviewConnection.bind(accessControl),
       this.environment.id,
       this.options
     )
@@ -1170,11 +1192,11 @@ class Hopr extends EventEmitter {
   }
 
   /**
-   * @param id the public key of the account we want to check if it's allowed access to the network
+   * @param id the peer id of the account we want to check if it's allowed access to the network
    * @returns true if allowed access
    */
-  public async isAllowedAccess(id: PublicKey): Promise<boolean> {
-    return this.connector.isAllowedAccess(id)
+  public async isAllowedAccess(id: PeerId): Promise<boolean> {
+    return this.connector.isAllowedAccess(PublicKey.fromPeerId(id))
   }
 
   /**
