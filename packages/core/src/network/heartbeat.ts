@@ -1,6 +1,7 @@
 import { setImmediate } from 'timers/promises'
 
 import type NetworkPeers from './network-peers'
+import type AccessControl from './access-control'
 import type PeerId from 'peer-id'
 import { randomInteger, u8aEquals, debug, retimer, nAtATime, u8aToHex } from '@hoprnet/hopr-utils'
 import { HEARTBEAT_INTERVAL, HEARTBEAT_TIMEOUT, HEARTBEAT_INTERVAL_VARIANCE } from '../constants'
@@ -43,6 +44,7 @@ export default class Heartbeat {
     private subscribe: Subscribe,
     protected sendMessage: SendMessage,
     private closeConnectionsTo: (peer: PeerId) => Promise<void>,
+    private reviewConnection: AccessControl['reviewConnection'],
     environmentId: string,
     config?: Partial<HeartbeatConfig>
   ) {
@@ -96,6 +98,12 @@ export default class Heartbeat {
    */
   public async pingNode(destination: PeerId, signal?: AbortSignal): Promise<HeartbeatPingResult> {
     log('ping', destination.toB58String())
+
+    const origin = this.networkPeers.has(destination)
+      ? this.networkPeers.getConnectionInfo(destination).origin
+      : 'unknown'
+    const allowed = await this.reviewConnection(destination, origin)
+    if (!allowed) throw Error('Connection to node is not allowed')
 
     const challenge = randomBytes(16)
     let pingResponse: Uint8Array[] | undefined

@@ -782,7 +782,13 @@ class Indexer extends EventEmitter {
     event: RegistryEvent<'EligibilityUpdated'>,
     lastSnapshot: Snapshot
   ): Promise<void> {
-    await this.db.setEligible(Address.fromString(event.args.account), event.args.eligibility, lastSnapshot)
+    const account = Address.fromString(event.args.account)
+    await this.db.setEligible(account, event.args.eligibility, lastSnapshot)
+    // emit event only when eligibility changes on accounts with a HoprNode associated
+    try {
+      const hoprNode = await this.db.findHoprNodeUsingAccount(account)
+      this.emit('network-registry-eligibility-changed', account, hoprNode, event.args.eligibility)
+    } catch {}
   }
 
   private async onRegistered(event: RegistryEvent<'Registered'>, lastSnapshot: Snapshot): Promise<void> {

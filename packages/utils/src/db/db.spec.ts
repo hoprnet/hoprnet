@@ -298,10 +298,12 @@ describe(`database tests`, function () {
 
     // should be set
     await db.addToRegistry(hoprNode, account, TestingSnapshot)
+    assert((await db.findHoprNodeUsingAccount(account)).eq(hoprNode), 'should match hoprNode')
     assert((await db.getAccountFromRegistry(hoprNode)).eq(account), 'should match account added')
 
     // should be removed
     await db.removeFromRegistry(account, TestingSnapshot)
+    assert.rejects(() => db.findHoprNodeUsingAccount(account), 'should throw when HoprNode is not linke to an account')
     assert.rejects(() => db.getAccountFromRegistry(hoprNode), 'should throw when account is deregistered')
   })
 
@@ -320,9 +322,9 @@ describe(`database tests`, function () {
     assert((await db.isEligible(account)) === false, 'account should be uneligible')
   })
 
-  it('should test register:enabled', async function () {
+  it('should test register toggle', async function () {
     // should be false by default
-    assert((await db.isRegisterEnabled()) === false, 'register should not be enabled by default')
+    assert((await db.isRegisterEnabled()) === true, 'register should be enabled by default')
 
     // should be true once set
     await db.setRegisterEnabled(true, TestingSnapshot)
