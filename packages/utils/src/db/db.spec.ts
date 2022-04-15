@@ -298,8 +298,6 @@ describe(`database tests`, function () {
 
     // should be set
     await db.addToRegistry(hoprNode, account, TestingSnapshot)
-    console.log('serializeCompressed', hoprNode.serializeCompressed())
-    console.log('serializeUncompressed', hoprNode.serializeUncompressed())
     assert((await db.findHoprNodeUsingAccount(account)).eq(hoprNode), 'should match hoprNode')
     assert((await db.getAccountFromRegistry(hoprNode)).eq(account), 'should match account added')
 

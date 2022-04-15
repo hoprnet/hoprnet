@@ -83,6 +83,21 @@ const argv = yargs(process.argv.slice(2))
     describe: 'Port to listen on for health check',
     default: 8080
   })
+  .option('allowLocalNodeConnections', {
+    boolean: true,
+    describe: 'Allow connections to other nodes running on localhost.',
+    default: false
+  })
+  .option('testAnnounceLocalAddresses', {
+    boolean: true,
+    describe: 'For testing local testnets. Announce local addresses.',
+    default: false
+  })
+  .option('testPreferLocalAddresses', {
+    boolean: true,
+    describe: 'For testing local testnets. Prefer local peers to remote.',
+    default: false
+  })
   .wrap(Math.min(120, terminalWidth()))
   .parseSync()
 
@@ -93,7 +108,12 @@ async function generateNodeOptions(environment: ResolvedEnvironment): Promise<Ho
     environment,
     forceCreateDB: false,
     password: '',
-    dataPath: argv.data
+    dataPath: argv.data,
+    allowLocalConnections: argv.allowLocalNodeConnections,
+    testing: {
+      announceLocalAddresses: argv.testAnnounceLocalAddresses,
+      preferLocalAddresses: argv.testPreferLocalAddresses
+    }
   }
 
   return options
@@ -124,16 +144,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   }
 
   log('creating a node')
-  const node = await createHoprNode(peerId, {
-    ...options,
-    testing: {
-      announceLocalAddresses: true,
-      preferLocalAddresses: true,
-      noUPNP: true
-    },
-    allowLocalConnections: true,
-    allowPrivateConnections: true
-  })
+  const node = await createHoprNode(peerId, options)
 
   node.on('hopr:message', logMessageToNode)
 

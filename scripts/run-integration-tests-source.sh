@@ -216,6 +216,9 @@ function setup_ct_node() {
     --data="${dir}" \
     --healthCheck \
     --healthCheckPort "${health_check_port}" \
+    --allowLocalNodeConnections \
+    --testAnnounceLocalAddresses \
+    --testPreferLocalAddresses \
     ${additional_args} \
      > "${log}" 2>&1 &
 }
