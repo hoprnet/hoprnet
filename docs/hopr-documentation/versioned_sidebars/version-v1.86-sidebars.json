@@ -121,6 +121,11 @@
       "collapsed": true
     },
     {
+      "type": "category",
+      "label": "dApps",
+      "items": ["dapps/myne-chat"]
+    },
+    {
       "type": "doc",
       "label": "FAQ",
       "id": "version-v1.86/faq"

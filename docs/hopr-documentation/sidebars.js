@@ -77,6 +77,11 @@ const sidebars = {
         'developers/visualising-hopr-network-topology'
       ]
     },
+    {
+       type: 'category',
+       label: 'dApps',
+       items: ['dapps/myne-chat'],
+     },
     /*{
         type: 'doc',
   id: 'staking',
