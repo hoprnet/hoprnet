@@ -156,6 +156,8 @@ export class EntryNodes extends EventEmitter {
     const tuples = ma.tuples() as [code: number, addr: Uint8Array][]
     const peer = PeerId.createFromBytes(tuples[2][1].slice(1))
 
+    log(`Disconnected from entry node ${peer.toB58String()}`)
+
     for (const usedRelay of this.usedRelays) {
       const relayTuples = usedRelay.relayDirectAddress.tuples()
 
