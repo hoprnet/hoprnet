@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.89.0-next.1",
+  "version": "1.89.0-next.8",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -9,8 +9,7 @@
   "bin": "lib/index.js",
   "files": [
     "lib",
-    "package-lock.json",
-    "yarn.lock",
+    "npm-shrinkwrap.json",
     "hopr-admin/.next/**",
     "hoprd-default.sh",
     "releases.json",
@@ -42,7 +41,7 @@
     "check-password-strength": "2.0.4",
     "cookie": "0.4.2",
     "cors": "2.8.5",
-    "debug": "4.3.3",
+    "debug": "4.3.4",
     "dids": "2.4.3",
     "express": "4.17.3",
     "express-openapi": "9.3.1",
@@ -63,19 +62,24 @@
     "trace-unhandled": "2.0.1",
     "ws": "8.3.0",
     "yamljs": "0.3.0",
-    "yargs": "17.3.1"
+    "yargs": "17.4.0"
   },
   "devDependencies": {
+    "@types/chai": "^4",
     "@types/cors": "2.8.12",
     "@types/mocha": "9.1.0",
-    "@types/yargs": "17.0.8",
-    "mocha": "9.2.0",
+    "@types/supertest": "^2.0.11",
+    "@types/yargs": "17.0.10",
+    "chai": "^4.3.6",
+    "chai-openapi-response-validator": "^0.14.2",
+    "mocha": "9.2.2",
     "rimraf": "3.0.2",
     "sinon": "12.0.1",
-    "ts-node": "10.5.0",
-    "typedoc": "0.22.11",
+    "supertest": "^6.2.2",
+    "ts-node": "10.7.0",
+    "typedoc": "0.22.13",
     "typedoc-plugin-markdown": "3.11.14",
-    "typescript": "4.5.5"
+    "typescript": "4.6.3"
   },
   "mocha": {
     "extension": [
@@ -86,11 +90,6 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "resolutions": {
-    "@ethersproject/providers": "hoprnet/ethers-js-provider#fa6b1f743ff3fe67c1e9a2207a67d79a854fc34c",
-    "@overnightjs/logger": "1.2.1",
-    "colors": "1.4.0"
   },
   "stableVersion": "1.76.0-next.31"
 }

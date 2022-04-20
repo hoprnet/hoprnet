@@ -1,13 +1,13 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "1.89.0-next.1",
+  "version": "1.89.0-next.8",
   "description": "On-chain logic for hoprnet.org",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "license": "GPL-3.0",
   "homepage": "https://hoprnet.org",
   "main": "./lib/index.js",
   "scripts": {
-    "clean": "rimraf ./lib ./src/types ./tsconfig.tsbuildinfo ./tsconfig.hardhat.tsbuildinfo ./tsconfig.spec.tsbuildinfo ./hardhat ./deployments/default/localhost",
+    "clean": "rimraf ./lib ./src/types ./tsconfig.tsbuildinfo ./tsconfig.hardhat.tsbuildinfo ./tsconfig.spec.tsbuildinfo ./hardhat ./deployments/default/localhost ./deployments/hardhat*",
     "build": "yarn clean && yarn build:sol:types && yarn build:tsc",
     "build:tsc": "tsc -p .",
     "build:sol": "TS_NODE_PROJECT=./tsconfig.hardhat.json hardhat compile",
@@ -52,14 +52,11 @@
     "rimraf": "3.0.2",
     "solidity-coverage": "0.7.18",
     "ts-generator": "0.1.1",
-    "ts-node": "10.5.0",
-    "typechain": "7.0.0",
-    "typedoc": "0.22.11",
+    "ts-node": "10.7.0",
+    "typechain": "7.0.1",
+    "typedoc": "0.22.13",
     "typedoc-plugin-markdown": "3.11.14",
-    "typescript": "4.5.5"
-  },
-  "resolutions": {
-    "eth-sig-util": "3.0.1"
+    "typescript": "4.6.3"
   },
   "engines": {
     "node": "16"

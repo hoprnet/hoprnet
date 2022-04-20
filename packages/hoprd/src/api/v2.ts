@@ -6,15 +6,16 @@ import cors from 'cors'
 import swaggerUi from 'swagger-ui-express'
 import bodyParser from 'body-parser'
 import { initialize } from 'express-openapi'
+import OpenAPIFramework from 'openapi-framework'
 import PeerId from 'peer-id'
 import { debug, Address } from '@hoprnet/hopr-utils'
-import { authenticateWsConnection, removeQueryParams } from './utils'
+import { authenticateWsConnection, getStatusCodeForInvalidInputInRequest, removeQueryParams } from './utils'
 
 import type { Server } from 'http'
 import type { Application, Request } from 'express'
 import type { WebSocketServer } from 'ws'
 import type Hopr from '@hoprnet/hopr-core'
-import type { StateOps } from '../types'
+import { SettingKey, StateOps } from '../types'
 import type { LogStream } from './../logs'
 
 const debugLog = debug('hoprd:api:v2')
@@ -22,7 +23,13 @@ const debugLog = debug('hoprd:api:v2')
 // The Rest API v2 is uses JSON for input and output, is validated through a
 // Swagger schema which is also accessible for testing at:
 // http://localhost:3001/api/v2/_swagger
-export function setupRestApi(service: Application, urlPath: string, node: Hopr, stateOps: StateOps, options: any) {
+export function setupRestApi(
+  service: Application,
+  urlPath: string,
+  node: Hopr,
+  stateOps: StateOps,
+  options: any
+): OpenAPIFramework {
   // this API uses JSON data only
   service.use(urlPath, bodyParser.json())
 
@@ -54,6 +61,14 @@ export function setupRestApi(service: Application, urlPath: string, node: Hopr, 
     paths: apiPathsPath,
     // since we pass the spec directly we don't need to expose it via HTTP
     exposeApiDocs: false,
+    errorMiddleware: function (err, _, res, next) {
+      if (err.status === 400) {
+        const path = String(err.errors[0].path) || ''
+        res.status(err.status).send({ status: getStatusCodeForInvalidInputInRequest(path) })
+      } else {
+        next(err)
+      }
+    },
     // we use custom formats for particular internal data types
     customFormats: {
       peerId: (input) => {
@@ -70,6 +85,12 @@ export function setupRestApi(service: Application, urlPath: string, node: Hopr, 
         } catch (_err) {
           return false
         }
+      },
+      amount: (input) => {
+        return !isNaN(Number(input))
+      },
+      settingKey: (input) => {
+        return Object.values(SettingKey).includes(input)
       }
     },
     securityHandlers: {
@@ -133,6 +154,8 @@ export function setupRestApi(service: Application, urlPath: string, node: Hopr, 
   service.use(urlPath, ((err, _req, res, _next) => {
     res.status(err.status).json(err)
   }) as express.ErrorRequestHandler)
+
+  return apiInstance
 }
 
 const WS_PATHS = {

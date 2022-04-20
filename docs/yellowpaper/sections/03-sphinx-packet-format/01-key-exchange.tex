@@ -1,33 +1,33 @@
 \subsubsection{Key Extraction}
 \label{sec:sphinx:keyderivation}
 
-Path selection, see section \ref{sec:path-selection}, results in a list $n_0, \dots, n_r$ of mixnodes which are supposed to process and forward the packet before the message reaches its destination $dest$. HOPR nodes use their public keys as addresses, hence the public keys $Y_0, \dots , Y_r$ are known to the creator of a packet.
+Path selection (see Section \ref{sec:path-selection}), results in a list $n_0, \dots, n_r$ of mix nodes which are supposed to process and forward the packet before the packet reaches its destination $dest$. HOPR nodes use their public keys as addresses, hence the public keys $Y_0, \dots , Y_r$ are known to the creator of a packet.\footnote{TODO: Make this more explicit in section \ref{sec:path-selection}.}
 
 \paragraph{Key Exchange}
 
-Having this knowledge allows the creator of the packet to perform an offline Diffie-Hellman key exchange with each of the mix nodes $n_0 , \dots , n_r$ and the destination $dest$, resulting in shared secrets $s_0, \dots , s_r$ and $s_{dest}$.
+Having this knowledge allows the creator of the packet to perform an offline Diffie-Hellman key exchange with each of the mix nodes $n_0 , \dots , n_r$ and the destination $dest$, resulting in shared secrets $s_0, \dots , s_r$, and $s_{dest}$.
 
-To provide perfect forward secrecy and thereby minimize the risk of key corruption, the sender first samples a random value $x \in \mathbb{F}$ and derives $\alpha_0 = x \cdot G$. It further derives blinding factor $b_0$ as $b_0 = \mathsf{KDF}(\alpha_0, x \cdot Y_0)$ where $\mathsf{KDF}(salt, secret)$ is a key derivation function, see appendix \ref{appendix:keyderivation}, and derives the shared secret as $s_0 = x \cdot b_0 \cdot Y_0$. Hence, deriving the shared secret $s_0$ requires the knowledge of the sender's field element $\alpha_0 = x \cdot G$ as well as the receivers' field element $x \cdot b_0 \cdot Y_0$.
+To provide perfect forward secrecy and thereby minimize the risk of key corruption, the sender first samples a random value $x \in \mathbb{F}$ and derives $\alpha_0 = x \cdot G$.\footnote{TODO: Properly introduce $G$} It further derives blinding factor $b_0$ as $b_0 = \mathsf{KDF}(\alpha_0, x \cdot Y_0)$ where $\mathsf{KDF}(salt, secret)$ is a key derivation function (see Appendix \ref{appendix:keyderivation}), and derives the shared secret as $s_0 = x \cdot b_0 \cdot Y_0$. Hence, deriving the shared secret $s_0$ requires knowledge of the sender's field element $\alpha_0 = x \cdot G$ as well as the receivers' field element $x \cdot b_0 \cdot Y_0$.
 
 The first relayer $n_0$ is then able to compute $s_0$ by first deriving $x \cdot Y_0$ as
 
 $$y_0 \cdot \alpha_0 = y_0 \cdot x \cdot G = x \cdot ( y_0 \cdot G) = x \cdot Y_0$$
 
-yielding $b_0$ and $s_0 = y_0 \cdot b_0 \cdot \alpha_0$ where $y_0$ refers to the private key of node $n_0$. The value $s_0$ then servers as a master secret to perform further key derivations as described in appendix \ref{appendix:keyderivation}.
+yielding $b_0$ and $s_0 = y_0 \cdot b_0 \cdot \alpha_0$ where $y_0$ refers to the private key of node $n_0$. The value $s_0$ then servers as a master secret to perform further key derivations as described in Appendix \ref{appendix:keyderivation}.
 
 \paragraph{Transformation}
 
-Once the key extraction is done, the each relayer $n_i$ transforms its value $\alpha_i$ into $\alpha_{i+1}$ by setting $\alpha_{i+1} = b_i \cdot \alpha_i$ such that
+Once the key extraction is complete, the each relayer $n_i$ transforms its value $\alpha_i$ into $\alpha_{i+1}$ by setting $\alpha_{i+1} = b_i \cdot \alpha_i$ such that
 
 $$ \alpha_i = x \cdot \biggl(\prod_{j=0}^{i} b_j \biggr) \cdot G = \biggl(\prod_{j=0}^{i} b_j \biggr) \cdot \alpha_0 = \biggl(\prod_{j=k+1}^{i} b_j \biggr) \cdot \alpha_k $$
 
 By adding an additional blinding for every node along the selected path, each incoming $\alpha_i$ and each outgoing $\alpha_{i+1}$ become indistinguishable from random numbers of the same length. Hence, an adversary who observes incoming and outgoing packets cannot use $\alpha$ to track packets.
 
-Since each $s_{i+1}$ depends on $b_{i+1}$ and therefore on all $\alpha_0, \dots , \alpha_i$, the key extraction can only be done in the foreseen order; first derive $s_0$, then derive $s_1$ etc. Hence, an adversary is unable to extract keys in a more favorable order, e.g. because it has managed to compromise \textit{some} but not \textit{all} nodes on the path.
+Since each $s_{i+1}$ depends on $b_{i+1}$ and therefore on all $\alpha_0, \dots , \alpha_i$, the key extraction can only be done in the preset order; first derive $s_0$, then derive $s_1$ etc. Hence, an adversary is unable to extract keys in a more favourable order, e.g., because it has managed to compromise some but not all nodes on the path.
 
 \paragraph{Example}
 
-The following example shows the key extraction process for a sender $A$, three mix nodes $B,C,D$ and a receiver $Z$.
+The following example shows the key extraction process for a sender $A$, three mix nodes $B, C, D$ and a receiver $Z$.
 
 \begin{align*}
     (\alpha_B,b_B,s_B) & = (x \cdot G,\textsf{KDF}(\alpha_B, y_B \cdot \alpha_B), y_B \cdot \alpha_B )                   \\
@@ -38,7 +38,7 @@ The following example shows the key extraction process for a sender $A$, three m
 
 where $y_i$ for $i \in \{ B,C,D,Z \}$ refers to the nodes' private keys and $s_i$ denotes the derived shared secret group elements.
 
-Packets consist of $(\alpha, \beta, \gamma)$ where $\beta$ is described in section \ref{sec:sphinx:routinginformation} and $\gamma$ in section \ref{sec:sphinx:integrity}, leaving both underspecified for the moment. Let further be $packet_i = (\alpha_i, \beta_i, \gamma_i)$, leading to:
+Packets consist of $(\alpha, \beta, \gamma)$ where $\beta$ is described in section \ref{sec:sphinx:routinginformation} and $\gamma$ in section \ref{sec:sphinx:integrity}, leaving both underspecified for the moment. Further, let $packet_i = (\alpha_i, \beta_i, \gamma_i)$, leading to:
 
 \begin{figure}[H]
     \begin{tikzpicture}
@@ -59,6 +59,6 @@ Packets consist of $(\alpha, \beta, \gamma)$ where $\beta$ is described in secti
                 \fi
             }
     \end{tikzpicture}
-    \caption{Node $A$ derives shared keys $s_B,s_C,s_D,s_Z$ with node $B,C,D,Z$ using their public keys $Y_B,Y_C,Y_D,Y_Z$.}
+    \caption{Node $A$ derives shared keys $s_B, s_C, s_D, s_Z$ with node $B, C, D, Z$ using their public keys $Y_B, Y_C, Y_D, Y_Z$.}
     \label{fig:sphinx:keyderivation}
 \end{figure}

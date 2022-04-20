@@ -5,16 +5,16 @@ After running through the validations of the previous section, the node $n$ ends
 
 $$ stored := \{ t \in Tickets \ | \ isWinner(t) \land t.recipient = n \}$$
 
-Each ticket $t$ is given a  \lcnameref{sec:tickets:issuance:ticketindex}, which means tickets need to be redeemed in order which is why the node first creates an ordered set $ordered$ out of the set $tickets$ and proceeds with the first ticket.
+Each ticket $t$ is given a  \lcnameref{sec:tickets:issuance:ticketindex}, which means tickets need to be redeemed in order. To achieve this, the node first creates an ordered set $ordered$ from the set $tickets$ and proceeds with the first ticket.
 
-Redemption means that the node now proves for each $t \in stored$ one-by-one to the smart contract that $t$ is indeed a win. If successful, the smart contract transfers the stated incentives to the account of the node, see paragraph \lcnameref{sec:tickets:redemption:assettransfer}.
+Redemption requires the node to prove for each $t \in stored$ one-by-one to the smart contract that $t$ is indeed a winning ticket. If successful, the smart contract transfers the stated incentives to the account of the node, see paragraph \lcnameref{sec:tickets:redemption:assettransfer}.
 
-In contrast to ticket recipients, the smart contract considers a ticket only valid if the redeemer is able to provide a $response$ that solves $ticket.challenge$ and a value $opening$ that opens the most recent $commitment$ stored on-chain. Note that the smart contract thereby acts as a trusted third party that forces the node reveal additional cryptographic material despite the signature of the ticket is valid. This is possible because the blockchain consensus makes it infeasible to add state changes which have not been the result of a method execution in the smart contract.
+In contrast to ticket recipients, the smart contract only considers a ticket if the redeemer can provide a $response$ that solves $ticket.challenge$ and a value $opening$ that opens the most recent $commitment$ stored on-chain. Note that the smart contract thereby acts as a trusted third party that forces the node to reveal additional cryptographic material despite the signature for the ticket being valid. This is possible because the blockchain consensus makes it infeasible to add state changes which have not been the result of a method execution in the smart contract.
 
 \paragraph{Challenge}
 \label{sec:tickets:redemption:challenge}
 
-Solving a challenge $C$ means finding a value $r \in \mathbb{F}$ such that $r \cdot G =C$. Hence, in order to check this equation, the smart contract needs to compute a scalar multiplication of an elliptic curve point, which is as of writing of the paper not directly available within Ethereum.
+Solving a challenge $C$ means finding a value $r \in \mathbb{F}$ such that $r \cdot G =C$. Hence, in order to check this equation, the smart contract needs to compute a scalar multiplication of an elliptic curve point, which is at time of writing not directly available within Ethereum.
 
 Instead, Ethereun allows to efficiently implement a function $mul'$:
 

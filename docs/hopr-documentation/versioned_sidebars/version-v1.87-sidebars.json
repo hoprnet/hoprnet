@@ -53,6 +53,11 @@
       ]
     },
     {
+      "type": "category",
+      "label": "dApps",
+      "items": ["dapps/myne-chat"]
+    },
+    {
       "type": "doc",
       "id": "faq",
       "label": "FAQ"

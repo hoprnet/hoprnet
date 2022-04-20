@@ -512,7 +512,7 @@ and feeds them to the given handler.
 
 ### ADDRESS\_LENGTH
 
-• **ADDRESS\_LENGTH**: ``20``
+• `Const` **ADDRESS\_LENGTH**: ``20``
 
 #### Defined in
 
@@ -522,7 +522,7 @@ ___
 
 ### A\_EQUALS\_B
 
-• **A\_EQUALS\_B**: ``0``
+• `Const` **A\_EQUALS\_B**: ``0``
 
 #### Defined in
 
@@ -532,7 +532,7 @@ ___
 
 ### A\_STRICLY\_LESS\_THAN\_B
 
-• **A\_STRICLY\_LESS\_THAN\_B**: ``-1``
+• `Const` **A\_STRICLY\_LESS\_THAN\_B**: ``-1``
 
 #### Defined in
 
@@ -542,7 +542,7 @@ ___
 
 ### A\_STRICTLY\_GREATER\_THAN\_B
 
-• **A\_STRICTLY\_GREATER\_THAN\_B**: ``1``
+• `Const` **A\_STRICTLY\_GREATER\_THAN\_B**: ``1``
 
 #### Defined in
 
@@ -552,7 +552,7 @@ ___
 
 ### HASH\_LENGTH
 
-• **HASH\_LENGTH**: ``32``
+• `Const` **HASH\_LENGTH**: ``32``
 
 #### Defined in
 
@@ -562,7 +562,7 @@ ___
 
 ### INVERSE\_TICKET\_WIN\_PROB
 
-• **INVERSE\_TICKET\_WIN\_PROB**: `BN`
+• `Const` **INVERSE\_TICKET\_WIN\_PROB**: `BN`
 
 #### Defined in
 
@@ -572,7 +572,7 @@ ___
 
 ### LENGTH\_PREFIX\_LENGTH
 
-• **LENGTH\_PREFIX\_LENGTH**: ``4``
+• `Const` **LENGTH\_PREFIX\_LENGTH**: ``4``
 
 #### Defined in
 
@@ -582,7 +582,7 @@ ___
 
 ### LINK\_LOCAL\_NETWORKS
 
-• **LINK\_LOCAL\_NETWORKS**: [`Network`](modules.md#network)[]
+• `Const` **LINK\_LOCAL\_NETWORKS**: [`Network`](modules.md#network)[]
 
 #### Defined in
 
@@ -592,7 +592,7 @@ ___
 
 ### LOOPBACK\_ADDRS
 
-• **LOOPBACK\_ADDRS**: [`Network`](modules.md#network)[]
+• `Const` **LOOPBACK\_ADDRS**: [`Network`](modules.md#network)[]
 
 #### Defined in
 
@@ -602,7 +602,7 @@ ___
 
 ### MAX\_AUTO\_CHANNELS
 
-• **MAX\_AUTO\_CHANNELS**: ``5``
+• `Const` **MAX\_AUTO\_CHANNELS**: ``5``
 
 #### Defined in
 
@@ -612,7 +612,7 @@ ___
 
 ### MAX\_RANDOM\_BIGINTEGER
 
-• **MAX\_RANDOM\_BIGINTEGER**: `bigint`
+• `Const` **MAX\_RANDOM\_BIGINTEGER**: `bigint`
 
 Maximum random big integer that can be generated using randomInteger function.
 
@@ -624,7 +624,7 @@ ___
 
 ### MAX\_RANDOM\_INTEGER
 
-• **MAX\_RANDOM\_INTEGER**: `bigint`
+• `Const` **MAX\_RANDOM\_INTEGER**: `bigint`
 
 Maximum random integer that can be generated using randomInteger function.
 
@@ -636,7 +636,7 @@ ___
 
 ### MINIMUM\_REASONABLE\_CHANNEL\_STAKE
 
-• **MINIMUM\_REASONABLE\_CHANNEL\_STAKE**: `BN`
+• `Const` **MINIMUM\_REASONABLE\_CHANNEL\_STAKE**: `BN`
 
 #### Defined in
 
@@ -646,7 +646,7 @@ ___
 
 ### MIN\_NATIVE\_BALANCE
 
-• **MIN\_NATIVE\_BALANCE**: `BN`
+• `Const` **MIN\_NATIVE\_BALANCE**: `BN`
 
 #### Defined in
 
@@ -656,7 +656,7 @@ ___
 
 ### MULTI\_ADDR\_MAX\_LENGTH
 
-• **MULTI\_ADDR\_MAX\_LENGTH**: ``200``
+• `Const` **MULTI\_ADDR\_MAX\_LENGTH**: ``200``
 
 #### Defined in
 
@@ -666,7 +666,7 @@ ___
 
 ### POR\_STRING\_LENGTH
 
-• **POR\_STRING\_LENGTH**: `number`
+• `Const` **POR\_STRING\_LENGTH**: `number`
 
 #### Defined in
 
@@ -676,7 +676,7 @@ ___
 
 ### PRG\_COUNTER\_LENGTH
 
-• **PRG\_COUNTER\_LENGTH**: ``4``
+• `Const` **PRG\_COUNTER\_LENGTH**: ``4``
 
 #### Defined in
 
@@ -686,7 +686,7 @@ ___
 
 ### PRG\_IV\_LENGTH
 
-• **PRG\_IV\_LENGTH**: ``12``
+• `Const` **PRG\_IV\_LENGTH**: ``12``
 
 #### Defined in
 
@@ -696,7 +696,7 @@ ___
 
 ### PRG\_KEY\_LENGTH
 
-• **PRG\_KEY\_LENGTH**: ``16``
+• `Const` **PRG\_KEY\_LENGTH**: ``16``
 
 #### Defined in
 
@@ -706,7 +706,7 @@ ___
 
 ### PRICE\_PER\_PACKET
 
-• **PRICE\_PER\_PACKET**: `BN`
+• `Const` **PRICE\_PER\_PACKET**: `BN`
 
 #### Defined in
 
@@ -716,7 +716,7 @@ ___
 
 ### PRIVATE\_KEY\_LENGTH
 
-• **PRIVATE\_KEY\_LENGTH**: ``32``
+• `Const` **PRIVATE\_KEY\_LENGTH**: ``32``
 
 #### Defined in
 
@@ -726,7 +726,7 @@ ___
 
 ### PRIVATE\_NETWORK
 
-• **PRIVATE\_NETWORK**: [`Network`](modules.md#network)[]
+• `Const` **PRIVATE\_NETWORK**: [`Network`](modules.md#network)[]
 
 #### Defined in
 
@@ -736,7 +736,7 @@ ___
 
 ### PRP\_IV\_LENGTH
 
-• **PRP\_IV\_LENGTH**: `number`
+• `Const` **PRP\_IV\_LENGTH**: `number`
 
 #### Defined in
 
@@ -746,7 +746,7 @@ ___
 
 ### PRP\_KEY\_LENGTH
 
-• **PRP\_KEY\_LENGTH**: `number`
+• `Const` **PRP\_KEY\_LENGTH**: `number`
 
 #### Defined in
 
@@ -756,7 +756,7 @@ ___
 
 ### PRP\_MIN\_LENGTH
 
-• **PRP\_MIN\_LENGTH**: ``32``
+• `Const` **PRP\_MIN\_LENGTH**: ``32``
 
 #### Defined in
 
@@ -766,7 +766,7 @@ ___
 
 ### PUBLIC\_KEY\_LENGTH
 
-• **PUBLIC\_KEY\_LENGTH**: ``33``
+• `Const` **PUBLIC\_KEY\_LENGTH**: ``33``
 
 #### Defined in
 
@@ -776,7 +776,7 @@ ___
 
 ### RESERVED\_ADDRS
 
-• **RESERVED\_ADDRS**: [`Network`](modules.md#network)[]
+• `Const` **RESERVED\_ADDRS**: [`Network`](modules.md#network)[]
 
 #### Defined in
 
@@ -786,7 +786,7 @@ ___
 
 ### SECP256K1\_CONSTANTS
 
-• **SECP256K1\_CONSTANTS**: `Object`
+• `Const` **SECP256K1\_CONSTANTS**: `Object`
 
 Several ECDSA on secp256k1 related constants
 
@@ -808,7 +808,7 @@ ___
 
 ### SECRET\_LENGTH
 
-• **SECRET\_LENGTH**: ``32``
+• `Const` **SECRET\_LENGTH**: ``32``
 
 #### Defined in
 
@@ -818,7 +818,7 @@ ___
 
 ### SIGNATURE\_LENGTH
 
-• **SIGNATURE\_LENGTH**: ``64``
+• `Const` **SIGNATURE\_LENGTH**: ``64``
 
 #### Defined in
 
@@ -828,7 +828,7 @@ ___
 
 ### SIGNATURE\_RECOVERY\_LENGTH
 
-• **SIGNATURE\_RECOVERY\_LENGTH**: ``1``
+• `Const` **SIGNATURE\_RECOVERY\_LENGTH**: ``1``
 
 #### Defined in
 
@@ -838,7 +838,7 @@ ___
 
 ### SUGGESTED\_BALANCE
 
-• **SUGGESTED\_BALANCE**: `BN`
+• `Const` **SUGGESTED\_BALANCE**: `BN`
 
 #### Defined in
 
@@ -848,7 +848,7 @@ ___
 
 ### SUGGESTED\_NATIVE\_BALANCE
 
-• **SUGGESTED\_NATIVE\_BALANCE**: `BN`
+• `Const` **SUGGESTED\_NATIVE\_BALANCE**: `BN`
 
 #### Defined in
 
@@ -858,7 +858,7 @@ ___
 
 ### UNCOMPRESSED\_PUBLIC\_KEY\_LENGTH
 
-• **UNCOMPRESSED\_PUBLIC\_KEY\_LENGTH**: ``66``
+• `Const` **UNCOMPRESSED\_PUBLIC\_KEY\_LENGTH**: ``66``
 
 #### Defined in
 
@@ -868,7 +868,7 @@ ___
 
 ### b58StringRegex
 
-• **b58StringRegex**: `RegExp`
+• `Const` **b58StringRegex**: `RegExp`
 
 Regular expresion used to match b58Strings
 
@@ -880,7 +880,7 @@ ___
 
 ### dbMock
 
-• **dbMock**: [`HoprDB`](classes/HoprDB.md) = `db`
+• `Const` **dbMock**: [`HoprDB`](classes/HoprDB.md) = `db`
 
 #### Defined in
 
@@ -890,7 +890,7 @@ ___
 
 ### durations
 
-• **durations**: `Object`
+• `Const` **durations**: `Object`
 
 #### Type declaration
 
@@ -1231,7 +1231,7 @@ ___
 
 ### debug
 
-▸ `Const` **debug**(`namespace`): (`message`: `any`, ...`parameters`: `any`[]) => `void`
+▸ **debug**(`namespace`): (`message`: `any`, ...`parameters`: `any`[]) => `void`
 
 #### Parameters
 
@@ -2434,7 +2434,7 @@ ___
 
 ### pickVersion
 
-▸ `Const` **pickVersion**(`full_version`): `string`
+▸ **pickVersion**(`full_version`): `string`
 
 Used by our network stack and deployment scripts to determine.
 

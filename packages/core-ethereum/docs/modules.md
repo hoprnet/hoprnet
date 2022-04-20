@@ -77,7 +77,7 @@ ___
 
 ### CONFIRMATIONS
 
-• **CONFIRMATIONS**: ``8``
+• `Const` **CONFIRMATIONS**: ``8``
 
 #### Defined in
 
@@ -87,7 +87,7 @@ ___
 
 ### INDEXER\_BLOCK\_RANGE
 
-• **INDEXER\_BLOCK\_RANGE**: ``2000``
+• `Const` **INDEXER\_BLOCK\_RANGE**: ``2000``
 
 #### Defined in
 
@@ -97,7 +97,7 @@ ___
 
 ### sampleChainOptions
 
-• **sampleChainOptions**: [`ChainOptions`](modules.md#chainoptions)
+• `Const` **sampleChainOptions**: [`ChainOptions`](modules.md#chainoptions)
 
 #### Defined in
 
@@ -222,7 +222,7 @@ ___
 
 ### useFixtures
 
-▸ `Const` **useFixtures**(`ops?`): `Promise`<{ `COMMITTED_CHANNEL`: [`ChannelEntry`](classes/ChannelEntry.md) ; `OPENED_CHANNEL`: [`ChannelEntry`](classes/ChannelEntry.md) ; `chain`: { `announce`: (`multiaddr`: `Multiaddr`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> ; `finalizeChannelClosure`: (`counterparty`: `Address`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> ; `fundChannel`: (`partyA`: `Address`, `partyB`: `Address`, `fundsA`: `Balance`, `fundsB`: `Balance`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> ; `getAllQueuingTransactionRequests`: () => `TransactionRequest`[] ; `getBalance`: (`accountAddress`: `Address`) => `Promise`<`Balance`\> ; `getChannels`: () => `HoprChannels` ; `getGenesisBlock`: () => `number` ; `getInfo`: () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `string` = networkInfo.network } ; `getLatestBlockNumber`: () => `Promise`<`number`\> ; `getNativeBalance`: (`accountAddress`: `Address`) => `Promise`<`Balance`\> ; `getPrivateKey`: () => `Uint8Array` ; `getPublicKey`: () => `PublicKey` ; `getToken`: () => `HoprToken` ; `getTransactionsInBlock`: (`blockNumber`: `number`) => `Promise`<`string`[]\> ; `initiateChannelClosure`: (`counterparty`: `Address`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> ; `redeemTicket`: (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> ; `sendTransaction`: (`signedTransaction`: `string` \| `Promise`<`string`\>) => `Promise`<`TransactionResponse`\> ; `setCommitment`: (`counterparty`: `Address`, `commitment`: `Hash`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> ; `subscribeBlock`: (`cb`: (`blockNumber`: `number`) => `void` \| `Promise`<`void`\>) => () => `void` ; `subscribeError`: (`cb`: (`err`: `any`) => `void` \| `Promise`<`void`\>) => () => `void` ; `unsubscribe`: () => `void` ; `updateConfirmedTransaction`: (`hash`: `string`) => `void` ; `waitUntilReady`: () => `Promise`<`Network`\> ; `withdraw`: (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: `string`, `amount`: `string`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\>  } ; `db`: `HoprDB` ; `hoprChannels`: `HoprChannels` ; `hoprToken`: `HoprToken` ; `indexer`: `TestingIndexer` ; `newBlock`: () => `void` ; `newEvent`: (`event`: `TypedEvent`<`any`, `any`\>) => `void` ; `newTokenEvent`: (`event`: `TypedEvent`<`any`, `any`\>) => `void` ; `provider`: `WebSocketProvider`  }\>
+▸ **useFixtures**(`ops?`): `Promise`<{ `COMMITTED_CHANNEL`: [`ChannelEntry`](classes/ChannelEntry.md) ; `OPENED_CHANNEL`: [`ChannelEntry`](classes/ChannelEntry.md) ; `chain`: { `announce`: (`multiaddr`: `Multiaddr`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> ; `finalizeChannelClosure`: (`counterparty`: `Address`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> ; `fundChannel`: (`partyA`: `Address`, `partyB`: `Address`, `fundsA`: `Balance`, `fundsB`: `Balance`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> ; `getAllQueuingTransactionRequests`: () => `TransactionRequest`[] ; `getBalance`: (`accountAddress`: `Address`) => `Promise`<`Balance`\> ; `getChannels`: () => `HoprChannels` ; `getGenesisBlock`: () => `number` ; `getInfo`: () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `string` = networkInfo.network } ; `getLatestBlockNumber`: () => `Promise`<`number`\> ; `getNativeBalance`: (`accountAddress`: `Address`) => `Promise`<`Balance`\> ; `getPrivateKey`: () => `Uint8Array` ; `getPublicKey`: () => `PublicKey` ; `getToken`: () => `HoprToken` ; `getTransactionsInBlock`: (`blockNumber`: `number`) => `Promise`<`string`[]\> ; `initiateChannelClosure`: (`counterparty`: `Address`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> ; `redeemTicket`: (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> ; `sendTransaction`: (`signedTransaction`: `string` \| `Promise`<`string`\>) => `Promise`<`TransactionResponse`\> ; `setCommitment`: (`counterparty`: `Address`, `commitment`: `Hash`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> ; `subscribeBlock`: (`cb`: (`blockNumber`: `number`) => `void` \| `Promise`<`void`\>) => () => `void` ; `subscribeError`: (`cb`: (`err`: `any`) => `void` \| `Promise`<`void`\>) => () => `void` ; `unsubscribe`: () => `void` ; `updateConfirmedTransaction`: (`hash`: `string`) => `void` ; `waitUntilReady`: () => `Promise`<`Network`\> ; `withdraw`: (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: `string`, `amount`: `string`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\>  } ; `db`: `HoprDB` ; `hoprChannels`: `HoprChannels` ; `hoprToken`: `HoprToken` ; `indexer`: `TestingIndexer` ; `newBlock`: () => `void` ; `newEvent`: (`event`: `TypedEvent`<`any`, `any`\>) => `void` ; `newTokenEvent`: (`event`: `TypedEvent`<`any`, `any`\>) => `void` ; `provider`: `WebSocketProvider`  }\>
 
 #### Parameters
 

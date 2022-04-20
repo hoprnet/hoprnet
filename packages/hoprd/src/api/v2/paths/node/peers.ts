@@ -1,4 +1,5 @@
 import type { Operation } from 'express-openapi'
+import type { Multiaddr } from 'multiaddr'
 import Hopr from '@hoprnet/hopr-core'
 import PeerId from 'peer-id'
 import { STATUS_CODES } from '../../utils'
@@ -17,6 +18,25 @@ export type PeerInfo = {
 }
 
 /**
+ * Convert `info` taken from `core` to our preferred response format.
+ * @param info `entry` information taken from `core`
+ * @param multiaddr
+ * @returns PeerInfo
+ */
+const toPeerInfoFormat = (info: ReturnType<Hopr['getConnectionInfo']>, multiaddr?: Multiaddr): PeerInfo => ({
+  peerId: info.id.toB58String(),
+  multiAddr: multiaddr ? multiaddr.toString() : undefined,
+  heartbeats: {
+    sent: info.heartbeatsSent,
+    success: info.heartbeatsSuccess
+  },
+  lastSeen: info.lastSeen,
+  quality: info.quality,
+  backoff: info.backoff,
+  isNew: info.heartbeatsSent === 0
+})
+
+/**
  * @param node a hopr instance
  * @param quality a float range from 0 to 1
  * @returns List of peers alongside their connection status.
@@ -28,60 +48,43 @@ export const getPeers = async (
   announced: PeerInfo[]
   connected: PeerInfo[]
 }> => {
-  if (isNaN(quality) || quality > 1) throw new Error(STATUS_CODES.INVALID_QUALITY)
+  if (isNaN(quality) || quality < 0 || quality > 1) throw new Error(STATUS_CODES.INVALID_QUALITY)
 
   try {
-    const connected = node.getConnectedPeers().reduce<PeerInfo[]>((result, peerId) => {
-      try {
-        const info = node.getConnectionInfo(peerId)
-        // exclude if quality is lesser than the one wanted
-        if (info.quality < quality) return result
-        const isNew = info.heartbeatsSent === 0
-
-        result.push({
-          peerId: info.id.toB58String(),
-          heartbeats: {
-            sent: info.heartbeatsSent,
-            success: info.heartbeatsSuccess
-          },
-          lastSeen: info.lastSeen,
-          quality: info.quality,
-          backoff: info.backoff,
-          isNew
-        })
-      } catch {}
-      return result
-    }, [])
-
     const announced = await node.getAddressesAnnouncedOnChain().then((addrs) => {
-      return addrs.reduce<PeerInfo[]>((result, addr) => {
+      return addrs.reduce<Map<string, PeerInfo>>((result, addr) => {
         const peerId = PeerId.createFromB58String(addr.getPeerId())
         try {
           const info = node.getConnectionInfo(peerId)
           // exclude if quality is lesser than the one wanted
           if (info.quality < quality) return result
-          const isNew = info.heartbeatsSent === 0
-
-          result.push({
-            peerId: info.id.toB58String(),
-            multiAddr: addr.toString(),
-            heartbeats: {
-              sent: info.heartbeatsSent,
-              success: info.heartbeatsSuccess
-            },
-            lastSeen: info.lastSeen,
-            quality: info.quality,
-            backoff: info.backoff,
-            isNew
-          })
+          result.set(peerId.toB58String(), toPeerInfoFormat(info, addr))
         } catch {}
         return result
-      }, [])
+      }, new Map())
     })
+
+    const connected = node.getConnectedPeers().reduce<PeerInfo[]>((result, peerId) => {
+      const peerIdStr = peerId.toB58String()
+
+      // already exists in announced, we use this because it contains multiaddr already
+      if (announced.has(peerIdStr)) {
+        result.push(announced.get(peerIdStr))
+      } else {
+        try {
+          const info = node.getConnectionInfo(peerId)
+          // exclude if quality is lesser than the one wanted
+          if (info.quality < quality) return result
+          result.push(toPeerInfoFormat(info))
+        } catch {}
+      }
+
+      return result
+    }, [])
 
     return {
       connected,
-      announced
+      announced: Array.from(announced.values())
     }
   } catch (error) {
     throw new Error(STATUS_CODES.UNKNOWN_FAILURE + ' ' + error.message)

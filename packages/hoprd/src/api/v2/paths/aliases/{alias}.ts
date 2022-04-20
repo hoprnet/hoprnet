@@ -63,7 +63,10 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/HoprAddress'
+            type: 'object',
+            properties: {
+              peerId: { $ref: '#/components/schemas/HoprAddress' }
+            }
           }
         }
       }

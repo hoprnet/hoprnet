@@ -2,7 +2,7 @@ import type Hopr from '@hoprnet/hopr-core'
 import { PassiveStrategy, PromiscuousStrategy } from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils'
-import type { State, StateOps } from '../../../../types'
+import { SettingKey, State, StateOps } from '../../../../types'
 
 /**
  * Sets node setting/s in HOPRd state.
@@ -11,16 +11,16 @@ import type { State, StateOps } from '../../../../types'
  */
 export const setSetting = (node: Hopr, stateOps: StateOps, key: keyof State['settings'], value: any) => {
   const state = stateOps.getState()
-  if (typeof state.settings[key] === 'undefined') {
+  if (!Object.values(SettingKey).includes(key)) {
     throw Error(STATUS_CODES.INVALID_SETTING)
   }
 
   switch (key) {
-    case 'includeRecipient':
+    case SettingKey.INCLUDE_RECIPIENT:
       if (typeof value !== 'boolean') throw Error(STATUS_CODES.INVALID_SETTING_VALUE)
       state.settings[key] = value
       break
-    case 'strategy':
+    case SettingKey.STRATEGY:
       let strategy: PassiveStrategy | PromiscuousStrategy
 
       switch (value) {
@@ -43,17 +43,18 @@ export const setSetting = (node: Hopr, stateOps: StateOps, key: keyof State['set
 export const PUT: Operation = [
   async (req, res, _next) => {
     const { stateOps, node } = req.context
-    const { key, value } = req.body
+    const { setting } = req.params
+    const { settingValue } = req.body
 
     try {
-      setSetting(node, stateOps, key, value)
+      setSetting(node, stateOps, setting as SettingKey, settingValue)
       return res.status(204).send()
     } catch (error) {
-      const INVALID_ARG = [STATUS_CODES.INVALID_SETTING_VALUE, STATUS_CODES.INVALID_SETTING].find((arg) =>
-        error.message.includes(arg)
-      )
-      if (INVALID_ARG) {
-        return res.status(400).send({ STATUS: INVALID_ARG })
+      // Can't validate setting value on express validation level bacause the type of settingValue depends on settingKey.
+      // CustomFormats validation check in express-openapi doesn't have access to rest of the request body so we can't check setting key,
+      // that's why we leave validation of the setting value to the logic function and not route code.
+      if (error.message.includes(STATUS_CODES.INVALID_SETTING_VALUE)) {
+        return res.status(400).send({ status: STATUS_CODES.INVALID_SETTING_VALUE })
       } else {
         return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
       }
@@ -65,19 +66,29 @@ PUT.apiDoc = {
   description: `Change this node's setting value. Check Settings schema to learn more about each setting and the type of value it expects.`,
   tags: ['Settings'],
   operationId: 'settingsSetSetting',
+  parameters: [
+    {
+      in: 'path',
+      name: 'setting',
+      required: true,
+      schema: {
+        format: 'settingKey',
+        type: 'string',
+        description: 'Name of the setting we want to change.',
+        example: 'includeRecipient'
+      }
+    }
+  ],
   requestBody: {
     content: {
       'application/json': {
         schema: {
           type: 'object',
-          required: ['key', 'value'],
+          required: ['settingValue'],
           properties: {
-            key: {
-              type: 'string'
-            },
-            value: {}
+            settingValue: {}
           },
-          example: { key: 'includeRecipient', value: true }
+          example: { settingValue: true }
         }
       }
     }
