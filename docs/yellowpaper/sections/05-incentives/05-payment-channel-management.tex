@@ -79,7 +79,7 @@ Once $n_{open}$ locks funds, the smart contract instantiates the data structure 
     \label{fig:channeldata}
 \end{figure}
 
-Closing a channel sets $closureTime$ to current UNIX timestamp plus the timeframe\footnote{As of now, the timeframe is set for debugging purposes to five minutes.} in miliseconds in which node $n_{dest}$ is allowed to submit previously unredeemed tickets.
+Closing a channel sets $closureTime$ to current UNIX timestamp plus the timeframe in miliseconds in which node $n_{dest}$ is allowed to submit previously unredeemed tickets. This timeframe is currently set to five minutes for debugging purposes.
 
 \begin{comment}
 \paragraph{Opening a channel} Node $A$ can open a channel by transferring funds to the payment channels contract \textit{HoprChannels} and including the following \textit{userdata}:
