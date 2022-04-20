@@ -41,6 +41,22 @@ function defaultEnvironment(): string {
 // Replace default process name (`node`) by `hoprd`
 process.title = 'hoprd'
 
+// See https://github.com/hoprnet/hoprnet/issues/3755
+process.on('unhandledRejection', (reason: any, _promise: Promise<any>) => {
+  if (reason.message && reason.message.toString) {
+    const msgString = reason.toString()
+
+    // Only silence very specific errors
+    if (msgString.match(/write ECONNRESET/) || msgString.match(/The operation was aborted/)) {
+      return
+    }
+  }
+
+  console.warn('UnhandledPromiseRejectionWarning')
+  console.log(reason)
+  process.exit(1)
+})
+
 // Use environment-specific default data path
 const defaultDataPath = path.join(process.cwd(), 'hoprd-db', defaultEnvironment())
 
