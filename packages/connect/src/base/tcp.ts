@@ -24,6 +24,7 @@ class TCPConnection implements MultiaddrConnection {
   public localAddr: Multiaddr
   public sink: StreamSink
   public source: StreamSourceAsync
+  public closed: boolean
 
   private _stream: Stream
 
@@ -37,6 +38,7 @@ class TCPConnection implements MultiaddrConnection {
   constructor(public remoteAddr: Multiaddr, self: PeerId, public conn: Socket, options?: HoprConnectDialOptions) {
     this.localAddr = nodeToMultiaddr(this.conn.address() as AddressInfo, self)
 
+    this.closed = false
     this.timeline = {
       open: Date.now()
     }
@@ -61,9 +63,10 @@ class TCPConnection implements MultiaddrConnection {
   }
 
   public close(): Promise<void> {
-    if (this.conn.destroyed) {
+    if (this.conn.destroyed || this.closed) {
       return Promise.resolve()
     }
+    this.closed = true
 
     return new Promise<void>((resolve) => {
       let done = false
@@ -144,9 +147,9 @@ class TCPConnection implements MultiaddrConnection {
 
       const onError = (err: any) => {
         if (err.code === 'ABORT_ERR') {
-          verbose(`Abort to ${ma.toString()} after ${Date.now() - start} ms`, err)
+          verbose(`Abort to ${ma.toString()} after ${Date.now() - start} ms`)
         } else {
-          verbose(`Error connecting to ${ma.toString()}.`, err)
+          verbose(`Error connecting to ${ma.toString()}.`)
         }
 
         done(err)
@@ -178,7 +181,7 @@ class TCPConnection implements MultiaddrConnection {
           return reject(err)
         }
 
-        resolve(new TCPConnection(ma, self, rawSocket))
+        resolve(new TCPConnection(ma, self, rawSocket, options))
       }
 
       rawSocket = net

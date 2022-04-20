@@ -223,7 +223,9 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
     destination: PeerId,
     options: HoprConnectDialOptions
   ): Promise<Connection> {
-    log(`Attempting to dial /p2p/${relay.toB58String()}/p2p-circuit/p2p/${destination.toB58String()}`)
+    log(
+      `Attempting to dial ${chalk.yellow(`/p2p/${relay.toB58String()}/p2p-circuit/p2p/${destination.toB58String()}`)}`
+    )
 
     let maConn = await this.relay.connect(relay, destination, options)
 
@@ -252,14 +254,29 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
    * @param options optional dial options
    */
   public async dialDirectly(ma: Multiaddr, options?: HoprConnectDialOptions): Promise<Connection> {
-    log(`Attempting to dial ${chalk.yellow(ma.toString())} directly`)
+    log(`Attempting to dial ${chalk.yellow(ma.toString())}`)
 
     const maConn = await TCPConnection.create(ma, this._peerId, options)
 
     verbose(
       `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshake.`
     )
-    return await this._upgradeOutbound(maConn)
+
+    const conn = await this._upgradeOutbound(maConn)
+
+    // Assign disconnect handler once we're sure that public keys match,
+    // i.e. dialed node == desired destination
+    if (options && options.onDisconnect) {
+      maConn.conn.on('close', () => {
+        // Don't call the disconnect handler if connection has been closed intentionally
+        if (maConn.closed) {
+          return
+        }
+        options.onDisconnect!(ma)
+      })
+    }
+
+    return conn
   }
 }
 

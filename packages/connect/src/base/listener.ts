@@ -6,6 +6,7 @@ import {
   type Server as TCPServer
 } from 'net'
 import { createSocket, type RemoteInfo, type Socket as UDPSocket } from 'dgram'
+import type Connection from 'libp2p-interfaces/dist/src/connection/connection'
 
 import { once, EventEmitter } from 'events'
 import type { PeerStoreType, HoprConnectOptions, HoprConnectTestingOptions } from '../types'
@@ -447,7 +448,7 @@ class Listener extends EventEmitter implements InterfaceListener {
     // Avoid uncaught errors caused by unstable connections
     socket.on('error', (err) => error('socket error', err))
 
-    let maConn: MultiaddrConnection | undefined
+    let maConn: TCPConnection | undefined
 
     try {
       maConn = TCPConnection.fromSocket(socket, this.peerId)
@@ -462,8 +463,9 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     log('new inbound connection %s', maConn.remoteAddr)
 
+    let conn: Connection
     try {
-      await this.upgradeInbound(maConn)
+      conn = await this.upgradeInbound(maConn)
     } catch (err: any) {
       if (err.code === 'ERR_ENCRYPTION_FAILED') {
         error(`inbound connection failed because encryption failed. Maybe connected to the wrong node?`)
@@ -476,6 +478,23 @@ class Listener extends EventEmitter implements InterfaceListener {
       }
 
       return
+    }
+
+    for (const peer of this.entry.getUsedRelayPeerIds()) {
+      if (peer.equals(conn.remotePeer)) {
+        // Make sure that Multiaddr contains a PeerId
+        const maWithPeerId = maConn.remoteAddr
+          .decapsulateCode(CODE_P2P)
+          .encapsulate(`/p2p/${conn.remotePeer.toB58String()}`)
+
+        ;(maConn.conn as TCPSocket).on('close', () => {
+          if (maConn!.closed) {
+            return
+          }
+
+          this.entry._onEntryNodeDisconnect!(maWithPeerId)
+        })
+      }
     }
 
     log('inbound connection %s upgraded', maConn.remoteAddr)
@@ -544,8 +563,8 @@ class Listener extends EventEmitter implements InterfaceListener {
   /**
    * Tries to determine a node's public IP address by
    * using STUN servers
-   * @param port the port on which we are listening
-   * @param host [optional] the host on which we are listening
+   * @param ownAddress the host on which we are listening
+   * @param ownPort the port on which we are listening
    * @returns Promise that resolves once STUN request came back or STUN timeout was reched
    */
   async checkNATSituation(

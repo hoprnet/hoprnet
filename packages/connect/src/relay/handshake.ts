@@ -229,7 +229,9 @@ class RelayHandshake {
 
     // Anything can happen while attempting to connect
     if (toDestinationStruct == null) {
-      error(`Cannot establish a relayed connection from ${source.toB58String()} to ${destination.toB58String()}`)
+      error(
+        `Failed to create circuit from ${source.toB58String()} to ${destination.toB58String()} because destination is not reachable`
+      )
       this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY))
       this.shaker.rest()
       return

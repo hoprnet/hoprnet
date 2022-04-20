@@ -1,480 +1,673 @@
-// import { EntryNodes, ENTRY_NODES_MAX_PARALLEL_DIALS, RELAY_CHANGED_EVENT } from './entry'
-// import type PeerId from 'peer-id'
-// import assert from 'assert'
-// import { createPeerId, getPeerStoreEntry } from './utils.spec'
-// import { once, EventEmitter } from 'events'
-// import { Multiaddr } from 'multiaddr'
-
-// import { MAX_RELAYS_PER_NODE, OK } from '../constants'
-// import type { PeerStoreType, PublicNodesEmitter } from '../types'
-
-// /**
-//  * Decorated EntryNodes class that allows direct access
-//  * to protected class elements
-//  */
-// class TestingEntryNodes extends EntryNodes {
-//   // @ts-ignore
-//   public availableEntryNodes: InstanceType<typeof EntryNodes>['availableEntryNodes']
-
-//   // @ts-ignore
-//   public usedRelays: InstanceType<typeof EntryNodes>['usedRelays']
-
-//   // @ts-ignore
-//   public uncheckedEntryNodes: InstanceType<typeof EntryNodes>['uncheckedEntryNodes']
-
-//   public onNewRelay(...args: Parameters<InstanceType<typeof EntryNodes>['onNewRelay']>) {
-//     return super.onNewRelay(...args)
-//   }
-//   public onRemoveRelay(peer: PeerId) {
-//     return super.onRemoveRelay(peer)
-//   }
-
-//   public async updatePublicNodes() {
-//     return super.updatePublicNodes()
-//   }
-// }
-
-// function connectEvent(addr: string): string {
-//   return `connect:${addr}`
-// }
-// function createFakeNetwork() {
-//   const network = new EventEmitter()
-
-//   const listen = (addr: string) => {
-//     const emitter = new EventEmitter()
-//     network.on(connectEvent(addr), () => emitter.emit('connected'))
-
-//     return emitter
-//   }
-
-//   const connect = (addr: string) => {
-//     if (network.listeners(connectEvent(addr)).length >= 1) {
-//       network.emit(connectEvent(addr))
-//       return Promise.resolve({
-//         newStream: (_protocols: string[]) =>
-//           Promise.resolve({
-//             stream: {
-//               source: (async function* () {
-//                 yield OK
-//               })(),
-//               sink: async (source: AsyncIterableIterator<any>) => {
-//                 // consume the send stream
-//                 for await (const _sth of source) {
-//                 }
-//               }
-//             }
-//           })
-//       })
-//     } else {
-//       return Promise.resolve(undefined)
-//     }
-//   }
-
-//   return {
-//     listen,
-//     connect,
-//     close: network.removeAllListeners.bind(network)
-//   }
-// }
-
-// describe('entry node functionality', function () {
-//   const peerId = createPeerId()
-//   it('add public nodes', function () {
-//     const entryNodes = new TestingEntryNodes(
-//       peerId,
-//       // Make sure that call is indeed asynchronous
-//       (async () => new Promise((resolve) => setImmediate(resolve))) as any,
-//       {}
-//     )
-
-//     entryNodes.start()
-
-//     const peerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/0`)
-
-//     entryNodes.onNewRelay(peerStoreEntry)
-//     // Should filter duplicate
-//     entryNodes.onNewRelay(peerStoreEntry)
-
-//     const uncheckedNodes = entryNodes.getUncheckedEntryNodes()
-
-//     assert(uncheckedNodes.length == 1, `Unchecked nodes must contain one entry`)
-//     assert(uncheckedNodes[0].id.equals(peerStoreEntry.id), `id must match the generated one`)
-//     assert(uncheckedNodes[0].multiaddrs.length == peerStoreEntry.multiaddrs.length, `must not contain more multiaddrs`)
+import { EntryNodes, ENTRY_NODES_MAX_PARALLEL_DIALS, RELAY_CHANGED_EVENT } from './entry'
+import type PeerId from 'peer-id'
+import assert from 'assert'
+import { createPeerId, getPeerStoreEntry } from './utils.spec'
+import { once, EventEmitter } from 'events'
+import { Multiaddr } from 'multiaddr'
+import type Connection from 'libp2p-interfaces/dist/src/connection/connection'
+
+import { MAX_RELAYS_PER_NODE, OK } from '../constants'
+import type { HoprConnectDialOptions, PeerStoreType, PublicNodesEmitter } from '../types'
+// import { defer } from '@hoprnet/hopr-utils'
+
+class FakeConnectionManager {
+  public _started: boolean
+  private connections: Map<string, Connection[]>
+
+  constructor(started = false) {
+    this._started = started
+    this.connections = new Map<string, Connection[]>()
+  }
+
+  public start() {
+    this._started = true
+  }
+
+  public getAll(peer: PeerId): Connection[] {
+    return this.connections.get(peer.toB58String()) ?? []
+  }
+
+  public onDisconnect(_conn: Connection): void {}
+}
+
+/**
+ * Decorated EntryNodes class that allows direct access
+ * to protected class elements
+ */
+class TestingEntryNodes extends EntryNodes {
+  // @ts-ignore
+  public availableEntryNodes: InstanceType<typeof EntryNodes>['availableEntryNodes']
+
+  // @ts-ignore
+  public usedRelays: InstanceType<typeof EntryNodes>['usedRelays']
+
+  // @ts-ignore
+  public uncheckedEntryNodes: InstanceType<typeof EntryNodes>['uncheckedEntryNodes']
+
+  public onNewRelay(...args: Parameters<InstanceType<typeof EntryNodes>['onNewRelay']>) {
+    return super.onNewRelay(...args)
+  }
+  public onRemoveRelay(peer: PeerId) {
+    return super.onRemoveRelay(peer)
+  }
+
+  public async updatePublicNodes() {
+    return super.updatePublicNodes()
+  }
+}
+
+function connectEvent(addr: string): string {
+  return `connect:${addr}`
+}
+
+function disconnectEvent(addr: string) {
+  return `disconnect:${addr}`
+}
+
+function createFakeNetwork() {
+  const network = new EventEmitter()
+
+  const listen = (addr: string) => {
+    const emitter = new EventEmitter()
+    network.on(connectEvent(addr), () => emitter.emit('connected'))
+
+    return emitter
+  }
+
+  const connect = (ma: Multiaddr, opts: HoprConnectDialOptions) => {
+    const addr = ma.toString()
+
+    if (opts.onDisconnect) {
+      network.once(disconnectEvent(addr), () => opts?.onDisconnect?.(ma))
+    }
+
+    if (network.listeners(connectEvent(addr)).length >= 1) {
+      network.emit(connectEvent(addr))
+
+      const conn = {
+        _closed: false,
+        close: async () => {
+          conn._closed = true
+        },
+        newStream: (_protocols: string[]) =>
+          Promise.resolve({
+            stream: {
+              source: (async function* () {
+                yield OK
+              })(),
+              sink: async (source: AsyncIterableIterator<any>) => {
+                // consume the send stream
+                for await (const _sth of source) {
+                }
+              }
+            }
+          })
+      }
+      return Promise.resolve(conn)
+    } else {
+      return Promise.resolve(undefined)
+    }
+  }
+
+  const close = (ma: Multiaddr) => {
+    network.emit(disconnectEvent(ma.toString()))
+  }
+
+  return {
+    listen,
+    connect,
+    close,
+    stop: network.removeAllListeners.bind(network)
+  }
+}
+
+describe('entry node functionality', function () {
+  const peerId = createPeerId()
+  it('add public nodes', function () {
+    const entryNodes = new TestingEntryNodes(
+      peerId,
+      {
+        connectionManager: new FakeConnectionManager(true)
+      },
+      // Make sure that call is indeed asynchronous
+      (async () => new Promise((resolve) => setImmediate(resolve))) as any,
+      {}
+    )
+
+    entryNodes.start()
+
+    const peerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/0`)
+
+    entryNodes.onNewRelay(peerStoreEntry)
+    // Should filter duplicate
+    entryNodes.onNewRelay(peerStoreEntry)
+
+    const uncheckedNodes = entryNodes.getUncheckedEntryNodes()
+
+    assert(uncheckedNodes.length == 1, `Unchecked nodes must contain one entry`)
+    assert(uncheckedNodes[0].id.equals(peerStoreEntry.id), `id must match the generated one`)
+    assert(uncheckedNodes[0].multiaddrs.length == peerStoreEntry.multiaddrs.length, `must not contain more multiaddrs`)
+
+    const usedRelays = entryNodes.getUsedRelayAddresses()
+    assert(usedRelays == undefined || usedRelays.length == 0, `must not expose any internal addrs`)
+
+    entryNodes.stop()
+  })
+
+  it('remove an offline node', function () {
+    const entryNodes = new TestingEntryNodes(
+      peerId,
+      {
+        connectionManager: new FakeConnectionManager()
+      },
+      (async () => new Promise((resolve) => setImmediate(resolve))) as any,
+      {}
+    )
+
+    entryNodes.start()
+
+    const peerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/0`)
+
+    entryNodes.availableEntryNodes.push({
+      ...peerStoreEntry,
+      latency: 23
+    })
+
+    entryNodes.onRemoveRelay(peerStoreEntry.id)
+
+    const availablePublicNodes = entryNodes.getAvailabeEntryNodes()
+    assert(availablePublicNodes.length == 0, `must remove node from public nodes`)
+
+    const usedRelays = entryNodes.getUsedRelayAddresses()
+    assert(usedRelays == undefined || usedRelays.length == 0, `must not expose any internal addrs`)
+
+    entryNodes.stop()
+  })
+
+  it('contact potential relays and update relay addresses', async function () {
+    const network = createFakeNetwork()
+
+    const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/12345`)
+
+    const relayListener = network.listen(relay.multiaddrs[0].toString())
+
+    const connectPromise = once(relayListener, 'connected')
+
+    const entryNodes = new TestingEntryNodes(
+      peerId,
+      {
+        connectionManager: new FakeConnectionManager(true)
+      },
+      network.connect as any,
+      {
+        initialNodes: [relay]
+      }
+    )
+
+    entryNodes.start()
+
+    await entryNodes.updatePublicNodes()
+
+    await connectPromise
+
+    const availableEntryNodes = entryNodes.getAvailabeEntryNodes()
+    assert(availableEntryNodes.length == 1, `must contain exactly one public node`)
+    assert(availableEntryNodes[0].id.equals(relay.id), `must contain correct peerId`)
+    assert(availableEntryNodes[0].latency >= 0, `latency must be non-negative`)
+
+    const usedRelays = entryNodes.getUsedRelayAddresses()
+    assert(usedRelays != undefined, `must expose relay addrs`)
+    assert(usedRelays.length == 1, `must expose exactly one relay addrs`)
+    assert(
+      usedRelays[0].toString() === `/p2p/${relay.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`,
+      `must expose the right relay address`
+    )
 
-//     const usedRelays = entryNodes.getUsedRelayAddresses()
-//     assert(usedRelays == undefined || usedRelays.length == 0, `must not expose any internal addrs`)
+    relayListener.removeAllListeners()
+    network.stop()
+    entryNodes.stop()
+  })
 
-//     entryNodes.stop()
-//   })
+  it('expose limited number of relay addresses', async function () {
+    const network = createFakeNetwork()
 
-//   it('remove an offline node', function () {
-//     const entryNodes = new TestingEntryNodes(
-//       peerId,
-//       (async () => new Promise((resolve) => setImmediate(resolve))) as any,
-//       {}
-//     )
+    const relayNodes = Array.from<undefined, [Promise<any>, PeerStoreType, EventEmitter]>(
+      { length: ENTRY_NODES_MAX_PARALLEL_DIALS + 1 },
+      (_value: undefined, index: number) => {
+        const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/${index}`)
+
+        const relayListener = network.listen(relay.multiaddrs[0].toString())
 
-//     entryNodes.start()
+        const connectPromise = once(relayListener, 'connected')
 
-//     const peerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/0`)
+        return [connectPromise, relay, relayListener]
+      }
+    )
 
-//     entryNodes.availableEntryNodes.push({
-//       ...peerStoreEntry,
-//       latency: 23
-//     })
+    const additionalOfflineNodes = [getPeerStoreEntry(`/ip4/127.0.0.1/tcp/23`)]
 
-//     entryNodes.onRemoveRelay(peerStoreEntry.id)
+    const entryNodes = new TestingEntryNodes(
+      peerId,
+      {
+        connectionManager: new FakeConnectionManager(true)
+      },
+      network.connect as any,
+      {
+        initialNodes: relayNodes.map((relayNode) => relayNode[1]).concat(additionalOfflineNodes)
+      }
+    )
 
-//     const availablePublicNodes = entryNodes.getAvailabeEntryNodes()
-//     assert(availablePublicNodes.length == 0, `must remove node from public nodes`)
+    entryNodes.start()
 
-//     const usedRelays = entryNodes.getUsedRelayAddresses()
-//     assert(usedRelays == undefined || usedRelays.length == 0, `must not expose any internal addrs`)
+    await entryNodes.updatePublicNodes()
 
-//     entryNodes.stop()
-//   })
+    await Promise.all(relayNodes.map((relayNode) => relayNode[0]))
 
-//   it('contact potential relays and update relay addresses', async function () {
-//     const network = createFakeNetwork()
+    const usedRelays = entryNodes.getUsedRelayAddresses()
+    assert(usedRelays != undefined, `must expose relay addresses`)
+    assert(usedRelays.length == MAX_RELAYS_PER_NODE, `must expose ${MAX_RELAYS_PER_NODE} relay addresses`)
 
-//     const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/12345`)
+    const availableEntryNodes = entryNodes.getAvailabeEntryNodes()
+    assert(availableEntryNodes.length == ENTRY_NODES_MAX_PARALLEL_DIALS + 1)
+    assert(
+      relayNodes.every((relayNode) =>
+        availableEntryNodes.some((availableEntryNode) => availableEntryNode.id.equals(relayNode[1].id))
+      ),
+      `must contain all relay nodes`
+    )
 
-//     const relayListener = network.listen(relay.multiaddrs[0].toString())
+    // cleanup
+    relayNodes.forEach((relayNode) => relayNode[2].removeAllListeners())
+    network.stop()
+    entryNodes.stop()
+  })
 
-//     const connectPromise = once(relayListener, 'connected')
+  it('update nodes once node became offline', async function () {
+    const network = createFakeNetwork()
 
-//     const entryNodes = new TestingEntryNodes(
-//       peerId,
-//       async (ma: Multiaddr) => (await network.connect(ma.toString())) as any,
-//       {
-//         initialNodes: [relay]
-//       }
-//     )
+    const newNode = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
+    const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/2`)
 
-//     entryNodes.start()
+    const newNodeListener = network.listen(newNode.multiaddrs[0].toString())
 
-//     await entryNodes.updatePublicNodes()
+    const entryNodes = new TestingEntryNodes(
+      peerId,
+      {
+        connectionManager: new FakeConnectionManager(true)
+      },
+      network.connect as any,
+      {}
+    )
 
-//     await connectPromise
+    entryNodes.start()
 
-//     const availableEntryNodes = entryNodes.getAvailabeEntryNodes()
-//     assert(availableEntryNodes.length == 1, `must contain exactly one public node`)
-//     assert(availableEntryNodes[0].id.equals(relay.id), `must contain correct peerId`)
-//     assert(availableEntryNodes[0].latency >= 0, `latency must be non-negative`)
+    entryNodes.uncheckedEntryNodes.push(newNode)
 
-//     const usedRelays = entryNodes.getUsedRelayAddresses()
-//     assert(usedRelays != undefined, `must expose relay addrs`)
-//     assert(usedRelays.length == 1, `must expose exactly one relay addrs`)
-//     assert(
-//       usedRelays[0].toString() === `/p2p/${relay.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`,
-//       `must expose the right relay address`
-//     )
+    let usedRelay = {
+      relayDirectAddress: new Multiaddr('/ip4/127.0.0.1/tcp/1234'),
+      ourCircuitAddress: new Multiaddr(`/p2p/${relay.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`)
+    }
 
-//     relayListener.removeAllListeners()
-//     network.close()
-//     entryNodes.stop()
-//   })
+    entryNodes.usedRelays.push(usedRelay)
 
-//   it('expose limited number of relay addresses', async function () {
-//     const network = createFakeNetwork()
+    // Should have one unchecked node and one relay node
+    assert(entryNodes.getUsedRelayAddresses().length == 1)
+    assert(entryNodes.getUncheckedEntryNodes().length == 1)
 
-//     const relayNodes = Array.from<undefined, [Promise<any>, PeerStoreType, EventEmitter]>(
-//       { length: ENTRY_NODES_MAX_PARALLEL_DIALS + 1 },
-//       (_value: undefined, index: number) => {
-//         const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/${index}`)
+    const connectPromise = once(newNodeListener, 'connected')
 
-//         const relayListener = network.listen(relay.multiaddrs[0].toString())
+    const updatePromise = once(entryNodes, RELAY_CHANGED_EVENT)
 
-//         const connectPromise = once(relayListener, 'connected')
+    entryNodes.onRemoveRelay(relay.id)
 
-//         return [connectPromise, relay, relayListener]
-//       }
-//     )
+    await Promise.all([connectPromise, updatePromise])
 
-//     const additionalOfflineNodes = [getPeerStoreEntry(`/ip4/127.0.0.1/tcp/23`)]
+    assert(entryNodes.getAvailabeEntryNodes().length == 1)
 
-//     const entryNodes = new TestingEntryNodes(
-//       peerId,
-//       async (ma: Multiaddr) => (await network.connect(ma.toString())) as any,
-//       {
-//         initialNodes: relayNodes.map((relayNode) => relayNode[1]).concat(additionalOfflineNodes)
-//       }
-//     )
+    const usedRelays = entryNodes.getUsedRelayAddresses()
+    assert(entryNodes.getUsedRelayAddresses().length == 1)
 
-//     entryNodes.start()
+    assert(
+      usedRelays[0].equals(new Multiaddr(`/p2p/${newNode.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`))
+    )
 
-//     await entryNodes.updatePublicNodes()
+    newNodeListener.removeAllListeners()
+    network.stop()
+    entryNodes.stop()
+  })
 
-//     await Promise.all(relayNodes.map((relayNode) => relayNode[0]))
+  it('take those nodes that are online', async function () {
+    const network = createFakeNetwork()
 
-//     const usedRelays = entryNodes.getUsedRelayAddresses()
-//     assert(usedRelays != undefined, `must expose relay addresses`)
-//     assert(usedRelays.length == MAX_RELAYS_PER_NODE, `must expose ${MAX_RELAYS_PER_NODE} relay addresses`)
+    const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
+    const relayListener = network.listen(relay.multiaddrs[0].toString())
 
-//     const availableEntryNodes = entryNodes.getAvailabeEntryNodes()
-//     assert(availableEntryNodes.length == ENTRY_NODES_MAX_PARALLEL_DIALS + 1)
-//     assert(
-//       relayNodes.every((relayNode) =>
-//         availableEntryNodes.some((availableEntryNode) => availableEntryNode.id.equals(relayNode[1].id))
-//       ),
-//       `must contain all relay nodes`
-//     )
+    const connectPromise = once(relayListener, 'connected')
 
-//     // cleanup
-//     relayNodes.forEach((relayNode) => relayNode[2].removeAllListeners())
-//     network.close()
-//     entryNodes.stop()
-//   })
+    const entryNodes = new TestingEntryNodes(
+      peerId,
+      {
+        connectionManager: new FakeConnectionManager(true)
+      },
+      network.connect as any,
+      {}
+    )
 
-//   it('update nodes once node became offline', async function () {
-//     const network = createFakeNetwork()
+    entryNodes.start()
 
-//     const newNode = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
-//     const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/2`)
+    const fakeNode = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/2`)
 
-//     const newNodeListener = network.listen(newNode.multiaddrs[0].toString())
+    entryNodes.uncheckedEntryNodes.push(relay)
+    entryNodes.uncheckedEntryNodes.push(fakeNode)
 
-//     const entryNodes = new TestingEntryNodes(
-//       peerId,
-//       async (ma: Multiaddr) => (await network.connect(ma.toString())) as any,
-//       {}
-//     )
+    await entryNodes.updatePublicNodes()
 
-//     entryNodes.start()
+    await connectPromise
 
-//     entryNodes.uncheckedEntryNodes.push(newNode)
+    const availableEntryNodes = entryNodes.getAvailabeEntryNodes()
+    assert(availableEntryNodes.length == 1)
+    assert(availableEntryNodes[0].id.equals(relay.id))
 
-//     let usedRelay = {
-//       relayDirectAddress: new Multiaddr('/ip4/127.0.0.1/tcp/1234'),
-//       ourCircuitAddress: new Multiaddr(`/p2p/${relay.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`)
-//     }
+    const usedRelays = entryNodes.getUsedRelayAddresses()
+    assert(usedRelays.length == 1)
+    assert(
+      usedRelays[0].equals(new Multiaddr(`/p2p/${relay.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`))
+    )
 
-//     entryNodes.usedRelays.push(usedRelay)
+    network.stop()
+    relayListener.removeAllListeners()
+    entryNodes.stop()
+  })
 
-//     // Should have one unchecked node and one relay node
-//     assert(entryNodes.getUsedRelayAddresses().length == 1)
-//     assert(entryNodes.getUncheckedEntryNodes().length == 1)
+  it('no available entry nodes', async function () {
+    const network = createFakeNetwork()
 
-//     const connectPromise = once(newNodeListener, 'connected')
+    const offlineRelay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
 
-//     const updatePromise = once(entryNodes, RELAY_CHANGED_EVENT)
+    const entryNodes = new TestingEntryNodes(
+      peerId,
+      {
+        connectionManager: new FakeConnectionManager(true)
+      },
+      network.connect as any,
+      {}
+    )
 
-//     entryNodes.onRemoveRelay(relay.id)
+    entryNodes.start()
 
-//     await Promise.all([connectPromise, updatePromise])
+    entryNodes.uncheckedEntryNodes.push(offlineRelay)
 
-//     assert(entryNodes.getAvailabeEntryNodes().length == 1)
+    await entryNodes.updatePublicNodes()
 
-//     const usedRelays = entryNodes.getUsedRelayAddresses()
-//     assert(entryNodes.getUsedRelayAddresses().length == 1)
+    const usedRelays = entryNodes.getUsedRelayAddresses()
+    assert(usedRelays.length == 0)
 
-//     assert(
-//       usedRelays[0].equals(new Multiaddr(`/p2p/${newNode.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`))
-//     )
+    network.stop()
+    entryNodes.stop()
+  })
 
-//     newNodeListener.removeAllListeners()
-//     network.close()
-//     entryNodes.stop()
-//   })
+  it('do not emit listening event if nothing has changed', async function () {
+    const entryNodes = new TestingEntryNodes(
+      peerId,
+      {
+        connectionManager: new FakeConnectionManager(true)
+      },
+      (async () => {}) as any,
+      {}
+    )
 
-//   it('take those nodes that are online', async function () {
-//     const network = createFakeNetwork()
+    entryNodes.start()
 
-//     const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
-//     const relayListener = network.listen(relay.multiaddrs[0].toString())
+    const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
 
-//     const connectPromise = once(relayListener, 'connected')
+    let usedRelay = {
+      relayDirectAddress: new Multiaddr(`/ip4/127.0.0.1/tcp/1`),
+      ourCircuitAddress: new Multiaddr(`/p2p/${relay.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`)
+    }
 
-//     const entryNodes = new TestingEntryNodes(
-//       peerId,
-//       async (ma: Multiaddr) => (await network.connect(ma.toString())) as any,
-//       {}
-//     )
+    entryNodes.availableEntryNodes.push({ ...relay, latency: 23 })
+    entryNodes.usedRelays.push(usedRelay)
 
-//     entryNodes.start()
+    entryNodes.once('listening', () =>
+      assert.fail(`must not throw listening event if list of entry nodes has not changed`)
+    )
 
-//     const fakeNode = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/2`)
+    await entryNodes.updatePublicNodes()
 
-//     entryNodes.uncheckedEntryNodes.push(relay)
-//     entryNodes.uncheckedEntryNodes.push(fakeNode)
+    const availableEntryNodes = entryNodes.getAvailabeEntryNodes()
+    assert(availableEntryNodes.length == 0)
 
-//     await entryNodes.updatePublicNodes()
+    const usedRelays = entryNodes.getUsedRelayAddresses()
+    assert(usedRelays.length == 0)
 
-//     await connectPromise
+    entryNodes.stop()
+  })
 
-//     const availableEntryNodes = entryNodes.getAvailabeEntryNodes()
-//     assert(availableEntryNodes.length == 1)
-//     assert(availableEntryNodes[0].id.equals(relay.id))
+  it('events should trigger actions', async function () {
+    const network = createFakeNetwork()
 
-//     const usedRelays = entryNodes.getUsedRelayAddresses()
-//     assert(usedRelays.length == 1)
-//     assert(
-//       usedRelays[0].equals(new Multiaddr(`/p2p/${relay.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`))
-//     )
+    const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
+    const relayListener = network.listen(relay.multiaddrs[0].toString())
 
-//     network.close()
-//     relayListener.removeAllListeners()
-//     entryNodes.stop()
-//   })
+    const publicNodes = new EventEmitter() as PublicNodesEmitter
+    const entryNodes = new TestingEntryNodes(
+      peerId,
+      {
+        connectionManager: new FakeConnectionManager(true)
+      },
+      network.connect as any,
+      {
+        publicNodes
+      }
+    )
 
-//   it('no available entry nodes', async function () {
-//     const network = createFakeNetwork()
+    entryNodes.start()
 
-//     const offlineRelay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
+    publicNodes.emit('addPublicNode', relay)
 
-//     const entryNodes = new TestingEntryNodes(
-//       peerId,
-//       async (ma: Multiaddr) => (await network.connect(ma.toString())) as any,
-//       {}
-//     )
+    await once(entryNodes, RELAY_CHANGED_EVENT)
 
-//     entryNodes.start()
+    publicNodes.emit('removePublicNode', relay.id)
 
-//     entryNodes.uncheckedEntryNodes.push(offlineRelay)
+    await once(entryNodes, RELAY_CHANGED_EVENT)
 
-//     await entryNodes.updatePublicNodes()
+    entryNodes.once(RELAY_CHANGED_EVENT, () => assert.fail('Must not throw the relay:changed event'))
 
-//     const usedRelays = entryNodes.getUsedRelayAddresses()
-//     assert(usedRelays.length == 0)
+    await entryNodes.updatePublicNodes()
 
-//     network.close()
-//     entryNodes.stop()
-//   })
+    relayListener.removeAllListeners()
+    entryNodes.stop()
+    network.stop()
+  })
 
-//   it('do not emit listening event if nothing has changed', async function () {
-//     const entryNodes = new TestingEntryNodes(peerId, (async () => {}) as any, {})
+  it('renew DHT entry', async function () {
+    const network = createFakeNetwork()
 
-//     entryNodes.start()
+    const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
 
-//     const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
+    const connectEmitter = network.listen(relay.multiaddrs[0].toString())
 
-//     let usedRelay = {
-//       relayDirectAddress: new Multiaddr(`/ip4/127.0.0.1/tcp/1`),
-//       ourCircuitAddress: new Multiaddr(`/p2p/${relay.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`)
-//     }
+    let renews = 0
 
-//     entryNodes.availableEntryNodes.push({ ...relay, latency: 23 })
-//     entryNodes.usedRelays.push(usedRelay)
+    connectEmitter.on('connected', () => renews++)
 
-//     entryNodes.once('listening', () =>
-//       assert.fail(`must not throw listening event if list of entry nodes has not changed`)
-//     )
+    const publicNodes: PublicNodesEmitter = new EventEmitter()
 
-//     await entryNodes.updatePublicNodes()
+    const CUSTOM_DHT_RENEWAL_TIMEOUT = 100 // very short timeout
 
-//     const availableEntryNodes = entryNodes.getAvailabeEntryNodes()
-//     assert(availableEntryNodes.length == 0)
+    const entryNodes = new TestingEntryNodes(
+      peerId,
+      {
+        connectionManager: new FakeConnectionManager(true)
+      },
+      network.connect as any,
+      {
+        dhtRenewalTimeout: CUSTOM_DHT_RENEWAL_TIMEOUT,
+        publicNodes
+      }
+    )
 
-//     const usedRelays = entryNodes.getUsedRelayAddresses()
-//     assert(usedRelays.length == 0)
+    entryNodes.start()
 
-//     entryNodes.stop()
-//   })
+    publicNodes.emit('addPublicNode', relay)
 
-//   it('events should trigger actions', async function () {
-//     const network = createFakeNetwork()
+    await new Promise((resolve) => setTimeout(resolve, 1e3))
 
-//     const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
-//     const relayListener = network.listen(relay.multiaddrs[0].toString())
+    // depends on scheduler
+    assert([9, 10].includes(renews), `Should capture at least 9 renews but not more than 10`)
 
-//     const publicNodes = new EventEmitter() as PublicNodesEmitter
-//     const entryNodes = new TestingEntryNodes(
-//       peerId,
-//       async (ma: Multiaddr) => (await network.connect(ma.toString())) as any,
-//       {
-//         publicNodes
-//       }
-//     )
+    connectEmitter.removeAllListeners()
+    entryNodes.stop()
+    network.stop()
+  })
 
-//     entryNodes.start()
+  it('do not contact nodes we are already connected to', async function () {
+    const entryNodes = new TestingEntryNodes(
+      peerId,
+      {
+        connectionManager: new FakeConnectionManager(true)
+      },
+      // Make sure that call is indeed asynchronous
+      (async () => new Promise((resolve) => setImmediate(resolve))) as any,
+      {}
+    )
 
-//     publicNodes.emit('addPublicNode', relay)
+    const ma = new Multiaddr('/ip4/8.8.8.8/tcp/9091')
 
-//     await once(entryNodes, RELAY_CHANGED_EVENT)
+    const peerStoreEntry = getPeerStoreEntry(ma.toString())
 
-//     publicNodes.emit('removePublicNode', relay.id)
+    entryNodes.usedRelays.push({
+      relayDirectAddress: ma,
+      ourCircuitAddress: new Multiaddr(
+        `/p2p/${peerStoreEntry.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`
+      )
+    })
 
-//     await once(entryNodes, RELAY_CHANGED_EVENT)
+    entryNodes.start()
 
-//     entryNodes.once(RELAY_CHANGED_EVENT, () => assert.fail('Must not throw the relay:changed event'))
+    entryNodes.onNewRelay(peerStoreEntry)
 
-//     await entryNodes.updatePublicNodes()
+    const uncheckedNodes = entryNodes.getUncheckedEntryNodes()
 
-//     relayListener.removeAllListeners()
-//     entryNodes.stop()
-//     network.close()
-//   })
+    assert(uncheckedNodes.length == 1, `Unchecked nodes must contain one entry`)
+    assert(uncheckedNodes[0].id.equals(peerStoreEntry.id), `id must match the generated one`)
+    assert(uncheckedNodes[0].multiaddrs.length == peerStoreEntry.multiaddrs.length, `must not contain more multiaddrs`)
 
-//   it('renew DHT entry', async function () {
-//     const network = createFakeNetwork()
+    const usedRelays = entryNodes.getUsedRelayAddresses()
+    assert(usedRelays.length == 1, `must not expose any relay addrs`)
 
-//     const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
+    entryNodes.stop()
+  })
 
-//     const connectEmitter = network.listen(relay.multiaddrs[0].toString())
+  // it('reconnect on disconnect - temporarily offline', async function () {
+  //   const network = createFakeNetwork()
 
-//     let renews = 0
+  //   const relay = getPeerStoreEntry(`/ip4/1.2.3.4/tcp/1`)
+  //   const relayListener = network.listen(relay.multiaddrs[0].toString())
 
-//     connectEmitter.on('connected', () => renews++)
+  //   let secondAttempt = defer<void>()
+  //   let connectAttempt = 0
+  //   const entryNodes = new TestingEntryNodes(
+  //     peerId,
+  //     {
+  //       connectionManager: new FakeConnectionManager(true)
+  //     },
+  //     (async (ma: Multiaddr, opts: any) => {
+  //       switch (connectAttempt++) {
+  //         case 0:
+  //           return network.connect(ma, opts)
+  //         case 1:
+  //           return
+  //         case 2:
+  //           secondAttempt.resolve()
+  //           return network.connect(ma, opts)
+  //         default:
+  //           return
+  //       }
+  //     }) as any,
+  //     // Should be successful after second try
+  //     {
+  //       entryNodeReconnectBaseTimeout: 1,
+  //       entryNodeReconnectBackoff: 5
+  //     }
+  //   )
 
-//     const publicNodes: PublicNodesEmitter = new EventEmitter()
+  //   entryNodes.start()
 
-//     const CUSTOM_DHT_RENEWAL_TIMEOUT = 100 // very short timeout
+  //   const updated = once(entryNodes, RELAY_CHANGED_EVENT)
 
-//     const entryNodes = new TestingEntryNodes(
-//       peerId,
-//       async (ma: Multiaddr) => (await network.connect(ma.toString())) as any,
-//       {
-//         dhtRenewalTimeout: CUSTOM_DHT_RENEWAL_TIMEOUT,
-//         publicNodes
-//       }
-//     )
+  //   entryNodes.onNewRelay(relay)
 
-//     entryNodes.start()
+  //   await updated
 
-//     publicNodes.emit('addPublicNode', relay)
+  //   // Should eventually remove relay from list
+  //   network.close(relay.multiaddrs[0])
 
-//     await new Promise((resolve) => setTimeout(resolve, 1e3))
+  //   await secondAttempt.promise
 
-//     // depends on scheduler
-//     assert([9, 10].includes(renews), `Should capture at least 9 renews but not more than 10`)
+  //   // Wait for end of event loop
+  //   await new Promise((resolve) => setImmediate(resolve))
 
-//     connectEmitter.removeAllListeners()
-//     entryNodes.stop()
-//     network.close()
-//   })
+  //   const availablePublicNodes = entryNodes.getAvailabeEntryNodes()
+  //   assert(availablePublicNodes.length == 1, `must keep entry node after reconnect`)
 
-//   it('do not contact nodes we are already connected to', async function () {
-//     const entryNodes = new TestingEntryNodes(
-//       peerId,
-//       // Make sure that call is indeed asynchronous
-//       (async () => new Promise((resolve) => setImmediate(resolve))) as any,
-//       {}
-//     )
+  //   const usedRelays = entryNodes.getUsedRelayAddresses()
+  //   assert(usedRelays.length == 1, `must keep relay address after reconnect`)
 
-//     const ma = new Multiaddr('/ip4/8.8.8.8/tcp/9091')
+  //   relayListener.removeAllListeners()
+  //   entryNodes.stop()
+  // })
 
-//     const peerStoreEntry = getPeerStoreEntry(ma.toString())
+  // it('reconnect on disconnect - permanently offline', async function () {
+  //   const network = createFakeNetwork()
 
-//     entryNodes.usedRelays.push({
-//       relayDirectAddress: ma,
-//       ourCircuitAddress: new Multiaddr(
-//         `/p2p/${peerStoreEntry.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`
-//       )
-//     })
+  //   const relay = getPeerStoreEntry(`/ip4/1.2.3.4/tcp/1`)
+  //   const relayListener = network.listen(relay.multiaddrs[0].toString())
 
-//     entryNodes.start()
+  //   let connectAttempt = 0
 
-//     entryNodes.onNewRelay(peerStoreEntry)
+  //   const entryNodes = new TestingEntryNodes(
+  //     peerId,
+  //     {
+  //       connectionManager: new FakeConnectionManager(true)
+  //     },
+  //     (async (ma: Multiaddr, opts: any) => {
+  //       switch (connectAttempt++) {
+  //         case 0:
+  //           return network.connect(ma, opts)
+  //         default:
+  //           return
+  //       }
+  //     }) as any,
+  //     // Should fail after second try
+  //     {
+  //       entryNodeReconnectBaseTimeout: 1,
+  //       entryNodeReconnectBackoff: 5
+  //     }
+  //   )
 
-//     const uncheckedNodes = entryNodes.getUncheckedEntryNodes()
+  //   entryNodes.start()
 
-//     assert(uncheckedNodes.length == 1, `Unchecked nodes must contain one entry`)
-//     assert(uncheckedNodes[0].id.equals(peerStoreEntry.id), `id must match the generated one`)
-//     assert(uncheckedNodes[0].multiaddrs.length == peerStoreEntry.multiaddrs.length, `must not contain more multiaddrs`)
+  //   const firstUpdate = once(entryNodes, RELAY_CHANGED_EVENT)
 
-//     const usedRelays = entryNodes.getUsedRelayAddresses()
-//     assert(usedRelays.length == 1, `must not expose any internal addrs`)
+  //   entryNodes.onNewRelay(relay)
 
-//     entryNodes.stop()
-//   })
-// })
+  //   await firstUpdate
+
+  //   const secondUpdate = once(entryNodes, RELAY_CHANGED_EVENT)
+
+  //   // Should eventually remove relay from list
+  //   network.close(relay.multiaddrs[0])
+
+  //   await secondUpdate
+
+  //   const availablePublicNodes = entryNodes.getAvailabeEntryNodes()
+  //   assert(availablePublicNodes.length == 0, `must remove node from public nodes`)
+
+  //   const usedRelays = entryNodes.getUsedRelayAddresses()
+  //   assert(usedRelays == undefined || usedRelays.length == 0, `must not expose any relay addrs`)
+
+  //   relayListener.removeAllListeners()
+  //   entryNodes.stop()
+  // })
+})
