@@ -78,10 +78,10 @@ const sidebars = {
       ]
     },
     {
-       type: 'category',
-       label: 'dApps',
-       items: ['dapps/myne-chat'],
-     },
+      type: 'category',
+      label: 'dApps',
+      items: ['dapps/myne-chat']
+    },
     /*{
         type: 'doc',
   id: 'staking',
