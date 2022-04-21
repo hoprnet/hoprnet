@@ -39,6 +39,10 @@
     "version_major": "1",
     "version_minor": "88"
   },
+  "debug-small": {
+    "git_ref": "^debug-small/.*",
+    "environment_id": "debug-xdai"
+  },
   "debug-goerli": {
     "git_ref": "^debug-deploy/.*",
     "environment_id": "debug-goerli"
