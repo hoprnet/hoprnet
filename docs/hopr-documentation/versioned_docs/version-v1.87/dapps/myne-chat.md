@@ -3,21 +3,21 @@ id: myne-chat
 title: myne.chat (alpha version)
 ---
 
-myne.chat is the first dApp built on top of the HOPR protocol. This alpha version will let you run a localized version where you can test how myne works in ideal conditions. 
+myne.chat is the first dApp built on top of the HOPR protocol. This alpha version will let you run a localized version where you can test how myne works in ideal conditions.
 
 This tutorial will walk you through running a local cluster with five instances of myne.chat. You can then share myne.chat links with your friends or colleagues and start chatting.
 
-Note that although this version of myne.chat uses the HOPR protocol, it is not fully private, because: 
+Note that although this version of myne.chat uses the HOPR protocol, it is not fully private, because:
 
 - the small network provides minimal mixing
-- there is no cover traffic 
+- there is no cover traffic
 - the person who sets up the cluster and distributes the links can use them to enter any instance and read the conversations.
 
 Please inform your friends or colleagues of this before sharing the links.
 
 ## How to start a chat?
 
-Before starting your localized network, make sure you have registered an account on [https://github.com](https://github.com) 
+Before starting your localized network, make sure you have registered an account on [https://github.com](https://github.com)
 
 Start a localized network with the help of gitpod: [https://gitpod.io/#https://github.com/hoprnet/myne-chat](https://gitpod.io/#https://github.com/hoprnet/myne-chat)
 
@@ -55,7 +55,7 @@ These links will not work for you, because you will be running your own localize
 
 **MyneChat**: [https://8080-hoprnet-mynechat-b4ssakdaol7.ws-eu39b.gitpod.io/?httpEndpoint=https://13301-hoprnet-mynechat-b4ssakdaol7.ws-eu39b.gitpod.io&wsEndpoint=wss://19501-hoprnet-mynechat-b4ssakdaol7.ws-eu39b.gitpod.io&securityToken=^^LOCAL-testing-123^^](https://8080-hoprnet-mynechat-b4ssakdaol7.ws-eu39b.gitpod.io/?httpEndpoint=https://13301-hoprnet-mynechat-b4ssakdaol7.ws-eu39b.gitpod.io&wsEndpoint=wss://19501-hoprnet-mynechat-b4ssakdaol7.ws-eu39b.gitpod.io&securityToken=^^LOCAL-testing-123^^)
 
-**Rest API**: [https://13301-hoprnet-mynechat-b4ssakdaol7.ws-eu39b.gitpod.io/api/v2/_swagger](https://13301-hoprnet-mynechat-b4ssakdaol7.ws-eu39b.gitpod.io/api/v2/_swagger)
+**Rest API**: [https://13301-hoprnet-mynechat-b4ssakdaol7.ws-eu39b.gitpod.io/api/v2/\_swagger](https://13301-hoprnet-mynechat-b4ssakdaol7.ws-eu39b.gitpod.io/api/v2/_swagger)
 
 **Admin UI**: [https://19501-hoprnet-mynechat-b4ssakdaol7.ws-eu39b.gitpod.io/](https://19501-hoprnet-mynechat-b4ssakdaol7.ws-eu39b.gitpod.io/)
 
@@ -69,7 +69,7 @@ Congrats! You have launched the Alex MyneChat app locally! Now you can share the
 
 ## How does chat work?
 
-Every MyneChat user has their own **User Peer ID**. This is how you connect with each other. 
+Every MyneChat user has their own **User Peer ID**. This is how you connect with each other.
 To see Alex’s peer ID, navigate to the top left corner and select the bars icon.
 
 ![first dapp myne chat](/img/dapps/myne-chat-alpha-7.jpg)

@@ -46,13 +46,9 @@ const FeatureList = [
   },
   {
     title: 'dApps',
-    Svg: <img class="svg_icon" src={'/img/front_icons/hopr-dapps.svg'}/>,
-    description: (
-      <>
-        Documentations and guides of dApps built on HOPR.
-      </>
-    ),
-        docName: ('dapps/myne-chat'),
+    Svg: <img class="svg_icon" src={'/img/front_icons/hopr-dapps.svg'} />,
+    description: <>Documentations and guides of dApps built on HOPR.</>,
+    docName: 'dapps/myne-chat'
   },
   /*{
     title: 'Ecosystem',
