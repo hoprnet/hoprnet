@@ -170,7 +170,7 @@ export class EntryNodes extends EventEmitter {
             const result = await this.connectToRelay(peer, usedRelay.relayDirectAddress, ENTRY_NODE_CONTACT_TIMEOUT)
             log(
               `Reconnect attempt ${attempt} to entry node ${peer.toB58String()} was ${
-                result.entry.latency >= 0 ? 'succesful' : 'not successful'
+                result.entry.latency >= 0 ? 'successful' : 'not successful'
               }`
             )
 
@@ -190,8 +190,8 @@ export class EntryNodes extends EventEmitter {
           if (err.message !== KNOWN_DISCONNECT_ERROR) {
             throw err
           } else {
-            // Remove relay because we certainly can't connect to it
-            this.onRemoveRelay(peer)
+            //this.onRemoveRelay(peer)
+            log(`connection to relay ${peer.toB58String()} failed permanently`)
           }
         })
 
