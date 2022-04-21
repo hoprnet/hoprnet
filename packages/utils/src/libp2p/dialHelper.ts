@@ -154,7 +154,7 @@ async function establishNewConnection(
     conn = await libp2p.dial(destination, { signal: opts.signal })
   } catch (err) {
     logError(
-      `Error while establising relayed connection using ${
+      `Error while establishing relayed connection using ${
         PeerId.isPeerId(destination) ? destination.toB58String() : destination.toString()
       }.`
     )

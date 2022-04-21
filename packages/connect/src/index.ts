@@ -262,6 +262,8 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
       `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshake.`
     )
 
+    maConn.conn.setKeepAlive(true, 1000)
+
     const conn = await this._upgradeOutbound(maConn)
 
     // Assign disconnect handler once we're sure that public keys match,
