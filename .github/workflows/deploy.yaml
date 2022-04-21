@@ -9,7 +9,7 @@ env:
 
 on:
   push:
-    branches: ['integration/**', 'master', 'release/**', 'avado', 'debug-deploy/**']
+    branches: ['integration/**', 'master', 'release/**', 'avado', 'debug-deploy/**', 'debug-small/**']
     paths-ignore:
       - '.processes/**/*'
       - 'docs/**/*'
@@ -180,6 +180,8 @@ jobs:
     name: Build HOPRD NAT Docker
     runs-on: ubuntu-latest
     needs: [build_deploy_sc_npm]
+    # Do not build for debug-small/**
+    if: ${{ ! startsWith(github.ref, 'refs/heads/debug-small/')) }}
     steps:
       - uses: actions/checkout@v2
         with:
@@ -220,6 +222,8 @@ jobs:
     name: Build HOPR cover traffic daemon docker
     runs-on: ubuntu-latest
     needs: [build_deploy_sc_npm]
+    # Do not build for debug-small/**
+    if: ${{ ! startsWith(github.ref, 'refs/heads/debug-small/')) }}
     steps:
       - uses: actions/checkout@v2
         with:
@@ -259,7 +263,7 @@ jobs:
   avado:
     name: Build Avado (master or release pushes)
     runs-on: ubuntu-latest
-    needs: [build_deploy_sc_npm,build_hoprd_docker]
+    needs: [build_deploy_sc_npm, build_hoprd_docker]
     steps:
       - uses: actions/checkout@v2
 
@@ -374,7 +378,9 @@ jobs:
   deploy_nat_instances:
     name: 'Continuous Deployment: Deploy NAT instances'
     runs-on: ubuntu-latest
-    needs: [build_hoprd_nat_docker]
+    needs: [deploy_public_instances]
+    # Do not deploy for debug-small/**
+    if: ${{ ! startsWith(github.ref, 'refs/heads/debug-small/')) }}
     steps:
       - uses: actions/checkout@v2
         with:
