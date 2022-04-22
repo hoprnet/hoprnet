@@ -190,8 +190,9 @@ export class EntryNodes extends EventEmitter {
           if (err.message !== KNOWN_DISCONNECT_ERROR) {
             throw err
           } else {
+            // Keep the entry node on the list, to avoid losing information about ALL of them
             //this.onRemoveRelay(peer)
-            log(`connection to relay ${peer.toB58String()} failed permanently`)
+            error(`Re-connection to relay ${peer.toB58String()} failed.`)
           }
         })
 
