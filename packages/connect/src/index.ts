@@ -270,29 +270,27 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
 
     maConn.conn.setKeepAlive(true, 1000)
 
-    maConn.conn.on('end', function() {
-      log(`SOCKET END on connection to ${maConn.remoteAddr.toString()}:  other end of the socket sent a FIN packet`);
-    });
+    maConn.conn.on('end', function () {
+      log(`SOCKET END on connection to ${maConn.remoteAddr.toString()}:  other end of the socket sent a FIN packet`)
+    })
 
-    maConn.conn.on('timeout', function() {
-      warn(`SOCKET TIMEOUT on connection to ${maConn.remoteAddr.toString()}`);
-    });
+    maConn.conn.on('timeout', function () {
+      warn(`SOCKET TIMEOUT on connection to ${maConn.remoteAddr.toString()}`)
+    })
 
-    maConn.conn.on('error', function(e) {
-      error(`SOCKET ERROR on connection to ${maConn.remoteAddr.toString()}: ' ${JSON.stringify(e)}`);
-    });
+    maConn.conn.on('error', function (e) {
+      error(`SOCKET ERROR on connection to ${maConn.remoteAddr.toString()}: ' ${JSON.stringify(e)}`)
+    })
 
     maConn.conn.on('close', (had_error) => {
-      log(`SOCKET CLOSE on connection to ${maConn.remoteAddr.toString()}: error flag is ${had_error}`);
+      log(`SOCKET CLOSE on connection to ${maConn.remoteAddr.toString()}: error flag is ${had_error}`)
       // Don't call the disconnect handler if connection has been closed intentionally
       if (!maConn.closed && options && options.onDisconnect) {
-          options.onDisconnect(ma)
+        options.onDisconnect(ma)
       }
     })
 
-    verbose(
-      `Direct connection to ${maConn.remoteAddr.toString()} has been established successfully!`
-    )
+    verbose(`Direct connection to ${maConn.remoteAddr.toString()} has been established successfully!`)
 
     return conn
   }
