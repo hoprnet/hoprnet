@@ -268,6 +268,7 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
     // Assign various connection properties once we're sure that public keys match,
     // i.e. dialed node == desired destination
 
+    // Set the SO_KEEPALIVE flag on socket to tell kernel to be more aggressive on keeping the connection up
     maConn.conn.setKeepAlive(true, 1000)
 
     maConn.conn.on('end', function () {
