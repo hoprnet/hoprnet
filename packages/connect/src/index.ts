@@ -22,6 +22,7 @@ import type {
 const DEBUG_PREFIX = 'hopr-connect'
 const log = Debug(DEBUG_PREFIX)
 const verbose = Debug(DEBUG_PREFIX.concat(':verbose'))
+const warn = Debug(DEBUG_PREFIX.concat(':warn'))
 const error = Debug(DEBUG_PREFIX.concat(':error'))
 
 type HoprConnectConfig = {
@@ -264,17 +265,33 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
 
     const conn = await this._upgradeOutbound(maConn)
 
-    // Assign disconnect handler once we're sure that public keys match,
+    // Assign various connection properties once we're sure that public keys match,
     // i.e. dialed node == desired destination
-    if (options && options.onDisconnect) {
-      maConn.conn.on('close', () => {
-        // Don't call the disconnect handler if connection has been closed intentionally
-        if (maConn.closed) {
-          return
-        }
-        options.onDisconnect!(ma)
-      })
-    }
+
+    // Set the SO_KEEPALIVE flag on socket to tell kernel to be more aggressive on keeping the connection up
+    maConn.conn.setKeepAlive(true, 1000)
+
+    maConn.conn.on('end', function () {
+      log(`SOCKET END on connection to ${maConn.remoteAddr.toString()}:  other end of the socket sent a FIN packet`)
+    })
+
+    maConn.conn.on('timeout', function () {
+      warn(`SOCKET TIMEOUT on connection to ${maConn.remoteAddr.toString()}`)
+    })
+
+    maConn.conn.on('error', function (e) {
+      error(`SOCKET ERROR on connection to ${maConn.remoteAddr.toString()}: ' ${JSON.stringify(e)}`)
+    })
+
+    maConn.conn.on('close', (had_error) => {
+      log(`SOCKET CLOSE on connection to ${maConn.remoteAddr.toString()}: error flag is ${had_error}`)
+      // Don't call the disconnect handler if connection has been closed intentionally
+      if (!maConn.closed && options && options.onDisconnect) {
+        options.onDisconnect(ma)
+      }
+    })
+
+    verbose(`Direct connection to ${maConn.remoteAddr.toString()} has been established successfully!`)
 
     return conn
   }

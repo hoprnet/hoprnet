@@ -48,6 +48,7 @@ process.on('unhandledRejection', (reason: any, _promise: Promise<any>) => {
 
     // Only silence very specific errors
     if (msgString.match(/write ECONNRESET/) || msgString.match(/The operation was aborted/)) {
+      console.error('Unhandled promise rejection silenced')
       return
     }
   }
