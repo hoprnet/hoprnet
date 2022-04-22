@@ -218,8 +218,7 @@ class NetworkPeers {
       const quality = this.qualityOf(peer)
       if (quality.toFixed(1) === '1.0') {
         bestAvailabilityNodes++
-      }
-      else if (quality < NETWORK_QUALITY_THRESHOLD) {
+      } else if (quality < NETWORK_QUALITY_THRESHOLD) {
         badAvailabilityNodes++
       }
 
