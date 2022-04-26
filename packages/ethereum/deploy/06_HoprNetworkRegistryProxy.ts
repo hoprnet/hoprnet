@@ -20,7 +20,7 @@ const main = async function (hre: HardhatRuntimeEnvironment) {
         await deployments.deploy('HoprStakingProxyForNetworkRegistry', {
           from: deployer.address,
           log: true,
-          args: [environmentConfig['stake_v2_contract_address'], adminAddress, MIN_STAKE]
+          args: [environmentConfig['stake_contract_address'], adminAddress, MIN_STAKE]
         })
       : // deploy "HoprDummyProxyForNetworkRegistry" contract for the rest
         await deployments.deploy('HoprDummyProxyForNetworkRegistry', {
