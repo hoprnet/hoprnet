@@ -285,7 +285,7 @@ class Relay {
 
           // Initiate the DHT query but does not await the result which easily
           // takes more than 10 seconds
-          ;(async function (this: Relay) {
+          ;(async function(this: Relay) {
             try {
               const key = await createRelayerKey(conn.connection.remotePeer)
 
@@ -305,7 +305,7 @@ class Relay {
     }
   }
 
-  private onRelay(conn: HandlerProps) {
+  private async onRelay(conn: HandlerProps) {
     if (conn.connection == undefined || conn.connection.remotePeer == undefined) {
       verbose(`Received incomplete connection object`)
       return
@@ -316,11 +316,16 @@ class Relay {
     log(`handling relay request from ${conn.connection.remotePeer.toB58String()}`)
     log(`relayed connection count: ${this.relayState.relayedConnectionCount()}`)
 
-    if (this.relayState.relayedConnectionCount() >= (this.options.maxRelayedConnections as number)) {
-      log(`relayed request rejected, already at max capacity (${this.options.maxRelayedConnections as number})`)
-      shaker.reject(RelayHandshakeMessage.FAIL_RELAY_FULL)
-    } else {
-      shaker.negotiate(conn.connection.remotePeer, this._dialNodeDirectly as Relay['dialNodeDirectly'], this.relayState)
+    try {
+      if (this.relayState.relayedConnectionCount() >= (this.options.maxRelayedConnections as number)) {
+        log(`relayed request rejected, already at max capacity (${this.options.maxRelayedConnections as number})`)
+        await shaker.reject(RelayHandshakeMessage.FAIL_RELAY_FULL)
+      } else {
+        await shaker.negotiate(conn.connection.remotePeer, this._dialNodeDirectly as Relay['dialNodeDirectly'], this.relayState)
+      }
+    }
+    catch (e) {
+      error(`Error while processing relay request from ${conn.connection.remotePeer.toB58String()}: ${e}`)
     }
   }
 

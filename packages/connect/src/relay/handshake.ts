@@ -280,7 +280,7 @@ class RelayHandshake {
           )
         } catch (err) {
           error(
-            `Cannot established relayed connection between ${destination.toB58String()} and ${source.toB58String()}`,
+            `Cannot establish relayed connection between ${destination.toB58String()} and ${source.toB58String()}`,
             err
           )
           // @TODO find a way how to forward the error to source and destination
