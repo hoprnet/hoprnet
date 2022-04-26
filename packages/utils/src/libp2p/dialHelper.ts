@@ -272,9 +272,13 @@ async function doDial(
   const knownAddressesForPeer = await libp2p.peerStore.addressBook.get(destination)
   if (knownAddressesForPeer.length > 0) {
     // Let's try using the known addresses by connecting directly
+    log(`There are ${knownAddressesForPeer.length} already known addresses for ${destination.toB58String()}:`)
+    for (const address in knownAddressesForPeer) {
+      log(`- ${address}`)
+    }
     struct = await establishNewConnection(libp2p, destination, protocol, opts)
     if (struct) {
-      log(`Successfully reached ${destination.toB58String()} via direct connection !`)
+      log(`Successfully reached ${destination.toB58String()} via already known addresses !`)
       return { status: DialStatus.SUCCESS, resp: struct }
     }
   }
@@ -294,7 +298,7 @@ async function doDial(
   }
 
   // Try to get some fresh addresses from the DHT
-  log(`Could not reach ${destination.toB58String()} directly, querying DHT for more addresses...`)
+  log(`Could not reach ${destination.toB58String()} using known addresses, querying DHT for more addresses...`)
   const dhtResult = await queryDHT(libp2p, destination, {
     ...opts,
     signal: undefined
@@ -309,8 +313,8 @@ async function doDial(
     return { status: DialStatus.DHT_ERROR, query: destination.toB58String() }
   }
 
-  // Use the existing set of known addresses
-  const knownAddressSet = new Set(knownAddressesForPeer
+  // Take all the known circuit addresses from the existing set of known addresses
+  const knownCircuitAddressSet = new Set(knownAddressesForPeer
     .map((address) => address.multiaddr)
     .filter((address) => {
       const tuples = address.tuples()
@@ -324,16 +328,19 @@ async function doDial(
     conn: Connection
   }
 
-  log(`Proceeding to try ${dhtResult.length} relays to reach ${destination.toB58String()}`)
+  // Filter out the circuit addresses that were tried using the previous attempt
+  const circuitsNotTriedYet = dhtResult
+    .map((relay) => createCircuitAddress(relay, destination))
+    .filter((circuitAddr) => !knownCircuitAddressSet.has(circuitAddr.toString()));
 
-  for (const relay of dhtResult) {
-    const circuitAddress = createCircuitAddress(relay, destination)
+  log(`Proceeding to try with ${circuitsNotTriedYet.length} new relays to reach ${destination.toB58String()}...`)
 
-    if (!knownAddressSet.has(circuitAddress.toString())) {
+  for (const circuitAddress of circuitsNotTriedYet) {
+
       // Share new knowledge about peer with Libp2p's peerStore
       await libp2p.peerStore.addressBook.add(destination, [circuitAddress])
 
-      log(`Trying to reach ${destination.toB58String()} via ${relay.toB58String()}...`)
+      log(`Trying to reach ${destination.toB58String()} via circuit ${circuitAddress}...`)
 
       relayStruct = await establishNewConnection(libp2p, circuitAddress, protocol, {
         ...opts,
@@ -342,11 +349,11 @@ async function doDial(
 
       // Return if we were successful
       if (relayStruct) {
-        log(`Successfully reached ${destination.toB58String()} via ${relay.toB58String()} !`)
+        log(`Successfully reached ${destination.toB58String()} via circuit ${circuitAddress} !`)
         return { status: DialStatus.SUCCESS, resp: relayStruct }
       }
-    }
   }
+
 
   return { status: DialStatus.DIAL_ERROR, dhtContacted: true }
 }
