@@ -285,7 +285,7 @@ class Relay {
 
           // Initiate the DHT query but does not await the result which easily
           // takes more than 10 seconds
-          ;(async function(this: Relay) {
+          ;(async function (this: Relay) {
             try {
               const key = await createRelayerKey(conn.connection.remotePeer)
 
@@ -321,10 +321,13 @@ class Relay {
         log(`relayed request rejected, already at max capacity (${this.options.maxRelayedConnections as number})`)
         await shaker.reject(RelayHandshakeMessage.FAIL_RELAY_FULL)
       } else {
-        await shaker.negotiate(conn.connection.remotePeer, this._dialNodeDirectly as Relay['dialNodeDirectly'], this.relayState)
+        await shaker.negotiate(
+          conn.connection.remotePeer,
+          this._dialNodeDirectly as Relay['dialNodeDirectly'],
+          this.relayState
+        )
       }
-    }
-    catch (e) {
+    } catch (e) {
       error(`Error while processing relay request from ${conn.connection.remotePeer.toB58String()}: ${e}`)
     }
   }
