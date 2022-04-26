@@ -321,8 +321,8 @@ class Relay {
         log(`relayed request rejected, already at max capacity (${this.options.maxRelayedConnections as number})`)
         await shaker.reject(RelayHandshakeMessage.FAIL_RELAY_FULL)
       } else {
-        // This cannot be awaited, otherwise it stalls the relay loop. Therefore promise rejections must be handled downstream,
-        // to avoid unhandled promise rejection crashes
+        // NOTE: This cannot be awaited, otherwise it stalls the relay loop. Therefore, promise rejections must
+        // be handled downstream to avoid unhandled promise rejection crashes
         shaker.negotiate(
           conn.connection.remotePeer,
           this._dialNodeDirectly as Relay['dialNodeDirectly'],
