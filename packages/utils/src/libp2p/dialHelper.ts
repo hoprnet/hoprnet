@@ -149,7 +149,11 @@ async function establishNewConnection(
 
   opts.signal?.addEventListener('abort', onAbort)
 
-  log(`Trying to establish connection to ${PeerId.isPeerId(destination) ? destination.toB58String() : destination.toString()}`)
+  log(
+    `Trying to establish connection to ${
+      PeerId.isPeerId(destination) ? destination.toB58String() : destination.toString()
+    }`
+  )
 
   let conn: Connection
   try {
@@ -281,8 +285,7 @@ async function doDial(
       log(`Successfully reached ${destination.toB58String()} via already known addresses !`)
       return { status: DialStatus.SUCCESS, resp: struct }
     }
-  }
-  else {
+  } else {
     log(`No currently known addresses for peer ${destination.toB58String()}`)
   }
 
@@ -314,13 +317,15 @@ async function doDial(
   }
 
   // Take all the known circuit addresses from the existing set of known addresses
-  const knownCircuitAddressSet = new Set(knownAddressesForPeer
-    .map((address) => address.multiaddr)
-    .filter((address) => {
-      const tuples = address.tuples()
-      return tuples[0][0] == CODE_P2P
-    })
-    .map((address) => address.toString()))
+  const knownCircuitAddressSet = new Set(
+    knownAddressesForPeer
+      .map((address) => address.multiaddr)
+      .filter((address) => {
+        const tuples = address.tuples()
+        return tuples[0][0] == CODE_P2P
+      })
+      .map((address) => address.toString())
+  )
 
   let relayStruct: {
     stream: MuxedStream
