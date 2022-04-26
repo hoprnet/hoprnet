@@ -273,8 +273,8 @@ function addUnhandledPromiseRejectionHandler() {
   require('trace-unhandled/register')
   setLogger((msg) => {
     console.error(msg)
-    //process.exit(1)
   })
+
   // See https://github.com/hoprnet/hoprnet/issues/3755
   process.on('unhandledRejection', (reason: any, _promise: Promise<any>) => {
     if (reason.message && reason.message.toString) {
@@ -289,7 +289,7 @@ function addUnhandledPromiseRejectionHandler() {
 
     console.warn('UnhandledPromiseRejectionWarning')
     console.log(reason)
-    //process.exit(1)
+    process.exit(1)
   })
 }
 
