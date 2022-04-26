@@ -18,7 +18,7 @@ const DEBUG_PREFIX = `hopr-core:libp2p`
 const log = debug(DEBUG_PREFIX)
 const logError = debug(DEBUG_PREFIX.concat(`:error`))
 
-const DEFAULT_DHT_QUERY_TIMEOUT = 10000
+const DEFAULT_DHT_QUERY_TIMEOUT = 20000
 
 export enum DialStatus {
   SUCCESS = 'SUCCESS',
@@ -149,12 +149,14 @@ async function establishNewConnection(
 
   opts.signal?.addEventListener('abort', onAbort)
 
+  log(`Trying to establish connection to ${PeerId.isPeerId(destination) ? destination.toB58String() : destination.toString()}`)
+
   let conn: Connection
   try {
     conn = await libp2p.dial(destination, { signal: opts.signal })
   } catch (err) {
     logError(
-      `Error while establishing relayed connection using ${
+      `Error while establishing connection to ${
         PeerId.isPeerId(destination) ? destination.toB58String() : destination.toString()
       }.`
     )
@@ -166,6 +168,8 @@ async function establishNewConnection(
   if (!conn) {
     return
   }
+
+  log(`Connection ${PeerId.isPeerId(destination) ? destination.toB58String() : destination.toString()} established !`)
 
   const stream = (await timeout(10000, () => conn.newStream(protocol)))?.stream
 
@@ -257,22 +261,30 @@ async function doDial(
   protocol: string,
   opts: Required<TimeoutOpts>
 ): Promise<DialResponse> {
+  // First let's try already existing connections
   let struct = await tryExistingConnections(libp2p, destination, protocol)
-
-  if (!struct) {
-    const knownAddresses = await libp2p.peerStore.addressBook.get(destination)
-
-    if (knownAddresses.length > 0) {
-      struct = await establishNewConnection(libp2p, destination, protocol, opts)
-    }
-  }
-
   if (struct) {
+    log(`Successfully reached ${destination.toB58String()} via existing connection !`)
     return { status: DialStatus.SUCCESS, resp: struct }
   }
 
-  // Stop if there is no DHT available
-  if (!struct && libp2p.contentRouting.routers.length == 0) {
+  // Fetch known addresses for the given destination peer
+  const knownAddressesForPeer = await libp2p.peerStore.addressBook.get(destination)
+  if (knownAddressesForPeer.length > 0) {
+    // Let's try using the known addresses by connecting directly
+    struct = await establishNewConnection(libp2p, destination, protocol, opts)
+    if (struct) {
+      log(`Successfully reached ${destination.toB58String()} via direct connection !`)
+      return { status: DialStatus.SUCCESS, resp: struct }
+    }
+  }
+  else {
+    log(`No currently known addresses for peer ${destination.toB58String()}`)
+  }
+
+  // Check if DHT is available
+  if (libp2p.contentRouting.routers.length == 0) {
+    // Stop if there is no DHT available
     await printPeerStoreAddresses(
       `Could not establish a connection to ${destination.toB58String()} and libp2p was started without a DHT. Giving up`,
       destination,
@@ -282,6 +294,7 @@ async function doDial(
   }
 
   // Try to get some fresh addresses from the DHT
+  log(`Could not reach ${destination.toB58String()} directly, querying DHT for more addresses...`)
   const dhtResult = await queryDHT(libp2p, destination, {
     ...opts,
     signal: undefined
@@ -296,43 +309,46 @@ async function doDial(
     return { status: DialStatus.DHT_ERROR, query: destination.toB58String() }
   }
 
-  const knownAddresses = (await libp2p.peerStore.addressBook.get(destination))
+  // Use the existing set of known addresses
+  const knownAddressSet = new Set(knownAddressesForPeer
     .map((address) => address.multiaddr)
     .filter((address) => {
       const tuples = address.tuples()
-
       return tuples[0][0] == CODE_P2P
     })
-
-  const knownAddressSet = new Set(knownAddresses.map((address) => address.toString()))
+    .map((address) => address.toString()))
 
   let relayStruct: {
     stream: MuxedStream
     protocol: string
     conn: Connection
   }
+
+  log(`Proceeding to try ${dhtResult.length} relays to reach ${destination.toB58String()}`)
+
   for (const relay of dhtResult) {
-    const cirtcuitAddress = createCircuitAddress(relay, destination)
+    const circuitAddress = createCircuitAddress(relay, destination)
 
-    if (!knownAddressSet.has(cirtcuitAddress.toString())) {
+    if (!knownAddressSet.has(circuitAddress.toString())) {
       // Share new knowledge about peer with Libp2p's peerStore
-      await libp2p.peerStore.addressBook.add(destination, [cirtcuitAddress])
+      await libp2p.peerStore.addressBook.add(destination, [circuitAddress])
 
-      // Only establish new connection if not yet successful
-      if (!relayStruct) {
-        relayStruct = await establishNewConnection(libp2p, cirtcuitAddress, protocol, {
-          ...opts,
-          signal: undefined
-        })
+      log(`Trying to reach ${destination.toB58String()} via ${relay.toB58String()}...`)
+
+      relayStruct = await establishNewConnection(libp2p, circuitAddress, protocol, {
+        ...opts,
+        signal: undefined
+      })
+
+      // Return if we were successful
+      if (relayStruct) {
+        log(`Successfully reached ${destination.toB58String()} via ${relay.toB58String()} !`)
+        return { status: DialStatus.SUCCESS, resp: relayStruct }
       }
     }
   }
 
-  if (relayStruct) {
-    return { status: DialStatus.SUCCESS, resp: relayStruct }
-  } else {
-    return { status: DialStatus.DIAL_ERROR, dhtContacted: true }
-  }
+  return { status: DialStatus.DIAL_ERROR, dhtContacted: true }
 }
 
 /**
