@@ -6,7 +6,7 @@
       "token_contract_address": "${HARDHAT_TOKEN_CONTACT_ADDRESS}",
       "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}",
       "minted_token_receiver_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
-      "stake_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
+      "stake_contract_address": "0xae933331ef0bE122f9499512d3ed4Fa3896DCf20",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
       "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["development"]
@@ -17,7 +17,7 @@
       "token_contract_address": "${HARDHAT_TOKEN_CONTACT_ADDRESS}",
       "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}",
       "minted_token_receiver_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
-      "stake_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
+      "stake_contract_address": "0xae933331ef0bE122f9499512d3ed4Fa3896DCf20",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
       "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["development"]
@@ -28,7 +28,7 @@
       "token_contract_address": "0xa3C8f4044b30Fb3071F5b3b02913DE524F1041dc",
       "channels_contract_address": "0x7587B259bbe2AdcDc7bFd6FD667Fd440b64c0Aad",
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
-      "stake_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
+      "stake_contract_address": "0x5F1f18E44d29E159366810Fc6C1208E386Ef661F",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
       "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["development"]
@@ -39,7 +39,7 @@
       "token_contract_address": "0xC3Ff0A2C4F404D6a9B31a7ABc2a41E616bd4F34C",
       "channels_contract_address": "0x5daae235eEAeA72D9116702A615c2Be89D00D91b",
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
-      "stake_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
+      "stake_contract_address": "0xae933331ef0bE122f9499512d3ed4Fa3896DCf20",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
       "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["development"]
