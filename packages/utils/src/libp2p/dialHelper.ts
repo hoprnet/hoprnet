@@ -277,7 +277,7 @@ async function doDial(
   if (knownAddressesForPeer.length > 0) {
     // Let's try using the known addresses by connecting directly
     log(`There are ${knownAddressesForPeer.length} already known addresses for ${destination.toB58String()}:`)
-    for (const address in knownAddressesForPeer) {
+    for (const address of knownAddressesForPeer) {
       log(`- ${address}`)
     }
     struct = await establishNewConnection(libp2p, destination, protocol, opts)
