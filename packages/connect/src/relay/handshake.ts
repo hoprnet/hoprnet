@@ -271,6 +271,7 @@ class RelayHandshake {
         destinationShaker.rest()
 
         try {
+          // NOTE: This returns only when the relay connection is terminated
           await state.createNew(
             source,
             destination,

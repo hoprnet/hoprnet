@@ -108,10 +108,12 @@ class RelayState {
 
   /**
    * Creates and stores a new relayed connection
+   * This function returns only when the relay connection is terminated.
    * @param source initiator of the relayed connection
    * @param destination other party of the relayed connection
    * @param toSource duplex stream to source
    * @param toDestination duplex stream to destination
+   * @param __relayFreeTimeout
    */
   async createNew(
     source: PeerId,
