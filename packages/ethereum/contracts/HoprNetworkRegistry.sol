@@ -5,23 +5,37 @@ import '@openzeppelin/contracts/access/Ownable.sol';
 import './IHoprNetworkRegistryRequirement.sol';
 
 /**
- * @dev Allowlist addresses and hopr nodes
+ * @dev Smart contract that maintains a list of multiaddresses of hopr nodes that are allowed
+ * to enter HOPR network. Each node address is linked with an Ethereum account. Only Ethereum
+ * accounts that are eligible according to `IHoprNetworkRegistryRequirement` can register a
+ * HOPR node address. If an account wants to change its registerd HOPR node address, it must
+ * firstly deregister itself before registering new node.
+ *
+ * This network registry can be globally enabled/disabled by the owner
+ *
+ * Implementation of `IHoprNetworkRegistryRequirement` can also be dynamically updated by the
+ * owner. Some sample implementations can be found under../proxy/ folder
+ *
+ * Owner has the power to overwrite the registration
  */
 contract HoprNetworkRegistry is Ownable {
-  IHoprNetworkRegistryRequirement public requirementImplementation;
+  IHoprNetworkRegistryRequirement public requirementImplementation; // Implementation of network registry proxy
   mapping(address => string) public accountToNodeMultiaddr;
   mapping(string => address) public nodeMultiaddrToAccount;
   bool public enabled;
 
-  event EnabledNetworkRegistry(bool indexed isEnabled);
-  event RequirementUpdated(address indexed requirementImplementation);
-  event Registered(address indexed account, string HoprMultiaddr);
-  event RegisteredByOwner(address indexed account, string HoprMultiaddr);
-  event DeregisteredByOwner(address indexed account);
-  event EligibilityUpdated(address indexed account, bool indexed eligibility);
+  event EnabledNetworkRegistry(bool indexed isEnabled); // Global toggle of the network registry
+  event RequirementUpdated(address indexed requirementImplementation); // Emit when the network registry proxy is updated
+  event Registered(address indexed account, string HoprMultiaddr); // Emit when an account register a node address for itself
+  event Deregistered(address indexed account); // Emit when an account deregister a node address for itself
+  event RegisteredByOwner(address indexed account, string HoprMultiaddr); // Emit when the contract owner register a node address for an account
+  event DeregisteredByOwner(address indexed account); // Emit when the contract owner deregister a node address for an account
+  event EligibilityUpdated(address indexed account, bool indexed eligibility); // Emit when the eligibility of an account is updated
 
   /**
-   * Network registry must be globally enabled to proceed
+   * @dev Network registry can be globally toggled. If `enabled === true`, only nodes registered
+   * in this contract with an eligible account associated can join HOPR network; If `!enabled`,
+   * all the nodes can join HOPR network regardless the eligibility of the associated account.
    */
   modifier mustBeEnabled() {
     require(enabled, 'HoprNetworkRegistry: Registry is disabled');
@@ -75,20 +89,53 @@ contract HoprNetworkRegistry is Ownable {
    * @notice It allows msg.sender to update registered node address.
    * @param hoprAddress Hopr nodes id. e.g. 16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x1
    */
-  function selfRegister(string calldata hoprAddress) external mustBeEnabled returns (bool) {
+  function selfRegister(string memory hoprAddress) external mustBeEnabled returns (bool) {
+    require(bytes(hoprAddress).length > 0, 'HoprNetworkRegistry: HOPR node multiaddress must not be empty');
+    // get account associated with the given hopr node address, if any
+    address registeredAccount = nodeMultiaddrToAccount[hoprAddress];
+    // if the hopr node multiaddress was linked to a different account, revert.
+    // To change a nodes' linked account, it must be deregistered by the previously linked account
+    // first before registering by the new account, to prevent hostile takeover of others' node address
+    require(
+      registeredAccount == msg.sender || registeredAccount == address(0),
+      'HoprNetworkRegistry: Cannot link a registered node to a different account'
+    );
+
+    // get multi address associated with the caller, if any
+    bytes memory registeredNodeMultiaddrInBytes = bytes(accountToNodeMultiaddr[msg.sender]);
+    require(
+      registeredNodeMultiaddrInBytes.length == 0 ||
+        keccak256(registeredNodeMultiaddrInBytes) == keccak256(bytes(hoprAddress)),
+      'HoprNetworkRegistry: Cannot link an account to a different node. Please remove the registered node'
+    );
+
     if (requirementImplementation.isRequirementFulfilled(msg.sender)) {
-      accountToNodeMultiaddr[msg.sender] = hoprAddress;
-      nodeMultiaddrToAccount[hoprAddress] = msg.sender;
-      emit Registered(msg.sender, hoprAddress);
+      // only update the list when no record previously exists
+      if (registeredNodeMultiaddrInBytes.length == 0) {
+        accountToNodeMultiaddr[msg.sender] = hoprAddress;
+        nodeMultiaddrToAccount[hoprAddress] = msg.sender;
+        emit Registered(msg.sender, hoprAddress);
+      }
       emit EligibilityUpdated(msg.sender, true);
       return true;
     }
 
-    if (bytes(accountToNodeMultiaddr[msg.sender]).length != 0) {
-      // if the account has a registration entry, keep the entry but update the eligibility
+    // if the account has a registration entry, keep the entry but update the eligibility
+    if (registeredNodeMultiaddrInBytes.length == 0) {
       emit EligibilityUpdated(msg.sender, false);
     }
     return false;
+  }
+
+  /**
+   * @dev Allows when there's already a multi address associated with the caller account, remove the link by deregistering
+   */
+  function selfDeregister() external mustBeEnabled returns (bool) {
+    string memory registeredNodeMultiaddr = accountToNodeMultiaddr[msg.sender];
+    require(bytes(registeredNodeMultiaddr).length > 0, 'HoprNetworkRegistry: Cannot delete an empty entry');
+    delete accountToNodeMultiaddr[msg.sender];
+    delete nodeMultiaddrToAccount[registeredNodeMultiaddr];
+    emit Deregistered(msg.sender);
   }
 
   /**
