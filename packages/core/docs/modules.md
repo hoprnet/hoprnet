@@ -208,7 +208,7 @@ ___
 
 ### HEARTBEAT\_TIMEOUT
 
-• **HEARTBEAT\_TIMEOUT**: ``20000``
+• **HEARTBEAT\_TIMEOUT**: ``30000``
 
 #### Defined in
 
