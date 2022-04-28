@@ -27,7 +27,7 @@ describe(`test HoprEthereum instance creation`, function () {
 describe('test HoprEthereum', function () {
   const connector = new HoprCoreEthereum(dbMock, PARTY_A, stringToU8a(ACCOUNT_A.privateKey), sampleChainOptions)
 
-  it('should test isAllowedAccess', async function () {
+  it('should test isAllowedAccessToNetwork', async function () {
     // @ts-ignore
     connector.db = sinon.stub()
 
@@ -35,36 +35,42 @@ describe('test HoprEthereum', function () {
     const account = Address.createMock()
 
     // should be false by default
-    assert((await connector.isAllowedAccess(hoprNode)) === false, 'hoprNode is not eligible by default')
+    assert((await connector.isAllowedAccessToNetwork(hoprNode)) === false, 'hoprNode is not eligible by default')
 
     // @ts-ignore
-    connector.db.isRegisterEnabled = () => Promise.resolve(false)
-    assert((await connector.isAllowedAccess(hoprNode)) === true, 'should become registered when register is disabled')
+    connector.db.isNetworkRegistryEnabled = () => Promise.resolve(false)
+    assert(
+      (await connector.isAllowedAccessToNetwork(hoprNode)) === true,
+      'should become registered when register is disabled'
+    )
 
     // @ts-ignore
-    connector.db.isRegisterEnabled = () => Promise.resolve(true)
-    assert((await connector.isAllowedAccess(hoprNode)) === false, 'should go back to being not eligible')
+    connector.db.isNetworkRegistryEnabled = () => Promise.resolve(true)
+    assert((await connector.isAllowedAccessToNetwork(hoprNode)) === false, 'should go back to being not eligible')
 
     // @ts-ignore
-    connector.db.getAccountFromRegistry = () => Promise.resolve(account)
+    connector.db.getAccountFromNetworkRegistry = () => Promise.resolve(account)
     // should remain false
-    assert((await connector.isAllowedAccess(hoprNode)) === false, 'eligibility should remain false when not eligible')
+    assert(
+      (await connector.isAllowedAccessToNetwork(hoprNode)) === false,
+      'eligibility should remain false when not eligible'
+    )
 
     // @ts-ignore
     connector.db.isEligible = () => Promise.resolve(true)
     // should be true once is eligible
-    assert((await connector.isAllowedAccess(hoprNode)) === true, 'hoprNode should be eligible')
+    assert((await connector.isAllowedAccessToNetwork(hoprNode)) === true, 'hoprNode should be eligible')
 
     // @ts-ignore
     connector.db.isEligible = () => Promise.resolve(false)
     // should be false once unset
-    assert((await connector.isAllowedAccess(hoprNode)) === false, 'hoprNode should be uneligible')
+    assert((await connector.isAllowedAccessToNetwork(hoprNode)) === false, 'hoprNode should be uneligible')
 
     // @ts-ignore
     connector.db.isEligible = () => Promise.resolve(true)
     // @ts-ignore
-    connector.db.getAccountFromRegistry = () => Promise.reject()
+    connector.db.getAccountFromNetworkRegistry = () => Promise.reject()
     // should be false when registry is removed
-    assert((await connector.isAllowedAccess(hoprNode)) === false, 'hoprNode should not be eligible anymore')
+    assert((await connector.isAllowedAccessToNetwork(hoprNode)) === false, 'hoprNode should not be eligible anymore')
   })
 })

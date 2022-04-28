@@ -483,13 +483,13 @@ export default class HoprCoreEthereum extends EventEmitter {
    * @param hoprNode the public key of the account we want to check if it's registered
    * @returns true if registered
    */
-  public async isAllowedAccess(hoprNode: PublicKey): Promise<boolean> {
+  public async isAllowedAccessToNetwork(hoprNode: PublicKey): Promise<boolean> {
     try {
       // if register is disabled, all nodes are seen as "allowed"
-      const registerEnabled = await this.db.isRegisterEnabled()
+      const registerEnabled = await this.db.isNetworkRegistryEnabled()
       if (!registerEnabled) return true
       // find hoprNode's linked account
-      const account = await this.db.getAccountFromRegistry(hoprNode)
+      const account = await this.db.getAccountFromNetworkRegistry(hoprNode)
       // check if account is eligible
       return this.db.isEligible(account)
     } catch (error) {
