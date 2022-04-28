@@ -1,5 +1,8 @@
 name: build yellowpaper
 
+env:
+  HOPR_GITHUB_REF: ${{ github.ref }}
+
 on:
   push:
     branches: ['master', 'yellowpaper/**']
@@ -22,8 +25,10 @@ jobs:
         run: ./scripts/configure-git-info.sh
 
       - name: Install dependencies
-        run: |
-          sudo apt -y install texlive texlive-latex-extra texlive-science texlive-bibtex-extra latexmk
+        run: >
+          sudo apt -y install
+            texlive texlive-latex-extra texlive-science
+            texlive-bibtex-extra latexmk
 
       - name: Compile LaTeX document
         run: |
