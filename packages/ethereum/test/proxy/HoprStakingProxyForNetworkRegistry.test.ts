@@ -12,6 +12,8 @@ const NFT_TYPE = [1, 2]
 const NFT_RANK = [123, 456]
 const HIGH_STAKE = 2000
 const LOW_STAKE = 100
+const SPECIAL_NFT_TYPE = 3; // 'Dev'
+const SPECIAL_NFT_RANK = 0; // 'Rock'
 
 const createFakeStakeV2Contract = async (participants: string[]) => {
   const stakeV2Fake = await smock.fake([
@@ -86,7 +88,8 @@ const createFakeStakeV2Contract = async (participants: string[]) => {
       stakeV2Fake.stakedHoprTokens.whenCalledWith(participant).returns(LOW_STAKE)
     }
   })
-
+  // participant 2 redeemd a special NFT
+  stakeV2Fake.isNftTypeAndRankRedeemed3.whenCalledWith(SPECIAL_NFT_TYPE, SPECIAL_NFT_RANK, participants[2]).returns(true)
   return stakeV2Fake
 }
 
@@ -247,6 +250,29 @@ describe('Registry proxy for stake v2', () => {
     })
     const canSelfRegister = []
     const cannotSelfRegister = [0, 1, 2, 3, 4, 5]
+
+    canSelfRegister.forEach((accountIndex) => {
+      it(`participant ${accountIndex} is still registered`, async () => {
+        expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[accountIndex])).to
+          .be.true
+      })
+    })
+    cannotSelfRegister.forEach((accountIndex) => {
+      it(`participant ${accountIndex} is not registered`, async () => {
+        expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[accountIndex])).to
+          .be.false
+      })
+    })
+  })
+  describe(`Special NFTs`, () => {
+    beforeEach(async () => {
+      await hoprStakingProxyForNetworkRegistry
+        .connect(owner)
+        .ownerBatchAddSpecialNftTypeAndRank([SPECIAL_NFT_TYPE], [SPECIAL_NFT_RANK])
+    })
+
+    const canSelfRegister = [2]
+    const cannotSelfRegister = [0, 1, 3, 4, 5]
 
     canSelfRegister.forEach((accountIndex) => {
       it(`participant ${accountIndex} is still registered`, async () => {
