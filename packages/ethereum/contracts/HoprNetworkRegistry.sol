@@ -120,10 +120,7 @@ contract HoprNetworkRegistry is Ownable {
       return true;
     }
 
-    // if the account has a registration entry, keep the entry but update the eligibility
-    if (registeredNodeMultiaddrInBytes.length == 0) {
-      emit EligibilityUpdated(msg.sender, false);
-    }
+    emit EligibilityUpdated(msg.sender, false);
     return false;
   }
 

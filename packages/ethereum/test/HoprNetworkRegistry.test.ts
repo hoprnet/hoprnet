@@ -116,11 +116,11 @@ describe('HoprNetworkRegistry', () => {
         .withArgs(true)
     })
   })
-  describe('Register contract', () => {
+  describe('Register contract for a single time', () => {
     beforeEach(async () => {
       ;({ owner, participants, participantAddresses, registryFake, hoprNetworkRegistry } = await useFixtures())
     })
-    it('can self-register when the requirement is fulfilled and emits false', async () => {
+    it('can self-register when the requirement is fulfilled and emits true', async () => {
       const participantIndex = 1
       await expect(
         hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister(hoprAddress(participantIndex))
@@ -136,6 +136,13 @@ describe('HoprNetworkRegistry', () => {
         .connect(participants[participantIndex])
         .selfRegister(hoprAddress(participantIndex))
       expect(tx.value.toString()).to.be.equal('0')
+    })
+    it('fail to register when hopr node address is empty', async () => {
+      await expect(
+        hoprNetworkRegistry
+          .connect(participants[0])
+          .selfRegister('')
+      ).to.be.revertedWith('HoprNetworkRegistry: HOPR node multiaddress must not be empty')
     })
     it('fail to when array length does not match', async () => {
       await expect(
@@ -167,8 +174,54 @@ describe('HoprNetworkRegistry', () => {
         .withArgs(participantAddresses[5], false)
     })
   })
-  describe('Sync with when criteria change', () => {
+  describe('Register contract for multiple times by one', () => {
     const participantIndex = 1
+    beforeEach(async () => {
+      ;({ owner, participants, participantAddresses, registryFake, hoprNetworkRegistry } = await useFixtures())
+      // participant successfully registered itself
+      hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister(hoprAddress(participantIndex))
+    })
+    it('fails to deregister an non-registered account', async () => {
+      await expect(hoprNetworkRegistry.connect(participants[participantIndex + 1]).selfDeregister()).to.be.revertedWith(
+        'HoprNetworkRegistry: Cannot delete an empty entry'
+      )
+    })
+    it('can deregister by itself', async () => {
+      await expect(
+        hoprNetworkRegistry.connect(participants[participantIndex]).selfDeregister()
+      )
+        .to.emit(hoprNetworkRegistry, 'Deregistered')
+        .withArgs(participantAddresses[participantIndex])
+    })
+    it('fails to register the node address by a different account', async () => {
+      await expect(hoprNetworkRegistry.connect(participants[participantIndex + 1]).selfRegister(hoprAddress(participantIndex))).to.be.revertedWith(
+        'HoprNetworkRegistry: Cannot link a registered node to a different account'
+      )
+    })
+    it('fails to update the registry with a different node address', async () => {
+      await expect(hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister(hoprAddress(participantIndex + 1))).to.be.revertedWith(
+        'HoprNetworkRegistry: Cannot link an account to a different node. Please remove the registered node'
+      )
+    })
+    it('self-registered account emits true when the requirement is fulfilled', async () => {
+      await expect(
+        hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister(hoprAddress(participantIndex))
+      )
+        .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
+        .withArgs(participantAddresses[participantIndex], true)
+    })
+    it('self-registered account emits false when the requirement is not fulfilled', async () => {
+      // second time call - requirement is reverted
+      registryFake.isRequirementFulfilled.whenCalledWith(participantAddresses[participantIndex]).returns(false)
+      await expect(
+        hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister(hoprAddress(participantIndex))
+      )
+        .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
+        .withArgs(participantAddresses[participantIndex], false)
+    })
+  })
+  describe('Sync with when criteria change', () => {
+    const participantIndex = 2
     beforeEach(async () => {
       ;({ owner, participants, participantAddresses, registryFake, hoprNetworkRegistry } = await useFixtures())
       // // first time call - requirement is reverted
@@ -198,14 +251,14 @@ describe('HoprNetworkRegistry', () => {
         .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
         .withArgs(participantAddresses[participantIndex], false)
     })
-    it('cannot self-register with a new address when the requirement is fulfilled and emits false', async () => {
-      // second time call - requirement is reverted
-      registryFake.isRequirementFulfilled.whenCalledWith(participantAddresses[participantIndex]).returns(false)
+    // it('cannot self-register with a new address when the requirement is fulfilled and emits false', async () => {
+    //   // second time call - requirement is reverted
+    //   registryFake.isRequirementFulfilled.whenCalledWith(participantAddresses[participantIndex]).returns(false)
 
-      await expect(hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister(hoprAddress(9)))
-        .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
-        .withArgs(participantAddresses[participantIndex], false)
-    })
+    //   await expect(hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister(hoprAddress(9)))
+    //     .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
+    //     .withArgs(participantAddresses[participantIndex], false)
+    // })
     it('anyone can check the eligibility', async () => {
       expect(await hoprNetworkRegistry.isAccountRegisteredAndEligible(participantAddresses[participantIndex])).to.be
         .true
@@ -222,16 +275,7 @@ describe('HoprNetworkRegistry', () => {
       expect(await hoprNetworkRegistry.isAccountRegisteredAndEligible(participantAddresses[participantIndex])).to.be
         .false
     })
-    it('self-registered account emits false when the requirement is not fulfilled', async () => {
-      // second time call - requirement is reverted
-      registryFake.isRequirementFulfilled.whenCalledWith(participantAddresses[participantIndex]).returns(false)
 
-      await expect(
-        hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister(hoprAddress(participantIndex))
-      )
-        .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
-        .withArgs(participantAddresses[participantIndex], false)
-    })
     it('anyone can check the node eligibility', async () => {
       expect(await hoprNetworkRegistry.isNodeRegisteredAndEligible(hoprAddress(participantIndex))).to.be.true
     })
