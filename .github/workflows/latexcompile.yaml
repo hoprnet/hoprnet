@@ -5,14 +5,13 @@ env:
 
 on:
   push:
-    branches: ['master', 'yellowpaper/**']
+    branches:
+      - 'master'
+      - 'yellowpaper/**'
     paths:
+      - '!docs/yellowpaper/yellowpaper.pdf'
       - 'docs/yellowpaper/**'
       - '.github/workflows/latexcompile.yml'
-      - '!.github/workflows/*.yml'
-      - '!docs/yellowpaper/yellowpaper.pdf'
-      - '!docs/yellowpaper/*.md'
-      - '!.processes/**/*'
 
 jobs:
   build_latex:
