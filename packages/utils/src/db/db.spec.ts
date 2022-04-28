@@ -294,17 +294,20 @@ describe(`database tests`, function () {
     const account = Address.createMock()
 
     // should be throw when not added
-    assert.rejects(() => db.getAccountFromRegistry(hoprNode), 'should throw when account is not registered')
+    assert.rejects(() => db.getAccountFromNetworkRegistry(hoprNode), 'should throw when account is not registered')
 
     // should be set
-    await db.addToRegistry(hoprNode, account, TestingSnapshot)
-    assert((await db.findHoprNodeUsingAccount(account)).eq(hoprNode), 'should match hoprNode')
-    assert((await db.getAccountFromRegistry(hoprNode)).eq(account), 'should match account added')
+    await db.addToNetworkRegistry(hoprNode, account, TestingSnapshot)
+    assert((await db.findHoprNodeUsingAccountInNetworkRegistry(account)).eq(hoprNode), 'should match hoprNode')
+    assert((await db.getAccountFromNetworkRegistry(hoprNode)).eq(account), 'should match account added')
 
     // should be removed
-    await db.removeFromRegistry(account, TestingSnapshot)
-    assert.rejects(() => db.findHoprNodeUsingAccount(account), 'should throw when HoprNode is not linke to an account')
-    assert.rejects(() => db.getAccountFromRegistry(hoprNode), 'should throw when account is deregistered')
+    await db.removeFromNetworkRegistry(account, TestingSnapshot)
+    assert.rejects(
+      () => db.findHoprNodeUsingAccountInNetworkRegistry(account),
+      'should throw when HoprNode is not linke to an account'
+    )
+    assert.rejects(() => db.getAccountFromNetworkRegistry(hoprNode), 'should throw when account is deregistered')
   })
 
   it('should test eligible', async function () {
@@ -324,14 +327,14 @@ describe(`database tests`, function () {
 
   it('should test register toggle', async function () {
     // should be false by default
-    assert((await db.isRegisterEnabled()) === true, 'register should be enabled by default')
+    assert((await db.isNetworkRegistryEnabled()) === true, 'register should be enabled by default')
 
     // should be true once set
-    await db.setRegisterEnabled(true, TestingSnapshot)
-    assert((await db.isRegisterEnabled()) === true, 'register should be enabled')
+    await db.setNetworkRegistryEnabled(true, TestingSnapshot)
+    assert((await db.isNetworkRegistryEnabled()) === true, 'register should be enabled')
 
     // should be false once unset
-    await db.setRegisterEnabled(false, TestingSnapshot)
-    assert((await db.isRegisterEnabled()) === false, 'register should be disabled')
+    await db.setNetworkRegistryEnabled(false, TestingSnapshot)
+    assert((await db.isNetworkRegistryEnabled()) === false, 'register should be disabled')
   })
 })

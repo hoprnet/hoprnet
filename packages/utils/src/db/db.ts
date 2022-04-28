@@ -41,9 +41,9 @@ const PENDING_TICKETS_COUNT = encoder.encode('statistics:pending:value-')
 const ACKNOWLEDGED_TICKETS_PREFIX = encoder.encode('tickets:acknowledged-')
 const PENDING_ACKNOWLEDGEMENTS_PREFIX = encoder.encode('tickets:pending-acknowledgement-')
 const PACKET_TAG_PREFIX: Uint8Array = encoder.encode('packets:tag-')
-const REGISTER_REGISTRY_PREFIX: Uint8Array = encoder.encode('register:registry:')
-const REGISTER_ELIGIBLE_PREFIX: Uint8Array = encoder.encode('register:eligible:')
-const REGISTER_ENABLED_PREFIX: Uint8Array = encoder.encode('register:enabled')
+const NETWORK_REGISTRY_HOPR_NODE_PREFIX: Uint8Array = encoder.encode('networkRegistry:hopr-node:')
+const NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX: Uint8Array = encoder.encode('networkRegistry:address-eligible:')
+const NETWORK_REGISTRY_ENABLED_PREFIX: Uint8Array = encoder.encode('networkRegistry:enabled')
 
 function createChannelKey(channelId: Hash): Uint8Array {
   return Uint8Array.from([...CHANNEL_PREFIX, ...channelId.serialize()])
@@ -72,14 +72,14 @@ function createPendingAcknowledgement(halfKey: HalfKeyChallenge) {
 function createPacketTagKey(tag: Uint8Array) {
   return Uint8Array.from([...PACKET_TAG_PREFIX, ...tag])
 }
-function createRegisterKey(publicKey: PublicKey) {
-  return Uint8Array.from([...REGISTER_REGISTRY_PREFIX, ...publicKey.serializeUncompressed()])
+function createNetworkRegistryHoprNodeKey(publicKey: PublicKey) {
+  return Uint8Array.from([...NETWORK_REGISTRY_HOPR_NODE_PREFIX, ...publicKey.serializeUncompressed()])
 }
-function parsePublicKeyFromRegisterKey(key: Uint8Array): PublicKey {
+function parseNetworkRegistryPublicKeyFromHoprNodeKey(key: Uint8Array): PublicKey {
   return PublicKey.deserialize(key.subarray(key.length - PublicKey.SIZE_UNCOMPRESSED, key.length))
 }
-function createEligibleKey(address: Address) {
-  return Uint8Array.from([...REGISTER_ELIGIBLE_PREFIX, ...address.serialize()])
+function createNetworkRegistryAddressEligibleKey(address: Address) {
+  return Uint8Array.from([...NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX, ...address.serialize()])
 }
 
 const LATEST_BLOCK_NUMBER_KEY = encoder.encode('latestBlockNumber')
@@ -722,10 +722,10 @@ export class HoprDB {
    * @param account the account that made the transaction
    * @param snapshot
    */
-  public async addToRegistry(hoprNode: PublicKey, account: Address, snapshot: Snapshot): Promise<void> {
+  public async addToNetworkRegistry(hoprNode: PublicKey, account: Address, snapshot: Snapshot): Promise<void> {
     await this.db
       .batch()
-      .put(Buffer.from(this.keyOf(createRegisterKey(hoprNode))), Buffer.from(account.serialize()))
+      .put(Buffer.from(this.keyOf(createNetworkRegistryHoprNodeKey(hoprNode))), Buffer.from(account.serialize()))
       .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
       .write()
   }
@@ -736,13 +736,13 @@ export class HoprDB {
    * @param account
    * @returns PublicKey of the associated HoprNode
    */
-  public async findHoprNodeUsingAccount(account: Address): Promise<PublicKey> {
+  public async findHoprNodeUsingAccountInNetworkRegistry(account: Address): Promise<PublicKey> {
     // range of keys to search
     const from = this.keyOf(
-      Uint8Array.from([...REGISTER_REGISTRY_PREFIX, ...new Uint8Array(PublicKey.SIZE_UNCOMPRESSED).fill(0x00)])
+      Uint8Array.from([...NETWORK_REGISTRY_HOPR_NODE_PREFIX, ...new Uint8Array(PublicKey.SIZE_UNCOMPRESSED).fill(0x00)])
     )
     const to = this.keyOf(
-      Uint8Array.from([...REGISTER_REGISTRY_PREFIX, ...new Uint8Array(PublicKey.SIZE_UNCOMPRESSED).fill(0xff)])
+      Uint8Array.from([...NETWORK_REGISTRY_HOPR_NODE_PREFIX, ...new Uint8Array(PublicKey.SIZE_UNCOMPRESSED).fill(0xff)])
     )
 
     // create iterable stream to search all registered nodes
@@ -770,7 +770,7 @@ export class HoprDB {
       throw Error('HoprNode not found')
     }
 
-    return parsePublicKeyFromRegisterKey(new Uint8Array(entryKey))
+    return parseNetworkRegistryPublicKeyFromHoprNodeKey(new Uint8Array(entryKey))
   }
 
   /**
@@ -779,9 +779,9 @@ export class HoprDB {
    * @param account the account to use so we can search for the key in the database
    * @param snapshot
    */
-  public async removeFromRegistry(account: Address, snapshot: Snapshot): Promise<void> {
-    const hoprNode = await this.findHoprNodeUsingAccount(account)
-    const entryKey = createRegisterKey(hoprNode)
+  public async removeFromNetworkRegistry(account: Address, snapshot: Snapshot): Promise<void> {
+    const hoprNode = await this.findHoprNodeUsingAccountInNetworkRegistry(account)
+    const entryKey = createNetworkRegistryHoprNodeKey(hoprNode)
 
     if (entryKey) {
       await this.db
@@ -798,8 +798,8 @@ export class HoprDB {
    * @param hoprNode the node to register
    * @returns ETH address
    */
-  public async getAccountFromRegistry(hoprNode: PublicKey): Promise<Address> {
-    return this.getCoerced<Address>(createRegisterKey(hoprNode), Address.deserialize)
+  public async getAccountFromNetworkRegistry(hoprNode: PublicKey): Promise<Address> {
+    return this.getCoerced<Address>(createNetworkRegistryHoprNodeKey(hoprNode), Address.deserialize)
   }
 
   /**
@@ -809,7 +809,7 @@ export class HoprDB {
    * @param snapshot
    */
   public async setEligible(account: Address, eligible: boolean, snapshot: Snapshot): Promise<void> {
-    const key = Buffer.from(this.keyOf(createEligibleKey(account)))
+    const key = Buffer.from(this.keyOf(createNetworkRegistryAddressEligibleKey(account)))
 
     if (eligible) {
       await this.db
@@ -832,17 +832,17 @@ export class HoprDB {
    * @returns true if account is eligible
    */
   public async isEligible(account: Address): Promise<boolean> {
-    return this.getCoercedOrDefault(createEligibleKey(account), () => true, false)
+    return this.getCoercedOrDefault(createNetworkRegistryAddressEligibleKey(account), () => true, false)
   }
 
   /**
    * Hopr Network Registry
    * @param enabled whether register is enabled
    */
-  public async setRegisterEnabled(enabled: boolean, snapshot: Snapshot): Promise<void> {
+  public async setNetworkRegistryEnabled(enabled: boolean, snapshot: Snapshot): Promise<void> {
     await this.db
       .batch()
-      .put(Buffer.from(this.keyOf(REGISTER_ENABLED_PREFIX)), Buffer.from([Number(enabled)]))
+      .put(Buffer.from(this.keyOf(NETWORK_REGISTRY_ENABLED_PREFIX)), Buffer.from([Number(enabled)]))
       .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
       .write()
   }
@@ -851,8 +851,8 @@ export class HoprDB {
    * Hopr Network Registry
    * @returns true if register is enabled
    */
-  public async isRegisterEnabled(): Promise<boolean> {
-    return this.getCoercedOrDefault(REGISTER_ENABLED_PREFIX, (v) => Boolean(v[0]), true)
+  public async isNetworkRegistryEnabled(): Promise<boolean> {
+    return this.getCoercedOrDefault(NETWORK_REGISTRY_ENABLED_PREFIX, (v) => Boolean(v[0]), true)
   }
 
   static createMock(id?: PublicKey): HoprDB {

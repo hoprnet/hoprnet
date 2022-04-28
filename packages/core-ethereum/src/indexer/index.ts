@@ -786,7 +786,7 @@ class Indexer extends EventEmitter {
     await this.db.setEligible(account, event.args.eligibility, lastSnapshot)
     // emit event only when eligibility changes on accounts with a HoprNode associated
     try {
-      const hoprNode = await this.db.findHoprNodeUsingAccount(account)
+      const hoprNode = await this.db.findHoprNodeUsingAccountInNetworkRegistry(account)
       this.emit('network-registry-eligibility-changed', account, hoprNode, event.args.eligibility)
     } catch {}
   }
@@ -802,11 +802,11 @@ class Indexer extends EventEmitter {
     }
     const hoprNode = PublicKey.fromPeerIdString(multiaddr.getPeerId())
     const account = Address.fromString(event.args.account)
-    await this.db.addToRegistry(hoprNode, account, lastSnapshot)
+    await this.db.addToNetworkRegistry(hoprNode, account, lastSnapshot)
   }
 
   private async onDeregistered(event: RegistryEvent<'DeregisteredByOwner'>, lastSnapshot: Snapshot): Promise<void> {
-    await this.db.removeFromRegistry(Address.fromString(event.args.account), lastSnapshot)
+    await this.db.removeFromNetworkRegistry(Address.fromString(event.args.account), lastSnapshot)
   }
 
   private async onEnabledNetworkRegistry(
@@ -814,7 +814,7 @@ class Indexer extends EventEmitter {
     lastSnapshot: Snapshot
   ): Promise<void> {
     this.emit('network-registry-status-changed', event.args.isEnabled)
-    await this.db.setRegisterEnabled(event.args.isEnabled, lastSnapshot)
+    await this.db.setNetworkRegistryEnabled(event.args.isEnabled, lastSnapshot)
   }
 
   private async onTransfer(event: TokenEvent<'Transfer'>, lastSnapshot: Snapshot) {

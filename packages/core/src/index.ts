@@ -274,7 +274,7 @@ class Hopr extends EventEmitter {
     // Initialize AccessControl
     const accessControl = new AccessControl(
       this.networkPeers,
-      this.isAllowedAccess.bind(this),
+      this.isAllowedAccessToNetwork.bind(this),
       this.closeConnectionsTo.bind(this)
     )
 
@@ -1195,8 +1195,8 @@ class Hopr extends EventEmitter {
    * @param id the peer id of the account we want to check if it's allowed access to the network
    * @returns true if allowed access
    */
-  public async isAllowedAccess(id: PeerId): Promise<boolean> {
-    return this.connector.isAllowedAccess(PublicKey.fromPeerId(id))
+  public async isAllowedAccessToNetwork(id: PeerId): Promise<boolean> {
+    return this.connector.isAllowedAccessToNetwork(PublicKey.fromPeerId(id))
   }
 
   /**

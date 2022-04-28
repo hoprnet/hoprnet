@@ -1,5 +1,9 @@
 import type PeerId from 'peer-id'
 import type NetworkPeers from './network-peers'
+import { debug } from '@hoprnet/hopr-utils'
+
+// const log = debug('hopr-core:access-control')
+const logError = debug('hopr-core:access-control:error')
 
 /**
  * Encapsulates logic to control access behaviours.
@@ -7,7 +11,7 @@ import type NetworkPeers from './network-peers'
 export default class AccessControl {
   constructor(
     private networkPeers: NetworkPeers,
-    private isAllowedAccess: (peerId: PeerId) => Promise<boolean>,
+    private isAllowedAccessToNetwork: (peerId: PeerId) => Promise<boolean>,
     private closeConnectionsTo: (peerId: PeerId) => Promise<void>
   ) {}
 
@@ -28,9 +32,16 @@ export default class AccessControl {
    * @returns true if peer is allowed access
    */
   public async reviewConnection(peerId: PeerId, origin: string): Promise<boolean> {
-    const allowed = this.isAllowedAccess(peerId)
-    if (allowed) await this.allowConnectionWithPeer(peerId, origin)
-    else await this.denyConnectionWithPeer(peerId, origin)
+    let allowed: boolean = false
+
+    try {
+      allowed = await this.isAllowedAccessToNetwork(peerId)
+      if (allowed) await this.allowConnectionWithPeer(peerId, origin)
+      else await this.denyConnectionWithPeer(peerId, origin)
+    } catch (error) {
+      logError(`unexpected error when reviewing connection ${peerId.toB58String()} from ${origin}`, error)
+    }
+
     return allowed
   }
 

@@ -576,7 +576,7 @@ describe('test indexer', function () {
 
     newBlock()
     await processed.promise
-    assert(await db.getAccountFromRegistry(PublicKey.fromPeerIdString(PARTY_B_MULTIADDR.getPeerId())))
+    assert(await db.getAccountFromNetworkRegistry(PublicKey.fromPeerIdString(PARTY_B_MULTIADDR.getPeerId())))
     assert(await db.isEligible(fixtures.PARTY_A.toAddress()))
   })
 
@@ -595,7 +595,7 @@ describe('test indexer', function () {
 
     newBlock()
     await processed.promise
-    assert(await db.getAccountFromRegistry(PublicKey.fromPeerIdString(PARTY_B_MULTIADDR.getPeerId())))
+    assert(await db.getAccountFromNetworkRegistry(PublicKey.fromPeerIdString(PARTY_B_MULTIADDR.getPeerId())))
     assert((await db.isEligible(fixtures.PARTY_A.toAddress())) === false)
   })
 
@@ -620,7 +620,7 @@ describe('test indexer', function () {
 
     newBlock()
     await processed.promise
-    assert.rejects(() => db.getAccountFromRegistry(PublicKey.fromPeerIdString(PARTY_B_MULTIADDR.getPeerId())))
+    assert.rejects(() => db.getAccountFromNetworkRegistry(PublicKey.fromPeerIdString(PARTY_B_MULTIADDR.getPeerId())))
     assert(await db.isEligible(fixtures.PARTY_A.toAddress()))
   })
 
@@ -639,7 +639,7 @@ describe('test indexer', function () {
 
     newBlock()
     await processed.promise
-    assert(await db.isRegisterEnabled())
+    assert(await db.isNetworkRegistryEnabled())
   })
 
   it('should process register disabled', async function () {
@@ -657,6 +657,6 @@ describe('test indexer', function () {
 
     newBlock()
     await processed.promise
-    assert((await db.isRegisterEnabled()) === false)
+    assert((await db.isNetworkRegistryEnabled()) === false)
   })
 })
