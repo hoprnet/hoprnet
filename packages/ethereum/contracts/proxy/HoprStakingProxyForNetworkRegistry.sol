@@ -36,11 +36,11 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   NftTypeAndRank[] public eligibleNftTypeAndRank; // list of NFTs whose owner are considered as eligible to the network if the `stakeThreshold` is also met
   NftTypeAndRank[] public specialeNftTypeAndRank; // list of NFTs whose owner are considered as eligible to the network without meeting the `stakeThreshold`, e.g. "Dev NFT"
 
-  event NftTypeAndRankAdded(uint256 indexed nftType, uint256 indexed nftRank);
-  event NftTypeAndRankRemoved(uint256 indexed nftType, uint256 indexed nftRank);
-  event SpecialNftTypeAndRankAdded(uint256 indexed nftType, uint256 indexed nftRank);
-  event SpecialNftTypeAndRankRemoved(uint256 indexed nftType, uint256 indexed nftRank);
-  event ThresholdUpdated(uint256 indexed threshold);
+  event NftTypeAndRankAdded(uint256 indexed nftType, uint256 indexed nftRank); // emit when a new NFT type and rank gets included in the eligibility list
+  event NftTypeAndRankRemoved(uint256 indexed nftType, uint256 indexed nftRank); // emit when a NFT type and rank gets removed from the eligibility list
+  event SpecialNftTypeAndRankAdded(uint256 indexed nftType, uint256 indexed nftRank); // emit when a new special type and rank of NFT gets included in the eligibility list
+  event SpecialNftTypeAndRankRemoved(uint256 indexed nftType, uint256 indexed nftRank); // emit when a special type and rank of NFT gets removed from the eligibility list
+  event ThresholdUpdated(uint256 indexed threshold); // emit when the staking threshold gets updated.
 
   constructor(
     address stakeContract,
