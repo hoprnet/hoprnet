@@ -12,8 +12,8 @@ const NFT_TYPE = [1, 2]
 const NFT_RANK = [123, 456]
 const HIGH_STAKE = 2000
 const LOW_STAKE = 100
-const SPECIAL_NFT_TYPE = 3; // 'Dev'
-const SPECIAL_NFT_RANK = 0; // 'Rock'
+const SPECIAL_NFT_TYPE = 3 // 'Dev'
+const SPECIAL_NFT_RANK = 0 // 'Rock'
 
 const createFakeStakeV2Contract = async (participants: string[]) => {
   const stakeV2Fake = await smock.fake([
@@ -89,7 +89,9 @@ const createFakeStakeV2Contract = async (participants: string[]) => {
     }
   })
   // participant 2 redeemd a special NFT
-  stakeV2Fake.isNftTypeAndRankRedeemed3.whenCalledWith(SPECIAL_NFT_TYPE, SPECIAL_NFT_RANK, participants[2]).returns(true)
+  stakeV2Fake.isNftTypeAndRankRedeemed3
+    .whenCalledWith(SPECIAL_NFT_TYPE, SPECIAL_NFT_RANK, participants[2])
+    .returns(true)
   return stakeV2Fake
 }
 
