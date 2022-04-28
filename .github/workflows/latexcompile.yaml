@@ -26,8 +26,8 @@ jobs:
       - name: Install dependencies
         run: >
           sudo apt -y install
-            texlive texlive-latex-extra texlive-science
-            texlive-bibtex-extra latexmk
+          texlive texlive-latex-extra texlive-science
+          texlive-bibtex-extra latexmk
 
       - name: Compile LaTeX document
         run: |
