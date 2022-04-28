@@ -138,11 +138,9 @@ describe('HoprNetworkRegistry', () => {
       expect(tx.value.toString()).to.be.equal('0')
     })
     it('fail to register when hopr node address is empty', async () => {
-      await expect(
-        hoprNetworkRegistry
-          .connect(participants[0])
-          .selfRegister('')
-      ).to.be.revertedWith('HoprNetworkRegistry: HOPR node multiaddress must not be empty')
+      await expect(hoprNetworkRegistry.connect(participants[0]).selfRegister('')).to.be.revertedWith(
+        'HoprNetworkRegistry: HOPR node multiaddress must not be empty'
+      )
     })
     it('fail to when array length does not match', async () => {
       await expect(
@@ -187,19 +185,19 @@ describe('HoprNetworkRegistry', () => {
       )
     })
     it('can deregister by itself', async () => {
-      await expect(
-        hoprNetworkRegistry.connect(participants[participantIndex]).selfDeregister()
-      )
+      await expect(hoprNetworkRegistry.connect(participants[participantIndex]).selfDeregister())
         .to.emit(hoprNetworkRegistry, 'Deregistered')
         .withArgs(participantAddresses[participantIndex])
     })
     it('fails to register the node address by a different account', async () => {
-      await expect(hoprNetworkRegistry.connect(participants[participantIndex + 1]).selfRegister(hoprAddress(participantIndex))).to.be.revertedWith(
-        'HoprNetworkRegistry: Cannot link a registered node to a different account'
-      )
+      await expect(
+        hoprNetworkRegistry.connect(participants[participantIndex + 1]).selfRegister(hoprAddress(participantIndex))
+      ).to.be.revertedWith('HoprNetworkRegistry: Cannot link a registered node to a different account')
     })
     it('fails to update the registry with a different node address', async () => {
-      await expect(hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister(hoprAddress(participantIndex + 1))).to.be.revertedWith(
+      await expect(
+        hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister(hoprAddress(participantIndex + 1))
+      ).to.be.revertedWith(
         'HoprNetworkRegistry: Cannot link an account to a different node. Please remove the registered node'
       )
     })
