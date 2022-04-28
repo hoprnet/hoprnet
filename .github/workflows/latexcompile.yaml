@@ -11,7 +11,7 @@ on:
     paths:
       - '!docs/yellowpaper/yellowpaper.pdf'
       - 'docs/yellowpaper/**'
-      - '.github/workflows/latexcompile.yml'
+      - '.github/workflows/latexcompile.yaml'
 
 jobs:
   build_latex:
