@@ -5,14 +5,13 @@ env:
 
 on:
   push:
-    branches: ['master', 'yellowpaper/**']
+    branches:
+      - 'master'
+      - 'yellowpaper/**'
     paths:
-      - 'docs/yellowpaper/**'
-      - '.github/workflows/latexcompile.yml'
-      - '!.github/workflows/*.yml'
       - '!docs/yellowpaper/yellowpaper.pdf'
-      - '!docs/yellowpaper/*.md'
-      - '!.processes/**/*'
+      - 'docs/yellowpaper/**'
+      - '.github/workflows/latexcompile.yaml'
 
 jobs:
   build_latex:
@@ -27,8 +26,8 @@ jobs:
       - name: Install dependencies
         run: >
           sudo apt -y install
-            texlive texlive-latex-extra texlive-science
-            texlive-bibtex-extra latexmk
+          texlive texlive-latex-extra texlive-science
+          texlive-bibtex-extra latexmk
 
       - name: Compile LaTeX document
         run: |
