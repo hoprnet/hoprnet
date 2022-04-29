@@ -653,7 +653,7 @@ class Indexer extends EventEmitter {
           )
           break
         case 'Deregistered':
-        case 'Deregistered(address,string)':
+        case 'Deregistered(address)':
         case 'DeregisteredByOwner':
         case 'DeregisteredByOwner(address)':
           await this.onDeregistered(event as RegistryEvent<'DeregisteredByOwner'>, lastDatabaseSnapshot)
