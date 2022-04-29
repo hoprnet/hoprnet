@@ -112,6 +112,6 @@ To redeem an NFT, press the “Lock NFT” button under the NFT you want to lock
 
 :::caution Important
 
-When you confirm, the NFT will be sent to the token contract and boost the associated address. This cannot be undone! So make sure you’re redeeming the NFT you want in the address you want. Like stakes, NFTs are locked during staking season, at which point they’ll be automatically returned.
+When you confirm, the NFT will be sent to the token contract and boost the associated address. This cannot be undone! So make sure you’re redeeming the NFT you want in the address you want. Like stakes, NFTs are locked for a three-month period, after which they can be claimed.
 
 :::
