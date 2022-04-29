@@ -281,7 +281,7 @@ function addUnhandledPromiseRejectionHandler() {
       const msgString = reason.toString()
 
       // Only silence very specific errors
-      if (msgString.match(/write ECONNRESET/) || msgString.match(/The operation was aborted/)) {
+      if (msgString.match(/read ECONNRESET/) || msgString.match(/write ECONNRESET/) || msgString.match(/The operation was aborted/)) {
         console.error('Unhandled promise rejection silenced')
         return
       }
