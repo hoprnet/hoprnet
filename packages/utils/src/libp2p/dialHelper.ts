@@ -65,8 +65,8 @@ type ReducedDHT = { contentRouting: Pick<LibP2P['contentRouting'], 'routers' | '
 type ReducedTransportManager = { transportManager: Pick<LibP2P['transportManager'], 'dial'> }
 type ReducedLibp2p = ReducedDHT &
   ReducedTransportManager & { peerStore: ReducedPeerStore } & {
-  connectionManager: ReducedConnectionManager
-}
+    connectionManager: ReducedConnectionManager
+  }
 
 async function printPeerStoreAddresses(msg: string, destination: PeerId, peerStore: ReducedPeerStore): Promise<void> {
   logError(msg)

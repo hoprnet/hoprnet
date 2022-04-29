@@ -76,7 +76,6 @@ async function getNode(id: PeerId, withDHT = false, maDestination?: Multiaddr): 
   return node
 }
 
-
 function getPeerStore() {
   const peerStore = new Map<PeerId, Set<Address>>()
 
