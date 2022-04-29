@@ -3,7 +3,7 @@ id: how-to-stake
 title: Staking on HOPR smart contract
 ---
 
-HOPR staking scheme goal is to reward HOPR token holders while providing a way to develop and test cover traffic with the help of the community. This staking scheme takes standard yield farming and gives a gamified twist thanks to collectible NFTs which can boost your APR. First Staking Season launched on July 27th 2021, at the moment we are running Staking Season 3, which started on April 26th and will run until June 26th, a period of 90 days.
+HOPR staking scheme goal is to reward HOPR token holders while providing a way to develop and test cover traffic with the help of the community. This staking scheme takes standard yield farming and gives a gamified twist thanks to collectible NFTs which can boost your APR. The first staking season launched on July 27th, currently we're running staking season 3, which started on April 26th 2022 and will run for a period of 90 days.
 
 Locking HOPR tokens in this smart contract isn’t just a way to farm tokens: it’s your gateway to participating in HOPR community testing, earning even higher rewards while helping to improve online privacy.
 
