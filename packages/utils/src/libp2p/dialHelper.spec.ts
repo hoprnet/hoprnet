@@ -76,6 +76,7 @@ async function getNode(id: PeerId, withDHT = false, maDestination?: Multiaddr): 
   return node
 }
 
+
 function getPeerStore() {
   const peerStore = new Map<PeerId, Set<Address>>()
 
@@ -209,7 +210,9 @@ describe('test dialHelper', function () {
         findProviders: () => (async function* () {})()
       },
       connectionManager: getConnectionManager(),
-      dial: () => Promise.resolve<Connection>(undefined),
+      transportManager: {
+        dial: () => Promise.resolve<Connection>(undefined)
+      },
       peerStore: getPeerStore()
     }
 
@@ -232,7 +235,9 @@ describe('test dialHelper', function () {
             throw Error(`boom`)
           })()
       },
-      dial: () => Promise.resolve<Connection>(undefined),
+      transportManager: {
+        dial: () => Promise.resolve<Connection>(undefined)
+      },
       connectionManager: getConnectionManager(),
       peerStore: getPeerStore()
     }

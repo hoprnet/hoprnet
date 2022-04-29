@@ -62,9 +62,11 @@ type ReducedPeerStore = {
 }
 type ReducedConnectionManager = Pick<LibP2P['connectionManager'], 'getAll' | 'onDisconnect'>
 type ReducedDHT = { contentRouting: Pick<LibP2P['contentRouting'], 'routers' | 'findProviders'> }
-type ReducedLibp2p = ReducedDHT & { peerStore: ReducedPeerStore } & {
+type ReducedTransportManager = { transportManager: Pick<LibP2P['transportManager'], 'dial'> }
+type ReducedLibp2p = ReducedDHT &
+  ReducedTransportManager & { peerStore: ReducedPeerStore } & {
   connectionManager: ReducedConnectionManager
-} & Pick<LibP2P, 'dial'>
+}
 
 async function printPeerStoreAddresses(msg: string, destination: PeerId, peerStore: ReducedPeerStore): Promise<void> {
   logError(msg)
@@ -134,8 +136,8 @@ export async function tryExistingConnections(
  * @param opts timeout options
  */
 async function establishNewConnection(
-  libp2p: Pick<ReducedLibp2p, 'dial'>,
-  destination: PeerId | Multiaddr,
+  libp2p: Pick<ReducedLibp2p, 'transportManager'>,
+  destination: Multiaddr,
   protocol: string,
   opts: TimeoutOpts
 ) {
@@ -157,7 +159,7 @@ async function establishNewConnection(
 
   let conn: Connection
   try {
-    conn = await libp2p.dial(destination, { signal: opts.signal })
+    conn = await libp2p.transportManager.dial(destination, { signal: opts.signal })
   } catch (err) {
     logError(
       `Error while establishing connection to ${
@@ -274,19 +276,15 @@ async function doDial(
 
   // Fetch known addresses for the given destination peer
   const knownAddressesForPeer = await libp2p.peerStore.addressBook.get(destination)
-  if (knownAddressesForPeer.length > 0) {
+  log(`There are ${knownAddressesForPeer.length} already known addresses for ${destination.toB58String()}:`)
+  for (const knownAddress of knownAddressesForPeer) {
     // Let's try using the known addresses by connecting directly
-    log(`There are ${knownAddressesForPeer.length} already known addresses for ${destination.toB58String()}:`)
-    for (const address of knownAddressesForPeer) {
-      log(`- ${address.multiaddr.toString()}`)
-    }
-    struct = await establishNewConnection(libp2p, destination, protocol, opts)
+    log(`Trying address ${knownAddress.multiaddr.toString()}`)
+    struct = await establishNewConnection(libp2p, knownAddress.multiaddr, protocol, opts)
     if (struct) {
-      log(`Successfully reached ${destination.toB58String()} via already known addresses !`)
+      log(`Successfully reached ${destination.toB58String()} via already known ${knownAddress.multiaddr} !`)
       return { status: DialStatus.SUCCESS, resp: struct }
     }
-  } else {
-    log(`No currently known addresses for peer ${destination.toB58String()}`)
   }
 
   // Check if DHT is available
