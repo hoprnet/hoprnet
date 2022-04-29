@@ -159,6 +159,7 @@ async function establishNewConnection(
 
   let conn: Connection
   try {
+    // NOTE: This bypasses the dial filter in HOPR Connect
     conn = await libp2p.transportManager.dial(destination, { signal: opts.signal })
   } catch (err) {
     logError(
@@ -277,8 +278,9 @@ async function doDial(
   // Fetch known addresses for the given destination peer
   const knownAddressesForPeer = await libp2p.peerStore.addressBook.get(destination)
   log(`There are ${knownAddressesForPeer.length} already known addresses for ${destination.toB58String()}:`)
+
+  // Try using each known address to reach the destination
   for (const knownAddress of knownAddressesForPeer) {
-    // Let's try using the known addresses by connecting directly
     log(`Trying address ${knownAddress.multiaddr.toString()}`)
     struct = await establishNewConnection(libp2p, knownAddress.multiaddr, protocol, opts)
     if (struct) {
