@@ -57,14 +57,15 @@ async function getNode(id: PeerId, withDHT = false, maDestination?: Multiaddr): 
     }
   })
 
-  const dial = node.transportManager.dial.bind(node)
+  const dialOrig = node.transportManager.dial.bind(node.transportManager)
 
   node.transportManager.dial = async (peer: PeerId | Multiaddr, options: any) => {
-    if (PeerId.isPeerId(peer)) {
-      return dial(peer, options)
+
+    if (maDestination) {
+      return dialOrig(maDestination, options)
     }
 
-    return dial(maDestination, options)
+    return dialOrig(peer, options)
   }
 
   node.handle(TEST_PROTOCOL, async ({ stream }) => {

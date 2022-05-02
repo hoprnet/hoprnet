@@ -91,6 +91,7 @@ function getFakeLibp2p(
     | undefined
 ) {
   return {
+    transportManager: {
     dial(destination: PeerId, ..._opts: any[]): Promise<Connection> {
       return Promise.resolve<Connection>({
         newStream: (protocol: string) =>
@@ -120,6 +121,7 @@ function getFakeLibp2p(
           }),
         remotePeer: destination
       } as Connection)
+    }
     },
     peerStore: {
       addressBook: {
