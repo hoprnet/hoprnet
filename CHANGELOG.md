@@ -26,6 +26,7 @@
 - Ping & DHT query timeout increased ([#3780](https://github.com/hoprnet/hoprnet/pull/3780))
 - Dial refactoring and optimization ([#3780](https://github.com/hoprnet/hoprnet/pull/3780))
 - onAbort unhandled promise rejection workaround fix ([#3780](https://github.com/hoprnet/hoprnet/pull/3780))
+- Optimizations in dialing process ([#3788](https://github.com/hoprnet/hoprnet/pull/3788))
 
 ---
 

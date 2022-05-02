@@ -159,9 +159,10 @@ async function establishNewConnection(
 
   let conn: Connection
   try {
-    // NOTE: This bypasses the dial filter in HOPR Connect
+    // Attempt to dial directly using libp2p's transport manager
     conn = await libp2p.transportManager.dial(destination, { signal: opts.signal })
-  } catch (err) {
+  }
+  catch (err) {
     logError(
       `Error while establishing connection to ${
         PeerId.isPeerId(destination) ? destination.toB58String() : destination.toString()
