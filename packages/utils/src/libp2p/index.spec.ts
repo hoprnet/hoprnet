@@ -92,36 +92,36 @@ function getFakeLibp2p(
 ) {
   return {
     transportManager: {
-    dial(destination: PeerId, ..._opts: any[]): Promise<Connection> {
-      return Promise.resolve<Connection>({
-        newStream: (protocol: string) =>
-          Promise.resolve({
-            stream: {
-              sink: async (source: AsyncIterable<Uint8Array>) => {
-                for await (const msg of source) {
-                  if (messages?.msgToReceive && u8aEquals(Uint8Array.from(msg.slice()), messages.msgToReceive)) {
-                    state?.msgReceived?.resolve()
-                  } else {
-                    state?.msgReceived?.reject()
+      dial(destination: PeerId, ..._opts: any[]): Promise<Connection> {
+        return Promise.resolve<Connection>({
+          newStream: (protocol: string) =>
+            Promise.resolve({
+              stream: {
+                sink: async (source: AsyncIterable<Uint8Array>) => {
+                  for await (const msg of source) {
+                    if (messages?.msgToReceive && u8aEquals(Uint8Array.from(msg.slice()), messages.msgToReceive)) {
+                      state?.msgReceived?.resolve()
+                    } else {
+                      state?.msgReceived?.reject()
+                    }
+
+                    await new Promise((resolve) => setTimeout(resolve, 50))
+                    state?.waitUntilSend?.resolve()
                   }
+                },
+                source: (async function* () {
+                  state?.waitUntilSend && (await state.waitUntilSend.promise)
 
-                  await new Promise((resolve) => setTimeout(resolve, 50))
-                  state?.waitUntilSend?.resolve()
-                }
-              },
-              source: (async function* () {
-                state?.waitUntilSend && (await state.waitUntilSend.promise)
-
-                if (messages.msgToReplyWith) {
-                  yield new BL(Buffer.from(messages.msgToReplyWith))
-                }
-              })()
-            } as any,
-            protocol
-          }),
-        remotePeer: destination
-      } as Connection)
-    }
+                  if (messages.msgToReplyWith) {
+                    yield new BL(Buffer.from(messages.msgToReplyWith))
+                  }
+                })()
+              } as any,
+              protocol
+            }),
+          remotePeer: destination
+        } as Connection)
+      }
     },
     peerStore: {
       addressBook: {

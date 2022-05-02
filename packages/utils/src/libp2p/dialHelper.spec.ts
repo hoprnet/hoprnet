@@ -60,7 +60,6 @@ async function getNode(id: PeerId, withDHT = false, maDestination?: Multiaddr): 
   const dialOrig = node.transportManager.dial.bind(node.transportManager)
 
   node.transportManager.dial = async (peer: PeerId | Multiaddr, options: any) => {
-
     if (maDestination) {
       return dialOrig(maDestination, options)
     }
