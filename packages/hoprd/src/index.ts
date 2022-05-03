@@ -301,7 +301,7 @@ async function main() {
   addUnhandledPromiseRejectionHandler()
 
   // Increase the default maximum number of event listeners
-  require('events').EventEmitter.defaultMaxListeners = 20;
+  require('events').EventEmitter.defaultMaxListeners = 20
 
   let node: Hopr
   let logs = new LogStream(argv.forwardLogs)
