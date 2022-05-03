@@ -236,10 +236,14 @@ const useFixtures = deployments.createFixture(
 
     // announce
     if (!ops?.skipAnnounceForAccountA) {
-      await channels.connect(accountA).announce(accountAPubKey.toUncompressedPubKeyHex(), [], {gasLimit: BigNumber.from('100000')})
+      await channels
+        .connect(accountA)
+        .announce(accountAPubKey.toUncompressedPubKeyHex(), [], { gasLimit: BigNumber.from('100000') })
     }
     if (!ops?.skipAnnounceForAccountB) {
-      await channels.connect(accountB).announce(accountBPubKey.toUncompressedPubKeyHex(), [], {gasLimit: BigNumber.from('100000')})
+      await channels
+        .connect(accountB)
+        .announce(accountBPubKey.toUncompressedPubKeyHex(), [], { gasLimit: BigNumber.from('100000') })
     }
 
     return {

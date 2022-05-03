@@ -69,7 +69,7 @@ function networkToHardhatNetwork(name: String, input: ResolvedEnvironment['netwo
       ;(cfg as HttpNetworkUserConfig).url = 'invalid_url'
     }
   } else {
-    (cfg as HardhatNetworkUserConfig).initialDate = '2021-07-27';
+    ;(cfg as HardhatNetworkUserConfig).initialDate = '2021-07-27'
   }
 
   if (input.live) {
@@ -110,13 +110,13 @@ const hardhatConfig: HardhatUserConfig = {
     deployer: 0,
     admin: {
       default: 1,
-      "goerli": '0xA18732DC751BE0dB04157eb92C92BA9d0fC09FC5',
-      "xdai": '0xE9131488563776DE7FEa238d6112c5dA46be9a9F'
+      goerli: '0xA18732DC751BE0dB04157eb92C92BA9d0fC09FC5',
+      xdai: '0xE9131488563776DE7FEa238d6112c5dA46be9a9F'
     },
     alice: {
       default: 2,
-      "goerli": '0x3dA21EB3D7d40fEA6bd78c627Cc9B1F59E7481E1',
-      "xdai": '0x3dA21EB3D7d40fEA6bd78c627Cc9B1F59E7481E1'
+      goerli: '0x3dA21EB3D7d40fEA6bd78c627Cc9B1F59E7481E1',
+      xdai: '0x3dA21EB3D7d40fEA6bd78c627Cc9B1F59E7481E1'
     }
   },
   solidity: {
@@ -283,37 +283,42 @@ task('flat', 'Flattens and prints contracts and their dependencies')
     )
   })
 
-subtask(TASK_TEST_SETUP_TEST_ENVIRONMENT, 'Setup test environment')
-  .setAction(async ({}, {network}) => {
-    if (network.name === HARDHAT_NETWORK_NAME) {
-      let provider = network.provider; 
-      // const hardhatNetworkConfig = newconfig.networks[HARDHAT_NETWORK_NAME];
-      // provider = createProvider(
-      //   HARDHAT_NETWORK_NAME,
-      //   hardhatNetworkConfig,
-      //   config.paths,
-      //   artifacts
-      // );
-      await provider.send("hardhat_reset")
-    }
-  })
-subtask<ParallelTestCLIOpts>('test:in-group:with-config', 'Faucets a local development HOPR node account with ETH and HOPR tokens', parallelTest)
+subtask(TASK_TEST_SETUP_TEST_ENVIRONMENT, 'Setup test environment').setAction(async ({}, { network }) => {
+  if (network.name === HARDHAT_NETWORK_NAME) {
+    let provider = network.provider
+    // const hardhatNetworkConfig = newconfig.networks[HARDHAT_NETWORK_NAME];
+    // provider = createProvider(
+    //   HARDHAT_NETWORK_NAME,
+    //   hardhatNetworkConfig,
+    //   config.paths,
+    //   artifacts
+    // );
+    await provider.send('hardhat_reset')
+  }
+})
+subtask<ParallelTestCLIOpts>(
+  'test:in-group:with-config',
+  'Faucets a local development HOPR node account with ETH and HOPR tokens',
+  parallelTest
+)
 
-task('test:in-group', 'Test files under default folders in the order of given groups and finish with the remaining ones')
-  .setAction(async ({}, { run, config }) => {
-    const parallelConfig = {
-      config: [
-        {
-          date: "2021-07-27",
-          testFiles: ['stake/HoprStake.test.ts']
-        },
-        {
-          date: "2021-07-27",
-          testFiles: ['stake/HoprBoost.test.ts']
-        }
-      ]
-    };
-    await run('test:in-group:with-config', parallelConfig)
-  })
+task(
+  'test:in-group',
+  'Test files under default folders in the order of given groups and finish with the remaining ones'
+).setAction(async ({}, { run, config }) => {
+  const parallelConfig = {
+    config: [
+      {
+        date: '2021-07-27',
+        testFiles: ['stake/HoprStake.test.ts']
+      },
+      {
+        date: '2021-07-27',
+        testFiles: ['stake/HoprBoost.test.ts']
+      }
+    ]
+  }
+  await run('test:in-group:with-config', parallelConfig)
+})
 
 export default hardhatConfig
