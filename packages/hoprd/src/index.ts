@@ -304,6 +304,9 @@ async function main() {
   // the rejected promise can be detected.
   addUnhandledPromiseRejectionHandler()
 
+  // Increase the default maximum number of event listeners
+  require('events').EventEmitter.defaultMaxListeners = 20;
+
   let node: Hopr
   let logs = new LogStream(argv.forwardLogs)
   let adminServer: AdminServer = undefined
