@@ -175,6 +175,10 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
    * @param newThreshold Minimum stake of HOPR token
    */
   function ownerUpdateThreshold(uint256 newThreshold) external onlyOwner {
+    require(
+      stakeThreshold != newThreshold,
+      'HoprStakingProxyForNetworkRegistry: try to update with the same staking threshold'
+    );
     stakeThreshold = newThreshold;
     emit ThresholdUpdated(stakeThreshold);
   }

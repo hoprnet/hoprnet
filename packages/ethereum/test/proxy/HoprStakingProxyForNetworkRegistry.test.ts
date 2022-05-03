@@ -145,12 +145,31 @@ describe('Registry proxy for stake v2', () => {
     })
   })
 
-  describe(`Lower threshold to ${LOW_STAKE}`, () => {
-    beforeEach(async () => {
-      await hoprStakingProxyForNetworkRegistry.connect(owner).ownerUpdateThreshold(LOW_STAKE)
+  describe('Update threshold', () => {
+    before(async () => {
+      ;({ owner, participantAddresses, hoprStakingProxyForNetworkRegistry } = await useFixtures())
     })
-    const canSelfRegister = [0, 2, 5]
-    const cannotSelfRegister = [1, 3, 4]
+    it('fails to update with the same threshold', async () => {
+      await expect(
+        hoprStakingProxyForNetworkRegistry
+          .connect(owner)
+          .ownerUpdateThreshold(INITIAL_MIN_STAKE)
+      ).to.be.revertedWith('HoprStakingProxyForNetworkRegistry: try to update with the same staking threshold')
+    })
+    it('updates with a different threshold', async () => {
+      await expect(hoprStakingProxyForNetworkRegistry.connect(owner).ownerUpdateThreshold(LOW_STAKE))
+        .to.emit(hoprStakingProxyForNetworkRegistry, 'ThresholdUpdated')
+        .withArgs(LOW_STAKE)
+    })
+  })
+
+  describe(`Owner add an existing NFT`, () => {
+    beforeEach(async () => {
+      ;({ owner, participantAddresses, hoprStakingProxyForNetworkRegistry } = await useFixtures())
+      await hoprStakingProxyForNetworkRegistry.connect(owner).ownerAddNftTypeAndRank(NFT_TYPE[0], NFT_RANK[1])
+    })
+    const canSelfRegister = [0]
+    const cannotSelfRegister = [1, 2, 3, 4, 5]
 
     canSelfRegister.forEach((accountIndex) => {
       it(`participant ${accountIndex} is still registered`, async () => {
@@ -165,8 +184,16 @@ describe('Registry proxy for stake v2', () => {
       })
     })
   })
-  describe(`Owner add an existing NFT`, () => {
+
+  describe(`Lower threshold to ${LOW_STAKE}`, () => {
     beforeEach(async () => {
+      ;({ owner, participantAddresses, hoprStakingProxyForNetworkRegistry } = await useFixtures())
+
+      const threshold = await hoprStakingProxyForNetworkRegistry.stakeThreshold();
+      if (threshold.toString() !== LOW_STAKE.toString()) {
+        await hoprStakingProxyForNetworkRegistry.connect(owner).ownerUpdateThreshold(LOW_STAKE)
+      }
+      //   add eligible NFT
       await hoprStakingProxyForNetworkRegistry.connect(owner).ownerAddNftTypeAndRank(NFT_TYPE[0], NFT_RANK[1])
     })
     const canSelfRegister = [0, 2, 5]
@@ -187,6 +214,10 @@ describe('Registry proxy for stake v2', () => {
   })
   describe(`Owner batch-add NFTs`, () => {
     beforeEach(async () => {
+      ;({ owner, participantAddresses, hoprStakingProxyForNetworkRegistry } = await useFixtures())
+      await hoprStakingProxyForNetworkRegistry.connect(owner).ownerUpdateThreshold(LOW_STAKE)
+      await hoprStakingProxyForNetworkRegistry.connect(owner).ownerAddNftTypeAndRank(NFT_TYPE[0], NFT_RANK[1])
+
       await hoprStakingProxyForNetworkRegistry
         .connect(owner)
         .ownerBatchAddNftTypeAndRank([NFT_TYPE[0], NFT_TYPE[1]], [NFT_RANK[1], NFT_RANK[0]])
@@ -217,6 +248,12 @@ describe('Registry proxy for stake v2', () => {
   })
   describe(`Owner remove NFT`, () => {
     beforeEach(async () => {
+      ;({ owner, participantAddresses, hoprStakingProxyForNetworkRegistry } = await useFixtures())
+      await hoprStakingProxyForNetworkRegistry.connect(owner).ownerUpdateThreshold(LOW_STAKE)
+      await hoprStakingProxyForNetworkRegistry
+        .connect(owner)
+        .ownerBatchAddNftTypeAndRank([NFT_TYPE[0], NFT_TYPE[1]], [NFT_RANK[1], NFT_RANK[0]])
+
       await hoprStakingProxyForNetworkRegistry.connect(owner).ownerRemoveNftTypeAndRank(NFT_TYPE[0], NFT_RANK[1])
     })
 
@@ -238,6 +275,9 @@ describe('Registry proxy for stake v2', () => {
   })
   describe(`Owner batch-remove NFTs`, () => {
     beforeEach(async () => {
+      ;({ owner, participantAddresses, hoprStakingProxyForNetworkRegistry } = await useFixtures())
+      await hoprStakingProxyForNetworkRegistry.connect(owner).ownerUpdateThreshold(LOW_STAKE)
+      await hoprStakingProxyForNetworkRegistry.connect(owner).ownerAddNftTypeAndRank(NFT_TYPE[1], NFT_RANK[0])
       await hoprStakingProxyForNetworkRegistry
         .connect(owner)
         .ownerBatchRemoveNftTypeAndRank([NFT_TYPE[0], NFT_TYPE[1]], [NFT_RANK[1], NFT_RANK[0]])
@@ -268,6 +308,8 @@ describe('Registry proxy for stake v2', () => {
   })
   describe(`Special NFTs`, () => {
     beforeEach(async () => {
+      ;({ owner, participantAddresses, hoprStakingProxyForNetworkRegistry } = await useFixtures())
+
       await hoprStakingProxyForNetworkRegistry
         .connect(owner)
         .ownerBatchAddSpecialNftTypeAndRank([SPECIAL_NFT_TYPE], [SPECIAL_NFT_RANK])
