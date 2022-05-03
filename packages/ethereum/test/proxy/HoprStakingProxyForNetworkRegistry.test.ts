@@ -151,9 +151,7 @@ describe('Registry proxy for stake v2', () => {
     })
     it('fails to update with the same threshold', async () => {
       await expect(
-        hoprStakingProxyForNetworkRegistry
-          .connect(owner)
-          .ownerUpdateThreshold(INITIAL_MIN_STAKE)
+        hoprStakingProxyForNetworkRegistry.connect(owner).ownerUpdateThreshold(INITIAL_MIN_STAKE)
       ).to.be.revertedWith('HoprStakingProxyForNetworkRegistry: try to update with the same staking threshold')
     })
     it('updates with a different threshold', async () => {
@@ -189,7 +187,7 @@ describe('Registry proxy for stake v2', () => {
     beforeEach(async () => {
       ;({ owner, participantAddresses, hoprStakingProxyForNetworkRegistry } = await useFixtures())
 
-      const threshold = await hoprStakingProxyForNetworkRegistry.stakeThreshold();
+      const threshold = await hoprStakingProxyForNetworkRegistry.stakeThreshold()
       if (threshold.toString() !== LOW_STAKE.toString()) {
         await hoprStakingProxyForNetworkRegistry.connect(owner).ownerUpdateThreshold(LOW_STAKE)
       }
