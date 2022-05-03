@@ -71,4 +71,3 @@ describe('test address sorting', function () {
     )
   })
 })
-

@@ -18,10 +18,7 @@ import { NOISE } from '@chainsafe/libp2p-noise'
 import type PeerId from 'peer-id'
 import Hopr, { type HoprOptions } from '.'
 import { getAddrs } from './identity'
-import HoprConnect, {
-  type HoprConnectConfig,
-  type PublicNodesEmitter
-} from '@hoprnet/hopr-connect'
+import HoprConnect, { type HoprConnectConfig, type PublicNodesEmitter } from '@hoprnet/hopr-connect'
 import type { Multiaddr } from 'multiaddr'
 
 const log = debug(`hopr-core:create-hopr`)
