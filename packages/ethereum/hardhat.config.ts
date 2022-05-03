@@ -20,6 +20,7 @@ import 'solidity-coverage'
 import '@typechain/hardhat'
 import { utils } from 'ethers'
 import faucet, { type FaucetCLIOPts } from './tasks/faucet'
+import parallelTest, { type ParallelTestCLIOpts } from './tasks/parallelTest'
 import getAccounts from './tasks/getAccounts'
 
 import { expandVars } from '@hoprnet/hopr-utils'
@@ -28,6 +29,8 @@ import type { ResolvedEnvironment } from '@hoprnet/hopr-core'
 // rest
 import { task, types, extendEnvironment, subtask } from 'hardhat/config'
 import { writeFileSync, realpathSync } from 'fs'
+import { TASK_NODE_GET_PROVIDER, TASK_TEST_SETUP_TEST_ENVIRONMENT } from 'hardhat/builtin-tasks/task-names'
+import { HARDHAT_NETWORK_NAME } from 'hardhat/plugins'
 
 const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, HOPR_ENVIRONMENT_ID, HOPR_HARDHAT_TAG } = process.env
 
@@ -59,13 +62,14 @@ function networkToHardhatNetwork(name: String, input: ResolvedEnvironment['netwo
       cfg.gasPrice = Number(parsedGasPrice[0])
     }
   }
-
   if (name !== 'hardhat') {
     try {
       ;(cfg as HttpNetworkUserConfig).url = expandVars(input.default_provider, process.env)
     } catch (_) {
       ;(cfg as HttpNetworkUserConfig).url = 'invalid_url'
     }
+  } else {
+    (cfg as HardhatNetworkUserConfig).initialDate = '2021-07-27';
   }
 
   if (input.live) {
@@ -103,7 +107,17 @@ for (const [networkId, network] of Object.entries<ResolvedEnvironment['network']
 const hardhatConfig: HardhatUserConfig = {
   networks,
   namedAccounts: {
-    deployer: 0
+    deployer: 0,
+    admin: {
+      default: 1,
+      "goerli": '0xA18732DC751BE0dB04157eb92C92BA9d0fC09FC5',
+      "xdai": '0xE9131488563776DE7FEa238d6112c5dA46be9a9F'
+    },
+    alice: {
+      default: 2,
+      "goerli": '0x3dA21EB3D7d40fEA6bd78c627Cc9B1F59E7481E1',
+      "xdai": '0x3dA21EB3D7d40fEA6bd78c627Cc9B1F59E7481E1'
+    }
   },
   solidity: {
     compilers: ['0.8.9', '0.6.6', '0.4.24'].map<SolcUserConfig>((version) => ({
@@ -134,6 +148,9 @@ const hardhatConfig: HardhatUserConfig = {
   },
   etherscan: {
     apiKey: ETHERSCAN_KEY
+  },
+  mocha: {
+    parallel: true
   }
 }
 
@@ -264,6 +281,39 @@ task('flat', 'Flattens and prints contracts and their dependencies')
         output
       })
     )
+  })
+
+subtask(TASK_TEST_SETUP_TEST_ENVIRONMENT, 'Setup test environment')
+  .setAction(async ({}, {network}) => {
+    if (network.name === HARDHAT_NETWORK_NAME) {
+      let provider = network.provider; 
+      // const hardhatNetworkConfig = newconfig.networks[HARDHAT_NETWORK_NAME];
+      // provider = createProvider(
+      //   HARDHAT_NETWORK_NAME,
+      //   hardhatNetworkConfig,
+      //   config.paths,
+      //   artifacts
+      // );
+      await provider.send("hardhat_reset")
+    }
+  })
+subtask<ParallelTestCLIOpts>('test:in-group:with-config', 'Faucets a local development HOPR node account with ETH and HOPR tokens', parallelTest)
+
+task('test:in-group', 'Test files under default folders in the order of given groups and finish with the remaining ones')
+  .setAction(async ({}, { run, config }) => {
+    const parallelConfig = {
+      config: [
+        {
+          date: "2021-07-27",
+          testFiles: ['stake/HoprStake.test.ts']
+        },
+        {
+          date: "2021-07-27",
+          testFiles: ['stake/HoprBoost.test.ts']
+        }
+      ]
+    };
+    await run('test:in-group:with-config', parallelConfig)
   })
 
 export default hardhatConfig
