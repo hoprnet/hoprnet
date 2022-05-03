@@ -12,6 +12,7 @@ import { timeout, abortableTimeout, type TimeoutOpts } from '../async'
 import { debug } from '../process'
 import { createRelayerKey } from './relayCode'
 import { createCircuitAddress } from '../network'
+import { compareAddressesPublicMode } from './addressSorters'
 
 const DEBUG_PREFIX = `hopr-core:libp2p`
 
@@ -277,8 +278,11 @@ async function doDial(
     return { status: DialStatus.SUCCESS, resp: struct }
   }
 
-  // Fetch known addresses for the given destination peer
-  const knownAddressesForPeer = await libp2p.peerStore.addressBook.get(destination)
+  // Fetch sorted known addresses for the given destination peer
+  const knownAddressesForPeer = (await libp2p.peerStore.addressBook.get(destination))
+                                .sort((a, b) => compareAddressesPublicMode(a.multiaddr, b.multiaddr));
+  // TODO: Do we need to sort in local mode as well?
+
   log(`There are ${knownAddressesForPeer.length} already known addresses for ${destination.toB58String()}:`)
 
   // Try using each known address to reach the destination
