@@ -11,7 +11,6 @@ import { Multiaddr } from 'multiaddr'
 import { CODE_CIRCUIT, CODE_P2P } from '../constants'
 
 export * from './addrs'
-export * from './addressSorters'
 export { encodeWithLengthPrefix, decodeWithLengthPrefix } from './lengthPrefix'
 
 function isAsyncStream<T>(iterator: AsyncIterable<T> | Iterable<T>): iterator is AsyncIterable<T> {

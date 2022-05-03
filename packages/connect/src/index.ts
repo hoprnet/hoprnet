@@ -298,6 +298,5 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
 }
 
 export type { PublicNodesEmitter, HoprConnectConfig, HoprConnectDialOptions, HoprConnectListeningOptions }
-export { compareAddressesLocalMode, compareAddressesPublicMode } from './utils'
 
 export default HoprConnect

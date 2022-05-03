@@ -10,16 +10,9 @@ import type { default as LibP2P, Connection } from 'libp2p'
 import type { Peer } from 'libp2p/src/peer-store/types'
 import type PeerId from 'peer-id'
 
-import { compareAddressesLocalMode, compareAddressesPublicMode, type HoprConnectConfig } from '@hoprnet/hopr-connect'
-
-import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants'
-
-import NetworkPeers, { Entry } from './network/network-peers'
-import Heartbeat, { type HeartbeatPingResult } from './network/heartbeat'
-
-import { findPath } from './path'
-
 import {
+  compareAddressesLocalMode,
+  compareAddressesPublicMode,
   PublicKey,
   Balance,
   NativeBalance,
@@ -48,6 +41,15 @@ import {
   createCircuitAddress,
   convertPubKeyFromPeerId
 } from '@hoprnet/hopr-utils'
+
+import { type HoprConnectConfig } from '@hoprnet/hopr-connect'
+
+import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants'
+
+import NetworkPeers, { Entry } from './network/network-peers'
+import Heartbeat, { type HeartbeatPingResult } from './network/heartbeat'
+
+import { findPath } from './path'
 import { type default as HoprCoreEthereum, type Indexer } from '@hoprnet/hopr-core-ethereum'
 
 import {

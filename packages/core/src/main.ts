@@ -3,7 +3,14 @@ import { mkdir } from 'fs/promises'
 
 import { default as LibP2P, type Connection } from 'libp2p'
 import { LevelDatastore } from 'datastore-level'
-import { type AddressSorter, HoprDB, PublicKey, debug } from '@hoprnet/hopr-utils'
+import {
+  type AddressSorter,
+  HoprDB,
+  PublicKey,
+  debug,
+  compareAddressesLocalMode,
+  compareAddressesPublicMode
+} from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import Mplex from 'libp2p-mplex'
 import KadDHT from 'libp2p-kad-dht'
@@ -13,9 +20,7 @@ import Hopr, { type HoprOptions } from '.'
 import { getAddrs } from './identity'
 import HoprConnect, {
   type HoprConnectConfig,
-  type PublicNodesEmitter,
-  compareAddressesLocalMode,
-  compareAddressesPublicMode
+  type PublicNodesEmitter
 } from '@hoprnet/hopr-connect'
 import type { Multiaddr } from 'multiaddr'
 
