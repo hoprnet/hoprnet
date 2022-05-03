@@ -289,6 +289,8 @@ async function doDial(
   // Try using each known address to reach the destination
   for (const knownAddress of knownAddressesForPeer) {
     log(`Trying address ${knownAddress.multiaddr.toString()}`)
+
+    // TODO: if one of these attempts times out, it sets the abort signal making the subsequent attempts fail as well.
     struct = await establishNewConnection(libp2p, knownAddress.multiaddr, protocol, opts)
     if (struct) {
       log(`Successfully reached ${destination.toB58String()} via already known ${knownAddress.multiaddr} !`)
