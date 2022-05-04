@@ -4,7 +4,7 @@ import { expect } from 'chai'
 import BN from 'bn.js'
 import type { HoprChannels, HoprToken, ChannelsMock } from '../src/types'
 import { increaseTime } from './utils'
-import { ACCOUNT_A, ACCOUNT_B } from './constants'
+import { ACCOUNT_A, ACCOUNT_B } from './utils'
 import {
   Address,
   Challenge,

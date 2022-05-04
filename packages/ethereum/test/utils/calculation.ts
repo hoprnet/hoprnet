@@ -19,3 +19,7 @@ export const calculateRewards = (baseTokenAmount: number, duration: number, fact
     .div(utils.parseUnits('1.0', 12))
     .toString()
 }
+
+export const toSolPercent = (multiplier: number, percent: number): string => {
+  return String(Math.floor(percent * multiplier))
+}
