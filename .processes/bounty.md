@@ -77,4 +77,3 @@ Depending on the prize's currency, there might be fluctuations in the price rela
 ## Awarding the prize
 
 Before the bounty is awarded, one of the [tech representatives](./development#tech-representatives) has to approve the PR which was created to resolve the bounty.
-
