@@ -170,6 +170,8 @@ async function establishNewConnection(
   }
 
   if (!conn) {
+    // Do not forget to remove event listener, to prevent leakage
+    opts.signal?.removeEventListener('abort', onAbort)
     return
   }
 
