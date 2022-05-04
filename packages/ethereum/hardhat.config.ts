@@ -148,9 +148,6 @@ const hardhatConfig: HardhatUserConfig = {
   },
   etherscan: {
     apiKey: ETHERSCAN_KEY
-  },
-  mocha: {
-    parallel: true
   }
 }
 

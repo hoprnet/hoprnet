@@ -36,6 +36,7 @@ async function main(opts: ParallelTestCLIOpts, { run, config }: HardhatRuntimeEn
 
   // run tests with their config files
   await run(TASK_TEST, { testFiles: groupedTestFiles[0] })
+  await run(TASK_TEST, { testFiles: groupedTestFiles[1] })
 }
 
 export default main
