@@ -473,7 +473,11 @@ const whitehatTestOnly = !TEST_WHITEHAT_ONLY || TEST_WHITEHAT_ONLY.toLowerCase()
           await expect(
             nftContract
               .connect(participants[0])
-              .functions['safeTransferFrom(address,address,uint256)'](participantAddresses[0], stake2Contract.address, 3)
+              .functions['safeTransferFrom(address,address,uint256)'](
+                participantAddresses[0],
+                stake2Contract.address,
+                3
+              )
           )
             .to.emit(stake2Contract, 'Redeemed')
             .withArgs(participantAddresses[0], '3', true)
