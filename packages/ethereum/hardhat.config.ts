@@ -307,11 +307,15 @@ task(
     config: [
       {
         date: '2021-07-27',
+        testFiles: ['stake/HoprBoost.test.ts']
+      },
+      {
+        date: '2021-07-27',
         testFiles: ['stake/HoprStake.test.ts']
       },
       {
         date: '2021-07-27',
-        testFiles: ['stake/HoprBoost.test.ts']
+        testFiles: ['stake/HoprStake2.test.ts']
       }
     ]
   }
