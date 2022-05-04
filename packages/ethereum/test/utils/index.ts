@@ -3,6 +3,7 @@ import { ethers } from 'ethers'
 export * from './time'
 export * from './deploy'
 export * from './interface'
+export * from './rewards'
 
 export const getAccount = (privateKey: string) => {
   const wallet = new ethers.Wallet(privateKey)
