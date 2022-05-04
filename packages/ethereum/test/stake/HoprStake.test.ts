@@ -2,32 +2,9 @@ import * as hre from 'hardhat'
 import { BigNumber, constants, Contract, Signer, utils } from 'ethers'
 import { expect } from 'chai'
 import deployERC1820Registry, { ERC1820_REGISTRY_ABI, ERC1820_REGISTRY_ADDRESS } from '../../deploy/01_ERC1820Registry'
-import { advanceTimeForNextBlock, deployContractFromFactory, latestBlockTime } from '../utils'
+import { advanceTimeForNextBlock, calculateRewards, deployContractFromFactory, latestBlockTime } from '../utils'
 
-/**
- * @dev Rewards should be calculated for two blocks: for 1e18 tokens, at a rate of:
- *  - BASE_RATE: 5787
- *  - silver hodler: 158
- *  calculation is done: 1000 * 1e18 * 2 * (5787 + 158) / 1e12;
- * @param baseTokenAmount
- * @param duration
- * @param factors
- * @returns
- */
-const calculateRewards = (baseTokenAmount: number, duration: number, factors: number[]): string => {
-  const cumulatedFactors = factors.reduce((acc, cur) => BigNumber.from(cur).add(acc), BigNumber.from(0))
-  return utils
-    .parseUnits(baseTokenAmount.toFixed(), 'ether')
-    .mul(BigNumber.from(duration))
-    .mul(cumulatedFactors)
-    .div(utils.parseUnits('1.0', 12))
-    .toString()
-}
-
-const { TEST_WHITEHAT_ONLY } = process.env
-const whitehatTestOnly = !TEST_WHITEHAT_ONLY || TEST_WHITEHAT_ONLY.toLowerCase() !== 'true' ? false : true
-
-;(whitehatTestOnly ? describe.skip : describe)('HoprStake', function () {
+describe('HoprStake', function () {
   let deployer: Signer
   let admin: Signer
   let participants: Signer[]
@@ -45,8 +22,6 @@ const whitehatTestOnly = !TEST_WHITEHAT_ONLY || TEST_WHITEHAT_ONLY.toLowerCase()
 
   const BASIC_START = 1627387200 // July 27 2021 14:00 CET.
   const PROGRAM_END = 1642424400 // Jan 17 2022 14:00 CET.
-  const PROGRAM_V2_START = 1642424400 // Jan 17 2022 14:00 CET.
-  // const PROGRAM_V2_END = 1650974400; // Apr 26th 2022 14:00 CET.
   const BASIC_FACTOR_NUMERATOR = 5787
   const BADGES = [
     {
@@ -345,176 +320,126 @@ const whitehatTestOnly = !TEST_WHITEHAT_ONLY || TEST_WHITEHAT_ONLY.toLowerCase()
       })
     })
 
-    describe('During the staking program v1 / before staking v2', function () {
-      describe('Staking v1', function () {
-        it('advance 2 blocks (10 seconds), there is more rewards to be claimed.', async () => {
-          const lastBlockTime = await latestBlockTime(hre.ethers.provider)
+    describe('During the staking program v1', function () {
+      it('advance 2 blocks (10 seconds), there is more rewards to be claimed.', async () => {
+        const lastBlockTime = await latestBlockTime(hre.ethers.provider)
 
-          const duration = 10 // in seconds
-          await advanceTimeForNextBlock(hre.ethers.provider, lastBlockTime + duration) // advance two blocks - 2 seconds
-          const currentAccount = await stakeContract.accounts(participantAddresses[0])
+        const duration = 10 // in seconds
+        await advanceTimeForNextBlock(hre.ethers.provider, lastBlockTime + duration) // advance two blocks - 2 seconds
+        const currentAccount = await stakeContract.accounts(participantAddresses[0])
 
-          const reward = await stakeContract.getCumulatedRewardsIncrement(participantAddresses[0])
-          const blockTime = await latestBlockTime(hre.ethers.provider)
-          expect(blockTime - lastBlockTime).to.equal(duration) // advance duration blocks or second
-          expect(currentAccount[3].toString()).to.equal(constants.Zero.toString()) // equals to the expected rewards.
-          expect(reward.toString()).to.equal(
-            calculateRewards(1000, blockTime - BASIC_START, [BASIC_FACTOR_NUMERATOR, parseInt(BADGES[0].nominator)])
-          ) // rewards get synced
-        })
-
-        it('can redeem another (less good) HODLr token', async function () {
-          // create the 7th NFT.
-          await nftContract
-            .connect(admin)
-            .mint(participantAddresses[0], BADGES[3].type, BADGES[3].rank, BADGES[3].nominator, BADGES[3].deadline)
-
-          // redeem NFT #7
-          await expect(
-            nftContract
-              .connect(participants[0])
-              .functions['safeTransferFrom(address,address,uint256)'](participantAddresses[0], stakeContract.address, 7)
-          )
-            .to.emit(stakeContract, 'Redeemed')
-            .withArgs(participantAddresses[0], '7', false)
-        })
-
-        it('can redeem another (better) HODLr token', async function () {
-          // redeem token number 2
-          await expect(
-            nftContract
-              .connect(participants[0])
-              .functions['safeTransferFrom(address,address,uint256)'](participantAddresses[0], stakeContract.address, 2)
-          )
-            .to.emit(stakeContract, 'Redeemed')
-            .withArgs(participantAddresses[0], '2', true)
-        })
-
-        it('their token value is synced', async function () {
-          const currentAccount = await stakeContract.accounts(participantAddresses[0])
-          const reward = await stakeContract.getCumulatedRewardsIncrement(participantAddresses[0])
-          const blockTime = await latestBlockTime(hre.ethers.provider)
-          expect(currentAccount[3].toString()).to.equal(
-            calculateRewards(1000, blockTime - BASIC_START, [BASIC_FACTOR_NUMERATOR, parseInt(BADGES[0].nominator)])
-          ) // equals to the expected rewards.
-          expect(reward.toString()).to.equal(constants.Zero.toString()) // rewards get synced
-        })
-
-        it('receives more claim rewards', async () => {
-          await erc777
-            .connect(admin)
-            .send(stakeContract.address, utils.parseUnits('5000000', 'ether').sub(constants.One), '0x') // propide 5 million REWARD_TOKEN
-          expect((await erc777.balanceOf(adminAddress)).toString()).to.equal(constants.Zero.toString())
-        })
-
-        it('claims rewards', async () => {
-          await expect(stakeContract.claimRewards(participantAddresses[0]))
-            .to.emit(stakeContract, 'Claimed')
-            .withArgs(participantAddresses[0], (await erc777.balanceOf(participantAddresses[0])).toString())
-        })
-
-        it('can redeem another HODLr token of another category', async function () {
-          // create the 8th NFT.
-          await nftContract
-            .connect(admin)
-            .mint(participantAddresses[0], BADGES[4].type, BADGES[4].rank, BADGES[4].nominator, BADGES[4].deadline)
-
-          // redeem NFT #8
-          await expect(
-            nftContract
-              .connect(participants[0])
-              .functions['safeTransferFrom(address,address,uint256)'](participantAddresses[0], stakeContract.address, 8)
-          )
-            .to.emit(stakeContract, 'Redeemed')
-            .withArgs(participantAddresses[0], '8', true)
-        })
-
-        it('cannot lock tokens when length does not match', async () => {
-          await expect(stakeContract.connect(admin).lock([participantAddresses[0]], ['1', '2'])).to.be.revertedWith(
-            'HoprStake: Length does not match'
-          )
-        })
-
-        it('can lock tokens', async () => {
-          await expect(
-            stakeContract.connect(admin).lock([participantAddresses[2]], [utils.parseUnits('1.0', 'ether').toString()])
-          )
-            .to.emit(stakeContract, 'Staked')
-            .withArgs(participantAddresses[2], constants.Zero.toString(), utils.parseUnits('1.0', 'ether').toString())
-        })
-
-        it('cannot unlock tokens', async () => {
-          await expect(stakeContract.unlock(participantAddresses[0])).to.be.revertedWith(
-            'HoprStake: Program is ongoing, cannot unlock stake.'
-          )
-        })
-
-        it('can reclaim random ERC20', async () => {
-          const randomERC20 = await deployContractFromFactory(deployer, 'ERC20Mock', [stakeContract.address, 1])
-          // Revert message was bubbled up, showing only the one from ERC677Mock
-          await stakeContract.connect(admin).reclaimErc20Tokens(randomERC20.address)
-          expect((await randomERC20.balanceOf(adminAddress)).toString()).to.equal('1')
-        })
-
-        it('can sync at anytime', async () => {
-          // const currentAccount = await stakeContract.accounts(participantAddresses[0]);
-          // expect(currentAccount[0].toString()).to.equal(utils.parseUnits('1000', 'ether').toString()); // actualLockedTokenAmount
-          // expect(currentAccount[1].toString()).to.equal('0'); // virtualLockedTokenAmount
-          // // skip checking lastSyncTimestamp
-          // expect(currentAccount[3].toString()).to.equal('0'); // cumulatedRewards
-          // expect(currentAccount[4].toString()).to.equal('0'); // claimedRewards
-          console.log(JSON.stringify(await stakeContract.accounts(participantAddresses[0]).toString()))
-          await stakeContract.sync(participantAddresses[2])
-          console.log(JSON.stringify(await stakeContract.accounts(participantAddresses[0]).toString()))
-        })
+        const reward = await stakeContract.getCumulatedRewardsIncrement(participantAddresses[0])
+        const blockTime = await latestBlockTime(hre.ethers.provider)
+        expect(blockTime - lastBlockTime).to.equal(duration) // advance duration blocks or second
+        expect(currentAccount[3].toString()).to.equal(constants.Zero.toString()) // equals to the expected rewards.
+        expect(reward.toString()).to.equal(
+          calculateRewards(1000, blockTime - BASIC_START, [BASIC_FACTOR_NUMERATOR, parseInt(BADGES[0].nominator)])
+        ) // rewards get synced
       })
-      describe('Staking v2', function () {
-        it('can redeem HODLr token', async function () {
-          await expect(
-            nftContract
-              .connect(participants[0])
-              .functions['safeTransferFrom(address,address,uint256)'](participantAddresses[0], stake2Contract.address, 3)
-          )
-            .to.emit(stake2Contract, 'Redeemed')
-            .withArgs(participantAddresses[0], '3', true)
-        })
 
-        it('can receive LOCK_TOKEN with `transferAndCall()`', async () => {
-          expect((await erc677.balanceOf(participantAddresses[0])).toString()).to.equal(
-            utils.parseUnits('9000', 'ether').toString()
-          )
-          await erc677
+      it('can redeem another (less good) HODLr token', async function () {
+        // create the 7th NFT.
+        await nftContract
+          .connect(admin)
+          .mint(participantAddresses[0], BADGES[3].type, BADGES[3].rank, BADGES[3].nominator, BADGES[3].deadline)
+
+        // redeem NFT #7
+        await expect(
+          nftContract
             .connect(participants[0])
-            .transferAndCall(stake2Contract.address, utils.parseUnits('1000', 'ether'), '0x') // stake 1000 LOCK_TOKEN
-          expect((await erc677.balanceOf(participantAddresses[0])).toString()).to.equal(
-            utils.parseUnits('8000', 'ether').toString()
-          )
-        })
-        it('has no cumulated rewards increment', async () => {
-          const blockTime = await latestBlockTime(hre.ethers.provider)
-          console.log('debug blockTime', blockTime)
-          const rewardsIncrement = await stake2Contract.getCumulatedRewardsIncrement(participantAddresses[0])
-          expect(BigNumber.from(rewardsIncrement).toString()).to.equal(constants.Zero.toString())
-        })
-        it('has nothing to claim', async () => {
-          await expect(stake2Contract.claimRewards(participantAddresses[0])).to.be.revertedWith(
-            'HoprStake: Nothing to claim'
-          )
-        })
-        it('can redeem token #4 and stake some tokens', async () => {
-          await nftContract
-            .connect(participants[1])
-            .functions['safeTransferFrom(address,address,uint256)'](participantAddresses[1], stake2Contract.address, 4)
-          await erc677.connect(participants[1]).transferAndCall(stake2Contract.address, utils.parseUnits('1.'), '0x')
-        })
-        it('gets the cumulated rewards right at PROGRAM_START', async function () {
-          const currentAccount = await stake2Contract.accounts(participantAddresses[0])
-          const reward = await stake2Contract.getCumulatedRewardsIncrement(participantAddresses[0])
-          expect(currentAccount[2].toString()).to.equal(
-            calculateRewards(1000, 0, [BASIC_FACTOR_NUMERATOR, parseInt(BADGES[0].nominator)])
-          ) // equals to the expected rewards.
-          expect(reward.toString()).to.equal(constants.Zero.toString()) // rewards get synced
-        })
+            .functions['safeTransferFrom(address,address,uint256)'](participantAddresses[0], stakeContract.address, 7)
+        )
+          .to.emit(stakeContract, 'Redeemed')
+          .withArgs(participantAddresses[0], '7', false)
+      })
+
+      it('can redeem another (better) HODLr token', async function () {
+        // redeem token number 2
+        await expect(
+          nftContract
+            .connect(participants[0])
+            .functions['safeTransferFrom(address,address,uint256)'](participantAddresses[0], stakeContract.address, 2)
+        )
+          .to.emit(stakeContract, 'Redeemed')
+          .withArgs(participantAddresses[0], '2', true)
+      })
+
+      it('their token value is synced', async function () {
+        const currentAccount = await stakeContract.accounts(participantAddresses[0])
+        const reward = await stakeContract.getCumulatedRewardsIncrement(participantAddresses[0])
+        const blockTime = await latestBlockTime(hre.ethers.provider)
+        expect(currentAccount[3].toString()).to.equal(
+          calculateRewards(1000, blockTime - BASIC_START, [BASIC_FACTOR_NUMERATOR, parseInt(BADGES[0].nominator)])
+        ) // equals to the expected rewards.
+        expect(reward.toString()).to.equal(constants.Zero.toString()) // rewards get synced
+      })
+
+      it('receives more claim rewards', async () => {
+        await erc777
+          .connect(admin)
+          .send(stakeContract.address, utils.parseUnits('5000000', 'ether').sub(constants.One), '0x') // propide 5 million REWARD_TOKEN
+        expect((await erc777.balanceOf(adminAddress)).toString()).to.equal(constants.Zero.toString())
+      })
+
+      it('claims rewards', async () => {
+        await expect(stakeContract.claimRewards(participantAddresses[0]))
+          .to.emit(stakeContract, 'Claimed')
+          .withArgs(participantAddresses[0], (await erc777.balanceOf(participantAddresses[0])).toString())
+      })
+
+      it('can redeem another HODLr token of another category', async function () {
+        // create the 8th NFT.
+        await nftContract
+          .connect(admin)
+          .mint(participantAddresses[0], BADGES[4].type, BADGES[4].rank, BADGES[4].nominator, BADGES[4].deadline)
+
+        // redeem NFT #8
+        await expect(
+          nftContract
+            .connect(participants[0])
+            .functions['safeTransferFrom(address,address,uint256)'](participantAddresses[0], stakeContract.address, 8)
+        )
+          .to.emit(stakeContract, 'Redeemed')
+          .withArgs(participantAddresses[0], '8', true)
+      })
+
+      it('cannot lock tokens when length does not match', async () => {
+        await expect(stakeContract.connect(admin).lock([participantAddresses[0]], ['1', '2'])).to.be.revertedWith(
+          'HoprStake: Length does not match'
+        )
+      })
+
+      it('can lock tokens', async () => {
+        await expect(
+          stakeContract.connect(admin).lock([participantAddresses[2]], [utils.parseUnits('1.0', 'ether').toString()])
+        )
+          .to.emit(stakeContract, 'Staked')
+          .withArgs(participantAddresses[2], constants.Zero.toString(), utils.parseUnits('1.0', 'ether').toString())
+      })
+
+      it('cannot unlock tokens', async () => {
+        await expect(stakeContract.unlock(participantAddresses[0])).to.be.revertedWith(
+          'HoprStake: Program is ongoing, cannot unlock stake.'
+        )
+      })
+
+      it('can reclaim random ERC20', async () => {
+        const randomERC20 = await deployContractFromFactory(deployer, 'ERC20Mock', [stakeContract.address, 1])
+        // Revert message was bubbled up, showing only the one from ERC677Mock
+        await stakeContract.connect(admin).reclaimErc20Tokens(randomERC20.address)
+        expect((await randomERC20.balanceOf(adminAddress)).toString()).to.equal('1')
+      })
+
+      it('can sync at anytime', async () => {
+        // const currentAccount = await stakeContract.accounts(participantAddresses[0]);
+        // expect(currentAccount[0].toString()).to.equal(utils.parseUnits('1000', 'ether').toString()); // actualLockedTokenAmount
+        // expect(currentAccount[1].toString()).to.equal('0'); // virtualLockedTokenAmount
+        // // skip checking lastSyncTimestamp
+        // expect(currentAccount[3].toString()).to.equal('0'); // cumulatedRewards
+        // expect(currentAccount[4].toString()).to.equal('0'); // claimedRewards
+        console.log(JSON.stringify(await stakeContract.accounts(participantAddresses[0]).toString()))
+        await stakeContract.sync(participantAddresses[2])
+        console.log(JSON.stringify(await stakeContract.accounts(participantAddresses[0]).toString()))
       })
     })
 
@@ -574,165 +499,6 @@ const whitehatTestOnly = !TEST_WHITEHAT_ONLY || TEST_WHITEHAT_ONLY.toLowerCase()
           expect(owner).to.equal(participantAddresses[1]) // compare bytes32 like address
         })
       })
-      describe('Staking v2', function () {
-        it('gets the cumulated rewards shortly after PROGRAM_V2_START', async function () {
-          await stake2Contract.sync(participantAddresses[0])
-          const currentAccount = await stake2Contract.accounts(participantAddresses[0])
-          const reward = await stake2Contract.getCumulatedRewardsIncrement(participantAddresses[0])
-          const blockTime = await latestBlockTime(hre.ethers.provider)
-          expect(currentAccount[2].toString()).to.equal(
-            calculateRewards(1000, blockTime - PROGRAM_V2_START, [
-              BASIC_FACTOR_NUMERATOR,
-              parseInt(BADGES[0].nominator)
-            ])
-          ) // equals to the expected rewards.
-          expect(reward.toString()).to.equal(constants.Zero.toString()) // rewards get synced
-        })
-
-        it('has insufficient pool', async () => {
-          await expect(stake2Contract.claimRewards(participantAddresses[0])).to.be.revertedWith(
-            'HoprStake: Insufficient reward pool.'
-          )
-        })
-      })
     })
-
-    describe('During the staking v2 program', function () {
-      it('can redeem another (less good) HODLr token', async function () {
-        // create the 10th NFT.
-        await nftContract
-          .connect(admin)
-          .mint(participantAddresses[0], BADGES[3].type, BADGES[3].rank, BADGES[3].nominator, BADGES[3].deadline)
-
-        // redeem NFT #10
-        await expect(
-          nftContract
-            .connect(participants[0])
-            .functions['safeTransferFrom(address,address,uint256)'](participantAddresses[0], stake2Contract.address, 10)
-        )
-          .to.emit(stake2Contract, 'Redeemed')
-          .withArgs(participantAddresses[0], '10', false)
-      })
-
-      it('can redeem another (better) HODLr token', async function () {
-        // redeem token number 5
-        await expect(
-          nftContract
-            .connect(participants[0])
-            .functions['safeTransferFrom(address,address,uint256)'](participantAddresses[0], stake2Contract.address, 5)
-        )
-          .to.emit(stake2Contract, 'Redeemed')
-          .withArgs(participantAddresses[0], '5', true)
-      })
-
-      it('their token value is synced', async function () {
-        const currentAccount = await stake2Contract.accounts(participantAddresses[0])
-        const reward = await stake2Contract.getCumulatedRewardsIncrement(participantAddresses[0])
-        const blockTime = await latestBlockTime(hre.ethers.provider)
-        expect(currentAccount[2].toString()).to.equal(
-          calculateRewards(1000, blockTime - PROGRAM_V2_START, [BASIC_FACTOR_NUMERATOR, parseInt(BADGES[0].nominator)])
-        ) // equals to the expected rewards.
-        expect(reward.toString()).to.equal(constants.Zero.toString()) // rewards get synced
-      })
-
-      it('receives more claim rewards', async () => {
-        await erc777.mintInternal(adminAddress, utils.parseUnits('5000000', 'ether'), '0x', '0x') // admin account holds 5 million wxHOPR
-        await erc777.connect(admin).send(stake2Contract.address, utils.parseUnits('5000000', 'ether'), '0x') // propide 5 million REWARD_TOKEN
-        expect((await erc777.balanceOf(adminAddress)).toString()).to.equal(constants.Zero.toString())
-      })
-
-      it('can redeem another HODLr token of another category', async function () {
-        // create the 10th NFT.
-        await nftContract
-          .connect(admin)
-          .mint(participantAddresses[0], BADGES[4].type, BADGES[4].rank, BADGES[4].nominator, BADGES[4].deadline)
-
-        // redeem NFT #11
-        await expect(
-          nftContract
-            .connect(participants[0])
-            .functions['safeTransferFrom(address,address,uint256)'](participantAddresses[0], stake2Contract.address, 11)
-        )
-          .to.emit(stake2Contract, 'Redeemed')
-          .withArgs(participantAddresses[0], '11', true)
-      })
-
-      it('cannot unlockFor tokens', async () => {
-        await expect(stake2Contract.unlockFor(participantAddresses[0])).to.be.revertedWith(
-          'HoprStake: Program is ongoing, cannot unlock stake.'
-        )
-      })
-
-      it('cannot unlock tokens', async () => {
-        await expect(stake2Contract.unlock()).to.be.revertedWith('HoprStake: Program is ongoing, cannot unlock stake.')
-      })
-
-      it('can reclaim random ERC20', async () => {
-        const randomERC20 = await deployContractFromFactory(deployer, 'ERC20Mock', [stake2Contract.address, 1])
-        // Revert message was bubbled up, showing only the one from ERC677Mock
-        await stake2Contract.connect(admin).reclaimErc20Tokens(randomERC20.address)
-        expect((await randomERC20.balanceOf(adminAddress)).toString()).to.equal('1')
-      })
-
-      it('can sync at anytime', async () => {
-        console.log(JSON.stringify(await stake2Contract.accounts(participantAddresses[0]).toString()))
-        await stake2Contract.sync(participantAddresses[2])
-        console.log(JSON.stringify(await stake2Contract.accounts(participantAddresses[0]).toString()))
-      })
-    })
-    // describe('After PROGRAM_V2_END', function () {
-    //     let tx;
-    //     it('succeeds in advancing block to PROGRAM_V2_END + 1', async function () {
-    //         await advanceTimeForNextBlock(hre.ethers.provider, PROGRAM_V2_END + 1);
-    //         const blockTime = await latestBlockTime(hre.ethers.provider);
-    //         expect(blockTime.toString()).to.equal((PROGRAM_V2_END + 1).toString());
-    //     });
-
-    //     it('cannot receive random 677 with `transferAndCall()`', async () => {
-    //         // bubbled up
-    //         expectRevert(erc677.connect(participants[1]).transferAndCall(stake2Contract.address, constants.One, '0x'), 'ERC677Mock: failed when calling onTokenTransfer');
-    //     });
-    //     it('cannot redeem NFT`', async () => {
-    //         // created 12th NFT
-    //         await nftContract.connect(admin).mint(participantAddresses[1], BADGES[1].type, BADGES[1].rank, BADGES[1].nominator, BADGES[1].deadline);
-    //         expectRevert(nftContract.connect(participants[1]).functions["safeTransferFrom(address,address,uint256)"](participantAddresses[1], stake2Contract.address, 12), 'HoprStake: Program ended, cannot redeem boosts.');
-    //     });
-    //     it('can unlock', async () => {
-    //         tx = await stake2Contract.connect(participants[1]).unlock(participantAddresses[1]);
-    //     });
-    //     it('reclaims rewards', async () => {
-    //         const rewards = calculateRewards(1, PROGRAM_V2_END - PROGRAM_V2_START, [BASIC_FACTOR_NUMERATOR, parseInt(BADGES[0].nominator)]);
-    //         const receipt = await ethers.provider.waitForTransaction(tx.hash);
-    //         const account = await getParamFromTxResponse(
-    //             receipt, stake2Contract.interface.getEvent("Claimed").format(), 1, stake2Contract.address.toLowerCase(), "Lock the token"
-    //         );
-    //         const reward = await getParamFromTxResponse(
-    //             receipt, stake2Contract.interface.getEvent("Claimed").format(), 2, stake2Contract.address.toLowerCase(), "Lock the token"
-    //         );
-
-    //         expect(account.toString().slice(-40).toLowerCase()).to.equal(participantAddresses[1].slice(2).toLowerCase()); // compare bytes32 like address
-    //         expect(BigNumber.from(reward).toString()).to.equal(rewards);  // true
-    //     });
-    //     it('receives original tokens - Released event ', async () => {
-    //         const receipt = await ethers.provider.waitForTransaction(tx.hash);
-    //         const account = await getParamFromTxResponse(
-    //             receipt, stake2Contract.interface.getEvent("Released").format(), 1, stake2Contract.address.toLowerCase(), "Lock the token"
-    //         );
-    //         const actualStake = await getParamFromTxResponse(
-    //             receipt, stake2Contract.interface.getEvent("Released").format(), 2, stake2Contract.address.toLowerCase(), "Lock the token"
-    //         );
-
-    //         expect(account.toString().slice(-40).toLowerCase()).to.equal(participantAddresses[1].slice(2).toLowerCase()); // compare bytes32 like address
-    //         expect(BigNumber.from(actualStake).toString()).to.equal(utils.parseUnits('1.0', 'ether').toString());  // true
-    //     });
-    //     it('receives original tokens - total balance matches old one ', async () => {
-    //         const balance = await erc677.balanceOf(participantAddresses[1]);
-    //         expect(BigNumber.from(balance).toString()).to.equal(utils.parseUnits('10000', 'ether').toString());  // true
-    //     });
-    //     it('receives NFTs', async () => {
-    //         const owner = await nftContract.ownerOf(9);
-    //         expect(owner).to.equal(participantAddresses[1]); // compare bytes32 like address
-    //     });
-    // });
   })
 })
