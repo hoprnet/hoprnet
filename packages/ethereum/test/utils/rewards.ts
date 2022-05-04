@@ -10,12 +10,12 @@ import { BigNumber, utils } from 'ethers'
  * @param factors
  * @returns
  */
- export const calculateRewards = (baseTokenAmount: number, duration: number, factors: number[]): string => {
-    const cumulatedFactors = factors.reduce((acc, cur) => BigNumber.from(cur).add(acc), BigNumber.from(0))
-    return utils
-      .parseUnits(baseTokenAmount.toFixed(), 'ether')
-      .mul(BigNumber.from(duration))
-      .mul(cumulatedFactors)
-      .div(utils.parseUnits('1.0', 12))
-      .toString()
-  }
+export const calculateRewards = (baseTokenAmount: number, duration: number, factors: number[]): string => {
+  const cumulatedFactors = factors.reduce((acc, cur) => BigNumber.from(cur).add(acc), BigNumber.from(0))
+  return utils
+    .parseUnits(baseTokenAmount.toFixed(), 'ether')
+    .mul(BigNumber.from(duration))
+    .mul(cumulatedFactors)
+    .div(utils.parseUnits('1.0', 12))
+    .toString()
+}

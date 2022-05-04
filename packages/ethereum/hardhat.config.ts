@@ -296,13 +296,10 @@ subtask<ParallelTestCLIOpts>(
  * parallelConfig.config contains an array of {testFiles: string[]} where the testFiles is an array
  * of relative paths of test files.
  * Test files in the same array share the same reset hardhat instance.
- * Test files that are in the default test path but not specified in the parallelConfig.config array 
+ * Test files that are in the default test path but not specified in the parallelConfig.config array
  * will be executed at the every end using a reset hardhat instance.
  */
-task(
-  'test:in-group',
-  'Reset the hardhat node instances per testFiles array.'
-).setAction(async ({}, { run }) => {
+task('test:in-group', 'Reset the hardhat node instances per testFiles array.').setAction(async ({}, { run }) => {
   const parallelConfig = {
     config: [
       {
