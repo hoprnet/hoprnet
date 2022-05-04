@@ -29,7 +29,7 @@ import type { ResolvedEnvironment } from '@hoprnet/hopr-core'
 // rest
 import { task, types, extendEnvironment, subtask } from 'hardhat/config'
 import { writeFileSync, realpathSync } from 'fs'
-import { TASK_NODE_GET_PROVIDER, TASK_TEST_SETUP_TEST_ENVIRONMENT } from 'hardhat/builtin-tasks/task-names'
+import { TASK_TEST_SETUP_TEST_ENVIRONMENT } from 'hardhat/builtin-tasks/task-names'
 import { HARDHAT_NETWORK_NAME } from 'hardhat/plugins'
 
 const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, HOPR_ENVIRONMENT_ID, HOPR_HARDHAT_TAG } = process.env
@@ -69,7 +69,7 @@ function networkToHardhatNetwork(name: String, input: ResolvedEnvironment['netwo
       ;(cfg as HttpNetworkUserConfig).url = 'invalid_url'
     }
   } else {
-    ;(cfg as HardhatNetworkUserConfig).initialDate = '2021-07-27'
+    ;(cfg as HardhatNetworkUserConfig).initialDate = '2021-07-26'
   }
 
   if (input.live) {
@@ -280,46 +280,52 @@ task('flat', 'Flattens and prints contracts and their dependencies')
     )
   })
 
-subtask(TASK_TEST_SETUP_TEST_ENVIRONMENT, 'Setup test environment').setAction(async ({}, { network }) => {
+subtask(TASK_TEST_SETUP_TEST_ENVIRONMENT, 'Setup test environment').setAction(async (_, { network, config }) => {
   if (network.name === HARDHAT_NETWORK_NAME) {
-    let provider = network.provider
-    // const hardhatNetworkConfig = newconfig.networks[HARDHAT_NETWORK_NAME];
-    // provider = createProvider(
-    //   HARDHAT_NETWORK_NAME,
-    //   hardhatNetworkConfig,
-    //   config.paths,
-    //   artifacts
-    // );
-    await provider.send('hardhat_reset')
+    await network.provider.send('hardhat_reset')
   }
 })
+
 subtask<ParallelTestCLIOpts>(
-  'test:in-group:with-config',
-  'Faucets a local development HOPR node account with ETH and HOPR tokens',
+  'test:in-group:with-same-instance',
+  'Put test files into groups that shares the same ganache instances',
   parallelTest
 )
 
+/**
+ * parallelConfig.config contains an array of {testFiles: string[]} where the testFiles is an array
+ * of relative paths of test files.
+ * Test files in the same array share the same reset hardhat instance.
+ * Test files that are in the default test path but not specified in the parallelConfig.config array 
+ * will be executed at the every end using a reset hardhat instance.
+ */
 task(
   'test:in-group',
-  'Test files under default folders in the order of given groups and finish with the remaining ones'
-).setAction(async ({}, { run, config }) => {
+  'Reset the hardhat node instances per testFiles array.'
+).setAction(async ({}, { run }) => {
   const parallelConfig = {
     config: [
       {
-        date: '2021-07-27',
         testFiles: ['stake/HoprBoost.test.ts']
       },
       {
-        date: '2021-07-27',
         testFiles: ['stake/HoprStake.test.ts']
       },
       {
-        date: '2021-07-27',
         testFiles: ['stake/HoprStake2.test.ts']
+      },
+      {
+        testFiles: ['stake/HoprStakeSeason3.test.ts']
+      },
+      {
+        testFiles: ['stake/HoprStakeSeason4.test.ts']
+      },
+      {
+        testFiles: ['stake/HoprWhitehat.test.ts']
       }
     ]
   }
-  await run('test:in-group:with-config', parallelConfig)
+  await run('test:in-group:with-same-instance', parallelConfig)
 })
 
 export default hardhatConfig
