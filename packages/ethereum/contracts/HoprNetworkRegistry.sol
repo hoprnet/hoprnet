@@ -5,11 +5,14 @@ import '@openzeppelin/contracts/access/Ownable.sol';
 import './IHoprNetworkRegistryRequirement.sol';
 
 /**
- * @dev Smart contract that maintains a list of multiaddresses of hopr nodes that are allowed
+ * @title HoprNetworkRegistry
+ * @dev Smart contract that maintains a list of hopr node addresses that are allowed
  * to enter HOPR network. Each node address is linked with an Ethereum account. Only Ethereum
  * accounts that are eligible according to `IHoprNetworkRegistryRequirement` can register a
  * HOPR node address. If an account wants to change its registerd HOPR node address, it must
  * firstly deregister itself before registering new node.
+ *
+ * Note that HOPR node address refers to `PeerId.toB58String()`
  *
  * This network registry can be globally enabled/disabled by the owner
  *
@@ -20,8 +23,8 @@ import './IHoprNetworkRegistryRequirement.sol';
  */
 contract HoprNetworkRegistry is Ownable {
   IHoprNetworkRegistryRequirement public requirementImplementation; // Implementation of network registry proxy
-  mapping(address => string) public accountToNodeMultiaddr;
-  mapping(string => address) public nodeMultiaddrToAccount;
+  mapping(address => string) public accountToNodeMultiaddr; // mapping the account to the hopr node address in bytes
+  mapping(string => address) public nodeMultiaddrToAccount; // mapping the hopr node address in bytes to account
   bool public enabled;
 
   event EnabledNetworkRegistry(bool indexed isEnabled); // Global toggle of the network registry
@@ -87,13 +90,17 @@ contract HoprNetworkRegistry is Ownable {
    * register the EOA with HOPR node address. Account can also update its registration status
    * with this function.
    * @notice It allows msg.sender to update registered node address.
-   * @param hoprAddress Hopr nodes id. e.g. 16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x1
+   * @param hoprAddress Hopr nodes id in bytes. e.g. 16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x1
+   * hopr node address should always start with '16Uiu2HA' (0x3136556975324841) and be of length 53
    */
-  function selfRegister(string memory hoprAddress) external mustBeEnabled returns (bool) {
-    require(bytes(hoprAddress).length > 0, 'HoprNetworkRegistry: HOPR node multiaddress must not be empty');
+  function selfRegister(string calldata hoprAddress) external mustBeEnabled returns (bool) {
+    require(
+      bytes(hoprAddress).length == 53 && bytes32(bytes(hoprAddress)[0:8]) == '16Uiu2HA',
+      'HoprNetworkRegistry: HOPR node address must be valid'
+    );
     // get account associated with the given hopr node address, if any
     address registeredAccount = nodeMultiaddrToAccount[hoprAddress];
-    // if the hopr node multiaddress was linked to a different account, revert.
+    // if the hopr node address was linked to a different account, revert.
     // To change a nodes' linked account, it must be deregistered by the previously linked account
     // first before registering by the new account, to prevent hostile takeover of others' node address
     require(
@@ -133,6 +140,7 @@ contract HoprNetworkRegistry is Ownable {
     delete accountToNodeMultiaddr[msg.sender];
     delete nodeMultiaddrToAccount[registeredNodeMultiaddr];
     emit Deregistered(msg.sender);
+    return true;
   }
 
   /**
