@@ -8,6 +8,8 @@
 /cache
 /.testid
 
+/**/*.swp
+
 # used only in release and should not be tracked
 /default-environment.json
 
