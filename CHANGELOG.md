@@ -27,6 +27,7 @@
 - Dial refactoring and optimization ([#3780](https://github.com/hoprnet/hoprnet/pull/3780))
 - onAbort unhandled promise rejection workaround fix ([#3780](https://github.com/hoprnet/hoprnet/pull/3780))
 - Optimizations in dialing process ([#3788](https://github.com/hoprnet/hoprnet/pull/3788))
+- Fix event listener leak and increase maximum number of event listeners to 20 ([#3790](https://github.com/hoprnet/hoprnet/pull/3790))
 
 ---
 
