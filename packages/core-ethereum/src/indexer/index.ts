@@ -794,15 +794,14 @@ class Indexer extends EventEmitter {
   }
 
   private async onRegistered(event: RegistryEvent<'Registered'>, lastSnapshot: Snapshot): Promise<void> {
-    let multiaddr: Multiaddr
+    let hoprNode: PeerId
     try {
-      multiaddr = new Multiaddr(event.args.HoprMultiaddr)
+      hoprNode = PeerId.createFromB58String(event.args.HoprPeerId)
     } catch (error) {
-      log(`Invalid multiaddr '${event.args.HoprMultiaddr}' given in event 'onRegistered'`)
+      log(`Invalid peer Id '${event.args.HoprPeerId}' given in event 'onRegistered'`)
       log(error)
       return
     }
-    const hoprNode = PublicKey.fromPeerIdString(multiaddr.getPeerId())
     const account = Address.fromString(event.args.account)
     await this.db.addToRegistry(hoprNode, account, lastSnapshot)
   }
