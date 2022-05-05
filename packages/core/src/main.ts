@@ -41,7 +41,7 @@ export async function createLibp2pInstance(
   if (options.testing?.preferLocalAddresses) {
     addressSorter = (addrs) => {
       let a = new Array(...addrs) // Create copy to prevent sorting the original array
-      return a.sort((aa,ba) => compareAddressesLocalMode(aa.multiaddr, ba.multiaddr))
+      return a.sort((aa, ba) => compareAddressesLocalMode(aa.multiaddr, ba.multiaddr))
     }
     log('Preferring local addresses')
   } else {
