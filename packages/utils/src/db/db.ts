@@ -51,34 +51,38 @@ function createChannelKey(channelId: Hash): Uint8Array {
 function createAccountKey(address: Address): Uint8Array {
   return Uint8Array.from([...ACCOUNT_PREFIX, ...address.serialize()])
 }
-function createCommitmentKey(channelId: Hash, iteration: number) {
+function createCommitmentKey(channelId: Hash, iteration: number): Uint8Array {
   return Uint8Array.from([...COMMITMENT_PREFIX, ...channelId.serialize(), ...toU8a(iteration, 4)])
 }
-function createCurrentCommitmentKey(channelId: Hash) {
+function createCurrentCommitmentKey(channelId: Hash): Uint8Array {
   return Uint8Array.from([...CURRENT_COMMITMENT_PREFIX, ...channelId.serialize()])
 }
-function createCurrentTicketIndexKey(channelId: Hash) {
+function createCurrentTicketIndexKey(channelId: Hash): Uint8Array {
   return Uint8Array.from([...TICKET_INDEX_PREFIX, ...channelId.serialize()])
 }
-function createPendingTicketsCountKey(address: Address) {
+function createPendingTicketsCountKey(address: Address): Uint8Array {
   return Uint8Array.from([...PENDING_TICKETS_COUNT, ...address.serialize()])
 }
-function createAcknowledgedTicketKey(challenge: EthereumChallenge, channelEpoch: UINT256) {
+function createAcknowledgedTicketKey(challenge: EthereumChallenge, channelEpoch: UINT256): Uint8Array {
   return Uint8Array.from([...ACKNOWLEDGED_TICKETS_PREFIX, ...channelEpoch.serialize(), ...challenge.serialize()])
 }
-function createPendingAcknowledgement(halfKey: HalfKeyChallenge) {
+function createPendingAcknowledgement(halfKey: HalfKeyChallenge): Uint8Array {
   return Uint8Array.from([...PENDING_ACKNOWLEDGEMENTS_PREFIX, ...halfKey.serialize()])
 }
-function createPacketTagKey(tag: Uint8Array) {
+function createPacketTagKey(tag: Uint8Array): Uint8Array {
   return Uint8Array.from([...PACKET_TAG_PREFIX, ...tag])
 }
-function createNetworkRegistryHoprNodeKey(publicKey: PublicKey) {
-  return Uint8Array.from([...NETWORK_REGISTRY_HOPR_NODE_PREFIX, ...publicKey.serializeUncompressed()])
+
+// Use compressed EC-points within entry key because canonical (uncompressed) representation
+// is not needed and thus prevents decompression operations when converting from PeerId.
+// This happens e.g. on newly established connections.
+function createNetworkRegistryEntryKey(publicKey: PublicKey): Uint8Array {
+  return Uint8Array.from([...NETWORK_REGISTRY_HOPR_NODE_PREFIX, ...publicKey.serializeCompressed()])
 }
-function parseNetworkRegistryPublicKeyFromHoprNodeKey(key: Uint8Array): PublicKey {
+function parseNetworkRegistryPublicKeyFromRegistryEntryKey(key: Uint8Array): PublicKey {
   return PublicKey.deserialize(key.subarray(key.length - PublicKey.SIZE_UNCOMPRESSED, key.length))
 }
-function createNetworkRegistryAddressEligibleKey(address: Address) {
+function createNetworkRegistryAddressEligibleKey(address: Address): Uint8Array {
   return Uint8Array.from([...NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX, ...address.serialize()])
 }
 
@@ -718,14 +722,14 @@ export class HoprDB {
   /**
    * Hopr Network Registry
    * Link hoprNode to an ETH address.
-   * @param hoprNode the node to register
+   * @param pubKey the node to register
    * @param account the account that made the transaction
    * @param snapshot
    */
-  public async addToNetworkRegistry(hoprNode: PublicKey, account: Address, snapshot: Snapshot): Promise<void> {
+  public async addToNetworkRegistry(pubKey: PublicKey, account: Address, snapshot: Snapshot): Promise<void> {
     await this.db
       .batch()
-      .put(Buffer.from(this.keyOf(createNetworkRegistryHoprNodeKey(hoprNode))), Buffer.from(account.serialize()))
+      .put(Buffer.from(this.keyOf(createNetworkRegistryEntryKey(pubKey))), Buffer.from(account.serialize()))
       .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
       .write()
   }
@@ -739,10 +743,10 @@ export class HoprDB {
   public async findHoprNodeUsingAccountInNetworkRegistry(account: Address): Promise<PublicKey> {
     // range of keys to search
     const from = this.keyOf(
-      Uint8Array.from([...NETWORK_REGISTRY_HOPR_NODE_PREFIX, ...new Uint8Array(PublicKey.SIZE_UNCOMPRESSED).fill(0x00)])
+      Uint8Array.from([...NETWORK_REGISTRY_HOPR_NODE_PREFIX, ...new Uint8Array(PublicKey.SIZE_COMPRESSED).fill(0x00)])
     )
     const to = this.keyOf(
-      Uint8Array.from([...NETWORK_REGISTRY_HOPR_NODE_PREFIX, ...new Uint8Array(PublicKey.SIZE_UNCOMPRESSED).fill(0xff)])
+      Uint8Array.from([...NETWORK_REGISTRY_HOPR_NODE_PREFIX, ...new Uint8Array(PublicKey.SIZE_COMPRESSED).fill(0xff)])
     )
 
     // create iterable stream to search all registered nodes
@@ -770,7 +774,7 @@ export class HoprDB {
       throw Error('HoprNode not found')
     }
 
-    return parseNetworkRegistryPublicKeyFromHoprNodeKey(new Uint8Array(entryKey))
+    return parseNetworkRegistryPublicKeyFromRegistryEntryKey(new Uint8Array(entryKey))
   }
 
   /**
@@ -781,7 +785,7 @@ export class HoprDB {
    */
   public async removeFromNetworkRegistry(account: Address, snapshot: Snapshot): Promise<void> {
     const hoprNode = await this.findHoprNodeUsingAccountInNetworkRegistry(account)
-    const entryKey = createNetworkRegistryHoprNodeKey(hoprNode)
+    const entryKey = createNetworkRegistryEntryKey(hoprNode)
 
     if (entryKey) {
       await this.db
@@ -799,7 +803,7 @@ export class HoprDB {
    * @returns ETH address
    */
   public async getAccountFromNetworkRegistry(hoprNode: PublicKey): Promise<Address> {
-    return this.getCoerced<Address>(createNetworkRegistryHoprNodeKey(hoprNode), Address.deserialize)
+    return this.getCoerced<Address>(createNetworkRegistryEntryKey(hoprNode), Address.deserialize)
   }
 
   /**
