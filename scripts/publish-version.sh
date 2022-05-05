@@ -24,10 +24,8 @@ usage() {
 cleanup() {
   # Remove lock files due to conflicts with workspaces
   rm -f \
-    "${mydir}/../packages/cover-traffic-daemon/package-lock.json" \
-    "${mydir}/../packages/hoprd/package-lock.json" \
-    "${mydir}/../packages/cover-traffic-daemon/yarn.lock" \
-    "${mydir}/../packages/hoprd/yarn.lock"
+    "${mydir}/../packages/cover-traffic-daemon/npm-shrinkwrap.json" \
+    "${mydir}/../packages/hoprd/npm-shrinkwrap.json"
 
   # Don't commit changed package.json files as package resolutions are
   # supposed to interfer with workspaces according to https://yarnpkg.com/configuration/manifest#resolutions
@@ -123,7 +121,7 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   ${mydir}/wait-for-npm-package.sh core-ethereum
   ${mydir}/wait-for-npm-package.sh core
 
-  trap cleanup SIGINT SIGTERM ERR EXIT
+  trap cleanup SIGINT SIGTERM ERR
 
   # set default environments
   log "adding default environments to packages"

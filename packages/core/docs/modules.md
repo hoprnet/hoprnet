@@ -102,7 +102,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L84)
+[packages/core/src/index.ts:86](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L86)
 
 ___
 
@@ -112,7 +112,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:125](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L125)
+[packages/core/src/index.ts:127](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L127)
 
 ___
 
@@ -142,7 +142,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:140](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L140)
+[packages/core/src/index.ts:142](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L142)
 
 ___
 
@@ -152,13 +152,13 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:127](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L127)
+[packages/core/src/index.ts:129](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L129)
 
 ## Variables
 
 ### ACKNOWLEDGEMENT\_TIMEOUT
 
-• **ACKNOWLEDGEMENT\_TIMEOUT**: ``2000``
+• `Const` **ACKNOWLEDGEMENT\_TIMEOUT**: ``2000``
 
 #### Defined in
 
@@ -168,7 +168,7 @@ ___
 
 ### CHECK\_TIMEOUT
 
-• **CHECK\_TIMEOUT**: ``60000``
+• `Const` **CHECK\_TIMEOUT**: ``60000``
 
 #### Defined in
 
@@ -178,7 +178,7 @@ ___
 
 ### FULL\_VERSION
 
-• **FULL\_VERSION**: `any` = `pkg.version`
+• `Const` **FULL\_VERSION**: `any` = `pkg.version`
 
 #### Defined in
 
@@ -188,7 +188,7 @@ ___
 
 ### HEARTBEAT\_INTERVAL
 
-• **HEARTBEAT\_INTERVAL**: ``60000``
+• `Const` **HEARTBEAT\_INTERVAL**: ``30000``
 
 #### Defined in
 
@@ -198,7 +198,7 @@ ___
 
 ### HEARTBEAT\_INTERVAL\_VARIANCE
 
-• **HEARTBEAT\_INTERVAL\_VARIANCE**: ``2000``
+• `Const` **HEARTBEAT\_INTERVAL\_VARIANCE**: ``2000``
 
 #### Defined in
 
@@ -208,7 +208,7 @@ ___
 
 ### HEARTBEAT\_TIMEOUT
 
-• **HEARTBEAT\_TIMEOUT**: ``30000``
+• `Const` **HEARTBEAT\_TIMEOUT**: ``6000``
 
 #### Defined in
 
@@ -218,7 +218,7 @@ ___
 
 ### INTERMEDIATE\_HOPS
 
-• **INTERMEDIATE\_HOPS**: ``3``
+• `Const` **INTERMEDIATE\_HOPS**: ``3``
 
 #### Defined in
 
@@ -228,7 +228,7 @@ ___
 
 ### MAX\_HOPS
 
-• **MAX\_HOPS**: ``3``
+• `Const` **MAX\_HOPS**: ``3``
 
 #### Defined in
 
@@ -238,7 +238,7 @@ ___
 
 ### MAX\_NEW\_CHANNELS\_PER\_TICK
 
-• **MAX\_NEW\_CHANNELS\_PER\_TICK**: ``5``
+• `Const` **MAX\_NEW\_CHANNELS\_PER\_TICK**: ``5``
 
 #### Defined in
 
@@ -248,7 +248,7 @@ ___
 
 ### MAX\_PACKET\_DELAY
 
-• **MAX\_PACKET\_DELAY**: ``200``
+• `Const` **MAX\_PACKET\_DELAY**: ``200``
 
 #### Defined in
 
@@ -258,7 +258,7 @@ ___
 
 ### MAX\_PATH\_ITERATIONS
 
-• **MAX\_PATH\_ITERATIONS**: ``100``
+• `Const` **MAX\_PATH\_ITERATIONS**: ``100``
 
 #### Defined in
 
@@ -268,7 +268,7 @@ ___
 
 ### NETWORK\_QUALITY\_THRESHOLD
 
-• **NETWORK\_QUALITY\_THRESHOLD**: ``0.5``
+• `Const` **NETWORK\_QUALITY\_THRESHOLD**: ``0.5``
 
 #### Defined in
 
@@ -278,7 +278,7 @@ ___
 
 ### PACKET\_SIZE
 
-• **PACKET\_SIZE**: ``500``
+• `Const` **PACKET\_SIZE**: ``500``
 
 #### Defined in
 
@@ -288,7 +288,7 @@ ___
 
 ### PATH\_RANDOMNESS
 
-• **PATH\_RANDOMNESS**: ``0.1``
+• `Const` **PATH\_RANDOMNESS**: ``0.1``
 
 #### Defined in
 
@@ -298,7 +298,7 @@ ___
 
 ### VERSION
 
-• **VERSION**: `string`
+• `Const` **VERSION**: `string`
 
 #### Defined in
 
@@ -308,7 +308,7 @@ ___
 
 ### sampleOptions
 
-• **sampleOptions**: `Partial`<[`HoprOptions`](modules.md#hoproptions)\>
+• `Const` **sampleOptions**: `Partial`<[`HoprOptions`](modules.md#hoproptions)\>
 
 #### Defined in
 
@@ -334,7 +334,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/main.ts:178](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L178)
+[packages/core/src/main.ts:168](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L168)
 
 ___
 

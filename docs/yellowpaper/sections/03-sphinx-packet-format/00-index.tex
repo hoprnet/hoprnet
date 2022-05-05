@@ -1,7 +1,7 @@
 \section{Sphinx Packet Format}
 \label{sec:sphinx}
 
-HOPR uses the Sphinx packet format \cite{sphinxpaper} to encapsulate and route data packets its final recipient while achieving sender and recipient unlinkability. The Sphinx packet format determines how mixnet packets are created and transformed. This happens in a way that does not leak path information to relayers or other parties eavesdropping the communication. A Sphinx packet consists of two parts, a header and an onion-encrypted payload:
+HOPR uses the Sphinx packet format \cite{sphinxpaper} to encapsulate and route data packets to their final recipient while achieving sender and recipient unlinkability. The Sphinx packet format determines how mixnet packets are created and transformed. This happens in a way that does not leak path information to relayers or other parties eavesdropping on the communication. A Sphinx packet consists of two parts, a header and an onion-encrypted payload:
 
 \begin{figure}[H]
     \centering
@@ -27,9 +27,9 @@ HOPR uses the Sphinx packet format \cite{sphinxpaper} to encapsulate and route d
 
 \subsection{Construction}
 
-The following explains how a Sphinx packet is created and how it is transformed at each hop before arriving at its final destination. At first, the sender chooses a path (see Section \ref{sec:path-selection}), and derives shared keys with each node on the path. The shared keys serve as a master secret to derive subkeys. These subkeys are used to blind the routing information in such a way that nodes can solely determine the next downstream node, and also to create an authentication tag to check the integrity of the header. In addition, the sender applies one layer of encryption for each node along the chosen path to the payload. This accomplished, the sender finally sends the packet to the first hop.
+The following explains how a Sphinx packet is created and how it is transformed at each hop before arriving at its final destination. First, the sender chooses a path (see Section \ref{sec:path-selection}), and derives shared keys with each node on the path. The shared keys serve as a master secret to derive subkeys. These subkeys are used to blind the routing information in such a way that nodes can solely determine the next downstream node, and also to create an authentication tag to check the integrity of the header. In addition, the sender applies one layer of encryption for each node along the chosen path to the payload. This accomplished, the sender finally sends the packet to the first hop.
 
-Once a node receives a mixnet packet, it first derives the key that it has shared with the sender of the packet and checks the integrity of the header. Next, it unblinds the routing information to determine the next downstream node and removes one layer of encryption from the encrypted payload. At this point, the node is able to decide whether it is the final recipient of the message or it is supposed to forward the packet to the next hop.
+Once a node receives a mixnet packet, it first derives the key that it has shared with the sender of the packet and checks the integrity of the header. Next, it unblinds the routing information to determine the next downstream node and removes one layer of encryption from the encrypted payload. At this point, the node is able to decide whether it is the final recipient of the message or it is supposed to forward the packet to the next hop.\footnote{TODO: Make explicit the conditions behind this decision.}
 
 \begin{comment}
 \paragraph{Notation:}Let $\kappa=128$ be the security parameter. With non-negligible probability, an adversary must perform around $2^\kappa$ operations to break the security of Sphinx.

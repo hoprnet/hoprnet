@@ -3,20 +3,16 @@ import { mkdir } from 'fs/promises'
 
 import { default as LibP2P, type Connection } from 'libp2p'
 import { LevelDatastore } from 'datastore-level'
-import { type AddressSorter, HoprDB, PublicKey, debug } from '@hoprnet/hopr-utils'
+import { type AddressSorter, HoprDB, localAddressesFirst, PublicKey } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
-import Mplex from 'libp2p-mplex'
+const Mplex = require('libp2p-mplex')
 import KadDHT from 'libp2p-kad-dht'
 import { NOISE } from '@chainsafe/libp2p-noise'
 import type PeerId from 'peer-id'
+import { debug } from '@hoprnet/hopr-utils'
 import Hopr, { type HoprOptions } from '.'
 import { getAddrs } from './identity'
-import HoprConnect, {
-  type HoprConnectConfig,
-  type PublicNodesEmitter,
-  compareAddressesLocalMode,
-  compareAddressesPublicMode
-} from '@hoprnet/hopr-connect'
+import HoprConnect, { type HoprConnectConfig, type PublicNodesEmitter } from '@hoprnet/hopr-connect'
 import type { Multiaddr } from 'multiaddr'
 
 const log = debug(`hopr-core:create-hopr`)
@@ -39,16 +35,13 @@ export async function createLibp2pInstance(
   let addressSorter: AddressSorter
 
   if (options.testing?.preferLocalAddresses) {
-    // @TODO use address.isCertified to treat signed peer records differently
-    // than observed addresses
-    addressSorter = (addresses) => addresses.sort((a, b) => compareAddressesLocalMode(a.multiaddr, b.multiaddr))
+    addressSorter = localAddressesFirst
     log('Preferring local addresses')
   } else {
-    // Address sorter **must** be overwritten since libp2p
-    // cannot handle Hopr's circuit addresses
-    // @TODO use address.isCertified to treat signed peer records differently
-    // than observed addresses
-    addressSorter = (addresses) => addresses.sort((a, b) => compareAddressesPublicMode(a.multiaddr, b.multiaddr))
+    // Overwrite address sorter with identity function since
+    // libp2p's own address sorter function is unable to handle
+    // p2p addresses, e.g. /p2p/<RELAY>/p2p-circuit/p2p/<DESTINATION>
+    addressSorter = (addr) => addr
     log('Addresses are sorted by default')
   }
 
@@ -68,10 +61,9 @@ export async function createLibp2pInstance(
     modules: {
       transport: [HoprConnect as any],
       streamMuxer: [Mplex],
-      connEncryption: [NOISE],
+      connEncryption: [NOISE as any],
       dht: KadDHT
     },
-    // Currently disabled due to problems with serialization and deserialization
     // Configure peerstore to be persisted using LevelDB, also requires config
     // persistence to be set.
     datastore,
@@ -112,9 +104,7 @@ export async function createLibp2pInstance(
         enabled: true,
         // Feed DHT with all previously announced nodes
         // @ts-ignore
-        bootstrapPeers: initialNodes,
-        // Answer requests from other peers
-        clientMode: false
+        bootstrapPeers: initialNodes
       },
       relay: {
         // Conflicts with HoprConnect's own mechanism
@@ -208,5 +198,6 @@ export async function createHoprNode(
   // Initialize connection to the blockchain
   await chain.initializeChainWrapper()
 
-  return new Hopr(peerId, db, chain, options)
+  const node = new Hopr(peerId, db, chain, options)
+  return node
 }

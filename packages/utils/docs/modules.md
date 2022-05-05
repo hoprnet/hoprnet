@@ -69,7 +69,6 @@
 - [A\_EQUALS\_B](modules.md#a_equals_b)
 - [A\_STRICLY\_LESS\_THAN\_B](modules.md#a_stricly_less_than_b)
 - [A\_STRICTLY\_GREATER\_THAN\_B](modules.md#a_strictly_greater_than_b)
-- [CARRIER\_GRADE\_NAT\_NETWORK](modules.md#carrier_grade_nat_network)
 - [HASH\_LENGTH](modules.md#hash_length)
 - [INVERSE\_TICKET\_WIN\_PROB](modules.md#inverse_ticket_win_prob)
 - [LENGTH\_PREFIX\_LENGTH](modules.md#length_prefix_length)
@@ -87,10 +86,7 @@
 - [PRG\_KEY\_LENGTH](modules.md#prg_key_length)
 - [PRICE\_PER\_PACKET](modules.md#price_per_packet)
 - [PRIVATE\_KEY\_LENGTH](modules.md#private_key_length)
-- [PRIVATE\_NETWORKS](modules.md#private_networks)
-- [PRIVATE\_V4\_CLASS\_A](modules.md#private_v4_class_a)
-- [PRIVATE\_V4\_CLASS\_B](modules.md#private_v4_class_b)
-- [PRIVATE\_V4\_CLASS\_C](modules.md#private_v4_class_c)
+- [PRIVATE\_NETWORK](modules.md#private_network)
 - [PRP\_IV\_LENGTH](modules.md#prp_iv_length)
 - [PRP\_KEY\_LENGTH](modules.md#prp_key_length)
 - [PRP\_MIN\_LENGTH](modules.md#prp_min_length)
@@ -135,6 +131,7 @@
 - [generateKeyShares](modules.md#generatekeyshares)
 - [getB58String](modules.md#getb58string)
 - [getHeaderLength](modules.md#getheaderlength)
+- [getIpv4LocalAddressClass](modules.md#getipv4localaddressclass)
 - [getLocalAddresses](modules.md#getlocaladdresses)
 - [getLocalHosts](modules.md#getlocalhosts)
 - [getNetworkPrefix](modules.md#getnetworkprefix)
@@ -160,7 +157,9 @@
 - [libp2pSendMessage](modules.md#libp2psendmessage)
 - [libp2pSubscribe](modules.md#libp2psubscribe)
 - [loadJson](modules.md#loadjson)
+- [localAddressesFirst](modules.md#localaddressesfirst)
 - [moveDecimalPoint](modules.md#movedecimalpoint)
+- [multiaddressCompareByClassFunction](modules.md#multiaddresscomparebyclassfunction)
 - [nAtATime](modules.md#natatime)
 - [oneAtATime](modules.md#oneatatime)
 - [ordered](modules.md#ordered)
@@ -185,12 +184,11 @@
 - [serializeToU8a](modules.md#serializetou8a)
 - [startResourceUsageLogger](modules.md#startresourceusagelogger)
 - [stringToU8a](modules.md#stringtou8a)
-- [timeout](modules.md#timeout)
+- [timeoutAfter](modules.md#timeoutafter)
 - [timer](modules.md#timer)
 - [toLengthPrefixedU8a](modules.md#tolengthprefixedu8a)
 - [toNetworkPrefix](modules.md#tonetworkprefix)
 - [toU8a](modules.md#tou8a)
-- [tryExistingConnections](modules.md#tryexistingconnections)
 - [u8aAdd](modules.md#u8aadd)
 - [u8aAddrToString](modules.md#u8aaddrtostring)
 - [u8aAddressToCIDR](modules.md#u8aaddresstocidr)
@@ -238,7 +236,7 @@ Renames and re-exports [TimeoutOpts](modules.md#timeoutopts)
 
 #### Defined in
 
-[libp2p/addressSorters.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L33)
+[libp2p/addressSorters.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L98)
 
 ___
 
@@ -268,11 +266,11 @@ ___
 
 ### DialResponse
 
-Ƭ **DialResponse**: { `resp`: { `conn`: `Connection` ; `protocol`: `string` ; `stream`: `MuxedStream`  } ; `status`: [`SUCCESS`](enums/DialStatus.md#success)  } \| { `status`: [`TIMEOUT`](enums/DialStatus.md#timeout)  } \| { `status`: [`ABORTED`](enums/DialStatus.md#aborted)  } \| { `dhtContacted`: `boolean` ; `status`: [`DIAL_ERROR`](enums/DialStatus.md#dial_error)  } \| { `query`: `string` ; `status`: [`DHT_ERROR`](enums/DialStatus.md#dht_error)  } \| { `status`: [`NO_DHT`](enums/DialStatus.md#no_dht)  }
+Ƭ **DialResponse**: { `resp`: `Awaited`<`ReturnType`<`LibP2P`[``"dialProtocol"``]\>\> ; `status`: [`SUCCESS`](enums/DialStatus.md#success)  } \| { `status`: [`TIMEOUT`](enums/DialStatus.md#timeout)  } \| { `status`: [`ABORTED`](enums/DialStatus.md#aborted)  } \| { `dhtContacted`: `boolean` ; `status`: [`DIAL_ERROR`](enums/DialStatus.md#dial_error)  } \| { `query`: `PeerId` ; `status`: [`DHT_ERROR`](enums/DialStatus.md#dht_error)  }
 
 #### Defined in
 
-[libp2p/dialHelper.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L32)
+[libp2p/dialHelper.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L35)
 
 ___
 
@@ -514,7 +512,7 @@ and feeds them to the given handler.
 
 ### ADDRESS\_LENGTH
 
-• **ADDRESS\_LENGTH**: ``20``
+• `Const` **ADDRESS\_LENGTH**: ``20``
 
 #### Defined in
 
@@ -524,7 +522,7 @@ ___
 
 ### A\_EQUALS\_B
 
-• **A\_EQUALS\_B**: ``0``
+• `Const` **A\_EQUALS\_B**: ``0``
 
 #### Defined in
 
@@ -534,7 +532,7 @@ ___
 
 ### A\_STRICLY\_LESS\_THAN\_B
 
-• **A\_STRICLY\_LESS\_THAN\_B**: ``-1``
+• `Const` **A\_STRICLY\_LESS\_THAN\_B**: ``-1``
 
 #### Defined in
 
@@ -544,7 +542,7 @@ ___
 
 ### A\_STRICTLY\_GREATER\_THAN\_B
 
-• **A\_STRICTLY\_GREATER\_THAN\_B**: ``1``
+• `Const` **A\_STRICTLY\_GREATER\_THAN\_B**: ``1``
 
 #### Defined in
 
@@ -552,19 +550,9 @@ ___
 
 ___
 
-### CARRIER\_GRADE\_NAT\_NETWORK
-
-• **CARRIER\_GRADE\_NAT\_NETWORK**: [`Network`](modules.md#network)
-
-#### Defined in
-
-[network/constants.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L27)
-
-___
-
 ### HASH\_LENGTH
 
-• **HASH\_LENGTH**: ``32``
+• `Const` **HASH\_LENGTH**: ``32``
 
 #### Defined in
 
@@ -574,7 +562,7 @@ ___
 
 ### INVERSE\_TICKET\_WIN\_PROB
 
-• **INVERSE\_TICKET\_WIN\_PROB**: `BN`
+• `Const` **INVERSE\_TICKET\_WIN\_PROB**: `BN`
 
 #### Defined in
 
@@ -584,7 +572,7 @@ ___
 
 ### LENGTH\_PREFIX\_LENGTH
 
-• **LENGTH\_PREFIX\_LENGTH**: ``4``
+• `Const` **LENGTH\_PREFIX\_LENGTH**: ``4``
 
 #### Defined in
 
@@ -594,27 +582,27 @@ ___
 
 ### LINK\_LOCAL\_NETWORKS
 
-• **LINK\_LOCAL\_NETWORKS**: [`Network`](modules.md#network)[]
+• `Const` **LINK\_LOCAL\_NETWORKS**: [`Network`](modules.md#network)[]
 
 #### Defined in
 
-[network/constants.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L48)
+[network/constants.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L40)
 
 ___
 
 ### LOOPBACK\_ADDRS
 
-• **LOOPBACK\_ADDRS**: [`Network`](modules.md#network)[]
+• `Const` **LOOPBACK\_ADDRS**: [`Network`](modules.md#network)[]
 
 #### Defined in
 
-[network/constants.ts:62](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L62)
+[network/constants.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L54)
 
 ___
 
 ### MAX\_AUTO\_CHANNELS
 
-• **MAX\_AUTO\_CHANNELS**: ``5``
+• `Const` **MAX\_AUTO\_CHANNELS**: ``5``
 
 #### Defined in
 
@@ -624,7 +612,7 @@ ___
 
 ### MAX\_RANDOM\_BIGINTEGER
 
-• **MAX\_RANDOM\_BIGINTEGER**: `bigint`
+• `Const` **MAX\_RANDOM\_BIGINTEGER**: `bigint`
 
 Maximum random big integer that can be generated using randomInteger function.
 
@@ -636,7 +624,7 @@ ___
 
 ### MAX\_RANDOM\_INTEGER
 
-• **MAX\_RANDOM\_INTEGER**: `bigint`
+• `Const` **MAX\_RANDOM\_INTEGER**: `bigint`
 
 Maximum random integer that can be generated using randomInteger function.
 
@@ -648,7 +636,7 @@ ___
 
 ### MINIMUM\_REASONABLE\_CHANNEL\_STAKE
 
-• **MINIMUM\_REASONABLE\_CHANNEL\_STAKE**: `BN`
+• `Const` **MINIMUM\_REASONABLE\_CHANNEL\_STAKE**: `BN`
 
 #### Defined in
 
@@ -658,7 +646,7 @@ ___
 
 ### MIN\_NATIVE\_BALANCE
 
-• **MIN\_NATIVE\_BALANCE**: `BN`
+• `Const` **MIN\_NATIVE\_BALANCE**: `BN`
 
 #### Defined in
 
@@ -668,7 +656,7 @@ ___
 
 ### MULTI\_ADDR\_MAX\_LENGTH
 
-• **MULTI\_ADDR\_MAX\_LENGTH**: ``200``
+• `Const` **MULTI\_ADDR\_MAX\_LENGTH**: ``200``
 
 #### Defined in
 
@@ -678,7 +666,7 @@ ___
 
 ### POR\_STRING\_LENGTH
 
-• **POR\_STRING\_LENGTH**: `number`
+• `Const` **POR\_STRING\_LENGTH**: `number`
 
 #### Defined in
 
@@ -688,7 +676,7 @@ ___
 
 ### PRG\_COUNTER\_LENGTH
 
-• **PRG\_COUNTER\_LENGTH**: ``4``
+• `Const` **PRG\_COUNTER\_LENGTH**: ``4``
 
 #### Defined in
 
@@ -698,7 +686,7 @@ ___
 
 ### PRG\_IV\_LENGTH
 
-• **PRG\_IV\_LENGTH**: ``12``
+• `Const` **PRG\_IV\_LENGTH**: ``12``
 
 #### Defined in
 
@@ -708,7 +696,7 @@ ___
 
 ### PRG\_KEY\_LENGTH
 
-• **PRG\_KEY\_LENGTH**: ``16``
+• `Const` **PRG\_KEY\_LENGTH**: ``16``
 
 #### Defined in
 
@@ -718,7 +706,7 @@ ___
 
 ### PRICE\_PER\_PACKET
 
-• **PRICE\_PER\_PACKET**: `BN`
+• `Const` **PRICE\_PER\_PACKET**: `BN`
 
 #### Defined in
 
@@ -728,7 +716,7 @@ ___
 
 ### PRIVATE\_KEY\_LENGTH
 
-• **PRIVATE\_KEY\_LENGTH**: ``32``
+• `Const` **PRIVATE\_KEY\_LENGTH**: ``32``
 
 #### Defined in
 
@@ -736,49 +724,19 @@ ___
 
 ___
 
-### PRIVATE\_NETWORKS
+### PRIVATE\_NETWORK
 
-• **PRIVATE\_NETWORKS**: [`Network`](modules.md#network)[]
-
-#### Defined in
-
-[network/constants.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L34)
-
-___
-
-### PRIVATE\_V4\_CLASS\_A
-
-• **PRIVATE\_V4\_CLASS\_A**: [`Network`](modules.md#network)
+• `Const` **PRIVATE\_NETWORK**: [`Network`](modules.md#network)[]
 
 #### Defined in
 
-[network/constants.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L9)
-
-___
-
-### PRIVATE\_V4\_CLASS\_B
-
-• **PRIVATE\_V4\_CLASS\_B**: [`Network`](modules.md#network)
-
-#### Defined in
-
-[network/constants.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L15)
-
-___
-
-### PRIVATE\_V4\_CLASS\_C
-
-• **PRIVATE\_V4\_CLASS\_C**: [`Network`](modules.md#network)
-
-#### Defined in
-
-[network/constants.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L21)
+[network/constants.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L10)
 
 ___
 
 ### PRP\_IV\_LENGTH
 
-• **PRP\_IV\_LENGTH**: `number`
+• `Const` **PRP\_IV\_LENGTH**: `number`
 
 #### Defined in
 
@@ -788,7 +746,7 @@ ___
 
 ### PRP\_KEY\_LENGTH
 
-• **PRP\_KEY\_LENGTH**: `number`
+• `Const` **PRP\_KEY\_LENGTH**: `number`
 
 #### Defined in
 
@@ -798,7 +756,7 @@ ___
 
 ### PRP\_MIN\_LENGTH
 
-• **PRP\_MIN\_LENGTH**: ``32``
+• `Const` **PRP\_MIN\_LENGTH**: ``32``
 
 #### Defined in
 
@@ -808,7 +766,7 @@ ___
 
 ### PUBLIC\_KEY\_LENGTH
 
-• **PUBLIC\_KEY\_LENGTH**: ``33``
+• `Const` **PUBLIC\_KEY\_LENGTH**: ``33``
 
 #### Defined in
 
@@ -818,17 +776,17 @@ ___
 
 ### RESERVED\_ADDRS
 
-• **RESERVED\_ADDRS**: [`Network`](modules.md#network)[]
+• `Const` **RESERVED\_ADDRS**: [`Network`](modules.md#network)[]
 
 #### Defined in
 
-[network/constants.ts:75](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L75)
+[network/constants.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L67)
 
 ___
 
 ### SECP256K1\_CONSTANTS
 
-• **SECP256K1\_CONSTANTS**: `Object`
+• `Const` **SECP256K1\_CONSTANTS**: `Object`
 
 Several ECDSA on secp256k1 related constants
 
@@ -850,7 +808,7 @@ ___
 
 ### SECRET\_LENGTH
 
-• **SECRET\_LENGTH**: ``32``
+• `Const` **SECRET\_LENGTH**: ``32``
 
 #### Defined in
 
@@ -860,7 +818,7 @@ ___
 
 ### SIGNATURE\_LENGTH
 
-• **SIGNATURE\_LENGTH**: ``64``
+• `Const` **SIGNATURE\_LENGTH**: ``64``
 
 #### Defined in
 
@@ -870,7 +828,7 @@ ___
 
 ### SIGNATURE\_RECOVERY\_LENGTH
 
-• **SIGNATURE\_RECOVERY\_LENGTH**: ``1``
+• `Const` **SIGNATURE\_RECOVERY\_LENGTH**: ``1``
 
 #### Defined in
 
@@ -880,7 +838,7 @@ ___
 
 ### SUGGESTED\_BALANCE
 
-• **SUGGESTED\_BALANCE**: `BN`
+• `Const` **SUGGESTED\_BALANCE**: `BN`
 
 #### Defined in
 
@@ -890,7 +848,7 @@ ___
 
 ### SUGGESTED\_NATIVE\_BALANCE
 
-• **SUGGESTED\_NATIVE\_BALANCE**: `BN`
+• `Const` **SUGGESTED\_NATIVE\_BALANCE**: `BN`
 
 #### Defined in
 
@@ -900,7 +858,7 @@ ___
 
 ### UNCOMPRESSED\_PUBLIC\_KEY\_LENGTH
 
-• **UNCOMPRESSED\_PUBLIC\_KEY\_LENGTH**: ``66``
+• `Const` **UNCOMPRESSED\_PUBLIC\_KEY\_LENGTH**: ``66``
 
 #### Defined in
 
@@ -910,7 +868,7 @@ ___
 
 ### b58StringRegex
 
-• **b58StringRegex**: `RegExp`
+• `Const` **b58StringRegex**: `RegExp`
 
 Regular expresion used to match b58Strings
 
@@ -922,7 +880,7 @@ ___
 
 ### dbMock
 
-• **dbMock**: [`HoprDB`](classes/HoprDB.md) = `db`
+• `Const` **dbMock**: [`HoprDB`](classes/HoprDB.md) = `db`
 
 #### Defined in
 
@@ -932,7 +890,7 @@ ___
 
 ### durations
 
-• **durations**: `Object`
+• `Const` **durations**: `Object`
 
 #### Type declaration
 
@@ -1149,7 +1107,7 @@ Create a multiaddress that is a circuit address using given relay to the given d
 
 #### Defined in
 
-[network/addrs.ts:290](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L290)
+[network/addrs.ts:280](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L280)
 
 ___
 
@@ -1273,7 +1231,7 @@ ___
 
 ### debug
 
-▸ `Const` **debug**(`namespace`): (`message`: `any`, ...`parameters`: `any`[]) => `void`
+▸ **debug**(`namespace`): (`message`: `any`, ...`parameters`: `any`[]) => `void`
 
 #### Parameters
 
@@ -1448,7 +1406,7 @@ Contains a baseline protection against dialing same addresses twice.
 
 #### Defined in
 
-[libp2p/dialHelper.ts:373](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L373)
+[libp2p/dialHelper.ts:295](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L295)
 
 ___
 
@@ -1626,6 +1584,26 @@ ___
 
 ___
 
+### getIpv4LocalAddressClass
+
+▸ **getIpv4LocalAddressClass**(`address`): ``"A"`` \| ``"B"`` \| ``"C"`` \| ``"D"`` \| `undefined`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `address` | `Multiaddr` |
+
+#### Returns
+
+``"A"`` \| ``"B"`` \| ``"C"`` \| ``"D"`` \| `undefined`
+
+#### Defined in
+
+[libp2p/addressSorters.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L34)
+
+___
+
 ### getLocalAddresses
 
 ▸ **getLocalAddresses**(`_iface?`): [`Network`](modules.md#network)[]
@@ -1642,7 +1620,7 @@ ___
 
 #### Defined in
 
-[network/addrs.ts:270](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L270)
+[network/addrs.ts:260](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L260)
 
 ___
 
@@ -1662,7 +1640,7 @@ ___
 
 #### Defined in
 
-[network/addrs.ts:281](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L281)
+[network/addrs.ts:271](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L271)
 
 ___
 
@@ -1684,7 +1662,7 @@ ___
 
 #### Defined in
 
-[network/addrs.ts:195](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L195)
+[network/addrs.ts:185](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L185)
 
 ___
 
@@ -1726,7 +1704,7 @@ ___
 
 #### Defined in
 
-[network/addrs.ts:267](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L267)
+[network/addrs.ts:257](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L257)
 
 ___
 
@@ -1746,7 +1724,7 @@ ___
 
 #### Defined in
 
-[network/addrs.ts:274](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L274)
+[network/addrs.ts:264](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L264)
 
 ___
 
@@ -1791,7 +1769,7 @@ ___
 
 #### Defined in
 
-[network/addrs.ts:208](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L208)
+[network/addrs.ts:198](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L198)
 
 ___
 
@@ -1999,7 +1977,7 @@ true if address is a private ip address
 
 #### Defined in
 
-[libp2p/addressSorters.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L15)
+[libp2p/addressSorters.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L11)
 
 ___
 
@@ -2200,6 +2178,30 @@ object parsed from JSON data
 
 ___
 
+### localAddressesFirst
+
+▸ **localAddressesFirst**(`addresses`): `Address`[]
+
+Take an array of addresses and sorts such that private addresses are first
+
+**`dev`** used to run Hopr locally
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `addresses` | `Address`[] |
+
+#### Returns
+
+`Address`[]
+
+#### Defined in
+
+[libp2p/addressSorters.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L94)
+
+___
+
 ### moveDecimalPoint
 
 ▸ **moveDecimalPoint**(`amount`, `position`): `string`
@@ -2218,6 +2220,30 @@ ___
 #### Defined in
 
 [math/moveDecimalPoint.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/math/moveDecimalPoint.ts#L3)
+
+___
+
+### multiaddressCompareByClassFunction
+
+▸ **multiaddressCompareByClassFunction**(`a`, `b`): `number`
+
+Compare two multiaddresses based on their class: A class first, B class second, ...
+Local addresses take precedence over remote addresses.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `a` | `Multiaddr` |
+| `b` | `Multiaddr` |
+
+#### Returns
+
+`number`
+
+#### Defined in
+
+[libp2p/addressSorters.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L54)
 
 ___
 
@@ -2408,7 +2434,7 @@ ___
 
 ### pickVersion
 
-▸ `Const` **pickVersion**(`full_version`): `string`
+▸ **pickVersion**(`full_version`): `string`
 
 Used by our network stack and deployment scripts to determine.
 
@@ -2480,7 +2506,7 @@ the prefix length, e.g. 24
 
 #### Defined in
 
-[network/addrs.ts:143](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L143)
+[network/addrs.ts:133](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L133)
 
 ___
 
@@ -2936,11 +2962,9 @@ stringToU8a('0xDEadBeeF') // Uint8Array [ 222, 173, 190, 239 ]
 
 ___
 
-### timeout
+### timeoutAfter
 
-▸ **timeout**<`T`\>(`timeout`, `work`): `Promise`<`T`\>
-
-Races a timeout against some work
+▸ **timeoutAfter**<`T`\>(`body`, `timeout`): `Promise`<`T`\>
 
 #### Type parameters
 
@@ -2950,20 +2974,18 @@ Races a timeout against some work
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `timeout` | `number` | return after timeout in ms |
-| `work` | () => `Promise`<`T`\> | function that returns a Promise that resolves once the work is done |
+| Name | Type |
+| :------ | :------ |
+| `body` | (`abortSignal`: `AbortSignal`) => `Promise`<`T`\> |
+| `timeout` | `number` |
 
 #### Returns
 
 `Promise`<`T`\>
 
-a Promise that resolves once the timeout is due or the work is done
-
 #### Defined in
 
-[async/timeout.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/timeout.ts#L7)
+[async/timeout.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/timeout.ts#L5)
 
 ___
 
@@ -3027,7 +3049,7 @@ ___
 
 #### Defined in
 
-[network/addrs.ts:241](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L241)
+[network/addrs.ts:231](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L231)
 
 ___
 
@@ -3052,28 +3074,6 @@ the desired size.
 #### Defined in
 
 [u8a/toU8a.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/toU8a.ts#L7)
-
-___
-
-### tryExistingConnections
-
-▸ **tryExistingConnections**(`libp2p`, `destination`, `protocol`): `Promise`<`void` \| { `conn`: `Connection` ; `protocol`: `string` ; `stream`: `MuxedStream`  }\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `libp2p` | `Pick`<`ReducedLibp2p`, ``"connectionManager"``\> |
-| `destination` | `PeerId` |
-| `protocol` | `string` |
-
-#### Returns
-
-`Promise`<`void` \| { `conn`: `Connection` ; `protocol`: `string` ; `stream`: `MuxedStream`  }\>
-
-#### Defined in
-
-[libp2p/dialHelper.ts:80](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L80)
 
 ___
 
@@ -3126,7 +3126,7 @@ Converts ip address from byte representation to string
 
 #### Defined in
 
-[network/addrs.ts:176](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L176)
+[network/addrs.ts:166](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L166)
 
 ___
 
@@ -3153,7 +3153,7 @@ a CIDR string, such as `192.168.1.0/24`
 
 #### Defined in
 
-[network/addrs.ts:166](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L166)
+[network/addrs.ts:156](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L156)
 
 ___
 
