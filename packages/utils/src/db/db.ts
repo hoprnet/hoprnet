@@ -41,8 +41,10 @@ const PENDING_TICKETS_COUNT = encoder.encode('statistics:pending:value-')
 const ACKNOWLEDGED_TICKETS_PREFIX = encoder.encode('tickets:acknowledged-')
 const PENDING_ACKNOWLEDGEMENTS_PREFIX = encoder.encode('tickets:pending-acknowledgement-')
 const PACKET_TAG_PREFIX: Uint8Array = encoder.encode('packets:tag-')
-const NETWORK_REGISTRY_HOPR_NODE_PREFIX: Uint8Array = encoder.encode('networkRegistry:hopr-node:')
-const NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX: Uint8Array = encoder.encode('networkRegistry:address-eligible:')
+const NETWORK_REGISTRY_HOPR_NODE_PREFIX: Uint8Array = encoder.encode('networkRegistry:hopr-node-')
+const NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX: Uint8Array = encoder.encode('networkRegistry:addressEligible-')
+const NETWORK_REGISTRY_ADDRESS_PUBLIC_KEY_PREFIX: Uint8Array = encoder.encode('networkRegistry:addressPublicKey-')
+
 const NETWORK_REGISTRY_ENABLED_PREFIX: Uint8Array = encoder.encode('networkRegistry:enabled')
 
 function createChannelKey(channelId: Hash): Uint8Array {
@@ -79,11 +81,11 @@ function createPacketTagKey(tag: Uint8Array): Uint8Array {
 function createNetworkRegistryEntryKey(publicKey: PublicKey): Uint8Array {
   return Uint8Array.from([...NETWORK_REGISTRY_HOPR_NODE_PREFIX, ...publicKey.serializeCompressed()])
 }
-function parseNetworkRegistryPublicKeyFromRegistryEntryKey(key: Uint8Array): PublicKey {
-  return PublicKey.deserialize(key.subarray(key.length - PublicKey.SIZE_UNCOMPRESSED, key.length))
-}
 function createNetworkRegistryAddressEligibleKey(address: Address): Uint8Array {
   return Uint8Array.from([...NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX, ...address.serialize()])
+}
+function createNetworkRegistryAddressToPublicKeyKey(address: Address) {
+  return Uint8Array.from([...NETWORK_REGISTRY_ADDRESS_PUBLIC_KEY_PREFIX, ...address.serialize()])
 }
 
 const LATEST_BLOCK_NUMBER_KEY = encoder.encode('latestBlockNumber')
@@ -730,6 +732,10 @@ export class HoprDB {
     await this.db
       .batch()
       .put(Buffer.from(this.keyOf(createNetworkRegistryEntryKey(pubKey))), Buffer.from(account.serialize()))
+      .put(
+        Buffer.from(this.keyOf(createNetworkRegistryAddressToPublicKeyKey(account))),
+        Buffer.from(pubKey.serializeCompressed())
+      )
       .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
       .write()
   }
@@ -741,40 +747,17 @@ export class HoprDB {
    * @returns PublicKey of the associated HoprNode
    */
   public async findHoprNodeUsingAccountInNetworkRegistry(account: Address): Promise<PublicKey> {
-    // range of keys to search
-    const from = this.keyOf(
-      Uint8Array.from([...NETWORK_REGISTRY_HOPR_NODE_PREFIX, ...new Uint8Array(PublicKey.SIZE_COMPRESSED).fill(0x00)])
-    )
-    const to = this.keyOf(
-      Uint8Array.from([...NETWORK_REGISTRY_HOPR_NODE_PREFIX, ...new Uint8Array(PublicKey.SIZE_COMPRESSED).fill(0xff)])
+    const pubKey = await this.getCoercedOrDefault(
+      createNetworkRegistryAddressToPublicKeyKey(account),
+      PublicKey.deserialize,
+      undefined
     )
 
-    // create iterable stream to search all registered nodes
-    const iterable = this.db.iterator({
-      gte: Buffer.from(from),
-      lte: Buffer.from(to),
-      keys: true,
-      values: true
-    })
-
-    let entryKey: Buffer | undefined
-    // search for a matching account
-    // we are interested in finding the `key`, this `.getAll` can't be used
-    for await (const [key, val] of iterable as any) {
-      try {
-        if (account.eq(Address.deserialize(Buffer.from(val)))) {
-          // get hoprNode from key
-          entryKey = Buffer.from(key)
-          break
-        }
-      } catch {}
-    }
-
-    if (!entryKey) {
+    if (!pubKey) {
       throw Error('HoprNode not found')
     }
 
-    return parseNetworkRegistryPublicKeyFromRegistryEntryKey(new Uint8Array(entryKey))
+    return pubKey
   }
 
   /**
@@ -791,6 +774,7 @@ export class HoprDB {
       await this.db
         .batch()
         .del(Buffer.from(this.keyOf(entryKey)))
+        .del(Buffer.from(this.keyOf(createNetworkRegistryAddressToPublicKeyKey(account))))
         .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
         .write()
     }
