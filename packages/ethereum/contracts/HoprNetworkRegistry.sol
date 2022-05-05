@@ -149,24 +149,20 @@ contract HoprNetworkRegistry is Ownable {
    * HOPR node peer id validation should be done off-chain.
    * @notice It allows owner to overwrite exisitng entries.
    * @param accounts Array of Ethereum accounts, e.g. [0xf6A8b267f43998B890857f8d1C9AabC68F8556ee]
-   * @param hoprAddresses Array of hopr nodes id. e.g. [16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x1]
+   * @param hoprPeerIds Array of hopr nodes id. e.g. [16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x1]
    */
-  function ownerRegister(address[] calldata accounts, string[] calldata hoprAddresses)
-    external
-    onlyOwner
-    mustBeEnabled
-  {
-    require(
-      hoprAddresses.length == accounts.length,
-      'HoprNetworkRegistry: hoprAddresses and accounts lengths mismatch'
-    );
+  function ownerRegister(address[] calldata accounts, string[] calldata hoprPeerIds) external onlyOwner mustBeEnabled {
+    require(hoprPeerIds.length == accounts.length, 'HoprNetworkRegistry: hoprPeerIdes and accounts lengths mismatch');
     for (uint256 i = 0; i < accounts.length; i++) {
-      string memory hoprAddress = hoprAddresses[i];
-      address account = accounts[i];
-      accountToNodePeerId[account] = hoprAddress;
-      nodePeerIdToAccount[hoprAddress] = account;
-      emit RegisteredByOwner(account, hoprAddress);
-      emit EligibilityUpdated(account, true);
+      // validate peer the length and prefix of peer Ids. If invalid, skip.
+      if (bytes(hoprPeerIds[i]).length == 53 && bytes32(bytes(hoprPeerIds[i])[0:8]) == '16Uiu2HA') {
+        string memory hoprPeerId = hoprPeerIds[i];
+        address account = accounts[i];
+        accountToNodePeerId[account] = hoprPeerId;
+        nodePeerIdToAccount[hoprPeerId] = account;
+        emit RegisteredByOwner(account, hoprPeerId);
+        emit EligibilityUpdated(account, true);
+      }
     }
   }
 
@@ -178,9 +174,9 @@ contract HoprNetworkRegistry is Ownable {
   function ownerDeregister(address[] calldata accounts) external onlyOwner mustBeEnabled {
     for (uint256 i = 0; i < accounts.length; i++) {
       address account = accounts[i];
-      string memory hoprAddress = accountToNodePeerId[account];
+      string memory hoprPeerId = accountToNodePeerId[account];
       delete accountToNodePeerId[account];
-      delete nodePeerIdToAccount[hoprAddress];
+      delete nodePeerIdToAccount[hoprPeerId];
       emit DeregisteredByOwner(account);
       emit EligibilityUpdated(account, false);
     }
