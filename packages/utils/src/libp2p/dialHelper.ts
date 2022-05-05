@@ -279,10 +279,10 @@ async function doDial(
   }
 
   // Fetch sorted known addresses for the given destination peer
+  // NOTE: It looks like we do not need to conditionally sort local first here for tests to work
   const knownAddressesForPeer = (await libp2p.peerStore.addressBook.get(destination)).sort((a, b) =>
     compareAddressesPublicMode(a.multiaddr, b.multiaddr)
   )
-  // TODO: Do we need to sort in local mode as well?
 
   log(`There are ${knownAddressesForPeer.length} already known addresses for ${destination.toB58String()}:`)
 
