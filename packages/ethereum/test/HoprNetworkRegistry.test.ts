@@ -148,9 +148,9 @@ describe('HoprNetworkRegistry', () => {
       )
     })
     it('fail to register when hopr node address is of the right length but with wrong prefix', async () => {
-      await expect(hoprNetworkRegistry.connect(participants[0]).selfRegister(`0x${hoprAddress(5).slice(2)}`)).to.be.revertedWith(
-        'HoprNetworkRegistry: HOPR node peer id must be valid'
-      )
+      await expect(
+        hoprNetworkRegistry.connect(participants[0]).selfRegister(`0x${hoprAddress(5).slice(2)}`)
+      ).to.be.revertedWith('HoprNetworkRegistry: HOPR node peer id must be valid')
     })
     it('fail to when array length does not match', async () => {
       await expect(
