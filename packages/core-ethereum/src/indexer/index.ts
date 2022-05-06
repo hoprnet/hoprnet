@@ -652,6 +652,8 @@ class Indexer extends EventEmitter {
             lastDatabaseSnapshot
           )
           break
+        case 'Deregistered':
+        case 'Deregistered(address)':
         case 'DeregisteredByOwner':
         case 'DeregisteredByOwner(address)':
           await this.onDeregistered(event as RegistryEvent<'DeregisteredByOwner'>, lastDatabaseSnapshot)
@@ -792,17 +794,16 @@ class Indexer extends EventEmitter {
   }
 
   private async onRegistered(event: RegistryEvent<'Registered'>, lastSnapshot: Snapshot): Promise<void> {
-    let multiaddr: Multiaddr
+    let hoprNode: PeerId
     try {
-      multiaddr = new Multiaddr(event.args.HoprMultiaddr)
+      hoprNode = PeerId.createFromB58String(event.args.HoprPeerId)
     } catch (error) {
-      log(`Invalid multiaddr '${event.args.HoprMultiaddr}' given in event 'onRegistered'`)
+      log(`Invalid peer Id '${event.args.HoprPeerId}' given in event 'onRegistered'`)
       log(error)
       return
     }
-    const hoprNode = PublicKey.fromPeerIdString(multiaddr.getPeerId())
     const account = Address.fromString(event.args.account)
-    await this.db.addToNetworkRegistry(hoprNode, account, lastSnapshot)
+    await this.db.addToNetworkRegistry(PublicKey.fromPeerId(hoprNode), account, lastSnapshot)
   }
 
   private async onDeregistered(event: RegistryEvent<'DeregisteredByOwner'>, lastSnapshot: Snapshot): Promise<void> {
@@ -898,7 +899,6 @@ class Indexer extends EventEmitter {
 
     deferred.promise = new Promise<string>((resolve, reject) => {
       let done = false
-
       deferred.reject = () => {
         if (done) {
           return
