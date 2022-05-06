@@ -157,7 +157,7 @@ describe('HoprNetworkRegistry', () => {
         hoprNetworkRegistry
           .connect(owner)
           .ownerRegister([participantAddresses[5], participantAddresses[6]], [hoprAddress(5)])
-      ).to.be.revertedWith('HoprNetworkRegistry: hoprAddresses and accounts lengths mismatch')
+      ).to.be.revertedWith('HoprNetworkRegistry: hoprPeerIdes and accounts lengths mismatch')
     })
     it('can register by the owner', async () => {
       await expect(
