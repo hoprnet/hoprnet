@@ -251,7 +251,6 @@ class Hopr extends EventEmitter {
 
     const sendMessage = ((dest: PeerId, protocol: string, msg: Uint8Array, includeReply: boolean, opts: DialOpts) =>
       libp2pSendMessage(this.libp2p, dest, protocol, msg, includeReply, opts)) as SendMessage
-    const hangup = this.libp2p.hangUp.bind(this.libp2p)
 
     // Attach network health measurement functionality
     const peers: Peer[] = await all(this.libp2p.peerStore.getPeers())
@@ -263,9 +262,17 @@ class Hopr extends EventEmitter {
         this.publicNodesEmitter.emit('removePublicNode', peer)
       }
     )
+
     peers.forEach((peer) => log(`peer store: loaded peer ${peer.id.toB58String()}`))
 
-    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessage, hangup, this.environment.id, this.options)
+    this.heartbeat = new Heartbeat(
+      this.networkPeers,
+      subscribe,
+      sendMessage,
+      this.closeConnectionsTo.bind(this),
+      this.environment.id,
+      this.options
+    )
 
     this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.networkPeers.register(conn.remotePeer, 'libp2p peer connect')
@@ -768,6 +775,24 @@ class Hopr extends EventEmitter {
    */
   public getConnectionInfo(peerId: PeerId): Entry {
     return this.networkPeers.getConnectionInfo(peerId)
+  }
+
+  /**
+   * Closes all open connections to a peer. Used to temporarily or permanently
+   * disconnect from a peer.
+   * Similar to `libp2p.hangUp` but catching all errors.
+   * @param peer PeerId of the peer from whom we want to disconnect
+   */
+  private async closeConnectionsTo(peer: PeerId): Promise<void> {
+    const connections = this.libp2p.connectionManager.getAll(peer)
+
+    for (const conn of connections) {
+      try {
+        await conn.close()
+      } catch (err: any) {
+        error(`Error while intentionally closing connection to ${peer.toB58String()}`, err)
+      }
+    }
   }
 
   /**
