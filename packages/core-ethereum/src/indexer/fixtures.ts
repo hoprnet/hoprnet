@@ -230,7 +230,7 @@ export const PARTY_A_REGISTERED = {
   logIndex: 0,
   args: {
     account: PARTY_A.toAddress().toHex(),
-    HoprPeerId: PARTY_B.toPeerId().toB58String()
+    hoprPeerId: PARTY_B.toPeerId().toB58String()
   } as any
 } as RegistryEvent<'Registered'>
 

@@ -305,7 +305,7 @@ describe(`database tests`, function () {
     await db.removeFromNetworkRegistry(account, TestingSnapshot)
     assert.rejects(
       () => db.findHoprNodeUsingAccountInNetworkRegistry(account),
-      'should throw when HoprNode is not linke to an account'
+      'should throw when HoprNode is not linked to an account'
     )
     assert.rejects(() => db.getAccountFromNetworkRegistry(hoprNode), 'should throw when account is deregistered')
   })

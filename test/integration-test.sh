@@ -394,24 +394,24 @@ native_addr5="$(get_native_address "${api_token}@${api5}")"
 native_addr7="$(get_native_address "${api_token}@${api7}")"
 native_addr8="$(get_native_address "${api_token}@${api8}")"
 
-declare multiaddr1 multiaddr2 multiaddr3 multiaddr4 multiaddr5 multiaddr7 multiaddr8
-multiaddr1="$(get_multiaddress "${api_token}@${api1}")"
-multiaddr2="$(get_multiaddress "${api_token}@${api2}")"
-multiaddr3="$(get_multiaddress "${api_token}@${api3}")"
-multiaddr4="$(get_multiaddress "${api_token}@${api4}")"
-multiaddr5="$(get_multiaddress "${api_token}@${api5}")"
+declare hopr_addr1 hopr_addr2 hopr_addr3 hopr_addr4 hopr_addr5 hopr_addr7 hopr_addr8
+hopr_addr1="$(get_hopr_address "${api_token}@${api1}")"
+hopr_addr2="$(get_hopr_address "${api_token}@${api2}")"
+hopr_addr3="$(get_hopr_address "${api_token}@${api3}")"
+hopr_addr4="$(get_hopr_address "${api_token}@${api4}")"
+hopr_addr5="$(get_hopr_address "${api_token}@${api5}")"
 # we don't need node6 because it's short-living
-multiaddr7="$(get_multiaddress "${api_token}@${api7}")"
-multiaddr8="$(get_multiaddress "${api_token}@${api8}")"
+hopr_addr7="$(get_hopr_address "${api_token}@${api7}")"
+hopr_addr8="$(get_hopr_address "${api_token}@${api8}")"
 
-log "hopr addr1: ${addr1} ${native_addr1} ${multiaddr1}"
-log "hopr addr2: ${addr2} ${native_addr2} ${multiaddr2}"
-log "hopr addr3: ${addr3} ${native_addr3} ${multiaddr3}"
-log "hopr addr4: ${addr4} ${native_addr4} ${multiaddr4}"
-log "hopr addr5: ${addr5} ${native_addr5} ${multiaddr5}"
+log "hopr addr1: ${addr1} ${native_addr1} ${hopr_addr1}"
+log "hopr addr2: ${addr2} ${native_addr2} ${hopr_addr2}"
+log "hopr addr3: ${addr3} ${native_addr3} ${hopr_addr3}"
+log "hopr addr4: ${addr4} ${native_addr4} ${hopr_addr4}"
+log "hopr addr5: ${addr5} ${native_addr5} ${hopr_addr5}"
 # we don't need node6 because it's short-living
-log "hopr addr7: ${addr7} ${native_addr7} ${multiaddr7}"
-log "hopr addr8: ${addr8} ${native_addr8} ${multiaddr8}"
+log "hopr addr7: ${addr7} ${native_addr7} ${hopr_addr7}"
+log "hopr addr8: ${addr8} ${native_addr8} ${hopr_addr8}"
 
 # add nodes 1,2,3,4,5,7 in register, do NOT add node 8
 log "Adding nodes to register"
@@ -421,7 +421,7 @@ yarn workspace @hoprnet/hopr-ethereum hardhat register \
   --network hardhat \
   --task add \
   --native-addresses "$native_addr1,$native_addr2,$native_addr3,$native_addr4,$native_addr5,$native_addr7" \
-  --multiaddresses "$multiaddr1,$multiaddr2,$multiaddr3,$multiaddr4,$multiaddr5,$multiaddr7"
+  --peer-ids "$hopr_addr1,$hopr_addr2,$hopr_addr3,$hopr_addr4,$hopr_addr5,$hopr_addr7"
 log "Nodes added to register"
 
 # running withdraw and checking it results at the end of this test run

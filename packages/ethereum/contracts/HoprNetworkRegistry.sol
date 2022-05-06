@@ -29,9 +29,9 @@ contract HoprNetworkRegistry is Ownable {
 
   event EnabledNetworkRegistry(bool indexed isEnabled); // Global toggle of the network registry
   event RequirementUpdated(address indexed requirementImplementation); // Emit when the network registry proxy is updated
-  event Registered(address indexed account, string HoprPeerId); // Emit when an account register a node peer id for itself
+  event Registered(address indexed account, string hoprPeerId); // Emit when an account register a node peer id for itself
   event Deregistered(address indexed account); // Emit when an account deregister a node peer id for itself
-  event RegisteredByOwner(address indexed account, string HoprPeerId); // Emit when the contract owner register a node peer id for an account
+  event RegisteredByOwner(address indexed account, string hoprPeerId); // Emit when the contract owner register a node peer id for an account
   event DeregisteredByOwner(address indexed account); // Emit when the contract owner deregister a node peer id for an account
   event EligibilityUpdated(address indexed account, bool indexed eligibility); // Emit when the eligibility of an account is updated
 
@@ -177,8 +177,11 @@ contract HoprNetworkRegistry is Ownable {
       string memory hoprPeerId = accountToNodePeerId[account];
       delete accountToNodePeerId[account];
       delete nodePeerIdToAccount[hoprPeerId];
-      emit DeregisteredByOwner(account);
+      // Eligibility update should have a logindex strictly smaller
+      // than the deregister event to make sure it always gets processed
+      // before the deregister event
       emit EligibilityUpdated(account, false);
+      emit DeregisteredByOwner(account);
     }
   }
 
