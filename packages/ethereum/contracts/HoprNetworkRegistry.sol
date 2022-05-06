@@ -177,8 +177,11 @@ contract HoprNetworkRegistry is Ownable {
       string memory hoprPeerId = accountToNodePeerId[account];
       delete accountToNodePeerId[account];
       delete nodePeerIdToAccount[hoprPeerId];
-      emit DeregisteredByOwner(account);
+      // Eligibility update should have a logindex strictly smaller
+      // than the deregister event to make sure it always gets processed
+      // before the deregister event
       emit EligibilityUpdated(account, false);
+      emit DeregisteredByOwner(account);
     }
   }
 
