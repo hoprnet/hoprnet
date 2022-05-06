@@ -803,7 +803,7 @@ class Indexer extends EventEmitter {
       return
     }
     const account = Address.fromString(event.args.account)
-    await this.db.addToRegistry(PublicKey.fromPeerId(hoprNode), account, lastSnapshot)
+    await this.db.addToNetworkRegistry(PublicKey.fromPeerId(hoprNode), account, lastSnapshot)
   }
 
   private async onDeregistered(event: RegistryEvent<'DeregisteredByOwner'>, lastSnapshot: Snapshot): Promise<void> {
