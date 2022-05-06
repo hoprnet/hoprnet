@@ -1,11 +1,12 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import { utils } from 'ethers'
+import type { HoprNetworkRegistry, HoprDummyProxyForNetworkRegistry } from '../src/types'
 
 export type RegisterOpts =
   | {
       task: 'add'
       nativeAddresses: string
-      multiaddresses: string
+      peerIds: string
     }
   | {
       task: 'disable'
@@ -49,19 +50,19 @@ async function main(
 
   const hoprDummyProxy = (await ethers.getContractFactory('HoprDummyProxyForNetworkRegistry'))
     .connect(signer)
-    .attach(hoprDummyProxyAddress)
+    .attach(hoprDummyProxyAddress) as HoprDummyProxyForNetworkRegistry
 
   const hoprNetworkRegistry = (await ethers.getContractFactory('HoprNetworkRegistry'))
     .connect(signer)
-    .attach(hoprNetworkRegistryAddress)
+    .attach(hoprNetworkRegistryAddress) as HoprNetworkRegistry
 
   try {
     if (opts.task === 'add') {
       const nativeAddresses = opts.nativeAddresses.split(',')
-      const multiaddresses = opts.multiaddresses.split(',')
+      const peerIds = opts.peerIds.split(',')
 
       // ensure lists match in length
-      if (nativeAddresses.length !== multiaddresses.length) {
+      if (nativeAddresses.length !== peerIds.length) {
         console.error('Given native and multiaddress lists do not match in length.')
         process.exit(1)
       }
@@ -73,7 +74,7 @@ async function main(
       }
 
       await (await hoprDummyProxy.ownerBatchAddAccounts(nativeAddresses)).wait()
-      await (await hoprNetworkRegistry.ownerRegister(nativeAddresses, multiaddresses)).wait()
+      await (await hoprNetworkRegistry.ownerRegister(nativeAddresses, peerIds)).wait()
     } else {
       await (await hoprNetworkRegistry.disableRegistry()).wait()
     }

@@ -173,7 +173,7 @@ task<RegisterOpts>(
 )
   .addParam<RegisterOpts['task']>('task', 'The task to run', undefined, types.string)
   .addOptionalParam<string>('nativeAddresses', 'A list of native addresses', undefined, types.string)
-  .addOptionalParam<string>('multiaddresses', 'A list of multiaddresses', undefined, types.string)
+  .addOptionalParam<string>('peerIds', 'A list of peerIds', undefined, types.string)
 
 function getSortedFiles(dependenciesGraph) {
   const tsort = require('tsort')

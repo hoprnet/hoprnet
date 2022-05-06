@@ -786,6 +786,7 @@ class Indexer extends EventEmitter {
   ): Promise<void> {
     const account = Address.fromString(event.args.account)
     await this.db.setEligible(account, event.args.eligibility, lastSnapshot)
+    verbose(`network-registry: account ${account} is ${event.args.eligibility ? 'eligible' : 'not eligible'}`)
     // emit event only when eligibility changes on accounts with a HoprNode associated
     try {
       const hoprNode = await this.db.findHoprNodeUsingAccountInNetworkRegistry(account)
@@ -796,14 +797,15 @@ class Indexer extends EventEmitter {
   private async onRegistered(event: RegistryEvent<'Registered'>, lastSnapshot: Snapshot): Promise<void> {
     let hoprNode: PeerId
     try {
-      hoprNode = PeerId.createFromB58String(event.args.HoprPeerId)
+      hoprNode = PeerId.createFromB58String(event.args.hoprPeerId)
     } catch (error) {
-      log(`Invalid peer Id '${event.args.HoprPeerId}' given in event 'onRegistered'`)
+      log(`Invalid peer Id '${event.args.hoprPeerId}' given in event 'onRegistered'`)
       log(error)
       return
     }
     const account = Address.fromString(event.args.account)
     await this.db.addToNetworkRegistry(PublicKey.fromPeerId(hoprNode), account, lastSnapshot)
+    verbose(`network-registry: node ${event.args.hoprPeerId} is allowed to connect`)
   }
 
   private async onDeregistered(event: RegistryEvent<'DeregisteredByOwner'>, lastSnapshot: Snapshot): Promise<void> {
