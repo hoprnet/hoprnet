@@ -7,7 +7,7 @@
   "autoupdate": true,
   "image": {
     "volumes": [
-      "db:/app/db"
+      "db:/app/hoprd-db"
     ],
     "environment": [
       "DEBUG=hopr*"

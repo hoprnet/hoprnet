@@ -206,20 +206,20 @@ class NetworkPeers {
     // Sort a copy of peers in-place
     peers.sort((a, b) => this.qualityOf(b) - this.qualityOf(a))
 
-    const bestAvailabilityIndex = peers.reverse().findIndex((peer) => this.qualityOf(peer).toFixed(1) === '1.0')
-    const badAvailabilityIndex = peers.findIndex((peer) => this.qualityOf(peer) < NETWORK_QUALITY_THRESHOLD)
-
-    const bestAvailabilityNodes = bestAvailabilityIndex < 0 ? 0 : peers.length - bestAvailabilityIndex
-    const badAvailabilityNodes = badAvailabilityIndex < 0 ? 0 : peers.length - badAvailabilityIndex
-    const msgTotalNodes = `${peers.length} node${peers.length == 1 ? '' : 's'} in total`
-    const msgBestNodes = `${bestAvailabilityNodes} node${bestAvailabilityNodes == 1 ? '' : 's'} with quality 1.0`
-    const msgBadNodes = `${badAvailabilityNodes} node${badAvailabilityNodes == 1 ? '' : 's'} with quality below 0.5`
-
-    let out = `network peers status: ${msgTotalNodes}, ${msgBestNodes}, ${msgBadNodes}\n`
+    let bestAvailabilityNodes = 0
+    let badAvailabilityNodes = 0
+    let out = ''
 
     for (const peer of peers) {
       if (!this.has(peer)) {
         continue
+      }
+
+      const quality = this.qualityOf(peer)
+      if (quality.toFixed(1) === '1.0') {
+        bestAvailabilityNodes++
+      } else if (quality < NETWORK_QUALITY_THRESHOLD) {
+        badAvailabilityNodes++
       }
 
       const entry = this.peers.get(peer.toB58String())
@@ -232,6 +232,11 @@ class NetworkPeers {
       out += `origin: ${entry.origin}`
       out += '\n'
     }
+
+    const msgTotalNodes = `${peers.length} node${peers.length == 1 ? '' : 's'} in total`
+    const msgBestNodes = `${bestAvailabilityNodes} node${bestAvailabilityNodes == 1 ? '' : 's'} with quality 1.0`
+    const msgBadNodes = `${badAvailabilityNodes} node${badAvailabilityNodes == 1 ? '' : 's'} with quality below 0.5`
+    out += `network peers status: ${msgTotalNodes}, ${msgBestNodes}, ${msgBadNodes}\n`
 
     return out
   }

@@ -6,6 +6,7 @@ import {
   type Server as TCPServer
 } from 'net'
 import { createSocket, type RemoteInfo, type Socket as UDPSocket } from 'dgram'
+import type Connection from 'libp2p-interfaces/dist/src/connection/connection'
 
 import { once, EventEmitter } from 'events'
 import type { PeerStoreType, HoprConnectOptions, HoprConnectTestingOptions } from '../types'
@@ -32,6 +33,7 @@ import type HoprConnect from '..'
 import { UpnpManager } from './upnp'
 import type { Filter } from '../filter'
 import type { Relay } from '../relay'
+import type Libp2p from 'libp2p'
 
 const log = Debug('hopr-connect:listener')
 const error = Debug('hopr-connect:listener:error')
@@ -67,24 +69,28 @@ class Listener extends EventEmitter implements InterfaceListener {
   }
 
   /**
-   * @param handler called on incoming connection
-   * @param upgrader inform libp2p about incoming connections
-   * @param publicNodes emits on new and dead entry nodes
-   * @param initialNodes array of entry nodes that is know at startup
+   * @param onClose called once listener is closed
+   * @param onListening called once listener is listening
+   * @param dialDirectly utility to establish a direct connection
+   * @param upgradeInbound forward inbound connections to libp2p
    * @param peerId own id
-   * @param iface interface to listen on, e.g. `eth0`
-   * @param __testingOptions.runningLocally [testing] assume that all nodes are running on localhost
-   * @param __testingOptions.preferLocalAddresses [testing] treat local addresses as public addresses
-   * @param __testingOptions.noUPNP [testing] disable UPNP support, speedup calls to checkNATSituation
+   * @param options connection Options, e.g. AbortSignal
+   * @param testingOptions turn on / off modules for testing
+   * @param filter allow Listener to populate address filter
+   * @param relay allow Listener to populate list of utilized relays
+   * @param libp2p libp2p instance for various purposes
    */
   constructor(
+    private onClose: () => void,
+    private onListening: () => void,
     dialDirectly: HoprConnect['dialDirectly'],
     private upgradeInbound: Upgrader['upgradeInbound'],
     private peerId: PeerId,
     private options: HoprConnectOptions,
     private testingOptions: HoprConnectTestingOptions,
     private filter: Filter,
-    private relay: Relay
+    private relay: Relay,
+    libp2p: Libp2p
   ) {
     super()
 
@@ -120,7 +126,7 @@ class Listener extends EventEmitter implements InterfaceListener {
         const relayPeerIds = this.entry.getUsedRelayAddresses().map((ma: Multiaddr) => {
           const tuples = ma.tuples()
 
-          return PeerId.createFromBytes((tuples[0][1] as any).slice(1))
+          return PeerId.createFromBytes((tuples[0][1] as Uint8Array).slice(1))
         })
 
         this.relay.setUsedRelays(relayPeerIds)
@@ -129,7 +135,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       this.emit('listening')
     }.bind(this)
 
-    this.entry = new EntryNodes(this.peerId, dialDirectly, this.options)
+    this.entry = new EntryNodes(this.peerId, libp2p, dialDirectly, this.options)
 
     this.upnpManager = new UpnpManager()
   }
@@ -352,6 +358,11 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     this.attachSocketHandlers()
 
+    // Need to be called before _emitListening
+    // because _emitListening() sets an attribute in
+    // the relay object
+    this.onListening()
+
     this._emitListening()
 
     // Only add relay nodes if node is not directly reachable or running locally
@@ -361,7 +372,8 @@ class Listener extends EventEmitter implements InterfaceListener {
       // Finish startup
       this.entry.start()
 
-      await this.entry.updatePublicNodes()
+      // Initiate update but don't await its result
+      this.entry.updatePublicNodes()
     }
 
     this.state = State.LISTENING
@@ -386,6 +398,7 @@ class Listener extends EventEmitter implements InterfaceListener {
     ])
 
     this.state = State.CLOSED
+    this.onClose()
     this.emit('close')
   }
 
@@ -435,10 +448,10 @@ class Listener extends EventEmitter implements InterfaceListener {
     // Avoid uncaught errors caused by unstable connections
     socket.on('error', (err) => error('socket error', err))
 
-    let maConn: MultiaddrConnection | undefined
+    let maConn: TCPConnection | undefined
 
     try {
-      maConn = TCPConnection.fromSocket(socket, this.peerId) as any
+      maConn = TCPConnection.fromSocket(socket, this.peerId)
     } catch (err: any) {
       error(`inbound connection failed. ${err.message}`)
     }
@@ -450,8 +463,9 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     log('new inbound connection %s', maConn.remoteAddr)
 
+    let conn: Connection
     try {
-      await this.upgradeInbound(maConn)
+      conn = await this.upgradeInbound(maConn)
     } catch (err: any) {
       if (err.code === 'ERR_ENCRYPTION_FAILED') {
         error(`inbound connection failed because encryption failed. Maybe connected to the wrong node?`)
@@ -464,6 +478,23 @@ class Listener extends EventEmitter implements InterfaceListener {
       }
 
       return
+    }
+
+    for (const peer of this.entry.getUsedRelayPeerIds()) {
+      if (peer.equals(conn.remotePeer)) {
+        // Make sure that Multiaddr contains a PeerId
+        const maWithPeerId = maConn.remoteAddr
+          .decapsulateCode(CODE_P2P)
+          .encapsulate(`/p2p/${conn.remotePeer.toB58String()}`)
+
+        ;(maConn.conn as TCPSocket).on('close', () => {
+          if (maConn!.closed) {
+            return
+          }
+
+          this.entry._onEntryNodeDisconnect!(maWithPeerId)
+        })
+      }
     }
 
     log('inbound connection %s upgraded', maConn.remoteAddr)
@@ -532,8 +563,8 @@ class Listener extends EventEmitter implements InterfaceListener {
   /**
    * Tries to determine a node's public IP address by
    * using STUN servers
-   * @param port the port on which we are listening
-   * @param host [optional] the host on which we are listening
+   * @param ownAddress the host on which we are listening
+   * @param ownPort the port on which we are listening
    * @returns Promise that resolves once STUN request came back or STUN timeout was reched
    */
   async checkNATSituation(

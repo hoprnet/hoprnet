@@ -1,19 +1,19 @@
 import net, { type Socket, type AddressInfo } from 'net'
-import abortable, { AbortError } from 'abortable-iterator'
+import abortable from 'abortable-iterator'
 import Debug from 'debug'
-import { nodeToMultiaddr } from '../utils'
+import { nodeToMultiaddr, toU8aStream } from '../utils'
 
 const log = Debug('hopr-connect:tcp')
 const error = Debug('hopr-connect:tcp:error')
 const verbose = Debug('hopr-connect:verbose:tcp')
 
+// Timeout to wait for socket close before destroying it
 export const SOCKET_CLOSE_TIMEOUT = 1000
 
 import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
 
 import type { Multiaddr } from 'multiaddr'
 import toIterable from 'stream-to-it'
-import { toU8aStream } from '../utils'
 import type PeerId from 'peer-id'
 import type { Stream, StreamSink, StreamSource, StreamSourceAsync, StreamType, HoprConnectDialOptions } from '../types'
 
@@ -24,6 +24,7 @@ class TCPConnection implements MultiaddrConnection {
   public localAddr: Multiaddr
   public sink: StreamSink
   public source: StreamSourceAsync
+  public closed: boolean
 
   private _stream: Stream
 
@@ -37,14 +38,15 @@ class TCPConnection implements MultiaddrConnection {
   constructor(public remoteAddr: Multiaddr, self: PeerId, public conn: Socket, options?: HoprConnectDialOptions) {
     this.localAddr = nodeToMultiaddr(this.conn.address() as AddressInfo, self)
 
+    this.closed = false
     this.timeline = {
       open: Date.now()
     }
 
     this.conn.once('close', () => {
-      // In instances where `close` was not explicitly called,
-      // such as an iterable stream ending, ensure we have set the close
-      // timeline
+      // Whenever the socket gets closed, mark the
+      // connection closed to cleanup data structures in
+      // ConnectionManager
       this.timeline.close ??= Date.now()
     })
 
@@ -54,14 +56,17 @@ class TCPConnection implements MultiaddrConnection {
 
     this.sink = this._sink.bind(this)
 
-    // @ts-ignore
-    this.source = this._signal != undefined ? abortable(this._stream.source, this._signal) : this._stream.source
+    this.source =
+      this._signal != undefined
+        ? abortable(this._stream.source, this._signal)
+        : (this._stream.source as AsyncIterable<StreamType>)
   }
 
   public close(): Promise<void> {
-    if (this.conn.destroyed) {
+    if (this.conn.destroyed || this.closed) {
       return Promise.resolve()
     }
+    this.closed = true
 
     return new Promise<void>((resolve) => {
       let done = false
@@ -85,13 +90,13 @@ class TCPConnection implements MultiaddrConnection {
         if (this.conn.destroyed) {
           log('%s:%s is already destroyed', cOptions.host, cOptions.port)
         } else {
-          log(`destroying connection`)
+          log(`destroying connection ${cOptions.host}:${cOptions.port}`)
           this.conn.destroy()
         }
-
-        resolve()
       }, SOCKET_CLOSE_TIMEOUT)
 
+      // Resolve once closed
+      // Could take place after timeout or as a result of `.end()` call
       this.conn.once('close', () => {
         if (done) {
           return
@@ -101,15 +106,11 @@ class TCPConnection implements MultiaddrConnection {
         resolve()
       })
 
-      this.conn.end(() => {
-        if (done) {
-          return
-        }
-        done = true
-        this.timeline.close ??= Date.now()
-
-        resolve()
-      })
+      try {
+        this.conn.end()
+      } catch (err) {
+        this.conn.destroy()
+      }
     })
   }
 
@@ -132,28 +133,30 @@ class TCPConnection implements MultiaddrConnection {
 
   /**
    * @param ma
+   * @param self
    * @param options
-   * @param options.signal Used to abort dial requests
    * @returns Resolves a TCP Socket
    */
   public static create(ma: Multiaddr, self: PeerId, options?: HoprConnectDialOptions): Promise<TCPConnection> {
-    if (options?.signal?.aborted) {
-      return Promise.reject(new AbortError())
-    }
-
     return new Promise<TCPConnection>((resolve, reject) => {
       const start = Date.now()
       const cOpts = ma.toOptions()
 
       let rawSocket: Socket
+      let finished = false
 
-      const onError = (err: Error) => {
-        verbose(`Error connecting to ${ma.toString()}.`, err.message)
+      const onError = (err: any) => {
+        if (err.code === 'ABORT_ERR') {
+          verbose(`Abort to ${ma.toString()} after ${Date.now() - start} ms`)
+        } else {
+          verbose(`Error connecting to ${ma.toString()}.`)
+        }
+
         done(err)
       }
 
       const onTimeout = () => {
-        verbose(`Connnection timeout while connecting to ${ma.toString()}`)
+        verbose(`Connection timeout while connecting to ${ma.toString()}`)
         done(new Error(`connection timeout after ${Date.now() - start}ms`))
       }
 
@@ -163,12 +166,22 @@ class TCPConnection implements MultiaddrConnection {
       }
 
       const done = (err?: Error) => {
+        if (finished) {
+          return
+        }
+        finished = true
+
+        // Make sure that `done` is called only once
+        rawSocket?.removeListener('error', onError)
+        rawSocket?.removeListener('timeout', onTimeout)
+        rawSocket?.removeListener('connect', onConnect)
+
         if (err) {
           rawSocket?.destroy()
           return reject(err)
         }
 
-        resolve(new TCPConnection(ma, self, rawSocket))
+        resolve(new TCPConnection(ma, self, rawSocket, options))
       }
 
       rawSocket = net
@@ -177,7 +190,7 @@ class TCPConnection implements MultiaddrConnection {
           port: cOpts.port,
           signal: options?.signal
         })
-        .on('error', onError)
+        .once('error', onError)
         .once('timeout', onTimeout)
         .once('connect', onConnect)
     })
@@ -187,6 +200,16 @@ class TCPConnection implements MultiaddrConnection {
     if (socket.remoteAddress == undefined || socket.remoteFamily == undefined || socket.remotePort == undefined) {
       throw Error(`Could not determine remote address`)
     }
+
+    // Catch error from *incoming* socket
+    socket.once('error', (err: any) => {
+      error(`Error in incoming socket ${socket.remoteAddress}`, err)
+      try {
+        socket.destroy()
+      } catch (internalError: any) {
+        error(`Error while destroying incoming socket that threw an error`, internalError)
+      }
+    })
 
     // PeerId of remote peer is not yet known,
     // will be available after encryption is set up

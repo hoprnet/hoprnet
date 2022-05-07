@@ -380,6 +380,7 @@ log "Verifying node6 log output"
 grep -E "HOPR Balance: +20000 txHOPR" "${node6_log}"
 grep -E "ETH Balance: +10 xDAI" "${node6_log}"
 grep -E "Running on: hardhat" "${node6_log}"
+log "Output of node6 correct"
 # }}}
 
 # -- CT test {{{

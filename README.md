@@ -186,14 +186,14 @@ hoprd
 The following command assumes you've setup an alias like described in [Install via Docker](#install-via-docker).
 
 ```sh
-hoprd --identity /app/db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --admin --adminHost 0.0.0.0 --forwardLogs --apiToken <MY_TOKEN> --environment jungfrau
+hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --admin --adminHost 0.0.0.0 --forwardLogs --apiToken <MY_TOKEN> --environment jungfrau
 ```
 
 Here is a short break-down of each argument.
 
 ```sh
 hoprd
-  --identity /app/db/.hopr-identity      # store your node identity information in the persisted database folder
+  --identity /app/hoprd-db/.hopr-identity      # store your node identity information in the persisted database folder
   --password switzerland   		 # set the encryption password for your identity
   --init 				 # initialize the database and identity if not present
   --announce 				 # announce the node to other nodes in the network and act as relay if publicly reachable

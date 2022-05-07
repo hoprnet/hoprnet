@@ -10,7 +10,8 @@ import { isAnyAddress } from '@hoprnet/hopr-utils'
 import { Multiaddr } from 'multiaddr'
 import { CODE_CIRCUIT, CODE_P2P } from '../constants'
 
-export { parseAddress, type ValidAddress } from './addrs'
+export * from './addrs'
+export * from './addressSorters'
 export { encodeWithLengthPrefix, decodeWithLengthPrefix } from './lengthPrefix'
 
 function isAsyncStream<T>(iterator: AsyncIterable<T> | Iterable<T>): iterator is AsyncIterable<T> {
@@ -229,7 +230,10 @@ export function bindToPort(
  * @private
  * @param maConn
  */
-export async function attemptClose(maConn: MultiaddrConnection | Connection, logError: (...args: any[]) => void) {
+export async function attemptClose(
+  maConn: MultiaddrConnection | Connection | undefined,
+  logError: (...args: any[]) => void
+) {
   if (maConn == null) {
     return
   }
@@ -247,12 +251,12 @@ export async function attemptClose(maConn: MultiaddrConnection | Connection, log
  * @returns
  */
 export function relayFromRelayAddress(ma: Multiaddr): PeerId {
-  const tuples = ma.tuples()
+  const tuples = ma.tuples() as [code: number, addr: Uint8Array][]
 
   if (tuples.length != 3 || tuples[0][0] != CODE_P2P || tuples[1][0] != CODE_CIRCUIT || tuples[2][0] != CODE_P2P) {
     throw Error(`Cannot extract relay from non-relay address. Given address ${ma.toString()}`)
   }
 
   // Remove length prefix
-  return PeerId.createFromBytes(tuples[0][1]?.slice(1) as Uint8Array)
+  return PeerId.createFromBytes(tuples[0][1].slice(1))
 }
