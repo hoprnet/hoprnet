@@ -93,7 +93,11 @@ for (const [networkId, network] of Object.entries<ResolvedEnvironment['network']
     PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID] &&
     PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID].network_id === networkId
   ) {
-    network['tags'] = PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID].tags
+    network['tags'] = [
+      // always insert 'environment_type' as a tag so we know this info during smart contract deployment
+      PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID].environment_type,
+      ...PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID].tags
+    ]
   }
   // environment could be undefined at this point
   const hardhatNetwork = networkToHardhatNetwork(networkId, network)

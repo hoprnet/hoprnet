@@ -70,7 +70,10 @@
     "extension": [
       "ts"
     ],
-    "spec": "src/**/*.spec.ts",
+    "spec": [
+      "src/**/*.spec.ts",
+      "test/*.spec.ts"
+    ],
     "require": [
       "ts-node/register"
     ]

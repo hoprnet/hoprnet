@@ -2,77 +2,87 @@
   "environments": {
     "hardhat-localhost": {
       "network_id": "hardhat",
+      "environment_type": "development",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "${HARDHAT_TOKEN_CONTACT_ADDRESS}",
       "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}",
       "minted_token_receiver_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
-      "tags": ["development"]
+      "tags": []
     },
     "hardhat-localhost2": {
       "network_id": "hardhat",
+      "environment_type": "development",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "${HARDHAT_TOKEN_CONTACT_ADDRESS}",
       "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}",
       "minted_token_receiver_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
-      "tags": ["development"]
+      "tags": []
     },
     "master-goerli": {
       "network_id": "goerli",
+      "environment_type": "staging",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xa3C8f4044b30Fb3071F5b3b02913DE524F1041dc",
       "channels_contract_address": "0x7587B259bbe2AdcDc7bFd6FD667Fd440b64c0Aad",
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
-      "tags": ["development"]
+      "tags": []
     },
     "debug-goerli": {
       "network_id": "goerli",
+      "environment_type": "staging",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xC3Ff0A2C4F404D6a9B31a7ABc2a41E616bd4F34C",
       "channels_contract_address": "0x5daae235eEAeA72D9116702A615c2Be89D00D91b",
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
-      "tags": ["development"]
+      "tags": []
     },
     "tuttlingen": {
+      "environment_type": "production",
       "network_id": "xdai",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
       "channels_contract_address": "0xd2229d5d54bE8ABC9A2b2d5cFdEd22B48FB8ce2c",
-      "tags": ["production"]
+      "tags": []
     },
     "prague": {
       "network_id": "xdai",
+      "environment_type": "production",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
       "channels_contract_address": "0x4f98F01cb02083eb5457CA0DDC6B37073ec5388a",
-      "tags": ["production"]
+      "tags": []
     },
     "budapest": {
       "network_id": "xdai",
+      "environment_type": "production",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
       "channels_contract_address": "0xEee8AB66b7169b3f9024676165fB1D2a25E472c5",
-      "tags": ["production"]
+      "tags": []
     },
     "athens": {
       "network_id": "xdai",
+      "environment_type": "production",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
       "channels_contract_address": "0xD2F008718EEdD7aF7E9a466F5D68bb77D03B8F7A",
-      "tags": ["production"]
+      "tags": []
     },
     "lisbon": {
       "network_id": "xdai",
+      "environment_type": "production",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0x978D91ddFdb0c6eaCC22A258fE498957a79c5F4C",
       "channels_contract_address": "0x1753C9eE656c54f443ce2Fe7248076f9bA4eC100",
-      "tags": ["production"]
+      "tags": []
     },
     "ouagadougou": {
       "network_id": "xdai",
+      "environment_type": "production",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0x978D91ddFdb0c6eaCC22A258fE498957a79c5F4C",
       "channels_contract_address": "0x0BB1Ff7A9b3f2c87267626630aa0195cAE3ed5E3",
-      "tags": ["production"]
+      "tags": []
     }
   },
   "networks": {
