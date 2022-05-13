@@ -91,6 +91,7 @@
         "outputSelection": {
           "*": {
             "*": [
+              "storageLayout",
               "abi",
               "evm.bytecode",
               "evm.deployedBytecode",
@@ -98,7 +99,6 @@
               "metadata",
               "devdoc",
               "userdoc",
-              "storageLayout",
               "evm.gasEstimates"
             ],
             "": [

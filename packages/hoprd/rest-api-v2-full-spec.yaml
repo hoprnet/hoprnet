@@ -342,7 +342,6 @@
                                 {
                                   'peerId':
                                     {
-                                      'format': 'peerId',
                                       'type': 'string',
                                       'description': 'PeerId associated to the other node that we want to ping.'
                                     }
@@ -1008,13 +1007,11 @@
                                 {
                                   'peerId':
                                     {
-                                      'format': 'peerId',
                                       'type': 'string',
                                       'description': 'PeerId that we want to transact with using this channel.'
                                     },
                                   'amount':
                                     {
-                                      'format': 'amount',
                                       'type': 'string',
                                       'description': 'Amount of HOPR tokens to fund the channel. It will be used to pay for sending messages through channel'
                                     }
@@ -1073,49 +1070,46 @@
                     },
                   '403':
                     {
-                      'description': 'Failed to open the channel because of insufficient HOPR balance.',
+                      'description': 'Failed to open the channel either because of insufficient HOPR balance or because channel between this nodes already exists. Check response examples for more info.',
                       'content':
                         {
                           'application/json':
                             {
                               'schema':
                                 {
-                                  'type': 'object',
-                                  'properties':
-                                    {
-                                      'status':
-                                        {
-                                          'type': 'string',
-                                          'example': 'NOT_ENOUGH_BALANCE',
-                                          'description': 'Insufficient balance to open channel. Amount passed in request body exeeds current balance.'
-                                        }
-                                    }
+                                  'oneOf':
+                                    [
+                                      {
+                                        'type': 'object',
+                                        'properties':
+                                          {
+                                            'status':
+                                              {
+                                                'type': 'string',
+                                                'example': 'NOT_ENOUGH_BALANCE',
+                                                'description': 'Insufficient balance to open channel. Amount passed in request body exeeds current balance.'
+                                              }
+                                          }
+                                      },
+                                      {
+                                        'type': 'object',
+                                        'properties':
+                                          {
+                                            'status':
+                                              {
+                                                'type': 'string',
+                                                'example': 'CHANNEL_ALREADY_OPEN',
+                                                'description': 'Channel already open. Cannot open more than one channel between two nodes.'
+                                              }
+                                          }
+                                      }
+                                    ]
                                 },
-                              'example': { 'status': 'NOT_ENOUGH_BALANCE' }
-                            }
-                        }
-                    },
-                  '409':
-                    {
-                      'description': 'Failed to open the channel because the channel between this nodes already exists.',
-                      'content':
-                        {
-                          'application/json':
-                            {
-                              'schema':
+                              'examples':
                                 {
-                                  'type': 'object',
-                                  'properties':
-                                    {
-                                      'status':
-                                        {
-                                          'type': 'string',
-                                          'example': 'CHANNEL_ALREADY_OPEN',
-                                          'description': 'Channel already open. Cannot open more than one channel between two nodes.'
-                                        }
-                                    }
-                                },
-                              'example': { 'status': 'CHANNEL_ALREADY_OPEN' }
+                                  'NOT_ENOUGH_BALANCE': { 'value': { 'status': 'NOT_ENOUGH_BALANCE' } },
+                                  'CHANNEL_ALREADY_OPEN': { 'value': { 'status': 'CHANNEL_ALREADY_OPEN' } }
+                                }
                             }
                         }
                     },
@@ -1210,12 +1204,7 @@
                               'required': ['peerId', 'alias'],
                               'properties':
                                 {
-                                  'peerId':
-                                    {
-                                      'format': 'peerId',
-                                      'type': 'string',
-                                      'description': 'PeerId that we want to set alias to.'
-                                    },
+                                  'peerId': { 'type': 'string', 'description': 'PeerId that we want to set alias to.' },
                                   'alias':
                                     { 'type': 'string', 'description': 'Alias that we want to attach to peerId.' }
                                 },
@@ -1287,7 +1276,6 @@
                                   'amount':
                                     {
                                       'type': 'string',
-                                      'format': 'amount',
                                       'description': "Amount to withdraw in the currency's smallest unit.",
                                       'example': '1337'
                                     },
@@ -1324,32 +1312,24 @@
                     },
                   '400':
                     {
-                      'description': "Incorrect data in request body. Make sure to provide valid currency ('NATIVE' | 'HOPR') or amount.",
+                      'description': "Incorrect data in request body. Make sure to provide valid currency ('NATIVE' | 'HOPR'), amount, and ethereum address.",
                       'content':
                         {
                           'application/json':
                             {
                               'schema': { '$ref': '#/components/schemas/RequestStatus' },
-                              'example': { 'status': 'INVALID_CURRENCY | INVALID_AMOUNT' }
+                              'example': { 'status': 'INVALID_CURRENCY | INVALID_AMOUNT | INVALID_ADDRESS' }
                             }
                         }
                     },
                   '422':
                     {
-                      'description': 'Withdraw amount exeeds current balance or unknown error. You can check current balance using /account/balance endpoint.',
+                      'description': 'Withdraw amount exeeds current balance. You can check current balance using /account/balance endpoint.',
                       'content':
                         {
                           'application/json':
                             {
-                              'schema':
-                                {
-                                  'type': 'object',
-                                  'properties':
-                                    {
-                                      'status': { 'type': 'string', 'example': 'NOT_ENOUGH_BALANCE | UNKNOWN_FAILURE' },
-                                      'error': { 'type': 'string', 'example': 'NOT_ENOUGH_BALANCE' }
-                                    }
-                                },
+                              'schema': { '$ref': '#/components/schemas/RequestStatus' },
                               'example': { 'status': 'NOT_ENOUGH_BALANCE' }
                             }
                         }
@@ -1542,21 +1522,6 @@
               'description': "Change this node's setting value. Check Settings schema to learn more about each setting and the type of value it expects.",
               'tags': ['Settings'],
               'operationId': 'settingsSetSetting',
-              'parameters':
-                [
-                  {
-                    'in': 'path',
-                    'name': 'setting',
-                    'required': true,
-                    'schema':
-                      {
-                        'format': 'settingKey',
-                        'type': 'string',
-                        'description': 'Name of the setting we want to change.',
-                        'example': 'includeRecipient'
-                      }
-                  }
-                ],
               'requestBody':
                 {
                   'content':
@@ -1566,9 +1531,9 @@
                           'schema':
                             {
                               'type': 'object',
-                              'required': ['settingValue'],
-                              'properties': { 'settingValue': {} },
-                              'example': { 'settingValue': true }
+                              'required': ['key', 'value'],
+                              'properties': { 'key': { 'type': 'string' }, 'value': {} },
+                              'example': { 'key': 'includeRecipient', 'value': true }
                             }
                         }
                     }
@@ -1611,6 +1576,69 @@
                 }
             }
         },
+      '/peerInfo/{peerid}':
+        {
+          'parameters': [],
+          'get':
+            {
+              'description': 'Get information about this peer.',
+              'tags': ['PeerInfo'],
+              'operationId': 'peerInfoGetPeerInfo',
+              'parameters':
+                [
+                  {
+                    'in': 'path',
+                    'name': 'peerid',
+                    'required': true,
+                    'schema': { '$ref': '#/components/schemas/HoprAddress' }
+                  }
+                ],
+              'responses':
+                {
+                  '200':
+                    {
+                      'description': 'Peer information fetched successfully.',
+                      'content':
+                        {
+                          'application/json':
+                            {
+                              'schema':
+                                {
+                                  'type': 'object',
+                                  'properties':
+                                    {
+                                      'announced':
+                                        { 'type': 'array', 'items': { '$ref': '#/components/schemas/MultiAddress' } },
+                                      'observed':
+                                        { 'type': 'array', 'items': { '$ref': '#/components/schemas/MultiAddress' } }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                  '422':
+                    {
+                      'description': 'Unknown failure.',
+                      'content':
+                        {
+                          'application/json':
+                            {
+                              'schema':
+                                {
+                                  'type': 'object',
+                                  'properties':
+                                    {
+                                      'status': { 'type': 'string', 'example': 'UNKNOWN_FAILURE' },
+                                      'error': { 'type': 'string', 'example': 'Full error message.' }
+                                    }
+                                },
+                              'example': { 'status': 'UNKNOWN_FAILURE', 'error': 'Full error message.' }
+                            }
+                        }
+                    }
+                }
+            }
+        },
       '/channels/{peerid}/tickets/redeem':
         {
           'parameters': [],
@@ -1619,37 +1647,9 @@
               'description': 'Redeems your tickets for this channel. Redeeming will change your tickets into Hopr tokens if they are winning ones. You can check how much tickets given channel has by calling /channels/{peerid}/tickets endpoint. Do this before channel is closed as neglected tickets are no longer valid for redeeming.',
               'tags': ['Channels'],
               'operationId': 'channelsRedeemTickets',
-              'parameters':
-                [
-                  {
-                    'in': 'path',
-                    'name': 'peerid',
-                    'example': '16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit',
-                    'required': true,
-                    'schema':
-                      {
-                        'format': 'peerId',
-                        'type': 'string',
-                        'description': 'PeerId attached to the channel.',
-                        'example': '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12'
-                      }
-                  }
-                ],
               'responses':
                 {
                   '204': { 'description': 'Tickets redeemed succesfully.' },
-                  '400':
-                    {
-                      'description': 'Invalid peerId.',
-                      'content':
-                        {
-                          'application/json':
-                            {
-                              'schema': { '$ref': '#/components/schemas/RequestStatus' },
-                              'example': { 'status': 'INVALID_PEERID' }
-                            }
-                        }
-                    },
                   '404':
                     {
                       'description': 'Tickets were not found for that channel. That means that no messages were sent inside this channel yet.',
@@ -1703,7 +1703,6 @@
                     'schema':
                       {
                         'type': 'string',
-                        'format': 'peerId',
                         'description': 'PeerId attached to the channel.',
                         'example': '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12'
                       }
@@ -1718,18 +1717,6 @@
                         {
                           'application/json':
                             { 'schema': { 'type': 'array', 'items': { '$ref': '#/components/schemas/Ticket' } } }
-                        }
-                    },
-                  '400':
-                    {
-                      'description': 'Invalid peerId.',
-                      'content':
-                        {
-                          'application/json':
-                            {
-                              'schema': { '$ref': '#/components/schemas/RequestStatus' },
-                              'example': { 'status': 'INVALID_PEERID' }
-                            }
                         }
                     },
                   '404':
@@ -1783,7 +1770,6 @@
                     'required': true,
                     'schema':
                       {
-                        'format': 'peerId',
                         'type': 'string',
                         'description': 'PeerId attached to the channel that we want to close.',
                         'example': '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12'
@@ -1819,9 +1805,9 @@
                                         },
                                       'channelStatus':
                                         {
-                                          'type': 'string',
+                                          'type': 'number',
                                           'description': 'Current status of the channel',
-                                          'example': 'Closed'
+                                          'example': 2
                                         }
                                     }
                                 }
@@ -1962,17 +1948,7 @@
                   '200':
                     {
                       'description': 'HOPR address was found for the provided alias.',
-                      'content':
-                        {
-                          'application/json':
-                            {
-                              'schema':
-                                {
-                                  'type': 'object',
-                                  'properties': { 'peerId': { '$ref': '#/components/schemas/HoprAddress' } }
-                                }
-                            }
-                        }
+                      'content': { 'application/json': { 'schema': { '$ref': '#/components/schemas/HoprAddress' } } }
                     },
                   '404':
                     {
@@ -2065,8 +2041,8 @@
             },
           'Signature':
             {
-              'type': 'string',
-              'description': 'Signature from requested message.',
+              'type': 'object',
+              'properties': { 'signature': { 'type': 'string', 'description': 'Signature from requested message.' } },
               'example': '0x304402201065a95fd22fc3e48266c3b270ace032489b0177e07d33c59e0d13dccc89108402205f41fb911bcfe485a8e58162ebce90382dc96ccafff378e5c8960e07efcf9e92'
             },
           'MultiAddress':
@@ -2091,13 +2067,11 @@
           'NativeAddress':
             {
               'type': 'string',
-              'format': 'address',
               'description': "Blockchain-native account address. Can be funded from external wallets (starts with **0x...**). It **can't be used** internally to send / receive messages, open / close payment channels.",
               'example': '0xEA9eDAE5CfC794B75C45c8fa89b605508A03742a'
             },
           'HoprAddress':
             {
-              'format': 'peerId',
               'type': 'string',
               'description': 'HOPR account address, also called a PeerId. Used to send / receive messages, open / close payment channels.',
               'example': '16Uiu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQxTWDcmUX5847roBar'
@@ -2224,6 +2198,7 @@
       { 'name': 'Channels' },
       { 'name': 'Messages' },
       { 'name': 'Node' },
+      { 'name': 'PeerInfo' },
       { 'name': 'Settings' },
       { 'name': 'Tickets' }
     ]
