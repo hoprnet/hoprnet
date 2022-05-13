@@ -55,6 +55,7 @@ async function main(
   const hoprNetworkRegistry = (await ethers.getContractFactory('HoprNetworkRegistry'))
     .connect(signer)
     .attach(hoprNetworkRegistryAddress) as HoprNetworkRegistry
+  const isEnabled = await hoprNetworkRegistry.enabled()
 
   try {
     if (opts.task === 'add') {
@@ -75,9 +76,9 @@ async function main(
 
       await (await hoprDummyProxy.ownerBatchAddAccounts(nativeAddresses)).wait()
       await (await hoprNetworkRegistry.ownerRegister(nativeAddresses, peerIds)).wait()
-    } else if (opts.task === 'enable') {
+    } else if (opts.task === 'enable' && !isEnabled) {
       await (await hoprNetworkRegistry.enableRegistry()).wait()
-    } else if (opts.task === 'disable') {
+    } else if (opts.task === 'disable' && isEnabled) {
       await (await hoprNetworkRegistry.disableRegistry()).wait()
     } else {
       throw Error(`Task "${opts.task}" not available.`)
