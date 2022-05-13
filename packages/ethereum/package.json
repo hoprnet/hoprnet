@@ -20,7 +20,6 @@
     "test": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost HOPR_HARDHAT_TAG=testing hardhat test:in-group",
     "coverage": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost HOPR_HARDHAT_TAG=testing hardhat coverage",
     "deploy:local": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost HOPR_HARDHAT_TAG=testing hardhat deploy --network hardhat --write true",
-
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },
