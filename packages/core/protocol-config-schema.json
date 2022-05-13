@@ -12,11 +12,7 @@
             },
             "environment_type": {
               "type": "string",
-              "enum": [
-                "production",
-                "staging",
-                "development"
-              ]
+              "enum": ["production", "staging", "development"]
             },
             "channel_contract_deploy_block": {
               "type": "integer"
@@ -123,8 +119,5 @@
       }
     }
   },
-  "required": [
-    "environments",
-    "networks"
-  ]
+  "required": ["environments", "networks"]
 }
