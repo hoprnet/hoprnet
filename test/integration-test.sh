@@ -413,6 +413,15 @@ log "hopr addr5: ${addr5} ${native_addr5} ${hopr_addr5}"
 log "hopr addr7: ${addr7} ${native_addr7} ${hopr_addr7}"
 log "hopr addr8: ${addr8} ${native_addr8} ${hopr_addr8}"
 
+# enable register
+log "Enabling register"
+HOPR_ENVIRONMENT_ID=hardhat-localhost \
+TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
+yarn workspace @hoprnet/hopr-ethereum hardhat register \
+  --network hardhat \
+  --task enable
+log "Register enabled"
+
 # add nodes 1,2,3,4,5,7 in register, do NOT add node 8
 log "Adding nodes to register"
 HOPR_ENVIRONMENT_ID=hardhat-localhost \

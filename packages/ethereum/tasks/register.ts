@@ -9,7 +9,7 @@ export type RegisterOpts =
       peerIds: string
     }
   | {
-      task: 'disable'
+      task: 'disable' | 'enable'
     }
 
 /**
@@ -76,7 +76,8 @@ async function main(
       await (await hoprDummyProxy.ownerBatchAddAccounts(nativeAddresses)).wait()
       await (await hoprNetworkRegistry.ownerRegister(nativeAddresses, peerIds)).wait()
     } else {
-      await (await hoprNetworkRegistry.disableRegistry()).wait()
+      if (opts.task === 'disable') await (await hoprNetworkRegistry.disableRegistry()).wait()
+      else await (await hoprNetworkRegistry.enableRegistry()).wait()
     }
   } catch (error) {
     console.error('Failed to add account with error:', error)
