@@ -34,7 +34,7 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   IHoprStake public immutable STAKE_CONTRACT; // contract of HoprStake contract
   uint256 public stakeThreshold; // minimum amount HOPR tokens being staked in the staking contract to be considered eligible
   NftTypeAndRank[] public eligibleNftTypeAndRank; // list of NFTs whose owner are considered as eligible to the network if the `stakeThreshold` is also met
-  NftTypeAndRank[] public specialeNftTypeAndRank; // list of NFTs whose owner are considered as eligible to the network without meeting the `stakeThreshold`, e.g. "Dev NFT"
+  NftTypeAndRank[] public specialNftTypeAndRank; // list of NFTs whose owner are considered as eligible to the network without meeting the `stakeThreshold`, e.g. "Dev NFT"
 
   event NftTypeAndRankAdded(uint256 indexed nftType, uint256 indexed nftRank); // emit when a new NFT type and rank gets included in the eligibility list
   event NftTypeAndRankRemoved(uint256 indexed nftType, uint256 indexed nftRank); // emit when a NFT type and rank gets removed from the eligibility list
@@ -61,8 +61,8 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
    */
   function isRequirementFulfilled(address account) external view returns (bool) {
     // if the account owns a special NFT, requirement is fulfilled
-    for (uint256 i = 0; i < specialeNftTypeAndRank.length; i++) {
-      NftTypeAndRank memory eligible = specialeNftTypeAndRank[i];
+    for (uint256 i = 0; i < specialNftTypeAndRank.length; i++) {
+      NftTypeAndRank memory eligible = specialNftTypeAndRank[i];
       if (STAKE_CONTRACT.isNftTypeAndRankRedeemed3(eligible.nftType, eligible.nftRank, account)) {
         return true;
       }
@@ -190,14 +190,14 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
    */
   function _addSpecialNftTypeAndRank(uint256 nftType, uint256 nftRank) private {
     uint256 i = 0;
-    for (i; i < specialeNftTypeAndRank.length; i++) {
+    for (i; i < specialNftTypeAndRank.length; i++) {
       // walk through all the types
-      if (specialeNftTypeAndRank[i].nftType == nftType && specialeNftTypeAndRank[i].nftRank == nftRank) {
+      if (specialNftTypeAndRank[i].nftType == nftType && specialNftTypeAndRank[i].nftRank == nftRank) {
         // already exist;
         return;
       }
     }
-    specialeNftTypeAndRank.push(NftTypeAndRank({nftType: nftType, nftRank: nftRank}));
+    specialNftTypeAndRank.push(NftTypeAndRank({nftType: nftType, nftRank: nftRank}));
     emit SpecialNftTypeAndRankAdded(nftType, nftRank);
     (nftType, nftRank);
   }
@@ -209,11 +209,11 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
    */
   function _removeSpecialNftTypeAndRank(uint256 nftType, uint256 nftRank) private {
     // walk through
-    for (uint256 i = 0; i < specialeNftTypeAndRank.length; i++) {
-      if (specialeNftTypeAndRank[i].nftType == nftType && specialeNftTypeAndRank[i].nftRank == nftRank) {
+    for (uint256 i = 0; i < specialNftTypeAndRank.length; i++) {
+      if (specialNftTypeAndRank[i].nftType == nftType && specialNftTypeAndRank[i].nftRank == nftRank) {
         // overwrite with the last element in the array
-        specialeNftTypeAndRank[i] = specialeNftTypeAndRank[specialeNftTypeAndRank.length - 1];
-        specialeNftTypeAndRank.pop();
+        specialNftTypeAndRank[i] = specialNftTypeAndRank[specialNftTypeAndRank.length - 1];
+        specialNftTypeAndRank.pop();
         emit SpecialNftTypeAndRankRemoved(nftType, nftRank);
       }
     }
