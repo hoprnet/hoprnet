@@ -63,7 +63,7 @@ npx hardhat coverage
 To deploy locally, run
 
 ```bash
-yarn prepack && yarn deploy:local
+rm -rf deployments/hardhat-localhost deployments/hardhat-localhost2 && yarn deploy:local
 ```
 
 # Migrating
