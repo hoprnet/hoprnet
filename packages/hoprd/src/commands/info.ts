@@ -26,6 +26,7 @@ export class Info extends AbstractCommand {
         `Running on: ${smartContractInfo.network}`,
         `HOPR Token: ${smartContractInfo.hoprTokenAddress}`,
         `HOPR Channels: ${smartContractInfo.hoprChannelsAddress}`,
+        `HOPR NetworkRegistry: ${smartContractInfo.hoprNetworkRegistryAddress}`,
         `Channel closure period: ${channelClosureMins} minutes`
       ].join('\n')
     )

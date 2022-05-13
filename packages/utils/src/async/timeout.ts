@@ -1,15 +1,45 @@
-import AbortController from 'abort-controller'
-import type { AbortSignal } from 'abort-controller'
+/**
+ * Races a timeout against some work
+ * @param timeout return after timeout in ms
+ * @param work function that returns a Promise that resolves once the work is done
+ * @returns a Promise that resolves once the timeout is due or the work is done
+ */
+export function timeout<T>(timeout: number, work: () => Promise<T>): Promise<T> {
+  let resolve: any
+  let reject: any
 
-// Reject the body promise if it hasn't settled after timeout
-export function timeoutAfter<T>(body: (abortSignal: AbortSignal) => Promise<T>, timeout: number): Promise<T> {
-  const abortController = new AbortController()
-  const timeoutPromise = new Promise<T>((_resolve, reject) => {
-    setTimeout(() => {
-      abortController.abort()
-      reject('timeout exceeded')
-    }, timeout)
+  let done = false
+
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
   })
-  const bodyPromise = body(abortController.signal)
-  return Promise.race([timeoutPromise, bodyPromise])
+
+  const onReject = (err?: any) => {
+    if (done) {
+      return
+    }
+    done = true
+
+    reject(err)
+  }
+
+  const onResolve = (res: T) => {
+    if (done) {
+      return
+    }
+    done = true
+
+    resolve(res)
+  }
+
+  setTimeout(onReject, timeout)
+
+  try {
+    work().then(onResolve, onReject)
+  } catch (err) {
+    onReject(err)
+  }
+
+  return promise
 }

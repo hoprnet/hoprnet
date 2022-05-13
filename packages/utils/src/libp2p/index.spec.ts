@@ -9,9 +9,10 @@ import {
   libp2pSubscribe,
   libp2pSendMessage
 } from '.'
+import type { Connection } from 'libp2p/src/connection-manager'
 import type { LibP2PHandlerArgs } from './index'
 import BL from 'bl'
-import { defer } from '../async'
+import { defer, type DeferType } from '../async'
 import { u8aEquals } from '../u8a'
 import { Multiaddr } from 'multiaddr'
 
@@ -75,48 +76,87 @@ describe(`test hasB58String`, function () {
   })
 })
 
+function getFakeLibp2p(
+  state:
+    | {
+        msgReceived?: DeferType<void>
+        waitUntilSend?: DeferType<void>
+      }
+    | undefined,
+  messages:
+    | {
+        msgToReceive?: Uint8Array
+        msgToReplyWith?: Uint8Array
+      }
+    | undefined
+) {
+  return {
+    dial(destination: PeerId, ..._opts: any[]): Promise<Connection> {
+      return Promise.resolve<Connection>({
+        newStream: (protocol: string) =>
+          Promise.resolve({
+            stream: {
+              sink: async (source: AsyncIterable<Uint8Array>) => {
+                for await (const msg of source) {
+                  if (messages?.msgToReceive && u8aEquals(Uint8Array.from(msg.slice()), messages.msgToReceive)) {
+                    state?.msgReceived?.resolve()
+                  } else {
+                    state?.msgReceived?.reject()
+                  }
+
+                  await new Promise((resolve) => setTimeout(resolve, 50))
+                  state?.waitUntilSend?.resolve()
+                }
+              },
+              source: (async function* () {
+                state?.waitUntilSend && (await state.waitUntilSend.promise)
+
+                if (messages.msgToReplyWith) {
+                  yield new BL(Buffer.from(messages.msgToReplyWith))
+                }
+              })()
+            } as any,
+            protocol
+          }),
+        remotePeer: destination
+      } as Connection)
+    },
+    peerStore: {
+      addressBook: {
+        get(_peer: PeerId) {
+          return [
+            {
+              multiaddr: new Multiaddr(`/ip4/1.2.3.4/`)
+            }
+          ]
+        }
+      }
+    },
+    connectionManager: {
+      getAll: () => {
+        return []
+      }
+    }
+  }
+}
+
 describe(`test libp2pSendMessage`, function () {
   it(`send message`, async function () {
     const msgToReceive = new TextEncoder().encode(`This message should be received.`)
 
-    const desintation = await PeerId.create({ keyType: 'secp256k1' })
+    const destination = await PeerId.create({ keyType: 'secp256k1' })
     const msgReceived = defer<void>()
 
-    const fakeLibp2p = {
-      dialProtocol(destination: Multiaddr, protocol: string, ..._opts: any[]): Promise<LibP2PHandlerArgs> {
-        return Promise.resolve({
-          stream: {
-            sink: async (source: AsyncIterable<Uint8Array>) => {
-              for await (const msg of source) {
-                if (u8aEquals(Uint8Array.from(msg.slice()), msgToReceive)) {
-                  msgReceived.resolve()
-                } else {
-                  msgReceived.reject()
-                }
-              }
-            },
-            source: []
-          } as any,
-          protocol,
-          connection: {
-            remotePeer: destination
-          } as any
-        })
+    const fakeLibp2p = getFakeLibp2p(
+      {
+        msgReceived
       },
-      peerStore: {
-        addressBook: {
-          get(_peer: PeerId) {
-            return [
-              {
-                multiaddr: new Multiaddr(`/ip4/1.2.3.4/`)
-              }
-            ]
-          }
-        }
+      {
+        msgToReceive
       }
-    }
+    )
 
-    await libp2pSendMessage(fakeLibp2p as any, desintation, 'demo protocol', msgToReceive, false, { timeout: 5000 })
+    await libp2pSendMessage(fakeLibp2p as any, destination, 'demo protocol', msgToReceive, false, { timeout: 5000 })
 
     await msgReceived.promise
   })
@@ -127,56 +167,26 @@ describe(`test libp2pSendMessage with response`, function () {
     const msgToReceive = new TextEncoder().encode(`This message should be received.`)
     const msgToReplyWith = new TextEncoder().encode(`This message should be received.`)
 
-    const desintation = await PeerId.create({ keyType: 'secp256k1' })
+    const destination = await PeerId.create({ keyType: 'secp256k1' })
 
     const msgReceived = defer<void>()
 
     const waitUntilSend = defer<void>()
 
-    const fakeLibp2p = {
-      dialProtocol(destination: Multiaddr, protocol: string, ..._opts: any[]): Promise<LibP2PHandlerArgs> {
-        return Promise.resolve({
-          stream: {
-            sink: async (source: AsyncIterable<Uint8Array>) => {
-              for await (const msg of source) {
-                if (u8aEquals(Uint8Array.from(msg.slice()), msgToReceive)) {
-                  msgReceived.resolve()
-                } else {
-                  msgReceived.reject()
-                }
-
-                await new Promise((resolve) => setTimeout(resolve, 50))
-                waitUntilSend.resolve()
-              }
-            },
-            source: (async function* () {
-              await waitUntilSend.promise
-
-              yield new BL(msgToReplyWith as any)
-            })()
-          } as any,
-          protocol,
-          connection: {
-            remotePeer: destination
-          } as any
-        })
+    const fakeLibp2p = getFakeLibp2p(
+      {
+        waitUntilSend,
+        msgReceived
       },
-      peerStore: {
-        addressBook: {
-          get(_peer: PeerId) {
-            return [
-              {
-                multiaddr: new Multiaddr(`/ip4/1.2.3.4/`)
-              }
-            ]
-          }
-        }
+      {
+        msgToReceive,
+        msgToReplyWith
       }
-    }
+    )
 
     const results = await Promise.all([
       msgReceived.promise,
-      libp2pSendMessage(fakeLibp2p as any, desintation, 'demo protocol', msgToReceive, true, {
+      libp2pSendMessage(fakeLibp2p as any, destination, 'demo protocol', msgToReceive, true, {
         timeout: 5000
       })
     ])

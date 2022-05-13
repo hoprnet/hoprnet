@@ -11,6 +11,7 @@
 ### Interfaces
 
 - [HoprChannels](interfaces/HoprChannels.md)
+- [HoprNetworkRegistry](interfaces/HoprNetworkRegistry.md)
 - [HoprToken](interfaces/HoprToken.md)
 - [TypedEvent](interfaces/TypedEvent.md)
 - [TypedEventFilter](interfaces/TypedEventFilter.md)
@@ -51,7 +52,7 @@ ___
 
 ### ContractNames
 
-Ƭ **ContractNames**: ``"HoprToken"`` \| ``"HoprChannels"`` \| ``"HoprDistributor"``
+Ƭ **ContractNames**: ``"HoprToken"`` \| ``"HoprChannels"`` \| ``"HoprDistributor"`` \| ``"HoprNetworkRegistry"``
 
 #### Defined in
 

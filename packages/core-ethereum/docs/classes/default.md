@@ -49,6 +49,7 @@
 - [getRandomOpenChannel](default.md#getrandomopenchannel)
 - [initializeChainWrapper](default.md#initializechainwrapper)
 - [initializeClosure](default.md#initializeclosure)
+- [isAllowedAccessToNetwork](default.md#isallowedaccesstonetwork)
 - [listenerCount](default.md#listenercount)
 - [listeners](default.md#listeners)
 - [off](default.md#off)
@@ -154,9 +155,10 @@ ___
 | `getBalance` | (`accountAddress`: `Address`) => `Promise`<`Balance`\> |
 | `getChannels` | () => `HoprChannels` |
 | `getGenesisBlock` | () => `number` |
-| `getInfo` | () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `string` = networkInfo.network } |
+| `getInfo` | () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprNetworkRegistryAddress`: `string` = hoprNetworkRegistryDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `string` = networkInfo.network } |
 | `getLatestBlockNumber` | () => `Promise`<`number`\> |
 | `getNativeBalance` | (`accountAddress`: `Address`) => `Promise`<`Balance`\> |
+| `getNetworkRegistry` | () => `HoprNetworkRegistry` |
 | `getPrivateKey` | () => `Uint8Array` |
 | `getPublicKey` | () => `PublicKey` |
 | `getToken` | () => `HoprToken` |
@@ -349,7 +351,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:220](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L220)
+[packages/core-ethereum/src/index.ts:221](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L221)
 
 ___
 
@@ -484,7 +486,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:435](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L435)
+[packages/core-ethereum/src/index.ts:436](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L436)
 
 ___
 
@@ -506,7 +508,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:463](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L463)
+[packages/core-ethereum/src/index.ts:464](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L464)
 
 ___
 
@@ -697,7 +699,33 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:425](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L425)
+[packages/core-ethereum/src/index.ts:426](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L426)
+
+___
+
+### isAllowedAccessToNetwork
+
+▸ **isAllowedAccessToNetwork**(`hoprNode`): `Promise`<`boolean`\>
+
+Checks whether a given `hoprNode` is allowed access.
+When the register is disabled, a `hoprNode` is seen as `registered`,
+when the register is enabled, a `hoprNode` needs to also be `eligible`.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `hoprNode` | `PublicKey` | the public key of the account we want to check if it's registered |
+
+#### Returns
+
+`Promise`<`boolean`\>
+
+true if registered
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:486](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L486)
 
 ___
 
@@ -915,7 +943,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:445](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L445)
+[packages/core-ethereum/src/index.ts:446](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L446)
 
 ___
 
@@ -1060,7 +1088,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:241](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L241)
+[packages/core-ethereum/src/index.ts:242](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L242)
 
 ___
 
@@ -1074,7 +1102,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:256](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L256)
+[packages/core-ethereum/src/index.ts:257](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L257)
 
 ___
 
@@ -1095,7 +1123,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:369](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L369)
+[packages/core-ethereum/src/index.ts:370](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L370)
 
 ___
 
@@ -1115,7 +1143,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:282](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L282)
+[packages/core-ethereum/src/index.ts:283](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L283)
 
 ___
 
@@ -1135,7 +1163,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:277](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L277)
+[packages/core-ethereum/src/index.ts:278](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L278)
 
 ___
 
@@ -1155,7 +1183,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:304](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L304)
+[packages/core-ethereum/src/index.ts:305](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L305)
 
 ___
 
@@ -1363,6 +1391,7 @@ ___
 | :------ | :------ |
 | `channelClosureSecs` | `number` |
 | `hoprChannelsAddress` | `string` |
+| `hoprNetworkRegistryAddress` | `string` |
 | `hoprTokenAddress` | `string` |
 | `network` | `string` |
 
@@ -1430,7 +1459,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:216](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L216)
+[packages/core-ethereum/src/index.ts:217](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L217)
 
 ___
 

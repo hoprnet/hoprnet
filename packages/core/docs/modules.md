@@ -102,7 +102,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:86](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L86)
+[packages/core/src/index.ts:85](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L85)
 
 ___
 
@@ -112,7 +112,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:127](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L127)
+[packages/core/src/index.ts:126](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L126)
 
 ___
 
@@ -142,7 +142,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:142](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L142)
+[packages/core/src/index.ts:141](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L141)
 
 ___
 
@@ -152,7 +152,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:129](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L129)
+[packages/core/src/index.ts:128](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L128)
 
 ## Variables
 
@@ -188,7 +188,7 @@ ___
 
 ### HEARTBEAT\_INTERVAL
 
-• `Const` **HEARTBEAT\_INTERVAL**: ``30000``
+• `Const` **HEARTBEAT\_INTERVAL**: ``60000``
 
 #### Defined in
 
@@ -208,7 +208,7 @@ ___
 
 ### HEARTBEAT\_TIMEOUT
 
-• `Const` **HEARTBEAT\_TIMEOUT**: ``6000``
+• `Const` **HEARTBEAT\_TIMEOUT**: ``30000``
 
 #### Defined in
 
@@ -334,7 +334,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/main.ts:168](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L168)
+[packages/core/src/main.ts:186](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L186)
 
 ___
 

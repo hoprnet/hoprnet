@@ -229,13 +229,15 @@ class RelayHandshake {
 
     // Anything can happen while attempting to connect
     if (toDestinationStruct == null) {
-      error(`Cannot establish a relayed connection from ${source.toB58String()} to ${destination.toB58String()}`)
+      error(
+        `Failed to create circuit from ${source.toB58String()} to ${destination.toB58String()} because destination is not reachable`
+      )
       this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY))
       this.shaker.rest()
       return
     }
 
-    const destinationShaker = handshake(toDestinationStruct.stream)
+    const destinationShaker = handshake(toDestinationStruct.stream as Stream)
 
     destinationShaker.write(source.pubKey.marshal())
 
@@ -269,6 +271,7 @@ class RelayHandshake {
         destinationShaker.rest()
 
         try {
+          // NOTE: This returns only when the relay connection is terminated
           await state.createNew(
             source,
             destination,
@@ -278,7 +281,7 @@ class RelayHandshake {
           )
         } catch (err) {
           error(
-            `Cannot established relayed connection between ${destination.toB58String()} and ${source.toB58String()}`,
+            `Cannot establish relayed connection between ${destination.toB58String()} and ${source.toB58String()}`,
             err
           )
           // @TODO find a way how to forward the error to source and destination

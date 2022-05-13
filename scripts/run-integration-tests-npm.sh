@@ -79,6 +79,7 @@ declare node4_dir="${tmp}/${node_prefix}-4"
 declare node5_dir="${tmp}/${node_prefix}-5"
 declare node6_dir="${tmp}/${node_prefix}-6"
 declare node7_dir="${tmp}/${node_prefix}-7"
+declare node8_dir="${tmp}/${node_prefix}-8"
 
 declare node1_log="${node1_dir}.log"
 declare node2_log="${node2_dir}.log"
@@ -87,6 +88,7 @@ declare node4_log="${node4_dir}.log"
 declare node5_log="${node5_dir}.log"
 declare node6_log="${node6_dir}.log"
 declare node7_log="${node7_dir}.log"
+declare node8_log="${node8_dir}.log"
 
 declare node1_id="${node1_dir}.id"
 declare node2_id="${node2_dir}.id"
@@ -95,6 +97,7 @@ declare node4_id="${node4_dir}.id"
 declare node5_id="${node5_dir}.id"
 declare node6_id="${node6_dir}.id"
 declare node7_id="${node7_dir}.id"
+declare node8_id="${node8_dir}.id"
 
 declare password="e2e-test"
 
@@ -109,10 +112,10 @@ function cleanup {
 
   # Cleaning up everything
   log "Wiping databases"
-  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${node7_dir}" "${npm_install_dir}"
+  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${node7_dir}" "${node8_dir}" "${ct_node1_dir}"
 
   log "Cleaning up processes"
-  for port in 8545 13301 13302 13303 13304 13305 13306 13307 19091 19092 19093 19094 19095 19096 19097 20000; do
+  for port in 8545 13301 13302 13303 13304 13305 13306 13307 13308 19091 19092 19093 19094 19095 19096 19097 19098 20000; do
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
 
@@ -120,7 +123,7 @@ function cleanup {
   rm -f "${mydir}/../packages/hoprd/default-environment.json"
 
   local log exit_code non_zero
-  for node_log in "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}" "${node5_log}" "${node6_log}" "${node7_log}"; do
+  for node_log in "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}" "${node5_log}" "${node6_log}" "${node7_log}" "${node8_log}"; do
     log=$(wait_for_regex ${node_log} "Process exiting with signal [0-9]")
 
     if [ -z "${log}" ]; then
@@ -287,6 +290,10 @@ log "\tnode7"
 log "\t\tdata dir: ${node7_dir} (will be removed)"
 log "\t\tlog: ${node7_log}"
 log "\t\tid: ${node7_id}"
+log "\tnode8"
+log "\t\tdata dir: ${node8_dir} (will be removed)"
+log "\t\tlog: ${node8_log}"
+log "\t\tid: ${node8_id}"
 # }}}
 
 # --- Check all resources we need are free {{{
@@ -298,6 +305,7 @@ ensure_port_is_free 13304
 ensure_port_is_free 13305
 ensure_port_is_free 13306
 ensure_port_is_free 13307
+ensure_port_is_free 13308
 ensure_port_is_free 19091
 ensure_port_is_free 19092
 ensure_port_is_free 19093
@@ -305,6 +313,7 @@ ensure_port_is_free 19094
 ensure_port_is_free 19095
 ensure_port_is_free 19096
 ensure_port_is_free 19097
+ensure_port_is_free 19098
 # }}}
 
 # --- Cleanup old contract deployments {{{
@@ -351,6 +360,8 @@ setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}" "--test
 setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--announce --run \"info;balance\""
 # should not be able to talk to the rest
 setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--announce --environment hardhat-localhost2"
+# node n8 will be the only one NOT registered
+setup_node 13308 19098 19508 "${node8_dir}" "${node8_log}" "${node8_id}" "--announce"
 # }}}
 
 # DO NOT MOVE THIS STEP
@@ -362,6 +373,7 @@ wait_for_regex ${node4_log} "please fund this node"
 wait_for_regex ${node5_log} "please fund this node"
 wait_for_regex ${node6_log} "please fund this node"
 wait_for_regex ${node7_log} "please fund this node"
+wait_for_regex ${node8_log} "please fund this node"
 # }}}
 
 #  --- Fund nodes --- {{{
@@ -382,11 +394,13 @@ wait_for_regex ${node3_log} "STARTED NODE"
 wait_for_regex ${node4_log} "STARTED NODE"
 wait_for_regex ${node5_log} "STARTED NODE"
 # no need to wait for node 6 since that will stop right away
+wait_for_regex ${node7_log} "STARTED NODE"
 wait_for_port 19097 "127.0.0.1" "${node7_log}"
+wait_for_regex ${node8_log} "STARTED NODE"
 # }}}
 
 #  --- Ensure data directories are used --- {{{
-for node_dir in ${node1_dir} ${node2_dir} ${node3_dir} ${node4_dir} ${node5_dir}; do
+for node_dir in ${node1_dir} ${node2_dir} ${node3_dir} ${node4_dir} ${node5_dir} ${node7_dir} ${node8_dir}; do
   declare node_dir_db="${node_dir}/db/LOG"
   declare node_dir_peerstore="${node_dir}/peerstore/LOG"
   [ -f "${node_dir_db}" ] || { echo "Data file ${node_dir_db} missing"; exit 1; }
@@ -401,7 +415,7 @@ ${mydir}/../test/security-test.sh \
 
 # --- Run test --- {{{
 HOPRD_API_TOKEN="${api_token}" ${mydir}/../test/integration-test.sh \
-  "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305" "localhost:13306" "localhost:13307"
+  "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305" "localhost:13306" "localhost:13307" "localhost:13308"
 # }}}
 
 # -- Verify node6 has executed the commands {{{
@@ -409,4 +423,5 @@ log "Verifying node6 log output"
 grep -E "HOPR Balance: +20000 txHOPR" "${node6_log}"
 grep -E "ETH Balance: +10 xDAI" "${node6_log}"
 grep -E "Running on: hardhat" "${node6_log}"
+log "Output of node6 correct"
 # }}}

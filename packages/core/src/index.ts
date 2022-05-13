@@ -10,11 +10,11 @@ import type { default as LibP2P, Connection } from 'libp2p'
 import type { Peer } from 'libp2p/src/peer-store/types'
 import type PeerId from 'peer-id'
 
-import { convertPubKeyFromPeerId } from '@hoprnet/hopr-utils'
-import type { HoprConnectConfig } from '@hoprnet/hopr-connect'
+import { compareAddressesLocalMode, compareAddressesPublicMode, type HoprConnectConfig } from '@hoprnet/hopr-connect'
 
 import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants'
 
+import AccessControl from './network/access-control'
 import NetworkPeers, { Entry } from './network/network-peers'
 import Heartbeat, { type HeartbeatPingResult } from './network/heartbeat'
 
@@ -45,9 +45,9 @@ import {
   type Hash,
   type HalfKeyChallenge,
   type Ticket,
-  multiaddressCompareByClassFunction,
   createRelayerKey,
-  createCircuitAddress
+  createCircuitAddress,
+  convertPubKeyFromPeerId
 } from '@hoprnet/hopr-utils'
 import { type default as HoprCoreEthereum, type Indexer } from '@hoprnet/hopr-core-ethereum'
 
@@ -66,7 +66,6 @@ import { PacketForwardInteraction } from './interactions/packet/forward'
 import { Packet } from './messages'
 import type { ResolvedEnvironment } from './environment'
 import { createLibp2pInstance } from './main'
-import { Receipt } from '@hoprnet/hopr-core-ethereum/src/ethereum'
 
 const DEBUG_PREFIX = `hopr-core`
 const log = debug(DEBUG_PREFIX)
@@ -238,10 +237,18 @@ class Hopr extends EventEmitter {
     // Fetch all nodes that will announces themselves during startup
     const recentlyAnnouncedNodes: PeerStoreAddress[] = []
     const pushToRecentlyAnnouncedNodes = (peer: PeerStoreAddress) => recentlyAnnouncedNodes.push(peer)
-    this.connector.on('peer', pushToRecentlyAnnouncedNodes)
+    this.connector.indexer.on('peer', pushToRecentlyAnnouncedNodes)
 
     // Initialize libp2p object and pass configuration
-    this.libp2p = await createLibp2pInstance(this.id, this.options, initialNodes, this.publicNodesEmitter)
+    this.libp2p = await createLibp2pInstance(
+      this.id,
+      this.options,
+      initialNodes,
+      this.publicNodesEmitter,
+      async (peerId: PeerId, origin: string): Promise<boolean> => {
+        return accessControl.reviewConnection(peerId, origin)
+      }
+    )
 
     // Subscribe to p2p events from libp2p. Wraps our instance of libp2p.
     const subscribe = ((
@@ -259,13 +266,43 @@ class Hopr extends EventEmitter {
     this.networkPeers = new NetworkPeers(
       peers.map((p) => p.id),
       [this.id],
-      (peer: PeerId) => this.publicNodesEmitter.emit('removePublicNode', peer)
+      (peer: PeerId) => {
+        this.libp2p.peerStore.delete(peer)
+        this.publicNodesEmitter.emit('removePublicNode', peer)
+      }
     )
+
+    // Initialize AccessControl
+    const accessControl = new AccessControl(
+      this.networkPeers,
+      this.isAllowedAccessToNetwork.bind(this),
+      this.closeConnectionsTo.bind(this)
+    )
+
+    // react when network registry is enabled / disabled
+    this.connector.indexer.on('network-registry-status-changed', (_enabled: boolean) => {
+      accessControl.reviewConnections()
+    })
+    // react when an account's eligibility has changed
+    this.connector.indexer.on(
+      'network-registry-eligibility-changed',
+      (_account: Address, node: PublicKey, _eligible: boolean) => {
+        const peerId = node.toPeerId()
+        const origin = this.networkPeers.has(peerId)
+          ? this.networkPeers.getConnectionInfo(peerId).origin
+          : 'network registry'
+        accessControl.reviewConnection(peerId, origin)
+      }
+    )
+
+    peers.forEach((peer) => log(`peer store: loaded peer ${peer.id.toB58String()}`))
+
     this.heartbeat = new Heartbeat(
       this.networkPeers,
       subscribe,
       sendMessage,
       this.closeConnectionsTo.bind(this),
+      accessControl.reviewConnection.bind(accessControl),
       this.environment.id,
       this.options
     )
@@ -592,26 +629,30 @@ class Hopr extends EventEmitter {
    * @param timeout [optional] custom timeout for DHT query
    */
   public async getAddressesAnnouncedToDHT(peer: PeerId = this.getId(), timeout = 5e3): Promise<Multiaddr[]> {
+    let addrs: Multiaddr[]
+
     if (peer.equals(this.getId())) {
-      return this.libp2p.multiaddrs
-    }
+      addrs = this.libp2p.multiaddrs
+    } else {
+      addrs = await this.getObservedAddresses(peer)
 
-    const knownAddresses = await this.getObservedAddresses(peer)
-
-    try {
-      for await (const relayer of this.libp2p.contentRouting.findProviders(await createRelayerKey(peer), {
-        timeout
-      })) {
-        const relayAddress = createCircuitAddress(relayer.id, peer)
-        if (knownAddresses.findIndex((ma) => ma.equals(relayAddress)) < 0) {
-          knownAddresses.push(relayAddress)
+      try {
+        for await (const relayer of this.libp2p.contentRouting.findProviders(await createRelayerKey(peer), {
+          timeout
+        })) {
+          const relayAddress = createCircuitAddress(relayer.id, peer)
+          if (addrs.findIndex((ma) => ma.equals(relayAddress)) < 0) {
+            addrs.push(relayAddress)
+          }
         }
+      } catch (err) {
+        log(`Could not find any relayer key for ${peer.toB58String()}`)
       }
-    } catch (err) {
-      log(`Could not find any relayer key for ${peer.toB58String()}`)
     }
 
-    return knownAddresses
+    return addrs.sort(
+      this.options.testing?.preferLocalAddresses ? compareAddressesLocalMode : compareAddressesPublicMode
+    )
   }
 
   /**
@@ -854,7 +895,7 @@ class Hopr extends EventEmitter {
         multiaddrs = multiaddrs.filter((ma) => isMultiaddrLocal(ma))
       } else if (this.options.testing?.preferLocalAddresses) {
         // If we need local addresses, sort them first according to their class
-        multiaddrs.sort(multiaddressCompareByClassFunction)
+        multiaddrs.sort(compareAddressesLocalMode)
       } else {
         // If we don't need local addresses, just throw them away
         multiaddrs = multiaddrs.filter((ma) => !isMultiaddrLocal(ma))
@@ -936,6 +977,7 @@ class Hopr extends EventEmitter {
     network: string
     hoprTokenAddress: string
     hoprChannelsAddress: string
+    hoprNetworkRegistryAddress: string
     channelClosureSecs: number
   } {
     return this.connector.smartContractInfo()
@@ -952,7 +994,7 @@ class Hopr extends EventEmitter {
     amountToFund: BN
   ): Promise<{
     channelId: Hash
-    receipt: Receipt
+    receipt: string
   }> {
     const counterpartyPubKey = PublicKey.fromPeerId(counterparty)
     const myAvailableTokens = await this.connector.getBalance(true)
@@ -1154,6 +1196,14 @@ class Hopr extends EventEmitter {
     }
 
     return result
+  }
+
+  /**
+   * @param id the peer id of the account we want to check if it's allowed access to the network
+   * @returns true if allowed access
+   */
+  public async isAllowedAccessToNetwork(id: PeerId): Promise<boolean> {
+    return this.connector.isAllowedAccessToNetwork(PublicKey.fromPeerId(id))
   }
 
   /**

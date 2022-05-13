@@ -10,7 +10,7 @@ import {
   type ContractTransaction,
   type BaseContract
 } from 'ethers'
-import { getContractData, type HoprToken, type HoprChannels } from '@hoprnet/hopr-ethereum'
+import { getContractData, type HoprToken, type HoprChannels, type HoprNetworkRegistry } from '@hoprnet/hopr-ethereum'
 import {
   Address,
   Balance,
@@ -58,6 +58,11 @@ export async function createChainWrapper(
 
   const hoprTokenDeployment = getContractData(networkInfo.network, networkInfo.environment, 'HoprToken')
   const hoprChannelsDeployment = getContractData(networkInfo.network, networkInfo.environment, 'HoprChannels')
+  const hoprNetworkRegistryDeployment = getContractData(
+    networkInfo.network,
+    networkInfo.environment,
+    'HoprNetworkRegistry'
+  )
 
   const token = new ethers.Contract(hoprTokenDeployment.address, hoprTokenDeployment.abi, provider) as HoprToken
 
@@ -66,6 +71,12 @@ export async function createChainWrapper(
     hoprChannelsDeployment.abi,
     provider
   ) as HoprChannels
+
+  const networkRegistry = new ethers.Contract(
+    hoprNetworkRegistryDeployment.address,
+    hoprNetworkRegistryDeployment.abi,
+    provider
+  ) as HoprNetworkRegistry
 
   const genesisBlock = parseInt(hoprChannelsDeployment.blockNumber)
   const channelClosureSecs = await channels.secsClosure()
@@ -614,26 +625,31 @@ export async function createChainWrapper(
       provider.on('error', cb)
       channels.on('error', cb)
       token.on('error', cb)
+      networkRegistry.on('error', cb)
 
       return () => {
         provider.off('error', cb)
         channels.off('error', cb)
         token.off('error', cb)
+        networkRegistry.off('error', cb)
       }
     },
     unsubscribe: () => {
       provider.removeAllListeners()
       channels.removeAllListeners()
       token.removeAllListeners()
+      networkRegistry.removeAllListeners()
     },
     getChannels: () => channels,
     getToken: () => token,
+    getNetworkRegistry: () => networkRegistry,
     getPrivateKey: () => privateKey,
     getPublicKey: () => PublicKey.fromPrivKey(privateKey),
     getInfo: () => ({
       network: networkInfo.network,
       hoprTokenAddress: hoprTokenDeployment.address,
       hoprChannelsAddress: hoprChannelsDeployment.address,
+      hoprNetworkRegistryAddress: hoprNetworkRegistryDeployment.address,
       channelClosureSecs
     }),
     updateConfirmedTransaction: transactions.moveToConfirmed.bind(

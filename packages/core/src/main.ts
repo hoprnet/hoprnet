@@ -3,17 +3,22 @@ import { mkdir } from 'fs/promises'
 
 import { default as LibP2P, type Connection } from 'libp2p'
 import { LevelDatastore } from 'datastore-level'
-import { type AddressSorter, HoprDB, localAddressesFirst, PublicKey } from '@hoprnet/hopr-utils'
+import { type AddressSorter, HoprDB, PublicKey, debug } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+
 const Mplex = require('libp2p-mplex')
 import KadDHT from 'libp2p-kad-dht'
 import { NOISE } from '@chainsafe/libp2p-noise'
 import type PeerId from 'peer-id'
-import { debug } from '@hoprnet/hopr-utils'
 import Hopr, { type HoprOptions } from '.'
 import { getAddrs } from './identity'
-import HoprConnect, { type HoprConnectConfig, type PublicNodesEmitter } from '@hoprnet/hopr-connect'
+import HoprConnect, {
+  compareAddressesLocalMode,
+  type HoprConnectConfig,
+  type PublicNodesEmitter
+} from '@hoprnet/hopr-connect'
 import type { Multiaddr } from 'multiaddr'
+import type AccessControl from './network/access-control'
 
 const log = debug(`hopr-core:create-hopr`)
 
@@ -24,18 +29,23 @@ const log = debug(`hopr-core:create-hopr`)
  * @param options:HoprOptions - Required options to create node
  * @param initialNodes:{ id: PeerId; multiaddrs: Multiaddr[] } - Array of PeerIds w/their multiaddrss
  * @param publicNodesEmitter:PublicNodesEmitter Event emitter for all public nodes.
+ * @param isDenied given a peerId, checks whether we want to connect to that node
  * @returns {Hopr} - HOPR node
  */
 export async function createLibp2pInstance(
   peerId: PeerId,
   options: HoprOptions,
   initialNodes: { id: PeerId; multiaddrs: Multiaddr[] }[],
-  publicNodes: PublicNodesEmitter
+  publicNodes: PublicNodesEmitter,
+  reviewConnection: AccessControl['reviewConnection']
 ): Promise<LibP2P> {
   let addressSorter: AddressSorter
 
   if (options.testing?.preferLocalAddresses) {
-    addressSorter = localAddressesFirst
+    addressSorter = (addrs) => {
+      let a = new Array(...addrs) // Create copy to prevent sorting the original array
+      return a.sort((aa, ba) => compareAddressesLocalMode(aa.multiaddr, ba.multiaddr))
+    }
     log('Preferring local addresses')
   } else {
     // Overwrite address sorter with identity function since
@@ -147,14 +157,22 @@ export async function createLibp2pInstance(
   libp2p._dht._lan._network._protocol = HOPR_DHT_LAN_PROTOCOL
   libp2p._dht._lan._topologyListener._protocol = HOPR_DHT_LAN_PROTOCOL
 
-  const onConnection = libp2p.upgrader.onConnection
-
-  // @TODO implement whitelisting support
-  libp2p.upgrader.onConnection = (conn: Connection) => {
-    // if (isWhitelisted()) {
-    onConnection(conn)
-    // }
+  const onConnectionOriginal = libp2p.upgrader.onConnection
+  // check if connection is allowed
+  libp2p.upgrader.onConnection = async (conn: Connection) => {
+    const allowed = await reviewConnection(conn.remotePeer, 'libp2p peer connect')
+    if (allowed) {
+      // continue connection
+      onConnectionOriginal(conn)
+    } else {
+      try {
+        await conn.close()
+      } catch (err: any) {
+        log(`Error while closing connection to non-registered node`, err)
+      }
+    }
   }
+
   return libp2p
 }
 
