@@ -14,6 +14,7 @@ import { compareAddressesLocalMode, compareAddressesPublicMode, type HoprConnect
 
 import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants'
 
+import AccessControl from './network/access-control'
 import NetworkPeers, { Entry } from './network/network-peers'
 import Heartbeat, { type HeartbeatPingResult } from './network/heartbeat'
 
@@ -236,10 +237,18 @@ class Hopr extends EventEmitter {
     // Fetch all nodes that will announces themselves during startup
     const recentlyAnnouncedNodes: PeerStoreAddress[] = []
     const pushToRecentlyAnnouncedNodes = (peer: PeerStoreAddress) => recentlyAnnouncedNodes.push(peer)
-    this.connector.on('peer', pushToRecentlyAnnouncedNodes)
+    this.connector.indexer.on('peer', pushToRecentlyAnnouncedNodes)
 
     // Initialize libp2p object and pass configuration
-    this.libp2p = await createLibp2pInstance(this.id, this.options, initialNodes, this.publicNodesEmitter)
+    this.libp2p = await createLibp2pInstance(
+      this.id,
+      this.options,
+      initialNodes,
+      this.publicNodesEmitter,
+      async (peerId: PeerId, origin: string): Promise<boolean> => {
+        return accessControl.reviewConnection(peerId, origin)
+      }
+    )
 
     // Subscribe to p2p events from libp2p. Wraps our instance of libp2p.
     const subscribe = ((
@@ -263,6 +272,29 @@ class Hopr extends EventEmitter {
       }
     )
 
+    // Initialize AccessControl
+    const accessControl = new AccessControl(
+      this.networkPeers,
+      this.isAllowedAccessToNetwork.bind(this),
+      this.closeConnectionsTo.bind(this)
+    )
+
+    // react when network registry is enabled / disabled
+    this.connector.indexer.on('network-registry-status-changed', (_enabled: boolean) => {
+      accessControl.reviewConnections()
+    })
+    // react when an account's eligibility has changed
+    this.connector.indexer.on(
+      'network-registry-eligibility-changed',
+      (_account: Address, node: PublicKey, _eligible: boolean) => {
+        const peerId = node.toPeerId()
+        const origin = this.networkPeers.has(peerId)
+          ? this.networkPeers.getConnectionInfo(peerId).origin
+          : 'network registry'
+        accessControl.reviewConnection(peerId, origin)
+      }
+    )
+
     peers.forEach((peer) => log(`peer store: loaded peer ${peer.id.toB58String()}`))
 
     this.heartbeat = new Heartbeat(
@@ -270,6 +302,7 @@ class Hopr extends EventEmitter {
       subscribe,
       sendMessage,
       this.closeConnectionsTo.bind(this),
+      accessControl.reviewConnection.bind(accessControl),
       this.environment.id,
       this.options
     )
@@ -944,6 +977,7 @@ class Hopr extends EventEmitter {
     network: string
     hoprTokenAddress: string
     hoprChannelsAddress: string
+    hoprNetworkRegistryAddress: string
     channelClosureSecs: number
   } {
     return this.connector.smartContractInfo()
@@ -1162,6 +1196,14 @@ class Hopr extends EventEmitter {
     }
 
     return result
+  }
+
+  /**
+   * @param id the peer id of the account we want to check if it's allowed access to the network
+   * @returns true if allowed access
+   */
+  public async isAllowedAccessToNetwork(id: PeerId): Promise<boolean> {
+    return this.connector.isAllowedAccessToNetwork(PublicKey.fromPeerId(id))
   }
 
   /**

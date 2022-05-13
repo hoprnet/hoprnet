@@ -18,6 +18,7 @@ import HoprConnect, {
   type PublicNodesEmitter
 } from '@hoprnet/hopr-connect'
 import type { Multiaddr } from 'multiaddr'
+import type AccessControl from './network/access-control'
 
 const log = debug(`hopr-core:create-hopr`)
 
@@ -28,13 +29,15 @@ const log = debug(`hopr-core:create-hopr`)
  * @param options:HoprOptions - Required options to create node
  * @param initialNodes:{ id: PeerId; multiaddrs: Multiaddr[] } - Array of PeerIds w/their multiaddrss
  * @param publicNodesEmitter:PublicNodesEmitter Event emitter for all public nodes.
+ * @param isDenied given a peerId, checks whether we want to connect to that node
  * @returns {Hopr} - HOPR node
  */
 export async function createLibp2pInstance(
   peerId: PeerId,
   options: HoprOptions,
   initialNodes: { id: PeerId; multiaddrs: Multiaddr[] }[],
-  publicNodes: PublicNodesEmitter
+  publicNodes: PublicNodesEmitter,
+  reviewConnection: AccessControl['reviewConnection']
 ): Promise<LibP2P> {
   let addressSorter: AddressSorter
 
@@ -154,14 +157,22 @@ export async function createLibp2pInstance(
   libp2p._dht._lan._network._protocol = HOPR_DHT_LAN_PROTOCOL
   libp2p._dht._lan._topologyListener._protocol = HOPR_DHT_LAN_PROTOCOL
 
-  const onConnection = libp2p.upgrader.onConnection
-
-  // @TODO implement whitelisting support
-  libp2p.upgrader.onConnection = (conn: Connection) => {
-    // if (isWhitelisted()) {
-    onConnection(conn)
-    // }
+  const onConnectionOriginal = libp2p.upgrader.onConnection
+  // check if connection is allowed
+  libp2p.upgrader.onConnection = async (conn: Connection) => {
+    const allowed = await reviewConnection(conn.remotePeer, 'libp2p peer connect')
+    if (allowed) {
+      // continue connection
+      onConnectionOriginal(conn)
+    } else {
+      try {
+        await conn.close()
+      } catch (err: any) {
+        log(`Error while closing connection to non-registered node`, err)
+      }
+    }
   }
+
   return libp2p
 }
 

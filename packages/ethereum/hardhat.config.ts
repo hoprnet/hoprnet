@@ -20,6 +20,7 @@ import 'solidity-coverage'
 import '@typechain/hardhat'
 import { utils } from 'ethers'
 import faucet, { type FaucetCLIOPts } from './tasks/faucet'
+import register, { type RegisterOpts } from './tasks/register'
 import getAccounts from './tasks/getAccounts'
 
 import { expandVars } from '@hoprnet/hopr-utils'
@@ -112,6 +113,11 @@ const hardhatConfig: HardhatUserConfig = {
         optimizer: {
           enabled: true,
           runs: 200
+        },
+        outputSelection: {
+          '*': {
+            '*': ['storageLayout']
+          }
         }
       }
     }))
@@ -159,6 +165,15 @@ task<FaucetCLIOPts>('faucet', 'Faucets a local development HOPR node account wit
   .addOptionalParam<string>('identityPrefix', `only use identity files with prefix`, undefined, types.string)
 
 task('accounts', 'View unlocked accounts', getAccounts)
+
+task<RegisterOpts>(
+  'register',
+  "Used by our E2E tests to interact with 'HoprNetworkRegistry' and 'HoprDummyProxyForNetworkRegistry'.",
+  register
+)
+  .addParam<RegisterOpts['task']>('task', 'The task to run', undefined, types.string)
+  .addOptionalParam<string>('nativeAddresses', 'A list of native addresses', undefined, types.string)
+  .addOptionalParam<string>('peerIds', 'A list of peerIds', undefined, types.string)
 
 function getSortedFiles(dependenciesGraph) {
   const tsort = require('tsort')

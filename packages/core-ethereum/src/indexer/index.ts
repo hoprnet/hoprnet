@@ -26,7 +26,15 @@ import {
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum'
-import type { Event, EventNames, IndexerEvents, TokenEvent, TokenEventNames } from './types'
+import type {
+  Event,
+  EventNames,
+  IndexerEvents,
+  TokenEvent,
+  TokenEventNames,
+  RegistryEvent,
+  RegistryEventNames
+} from './types'
 import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils'
 import { Contract, errors } from 'ethers'
 import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants'
@@ -227,6 +235,7 @@ class Indexer extends EventEmitter {
     let rawEvents: TypedEvent<any, any>[] = []
 
     const queries: { contract: Contract; filter: TypedEventFilter<any> }[] = [
+      // HoprChannels
       {
         contract: this.chain.getChannels(),
         filter: {
@@ -239,9 +248,26 @@ class Indexer extends EventEmitter {
             ]
           ]
         }
+      },
+      // HoprNetworkRegistry
+      {
+        contract: this.chain.getNetworkRegistry(),
+        filter: {
+          topics: [
+            [
+              // Relevant HoprNetworkRegistry events
+              this.chain.getNetworkRegistry().interface.getEventTopic('Registered'),
+              this.chain.getNetworkRegistry().interface.getEventTopic('RegisteredByOwner'),
+              this.chain.getNetworkRegistry().interface.getEventTopic('DeregisteredByOwner'),
+              this.chain.getNetworkRegistry().interface.getEventTopic('EligibilityUpdated'),
+              this.chain.getNetworkRegistry().interface.getEventTopic('EnabledNetworkRegistry')
+            ]
+          ]
+        }
       }
     ]
 
+    // Token events
     // Actively query for logs to prevent polling done by Ethers.js
     // that don't retry on failed attempts and thus makes the indexer
     // handle errors produced by internal Ethers.js provider calls
@@ -503,7 +529,7 @@ class Indexer extends EventEmitter {
    * @dev ignores events that have been processed before.
    * @param events new unprocessed events
    */
-  private onNewEvents(events: Event<any>[] | TokenEvent<any>[] | undefined): void {
+  private onNewEvents(events: Event<any>[] | TokenEvent<any>[] | RegistryEvent<any>[] | undefined): void {
     if (events == undefined || events.length == 0) {
       // Nothing to do
       return
@@ -605,7 +631,7 @@ class Indexer extends EventEmitter {
       }
 
       // @TODO: fix type clash
-      const eventName = event.event as EventNames | TokenEventNames
+      const eventName = event.event as EventNames | TokenEventNames | RegistryEventNames
 
       lastDatabaseSnapshot = new Snapshot(
         new BN(event.blockNumber),
@@ -640,6 +666,29 @@ class Indexer extends EventEmitter {
           // if unlock `outstandingTicketBalance`, if applicable
           await this.onTicketRedeemed(event as Event<'TicketRedeemed'>, lastDatabaseSnapshot)
           break
+        case 'EligibilityUpdated':
+        case 'EligibilityUpdated(address,bool)':
+          await this.onEligibilityUpdated(event as RegistryEvent<'EligibilityUpdated'>, lastDatabaseSnapshot)
+          break
+        case 'Registered':
+        case 'Registered(address,string)':
+        case 'RegisteredByOwner':
+        case 'RegisteredByOwner(address,string)':
+          await this.onRegistered(
+            event as RegistryEvent<'Registered'> | RegistryEvent<'RegisteredByOwner'>,
+            lastDatabaseSnapshot
+          )
+          break
+        case 'Deregistered':
+        case 'Deregistered(address)':
+        case 'DeregisteredByOwner':
+        case 'DeregisteredByOwner(address)':
+          await this.onDeregistered(event as RegistryEvent<'DeregisteredByOwner'>, lastDatabaseSnapshot)
+          break
+        case 'EnabledNetworkRegistry':
+        case 'EnabledNetworkRegistry(bool)':
+          await this.onEnabledNetworkRegistry(event as RegistryEvent<'EnabledNetworkRegistry'>, lastDatabaseSnapshot)
+          break
         default:
           log(`ignoring event '${String(eventName)}'`)
       }
@@ -660,11 +709,19 @@ class Indexer extends EventEmitter {
     // publicKey given by the SC is verified
     const publicKey = PublicKey.fromString(event.args.publicKey)
 
-    const multiaddr = new Multiaddr(stringToU8a(event.args.multiaddr))
-      // remove "p2p" and corresponding peerID
-      .decapsulateCode(421)
-      // add new peerID
-      .encapsulate(`/p2p/${publicKey.toPeerId().toB58String()}`)
+    let multiaddr: Multiaddr
+    try {
+      multiaddr = new Multiaddr(stringToU8a(event.args.multiaddr))
+        // remove "p2p" and corresponding peerID
+        .decapsulateCode(421)
+        // add new peerID
+        .encapsulate(`/p2p/${publicKey.toPeerId().toB58String()}`)
+    } catch (error) {
+      log(`Invalid multiaddr '${event.args.multiaddr}' given in event 'onAnnouncement'`)
+      log(error)
+      return
+    }
+
     const account = new AccountEntry(publicKey, multiaddr, blockNumber)
 
     log('New node announced', account.getAddress().toHex(), account.multiAddr.toString())
@@ -750,6 +807,46 @@ class Indexer extends EventEmitter {
     this.emit('channel-closed', channel)
   }
 
+  private async onEligibilityUpdated(
+    event: RegistryEvent<'EligibilityUpdated'>,
+    lastSnapshot: Snapshot
+  ): Promise<void> {
+    const account = Address.fromString(event.args.account)
+    await this.db.setEligible(account, event.args.eligibility, lastSnapshot)
+    verbose(`network-registry: account ${account} is ${event.args.eligibility ? 'eligible' : 'not eligible'}`)
+    // emit event only when eligibility changes on accounts with a HoprNode associated
+    try {
+      const hoprNode = await this.db.findHoprNodeUsingAccountInNetworkRegistry(account)
+      this.emit('network-registry-eligibility-changed', account, hoprNode, event.args.eligibility)
+    } catch {}
+  }
+
+  private async onRegistered(event: RegistryEvent<'Registered'>, lastSnapshot: Snapshot): Promise<void> {
+    let hoprNode: PeerId
+    try {
+      hoprNode = PeerId.createFromB58String(event.args.hoprPeerId)
+    } catch (error) {
+      log(`Invalid peer Id '${event.args.hoprPeerId}' given in event 'onRegistered'`)
+      log(error)
+      return
+    }
+    const account = Address.fromString(event.args.account)
+    await this.db.addToNetworkRegistry(PublicKey.fromPeerId(hoprNode), account, lastSnapshot)
+    verbose(`network-registry: node ${event.args.hoprPeerId} is allowed to connect`)
+  }
+
+  private async onDeregistered(event: RegistryEvent<'DeregisteredByOwner'>, lastSnapshot: Snapshot): Promise<void> {
+    await this.db.removeFromNetworkRegistry(Address.fromString(event.args.account), lastSnapshot)
+  }
+
+  private async onEnabledNetworkRegistry(
+    event: RegistryEvent<'EnabledNetworkRegistry'>,
+    lastSnapshot: Snapshot
+  ): Promise<void> {
+    this.emit('network-registry-status-changed', event.args.isEnabled)
+    await this.db.setNetworkRegistryEnabled(event.args.isEnabled, lastSnapshot)
+  }
+
   private async onTransfer(event: TokenEvent<'Transfer'>, lastSnapshot: Snapshot) {
     const isIncoming = Address.fromString(event.args.to).eq(this.address)
     const amount = new Balance(new BN(event.args.value.toString()))
@@ -831,7 +928,6 @@ class Indexer extends EventEmitter {
 
     deferred.promise = new Promise<string>((resolve, reject) => {
       let done = false
-
       deferred.reject = () => {
         if (done) {
           return
