@@ -75,9 +75,12 @@ async function main(
 
       await (await hoprDummyProxy.ownerBatchAddAccounts(nativeAddresses)).wait()
       await (await hoprNetworkRegistry.ownerRegister(nativeAddresses, peerIds)).wait()
+    } else if (opts.task === 'enable') {
+      await (await hoprNetworkRegistry.enableRegistry()).wait()
+    } else if (opts.task === 'disable') {
+      await (await hoprNetworkRegistry.disableRegistry()).wait()
     } else {
-      if (opts.task === 'disable') await (await hoprNetworkRegistry.disableRegistry()).wait()
-      else await (await hoprNetworkRegistry.enableRegistry()).wait()
+      throw Error(`Task "${opts.task}" not available.`)
     }
   } catch (error) {
     console.error('Failed to add account with error:', error)
