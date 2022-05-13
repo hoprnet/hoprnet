@@ -37,7 +37,7 @@ class NetworkPeers {
 
   constructor(
     existingPeers: PeerId[],
-    private excludedPeers: PeerId[] = [],
+    private excludedPeers: PeerId[] = [], // used in unit tests!
     private onPeerOffline?: (peer: PeerId) => void
   ) {
     // register all existing peers
