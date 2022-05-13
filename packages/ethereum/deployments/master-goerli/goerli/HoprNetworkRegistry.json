@@ -1,7 +1,7 @@
 {
-  "address": "0x7587B259bbe2AdcDc7bFd6FD667Fd440b64c0Aad",
-  "transactionHash": "0x5c31eead21b6e412d5a582b16ee6d2476b007489504a159406cad6cb79dab75e",
-  "blockNumber": 6587348,
+  "address": "0x6aDc4991Ac9622Ca07d89A6D38b1Cd062309E8F0",
+  "transactionHash": "0x6cc86ead0fc6fc10cfcf1edff9afeffea7c111f033fff2efeffeb5c5c4e2d347",
+  "blockNumber": 6877085,
   "metadata": {
     "solcVersion": "0.8.9",
     "input": {
@@ -102,13 +102,13 @@
       "inputs": [
         {
           "internalType": "address",
-          "name": "_token",
+          "name": "_requirementImplementation",
           "type": "address"
         },
         {
-          "internalType": "uint32",
-          "name": "_secsClosure",
-          "type": "uint32"
+          "internalType": "address",
+          "name": "_newOwner",
+          "type": "address"
         }
       ],
       "stateMutability": "nonpayable",
@@ -122,21 +122,9 @@
           "internalType": "address",
           "name": "account",
           "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "bytes",
-          "name": "publicKey",
-          "type": "bytes"
-        },
-        {
-          "indexed": false,
-          "internalType": "bytes",
-          "name": "multiaddr",
-          "type": "bytes"
         }
       ],
-      "name": "Announcement",
+      "name": "Deregistered",
       "type": "event"
     },
     {
@@ -145,35 +133,11 @@
         {
           "indexed": true,
           "internalType": "address",
-          "name": "source",
+          "name": "account",
           "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "destination",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "bytes32",
-          "name": "newCommitment",
-          "type": "bytes32"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "ticketEpoch",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "channelBalance",
-          "type": "uint256"
         }
       ],
-      "name": "ChannelBumped",
+      "name": "DeregisteredByOwner",
       "type": "event"
     },
     {
@@ -182,29 +146,30 @@
         {
           "indexed": true,
           "internalType": "address",
-          "name": "source",
+          "name": "account",
           "type": "address"
         },
         {
           "indexed": true,
-          "internalType": "address",
-          "name": "destination",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint32",
-          "name": "closureFinalizationTime",
-          "type": "uint32"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "channelBalance",
-          "type": "uint256"
+          "internalType": "bool",
+          "name": "eligibility",
+          "type": "bool"
         }
       ],
-      "name": "ChannelClosureFinalized",
+      "name": "EligibilityUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bool",
+          "name": "isEnabled",
+          "type": "bool"
+        }
+      ],
+      "name": "EnabledNetworkRegistry",
       "type": "event"
     },
     {
@@ -213,23 +178,17 @@
         {
           "indexed": true,
           "internalType": "address",
-          "name": "source",
+          "name": "previousOwner",
           "type": "address"
         },
         {
           "indexed": true,
           "internalType": "address",
-          "name": "destination",
+          "name": "newOwner",
           "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint32",
-          "name": "closureInitiationTime",
-          "type": "uint32"
         }
       ],
-      "name": "ChannelClosureInitiated",
+      "name": "OwnershipTransferred",
       "type": "event"
     },
     {
@@ -238,29 +197,17 @@
         {
           "indexed": true,
           "internalType": "address",
-          "name": "funder",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "source",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "destination",
+          "name": "account",
           "type": "address"
         },
         {
           "indexed": false,
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
+          "internalType": "string",
+          "name": "hoprPeerId",
+          "type": "string"
         }
       ],
-      "name": "ChannelFunded",
+      "name": "Registered",
       "type": "event"
     },
     {
@@ -269,17 +216,17 @@
         {
           "indexed": true,
           "internalType": "address",
-          "name": "source",
+          "name": "account",
           "type": "address"
         },
         {
-          "indexed": true,
-          "internalType": "address",
-          "name": "destination",
-          "type": "address"
+          "indexed": false,
+          "internalType": "string",
+          "name": "hoprPeerId",
+          "type": "string"
         }
       ],
-      "name": "ChannelOpened",
+      "name": "RegisteredByOwner",
       "type": "event"
     },
     {
@@ -288,131 +235,27 @@
         {
           "indexed": true,
           "internalType": "address",
-          "name": "source",
+          "name": "requirementImplementation",
           "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "destination",
-          "type": "address"
-        },
-        {
-          "components": [
-            {
-              "internalType": "uint256",
-              "name": "balance",
-              "type": "uint256"
-            },
-            {
-              "internalType": "bytes32",
-              "name": "commitment",
-              "type": "bytes32"
-            },
-            {
-              "internalType": "uint256",
-              "name": "ticketEpoch",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "ticketIndex",
-              "type": "uint256"
-            },
-            {
-              "internalType": "enum HoprChannels.ChannelStatus",
-              "name": "status",
-              "type": "uint8"
-            },
-            {
-              "internalType": "uint256",
-              "name": "channelEpoch",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint32",
-              "name": "closureTime",
-              "type": "uint32"
-            }
-          ],
-          "indexed": false,
-          "internalType": "struct HoprChannels.Channel",
-          "name": "newState",
-          "type": "tuple"
         }
       ],
-      "name": "ChannelUpdated",
+      "name": "RequirementUpdated",
       "type": "event"
     },
     {
-      "anonymous": false,
       "inputs": [
         {
-          "indexed": true,
           "internalType": "address",
-          "name": "source",
+          "name": "",
           "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "destination",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "bytes32",
-          "name": "nextCommitment",
-          "type": "bytes32"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "ticketEpoch",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "ticketIndex",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "bytes32",
-          "name": "proofOfRelaySecret",
-          "type": "bytes32"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "winProb",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "bytes",
-          "name": "signature",
-          "type": "bytes"
         }
       ],
-      "name": "TicketRedeemed",
-      "type": "event"
-    },
-    {
-      "inputs": [],
-      "name": "FUND_CHANNEL_MULTI_SIZE",
+      "name": "accountToNodePeerId",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "stateMutability": "view",
@@ -420,12 +263,26 @@
     },
     {
       "inputs": [],
-      "name": "TOKENS_RECIPIENT_INTERFACE_HASH",
+      "name": "disableRegistry",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "enableRegistry",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "enabled",
       "outputs": [
         {
-          "internalType": "bytes32",
+          "internalType": "bool",
           "name": "",
-          "type": "bytes32"
+          "type": "bool"
         }
       ],
       "stateMutability": "view",
@@ -433,59 +290,18 @@
     },
     {
       "inputs": [
-        {
-          "internalType": "bytes",
-          "name": "publicKey",
-          "type": "bytes"
-        },
-        {
-          "internalType": "bytes",
-          "name": "multiaddr",
-          "type": "bytes"
-        }
-      ],
-      "name": "announce",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "source",
-          "type": "address"
-        },
-        {
-          "internalType": "bytes32",
-          "name": "newCommitment",
-          "type": "bytes32"
-        }
-      ],
-      "name": "bumpChannel",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "interfaceHash",
-          "type": "bytes32"
-        },
         {
           "internalType": "address",
           "name": "account",
           "type": "address"
         }
       ],
-      "name": "canImplementInterfaceForAddress",
+      "name": "isAccountRegisteredAndEligible",
       "outputs": [
         {
-          "internalType": "bytes32",
+          "internalType": "bool",
           "name": "",
-          "type": "bytes32"
+          "type": "bool"
         }
       ],
       "stateMutability": "view",
@@ -494,47 +310,17 @@
     {
       "inputs": [
         {
-          "internalType": "bytes32",
-          "name": "",
-          "type": "bytes32"
+          "internalType": "string",
+          "name": "hoprPeerId",
+          "type": "string"
         }
       ],
-      "name": "channels",
+      "name": "isNodeRegisteredAndEligible",
       "outputs": [
         {
-          "internalType": "uint256",
-          "name": "balance",
-          "type": "uint256"
-        },
-        {
-          "internalType": "bytes32",
-          "name": "commitment",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "uint256",
-          "name": "ticketEpoch",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "ticketIndex",
-          "type": "uint256"
-        },
-        {
-          "internalType": "enum HoprChannels.ChannelStatus",
-          "name": "status",
-          "type": "uint8"
-        },
-        {
-          "internalType": "uint256",
-          "name": "channelEpoch",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint32",
-          "name": "closureTime",
-          "type": "uint32"
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
         }
       ],
       "stateMutability": "view",
@@ -543,90 +329,30 @@
     {
       "inputs": [
         {
-          "internalType": "address",
-          "name": "destination",
-          "type": "address"
+          "internalType": "string",
+          "name": "",
+          "type": "string"
         }
       ],
-      "name": "finalizeChannelClosure",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "account1",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "account2",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "amount1",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "amount2",
-          "type": "uint256"
-        }
-      ],
-      "name": "fundChannelMulti",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "destination",
-          "type": "address"
-        }
-      ],
-      "name": "initiateChannelClosure",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes[]",
-          "name": "data",
-          "type": "bytes[]"
-        }
-      ],
-      "name": "multicall",
+      "name": "nodePeerIdToAccount",
       "outputs": [
-        {
-          "internalType": "bytes[]",
-          "name": "results",
-          "type": "bytes[]"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
         {
           "internalType": "address",
           "name": "",
           "type": "address"
         }
       ],
-      "name": "publicKeys",
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
       "outputs": [
         {
-          "internalType": "bytes",
+          "internalType": "address",
           "name": "",
-          "type": "bytes"
+          "type": "address"
         }
       ],
       "stateMutability": "view",
@@ -635,59 +361,49 @@
     {
       "inputs": [
         {
-          "internalType": "address",
-          "name": "source",
-          "type": "address"
-        },
-        {
-          "internalType": "bytes32",
-          "name": "nextCommitment",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "uint256",
-          "name": "ticketEpoch",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "ticketIndex",
-          "type": "uint256"
-        },
-        {
-          "internalType": "bytes32",
-          "name": "proofOfRelaySecret",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "winProb",
-          "type": "uint256"
-        },
-        {
-          "internalType": "bytes",
-          "name": "signature",
-          "type": "bytes"
+          "internalType": "address[]",
+          "name": "accounts",
+          "type": "address[]"
         }
       ],
-      "name": "redeemTicket",
+      "name": "ownerDeregister",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address[]",
+          "name": "accounts",
+          "type": "address[]"
+        },
+        {
+          "internalType": "string[]",
+          "name": "hoprPeerIds",
+          "type": "string[]"
+        }
+      ],
+      "name": "ownerRegister",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
     },
     {
       "inputs": [],
-      "name": "secsClosure",
+      "name": "renounceOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "requirementImplementation",
       "outputs": [
         {
-          "internalType": "uint32",
+          "internalType": "contract IHoprNetworkRegistryRequirement",
           "name": "",
-          "type": "uint32"
+          "type": "address"
         }
       ],
       "stateMutability": "view",
@@ -695,51 +411,71 @@
     },
     {
       "inputs": [],
-      "name": "token",
+      "name": "selfDeregister",
       "outputs": [
         {
-          "internalType": "contract IERC20",
+          "internalType": "bool",
           "name": "",
-          "type": "address"
+          "type": "bool"
         }
       ],
-      "stateMutability": "view",
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "hoprPeerId",
+          "type": "string"
+        }
+      ],
+      "name": "selfRegister",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address[]",
+          "name": "accounts",
+          "type": "address[]"
+        }
+      ],
+      "name": "sync",
+      "outputs": [],
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
       "inputs": [
         {
           "internalType": "address",
-          "name": "operator",
+          "name": "newOwner",
           "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "from",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "to",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
-        },
-        {
-          "internalType": "bytes",
-          "name": "userData",
-          "type": "bytes"
-        },
-        {
-          "internalType": "bytes",
-          "name": "operatorData",
-          "type": "bytes"
         }
       ],
-      "name": "tokensReceived",
+      "name": "transferOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_requirementImplementation",
+          "type": "address"
+        }
+      ],
+      "name": "updateRequirementImplementation",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"

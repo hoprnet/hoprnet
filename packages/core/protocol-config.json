@@ -29,7 +29,7 @@
       "channels_contract_address": "0x7587B259bbe2AdcDc7bFd6FD667Fd440b64c0Aad",
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
       "stake_contract_address": "0x5F1f18E44d29E159366810Fc6C1208E386Ef661F",
-      "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "network_registry_contract_address": "0x6aDc4991Ac9622Ca07d89A6D38b1Cd062309E8F0",
       "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["development"]
     },
