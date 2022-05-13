@@ -250,6 +250,7 @@ function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
     hosts: parseHosts(),
     environment,
     allowLocalConnections: argv.allowLocalNodeConnections,
+    allowPrivateConnections: argv.allowPrivateNodeConnections,
     heartbeatInterval: argv.heartbeatInterval,
     heartbeatVariance: argv.heartbeatVariance,
     testing: {
@@ -272,6 +273,26 @@ function addUnhandledPromiseRejectionHandler() {
   require('trace-unhandled/register')
   setLogger((msg) => {
     console.error(msg)
+  })
+
+  // See https://github.com/hoprnet/hoprnet/issues/3755
+  process.on('unhandledRejection', (reason: any, _promise: Promise<any>) => {
+    if (reason.message && reason.message.toString) {
+      const msgString = reason.toString()
+
+      // Only silence very specific errors
+      if (
+        msgString.match(/read ECONNRESET/) ||
+        msgString.match(/write ECONNRESET/) ||
+        msgString.match(/The operation was aborted/)
+      ) {
+        console.error('Unhandled promise rejection silenced')
+        return
+      }
+    }
+
+    console.warn('UnhandledPromiseRejectionWarning')
+    console.log(reason)
     process.exit(1)
   })
 }
@@ -282,6 +303,9 @@ async function main() {
   // Therefore adding a promise rejection handler to make sure that the origin of
   // the rejected promise can be detected.
   addUnhandledPromiseRejectionHandler()
+
+  // Increase the default maximum number of event listeners
+  require('events').EventEmitter.defaultMaxListeners = 20
 
   let node: Hopr
   let logs = new LogStream(argv.forwardLogs)

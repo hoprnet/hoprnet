@@ -5,11 +5,11 @@ The HOPR network uses source-selected routing. This means a node must sample the
 
 To achieve the aforementioned privacy guarantees, paths must include at least one intermediate node. However, using the Sphinx packet format (see Section \ref{sec:sphinx}) increases both the size of the header and the computation needed to generate it, which makes it possible for adversaries to distinguish packets on longer paths. Therefore, all nodes in the HOPR network are strongly encouraged to use a $targetLength$ of three. Packets with longer paths are dropped by relayers. It is possible but discouraged for nodes to use paths of one or two hops.
 
-Nodes can only be chosen once per path. For example, when choosing the third node in the path $A\rightarrow B$, if $A$ is found to be the only node with an open channel to $B$, the search will fail and a new path will be generated.
+Nodes can only be chosen once per path. For example, when choosing the third node in the path $A\rightarrow B$, if $A$ is found to be the only node with an open channel to $B$, the search will fail and a new path will be generated.\footnote{TODO: Clarify how this new path can and will differ from the failed one.}
 
-The algorithm terminates once a path with $targetLength$ is found. To prevent the algorithm from visiting too many nodes, the number of iterations is bound by $maxIterations$ and the longest known path is returned if no path of length $targetLength$ was found.
+The algorithm terminates once a path with $targetLength$ is found. To prevent the algorithm from visiting too many nodes, the number of iterations is bound by $maxIterations$ and the longest known path is returned if no path of length $targetLength$ has been found.
 
-The default path selection algorithm is a best-first search of edges which got initialized with randomized payment channels stakes as outlined above. It omits paths that would contain loops and nodes with $healthScore < healthThreshold$ and paths that would be shorter than $targetLength$.
+The default path selection algorithm is a best-first search of edges which were initialized with randomized payment channel stakes, as outlined above. It omits paths that would contain loops and nodes with $healthScore < healthThreshold$ and paths that would be shorter than $targetLength$.\footnote{TODO: Add time and space complexity analyses; explain how $maxIterations$ and $healthThreshold$ are set, and how changing these values are expected to affect performance within the HOPR network.} 
 
 \begin{algorithm}[H]
     \SetAlgoNoLine

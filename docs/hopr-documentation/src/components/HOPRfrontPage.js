@@ -44,6 +44,12 @@ const FeatureList = [
     description: <>Learn how to build apps on top of the HOPR network.</>,
     docName: 'developers/intro'
   },
+  {
+    title: 'dApps',
+    Svg: <img class="svg_icon" src={'/img/front_icons/hopr-dapps.svg'} />,
+    description: <>Documentations and guides of dApps built on HOPR.</>,
+    docName: 'dapps/myne-chat'
+  },
   /*{
     title: 'Ecosystem',
     Svg: <img class="svg_icon" src={'/img/front_icons/hopr-ecosystem.svg'}/>,

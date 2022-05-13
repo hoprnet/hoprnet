@@ -97,7 +97,7 @@ export default class Heartbeat {
    * @returns a Promise of a pingResult object with property `lastSeen < 0` if there were a timeout
    */
   public async pingNode(destination: PeerId, signal?: AbortSignal): Promise<HeartbeatPingResult> {
-    log('ping', destination.toB58String())
+    log(`ping ${destination.toB58String()} (timeout ${this.config.heartbeatDialTimeout})`)
 
     const origin = this.networkPeers.has(destination)
       ? this.networkPeers.getConnectionInfo(destination).origin

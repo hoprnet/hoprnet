@@ -90,7 +90,7 @@ function getPeer(peerId: PeerId, network: EventEmitter) {
       },
       dialer: {} as any,
       connectionManager: {
-        get: () => null
+        getAll: () => []
       } as any,
       contentRouting: {
         provide: (_key: any) => Promise.resolve()
@@ -134,6 +134,10 @@ describe('test relay', function () {
       await new Promise((resolve) => setTimeout(resolve))
     }
 
+    Alice.stop()
+    Bob.stop()
+    Charly.stop()
+
     network.removeAllListeners()
   })
 
@@ -164,6 +168,10 @@ describe('test relay', function () {
       // Let I/O happen
       await new Promise((resolve) => setTimeout(resolve))
     }
+
+    Alice.stop()
+    Bob.stop()
+    Charly.stop()
 
     network.removeAllListeners()
   })

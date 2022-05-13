@@ -7,13 +7,14 @@ import * as fixtures from './fixtures'
 import { PARTY_A, PARTY_B, PARTY_B_MULTIADDR } from '../fixtures'
 import type { Event } from './types'
 import { useFixtures } from './index.mock'
+import { IndexerStatus } from '.'
 
 describe('test indexer', function () {
   it('should start indexer', async function () {
     const { indexer, chain } = await useFixtures()
 
     await indexer.start(chain, 0)
-    assert.strictEqual(indexer.status, 'started')
+    assert.strictEqual(indexer.status, IndexerStatus.STARTED)
   })
 
   it('should stop indexer', async function () {
@@ -35,7 +36,7 @@ describe('test indexer', function () {
     assert(provider.listeners('error').length == 0)
     assert(provider.listeners('block').length == 0)
 
-    assert.strictEqual(indexer.status, 'stopped')
+    assert.strictEqual(indexer.status, IndexerStatus.STOPPED)
   })
 
   it('should restart the indexer', async function () {
@@ -61,7 +62,17 @@ describe('test indexer', function () {
       latestBlockNumber: 2,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
+
+    const blockProcessed = defer<void>()
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber == 1) {
+        blockProcessed.resolve()
+      }
+    })
+
     await indexer.start(chain, 0)
+
+    await blockProcessed.promise
 
     const account = await indexer.getAccount(fixtures.PARTY_A.toAddress())
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
@@ -74,7 +85,17 @@ describe('test indexer', function () {
       latestBlockNumber: 3,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT]
     })
+
+    const blockProcessed = defer<void>()
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber == 2) {
+        blockProcessed.resolve()
+      }
+    })
+
     await indexer.start(chain, 0)
+
+    await blockProcessed.promise
 
     const account = await indexer.getAccount(fixtures.PARTY_A.toAddress())
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
@@ -116,7 +137,16 @@ describe('test indexer', function () {
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT]
     })
 
+    const blockProcessed = defer<void>()
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber == 1) {
+        blockProcessed.resolve()
+      }
+    })
+
     await indexer.start(chain, 0)
+
+    await blockProcessed.promise
 
     const pubKey = await indexer.getPublicKeyOf(fixtures.PARTY_A.toAddress())
     assert(pubKey.eq(fixtures.PARTY_A))
@@ -128,7 +158,16 @@ describe('test indexer', function () {
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
 
+    const blockProcessed = defer<void>()
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber == 3) {
+        blockProcessed.resolve()
+      }
+    })
+
     await indexer.start(chain, 0)
+
+    await blockProcessed.promise
 
     const account = await indexer.getAccount(fixtures.PARTY_A.toAddress())
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
@@ -156,16 +195,26 @@ describe('test indexer', function () {
 
     await indexer.start(chain, 0)
 
+    const indexerStopped = defer<void>()
+    indexer.on('status', (status: string) => {
+      if (status === 'stopped') {
+        indexerStopped.resolve()
+      }
+    })
+
     provider.emit('error', new Error('MOCK'))
 
-    assert.strictEqual(indexer.status, 'stopped')
+    await indexerStopped.promise
+
+    // Indexer is either stopped or restarting
+    assert([IndexerStatus.STOPPED, IndexerStatus.RESTARTING].includes(indexer.status))
 
     const started = defer<void>()
     indexer.on('status', (status: string) => {
       if (status === 'started') started.resolve()
     })
     await started.promise
-    assert.strictEqual(indexer.status, 'started')
+    assert.strictEqual(indexer.status, IndexerStatus.STARTED)
   })
 
   it('should handle provider error and resend queuing transactions', async function () {
@@ -175,16 +224,27 @@ describe('test indexer', function () {
     })
 
     await indexer.start(chain, 0)
+
+    const indexerStopped = defer<void>()
+    indexer.on('status', (status: string) => {
+      if (status === 'stopped') {
+        indexerStopped.resolve()
+      }
+    })
+
     provider.emit('error', new Error('ECONNRESET'))
 
-    assert.strictEqual(indexer.status, 'stopped')
+    await indexerStopped.promise
+
+    // Indexer is either stopped or restarting
+    assert([IndexerStatus.STOPPED, IndexerStatus.RESTARTING].includes(indexer.status))
 
     const started = defer<void>()
     indexer.on('status', (status: string) => {
       if (status === 'started') started.resolve()
     })
     await started.promise
-    assert.strictEqual(indexer.status, 'started')
+    assert.strictEqual(indexer.status, IndexerStatus.STARTED)
   })
 
   it('should contract error by restarting', async function () {
@@ -202,7 +262,7 @@ describe('test indexer', function () {
       if (status === 'started') started.resolve()
     })
     await started.promise
-    assert.strictEqual(indexer.status, 'started')
+    assert.strictEqual(indexer.status, IndexerStatus.STARTED)
   })
 
   it('should emit events on updated channels', async function () {
@@ -327,7 +387,9 @@ describe('test indexer', function () {
     const blockProcessed = defer<void>()
 
     indexer.on('block-processed', (blockNumber: number) => {
-      if (blockNumber === 4) blockProcessed.resolve()
+      if (blockNumber === 4) {
+        blockProcessed.resolve()
+      }
     })
 
     // confirmations == 1
@@ -507,7 +569,9 @@ describe('test indexer', function () {
 
     const blockProcessed = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
-      if (blockNumber == 5) blockProcessed.resolve()
+      if (blockNumber == 5) {
+        blockProcessed.resolve()
+      }
     })
     await indexer.start(chain, 0)
 

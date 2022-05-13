@@ -19,6 +19,13 @@ Add milestones if applicable:
 On large bounties, it might make sense to include various milestones, so to encourage early PRs and minimize delayed / last minute work.
 -->
 
+<!--
+Add expiry date if applicable:
+
+- If the bounty must be completed before specific date, expiry date must be included.
+- Once expired, does it make the bounty invalid or is the bounty still valuable?
+-->
+
 ### Definition of Done
 
 <!--

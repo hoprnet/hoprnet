@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 
 import Libp2p from 'libp2p'
 import TCP from 'libp2p-tcp'
-const Mplex = require('libp2p-mplex')
+import Mplex from 'libp2p-mplex'
 import { NOISE } from '@chainsafe/libp2p-noise'
 import KadDHT from 'libp2p-kad-dht'
 import { Multiaddr } from 'multiaddr'
@@ -38,8 +38,8 @@ async function getNode(id = getPeerId()): Promise<Libp2p> {
     peerId: id,
     modules: {
       transport: [TCP],
-      streamMuxer: [Mplex as any],
-      connEncryption: [NOISE as any],
+      streamMuxer: [Mplex],
+      connEncryption: [NOISE],
       dht: KadDHT
     },
     metrics: {
@@ -70,6 +70,7 @@ async function getNode(id = getPeerId()): Promise<Libp2p> {
 
 describe('relay code generation', function () {
   it('provide and fetch CID key', async function () {
+    this.timeout(5e3)
     const nodeA = await getNode(peerA)
     const nodeB = await getNode(peerB)
     const nodeC = await getNode(peerC)

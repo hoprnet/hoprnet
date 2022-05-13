@@ -3,7 +3,7 @@ id: how-to-stake
 title: Staking on HOPR smart contract
 ---
 
-HOPR staking scheme goal is to reward HOPR token holders while providing a way to develop and test cover traffic with the help of the community. This is a six month-scheme takes standard yield farming and gives a gamified twist thanks to collectible NFTs which can boost your APY. It was launched on July 27th and will run until 17th January 2022, a period of 175 days.
+HOPR staking scheme goal is to reward HOPR token holders while providing a way to develop and test cover traffic with the help of the community. This staking scheme takes standard yield farming and gives a gamified twist thanks to collectible NFTs which can boost your APR. The first staking season launched on July 27th, currently we're running staking season 3, which started on April 26th 2022 and will run for a period of 90 days.
 
 Locking HOPR tokens in this smart contract isn’t just a way to farm tokens: it’s your gateway to participating in HOPR community testing, earning even higher rewards while helping to improve online privacy.
 
@@ -11,9 +11,9 @@ Locking HOPR tokens in this smart contract isn’t just a way to farm tokens: it
 
 To participate in HOPR staking you’ll need to stake and lock your tokens in a HOPR smart contract.
 
-Rewards will pay out as the contract runs. You can claim your rewards as you go, or you can choose to reinvest them in the contract to compound your earnings. If you choose to reinvest, your APY will increase, but those tokens will be locked until January 17th like the rest of your stake.
+Rewards will pay out as the contract runs. You can claim your rewards as you go, or you can choose to reinvest them in the contract to compound your earnings. If you choose to reinvest, your APR will increase, but those tokens will be locked until June 26th like the rest of your stake.
 
-Staked tokens receive a base reward of 0.05% per day. This works out at 18.25% APY, assuming you don’t take advantage of compounding.
+Staked tokens receive a base reward of 0.027% per day. This works out at 10% APR, assuming you don’t take advantage of compounding.
 
 ## NFT Boosts
 
@@ -21,9 +21,9 @@ Inspired by the daily tasks from our earlier incentivized testnets, HOPR NFTs wi
 
 Here’s how it will work: we’ll be running regular testing programs throughout the six months of the staking program. Once each round of testing is complete, each participant will receive an NFT to certify that you participated in testing and helped with the development of the HOPR protocol.
 
-Linking that NFT to your staking address will earn you an APY boost. Best of all, they stack, so the more NFTs you collect the higher your APY will be.
+Linking that NFT to your staking address will earn you an APR boost. Best of all, they stack, so the more NFTs you collect the higher your APR will be.
 
-Want to know more about the staking? [Read here](https://medium.com/hoprnet/hopr-staking-program-full-details-d0a4eb12d2c)
+Want to know more about the staking? [Read here](https://medium.com/hoprnet/hopr-staking-faqs-780edfd4f1e1)
 
 ## How to stake?
 
@@ -112,6 +112,6 @@ To redeem an NFT, press the “Lock NFT” button under the NFT you want to lock
 
 :::caution Important
 
-When you confirm, the NFT will be sent to the token contract and boost the associated address. This cannot be undone! So make sure you’re redeeming the NFT you want in the address you want. Like stakes, NFTs are locked until 17th January, at which point they’ll be automatically returned.
+When you confirm, the NFT will be sent to the token contract and boost the associated address. This cannot be undone! So make sure you’re redeeming the NFT you want in the address you want. Like stakes, NFTs are locked for a three-month period, after which they can be claimed.
 
 :::
