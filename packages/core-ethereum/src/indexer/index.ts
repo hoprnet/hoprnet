@@ -459,6 +459,47 @@ class Indexer extends EventEmitter {
 
     let lastDatabaseSnapshot = await this.db.getLatestConfirmedSnapshotOrUndefined()
 
+    // settle transactions before processing events
+    if (fetchNativeTxs) {
+      // get the number of unconfirmed (pending and mined) transactions tracked by the transaction manager
+      const unconfirmedTxListeners = this.chain.getAllUnconfirmedHash();
+      // only request transactions in block when transaction manager is tracking 
+      log('Indexer fetches native txs for %d unconfirmed tx listeners', unconfirmedTxListeners.length)
+      if (unconfirmedTxListeners.length > 0) {
+        let nativeTxHashes: string[] | undefined
+        try {
+          // This new block marks a previous block
+          // (blockNumber - this.maxConfirmations) is final.
+          // Confirm native token transactions in that previous block.
+          nativeTxHashes = await this.chain.getTransactionsInBlock(currentBlock)
+        } catch (err) {
+          log(
+            `error: failed to retrieve information about block ${currentBlock} with finality ${this.maxConfirmations}`,
+            err
+          )
+        }
+  
+        // update transaction manager after updating db
+        if (nativeTxHashes && nativeTxHashes.length > 0) {
+          // @TODO replace this with some efficient set intersection algorithm
+          for (const txHash of nativeTxHashes) {
+            if (this.listeners(`withdraw-native-${txHash}`).length > 0) {
+              this.indexEvent(`withdraw-native-${txHash}`)
+            } else if (this.listeners(`withdraw-hopr-${txHash}`).length > 0) {
+              this.indexEvent(`withdraw-hopr-${txHash}`)
+            } else if (this.listeners(`announce-${txHash}`).length > 0) {
+              this.indexEvent(`announce-${txHash}`)
+            } else if (this.listeners(`channel-updated-${txHash}`).length > 0) {
+              this.indexEvent(`channel-updated-${txHash}`)
+            }
+  
+            // update transaction manager
+            this.chain.updateConfirmedTransaction(txHash)
+          }
+        }
+      }
+    }
+
     if (fetchEvents) {
       // Don't fail immediately when one block is temporarily not available
       const RETRIES = 3
@@ -479,39 +520,6 @@ class Indexer extends EventEmitter {
     }
 
     await this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot, blocking)
-
-    if (fetchNativeTxs) {
-      let nativeTxHashes: string[] | undefined
-      try {
-        // This new block marks a previous block
-        // (blockNumber - this.maxConfirmations) is final.
-        // Confirm native token transactions in that previous block.
-        nativeTxHashes = await this.chain.getTransactionsInBlock(currentBlock)
-      } catch (err) {
-        log(
-          `error: failed to retrieve information about block ${currentBlock} with finality ${this.maxConfirmations}`,
-          err
-        )
-      }
-
-      // update transaction manager after updating db
-      if (nativeTxHashes && nativeTxHashes.length > 0) {
-        // @TODO replace this with some efficient set intersection algorithm
-        for (const txHash of nativeTxHashes) {
-          if (this.listeners(`withdraw-native-${txHash}`).length > 0) {
-            this.indexEvent(`withdraw-native-${txHash}`)
-          } else if (this.listeners(`withdraw-hopr-${txHash}`).length > 0) {
-            this.indexEvent(`withdraw-hopr-${txHash}`)
-          } else if (this.listeners(`announce-${txHash}`).length > 0) {
-            this.indexEvent(`announce-${txHash}`)
-          } else if (this.listeners(`channel-updated-${txHash}`).length > 0) {
-            this.indexEvent(`channel-updated-${txHash}`)
-          }
-
-          this.chain.updateConfirmedTransaction(txHash)
-        }
-      }
-    }
 
     try {
       await this.db.updateLatestBlockNumber(new BN(blockNumber))
@@ -639,8 +647,6 @@ class Indexer extends EventEmitter {
         new BN(event.logIndex)
       )
 
-      // update transaction manager
-      this.chain.updateConfirmedTransaction(event.transactionHash)
       log('Event name %s and hash %s', eventName, event.transactionHash)
 
       switch (eventName) {
@@ -859,6 +865,7 @@ class Indexer extends EventEmitter {
   }
 
   private indexEvent(indexerEvent: IndexerEvents) {
+    log(`Indexer indexEvent ${indexerEvent}`)
     this.emit(indexerEvent)
   }
 

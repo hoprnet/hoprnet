@@ -249,6 +249,8 @@ export async function createChainWrapper(
       // 4. send transaction to our ethereum provider
       // throws various exceptions if tx gets rejected
       transaction = await provider.sendTransaction(signedTx)
+      // when transaction is sent to the provider, it is moved from queuing to pending
+      transactions.moveFromQueuingToPending(initiatedHash);
     } catch (error) {
       log('Transaction with nonce %d failed to sent: %s', nonce, error)
       deferredListener.reject()
@@ -303,6 +305,7 @@ export async function createChainWrapper(
 
       const onTransaction = (receipt: providers.TransactionReceipt) => {
         if (receipt.confirmations >= 1) {
+          transactions.moveFromPendingToMined(receipt.transactionHash);
           cleanUp()
         }
       }
@@ -315,6 +318,7 @@ export async function createChainWrapper(
 
     try {
       await deferredListener.promise
+      transactions.moveFromMinedToConfirmed(transaction.hash)
       return {
         code: 'SUCCESS',
         tx: { hash: transaction.hash }
@@ -655,6 +659,9 @@ export async function createChainWrapper(
     updateConfirmedTransaction: transactions.moveToConfirmed.bind(
       transactions
     ) as TransactionManager['moveToConfirmed'],
+    getAllUnconfirmedHash: transactions.getAllUnconfirmedHash.bind(
+      transactions
+    ) as TransactionManager['getAllUnconfirmedHash'],
     getAllQueuingTransactionRequests: transactions.getAllQueuingTxs.bind(
       transactions
     ) as TransactionManager['getAllQueuingTxs']
