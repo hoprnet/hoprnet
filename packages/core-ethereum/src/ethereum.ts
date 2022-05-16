@@ -182,7 +182,19 @@ export async function createChainWrapper(
     const nonceLock = await nonceTracker.getNonceLock(address)
     const nonce = nonceLock.nextNonce
 
-    const feeData = await provider.getFeeData()
+    let feeData: providers.FeeData;
+
+    try {
+      feeData = await provider.getFeeData()
+    } catch (error) {
+      log('Transaction with nonce %d failed to getFeeData', nonce, error)
+      // TODO: find an API for fee data per environment
+      feeData = {
+        maxFeePerGas: ethers.utils.parseUnits('5', 'gwei'),
+        maxPriorityFeePerGas: ethers.utils.parseUnits('2', 'gwei'),
+        gasPrice: null
+      }
+    }
 
     log('Sending transaction %o', {
       gasLimit,
