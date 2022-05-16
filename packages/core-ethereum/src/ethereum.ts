@@ -182,7 +182,7 @@ export async function createChainWrapper(
     const nonceLock = await nonceTracker.getNonceLock(address)
     const nonce = nonceLock.nextNonce
 
-    let feeData: providers.FeeData;
+    let feeData: providers.FeeData
 
     try {
       feeData = await provider.getFeeData()
