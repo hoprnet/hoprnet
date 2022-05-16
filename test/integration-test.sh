@@ -354,24 +354,28 @@ get_tickets_statistics() {
 
 log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5}, ${api6}, ${api7}, ${api8}"
 
-validate_native_address "${api1}" "${api_token}"
-validate_native_address "${api2}" "${api_token}"
-validate_native_address "${api3}" "${api_token}"
-validate_native_address "${api4}" "${api_token}"
-validate_native_address "${api5}" "${api_token}"
+validate_native_address "${api1}" "${api_token}" &
+validate_native_address "${api2}" "${api_token}" &
+validate_native_address "${api3}" "${api_token}" &
+validate_native_address "${api4}" "${api_token}" &
+validate_native_address "${api5}" "${api_token}" &
 # we don't need node6 because it's short-living
-validate_native_address "${api7}" "${api_token}"
-validate_native_address "${api8}" "${api_token}"
+validate_native_address "${api7}" "${api_token}" &
+validate_native_address "${api8}" "${api_token}" &
+log "Validating NATIVE addresses"
+wait
 log "ETH addresses exist"
 
-validate_node_balance_gt0 "${api1}"
-validate_node_balance_gt0 "${api2}"
-validate_node_balance_gt0 "${api3}"
-validate_node_balance_gt0 "${api4}"
-validate_node_balance_gt0 "${api5}"
+validate_node_balance_gt0 "${api1}" &
+validate_node_balance_gt0 "${api2}" &
+validate_node_balance_gt0 "${api3}" &
+validate_node_balance_gt0 "${api4}" &
+validate_node_balance_gt0 "${api5}" &
 # we don't need node6 because it's short-living
-validate_node_balance_gt0 "${api7}"
-validate_node_balance_gt0 "${api8}"
+validate_node_balance_gt0 "${api7}" &
+validate_node_balance_gt0 "${api8}" &
+log "Validating node balances"
+wait
 log "Nodes are funded"
 
 declare addr1 addr2 addr3 addr4 addr5 addr7 addr8 result
@@ -394,24 +398,14 @@ native_addr5="$(get_native_address "${api_token}@${api5}")"
 native_addr7="$(get_native_address "${api_token}@${api7}")"
 native_addr8="$(get_native_address "${api_token}@${api8}")"
 
-declare hopr_addr1 hopr_addr2 hopr_addr3 hopr_addr4 hopr_addr5 hopr_addr7 hopr_addr8
-hopr_addr1="$(get_hopr_address "${api_token}@${api1}")"
-hopr_addr2="$(get_hopr_address "${api_token}@${api2}")"
-hopr_addr3="$(get_hopr_address "${api_token}@${api3}")"
-hopr_addr4="$(get_hopr_address "${api_token}@${api4}")"
-hopr_addr5="$(get_hopr_address "${api_token}@${api5}")"
+log "hopr addr1: ${addr1} ${native_addr1}"
+log "hopr addr2: ${addr2} ${native_addr2}"
+log "hopr addr3: ${addr3} ${native_addr3}"
+log "hopr addr4: ${addr4} ${native_addr4}"
+log "hopr addr5: ${addr5} ${native_addr5}"
 # we don't need node6 because it's short-living
-hopr_addr7="$(get_hopr_address "${api_token}@${api7}")"
-hopr_addr8="$(get_hopr_address "${api_token}@${api8}")"
-
-log "hopr addr1: ${addr1} ${native_addr1} ${hopr_addr1}"
-log "hopr addr2: ${addr2} ${native_addr2} ${hopr_addr2}"
-log "hopr addr3: ${addr3} ${native_addr3} ${hopr_addr3}"
-log "hopr addr4: ${addr4} ${native_addr4} ${hopr_addr4}"
-log "hopr addr5: ${addr5} ${native_addr5} ${hopr_addr5}"
-# we don't need node6 because it's short-living
-log "hopr addr7: ${addr7} ${native_addr7} ${hopr_addr7}"
-log "hopr addr8: ${addr8} ${native_addr8} ${hopr_addr8}"
+log "hopr addr7: ${addr7} ${native_addr7}"
+log "hopr addr8: ${addr8} ${native_addr8}"
 
 # enable register
 log "Enabling register"
@@ -430,7 +424,7 @@ yarn workspace @hoprnet/hopr-ethereum hardhat register \
   --network hardhat \
   --task add \
   --native-addresses "$native_addr1,$native_addr2,$native_addr3,$native_addr4,$native_addr5,$native_addr7" \
-  --peer-ids "$hopr_addr1,$hopr_addr2,$hopr_addr3,$hopr_addr4,$hopr_addr5,$hopr_addr7"
+  --peer-ids "$addr1,$addr2,$addr3,$addr4,$addr5,$addr7"
 log "Nodes added to register"
 
 # running withdraw and checking it results at the end of this test run
