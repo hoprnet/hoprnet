@@ -462,8 +462,8 @@ class Indexer extends EventEmitter {
     // settle transactions before processing events
     if (fetchNativeTxs) {
       // get the number of unconfirmed (pending and mined) transactions tracked by the transaction manager
-      const unconfirmedTxListeners = this.chain.getAllUnconfirmedHash();
-      // only request transactions in block when transaction manager is tracking 
+      const unconfirmedTxListeners = this.chain.getAllUnconfirmedHash()
+      // only request transactions in block when transaction manager is tracking
       log('Indexer fetches native txs for %d unconfirmed tx listeners', unconfirmedTxListeners.length)
       if (unconfirmedTxListeners.length > 0) {
         let nativeTxHashes: string[] | undefined
@@ -478,7 +478,7 @@ class Indexer extends EventEmitter {
             err
           )
         }
-  
+
         // update transaction manager after updating db
         if (nativeTxHashes && nativeTxHashes.length > 0) {
           // @TODO replace this with some efficient set intersection algorithm
@@ -492,7 +492,7 @@ class Indexer extends EventEmitter {
             } else if (this.listeners(`channel-updated-${txHash}`).length > 0) {
               this.indexEvent(`channel-updated-${txHash}`)
             }
-  
+
             // update transaction manager
             this.chain.updateConfirmedTransaction(txHash)
           }
