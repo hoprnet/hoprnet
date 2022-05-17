@@ -157,7 +157,7 @@ export async function createChainWrapper(
   //   gasPrice = await provider.getGasPrice()
   // }
 
-  let defaultMaxFeePerGas:BigNumber;
+  let defaultMaxFeePerGas: BigNumber
   if (networkInfo.network == 'xdai') {
     defaultMaxFeePerGas = ethers.utils.parseUnits('10', 'gwei')
   } else if (networkInfo.network == 'goerli') {
@@ -200,7 +200,7 @@ export async function createChainWrapper(
       log('Transaction with nonce %d failed to getFeeData', nonce, error)
       // TODO: find an API for fee data per environment
       feeData = {
-        maxFeePerGas: defaultMaxFeePerGas, 
+        maxFeePerGas: defaultMaxFeePerGas,
         maxPriorityFeePerGas: ethers.utils.parseUnits('2', 'gwei'),
         gasPrice: null
       }
@@ -240,7 +240,10 @@ export async function createChainWrapper(
     log('essentialTxPayload %o', essentialTxPayload)
 
     if (checkDuplicate) {
-      const [isDuplicate, hash] = transactions.existInMinedOrPendingWithHigherFee(essentialTxPayload, feeData.maxPriorityFeePerGas)
+      const [isDuplicate, hash] = transactions.existInMinedOrPendingWithHigherFee(
+        essentialTxPayload,
+        feeData.maxPriorityFeePerGas
+      )
       // check duplicated pending/mined transaction against transaction manager
       // if transaction manager has a transaction with the same payload that is mined or is pending but with
       // a higher or equal nonce, halt.

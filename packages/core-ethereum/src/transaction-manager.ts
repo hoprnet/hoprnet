@@ -90,10 +90,7 @@ class TranscationManager {
    * @param maxPrority Max Priority Fee. Tips paying to the miners, which correlates to the likelyhood of getting transactions included.
    * @returns [true if it exists, transaction hash]
    */
-  public existInMinedOrPendingWithHigherFee(
-    payload: TransactionPayload,
-    maxPrority: BigNumber
-  ): [boolean, string] {
+  public existInMinedOrPendingWithHigherFee(payload: TransactionPayload, maxPrority: BigNumber): [boolean, string] {
     // Using isDeepStrictEqual to compare TransactionPayload objects, see
     // https://nodejs.org/api/util.html#util_util_isdeepstrictequal_val1_val2
     const index = Array.from(this.payloads.values()).findIndex((pl) => isDeepStrictEqual(pl, payload))
