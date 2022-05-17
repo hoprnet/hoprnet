@@ -267,7 +267,8 @@ const createChainMock = (
     getPublicKey: () => fixtures.PARTY_A,
     setCommitment: (counterparty: Address, commitment: Hash) =>
       hoprChannels.bumpChannel(counterparty.toHex(), commitment.toHex()),
-    getAllQueuingTransactionRequests: () => [txRequest]
+    getAllQueuingTransactionRequests: () => [txRequest],
+    getAllUnconfirmedHash: () => [fixtures.OPENED_EVENT.transactionHash]
   } as unknown as ChainWrapper
 }
 

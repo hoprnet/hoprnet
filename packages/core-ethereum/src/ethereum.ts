@@ -148,12 +148,22 @@ export async function createChainWrapper(
     durations.minutes(15)
   )
 
-  let gasPrice: number | BigNumber
-  if (networkInfo.gasPrice) {
-    const [gasPriceValue, gasPriceUnit] = networkInfo.gasPrice.split(' ')
-    gasPrice = ethers.utils.parseUnits(gasPriceValue, gasPriceUnit)
+  // comment out legacy tx 0 in favor of EIP-1559
+  // let gasPrice: number | BigNumber
+  // if (networkInfo.gasPrice) {
+  //   const [gasPriceValue, gasPriceUnit] = networkInfo.gasPrice.split(' ')
+  //   gasPrice = ethers.utils.parseUnits(gasPriceValue, gasPriceUnit)
+  // } else {
+  //   gasPrice = await provider.getGasPrice()
+  // }
+
+  let defaultMaxFeePerGas:BigNumber;
+  if (networkInfo.network == 'xdai') {
+    defaultMaxFeePerGas = ethers.utils.parseUnits('10', 'gwei')
+  } else if (networkInfo.network == 'goerli') {
+    defaultMaxFeePerGas = ethers.utils.parseUnits('10', 'gwei')
   } else {
-    gasPrice = await provider.getGasPrice()
+    defaultMaxFeePerGas = ethers.utils.parseUnits('500', 'gwei')
   }
 
   /**
@@ -190,7 +200,7 @@ export async function createChainWrapper(
       log('Transaction with nonce %d failed to getFeeData', nonce, error)
       // TODO: find an API for fee data per environment
       feeData = {
-        maxFeePerGas: ethers.utils.parseUnits('5', 'gwei'),
+        maxFeePerGas: defaultMaxFeePerGas, 
         maxPriorityFeePerGas: ethers.utils.parseUnits('2', 'gwei'),
         gasPrice: null
       }
@@ -230,7 +240,7 @@ export async function createChainWrapper(
     log('essentialTxPayload %o', essentialTxPayload)
 
     if (checkDuplicate) {
-      const [isDuplicate, hash] = transactions.existInMinedOrPendingWithHigherFee(essentialTxPayload, gasPrice)
+      const [isDuplicate, hash] = transactions.existInMinedOrPendingWithHigherFee(essentialTxPayload, feeData.maxPriorityFeePerGas)
       // check duplicated pending/mined transaction against transaction manager
       // if transaction manager has a transaction with the same payload that is mined or is pending but with
       // a higher or equal nonce, halt.
@@ -252,7 +262,7 @@ export async function createChainWrapper(
     const signedTx = utils.serializeTransaction(populatedTx, signature)
     // compute tx hash and save to initiated tx list in tx manager
     const initiatedHash = utils.keccak256(signedTx)
-    transactions.addToQueuing(initiatedHash, { nonce, gasPrice }, essentialTxPayload)
+    transactions.addToQueuing(initiatedHash, { nonce, maxPrority: feeData.maxPriorityFeePerGas }, essentialTxPayload)
     // with let indexer to listen to the tx
     const deferredListener = handleTxListener(initiatedHash)
 

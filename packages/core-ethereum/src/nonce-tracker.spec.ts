@@ -1,9 +1,10 @@
 import { expect } from 'chai'
 import NonceTracker, { Transaction } from './nonce-tracker'
 import { durations, Address } from '@hoprnet/hopr-utils'
+import { BigNumber } from 'ethers'
 
 const USER_ADDRESS = Address.fromString('0x7d3517b0d011698406d6e0aed8453f0be2697926')
-const GAS_PRICE = 100
+const MAZ_PRIORITY_FEE = BigNumber.from('100')
 
 describe('nonce-tracker', function () {
   let nonceTracker: NonceTracker
@@ -277,7 +278,7 @@ describe('nonce-tracker', function () {
 
 const genTx = (opts: { nonce: number; createdAt?: number }): Transaction => {
   const { createdAt = new Date().getTime() } = opts
-  return { ...opts, from: USER_ADDRESS.toHex(), createdAt, gasPrice: GAS_PRICE }
+  return { ...opts, from: USER_ADDRESS.toHex(), createdAt, maxPrority: MAZ_PRIORITY_FEE }
 }
 
 const genMultiTx = (opts: {
