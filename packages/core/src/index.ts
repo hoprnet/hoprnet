@@ -303,6 +303,7 @@ class Hopr extends EventEmitter {
       sendMessage,
       this.closeConnectionsTo.bind(this),
       accessControl.reviewConnection.bind(accessControl),
+      this,
       this.environment.id,
       this.options
     )

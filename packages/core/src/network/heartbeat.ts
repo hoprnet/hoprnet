@@ -8,6 +8,7 @@ import { HEARTBEAT_INTERVAL, HEARTBEAT_TIMEOUT, HEARTBEAT_INTERVAL_VARIANCE } fr
 import { createHash, randomBytes } from 'crypto'
 
 import type { Subscribe, SendMessage } from '../index'
+import EventEmitter from 'events'
 
 const log = debug('hopr-core:heartbeat')
 const error = debug('hopr-core:heartbeat:error')
@@ -31,12 +32,20 @@ export type HeartbeatConfig = {
   heartbeatThreshold: number
 }
 
+export enum P2PNetworkHealth {
+  RED = 0,      // No connection, default
+  ORANGE,   // Low quality (<= 0.5) connection to at least 1 public relay
+  YELLOW,   // High quality (> 0.5) connection to at least 1 public relay
+  GREEN     // High quality (> 0.5) connection to at least 1 public relay and 1 NAT node
+}
+
 export default class Heartbeat {
   private stopHeartbeatInterval: (() => void) | undefined
   private protocolHeartbeat: string
 
   private _pingNode: Heartbeat['pingNode'] | undefined
 
+  private currentHealth: P2PNetworkHealth = P2PNetworkHealth.RED
   private config: HeartbeatConfig
 
   constructor(
@@ -45,6 +54,7 @@ export default class Heartbeat {
     protected sendMessage: SendMessage,
     private closeConnectionsTo: (peer: PeerId) => Promise<void>,
     private reviewConnection: AccessControl['reviewConnection'],
+    private stateChangeEmitter: EventEmitter,
     environmentId: string,
     config?: Partial<HeartbeatConfig>
   ) {
@@ -85,6 +95,8 @@ export default class Heartbeat {
     } else {
       this.networkPeers.register(remotePeer, 'incoming heartbeat')
     }
+
+    this.recalculateNetworkHealth()
 
     log(`received heartbeat from ${remotePeer.toB58String()}`)
     return Promise.resolve(Heartbeat.calculatePingResponse(msg))
@@ -140,6 +152,56 @@ export default class Heartbeat {
     }
   }
 
+  public recalculateNetworkHealth() {
+
+    let newHealthValue = P2PNetworkHealth.RED
+    let lowQualityPublic = 0
+    let lowQualityNonPublic = 0
+    let highQualityPublic = 0
+    let highQualityNonPublic = 0
+
+    // Count quality of public/non-public nodes
+    for (let entry of this.networkPeers.allEntries()) {
+      let quality = this.networkPeers.qualityOf(entry.id)
+      if (entry.isPublic) {
+        if (quality > 0.5) {
+          ++highQualityPublic
+        }
+        else {
+          ++lowQualityPublic
+        }
+      }
+      else {
+        if (quality > 0.5) {
+          ++highQualityNonPublic
+        }
+        else {
+          ++lowQualityNonPublic
+        }
+      }
+    }
+
+    // ORANGE state = low quality connection to any node
+    if (lowQualityPublic > 0 || lowQualityNonPublic > 0)
+      newHealthValue = P2PNetworkHealth.ORANGE
+
+    // YELLOW = high-quality connection to a public node
+    if (highQualityPublic > 0)
+      newHealthValue = P2PNetworkHealth.YELLOW
+
+    // GREEN = hiqh-quality connection to a public and a non-public node
+    if (highQualityPublic > 0 && highQualityNonPublic > 0)
+      newHealthValue = P2PNetworkHealth.GREEN
+
+
+    // Emit network health change event if needed
+    if (newHealthValue != this.currentHealth) {
+      let oldValue = this.currentHealth
+      this.currentHealth = newHealthValue
+      this.stateChangeEmitter.emit('hopr:network-health-changed', oldValue, this.currentHealth)
+    }
+  }
+
   /**
    * Performs a ping request to all nodes who were not seen since the threshold
    */
@@ -185,6 +247,7 @@ export default class Heartbeat {
       }
     }
 
+    this.recalculateNetworkHealth()
     log(`finished checking nodes since ${thresholdTime} ${this.networkPeers.length()} nodes`)
     log(this.networkPeers.debugLog())
   }
