@@ -104,7 +104,8 @@ function createFakeNetwork() {
 
 async function getPeer(
   self: PeerId,
-  network: ReturnType<typeof createFakeNetwork>
+  network: ReturnType<typeof createFakeNetwork>,
+  netStatEvents: EventEmitter
 ): Promise<{ heartbeat: TestingHeartbeat; peers: NetworkPeers }> {
   const peers = new NetworkPeers([], [self])
 
@@ -116,6 +117,7 @@ async function getPeer(
       assert.fail(`must not call hangUp`)
     }) as any,
     () => Promise.resolve(true),
+    netStatEvents,
     TESTING_ENVIRONMENT,
     {
       ...SHORT_TIMEOUTS,
@@ -141,6 +143,7 @@ describe('unit test heartbeat', async () => {
         assert.fail(`must not call hangUp`)
       }) as any,
       () => Promise.resolve(true),
+      new EventEmitter(),
       TESTING_ENVIRONMENT,
       SHORT_TIMEOUTS
     )
@@ -151,9 +154,10 @@ describe('unit test heartbeat', async () => {
 
   it('check nodes does not change quality of newly registered peers', async () => {
     const network = createFakeNetwork()
-    const peerA = await getPeer(Alice, network)
+    const statEv = new EventEmitter()
+    const peerA = await getPeer(Alice, network, statEv)
 
-    const peerB = await getPeer(Bob, network)
+    const peerB = await getPeer(Bob, network, statEv)
 
     assert.equal(peerA.peers.qualityOf(Bob).toFixed(1), '0.2')
 
@@ -170,7 +174,8 @@ describe('unit test heartbeat', async () => {
 
   it('check nodes does not change quality of offline peer', async () => {
     const network = createFakeNetwork()
-    const peerA = await getPeer(Alice, network)
+    const statEv = new EventEmitter()
+    const peerA = await getPeer(Alice, network, statEv)
 
     assert.equal(peerA.peers.qualityOf(Charly).toFixed(1), '0.2')
 
@@ -188,10 +193,11 @@ describe('unit test heartbeat', async () => {
 
   it('test heartbeat flow', async () => {
     const network = createFakeNetwork()
+    const statEv = new EventEmitter()
 
-    const peerA = await getPeer(Alice, network)
-    const peerB = await getPeer(Bob, network)
-    const peerC = await getPeer(Charly, network)
+    const peerA = await getPeer(Alice, network, statEv)
+    const peerB = await getPeer(Bob, network, statEv)
+    const peerC = await getPeer(Charly, network, statEv)
 
     peerA.peers.register(Bob, 'test')
     peerA.peers.register(Charly, 'test')
