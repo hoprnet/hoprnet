@@ -30,7 +30,8 @@ const txRequest = {
   data: '0x0',
   value: 0,
   nonce: 0,
-  gasPrice: 1
+  maxPriorityFeePerGas: utils.parseUnits('1', 'gwei'),
+  maxFeePerGas: utils.parseUnits('1', 'gwei')
 }
 
 const createProviderMock = (ops: { latestBlockNumber?: number } = {}) => {

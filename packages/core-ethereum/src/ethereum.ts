@@ -39,7 +39,7 @@ export type SendTransactionReturn = {
 }
 
 export async function createChainWrapper(
-  networkInfo: { provider: string; chainId: number; gasPrice?: string; network: string; environment: string },
+  networkInfo: { provider: string; chainId: number; maxFeePerGas: string; maxPriorityFeePerGas: string; network: string; environment: string },
   privateKey: Uint8Array,
   checkDuplicate: Boolean = true,
   timeout = TX_CONFIRMATION_WAIT
@@ -148,23 +148,10 @@ export async function createChainWrapper(
     durations.minutes(15)
   )
 
-  // comment out legacy tx 0 in favor of EIP-1559
-  // let gasPrice: number | BigNumber
-  // if (networkInfo.gasPrice) {
-  //   const [gasPriceValue, gasPriceUnit] = networkInfo.gasPrice.split(' ')
-  //   gasPrice = ethers.utils.parseUnits(gasPriceValue, gasPriceUnit)
-  // } else {
-  //   gasPrice = await provider.getGasPrice()
-  // }
-
-  let defaultMaxFeePerGas: BigNumber
-  if (networkInfo.network == 'xdai') {
-    defaultMaxFeePerGas = ethers.utils.parseUnits('10', 'gwei')
-  } else if (networkInfo.network == 'goerli') {
-    defaultMaxFeePerGas = ethers.utils.parseUnits('10', 'gwei')
-  } else {
-    defaultMaxFeePerGas = ethers.utils.parseUnits('500', 'gwei')
-  }
+  const [defaultMaxFeePerGasValue, defaultMaxFeePerGasUnit] = networkInfo.maxFeePerGas.split(' ')
+  const defaultMaxFeePerGas = ethers.utils.parseUnits(defaultMaxFeePerGasValue, defaultMaxFeePerGasUnit)
+  const [defaultMaxPriorityFeePerGasValue, defaultMaxPriorityFeePerGasUnit] = networkInfo.maxPriorityFeePerGas.split(' ')
+  const defaultMaxPriorityFeePerGas = ethers.utils.parseUnits(defaultMaxPriorityFeePerGasValue, defaultMaxPriorityFeePerGasUnit)
 
   /**
    * Update nonce-tracker and transaction-manager, broadcast the transaction on chain, and listen
@@ -201,7 +188,7 @@ export async function createChainWrapper(
       // TODO: find an API for fee data per environment
       feeData = {
         maxFeePerGas: defaultMaxFeePerGas,
-        maxPriorityFeePerGas: ethers.utils.parseUnits('2', 'gwei'),
+        maxPriorityFeePerGas: defaultMaxPriorityFeePerGas,
         gasPrice: null
       }
     }

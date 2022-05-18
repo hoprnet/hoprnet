@@ -101,8 +101,8 @@
       "description": "Hardhat is an Ethereum development environment",
       "chain_id": 1,
       "live": false,
-      "gas_price": "1 gwei",
-      "gas_multiplier": 1.1,
+      "max_fee_per_gas": "1 gwei",
+      "max_priority_fee_per_gas": "2 gwei",
       "default_provider": "http://127.0.0.1:8545/",
       "native_token_name": "ETH",
       "hopr_token_name": "wxHOPR"
@@ -111,8 +111,8 @@
       "description": "The xDai chain is a stable payments EVM (Ethereum Virtual Machine) blockchain designed for fast and inexpensive transactions",
       "chain_id": 100,
       "live": true,
-      "gas_price": "2 gwei",
-      "gas_multiplier": 1.1,
+      "max_fee_per_gas": "10 gwei",
+      "max_priority_fee_per_gas": "2 gwei",
       "default_provider": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
       "native_token_name": "xDAI",
       "hopr_token_name": "wxHOPR"
@@ -121,8 +121,8 @@
       "description": "Görli Testnet is the first proof-of-authority cross-client testnet, synching Parity Ethereum, Geth, Nethermind, Hyperledger Besu (formerly Pantheon), and EthereumJS",
       "chain_id": 5,
       "live": true,
-      "gas_price": "1 gwei",
-      "gas_multiplier": 1.3,
+      "max_fee_per_gas": "10 gwei",
+      "max_priority_fee_per_gas": "2 gwei",
       "default_provider": "https://provider-proxy.hoprnet.workers.dev/eth_goerli",
       "native_token_name": "gETH",
       "hopr_token_name": "wxHOPR"
