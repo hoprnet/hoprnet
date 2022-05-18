@@ -479,7 +479,6 @@ class Hopr extends EventEmitter {
         this.networkPeers.setPublicOnEntry(peer.id, true)
         this.heartbeat.recalculateNetworkHealth()
       }
-
     } catch (err) {
       log(`Failed to update peer-store with new peer ${peer.id.toB58String()} info`, err)
     }

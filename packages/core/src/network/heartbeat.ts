@@ -153,34 +153,30 @@ export default class Heartbeat {
   }
 
   public recalculateNetworkHealth() {
-
     let newHealthValue = NetworkHealthIndicator.RED
-    let lowQualityPublic = 0, lowQualityNonPublic = 0
-    let highQualityPublic = 0, highQualityNonPublic = 0
+    let lowQualityPublic = 0,
+      lowQualityNonPublic = 0
+    let highQualityPublic = 0,
+      highQualityNonPublic = 0
 
     // Count quality of public/non-public nodes
     for (let entry of this.networkPeers.allEntries()) {
       let quality = this.networkPeers.qualityOf(entry.id)
       if (entry.isPublic) {
         quality > 0.5 ? ++highQualityPublic : ++lowQualityPublic
-      }
-      else {
+      } else {
         quality > 0.5 ? ++highQualityNonPublic : ++lowQualityNonPublic
       }
     }
 
     // ORANGE state = low quality connection to any node
-    if (lowQualityPublic > 0)
-      newHealthValue = NetworkHealthIndicator.ORANGE
+    if (lowQualityPublic > 0) newHealthValue = NetworkHealthIndicator.ORANGE
 
     // YELLOW = high-quality connection to a public node
-    if (highQualityPublic > 0)
-      newHealthValue = NetworkHealthIndicator.YELLOW
+    if (highQualityPublic > 0) newHealthValue = NetworkHealthIndicator.YELLOW
 
     // GREEN = hiqh-quality connection to a public and a non-public node
-    if (highQualityPublic > 0 && highQualityNonPublic > 0)
-      newHealthValue = NetworkHealthIndicator.GREEN
-
+    if (highQualityPublic > 0 && highQualityNonPublic > 0) newHealthValue = NetworkHealthIndicator.GREEN
 
     // Emit network health change event if needed
     if (newHealthValue != this.currentHealth) {
