@@ -39,7 +39,14 @@ export type SendTransactionReturn = {
 }
 
 export async function createChainWrapper(
-  networkInfo: { provider: string; chainId: number; maxFeePerGas: string; maxPriorityFeePerGas: string; network: string; environment: string },
+  networkInfo: {
+    provider: string
+    chainId: number
+    maxFeePerGas: string
+    maxPriorityFeePerGas: string
+    network: string
+    environment: string
+  },
   privateKey: Uint8Array,
   checkDuplicate: Boolean = true,
   timeout = TX_CONFIRMATION_WAIT
@@ -150,8 +157,12 @@ export async function createChainWrapper(
 
   const [defaultMaxFeePerGasValue, defaultMaxFeePerGasUnit] = networkInfo.maxFeePerGas.split(' ')
   const defaultMaxFeePerGas = ethers.utils.parseUnits(defaultMaxFeePerGasValue, defaultMaxFeePerGasUnit)
-  const [defaultMaxPriorityFeePerGasValue, defaultMaxPriorityFeePerGasUnit] = networkInfo.maxPriorityFeePerGas.split(' ')
-  const defaultMaxPriorityFeePerGas = ethers.utils.parseUnits(defaultMaxPriorityFeePerGasValue, defaultMaxPriorityFeePerGasUnit)
+  const [defaultMaxPriorityFeePerGasValue, defaultMaxPriorityFeePerGasUnit] =
+    networkInfo.maxPriorityFeePerGas.split(' ')
+  const defaultMaxPriorityFeePerGas = ethers.utils.parseUnits(
+    defaultMaxPriorityFeePerGasValue,
+    defaultMaxPriorityFeePerGasUnit
+  )
 
   /**
    * Update nonce-tracker and transaction-manager, broadcast the transaction on chain, and listen
