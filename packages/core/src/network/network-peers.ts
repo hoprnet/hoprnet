@@ -5,7 +5,6 @@ import { NETWORK_QUALITY_THRESHOLD } from '../constants'
 
 const log = debug('hopr-core:network-peers')
 
-
 export type Entry = {
   id: PeerId
   isPublic: boolean // Indicates whether the node is known to be public
