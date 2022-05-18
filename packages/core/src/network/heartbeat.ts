@@ -33,10 +33,10 @@ export type HeartbeatConfig = {
 }
 
 export enum P2PNetworkHealth {
-  RED = 0,      // No connection, default
-  ORANGE,   // Low quality (<= 0.5) connection to at least 1 public relay
-  YELLOW,   // High quality (> 0.5) connection to at least 1 public relay
-  GREEN     // High quality (> 0.5) connection to at least 1 public relay and 1 NAT node
+  RED = 0, // No connection, default
+  ORANGE, // Low quality (<= 0.5) connection to at least 1 public relay
+  YELLOW, // High quality (> 0.5) connection to at least 1 public relay
+  GREEN // High quality (> 0.5) connection to at least 1 public relay and 1 NAT node
 }
 
 export default class Heartbeat {
@@ -153,7 +153,6 @@ export default class Heartbeat {
   }
 
   public recalculateNetworkHealth() {
-
     let newHealthValue = P2PNetworkHealth.RED
     let lowQualityPublic = 0
     let lowQualityNonPublic = 0
@@ -166,33 +165,26 @@ export default class Heartbeat {
       if (entry.isPublic) {
         if (quality > 0.5) {
           ++highQualityPublic
-        }
-        else {
+        } else {
           ++lowQualityPublic
         }
-      }
-      else {
+      } else {
         if (quality > 0.5) {
           ++highQualityNonPublic
-        }
-        else {
+        } else {
           ++lowQualityNonPublic
         }
       }
     }
 
     // ORANGE state = low quality connection to any node
-    if (lowQualityPublic > 0 || lowQualityNonPublic > 0)
-      newHealthValue = P2PNetworkHealth.ORANGE
+    if (lowQualityPublic > 0 || lowQualityNonPublic > 0) newHealthValue = P2PNetworkHealth.ORANGE
 
     // YELLOW = high-quality connection to a public node
-    if (highQualityPublic > 0)
-      newHealthValue = P2PNetworkHealth.YELLOW
+    if (highQualityPublic > 0) newHealthValue = P2PNetworkHealth.YELLOW
 
     // GREEN = hiqh-quality connection to a public and a non-public node
-    if (highQualityPublic > 0 && highQualityNonPublic > 0)
-      newHealthValue = P2PNetworkHealth.GREEN
-
+    if (highQualityPublic > 0 && highQualityNonPublic > 0) newHealthValue = P2PNetworkHealth.GREEN
 
     // Emit network health change event if needed
     if (newHealthValue != this.currentHealth) {
