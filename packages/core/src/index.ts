@@ -473,6 +473,13 @@ class Hopr extends EventEmitter {
 
         await this.libp2p.peerStore.addressBook.add(peer.id, dialables)
       }
+
+      // Mark the corresponding entry as public & recalculate network health indicator
+      if (this.networkPeers.has(peer.id)) {
+        this.networkPeers.setPublicOnEntry(peer.id, true)
+        this.heartbeat.recalculateNetworkHealth()
+      }
+
     } catch (err) {
       log(`Failed to update peer-store with new peer ${peer.id.toB58String()} info`, err)
     }

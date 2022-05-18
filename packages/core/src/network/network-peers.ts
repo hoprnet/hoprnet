@@ -202,6 +202,10 @@ class NetworkPeers {
     return this.allEntries().map((entry) => entry.id)
   }
 
+  public setPublicOnEntry(peerId: PeerId, isPublic: boolean) {
+    this.entries[peerId.toB58String()].isPublic = isPublic
+  }
+
   /**
    * @returns a string describing the connection quality of all connected peers
    */

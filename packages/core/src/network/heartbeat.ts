@@ -32,7 +32,7 @@ export type HeartbeatConfig = {
   heartbeatThreshold: number
 }
 
-export enum P2PNetworkHealth {
+export enum NetworkHealthIndicator {
   RED = 0,      // No connection, default
   ORANGE,   // Low quality (<= 0.5) connection to at least 1 public relay
   YELLOW,   // High quality (> 0.5) connection to at least 1 public relay
@@ -45,7 +45,7 @@ export default class Heartbeat {
 
   private _pingNode: Heartbeat['pingNode'] | undefined
 
-  private currentHealth: P2PNetworkHealth = P2PNetworkHealth.RED
+  private currentHealth: NetworkHealthIndicator = NetworkHealthIndicator.RED
   private config: HeartbeatConfig
 
   constructor(
@@ -154,44 +154,32 @@ export default class Heartbeat {
 
   public recalculateNetworkHealth() {
 
-    let newHealthValue = P2PNetworkHealth.RED
-    let lowQualityPublic = 0
-    let lowQualityNonPublic = 0
-    let highQualityPublic = 0
-    let highQualityNonPublic = 0
+    let newHealthValue = NetworkHealthIndicator.RED
+    let lowQualityPublic = 0, lowQualityNonPublic = 0
+    let highQualityPublic = 0, highQualityNonPublic = 0
 
     // Count quality of public/non-public nodes
     for (let entry of this.networkPeers.allEntries()) {
       let quality = this.networkPeers.qualityOf(entry.id)
       if (entry.isPublic) {
-        if (quality > 0.5) {
-          ++highQualityPublic
-        }
-        else {
-          ++lowQualityPublic
-        }
+        quality > 0.5 ? ++highQualityPublic : ++lowQualityPublic
       }
       else {
-        if (quality > 0.5) {
-          ++highQualityNonPublic
-        }
-        else {
-          ++lowQualityNonPublic
-        }
+        quality > 0.5 ? ++highQualityNonPublic : ++lowQualityNonPublic
       }
     }
 
     // ORANGE state = low quality connection to any node
-    if (lowQualityPublic > 0 || lowQualityNonPublic > 0)
-      newHealthValue = P2PNetworkHealth.ORANGE
+    if (lowQualityPublic > 0)
+      newHealthValue = NetworkHealthIndicator.ORANGE
 
     // YELLOW = high-quality connection to a public node
     if (highQualityPublic > 0)
-      newHealthValue = P2PNetworkHealth.YELLOW
+      newHealthValue = NetworkHealthIndicator.YELLOW
 
     // GREEN = hiqh-quality connection to a public and a non-public node
     if (highQualityPublic > 0 && highQualityNonPublic > 0)
-      newHealthValue = P2PNetworkHealth.GREEN
+      newHealthValue = NetworkHealthIndicator.GREEN
 
 
     // Emit network health change event if needed
