@@ -34,10 +34,10 @@ export type HeartbeatConfig = {
 
 export enum NetworkHealthIndicator {
   UNKNOWN = 'Unknown',
-  RED     = 'Red', // No connection, default
-  ORANGE  = 'Orange', // Low quality (<= 0.5) connection to at least 1 public relay
-  YELLOW  = 'Yellow', // High quality (> 0.5) connection to at least 1 public relay
-  GREEN   = 'Green' // High quality (> 0.5) connection to at least 1 public relay and 1 NAT node
+  RED = 'Red', // No connection, default
+  ORANGE = 'Orange', // Low quality (<= 0.5) connection to at least 1 public relay
+  YELLOW = 'Yellow', // High quality (> 0.5) connection to at least 1 public relay
+  GREEN = 'Green' // High quality (> 0.5) connection to at least 1 public relay and 1 NAT node
 }
 
 export default class Heartbeat {
