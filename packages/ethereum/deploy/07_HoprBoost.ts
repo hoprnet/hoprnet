@@ -1,25 +1,17 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 
-const PROTOCOL_CONFIG = require('../../core/protocol-config.json')
-
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const { ethers, deployments, getNamedAccounts, network, environment } = hre;
-
-  const environmentConfig = PROTOCOL_CONFIG.environments[environment]
+  const { deployments, getNamedAccounts } = hre;
 
   const { deploy } = deployments;
-  const { deployer, admin } = await getNamedAccounts();
+  const { deployer } = await getNamedAccounts(); // Deployer is still the admin and minter
 
-  const hoprBoostContract = await deploy("HoprBoost", {
+  await deploy("HoprBoost", {
     from: deployer,
-    args: [admin, ""],
+    args: [deployer, ""],
     log: true,
   });
-
-  // get hoprboost types created in the production contract
-  const productionHoprBoost = await deployments.get('HoprBoost');
-  console.log(`productionHoprBoost ${productionHoprBoost.address} and just deployed ${hoprBoostContract.address}`)
 };
 main.tags = ['HoprBoost'];
 main.skip = async (env: HardhatRuntimeEnvironment) => !!env.network.tags.production || !!env.network.tags.staging

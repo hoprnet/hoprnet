@@ -10,12 +10,12 @@ const main = async function (hre: HardhatRuntimeEnvironment) {
 
   const adminAddress =
     network.name == 'hardhat' ? deployer.address : environmentConfig['network_registry_admin_address']
-  // FIXME:
+  // FIXME: All the network uses HoprStakingProxyForNetworkRegistry
   // const registryProxy =
   //   environmentConfig['network_id'] == 'xdai'
   //     ? await deployments.get('HoprStakingProxyForNetworkRegistry')
   //     : await deployments.get('HoprDummyProxyForNetworkRegistry')
-  const registryProxy = await deployments.get('HoprStakingProxyForNetworkRegistry')
+  const registryProxy = await deployments.get('HoprNetworkRegistryProxy')
 
   const networkRegistry = await deployments.deploy('HoprNetworkRegistry', {
     from: deployer.address,

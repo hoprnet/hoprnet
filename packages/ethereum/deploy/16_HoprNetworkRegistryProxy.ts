@@ -9,33 +9,36 @@ const main = async function ({
 }: HardhatRuntimeEnvironment) {
 
   const environmentConfig = PROTOCOL_CONFIG.environments[environment]
-  const deployer = await getNamedAccounts().then((o) => ethers.getSigner(o.deployer))
+  const { deployer, admin } = await getNamedAccounts()
 
-  const adminAddress =
-    network.name == 'hardhat' ? deployer.address : environmentConfig['network_registry_admin_address']
+  const stakeAddress =
+    (network.tags.testing || network.tags.development) ? (await deployments.get("HoprStake")).address: environmentConfig['stake_contract_address']
 
-  // FIXME:
+  // FIXME: All the network uses HoprStakingProxyForNetworkRegistry
   // // deploy different contracts depending on the environment
   // const registryProxy =
   //   !!network.tags.production || !!network.tags.staging // environmentConfig['network_id'] == 'xdai' || environmentConfig['network_id'] == 'goerli'
   //     ? // deploy "HoprStakingProxyForNetworkRegistry" contract for releases on Gnosis chain (xDai)
-  //       await deployments.deploy('HoprStakingProxyForNetworkRegistry', {
+  //       await deployments.deploy('HoprNetworkRegistryProxy', {
+  //         contract: "HoprStakingProxyForNetworkRegistry",
   //         from: deployer.address,
   //         log: true,
-  //         args: [environmentConfig['stake_contract_address'], adminAddress, MIN_STAKE]
+  //         args: [environmentConfig['stake_contract_address'], admin, MIN_STAKE]
   //       })
   //     : // deploy "HoprDummyProxyForNetworkRegistry" contract for the rest
-  //       await deployments.deploy('HoprDummyProxyForNetworkRegistry', {
+  //       await deployments.deploy('HoprNetworkRegistryProxy', {
+  //         contract: "HoprDummyProxyForNetworkRegistry",
   //         from: deployer.address,
   //         log: true,
-  //         args: [adminAddress]
+  //         args: [admin]
   //       })
 
   // deploy different contracts depending on the environment
-  const registryProxy = await deployments.deploy('HoprStakingProxyForNetworkRegistry', {
-    from: deployer.address,
+  await deployments.deploy('HoprNetworkRegistryProxy', {
+    contract: "HoprStakingProxyForNetworkRegistry",
+    from: deployer,
     log: true,
-    args: [environmentConfig['stake_contract_address'], adminAddress, MIN_STAKE]
+    args: [stakeAddress, admin, MIN_STAKE]
   })
 }
 
