@@ -7,7 +7,6 @@ const log = debug('hopr-core:network-peers')
 
 export type Entry = {
   id: PeerId
-  isPublic: boolean // Indicates whether the node is known to be public
   heartbeatsSent: number
   heartbeatsSuccess: number
   lastSeen: number
@@ -93,7 +92,6 @@ class NetworkPeers {
       // failed ping
       newEntry = {
         id: pingResult.destination,
-        isPublic: previousEntry.isPublic,
         heartbeatsSent: previousEntry.heartbeatsSent + 1,
         lastSeen: Date.now(),
         heartbeatsSuccess: previousEntry.heartbeatsSuccess,
@@ -119,7 +117,6 @@ class NetworkPeers {
       // successful ping
       newEntry = {
         id: pingResult.destination,
-        isPublic: previousEntry.isPublic,
         heartbeatsSent: previousEntry.heartbeatsSent + 1,
         lastSeen: Date.now(),
         heartbeatsSuccess: previousEntry.heartbeatsSuccess + 1,
@@ -156,7 +153,6 @@ class NetworkPeers {
     if (!hasEntry && !isExcluded && !isDenied) {
       this.entries.set(id, {
         id: peerId,
-        isPublic: false,
         heartbeatsSent: 0,
         heartbeatsSuccess: 0,
         lastSeen: now,
@@ -199,10 +195,6 @@ class NetworkPeers {
 
   public all(): PeerId[] {
     return this.allEntries().map((entry) => entry.id)
-  }
-
-  public setPublicOnEntry(peerId: PeerId, isPublic: boolean) {
-    this.entries[peerId.toB58String()].isPublic = isPublic
   }
 
   /**

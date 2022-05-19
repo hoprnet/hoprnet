@@ -33,10 +33,11 @@ export type HeartbeatConfig = {
 }
 
 export enum NetworkHealthIndicator {
-  RED = 0, // No connection, default
-  ORANGE, // Low quality (<= 0.5) connection to at least 1 public relay
-  YELLOW, // High quality (> 0.5) connection to at least 1 public relay
-  GREEN // High quality (> 0.5) connection to at least 1 public relay and 1 NAT node
+  UNKNOWN = 'Unknown',
+  RED     = 'Red', // No connection, default
+  ORANGE  = 'Orange', // Low quality (<= 0.5) connection to at least 1 public relay
+  YELLOW  = 'Yellow', // High quality (> 0.5) connection to at least 1 public relay
+  GREEN   = 'Green' // High quality (> 0.5) connection to at least 1 public relay and 1 NAT node
 }
 
 export default class Heartbeat {
@@ -46,7 +47,7 @@ export default class Heartbeat {
   private _pingNode: Heartbeat['pingNode'] | undefined
 
   // Initial network health is always RED
-  private currentHealth: NetworkHealthIndicator = NetworkHealthIndicator.RED
+  private currentHealth: NetworkHealthIndicator = NetworkHealthIndicator.UNKNOWN
 
   private config: HeartbeatConfig
 
@@ -57,6 +58,7 @@ export default class Heartbeat {
     private closeConnectionsTo: (peer: PeerId) => Promise<void>,
     private reviewConnection: AccessControl['reviewConnection'],
     private stateChangeEmitter: EventEmitter,
+    private publicNodeLookup: (addr: PeerId) => boolean,
     environmentId: string,
     config?: Partial<HeartbeatConfig>
   ) {
@@ -164,7 +166,7 @@ export default class Heartbeat {
     // Count quality of public/non-public nodes
     for (let entry of this.networkPeers.allEntries()) {
       let quality = this.networkPeers.qualityOf(entry.id)
-      if (entry.isPublic) {
+      if (this.publicNodeLookup(entry.id)) {
         quality > 0.5 ? ++highQualityPublic : ++lowQualityPublic
       } else {
         quality > 0.5 ? ++highQualityNonPublic : ++lowQualityNonPublic

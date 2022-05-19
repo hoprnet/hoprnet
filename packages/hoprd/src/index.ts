@@ -331,6 +331,7 @@ async function main() {
 
   function networkHealthChanged(oldState: NetworkHealthIndicator, newState: NetworkHealthIndicator) {
     logs.log(`Network health indicator changed: ${oldState} -> ${newState}`)
+    logs.log(`NETWORK HEALTH: ${newState}`)
   }
 
   function logMessageToNode(msg: Uint8Array) {

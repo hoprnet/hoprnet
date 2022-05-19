@@ -118,6 +118,7 @@ async function getPeer(
     }) as any,
     () => Promise.resolve(true),
     netStatEvents,
+    (_) => true,
     TESTING_ENVIRONMENT,
     {
       ...SHORT_TIMEOUTS,
@@ -144,6 +145,7 @@ describe('unit test heartbeat', async () => {
       }) as any,
       () => Promise.resolve(true),
       new EventEmitter(),
+      (_) => true,
       TESTING_ENVIRONMENT,
       SHORT_TIMEOUTS
     )
