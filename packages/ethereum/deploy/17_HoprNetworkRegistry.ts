@@ -1,15 +1,10 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 
-const PROTOCOL_CONFIG = require('../../core/protocol-config.json')
-
 const main = async function (hre: HardhatRuntimeEnvironment) {
-  const { ethers, deployments, getNamedAccounts, network, environment } = hre
+  const { deployments, getNamedAccounts } = hre
 
-  const environmentConfig = PROTOCOL_CONFIG.environments[environment]
-  const deployer = await getNamedAccounts().then((o) => ethers.getSigner(o.deployer))
+  const { deployer, admin } = await getNamedAccounts()
 
-  const adminAddress =
-    network.name == 'hardhat' ? deployer.address : environmentConfig['network_registry_admin_address']
   // FIXME: All the network uses HoprStakingProxyForNetworkRegistry
   // const registryProxy =
   //   environmentConfig['network_id'] == 'xdai'
@@ -18,9 +13,9 @@ const main = async function (hre: HardhatRuntimeEnvironment) {
   const registryProxy = await deployments.get('HoprNetworkRegistryProxy')
 
   const networkRegistry = await deployments.deploy('HoprNetworkRegistry', {
-    from: deployer.address,
+    from: deployer,
     log: true,
-    args: [registryProxy.address, adminAddress]
+    args: [registryProxy.address, admin]
   })
 
   console.log(`"HoprNetworkRegistry" deployed at ${networkRegistry.address}`)
