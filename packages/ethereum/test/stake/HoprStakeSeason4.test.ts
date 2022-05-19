@@ -313,7 +313,6 @@ describe('HoprStakeSeason4', function () {
   })
 
   describe('After PROGRAM_S4_END', function () {
-    let tx
     before(async function () {
       await reset()
 
@@ -350,7 +349,7 @@ describe('HoprStakeSeason4', function () {
       ).to.be.revertedWith('HoprStake: Program ended, cannot redeem boosts.')
     })
     it('can unlock', async () => {
-      tx = await stakeContract.connect(participants[0]).unlock()
+      await stakeContract.connect(participants[0]).unlock()
     })
     it('receives original tokens - total balance matches old one ', async () => {
       const balance = await erc677.balanceOf(participantAddresses[0])

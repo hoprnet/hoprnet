@@ -313,7 +313,6 @@ describe('HoprStakeSeason3', function () {
   })
 
   describe('After PROGRAM_S3_END', function () {
-    let tx
     before(async function () {
       await reset()
 

@@ -4,6 +4,7 @@ export type NetworkOptions = {
   chain_id: number // >= 0
   live: boolean
   default_provider: string // a valid HTTP url pointing at a RPC endpoint
+  etherscan_api_url?: string // a valid HTTP url pointing at a RPC endpoint
   gas_price?: string // e.g. '1 gwei'
   gas_multiplier: number // e.g. 1.1
   native_token_name: string
@@ -17,6 +18,11 @@ export type Environment = {
   channel_contract_deploy_block: number // >= 0
   token_contract_address: string // an Ethereum address
   channels_contract_address: string // an Ethereum address
+  xhopr_contract_address: string // an Ethereum address,
+  boost_contract_address: string // an Ethereum address,
+  stake_contract_address: string // an Ethereum address,
+  network_registry_proxy_contract_address: string // an Ethereum address,
+  network_registry_contract_address: string // an Ethereum address,
 }
 
 export type ProtocolConfig = {
@@ -30,6 +36,11 @@ export type ResolvedEnvironment = {
   channel_contract_deploy_block: number
   token_contract_address: string // an Ethereum address
   channels_contract_address: string // an Ethereum address
+  xhopr_contract_address: string // an Ethereum address,
+  boost_contract_address: string // an Ethereum address,
+  stake_contract_address: string // an Ethereum address,
+  network_registry_proxy_contract_address: string // an Ethereum address,
+  network_registry_contract_address: string // an Ethereum address,
 }
 
 export function supportedEnvironments(): Environment[] {
@@ -50,7 +61,12 @@ export function resolveEnvironment(environment_id: string, customProvider?: stri
       network,
       channel_contract_deploy_block: environment.channel_contract_deploy_block,
       token_contract_address: environment.token_contract_address,
-      channels_contract_address: environment.channels_contract_address
+      channels_contract_address: environment.channels_contract_address,
+      xhopr_contract_address: environment.xhopr_contract_address,
+      boost_contract_address: environment.boost_contract_address,
+      stake_contract_address: environment.stake_contract_address,
+      network_registry_proxy_contract_address: environment.network_registry_proxy_contract_address,
+      network_registry_contract_address: environment.network_registry_contract_address
     }
   }
   const supportedEnvsString: string = supportedEnvironments()

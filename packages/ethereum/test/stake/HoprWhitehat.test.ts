@@ -219,7 +219,7 @@ describe('HoprWhitehat', function () {
       before(async function () {
         await reset()
         // stakers stake all the NFTs and 1000 xHOPR token
-        const nftIds = Array.from({ length: 6 }, (v, i) => i)
+        const nftIds = Array.from({ length: 6 }, (_, i) => i)
         await Promise.all(
           nftIds.map((nftId) => {
             const ownerIndex = nftId < 3 ? 0 : 2 // [0, 1, 2]: staker0; [3, 4, 5]: staker2
@@ -266,7 +266,7 @@ describe('HoprWhitehat', function () {
       await reset()
       // Before staking program ends
       // stakers stake all the NFTs and 1000 xHOPR token
-      const nftIds = Array.from({ length: 6 }, (v, i) => i)
+      const nftIds = Array.from({ length: 6 }, (_, i) => i)
       await Promise.all(
         nftIds.map((nftId) => {
           const ownerIndex = nftId < 3 ? 0 : 2 // [0, 1, 2]: staker0; [3, 4, 5]: staker2

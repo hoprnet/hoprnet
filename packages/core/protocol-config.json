@@ -6,7 +6,10 @@
       "token_contract_address": "${HARDHAT_TOKEN_CONTACT_ADDRESS}",
       "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}",
       "minted_token_receiver_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
-      "stake_contract_address": "0xae933331ef0bE122f9499512d3ed4Fa3896DCf20",
+      "xhopr_contract_address": "${HARDHAT_XHOPR_CONTACT_ADDRESS}",
+      "boost_contract_address": "${HARDHAT_BOOST_CONTACT_ADDRESS}",
+      "stake_contract_address": "${HARDHAT_STAKE_CONTACT_ADDRESS}",
+      "network_registry_proxy_contract_address": "${HARDHAT_REGISTRY_PROXY_CONTACT_ADDRESS}",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
       "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["development"]
@@ -17,7 +20,10 @@
       "token_contract_address": "${HARDHAT_TOKEN_CONTACT_ADDRESS}",
       "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}",
       "minted_token_receiver_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
-      "stake_contract_address": "0xae933331ef0bE122f9499512d3ed4Fa3896DCf20",
+      "xhopr_contract_address": "${HARDHAT_XHOPR_CONTACT_ADDRESS}",
+      "boost_contract_address": "${HARDHAT_BOOST_CONTACT_ADDRESS}",
+      "stake_contract_address": "${HARDHAT_STAKE_CONTACT_ADDRESS}",
+      "network_registry_proxy_contract_address": "${HARDHAT_REGISTRY_PROXY_CONTACT_ADDRESS}",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
       "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["development"]
@@ -28,8 +34,11 @@
       "token_contract_address": "0xa3C8f4044b30Fb3071F5b3b02913DE524F1041dc",
       "channels_contract_address": "0x7587B259bbe2AdcDc7bFd6FD667Fd440b64c0Aad",
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
-      "stake_contract_address": "0x5F1f18E44d29E159366810Fc6C1208E386Ef661F",
-      "network_registry_contract_address": "0x6aDc4991Ac9622Ca07d89A6D38b1Cd062309E8F0",
+      "xhopr_contract_address": "0xe8aD2ac347dA7549Aaca8F5B1c5Bf979d85bC78F",
+      "boost_contract_address": "0xd7ECa0E90cD85b08875E7d10d4D25B274C6CC549",
+      "stake_contract_address": "0x0d4Ec37e692BcD36FE7dDcB37a14358d7F44d72C",
+      "network_registry_proxy_contract_address": "0x67420381e278E93B290925278400f9FC26dBDE54",
+      "network_registry_contract_address": "0xd4e45b50518A076bEA3d5c757d25432A131656E9",
       "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["development"]
     },
@@ -93,6 +102,9 @@
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0x978D91ddFdb0c6eaCC22A258fE498957a79c5F4C",
       "channels_contract_address": "0x0BB1Ff7A9b3f2c87267626630aa0195cAE3ed5E3",
+      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
+      "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
+      "stake_contract_address": "0xae933331ef0bE122f9499512d3ed4Fa3896DCf20",
       "tags": ["production"]
     }
   },
@@ -124,6 +136,7 @@
       "gas_price": "1 gwei",
       "gas_multiplier": 1.3,
       "default_provider": "https://provider-proxy.hoprnet.workers.dev/eth_goerli",
+      "etherscan_api_url": "http://api-goerli.etherscan.io/api",
       "native_token_name": "gETH",
       "hopr_token_name": "wxHOPR"
     }

@@ -88,6 +88,13 @@ function networkToHardhatNetwork(name: String, input: ResolvedEnvironment['netwo
       interval: [1000, 3000] // mine new block every 1 - 3s
     }
   }
+  if (input.etherscan_api_url) {
+    (cfg as HardhatNetworkUserConfig).verify = {
+      etherscan: {
+        apiUrl: input.etherscan_api_url
+      }
+    }
+  }
   return cfg
 }
 
@@ -152,8 +159,10 @@ const hardhatConfig: HardhatUserConfig = {
     currency: 'USD',
     excludeContracts: ['mocks', 'utils/console.sol']
   },
-  etherscan: {
-    apiKey: ETHERSCAN_KEY
+  verify: {
+    etherscan: {
+      apiKey: ETHERSCAN_KEY
+    }
   }
 }
 
@@ -295,7 +304,7 @@ task('flat', 'Flattens and prints contracts and their dependencies')
     )
   })
 
-subtask(TASK_TEST_SETUP_TEST_ENVIRONMENT, 'Setup test environment').setAction(async (_, { network, config }) => {
+subtask(TASK_TEST_SETUP_TEST_ENVIRONMENT, 'Setup test environment').setAction(async (_, { network }) => {
   if (network.name === HARDHAT_NETWORK_NAME) {
     await network.provider.send('hardhat_reset')
   }

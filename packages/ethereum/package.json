@@ -20,6 +20,7 @@
     "test": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost HOPR_HARDHAT_TAG=testing hardhat test:in-group",
     "coverage": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost HOPR_HARDHAT_TAG=testing hardhat coverage",
     "deploy:local": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost HOPR_HARDHAT_TAG=testing hardhat deploy --network hardhat --write true",
+    "deploy:goerli": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=master-goerli HOPR_HARDHAT_TAG=testing hardhat deploy --network goerli --write true",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },
@@ -51,7 +52,7 @@
     "ethereum-waffle": "3.4.0",
     "ethers": "5.5.4",
     "hardhat": "2.8.4",
-    "hardhat-deploy": "0.10.5",
+    "hardhat-deploy": "^0.11.5",
     "hardhat-gas-reporter": "1.0.8",
     "multiaddr": "10.0.1",
     "rimraf": "3.0.2",
