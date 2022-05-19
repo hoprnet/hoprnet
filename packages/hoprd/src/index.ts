@@ -330,6 +330,7 @@ async function main() {
   }
 
   function networkHealthChanged(oldState: NetworkHealthIndicator, newState: NetworkHealthIndicator) {
+    // Log the network health indicator state change (goes over the WS as well)
     logs.log(`Network health indicator changed: ${oldState} -> ${newState}`)
     logs.log(`NETWORK HEALTH: ${newState}`)
   }

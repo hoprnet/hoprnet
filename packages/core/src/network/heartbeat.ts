@@ -104,6 +104,7 @@ export default class Heartbeat {
       this.networkPeers.register(remotePeer, 'incoming heartbeat')
     }
 
+    // Recalculate network health when incoming heartbeat has been received
     this.recalculateNetworkHealth()
 
     log(`received heartbeat from ${remotePeer.toB58String()}`)
@@ -246,7 +247,9 @@ export default class Heartbeat {
       }
     }
 
+    // Recalculate the network health indicator state after checking nodes
     this.recalculateNetworkHealth()
+
     log(`finished checking nodes since ${thresholdTime} ${this.networkPeers.length()} nodes`)
     log(this.networkPeers.debugLog())
   }
