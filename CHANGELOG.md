@@ -1,3 +1,9 @@
+<a name="1.90"></a>
+
+## 1.90
+
+- Marge hopr-stake contracs into monorepo and relevant deploy scripts
+
 <a name="1.89"></a>
 
 ## [1.89](https://github.com/hoprnet/hoprnet/compare/release/ouagadougou...hoprnet:master)
