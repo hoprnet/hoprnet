@@ -11,7 +11,6 @@
       "stake_contract_address": "${HARDHAT_STAKE_CONTACT_ADDRESS}",
       "network_registry_proxy_contract_address": "${HARDHAT_REGISTRY_PROXY_CONTACT_ADDRESS}",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["development"]
     },
     "hardhat-localhost2": {
@@ -25,7 +24,6 @@
       "stake_contract_address": "${HARDHAT_STAKE_CONTACT_ADDRESS}",
       "network_registry_proxy_contract_address": "${HARDHAT_REGISTRY_PROXY_CONTACT_ADDRESS}",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["development"]
     },
     "master-goerli": {
@@ -39,7 +37,6 @@
       "stake_contract_address": "0x0d4Ec37e692BcD36FE7dDcB37a14358d7F44d72C",
       "network_registry_proxy_contract_address": "0x67420381e278E93B290925278400f9FC26dBDE54",
       "network_registry_contract_address": "0xd4e45b50518A076bEA3d5c757d25432A131656E9",
-      "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["development"]
     },
     "debug-goerli": {
@@ -50,7 +47,6 @@
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
       "stake_contract_address": "0xae933331ef0bE122f9499512d3ed4Fa3896DCf20",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["development"]
     },
     "tuttlingen": {
@@ -60,7 +56,6 @@
       "channels_contract_address": "0xd2229d5d54bE8ABC9A2b2d5cFdEd22B48FB8ce2c",
       "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["production"]
     },
     "prague": {
@@ -70,7 +65,6 @@
       "channels_contract_address": "0x4f98F01cb02083eb5457CA0DDC6B37073ec5388a",
       "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["production"]
     },
     "budapest": {
@@ -80,7 +74,6 @@
       "channels_contract_address": "0xEee8AB66b7169b3f9024676165fB1D2a25E472c5",
       "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["production"]
     },
     "athens": {
