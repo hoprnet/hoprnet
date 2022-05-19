@@ -5,14 +5,19 @@ const MIN_STAKE = 0
 
 // Deploy directly a HoprNetworkRegistry contract, using hardcoded staking contract.
 const main = async function ({
-  ethers, deployments, getNamedAccounts, network, environment
+  ethers,
+  deployments,
+  getNamedAccounts,
+  network,
+  environment
 }: HardhatRuntimeEnvironment) {
-
   const environmentConfig = PROTOCOL_CONFIG.environments[environment]
   const { deployer, admin } = await getNamedAccounts()
 
   const stakeAddress =
-    (network.tags.testing || network.tags.development) ? (await deployments.get("HoprStake")).address: environmentConfig['stake_contract_address']
+    network.tags.testing || network.tags.development
+      ? (await deployments.get('HoprStake')).address
+      : environmentConfig['stake_contract_address']
 
   // FIXME: All the network uses HoprStakingProxyForNetworkRegistry
   // // deploy different contracts depending on the environment
@@ -35,7 +40,7 @@ const main = async function ({
 
   // deploy different contracts depending on the environment
   await deployments.deploy('HoprNetworkRegistryProxy', {
-    contract: "HoprStakingProxyForNetworkRegistry",
+    contract: 'HoprStakingProxyForNetworkRegistry',
     from: deployer,
     log: true,
     args: [stakeAddress, admin, MIN_STAKE]

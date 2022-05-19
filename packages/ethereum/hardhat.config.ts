@@ -89,7 +89,7 @@ function networkToHardhatNetwork(name: String, input: ResolvedEnvironment['netwo
     }
   }
   if (input.etherscan_api_url) {
-    (cfg as HardhatNetworkUserConfig).verify = {
+    ;(cfg as HardhatNetworkUserConfig).verify = {
       etherscan: {
         apiUrl: input.etherscan_api_url
       }
