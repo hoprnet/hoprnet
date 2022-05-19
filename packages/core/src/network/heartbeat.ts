@@ -45,7 +45,9 @@ export default class Heartbeat {
 
   private _pingNode: Heartbeat['pingNode'] | undefined
 
+  // Initial network health is always RED
   private currentHealth: NetworkHealthIndicator = NetworkHealthIndicator.RED
+
   private config: HeartbeatConfig
 
   constructor(
