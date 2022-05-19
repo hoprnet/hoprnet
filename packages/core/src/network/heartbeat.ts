@@ -32,6 +32,10 @@ export type HeartbeatConfig = {
   heartbeatThreshold: number
 }
 
+/**
+ * Indicator of the current state of the P2P network
+ * based on the different node types we can ping.
+ */
 export enum NetworkHealthIndicator {
   UNKNOWN = 'Unknown',
   RED = 'Red', // No connection, default
@@ -156,7 +160,12 @@ export default class Heartbeat {
     }
   }
 
-  public recalculateNetworkHealth() {
+  /**
+   * Recalculates the network health indicator based on the
+   * current network state knowledge.
+   * @returns Value of the current network health indicator (possibly updated).
+   */
+  public recalculateNetworkHealth(): NetworkHealthIndicator {
     let newHealthValue = NetworkHealthIndicator.RED
     let lowQualityPublic = 0,
       lowQualityNonPublic = 0
@@ -188,6 +197,8 @@ export default class Heartbeat {
       this.currentHealth = newHealthValue
       this.stateChangeEmitter.emit('hopr:network-health-changed', oldValue, this.currentHealth)
     }
+
+    return this.currentHealth
   }
 
   /**
