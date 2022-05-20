@@ -7,7 +7,7 @@ import { createTestApiInstance, ALICE_PEER_ID } from '../../fixtures.mjs'
 
 let node = sinon.fake() as any
 
-describe.only('GET /account/addresses', () => {
+describe('GET /account/addresses', () => {
   const ALICE_ETH_ADDRESS = PublicKey.fromPeerId(ALICE_PEER_ID).toAddress()
 
   let service: any
