@@ -4,7 +4,12 @@ import type NetworkPeers from './network-peers'
 import type AccessControl from './access-control'
 import type PeerId from 'peer-id'
 import { randomInteger, u8aEquals, debug, retimer, nAtATime, u8aToHex } from '@hoprnet/hopr-utils'
-import { HEARTBEAT_INTERVAL, HEARTBEAT_TIMEOUT, HEARTBEAT_INTERVAL_VARIANCE } from '../constants'
+import {
+  HEARTBEAT_INTERVAL,
+  HEARTBEAT_TIMEOUT,
+  HEARTBEAT_INTERVAL_VARIANCE,
+  NETWORK_QUALITY_THRESHOLD
+} from '../constants'
 import { createHash, randomBytes } from 'crypto'
 
 import type { Subscribe, SendMessage } from '../index'
@@ -177,9 +182,9 @@ export default class Heartbeat {
     for (let entry of this.networkPeers.allEntries()) {
       let quality = this.networkPeers.qualityOf(entry.id)
       if (this.publicNodeLookup(entry.id)) {
-        quality > 0.5 ? ++highQualityPublic : ++lowQualityPublic
+        quality > NETWORK_QUALITY_THRESHOLD ? ++highQualityPublic : ++lowQualityPublic
       } else {
-        quality > 0.5 ? ++highQualityNonPublic : ++lowQualityNonPublic
+        quality > NETWORK_QUALITY_THRESHOLD ? ++highQualityNonPublic : ++lowQualityNonPublic
       }
     }
 
