@@ -13,7 +13,6 @@ class TestingHeartbeat extends Heartbeat {
 }
 
 class NetworkHealth extends EventEmitter {
-
   public state: NetworkHealthIndicator = NetworkHealthIndicator.UNKNOWN
 
   constructor() {
@@ -22,10 +21,9 @@ class NetworkHealth extends EventEmitter {
   }
 
   private stateChanged(_oldState: NetworkHealthIndicator, newState: NetworkHealthIndicator) {
-    this.state = newState;
+    this.state = newState
   }
 }
-
 
 const Alice = privKeyToPeerId('0x427ff36aacbac09f6da4072161a6a338308c53cfb6e50ca56aa70b1a38602a9f')
 const Bob = privKeyToPeerId('0xf9bfbad938482b29076932b080fb6ac1e14616ee621fb3f77739784bcf1ee8cf')
@@ -120,7 +118,7 @@ function createFakeNetwork() {
 async function getPeer(
   self: PeerId,
   network: ReturnType<typeof createFakeNetwork>,
-  netStatEvents: EventEmitter,
+  netStatEvents: EventEmitter
 ): Promise<{ heartbeat: TestingHeartbeat; peers: NetworkPeers }> {
   const peers = new NetworkPeers([], [self])
 
@@ -149,7 +147,7 @@ async function getPeer(
 
 describe('unit test heartbeat', async () => {
   it('check nodes is noop with empty store & health indicator is red', async () => {
-    let netHealth = new NetworkHealth();
+    let netHealth = new NetworkHealth()
     const heartbeat = new TestingHeartbeat(
       new NetworkPeers([], [Alice]),
       (() => {}) as any,
@@ -192,7 +190,7 @@ describe('unit test heartbeat', async () => {
     assert.equal(peerA.peers.qualityOf(Bob).toFixed(1), '0.2')
     assert.equal(netHealthA.state, NetworkHealthIndicator.ORANGE)
 
-    for (let i = 0; i < 4;i++) {
+    for (let i = 0; i < 4; i++) {
       await peerA.heartbeat.checkNodes()
     }
 
@@ -204,7 +202,7 @@ describe('unit test heartbeat', async () => {
 
     assert.equal(netHealthA.state, NetworkHealthIndicator.YELLOW)
 
-    for (let i = 0; i < 6;i++) {
+    for (let i = 0; i < 6; i++) {
       await peerA.heartbeat.checkNodes()
     }
 
@@ -218,7 +216,6 @@ describe('unit test heartbeat', async () => {
 
     assert.equal(peerA.heartbeat.recalculateNetworkHealth(), NetworkHealthIndicator.YELLOW)
     assert.equal(netHealthA.state, NetworkHealthIndicator.YELLOW)
-
     ;[peerA, peerB].map((peer) => peer.heartbeat.stop())
     network.close()
   })
