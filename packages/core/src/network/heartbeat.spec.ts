@@ -212,7 +212,7 @@ describe('unit test heartbeat', async () => {
     network.unsubscribe(Charly)
     peerC.heartbeat.stop()
 
-    await Promise.all(Array.from({length: 6}, (_) => peerA.heartbeat.checkNodes()))
+    await Promise.all(Array.from({ length: 6 }, (_) => peerA.heartbeat.checkNodes()))
 
     assert.equal(peerA.heartbeat.recalculateNetworkHealth(), NetworkHealthIndicator.YELLOW)
     assert.equal(netHealthA.state, NetworkHealthIndicator.YELLOW)
