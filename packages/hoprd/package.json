@@ -6,6 +6,7 @@
   "homepage": "https://hoprnet.org",
   "license": "LGPL-3.0-only",
   "main": "lib/index.mjs",
+  "types": "lib/index.d.mts",
   "bin": "lib/index.mjs",
   "files": [
     "lib",
