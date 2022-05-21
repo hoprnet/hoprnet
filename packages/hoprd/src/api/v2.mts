@@ -59,6 +59,7 @@ export async function setupRestApi(
     apiDoc: apiBaseSpecPath,
     // path to generated HTTP operations
     paths: apiPathsPath,
+    pathsIgnore: /\.spec$/,
     routesGlob: '**/*.mjs',
     routesIndexFileRegExp: /(?:index)?\.mjs$/,
     // since we pass the spec directly we don't need to expose it via HTTP
