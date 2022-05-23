@@ -6,7 +6,7 @@ import { LevelDatastore } from 'datastore-level'
 import { type AddressSorter, HoprDB, PublicKey, debug } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
-const Mplex = require('libp2p-mplex')
+import Mplex from 'libp2p-mplex'
 import KadDHT from 'libp2p-kad-dht'
 import { NOISE } from '@chainsafe/libp2p-noise'
 import type PeerId from 'peer-id'

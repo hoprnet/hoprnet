@@ -385,14 +385,14 @@ class Hopr extends EventEmitter {
     } else {
       log(`No multiaddrs has been registered.`)
     }
-    this.maybeLogProfilingToGCloud()
+    await this.maybeLogProfilingToGCloud()
   }
 
-  private maybeLogProfilingToGCloud() {
+  private async maybeLogProfilingToGCloud() {
     if (process.env.GCLOUD) {
       try {
         var name = 'hopr_node_' + this.getId().toB58String().slice(-5).toLowerCase()
-        require('@google-cloud/profiler')
+        ;(await import('@google-cloud/profiler'))
           .start({
             projectId: 'hoprassociation',
             serviceContext: {

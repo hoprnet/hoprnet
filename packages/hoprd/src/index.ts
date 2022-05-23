@@ -7,9 +7,15 @@ import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 import { setTimeout } from 'timers/promises'
 
-import { default as Hopr, createHoprNode } from '@hoprnet/hopr-core'
 import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
-import { resolveEnvironment, supportedEnvironments, ResolvedEnvironment } from '@hoprnet/hopr-core'
+import {
+  default as Hopr,
+  type HoprOptions,
+  createHoprNode,
+  resolveEnvironment,
+  supportedEnvironments,
+  ResolvedEnvironment
+} from '@hoprnet/hopr-core'
 
 import type { State } from './types.js'
 import setupAPI from './api/index.js'
@@ -20,7 +26,6 @@ import { LogStream } from './logs.js'
 import { getIdentity } from './identity.js'
 import { register as registerUnhandled } from 'trace-unhandled'
 
-import type { HoprOptions } from '@hoprnet/hopr-core'
 import { setLogger } from 'trace-unhandled'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')

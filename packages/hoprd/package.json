@@ -5,10 +5,9 @@
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "LGPL-3.0-only",
-  "main": "lib/index.mjs",
-  "types": "lib/index.d.mts",
+  "types": "lib/index.d.ts",
   "type": "module",
-  "bin": "lib/index.mjs",
+  "bin": "lib/index.js",
   "files": [
     "lib",
     "npm-shrinkwrap.json",
@@ -20,6 +19,9 @@
   ],
   "engines": {
     "node": "16"
+  },
+  "exports": {
+    ".": "./lib/index.ts"
   },
   "scripts": {
     "clean": "rimraf ./lib ./tsconfig.tsbuildinfo",
@@ -72,7 +74,7 @@
     "@types/yargs": "17.0.10",
     "chai": "^4.3.6",
     "chai-openapi-response-validator": "^0.14.2",
-    "mocha": "10.0.0",
+    "mocha": "9.2.2",
     "rimraf": "3.0.2",
     "sinon": "12.0.1",
     "supertest": "^6.2.2",
@@ -80,7 +82,7 @@
     "typedoc-plugin-markdown": "3.11.14"
   },
   "mocha": {
-    "spec": "lib/**/*.spec.mjs"
+    "spec": "lib/**/*.spec.js"
   },
   "publishConfig": {
     "access": "public"

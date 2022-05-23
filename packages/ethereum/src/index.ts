@@ -19,7 +19,13 @@ export const getContractData = (network: string, environmentId: string, contract
   // unlike normal the release workflow, when running the E2E tests, we build the project
   // and then run deployments, which may update the deployment folder
   // this makes sure to always pick the deployment folder with the updated data
-  const deploymentsPath = join(__dirname, '..', 'deployments', environmentId, network, `${contract}.json`)
+  const deploymentsPath = join(
+    '..',
+    'deployments',
+    environmentId,
+    network === 'hardhat' ? 'localhost' : network,
+    `${contract}.json`
+  )
 
   try {
     return require(deploymentsPath)
