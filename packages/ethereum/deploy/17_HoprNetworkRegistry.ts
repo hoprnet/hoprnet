@@ -2,7 +2,6 @@ import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { HoprNetworkRegistry } from '../src/types'
 
 const main = async function ({ ethers, deployments, getNamedAccounts, network }: HardhatRuntimeEnvironment) {
-
   const { deployer, admin } = await getNamedAccounts()
 
   const inProd = network.name == 'xdai'
