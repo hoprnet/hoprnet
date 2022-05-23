@@ -136,8 +136,6 @@ Options:
   --healthCheck                  Run a health check end point on localhost:8080  [boolean] [default: false]
   --healthCheckHost              Updates the host for the healthcheck server  [string] [default: "localhost"]
   --healthCheckPort              Updates the port for the healthcheck server  [number] [default: 8080]
-  --forwardLogs                  Forwards all your node logs to a public available sink  [boolean] [default: false]
-  --forwardLogsProvider          A provider url for the logging sink node to use  [string] [default: "https://ceramic-clay.3boxlabs.com"]
   --password                     A password to encrypt your keys  [string] [default: ""]
   --apiToken                     A REST API token and admin panel password for user authentication  [string]
   --privateKey                   A private key to be used for your HOPR node  [string]
@@ -165,7 +163,7 @@ The following command assumes you've setup a local installation like described i
 
 ```sh
 cd MY_NEW_HOPR_TEST_FOLDER
-DEBUG=hopr* npx hoprd --admin --init --announce --identity .hopr-identity --password switzerland --forwardLogs --apiToken <MY_TOKEN>
+DEBUG=hopr* npx hoprd --admin --init --announce --identity .hopr-identity --password switzerland --apiToken <MY_TOKEN>
 ```
 
 Here is a short break-down of each argument.
@@ -177,7 +175,6 @@ hoprd
   --announce 				 # announce the node to other nodes in the network and act as relay if publicly reachable
   --identity .hopr-identity              # store your node identity information in your test folder
   --password switzerland   		 # set the encryption password for your identity
-  --forwardLogs                          # enable the node's log forwarding to the ceramic network
   --apiToken <MY_TOKEN> # specify password for accessing admin panel and REST API (REQUIRED)
 ```
 
@@ -186,7 +183,7 @@ hoprd
 The following command assumes you've setup an alias like described in [Install via Docker](#install-via-docker).
 
 ```sh
-hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --admin --adminHost 0.0.0.0 --forwardLogs --apiToken <MY_TOKEN> --environment jungfrau
+hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --admin --adminHost 0.0.0.0 --apiToken <MY_TOKEN> --environment jungfrau
 ```
 
 Here is a short break-down of each argument.
@@ -200,7 +197,6 @@ hoprd
   --host "0.0.0.0:9091"   		 # set IP and port of the P2P API to the container's external IP so it can be reached on your host
   --admin   	                         # enable the node's admin UI
   --adminHost 0.0.0.0                    # set IP of the Rest API to the container's external IP so it can be reached on your host
-  --forwardLogs                          # enable the node's log forwarding to the ceramic network
   --apiToken <MY_TOKEN> # specify password for accessing admin panel and REST API(REQUIRED)
   --environment jungfrau # an environment is defined as a chain plus a number of deployed smart contract addresses to use on that chain
                          # each release has a default environment id set, but the user can override this value

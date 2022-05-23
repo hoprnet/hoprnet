@@ -48,8 +48,8 @@
     "@ethersproject/cli": "5.5.0",
     "prettier": "2.6.1",
     "rimraf": "3.0.2",
-    "ts-node": "10.5.0",
-    "typescript": "4.6.3",
+    "ts-node": "10.7.0",
+    "typescript": "4.7.0-beta",
     "yargs": "17.4.0"
   },
   "resolutions": {
