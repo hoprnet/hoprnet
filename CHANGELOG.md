@@ -1,3 +1,11 @@
+<a name="1.90"></a>
+
+## 1.90
+
+### Changes
+
+- Reduce eth_getBlockByNumber calls when indexing and sending transactions ([#3814](https://github.com/hoprnet/hoprnet/pull/3814))
+
 <a name="1.89"></a>
 
 ## [1.89](https://github.com/hoprnet/hoprnet/compare/release/ouagadougou...hoprnet:master)
