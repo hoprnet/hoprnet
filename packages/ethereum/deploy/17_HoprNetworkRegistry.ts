@@ -3,13 +3,12 @@ import type { HoprNetworkRegistry } from '../src/types'
 
 const PROTOCOL_CONFIG = require('../../core/protocol-config.json')
 
-
 const main = async function ({ ethers, deployments, getNamedAccounts, environment }: HardhatRuntimeEnvironment) {
   const environmentConfig = PROTOCOL_CONFIG.environments[environment]
 
   const { deployer, admin } = await getNamedAccounts()
 
-  const inProd = environmentConfig['network_id'] == 'xdai';
+  const inProd = environmentConfig['network_id'] == 'xdai'
 
   // FIXME: All the network uses HoprStakingProxyForNetworkRegistry
   // const registryProxy =
@@ -36,7 +35,7 @@ const main = async function ({ ethers, deployments, getNamedAccounts, environmen
   }
 
   if (deployer !== admin) {
-    await networkRegistry.transferOwnership(admin);
+    await networkRegistry.transferOwnership(admin)
   }
 }
 

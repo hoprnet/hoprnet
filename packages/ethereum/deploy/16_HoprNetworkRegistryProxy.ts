@@ -4,12 +4,7 @@ const PROTOCOL_CONFIG = require('../../core/protocol-config.json')
 const MIN_STAKE = 0
 
 // Deploy directly a HoprNetworkRegistry contract, using hardcoded staking contract.
-const main = async function ({
-  deployments,
-  getNamedAccounts,
-  network,
-  environment
-}: HardhatRuntimeEnvironment) {
+const main = async function ({ deployments, getNamedAccounts, network, environment }: HardhatRuntimeEnvironment) {
   const environmentConfig = PROTOCOL_CONFIG.environments[environment]
   const { deployer, admin } = await getNamedAccounts()
 
