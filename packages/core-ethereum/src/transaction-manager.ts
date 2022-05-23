@@ -12,7 +12,7 @@ export type TransactionPayload = {
 export type Transaction = {
   nonce: number
   createdAt: number
-  gasPrice: number | BigNumber
+  maxPrority: BigNumber
 }
 
 /**
@@ -57,13 +57,13 @@ class TranscationManager {
     const queuingTxHash = Array.from(this.queuing.keys())
     return queuingTxHash.map((txHash) => {
       const { to, data, value } = this.payloads.get(txHash)
-      const { nonce, gasPrice } = this.queuing.get(txHash)
+      const { nonce, maxPrority } = this.queuing.get(txHash)
       return {
         to,
         data,
         value,
         nonce,
-        gasPrice
+        maxPrority
       }
     })
   }
@@ -87,13 +87,10 @@ class TranscationManager {
   /**
    * If a transaction payload exists in mined or pending with a higher/equal gas price
    * @param payload object
-   * @param gasPrice gas price associated with the payload
+   * @param maxPrority Max Priority Fee. Tips paying to the miners, which correlates to the likelyhood of getting transactions included.
    * @returns [true if it exists, transaction hash]
    */
-  public existInMinedOrPendingWithHigherFee(
-    payload: TransactionPayload,
-    gasPrice: number | BigNumber
-  ): [boolean, string] {
+  public existInMinedOrPendingWithHigherFee(payload: TransactionPayload, maxPrority: BigNumber): [boolean, string] {
     // Using isDeepStrictEqual to compare TransactionPayload objects, see
     // https://nodejs.org/api/util.html#util_util_isdeepstrictequal_val1_val2
     const index = Array.from(this.payloads.values()).findIndex((pl) => isDeepStrictEqual(pl, payload))
@@ -104,7 +101,7 @@ class TranscationManager {
     const hash = Array.from(this.payloads.keys())[index]
     if (
       !this.mined.get(hash) &&
-      BigNumber.from((this.pending.get(hash) ?? this.queuing.get(hash)).gasPrice).lt(BigNumber.from(gasPrice))
+      BigNumber.from((this.pending.get(hash) ?? this.queuing.get(hash)).maxPrority).lt(maxPrority)
     ) {
       return [false, hash]
     }
@@ -125,7 +122,7 @@ class TranscationManager {
 
     log('Adding queuing transaction %s %i', hash, transaction.nonce)
     this.payloads.set(hash, transactionPayload)
-    this.queuing.set(hash, { nonce: transaction.nonce, createdAt: 0, gasPrice: transaction.gasPrice })
+    this.queuing.set(hash, { nonce: transaction.nonce, createdAt: 0, maxPrority: transaction.maxPrority })
   }
 
   /**

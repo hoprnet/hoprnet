@@ -18,7 +18,6 @@ import 'hardhat-gas-reporter'
 import '@nomiclabs/hardhat-etherscan'
 import 'solidity-coverage'
 import '@typechain/hardhat'
-import { utils } from 'ethers'
 import faucet, { type FaucetCLIOPts } from './tasks/faucet'
 import parallelTest, { type ParallelTestCLIOpts } from './tasks/parallelTest'
 import register, { type RegisterOpts } from './tasks/register'
@@ -48,21 +47,12 @@ extendEnvironment((hre: HardhatRuntimeEnvironment) => {
 function networkToHardhatNetwork(name: String, input: ResolvedEnvironment['network']): NetworkUserConfig {
   let cfg: NetworkUserConfig = {
     chainId: input.chain_id,
-    gasMultiplier: input.gas_multiplier,
     live: input.live,
     tags: input.tags,
     // used by hardhat-deploy
     saveDeployments: true
   }
 
-  if (input.gas_price) {
-    const parsedGasPrice = input.gas_price.split(' ')
-    if (parsedGasPrice.length > 1) {
-      cfg.gasPrice = Number(utils.parseUnits(parsedGasPrice[0], parsedGasPrice[1]))
-    } else {
-      cfg.gasPrice = Number(parsedGasPrice[0])
-    }
-  }
   if (name !== 'hardhat') {
     try {
       ;(cfg as HttpNetworkUserConfig).url = expandVars(input.default_provider, process.env)

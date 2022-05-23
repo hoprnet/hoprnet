@@ -72,12 +72,13 @@
             "chain_id": {
               "type": "integer"
             },
-            "gas_price": {
+            "max_fee_per_gas": {
               "type": "string",
-              "description": "Gas price as either 'auto', a number '11' or a value which should be converted like '1 gwei'."
+              "description": "Max fee per gas as either a number '11' or a value which should be converted like '1 gwei'."
             },
-            "gas_multiplier": {
-              "type": "number"
+            "max_priority_fee_per_gas": {
+              "type": "string",
+              "description": "Max priority fee per gas as either a number '11' or a value which should be converted like '1 gwei'."
             },
             "default_provider": {
               "type": "string"
@@ -97,7 +98,8 @@
             "chain_id",
             "default_provider",
             "description",
-            "gas_multiplier",
+            "max_fee_per_gas",
+            "max_priority_fee_per_gas",
             "hopr_token_name",
             "native_token_name"
           ],

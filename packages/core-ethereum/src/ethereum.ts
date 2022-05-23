@@ -39,7 +39,14 @@ export type SendTransactionReturn = {
 }
 
 export async function createChainWrapper(
-  networkInfo: { provider: string; chainId: number; gasPrice?: string; network: string; environment: string },
+  networkInfo: {
+    provider: string
+    chainId: number
+    maxFeePerGas: string
+    maxPriorityFeePerGas: string
+    network: string
+    environment: string
+  },
   privateKey: Uint8Array,
   checkDuplicate: Boolean = true,
   timeout = TX_CONFIRMATION_WAIT
@@ -148,13 +155,14 @@ export async function createChainWrapper(
     durations.minutes(15)
   )
 
-  let gasPrice: number | BigNumber
-  if (networkInfo.gasPrice) {
-    const [gasPriceValue, gasPriceUnit] = networkInfo.gasPrice.split(' ')
-    gasPrice = ethers.utils.parseUnits(gasPriceValue, gasPriceUnit)
-  } else {
-    gasPrice = await provider.getGasPrice()
-  }
+  const [defaultMaxFeePerGasValue, defaultMaxFeePerGasUnit] = networkInfo.maxFeePerGas.split(' ')
+  const defaultMaxFeePerGas = ethers.utils.parseUnits(defaultMaxFeePerGasValue, defaultMaxFeePerGasUnit)
+  const [defaultMaxPriorityFeePerGasValue, defaultMaxPriorityFeePerGasUnit] =
+    networkInfo.maxPriorityFeePerGas.split(' ')
+  const defaultMaxPriorityFeePerGas = ethers.utils.parseUnits(
+    defaultMaxPriorityFeePerGasValue,
+    defaultMaxPriorityFeePerGasUnit
+  )
 
   /**
    * Update nonce-tracker and transaction-manager, broadcast the transaction on chain, and listen
@@ -182,7 +190,19 @@ export async function createChainWrapper(
     const nonceLock = await nonceTracker.getNonceLock(address)
     const nonce = nonceLock.nextNonce
 
-    const feeData = await provider.getFeeData()
+    let feeData: providers.FeeData
+
+    try {
+      feeData = await provider.getFeeData()
+    } catch (error) {
+      log('Transaction with nonce %d failed to getFeeData', nonce, error)
+      // TODO: find an API for fee data per environment
+      feeData = {
+        maxFeePerGas: defaultMaxFeePerGas,
+        maxPriorityFeePerGas: defaultMaxPriorityFeePerGas,
+        gasPrice: null
+      }
+    }
 
     log('Sending transaction %o', {
       gasLimit,
@@ -218,7 +238,10 @@ export async function createChainWrapper(
     log('essentialTxPayload %o', essentialTxPayload)
 
     if (checkDuplicate) {
-      const [isDuplicate, hash] = transactions.existInMinedOrPendingWithHigherFee(essentialTxPayload, gasPrice)
+      const [isDuplicate, hash] = transactions.existInMinedOrPendingWithHigherFee(
+        essentialTxPayload,
+        feeData.maxPriorityFeePerGas
+      )
       // check duplicated pending/mined transaction against transaction manager
       // if transaction manager has a transaction with the same payload that is mined or is pending but with
       // a higher or equal nonce, halt.
@@ -240,7 +263,7 @@ export async function createChainWrapper(
     const signedTx = utils.serializeTransaction(populatedTx, signature)
     // compute tx hash and save to initiated tx list in tx manager
     const initiatedHash = utils.keccak256(signedTx)
-    transactions.addToQueuing(initiatedHash, { nonce, gasPrice }, essentialTxPayload)
+    transactions.addToQueuing(initiatedHash, { nonce, maxPrority: feeData.maxPriorityFeePerGas }, essentialTxPayload)
     // with let indexer to listen to the tx
     const deferredListener = handleTxListener(initiatedHash)
 
@@ -249,6 +272,8 @@ export async function createChainWrapper(
       // 4. send transaction to our ethereum provider
       // throws various exceptions if tx gets rejected
       transaction = await provider.sendTransaction(signedTx)
+      // when transaction is sent to the provider, it is moved from queuing to pending
+      transactions.moveFromQueuingToPending(initiatedHash)
     } catch (error) {
       log('Transaction with nonce %d failed to sent: %s', nonce, error)
       deferredListener.reject()
@@ -303,6 +328,7 @@ export async function createChainWrapper(
 
       const onTransaction = (receipt: providers.TransactionReceipt) => {
         if (receipt.confirmations >= 1) {
+          transactions.moveFromPendingToMined(receipt.transactionHash)
           cleanUp()
         }
       }
@@ -315,6 +341,7 @@ export async function createChainWrapper(
 
     try {
       await deferredListener.promise
+      transactions.moveFromMinedToConfirmed(transaction.hash)
       return {
         code: 'SUCCESS',
         tx: { hash: transaction.hash }
@@ -655,6 +682,9 @@ export async function createChainWrapper(
     updateConfirmedTransaction: transactions.moveToConfirmed.bind(
       transactions
     ) as TransactionManager['moveToConfirmed'],
+    getAllUnconfirmedHash: transactions.getAllUnconfirmedHash.bind(
+      transactions
+    ) as TransactionManager['getAllUnconfirmedHash'],
     getAllQueuingTransactionRequests: transactions.getAllQueuingTxs.bind(
       transactions
     ) as TransactionManager['getAllQueuingTxs']
