@@ -2,7 +2,7 @@ import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { HoprNetworkRegistry } from '../src/types'
 
 const main = async function ({ ethers, deployments, getNamedAccounts, network }: HardhatRuntimeEnvironment) {
-  const { deployer, admin } = await getNamedAccounts()
+  const { deployer } = await getNamedAccounts()
 
   const inProd = network.name == 'xdai'
 
@@ -24,10 +24,6 @@ const main = async function ({ ethers, deployments, getNamedAccounts, network }:
   if (!inProd) {
     await networkRegistry.disableRegistry()
     console.log(`Disabled "HoprNetworkRegistry" in production.`)
-  }
-
-  if (deployer !== admin) {
-    await networkRegistry.transferOwnership(admin)
   }
 }
 
