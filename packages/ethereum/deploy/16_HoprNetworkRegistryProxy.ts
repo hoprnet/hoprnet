@@ -5,7 +5,6 @@ const MIN_STAKE = 0
 
 // Deploy directly a HoprNetworkRegistry contract, using hardcoded staking contract.
 const main = async function ({
-  ethers,
   deployments,
   getNamedAccounts,
   network,

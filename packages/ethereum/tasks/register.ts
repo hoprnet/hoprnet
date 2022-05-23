@@ -9,7 +9,7 @@ export type RegisterOpts =
       peerIds: string
     }
   | {
-      task: 'disable'
+      task: 'disable' | 'enable'
     }
 
 /**
@@ -55,6 +55,7 @@ async function main(
   const hoprNetworkRegistry = (await ethers.getContractFactory('HoprNetworkRegistry'))
     .connect(signer)
     .attach(hoprNetworkRegistryAddress) as HoprNetworkRegistry
+  const isEnabled = await hoprNetworkRegistry.enabled()
 
   try {
     if (opts.task === 'add') {
@@ -75,8 +76,12 @@ async function main(
 
       await (await hoprDummyProxy.ownerBatchAddAccounts(nativeAddresses)).wait()
       await (await hoprNetworkRegistry.ownerRegister(nativeAddresses, peerIds)).wait()
-    } else {
+    } else if (opts.task === 'enable' && !isEnabled) {
+      await (await hoprNetworkRegistry.enableRegistry()).wait()
+    } else if (opts.task === 'disable' && isEnabled) {
       await (await hoprNetworkRegistry.disableRegistry()).wait()
+    } else {
+      throw Error(`Task "${opts.task}" not available.`)
     }
   } catch (error) {
     console.error('Failed to add account with error:', error)

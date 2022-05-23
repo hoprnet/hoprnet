@@ -49,3 +49,5 @@ Find out more about HOPR at the following links:
 - [hoprnet monorepo](https://github.com/hoprnet/hoprnet)
 - [hoprnet docs](http://docs.hoprnet.org)
 - [discord](https://discord.com/invite/dEAWC4G)
+
+This bounty is part of [The Bounty Program](https://bounties.hoprnet.org/)
