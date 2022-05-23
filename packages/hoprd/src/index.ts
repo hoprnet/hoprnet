@@ -21,6 +21,7 @@ import { getIdentity } from './identity'
 
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import { setLogger } from 'trace-unhandled'
+import { NetworkHealthIndicator } from '@hoprnet/hopr-core/lib/network/heartbeat'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
@@ -328,6 +329,12 @@ async function main() {
     return state
   }
 
+  function networkHealthChanged(oldState: NetworkHealthIndicator, newState: NetworkHealthIndicator) {
+    // Log the network health indicator state change (goes over the WS as well)
+    logs.log(`Network health indicator changed: ${oldState} -> ${newState}`)
+    logs.log(`NETWORK HEALTH: ${newState}`)
+  }
+
   function logMessageToNode(msg: Uint8Array) {
     logs.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
     try {
@@ -396,6 +403,7 @@ async function main() {
     node = await createHoprNode(peerId, options, false)
     logs.logStatus('PENDING')
     node.on('hopr:message', logMessageToNode)
+    node.on('hopr:network-health-changed', networkHealthChanged)
     node.subscribeOnConnector('hopr:connector:created', () => {
       // 2.b - Connector has been created, and we can now trigger the next set of steps.
       logs.log('Connector has been loaded properly.')

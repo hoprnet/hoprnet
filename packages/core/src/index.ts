@@ -157,6 +157,7 @@ class Hopr extends EventEmitter {
   private forward: PacketForwardInteraction
   private libp2p: LibP2P
   private pubKey: PublicKey
+  private knownPublicNodesCache = new Set()
 
   public environment: ResolvedEnvironment
 
@@ -234,6 +235,9 @@ class Hopr extends EventEmitter {
     // Fetch previous announcements from database
     const initialNodes = await this.connector.waitForPublicNodes()
 
+    // Add all initial public nodes to public nodes cache
+    initialNodes.forEach((initialNode) => this.knownPublicNodesCache.add(initialNode.id.toB58String()))
+
     // Fetch all nodes that will announces themselves during startup
     const recentlyAnnouncedNodes: PeerStoreAddress[] = []
     const pushToRecentlyAnnouncedNodes = (peer: PeerStoreAddress) => recentlyAnnouncedNodes.push(peer)
@@ -303,6 +307,8 @@ class Hopr extends EventEmitter {
       sendMessage,
       this.closeConnectionsTo.bind(this),
       accessControl.reviewConnection.bind(accessControl),
+      this,
+      (peerId: PeerId) => this.knownPublicNodesCache.has(peerId.toB58String()),
       this.environment.id,
       this.options
     )
@@ -386,6 +392,7 @@ class Hopr extends EventEmitter {
       log(`No multiaddrs has been registered.`)
     }
     this.maybeLogProfilingToGCloud()
+    this.heartbeat.recalculateNetworkHealth()
   }
 
   private maybeLogProfilingToGCloud() {
@@ -472,6 +479,10 @@ class Hopr extends EventEmitter {
 
         await this.libp2p.peerStore.addressBook.add(peer.id, dialables)
       }
+
+      // Mark the corresponding entry as public & recalculate network health indicator
+      this.knownPublicNodesCache.add(peer.id.toB58String())
+      this.heartbeat.recalculateNetworkHealth()
     } catch (err) {
       log(`Failed to update peer-store with new peer ${peer.id.toB58String()} info`, err)
     }
