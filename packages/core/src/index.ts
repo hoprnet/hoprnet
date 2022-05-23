@@ -16,7 +16,7 @@ import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constan
 
 import AccessControl from './network/access-control'
 import NetworkPeers, { Entry } from './network/network-peers'
-import Heartbeat, { type HeartbeatPingResult } from './network/heartbeat'
+import Heartbeat, { type HeartbeatPingResult, type NetworkHealthIndicator } from './network/heartbeat'
 
 import { findPath } from './path'
 
@@ -1282,7 +1282,7 @@ export default Hopr
 export * from './constants'
 export { createHoprNode } from './main'
 export { PassiveStrategy, PromiscuousStrategy, SaneDefaults, findPath }
-export type { ChannelsToOpen, ChannelsToClose }
+export type { ChannelsToOpen, ChannelsToClose, NetworkHealthIndicator }
 export { resolveEnvironment, supportedEnvironments, type ResolvedEnvironment } from './environment'
 export { createLibp2pMock } from './libp2p.mock'
 export { sampleOptions } from './index.mock'

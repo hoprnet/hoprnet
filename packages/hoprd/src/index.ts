@@ -11,6 +11,7 @@ import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
 import {
   default as Hopr,
   type HoprOptions,
+  type NetworkHealthIndicator,
   createHoprNode,
   resolveEnvironment,
   supportedEnvironments,
@@ -27,7 +28,6 @@ import { getIdentity } from './identity.js'
 import { register as registerUnhandled } from 'trace-unhandled'
 
 import { setLogger } from 'trace-unhandled'
-import { NetworkHealthIndicator } from '@hoprnet/hopr-core/lib/network/heartbeat'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
