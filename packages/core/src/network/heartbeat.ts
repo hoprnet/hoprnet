@@ -173,10 +173,10 @@ export default class Heartbeat {
    */
   public recalculateNetworkHealth(): NetworkHealthIndicator {
     let newHealthValue = NetworkHealthIndicator.RED
-    let lowQualityPublic = 0,
-      lowQualityNonPublic = 0
-    let highQualityPublic = 0,
-      highQualityNonPublic = 0
+    let lowQualityPublic = 0
+    let lowQualityNonPublic = 0
+    let highQualityPublic = 0
+    let highQualityNonPublic = 0
 
     // Count quality of public/non-public nodes
     for (let entry of this.networkPeers.allEntries()) {
