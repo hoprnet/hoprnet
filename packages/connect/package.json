@@ -12,6 +12,7 @@
   ],
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
+  "type": "commonjs",
   "engines": {
     "node": "16"
   },

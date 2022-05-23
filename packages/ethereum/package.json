@@ -6,6 +6,7 @@
   "license": "GPL-3.0",
   "homepage": "https://hoprnet.org",
   "main": "./lib/index.js",
+  "type": "commonjs",
   "scripts": {
     "clean": "rimraf ./lib ./src/types ./tsconfig.tsbuildinfo ./tsconfig.hardhat.tsbuildinfo ./tsconfig.spec.tsbuildinfo ./hardhat ./deployments/default/localhost ./deployments/hardhat*",
     "build": "yarn clean && yarn build:sol:types && yarn build:tsc",

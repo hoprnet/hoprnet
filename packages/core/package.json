@@ -15,6 +15,7 @@
   "engines": {
     "node": "16"
   },
+  "type": "commonjs",
   "scripts": {
     "clean": "rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
     "coverage": "nyc --reporter=html mocha",

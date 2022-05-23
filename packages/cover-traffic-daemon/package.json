@@ -8,6 +8,7 @@
   "types": "lib/index.d.ts",
   "main": "lib/index.js",
   "bin": "lib/index.js",
+  "type": "commonjs",
   "scripts": {
     "clean": "rimraf ./lib ./tsconfig.tsbuildinfo ./db ./ct.json ./tsconfig.spec.tsbuildinfo",
     "test": "NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
