@@ -1,20 +1,13 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { HoprNetworkRegistry } from '../src/types'
 
-const PROTOCOL_CONFIG = require('../../core/protocol-config.json')
-
-const main = async function ({ ethers, deployments, getNamedAccounts, environment }: HardhatRuntimeEnvironment) {
-  const environmentConfig = PROTOCOL_CONFIG.environments[environment]
+const main = async function ({ ethers, deployments, getNamedAccounts, network }: HardhatRuntimeEnvironment) {
 
   const { deployer, admin } = await getNamedAccounts()
 
-  const inProd = environmentConfig['network_id'] == 'xdai'
+  const inProd = network.name == 'xdai'
 
-  // FIXME: All the network uses HoprStakingProxyForNetworkRegistry
-  // const registryProxy =
-  //   inProd
-  //     ? await deployments.get('HoprStakingProxyForNetworkRegistry')
-  //     : await deployments.get('HoprDummyProxyForNetworkRegistry')
+  // Local development environment uses HoprDummyProxyForNetworkRegistry. All the other network uses HoprStakingProxyForNetworkRegistry
   const registryProxy = await deployments.get('HoprNetworkRegistryProxy')
 
   const networkRegistryContract = await deployments.deploy('HoprNetworkRegistry', {

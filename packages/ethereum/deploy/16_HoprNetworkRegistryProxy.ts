@@ -2,6 +2,8 @@ import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 
 const PROTOCOL_CONFIG = require('../../core/protocol-config.json')
 const MIN_STAKE = 0
+const DUMMY_PROXY = "HoprDummyProxyForNetworkRegistry"
+const STAKING_PROXY = "HoprStakingProxyForNetworkRegistry"
 
 // Deploy directly a HoprNetworkRegistry contract, using hardcoded staking contract.
 const main = async function ({ deployments, getNamedAccounts, network, environment }: HardhatRuntimeEnvironment) {
@@ -13,32 +15,17 @@ const main = async function ({ deployments, getNamedAccounts, network, environme
       ? (await deployments.get('HoprStake')).address
       : environmentConfig['stake_contract_address']
 
-  // FIXME: All the network uses HoprStakingProxyForNetworkRegistry
-  // // deploy different contracts depending on the environment
-  // const registryProxy =
-  //   !!network.tags.production || !!network.tags.staging // environmentConfig['network_id'] == 'xdai' || environmentConfig['network_id'] == 'goerli'
-  //     ? // deploy "HoprStakingProxyForNetworkRegistry" contract for releases on Gnosis chain (xDai)
-  //       await deployments.deploy('HoprNetworkRegistryProxy', {
-  //         contract: "HoprStakingProxyForNetworkRegistry",
-  //         from: deployer.address,
-  //         log: true,
-  //         args: [environmentConfig['stake_contract_address'], admin, MIN_STAKE]
-  //       })
-  //     : // deploy "HoprDummyProxyForNetworkRegistry" contract for the rest
-  //       await deployments.deploy('HoprNetworkRegistryProxy', {
-  //         contract: "HoprDummyProxyForNetworkRegistry",
-  //         from: deployer.address,
-  //         log: true,
-  //         args: [admin]
-  //       })
+  // Local development environment uses HoprDummyProxyForNetworkRegistry. All the other network uses HoprStakingProxyForNetworkRegistry
+  const registryProxyName = network.name == 'hardhat' ? DUMMY_PROXY : STAKING_PROXY;
 
-  // deploy different contracts depending on the environment
-  await deployments.deploy('HoprNetworkRegistryProxy', {
-    contract: 'HoprStakingProxyForNetworkRegistry',
+  const registryProxy = await deployments.deploy('HoprNetworkRegistryProxy', {
+    contract: registryProxyName,
     from: deployer,
     log: true,
-    args: [stakeAddress, admin, MIN_STAKE]
+    args: registryProxyName === STAKING_PROXY ? [stakeAddress, admin, MIN_STAKE] : [admin]
   })
+
+  console.log(`"HoprNetworkRegistry" deployed at ${registryProxy.address}`)
 }
 
 main.dependencies = ['preDeploy']

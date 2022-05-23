@@ -33,7 +33,7 @@ async function main(
   let hoprDummyProxyAddress: string
   let hoprNetworkRegistryAddress: string
   try {
-    hoprDummyProxyAddress = (await deployments.get('HoprDummyProxyForNetworkRegistry')).address
+    hoprDummyProxyAddress = (await deployments.get('HoprNetworkRegistryProxy')).address
     hoprNetworkRegistryAddress = (await deployments.get('HoprNetworkRegistry')).address
   } catch {
     console.error(
