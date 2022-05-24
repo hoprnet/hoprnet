@@ -128,15 +128,20 @@ ___
 
 | Name | Type |
 | :------ | :------ |
+| `boost_contract_address` | `string` |
 | `channel_contract_deploy_block` | `number` |
 | `channels_contract_address` | `string` |
 | `id` | `string` |
 | `network` | `NetworkOptions` |
+| `network_registry_contract_address` | `string` |
+| `network_registry_proxy_contract_address` | `string` |
+| `stake_contract_address` | `string` |
 | `token_contract_address` | `string` |
+| `xhopr_contract_address` | `string` |
 
 #### Defined in
 
-[packages/core/src/environment.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L27)
+[packages/core/src/environment.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L33)
 
 ___
 
@@ -411,7 +416,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/environment.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L41)
+[packages/core/src/environment.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L52)
 
 ___
 
@@ -425,4 +430,4 @@ ___
 
 #### Defined in
 
-[packages/core/src/environment.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L35)
+[packages/core/src/environment.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L46)
