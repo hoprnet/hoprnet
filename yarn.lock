@@ -2522,7 +2522,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ethereum-waffle/chai@npm:^3.4.0":
+"@ethereum-waffle/chai@npm:^3.4.4":
   version: 3.4.4
   resolution: "@ethereum-waffle/chai@npm:3.4.4"
   dependencies:
@@ -2532,7 +2532,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ethereum-waffle/compiler@npm:^3.4.0":
+"@ethereum-waffle/compiler@npm:^3.4.4":
   version: 3.4.4
   resolution: "@ethereum-waffle/compiler@npm:3.4.4"
   dependencies:
@@ -2562,7 +2562,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ethereum-waffle/mock-contract@npm:^3.3.0":
+"@ethereum-waffle/mock-contract@npm:^3.4.4":
   version: 3.4.4
   resolution: "@ethereum-waffle/mock-contract@npm:3.4.4"
   dependencies:
@@ -2572,7 +2572,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ethereum-waffle/provider@npm:^3.4.0, @ethereum-waffle/provider@npm:^3.4.4":
+"@ethereum-waffle/provider@npm:^3.4.4":
   version: 3.4.4
   resolution: "@ethereum-waffle/provider@npm:3.4.4"
   dependencies:
@@ -3799,7 +3799,7 @@ __metadata:
     bn.js: 5.2.0
     chai: 4.3.6
     dotenv: 10.0.0
-    ethereum-waffle: 3.4.0
+    ethereum-waffle: 3.4.4
     ethers: 5.5.4
     hardhat: 2.8.4
     hardhat-deploy: 0.10.5
@@ -11690,18 +11690,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ethereum-waffle@npm:3.4.0":
-  version: 3.4.0
-  resolution: "ethereum-waffle@npm:3.4.0"
+"ethereum-waffle@npm:3.4.4":
+  version: 3.4.4
+  resolution: "ethereum-waffle@npm:3.4.4"
   dependencies:
-    "@ethereum-waffle/chai": ^3.4.0
-    "@ethereum-waffle/compiler": ^3.4.0
-    "@ethereum-waffle/mock-contract": ^3.3.0
-    "@ethereum-waffle/provider": ^3.4.0
+    "@ethereum-waffle/chai": ^3.4.4
+    "@ethereum-waffle/compiler": ^3.4.4
+    "@ethereum-waffle/mock-contract": ^3.4.4
+    "@ethereum-waffle/provider": ^3.4.4
     ethers: ^5.0.1
   bin:
     waffle: bin/waffle
-  checksum: bfda147c4a57235c101aeb0a483bff3463df2029d4dcfabc8147de8c507a8df2bda101d03fb90cc880bb8df619a49fe9ed275d12757c3dfa386f947b73415ac0
+  checksum: 5a181b52f66f1b3c89ed1b68ef44cbd9acd4d743262de9edbe1fd57b0925576dd62c3436b1e65434d5ac03ab16da0df283972cd9aae726de0b8b9cdd7876b917
   languageName: node
   linkType: hard
 
