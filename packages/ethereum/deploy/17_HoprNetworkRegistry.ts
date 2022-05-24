@@ -4,7 +4,7 @@ import type { HoprNetworkRegistry } from '../src/types'
 const main = async function ({ ethers, deployments, getNamedAccounts, network }: HardhatRuntimeEnvironment) {
   const { deployer } = await getNamedAccounts()
 
-  const inProd = network.name == 'xdai'
+  const inProd = network.name === 'xdai'
 
   // Local development environment uses HoprDummyProxyForNetworkRegistry. All the other network uses HoprStakingProxyForNetworkRegistry
   const registryProxy = await deployments.get('HoprNetworkRegistryProxy')
