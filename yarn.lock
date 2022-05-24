@@ -3677,7 +3677,7 @@ __metadata:
     "@nomiclabs/hardhat-ethers": 2.0.5
     "@nomiclabs/hardhat-etherscan": 3.0.1
     "@nomiclabs/hardhat-solhint": 2.0.0
-    "@nomiclabs/hardhat-waffle": 2.0.2
+    "@nomiclabs/hardhat-waffle": 2.0.3
     "@openzeppelin/contracts": 4.4.2
     "@openzeppelin/contracts-v3-0-1": "npm:@openzeppelin/contracts@3.4.2"
     "@openzeppelin/test-helpers": ^0.5.15
@@ -4152,9 +4152,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@nomiclabs/hardhat-waffle@npm:2.0.2":
-  version: 2.0.2
-  resolution: "@nomiclabs/hardhat-waffle@npm:2.0.2"
+"@nomiclabs/hardhat-waffle@npm:2.0.3":
+  version: 2.0.3
+  resolution: "@nomiclabs/hardhat-waffle@npm:2.0.3"
   dependencies:
     "@types/sinon-chai": ^3.2.3
     "@types/web3": 1.0.19
@@ -4163,7 +4163,7 @@ __metadata:
     ethereum-waffle: ^3.2.0
     ethers: ^5.0.0
     hardhat: ^2.0.0
-  checksum: 7a14520b4ecbf77e01744c20ed95a9fc8000107be09bc8c0ef3f5edc2413157ad20b460c877c55774238b76d53ad5d1721119bccc3ad66bffad9d30fad1806dd
+  checksum: e68c9e13905caa54a10fa68d9ad7dc905c86469c879f91e999a1c4d039dd2f9fa43a8ed90ab975afb14a79cd6badeb60a7cf50dc6564660edd192614c55875ca
   languageName: node
   linkType: hard
 
