@@ -1,6 +1,6 @@
-import Hopr from '@hoprnet/hopr-core'
+import type { default as Hopr } from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
-import { STATUS_CODES } from '../../utils'
+import { STATUS_CODES } from '../../utils.js'
 
 /**
  * @returns Information about the HOPR Node, including any options it started with.

@@ -2,15 +2,23 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
-import { createTestApiInstance } from '../../fixtures'
+import { createTestApiInstance } from '../../fixtures.js'
 import { Balance, NativeBalance } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 
 let node = sinon.fake() as any
-const { api, service } = createTestApiInstance(node)
-chai.use(chaiResponseValidator(api.apiDoc))
 
 describe('GET /account/balances', () => {
+  let service: any
+  before(async function () {
+    const loaded = await createTestApiInstance(node)
+
+    service = loaded.service
+
+    // @ts-ignore ESM / CommonJS compatibility issue
+    chai.use(chaiResponseValidator.default(loaded.api.apiDoc))
+  })
+
   it('should get balance', async () => {
     const nativeBalance = new NativeBalance(new BN(10))
     const balance = new Balance(new BN(1))

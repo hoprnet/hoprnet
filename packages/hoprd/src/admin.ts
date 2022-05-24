@@ -1,13 +1,13 @@
-import type Hopr from '@hoprnet/hopr-core'
+import type { default as Hopr } from '@hoprnet/hopr-core'
 import http from 'http'
 import fs from 'fs'
 import path from 'path'
 import { parse } from 'url'
-import next from 'next'
+import { default as next } from 'next'
 import type { Server as HttpServer } from 'http'
 import stripAnsi from 'strip-ansi'
-import type { LogStream } from './logs'
-import { NODE_ENV } from './env'
+import type { LogStream } from './logs.js'
+import { NODE_ENV } from './env.js'
 import {
   Balance,
   NativeBalance,
@@ -16,7 +16,7 @@ import {
   debug,
   startResourceUsageLogger
 } from '@hoprnet/hopr-utils'
-import { Commands } from './commands'
+import { Commands } from './commands/index.js'
 import type { WebSocket } from 'ws'
 
 let debugLog = debug('hoprd:admin')
@@ -33,9 +33,9 @@ export class AdminServer {
   constructor(private logs: LogStream, private host: string, private port: number) {}
 
   async setup() {
-    let adminPath
+    let adminPath: string
     for (const adminRelPath of ['../hopr-admin', './hopr-admin']) {
-      const adminPathInt = path.resolve(__dirname, adminRelPath)
+      const adminPathInt = new URL(adminRelPath, import.meta.url).pathname
       const nextPath = path.resolve(adminPathInt, '.next')
       if (!fs.existsSync(nextPath)) {
         continue

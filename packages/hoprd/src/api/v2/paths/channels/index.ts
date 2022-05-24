@@ -1,9 +1,9 @@
 import type { Operation } from 'express-openapi'
-import type Hopr from '@hoprnet/hopr-core'
+import type { default as Hopr } from '@hoprnet/hopr-core'
 import { ChannelEntry, ChannelStatus, PublicKey } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import BN from 'bn.js'
-import { STATUS_CODES } from '../../utils'
+import { STATUS_CODES } from '../../utils.js'
 
 export interface ChannelInfo {
   type: 'outgoing' | 'incoming'

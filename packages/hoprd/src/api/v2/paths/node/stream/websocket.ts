@@ -1,5 +1,5 @@
 import type { Operation } from 'express-openapi'
-import { WS_DEFAULT_RESPONSES, generateWsApiDescription } from '../../../utils'
+import { WS_DEFAULT_RESPONSES, generateWsApiDescription } from '../../../utils.js'
 
 export const GET: Operation = [
   async (_, res, _next) => {

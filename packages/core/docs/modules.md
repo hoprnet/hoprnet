@@ -4,6 +4,10 @@
 
 ## Table of contents
 
+### Enumerations
+
+- [NetworkHealthIndicator](enums/NetworkHealthIndicator.md)
+
 ### Classes
 
 - [PassiveStrategy](classes/PassiveStrategy.md)

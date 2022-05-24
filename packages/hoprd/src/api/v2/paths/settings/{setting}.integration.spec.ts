@@ -2,15 +2,23 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
-import { createTestApiInstance } from '../../fixtures'
-import { STATUS_CODES } from '../../utils'
-import { SettingKey } from '../../../../types'
+import { createTestApiInstance } from '../../fixtures.js'
+import { STATUS_CODES } from '../../utils.js'
+import { SettingKey } from '../../../../types.js'
 
 let node = sinon.fake() as any
-const { api, service } = createTestApiInstance(node)
-chai.use(chaiResponseValidator(api.apiDoc))
 
 describe('PUT /settings/{setting}', () => {
+  let service: any
+  before(async function () {
+    const loaded = await createTestApiInstance(node)
+
+    service = loaded.service
+
+    // @ts-ignore ESM / CommonJS compatibility issue
+    chai.use(chaiResponseValidator.default(loaded.api.apiDoc))
+  })
+
   it('should set setting successfuly', async () => {
     const res = await request(service)
       .put(`/api/v2/settings/${SettingKey.INCLUDE_RECIPIENT}`)

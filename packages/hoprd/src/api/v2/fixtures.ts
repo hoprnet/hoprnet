@@ -1,8 +1,8 @@
-import type { State } from '../../types'
+import type { State } from '../../types.js'
 import express from 'express'
 import PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'
-import { setupRestApi } from '../v2'
+import { setupRestApi } from '../v2.js'
 
 export const ALICE_PEER_ID = PeerId.createFromB58String('16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz')
 export const ALICE_MULTI_ADDR = new Multiaddr(`/ip4/34.65.237.196/tcp/9091/p2p/${ALICE_PEER_ID.toB58String()}`)
@@ -26,10 +26,10 @@ export const TICKET_MOCK = {
  * Creates express app and initializes all routes for testing
  * @returns apiInstance for openAPI validation and express instance for supertest requests
  */
-export const createTestApiInstance = (node: any) => {
+export const createTestApiInstance = async (node: any) => {
   const service = express()
   return {
-    api: setupRestApi(service, '/api/v2', node, createTestMocks(), {
+    api: await setupRestApi(service, '/api/v2', node, createTestMocks(), {
       testNoAuthentication: true
     }),
     service
