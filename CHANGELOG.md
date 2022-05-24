@@ -5,6 +5,7 @@
 ### Changes
 
 - Reduce eth_getBlockByNumber calls when indexing and sending transactions ([#3814](https://github.com/hoprnet/hoprnet/pull/3814))
+- Marge hopr-stake contracs into monorepo and relevant deploy scripts
 
 <a name="1.89"></a>
 

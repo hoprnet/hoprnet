@@ -4,7 +4,17 @@ export * from './constants'
 export type { HoprChannels, HoprToken, HoprNetworkRegistry } from './types'
 export type { TypedEventFilter, TypedEvent } from './types/common'
 
-export type ContractNames = 'HoprToken' | 'HoprChannels' | 'HoprDistributor' | 'HoprNetworkRegistry'
+export type ContractNames =
+  | 'HoprToken'
+  | 'HoprChannels'
+  | 'HoprDistributor'
+  | 'HoprNetworkRegistry'
+  | 'HoprBoost'
+  | 'HoprStake'
+  | 'HoprStake2'
+  | 'HoprStakeSeason3'
+  | 'HoprStakeSeason4'
+  | 'HoprWhitehat'
 
 export type ContractData = {
   address: string

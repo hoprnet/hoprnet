@@ -22,10 +22,19 @@
             "minted_token_receiver_address": {
               "type": "string"
             },
-            "network_registry_contract_address": {
+            "xhopr_contract_address": {
               "type": "string"
             },
-            "network_registry_admin_address": {
+            "boost_contract_address": {
+              "type": "string"
+            },
+            "stake_contract_address": {
+              "type": "string"
+            },
+            "network_registry_proxy_contract_address": {
+              "type": "string"
+            },
+            "network_registry_contract_address": {
               "type": "string"
             },
             "tags": {
@@ -41,7 +50,6 @@
             "token_contract_address",
             "channels_contract_address",
             "network_registry_contract_address",
-            "network_registry_admin_address",
             "tags"
           ],
           "additionalProperties": false
@@ -75,8 +83,12 @@
             "default_provider": {
               "type": "string"
             },
-            "native_token_name": {
+            "etherscan_api_url": {
               "type": "string"
+            },
+            "native_token_name": {
+              "type": "string",
+              "description": "API for contract verification through etherscan"
             },
             "hopr_token_name": {
               "type": "string"
