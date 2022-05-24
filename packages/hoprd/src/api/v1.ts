@@ -3,13 +3,13 @@ import bodyParser from 'body-parser'
 
 import type { Application } from 'express'
 import type { WebSocketServer } from 'ws'
-import type Hopr from '@hoprnet/hopr-core'
-import type { AdminServer } from '../admin'
+import type { default as Hopr } from '@hoprnet/hopr-core'
+import type { AdminServer } from '../admin.js'
 
-import type { LogStream } from './../logs'
-import type { StateOps } from '../types'
-import { Commands } from './../commands'
-import { authenticateWsConnection } from './utils'
+import type { LogStream } from './../logs.js'
+import type { StateOps } from '../types.js'
+import { Commands } from './../commands/index.js'
+import { authenticateWsConnection } from './utils.js'
 
 export function setupRestApi(
   service: Application,

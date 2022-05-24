@@ -1,6 +1,6 @@
 import type { Operation } from 'express-openapi'
-import type { State } from '../../../../types'
-import { STATUS_CODES } from '../../utils'
+import type { State } from '../../../../types.js'
+import { STATUS_CODES } from '../../utils.js'
 
 export const getSettings = (state: State) => {
   return state.settings

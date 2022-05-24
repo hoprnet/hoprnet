@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { authenticateWsConnection, removeQueryParams } from './utils'
+import { authenticateWsConnection, removeQueryParams } from './utils.js'
 
 // mocks
 const VALID_API_TOKEN = 'VALID_API_TOKEN_123_^^'

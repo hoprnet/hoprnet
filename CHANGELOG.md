@@ -17,6 +17,10 @@
 - API v2 `/api/v2/node/peers` now returns `multiaddr` for connected peers ([#3643](https://github.com/hoprnet/hoprnet/pull/3643))
 - Add connectivity health indicator updates to the logs ([#3816](https://github.com/hoprnet/hoprnet/pull/3816))
 
+### Breaking changes
+
+- Migration to ECMAscript module standard (ESM), drop support for CommonJS ([#3825](https://github.com/hoprnet/hoprnet/pull/3825))
+
 ---
 
 <a name="1.88"></a>

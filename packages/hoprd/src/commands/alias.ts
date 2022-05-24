@@ -1,7 +1,7 @@
-import type Hopr from '@hoprnet/hopr-core'
-import type { StateOps } from '../types'
-import { AbstractCommand } from './abstractCommand'
-import { checkPeerIdInput, getPaddingLength, styleValue } from './utils'
+import type { default as Hopr } from '@hoprnet/hopr-core'
+import type { StateOps } from '../types.js'
+import { AbstractCommand } from './abstractCommand.js'
+import { checkPeerIdInput, getPaddingLength, styleValue } from './utils/index.js'
 
 export class Alias extends AbstractCommand {
   private parameters = ['PeerId', 'Name']

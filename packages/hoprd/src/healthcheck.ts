@@ -1,9 +1,9 @@
 import express from 'express'
 import http from 'http'
 import cors from 'cors'
-import type Hopr from '@hoprnet/hopr-core'
+import type { default as Hopr } from '@hoprnet/hopr-core'
 
-import type { LogStream } from './logs'
+import type { LogStream } from './logs.js'
 
 export default function setupHealthcheck(node: Hopr, logs: LogStream, host: string, port: number) {
   const service = express()

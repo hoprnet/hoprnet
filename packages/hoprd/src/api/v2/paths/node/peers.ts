@@ -1,8 +1,8 @@
 import type { Operation } from 'express-openapi'
 import type { Multiaddr } from 'multiaddr'
-import Hopr from '@hoprnet/hopr-core'
+import type { default as Hopr } from '@hoprnet/hopr-core'
 import PeerId from 'peer-id'
-import { STATUS_CODES } from '../../utils'
+import { STATUS_CODES } from '../../utils.js'
 
 export type PeerInfo = {
   peerId: string
@@ -52,7 +52,7 @@ export const getPeers = async (
 
   try {
     const announced = await node.getAddressesAnnouncedOnChain().then((addrs) => {
-      return addrs.reduce<Map<string, PeerInfo>>((result, addr) => {
+      return addrs.reduce((result: Map<string, PeerInfo>, addr: Multiaddr) => {
         const peerId = PeerId.createFromB58String(addr.getPeerId())
         try {
           const info = node.getConnectionInfo(peerId)
@@ -61,7 +61,7 @@ export const getPeers = async (
           result.set(peerId.toB58String(), toPeerInfoFormat(info, addr))
         } catch {}
         return result
-      }, new Map())
+      }, new Map<string, PeerInfo>())
     })
 
     const connected = node.getConnectedPeers().reduce<PeerInfo[]>((result, peerId) => {

@@ -3,25 +3,31 @@
 import { passwordStrength } from 'check-password-strength'
 import { decode } from 'rlp'
 import path from 'path'
-import yargs from 'yargs/yargs'
-import { terminalWidth } from 'yargs'
+import yargs from 'yargs'
+import { hideBin } from 'yargs/helpers'
 import { setTimeout } from 'timers/promises'
 
-import Hopr, { createHoprNode } from '@hoprnet/hopr-core'
 import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
-import { resolveEnvironment, supportedEnvironments, ResolvedEnvironment } from '@hoprnet/hopr-core'
+import {
+  default as Hopr,
+  type HoprOptions,
+  type NetworkHealthIndicator,
+  createHoprNode,
+  resolveEnvironment,
+  supportedEnvironments,
+  ResolvedEnvironment
+} from '@hoprnet/hopr-core'
 
-import type { State } from './types'
-import setupAPI from './api'
-import setupHealthcheck from './healthcheck'
-import { AdminServer } from './admin'
-import { Commands } from './commands'
-import { LogStream } from './logs'
-import { getIdentity } from './identity'
+import type { State } from './types.js'
+import setupAPI from './api/index.js'
+import setupHealthcheck from './healthcheck.js'
+import { AdminServer } from './admin.js'
+import { Commands } from './commands/index.js'
+import { LogStream } from './logs.js'
+import { getIdentity } from './identity.js'
+import { register as registerUnhandled } from 'trace-unhandled'
 
-import type { HoprOptions } from '@hoprnet/hopr-core'
 import { setLogger } from 'trace-unhandled'
-import { NetworkHealthIndicator } from '@hoprnet/hopr-core/lib/network/heartbeat'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
@@ -43,9 +49,14 @@ function defaultEnvironment(): string {
 process.title = 'hoprd'
 
 // Use environment-specific default data path
-const defaultDataPath = path.join(process.cwd(), 'hoprd-db', defaultEnvironment())
+const defaultDataPath = path.join(
+  path.dirname(new URL('../package.json', import.meta.url).pathname),
+  defaultEnvironment()
+)
 
-const argv = yargs(process.argv.slice(2))
+const yargsInstance = yargs(hideBin(process.argv))
+
+const argv = yargsInstance
   .option('environment', {
     string: true,
     describe: 'Environment id which the node shall run on',
@@ -110,16 +121,6 @@ const argv = yargs(process.argv.slice(2))
     number: true,
     describe: 'Updates the port for the healthcheck server',
     default: 8080
-  })
-  .option('forwardLogs', {
-    boolean: true,
-    describe: 'Forwards all your node logs to a public available sink',
-    default: false
-  })
-  .option('forwardLogsProvider', {
-    string: true,
-    describe: 'A provider url for the logging sink node to use',
-    default: 'https://ceramic-clay.3boxlabs.com'
   })
   .option('password', {
     string: true,
@@ -223,7 +224,7 @@ const argv = yargs(process.argv.slice(2))
     describe: 'Upper bound for variance applied to heartbeat interval in milliseconds',
     default: undefined
   })
-  .wrap(Math.min(120, terminalWidth()))
+  .wrap(Math.min(120, yargsInstance.terminalWidth()))
   .parseSync()
 
 function parseHosts(): HoprOptions['hosts'] {
@@ -271,7 +272,7 @@ function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
 }
 
 function addUnhandledPromiseRejectionHandler() {
-  require('trace-unhandled/register')
+  registerUnhandled()
   setLogger((msg) => {
     console.error(msg)
   })
@@ -304,12 +305,11 @@ async function main() {
   // Therefore adding a promise rejection handler to make sure that the origin of
   // the rejected promise can be detected.
   addUnhandledPromiseRejectionHandler()
-
   // Increase the default maximum number of event listeners
-  require('events').EventEmitter.defaultMaxListeners = 20
+  ;(await import('events')).EventEmitter.defaultMaxListeners = 20
 
   let node: Hopr
-  let logs = new LogStream(argv.forwardLogs)
+  let logs = new LogStream()
   let adminServer: AdminServer = undefined
   let cmds: Commands
   // As the daemon aims to maintain for the time being
@@ -348,13 +348,6 @@ async function main() {
       logs.log('Could not decode message', err)
       logs.log(msg.toString())
     }
-  }
-
-  if (logs.isReadyForPublicLogging()) {
-    const publicLogsId = await logs.enablePublicLoggingNode(argv.forwardLogsProvider)
-    logs.log(`Your unique Log Id is ${publicLogsId}`)
-    logs.log(`View logs at https://documint.net/${publicLogsId}`)
-    logs.startLoggingQueue()
   }
 
   if (!argv.testNoAuthentication && (argv.api || argv.admin)) {

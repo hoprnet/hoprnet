@@ -16,7 +16,7 @@ import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constan
 
 import AccessControl from './network/access-control'
 import NetworkPeers, { Entry } from './network/network-peers'
-import Heartbeat, { type HeartbeatPingResult } from './network/heartbeat'
+import Heartbeat, { type HeartbeatPingResult, type NetworkHealthIndicator } from './network/heartbeat'
 
 import { findPath } from './path'
 
@@ -391,15 +391,15 @@ class Hopr extends EventEmitter {
     } else {
       log(`No multiaddrs has been registered.`)
     }
-    this.maybeLogProfilingToGCloud()
+    await this.maybeLogProfilingToGCloud()
     this.heartbeat.recalculateNetworkHealth()
   }
 
-  private maybeLogProfilingToGCloud() {
+  private async maybeLogProfilingToGCloud() {
     if (process.env.GCLOUD) {
       try {
         var name = 'hopr_node_' + this.getId().toB58String().slice(-5).toLowerCase()
-        require('@google-cloud/profiler')
+        ;(await import('@google-cloud/profiler'))
           .start({
             projectId: 'hoprassociation',
             serviceContext: {
@@ -1282,7 +1282,7 @@ export default Hopr
 export * from './constants'
 export { createHoprNode } from './main'
 export { PassiveStrategy, PromiscuousStrategy, SaneDefaults, findPath }
-export type { ChannelsToOpen, ChannelsToClose }
+export type { ChannelsToOpen, ChannelsToClose, NetworkHealthIndicator }
 export { resolveEnvironment, supportedEnvironments, type ResolvedEnvironment } from './environment'
 export { createLibp2pMock } from './libp2p.mock'
 export { sampleOptions } from './index.mock'

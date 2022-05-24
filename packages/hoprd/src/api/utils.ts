@@ -1,6 +1,6 @@
 import cookie from 'cookie'
 import { debug } from '@hoprnet/hopr-utils'
-import { STATUS_CODES } from './v2/utils'
+import { STATUS_CODES } from './v2/utils.js'
 
 const debugLog = debug('hoprd:api:utils')
 

@@ -2,16 +2,13 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
-import { createTestApiInstance, ALICE_PEER_ID, INVALID_PEER_ID } from '../../fixtures'
+import { createTestApiInstance, ALICE_PEER_ID, INVALID_PEER_ID } from '../../fixtures.js'
 import { Balance, ChannelEntry, NativeBalance } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { STATUS_CODES } from '../../utils'
+import { STATUS_CODES } from '../../utils.js'
 
 let node = sinon.fake() as any
 node.getId = sinon.fake.returns(ALICE_PEER_ID)
-
-const { api, service } = createTestApiInstance(node)
-chai.use(chaiResponseValidator(api.apiDoc))
 
 const CHANNEL_ID = ChannelEntry.createMock().getId()
 
@@ -19,6 +16,16 @@ describe('GET /channels', function () {
   const testChannel = ChannelEntry.createMock()
   node.getChannelsFrom = sinon.fake.returns(Promise.resolve([testChannel]))
   node.getChannelsTo = sinon.fake.returns(Promise.resolve([testChannel]))
+
+  let service: any
+  before(async function () {
+    const loaded = await createTestApiInstance(node)
+
+    service = loaded.service
+
+    // @ts-ignore ESM / CommonJS compatibility issue
+    chai.use(chaiResponseValidator.default(loaded.api.apiDoc))
+  })
 
   it('should get channels list including closed', async function () {
     const res = await request(service).get('/api/v2/channels?includingClosed=true')
@@ -46,6 +53,13 @@ node.openChannel = sinon.fake.returns(
 )
 
 describe('POST /channels', () => {
+  let service: any
+  before(async function () {
+    const loaded = await createTestApiInstance(node)
+
+    service = loaded.service
+  })
+
   it('should open channel', async () => {
     const res = await request(service).post('/api/v2/channels').send({
       peerId: ALICE_PEER_ID.toB58String(),
