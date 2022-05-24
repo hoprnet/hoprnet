@@ -26,7 +26,7 @@
     "abort-controller": "~3.0.0",
     "bignumber.js": "9.0.2",
     "bn.js": "5.2.0",
-    "chalk": "4.1.2",
+    "chalk": "5.0.1",
     "debug": "4.3.4",
     "ethers": "5.5.4",
     "futoin-hkdf": "1.5.0",

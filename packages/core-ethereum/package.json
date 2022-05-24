@@ -29,7 +29,7 @@
     "@sinonjs/referee": "9.1.1",
     "async-mutex": "0.3.2",
     "bn.js": "5.2.0",
-    "chalk": "4.1.2",
+    "chalk": "5.0.1",
     "debug": "4.3.4",
     "ethers": "5.5.4",
     "heap-js": "2.1.6",
