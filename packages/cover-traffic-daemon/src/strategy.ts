@@ -1,4 +1,4 @@
-import { ChannelsToOpen, ChannelsToClose, SaneDefaults } from '@hoprnet/hopr-core'
+import { type StrategyTickResult, SaneDefaults, type ChannelStrategyInterface } from '@hoprnet/hopr-core'
 import type Hopr from '@hoprnet/hopr-core'
 import type BN from 'bn.js'
 import { PublicKey, ChannelEntry, ChannelStatus } from '@hoprnet/hopr-utils'
@@ -18,7 +18,7 @@ import { debug } from '@hoprnet/hopr-utils'
 
 const log = debug('hopr:cover-traffic')
 
-export class CoverTrafficStrategy extends SaneDefaults {
+export class CoverTrafficStrategy extends SaneDefaults implements ChannelStrategyInterface {
   name = 'covertraffic'
 
   constructor(private selfPub: PublicKey, private node: Hopr, private data: PersistedState) {
@@ -42,14 +42,19 @@ export class CoverTrafficStrategy extends SaneDefaults {
     currentChannels: ChannelEntry[],
     peers: Hopr['networkPeers'],
     _getRandomChannel: () => Promise<ChannelEntry>
-  ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
+  ): Promise<StrategyTickResult> {
     log(`tick, balance ${balance.toString()}`)
-    const toOpen = []
-    const toClose = []
+    const toOpen: StrategyTickResult['toOpen'] = []
+    const toClose: StrategyTickResult['toClose'] = []
     const state = this.data.get()
 
     // Refresh open channels.
-    const ctChannels = []
+    const ctChannels: {
+      destination: PublicKey
+      latestQualityOf: number
+      openFrom: number
+    }[] = []
+    
     for (let channel of currentChannels) {
       if (channel.status === ChannelStatus.Closed) {
         continue
@@ -64,18 +69,24 @@ export class CoverTrafficStrategy extends SaneDefaults {
       // Cover traffic channels with quality below this threshold will be closed
       if (quality < CT_NETWORK_QUALITY_THRESHOLD) {
         log(`closing channel ${channel.destination.toB58String()} with quality < ${CT_NETWORK_QUALITY_THRESHOLD}`)
-        toClose.push(channel.destination)
+        toClose.push({
+          destination: channel.destination
+        })
       }
       // If the HOPR token balance of the current CT node is no larger than the `MINIMUM_STAKE_BEFORE_CLOSURE`, close all the non-closed channels.
       if (channel.balance.toBN().lt(MINIMUM_STAKE_BEFORE_CLOSURE)) {
         log(`closing channel with balance too low ${channel.destination.toB58String()}`)
-        toClose.push(channel.destination)
+        toClose.push({
+          destination: channel.destination
+        })
       }
       // Close the cover-traffic channel when the number of failed messages meets the threshold. Reset the failed message counter.
       if (this.data.messageFails(channel.destination) > MESSAGE_FAIL_THRESHOLD) {
         log(`closing channel with too many message fails: ${channel.destination.toB58String()}`)
         this.data.resetMessageFails(channel.destination)
-        toClose.push(channel.destination)
+        toClose.push({
+          destination: channel.destination
+        })
       }
     }
     this.data.setCTChannels(ctChannels)
@@ -115,7 +126,9 @@ export class CoverTrafficStrategy extends SaneDefaults {
           if (Date.now() - openChannel.openFrom >= CT_CHANNEL_STALL_TIMEOUT) {
             // handle waiting for commitment stalls
             log('channel is stalled in WAITING_FOR_COMMITMENT, closing', openChannel.destination.toB58String())
-            toClose.push(openChannel.destination)
+            toClose.push({
+              destination: openChannel.destination
+            })
           } else {
             log('channel is WAITING_FOR_COMMITMENT, waiting', openChannel.destination.toB58String())
           }
@@ -149,8 +162,8 @@ export class CoverTrafficStrategy extends SaneDefaults {
       if (
         ctChannels.find((x) => x.destination.eq(choice)) ||
         choice.eq(this.selfPub) ||
-        toOpen.find((x) => x[0].eq(choice)) ||
-        toClose.find((x) => x.eq(choice))
+        toOpen.find((x: typeof toOpen[number]) => x.destination.eq(choice)) ||
+        toClose.find((x: typeof toClose[number]) => x.destination.eq(choice))
       ) {
         //console.error('skipping node', c.toB58String())
         continue
@@ -163,15 +176,20 @@ export class CoverTrafficStrategy extends SaneDefaults {
 
       log(`opening ${choice.toB58String()}`)
       currentChannelNum++
-      toOpen.push([choice, CHANNEL_STAKE])
+      toOpen.push({
+        destination: choice,
+        stake: CHANNEL_STAKE
+      })
     }
 
     log(
       `strategy tick: ${Date.now()} balance:${balance.toString()} open:${toOpen
         .map((p) => p[0].toPeerId().toB58String())
-        .join(',')} close: ${toClose.map((p) => p.toPeerId().toB58String()).join(',')}`.replace('\n', ', ')
+        .join(',')} close: ${toClose
+        .map((p: typeof toClose[number]) => p.destination.toPeerId().toB58String())
+        .join(',')}`.replace('\n', ', ')
     )
-    return [toOpen, toClose]
+    return { toOpen, toClose }
   }
 
   async onWinningTicket() {
