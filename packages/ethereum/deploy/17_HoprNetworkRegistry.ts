@@ -15,11 +15,11 @@ const main = async function ({ ethers, deployments, getNamedAccounts, network }:
     args: [registryProxy.address, deployer]
   })
   console.log(`"HoprNetworkRegistry" deployed at ${networkRegistryContract.address}`)
-  
+
   const networkRegistry = (await ethers.getContractFactory('HoprNetworkRegistry')).attach(
     networkRegistryContract.address
-    ) as HoprNetworkRegistry
-  
+  ) as HoprNetworkRegistry
+
   if (!inProd) {
     await networkRegistry.disableRegistry()
     console.log(`Disabled "HoprNetworkRegistry" in production.`)

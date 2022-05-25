@@ -344,33 +344,36 @@ task('test:in-group', 'Reset the hardhat node instances per testFiles array.').s
  * Override https://github.com/wighawag/hardhat-deploy/blob/819df0fad56d75a5de5218c3307bec2093f8794c/src/index.ts#L396
  * in hardhat-deploy plugin, as it does not support EIP-1559
  */
-subtask(TASK_DEPLOY_RUN_DEPLOY, "Override the deploy task, with an explicit gas price.")
-  .setAction(async (taskArgs, { network, ethers }, runSuper) => {
+subtask(TASK_DEPLOY_RUN_DEPLOY, 'Override the deploy task, with an explicit gas price.').setAction(
+  async (taskArgs, { network, ethers }, runSuper) => {
     // const protocolConfigNetworkNames = Object.keys<ResolvedEnvironment['network']>(PROTOCOL_CONFIG.networks);
     // const protocolConfigNetworks = Object.values<ResolvedEnvironment['network']>(PROTOCOL_CONFIG.networks);
-    const protocolConfigNetwork = PROTOCOL_CONFIG.networks[network.name] ?? undefined;
+    const protocolConfigNetwork = PROTOCOL_CONFIG.networks[network.name] ?? undefined
     if (!protocolConfigNetwork) {
-      throw Error("Cannot deploy with hardhat-deploy due to missing hardhat_deploy_gas_price field in protocol-config.json file")
+      throw Error(
+        'Cannot deploy with hardhat-deploy due to missing hardhat_deploy_gas_price field in protocol-config.json file'
+      )
     }
-    
+
     const hardhatDeployGasPrice = (protocolConfigNetwork as ResolvedEnvironment['network']).hardhat_deploy_gas_price
     const parsedGasPrice = hardhatDeployGasPrice.split(' ')
-    
+
     // as in https://github.com/wighawag/hardhat-deploy/blob/819df0fad56d75a5de5218c3307bec2093f8794c/src/DeploymentsManager.ts#L974
-    let gasPrice: string; 
+    let gasPrice: string
     if (parsedGasPrice.length > 1) {
       gasPrice = ethers.utils.parseUnits(parsedGasPrice[0], parsedGasPrice[1]).toString()
     } else {
       gasPrice = parsedGasPrice[0]
     }
-    
-    console.log(`Deployment arguments are ${JSON.stringify({...taskArgs, gasprice: gasPrice}, null, 2)}`)
-    
+
+    console.log(`Deployment arguments are ${JSON.stringify({ ...taskArgs, gasprice: gasPrice }, null, 2)}`)
+
     try {
-      await runSuper({...taskArgs, gasprice: gasPrice})
+      await runSuper({ ...taskArgs, gasprice: gasPrice })
     } catch (error) {
       console.log(error)
-      throw Error("Cannot override hardhat task TASK_DEPLOY_RUN_DEPLOY")
+      throw Error('Cannot override hardhat task TASK_DEPLOY_RUN_DEPLOY')
     }
-  })
+  }
+)
 export default hardhatConfig
