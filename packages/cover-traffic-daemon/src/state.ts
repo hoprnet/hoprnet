@@ -1,6 +1,7 @@
 import BN from 'bn.js'
 import { PublicKey, ChannelEntry, ChannelStatus, randomFloat } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
+import type { Multiaddr } from 'multiaddr'
 import { findChannel, importance } from './utils'
 import fs from 'fs'
 
@@ -10,6 +11,12 @@ export type ChannelData = {
   sendAttempts: number
   // number of attempts of a channel to forward packets (aka as intermediate hops other than the 1st hop).
   forwardAttempts: number
+}
+
+export type PeerData = {
+  id: PeerId
+  pub: PublicKey
+  multiaddrs: Multiaddr[]
 }
 
 export type OpenChannels = {
@@ -31,10 +38,74 @@ export type State = {
   messageTotalSuccess: number
 }
 
-export type PeerData = {
-  id: any //PeerId type, as implemented in IPFS
-  pub: PublicKey
-  multiaddrs: any[] // Multiaddress type
+// serialized representation of State type
+type SerializedState = {
+  nodes: {
+    id: string
+    multiaddrs: string[]
+  }[]
+  channels: {
+    channel: string
+    forwardAttempts: number
+    sendAttempts: number
+  }[]
+  ctChannels: {
+    destination: string
+    openFrom: number
+  }[]
+  block: string
+}
+
+function serializeState(state: State): string {
+  return JSON.stringify({
+    nodes: Object.values(state.nodes).map((node: PeerData) => ({
+      // Using hex representation since deserializing Base58 encoded
+      // strings is complex
+      id: node.id.toHexString(),
+      multiaddrs: node.multiaddrs.map((ma: Multiaddr) => ma.toString())
+    })),
+    channels: Object.values(state.channels).map((c: ChannelData) => ({
+      channel: Buffer.from(c.channel.serialize()).toString('base64'),
+      forwardAttempts: c.forwardAttempts,
+      sendAttempts: c.sendAttempts
+    })),
+    ctChannels: state.ctChannels.map((open: OpenChannels) => ({
+      destination: open.destination.toCompressedPubKeyHex(),
+      openFrom: open.openFrom
+    })),
+    block: state.block.toString()
+  } as SerializedState)
+}
+
+function deserializeState(serialized: string): State {
+  const parsed = JSON.parse(serialized) as SerializedState
+
+  return {
+    nodes: parsed.nodes.reduce((acc, node) => {
+      // Using hex representation since deserializing Base58 encoded
+      // strings is complex
+      const id = PeerId.createFromHexString(node.id)
+      acc[id.toB58String()] = { id, pub: PublicKey.fromPeerId(id), multiaddrs: [] }
+      return acc
+    }, {}),
+    channels: parsed.channels.reduce((acc, c) => {
+      const channel = ChannelEntry.deserialize(Uint8Array.from(Buffer.from(c.channel, 'base64')))
+      acc[channel.getId().toHex()] = {
+        channel,
+        forwardAttempts: c.forwardAttempts,
+        sendAttempts: c.sendAttempts
+      }
+      return acc
+    }, {}),
+    ctChannels: parsed.ctChannels.map((p) => ({
+      destination: PublicKey.fromString(p.destination),
+      latestQualityOf: 0,
+      openFrom: p.openFrom
+    })),
+    messageFails: {},
+    messageTotalSuccess: 0,
+    block: new BN(parsed.block)
+  }
 }
 
 export class PersistedState {
@@ -68,34 +139,7 @@ export class PersistedState {
    */
   load(): void {
     const json = JSON.parse(fs.readFileSync(this.db_path, 'utf8'))
-    this._data = {
-      nodes: {},
-      channels: {},
-      ctChannels: json.ctChannels.map((p) => ({
-        destination: PublicKey.fromPeerId(PeerId.createFromB58String(p.destination)),
-        latestQualityOf: 0,
-        openFrom: p.openFrom
-      })),
-      messageFails: {},
-      messageTotalSuccess: 0,
-      block: new BN(json.block)
-    }
-
-    // node ids are encoded in base58 strings
-    json.nodes.forEach((n) => {
-      const id = PeerId.createFromB58String(n.id)
-      this._data.nodes[id.toB58String()] = { id, pub: PublicKey.fromPeerId(id), multiaddrs: [] }
-    })
-
-    // channel entries are encoded in base64 strings
-    json.channels.forEach((c) => {
-      const channel = ChannelEntry.deserialize(Uint8Array.from(Buffer.from(c.channel, 'base64')))
-      this._data.channels[channel.getId().toHex()] = {
-        channel,
-        forwardAttempts: c.forwardAttempts,
-        sendAttempts: c.sendAttempts
-      }
-    })
+    this._data = deserializeState(json)
   }
 
   /**
@@ -113,26 +157,7 @@ export class PersistedState {
    */
   set(s: State): void {
     this._data = s
-    fs.writeFileSync(
-      this.db_path,
-      JSON.stringify({
-        nodes: Object.values(s.nodes).map((n: PeerData) => ({
-          id: n.id.toB58String(),
-          multiaddrs: n.multiaddrs.map((m) => m.toString())
-        })),
-        channels: Object.values(s.channels).map((c) => ({
-          channel: Buffer.from(c.channel.serialize()).toString('base64'),
-          forwardAttempts: c.forwardAttempts,
-          sendAttempts: c.sendAttempts
-        })),
-        ctChannels: s.ctChannels.map((o: OpenChannels) => ({
-          destination: o.destination.toB58String(),
-          openFrom: o.openFrom
-        })),
-        block: s.block.toString()
-      }),
-      'utf8'
-    )
+    fs.writeFileSync(this.db_path, serializeState(s), 'utf8')
     this.update(s)
     return
   }
@@ -243,9 +268,12 @@ export class PersistedState {
     const ind = randomFloat()
 
     // for all the nodes in the network, set importance score as its weight and calculate the sum of all weights
-    for (const p of Object.values(state.nodes)) {
-      weights[p.pub.toUncompressedPubKeyHex()] = importance(p.pub, state)
-      total = total.add(weights[p.pub.toUncompressedPubKeyHex()])
+    for (const node of Object.values(state.nodes)) {
+      // PublicKey might not be decompressed yet, so using compressed
+      // representation makes sure the PublicKey does not get decompressed without need
+      const nodeString = node.pub.toCompressedPubKeyHex()
+      weights[nodeString] = importance(node.pub, state)
+      total = total.add(weights[nodeString])
     }
 
     if (total.lten(0)) {

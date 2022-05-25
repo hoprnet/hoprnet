@@ -44,6 +44,11 @@ export interface PublicNodesEmitter {
   removeListener(event: AddEventName, listener: NewNodeListener): this
   removeListener(event: RemoveEventName, listener: (removeNode: PeerId) => void): this
   removeListener(event: string | symbol, listener: (...args: any[]) => void): this
+
+  off(event: AddEventName | RemoveEventName, listener: () => void): this
+  off(event: AddEventName, listener: NewNodeListener): this
+  off(event: RemoveEventName, listener: (removeNode: PeerId) => void): this
+  off(event: string | symbol, listener: (...args: any[]) => void): this
 }
 
 export type StreamType = BufferList | Uint8Array

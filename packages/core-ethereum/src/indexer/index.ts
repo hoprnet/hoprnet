@@ -26,14 +26,16 @@ import {
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum'
-import type {
-  Event,
-  EventNames,
-  IndexerEvents,
-  TokenEvent,
-  TokenEventNames,
-  RegistryEvent,
-  RegistryEventNames
+import {
+  type Event,
+  type EventNames,
+  type IndexerEvents,
+  type TokenEvent,
+  type TokenEventNames,
+  type RegistryEvent,
+  type RegistryEventNames,
+  type IndexerEventEmitter,
+  IndexerStatus
 } from './types'
 import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils'
 import { Contract, errors } from 'ethers'
@@ -47,19 +49,12 @@ const getSyncPercentage = (start: number, current: number, end: number) =>
   (((current - start) / (end - start)) * 100).toFixed(2)
 const backoffOption: Parameters<typeof retryWithBackoff>[1] = { maxDelay: MAX_TRANSACTION_BACKOFF }
 
-export enum IndexerStatus {
-  STARTING = 'starting',
-  STARTED = 'started',
-  RESTARTING = 'restarting',
-  STOPPED = 'stopped'
-}
-
 /**
  * Indexes HoprChannels smart contract and stores to the DB,
  * all channels in the network.
  * Also keeps track of the latest block number.
  */
-class Indexer extends EventEmitter {
+class Indexer extends EventEmitter implements IndexerEventEmitter {
   public status: IndexerStatus = IndexerStatus.STOPPED
   public latestBlock: number = 0 // latest known on-chain block number
 

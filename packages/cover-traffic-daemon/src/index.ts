@@ -101,7 +101,7 @@ const argv = yargs(process.argv.slice(2))
   .wrap(Math.min(120, terminalWidth()))
   .parseSync()
 
-async function generateNodeOptions(environment: ResolvedEnvironment): Promise<HoprOptions> {
+function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
   const options: HoprOptions = {
     announce: false,
     createDbIfNotExist: true,
@@ -121,7 +121,7 @@ async function generateNodeOptions(environment: ResolvedEnvironment): Promise<Ho
 
 export async function main(update: (State: State) => void, peerId?: PeerId) {
   const environment = resolveEnvironment(argv.environment, argv.provider)
-  const options = await generateNodeOptions(environment)
+  const options = generateNodeOptions(environment)
   if (!peerId) {
     peerId = privKeyToPeerId(argv.privateKey)
   }
