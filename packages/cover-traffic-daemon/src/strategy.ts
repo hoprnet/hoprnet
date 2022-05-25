@@ -54,7 +54,7 @@ export class CoverTrafficStrategy extends SaneDefaults implements ChannelStrateg
       latestQualityOf: number
       openFrom: number
     }[] = []
-    
+
     for (let channel of currentChannels) {
       if (channel.status === ChannelStatus.Closed) {
         continue
