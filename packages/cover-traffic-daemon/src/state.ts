@@ -138,8 +138,8 @@ export class PersistedState {
    * Load the exisitng cover traffic state, where the path is defined in `DB`
    */
   load(): void {
-    const json = JSON.parse(fs.readFileSync(this.db_path, 'utf8'))
-    this._data = deserializeState(json)
+    const serialized = fs.readFileSync(this.db_path, 'utf8')
+    this._data = deserializeState(serialized)
   }
 
   /**

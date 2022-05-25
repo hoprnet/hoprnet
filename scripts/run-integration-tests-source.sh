@@ -178,7 +178,7 @@ function setup_node() {
   log "Additional args: \"${additional_args}\""
 
   # Remove previous logs to make sure the regex does not match
-  rm -Rf "${log}"
+  rm -f "${log}"
 
   # Set NODE_ENV=development to rebuild hopr-admin next files
   # at runtime. Necessary to start multiple instances of hoprd
@@ -219,6 +219,9 @@ function setup_ct_node() {
   local health_check_port=${3}
   local dir=${4}
   local additional_args=${5:-""}
+
+  # Remove previous logs to make sure the regex does not match
+  rm -f "${log}"
 
   log "Run CT node -> ${log}"
 
@@ -325,7 +328,7 @@ cp -R \
 # }}}
 
 # static address because static private key
-declare ct_node1_address="0xDe913EeED23Bce5274eAD3dE8c196A41176fbd49"
+declare ct_node1_address="0xde913eeed23bce5274ead3de8c196a41176fbd49"
 
 #  --- Run nodes --- {{{
 setup_node 13301 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}" "${node1_privkey}" "--announce"

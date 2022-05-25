@@ -160,7 +160,7 @@ add_keys() {
 # $1 hardhat log file
 start_local_hardhat() {
   # Remove previous log file to make sure that the regex does not match
-  rm -Rf "${hardhat_rpc_log}"
+  rm -f "${hardhat_rpc_log}"
 
   log "Running hardhat local node"
   HOPR_ENVIRONMENT_ID="hardhat-localhost" \
@@ -191,5 +191,5 @@ fund_nodes() {
       --use-local-identities \
       --network hardhat \
       --password "${password}" \
-      "${addr_arg}"
+      $addr_arg
 }
