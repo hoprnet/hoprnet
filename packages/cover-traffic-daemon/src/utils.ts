@@ -1,7 +1,7 @@
 import { findPath } from '@hoprnet/hopr-core'
 import BN from 'bn.js'
 import { BigNumber } from 'bignumber.js'
-import type { PublicKey, ChannelEntry } from '@hoprnet/hopr-utils'
+import { type PublicKey, type ChannelEntry, randomFloat } from '@hoprnet/hopr-utils'
 import type { State, ChannelData, PersistedState } from './state'
 import { CT_PATH_RANDOMNESS, CT_INTERMEDIATE_HOPS } from './constants'
 import { debug } from '@hoprnet/hopr-utils'
@@ -108,7 +108,7 @@ export const importance = (p: PublicKey, state: State): BN =>
  * @returns the randmonized importance score
  */
 export const randomWeightedImportance = (p: PublicKey, state: State): BN => {
-  const randomComponent = 1 + Math.random() * CT_PATH_RANDOMNESS
+  const randomComponent = 1 + randomFloat() * CT_PATH_RANDOMNESS
   return importance(p, state).muln(randomComponent)
 }
 

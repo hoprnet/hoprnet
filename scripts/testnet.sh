@@ -156,3 +156,40 @@ add_keys() {
     echo "Authorized keys file not found"
   fi
 }
+
+# $1 hardhat log file
+start_local_hardhat() {
+  # Remove previous log file
+  rm -Rf "${hardhat_rpc_log}"
+
+  log "Running hardhat local node"
+  HOPR_ENVIRONMENT_ID="hardhat-localhost" \
+    TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
+    yarn workspace @hoprnet/hopr-ethereum hardhat node \
+      --network hardhat \
+      --show-stack-traces > \
+      "$1" 2>&1 &
+}
+
+# $1 prefix, e.g. "e2e-source"
+# $2 identity file directory, e.g. "/tmp"
+# $3 password, e.g. "dummy e2e password"
+# $4 additional address, e.g CT node address
+fund_nodes() {
+  local addr_arg
+  if [ -z $4 ]; then
+    addr_arg=""
+  else
+    addr_arg="--address $4"
+  fi
+
+  HOPR_ENVIRONMENT_ID=hardhat-localhost \
+    TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
+    yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
+      --identity-prefix "${node_prefix}" \
+      --identity-directory "${tmp}" \
+      --use-local-identities \
+      --network hardhat \
+      --password "${password}" \
+      "${addr_arg}"
+}

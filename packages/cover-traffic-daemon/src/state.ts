@@ -1,5 +1,5 @@
 import BN from 'bn.js'
-import { PublicKey, ChannelEntry, ChannelStatus } from '@hoprnet/hopr-utils'
+import { PublicKey, ChannelEntry, ChannelStatus, randomFloat } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import { findChannel, importance } from './utils'
 import fs from 'fs'
@@ -198,9 +198,9 @@ export class PersistedState {
    * @param block Latest block number (a big number) listened by the indexer.
    */
   setBlock(block: BN): void {
-    const s = this.get()
-    s.block = block
-    this.set(s)
+    const state = this.get()
+    state.block = block
+    this.set(state)
   }
 
   /**
@@ -209,8 +209,8 @@ export class PersistedState {
    * @returns PeerData of the given ID.
    */
   getNode(b58String: string): PeerData {
-    const s = this.get()
-    return s.nodes[b58String]
+    const state = this.get()
+    return state.nodes[b58String]
   }
 
   /**
@@ -221,8 +221,8 @@ export class PersistedState {
    * @returns ChannelEntry between `source` and `destination`, undefined otherwise.
    */
   findChannel(src: PublicKey, dest: PublicKey): ChannelEntry {
-    const s = this.get()
-    return findChannel(src, dest, s)
+    const state = this.get()
+    return findChannel(src, dest, state)
   }
 
   /**
@@ -233,25 +233,25 @@ export class PersistedState {
    * weight, throw an error otherwise.
    */
   weightedRandomChoice(): PublicKey {
-    const s = this.get()
-    if (Object.keys(s.nodes).length == 0) {
+    const state = this.get()
+    if (Object.keys(state.nodes).length == 0) {
       throw new Error('no nodes to pick from')
     }
     // key: Public key of a node, value: Importance score of a node
     const weights: Record<string, BN> = {}
     let total = new BN('0')
-    const ind = Math.random()
+    const ind = randomFloat()
 
     // for all the nodes in the network, set importance score as its weight and calculate the sum of all weights
-    for (const p of Object.values(s.nodes)) {
-      weights[p.pub.toUncompressedPubKeyHex()] = importance(p.pub, s)
+    for (const p of Object.values(state.nodes)) {
+      weights[p.pub.toUncompressedPubKeyHex()] = importance(p.pub, state)
       total = total.add(weights[p.pub.toUncompressedPubKeyHex()])
     }
 
     if (total.lten(0)) {
       // No important nodes - let's pick a random node for now.
-      const index = Math.floor(ind * Object.keys(s.nodes).length)
-      return Object.values(s.nodes)[index].pub
+      const index = Math.floor(ind * Object.keys(state.nodes).length)
+      return Object.values(state.nodes)[index].pub
     }
 
     let interval = total.muln(ind)
@@ -270,13 +270,13 @@ export class PersistedState {
    * @param destination Public key of the message sender.
    */
   async incrementSent(source: PublicKey, destination: PublicKey) {
-    const s = this.get()
-    const channel = findChannel(source, destination, s)
+    const state = this.get()
+    const channel = findChannel(source, destination, state)
     if (channel) {
       const channelId = channel.getId().toHex()
-      const prev = s.channels[channelId].sendAttempts || 0
-      s.channels[channelId].sendAttempts = prev + 1
-      this.set(s)
+      const prev = state.channels[channelId].sendAttempts || 0
+      state.channels[channelId].sendAttempts = prev + 1
+      this.set(state)
     }
   }
 
@@ -286,13 +286,13 @@ export class PersistedState {
    * @param destination Public key of the message sender.
    */
   async incrementForwards(source: PublicKey, destination: PublicKey) {
-    const s = this.get()
-    const channel = findChannel(source, destination, s)
+    const state = this.get()
+    const channel = findChannel(source, destination, state)
     if (channel) {
       const channelId = channel.getId().toHex()
-      const prev = s.channels[channelId].forwardAttempts || 0
-      s.channels[channelId].forwardAttempts = prev + 1
-      this.set(s)
+      const prev = state.channels[channelId].forwardAttempts || 0
+      state.channels[channelId].forwardAttempts = prev + 1
+      this.set(state)
     }
   }
 
@@ -301,8 +301,8 @@ export class PersistedState {
    * @returns number of all the open channels
    */
   openChannelCount(): number {
-    const s = this.get()
-    return Object.values(s.channels).filter((x) => x.channel.status != ChannelStatus.Closed).length
+    const state = this.get()
+    return Object.values(state.channels).filter((x) => x.channel.status != ChannelStatus.Closed).length
   }
 
   /**
@@ -317,10 +317,10 @@ export class PersistedState {
    * Update the total number of sent messages from the current CT node
    */
   incrementMessageTotalSuccess(): void {
-    const s = this.get()
-    const prev = s.messageTotalSuccess || 0
-    s.messageTotalSuccess = prev + 1
-    this.set(s)
+    const state = this.get()
+    const prev = state.messageTotalSuccess || 0
+    state.messageTotalSuccess = prev + 1
+    this.set(state)
   }
 
   /**
@@ -337,10 +337,10 @@ export class PersistedState {
    * @param dest Public key of the destination that supposed to received messages but failed.
    */
   incrementMessageFails(dest: PublicKey): void {
-    const s = this.get()
-    const prev = s.messageFails[dest.toB58String()] || 0
-    s.messageFails[dest.toB58String()] = prev + 1
-    this.set(s)
+    const state = this.get()
+    const prev = state.messageFails[dest.toB58String()] || 0
+    state.messageFails[dest.toB58String()] = prev + 1
+    this.set(state)
   }
 
   /**
@@ -348,8 +348,8 @@ export class PersistedState {
    * @param dest Public key of the destination that supposed to received messages but failed.
    */
   resetMessageFails(dest: PublicKey): void {
-    const s = this.get()
-    s.messageFails[dest.toB58String()] = 0
-    this.set(s)
+    const state = this.get()
+    state.messageFails[dest.toB58String()] = 0
+    this.set(state)
   }
 }

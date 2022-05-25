@@ -962,7 +962,7 @@ class Hopr extends EventEmitter {
     log('setting channel strategy from', this.strategy?.name, 'to', strategy.name)
     this.strategy = strategy
 
-    this.connector.on('ticket:win', async (ack) => {
+    this.connector.on('ticket:win', async (ack: AcknowledgedTicket) => {
       try {
         await this.strategy.onWinningTicket(ack, this.connector)
       } catch (err) {
