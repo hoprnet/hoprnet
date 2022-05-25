@@ -1,0 +1,14 @@
+[package]
+name = "@hoprnet/hopr-wasm-common"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "@hoprnet/hopr-wasm-common"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = { version = "0.2.80", features = ["serde-serialize"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
