@@ -24,6 +24,6 @@ pub fn get_hoprd_version() -> Result<String, JsValue> {
 }
 
 #[wasm_bindgen]
-pub fn get_version() -> String {
+pub fn dummy_get_one() -> String {
     String::from("1")
 }
