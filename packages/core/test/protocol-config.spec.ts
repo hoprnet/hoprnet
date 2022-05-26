@@ -1,5 +1,5 @@
+import type { ProtocolConfig } from '../src/environment'
 import { loadJson, validateData } from '@hoprnet/hopr-utils'
-import type { Network, ProtocolConfig } from '@hoprnet/hopr-core'
 
 describe('protocol config', async function () {
   it('should conform to schema', async function () {
@@ -10,19 +10,9 @@ describe('protocol config', async function () {
   })
 
   it('should be internally consistent', async function () {
-    function getNetwork(id: string): Network | null {
-      for (const network of env_data.networks) {
-        if (network.id === id) {
-          return network
-        }
-      }
-      return null
-    }
-
-    const env_data = loadJson('./protocol-config.json') as ProtocolConfig
-
-    for (const env of env_data.environments) {
-      if (getNetwork(env.network_id) == null) {
+    const protocolConfig = loadJson('./protocol-config.json') as ProtocolConfig
+    for (const env of Object.values(protocolConfig.environments)) {
+      if (!protocolConfig.networks[env.network_id]) {
         throw new Error(`no such network: ${env.network_id}`)
       }
     }

@@ -5,10 +5,18 @@
       "type": "object",
       "patternProperties": {
         "^[a-z0-9-]+$": {
-          "type": "string",
+          "type": "object",
           "properties": {
             "network_id": {
               "type": "string"
+            },
+            "environment_type": {
+              "type": "string",
+              "enum": [
+                "production",
+                "staging",
+                "development"
+              ]
             },
             "channel_contract_deploy_block": {
               "type": "integer"
@@ -46,6 +54,7 @@
           },
           "required": [
             "network_id",
+            "environment_type",
             "channel_contract_deploy_block",
             "token_contract_address",
             "channels_contract_address",
@@ -61,7 +70,7 @@
       "type": "object",
       "patternProperties": {
         "^[a-z0-9]+$": {
-          "type": "string",
+          "type": "object",
           "properties": {
             "description": {
               "type": "string"
@@ -114,5 +123,8 @@
       }
     }
   },
-  "required": ["environments", "networks"]
+  "required": [
+    "environments",
+    "networks"
+  ]
 }
