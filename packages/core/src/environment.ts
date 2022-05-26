@@ -3,6 +3,7 @@ export type NetworkOptions = {
   description: string
   chain_id: number // >= 0
   live: boolean
+  hardhat_deploy_gas_price: string // Gas price as either a number string '11' or a value which should be converted like '1 gwei'. Used in hardhat-deploy plugin.
   default_provider: string // a valid HTTP url pointing at a RPC endpoint
   etherscan_api_url?: string // a valid HTTP url pointing at a RPC endpoint
   max_fee_per_gas: string // The absolute maximum you are willing to pay per unit of gas to get your transaction included in a block, e.g. '10 gwei'

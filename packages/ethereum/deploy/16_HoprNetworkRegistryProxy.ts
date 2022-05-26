@@ -25,7 +25,7 @@ const main = async function ({ deployments, getNamedAccounts, network, environme
     args: registryProxyName === STAKING_PROXY ? [stakeAddress, deployer, MIN_STAKE] : [deployer]
   })
 
-  console.log(`"HoprNetworkRegistry" deployed at ${registryProxy.address}`)
+  console.log(`"HoprNetworkRegistryProxy" deployed at ${registryProxy.address}`)
 }
 
 main.dependencies = ['preDeploy']

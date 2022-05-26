@@ -14,7 +14,6 @@ const main = async function ({ ethers, deployments, getNamedAccounts, network }:
     log: true,
     args: [registryProxy.address, deployer]
   })
-
   console.log(`"HoprNetworkRegistry" deployed at ${networkRegistryContract.address}`)
 
   const networkRegistry = (await ethers.getContractFactory('HoprNetworkRegistry')).attach(
