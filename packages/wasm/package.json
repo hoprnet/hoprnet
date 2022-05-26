@@ -2,13 +2,18 @@
   "name": "@hoprnet/hopr-wasm",
   "version": "1.0.0",
   "private": true,
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "files": [
+    "lib"
+  ],
+  "engines": {
+    "node": "16"
+  },
   "scripts": {
     "clean": "make clean && rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
-    "build": "tsc -p . && make clean && make all",
+    "build": "make all && make install && tsc -p . && echo 'hopr-wasm build completed'",
     "test": "make test && NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace"
-  },
-  "dependencies": {
-    "@hoprnet/hopr-wasm-common": "link:./hopr-wasm-common/pkg"
   },
   "devDependencies": {
     "@wasm-tool/wasm-pack-plugin": "^1.1.0",

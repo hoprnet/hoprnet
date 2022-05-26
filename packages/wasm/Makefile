@@ -1,21 +1,29 @@
 # Append here when new WASM crate is added
 PACKAGES = common
+##########################################
 
-BINARIES = $(foreach package,$(PACKAGES),$(package)/pkg/$(subst -,_,$(package)).js)
+PKG_DIRS = $(addsuffix /pkg, $(PACKAGES))
+JS_FILES = $(foreach package,$(PACKAGES),$(package)/pkg/$(subst -,_,$(package)).js)
 
-.PHONY := all clean test
+.PHONY := all clean test install
 
-all: $(BINARIES)
-	@echo "WASM build completed"
+all: $(JS_FILES)
+	@echo "All WASM modules built successfully"
 
-test: $(BINARIES)
+test: $(JS_FILES)
 	$(foreach pkg,$(PACKAGES),wasm-pack test --node $(pkg))
 
-$(BINARIES):
+$(JS_FILES):
 	@echo "--- Building WASM module to '$(@D)' ... ---"
 	mkdir -p $(@D)
-	cd $(@D)/.. && wasm-pack build --target=bundler
+	cd $(@D)/.. && wasm-pack build --target=nodejs
 	@echo "--- Built WASM module in '$(@D)' ---"
 
+install:
+	@mkdir -p lib
+	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.js) lib/
+	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.ts) lib/
+	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.wasm) lib/
+
 clean:
-	rm -rf $(addsuffix /pkg, $(PACKAGES))
+	rm -rf $(PKG_DIRS)

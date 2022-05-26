@@ -3644,17 +3644,10 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@hoprnet/hopr-wasm-common@link:./hopr-wasm-common/pkg::locator=%40hoprnet%2Fhopr-wasm%40workspace%3Apackages%2Fwasm":
-  version: 0.0.0-use.local
-  resolution: "@hoprnet/hopr-wasm-common@link:./hopr-wasm-common/pkg::locator=%40hoprnet%2Fhopr-wasm%40workspace%3Apackages%2Fwasm"
-  languageName: node
-  linkType: soft
-
 "@hoprnet/hopr-wasm@workspace:packages/wasm":
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-wasm@workspace:packages/wasm"
   dependencies:
-    "@hoprnet/hopr-wasm-common": "link:./hopr-wasm-common/pkg"
     "@wasm-tool/wasm-pack-plugin": ^1.1.0
     mocha: 9.2.2
     rimraf: ^3.0.0

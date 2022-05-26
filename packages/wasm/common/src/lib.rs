@@ -2,7 +2,7 @@ use serde::{Deserialize};
 
 use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen]
+#[wasm_bindgen(module = "@hoprnet/hopr-wasm")]
 extern "C" {
     fn read_file(s: &str) -> Box<[u8]>;
 }
