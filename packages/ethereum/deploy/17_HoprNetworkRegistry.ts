@@ -21,8 +21,11 @@ const main = async function ({ ethers, deployments, getNamedAccounts, network }:
   ) as HoprNetworkRegistry
 
   if (!inProd) {
-    await networkRegistry.disableRegistry()
-    console.log(`Disabled "HoprNetworkRegistry" in production.`)
+    const isEnabled = await networkRegistry.enabled();
+    if (isEnabled) {
+      await networkRegistry.disableRegistry()
+      console.log(`Disabled "HoprNetworkRegistry" in production.`)
+    }
   }
 }
 
