@@ -23,3 +23,7 @@ pub fn get_hoprd_version() -> Result<String, JsValue> {
     Err(JsValue::from("Failed to parse package.json"))
 }
 
+#[wasm_bindgen]
+pub fn get_version() -> String {
+    String::from("1")
+}

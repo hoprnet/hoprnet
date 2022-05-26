@@ -3644,6 +3644,26 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@hoprnet/hopr-wasm-common@link:./hopr-wasm-common/pkg::locator=%40hoprnet%2Fhopr-wasm%40workspace%3Apackages%2Fwasm":
+  version: 0.0.0-use.local
+  resolution: "@hoprnet/hopr-wasm-common@link:./hopr-wasm-common/pkg::locator=%40hoprnet%2Fhopr-wasm%40workspace%3Apackages%2Fwasm"
+  languageName: node
+  linkType: soft
+
+"@hoprnet/hopr-wasm@workspace:packages/wasm":
+  version: 0.0.0-use.local
+  resolution: "@hoprnet/hopr-wasm@workspace:packages/wasm"
+  dependencies:
+    "@hoprnet/hopr-wasm-common": "link:./hopr-wasm-common/pkg"
+    "@wasm-tool/wasm-pack-plugin": ^1.1.0
+    rimraf: ^3.0.0
+    ts-node: 10.7.0
+    typedoc: 0.22.13
+    typedoc-plugin-markdown: 3.11.14
+    typescript: 4.6.3
+  languageName: unknown
+  linkType: soft
+
 "@hoprnet/hoprd@workspace:packages/hoprd":
   version: 0.0.0-use.local
   resolution: "@hoprnet/hoprd@workspace:packages/hoprd"
@@ -3652,6 +3672,7 @@ __metadata:
     "@ceramicnetwork/stream-tile": 1.5.7
     "@hoprnet/hopr-core": "workspace:packages/core"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
+    "@hoprnet/hopr-wasm": "workspace:packages/wasm"
     "@types/chai": ^4
     "@types/cors": 2.8.12
     "@types/mocha": 9.1.0
@@ -5653,6 +5674,18 @@ __metadata:
   version: 1.1.0
   resolution: "@vascosantos/moving-average@npm:1.1.0"
   checksum: 0a6d369d7b621d6b683ece6acdd015f0d88829a11e6cda736b1441e749f3d4b5ed84f629eca39155b69ec1200e1ddb42919d0597357babd6653764593e4b3d70
+  languageName: node
+  linkType: hard
+
+"@wasm-tool/wasm-pack-plugin@npm:^1.1.0":
+  version: 1.6.0
+  resolution: "@wasm-tool/wasm-pack-plugin@npm:1.6.0"
+  dependencies:
+    chalk: ^2.4.1
+    command-exists: ^1.2.7
+    watchpack: ^2.1.1
+    which: ^2.0.2
+  checksum: ae2af8507a83b2994630a1393832ede09ecf86b1986e2506f4ad8c8908875e8b9e40d3fff97b2fbca1835eaf6cbe5a69611643d613dea961b1279122db60a0ec
   languageName: node
   linkType: hard
 
@@ -8912,7 +8945,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"command-exists@npm:^1.2.8":
+"command-exists@npm:^1.2.7, command-exists@npm:^1.2.8":
   version: 1.2.9
   resolution: "command-exists@npm:1.2.9"
   checksum: 729ae3d88a2058c93c58840f30341b7f82688a573019535d198b57a4d8cb0135ced0ad7f52b591e5b28a90feb2c675080ce916e56254a0f7c15cb2395277cac3
@@ -26080,7 +26113,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"watchpack@npm:^2.3.1":
+"watchpack@npm:^2.1.1, watchpack@npm:^2.3.1":
   version: 2.3.1
   resolution: "watchpack@npm:2.3.1"
   dependencies:

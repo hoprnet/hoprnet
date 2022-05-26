@@ -35,6 +35,7 @@
     "@ceramicnetwork/stream-tile": "1.5.7",
     "@hoprnet/hopr-core": "workspace:packages/core",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
+    "@hoprnet/hopr-wasm": "workspace:packages/wasm",
     "bn.js": "5.2.0",
     "body-parser": "1.19.2",
     "chalk": "4.1.2",

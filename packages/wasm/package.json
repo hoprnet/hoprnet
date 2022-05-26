@@ -4,17 +4,18 @@
   "private": true,
   "scripts": {
     "clean": "make clean && rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
-    "build": "tsc -p . && make all"
+    "build": "tsc -p . && make clean && make all",
+    "test": "make test && NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace"
   },
   "dependencies": {
     "@hoprnet/hopr-wasm-common": "link:./hopr-wasm-common/pkg"
   },
   "devDependencies": {
     "@wasm-tool/wasm-pack-plugin": "^1.1.0",
+    "rimraf": "^3.0.0",
     "ts-node": "10.7.0",
     "typedoc": "0.22.13",
     "typedoc-plugin-markdown": "3.11.14",
-    "typescript": "4.6.3",
-    "rimraf": "^3.0.0"
+    "typescript": "4.6.3"
   }
 }
