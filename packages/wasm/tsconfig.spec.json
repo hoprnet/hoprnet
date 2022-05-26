@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "strictBindCallApply": true
+  },
+  "include": ["src/**/*.ts"],
+  "references": [{ "path": "../connect" }, { "path": "../utils" }, { "path": "../core-ethereum" }]
+}
