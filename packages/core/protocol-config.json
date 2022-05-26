@@ -35,8 +35,8 @@
       "xhopr_contract_address": "0xe8aD2ac347dA7549Aaca8F5B1c5Bf979d85bC78F",
       "boost_contract_address": "0xd7ECa0E90cD85b08875E7d10d4D25B274C6CC549",
       "stake_contract_address": "0x0d4Ec37e692BcD36FE7dDcB37a14358d7F44d72C",
-      "network_registry_proxy_contract_address": "0x67420381e278E93B290925278400f9FC26dBDE54",
-      "network_registry_contract_address": "0xd4e45b50518A076bEA3d5c757d25432A131656E9",
+      "network_registry_proxy_contract_address": "0x3ee6e1eaE59C44EC30bc5e8FEeE587f95C9F2626",
+      "network_registry_contract_address": "0x3e5AA27125C90686444b2d093BFe9b843E82D2F5",
       "tags": ["development"]
     },
     "debug-goerli": {
