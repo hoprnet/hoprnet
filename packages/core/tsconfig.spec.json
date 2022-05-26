@@ -7,5 +7,5 @@
     "strictBindCallApply": true
   },
   "include": ["src/**/*.ts"],
-  "references": []
+  "references": [{ "path": "../connect" }, { "path": "../utils" }, { "path": "../core-ethereum" }]
 }
