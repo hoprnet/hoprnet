@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": ""
+    "build": "make clean && make all"
+  },
+  "dependencies": {
+    "@hoprnet/hopr-wasm-common": "link:./hopr-wasm-common/pkg"
   }
 }

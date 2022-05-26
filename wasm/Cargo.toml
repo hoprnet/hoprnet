@@ -1,6 +1,6 @@
 [workspace]
 members = [
-	"@hoprnet/hopr-wasm-common"
+	"hopr-wasm-common"
 ]
 
 
