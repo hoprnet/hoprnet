@@ -1,10 +1,13 @@
 [package]
 name = "hopr-wasm-common"
 version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
+description = "Rust WASM modules for HOPR"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
 
 [lib]
-name = "hopr_wasm_common"
 path = "src/lib.rs"
 crate-type = ["cdylib"]
 

@@ -12,6 +12,7 @@
   },
   "devDependencies": {
     "@wasm-tool/wasm-pack-plugin": "^1.1.0",
+    "mocha": "9.2.2",
     "rimraf": "^3.0.0",
     "ts-node": "10.7.0",
     "typedoc": "0.22.13",
