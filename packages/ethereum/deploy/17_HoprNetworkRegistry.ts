@@ -39,7 +39,11 @@ const main = async function ({ ethers, deployments, getNamedAccounts, network }:
       console.log(`Disabled "HoprNetworkRegistry" in production.`)
     }
   }
-  console.log(`NetworkRegistry on ${network.name} network with tags ${Object.keys(network.tags)} is ${(await networkRegistry.enabled())? "enabled": "disabled"}.`)
+  console.log(
+    `NetworkRegistry on ${network.name} network with tags ${Object.keys(network.tags)} is ${
+      (await networkRegistry.enabled()) ? 'enabled' : 'disabled'
+    }.`
+  )
 }
 
 main.dependencies = ['preDeploy', 'HoprNetworkRegistryProxy']

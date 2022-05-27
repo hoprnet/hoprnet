@@ -12,7 +12,7 @@ const DUMMY_NFT_BOOST = 10
 const MINTER_ROLE = utils.keccak256(utils.toUtf8Bytes('MINTER_ROLE'))
 const DEFAULT_ADMIN_ROLE = '0x0000000000000000000000000000000000000000000000000000000000000000'
 const NFT_BLOCKED = utils.keccak256(utils.toUtf8Bytes('NftBlocked(uint256)'))
-const DEV_BANK_ADDRESS = '0x2402da10A6172ED018AEEa22CA60EDe1F766655C';
+const DEV_BANK_ADDRESS = '0x2402da10A6172ED018AEEa22CA60EDe1F766655C'
 
 const main: DeployFunction = async function ({ ethers, deployments, getNamedAccounts, network }: HardhatRuntimeEnvironment) {
   const { deployer, admin } = await getNamedAccounts()
