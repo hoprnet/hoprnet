@@ -9,6 +9,7 @@ use wasm_bindgen::prelude::*;
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
+/// Dummy function to test WASM.
 #[wasm_bindgen]
 pub fn dummy_get_one() -> String {
     String::from("1")
