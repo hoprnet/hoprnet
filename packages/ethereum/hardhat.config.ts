@@ -32,6 +32,8 @@ import { writeFileSync, realpathSync } from 'fs'
 import { TASK_TEST_SETUP_TEST_ENVIRONMENT } from 'hardhat/builtin-tasks/task-names'
 import { HARDHAT_NETWORK_NAME } from 'hardhat/plugins'
 import { TASK_DEPLOY_RUN_DEPLOY } from 'hardhat-deploy'
+import stake, { StakeOpts } from './tasks/stake'
+import { MIN_STAKE } from './utils/constants'
 
 const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, HOPR_ENVIRONMENT_ID, HOPR_HARDHAT_TAG } = process.env
 
@@ -192,6 +194,13 @@ task<RegisterOpts>(
   .addParam<RegisterOpts['task']>('task', 'The task to run', undefined, types.string)
   .addOptionalParam<string>('nativeAddresses', 'A list of native addresses', undefined, types.string)
   .addOptionalParam<string>('peerIds', 'A list of peerIds', undefined, types.string)
+
+task<StakeOpts>(
+  'stake',
+  "Used by CI tests to stake tokens to the running staking program.",
+  stake
+)
+  .addParam<StakeOpts['amount']>('taamountsk', 'txHOPR token amount (in wei) that will be staked', MIN_STAKE.toString(), types.string)
 
 function getSortedFiles(dependenciesGraph) {
   const tsort = require('tsort')

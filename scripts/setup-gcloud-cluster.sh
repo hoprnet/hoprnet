@@ -139,7 +139,7 @@ for ip in ${node_ips}; do
 done
 
 # To test Network registry, the cluster_size is greater or equal to 2 and staker_addresses are provided as parameters
-# TODO: the first staker_addresses[0] (the one that staked) shoud call `transferAndCall` function
+# TODO: call stake API so that the first staker_addresses[0] stake in the current program
 # TODO: call register API and register staker_addresses with node peer ids
 
 # We cannot poll for NAT nodes, because they do not expose 9091 to the outside world

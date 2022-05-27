@@ -1,8 +1,8 @@
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
 import { DeployFunction } from 'hardhat-deploy/types'
-import type { HoprBoost } from '../src/types'
+import type { HoprBoost, HoprToken } from '../src/types'
 import { utils } from 'ethers'
-import { DEV_NFT_BOOST } from '../utils/constants'
+import { CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES, DEV_NFT_BOOST, MIN_STAKE } from '../utils/constants'
 import type { HoprStakingProxyForNetworkRegistry } from '../src/types'
 
 const DEV_NFT_TYPE = 'Dev'
@@ -62,14 +62,6 @@ const main: DeployFunction = async function ({
     devNftIndex = Math.max(blockNftTypeMax, index) + 1
   }
 
-  // add special NFT types (dev NFTs) in network registry for staging envionment
-  if (network.tags.staging) {
-    const registryProxy = (await ethers.getContractFactory('HoprStakingProxyForNetworkRegistry')).attach(
-      registryProxyDeployment.address
-    ) as HoprStakingProxyForNetworkRegistry
-    await registryProxy.ownerBatchAddNftTypeAndRank([devNftIndex], [DEV_NFT_BOOST])
-  }
-
   console.log(
     `HoprBoost NFT now has ${
       index - 1
@@ -99,6 +91,44 @@ const main: DeployFunction = async function ({
     console.log(`Admin ${admin} has ${await hoprBoost.balanceOf(admin)} Boost NFTs`)
     // // renounce its MINTER_ROLE, if needed
     // await hoprBoost.renounceRole(MINTER_ROLE, deployer);
+  }
+
+  if (network.tags.staging) {
+    // add special NFT types (dev NFTs) in network registry for staging envionment
+    const registryProxy = (await ethers.getContractFactory('HoprStakingProxyForNetworkRegistry')).attach(
+      registryProxyDeployment.address
+    ) as HoprStakingProxyForNetworkRegistry
+    await registryProxy.ownerBatchAddNftTypeAndRank([devNftIndex], [DEV_NFT_BOOST])
+
+    try {
+      // mint minimum stake to addresses that will stake and are binded to nodes in NR
+      const tokenContract = await deployments.get('HoprToken')
+      const hoprToken = (await ethers.getContractFactory('HoprToken')).attach(tokenContract.address) as HoprToken
+      await hoprToken.mint(
+        CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0],
+        MIN_STAKE,
+        ethers.constants.HashZero,
+        ethers.constants.HashZero
+      )
+      await hoprToken.mint(
+        CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[2],
+        MIN_STAKE,
+        ethers.constants.HashZero,
+        ethers.constants.HashZero
+      )
+      console.log(`... minting ${MIN_STAKE} txHOPR to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0] and [2]`)
+    } catch (error) {
+      console.error(`Cannot mint txHOPR to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0] and CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[2] due to ${error}`)
+    }
+    
+    try {
+      await hoprBoost.batchMint([CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1], CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[3]], DEV_NFT_TYPE, DEV_NFT_TYPE, DEV_NFT_BOOST, 0, {
+        gasLimit: 4e6
+      })
+      console.log(`... minting ${DEV_NFT_TYPE} NFTs to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1] and [3]`)
+    } catch (error) {
+      console.error(`Cannot mint ${DEV_NFT_TYPE} NFTs to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1] and CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[3] due to ${error}`)
+    }
   }
 
   const isDeployerAdmin = await hoprBoost.hasRole(DEFAULT_ADMIN_ROLE, deployer)
