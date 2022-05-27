@@ -2,9 +2,10 @@ import { HardhatRuntimeEnvironment } from 'hardhat/types'
 import { DeployFunction } from 'hardhat-deploy/types'
 import type { HoprBoost } from '../src/types'
 import { utils } from 'ethers'
+import { DEV_NFT_BOOST } from '../utils/constants'
+import type { HoprStakingProxyForNetworkRegistry } from '../src/types'
 
 const DEV_NFT_TYPE = 'Dev'
-const DEV_NFT_BOOST = 0
 const NUM_DEV_NFT = 3
 const DUMMY_NFT_TYPE = 'Dummy'
 const DUMMY_NFT_BOOST = 10
@@ -13,12 +14,13 @@ const DEFAULT_ADMIN_ROLE = '0x00000000000000000000000000000000000000000000000000
 const NFT_BLOCKED = utils.keccak256(utils.toUtf8Bytes('NftBlocked(uint256)'))
 const DEV_BANK_ADDRESS = '0x2402da10A6172ED018AEEa22CA60EDe1F766655C';
 
-const main: DeployFunction = async function ({ ethers, deployments, getNamedAccounts }: HardhatRuntimeEnvironment) {
+const main: DeployFunction = async function ({ ethers, deployments, getNamedAccounts, network }: HardhatRuntimeEnvironment) {
   const { deployer, admin } = await getNamedAccounts()
 
   // check boost types being created
   const stakeDeployment = await deployments.get('HoprStake')
   const boostDeployment = await deployments.get('HoprBoost')
+  const registryProxyDeployment = await deployments.get('HoprNetworkRegistryProxy')
   const hoprBoost = (await ethers.getContractFactory('HoprBoost')).attach(boostDeployment.address) as HoprBoost
 
   // find the blocked NFT types and check the created boost types
@@ -53,6 +55,14 @@ const main: DeployFunction = async function ({ ethers, deployments, getNamedAcco
   // assign the dev nft if dev nft does not exist.
   if (!devNftIndex) {
     devNftIndex = Math.max(blockNftTypeMax, index) + 1
+  }
+
+  // add special NFT types (dev NFTs) in network registry for staging envionment
+  if (network.tags.staging) {
+    const registryProxy = (await ethers.getContractFactory('HoprStakingProxyForNetworkRegistry')).attach(
+      registryProxyDeployment.address
+    ) as HoprStakingProxyForNetworkRegistry
+    await registryProxy.ownerBatchAddNftTypeAndRank([devNftIndex], [DEV_NFT_BOOST])
   }
 
   console.log(

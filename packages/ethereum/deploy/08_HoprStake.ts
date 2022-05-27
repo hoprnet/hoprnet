@@ -1,7 +1,7 @@
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
 import { DeployFunction } from 'hardhat-deploy/types'
+import { getHoprStakeContractName } from '../utils/constants'
 
-const S3_PROGRAM_END = 1658836800
 const PROTOCOL_CONFIG = require('../../core/protocol-config.json')
 
 const main: DeployFunction = async function ({
@@ -27,23 +27,13 @@ const main: DeployFunction = async function ({
   const latestBlockTimestamp = (await ethers.provider.getBlock('latest')).timestamp
   console.log(`Latest block timestamp is ${latestBlockTimestamp}`)
 
-  if (latestBlockTimestamp <= S3_PROGRAM_END) {
-    // deploy season 3
-    await deploy('HoprStake', {
-      contract: 'HoprStakeSeason3',
-      from: deployer,
-      args: [HoprBoost.address, admin, xHOPR.address, wxHOPR.address],
-      log: true
-    })
-  } else {
-    // deploy season 4
-    await deploy('HoprStake', {
-      contract: 'HoprStakeSeason4',
-      from: deployer,
-      args: [HoprBoost.address, admin, xHOPR.address, wxHOPR.address],
-      log: true
-    })
-  }
+  const stakeContractName = getHoprStakeContractName(latestBlockTimestamp)
+  await deploy('HoprStake', {
+    contract: stakeContractName,
+    from: deployer,
+    args: [HoprBoost.address, admin, xHOPR.address, wxHOPR.address],
+    log: true
+  })
 }
 
 main.tags = ['HoprStake']

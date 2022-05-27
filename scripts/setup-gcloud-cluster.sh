@@ -138,6 +138,10 @@ for ip in ${node_ips}; do
   fund_if_empty "${eth_address}" "${environment}"
 done
 
+# To test Network registry, the cluster_size is greater or equal to 2 and a staker_address is provided as a parameter
+# Staker has staked 1000 txHOPR token and is ready to register nodes' peerId to the registry contract
+# The seconde node should have a Dev NFT
+
 # We cannot poll for NAT nodes, because they do not expose 9091 to the outside world
 if [[ "${docker_image}" != *-nat:* ]]; then
   for ip in ${node_ips}; do
