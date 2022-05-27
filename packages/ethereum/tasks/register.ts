@@ -1,6 +1,10 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import { utils } from 'ethers'
-import type { HoprNetworkRegistry, HoprDummyProxyForNetworkRegistry, HoprStakingProxyForNetworkRegistry } from '../src/types'
+import type {
+  HoprNetworkRegistry,
+  HoprDummyProxyForNetworkRegistry,
+  HoprStakingProxyForNetworkRegistry
+} from '../src/types'
 
 export type RegisterOpts =
   | {
@@ -34,7 +38,9 @@ async function main(
   let hoprProxyAddress: string
   let hoprNetworkRegistryAddress: string
   try {
-    hoprProxyAddress = !network.tags.staging ? (await deployments.get('HoprNetworkRegistryProxy')).address : (await deployments.get('HoprNetworkRegistryProxy')).address
+    hoprProxyAddress = !network.tags.staging
+      ? (await deployments.get('HoprNetworkRegistryProxy')).address
+      : (await deployments.get('HoprNetworkRegistryProxy')).address
     hoprNetworkRegistryAddress = (await deployments.get('HoprNetworkRegistry')).address
   } catch {
     console.error(
@@ -49,13 +55,13 @@ async function main(
   const provider = new ethers.providers.JsonRpcProvider()
   const signer = provider.getSigner()
 
-  const hoprProxy = !network.tags.staging 
-    ? (await ethers.getContractFactory('HoprDummyProxyForNetworkRegistry'))
-      .connect(signer)
-      .attach(hoprProxyAddress) as HoprDummyProxyForNetworkRegistry
-    : (await ethers.getContractFactory('HoprStakingProxyForNetworkRegistry'))
-      .connect(signer)
-      .attach(hoprProxyAddress) as HoprStakingProxyForNetworkRegistry
+  const hoprProxy = !network.tags.staging
+    ? ((await ethers.getContractFactory('HoprDummyProxyForNetworkRegistry'))
+        .connect(signer)
+        .attach(hoprProxyAddress) as HoprDummyProxyForNetworkRegistry)
+    : ((await ethers.getContractFactory('HoprStakingProxyForNetworkRegistry'))
+        .connect(signer)
+        .attach(hoprProxyAddress) as HoprStakingProxyForNetworkRegistry)
 
   const hoprNetworkRegistry = (await ethers.getContractFactory('HoprNetworkRegistry'))
     .connect(signer)
@@ -80,7 +86,7 @@ async function main(
       }
 
       // in staging account, special DEV nfts are minted; in non-stagin environment, add addresses directly to proxy
-      if (!network.tags.staging ) {
+      if (!network.tags.staging) {
         await (await (hoprProxy as HoprDummyProxyForNetworkRegistry).ownerBatchAddAccounts(nativeAddresses)).wait()
       }
       await (await hoprNetworkRegistry.ownerRegister(nativeAddresses, peerIds)).wait()
