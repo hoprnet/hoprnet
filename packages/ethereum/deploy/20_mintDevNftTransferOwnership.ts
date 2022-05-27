@@ -11,6 +11,7 @@ const DUMMY_NFT_BOOST = 10
 const MINTER_ROLE = utils.keccak256(utils.toUtf8Bytes('MINTER_ROLE'))
 const DEFAULT_ADMIN_ROLE = '0x0000000000000000000000000000000000000000000000000000000000000000'
 const NFT_BLOCKED = utils.keccak256(utils.toUtf8Bytes('NftBlocked(uint256)'))
+const DEV_BANK_ADDRESS = '0x2402da10A6172ED018AEEa22CA60EDe1F766655C';
 
 const main: DeployFunction = async function ({ ethers, deployments, getNamedAccounts }: HardhatRuntimeEnvironment) {
   const { deployer, admin } = await getNamedAccounts()
@@ -86,14 +87,18 @@ const main: DeployFunction = async function ({ ethers, deployments, getNamedAcco
   }
 
   const isDeployerAdmin = await hoprBoost.hasRole(DEFAULT_ADMIN_ROLE, deployer)
-  if (isDeployerAdmin && deployer !== admin) {
-    // make admin MINTER
-    await hoprBoost.grantRole(MINTER_ROLE, admin)
-    // transfer DEFAULT_ADMIN_ROLE from deployer to admin
-    await hoprBoost.grantRole(DEFAULT_ADMIN_ROLE, admin)
-    console.log('DEFAULT_ADMIN_ROLE is transferred.')
-    await hoprBoost.renounceRole(DEFAULT_ADMIN_ROLE, deployer)
-    console.log('DEFAULT_ADMIN_ROLE is transferred.')
+  if (isDeployerAdmin) {
+    // Assign the Dev Bank as a minter role for HOPR Boost
+    await hoprBoost.grantRole(MINTER_ROLE, DEV_BANK_ADDRESS)
+    if (deployer !== admin) {
+      // make admin MINTER
+      await hoprBoost.grantRole(MINTER_ROLE, admin)
+      // transfer DEFAULT_ADMIN_ROLE from deployer to admin
+      await hoprBoost.grantRole(DEFAULT_ADMIN_ROLE, admin)
+      console.log('DEFAULT_ADMIN_ROLE is transferred.')
+      await hoprBoost.renounceRole(DEFAULT_ADMIN_ROLE, deployer)
+      console.log('DEFAULT_ADMIN_ROLE is transferred.')
+    }
   }
 }
 
