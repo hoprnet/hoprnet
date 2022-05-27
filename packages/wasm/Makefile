@@ -1,5 +1,5 @@
 # Append here when new WASM crate is added
-PACKAGES = common
+PACKAGES = hopr-wasm-common
 ##########################################
 
 PKG_DIRS = $(addsuffix /pkg, $(PACKAGES))

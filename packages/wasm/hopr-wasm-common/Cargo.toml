@@ -9,11 +9,20 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "LGPL-3.0-only"
 
 [lib]
+name = "hopr_wasm_common"
 path = "src/lib.rs"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"] # rlib is necessary to run integration tests
+
+[[test]]
+name = "hopr_wasm_common_tets"
+path = "tests/node.rs"
+
 
 [dependencies]
 wasm-bindgen = { version = "0.2.80", features = ["serde-serialize"] }
 wasm-bindgen-test = "0.3.30"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3.0"
