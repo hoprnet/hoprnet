@@ -138,9 +138,9 @@ for ip in ${node_ips}; do
   fund_if_empty "${eth_address}" "${environment}"
 done
 
-# To test Network registry, the cluster_size is greater or equal to 2 and a staker_address is provided as a parameter
-# Staker has staked 1000 txHOPR token and is ready to register nodes' peerId to the registry contract
-# The seconde node should have a Dev NFT
+# To test Network registry, the cluster_size is greater or equal to 2 and staker_addresses are provided as parameters
+# TODO: the first staker_addresses[0] (the one that staked) shoud call `transferAndCall` function
+# TODO: call register API and register staker_addresses with node peer ids
 
 # We cannot poll for NAT nodes, because they do not expose 9091 to the outside world
 if [[ "${docker_image}" != *-nat:* ]]; then
