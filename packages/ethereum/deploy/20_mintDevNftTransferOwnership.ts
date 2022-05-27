@@ -118,16 +118,27 @@ const main: DeployFunction = async function ({
       )
       console.log(`... minting ${MIN_STAKE} txHOPR to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0] and [2]`)
     } catch (error) {
-      console.error(`Cannot mint txHOPR to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0] and CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[2] due to ${error}`)
+      console.error(
+        `Cannot mint txHOPR to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0] and CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[2] due to ${error}`
+      )
     }
-    
+
     try {
-      await hoprBoost.batchMint([CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1], CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[3]], DEV_NFT_TYPE, DEV_NFT_TYPE, DEV_NFT_BOOST, 0, {
-        gasLimit: 4e6
-      })
+      await hoprBoost.batchMint(
+        [CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1], CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[3]],
+        DEV_NFT_TYPE,
+        DEV_NFT_TYPE,
+        DEV_NFT_BOOST,
+        0,
+        {
+          gasLimit: 4e6
+        }
+      )
       console.log(`... minting ${DEV_NFT_TYPE} NFTs to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1] and [3]`)
     } catch (error) {
-      console.error(`Cannot mint ${DEV_NFT_TYPE} NFTs to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1] and CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[3] due to ${error}`)
+      console.error(
+        `Cannot mint ${DEV_NFT_TYPE} NFTs to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1] and CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[3] due to ${error}`
+      )
     }
   }
 
