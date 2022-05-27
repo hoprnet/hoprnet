@@ -9,6 +9,7 @@ This directory contains Rust WASM modules for HOPR.
 5. run `make all` for the first time from `packages/wasm`.
 
 ## Testing
+
 Each module can have it's own unit tests and integration tests.
 
 - Unit tests are placed within the module file
