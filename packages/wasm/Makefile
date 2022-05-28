@@ -1,4 +1,4 @@
-# Append here when new WASM crate is added
+# Append here when new Rust WASM crate is added (the list is space separated)
 PACKAGES = hopr-wasm-common
 ##########################################
 

@@ -7,9 +7,13 @@ import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
 import { setTimeout } from 'timers/promises'
 
-import Hopr, { createHoprNode } from '@hoprnet/hopr-core'
+import Hopr, {
+  createHoprNode,
+  resolveEnvironment,
+  supportedEnvironments,
+  ResolvedEnvironment
+} from '@hoprnet/hopr-core'
 import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
-import { resolveEnvironment, supportedEnvironments, ResolvedEnvironment } from '@hoprnet/hopr-core'
 
 import type { State } from './types'
 import setupAPI from './api'
@@ -23,7 +27,7 @@ import type { HoprOptions } from '@hoprnet/hopr-core'
 import { setLogger } from 'trace-unhandled'
 import { NetworkHealthIndicator } from '@hoprnet/hopr-core/lib/network/heartbeat'
 
-import { get_hoprd_version } from '@hoprnet/hopr-wasm'
+import * as wasm from '@hoprnet/hopr-wasm'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
@@ -391,7 +395,7 @@ async function main() {
   }
 
   try {
-    logs.log(`This is hoprd version ${get_hoprd_version()}`)
+    logs.log(`This is hoprd version ${wasm.common.get_hoprd_version()}`)
 
     // 1. Find or create an identity
     const peerId = await getIdentity({
