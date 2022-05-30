@@ -1,0 +1,40 @@
+/node_modules
+**/.DS_Store
+/.bin
+/build
+
+# Exclude databases resulting from local execution of hoprd
+/db
+
+/*.swp
+/.vercel
+
+/test/local-fixtures
+
+# logs
+*.log
+logs.txt
+
+# we need to specify the direct paths since act only supports strict git ignore checks
+/.direnv
+
+# yarn v2 specific
+/.yarn/*
+!/.yarn/patches
+!/.yarn/releases
+!/.yarn/plugins
+!/.yarn/sdks
+!/.yarn/versions
+/.pnp.*
+
+# Typescript build info resulting from Typescript Project References
+# see https://www.typescriptlang.org/docs/handbook/project-references.html
+**/*.tsbuildinfo
+
+.dockerignore
+Dockerfile
+.git
+.gitignore
+
+# no generated JS files
+packages/*/lib/
