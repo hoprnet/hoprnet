@@ -9,5 +9,5 @@ if (!majorNodeVersion || majorNodeVersion.length == 0 || parseInt(majorNodeVersi
   throw Error(`Incompatible Node.js version. Please use Node.js 15+`)
 }
 
-// Start bootstrap process after Node.js has been checked
+// Start bootstrap process *after* Node.js has been checked
 import('./index.js')
