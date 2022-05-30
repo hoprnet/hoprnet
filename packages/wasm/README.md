@@ -27,7 +27,7 @@ if (wasm.common.dummy_get_one() === '1') {
 1. `cd packages/wasm && wasm-pack new my-module`, this will create a new Rust crate for WASM.
 2. add `my-module` member in `packages/wasm/Cargo.toml`
 3. add `my-module` to `PACKAGES` space separated list in `packages/wasm/Makefile`
-4. run `make all` for the first time from `packages/wasm`.
+4. run `make all && make install` for the first time from `packages/wasm`.
 5. export your WASM Rust crate under it's alias in `packages/wasm/src/index.ts`, e.g.: `export * as my-modules from '../lib/my-module'`
 
 ## Testing
