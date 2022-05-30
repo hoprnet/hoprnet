@@ -22,7 +22,7 @@ if (wasm.common.dummy_get_one() === '1') {
 }
 ```
 
-## <a id="adding_mod"></a>  Adding a new Rust WASM module
+## <a id="adding_mod"></a> Adding a new Rust WASM module
 
 1. `cd packages/wasm && wasm-pack new my-module`, this will create a new Rust crate for WASM.
 2. add `my-module` member in `packages/wasm/Cargo.toml`
@@ -45,7 +45,7 @@ The Rust WASM code is not limited just to `@hoprnet/hopr-wasm` package. The exis
 2. Add `"@wasm-tool/wasm-pack-plugin": "^1.1.0"` as a `devDependency` in the existing package
 3. Make sure the `files` section in `package.json` contains the `lib` entry.
 4. Prepend `make` to script actions in `package.json` accordingly:
-    * for `build` action prepend: `make all && make install && ...`
-    * for `clean` action prepend: `make clean && ...`
-    * for `test` action prepend: `make test && ...`
+   - for `build` action prepend: `make all && make install && ...`
+   - for `clean` action prepend: `make clean && ...`
+   - for `test` action prepend: `make test && ...`
 5. Now you can add Rust crates as described in the [section above](#adding_mod).
