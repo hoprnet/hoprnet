@@ -1,5 +1,5 @@
 import fs from 'fs'
-import {read_file_to_string} from './io'
+import { read_file_to_string } from './io'
 import * as assert from 'assert'
 
 describe('test io abstraction for wasm', async function () {
