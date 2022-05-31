@@ -98,7 +98,10 @@ export type HoprOptions = {
     ip6?: NetOptions
   }
   heartbeatInterval?: number
+  heartbeatThreshold?: number
   heartbeatVariance?: number
+  networkQualityThreshold?: number
+  onChainConfirmations?: number
   testing?: {
     // when true, assume that the node is running in an isolated network and does
     // not need any connection to nodes outside of the subnet
@@ -270,10 +273,11 @@ class Hopr extends EventEmitter {
     this.networkPeers = new NetworkPeers(
       peers.map((p) => p.id),
       [this.id],
+      this.options.networkQualityThreshold,
       (peer: PeerId) => {
         this.libp2p.peerStore.delete(peer)
         this.publicNodesEmitter.emit('removePublicNode', peer)
-      }
+      },
     )
 
     // Initialize AccessControl
@@ -1258,7 +1262,7 @@ class Hopr extends EventEmitter {
           })
         },
         {
-          minDelay: durations.seconds(30),
+          minDelay: durations.seconds(1),
           maxDelay: durations.seconds(200),
           delayMultiple: 1.05
         }
@@ -1286,3 +1290,4 @@ export type { ChannelsToOpen, ChannelsToClose, NetworkHealthIndicator }
 export { resolveEnvironment, supportedEnvironments, type ResolvedEnvironment } from './environment'
 export { createLibp2pMock } from './libp2p.mock'
 export { sampleOptions } from './index.mock'
+export { CONFIRMATIONS } from '@hoprnet/hopr-core-ethereum'

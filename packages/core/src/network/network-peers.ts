@@ -1,7 +1,6 @@
 import { type HeartbeatPingResult } from './heartbeat'
 import PeerId from 'peer-id'
 import { randomSubset, debug } from '@hoprnet/hopr-utils'
-import { NETWORK_QUALITY_THRESHOLD } from '../constants'
 
 const log = debug('hopr-core:network-peers')
 
@@ -38,6 +37,7 @@ class NetworkPeers {
   constructor(
     existingPeers: PeerId[],
     private excludedPeers: PeerId[] = [], // populated only by constructor, does not change during runtime
+    private networkQualityThreshold: number,
     private onPeerOffline?: (peer: PeerId) => void
   ) {
     // register all existing peers
@@ -99,7 +99,7 @@ class NetworkPeers {
         quality: Math.max(0, previousEntry.quality - 0.1),
         origin: previousEntry.origin
       }
-      if (newEntry.quality < NETWORK_QUALITY_THRESHOLD) {
+      if (newEntry.quality < this.networkQualityThreshold) {
         // trigger callback first to cut connections
         this.onPeerOffline?.(pingResult.destination)
 
@@ -222,7 +222,7 @@ class NetworkPeers {
       const quality = this.qualityOf(peer)
       if (quality.toFixed(1) === '1.0') {
         bestAvailabilityNodes++
-      } else if (quality < NETWORK_QUALITY_THRESHOLD) {
+      } else if (quality < this.networkQualityThreshold) {
         badAvailabilityNodes++
       }
 
@@ -237,7 +237,7 @@ class NetworkPeers {
 
     const msgTotalNodes = `${peers.length} node${peers.length == 1 ? '' : 's'} in total`
     const msgBestNodes = `${bestAvailabilityNodes} node${bestAvailabilityNodes == 1 ? '' : 's'} with quality 1.0`
-    const msgBadNodes = `${badAvailabilityNodes} node${badAvailabilityNodes == 1 ? '' : 's'} with quality below 0.5`
+    const msgBadNodes = `${badAvailabilityNodes} node${badAvailabilityNodes == 1 ? '' : 's'} with quality below ${this.networkQualityThreshold}`
     out += `network peers status: ${msgTotalNodes}, ${msgBestNodes}, ${msgBadNodes}\n`
 
     return out
