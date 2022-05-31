@@ -24,10 +24,10 @@ if (wasm.common.dummy_get_one() === '1') {
 
 ## <a id="adding_mod"></a> Adding a new Rust WASM module
 
-1. `cd packages/wasm && wasm-pack new my-module`, this will create a new Rust crate for WASM.
-2. add `my-module` member in `packages/wasm/Cargo.toml`
-3. add `my-module` to `PACKAGES` space separated list in `packages/wasm/Makefile`
-4. run `make all && make install` for the first time from `packages/wasm`.
+1. `cd packages/wasm/crates`
+2. `wasm-pack new my-module`, this will create a new Rust crate for WASM.
+3. add `my-module` to `PACKAGES` space separated list in `Makefile`
+4. run `make all && make install` for the first time
 5. export your WASM Rust crate under it's alias in `packages/wasm/src/index.ts`, e.g.: `export * as my-modules from '../lib/my-module'`
 
 ## Testing
@@ -41,11 +41,13 @@ Each WASM module can have it's own unit tests and integration tests.
 
 The Rust WASM code is not limited just to `@hoprnet/hopr-wasm` package. The existing tooling and structure in `@hoprnet/hopr-wasm` can be easily copied to any existing package within the monorepo.
 
-1. Copy the `Makefile` from `packages/wasm` to `packages/<other_package>`
-2. Add `"@wasm-tool/wasm-pack-plugin": "^1.1.0"` as a `devDependency` in the existing package
-3. Make sure the `files` section in `package.json` contains the `lib` entry.
-4. Prepend `make` to script actions in `package.json` accordingly:
-   - for `build` action prepend: `make all && make install && ...`
-   - for `clean` action prepend: `make clean && ...`
-   - for `test` action prepend: `make test && ...`
-5. Now you can add Rust crates as described in the [section above](#adding_mod).
+1. Create an empty directory `packages/<other_package>/crates`
+2. Copy the `Makefile` from `packages/wasm` to `packages/<other_package>/crates`
+3. Set the `PACKAGES` variable in the `packages/<other_package>/crates/Makefile` to empty.
+4. Add `"@wasm-tool/wasm-pack-plugin": "^1.1.0"` as a `devDependency` in the existing package
+5. Make sure the `files` section in `package.json` contains the `lib` entry.
+6. Prepend `make` to script actions in `package.json` accordingly:
+   - for `build` action prepend: `make -C crates all && make -C crates install && ...`
+   - for `clean` action prepend: `make -C crates clean && ...`
+   - for `test` action prepend: `make -C crates test && ...`
+7. Now you can add Rust crates as described in the [section above](#adding_mod)

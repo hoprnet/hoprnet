@@ -11,9 +11,9 @@
     "node": "16"
   },
   "scripts": {
-    "clean": "make clean && rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
-    "build": "make all && make install && tsc -p . && echo 'hopr-wasm build completed'",
-    "test": "make test && NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace"
+    "clean": "make -C crates clean && rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
+    "build": "make -C crates all && make -C crates install && tsc -p . && echo 'hopr-wasm build completed'",
+    "test": "make -C crates test && NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace"
   },
   "devDependencies": {
     "@wasm-tool/wasm-pack-plugin": "^1.1.0",

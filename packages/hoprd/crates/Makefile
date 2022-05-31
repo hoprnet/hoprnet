@@ -1,5 +1,5 @@
 # Append here when new Rust WASM crate is added (the list is space separated)
-PACKAGES = hopr-wasm-common
+PACKAGES =
 ##########################################
 
 PKG_DIRS = $(addsuffix /pkg, $(PACKAGES))
@@ -20,10 +20,10 @@ $(JS_FILES):
 	@echo "--- Built WASM module in '$(@D)' ---"
 
 install:
-	@mkdir -p lib
-	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.js) lib/
-	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.ts) lib/
-	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.wasm) lib/
+	@mkdir -p ../lib
+	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.js) ../lib/
+	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.ts) ../lib/
+	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.wasm) ../lib/
 
 clean:
 	rm -rf $(PKG_DIRS)
