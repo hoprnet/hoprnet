@@ -277,7 +277,7 @@ class Hopr extends EventEmitter {
       (peer: PeerId) => {
         this.libp2p.peerStore.delete(peer)
         this.publicNodesEmitter.emit('removePublicNode', peer)
-      },
+      }
     )
 
     // Initialize AccessControl
@@ -1248,7 +1248,9 @@ class Hopr extends EventEmitter {
         () => {
           return new Promise<void>(async (resolve, reject) => {
             try {
-              const nativeBalance = await this.getNativeBalance()
+              // call connector directly and don't use cache, since this is
+              // most likely outdated during node startup
+              const nativeBalance = await this.connector.getNativeBalance(false)
               if (nativeBalance.toBN().gte(MIN_NATIVE_BALANCE)) {
                 resolve()
               } else {

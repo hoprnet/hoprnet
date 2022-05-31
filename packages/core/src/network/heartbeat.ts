@@ -4,9 +4,7 @@ import type NetworkPeers from './network-peers'
 import type AccessControl from './access-control'
 import type PeerId from 'peer-id'
 import { randomInteger, u8aEquals, debug, retimer, nAtATime, u8aToHex } from '@hoprnet/hopr-utils'
-import {
-  HEARTBEAT_TIMEOUT,
-} from '../constants'
+import { HEARTBEAT_TIMEOUT } from '../constants'
 import { createHash, randomBytes } from 'crypto'
 
 import type { Subscribe, SendMessage } from '../index'

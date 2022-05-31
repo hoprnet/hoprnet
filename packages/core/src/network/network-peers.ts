@@ -237,7 +237,9 @@ class NetworkPeers {
 
     const msgTotalNodes = `${peers.length} node${peers.length == 1 ? '' : 's'} in total`
     const msgBestNodes = `${bestAvailabilityNodes} node${bestAvailabilityNodes == 1 ? '' : 's'} with quality 1.0`
-    const msgBadNodes = `${badAvailabilityNodes} node${badAvailabilityNodes == 1 ? '' : 's'} with quality below ${this.networkQualityThreshold}`
+    const msgBadNodes = `${badAvailabilityNodes} node${badAvailabilityNodes == 1 ? '' : 's'} with quality below ${
+      this.networkQualityThreshold
+    }`
     out += `network peers status: ${msgTotalNodes}, ${msgBestNodes}, ${msgBadNodes}\n`
 
     return out
