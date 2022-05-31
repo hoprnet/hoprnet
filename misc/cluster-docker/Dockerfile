@@ -1,7 +1,8 @@
-# Run HOPRd  within a single container using npm
+# Run a cluster of 5 hoprd nodes and a hardhat instance in a single Docker
+# container
 
 # use slim version of node on Debian buster for smaller image sizes
-FROM node:16-bullseye-slim@sha256:8265ac132f720998222008355e11535caf53d6bccecbb562a055605138975b4e as build
+FROM node:16-buster-slim@sha256:380112b3f3df96ae593b0b89f4c44e501e9ae0ec1580b270b50f8ac52688256e as build
 
 # python is used by some nodejs dependencies as an installation requirement
 RUN apt-get update && \
@@ -30,14 +31,18 @@ ENV npm_config_build_from_source false
 RUN yarn add @hoprnet/hoprd@${PACKAGE_VERSION}
 
 # use slim version of node on Debian buster for smaller image sizes
-FROM node:16-bullseye-slim@sha256:8265ac132f720998222008355e11535caf53d6bccecbb562a055605138975b4e as runtime
+FROM node:16-buster-slim@sha256:380112b3f3df96ae593b0b89f4c44e501e9ae0ec1580b270b50f8ac52688256e as runtime
 
 # we use tini as process 1 to catch signals properly, which is also built into Docker by default
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
-     tini \
+     tini supervisor \
   && rm -rf /var/lib/apt/lists/* \
   && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
+
+RUN mkdir -p /var/log/supervisor
+
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 WORKDIR /app
 
@@ -63,7 +68,8 @@ VOLUME ["/app/hoprd-db"]
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
 ENV DEBUG 'hopr*'
-ENV NODE_OPTIONS=--max_old_space_size=4096
+# only 1GB of RAM is used at max to keep overall memory consumption of a container at 6GB max
+ENV NODE_OPTIONS=--max_old_space_size=1024
 
 # Admin web server
 EXPOSE 3000
@@ -74,4 +80,4 @@ EXPOSE 8080
 # p2p
 EXPOSE 9091
 
-ENTRYPOINT ["/usr/bin/tini", "--", "yarn", "hoprd"]
+ENTRYPOINT ["/usr/bin/tini", "--", "supervisord"]
