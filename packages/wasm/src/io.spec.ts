@@ -9,7 +9,7 @@ describe('test io abstraction for wasm', async function () {
 
     assert.equal(false, data.hasError())
     assert.equal(undefined, data.error)
-    assert.deepEqual(data.data , fs.readFileSync(file))
+    assert.deepEqual(data.data, fs.readFileSync(file))
   })
 
   it('test reading error', async function () {

@@ -29,8 +29,7 @@ class XOrError<X> {
   }
 }
 
-export class DataOrError extends XOrError<Uint8Array> { }
-
+export class DataOrError extends XOrError<Uint8Array> {}
 
 /**
  * Wrapper for reading file via WASM
