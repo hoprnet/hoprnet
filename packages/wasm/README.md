@@ -30,6 +30,9 @@ if (wasm.common.dummy_get_one() === '1') {
 4. run `make all && make install` for the first time
 5. export your WASM Rust crate under it's alias in `packages/wasm/src/index.ts`, e.g.: `export * as my-modules from '../lib/my-module'`
 
+Optionally if you want to make your crate available to other crates,
+add path to it into the `members` section in `Cargo.toml` in the root of the monorepo. 
+
 ## Testing
 
 Each WASM module can have it's own unit tests and integration tests.
