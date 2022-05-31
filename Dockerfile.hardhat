@@ -14,7 +14,9 @@ RUN apt-get update \
      openssl \
      pkg-config \
      python3 \
-     wget
+     wget \
+  && rm -rf /var/lib/apt/lists/* \
+  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
 
 # taken from
 # https://github.com/rust-lang/docker-rust/blob/186e4d580b5581861907c015d6b58919c809e375/1.61.0/bullseye/Dockerfile
