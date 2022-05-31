@@ -2,34 +2,41 @@ import fs from 'fs'
 
 // This file will contain the Runtime Environment Abstraction Layer (REAL) for Node.js or browser
 
-export class DataOrError {
-  private d: Uint8Array
+class XOrError<X> {
+  private d: X
   private e: any
 
-  get data() {
+  public get data() {
     return this.d
   }
 
-  set data(val) {
+  public set data(val) {
     this.d = val
     this.e = undefined
   }
 
-  get error() {
+  public get error() {
     return this.e
   }
 
-  set error(val) {
+  public set error(val) {
     this.e = val
     this.d = undefined
   }
+
+  public hasError(): boolean {
+    return this.e != undefined
+  }
 }
+
+export class DataOrError extends XOrError<Uint8Array> { }
+
 
 /**
  * Wrapper for reading file via WASM
  * @param file File path
  */
-export function read_file_to_string(file: string): DataOrError {
+export function read_file(file: string): DataOrError {
   let ret = new DataOrError()
   try {
     ret.data = fs.readFileSync(file)
