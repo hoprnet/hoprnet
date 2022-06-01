@@ -2,7 +2,14 @@ import fs from 'fs'
 
 // This file will contain the Runtime Environment Abstraction Layer (REAL) for Node.js or browser
 
-class XOrError<X> {
+/**
+ * Simple base class for working-around the impossibility of Rust wasm_bindgen to handle
+ * Result<X, JsValue> return type for bound JS functions which can throw an exception.
+ *
+ * Create a subclass of this base class to return value or error when exception is being caught
+ * in the JS function. See `DataOrError` and `read_file` function in this module as an example/
+ */
+abstract class XOrError<X> {
   private d: X
   private e: any
 
@@ -29,6 +36,9 @@ class XOrError<X> {
   }
 }
 
+/**
+ * Class wrapping Uint8Array or error.
+ */
 export class DataOrError extends XOrError<Uint8Array> {}
 
 /**
