@@ -58,12 +58,26 @@ development release or any other older release.
 
 ### Install via NPM
 
+Please make sure you are running a compatible version of Node.js.
+
+```sh
+node --version
+# v16.15.0
+```
+
+To always use the right version of Node.js, we recommend to install [Fast Node.js Manager (fnm)](https://github.com/Schniz/fnm) and run `fnm use`.
+
+```sh
+fnm use
+# Using Node v16.15.0
+```
+
 Using the [hoprd npm package][6]:
 
 ```sh
 mkdir MY_NEW_HOPR_TEST_FOLDER
 cd MY_NEW_HOPR_TEST_FOLDER
-npm install @hoprnet/hoprd@1.73
+npm install @hoprnet/hoprd@1.88
 ```
 
 ### Install via Docker
@@ -452,10 +466,9 @@ a guideline on how to get started.
 As some tools are only partially supported, please tag the respective team member
 whenever you need an issue about a particular tool.
 
-| Maintainer       | Technology  |
-| :--------------- | :---------: |
-| @jjperezaguinaga | Visual Code |
-| @tolbrino        |     Nix     |
+| Maintainer | Technology |
+| :--------- | :--------: |
+| @tolbrino  |    Nix     |
 
 ## Contact
 
