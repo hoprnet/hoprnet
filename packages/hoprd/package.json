@@ -5,9 +5,9 @@
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "LGPL-3.0-only",
-  "types": "lib/index.d.ts",
+  "types": "lib/main.d.cts",
   "type": "module",
-  "bin": "lib/index.js",
+  "bin": "lib/main.cjs",
   "files": [
     "lib",
     "npm-shrinkwrap.json",
@@ -20,16 +20,13 @@
   "engines": {
     "node": "16"
   },
-  "exports": {
-    ".": "./lib/index.ts"
-  },
   "scripts": {
     "clean": "rimraf ./lib ./tsconfig.tsbuildinfo",
     "build": "yarn clean && tsc -p . && yarn buildAdmin && chmod u+x lib/*.js",
     "buildAdmin": "HOPRD_GIT_COMMIT=$(git rev-parse --short HEAD) next build hopr-admin",
     "test": "NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace --exit . test",
     "prebuild": "next telemetry disable",
-    "start": "node lib/index.js --admin --init --rest",
+    "start": "node lib/main.cjs --admin --init --rest",
     "dev": "NODE_ENV=development yarn start --environment hardhat-localhost --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses --testPreferLocalAddresses --testNoAuthentication",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
@@ -58,6 +55,7 @@
     "react-dom": "17.0.2",
     "rlp": "2.2.7",
     "run-queue": "2.0.1",
+    "semver": "7.3.7",
     "strip-ansi": "6.0.1",
     "swagger-ui-express": "4.3.0",
     "tiny-hashes": "1.0.1",
