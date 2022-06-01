@@ -24,9 +24,10 @@ const minimumVersion = semver.valid(semver.coerce(pkg.engines.node))
 
 if (semver.lt(nodeVersion, minimumVersion)) {
   console.error(
-    `Incompatible Node.js version. Got Node.js v${nodeVersion} but required is at least Node.js v${semver.clean(
-      minimumVersion
-    )}`
+    `Incompatible Node.js version. Got Node.js v${nodeVersion.replace(
+      /v/,
+      ''
+    )} but required is at least Node.js v${semver.clean(minimumVersion)}`
   )
   process.exit(1)
 }
