@@ -33,7 +33,7 @@ To add a new Rust WASM module (crate) into the existing `wasm` package:
 5. export your WASM Rust crate under it's alias in `packages/wasm/src/index.ts`, e.g.: `export * as my-modules from '../lib/my-module'`
 
 Optionally if you want to make your crate available to other crates within the HOPR monorepo,
-add a path to it into the `members` section in `Cargo.toml` in the root of the monorepo. 
+add a path to it into the `members` section in `Cargo.toml` in the root of the monorepo.
 
 ## Testing
 
