@@ -5,9 +5,9 @@
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "LGPL-3.0-only",
-  "types": "lib/main.d.ts",
+  "types": "lib/main.d.cts",
   "type": "module",
-  "bin": "lib/main.js",
+  "bin": "lib/main.cjs",
   "files": [
     "lib",
     "npm-shrinkwrap.json",
@@ -19,9 +19,6 @@
   ],
   "engines": {
     "node": "16"
-  },
-  "exports": {
-    ".": "./lib/main.ts"
   },
   "scripts": {
     "clean": "rimraf ./lib ./tsconfig.tsbuildinfo",
