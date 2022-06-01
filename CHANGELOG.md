@@ -6,6 +6,8 @@
 
 - Reduce eth_getBlockByNumber calls when indexing and sending transactions ([#3814](https://github.com/hoprnet/hoprnet/pull/3814))
 - Marge hopr-stake contracs into monorepo and relevant deploy scripts
+- Add additional CLI parameters `--heartbeatThreshold`, `--networkQualityThreshold` and `--onChainConfirmations`
+- Allow configuration via environment variables instead of CLI parameters for all supported options
 
 <a name="1.89"></a>
 
