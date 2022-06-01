@@ -1,9 +1,12 @@
 {
   "name": "@hoprnet/hopr-wasm",
-  "version": "1.0.0",
-  "private": true,
+  "version": "1.89.0-next.16",
+  "repository": "https://github.com/hoprnet/hoprnet.git",
+  "homepage": "https://hoprnet.org",
+  "license": "GPL-3.0-only",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
+  "type": "commonjs",
   "files": [
     "lib"
   ],

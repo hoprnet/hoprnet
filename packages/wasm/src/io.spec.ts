@@ -7,8 +7,8 @@ describe('test io abstraction for wasm', async function () {
     let file = 'package.json'
     let data = read_file(file)
 
-    assert.equal(false, data.hasError())
-    assert.equal(undefined, data.error)
+    assert.equal(data.hasError(), false)
+    assert.equal(data.error, undefined)
     assert.deepEqual(data.data, fs.readFileSync(file))
   })
 
@@ -16,8 +16,8 @@ describe('test io abstraction for wasm', async function () {
     let file = 'package-non-existent.json'
     let data = read_file(file)
 
-    assert.equal(undefined, data.data)
-    assert.equal(true, data.hasError())
-    assert.notEqual(undefined, data.error)
+    assert.equal(data.data, undefined)
+    assert.equal(data.hasError(), true)
+    assert.notEqual(data.error, undefined)
   })
 })
