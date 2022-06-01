@@ -20,10 +20,14 @@ $(JS_FILES):
 	@echo "--- Built WASM module in '$(@D)' ---"
 
 install:
+ifneq ($(PACKAGES),)
 	@mkdir -p ../lib
 	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.js) ../lib/
 	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.ts) ../lib/
 	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.wasm) ../lib/
+endif
 
 clean:
+ifneq ($(PACKAGES),)
 	rm -rf $(PKG_DIRS)
+endif

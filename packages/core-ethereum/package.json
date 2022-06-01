@@ -8,11 +8,14 @@
   "types": "lib/index.d.ts",
   "main": "lib/index.js",
   "scripts": {
-    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
+    "clean:wasm": "make -C crates clean",
+    "build:wasm": "make -C crates all && make -C crates install",
+    "test:wasm": "make -C crates test",
+    "clean": "yarn clean:wasm && rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
     "coverage": "nyc --reporter=html mocha",
-    "test": "NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
-    "dev": "yarn clean && tsc -w",
-    "build": "yarn clean && tsc",
+    "test": "yarn test:wasm && NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
+    "dev": "yarn clean && yarn build:wasm && tsc -w",
+    "build": "yarn clean && yarn build:wasm && tsc",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },
@@ -37,6 +40,7 @@
     "secp256k1": "4.0.3"
   },
   "devDependencies": {
+    "@wasm-tool/wasm-pack-plugin": "^1.1.0",
     "@types/mocha": "9.1.0",
     "@types/yargs": "17.0.10",
     "chai": "4.3.6",

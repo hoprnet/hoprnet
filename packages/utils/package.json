@@ -8,10 +8,13 @@
   "types": "lib/index.d.ts",
   "main": "lib/index.js",
   "scripts": {
-    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
-    "test": "mocha --parallel",
-    "dev": "yarn clean && tsc -w",
-    "build": "yarn clean && tsc -p .",
+    "clean:wasm": "make -C crates clean",
+    "build:wasm": "make -C crates all && make -C crates install",
+    "test:wasm": "make -C crates test",
+    "clean": "yarn clean:wasm && rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
+    "test": "yarn test:wasm && mocha --parallel",
+    "dev": "yarn clean && yarn build:wasm && tsc -w",
+    "build": "yarn clean && yarn build:wasm && tsc -p .",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },
@@ -45,6 +48,7 @@
     "secp256k1": "4.0.3"
   },
   "devDependencies": {
+    "@wasm-tool/wasm-pack-plugin": "^1.1.0",
     "@chainsafe/libp2p-noise": "5.0.3",
     "@types/mocha": "9.1.0",
     "@types/pino": "7.0.4",
