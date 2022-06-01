@@ -1,5 +1,5 @@
-import { AbstractCommand } from './abstractCommand'
-import { getPaddingLength, styleValue } from './utils'
+import { AbstractCommand } from './abstractCommand.js'
+import { getPaddingLength, styleValue } from './utils/index.js'
 
 function getOptions(
   options: { value: any; description?: string }[],

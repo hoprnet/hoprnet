@@ -1,5 +1,5 @@
-import type { StateOps } from '../types'
-import { styleValue } from './utils'
+import type { StateOps } from '../types.js'
+import { styleValue } from './utils/index.js'
 
 // REPL Command
 export abstract class AbstractCommand {

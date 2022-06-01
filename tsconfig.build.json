@@ -14,7 +14,6 @@
     { "path": "packages/ethereum" },
     { "path": "packages/ethereum/tsconfig.spec.json" },
     { "path": "packages/hoprd" },
-    { "path": "packages/hoprd/tsconfig.spec.json" },
     { "path": "packages/utils" },
     { "path": "packages/utils/tsconfig.spec.json" },
     { "path": "./tsconfig.scripts.json" },

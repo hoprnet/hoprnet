@@ -1,5 +1,5 @@
-export * from './checkPeerId'
-export * from './message'
+export * from './checkPeerId.js'
+export * from './message.js'
 
 const EXTRA_PADDING = 2
 

@@ -146,7 +146,8 @@ async function main() {
   const chainOptions = {
     chainId: environment.network.chain_id,
     environment: environment.id,
-    gasPrice: environment.network.gas_price,
+    maxFeePerGas: environment.network.max_fee_per_gas,
+    maxPriorityFeePerGas: environment.network.max_priority_fee_per_gas,
     network: environment.network.id,
     provider: expandVars(environment.network.default_provider, process.env)
   }

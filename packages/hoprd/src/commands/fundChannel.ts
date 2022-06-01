@@ -1,11 +1,11 @@
-import type Hopr from '@hoprnet/hopr-core'
+import type { default as Hopr } from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
 import chalk from 'chalk'
 import BN from 'bn.js'
 import { moveDecimalPoint, Balance } from '@hoprnet/hopr-utils'
-import type { StateOps } from '../types'
-import { AbstractCommand } from './abstractCommand'
-import { checkPeerIdInput, styleValue } from './utils'
+import type { StateOps } from '../types.js'
+import { AbstractCommand } from './abstractCommand.js'
+import { checkPeerIdInput, styleValue } from './utils/index.js'
 
 export default class FundChannel extends AbstractCommand {
   constructor(public node: Hopr) {

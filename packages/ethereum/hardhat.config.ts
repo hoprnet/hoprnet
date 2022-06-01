@@ -18,8 +18,8 @@ import 'hardhat-gas-reporter'
 import '@nomiclabs/hardhat-etherscan'
 import 'solidity-coverage'
 import '@typechain/hardhat'
-import { utils } from 'ethers'
 import faucet, { type FaucetCLIOPts } from './tasks/faucet'
+import parallelTest, { type ParallelTestCLIOpts } from './tasks/parallelTest'
 import register, { type RegisterOpts } from './tasks/register'
 import getAccounts from './tasks/getAccounts'
 
@@ -29,6 +29,9 @@ import type { ResolvedEnvironment } from '@hoprnet/hopr-core'
 // rest
 import { task, types, extendEnvironment, subtask } from 'hardhat/config'
 import { writeFileSync, realpathSync } from 'fs'
+import { TASK_TEST_SETUP_TEST_ENVIRONMENT } from 'hardhat/builtin-tasks/task-names'
+import { HARDHAT_NETWORK_NAME } from 'hardhat/plugins'
+import { TASK_DEPLOY_RUN_DEPLOY } from 'hardhat-deploy'
 
 const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, HOPR_ENVIRONMENT_ID, HOPR_HARDHAT_TAG } = process.env
 
@@ -45,20 +48,10 @@ extendEnvironment((hre: HardhatRuntimeEnvironment) => {
 function networkToHardhatNetwork(name: String, input: ResolvedEnvironment['network']): NetworkUserConfig {
   let cfg: NetworkUserConfig = {
     chainId: input.chain_id,
-    gasMultiplier: input.gas_multiplier,
     live: input.live,
     tags: input.tags,
     // used by hardhat-deploy
     saveDeployments: true
-  }
-
-  if (input.gas_price) {
-    const parsedGasPrice = input.gas_price.split(' ')
-    if (parsedGasPrice.length > 1) {
-      cfg.gasPrice = Number(utils.parseUnits(parsedGasPrice[0], parsedGasPrice[1]))
-    } else {
-      cfg.gasPrice = Number(parsedGasPrice[0])
-    }
   }
 
   if (name !== 'hardhat') {
@@ -67,6 +60,8 @@ function networkToHardhatNetwork(name: String, input: ResolvedEnvironment['netwo
     } catch (_) {
       ;(cfg as HttpNetworkUserConfig).url = 'invalid_url'
     }
+  } else {
+    ;(cfg as HardhatNetworkUserConfig).initialDate = '2021-07-26'
   }
 
   if (input.live) {
@@ -82,6 +77,13 @@ function networkToHardhatNetwork(name: String, input: ResolvedEnvironment['netwo
     ;(cfg as HardhatNetworkUserConfig).mining = {
       auto: true, // every transaction will trigger a new block (without this deployments fail)
       interval: [1000, 3000] // mine new block every 1 - 3s
+    }
+  }
+  if (input.etherscan_api_url) {
+    ;(cfg as HardhatNetworkUserConfig).verify = {
+      etherscan: {
+        apiUrl: input.etherscan_api_url
+      }
     }
   }
   return cfg
@@ -104,7 +106,17 @@ for (const [networkId, network] of Object.entries<ResolvedEnvironment['network']
 const hardhatConfig: HardhatUserConfig = {
   networks,
   namedAccounts: {
-    deployer: 0
+    deployer: 0,
+    admin: {
+      default: 1,
+      goerli: '0xA18732DC751BE0dB04157eb92C92BA9d0fC09FC5',
+      xdai: '0xE9131488563776DE7FEa238d6112c5dA46be9a9F'
+    },
+    alice: {
+      default: 2,
+      goerli: '0x3dA21EB3D7d40fEA6bd78c627Cc9B1F59E7481E1',
+      xdai: '0x3dA21EB3D7d40fEA6bd78c627Cc9B1F59E7481E1'
+    }
   },
   solidity: {
     compilers: ['0.8.9', '0.6.6', '0.4.24'].map<SolcUserConfig>((version) => ({
@@ -138,8 +150,10 @@ const hardhatConfig: HardhatUserConfig = {
     currency: 'USD',
     excludeContracts: ['mocks', 'utils/console.sol']
   },
-  etherscan: {
-    apiKey: ETHERSCAN_KEY
+  verify: {
+    etherscan: {
+      apiKey: ETHERSCAN_KEY
+    }
   }
 }
 
@@ -281,4 +295,85 @@ task('flat', 'Flattens and prints contracts and their dependencies')
     )
   })
 
+subtask(TASK_TEST_SETUP_TEST_ENVIRONMENT, 'Setup test environment').setAction(async (_, { network }) => {
+  if (network.name === HARDHAT_NETWORK_NAME) {
+    await network.provider.send('hardhat_reset')
+  }
+})
+
+subtask<ParallelTestCLIOpts>(
+  'test:in-group:with-same-instance',
+  'Put test files into groups that shares the same ganache instances',
+  parallelTest
+)
+
+/**
+ * parallelConfig.config contains an array of {testFiles: string[]} where the testFiles is an array
+ * of relative paths of test files.
+ * Test files in the same array share the same reset hardhat instance.
+ * Test files that are in the default test path but not specified in the parallelConfig.config array
+ * will be executed at the every end using a reset hardhat instance.
+ */
+task('test:in-group', 'Reset the hardhat node instances per testFiles array.').setAction(async ({}, { run }) => {
+  const parallelConfig = {
+    config: [
+      {
+        testFiles: ['stake/HoprBoost.test.ts']
+      },
+      {
+        testFiles: ['stake/HoprStake.test.ts']
+      },
+      {
+        testFiles: ['stake/HoprStake2.test.ts']
+      },
+      {
+        testFiles: ['stake/HoprStakeSeason3.test.ts']
+      },
+      {
+        testFiles: ['stake/HoprStakeSeason4.test.ts']
+      },
+      {
+        testFiles: ['stake/HoprWhitehat.test.ts']
+      }
+    ]
+  }
+  await run('test:in-group:with-same-instance', parallelConfig)
+})
+
+/**
+ * Override https://github.com/wighawag/hardhat-deploy/blob/819df0fad56d75a5de5218c3307bec2093f8794c/src/index.ts#L396
+ * in hardhat-deploy plugin, as it does not support EIP-1559
+ */
+subtask(TASK_DEPLOY_RUN_DEPLOY, 'Override the deploy task, with an explicit gas price.').setAction(
+  async (taskArgs, { network, ethers }, runSuper) => {
+    // const protocolConfigNetworkNames = Object.keys<ResolvedEnvironment['network']>(PROTOCOL_CONFIG.networks);
+    // const protocolConfigNetworks = Object.values<ResolvedEnvironment['network']>(PROTOCOL_CONFIG.networks);
+    const protocolConfigNetwork = PROTOCOL_CONFIG.networks[network.name] ?? undefined
+    if (!protocolConfigNetwork) {
+      throw Error(
+        'Cannot deploy with hardhat-deploy due to missing hardhat_deploy_gas_price field in protocol-config.json file'
+      )
+    }
+
+    const hardhatDeployGasPrice = (protocolConfigNetwork as ResolvedEnvironment['network']).hardhat_deploy_gas_price
+    const parsedGasPrice = hardhatDeployGasPrice.split(' ')
+
+    // as in https://github.com/wighawag/hardhat-deploy/blob/819df0fad56d75a5de5218c3307bec2093f8794c/src/DeploymentsManager.ts#L974
+    let gasPrice: string
+    if (parsedGasPrice.length > 1) {
+      gasPrice = ethers.utils.parseUnits(parsedGasPrice[0], parsedGasPrice[1]).toString()
+    } else {
+      gasPrice = parsedGasPrice[0]
+    }
+
+    console.log(`Deployment arguments are ${JSON.stringify({ ...taskArgs, gasprice: gasPrice }, null, 2)}`)
+
+    try {
+      await runSuper({ ...taskArgs, gasprice: gasPrice })
+    } catch (error) {
+      console.log(error)
+      throw Error('Cannot override hardhat task TASK_DEPLOY_RUN_DEPLOY')
+    }
+  }
+)
 export default hardhatConfig

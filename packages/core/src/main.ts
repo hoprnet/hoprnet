@@ -6,7 +6,7 @@ import { LevelDatastore } from 'datastore-level'
 import { type AddressSorter, HoprDB, PublicKey, debug } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
-const Mplex = require('libp2p-mplex')
+import Mplex from 'libp2p-mplex'
 import KadDHT from 'libp2p-kad-dht'
 import { NOISE } from '@chainsafe/libp2p-noise'
 import type PeerId from 'peer-id'
@@ -206,7 +206,8 @@ export async function createHoprNode(
     {
       chainId: options.environment.network.chain_id,
       environment: options.environment.id,
-      gasPrice: options.environment.network.gas_price,
+      maxFeePerGas: options.environment.network.max_fee_per_gas,
+      maxPriorityFeePerGas: options.environment.network.max_priority_fee_per_gas,
       network: options.environment.network.id,
       provider: options.environment.network.default_provider
     },

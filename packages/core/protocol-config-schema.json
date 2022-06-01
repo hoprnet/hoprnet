@@ -22,10 +22,19 @@
             "minted_token_receiver_address": {
               "type": "string"
             },
-            "network_registry_contract_address": {
+            "xhopr_contract_address": {
               "type": "string"
             },
-            "network_registry_admin_address": {
+            "boost_contract_address": {
+              "type": "string"
+            },
+            "stake_contract_address": {
+              "type": "string"
+            },
+            "network_registry_proxy_contract_address": {
+              "type": "string"
+            },
+            "network_registry_contract_address": {
               "type": "string"
             },
             "tags": {
@@ -41,7 +50,6 @@
             "token_contract_address",
             "channels_contract_address",
             "network_registry_contract_address",
-            "network_registry_admin_address",
             "tags"
           ],
           "additionalProperties": false
@@ -64,18 +72,27 @@
             "chain_id": {
               "type": "integer"
             },
-            "gas_price": {
+            "hardhat_deploy_gas_price": {
               "type": "string",
-              "description": "Gas price as either 'auto', a number '11' or a value which should be converted like '1 gwei'."
+              "description": "Gas price as either a number string '11' or a value which should be converted like '1 gwei'. Used in hardhat-deploy plugin."
             },
-            "gas_multiplier": {
-              "type": "number"
+            "max_fee_per_gas": {
+              "type": "string",
+              "description": "Max fee per gas as either a number '11' or a value which should be converted like '1 gwei'."
+            },
+            "max_priority_fee_per_gas": {
+              "type": "string",
+              "description": "Max priority fee per gas as either a number '11' or a value which should be converted like '1 gwei'."
             },
             "default_provider": {
               "type": "string"
             },
-            "native_token_name": {
+            "etherscan_api_url": {
               "type": "string"
+            },
+            "native_token_name": {
+              "type": "string",
+              "description": "API for contract verification through etherscan"
             },
             "hopr_token_name": {
               "type": "string"
@@ -85,7 +102,9 @@
             "chain_id",
             "default_provider",
             "description",
-            "gas_multiplier",
+            "hardhat_deploy_gas_price",
+            "max_fee_per_gas",
+            "max_priority_fee_per_gas",
             "hopr_token_name",
             "native_token_name"
           ],

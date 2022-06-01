@@ -1,7 +1,7 @@
 import type { Operation } from 'express-openapi'
 import PeerId from 'peer-id'
-import { STATUS_CODES } from '../../utils'
-import { State, StateOps } from '../../../../types'
+import { STATUS_CODES } from '../../utils.js'
+import { State, StateOps } from '../../../../types.js'
 
 /**
  * Sets an alias and assigns the PeerId to it.

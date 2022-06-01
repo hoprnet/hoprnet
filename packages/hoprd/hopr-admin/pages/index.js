@@ -1,14 +1,14 @@
 import React, { useEffect, useState, KeyboardEvent } from 'react'
 import Head from 'next/head'
 import styles from '../styles/Home.module.css'
-import Logo from '../components/logo'
-import { Logs } from '../components/log'
-import { Connection } from '../connection'
+import Logo from '../components/logo.js'
+import { Logs } from '../components/log.js'
+import { Connection } from '../connection.js'
 import dynamic from 'next/dynamic'
 import Cookies from 'js-cookie'
 import { render } from 'react-dom'
 
-const Jazzicon = dynamic(() => import('../components/jazzicon'), { ssr: false })
+const Jazzicon = dynamic(() => import('../components/jazzicon.js'), { ssr: false })
 const gitHash = process.env.NEXT_PUBLIC_GIT_COMMIT
 
 class TokenInput extends React.Component {

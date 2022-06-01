@@ -2,17 +2,24 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
-import { createTestApiInstance, INVALID_PEER_ID, ALICE_PEER_ID } from '../../fixtures'
-import { STATUS_CODES } from '../../utils'
+import { createTestApiInstance, INVALID_PEER_ID, ALICE_PEER_ID } from '../../fixtures.js'
+import { STATUS_CODES } from '../../utils.js'
 
 let node = sinon.fake() as any
-
-const { api, service } = createTestApiInstance(node)
-chai.use(chaiResponseValidator(api.apiDoc))
 
 const ALIAS = 'some_alias'
 
 describe('GET /aliases', () => {
+  let service: any
+  before(async function () {
+    const loaded = await createTestApiInstance(node)
+
+    service = loaded.service
+
+    // @ts-ignore ESM / CommonJS compatibility issue
+    chai.use(chaiResponseValidator.default(loaded.api.apiDoc))
+  })
+
   it('should successfuly get aliases', async () => {
     await request(service).post('/api/v2/aliases').send({
       peerId: ALICE_PEER_ID.toB58String(),
@@ -29,6 +36,12 @@ describe('GET /aliases', () => {
 })
 
 describe('POST /aliases', () => {
+  let service: any
+  before(async function () {
+    const loaded = await createTestApiInstance(node)
+
+    service = loaded.service
+  })
   it('should set alias successfuly', async () => {
     const res = await request(service).post('/api/v2/aliases').send({
       peerId: ALICE_PEER_ID.toB58String(),

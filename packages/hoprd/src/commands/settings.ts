@@ -1,7 +1,7 @@
-import type Hopr from '@hoprnet/hopr-core'
-import type { State, StateOps } from '../types'
-import { getPaddingLength, styleValue } from './utils'
-import { AbstractCommand } from './abstractCommand'
+import type { default as Hopr } from '@hoprnet/hopr-core'
+import type { State, StateOps } from '../types.js'
+import { getPaddingLength, styleValue } from './utils/index.js'
+import { AbstractCommand } from './abstractCommand.js'
 import { PassiveStrategy, PromiscuousStrategy } from '@hoprnet/hopr-core'
 
 function booleanSetter(name: string) {

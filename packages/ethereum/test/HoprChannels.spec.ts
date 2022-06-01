@@ -4,7 +4,7 @@ import { expect } from 'chai'
 import BN from 'bn.js'
 import type { HoprChannels, HoprToken, ChannelsMock } from '../src/types'
 import { increaseTime } from './utils'
-import { ACCOUNT_A, ACCOUNT_B } from './constants'
+import { ACCOUNT_A, ACCOUNT_B } from './utils'
 import {
   Address,
   Challenge,
@@ -231,16 +231,19 @@ const useFixtures = deployments.createFixture(
       ACCOUNT_A,
       SECRET_1
     )
-
     await fundEther(accountA.address, ethers.utils.parseEther(ChannelStatus.Open + ''))
     await fundEther(accountB.address, ethers.utils.parseEther(ChannelStatus.Open + ''))
 
     // announce
     if (!ops?.skipAnnounceForAccountA) {
-      await channels.connect(accountA).announce(accountAPubKey.toUncompressedPubKeyHex(), [])
+      await channels
+        .connect(accountA)
+        .announce(accountAPubKey.toUncompressedPubKeyHex(), [], { gasLimit: BigNumber.from('100000') })
     }
     if (!ops?.skipAnnounceForAccountB) {
-      await channels.connect(accountB).announce(accountBPubKey.toUncompressedPubKeyHex(), [])
+      await channels
+        .connect(accountB)
+        .announce(accountBPubKey.toUncompressedPubKeyHex(), [], { gasLimit: BigNumber.from('100000') })
     }
 
     return {

@@ -9,8 +9,8 @@ import {
   BOB_PEER_ID,
   BOB_MULTI_ADDR,
   CHARLIE_PEER_ID
-} from '../../fixtures'
-import { STATUS_CODES } from '../../utils'
+} from '../../fixtures.js'
+import { STATUS_CODES } from '../../utils.js'
 
 const ALICE_ENTRY = {
   id: ALICE_PEER_ID,
@@ -83,10 +83,17 @@ node.getConnectionInfo.withArgs(sinon.match.has('_idB58String', ALICE_PEER_ID.to
 node.getConnectionInfo.withArgs(sinon.match.has('_idB58String', BOB_PEER_ID.toB58String())).returns(BOB_ENTRY)
 node.getConnectionInfo.withArgs(sinon.match.has('_idB58String', CHARLIE_PEER_ID.toB58String())).returns(CHARLIE_ENTRY)
 
-const { api, service } = createTestApiInstance(node)
-chai.use(chaiResponseValidator(api.apiDoc))
-
 describe('GET /node/peers', function () {
+  let service: any
+  before(async function () {
+    const loaded = await createTestApiInstance(node)
+
+    service = loaded.service
+
+    // @ts-ignore ESM / CommonJS compatibility issue
+    chai.use(chaiResponseValidator.default(loaded.api.apiDoc))
+  })
+
   it('should return invalid quality when quality is not a number', async function () {
     const res = await request(service).get(`/api/v2/node/peers?quality=abc`).send()
     expect(res.status).to.equal(400)

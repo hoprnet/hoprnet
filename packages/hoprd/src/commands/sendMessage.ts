@@ -1,10 +1,13 @@
-import type Hopr from '@hoprnet/hopr-core'
+import type { default as Hopr } from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
-import type { StateOps, State } from '../types'
-import { INTERMEDIATE_HOPS } from '@hoprnet/hopr-core/lib/constants'
+import type { StateOps, State } from '../types.js'
 import { PublicKey } from '@hoprnet/hopr-utils'
-import { checkPeerIdInput, encodeMessage, styleValue } from './utils'
-import { AbstractCommand } from './abstractCommand'
+import { checkPeerIdInput, encodeMessage, styleValue } from './utils/index.js'
+import { AbstractCommand } from './abstractCommand.js'
+
+// @TODO requires migration of core
+// import { INTERMEDIATE_HOPS } from '@hoprnet/hopr-core/lib/constants'
+const INTERMEDIATE_HOPS = 3
 
 export class SendMessage extends AbstractCommand {
   constructor(public node: Hopr) {

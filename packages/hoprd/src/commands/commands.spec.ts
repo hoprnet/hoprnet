@@ -1,5 +1,5 @@
-import type { State, StateOps } from '../types'
-import * as mod from './index'
+import type { State, StateOps } from '../types.js'
+import * as mod from './index.js'
 import assert from 'assert'
 import sinon from 'sinon'
 

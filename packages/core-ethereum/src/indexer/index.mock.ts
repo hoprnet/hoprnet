@@ -30,7 +30,8 @@ const txRequest = {
   data: '0x0',
   value: 0,
   nonce: 0,
-  gasPrice: 1
+  maxPriorityFeePerGas: utils.parseUnits('1', 'gwei'),
+  maxFeePerGas: utils.parseUnits('1', 'gwei')
 }
 
 const createProviderMock = (ops: { latestBlockNumber?: number } = {}) => {
@@ -267,7 +268,8 @@ const createChainMock = (
     getPublicKey: () => fixtures.PARTY_A,
     setCommitment: (counterparty: Address, commitment: Hash) =>
       hoprChannels.bumpChannel(counterparty.toHex(), commitment.toHex()),
-    getAllQueuingTransactionRequests: () => [txRequest]
+    getAllQueuingTransactionRequests: () => [txRequest],
+    getAllUnconfirmedHash: () => [fixtures.OPENED_EVENT.transactionHash]
   } as unknown as ChainWrapper
 }
 

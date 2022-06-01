@@ -3,14 +3,22 @@ import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
 import { PublicKey } from '@hoprnet/hopr-utils'
-import { createTestApiInstance, ALICE_PEER_ID } from '../../fixtures'
+import { createTestApiInstance, ALICE_PEER_ID } from '../../fixtures.js'
 
 let node = sinon.fake() as any
-const { api, service } = createTestApiInstance(node)
-chai.use(chaiResponseValidator(api.apiDoc))
 
 describe('GET /account/addresses', () => {
   const ALICE_ETH_ADDRESS = PublicKey.fromPeerId(ALICE_PEER_ID).toAddress()
+
+  let service: any
+  before(async function () {
+    const loaded = await createTestApiInstance(node)
+
+    service = loaded.service
+
+    // @ts-ignore ESM / CommonJS compatibility issue
+    chai.use(chaiResponseValidator.default(loaded.api.apiDoc))
+  })
 
   it('should return addresses', async () => {
     node.getEthereumAddress = sinon.fake.returns(ALICE_ETH_ADDRESS)

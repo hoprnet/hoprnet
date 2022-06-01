@@ -4,7 +4,7 @@
 */
 
 import type { Operation } from 'express-openapi'
-import { GET as original } from './addresses'
+import { GET as original } from './addresses.js'
 
 export const GET: Operation = [original[0].bind()]
 GET.apiDoc = JSON.parse(JSON.stringify(original.apiDoc))
