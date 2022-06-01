@@ -49,7 +49,7 @@ The Rust WASM code is not limited just to `@hoprnet/hopr-wasm` package. The exis
 1. Create an empty directory `packages/<other_package>/crates`
 2. Copy the `Makefile` from `packages/wasm/crates` to `packages/<other_package>/crates`
 3. Set the `PACKAGES` variable in the `packages/<other_package>/crates/Makefile` to empty.
-4. Add `"@wasm-tool/wasm-pack-plugin": "^1.1.0"` as a `devDependency` in the existing package
+4. Add `"@wasm-tool/wasm-pack-plugin": "^1.1.0"` and `"wasm-pack": "0.10.2"` as a `devDependency` in the existing package
 5. Make sure the `files` section in `packages/<other_package>/package.json` contains the `lib` entry.
 6. Create build actions in `package.json` accordingly:
    - create `build:wasm` action as `make -C crates all && make -C crates install`

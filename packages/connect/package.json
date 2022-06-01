@@ -66,6 +66,7 @@
     "libp2p-mplex": "0.10.7",
     "mocha": "9.2.2",
     "rimraf": "3.0.2",
+    "wasm-pack": "0.10.2",
     "yargs": "17.4.0"
   },
   "mocha": {

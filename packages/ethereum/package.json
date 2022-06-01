@@ -65,7 +65,8 @@
     "ts-generator": "0.1.1",
     "typechain": "7.0.1",
     "typedoc": "0.22.13",
-    "typedoc-plugin-markdown": "3.11.14"
+    "typedoc-plugin-markdown": "3.11.14",
+    "wasm-pack": "0.10.2"
   },
   "engines": {
     "node": "16"

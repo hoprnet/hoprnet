@@ -3565,6 +3565,7 @@ __metadata:
     rimraf: 3.0.2
     simple-peer: 9.11.1
     stream-to-it: 0.2.4
+    wasm-pack: 0.10.2
     webrtc-stun: 3.0.0
     wrtc: 0.4.7
     yargs: 17.4.0
@@ -3598,6 +3599,7 @@ __metadata:
     sinon: 12.0.1
     typedoc: 0.22.13
     typedoc-plugin-markdown: 3.11.14
+    wasm-pack: 0.10.2
   languageName: unknown
   linkType: soft
 
@@ -3639,6 +3641,7 @@ __metadata:
     sinon: 12.0.1
     typedoc: 0.22.13
     typedoc-plugin-markdown: 3.11.14
+    wasm-pack: 0.10.2
   languageName: unknown
   linkType: soft
 
@@ -3665,6 +3668,7 @@ __metadata:
     rimraf: 3.0.2
     typedoc: 0.22.13
     typedoc-plugin-markdown: 3.11.14
+    wasm-pack: 0.10.2
     yargs: 17.4.0
   bin:
     hopr-cover-traffic-daemon: lib/index.js
@@ -3705,6 +3709,7 @@ __metadata:
     typechain: 7.0.1
     typedoc: 0.22.13
     typedoc-plugin-markdown: 3.11.14
+    wasm-pack: 0.10.2
   languageName: unknown
   linkType: soft
 
@@ -3749,6 +3754,7 @@ __metadata:
     sinon: 12.0.1
     typedoc: 0.22.13
     typedoc-plugin-markdown: 3.11.14
+    wasm-pack: 0.10.2
   languageName: unknown
   linkType: soft
 
@@ -3814,6 +3820,7 @@ __metadata:
     trace-unhandled: 2.0.1
     typedoc: 0.22.13
     typedoc-plugin-markdown: 3.11.14
+    wasm-pack: 0.10.2
     ws: 8.3.0
     yamljs: 0.3.0
     yargs: 17.4.0
