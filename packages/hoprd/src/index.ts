@@ -27,7 +27,7 @@ import type { HoprOptions } from '@hoprnet/hopr-core'
 import { setLogger } from 'trace-unhandled'
 import { NetworkHealthIndicator } from '@hoprnet/hopr-core/lib/network/heartbeat'
 
-import * as wasm from '@hoprnet/hopr-wasm'
+import * as wasm from '../lib/hopr_hoprd_misc'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
@@ -395,7 +395,7 @@ async function main() {
   }
 
   try {
-    logs.log(`This is hoprd version ${wasm.common.get_hoprd_version()}`)
+    logs.log(`This is hoprd version ${wasm.get_hoprd_version()}`)
 
     // 1. Find or create an identity
     const peerId = await getIdentity({

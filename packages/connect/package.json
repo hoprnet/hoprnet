@@ -44,7 +44,6 @@
     "wrtc": "0.4.7"
   },
   "devDependencies": {
-    "@wasm-tool/wasm-pack-plugin": "^1.1.0",
     "@chainsafe/libp2p-noise": "5.0.3",
     "@types/bl": "5.0.2",
     "@types/chai": "4.3.0",
@@ -54,6 +53,7 @@
     "@types/node": "16.11.26",
     "@types/simple-peer": "9.11.4",
     "@types/yargs": "17.0.10",
+    "@wasm-tool/wasm-pack-plugin": "^1.1.0",
     "abortable-iterator": "3.0.2",
     "chai": "4.3.6",
     "chai-spies": "1.0.0",

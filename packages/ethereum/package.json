@@ -36,7 +36,6 @@
     "@openzeppelin/contracts-v3-0-1": "npm:@openzeppelin/contracts@3.4.2"
   },
   "devDependencies": {
-    "@wasm-tool/wasm-pack-plugin": "^1.1.0",
     "@defi-wonderland/smock": "^2.0.7",
     "@ethersproject/wallet": "5.5.0",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
@@ -46,6 +45,7 @@
     "@nomiclabs/hardhat-waffle": "2.0.2",
     "@typechain/ethers-v5": "9.0.0",
     "@typechain/hardhat": "4.0.0",
+    "@wasm-tool/wasm-pack-plugin": "^1.1.0",
     "bn.js": "5.2.0",
     "chai": "4.3.6",
     "dotenv": "10.0.0",

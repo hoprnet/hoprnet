@@ -48,10 +48,10 @@
     "secp256k1": "4.0.3"
   },
   "devDependencies": {
-    "@wasm-tool/wasm-pack-plugin": "^1.1.0",
     "@chainsafe/libp2p-noise": "5.0.3",
     "@types/mocha": "9.1.0",
     "@types/pino": "7.0.4",
+    "@wasm-tool/wasm-pack-plugin": "^1.1.0",
     "bl": "5.0.0",
     "chai": "4.3.6",
     "libp2p": "0.36.2",
