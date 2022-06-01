@@ -13,5 +13,5 @@
     // when building docs for releases we can fix the revision on the cmdline
     "gitRevision": "master"
   },
-  "references": [{ "path": "../utils" }, { "path": "../core" }]
+  "references": [{ "path": "../utils" }, { "path": "../core" },  { "path": "../wasm" }]
 }

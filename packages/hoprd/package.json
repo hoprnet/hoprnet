@@ -20,10 +20,13 @@
     "node": "16"
   },
   "scripts": {
-    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
-    "build": "yarn clean && tsc -p . && yarn buildAdmin && chmod u+x lib/*.js",
+    "clean:wasm": "make -C crates clean",
+    "build:wasm": "make -C crates all && make -C crates install",
+    "test:wasm": "make -C crates test",
+    "clean": "yarn clean:wasm && rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
+    "build": "yarn clean && yarn build:wasm && tsc -p . && yarn buildAdmin && chmod u+x lib/*.js",
     "buildAdmin": "HOPRD_GIT_COMMIT=$(git rev-parse --short HEAD) next build hopr-admin",
-    "test": "NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace --exit . test",
+    "test": "yarn test:wasm && NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace --exit . test",
     "prebuild": "next telemetry disable",
     "start": "ts-node src/index --admin --init --rest",
     "dev": "NODE_ENV=development yarn start --environment hardhat-localhost --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses --testPreferLocalAddresses --testNoAuthentication",
@@ -66,6 +69,7 @@
     "yargs": "17.4.0"
   },
   "devDependencies": {
+    "@wasm-tool/wasm-pack-plugin": "^1.1.0",
     "@types/chai": "^4",
     "@types/cors": "2.8.12",
     "@types/mocha": "9.1.0",
