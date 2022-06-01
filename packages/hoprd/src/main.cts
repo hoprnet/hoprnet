@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
-// Must be CommonJS script to make sure it does not include any ESM syntax,
-// such `export` or `import`
+// File must be a CommonJS script to make sure it does not include any ESM syntax,
+// such as `export` or `import`, which causes incomprensive syntax errors when
+// running with old versions of Node.js.
 
 if (!process) {
   throw Error(`Please run with Node.js`)
