@@ -19,7 +19,9 @@
     "test:wasm": "make -C crates test",
     "clean": "yarn clean:wasm && rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
     "build": "yarn clean && yarn build:wasm && tsc -p .",
-    "test": "yarn test:wasm && NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace"
+    "test": "yarn test:wasm && NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
+    "docs:generate": "typedoc",
+    "docs:watch": "typedoc --watch"
   },
   "devDependencies": {
     "mocha": "9.2.2",
