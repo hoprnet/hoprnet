@@ -36,7 +36,8 @@ const SHORT_TIMEOUTS: Partial<HeartbeatConfig> = {
   heartbeatDialTimeout: 50,
   heartbeatRunTimeout: 100,
   heartbeatInterval: 200,
-  heartbeatVariance: 1
+  heartbeatVariance: 1,
+  networkQualityThreshold: 0.5
 }
 
 /**
