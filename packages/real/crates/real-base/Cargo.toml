@@ -1,5 +1,5 @@
 [package]
-name = "real-base"
+name = "hopr-real"
 version = "0.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
@@ -9,7 +9,7 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "LGPL-3.0-only"
 
 [lib]
-name = "real_base"
+name = "hopr_real"
 path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"] # rlib is necessary to run integration tests
 

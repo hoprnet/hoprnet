@@ -31,23 +31,23 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-hoprd-misc"
+name = "hopr-real"
 version = "0.1.0"
 dependencies = [
- "hopr-wasm-common",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+]
+
+[[package]]
+name = "hoprd-misc"
+version = "0.1.0"
+dependencies = [
+ "hopr-real",
  "serde",
  "serde_json",
  "wasm-bindgen",
  "wasm-bindgen-test",
  "wee_alloc",
-]
-
-[[package]]
-name = "hopr-wasm-common"
-version = "0.1.0"
-dependencies = [
- "wasm-bindgen",
- "wasm-bindgen-test",
 ]
 
 [[package]]

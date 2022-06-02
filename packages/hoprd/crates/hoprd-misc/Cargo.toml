@@ -14,7 +14,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 
 # Workspace dependencies
-hopr-wasm-common = { path = "../../../real/crates/real-base" }
+hopr-real = { path = "../../../real/crates/real-base" }
 
 # 3rd party dependencies
 wasm-bindgen = { version = "0.2.80", features = ["serde-serialize"] }
@@ -22,7 +22,7 @@ wasm-bindgen-test = "0.3.30"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
-# Unfortunately, `wee_alloc` requires nightly Rust when targeting wasm for now.
+# Unfortunately, `wee_alloc` requires nightly Rust when targeting real for now.
 wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]

@@ -1,6 +1,6 @@
 use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen(module = "@hoprnet/hopr-wasm")]
+#[wasm_bindgen(module = "@hoprnet/hopr-real")]
 extern "C" {
 
     /*

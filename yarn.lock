@@ -3713,6 +3713,19 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@hoprnet/hopr-real@workspace:packages/real":
+  version: 0.0.0-use.local
+  resolution: "@hoprnet/hopr-real@workspace:packages/real"
+  dependencies:
+    "@wasm-tool/wasm-pack-plugin": ^1.1.0
+    mocha: 9.2.2
+    rimraf: ^3.0.0
+    typedoc: 0.22.13
+    typedoc-plugin-markdown: 3.11.14
+    wasm-pack: 0.10.2
+  languageName: unknown
+  linkType: soft
+
 "@hoprnet/hopr-utils@workspace:packages/utils":
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-utils@workspace:packages/utils"
@@ -3758,26 +3771,13 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@hoprnet/hopr-wasm@workspace:packages/wasm":
-  version: 0.0.0-use.local
-  resolution: "@hoprnet/hopr-wasm@workspace:packages/wasm"
-  dependencies:
-    "@wasm-tool/wasm-pack-plugin": ^1.1.0
-    mocha: 9.2.2
-    rimraf: ^3.0.0
-    typedoc: 0.22.13
-    typedoc-plugin-markdown: 3.11.14
-    wasm-pack: 0.10.2
-  languageName: unknown
-  linkType: soft
-
 "@hoprnet/hoprd@workspace:packages/hoprd":
   version: 0.0.0-use.local
   resolution: "@hoprnet/hoprd@workspace:packages/hoprd"
   dependencies:
     "@hoprnet/hopr-core": "workspace:packages/core"
+    "@hoprnet/hopr-real": "workspace:packages/real"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
-    "@hoprnet/hopr-wasm": "workspace:packages/wasm"
     "@types/chai": ^4
     "@types/cors": 2.8.12
     "@types/mocha": 9.1.0

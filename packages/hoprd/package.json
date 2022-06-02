@@ -36,8 +36,8 @@
   },
   "dependencies": {
     "@hoprnet/hopr-core": "workspace:packages/core",
+    "@hoprnet/hopr-real": "workspace:packages/real",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
-    "@hoprnet/hopr-wasm": "workspace:packages/wasm",
     "bn.js": "5.2.0",
     "body-parser": "1.19.2",
     "chalk": "4.1.2",

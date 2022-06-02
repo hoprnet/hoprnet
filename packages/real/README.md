@@ -15,10 +15,10 @@ During build, all the Rust crates are build first using `make all` (see `Makefil
 Add dependency to `@hoprnet/hopr-wasm` to your `package.json`
 
 ```typescript
-import * as wasm from '@hoprnet/hopr-wasm'
+import * as wasm from ''
 
 if (wasm.common.dummy_get_one() === '1') {
-  console.log('It works!!')
+   console.log('It works!!')
 }
 ```
 

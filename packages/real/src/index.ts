@@ -2,4 +2,4 @@
 export * from './io'
 
 // Add your Rust WASM crate exports here
-export * as common from '../lib/hopr_wasm_common'
+export * as real from '../lib/hopr_real'
