@@ -33,7 +33,7 @@
       "environment_type": "staging",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xa3C8f4044b30Fb3071F5b3b02913DE524F1041dc",
-      "channels_contract_address": "0x7587B259bbe2AdcDc7bFd6FD667Fd440b64c0Aad",
+      "channels_contract_address": "0x2542c5d6814f577E1991849785B96fC40Ce63E49",
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
       "xhopr_contract_address": "0xe8aD2ac347dA7549Aaca8F5B1c5Bf979d85bC78F",
       "boost_contract_address": "0xd7ECa0E90cD85b08875E7d10d4D25B274C6CC549",

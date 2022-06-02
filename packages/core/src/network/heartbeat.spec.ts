@@ -36,7 +36,8 @@ const SHORT_TIMEOUTS: Partial<HeartbeatConfig> = {
   heartbeatDialTimeout: 50,
   heartbeatRunTimeout: 100,
   heartbeatInterval: 200,
-  heartbeatVariance: 1
+  heartbeatVariance: 1,
+  networkQualityThreshold: 0.5
 }
 
 /**
@@ -120,7 +121,7 @@ async function getPeer(
   network: ReturnType<typeof createFakeNetwork>,
   netStatEvents: EventEmitter
 ): Promise<{ heartbeat: TestingHeartbeat; peers: NetworkPeers }> {
-  const peers = new NetworkPeers([], [self])
+  const peers = new NetworkPeers([], [self], 0.3)
 
   const heartbeat = new TestingHeartbeat(
     peers,
@@ -149,7 +150,7 @@ describe('unit test heartbeat', async () => {
   it('check nodes is noop with empty store & health indicator is red', async () => {
     let netHealth = new NetworkHealth()
     const heartbeat = new TestingHeartbeat(
-      new NetworkPeers([], [Alice]),
+      new NetworkPeers([], [Alice], 0.3),
       (() => {}) as any,
       (async () => {
         assert.fail(`must not call send`)

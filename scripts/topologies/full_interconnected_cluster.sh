@@ -146,6 +146,5 @@ for endpoint in ${endpoints}; do
   done
 done
 
-
 log "Wait for all channel operations to finish"
 wait

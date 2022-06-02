@@ -54,6 +54,7 @@
             "channel_contract_deploy_block",
             "token_contract_address",
             "channels_contract_address",
+            "stake_contract_address",
             "network_registry_contract_address",
             "tags"
           ],

@@ -166,28 +166,28 @@ async function main(
 
   const hoprToken = (await ethers.getContractFactory('HoprToken')).attach(hoprTokenAddress)
 
-  const txs: UnsignedTransaction[] = []
-  for (const identity of identities) {
-    txs.push(
-      ...(await createTransaction(
-        hoprToken,
-        identity,
-        utils.parseEther('10.0'),
-        utils.parseEther('20000.0'),
-        network.name
-      ))
-    )
-  }
-
   // we use a custom ethers provider here instead of the ethers object from the
   // hre which is managed by hardhat-ethers, because that one seems to
   // run its own in-memory hardhat instance, which is undesirable
   const provider = new ethers.providers.JsonRpcProvider()
   const signer = provider.getSigner()
 
-  for (const tx of txs) {
-    await send(signer, tx)
+  const txs: Promise<void>[] = []
+  for (const identity of identities) {
+    let newTxs = await createTransaction(
+      hoprToken,
+      identity,
+      utils.parseEther('10.0'),
+      utils.parseEther('20000.0'),
+      network.name
+    )
+    for (const tx of newTxs) {
+      let txSend = send(signer, tx)
+      txs.push(txSend)
+    }
   }
+
+  await Promise.all(txs)
 }
 
 export default main
