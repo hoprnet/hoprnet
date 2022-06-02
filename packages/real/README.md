@@ -24,7 +24,7 @@ if (wasm.common.dummy_get_one() === '1') {
 
 ## <a id="adding_mod"></a> Adding a new Rust WASM module
 
-To add a new Rust WASM module (crate) into the existing `wasm` package:
+To add a new Rust WASM module (crate) into the existing `real` package:
 
 1. `cd packages/real/crates`
 2. `wasm-pack new my-module`, this will create a new Rust crate for WASM.
@@ -44,15 +44,14 @@ Each WASM module can have it's own unit tests and integration tests.
 
 ## Adding Rust WASM module support to other existing `hopr` packages
 
-The Rust WASM code is not limited just to `@hoprnet/hopr-wasm` package. The existing tooling and structure in `@hoprnet/hopr-wasm` can be easily copied to any existing package within the monorepo.
+The Rust WASM code is not limited just to `@hoprnet/hopr-real` package. The existing tooling and structure in `@hoprnet/hopr-wasm` can be easily copied to any existing package within the monorepo.
 
 1. Create an empty directory `packages/<other_package>/crates`
 2. Copy the `Makefile` from `packages/real/crates` to `packages/<other_package>/crates`
 3. Set the `PACKAGES` variable in the `packages/<other_package>/crates/Makefile` to empty.
-4. Add `"@wasm-tool/wasm-pack-plugin": "^1.1.0"` and `"wasm-pack": "0.10.2"` as a `devDependency` in the existing package
-5. Make sure the `files` section in `packages/<other_package>/package.json` contains the `lib` entry.
-6. Create build actions in `package.json` accordingly:
+4. Make sure the `files` section in `packages/<other_package>/package.json` contains the `lib` entry.
+5. Create build actions in `package.json` accordingly:
    - create `build:wasm` action as `make -C crates all && make -C crates install`
    - create `clean:wasm` action as `make -C crates clean`
    - create `test:wasm` action as `make -C crates test`
-7. Now you can add Rust crates as described in the [section above](#adding_mod)
+6. Now you can add Rust crates as described in the [section above](#adding_mod)
