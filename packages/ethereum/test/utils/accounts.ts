@@ -1,4 +1,4 @@
-import { ethers, providers } from 'ethers'
+import { ethers } from 'ethers'
 
 export const getAccount = (privateKey: string) => {
   const wallet = new ethers.Wallet(privateKey)
@@ -27,21 +27,6 @@ export const signMessage = async (message: string, privKey: string) => {
   }
 }
 
-export const toSolPercent = (multiplier: number, percent: number): string => {
-  return String(Math.floor(percent * multiplier))
-}
-
-export const advanceBlock = async (provider: providers.StaticJsonRpcProvider) => {
-  return provider.send('evm_mine', [])
-}
-
-// increases ganache time by the passed duration in seconds
-export const increaseTime = async (provider: providers.StaticJsonRpcProvider, _duration: ethers.BigNumberish) => {
-  const duration = ethers.BigNumber.from(_duration)
-
-  if (duration.isNegative()) throw Error(`Cannot increase time by a negative amount (${duration})`)
-
-  await provider.send('evm_increaseTime', [duration.toNumber()])
-
-  await advanceBlock(provider)
-}
+export const ACCOUNT_DEPLOYER = getAccount('0xf54bd518dd7e3e42710e9a96c92b1b244727df5a5afae34611089bee344d6bd4')
+export const ACCOUNT_A = getAccount('0xf54bd518dd7e3e42710e9a96c92b1b244727df5a5afae34611089bee344d6bd4')
+export const ACCOUNT_B = getAccount('0xf344315b0389d60ace0c8a5f36da6612d268019c2d88ff77cdb2b37f0ec7ddd5')

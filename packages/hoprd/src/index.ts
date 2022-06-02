@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import { passwordStrength } from 'check-password-strength'
 import { decode } from 'rlp'
 import path from 'path'
@@ -44,9 +42,6 @@ function defaultEnvironment(): string {
     return ''
   }
 }
-
-// Replace default process name (`node`) by `hoprd`
-process.title = 'hoprd'
 
 // Use environment-specific default data path
 const defaultDataPath = path.join(
