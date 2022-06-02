@@ -1,9 +1,5 @@
-# Build all hopr packages. This image is meant to be used as a base for
-# Docker-based development or utility Docker containers. It doesn't run anything
-# itself if started.
-
-# use slim version of node on Debian buster for smaller image sizes
-FROM node:16-buster-slim@sha256:380112b3f3df96ae593b0b89f4c44e501e9ae0ec1580b270b50f8ac52688256e as build
+# use slim version of node on Debian bullseye for smaller image sizes during build
+FROM node:16-bullseye-slim as build
 
 LABEL description="This image launches a hardhat node running a local network with the HOPR contracts deployed and available."
 
@@ -21,14 +17,31 @@ WORKDIR /app
 
 COPY . /app
 
-RUN cat package.json | jq '.workspaces = ["packages/ethereum", "packages/utils"]' > package.json.new \
-  && mv package.json.new package.json
+RUN yarn \
+ && npx tsc --build packages/utils/tsconfig.json \
+ && yarn workspace @hoprnet/hopr-ethereum run build:sol:types \
+ && npx tsc --build tsconfig.build.json \
+ && cp tsconfig.json packages/ethereum/tsconfig.base.json \
+ && cd packages/ethereum \
+ && cat tsconfig.hardhat.json | jq '.extends = "./tsconfig.base.json" | del(.references)' > tsconfig.hardhat.json.new \
+ && mv tsconfig.hardhat.json.new tsconfig.hardhat.json
 
-RUN yarn && yarn build
+# use alpine version of node for smallest image sizes
+FROM node:16-alpine as runtime
+
+RUN mkdir /core
+
+WORKDIR /app
+
+COPY --from=build /app/packages/ethereum .
+COPY --from=build /app/packages/core/protocol-config.json /core/
+
+RUN rm package.json \
+ && mv package.hardhat.json package.json \
+ && yarn
 
 EXPOSE 8454
 
-ENV NODE_OPTIONS=--max_old_space_size=4096
-ENV HOPR_ENVIRONMENT_ID=hardhat-localhost
+ENV NODE_OPTIONS=--max_old_space_size=1024
 
-ENTRYPOINT ["yarn", "workspace", "@hoprnet/hopr-ethereum", "hardhat", "node", "--network", "hardhat", "--show-stack-traces"]
+ENTRYPOINT ["yarn", "run", "network", "--network", "hardhat", "--show-stack-traces"]

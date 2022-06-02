@@ -12,6 +12,11 @@ const getLatestBlockTimestamp = async () => {
   return ethers.provider.getBlock('latest').then((res) => String(res.timestamp))
 }
 
+const minutes = (min: number): number => {
+  let msecs = min * 60 * 1e3
+  return msecs
+}
+
 const useFixtures = deployments.createFixture(async (hre, ops: { startTime?: string; maxMintAmount?: string } = {}) => {
   const startTime = ops.startTime ?? (await getLatestBlockTimestamp())
   const maxMintAmount = ops.maxMintAmount ?? '500'
@@ -47,7 +52,7 @@ describe('HoprDistributor', async function () {
 
     beforeEach(async function () {
       const blockNumber = ethers.BigNumber.from(await getLatestBlockTimestamp())
-      const startTime = blockNumber.add(durations.minutes(5))
+      const startTime = blockNumber.add(minutes(5))
       f = await useFixtures({ startTime: startTime.toString() })
     })
 
@@ -58,7 +63,7 @@ describe('HoprDistributor', async function () {
     })
 
     it('should fail to update start time', async function () {
-      await increaseTime(ethers.provider, durations.minutes(10))
+      await increaseTime(ethers.provider, minutes(10))
       await expect(f.distributor.updateStartTime('1')).to.be.revertedWith('Previous start time must not be reached')
     })
   })
@@ -71,7 +76,7 @@ describe('HoprDistributor', async function () {
     })
 
     it('should add schedule', async function () {
-      const _durations = [durations.minutes(1)]
+      const _durations = [minutes(1)]
       const _percents = [toSolPercent(f.multiplier, 1)]
 
       await expect(f.distributor.addSchedule(_durations, _percents, SCHEDULE_1_MIN_ALL))
@@ -114,7 +119,7 @@ describe('HoprDistributor', async function () {
 
     it('should fail to add schedule when percents do not sum to 100%', async function () {
       await expect(
-        f.distributor.addSchedule([durations.minutes(1)], [toSolPercent(f.multiplier, 0.5)], SCHEDULE_UNSET)
+        f.distributor.addSchedule([minutes(1)], [toSolPercent(f.multiplier, 0.5)], SCHEDULE_UNSET)
       ).to.revertedWith('Percents must sum to MULTIPLIER amount')
     })
   })
@@ -134,7 +139,7 @@ describe('HoprDistributor', async function () {
       const accounts = [f.owner]
       const amounts = ['100']
 
-      await f.distributor.addSchedule([durations.minutes(1)], [toSolPercent(f.multiplier, 1)], SCHEDULE_1_MIN_ALL)
+      await f.distributor.addSchedule([minutes(1)], [toSolPercent(f.multiplier, 1)], SCHEDULE_1_MIN_ALL)
       await expect(f.distributor.addAllocations(accounts, amounts, SCHEDULE_1_MIN_ALL))
         .to.emit(f.distributor, 'AllocationAdded')
         .withArgs(accounts[0], amounts[0], SCHEDULE_1_MIN_ALL)
@@ -159,7 +164,7 @@ describe('HoprDistributor', async function () {
       const accounts = [f.owner]
       const amounts = ['200']
 
-      await f.distributor.addSchedule([durations.minutes(1)], [toSolPercent(f.multiplier, 1)], SCHEDULE_TEAM)
+      await f.distributor.addSchedule([minutes(1)], [toSolPercent(f.multiplier, 1)], SCHEDULE_TEAM)
 
       await expect(f.distributor.addAllocations(accounts, amounts, SCHEDULE_TEAM))
         .to.emit(f.distributor, 'AllocationAdded')
@@ -175,17 +180,17 @@ describe('HoprDistributor', async function () {
     before(async function () {
       f = await useFixtures()
 
-      await f.distributor.addSchedule([durations.minutes(1)], [toSolPercent(f.multiplier, 1)], SCHEDULE_1_MIN_ALL)
+      await f.distributor.addSchedule([minutes(1)], [toSolPercent(f.multiplier, 1)], SCHEDULE_1_MIN_ALL)
       await f.distributor.addSchedule(
         [
-          durations.minutes(4),
-          durations.minutes(6),
-          durations.minutes(8),
-          durations.minutes(10),
-          durations.minutes(12),
-          durations.minutes(14),
-          durations.minutes(16),
-          durations.minutes(18)
+          minutes(4),
+          minutes(6),
+          minutes(8),
+          minutes(10),
+          minutes(12),
+          minutes(14),
+          minutes(16),
+          minutes(18)
         ],
         [
           toSolPercent(f.multiplier, 1 / 8),
@@ -205,7 +210,7 @@ describe('HoprDistributor', async function () {
     })
 
     it('should be able to claim 100 after 2 minutes using SCHEDULE_1_MIN_ALL', async function () {
-      await increaseTime(ethers.provider, durations.minutes(2))
+      await increaseTime(ethers.provider, minutes(2))
       expect(await f.distributor.getClaimable(f.owner, SCHEDULE_1_MIN_ALL)).to.equal('100')
     })
 
@@ -214,17 +219,17 @@ describe('HoprDistributor', async function () {
     })
 
     it('should be able to claim 12 after 5 minutes using SCHEDULE_TEAM', async function () {
-      await increaseTime(ethers.provider, durations.minutes(2))
+      await increaseTime(ethers.provider, minutes(2))
       expect(await f.distributor.getClaimable(f.owner, SCHEDULE_TEAM)).to.equal('12')
     })
 
     it('should be able to claim 24 after 8 minutes using SCHEDULE_TEAM', async function () {
-      await increaseTime(ethers.provider, durations.minutes(2))
+      await increaseTime(ethers.provider, minutes(2))
       expect(await f.distributor.getClaimable(f.owner, SCHEDULE_TEAM)).to.equal('24')
     })
 
     it('should be able to claim 100 after 19 minutes using SCHEDULE_TEAM', async function () {
-      await increaseTime(ethers.provider, durations.minutes(12))
+      await increaseTime(ethers.provider, minutes(12))
       expect(await f.distributor.getClaimable(f.owner, SCHEDULE_TEAM)).to.equal('100')
     })
   })
@@ -235,17 +240,17 @@ describe('HoprDistributor', async function () {
     before(async function () {
       f = await useFixtures()
 
-      await f.distributor.addSchedule([durations.minutes(1)], [toSolPercent(f.multiplier, 1)], SCHEDULE_1_MIN_ALL)
+      await f.distributor.addSchedule([minutes(1)], [toSolPercent(f.multiplier, 1)], SCHEDULE_1_MIN_ALL)
       await f.distributor.addSchedule(
         [
-          durations.minutes(4),
-          durations.minutes(6),
-          durations.minutes(8),
-          durations.minutes(10),
-          durations.minutes(12),
-          durations.minutes(14),
-          durations.minutes(16),
-          durations.minutes(18)
+          minutes(4),
+          minutes(6),
+          minutes(8),
+          minutes(10),
+          minutes(12),
+          minutes(14),
+          minutes(16),
+          minutes(18)
         ],
         [
           toSolPercent(f.multiplier, 1 / 8),
@@ -265,7 +270,7 @@ describe('HoprDistributor', async function () {
     })
 
     it('should claim 100 after 2 minutes using SCHEDULE_1_MIN_ALL', async function () {
-      await increaseTime(ethers.provider, durations.minutes(2))
+      await increaseTime(ethers.provider, minutes(2))
 
       await expect(f.distributor.claim(SCHEDULE_1_MIN_ALL))
         .to.emit(f.distributor, 'Claimed')
@@ -281,7 +286,7 @@ describe('HoprDistributor', async function () {
     })
 
     it('should claim 12 after 5 minutes using SCHEDULE_TEAM', async function () {
-      await increaseTime(ethers.provider, durations.minutes(2))
+      await increaseTime(ethers.provider, minutes(2))
 
       await expect(f.distributor.claim(SCHEDULE_TEAM))
         .to.emit(f.distributor, 'Claimed')
@@ -291,7 +296,7 @@ describe('HoprDistributor', async function () {
     })
 
     it('should claim 24 after 8 minutes using SCHEDULE_TEAM', async function () {
-      await increaseTime(ethers.provider, durations.minutes(2))
+      await increaseTime(ethers.provider, minutes(2))
 
       await expect(f.distributor.claim(SCHEDULE_TEAM))
         .to.emit(f.distributor, 'Claimed')
@@ -301,7 +306,7 @@ describe('HoprDistributor', async function () {
     })
 
     it('should claim 100 after 19 minutes using SCHEDULE_TEAM', async function () {
-      await increaseTime(ethers.provider, durations.minutes(12))
+      await increaseTime(ethers.provider, minutes(12))
 
       await expect(f.distributor.claim(SCHEDULE_TEAM))
         .to.emit(f.distributor, 'Claimed')
@@ -321,17 +326,17 @@ describe('HoprDistributor', async function () {
     before(async function () {
       f = await useFixtures()
 
-      await f.distributor.addSchedule([durations.minutes(1)], [toSolPercent(f.multiplier, 1)], SCHEDULE_1_MIN_ALL)
+      await f.distributor.addSchedule([minutes(1)], [toSolPercent(f.multiplier, 1)], SCHEDULE_1_MIN_ALL)
       await f.distributor.addSchedule(
         [
-          durations.minutes(4),
-          durations.minutes(6),
-          durations.minutes(8),
-          durations.minutes(10),
-          durations.minutes(12),
-          durations.minutes(14),
-          durations.minutes(16),
-          durations.minutes(18)
+          minutes(4),
+          minutes(6),
+          minutes(8),
+          minutes(10),
+          minutes(12),
+          minutes(14),
+          minutes(16),
+          minutes(18)
         ],
         [
           toSolPercent(f.multiplier, 1 / 8),
@@ -351,7 +356,7 @@ describe('HoprDistributor', async function () {
     })
 
     it('should claim 100 after 2 minutes using SCHEDULE_1_MIN_ALL', async function () {
-      await increaseTime(ethers.provider, durations.minutes(2))
+      await increaseTime(ethers.provider, minutes(2))
 
       await expect(f.distributor.claimFor(f.owner, SCHEDULE_1_MIN_ALL))
         .to.emit(f.distributor, 'Claimed')
@@ -367,7 +372,7 @@ describe('HoprDistributor', async function () {
     })
 
     it('should claim 12 after 5 minutes using SCHEDULE_TEAM', async function () {
-      await increaseTime(ethers.provider, durations.minutes(2))
+      await increaseTime(ethers.provider, minutes(2))
 
       await expect(f.distributor.claimFor(f.owner, SCHEDULE_TEAM))
         .to.emit(f.distributor, 'Claimed')
@@ -377,7 +382,7 @@ describe('HoprDistributor', async function () {
     })
 
     it('should claim 24 after 8 minutes using SCHEDULE_TEAM', async function () {
-      await increaseTime(ethers.provider, durations.minutes(2))
+      await increaseTime(ethers.provider, minutes(2))
 
       await expect(f.distributor.claimFor(f.owner, SCHEDULE_TEAM))
         .to.emit(f.distributor, 'Claimed')
@@ -387,7 +392,7 @@ describe('HoprDistributor', async function () {
     })
 
     it('should claim 100 after 19 minutes using SCHEDULE_TEAM', async function () {
-      await increaseTime(ethers.provider, durations.minutes(12))
+      await increaseTime(ethers.provider, minutes(12))
 
       await expect(f.distributor.claimFor(f.owner, SCHEDULE_TEAM))
         .to.emit(f.distributor, 'Claimed')
@@ -407,9 +412,9 @@ describe('HoprDistributor', async function () {
     before(async function () {
       f = await useFixtures()
 
-      await f.distributor.addSchedule([durations.minutes(1)], [toSolPercent(f.multiplier, 1)], SCHEDULE_1_MIN_ALL)
+      await f.distributor.addSchedule([minutes(1)], [toSolPercent(f.multiplier, 1)], SCHEDULE_1_MIN_ALL)
       await f.distributor.addSchedule(
-        [durations.minutes(2), durations.minutes(4)],
+        [minutes(2), minutes(4)],
         [toSolPercent(f.multiplier, 1 / 2), toSolPercent(f.multiplier, 1 / 2)],
         SCHEDULE_TEAM
       )
@@ -426,7 +431,7 @@ describe('HoprDistributor', async function () {
     })
 
     it('should fail to claim SCHEDULE_TEAM after revoked', async function () {
-      await increaseTime(ethers.provider, durations.minutes(2))
+      await increaseTime(ethers.provider, minutes(2))
 
       await f.distributor.claim(SCHEDULE_TEAM)
       await f.distributor.revokeAccount(f.owner, SCHEDULE_TEAM)

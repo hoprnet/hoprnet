@@ -72,6 +72,17 @@ extendEnvironment((hre: HardhatRuntimeEnvironment) => {
   hre.environment = HOPR_ENVIRONMENT_ID
 })
 
+// inlined from @hoprnet/hopr-utils to remove dependency on whole package
+function expandVars(input: string, vars: { [key: string]: any }) {
+  return input.replace(/\$\{(.*)\}/g, (_, varName) => {
+    if (!(varName in vars)) {
+      throw new Error(`failed to expand vars in string '${input}', var ${varName} not defined`)
+    }
+    return vars[varName]
+  })
+}
+
+
 // For reference on how the configuration is structured refer to:
 //
 // https://hardhat.org/hardhat-network/reference/#config
@@ -380,8 +391,6 @@ task('test:in-group', 'Reset the hardhat node instances per testFiles array.').s
  */
 subtask(TASK_DEPLOY_RUN_DEPLOY, 'Override the deploy task, with an explicit gas price.').setAction(
   async (taskArgs, { network, ethers }, runSuper) => {
-    // const protocolConfigNetworkNames = Object.keys<ResolvedEnvironment['network']>(PROTOCOL_CONFIG.networks);
-    // const protocolConfigNetworks = Object.values<ResolvedEnvironment['network']>(PROTOCOL_CONFIG.networks);
     const protocolConfigNetwork = PROTOCOL_CONFIG.networks[network.name] ?? undefined
     if (!protocolConfigNetwork) {
       throw Error(

@@ -44,14 +44,11 @@
     "multiformats": "^9.4.5",
     "multihashes": "4.0.3",
     "peer-id": "0.16.0",
-    "pino": "7.8.0",
-    "pino-logflare": "0.3.12",
     "secp256k1": "4.0.3"
   },
   "devDependencies": {
     "@chainsafe/libp2p-noise": "5.0.3",
     "@types/mocha": "9.1.0",
-    "@types/pino": "7.0.4",
     "bl": "5.0.0",
     "chai": "4.3.6",
     "libp2p": "0.36.2",
