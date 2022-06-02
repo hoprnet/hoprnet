@@ -20,9 +20,9 @@ struct PackageJsonFile {
 
 /// Reads the package.json file of hoprd and determines it's version.
 #[wasm_bindgen]
-pub fn get_hoprd_version() -> Result<String, JsValue> {
+pub fn get_hoprd_version(package_file: &str) -> Result<String, JsValue> {
 
-    let file_data = real::read_file("packages/hoprd/package.json");
+    let file_data = real::read_file(package_file);
 
     return serde_json::from_slice::<PackageJsonFile>(Result::from(file_data)?.as_slice())
         .map(|v| v.version)
