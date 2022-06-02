@@ -45,57 +45,61 @@ process.title = 'hopr-cover-traffic-daemon'
 const defaultDataPath = path.join(process.cwd(), 'hopr-cover-traffic-daemon-db', defaultEnvironment())
 
 const argv = yargs(process.argv.slice(2))
+  .env('HOPR_CTD') // enable options to be set as environment variables with the HOPR_CTD prefix
+  .epilogue(
+    'All CLI options can be configured through environment variables as well. CLI parameters have precedence over environment variables.'
+  )
   .option('environment', {
     string: true,
-    describe: 'Environment id which the node shall run on',
+    describe: 'Environment id which the node shall run on (HOPR_CTD_ENVIRONMENT)',
     choices: supportedEnvironments().map((env) => env.id),
     default: defaultEnvironment()
   })
   .option('privateKey', {
-    describe: 'A private key to be used for the node',
+    describe: 'A private key to be used for the node [env: HOPR_CTD_PRIVATE_KEY]',
     string: true,
     demandOption: true
   })
   .option('provider', {
     string: true,
-    describe: 'A custom RPC provider to be used for your HOPR node to connect to blockchain'
+    describe: 'A custom RPC provider to be used for the node to connect to blockchain [env: HOPR_CTD_PROVIDER]'
   })
   .option('dbFile', {
-    describe: 'A path to DB file for persistent storage',
+    describe: 'A path to DB file for persistent storage [env: HOPR_CTD_DB_FILE]',
     string: true,
     default: './ct.json'
   })
   .option('data', {
     string: true,
-    describe: 'manually specify the database directory to use',
+    describe: 'manually specify the data directory to use [env: HOPR_CTD_DATA]',
     default: defaultDataPath
   })
   .option('healthCheck', {
     boolean: true,
-    describe: 'Run a health check end point on localhost:8080',
+    describe: 'Run a health check end point on localhost:8080 [env: HOPR_CTD_HEALTH_CHECK]',
     default: false
   })
   .option('healthCheckHost', {
-    describe: 'Host to listen on for health check',
+    describe: 'Host to listen on for health check [env: HOPR_CTD_HEALTH_CHECK_HOST]',
     default: 'localhost'
   })
   .option('healthCheckPort', {
-    describe: 'Port to listen on for health check',
+    describe: 'Port to listen on for health check [env: HOPR_CTD_HEALTH_CHECK_PORT]',
     default: 8080
   })
   .option('allowLocalNodeConnections', {
     boolean: true,
-    describe: 'Allow connections to other nodes running on localhost.',
+    describe: 'Allow connections to other nodes running on localhost [env: HOPR_CTD_ALLOW_LOCAL_NODE_CONNECTIONS]',
     default: false
   })
   .option('testAnnounceLocalAddresses', {
     boolean: true,
-    describe: 'For testing local testnets. Announce local addresses.',
+    describe: 'For testing local testnets. Announce local addresses [env: HOPR_CTD_TEST_ANNOUNCE_LOCAL_ADDRESSES]',
     default: false
   })
   .option('testPreferLocalAddresses', {
     boolean: true,
-    describe: 'For testing local testnets. Prefer local peers to remote.',
+    describe: 'For testing local testnets. Prefer local peers to remote [env: HOPR_CTD_TEST_PREFER_LOCAL_ADDRESSES]',
     default: false
   })
   .wrap(Math.min(120, terminalWidth()))

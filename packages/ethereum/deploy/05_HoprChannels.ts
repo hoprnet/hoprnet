@@ -6,8 +6,8 @@ import { durations, u8aToHex, pickVersion } from '@hoprnet/hopr-utils'
 const closures: {
   [key in DeploymentTypes]: number
 } = {
-  testing: durations.minutes(1),
-  development: durations.minutes(1),
+  testing: durations.seconds(15),
+  development: durations.seconds(15),
   staging: durations.minutes(5),
   production: durations.minutes(5)
 }

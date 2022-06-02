@@ -4,12 +4,7 @@ import type NetworkPeers from './network-peers'
 import type AccessControl from './access-control'
 import type PeerId from 'peer-id'
 import { randomInteger, u8aEquals, debug, retimer, nAtATime, u8aToHex } from '@hoprnet/hopr-utils'
-import {
-  HEARTBEAT_INTERVAL,
-  HEARTBEAT_TIMEOUT,
-  HEARTBEAT_INTERVAL_VARIANCE,
-  NETWORK_QUALITY_THRESHOLD
-} from '../constants'
+import { HEARTBEAT_TIMEOUT } from '../constants'
 import { createHash, randomBytes } from 'crypto'
 
 import type { Subscribe, SendMessage } from '../index'
@@ -35,6 +30,7 @@ export type HeartbeatConfig = {
   heartbeatVariance: number
   heartbeatInterval: number
   heartbeatThreshold: number
+  networkQualityThreshold: number
 }
 
 /**
@@ -74,9 +70,10 @@ export default class Heartbeat {
     this.config = {
       heartbeatDialTimeout: config?.heartbeatDialTimeout ?? HEARTBEAT_TIMEOUT,
       heartbeatRunTimeout: config?.heartbeatRunTimeout ?? HEARTBEAT_RUN_TIMEOUT,
-      heartbeatInterval: config?.heartbeatInterval ?? HEARTBEAT_INTERVAL,
-      heartbeatThreshold: config?.heartbeatThreshold ?? HEARTBEAT_INTERVAL,
-      heartbeatVariance: config?.heartbeatVariance ?? HEARTBEAT_INTERVAL_VARIANCE,
+      heartbeatInterval: config?.heartbeatInterval,
+      heartbeatThreshold: config?.heartbeatThreshold,
+      heartbeatVariance: config?.heartbeatVariance,
+      networkQualityThreshold: config?.networkQualityThreshold,
       maxParallelHeartbeats: config?.maxParallelHeartbeats ?? MAX_PARALLEL_HEARTBEATS
     }
     this.protocolHeartbeat = `/hopr/${environmentId}/heartbeat`
@@ -182,9 +179,9 @@ export default class Heartbeat {
     for (let entry of this.networkPeers.allEntries()) {
       let quality = this.networkPeers.qualityOf(entry.id)
       if (this.publicNodeLookup(entry.id)) {
-        quality > NETWORK_QUALITY_THRESHOLD ? ++highQualityPublic : ++lowQualityPublic
+        quality > this.config.networkQualityThreshold ? ++highQualityPublic : ++lowQualityPublic
       } else {
-        quality > NETWORK_QUALITY_THRESHOLD ? ++highQualityNonPublic : ++lowQualityNonPublic
+        quality > this.config.networkQualityThreshold ? ++highQualityNonPublic : ++lowQualityNonPublic
       }
     }
 
