@@ -52,7 +52,6 @@
     "@chainsafe/libp2p-noise": "5.0.3",
     "@types/mocha": "9.1.0",
     "@types/pino": "7.0.4",
-    "@wasm-tool/wasm-pack-plugin": "^1.1.0",
     "bl": "5.0.0",
     "chai": "4.3.6",
     "libp2p": "0.36.2",
@@ -64,8 +63,7 @@
     "rimraf": "3.0.2",
     "sinon": "12.0.1",
     "typedoc": "0.22.13",
-    "typedoc-plugin-markdown": "3.11.14",
-    "wasm-pack": "0.10.2"
+    "typedoc-plugin-markdown": "3.11.14"
   },
   "mocha": {
     "extension": [
