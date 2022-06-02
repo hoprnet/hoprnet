@@ -1,6 +1,6 @@
 import { encode, decode } from 'rlp'
 import { u8aToHex } from '@hoprnet/hopr-utils'
-import { styleValue } from '.'
+import { styleValue } from './index.js'
 
 /**
  * Adds the current timestamp to the message in order to measure the latency.

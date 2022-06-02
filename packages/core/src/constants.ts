@@ -11,6 +11,7 @@ export const VERSION = pickVersion(pkg.version)
 // NATs which might include several round trips
 export const HEARTBEAT_TIMEOUT = 30000
 export const HEARTBEAT_INTERVAL = 60000
+export const HEARTBEAT_THRESHOLD = 60000
 export const HEARTBEAT_INTERVAL_VARIANCE = 2000
 
 export const MAX_PACKET_DELAY = 200

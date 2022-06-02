@@ -46,13 +46,13 @@
 
 #### Defined in
 
-[packages/ethereum/src/index.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L9)
+[packages/ethereum/src/index.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L19)
 
 ___
 
 ### ContractNames
 
-Ƭ **ContractNames**: ``"HoprToken"`` \| ``"HoprChannels"`` \| ``"HoprDistributor"`` \| ``"HoprNetworkRegistry"``
+Ƭ **ContractNames**: ``"HoprToken"`` \| ``"HoprChannels"`` \| ``"HoprDistributor"`` \| ``"HoprNetworkRegistry"`` \| ``"HoprBoost"`` \| ``"HoprStake"`` \| ``"HoprStake2"`` \| ``"HoprStakeSeason3"`` \| ``"HoprStakeSeason4"`` \| ``"HoprWhitehat"``
 
 #### Defined in
 
@@ -123,4 +123,4 @@ ___
 
 #### Defined in
 
-[packages/ethereum/src/index.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L16)
+[packages/ethereum/src/index.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L26)

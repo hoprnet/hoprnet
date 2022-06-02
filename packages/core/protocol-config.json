@@ -7,9 +7,11 @@
       "token_contract_address": "${HARDHAT_TOKEN_CONTACT_ADDRESS}",
       "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}",
       "minted_token_receiver_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
-      "stake_contract_address": "0xae933331ef0bE122f9499512d3ed4Fa3896DCf20",
+      "xhopr_contract_address": "${HARDHAT_XHOPR_CONTACT_ADDRESS}",
+      "boost_contract_address": "${HARDHAT_BOOST_CONTACT_ADDRESS}",
+      "stake_contract_address": "${HARDHAT_STAKE_CONTACT_ADDRESS}",
+      "network_registry_proxy_contract_address": "${HARDHAT_REGISTRY_PROXY_CONTACT_ADDRESS}",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": []
     },
     "hardhat-localhost2": {
@@ -19,9 +21,11 @@
       "token_contract_address": "${HARDHAT_TOKEN_CONTACT_ADDRESS}",
       "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}",
       "minted_token_receiver_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
-      "stake_contract_address": "0xae933331ef0bE122f9499512d3ed4Fa3896DCf20",
+      "xhopr_contract_address": "${HARDHAT_XHOPR_CONTACT_ADDRESS}",
+      "boost_contract_address": "${HARDHAT_BOOST_CONTACT_ADDRESS}",
+      "stake_contract_address": "${HARDHAT_STAKE_CONTACT_ADDRESS}",
+      "network_registry_proxy_contract_address": "${HARDHAT_REGISTRY_PROXY_CONTACT_ADDRESS}",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": []
     },
     "master-goerli": {
@@ -29,11 +33,13 @@
       "environment_type": "staging",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xa3C8f4044b30Fb3071F5b3b02913DE524F1041dc",
-      "channels_contract_address": "0x7587B259bbe2AdcDc7bFd6FD667Fd440b64c0Aad",
+      "channels_contract_address": "0x2542c5d6814f577E1991849785B96fC40Ce63E49",
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
-      "stake_contract_address": "0x5F1f18E44d29E159366810Fc6C1208E386Ef661F",
-      "network_registry_contract_address": "0x6aDc4991Ac9622Ca07d89A6D38b1Cd062309E8F0",
-      "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
+      "xhopr_contract_address": "0xe8aD2ac347dA7549Aaca8F5B1c5Bf979d85bC78F",
+      "boost_contract_address": "0xd7ECa0E90cD85b08875E7d10d4D25B274C6CC549",
+      "stake_contract_address": "0x0d4Ec37e692BcD36FE7dDcB37a14358d7F44d72C",
+      "network_registry_proxy_contract_address": "0x3ee6e1eaE59C44EC30bc5e8FEeE587f95C9F2626",
+      "network_registry_contract_address": "0x3e5AA27125C90686444b2d093BFe9b843E82D2F5",
       "tags": []
     },
     "debug-goerli": {
@@ -45,7 +51,6 @@
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
       "stake_contract_address": "0xae933331ef0bE122f9499512d3ed4Fa3896DCf20",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": []
     },
     "tuttlingen": {
@@ -56,7 +61,6 @@
       "channels_contract_address": "0xd2229d5d54bE8ABC9A2b2d5cFdEd22B48FB8ce2c",
       "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": []
     },
     "prague": {
@@ -67,7 +71,6 @@
       "channels_contract_address": "0x4f98F01cb02083eb5457CA0DDC6B37073ec5388a",
       "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": []
     },
     "budapest": {
@@ -78,7 +81,6 @@
       "channels_contract_address": "0xEee8AB66b7169b3f9024676165fB1D2a25E472c5",
       "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": []
     },
     "athens": {
@@ -103,6 +105,9 @@
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0x978D91ddFdb0c6eaCC22A258fE498957a79c5F4C",
       "channels_contract_address": "0x0BB1Ff7A9b3f2c87267626630aa0195cAE3ed5E3",
+      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
+      "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
+      "stake_contract_address": "0xae933331ef0bE122f9499512d3ed4Fa3896DCf20",
       "tags": []
     }
   },
@@ -111,8 +116,9 @@
       "description": "Hardhat is an Ethereum development environment",
       "chain_id": 1,
       "live": false,
-      "gas_price": "1 gwei",
-      "gas_multiplier": 1.1,
+      "hardhat_deploy_gas_price": "2 gwei",
+      "max_fee_per_gas": "1 gwei",
+      "max_priority_fee_per_gas": "2 gwei",
       "default_provider": "http://127.0.0.1:8545/",
       "native_token_name": "ETH",
       "hopr_token_name": "wxHOPR"
@@ -121,8 +127,9 @@
       "description": "The xDai chain is a stable payments EVM (Ethereum Virtual Machine) blockchain designed for fast and inexpensive transactions",
       "chain_id": 100,
       "live": true,
-      "gas_price": "2 gwei",
-      "gas_multiplier": 1.1,
+      "hardhat_deploy_gas_price": "2 gwei",
+      "max_fee_per_gas": "10 gwei",
+      "max_priority_fee_per_gas": "2 gwei",
       "default_provider": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
       "native_token_name": "xDAI",
       "hopr_token_name": "wxHOPR"
@@ -131,9 +138,11 @@
       "description": "Görli Testnet is the first proof-of-authority cross-client testnet, synching Parity Ethereum, Geth, Nethermind, Hyperledger Besu (formerly Pantheon), and EthereumJS",
       "chain_id": 5,
       "live": true,
-      "gas_price": "1 gwei",
-      "gas_multiplier": 1.3,
+      "hardhat_deploy_gas_price": "1 gwei",
+      "max_fee_per_gas": "10 gwei",
+      "max_priority_fee_per_gas": "2 gwei",
       "default_provider": "https://provider-proxy.hoprnet.workers.dev/eth_goerli",
+      "etherscan_api_url": "http://api-goerli.etherscan.io/api",
       "native_token_name": "gETH",
       "hopr_token_name": "wxHOPR"
     }

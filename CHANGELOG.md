@@ -1,3 +1,14 @@
+<a name="1.90"></a>
+
+## 1.90
+
+### Changes
+
+- Reduce eth_getBlockByNumber calls when indexing and sending transactions ([#3814](https://github.com/hoprnet/hoprnet/pull/3814))
+- Marge hopr-stake contracs into monorepo and relevant deploy scripts
+- Add additional CLI parameters `--heartbeatThreshold`, `--networkQualityThreshold` and `--onChainConfirmations`
+- Allow configuration via environment variables instead of CLI parameters for all supported options
+
 <a name="1.89"></a>
 
 ## [1.89](https://github.com/hoprnet/hoprnet/compare/release/ouagadougou...hoprnet:master)
@@ -7,6 +18,11 @@
 - Improvements in our API v2 unit tests ([#3643](https://github.com/hoprnet/hoprnet/pull/3643))
 - Improvements in our integration E2E tests ([#3643](https://github.com/hoprnet/hoprnet/pull/3643))
 - API v2 `/api/v2/node/peers` now returns `multiaddr` for connected peers ([#3643](https://github.com/hoprnet/hoprnet/pull/3643))
+- Add connectivity health indicator updates to the logs ([#3816](https://github.com/hoprnet/hoprnet/pull/3816))
+
+### Breaking changes
+
+- Migration to ECMAscript module standard (ESM), drop support for CommonJS ([#3825](https://github.com/hoprnet/hoprnet/pull/3825))
 
 ---
 

@@ -1,6 +1,6 @@
 import type { Operation } from 'express-openapi'
 import PeerId from 'peer-id'
-import { STATUS_CODES } from '../../../../utils'
+import { STATUS_CODES } from '../../../../utils.js'
 
 export const POST: Operation = [
   async (req, res, _next) => {

@@ -1,8 +1,8 @@
-import type Hopr from '@hoprnet/hopr-core'
+import type { default as Hopr } from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
-import { AbstractCommand } from './abstractCommand'
-import type { StateOps } from '../types'
-import { checkPeerIdInput, styleValue } from './utils'
+import { AbstractCommand } from './abstractCommand.js'
+import type { StateOps } from '../types.js'
+import { checkPeerIdInput, styleValue } from './utils/index.js'
 
 export default class Ping extends AbstractCommand {
   constructor(public node: Hopr) {

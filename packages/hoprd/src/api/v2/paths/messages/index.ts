@@ -1,8 +1,8 @@
 import type { Operation } from 'express-openapi'
 import PeerId from 'peer-id'
 import { PublicKey } from '@hoprnet/hopr-utils'
-import { encodeMessage } from '../../../../commands/utils'
-import { STATUS_CODES } from '../../utils'
+import { encodeMessage } from '../../../../commands/utils/index.js'
+import { STATUS_CODES } from '../../utils.js'
 
 export const POST: Operation = [
   async (req, res, _next) => {

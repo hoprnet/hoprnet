@@ -16,7 +16,7 @@ import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constan
 
 import AccessControl from './network/access-control'
 import NetworkPeers, { Entry } from './network/network-peers'
-import Heartbeat, { type HeartbeatPingResult } from './network/heartbeat'
+import Heartbeat, { type HeartbeatPingResult, type NetworkHealthIndicator } from './network/heartbeat'
 
 import { findPath } from './path'
 
@@ -98,7 +98,10 @@ export type HoprOptions = {
     ip6?: NetOptions
   }
   heartbeatInterval?: number
+  heartbeatThreshold?: number
   heartbeatVariance?: number
+  networkQualityThreshold?: number
+  onChainConfirmations?: number
   testing?: {
     // when true, assume that the node is running in an isolated network and does
     // not need any connection to nodes outside of the subnet
@@ -157,6 +160,7 @@ class Hopr extends EventEmitter {
   private forward: PacketForwardInteraction
   private libp2p: LibP2P
   private pubKey: PublicKey
+  private knownPublicNodesCache = new Set()
 
   public environment: ResolvedEnvironment
 
@@ -234,6 +238,9 @@ class Hopr extends EventEmitter {
     // Fetch previous announcements from database
     const initialNodes = await this.connector.waitForPublicNodes()
 
+    // Add all initial public nodes to public nodes cache
+    initialNodes.forEach((initialNode) => this.knownPublicNodesCache.add(initialNode.id.toB58String()))
+
     // Fetch all nodes that will announces themselves during startup
     const recentlyAnnouncedNodes: PeerStoreAddress[] = []
     const pushToRecentlyAnnouncedNodes = (peer: PeerStoreAddress) => recentlyAnnouncedNodes.push(peer)
@@ -266,6 +273,7 @@ class Hopr extends EventEmitter {
     this.networkPeers = new NetworkPeers(
       peers.map((p) => p.id),
       [this.id],
+      this.options.networkQualityThreshold,
       (peer: PeerId) => {
         this.libp2p.peerStore.delete(peer)
         this.publicNodesEmitter.emit('removePublicNode', peer)
@@ -303,6 +311,8 @@ class Hopr extends EventEmitter {
       sendMessage,
       this.closeConnectionsTo.bind(this),
       accessControl.reviewConnection.bind(accessControl),
+      this,
+      (peerId: PeerId) => this.knownPublicNodesCache.has(peerId.toB58String()),
       this.environment.id,
       this.options
     )
@@ -385,14 +395,15 @@ class Hopr extends EventEmitter {
     } else {
       log(`No multiaddrs has been registered.`)
     }
-    this.maybeLogProfilingToGCloud()
+    await this.maybeLogProfilingToGCloud()
+    this.heartbeat.recalculateNetworkHealth()
   }
 
-  private maybeLogProfilingToGCloud() {
+  private async maybeLogProfilingToGCloud() {
     if (process.env.GCLOUD) {
       try {
         var name = 'hopr_node_' + this.getId().toB58String().slice(-5).toLowerCase()
-        require('@google-cloud/profiler')
+        ;(await import('@google-cloud/profiler'))
           .start({
             projectId: 'hoprassociation',
             serviceContext: {
@@ -472,6 +483,10 @@ class Hopr extends EventEmitter {
 
         await this.libp2p.peerStore.addressBook.add(peer.id, dialables)
       }
+
+      // Mark the corresponding entry as public & recalculate network health indicator
+      this.knownPublicNodesCache.add(peer.id.toB58String())
+      this.heartbeat.recalculateNetworkHealth()
     } catch (err) {
       log(`Failed to update peer-store with new peer ${peer.id.toB58String()} info`, err)
     }
@@ -1233,7 +1248,9 @@ class Hopr extends EventEmitter {
         () => {
           return new Promise<void>(async (resolve, reject) => {
             try {
-              const nativeBalance = await this.getNativeBalance()
+              // call connector directly and don't use cache, since this is
+              // most likely outdated during node startup
+              const nativeBalance = await this.connector.getNativeBalance(false)
               if (nativeBalance.toBN().gte(MIN_NATIVE_BALANCE)) {
                 resolve()
               } else {
@@ -1247,7 +1264,7 @@ class Hopr extends EventEmitter {
           })
         },
         {
-          minDelay: durations.seconds(30),
+          minDelay: durations.seconds(1),
           maxDelay: durations.seconds(200),
           delayMultiple: 1.05
         }
@@ -1271,7 +1288,8 @@ export default Hopr
 export * from './constants'
 export { createHoprNode } from './main'
 export { PassiveStrategy, PromiscuousStrategy, SaneDefaults, findPath }
-export type { ChannelsToOpen, ChannelsToClose }
+export type { ChannelsToOpen, ChannelsToClose, NetworkHealthIndicator }
 export { resolveEnvironment, supportedEnvironments, type ResolvedEnvironment } from './environment'
 export { createLibp2pMock } from './libp2p.mock'
 export { sampleOptions } from './index.mock'
+export { CONFIRMATIONS } from '@hoprnet/hopr-core-ethereum'

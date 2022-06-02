@@ -53,7 +53,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 }
 
 main.runAtTheEnd = true
-main.dependencies = ['preDeploy']
+main.dependencies = ['postDeploy']
 main.tags = ['slimDeployments']
 
 export default main

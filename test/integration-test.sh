@@ -152,9 +152,9 @@ close_channel() {
   log "Node ${source_id} close channel to Node ${destination_id}"
 
   if [ "${close_check}" = "true" ]; then
-    result="$(call_api ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" "PendingToClose" 600)"
+    result="$(call_api ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" "Channel is already closed" 600)"
   else
-    result="$(call_api ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" "Open" 20 20)"
+    result="$(call_api ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" "PendingToClose" 20 20)"
   fi
 
   log "Node ${source_id} close channel to Node ${destination_id} result -- ${result}"
@@ -170,7 +170,7 @@ open_channel() {
   local source_api="${3}"
   local destination_peer_id="${4}"
   local result
-                                                                 
+
   log "Node ${source_id} open channel to Node ${destination_id}"
   result=$(call_api ${source_api} "/channels" "POST" "{\"peerId\": \"${destination_peer_id}\", \"amount\": \"100000000000000000000\"}" "channelId" 600 60)
   log "Node ${source_id} open channel to Node ${destination_id} result -- ${result}"
@@ -194,7 +194,7 @@ redeem_tickets() {
   # Trigger a redemption run, but cap it at 1 minute. We only want to measure
   # progress, not redeeem all tickets which takes too long.
   log "Node ${node_id} should redeem all tickets"
-  # add 60 second timeout 
+  # add 60 second timeout
   result=$(call_api ${node_api} "/tickets/redeem" "POST" "" "" 60 60)
   log "--${result}"
 
@@ -211,7 +211,7 @@ redeem_tickets() {
   # Trigger another redemption run, but cap it at 1 minute. We only want to measure
   # progress, not redeeem all tickets which takes too long.
   log "Node ${node_id} should redeem all tickets (again to ensure re-run of operation)"
-  # add 60 second timeout 
+  # add 60 second timeout
   result=$(call_api ${node_api} "/tickets/redeem" "POST" "" "" 60 60)
   log "--${result}"
 
@@ -337,7 +337,7 @@ get_tickets_in_channel() {
 # $3 = assertion
 ping() {
   local origin=${1:-localhost:3001}
-  local peer_id="${2}" 
+  local peer_id="${2}"
   local assertion="${3}"
 
   echo $(call_api ${1} "/node/ping" "POST" "{\"peerId\": \"${peer_id}\"}" ${assertion} 600)
@@ -413,16 +413,25 @@ log "hopr addr5: ${addr5} ${native_addr5} ${hopr_addr5}"
 log "hopr addr7: ${addr7} ${native_addr7} ${hopr_addr7}"
 log "hopr addr8: ${addr8} ${native_addr8} ${hopr_addr8}"
 
+# enable register
+# log "Enabling register"
+# HOPR_ENVIRONMENT_ID=hardhat-localhost \
+# TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
+# yarn workspace @hoprnet/hopr-ethereum hardhat register \
+#   --network hardhat \
+#   --task enable
+# log "Register enabled"
+
 # add nodes 1,2,3,4,5,7 in register, do NOT add node 8
-log "Adding nodes to register"
-HOPR_ENVIRONMENT_ID=hardhat-localhost \
-TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-yarn workspace @hoprnet/hopr-ethereum hardhat register \
-  --network hardhat \
-  --task add \
-  --native-addresses "$native_addr1,$native_addr2,$native_addr3,$native_addr4,$native_addr5,$native_addr7" \
-  --peer-ids "$hopr_addr1,$hopr_addr2,$hopr_addr3,$hopr_addr4,$hopr_addr5,$hopr_addr7"
-log "Nodes added to register"
+# log "Adding nodes to register"
+# HOPR_ENVIRONMENT_ID=hardhat-localhost \
+# TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
+# yarn workspace @hoprnet/hopr-ethereum hardhat register \
+#   --network hardhat \
+#   --task add \
+#   --native-addresses "$native_addr1,$native_addr2,$native_addr3,$native_addr4,$native_addr5,$native_addr7" \
+#   --peer-ids "$hopr_addr1,$hopr_addr2,$hopr_addr3,$hopr_addr4,$hopr_addr5,$hopr_addr7"
+# log "Nodes added to register"
 
 # running withdraw and checking it results at the end of this test run
 balances=$(get_balances ${api1})
@@ -485,13 +494,13 @@ log "Node 1 should not be able to talk to Node 7 (different environment id)"
 result=$(ping "${api1}" ${addr7} "TIMEOUT")
 log "-- ${result}"
 
-log "Node 8 should not be able to talk to Node 1 (Node 8 is not in the register)"
-result=$(ping "${api8}" ${addr1} "TIMEOUT")
-log "-- ${result}"
+# log "Node 8 should not be able to talk to Node 1 (Node 8 is not in the register)"
+# result=$(ping "${api8}" ${addr1} "TIMEOUT")
+# log "-- ${result}"
 
-log "Node 1 should not be able to talk to Node 8 (Node 8 is not in the register)"
-result=$(ping "${api1}" ${addr8} "TIMEOUT")
-log "-- ${result}"
+# log "Node 1 should not be able to talk to Node 8 (Node 8 is not in the register)"
+# result=$(ping "${api1}" ${addr8} "TIMEOUT")
+# log "-- ${result}"
 
 log "Node 2 has no unredeemed ticket value"
 result=$(get_tickets_statistics "${api2}" "\"unredeemedValue\":\"0\"")
@@ -520,16 +529,16 @@ close_channel 1 4 "${api1}" "${addr4}" "outgoing" "true" &
 
 for i in `seq 1 10`; do
   log "Node 1 send 1 hop message to self via node 2"
-  send_message "${api1}" "${addr1}" 'hello, world' "${addr2}" 
+  send_message "${api1}" "${addr1}" 'hello, world' "${addr2}"
 
   log "Node 2 send 1 hop message to self via node 3"
-  send_message "${api2}" "${addr2}" 'hello, world' "${addr3}" 
+  send_message "${api2}" "${addr2}" 'hello, world' "${addr3}"
 
   log "Node 3 send 1 hop message to self via node 4"
-  send_message "${api3}" "${addr3}" 'hello, world' "${addr4}" 
+  send_message "${api3}" "${addr3}" 'hello, world' "${addr4}"
 
   log "Node 4 send 1 hop message to self via node 5"
-  send_message "${api4}" "${addr4}" 'hello, world' "${addr5}" 
+  send_message "${api4}" "${addr4}" 'hello, world' "${addr5}"
 done
 
 log "Node 2 should now have a ticket"
@@ -585,7 +594,7 @@ test_redeem_in_specific_channel() {
 
   for i in `seq 1 3`; do
     log "Node ${node_id} send 1 hop message to self via node ${second_node_id}"
-    send_message "${node_api}" "${peer_id}" "hello, world" "${second_peer_id}" 
+    send_message "${node_api}" "${peer_id}" "hello, world" "${second_peer_id}"
   done
 
   # seems like there's slight delay needed for tickets endpoint to return up to date tickets, probably because of blockchain sync delay
@@ -593,7 +602,7 @@ test_redeem_in_specific_channel() {
   ticket_amount=$(get_tickets_in_channel ${second_node_api} ${peer_id} | jq '. | length')
   [[ "${ticket_amount}" != "3" ]] && { msg "Ticket ammount is different than expected: ${ticket_amount} != 3"; exit 1; }
 
-  redeem_tickets_in_channel ${second_node_api} ${peer_id}  
+  redeem_tickets_in_channel ${second_node_api} ${peer_id}
 
   get_tickets_in_channel ${second_node_api} ${peer_id} "TICKETS_NOT_FOUND"
 
@@ -627,8 +636,8 @@ log "Waiting for nodes to finish handling close channels calls"
 wait
 
 # Also add confirmation time
-log "Waiting 70 seconds for cool-off period"
-sleep 70
+log "Waiting 30 seconds for cool-off period"
+sleep 30
 
 # verify channel has been closed
 close_channel 1 5 "${api1}" "${addr5}" "outgoing" "true"

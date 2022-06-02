@@ -1,6 +1,6 @@
-import type Hopr from '@hoprnet/hopr-core'
-import { AbstractCommand } from './abstractCommand'
-import { styleValue } from './utils'
+import type { default as Hopr } from '@hoprnet/hopr-core'
+import { AbstractCommand } from './abstractCommand.js'
+import { styleValue } from './utils/index.js'
 import { PublicKey, ChannelStatus, channelStatusToString } from '@hoprnet/hopr-utils'
 
 export default class ListOpenChannels extends AbstractCommand {

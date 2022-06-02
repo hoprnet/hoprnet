@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-connect",
-  "version": "1.89.0-next.14",
+  "version": "1.89.0-next.17",
   "description": "A libp2p-complaint transport module that handles NAT traversal by using WebRTC",
   "repository": "https://github.com/hoprnet/hopr-connect.git",
   "homepage": "https://github.com/hoprnet/hopr-connect",
@@ -12,6 +12,7 @@
   ],
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
+  "type": "commonjs",
   "engines": {
     "node": "16"
   },
@@ -61,8 +62,6 @@
     "libp2p-mplex": "0.10.7",
     "mocha": "9.2.2",
     "rimraf": "3.0.2",
-    "ts-node": "10.7.0",
-    "typescript": "4.6.3",
     "yargs": "17.4.0"
   },
   "mocha": {
