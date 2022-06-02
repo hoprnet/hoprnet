@@ -18,7 +18,7 @@ Add dependency to `@hoprnet/hopr-real` to your `package.json`
 import * as wasm from '@hoprnet/hopr-real'
 
 if (wasm.common.dummy_get_one() === '1') {
-   console.log('It works!!')
+  console.log('It works!!')
 }
 ```
 
