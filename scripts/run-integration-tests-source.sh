@@ -166,29 +166,36 @@ function setup_node() {
 
   # Set NODE_ENV=development to rebuild hopr-admin next files
   # at runtime. Necessary to start multiple instances of hoprd
-  # in parallel
-  DEBUG="hopr*" NODE_ENV=development node packages/hoprd/lib/main.cjs \
-    --admin \
-    --adminHost "127.0.0.1" \
-    --adminPort ${admin_port} \
-    --api-token "${api_token}" \
-    --data="${dir}" \
-    --host="127.0.0.1:${node_port}" \
-    --identity="${id}" \
-    --init \
-    --password="${password}" \
-    --api \
-    --apiPort "${api_port}" \
-    --testAnnounceLocalAddresses \
-    --testPreferLocalAddresses \
-    --testUseWeakCrypto \
-    --testNoUPNP \
-    --allowLocalNodeConnections \
-    --allowPrivateNodeConnections \
-    --heartbeatInterval 2500 \
-    --heartbeatVariance 1000 \
-    ${additional_args} \
-    > "${log}" 2>&1 &
+  # in parallel. Using a mix of CLI parameters and env variables to ensure
+  # both work.
+  env \
+    DEBUG="hopr*" \
+    NODE_ENV=development \
+    HOPRD_HEARTBEAT_INTERVAL=2500 \
+    HOPRD_HEARTBEAT_THRESHOLD=2500 \
+    HOPRD_HEARTBEAT_VARIANCE=1000 \
+    HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
+    HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
+    node packages/hoprd/lib/main.cjs \
+      --admin \
+      --adminHost "127.0.0.1" \
+      --adminPort ${admin_port} \
+      --api-token "${api_token}" \
+      --data="${dir}" \
+      --host="127.0.0.1:${node_port}" \
+      --identity="${id}" \
+      --init \
+      --password="${password}" \
+      --api \
+      --apiPort "${api_port}" \
+      --testAnnounceLocalAddresses \
+      --testPreferLocalAddresses \
+      --testUseWeakCrypto \
+      --testNoUPNP \
+      --allowLocalNodeConnections \
+      --allowPrivateNodeConnections \
+      ${additional_args} \
+      > "${log}" 2>&1 &
 }
 
 # $1 = node log file
@@ -327,7 +334,7 @@ setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--anno
 setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--announce --environment hardhat-localhost2"
 # node n8 will be the only one NOT registered
 setup_node 13308 19098 19508 "${node8_dir}" "${node8_log}" "${node8_id}" "--announce"
-setup_ct_node "${ct_node1_log}" "0xa08666bca1363cb00b5402bbeb6d47f6b84296f3bba0f2f95b1081df5588a613" 20000 "${ct_node1_dir}" 
+setup_ct_node "${ct_node1_log}" "0xa08666bca1363cb00b5402bbeb6d47f6b84296f3bba0f2f95b1081df5588a613" 20000 "${ct_node1_dir}"
 # }}}
 
 log "CT node1 address: ${ct_node1_address}"
