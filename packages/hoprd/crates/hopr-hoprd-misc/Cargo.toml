@@ -1,5 +1,5 @@
 [package]
-name = "hopr-hoprd-misc"
+name = "hoprd-misc"
 version = "0.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
@@ -14,7 +14,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 
 # Workspace dependencies
-hopr-wasm-common = { path = "../../../wasm/crates/hopr-wasm-common" }
+hopr-wasm-common = { path = "../../../real/crates/real-base" }
 
 # 3rd party dependencies
 wasm-bindgen = { version = "0.2.80", features = ["serde-serialize"] }

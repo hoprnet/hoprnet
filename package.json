@@ -9,7 +9,7 @@
     "packages/ethereum",
     "packages/utils",
     "packages/hoprd",
-    "packages/wasm",
+    "packages/real",
     "docs/hopr-documentation"
   ],
   "scripts": {

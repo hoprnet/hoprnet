@@ -2,7 +2,7 @@ mod utils;
 
 use wasm_bindgen::prelude::*;
 
-use hopr_wasm_common::real;
+use hopr_real::real;
 
 use serde::{Deserialize};
 

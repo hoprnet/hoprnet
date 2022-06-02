@@ -1,5 +1,5 @@
 [package]
-name = "hopr-wasm-common"
+name = "real-base"
 version = "0.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
@@ -9,12 +9,12 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "LGPL-3.0-only"
 
 [lib]
-name = "hopr_wasm_common"
+name = "real_base"
 path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"] # rlib is necessary to run integration tests
 
 [[test]]
-name = "hopr_wasm_common_tets"
+name = "real_base_tests"
 path = "tests/node.rs"
 
 [dependencies]

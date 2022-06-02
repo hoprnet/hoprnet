@@ -1,5 +1,5 @@
 # Append here when new Rust WASM crate is added (the list is space separated)
-PACKAGES = hopr-wasm-common
+PACKAGES = real-base
 ##########################################
 
 PKG_DIRS = $(addsuffix /pkg, $(PACKAGES))

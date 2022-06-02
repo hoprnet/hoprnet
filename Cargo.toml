@@ -1,6 +1,6 @@
 [workspace]
 
 members = [
-    "packages/wasm/crates/hopr-wasm-common",
-    "packages/hoprd/crates/hopr-hoprd-misc"
+    "packages/real/crates/real-base",
+    "packages/hoprd/crates/hoprd-misc"
 ]
