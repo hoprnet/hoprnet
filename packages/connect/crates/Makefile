@@ -16,7 +16,7 @@ test: $(JS_FILES)
 $(JS_FILES):
 	@echo "--- Building WASM module to '$(@D)' ... ---"
 	mkdir -p $(@D)
-	cd $(@D)/.. && wasm-pack build --target=nodejs
+	cd $(@D)/.. && wasm-pack build --target=bundler
 	@echo "--- Built WASM module in '$(@D)' ---"
 
 install:
