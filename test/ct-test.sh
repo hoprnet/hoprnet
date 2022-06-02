@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# prevent souring of this script, only allow execution
+# prevent sourcing of this script, only allow execution
 $(return >/dev/null 2>&1)
 test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
 
@@ -20,14 +20,8 @@ declare ct_node1_log="${1}"
 declare healthcheck_host="${2}"
 declare healthcheck_port="${3}"
 
-# disable register
-log "Disabling register"
-HOPR_ENVIRONMENT_ID=hardhat-localhost \
-TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-yarn workspace @hoprnet/hopr-ethereum hardhat register \
-  --network hardhat \
-  --task disable
-log "Register disabled"
+# disable network registry
+disable_network_registry
 
 log "Running Cover Traffic test"
 

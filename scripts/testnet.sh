@@ -157,7 +157,7 @@ add_keys() {
   fi
 }
 
-# $1 hardhat log file
+# $1 hardhat debug log file
 start_local_hardhat() {
   # Remove previous log file to make sure that the regex does not match
   rm -f "${hardhat_rpc_log}"
@@ -192,4 +192,27 @@ fund_nodes() {
       --network hardhat \
       --password "${password}" \
       $addr_arg
+}
+
+enable_network_registry() {
+  log "Enabling register"
+  HOPR_ENVIRONMENT_ID=hardhat-localhost \
+    TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
+    yarn workspace @hoprnet/hopr-ethereum hardhat register \
+      --network hardhat \
+      --task enable
+  
+  log "Register enabled"
+}
+
+disable_network_registry() {
+  # disable register
+  log "Disabling register"
+  HOPR_ENVIRONMENT_ID=hardhat-localhost \
+  TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
+  yarn workspace @hoprnet/hopr-ethereum hardhat register \
+    --network hardhat \
+    --task disable
+  
+  log "Register disabled"
 }

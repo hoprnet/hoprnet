@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # HOPR interaction tests via HOPRd API v2
 
-# prevent souring of this script, only allow execution
+# prevent sourcing of this script, only allow execution
 $(return >/dev/null 2>&1)
 test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
 
@@ -13,6 +13,7 @@ declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="e2e-test"
 source "${mydir}/../scripts/utils.sh"
+source "${mydir}/../scripts/testnet.sh"
 
 usage() {
   msg
@@ -413,14 +414,8 @@ log "hopr addr5: ${addr5} ${native_addr5} ${hopr_addr5}"
 log "hopr addr7: ${addr7} ${native_addr7} ${hopr_addr7}"
 log "hopr addr8: ${addr8} ${native_addr8} ${hopr_addr8}"
 
-# enable register
-log "Enabling register"
-HOPR_ENVIRONMENT_ID=hardhat-localhost \
-TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-yarn workspace @hoprnet/hopr-ethereum hardhat register \
-  --network hardhat \
-  --task enable
-log "Register enabled"
+# enable network registry
+enable_network_registry
 
 # add nodes 1,2,3,4,5,7 in register, do NOT add node 8
 log "Adding nodes to register"
