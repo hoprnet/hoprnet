@@ -6,16 +6,16 @@ Each WASM module corresponds to a Rust crate.
 The package itself consists of two parts:
 
 - the Typescript code - mostly wrappers for JS functions that cannot be called from WASM modules (IO, sockets,...), sometimes called `REAL` - see [#3823](https://github.com/hoprnet/hoprnet/issues/3823).
-- directories containing Rust crates (currently only `hopr-wasm-common`)
+- directories containing Rust crates (currently only `hopr-real`)
 
 During build, all the Rust crates are build first using `make all` (see `Makefile` in `packages/wasm`), then the Typescript sources are built as well.
 
 ## Usage in Typescript code
 
-Add dependency to `@hoprnet/hopr-wasm` to your `package.json`
+Add dependency to `@hoprnet/hopr-real` to your `package.json`
 
 ```typescript
-import * as wasm from ''
+import * as wasm from '@hoprnet/hopr-real'
 
 if (wasm.common.dummy_get_one() === '1') {
    console.log('It works!!')
@@ -26,11 +26,11 @@ if (wasm.common.dummy_get_one() === '1') {
 
 To add a new Rust WASM module (crate) into the existing `wasm` package:
 
-1. `cd packages/wasm/crates`
+1. `cd packages/real/crates`
 2. `wasm-pack new my-module`, this will create a new Rust crate for WASM.
 3. add `my-module` to `PACKAGES` space separated list in `Makefile`
 4. run `make all && make install` for the first time
-5. export your WASM Rust crate under it's alias in `packages/wasm/src/index.ts`, e.g.: `export * as my-modules from '../lib/my-module'`
+5. export your WASM Rust crate under its alias in `packages/real/src/index.ts`, e.g.: `export * as my-modules from '../lib/my-module'`
 
 Optionally if you want to make your crate available to other crates within the HOPR monorepo,
 add a path to it into the `members` section in `Cargo.toml` in the root of the monorepo.
@@ -47,7 +47,7 @@ Each WASM module can have it's own unit tests and integration tests.
 The Rust WASM code is not limited just to `@hoprnet/hopr-wasm` package. The existing tooling and structure in `@hoprnet/hopr-wasm` can be easily copied to any existing package within the monorepo.
 
 1. Create an empty directory `packages/<other_package>/crates`
-2. Copy the `Makefile` from `packages/wasm/crates` to `packages/<other_package>/crates`
+2. Copy the `Makefile` from `packages/real/crates` to `packages/<other_package>/crates`
 3. Set the `PACKAGES` variable in the `packages/<other_package>/crates/Makefile` to empty.
 4. Add `"@wasm-tool/wasm-pack-plugin": "^1.1.0"` and `"wasm-pack": "0.10.2"` as a `devDependency` in the existing package
 5. Make sure the `files` section in `packages/<other_package>/package.json` contains the `lib` entry.

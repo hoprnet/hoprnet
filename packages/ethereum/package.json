@@ -50,7 +50,6 @@
     "@typechain/hardhat": "4.0.0",
     "@types/chai": "^4.3.1",
     "@types/mocha": "^9.1.1",
-    "@wasm-tool/wasm-pack-plugin": "^1.1.0",
     "bn.js": "5.2.0",
     "chai": "4.3.6",
     "dotenv": "10.0.0",
@@ -65,8 +64,7 @@
     "ts-generator": "0.1.1",
     "typechain": "7.0.1",
     "typedoc": "0.22.13",
-    "typedoc-plugin-markdown": "3.11.14",
-    "wasm-pack": "0.10.2"
+    "typedoc-plugin-markdown": "3.11.14"
   },
   "engines": {
     "node": "16"

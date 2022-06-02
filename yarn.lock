@@ -3543,7 +3543,6 @@ __metadata:
     "@types/node": 16.11.26
     "@types/simple-peer": 9.11.4
     "@types/yargs": 17.0.10
-    "@wasm-tool/wasm-pack-plugin": ^1.1.0
     abortable-iterator: 3.0.2
     bl: 5.0.0
     chai: 4.3.6
@@ -3565,7 +3564,6 @@ __metadata:
     rimraf: 3.0.2
     simple-peer: 9.11.1
     stream-to-it: 0.2.4
-    wasm-pack: 0.10.2
     webrtc-stun: 3.0.0
     wrtc: 0.4.7
     yargs: 17.4.0
@@ -3581,7 +3579,6 @@ __metadata:
     "@sinonjs/referee": 9.1.1
     "@types/mocha": 9.1.0
     "@types/yargs": 17.0.10
-    "@wasm-tool/wasm-pack-plugin": ^1.1.0
     async-mutex: 0.3.2
     bn.js: 5.2.0
     chai: 4.3.6
@@ -3599,7 +3596,6 @@ __metadata:
     sinon: 12.0.1
     typedoc: 0.22.13
     typedoc-plugin-markdown: 3.11.14
-    wasm-pack: 0.10.2
   languageName: unknown
   linkType: soft
 
@@ -3616,7 +3612,6 @@ __metadata:
     "@types/chai-as-promised": 7.1.5
     "@types/mocha": 9.1.0
     "@types/yargs": 17.0.10
-    "@wasm-tool/wasm-pack-plugin": ^1.1.0
     abort-controller: 3.0.0
     bn.js: 5.2.0
     chai: 4.3.6
@@ -3641,7 +3636,6 @@ __metadata:
     sinon: 12.0.1
     typedoc: 0.22.13
     typedoc-plugin-markdown: 3.11.14
-    wasm-pack: 0.10.2
   languageName: unknown
   linkType: soft
 
@@ -3655,7 +3649,6 @@ __metadata:
     "@types/mocha": 9.1.0
     "@types/rimraf": 3.0.2
     "@types/yargs": 17.0.10
-    "@wasm-tool/wasm-pack-plugin": ^1.1.0
     bignumber.js: 9.0.2
     bn.js: 5.2.0
     chai: 4.3.6
@@ -3668,7 +3661,6 @@ __metadata:
     rimraf: 3.0.2
     typedoc: 0.22.13
     typedoc-plugin-markdown: 3.11.14
-    wasm-pack: 0.10.2
     yargs: 17.4.0
   bin:
     hopr-cover-traffic-daemon: lib/index.js
@@ -3693,7 +3685,6 @@ __metadata:
     "@typechain/hardhat": 4.0.0
     "@types/chai": ^4.3.1
     "@types/mocha": ^9.1.1
-    "@wasm-tool/wasm-pack-plugin": ^1.1.0
     bn.js: 5.2.0
     chai: 4.3.6
     dotenv: 10.0.0
@@ -3709,7 +3700,6 @@ __metadata:
     typechain: 7.0.1
     typedoc: 0.22.13
     typedoc-plugin-markdown: 3.11.14
-    wasm-pack: 0.10.2
   languageName: unknown
   linkType: soft
 
@@ -3717,12 +3707,10 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-real@workspace:packages/real"
   dependencies:
-    "@wasm-tool/wasm-pack-plugin": ^1.1.0
     mocha: 9.2.2
     rimraf: ^3.0.0
     typedoc: 0.22.13
     typedoc-plugin-markdown: 3.11.14
-    wasm-pack: 0.10.2
   languageName: unknown
   linkType: soft
 
@@ -3783,7 +3771,6 @@ __metadata:
     "@types/mocha": 9.1.0
     "@types/supertest": ^2.0.11
     "@types/yargs": 17.0.10
-    "@wasm-tool/wasm-pack-plugin": ^1.1.0
     bn.js: 5.2.0
     body-parser: 1.19.2
     chai: ^4.3.6
@@ -3818,7 +3805,6 @@ __metadata:
     trace-unhandled: 2.0.1
     typedoc: 0.22.13
     typedoc-plugin-markdown: 3.11.14
-    wasm-pack: 0.10.2
     ws: 8.3.0
     yamljs: 0.3.0
     yargs: 17.4.0
@@ -14651,10 +14637,12 @@ __metadata:
   resolution: "hoprnet@workspace:."
   dependencies:
     "@ethersproject/cli": 5.5.0
+    "@wasm-tool/wasm-pack-plugin": ^1.1.0
     prettier: 2.6.1
     rimraf: 3.0.2
     ts-node: 10.7.0
     typescript: 4.7.0-beta
+    wasm-pack: 0.10.2
     yargs: 17.4.0
   languageName: unknown
   linkType: soft

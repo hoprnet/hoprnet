@@ -48,10 +48,12 @@
   },
   "devDependencies": {
     "@ethersproject/cli": "5.5.0",
+    "@wasm-tool/wasm-pack-plugin": "^1.1.0",
     "prettier": "2.6.1",
     "rimraf": "3.0.2",
     "ts-node": "10.7.0",
     "typescript": "4.7.0-beta",
+    "wasm-pack": "0.10.2",
     "yargs": "17.4.0"
   },
   "resolutions": {
