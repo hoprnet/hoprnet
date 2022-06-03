@@ -1,0 +1,4 @@
+
+pub const HASH_KEY_COMMITMENT_SEED: &str = "HASH_KEY_COMMITMENT_SEED";
+
+pub const SECRET_KEY_LENGTH: usize = 32;
