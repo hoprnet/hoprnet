@@ -89,6 +89,8 @@
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
       "channels_contract_address": "0xD2F008718EEdD7aF7E9a466F5D68bb77D03B8F7A",
+      "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
+      "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
       "tags": []
     },
     "lisbon": {
@@ -97,6 +99,8 @@
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0x978D91ddFdb0c6eaCC22A258fE498957a79c5F4C",
       "channels_contract_address": "0x1753C9eE656c54f443ce2Fe7248076f9bA4eC100",
+      "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
+      "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
       "tags": []
     },
     "ouagadougou": {
@@ -108,6 +112,7 @@
       "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
       "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
       "stake_contract_address": "0xae933331ef0bE122f9499512d3ed4Fa3896DCf20",
+      "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
       "tags": []
     }
   },
