@@ -12,7 +12,7 @@ async function main(
   { ethers, deployments }: HardhatRuntimeEnvironment,
   _runSuper: RunSuperFunction<any>
 ) {
-  const tokenContract = await deployments.get('HoprToken')
+  const tokenContract = await deployments.get('xHoprMock')
   const stakingContract = await deployments.get('HoprStake')
 
   // we use a custom ethers provider here instead of the ethers object from the
@@ -21,7 +21,7 @@ async function main(
   const provider = new ethers.providers.JsonRpcProvider()
   const signer = provider.getSigner()
 
-  const hoprToken = (await ethers.getContractFactory('HoprToken')).connect(signer).attach(tokenContract.address)
+  const hoprToken = (await ethers.getContractFactory('ERC677Mock')).connect(signer).attach(tokenContract.address)
 
   try {
     await (await hoprToken.transferAndCall(stakingContract.address, opts.amount, ethers.constants.HashZero)).wait()
