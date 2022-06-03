@@ -9,10 +9,13 @@
   "main": "lib/index.js",
   "type": "commonjs",
   "scripts": {
-    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
-    "test": "mocha --parallel",
-    "dev": "yarn clean && tsc -w",
-    "build": "yarn clean && tsc -p .",
+    "clean:wasm": "make -C crates clean",
+    "build:wasm": "make -C crates all && make -C crates install",
+    "test:wasm": "make -C crates test",
+    "clean": "yarn clean:wasm && rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
+    "test": "yarn test:wasm && mocha --parallel",
+    "dev": "yarn clean && yarn build:wasm && tsc -w",
+    "build": "yarn clean && yarn build:wasm && tsc -p .",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },

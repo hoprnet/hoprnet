@@ -3703,6 +3703,17 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@hoprnet/hopr-real@workspace:packages/real":
+  version: 0.0.0-use.local
+  resolution: "@hoprnet/hopr-real@workspace:packages/real"
+  dependencies:
+    mocha: 9.2.2
+    rimraf: ^3.0.0
+    typedoc: 0.22.13
+    typedoc-plugin-markdown: 3.11.14
+  languageName: unknown
+  linkType: soft
+
 "@hoprnet/hopr-utils@workspace:packages/utils":
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-utils@workspace:packages/utils"
@@ -3751,6 +3762,7 @@ __metadata:
   resolution: "@hoprnet/hoprd@workspace:packages/hoprd"
   dependencies:
     "@hoprnet/hopr-core": "workspace:packages/core"
+    "@hoprnet/hopr-real": "workspace:packages/real"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@types/chai": ^4
     "@types/cors": 2.8.12
@@ -5972,6 +5984,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@wasm-tool/wasm-pack-plugin@npm:^1.1.0":
+  version: 1.6.0
+  resolution: "@wasm-tool/wasm-pack-plugin@npm:1.6.0"
+  dependencies:
+    chalk: ^2.4.1
+    command-exists: ^1.2.7
+    watchpack: ^2.1.1
+    which: ^2.0.2
+  checksum: ae2af8507a83b2994630a1393832ede09ecf86b1986e2506f4ad8c8908875e8b9e40d3fff97b2fbca1835eaf6cbe5a69611643d613dea961b1279122db60a0ec
+  languageName: node
+  linkType: hard
+
 "@webassemblyjs/ast@npm:1.11.1":
   version: 1.11.1
   resolution: "@webassemblyjs/ast@npm:1.11.1"
@@ -7928,6 +7952,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"binary-install@npm:^0.1.0":
+  version: 0.1.1
+  resolution: "binary-install@npm:0.1.1"
+  dependencies:
+    axios: ^0.21.1
+    rimraf: ^3.0.2
+    tar: ^6.1.0
+  checksum: a3df9c07a3ab81533cff610527263181c4c34a44efb115555be910b6011ac047bf875ad57469cc2259dfaba58e971c7ba2958038e9d222c546eef7b58b826ecc
+  languageName: node
+  linkType: hard
+
 "bindings@npm:^1.2.1":
   version: 1.5.0
   resolution: "bindings@npm:1.5.0"
@@ -9307,7 +9342,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"command-exists@npm:^1.2.8":
+"command-exists@npm:^1.2.7, command-exists@npm:^1.2.8":
   version: 1.2.9
   resolution: "command-exists@npm:1.2.9"
   checksum: 729ae3d88a2058c93c58840f30341b7f82688a573019535d198b57a4d8cb0135ced0ad7f52b591e5b28a90feb2c675080ce916e56254a0f7c15cb2395277cac3
@@ -14600,10 +14635,12 @@ __metadata:
   resolution: "hoprnet@workspace:."
   dependencies:
     "@ethersproject/cli": 5.5.0
+    "@wasm-tool/wasm-pack-plugin": ^1.1.0
     prettier: 2.6.1
     rimraf: 3.0.2
     ts-node: 10.7.0
     typescript: 4.7.0-beta
+    wasm-pack: 0.10.2
     yargs: 17.4.0
   languageName: unknown
   linkType: soft
@@ -25316,7 +25353,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"tar@npm:^6.1.11, tar@npm:^6.1.2":
+"tar@npm:^6.1.0, tar@npm:^6.1.11, tar@npm:^6.1.2":
   version: 6.1.11
   resolution: "tar@npm:6.1.11"
   dependencies:
@@ -26865,7 +26902,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"watchpack@npm:^2.3.1":
+"wasm-pack@npm:0.10.2":
+  version: 0.10.2
+  resolution: "wasm-pack@npm:0.10.2"
+  dependencies:
+    binary-install: ^0.1.0
+  bin:
+    wasm-pack: run.js
+  checksum: 18ff3bf91fdafbe24570665ca761d1a90f264e902ac6c05b5dae0ba64622ce4c64488dfa89093f958cb6edfa77a1d30659cf69977a1eba8ce0c250ba4a896f58
+  languageName: node
+  linkType: hard
+
+"watchpack@npm:^2.1.1, watchpack@npm:^2.3.1":
   version: 2.3.1
   resolution: "watchpack@npm:2.3.1"
   dependencies:

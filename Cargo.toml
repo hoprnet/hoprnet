@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+    "packages/real/crates/real-base",
+    "packages/hoprd/crates/hoprd-misc"
+]

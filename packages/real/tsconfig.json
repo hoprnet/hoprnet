@@ -4,13 +4,13 @@
     "outDir": "./lib",
     "rootDir": "./src"
   },
-  "include": ["src/**/*.ts", "src/main.cts"],
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.spec.ts"],
   "typedocOptions": {
     "entryPoints": ["src/index.ts"],
     "out": "docs",
     // by default we don't want links to source code to change on every change
     // when building docs for releases we can fix the revision on the cmdline
     "gitRevision": "master"
-  },
-  "references": [{ "path": "../utils" }, { "path": "../core" }, { "path": "../real" }]
+  }
 }

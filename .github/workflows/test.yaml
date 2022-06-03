@@ -17,6 +17,7 @@ jobs:
       matrix:
         node-version: [16]
         os: ['ubuntu-latest']
+        rust: ['stable']
 
     steps:
       - uses: actions/checkout@v2

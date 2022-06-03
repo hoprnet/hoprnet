@@ -17,10 +17,13 @@
   },
   "type": "commonjs",
   "scripts": {
-    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
+    "clean:wasm": "make -C crates clean",
+    "build:wasm": "make -C crates all && make -C crates install",
+    "test:wasm": "make -C crates test",
+    "clean": "yarn clean:wasm && rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
     "coverage": "nyc --reporter=html mocha",
-    "build": "yarn clean && tsc -p .",
-    "test": "NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
+    "build": "yarn clean && yarn build:wasm && tsc -p .",
+    "test": "yarn test:wasm && NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },

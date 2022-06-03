@@ -19,6 +19,7 @@
 - Improvements in our integration E2E tests ([#3643](https://github.com/hoprnet/hoprnet/pull/3643))
 - API v2 `/api/v2/node/peers` now returns `multiaddr` for connected peers ([#3643](https://github.com/hoprnet/hoprnet/pull/3643))
 - Add connectivity health indicator updates to the logs ([#3816](https://github.com/hoprnet/hoprnet/pull/3816))
+- Introduce Rust WASM support into the build toolchain ([#3829](https://github.com/hoprnet/hoprnet/pull/3829))
 
 ### Breaking changes
 

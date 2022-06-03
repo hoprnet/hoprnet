@@ -226,6 +226,7 @@ function install_npm_packages() {
       # Install modules according to their dependencies
       # @dev only works when cleaning node_modules afterwards,
       #      otherwise NPM might use outdated packages
+      npm install ${tmp}/hopr-real-package.tgz
       npm install ${tmp}/hopr-utils-package.tgz
       npm install ${tmp}/hopr-connect-package.tgz
       npm install ${tmp}/hopr-ethereum-package.tgz
@@ -330,6 +331,7 @@ if [ -z "${npm_package_version}" ]; then
   create_npm_package "hopr-connect"
   create_npm_package "hopr-core"
   create_npm_package "hopr-utils"
+  create_npm_package "hopr-real"
   create_npm_package "hopr-ethereum"
   create_npm_package "hopr-core-ethereum"
   # set default environment

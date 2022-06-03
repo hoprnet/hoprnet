@@ -32,6 +32,8 @@ import { register as registerUnhandled } from 'trace-unhandled'
 
 import { setLogger } from 'trace-unhandled'
 
+import * as wasm from '../lib/hoprd_misc.js'
+
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
 export type DefaultEnvironment = {
@@ -413,6 +415,9 @@ async function main() {
   }
 
   try {
+    let packageFile = path.normalize(new URL('../package.json', import.meta.url).pathname)
+    logs.log(`This is hoprd version ${wasm.get_hoprd_version(packageFile)}`)
+
     // 1. Find or create an identity
     const peerId = await getIdentity({
       initialize: argv.init,
