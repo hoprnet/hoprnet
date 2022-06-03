@@ -1,9 +1,8 @@
 mod utils;
 
+use std::fmt::Display;
 use wasm_bindgen::prelude::*;
-
 use hopr_real::real;
-
 use serde::{Deserialize};
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
@@ -18,14 +17,19 @@ struct PackageJsonFile {
     version: String
 }
 
+/// Helper function to convert string-convertible types (like errors) to JsValue
+fn as_jsvalue<T>(v: T) -> JsValue where T: Display {
+    JsValue::from(v.to_string())
+}
+
 /// Reads the package.json file of hoprd and determines it's version.
 #[wasm_bindgen]
-pub fn get_hoprd_version(package_file: &str) -> Result<String, JsValue> {
+pub fn get_package_version(package_file: &str) -> Result<String, JsValue> {
 
-    let file_data = real::read_file(package_file);
+    let file_data = Vec::from(real::read_file(package_file)?);
 
-    return serde_json::from_slice::<PackageJsonFile>(Result::from(file_data)?.as_slice())
+    return serde_json::from_slice::<PackageJsonFile>(file_data.as_slice())
         .map(|v| v.version)
-        .map_err(|e| JsValue::from(e.to_string()));
+        .map_err(as_jsvalue);
 }
 

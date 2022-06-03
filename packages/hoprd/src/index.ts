@@ -416,7 +416,7 @@ async function main() {
 
   try {
     let packageFile = path.normalize(new URL('../package.json', import.meta.url).pathname)
-    logs.log(`This is hoprd version ${wasm.get_hoprd_version(packageFile)}`)
+    logs.log(`This is hoprd version ${wasm.get_package_version(packageFile)}`)
 
     // 1. Find or create an identity
     const peerId = await getIdentity({
