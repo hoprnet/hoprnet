@@ -15,6 +15,7 @@ declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="e2e-ct-test"
 source "${mydir}/../scripts/utils.sh"
+source "${mydir}/../scripts/testnet.sh"
 
 declare ct_node1_log="${1}"
 declare healthcheck_host="${2}"

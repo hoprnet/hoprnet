@@ -359,6 +359,7 @@ export async function createChainWrapper(
    * @returns a Promise that resolves with the transaction hash
    */
   const announce = async (multiaddr: Multiaddr, txHandler: (tx: string) => DeferType<string>): Promise<string> => {
+    log('Announcing on-chain with %s', multiaddr.toString())
     try {
       const confirmation = await sendTransaction(
         checkDuplicate,
@@ -389,6 +390,7 @@ export async function createChainWrapper(
     amount: string,
     txHandler: (tx: string) => DeferType<string>
   ): Promise<string> => {
+    log('Withdrawing %s %s tokens', amount, currency)
     try {
       if (currency === 'NATIVE') {
         const transaction = await sendTransaction(checkDuplicate, amount, recipient, undefined, txHandler)
@@ -419,7 +421,13 @@ export async function createChainWrapper(
     txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> => {
     const totalFund = fundsA.toBN().add(fundsB.toBN())
-
+    log(
+      'Funding channel from %s with %s HOPR to %s with %s HOPR',
+      partyA.toHex(),
+      fundsA.toFormattedString(),
+      partyB.toHex(),
+      fundsB.toFormattedString()
+    )
     try {
       const transaction = await sendTransaction(
         checkDuplicate,
@@ -450,6 +458,7 @@ export async function createChainWrapper(
     counterparty: Address,
     txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> => {
+    log('Initiating channel closure to %s', counterparty.toHex())
     try {
       const transaction = await sendTransaction(
         checkDuplicate,
@@ -477,6 +486,7 @@ export async function createChainWrapper(
     counterparty: Address,
     txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> => {
+    log('Finalizing channel closure to %s', counterparty.toHex())
     try {
       const transaction = await sendTransaction(
         checkDuplicate,
@@ -505,6 +515,7 @@ export async function createChainWrapper(
     ackTicket: AcknowledgedTicket,
     txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> => {
+    log('Redeeming ticket for challenge %s in channel to %s', ackTicket.ticket.challenge.toHex(), counterparty.toHex())
     try {
       const transaction = await sendTransaction(
         checkDuplicate,
@@ -539,6 +550,7 @@ export async function createChainWrapper(
     commitment: Hash,
     txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> => {
+    log('Setting commitment %s in channel to %s', commitment.toHex(), counterparty.toHex())
     try {
       const transaction = await sendTransaction(
         checkDuplicate,
@@ -580,6 +592,34 @@ export async function createChainWrapper(
     }
 
     return block.transactions
+  }
+
+  /**
+   * Gets the timestamp of a block
+   * @param blockNumber block number to look for
+   * @returns a Promise that resolves with the transaction hashes of the requested block
+   */
+  const getTimestamp = async function (blockNumber: number): Promise<number> {
+    let block: Block
+
+    const RETRIES = 3
+    for (let i = 0; i < RETRIES; i++) {
+      try {
+        block = await provider.getBlock(blockNumber)
+      } catch (err) {
+        if (i + 1 < RETRIES) {
+          // Give other tasks CPU time to happen
+          // Push next provider query to end of next event loop iteration
+          await setImmediatePromise()
+          continue
+        }
+
+        log(`could not retrieve native token transactions from block ${blockNumber} using the provider.`, err)
+        throw err
+      }
+    }
+
+    return block.timestamp
   }
 
   /**
@@ -636,6 +676,7 @@ export async function createChainWrapper(
     getBalance,
     getNativeBalance,
     getTransactionsInBlock,
+    getTimestamp,
     announce,
     withdraw,
     fundChannel,
@@ -671,7 +712,7 @@ export async function createChainWrapper(
     getToken: () => token,
     getNetworkRegistry: () => networkRegistry,
     getPrivateKey: () => privateKey,
-    getPublicKey: () => PublicKey.fromPrivKey(privateKey),
+    getPublicKey: () => publicKey,
     getInfo: () => ({
       network: networkInfo.network,
       hoprTokenAddress: hoprTokenDeployment.address,

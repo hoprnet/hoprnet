@@ -165,6 +165,27 @@ close_channel() {
 # $2 = destination node id
 # $3 = channel source api endpoint
 # $4 = channel destination peer id
+# $5 = channel direction, either incoming or outgoing
+# $6 = OPTIONAL: verify closure strictly
+finalize_close_channel() {
+  local source_id="${1}"
+  local destination_id="${2}"
+  local source_api="${3}"
+  local destination_peer_id="${4}"
+  local channel_direction="${5}"
+  local result
+
+  log "Node ${source_id} finalizes closure of channel to Node ${destination_id}"
+
+  result="$(call_api ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" "Closed" 600)"
+
+  log "Node ${source_id} finalized closure of channel to Node ${destination_id} result -- ${result}"
+}
+
+# $1 = source node id
+# $2 = destination node id
+# $3 = channel source api endpoint
+# $4 = channel destination peer id
 open_channel() {
   local source_id="${1}"
   local destination_id="${2}"
@@ -318,7 +339,7 @@ redeem_tickets_in_channel() {
   local node_api="${1}"
   local peer_id="${2}"
 
-  log "redeeming tickets in specific channel, this can take up to 5 minutes depending on the amount of uredeemed tickets in that channel"
+  log "redeeming tickets in specific channel, this can take up to 5 minutes depending on the amount of unredeemed tickets in that channel"
   echo $(call_api ${node_api} "/channels/${peer_id}/tickets/redeem" "POST" "" "" 600 600)
 }
 
@@ -354,6 +375,10 @@ get_tickets_statistics() {
 }
 
 log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5}, ${api6}, ${api7}, ${api8}"
+
+# Setup is done, so disable hardhat's auto-mining to correctly mimic 
+# real blockchain networks
+disable_hardhat_auto_mining
 
 validate_native_address "${api1}" "${api_token}"
 validate_native_address "${api2}" "${api_token}"
@@ -635,7 +660,7 @@ log "Waiting 70 seconds for cool-off period"
 sleep 70
 
 # verify channel has been closed
-close_channel 1 5 "${api1}" "${addr5}" "outgoing" "true"
+finalize_close_channel 1 5 "${api1}" "${addr5}" "outgoing"
 
 test_get_all_channels() {
   local node_api=${1}

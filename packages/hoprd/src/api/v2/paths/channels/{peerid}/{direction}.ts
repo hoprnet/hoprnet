@@ -2,7 +2,8 @@ import type { default as Hopr } from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 import PeerId from 'peer-id'
 import { STATUS_CODES } from '../../../utils.js'
-import { ChannelInfo, channelStatusToString, formatIncomingChannel, formatOutgoingChannel } from '../index.js'
+import { ChannelInfo, formatIncomingChannel, formatOutgoingChannel } from '../index.js'
+import { channelStatusToString, ChannelStatus } from '@hoprnet/hopr-utils'
 
 /**
  * Closes a channel with provided peerId.
@@ -33,13 +34,16 @@ export const DELETE: Operation = [
       const { receipt, channelStatus } = await closeChannel(node, peerid, direction as any)
       return res.status(200).send({ receipt, channelStatus: channelStatusToString(channelStatus) })
     } catch (err) {
+      if (err.message.match(/Channel is already closed/)) {
+        return res.status(200).send({ channelStatus: channelStatusToString(ChannelStatus.Closed) })
+      }
       return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
     }
   }
 ]
 
 DELETE.apiDoc = {
-  description: `Close a opened channel between this node and other node. Once you’ve initiated channel closure, you have to wait for a specified closure time, it will show you a closure initiation message with cool-off time you need to wait.
+  description: `Close a opened channel between this node and other node. Once you've initiated channel closure, you have to wait for a specified closure time, it will show you a closure initiation message with cool-off time you need to wait.
   Then you will need to send the same command again to finalize closure. This is a cool down period to give the other party in the channel sufficient time to redeem their tickets.`,
   tags: ['Channels'],
   operationId: 'channelsCloseChannel',

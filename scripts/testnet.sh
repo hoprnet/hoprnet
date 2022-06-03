@@ -216,3 +216,11 @@ disable_network_registry() {
   
   log "Register disabled"
 }
+
+disable_hardhat_auto_mining() {
+  log "Disabling hardhat automining"
+  HOPR_ENVIRONMENT_ID=hardhat-localhost \
+  TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
+  yarn workspace @hoprnet/hopr-ethereum hardhat disable-automine \
+    --network hardhat
+}

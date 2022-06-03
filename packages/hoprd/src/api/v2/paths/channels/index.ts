@@ -4,6 +4,7 @@ import { ChannelEntry, ChannelStatus, PublicKey } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import BN from 'bn.js'
 import { STATUS_CODES } from '../../utils.js'
+import { channelStatusToString } from '@hoprnet/hopr-utils'
 
 export interface ChannelInfo {
   type: 'outgoing' | 'incoming'
@@ -11,14 +12,6 @@ export interface ChannelInfo {
   peerId: string
   status: string
   balance: string
-}
-
-export const channelStatusToString = (status: ChannelStatus): string => {
-  if (status === 0) return 'Closed'
-  else if (status === 1) return 'WaitingForCommitment'
-  else if (status === 2) return 'Open'
-  else if (status === 3) return 'PendingToClose'
-  return 'Unknown'
 }
 
 export const formatOutgoingChannel = (channel: ChannelEntry): ChannelInfo => {

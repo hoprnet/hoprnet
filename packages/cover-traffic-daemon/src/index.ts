@@ -5,6 +5,7 @@ import path from 'path'
 import BN from 'bn.js'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
+import { hideBin } from 'yargs/helpers'
 import { createHoprNode, resolveEnvironment, supportedEnvironments, type ResolvedEnvironment } from '@hoprnet/hopr-core'
 import { type ChannelEntry, privKeyToPeerId, PublicKey, debug } from '@hoprnet/hopr-utils'
 
@@ -46,7 +47,7 @@ process.title = 'hopr-cover-traffic-daemon'
 // Use environment-specific default data path
 const defaultDataPath = path.join(process.cwd(), 'hopr-cover-traffic-daemon-db', defaultEnvironment())
 
-const argv = yargs(process.argv.slice(2))
+const argv = yargs(hideBin(process.argv))
   .option('environment', {
     string: true,
     describe: 'Environment id which the node shall run on',

@@ -518,7 +518,11 @@ class Hopr extends EventEmitter {
     }
 
     const currentChannels: ChannelEntry[] = (await this.getAllChannels()) ?? []
-    verbose('Channels obtained', currentChannels.map((entry) => entry.toString()).join(`\n`))
+
+    verbose(`Channels obtained:`)
+    for (const currentChannel of currentChannels) {
+      verbose(currentChannel.toString())
+    }
 
     if (currentChannels === undefined) {
       throw new Error('invalid channels retrieved from database')
@@ -547,9 +551,7 @@ class Hopr extends EventEmitter {
     for (const channel of currentChannels) {
       if (
         channel.status == ChannelStatus.PendingToClose &&
-        !tickResult.toClose.findIndex((x: typeof tickResult['toClose'][number]) =>
-          x.destination.eq(channel.destination)
-        )
+        !tickResult.toClose.find((x: typeof tickResult['toClose'][number]) => x.destination.eq(channel.destination))
       ) {
         // attempt to finalize closure
         tickResult.toClose.push({
@@ -948,14 +950,13 @@ class Hopr extends EventEmitter {
 
     try {
       log(
-        `announcing address ${addrToAnnounce.toString()} ${
-          announceRoutableAddress && routableAddressAvailable ? 'with' : 'without'
-        } routing`
+        'announcing on-chain %s routable address',
+        announceRoutableAddress && routableAddressAvailable ? 'with' : 'without'
       )
       const announceTxHash = await this.connector.announce(addrToAnnounce)
-      log(`announcing address ${addrToAnnounce.toString()} done in tx ${announceTxHash}`)
+      log('announcing address %s done in tx %s', addrToAnnounce.toString(), announceTxHash)
     } catch (err) {
-      log(`announcing address ${addrToAnnounce.toString()} failed`)
+      log('announcing address %s failed', addrToAnnounce.toString())
       this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to announce address ${addrToAnnounce.toString()}: ${err}`)
     }
@@ -1092,7 +1093,6 @@ class Hopr extends EventEmitter {
         // on-chain transactions
 
         if (channel.closureTimePassed()) {
-          log('finalizing closure of channel', channel.getId().toHex())
           txHash = await this.connector.finalizeClosure(counterpartyPubKey)
         } else {
           log(
