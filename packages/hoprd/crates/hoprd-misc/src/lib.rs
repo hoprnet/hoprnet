@@ -26,9 +26,9 @@ fn as_jsvalue<T>(v: T) -> JsValue where T: Display {
 #[wasm_bindgen]
 pub fn get_package_version(package_file: &str) -> Result<String, JsValue> {
 
-    let file_data = Vec::from(real::read_file(package_file)?);
+    let file_data = real::read_file(package_file)?;
 
-    return serde_json::from_slice::<PackageJsonFile>(file_data.as_slice())
+    return serde_json::from_slice::<PackageJsonFile>(&*file_data)
         .map(|v| v.version)
         .map_err(as_jsvalue);
 }

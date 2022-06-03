@@ -32,7 +32,7 @@ import { register as registerUnhandled } from 'trace-unhandled'
 
 import { setLogger } from 'trace-unhandled'
 
-import * as wasm from '../lib/hoprd_misc.js'
+import * as wasm from '../lib/hoprd_misc.cjs'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
