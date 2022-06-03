@@ -16,5 +16,5 @@ export function read_file(file: string): Uint8Array {
  * @param data Data to write to the file
  */
 export function write_file(file: string, data: Uint8Array) {
-  fs.writeFileSync(file, data);
+  fs.writeFileSync(file, data)
 }
