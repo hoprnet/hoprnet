@@ -20,7 +20,7 @@ $(JS_FILES):
 	cp $@ $(subst .js,.cjs,$@)
 	@echo "--- Built WASM module in '$(@D)' ---"
 
-install: $(CJS_FILES)
+install:
 ifneq ($(PACKAGES),)
 	@mkdir -p ../lib
 	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.cjs) ../lib/
