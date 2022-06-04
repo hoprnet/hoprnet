@@ -82,7 +82,6 @@ function expandVars(input: string, vars: { [key: string]: any }) {
   })
 }
 
-
 // For reference on how the configuration is structured refer to:
 //
 // https://hardhat.org/hardhat-network/reference/#config
