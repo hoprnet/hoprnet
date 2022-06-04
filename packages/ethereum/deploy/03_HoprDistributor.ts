@@ -11,7 +11,7 @@ const startTimes: {
   testing: oneDay,
   development: oneDay,
   staging: oneDay,
-  production: oneDay,
+  production: oneDay
 }
 
 const maxMintAmounts: {

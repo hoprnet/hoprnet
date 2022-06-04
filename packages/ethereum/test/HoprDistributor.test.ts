@@ -182,16 +182,7 @@ describe('HoprDistributor', async function () {
 
       await f.distributor.addSchedule([minutes(1)], [toSolPercent(f.multiplier, 1)], SCHEDULE_1_MIN_ALL)
       await f.distributor.addSchedule(
-        [
-          minutes(4),
-          minutes(6),
-          minutes(8),
-          minutes(10),
-          minutes(12),
-          minutes(14),
-          minutes(16),
-          minutes(18)
-        ],
+        [minutes(4), minutes(6), minutes(8), minutes(10), minutes(12), minutes(14), minutes(16), minutes(18)],
         [
           toSolPercent(f.multiplier, 1 / 8),
           toSolPercent(f.multiplier, 1 / 8),
@@ -242,16 +233,7 @@ describe('HoprDistributor', async function () {
 
       await f.distributor.addSchedule([minutes(1)], [toSolPercent(f.multiplier, 1)], SCHEDULE_1_MIN_ALL)
       await f.distributor.addSchedule(
-        [
-          minutes(4),
-          minutes(6),
-          minutes(8),
-          minutes(10),
-          minutes(12),
-          minutes(14),
-          minutes(16),
-          minutes(18)
-        ],
+        [minutes(4), minutes(6), minutes(8), minutes(10), minutes(12), minutes(14), minutes(16), minutes(18)],
         [
           toSolPercent(f.multiplier, 1 / 8),
           toSolPercent(f.multiplier, 1 / 8),
@@ -328,16 +310,7 @@ describe('HoprDistributor', async function () {
 
       await f.distributor.addSchedule([minutes(1)], [toSolPercent(f.multiplier, 1)], SCHEDULE_1_MIN_ALL)
       await f.distributor.addSchedule(
-        [
-          minutes(4),
-          minutes(6),
-          minutes(8),
-          minutes(10),
-          minutes(12),
-          minutes(14),
-          minutes(16),
-          minutes(18)
-        ],
+        [minutes(4), minutes(6), minutes(8), minutes(10), minutes(12), minutes(14), minutes(16), minutes(18)],
         [
           toSolPercent(f.multiplier, 1 / 8),
           toSolPercent(f.multiplier, 1 / 8),
