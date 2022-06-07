@@ -105,16 +105,19 @@ call_api(){
 
   result=$(${cmd} "${request_body}")
 
+  # log "before sed ${assertion}"
+  # log $(echo "${result}" | sed -n "/${assertion}/p")
+
   # if an assertion was given and has not been fulfilled, we fail
-  if [ -z "${assertion}" ] || [[ -n "${assertion}" && "${result}" == *"${assertion}"* ]]; then
+  if [ -z "${assertion}" ] || [[ -n  $(echo "${result}" | sed -n "/${assertion}/p") ]]; then
     echo "${result}"
   else
     now=$(node -e "console.log(process.hrtime.bigint().toString());")
     if [ ${end_time_ns} -lt ${now} ]; then
-      log "${RED}call_api (${cmd} \"${request_body}\") FAILED, received: ${result}${NOFORMAT}"
+      log "${RED}call_api (${cmd} \"${request_body}\") FAILED, received: ${result} but expected ${assertion}${NOFORMAT}"
       exit 1
     else
-      log "${YELLOW}call_api (${cmd} \"${request_body}\") FAILED, received: ${result}, retrying in ${step_time} seconds${NOFORMAT}"
+      log "${YELLOW}call_api (${cmd} \"${request_body}\") FAILED, received: ${result} but expected ${assertion}, retrying in ${step_time} seconds${NOFORMAT}"
       sleep ${step_time}
       call_api "${source_api}" "${api_endpoint}" "${rest_method}" "${request_body}" "${assertion}" "${wait_time}" \
         "${step_time}" "${end_time_ns}" "${should_assert_status_code}"
@@ -135,7 +138,7 @@ send_message(){
 
   local path=$(echo ${peers} | tr -d '\n' | jq -R -s 'split(" ")')
   local payload='{"body":"'${msg}'","path":'${path}',"recipient":"'${recipient}'"}'
-  result="$(call_api ${source_api} "/messages" "POST" "${payload}" 204 60 15 "" true)"
+  result="$(call_api ${source_api} "/messages" "POST" "${payload}" "204" 60 15 "" true)"
 }
 
 # $1 = source node id
@@ -156,9 +159,9 @@ close_channel() {
   log "Node ${source_id} close channel to Node ${destination_id}"
 
   if [ "${close_check}" = "true" ]; then
-    result="$(call_api ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" "Channel is already closed" 600)"
+    result="$(call_api ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" "Closed\|Channel is already closed" 600)"
   else
-    result="$(call_api ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" "PendingToClose" 20 20)"
+    result="$(call_api ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" "PendingToClose\|Closed" 20 20)"
   fi
 
   log "Node ${source_id} close channel to Node ${destination_id} result -- ${result}"
@@ -527,7 +530,7 @@ log "-- ${result}"
 # log "-- ${result}"
 
 log "Node 2 has no unredeemed ticket value"
-result=$(get_tickets_statistics "${api2}" "\"unredeemedValue\":\"0\"")
+result=$(get_tickets_statistics "${api2}" "\"unredeemedValue\"\:\"0\"")
 log "-- ${result}"
 
 log "Node 1 send 0-hop message to node 2"
@@ -566,19 +569,19 @@ for i in `seq 1 10`; do
 done
 
 log "Node 2 should now have a ticket"
-result=$(get_tickets_statistics "${api2}" "\"winProportion\":1") 
+result=$(get_tickets_statistics "${api2}" "\"winProportion\"\:1") 
 log "-- ${result}"
 
 log "Node 3 should now have a ticket"
-result=$(get_tickets_statistics "${api3}" "\"winProportion\":1") 
+result=$(get_tickets_statistics "${api3}" "\"winProportion\"\:1") 
 log "-- ${result}"
 
 log "Node 4 should now have a ticket"
-result=$(get_tickets_statistics "${api4}" "\"winProportion\":1") 
+result=$(get_tickets_statistics "${api4}" "\"winProportion\"\:1") 
 log "-- ${result}"
 
 log "Node 5 should now have a ticket"
-result=$(get_tickets_statistics "${api5}" "\"winProportion\":1") 
+result=$(get_tickets_statistics "${api5}" "\"winProportion\"\:1") 
 log "-- ${result}"
 
 for i in `seq 1 10`; do
@@ -664,7 +667,7 @@ log "Waiting 30 seconds for cool-off period"
 sleep 30
 
 # verify channel has been closed
-finalize_close_channel 1 5 "${api1}" "${addr5}" "outgoing"
+close_channel 1 5 "${api1}" "${addr5}" "outgoing" "true"
 
 test_get_all_channels() {
   local node_api=${1}
