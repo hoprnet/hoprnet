@@ -26,6 +26,7 @@ jobs:
           toolchain: stable
           components: wasm-pack
           target: wasm32-unknown-unknown
+          override: true
 
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v2
