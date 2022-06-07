@@ -45,6 +45,10 @@ jobs:
         with:
           version: 'latest'
 
+      - uses: jetli/wasm-bindgen-action@v0.1.0
+        with:
+          version: 'latest'
+
       - name: '[SETUP] Use Node.js'
         uses: actions/setup-node@v3
         with:
@@ -340,6 +344,10 @@ jobs:
         with:
           version: 'latest'
 
+      - uses: jetli/wasm-bindgen-action@v0.1.0
+        with:
+          version: 'latest'
+
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
         with:
@@ -407,7 +415,12 @@ jobs:
           toolchain: stable
           target: wasm32-unknown-unknown
           override: true
+
       - uses: jetli/wasm-pack-action@v0.3.0
+        with:
+          version: 'latest'
+
+      - uses: jetli/wasm-bindgen-action@v0.1.0
         with:
           version: 'latest'
 
