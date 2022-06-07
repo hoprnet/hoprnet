@@ -105,9 +105,6 @@ call_api(){
 
   result=$(${cmd} "${request_body}")
 
-  # log "before sed ${assertion}"
-  # log $(echo "${result}" | sed -n "/${assertion}/p")
-
   # if an assertion was given and has not been fulfilled, we fail
   if [ -z "${assertion}" ] || [[ -n  $(echo "${result}" | sed -n "/${assertion}/p") ]]; then
     echo "${result}"
@@ -530,7 +527,7 @@ log "-- ${result}"
 # log "-- ${result}"
 
 log "Node 2 has no unredeemed ticket value"
-result=$(get_tickets_statistics "${api2}" "\"unredeemedValue\"\:\"0\"")
+result=$(get_tickets_statistics "${api2}" "\"unredeemedValue\":\"0\"")
 log "-- ${result}"
 
 log "Node 1 send 0-hop message to node 2"
@@ -569,19 +566,19 @@ for i in `seq 1 10`; do
 done
 
 log "Node 2 should now have a ticket"
-result=$(get_tickets_statistics "${api2}" "\"winProportion\"\:1") 
+result=$(get_tickets_statistics "${api2}" "\"winProportion\":1") 
 log "-- ${result}"
 
 log "Node 3 should now have a ticket"
-result=$(get_tickets_statistics "${api3}" "\"winProportion\"\:1") 
+result=$(get_tickets_statistics "${api3}" "\"winProportion\":1") 
 log "-- ${result}"
 
 log "Node 4 should now have a ticket"
-result=$(get_tickets_statistics "${api4}" "\"winProportion\"\:1") 
+result=$(get_tickets_statistics "${api4}" "\"winProportion\":1") 
 log "-- ${result}"
 
 log "Node 5 should now have a ticket"
-result=$(get_tickets_statistics "${api5}" "\"winProportion\"\:1") 
+result=$(get_tickets_statistics "${api5}" "\"winProportion\":1") 
 log "-- ${result}"
 
 for i in `seq 1 10`; do
