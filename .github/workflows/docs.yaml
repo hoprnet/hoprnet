@@ -1,65 +1,65 @@
-# name: HOPR Generate API docs
+name: HOPR Generate API docs
 
-# env:
-#   HOPR_GITHUB_REF: ${{ github.ref }}
+env:
+  HOPR_GITHUB_REF: ${{ github.ref }}
 
-# on:
-#   push:
-#     branches: ['**']
-#     paths-ignore:
-#       - 'docs/**/*'
-#       - '.processes/**/*'
+on:
+  push:
+    branches: ['**']
+    paths-ignore:
+      - 'docs/**/*'
+      - '.processes/**/*'
 
-# jobs:
-#   docs:
-#     name: Generate API docs
-#     runs-on: ubuntu-latest
-#     steps:
-#       - uses: actions/checkout@v2
+jobs:
+  docs:
+    name: Generate API docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
 
-#       - name: Configure Git info
-#         run: ./scripts/configure-git-info.sh
+      - name: Configure Git info
+        run: ./scripts/configure-git-info.sh
 
-#       - name: Use Node.js
-#         uses: actions/setup-node@v2
-#         with:
-#           node-version: 16
-#           registry-url: https://registry.npmjs.org/
-#           cache: yarn
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+          registry-url: https://registry.npmjs.org/
+          cache: yarn
 
-#       - name: Install Yarn (only when using ACT)
-#         if: ${{ env.ACT == 'true' }}
-#         run: |
-#           curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
-#           echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
-#           apt update
-#           apt install --no-install-recommends yarn
+      - name: Install Yarn (only when using ACT)
+        if: ${{ env.ACT == 'true' }}
+        run: |
+          curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+          echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+          apt update
+          apt install --no-install-recommends yarn
 
-#       - name: Install dependencies
-#         run: yarn
+      - name: Install dependencies
+        run: yarn
 
-#       - name: Generate docs
-#         run: ./scripts/regenerate-typedocs.sh
+      - name: Generate docs
+        run: ./scripts/regenerate-typedocs.sh
 
-#       - name: Generate OpenAPI spec file
-#         run: ./scripts/build-rest-api-spec.sh
+      - name: Generate OpenAPI spec file
+        run: ./scripts/build-rest-api-spec.sh
 
-#       - name: Format newly created files
-#         run: yarn lint:fix
+      - name: Format newly created files
+        run: yarn lint:fix
 
-#       - name: Move OpenAPI spec file into documentation directory
-#         run: |
-#           mv packages/hoprd/rest-api-v2-full-spec.json docs/hopr-documentation/
-#           git add docs/hopr-documentation/rest-api-v2-full-spec.json
+      - name: Move OpenAPI spec file into documentation directory
+        run: |
+          mv packages/hoprd/rest-api-v2-full-spec.json docs/hopr-documentation/
+          git add docs/hopr-documentation/rest-api-v2-full-spec.json
 
-#       - name: Commit docs changes
-#         # only commit changes when not running via act and when on final branch<Plug>_es
-#         if: |
-#           (github.ref == 'refs/heads/master' ||
-#            github.ref == 'refs/heads/avado' ||
-#            startsWith(github.ref, 'refs/heads/debug-docs/') ||
-#            startsWith(github.ref, 'refs/heads/release/')
-#           ) && !env.ACT
-#         run: ./scripts/commit-and-push-all-changes.sh
-#         env:
-#           HOPR_GIT_MSG: 'Re-generate API docs for packages'
+      - name: Commit docs changes
+        # only commit changes when not running via act and when on final branch<Plug>_es
+        if: |
+          (github.ref == 'refs/heads/master' ||
+           github.ref == 'refs/heads/avado' ||
+           startsWith(github.ref, 'refs/heads/debug-docs/') ||
+           startsWith(github.ref, 'refs/heads/release/')
+          ) && !env.ACT
+        run: ./scripts/commit-and-push-all-changes.sh
+        env:
+          HOPR_GIT_MSG: 'Re-generate API docs for packages'

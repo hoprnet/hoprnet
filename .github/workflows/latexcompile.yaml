@@ -1,39 +1,39 @@
-# name: build yellowpaper
+name: build yellowpaper
 
-# env:
-#   HOPR_GITHUB_REF: ${{ github.ref }}
+env:
+  HOPR_GITHUB_REF: ${{ github.ref }}
 
-# on:
-#   push:
-#     branches:
-#       - 'master'
-#       - 'yellowpaper/**'
-#     paths:
-#       - '!docs/yellowpaper/yellowpaper.pdf'
-#       - 'docs/yellowpaper/**'
-#       - '.github/workflows/latexcompile.yaml'
+on:
+  push:
+    branches:
+      - 'master'
+      - 'yellowpaper/**'
+    paths:
+      - '!docs/yellowpaper/yellowpaper.pdf'
+      - 'docs/yellowpaper/**'
+      - '.github/workflows/latexcompile.yaml'
 
-# jobs:
-#   build_latex:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - name: Set up Git repository
-#         uses: actions/checkout@v2
+jobs:
+  build_latex:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Git repository
+        uses: actions/checkout@v3
 
-#       - name: Configure Git info
-#         run: ./scripts/configure-git-info.sh
+      - name: Configure Git info
+        run: ./scripts/configure-git-info.sh
 
-#       - name: Install dependencies
-#         run: >
-#           sudo apt -y install
-#           texlive texlive-latex-extra texlive-science
-#           texlive-bibtex-extra latexmk
+      - name: Install dependencies
+        run: >
+          sudo apt -y install
+          texlive texlive-latex-extra texlive-science
+          texlive-bibtex-extra latexmk
 
-#       - name: Compile LaTeX document
-#         run: |
-#           make -C docs/yellowpaper/
+      - name: Compile LaTeX document
+        run: |
+          make -C docs/yellowpaper/
 
-#       - name: Commit & Push changes
-#         run: ./scripts/commit-and-push-all-changes.sh
-#         env:
-#           HOPR_GIT_MSG: 'chore(build): update yellowpaper'
+      - name: Commit & Push changes
+        run: ./scripts/commit-and-push-all-changes.sh
+        env:
+          HOPR_GIT_MSG: 'chore(build): update yellowpaper'
