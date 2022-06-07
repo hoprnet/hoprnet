@@ -197,7 +197,7 @@ task<RegisterOpts>(
 
 task<StakeOpts>('stake', 'Used by CI tests to stake tokens to the running staking program.', stake).addParam<
   StakeOpts['amount']
->('taamountsk', 'txHOPR token amount (in wei) that will be staked', MIN_STAKE.toString(), types.string)
+>('amount', 'target txHOPR token amount (in wei) that will be staked', MIN_STAKE.toString(), types.string)
 
 function getSortedFiles(dependenciesGraph) {
   const tsort = require('tsort')

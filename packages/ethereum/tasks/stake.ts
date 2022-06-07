@@ -1,7 +1,7 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 
 export type StakeOpts = {
-  amount: string // amount in wei
+  amount: string // target amount in wei
 }
 
 /**
@@ -20,11 +20,21 @@ async function main(
   // run its own in-memory hardhat instance, which is undesirable
   const provider = new ethers.providers.JsonRpcProvider()
   const signer = provider.getSigner()
+  const signerAddress = await signer.getAddress()
 
   const hoprToken = (await ethers.getContractFactory('ERC677Mock')).connect(signer).attach(tokenContract.address)
+  const hoprStake = (await ethers.getContractFactory('HoprStakeSeason3')).connect(signer).attach(stakingContract.address)
 
+  const stakedAmount = (await hoprStake.stakedHoprTokens(signerAddress)).toString()
+  if (ethers.BigNumber.from(stakedAmount).gte(ethers.BigNumber.from(opts.amount))) {
+    console.log(`Account ${signerAddress} has staked enough.`)
+    return
+  }
+  
+  const amountToStake = ethers.BigNumber.from(opts.amount).sub(ethers.BigNumber.from(stakedAmount)).toString()
+  
   try {
-    await (await hoprToken.transferAndCall(stakingContract.address, opts.amount, ethers.constants.HashZero)).wait()
+    await (await hoprToken.transferAndCall(stakingContract.address, amountToStake, ethers.constants.HashZero)).wait()
     console.log(`Stake ${opts.amount} tokens in the staking contract`)
   } catch (error) {
     console.error(`Cannot stake via task due to ${error}`)
