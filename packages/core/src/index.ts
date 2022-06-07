@@ -175,7 +175,7 @@ class Hopr extends EventEmitter {
     private db: HoprDB,
     private connector: HoprCoreEthereum,
     private options: HoprOptions,
-    private publicNodesEmitter: HoprConnectConfig['config']['publicNodes'] = new EventEmitter()
+    private publicNodesEmitter = new (EventEmitter as new () => HoprConnectConfig['config']['publicNodes'])()
   ) {
     super()
 
