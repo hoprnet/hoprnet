@@ -182,30 +182,37 @@ function setup_node() {
 
   # Set NODE_ENV=development to rebuild hopr-admin next files
   # at runtime. Necessary to start multiple instances of hoprd
-  # in parallel
-  DEBUG="hopr*" NODE_ENV=development node packages/hoprd/lib/main.cjs \
-    --admin \
-    --adminHost "127.0.0.1" \
-    --adminPort ${admin_port} \
-    --api-token "${api_token}" \
-    --data="${dir}" \
-    --host="127.0.0.1:${node_port}" \
-    --identity="${id}" \
-    --init \
-    --password="${password}" \
-    --privateKey="${private_key}" \
-    --api \
-    --apiPort "${api_port}" \
-    --testAnnounceLocalAddresses \
-    --testPreferLocalAddresses \
-    --testUseWeakCrypto \
-    --testNoUPNP \
-    --allowLocalNodeConnections \
-    --allowPrivateNodeConnections \
-    --heartbeatInterval 2500 \
-    --heartbeatVariance 1000 \
-    ${additional_args} \
-    > "${log}" 2>&1 &
+  # in parallel. Using a mix of CLI parameters and env variables to ensure
+  # both work.
+  env \
+    DEBUG="hopr*" \
+    NODE_ENV=development \
+    HOPRD_HEARTBEAT_INTERVAL=2500 \
+    HOPRD_HEARTBEAT_THRESHOLD=2500 \
+    HOPRD_HEARTBEAT_VARIANCE=1000 \
+    HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
+    HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
+    node packages/hoprd/lib/main.cjs \
+      --admin \
+      --adminHost "127.0.0.1" \
+      --adminPort ${admin_port} \
+      --api-token "${api_token}" \
+      --data="${dir}" \
+      --host="127.0.0.1:${node_port}" \
+      --identity="${id}" \
+      --init \
+      --password="${password}" \
+      --privateKey="${private_key}" \
+      --api \
+      --apiPort "${api_port}" \
+      --testAnnounceLocalAddresses \
+      --testPreferLocalAddresses \
+      --testUseWeakCrypto \
+      --testNoUPNP \
+      --allowLocalNodeConnections \
+      --allowPrivateNodeConnections \
+      ${additional_args} \
+      > "${log}" 2>&1 &
 }
 
 # $1 = node log file

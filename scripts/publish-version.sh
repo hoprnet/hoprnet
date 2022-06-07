@@ -120,6 +120,7 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   ${mydir}/wait-for-npm-package.sh ethereum
   ${mydir}/wait-for-npm-package.sh core-ethereum
   ${mydir}/wait-for-npm-package.sh core
+  ${mydir}/wait-for-npm-package.sh real
 
   trap cleanup SIGINT SIGTERM ERR
 

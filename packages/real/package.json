@@ -1,0 +1,41 @@
+{
+  "name": "@hoprnet/hopr-real",
+  "version": "1.89.0-next.19",
+  "repository": "https://github.com/hoprnet/hoprnet.git",
+  "homepage": "https://hoprnet.org",
+  "license": "GPL-3.0-only",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "type": "commonjs",
+  "files": [
+    "lib"
+  ],
+  "engines": {
+    "node": "16"
+  },
+  "scripts": {
+    "clean:wasm": "make -C crates clean",
+    "build:wasm": "make -C crates all && make -C crates install",
+    "test:wasm": "make -C crates test",
+    "clean": "yarn clean:wasm && rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
+    "build": "yarn clean && yarn build:wasm && tsc -p .",
+    "test": "yarn test:wasm && NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
+    "docs:generate": "typedoc",
+    "docs:watch": "typedoc --watch"
+  },
+  "devDependencies": {
+    "mocha": "9.2.2",
+    "rimraf": "^3.0.0",
+    "typedoc": "0.22.13",
+    "typedoc-plugin-markdown": "3.11.14"
+  },
+  "mocha": {
+    "extension": [
+      "ts"
+    ],
+    "spec": "src/**/*.spec.ts",
+    "require": [
+      "ts-node/register"
+    ]
+  }
+}

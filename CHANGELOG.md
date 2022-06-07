@@ -6,6 +6,8 @@
 
 - Reduce eth_getBlockByNumber calls when indexing and sending transactions ([#3814](https://github.com/hoprnet/hoprnet/pull/3814))
 - Marge hopr-stake contracs into monorepo and relevant deploy scripts
+- Add additional CLI parameters `--heartbeatThreshold`, `--networkQualityThreshold` and `--onChainConfirmations`
+- Allow configuration via environment variables instead of CLI parameters for all supported options
 
 <a name="1.89"></a>
 
@@ -17,6 +19,7 @@
 - Improvements in our integration E2E tests ([#3643](https://github.com/hoprnet/hoprnet/pull/3643))
 - API v2 `/api/v2/node/peers` now returns `multiaddr` for connected peers ([#3643](https://github.com/hoprnet/hoprnet/pull/3643))
 - Add connectivity health indicator updates to the logs ([#3816](https://github.com/hoprnet/hoprnet/pull/3816))
+- Introduce Rust WASM support into the build toolchain ([#3829](https://github.com/hoprnet/hoprnet/pull/3829))
 
 ### Breaking changes
 
