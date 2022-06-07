@@ -21,9 +21,6 @@ declare ct_node1_log="${1}"
 declare healthcheck_host="${2}"
 declare healthcheck_port="${3}"
 
-# disable network registry
-disable_network_registry
-
 log "Running Cover Traffic test"
 
 log "Check CT daemon health"
