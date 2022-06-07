@@ -54,7 +54,7 @@ const backoffOption: Parameters<typeof retryWithBackoff>[1] = { maxDelay: MAX_TR
  * all channels in the network.
  * Also keeps track of the latest block number.
  */
-class Indexer extends EventEmitter implements IndexerEventEmitter {
+class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   public status: IndexerStatus = IndexerStatus.STOPPED
   public latestBlock: number = 0 // latest known on-chain block number
 
@@ -157,7 +157,7 @@ class Indexer extends EventEmitter implements IndexerEventEmitter {
     log('Subscribing to events from block %d', fromBlock)
 
     this.status = IndexerStatus.STARTED
-    this.emit('status', 'started')
+    this.emit('status', IndexerStatus.STARTED)
     log(chalk.green('Indexer started!'))
   }
 
@@ -177,7 +177,7 @@ class Indexer extends EventEmitter implements IndexerEventEmitter {
     this.blockProcessingLock && (await this.blockProcessingLock.promise)
 
     this.status = IndexerStatus.STOPPED
-    this.emit('status', 'stopped')
+    this.emit('status', IndexerStatus.STOPPED)
     log(chalk.green('Indexer stopped!'))
   }
 
@@ -200,7 +200,7 @@ class Indexer extends EventEmitter implements IndexerEventEmitter {
       await this.start(this.chain, this.genesisBlock)
     } catch (err) {
       this.status = IndexerStatus.STOPPED
-      this.emit('status', 'stopped')
+      this.emit('status', IndexerStatus.STOPPED)
       log(chalk.red('Failed to restart: %s', err.message))
       throw err
     }

@@ -1,7 +1,7 @@
 import type { HoprToken, HoprChannels, HoprNetworkRegistry, TypedEventFilter } from '@hoprnet/hopr-ethereum'
 import type PeerId from 'peer-id'
 import type { Multiaddr } from 'multiaddr'
-import type { ChannelEntry } from '@hoprnet/hopr-utils'
+import type { Address, ChannelEntry, PublicKey } from '@hoprnet/hopr-utils'
 
 /**
  * Typechain does not provide us with clean event types, in the lines below we infer
@@ -26,6 +26,8 @@ export enum IndexerStatus {
   STOPPED = 'stopped'
 }
 
+// Manual event typing because Node.js EventEmitter is untyped
+
 export type IndexerEvents =
   | `announce-${string}`
   | `withdraw-hopr-${string}`
@@ -36,26 +38,33 @@ type BlockEventName = 'block'
 type BlockProcessedEventName = 'block-processed'
 type StatusEventName = 'status'
 type PeerEventName = 'peer'
-type ChannelUpdateEventName = 'channel-update'
-type OwnChannelUpdatedEventName = 'own-channel-updated'
-type ChannelWaitingForCommitmentEventName = 'channel-waiting-for-commitment'
+type NetworkRegistryEligibilityChangedEventName = 'network-registry-eligibility-changed'
+type NetworkRegistryStatusChangedEventName = 'network-registry-status-changed'
+
+type ChannelUpdateEventNames =
+  | 'channel-update'
+  | 'own-channel-updated'
+  | 'channel-waiting-for-commitment'
+  | 'channel-closed'
 
 type IndexerEventNames =
   | BlockEventName
   | BlockProcessedEventName
   | StatusEventName
   | PeerEventName
-  | ChannelUpdateEventName
-  | OwnChannelUpdatedEventName
-  | ChannelWaitingForCommitmentEventName
+  | ChannelUpdateEventNames
+  | IndexerEvents
+  | NetworkRegistryEligibilityChangedEventName
+  | NetworkRegistryStatusChangedEventName
 
 type BlockListener = (block: number) => void
 type BlockProcessedListener = (block: number) => void
 type StatusListener = (status: IndexerStatus) => void
 type PeerListener = (peerData: { id: PeerId; multiaddrs: Multiaddr[] }) => void
 type ChannelUpdateListener = (channel: ChannelEntry) => void
-type OwnChannelUpdatedListener = (channel: ChannelEntry) => void
-type ChannelWaitingForCommitmentListener = (channel: ChannelEntry) => void
+type IndexerEventsListener = (txHash: string) => void
+type NetworkRegistryEligibilityChangedListener = (account: Address, hoprNode: PublicKey, eligibility: boolean) => void
+type NetworkRegistryStatusChangedListener = (isEnabled: boolean) => void
 
 export interface IndexerEventEmitter {
   addListener(event: IndexerEventNames, listener: () => void): this
@@ -63,70 +72,100 @@ export interface IndexerEventEmitter {
   addListener(event: BlockProcessedEventName, listener: BlockProcessedListener): this
   addListener(event: StatusEventName, listener: StatusListener): this
   addListener(event: PeerEventName, listener: PeerListener): this
-  addListener(event: ChannelUpdateEventName, listener: ChannelUpdateListener): this
-  addListener(event: OwnChannelUpdatedEventName, listener: OwnChannelUpdatedListener): this
-  addListener(event: ChannelWaitingForCommitmentEventName, listener: ChannelWaitingForCommitmentListener): this
+  addListener(event: ChannelUpdateEventNames, listener: ChannelUpdateListener): this
+  addListener(event: IndexerEvents, listener: IndexerEventsListener): this
+  addListener(
+    event: NetworkRegistryEligibilityChangedEventName,
+    listener: NetworkRegistryEligibilityChangedListener
+  ): this
+  addListener(event: NetworkRegistryStatusChangedEventName, listener: NetworkRegistryStatusChangedListener): this
 
   emit(event: IndexerEventNames): boolean
-  emit(event: BlockEventName, listener: BlockListener): boolean
-  emit(event: BlockProcessedEventName, listener: BlockProcessedListener): boolean
-  emit(event: StatusEventName, listener: StatusListener): boolean
-  emit(event: PeerEventName, listener: PeerListener): boolean
-  emit(event: ChannelUpdateEventName, listener: ChannelUpdateListener): boolean
-  emit(event: OwnChannelUpdatedEventName, listener: OwnChannelUpdatedListener): boolean
-  emit(event: ChannelWaitingForCommitmentEventName, listener: ChannelWaitingForCommitmentListener): boolean
+  emit(event: BlockEventName, block: number): boolean
+  emit(event: BlockProcessedEventName, block: number): boolean
+  emit(event: StatusEventName, status: IndexerStatus): boolean
+  emit(event: PeerEventName, peerData: { id: PeerId; multiaddrs: Multiaddr[] }): boolean
+  emit(event: ChannelUpdateEventNames, channel: ChannelEntry): boolean
+  emit(event: IndexerEvents, txHash: string): boolean
+  emit(
+    event: NetworkRegistryEligibilityChangedEventName,
+    account: Address,
+    hoprNode: PublicKey,
+    eligibility: boolean
+  ): boolean
+  emit(event: NetworkRegistryStatusChangedEventName, isEnabled: boolean): boolean
 
   on(event: IndexerEventNames, listener: () => void): this
   on(event: BlockEventName, listener: BlockListener): this
   on(event: BlockProcessedEventName, listener: BlockProcessedListener): this
   on(event: StatusEventName, listener: StatusListener): this
   on(event: PeerEventName, listener: PeerListener): this
-  on(event: ChannelUpdateEventName, listener: ChannelUpdateListener): this
-  on(event: OwnChannelUpdatedEventName, listener: OwnChannelUpdatedListener): this
-  on(event: ChannelWaitingForCommitmentEventName, listener: ChannelWaitingForCommitmentListener): this
+  on(event: ChannelUpdateEventNames, listener: ChannelUpdateListener): this
+  on(event: IndexerEvents, listener: IndexerEventsListener): this
+  on(event: NetworkRegistryEligibilityChangedEventName, listener: NetworkRegistryEligibilityChangedListener): this
+  on(event: NetworkRegistryStatusChangedEventName, listener: NetworkRegistryStatusChangedListener): this
 
   once(event: IndexerEventNames, listener: () => void): this
   once(event: BlockEventName, listener: BlockListener): this
   once(event: BlockProcessedEventName, listener: BlockProcessedListener): this
   once(event: StatusEventName, listener: StatusListener): this
   once(event: PeerEventName, listener: PeerListener): this
-  once(event: ChannelUpdateEventName, listener: ChannelUpdateListener): this
-  once(event: OwnChannelUpdatedEventName, listener: OwnChannelUpdatedListener): this
-  once(event: ChannelWaitingForCommitmentEventName, listener: ChannelWaitingForCommitmentListener): this
+  once(event: ChannelUpdateEventNames, listener: ChannelUpdateListener): this
+  once(event: IndexerEvents, listener: IndexerEventsListener): this
+  once(event: NetworkRegistryEligibilityChangedEventName, listener: NetworkRegistryEligibilityChangedListener): this
+  once(event: NetworkRegistryStatusChangedEventName, listener: NetworkRegistryStatusChangedListener): this
 
   prependListener(event: IndexerEventNames, listener: () => void): this
   prependListener(event: BlockEventName, listener: BlockListener): this
   prependListener(event: BlockProcessedEventName, listener: BlockProcessedListener): this
   prependListener(event: StatusEventName, listener: StatusListener): this
   prependListener(event: PeerEventName, listener: PeerListener): this
-  prependListener(event: ChannelUpdateEventName, listener: ChannelUpdateListener): this
-  prependListener(event: OwnChannelUpdatedEventName, listener: OwnChannelUpdatedListener): this
-  prependListener(event: ChannelWaitingForCommitmentEventName, listener: ChannelWaitingForCommitmentListener): this
+  prependListener(event: ChannelUpdateEventNames, listener: ChannelUpdateListener): this
+  prependListener(event: IndexerEvents, listener: IndexerEventsListener): this
+  prependListener(
+    event: NetworkRegistryEligibilityChangedEventName,
+    listener: NetworkRegistryEligibilityChangedListener
+  ): this
+  prependListener(event: NetworkRegistryStatusChangedEventName, listener: NetworkRegistryStatusChangedListener): this
 
   prependOnceListener(event: IndexerEventNames, listener: () => void): this
   prependOnceListener(event: BlockEventName, listener: BlockListener): this
   prependOnceListener(event: BlockProcessedEventName, listener: BlockProcessedListener): this
   prependOnceListener(event: StatusEventName, listener: StatusListener): this
   prependOnceListener(event: PeerEventName, listener: PeerListener): this
-  prependOnceListener(event: ChannelUpdateEventName, listener: ChannelUpdateListener): this
-  prependOnceListener(event: OwnChannelUpdatedEventName, listener: OwnChannelUpdatedListener): this
-  prependOnceListener(event: ChannelWaitingForCommitmentEventName, listener: ChannelWaitingForCommitmentListener): this
+  prependOnceListener(event: ChannelUpdateEventNames, listener: ChannelUpdateListener): this
+  prependOnceListener(event: IndexerEvents, listener: IndexerEventsListener): this
+  prependOnceListener(
+    event: NetworkRegistryEligibilityChangedEventName,
+    listener: NetworkRegistryEligibilityChangedListener
+  ): this
+  prependOnceListener(
+    event: NetworkRegistryStatusChangedEventName,
+    listener: NetworkRegistryStatusChangedListener
+  ): this
 
   removeListener(event: IndexerEventNames, listener: () => void): this
   removeListener(event: BlockEventName, listener: BlockListener): this
   removeListener(event: BlockProcessedEventName, listener: BlockProcessedListener): this
   removeListener(event: StatusEventName, listener: StatusListener): this
   removeListener(event: PeerEventName, listener: PeerListener): this
-  removeListener(event: ChannelUpdateEventName, listener: ChannelUpdateListener): this
-  removeListener(event: OwnChannelUpdatedEventName, listener: OwnChannelUpdatedListener): this
-  removeListener(event: ChannelWaitingForCommitmentEventName, listener: ChannelWaitingForCommitmentListener): this
+  removeListener(event: ChannelUpdateEventNames, listener: ChannelUpdateListener): this
+  removeListener(event: IndexerEvents, listener: IndexerEventsListener): this
+  removeListener(
+    event: NetworkRegistryEligibilityChangedEventName,
+    listener: NetworkRegistryEligibilityChangedListener
+  ): this
+  removeListener(event: NetworkRegistryStatusChangedEventName, listener: NetworkRegistryStatusChangedListener): this
 
   off(event: IndexerEventNames, listener: () => void): this
   off(event: BlockEventName, listener: BlockListener): this
   off(event: BlockProcessedEventName, listener: BlockProcessedListener): this
   off(event: StatusEventName, listener: StatusListener): this
   off(event: PeerEventName, listener: PeerListener): this
-  off(event: ChannelUpdateEventName, listener: ChannelUpdateListener): this
-  off(event: OwnChannelUpdatedEventName, listener: OwnChannelUpdatedListener): this
-  off(event: ChannelWaitingForCommitmentEventName, listener: ChannelWaitingForCommitmentListener): this
+  off(event: ChannelUpdateEventNames, listener: ChannelUpdateListener): this
+  off(event: IndexerEvents, listener: IndexerEventsListener): this
+  off(event: NetworkRegistryEligibilityChangedEventName, listener: NetworkRegistryEligibilityChangedListener): this
+  off(event: NetworkRegistryStatusChangedEventName, listener: NetworkRegistryStatusChangedListener): this
+
+  listeners(event: IndexerEventNames): Function[]
 }
