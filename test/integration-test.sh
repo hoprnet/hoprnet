@@ -454,7 +454,6 @@ if ! [ -z $additional_nodes_addrs ] && ! [ -z $additional_nodes_peerids ]; then
   native_addrs_to_register+=",${additional_nodes_addrs}"
   native_peerids_to_register+=",${additional_nodes_peerids}"
 fi
-log "registerung ${native_addrs_to_register} ${native_peerids_to_register}"
 register_nodes "${native_addrs_to_register}" "${native_peerids_to_register}"
 log "Nodes added to register"
 

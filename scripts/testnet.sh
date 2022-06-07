@@ -206,7 +206,6 @@ enable_network_registry() {
 }
 
 disable_network_registry() {
-  # disable register
   log "Disabling register"
   HOPR_ENVIRONMENT_ID=hardhat-localhost \
   TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
