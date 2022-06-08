@@ -10,9 +10,16 @@
 
 ### Interfaces
 
+- [HoprBoost](interfaces/HoprBoost.md)
 - [HoprChannels](interfaces/HoprChannels.md)
+- [HoprDistributor](interfaces/HoprDistributor.md)
 - [HoprNetworkRegistry](interfaces/HoprNetworkRegistry.md)
+- [HoprStake](interfaces/HoprStake.md)
+- [HoprStake2](interfaces/HoprStake2.md)
+- [HoprStakeSeason3](interfaces/HoprStakeSeason3.md)
+- [HoprStakeSeason4](interfaces/HoprStakeSeason4.md)
 - [HoprToken](interfaces/HoprToken.md)
+- [HoprWhitehat](interfaces/HoprWhitehat.md)
 - [TypedEvent](interfaces/TypedEvent.md)
 - [TypedEventFilter](interfaces/TypedEventFilter.md)
 
@@ -46,7 +53,7 @@
 
 #### Defined in
 
-[packages/ethereum/src/index.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L19)
+[packages/ethereum/src/index.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L30)
 
 ___
 
@@ -56,7 +63,7 @@ ___
 
 #### Defined in
 
-[packages/ethereum/src/index.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L7)
+[packages/ethereum/src/index.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L18)
 
 ___
 
@@ -123,4 +130,4 @@ ___
 
 #### Defined in
 
-[packages/ethereum/src/index.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L26)
+[packages/ethereum/src/index.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L37)
