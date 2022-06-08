@@ -61,7 +61,9 @@ export const GET: Operation = [
       const channels = await getChannels(node, includingClosed === 'true')
       return res.status(200).send(channels)
     } catch (err) {
-      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+      return res
+        .status(422)
+        .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 ]
@@ -153,10 +155,12 @@ export const openChannel = async (node: Hopr, counterpartyStr: string, amountStr
     const { channelId, receipt } = await node.openChannel(counterparty, amount)
     return { channelId: channelId.toHex(), receipt }
   } catch (err) {
-    if (err.message.includes('Channel is already opened')) {
+    const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
+
+    if (errString.includes('Channel is already opened')) {
       throw Error(STATUS_CODES.CHANNEL_ALREADY_OPEN)
     } else {
-      throw Error(err.message)
+      throw Error(errString)
     }
   }
 }
@@ -170,12 +174,14 @@ export const POST: Operation = [
       const { channelId, receipt } = await openChannel(node, peerId, amount)
       return res.status(201).send({ channelId, receipt })
     } catch (err) {
-      if (err.message.includes(STATUS_CODES.NOT_ENOUGH_BALANCE)) {
+      const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
+
+      if (errString.includes(STATUS_CODES.NOT_ENOUGH_BALANCE)) {
         return res.status(403).send({ status: STATUS_CODES.NOT_ENOUGH_BALANCE })
-      } else if (err.message.includes(STATUS_CODES.CHANNEL_ALREADY_OPEN)) {
+      } else if (errString.includes(STATUS_CODES.CHANNEL_ALREADY_OPEN)) {
         return res.status(409).send({ status: STATUS_CODES.CHANNEL_ALREADY_OPEN })
       } else {
-        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: errString })
       }
     }
   }

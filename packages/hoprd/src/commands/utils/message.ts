@@ -29,7 +29,12 @@ export function decodeMessage(encoded: Uint8Array): {
     }
   } catch (err) {
     console.log(
-      styleValue(`Could not decode received message '${u8aToHex(encoded)}' Error was ${err.message}.`, 'failure')
+      styleValue(
+        `Could not decode received message '${u8aToHex(encoded)}' Error was ${
+          err instanceof Error ? err.message : 'Unknown error'
+        }.`,
+        'failure'
+      )
     )
 
     return {

@@ -13,8 +13,10 @@ export const GET: Operation = [
     try {
       const settings = getSettings(stateOps.getState())
       return res.status(200).send(settings)
-    } catch (error) {
-      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
+    } catch (err) {
+      return res
+        .status(422)
+        .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 ]

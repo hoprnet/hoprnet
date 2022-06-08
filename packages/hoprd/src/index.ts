@@ -378,7 +378,7 @@ async function main() {
       // also send it tagged as message for apps to use
       logs.logMessage(decoded.toString())
     } catch (err) {
-      logs.log('Could not decode message', err)
+      logs.log('Could not decode message', err instanceof Error ? err.message : 'Unknown error')
       logs.log(msg.toString())
     }
   }

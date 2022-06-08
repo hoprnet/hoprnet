@@ -6,9 +6,11 @@ export const POST: Operation = [
   async (req, res, _next) => {
     try {
       const signature = await req.context.node.signMessage(new TextEncoder().encode(req.body.message))
-      res.status(200).send({ signature: u8aToHex(signature) })
+      return res.status(200).send({ signature: u8aToHex(signature) })
     } catch (err) {
-      res.status(422).json({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+      return res
+        .status(422)
+        .json({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 ]

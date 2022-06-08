@@ -28,7 +28,7 @@ export default class CloseChannel extends AbstractCommand {
     try {
       peerId = checkPeerIdInput(query, getState())
     } catch (err) {
-      return log(styleValue(err.message, 'failure'))
+      return log(styleValue(err instanceof Error ? err.message : 'Unknown error', 'failure'))
     }
 
     log('Closing channel...')
@@ -51,7 +51,7 @@ export default class CloseChannel extends AbstractCommand {
         )
       }
     } catch (err) {
-      return log(styleValue(err.message, 'failure'))
+      return log(styleValue(err instanceof Error ? err.message : 'Unknown error', 'failure'))
     }
   }
 }

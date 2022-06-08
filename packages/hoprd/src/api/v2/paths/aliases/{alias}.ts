@@ -32,10 +32,12 @@ export const GET: Operation = [
       const peerId = getAlias(stateOps.getState(), alias as string)
       return res.status(200).send({ peerId })
     } catch (err) {
-      if (err.message.includes(STATUS_CODES.PEERID_NOT_FOUND)) {
+      const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
+
+      if (errString.includes(STATUS_CODES.PEERID_NOT_FOUND)) {
         return res.status(404).send({ status: STATUS_CODES.PEERID_NOT_FOUND })
       } else {
-        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: errString })
       }
     }
   }
@@ -109,7 +111,9 @@ export const DELETE: Operation = [
       removeAlias(stateOps, alias)
       return res.status(204).send()
     } catch (err) {
-      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+      return res
+        .status(422)
+        .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 ]

@@ -37,7 +37,9 @@ export const GET: Operation = [
       const aliases = getAliases(stateOps.getState())
       return res.status(200).send(aliases)
     } catch (err) {
-      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+      return res
+        .status(422)
+        .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 ]
@@ -92,7 +94,9 @@ export const POST: Operation = [
       setAlias(stateOps, alias, peerId)
       return res.status(201).send()
     } catch (err) {
-      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+      return res
+        .status(422)
+        .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 ]

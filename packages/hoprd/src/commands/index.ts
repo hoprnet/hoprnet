@@ -82,7 +82,7 @@ export class Commands {
       try {
         return await cmd.execute(log, query || '', this.stateOps)
       } catch (err) {
-        return log(`${cmd} execution failed with error: ${err.message}`)
+        return log(`${cmd} execution failed with error: ${err instanceof Error ? err.message : 'Unknown error'}`)
       }
     }
 

@@ -27,14 +27,16 @@ export const GET: Operation = [
     try {
       const addresses = getAddresses(node)
 
-      res.status(200).json({
+      return res.status(200).json({
         nativeAddress: addresses.native,
         native: addresses.native,
         hoprAddress: addresses.hopr,
         hopr: addresses.hopr
       })
-    } catch (error) {
-      res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
+    } catch (err) {
+      return res
+        .status(422)
+        .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 ]

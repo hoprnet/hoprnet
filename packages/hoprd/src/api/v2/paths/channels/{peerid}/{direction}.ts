@@ -34,10 +34,12 @@ export const DELETE: Operation = [
       const { receipt, channelStatus } = await closeChannel(node, peerid, direction as any)
       return res.status(200).send({ receipt, channelStatus: channelStatusToString(channelStatus) })
     } catch (err) {
-      if (err.message.match(/Channel is already closed/)) {
+      const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
+
+      if (errString.match(/Channel is already closed/)) {
         return res.status(200).send({ channelStatus: channelStatusToString(ChannelStatus.Closed) })
       }
-      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: errString })
     }
   }
 ]
@@ -156,13 +158,15 @@ export const GET: Operation = [
       const channel = await getChannel(node, peerid, direction as any)
       return res.status(200).send(channel)
     } catch (err) {
-      console.log(err)
-      if (err.message === STATUS_CODES.INVALID_PEERID) {
-        return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID })
-      } else if (err.message === STATUS_CODES.CHANNEL_NOT_FOUND) {
-        return res.status(404).send({ status: STATUS_CODES.CHANNEL_NOT_FOUND })
-      } else {
-        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+      const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
+
+      switch (errString) {
+        case STATUS_CODES.INVALID_PEERID:
+          return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID })
+        case STATUS_CODES.CHANNEL_NOT_FOUND:
+          return res.status(404).send({ status: STATUS_CODES.CHANNEL_NOT_FOUND })
+        default:
+          return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: errString })
       }
     }
   }
