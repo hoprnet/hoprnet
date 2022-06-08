@@ -27,19 +27,23 @@ export const closeChannel = async (node: Hopr, peerIdStr: string, direction: Cha
 
 export const DELETE: Operation = [
   async (req, res, _next) => {
-    const { node } = req.context
-    const { peerid, direction } = req.params
-
     try {
-      const { receipt, channelStatus } = await closeChannel(node, peerid, direction as any)
-      return res.status(200).send({ receipt, channelStatus: channelStatusToString(channelStatus) })
-    } catch (err) {
-      const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
+      const { node } = req.context
+      const { peerid, direction } = req.params
 
-      if (errString.match(/Channel is already closed/)) {
-        return res.status(200).send({ channelStatus: channelStatusToString(ChannelStatus.Closed) })
+      try {
+        const { receipt, channelStatus } = await closeChannel(node, peerid, direction as any)
+        return res.status(200).send({ receipt, channelStatus: channelStatusToString(channelStatus) })
+      } catch (err) {
+        const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
+
+        if (errString.match(/Channel is already closed/)) {
+          return res.status(200).send({ channelStatus: channelStatusToString(ChannelStatus.Closed) })
+        }
+        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: errString })
       }
-      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: errString })
+    } catch (err) {
+      console.log(`DELETE error`, err)
     }
   }
 ]

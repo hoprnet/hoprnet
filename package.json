@@ -57,8 +57,6 @@
     "yargs": "17.4.0"
   },
   "resolutions": {
-    "express-openapi": "https://github.com/hoprnet/open-api/raw/robertkiel/built-esm-support/packages/express-openapi/express-openapi-11.0.4.tgz",
-    "openapi-framework": "https://github.com/hoprnet/open-api/raw/robertkiel/built-esm-support/packages/openapi-framework/openapi-framework-11.0.4.tgz",
     "@ethersproject/providers": "https://github.com/hoprnet/ethers-js-provider/archive/refs/tags/fixed-memory-leak.tar.gz",
     "@overnightjs/logger": "1.2.1",
     "colors": "1.4.0",

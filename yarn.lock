@@ -3780,7 +3780,7 @@ __metadata:
     debug: 4.3.4
     dids: 2.4.3
     express: 4.17.3
-    express-openapi: 9.3.1
+    express-openapi: 12.0.0
     jazzicon: 1.5.0
     js-cookie: 3.0.1
     key-did-provider-ed25519: 1.1.0
@@ -12426,14 +12426,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"express-openapi@https://github.com/hoprnet/open-api/raw/robertkiel/built-esm-support/packages/express-openapi/express-openapi-11.0.4.tgz":
-  version: 11.0.1
-  resolution: "express-openapi@https://github.com/hoprnet/open-api/raw/robertkiel/built-esm-support/packages/express-openapi/express-openapi-11.0.4.tgz"
+"express-openapi@npm:12.0.0":
+  version: 12.0.0
+  resolution: "express-openapi@npm:12.0.0"
   dependencies:
     express-normalize-query-params-middleware: ^0.5.0
-    openapi-framework: ^11.0.1
-    openapi-types: ^11.0.1
-  checksum: e052d10204dac74bfcaf43007a4d72d65845a684b787990e9f83024cf1e2e3c3f3eb3657c7bd36bbbce3dfda1419945d813ef7c9a631af8574ef585f4e156b6c
+    openapi-framework: ^12.0.0
+    openapi-types: ^12.0.0
+  checksum: 109d95728f67609005c61d9a1e16ab00a3dde06433743e3fbe3b9cf9d129d5c68cd2e976857624b64ad25e1c752b55a813d48bad8a10c9c275c47c62399f609a
   languageName: node
   linkType: hard
 
@@ -13345,12 +13345,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"fs-routes@npm:^11.0.1":
-  version: 11.0.1
-  resolution: "fs-routes@npm:11.0.1"
+"fs-routes@npm:^12.0.0":
+  version: 12.0.0
+  resolution: "fs-routes@npm:12.0.0"
   peerDependencies:
     glob: ">=7.1.6"
-  checksum: 9dc90f3c75f32c31165423a3c4c5fcd3f256c195ef7d3b5efa0904dd50c73e62474e378337595cc42eba182b00be344626d2c29cf85063dd3e7c979a5972be61
+  checksum: 4e97b08584c4ee04cf00215ac5175ba6f3aeaa4fb254cd108149d675edffcf90e802ead9965a5252271f26e1a47b31c341b41e209b9d210b2a584ae2a642c466
   languageName: node
   linkType: hard
 
@@ -19875,76 +19875,76 @@ __metadata:
   languageName: node
   linkType: hard
 
-"openapi-default-setter@npm:^11.0.1":
-  version: 11.0.1
-  resolution: "openapi-default-setter@npm:11.0.1"
+"openapi-default-setter@npm:^12.0.0":
+  version: 12.0.0
+  resolution: "openapi-default-setter@npm:12.0.0"
   dependencies:
-    openapi-types: ^11.0.1
-  checksum: 590d43809de50313f46774b92a8e15397aec2489f92c560bc7cf7d6dab205bec411426e3f2d2b169bb3d6268e4d372104317a971da224a22a201bd13e64fe6b9
+    openapi-types: ^12.0.0
+  checksum: 39604a7d4b9f724857ee0263251d88a2a02c6db8c6c36e5158346b550ef8f92b99102d09ebd758e07fd273093170288c2639823f5ed00ac5f2d93ea7674dfd37
   languageName: node
   linkType: hard
 
-"openapi-framework@https://github.com/hoprnet/open-api/raw/robertkiel/built-esm-support/packages/openapi-framework/openapi-framework-11.0.4.tgz":
-  version: 11.0.1
-  resolution: "openapi-framework@https://github.com/hoprnet/open-api/raw/robertkiel/built-esm-support/packages/openapi-framework/openapi-framework-11.0.4.tgz"
+"openapi-framework@npm:^12.0.0":
+  version: 12.0.0
+  resolution: "openapi-framework@npm:12.0.0"
   dependencies:
     difunc: 0.0.4
-    fs-routes: ^11.0.1
+    fs-routes: ^12.0.0
     glob: "*"
     is-dir: ^1.0.0
     js-yaml: ^3.10.0
-    openapi-default-setter: ^11.0.1
-    openapi-request-coercer: ^11.0.1
-    openapi-request-validator: ^11.0.1
-    openapi-response-validator: ^11.0.1
-    openapi-schema-validator: ^11.0.1
-    openapi-security-handler: ^11.0.1
-    openapi-types: ^11.0.1
+    openapi-default-setter: ^12.0.0
+    openapi-request-coercer: ^12.0.0
+    openapi-request-validator: ^12.0.0
+    openapi-response-validator: ^12.0.0
+    openapi-schema-validator: ^12.0.0
+    openapi-security-handler: ^12.0.0
+    openapi-types: ^12.0.0
     ts-log: ^2.1.4
-  checksum: 006d73bc2b32bbbc449269e61f0c48c89146f1c92cd6520aa3dddfbfff3402e2b3481e70a80d2c5087a04e5923b18c4554b17239628beeb04a9e6c276c22b142
+  checksum: 90ca60bf6e5f481940a6cabd19dfd08720ef7070f9353119783dd31ebc004c250f1253d894611b97fccb7b957baa6c4b09e2ef50d64d6f4bc60ab2f1ba912987
   languageName: node
   linkType: hard
 
-"openapi-jsonschema-parameters@npm:^11.0.1":
-  version: 11.0.1
-  resolution: "openapi-jsonschema-parameters@npm:11.0.1"
+"openapi-jsonschema-parameters@npm:^12.0.0":
+  version: 12.0.0
+  resolution: "openapi-jsonschema-parameters@npm:12.0.0"
   dependencies:
-    openapi-types: ^11.0.1
-  checksum: a1b75b2b449a5dafc1f3e7de4b134db8e6ed4348499847d722fe13c7433a636c2f35ac816118057106704fd87e8645d698c27342c9c576d830ebef456758f03d
+    openapi-types: ^12.0.0
+  checksum: 4065543bd0173e308fbd3aefa3db5cf8b44c3bbd157fc5e6ab7ec7a9825423934620718a42459a091c0867fc762cd48402cafd020ce7cd512fc57704df165d20
   languageName: node
   linkType: hard
 
-"openapi-request-coercer@npm:^11.0.1":
-  version: 11.0.1
-  resolution: "openapi-request-coercer@npm:11.0.1"
+"openapi-request-coercer@npm:^12.0.0":
+  version: 12.0.0
+  resolution: "openapi-request-coercer@npm:12.0.0"
   dependencies:
-    openapi-types: ^11.0.1
+    openapi-types: ^12.0.0
     ts-log: ^2.1.4
-  checksum: d5bb05ebc77716ab97a331eadfc48735c2b11cdb18c4291b7a91c66db06a89afce43dde2763b942710d3451e28824c9bc6054f197bc8a992c1115a2b142b46a5
+  checksum: ae1af40783ebd1e0e6ae2410f81aa0d87c283398439b672f1349611daf5b18629937da485f5a3f5cc9cd7dd54002e940c80bb7633265f94ca3ea1503983ca895
   languageName: node
   linkType: hard
 
-"openapi-request-validator@npm:^11.0.1":
-  version: 11.0.1
-  resolution: "openapi-request-validator@npm:11.0.1"
+"openapi-request-validator@npm:^12.0.0":
+  version: 12.0.0
+  resolution: "openapi-request-validator@npm:12.0.0"
   dependencies:
     ajv: ^8.3.0
     ajv-formats: ^2.1.0
     content-type: ^1.0.4
-    openapi-jsonschema-parameters: ^11.0.1
-    openapi-types: ^11.0.1
+    openapi-jsonschema-parameters: ^12.0.0
+    openapi-types: ^12.0.0
     ts-log: ^2.1.4
-  checksum: f763527233a252db62e619c2ad8cc1869f5b4f147d4e6408bcc36e793554d3f49edc029bffbe680f4c95ec5d0208803ab197188f16fec952ca9834b38202d8a2
+  checksum: 9586d04aafacd6eb9780a5dab2552c957ca5c165a5a8d3933da04f043d8a0e1fa9471c29bedcf377d3d29aad2eb6523ebbdc18a8b038131f5fe7ccdafd5850f3
   languageName: node
   linkType: hard
 
-"openapi-response-validator@npm:^11.0.1":
-  version: 11.0.1
-  resolution: "openapi-response-validator@npm:11.0.1"
+"openapi-response-validator@npm:^12.0.0":
+  version: 12.0.0
+  resolution: "openapi-response-validator@npm:12.0.0"
   dependencies:
     ajv: ^8.4.0
-    openapi-types: ^11.0.1
-  checksum: 7bd59e3b0b740cb712d84df115e0298705c4b1bb207ec94f8cb0b46972791311a12fe3ee47cb20e8a53cb2d871e09df6c2d0406df68690e99abb4f77ed012eb7
+    openapi-types: ^12.0.0
+  checksum: de56671daaa6b9cf41d3e3c0caf7d2e6ce6bc31b5a9e4414874abd4133e8002a2b7ab72db05ce8c65da8022ab1e6524be9e458cf76bc43cb0d6179adc1513257
   languageName: node
   linkType: hard
 
@@ -19968,15 +19968,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"openapi-schema-validator@npm:^11.0.1":
-  version: 11.0.1
-  resolution: "openapi-schema-validator@npm:11.0.1"
+"openapi-schema-validator@npm:^12.0.0":
+  version: 12.0.0
+  resolution: "openapi-schema-validator@npm:12.0.0"
   dependencies:
     ajv: ^8.1.0
     ajv-formats: ^2.0.2
     lodash.merge: ^4.6.1
-    openapi-types: ^11.0.1
-  checksum: b994cfd051bf3a55d2ebde7f22960da71bb0942644ddb77368f7002acd43cf069bc9f266b6f960715e0d6415fe8cc581917d89984bab109f7d6c86170cb1706a
+    openapi-types: ^12.0.0
+  checksum: bf99bf3c16b5088e2ff7496be2eb7963fc95c64e455745723ce368ff96d85bb129c94810ffa945424ff77796a42e38fc92c7d599fcc2500b71e36a647f0ff87e
   languageName: node
   linkType: hard
 
@@ -19992,19 +19992,19 @@ __metadata:
   languageName: node
   linkType: hard
 
-"openapi-security-handler@npm:^11.0.1":
-  version: 11.0.1
-  resolution: "openapi-security-handler@npm:11.0.1"
+"openapi-security-handler@npm:^12.0.0":
+  version: 12.0.0
+  resolution: "openapi-security-handler@npm:12.0.0"
   dependencies:
-    openapi-types: ^11.0.1
-  checksum: f558e9d8bb262f8d39d718de26608b02fd9dd6f1f14238e089bf9f7b0acd5b4f25c021d98d372cc57b6bcc35ea18db7a02d21cb3a8159bcb1d4bb44f0598225e
+    openapi-types: ^12.0.0
+  checksum: b9c151a32b6920895aea22bf3a6bbf357014bae5e64e7ab09de95248f50ea50d3639571b033d51969751fa58c84db1bf87746c576dbf8180b304b70e93586d26
   languageName: node
   linkType: hard
 
-"openapi-types@npm:^11.0.1":
-  version: 11.0.1
-  resolution: "openapi-types@npm:11.0.1"
-  checksum: 182c5b28199a0d030bf5f64b9c23f65dc800cdc845ae09c40aa5e03b862634a02526d5092af53bf853514af778ee2f36dead741e0521e01f944cf7f50927e14e
+"openapi-types@npm:^12.0.0":
+  version: 12.0.0
+  resolution: "openapi-types@npm:12.0.0"
+  checksum: 8d22cb3727e892ad8f9782210360627f6cde92a53c229407d897f0252543a937aed59bfd7a4bee291b50547d7a4e836290ee35eaebc3978c873c601de9ace5b6
   languageName: node
   linkType: hard
 
