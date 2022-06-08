@@ -12,25 +12,21 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook"]
 
 [dependencies]
+aes = "0.8.1"
+blake2 = "0.10.4"
+chacha20 = "0.9.0"
 digest = "0.10.3"
-blake2 = { version = "0.10.4", default-features = false }
-sha2 = "0.10.2"
+elliptic-curve = "0.12.0"
+getrandom = { version = "0.2.6", features = ["js"] }
 hkdf = "0.12.3"
 hmac = "0.12.1"
-getrandom = { version = "0.2.6", features = ["js"] }
-group = "0.12.0"
-elliptic-curve = "0.12.0"
-k256 = { version = "0.11.2", features = ["arithmetic"] }
+js-sys = "0.3.57"
+k256 = { version = "0.11.2", features = ["arithmetic", "ecdh"] }
+sha3 = "0.10.1"
 
 wasm-bindgen = "0.2.80"
 
 console_error_panic_hook = { version = "0.1.6", optional = true }
-
-# `wee_alloc` is a tiny allocator for wasm that is only ~1K in code size
-# compared to the default allocator's ~10K. It is slower than the default
-# allocator, however.
-#
-# Unfortunately, `wee_alloc` requires nightly Rust when targeting wasm for now.
 wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
