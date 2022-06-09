@@ -32,3 +32,21 @@ pub fn derive_commitment_seed(private_key: &[u8], channel_info: &[u8]) -> Result
 
     Ok(Vec::<u8>::from_iter(mac_value.into_iter()).into_boxed_slice())
 }
+
+#[cfg(test)]
+mod tests {
+
+    use wasm_bindgen_test::*;
+    use super::*;
+
+    #[wasm_bindgen_test]
+    fn test_derive_commitment_seed() {
+
+        let priv_key = [0u8; constants::SECRET_KEY_LENGTH];
+        let chinfo = [0u8; constants::SECRET_KEY_LENGTH];
+
+        let res = derive_commitment_seed(&priv_key, &chinfo);
+
+        assert_eq!(false, res.is_err());
+    }
+}

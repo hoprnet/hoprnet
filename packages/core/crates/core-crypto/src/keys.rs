@@ -31,12 +31,12 @@ fn extract_key_from_group_element(group_element: &PublicKey<Secp256k1>, salt: &[
     out.to_vec().into_boxed_slice()
 }
 
-fn full_kdf(group_element: &PublicKey<Secp256k1>, pub_key: &[u8]) -> Box<[u8]> {
+fn full_kdf(group_element: &PublicKey<Secp256k1>, salt: &[u8]) -> Box<[u8]> {
     // Create the compressed EC point representation first
     let compressed_element = group_element.to_encoded_point(true);
 
     let mut out = [0u8; constants::SECRET_KEY_LENGTH];
-    SimpleHkdf::<Blake2s256>::new(Some(pub_key), compressed_element.as_bytes())
+    SimpleHkdf::<Blake2s256>::new(Some(salt), compressed_element.as_bytes())
         .expand(b"", &mut out)
         .unwrap(); // Cannot panic, unless the constants are wrong
 
@@ -44,7 +44,7 @@ fn full_kdf(group_element: &PublicKey<Secp256k1>, pub_key: &[u8]) -> Box<[u8]> {
 }
 
 #[wasm_bindgen]
-pub fn generate_shared_keys(peer_pubkeys: Vec<js_sys::Uint8Array>) -> SharedKeys {
+pub fn generate_shared_keys(peer_pubkeys: Vec<Uint8Array>) -> SharedKeys {
 
     let mut shared_keys = Vec::new();
 
@@ -53,7 +53,6 @@ pub fn generate_shared_keys(peer_pubkeys: Vec<js_sys::Uint8Array>) -> SharedKeys
 
      for (i, pk) in peer_pubkeys.iter().map(|ppk| ppk.to_vec()).enumerate() {
          // Try to decode the given point
-         //let pk = peer_pubkey.to_vec();
          if let Ok(decoded_point) = EncodedPoint::from_bytes(pk.as_slice())
              .map(|p| PublicKey::from_encoded_point(&p))
              .map(|o: CtOption<PublicKey<Secp256k1>>| Option::<PublicKey<Secp256k1>>::from(o)) // We don't care about constant-time comparison here
@@ -81,5 +80,27 @@ pub fn generate_shared_keys(peer_pubkeys: Vec<js_sys::Uint8Array>) -> SharedKeys
     SharedKeys {
         alpha: Box::new([0u8]),
         secrets: shared_keys.into_boxed_slice()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use wasm_bindgen_test::*;
+    use super::*;
+
+    #[wasm_bindgen_test]
+    fn test_extract_key_from_group_element() {
+
+    }
+
+    #[wasm_bindgen_test]
+    fn test_full_kdf() {
+
+    }
+
+    #[wasm_bindgen_test]
+    fn test_generate_shared_keys() {
+
     }
 }
