@@ -46,7 +46,7 @@ jobs:
         run: yarn
 
       - name: Build
-        run: yarn build
+        run: yarn build; yarn build
 
       - name: Test
         run: yarn test

@@ -54,7 +54,7 @@ jobs:
       - name: Build
         run: |
           yarn
-          yarn build
+          yarn build; yarn build
 
       - name: Install websocat
         run: ./scripts/install-websocat.sh
