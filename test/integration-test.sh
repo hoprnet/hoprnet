@@ -106,7 +106,7 @@ call_api(){
   result=$(${cmd} "${request_body}")
 
   # if an assertion was given and has not been fulfilled, we fail
-  if [ -z "${assertion}" ] || [[ -n  $(echo "${result}" | sed -n "/${assertion}/p") ]]; then
+  if [ -z "${assertion}" ] || [[ -n  $(echo "${result}" | sed -nE "/${assertion}/p") ]]; then
     echo "${result}"
   else
     now=$(node -e "console.log(process.hrtime.bigint().toString());")
@@ -156,9 +156,9 @@ close_channel() {
   log "Node ${source_id} close channel to Node ${destination_id}"
 
   if [ "${close_check}" = "true" ]; then
-    result="$(call_api ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" "Closed\|Channel is already closed" 600)"
+    result="$(call_api ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" 'Closed|Channel is already closed' 600)"
   else
-    result="$(call_api ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" "PendingToClose\|Closed" 20 20)"
+    result="$(call_api ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" 'PendingToClose|Closed' 20 20)"
   fi
 
   log "Node ${source_id} close channel to Node ${destination_id} result -- ${result}"
