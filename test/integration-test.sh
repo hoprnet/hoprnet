@@ -197,7 +197,7 @@ open_channel() {
   local result
 
   log "Node ${source_id} open channel to Node ${destination_id}"
-  result=$(call_api ${source_api} "/channels" "POST" "{\"peerId\": \"${destination_peer_id}\", \"amount\": \"100000000000000000000\"}" "channelId" 600 60)
+  result=$(call_api ${source_api} "/channels" "POST" "{ \"peerId\": \"${destination_peer_id}\", \"amount\": \"100000000000000000000\" }" "channelId" 600 60)
   log "Node ${source_id} open channel to Node ${destination_id} result -- ${result}"
 }
 
@@ -549,19 +549,19 @@ log "Waiting for nodes to finish open channel (long running)"
 wait
 
 # closing temporary channel just to test get all channels later on
-close_channel 1 4 "${api1}" "${addr4}" "outgoing" "true" &
+close_channel 1 4 "${api1}" "${addr4}" "outgoing" "true"
 
 for i in `seq 1 10`; do
-  log "Node 1 send 1 hop message to self via node 2"
-  send_message "${api1}" "${addr1}" 'hello, world' "${addr2}"
+  log "Node 1 send 1 hop message to self via node 2" &
+  send_message "${api1}" "${addr1}" 'hello, world' "${addr2}" & 
 
-  log "Node 2 send 1 hop message to self via node 3"
-  send_message "${api2}" "${addr2}" 'hello, world' "${addr3}"
+  log "Node 2 send 1 hop message to self via node 3" &
+  send_message "${api2}" "${addr2}" 'hello, world' "${addr3}" &
 
-  log "Node 3 send 1 hop message to self via node 4"
-  send_message "${api3}" "${addr3}" 'hello, world' "${addr4}"
+  log "Node 3 send 1 hop message to self via node 4" &
+  send_message "${api3}" "${addr3}" 'hello, world' "${addr4}" &
 
-  log "Node 4 send 1 hop message to self via node 5"
+  log "Node 4 send 1 hop message to self via node 5" &
   send_message "${api4}" "${addr4}" 'hello, world' "${addr5}"
 done
 
@@ -582,16 +582,16 @@ result=$(get_tickets_statistics "${api5}" "\"winProportion\":1")
 log "-- ${result}"
 
 for i in `seq 1 10`; do
-  log "Node 1 send 1 hop message to node 3 via node 2"
-  send_message "${api1}" "${addr3}" 'hello, world' "${addr2}" 
+  log "Node 1 send 1 hop message to node 3 via node 2" &
+  send_message "${api1}" "${addr3}" 'hello, world' "${addr2}" &
 
-  log "Node 2 send 1 hop message to node 4 via node 3"
-  send_message "${api2}" "${addr4}" 'hello, world' "${addr3}" 
+  log "Node 2 send 1 hop message to node 4 via node 3" &
+  send_message "${api2}" "${addr4}" 'hello, world' "${addr3}" &
 
-  log "Node 3 send 1 hop message to node 5 via node 4"
-  send_message "${api3}" "${addr5}" 'hello, world' "${addr4}" 
+  log "Node 3 send 1 hop message to node 5 via node 4" &
+  send_message "${api3}" "${addr5}" 'hello, world' "${addr4}" &
 
-  log "Node 5 send 1 hop message to node 2 via node 1"
+  log "Node 5 send 1 hop message to node 2 via node 1" &
   send_message "${api5}" "${addr2}" 'hello, world' "${addr1}" 
 done
 
@@ -614,7 +614,7 @@ test_redeem_in_specific_channel() {
   peer_id=$(get_hopr_address ${api_token}@${node_api})
   second_peer_id=$(get_hopr_address ${api_token}@${second_node_api})
 
-  open_channel ${node_id} ${second_node_id} ${node_api} ${second_peer_id}
+  open_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_peer_id}"
 
   for i in `seq 1 3`; do
     log "Node ${node_id} send 1 hop message to self via node ${second_node_id}"
@@ -630,7 +630,7 @@ test_redeem_in_specific_channel() {
 
   get_tickets_in_channel ${second_node_api} ${peer_id} "TICKETS_NOT_FOUND"
 
-  close_channel ${node_id} ${second_node_id} ${node_api} ${second_peer_id} "outgoing"
+  close_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_peer_id}" "outgoing"
   echo "all good"
 }
 
@@ -654,18 +654,10 @@ close_channel 5 1 "${api5}" "${addr1}" "outgoing" &
 
 # initiate channel closures for channels without tickets so we can check
 # completeness
-close_channel 1 5 "${api1}" "${addr5}" "outgoing" &
+close_channel 1 5 "${api1}" "${addr5}" "outgoing" "true" &
 
 log "Waiting for nodes to finish handling close channels calls"
 wait
-
-# Also add confirmation time
-log "Waiting 30 seconds for cool-off period"
-sleep 30
-
-# verify channel has been closed
-close_channel 1 5 "${api1}" "${addr5}" "outgoing" "true"
-
 test_get_all_channels() {
   local node_api=${1}
 
