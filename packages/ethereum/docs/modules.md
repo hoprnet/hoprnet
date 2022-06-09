@@ -22,6 +22,7 @@
 - [HoprWhitehat](interfaces/HoprWhitehat.md)
 - [TypedEvent](interfaces/TypedEvent.md)
 - [TypedEventFilter](interfaces/TypedEventFilter.md)
+- [xHoprToken](interfaces/xHoprToken.md)
 
 ### Type aliases
 
@@ -53,7 +54,7 @@
 
 #### Defined in
 
-[packages/ethereum/src/index.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L30)
+[packages/ethereum/src/index.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L32)
 
 ___
 
@@ -63,7 +64,7 @@ ___
 
 #### Defined in
 
-[packages/ethereum/src/index.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L18)
+[packages/ethereum/src/index.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L20)
 
 ___
 
@@ -130,4 +131,4 @@ ___
 
 #### Defined in
 
-[packages/ethereum/src/index.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L37)
+[packages/ethereum/src/index.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L39)
