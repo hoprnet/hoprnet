@@ -590,7 +590,7 @@ test_redeem_in_specific_channel() {
   peer_id=$(get_hopr_address ${api_token}@${node_api})
   second_peer_id=$(get_hopr_address ${api_token}@${second_node_api})
 
-  open_channel ${node_id} ${second_node_id} ${node_api} ${second_peer_id}
+  open_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_peer_id}"
 
   for i in `seq 1 3`; do
     log "Node ${node_id} send 1 hop message to self via node ${second_node_id}"
@@ -606,7 +606,7 @@ test_redeem_in_specific_channel() {
 
   get_tickets_in_channel ${second_node_api} ${peer_id} "TICKETS_NOT_FOUND"
 
-  close_channel ${node_id} ${second_node_id} ${node_api} ${second_peer_id} "outgoing"
+  close_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_peer_id}" "outgoing"
   echo "all good"
 }
 
