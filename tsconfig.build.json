@@ -12,7 +12,6 @@
     { "path": "packages/cover-traffic-daemon" },
     { "path": "packages/cover-traffic-daemon/tsconfig.spec.json" },
     { "path": "packages/ethereum" },
-    { "path": "packages/ethereum/tsconfig.spec.json" },
     { "path": "packages/real" },
     { "path": "packages/hoprd" },
     { "path": "packages/utils" },
