@@ -23,7 +23,7 @@
     "clean:wasm": "make -C crates clean",
     "build:wasm": "make -C crates all && make -C crates install",
     "test:wasm": "make -C crates test",
-    "clean": "yarn clean:wasm && rimraf ./lib ./tsconfig.tsbuildinfo ./tests/tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
+    "clean": "yarn clean:wasm && rimraf ./lib ./tsconfig.tsbuildinfo ./tests/tsconfig.tsbuildinfo",
     "build": "yarn clean && yarn build:wasm && tsc -p .",
     "test": "yarn test:wasm && mocha --parallel --full-trace",
     "prepublishOnly": "yarn clean && yarn build:wasm && tsc -p ./tsconfig.npm.json"

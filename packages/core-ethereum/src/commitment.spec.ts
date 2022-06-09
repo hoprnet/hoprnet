@@ -5,7 +5,7 @@ import { Hash, HoprDB, privKeyToPeerId, stringToU8a, UINT256 } from '@hoprnet/ho
 import PeerId from 'peer-id'
 
 describe('commitment', function () {
-  let fakeSet, fakeGet, fakeDB
+  let fakeSet: any, fakeGet: any, fakeDB: any
   let fakeKey: PeerId
   let fakeCommInfo: ChannelCommitmentInfo
   beforeEach(async function () {
