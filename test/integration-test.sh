@@ -672,7 +672,7 @@ test_get_all_channels() {
   echo "Get all channels successfull"
 }
 
-test_get_all_channels ${api1}
+test_get_all_channels "${api1}"
 
 # NOTE: strategy testing will require separate setup so commented out for now until moved
 # test_strategy_setting() {
