@@ -33,7 +33,6 @@ jobs:
 
       - name: Build
         run: 
-          yarn build || true
           yarn build
 
       - name: Test

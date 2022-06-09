@@ -13,7 +13,7 @@
     "docs/hopr-documentation"
   ],
   "scripts": {
-    "build": "yarn workspaces foreach -pt run build:wasm && tsc --build packages/utils/tsconfig.json && yarn workspace @hoprnet/hopr-ethereum run build:sol:types && echo \"Building Typescript files\" && tsc --build tsconfig.build.json && yarn workspace @hoprnet/hoprd run buildAdmin",
+    "build": "./build.sh",
     "build:core": "yarn workspace @hoprnet/hopr-core run build",
     "build:core:all": "yarn workspaces foreach -ptv --include @hoprnet/hopr-core --include @hoprnet/hopr-core-ethereum run build",
     "build:hoprd": "yarn workspace @hoprnet/hoprd run build",

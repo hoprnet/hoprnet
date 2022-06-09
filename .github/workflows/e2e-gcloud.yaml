@@ -41,7 +41,6 @@ jobs:
       - name: Build
         run: |
           yarn
-          yarn build || true
           yarn build
 
       - name: Install websocat
