@@ -1,7 +1,7 @@
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
 
-export const GET: Operation = [
+const GET: Operation = [
   (req, res, _next) => {
     try {
       const version = req.context.node.getVersion()
@@ -48,3 +48,5 @@ GET.apiDoc = {
     }
   }
 }
+
+export default { GET }

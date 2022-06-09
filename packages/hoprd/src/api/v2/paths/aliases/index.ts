@@ -29,7 +29,7 @@ export const getAliases = (state: Readonly<State>): { [alias: string]: string } 
   }, {})
 }
 
-export const GET: Operation = [
+const GET: Operation = [
   async (req, res, _next) => {
     const { stateOps } = req.context
 
@@ -85,7 +85,7 @@ GET.apiDoc = {
   }
 }
 
-export const POST: Operation = [
+const POST: Operation = [
   async (req, res, _next) => {
     const { stateOps } = req.context
     const { peerId, alias } = req.body
@@ -158,3 +158,5 @@ POST.apiDoc = {
     }
   }
 }
+
+export default { GET, POST }

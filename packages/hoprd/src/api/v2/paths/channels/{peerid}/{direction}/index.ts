@@ -1,8 +1,8 @@
 import type { default as Hopr } from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 import PeerId from 'peer-id'
-import { STATUS_CODES } from '../../../utils.js'
-import { ChannelInfo, formatIncomingChannel, formatOutgoingChannel } from '../index.js'
+import { STATUS_CODES } from '../../../../utils.js'
+import { ChannelInfo, formatIncomingChannel, formatOutgoingChannel } from '../../index.js'
 import { channelStatusToString, ChannelStatus } from '@hoprnet/hopr-utils'
 
 /**
@@ -25,25 +25,27 @@ export const closeChannel = async (node: Hopr, peerIdStr: string, direction: Cha
   }
 }
 
-export const DELETE: Operation = [
+const DELETE: Operation = [
   async (req, res, _next) => {
+    const { node } = req.context
+    const { peerid, direction } = req.params
+
+    if (!['incoming', 'outgoing'].includes(direction)) {
+      return res
+        .status(404)
+        .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: 'Method not supported. Use "incoming" or "outgoing"' })
+    }
+
     try {
-      const { node } = req.context
-      const { peerid, direction } = req.params
-
-      try {
-        const { receipt, channelStatus } = await closeChannel(node, peerid, direction as any)
-        return res.status(200).send({ receipt, channelStatus: channelStatusToString(channelStatus) })
-      } catch (err) {
-        const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
-
-        if (errString.match(/Channel is already closed/)) {
-          return res.status(200).send({ channelStatus: channelStatusToString(ChannelStatus.Closed) })
-        }
-        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: errString })
-      }
+      const { receipt, channelStatus } = await closeChannel(node, peerid, direction as any)
+      return res.status(200).send({ receipt, channelStatus: channelStatusToString(channelStatus) })
     } catch (err) {
-      console.log(`DELETE error`, err)
+      const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
+
+      if (errString.match(/Channel is already closed/)) {
+        return res.status(200).send({ channelStatus: channelStatusToString(ChannelStatus.Closed) })
+      }
+      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: errString })
     }
   }
 ]
@@ -153,10 +155,16 @@ export const getChannel = async (
   }
 }
 
-export const GET: Operation = [
+const GET: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
     const { peerid, direction } = req.params
+
+    if (!['incoming', 'outgoing'].includes(direction)) {
+      return res
+        .status(404)
+        .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: 'Method not supported. Use "incoming" or "outgoing"' })
+    }
 
     try {
       const channel = await getChannel(node, peerid, direction as any)
@@ -257,3 +265,5 @@ GET.apiDoc = {
     }
   }
 }
+
+export default { DELETE, GET }

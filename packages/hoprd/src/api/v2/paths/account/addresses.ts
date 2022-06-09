@@ -20,7 +20,7 @@ export const getAddresses = (
   }
 }
 
-export const GET: Operation = [
+const GET: Operation = [
   (req, res, _next) => {
     const { node } = req.context
 
@@ -102,3 +102,5 @@ GET.apiDoc = {
     }
   }
 }
+
+export default { GET }

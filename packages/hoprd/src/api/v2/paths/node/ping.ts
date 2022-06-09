@@ -34,7 +34,7 @@ export const ping = async ({ node, peerId }: { node: Hopr; peerId: string }) => 
   throw Error(STATUS_CODES.TIMEOUT)
 }
 
-export const POST: Operation = [
+const POST: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
     const { peerId } = req.body
@@ -120,3 +120,5 @@ POST.apiDoc = {
     }
   }
 }
+
+export default { POST }

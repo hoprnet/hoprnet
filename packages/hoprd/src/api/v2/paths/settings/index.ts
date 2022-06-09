@@ -6,7 +6,7 @@ export const getSettings = (state: State) => {
   return state.settings
 }
 
-export const GET: Operation = [
+const GET: Operation = [
   async (req, res, _next) => {
     const { stateOps } = req.context
 
@@ -53,3 +53,5 @@ GET.apiDoc = {
     }
   }
 }
+
+export default { GET }

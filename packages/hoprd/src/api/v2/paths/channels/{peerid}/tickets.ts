@@ -9,7 +9,7 @@ export const getTickets = async (node: Hopr, peerId: string) => {
   return tickets.map(formatTicket)
 }
 
-export const GET: Operation = [
+const GET: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
     const { peerid } = req.params
@@ -104,3 +104,5 @@ GET.apiDoc = {
     }
   }
 }
+
+export default { GET }

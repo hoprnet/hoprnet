@@ -40,7 +40,7 @@ export const setSetting = (node: Hopr, stateOps: StateOps, key: keyof State['set
   stateOps.setState(state)
 }
 
-export const PUT: Operation = [
+const PUT: Operation = [
   async (req, res, _next) => {
     const { stateOps, node } = req.context
     const { setting } = req.params
@@ -129,3 +129,5 @@ PUT.apiDoc = {
     }
   }
 }
+
+export default { PUT }

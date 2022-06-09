@@ -14,7 +14,7 @@ export const getBalances = async (node: Hopr) => {
   }
 }
 
-export const GET: Operation = [
+const GET: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
 
@@ -73,3 +73,5 @@ GET.apiDoc = {
     }
   }
 }
+
+export default { GET }

@@ -23,7 +23,7 @@ export const getAlias = (state: Readonly<State>, alias: string): string => {
   return peerId.toB58String()
 }
 
-export const GET: Operation = [
+const GET: Operation = [
   async (req, res, _next) => {
     const { stateOps } = req.context
     const { alias } = req.params
@@ -102,7 +102,7 @@ GET.apiDoc = {
   }
 }
 
-export const DELETE: Operation = [
+const DELETE: Operation = [
   async (req, res, _next) => {
     const { stateOps } = req.context
     const { alias } = req.params
@@ -156,3 +156,5 @@ DELETE.apiDoc = {
     }
   }
 }
+
+export default { GET, DELETE }

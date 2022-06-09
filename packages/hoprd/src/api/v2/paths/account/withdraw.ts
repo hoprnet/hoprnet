@@ -34,7 +34,7 @@ export const withdraw = async (node: Hopr, currency: 'native' | 'hopr', recipien
   return txHash
 }
 
-export const POST: Operation = [
+const POST: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
     const { currency, amount, recipient } = req.body
@@ -140,3 +140,5 @@ POST.apiDoc = {
     }
   }
 }
+
+export default { POST }

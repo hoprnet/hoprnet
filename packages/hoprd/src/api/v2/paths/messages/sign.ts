@@ -2,7 +2,7 @@ import type { Operation } from 'express-openapi'
 import { u8aToHex } from '@hoprnet/hopr-utils'
 import { STATUS_CODES } from '../../utils.js'
 
-export const POST: Operation = [
+const POST: Operation = [
   async (req, res, _next) => {
     try {
       const signature = await req.context.node.signMessage(new TextEncoder().encode(req.body.message))
@@ -69,3 +69,5 @@ POST.apiDoc = {
     }
   }
 }
+
+export default { POST }

@@ -4,7 +4,7 @@ import { PublicKey } from '@hoprnet/hopr-utils'
 import { encodeMessage } from '../../../../commands/utils/index.js'
 import { STATUS_CODES } from '../../utils.js'
 
-export const POST: Operation = [
+const POST: Operation = [
   async (req, res, _next) => {
     const message = encodeMessage(req.body.body)
     const recipient: PeerId = PeerId.createFromB58String(req.body.recipient)
@@ -88,3 +88,5 @@ POST.apiDoc = {
     }
   }
 }
+
+export default { POST }

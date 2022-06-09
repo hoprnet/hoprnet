@@ -21,7 +21,7 @@ export const getAllTickets = async (node: Hopr) => {
   return tickets.map(formatTicket)
 }
 
-export const GET: Operation = [
+const GET: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
 
@@ -72,3 +72,5 @@ GET.apiDoc = {
     }
   }
 }
+
+export default { GET }

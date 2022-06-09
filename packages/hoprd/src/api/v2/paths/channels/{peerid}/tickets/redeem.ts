@@ -2,7 +2,7 @@ import type { Operation } from 'express-openapi'
 import PeerId from 'peer-id'
 import { STATUS_CODES } from '../../../../utils.js'
 
-export const POST: Operation = [
+const POST: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
     const { peerid } = req.params
@@ -90,3 +90,5 @@ POST.apiDoc = {
     }
   }
 }
+
+export default { POST }

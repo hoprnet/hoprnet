@@ -93,7 +93,7 @@ export const getPeers = async (
   }
 }
 
-export const GET: Operation = [
+const GET: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
     const quality = parseFloat(String(req.query.quality ?? 0))
@@ -228,3 +228,5 @@ GET.apiDoc = {
     }
   }
 }
+
+export default { GET }

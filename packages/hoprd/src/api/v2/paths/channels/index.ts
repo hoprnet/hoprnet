@@ -52,7 +52,7 @@ export const getChannels = async (node: Hopr, includingClosed: boolean) => {
   return { incoming: channelsFrom, outgoing: channelsTo }
 }
 
-export const GET: Operation = [
+const GET: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
     const { includingClosed } = req.query
@@ -165,7 +165,7 @@ export const openChannel = async (node: Hopr, counterpartyStr: string, amountStr
   }
 }
 
-export const POST: Operation = [
+const POST: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
     const { peerId, amount } = req.body
@@ -312,3 +312,5 @@ POST.apiDoc = {
     }
   }
 }
+
+export default { POST, GET }

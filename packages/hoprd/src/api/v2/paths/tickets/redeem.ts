@@ -1,7 +1,7 @@
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
 
-export const POST: Operation = [
+const POST: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
 
@@ -42,3 +42,5 @@ POST.apiDoc = {
     }
   }
 }
+
+export default { POST }
