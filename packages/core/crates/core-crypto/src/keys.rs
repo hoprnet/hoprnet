@@ -72,7 +72,7 @@ impl SharedKeys {
 
     /// Get the `alpha` value of the derived shared secrets.
     pub fn get_alpha(&self) -> Uint8Array {
-        Uint8Array::from(self.alpha.as_slice())
+        self.alpha.as_slice().into()
     }
 
     /// Gets the shared secret of the peer on the given index.
@@ -80,7 +80,7 @@ impl SharedKeys {
     /// [`generate`] function.
     pub fn get_peer_shared_key(&self, peer_idx: usize) -> Option<Uint8Array> {
         if peer_idx < self.secrets.len() {
-            Some(Uint8Array::from(self.secrets[peer_idx].as_slice()))
+            Some(self.secrets[peer_idx].as_slice().into())
         }
         else {
             None
@@ -135,7 +135,7 @@ impl SharedKeys {
         // Compress alpha
         let alpha_comp = alpha_prev.to_encoded_point(true);
         Ok(SharedKeys {
-            alpha: Vec::from(alpha_comp.as_bytes()) ,
+            alpha: alpha_comp.as_bytes().into(),
             secrets: shared_keys
         })
     }
@@ -154,7 +154,7 @@ impl SharedKeys {
         let alpha_new = (alpha_proj * b_k_checked.as_ref()).to_affine().to_encoded_point(true);
 
         Ok(SharedKeys {
-            alpha: Vec::from(alpha_new.as_bytes()),
+            alpha: alpha_new.as_bytes().into(),
             secrets: vec![secret.to_vec()]
         })
     }
@@ -163,6 +163,10 @@ impl SharedKeys {
 #[cfg(test)]
 mod tests {
 
+    use elliptic_curve::PublicKey;
+    use js_sys::Uint16Array;
+    use k256::ecdh::EphemeralSecret;
+    use k256::{EncodedPoint, Secp256k1};
     use wasm_bindgen_test::*;
     use super::*;
 
@@ -177,12 +181,51 @@ mod tests {
     }
 
     #[wasm_bindgen_test]
-    fn test_generate_shared_keys() {
+    fn test_shared_keys() {
 
+        /*
+         const { alpha, secrets } = generateKeyShares(keyPairs)
+
+    for (let i = 0; i < AMOUNT; i++) {
+      const { alpha: tmpAlpha, secret } = forwardTransform(alpha, keyPairs[i])
+
+      assert(u8aEquals(secret, secrets[i]))
+
+      alpha.set(tmpAlpha)
     }
+         */
 
-    #[wasm_bindgen_test]
-    fn test_forward_transform() {
+
+        const COUNT_KEYPAIRS: usize = 3;
+
+        let (priv_keys, pub_keys): (Vec<Uint8Array>, Vec<Uint8Array>) = (0..COUNT_KEYPAIRS)
+            .map(|i| NonZeroScalar::random(&mut OsRng))
+            .map(|s| (s, k256::ProjectivePoint::GENERATOR * s.as_ref()))
+            .map(|p| (p.0, p.1.to_encoded_point(true)))
+            .map(|p| (p.0.to_bytes(), p.1))
+            .map(|p| (p.0.as_slice().into(), p.1.as_bytes().into()))
+            .unzip();
+
+        let generated_shares = SharedKeys::generate(pub_keys.clone()).unwrap();
+
+        let mut alpha_cpy = generated_shares.alpha.clone();
+
+        for i in 0..COUNT_KEYPAIRS {
+            let priv_key = priv_keys[i].to_vec();
+            let pub_key = pub_keys[i].to_vec();
+
+            let shared_key = SharedKeys::forward_transform(alpha_cpy.as_slice(),
+                                          pub_key.as_slice(),
+                                          priv_key.as_slice())
+                .unwrap();
+
+            let a = shared_key.get_peer_shared_key(0).unwrap().to_vec();
+            let b = generated_shares.get_peer_shared_key(i).unwrap().to_vec();
+
+            assert_eq!(a, b);
+
+            alpha_cpy = shared_key.alpha.clone();
+        }
 
     }
 }
