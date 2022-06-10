@@ -21,6 +21,7 @@ build_ts(){
 }
 
 build_rs() {
+    rustup target add wasm32-unknown-unknown
     cargo build --release --target wasm32-unknown-unknown
     yarn workspaces foreach -p --exclude hoprnet --exclude hopr-docs run build:wasm
 }
