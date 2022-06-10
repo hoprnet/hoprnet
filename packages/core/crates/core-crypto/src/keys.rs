@@ -13,7 +13,7 @@ use k256::{AffinePoint, NonZeroScalar, Secp256k1};
 use hkdf::SimpleHkdf;
 use js_sys::Uint8Array;
 
-use crate::constants;
+use crate::parameters;
 use crate::utils::as_jsvalue;
 
 /// Type for the secret keys with fixed size
@@ -35,7 +35,7 @@ fn expand_key_from_group_element(group_element: &AffinePoint, salt: &[u8]) -> Ke
     // Create the compressed EC point representation first
     let compressed_element = group_element.to_encoded_point(true);
 
-    let mut out = [0u8; constants::SECRET_KEY_LENGTH];
+    let mut out = [0u8; parameters::SECRET_KEY_LENGTH];
     SimpleHkdf::<Blake2s256>::new(Some(salt), compressed_element.as_bytes())
         .expand(b"", &mut out)
         .unwrap(); // Cannot panic, unless the constants are wrong
@@ -172,12 +172,17 @@ mod tests {
     }
 
     #[wasm_bindgen_test]
-    fn test_full_kdf() {
+    fn test_expand_key_from_group_element() {
 
     }
 
     #[wasm_bindgen_test]
     fn test_generate_shared_keys() {
+
+    }
+
+    #[wasm_bindgen_test]
+    fn test_forward_transform() {
 
     }
 }
