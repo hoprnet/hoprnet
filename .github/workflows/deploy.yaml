@@ -49,6 +49,10 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
+      - uses: jetli/wasm-bindgen-action@v0.1.0
+        with:
+          version: '0.2.80'
+
       - name: '[SETUP] Configure Git info'
         run: ./scripts/configure-git-info.sh
 
@@ -364,6 +368,10 @@ jobs:
           registry-url: https://registry.npmjs.org/
           cache: yarn
 
+      - uses: jetli/wasm-bindgen-action@v0.1.0
+        with:
+          version: '0.2.80'
+
       - name: Set up Google Cloud Credentials
         uses: google-github-actions/auth@v0
         with:
@@ -442,6 +450,10 @@ jobs:
           node-version: 16
           registry-url: https://registry.npmjs.org/
           cache: yarn
+
+      - uses: jetli/wasm-bindgen-action@v0.1.0
+        with:
+          version: '0.2.80'
 
       - name: Set up Google Cloud Credentials
         uses: google-github-actions/auth@v0
