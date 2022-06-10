@@ -28,15 +28,21 @@ jobs:
     name: Build / Deploy SCs / Publish NPM
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+
+      - uses: actions-rs/toolchain@v1
+        with: 
+          toolchain: stable
+          target: wasm32-unknown-unknown
+          override: true
 
       - name: '[SETUP] Configure Git info'
         run: ./scripts/configure-git-info.sh
 
       - name: '[SETUP] Use Node.js'
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: 16
           registry-url: https://registry.npmjs.org/
@@ -109,7 +115,7 @@ jobs:
     needs: [build_deploy_sc_npm]
     if: ${{ startsWith(github.ref, 'refs/heads/release/') }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
@@ -141,7 +147,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_deploy_sc_npm]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
@@ -181,7 +187,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_deploy_sc_npm]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
@@ -221,7 +227,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_deploy_sc_npm]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
@@ -261,7 +267,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_deploy_sc_npm,build_hoprd_docker]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
@@ -314,15 +322,21 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_hoprd_docker]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+
+      - uses: actions-rs/toolchain@v1
+        with: 
+          toolchain: stable
+          target: wasm32-unknown-unknown
+          override: true
 
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
 
       - name: Use Node.js 16
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: 16
           registry-url: https://registry.npmjs.org/
@@ -376,15 +390,21 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_hoprd_nat_docker]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+
+      - uses: actions-rs/toolchain@v1
+        with: 
+          toolchain: stable
+          target: wasm32-unknown-unknown
+          override: true
 
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
 
       - name: Use Node.js 16
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: 16
           registry-url: https://registry.npmjs.org/

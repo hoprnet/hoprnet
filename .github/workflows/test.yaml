@@ -20,7 +20,16 @@ jobs:
         rust: ['stable']
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - uses: actions-rs/toolchain@v1
+        with: 
+          toolchain: stable
+          target: wasm32-unknown-unknown
+          override: true
+
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v2
         with:
