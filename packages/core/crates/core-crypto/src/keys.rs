@@ -183,19 +183,6 @@ mod tests {
     #[wasm_bindgen_test]
     fn test_shared_keys() {
 
-        /*
-         const { alpha, secrets } = generateKeyShares(keyPairs)
-
-    for (let i = 0; i < AMOUNT; i++) {
-      const { alpha: tmpAlpha, secret } = forwardTransform(alpha, keyPairs[i])
-
-      assert(u8aEquals(secret, secrets[i]))
-
-      alpha.set(tmpAlpha)
-    }
-         */
-
-
         const COUNT_KEYPAIRS: usize = 3;
 
         let (priv_keys, pub_keys): (Vec<Uint8Array>, Vec<Uint8Array>) = (0..COUNT_KEYPAIRS)
