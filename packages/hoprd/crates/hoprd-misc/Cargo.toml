@@ -24,8 +24,8 @@ serde_json = "1.0"
 # Unfortunately, `wee_alloc` requires nightly Rust when targeting real for now.
 wee_alloc = { version = "0.4.5", optional = true }
 
-[dev-dependencies]
-wasm-bindgen-test = "0.3.13"
+[build-dependencies]
+wasm-pack = "0.10.2"
 
 [profile.release]
 # Tell `rustc` to optimize for small code size.

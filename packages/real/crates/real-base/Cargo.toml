@@ -21,5 +21,5 @@ path = "tests/node.rs"
 wasm-bindgen = "0.2.80"
 wasm-bindgen-test = "0.3.30"
 
-[dev-dependencies]
-wasm-bindgen-test = "0.3.0"
+[build-dependencies]
+wasm-pack = "0.10.2"
