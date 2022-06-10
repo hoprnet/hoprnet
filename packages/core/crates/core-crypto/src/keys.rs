@@ -1,34 +1,26 @@
-
 use std::ops::Mul;
 use blake2::Blake2s256;
 
 use elliptic_curve::{ProjectivePoint, PublicKey};
 use elliptic_curve::rand_core::OsRng;
-use elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
-use elliptic_curve::subtle::CtOption;
+use elliptic_curve::sec1::ToEncodedPoint;
 
 use generic_array::GenericArray;
 use wasm_bindgen::prelude::*;
 
-use k256::{AffinePoint, EncodedPoint, NonZeroScalar, Secp256k1};
+use k256::{AffinePoint, NonZeroScalar, Secp256k1};
 
 use hkdf::SimpleHkdf;
 use js_sys::Uint8Array;
 
 use crate::constants;
+use crate::utils::as_jsvalue;
 
 /// Type for the secret keys with fixed size
 /// The GenericArray<..> is mostly deprecated since Rust 1.51 and it's introduction of const generics,
 /// but we need to use it because elliptic_curves and all RustCrypto crates mostly expose it in their
 /// public interfaces.
 pub type KeyBytes = GenericArray<u8, typenum::U32>;
-
-/// Structure containing shared keys for peers.
-#[wasm_bindgen]
-pub struct SharedKeys {
-    alpha: Box<[u8]>,
-    secrets: Box<[Uint8Array]>
-}
 
 /// Extract a keying material from an EC point using HKDF extract
 fn extract_key_from_group_element(group_element: &AffinePoint, salt: &[u8]) -> KeyBytes {
@@ -52,38 +44,78 @@ fn expand_key_from_group_element(group_element: &AffinePoint, salt: &[u8]) -> Ke
 }
 
 /// Decodes the public key and converts it into an EC point in projective coordinates
-fn decode_public_key_to_point(encoded_public_key: &[u8]) -> Result<ProjectivePoint<Secp256k1>, String> {
-    EncodedPoint::from_bytes(encoded_public_key)
-        .map(|p| PublicKey::from_encoded_point(&p))
-        .map(|o: CtOption<PublicKey<Secp256k1>>| Option::<PublicKey<Secp256k1>>::from(o)) // We don't care about constant-time comparison here
-        .map(|decoded| ProjectivePoint::<Secp256k1>::from(decoded.unwrap()))
-        .map_err(|err| err.to_string())
+fn decode_public_key_to_point(encoded_public_key: &[u8]) -> Result<ProjectivePoint<Secp256k1>, JsValue> {
+    PublicKey::<Secp256k1>::from_sec1_bytes(encoded_public_key)
+        .map(|decoded| ProjectivePoint::<Secp256k1>::from(decoded))
+        .map_err(as_jsvalue)
 }
 
-/// Generates shared keys for all the given public keys of the peers.
+/// Checks if the given key bytes can form a scalar for EC point
+fn to_checked_secret_scalar(secret_scalar: KeyBytes) -> Result<NonZeroScalar, JsValue> {
+    let scalar = NonZeroScalar::from_repr(secret_scalar);
+    match Option::from(scalar) {
+        Some(s) => Ok(s),
+        None => Err(JsValue::from("Invalid secret scalar resulting in EC point in infinity"))
+    }
+}
+
+/// Structure containing shared keys for peers.
+/// The members are exposed only using specialized methods.
 #[wasm_bindgen]
-pub fn generate_shared_keys(peer_pubkeys: Vec<Uint8Array>) -> SharedKeys {
+pub struct SharedKeys {
+    alpha: Vec<u8>,
+    secrets: Vec<Vec<u8>>
+}
 
-    let mut shared_keys = Vec::new();
+#[wasm_bindgen]
+impl SharedKeys {
 
-    // This becomes: x * b_0 * b_1 * b_2 * ...
-    let mut coeff_prev = NonZeroScalar::random(&mut OsRng);
+    /// Get the `alpha` value of the derived shared secrets.
+    pub fn get_alpha(&self) -> Uint8Array {
+        Uint8Array::from(self.alpha.as_slice())
+    }
 
-    // This becomes: x * b_0 * b_1 * b_2 * ... * G
-    // We remain in projective coordinates to save some cycles
-    let mut alpha_prev = k256::ProjectivePoint::GENERATOR * coeff_prev.as_ref();
+    /// Gets the shared secret of the peer on the given index.
+    /// The indices are assigned in the same order as they were given to the
+    /// [`generate`] function.
+    pub fn get_peer_shared_key(&self, peer_idx: usize) -> Option<Uint8Array> {
+        if peer_idx < self.secrets.len() {
+            Some(Uint8Array::from(self.secrets[peer_idx].as_slice()))
+        }
+        else {
+            None
+        }
+    }
 
-    // Iterate through all the given peer public keys
-    for (i, pk) in peer_pubkeys.iter().map(|ppk| ppk.to_vec()).enumerate() {
-        // Try to decode the given point
-        if let Ok(decoded_proj_point) = decode_public_key_to_point(pk.as_slice()) {
+    /// Returns the number of shared keys generated in this structure.
+    pub fn count_shared_keys(&self) -> usize {
+        self.secrets.len()
+    }
+
+    /// Generates shared secrets given the peer public keys array.
+    /// The order of the peer public keys is preserved for resulting shared keys.
+    pub fn generate(peer_pubkeys: Vec<Uint8Array>) -> Result<SharedKeys, JsValue> {
+
+        let mut shared_keys = Vec::new();
+
+        // This becomes: x * b_0 * b_1 * b_2 * ...
+        let mut coeff_prev = NonZeroScalar::random(&mut OsRng);
+
+        // This becomes: x * b_0 * b_1 * b_2 * ... * G
+        // We remain in projective coordinates to save some cycles
+        let mut alpha_prev = k256::ProjectivePoint::GENERATOR * coeff_prev.as_ref();
+
+        // Iterate through all the given peer public keys
+        for (i, pk) in peer_pubkeys.iter().map(|ppk| ppk.to_vec()).enumerate() {
+            // Try to decode the given point
+            let decoded_proj_point = decode_public_key_to_point(pk.as_slice())?;
 
             // Multiply the decoded public key point using the current coefficient
             let shared_secret = (decoded_proj_point * coeff_prev.as_ref()).to_affine();
 
             // Extract the shared secret from the computed EC point and copy it into the shared keys structure
             let shared_pk = extract_key_from_group_element(&shared_secret, pk.as_slice());
-            shared_keys.push(Uint8Array::from(shared_pk.as_ref()));
+            shared_keys.push(shared_pk.to_vec());
 
             // Stop here, we don't need to compute anything more
             if i == peer_pubkeys.len() - 1 {
@@ -93,19 +125,38 @@ pub fn generate_shared_keys(peer_pubkeys: Vec<Uint8Array>) -> SharedKeys {
             // Compute the new blinding factor b_k (alpha needs compressing first)
             let enc_alpha_prev = alpha_prev.to_encoded_point(true);
             let b_k = expand_key_from_group_element(&shared_secret, enc_alpha_prev.as_bytes());
+            let b_k_checked = to_checked_secret_scalar(b_k)?;
 
-            let b_k_checked: NonZeroScalar = Option::from(NonZeroScalar::from_repr(b_k))
-                .expect("Key derivation resulted in an EC point in infinity!"); // Extremely unlikely...
-
-            // Update coeff prev
+            // Update coeff prev and alpha
             coeff_prev = coeff_prev.mul(b_k_checked);
             alpha_prev = alpha_prev * b_k_checked.as_ref();
         }
+
+        // Compress alpha
+        let alpha_comp = alpha_prev.to_encoded_point(true);
+        Ok(SharedKeys {
+            alpha: Vec::from(alpha_comp.as_bytes()) ,
+            secrets: shared_keys
+        })
     }
 
-    SharedKeys {
-        alpha: alpha_prev.to_encoded_point(true).to_bytes(),
-        secrets: shared_keys.into_boxed_slice()
+    pub fn forward_transform(alpha: &[u8], public_key: &[u8], private_key: &[u8]) -> Result<SharedKeys, JsValue> {
+
+        let priv_key = to_checked_secret_scalar(KeyBytes::clone_from_slice(&private_key[0..private_key.len()]))?;
+        let alpha_proj = decode_public_key_to_point(alpha)?;
+
+        let s_k = (alpha_proj * priv_key.as_ref()).to_affine();
+        let secret = extract_key_from_group_element(&s_k, public_key);
+
+        let b_k = expand_key_from_group_element(&s_k, alpha);
+        let b_k_checked = to_checked_secret_scalar(b_k)?;
+
+        let alpha_new = (alpha_proj * b_k_checked.as_ref()).to_affine().to_encoded_point(true);
+
+        Ok(SharedKeys {
+            alpha: Vec::from(alpha_new.as_bytes()),
+            secrets: vec![secret.to_vec()]
+        })
     }
 }
 

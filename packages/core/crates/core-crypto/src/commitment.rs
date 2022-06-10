@@ -1,15 +1,11 @@
-use std::fmt::Display;
 use wasm_bindgen::prelude::*;
 
 use crate::constants;
+use crate::utils::as_jsvalue;
 
 use blake2::Blake2s256;
 use hkdf::SimpleHkdf;
 use hmac::{SimpleHmac, Mac};
-
-fn as_jsvalue<T>(v: T) -> JsValue where T: Display {
-    JsValue::from(v.to_string())
-}
 
 #[wasm_bindgen]
 pub fn derive_commitment_seed(private_key: &[u8], channel_info: &[u8]) -> Result<Box<[u8]>, JsValue> {

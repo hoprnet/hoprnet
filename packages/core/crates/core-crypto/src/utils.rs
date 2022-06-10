@@ -1,3 +1,6 @@
+use std::fmt::Display;
+use wasm_bindgen::JsValue;
+
 pub fn set_panic_hook() {
     // When the `console_error_panic_hook` feature is enabled, we can call the
     // `set_panic_hook` function at least once during initialization, and then
@@ -7,4 +10,8 @@ pub fn set_panic_hook() {
     // https://github.com/rustwasm/console_error_panic_hook#readme
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
+}
+
+pub fn as_jsvalue<T>(v: T) -> JsValue where T: Display {
+    JsValue::from(v.to_string())
 }
