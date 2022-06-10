@@ -43,12 +43,11 @@
     "run:hoprd:charlie": "yarn workspace @hoprnet/hoprd run dev --host=0.0.0.0:9094 --adminPort=3030 --restPort=3031 --data=/tmp/local-charlie --identity=/tmp/local-charly.id",
     "run:faucet:all": "yarn workspace @hoprnet/hopr-ethereum run faucet",
     "docs:generate": "yarn workspaces foreach -pv run docs:generate",
-    "clean": "yarn workspaces foreach --exclude hoprnet --exclude hopr-docs -v run clean && rimraf ./tsconfig.scripts.tsbuildinfo ./tsconfig.build.tsbuildinfo",
+    "clean": "yarn workspaces foreach --exclude hoprnet --exclude hopr-docs -v run clean && rm -Rf ./target ./tsconfig.scripts.tsbuildinfo ./tsconfig.build.tsbuildinfo",
     "reset": "rimraf packages/*/node_modules node_modules"
   },
   "devDependencies": {
     "@ethersproject/cli": "5.5.0",
-    "@wasm-tool/wasm-pack-plugin": "^1.1.0",
     "prettier": "2.6.1",
     "rimraf": "3.0.2",
     "ts-node": "10.7.0",

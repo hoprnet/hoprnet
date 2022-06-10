@@ -5984,18 +5984,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@wasm-tool/wasm-pack-plugin@npm:^1.1.0":
-  version: 1.6.0
-  resolution: "@wasm-tool/wasm-pack-plugin@npm:1.6.0"
-  dependencies:
-    chalk: ^2.4.1
-    command-exists: ^1.2.7
-    watchpack: ^2.1.1
-    which: ^2.0.2
-  checksum: ae2af8507a83b2994630a1393832ede09ecf86b1986e2506f4ad8c8908875e8b9e40d3fff97b2fbca1835eaf6cbe5a69611643d613dea961b1279122db60a0ec
-  languageName: node
-  linkType: hard
-
 "@webassemblyjs/ast@npm:1.11.1":
   version: 1.11.1
   resolution: "@webassemblyjs/ast@npm:1.11.1"
@@ -9342,7 +9330,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"command-exists@npm:^1.2.7, command-exists@npm:^1.2.8":
+"command-exists@npm:^1.2.8":
   version: 1.2.9
   resolution: "command-exists@npm:1.2.9"
   checksum: 729ae3d88a2058c93c58840f30341b7f82688a573019535d198b57a4d8cb0135ced0ad7f52b591e5b28a90feb2c675080ce916e56254a0f7c15cb2395277cac3
@@ -14635,7 +14623,6 @@ __metadata:
   resolution: "hoprnet@workspace:."
   dependencies:
     "@ethersproject/cli": 5.5.0
-    "@wasm-tool/wasm-pack-plugin": ^1.1.0
     prettier: 2.6.1
     rimraf: 3.0.2
     ts-node: 10.7.0
@@ -26913,7 +26900,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"watchpack@npm:^2.1.1, watchpack@npm:^2.3.1":
+"watchpack@npm:^2.3.1":
   version: 2.3.1
   resolution: "watchpack@npm:2.3.1"
   dependencies:

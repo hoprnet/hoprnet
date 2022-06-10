@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 
+# prevent sourcing of this script, only allow execution
+$(return >/dev/null 2>&1)
+test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
+
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
 
+declare mydir
+mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+
 build_ts_utils() {
-    yarn workspace @hoprnet/hopr-utils run build
+    tsc -p ${mydir}/packages/utils/tsconfig.json
 }
 
 build_ts(){
@@ -14,9 +21,11 @@ build_ts(){
 }
 
 build_rs() {
+    cargo build --release --target wasm32-unknown-unknown
     yarn workspaces foreach -p --exclude hoprnet --exclude hopr-docs run build:wasm
 }
 
+# First build hopr-utils package because hardhat uses it
 build_ts_utils
-build_ts & build_rs &
-wait
+build_rs
+build_ts
