@@ -20,12 +20,6 @@ jobs:
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
 
-      - name: restore node_modules cache
-        uses: actions/cache@v3
-        with:
-          path: '**/node_modules'
-          key: node_modules-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
-
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
