@@ -53,6 +53,10 @@ jobs:
         with:
           version: '0.2.80'
 
+      - uses: jetli/wasm-pack-action@v0.3.0
+        with:
+          version: '0.10.2'
+
       - name: '[SETUP] Configure Git info'
         run: ./scripts/configure-git-info.sh
 
@@ -372,6 +376,10 @@ jobs:
         with:
           version: '0.2.80'
 
+      - uses: jetli/wasm-pack-action@v0.3.0
+        with:
+          version: '0.10.2'
+
       - name: Set up Google Cloud Credentials
         uses: google-github-actions/auth@v0
         with:
@@ -454,6 +462,10 @@ jobs:
       - uses: jetli/wasm-bindgen-action@v0.1.0
         with:
           version: '0.2.80'
+
+      - uses: jetli/wasm-pack-action@v0.3.0
+        with:
+          version: '0.10.2'
 
       - name: Set up Google Cloud Credentials
         uses: google-github-actions/auth@v0
