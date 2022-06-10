@@ -32,12 +32,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: restore node_modules cache
-        uses: actions/cache@v3
-        with:
-          path: '**/node_modules'
-          key: node_modules-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
-
       - name: restore cargo cache
         uses: actions/cache@v3
         with:
@@ -48,14 +42,6 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      # - uses: jetli/wasm-bindgen-action@v0.1.0
-      #   with:
-      #     version: '0.2.80'
-
-      # - uses: jetli/wasm-pack-action@v0.3.0
-      #   with:
-      #     version: 'latest'
 
       - name: '[SETUP] Configure Git info'
         run: ./scripts/configure-git-info.sh
@@ -345,12 +331,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: restore node_modules cache
-        uses: actions/cache@v3
-        with:
-          path: '**/node_modules'
-          key: node_modules-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
-
       - name: restore cargo cache
         uses: actions/cache@v3
         with:
@@ -371,14 +351,6 @@ jobs:
           node-version: 16
           registry-url: https://registry.npmjs.org/
           cache: yarn
-
-      # - uses: jetli/wasm-bindgen-action@v0.1.0
-      #   with:
-      #     version: '0.2.80'
-
-      # - uses: jetli/wasm-pack-action@v0.3.0
-      #   with:
-      #     version: 'latest'
 
       - name: Set up Google Cloud Credentials
         uses: google-github-actions/auth@v0
@@ -432,12 +404,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: restore node_modules cache
-        uses: actions/cache@v3
-        with:
-          path: '**/node_modules'
-          key: node_modules-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
-
       - name: restore cargo cache
         uses: actions/cache@v3
         with:
@@ -458,14 +424,6 @@ jobs:
           node-version: 16
           registry-url: https://registry.npmjs.org/
           cache: yarn
-
-      # - uses: jetli/wasm-bindgen-action@v0.1.0
-      #   with:
-      #     version: '0.2.80'
-
-      # - uses: jetli/wasm-pack-action@v0.3.0
-      #   with:
-      #     version: 'latest'
 
       - name: Set up Google Cloud Credentials
         uses: google-github-actions/auth@v0
