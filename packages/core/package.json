@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "1.89.0-next.20",
+  "version": "1.89.0-next.21",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -18,9 +18,9 @@
   "type": "commonjs",
   "scripts": {
     "clean:wasm": "make -C crates clean",
-    "build:wasm": "make -C crates all && make -C crates install",
+    "build:wasm": "make -s -C crates all && make -s -C crates install",
     "test:wasm": "make -C crates test",
-    "clean": "yarn clean:wasm && rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
+    "clean": "yarn clean:wasm && rimraf ./lib ./tsconfig.tsbuildinfo",
     "coverage": "nyc --reporter=html mocha",
     "build": "yarn clean && yarn build:wasm && tsc -p .",
     "test": "yarn test:wasm && NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",

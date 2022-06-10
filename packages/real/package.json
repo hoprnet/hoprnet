@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-real",
-  "version": "1.89.0-next.19",
+  "version": "1.89.0-next.20",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0-only",
@@ -15,9 +15,9 @@
   },
   "scripts": {
     "clean:wasm": "make -C crates clean",
-    "build:wasm": "make -C crates all && make -C crates install",
+    "build:wasm": "make -s -C crates all && make -s -C crates install",
     "test:wasm": "make -C crates test",
-    "clean": "yarn clean:wasm && rimraf ./lib ./tsconfig.tsbuildinfo",
+    "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo",
     "build": "yarn clean && yarn build:wasm && tsc -p .",
     "test": "yarn test:wasm && NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
     "docs:generate": "typedoc",

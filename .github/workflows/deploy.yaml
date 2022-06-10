@@ -32,22 +32,24 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: restore cargo cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
       - name: '[SETUP] Configure Git info'
         run: ./scripts/configure-git-info.sh
 
-      - uses: actions-rs/toolchain@v1
-        with: 
-          toolchain: stable
-          target: wasm32-unknown-unknown
-          override: true
-
-      - uses: jetli/wasm-pack-action@v0.3.0
+      - name: '[SETUP] Use Node.js'
+        uses: actions/setup-node@v3
         with:
-          version: 'latest'
-
-      - uses: jetli/wasm-bindgen-action@v0.1.0
-        with:
-          version: 'latest'
+          version: '16'
 
       - name: '[SETUP] Use Node.js'
         uses: actions/setup-node@v3
@@ -276,6 +278,8 @@ jobs:
     needs: [build_deploy_sc_npm,build_hoprd_docker]
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
@@ -332,21 +336,24 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: restore cargo cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
 
-      - uses: actions-rs/toolchain@v1
-        with: 
-          toolchain: stable
-          target: wasm32-unknown-unknown
-          override: true
-      - uses: jetli/wasm-pack-action@v0.3.0
+      - name: Use Node.js 16
+        uses: actions/setup-node@v3
         with:
-          version: 'latest'
-
-      - uses: jetli/wasm-bindgen-action@v0.1.0
-        with:
-          version: 'latest'
+          version: '16'
 
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
@@ -407,22 +414,24 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: restore cargo cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
 
-      - uses: actions-rs/toolchain@v1
-        with: 
-          toolchain: stable
-          target: wasm32-unknown-unknown
-          override: true
-
-      - uses: jetli/wasm-pack-action@v0.3.0
+      - name: Use Node.js 16
+        uses: actions/setup-node@v3
         with:
-          version: 'latest'
-
-      - uses: jetli/wasm-bindgen-action@v0.1.0
-        with:
-          version: 'latest'
+          version: '16'
 
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
