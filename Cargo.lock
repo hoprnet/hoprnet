@@ -277,18 +277,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-real"
-version = "0.1.0"
-dependencies = [
- "wasm-bindgen",
- "wasm-bindgen-test",
-]
-
-[[package]]
 name = "hoprd-misc"
 version = "0.1.0"
 dependencies = [
- "hopr-real",
+ "real-base",
  "serde",
  "serde_json",
  "wasm-bindgen",
@@ -400,6 +392,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d34f1408f55294453790c48b2f1ebbb1c5b4b7563eb1f418bcfcfdbb06ebb4e7"
 dependencies = [
  "getrandom",
+]
+
+[[package]]
+name = "real-base"
+version = "0.1.0"
+dependencies = [
+ "wasm-bindgen",
+ "wasm-bindgen-test",
 ]
 
 [[package]]
