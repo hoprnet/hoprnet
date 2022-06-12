@@ -55,6 +55,7 @@ jobs:
           # Deploying smart contracts requires hardhat to be installed
           yarn
           # Deploying with hardhat requires built hopr-utils package
+          yarn build || true
           yarn build
 
       - name: '[SMART-CONTRACTS] Deploy for known environments'
@@ -346,6 +347,7 @@ jobs:
           # need to install tools first which may be used during deployment
           yarn
           # need to build our packages which might by used by the scripts, such as the fund script
+          yarn build || true
           yarn build
 
       - name: Run deploy script for public nodes
@@ -408,6 +410,7 @@ jobs:
           # need to install tools first which may be used during deployment
           yarn
           # need to build our packages which might by used by the scripts, such as the fund script
+          yarn build || true
           yarn build
 
       - name: Run deploy script for nodes behind NAT
