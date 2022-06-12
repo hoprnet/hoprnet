@@ -136,9 +136,9 @@ impl SharedKeys {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dummy_rng;
     use hex_literal::hex;
     use elliptic_curve::group::prime::PrimeCurveAffine;
+    use elliptic_curve::rand_core::OsRng;
 
     #[test]
     fn test_extract_key_from_group_element() {
@@ -166,23 +166,25 @@ mod tests {
 
     #[test]
     fn test_shared_keys() {
+        // DummyRng is useful for deterministic debugging
+        //let mut used_rng = crate::dummy_rng::DummyFixedRng::new();
 
         const COUNT_KEYPAIRS: usize = 3;
+        let mut used_rng = OsRng;
 
-        let mut fixed_rng = dummy_rng::DummyFixedRng::new();
-
+        // Generate some random key pairs
         let (priv_keys, pub_keys): (Vec<Box<[u8]>>, Vec<Box<[u8]>>) = (0..COUNT_KEYPAIRS)
-            .map(|_i| NonZeroScalar::random(&mut fixed_rng))
+            .map(|_i| NonZeroScalar::random(&mut used_rng))
             .map(|s| (s, k256::ProjectivePoint::GENERATOR * s.as_ref()))
             .map(|p| (p.0, p.1.to_encoded_point(true)))
             .map(|p| (p.0.to_bytes(), p.1))
             .map(|p| (Box::from(p.0.as_slice()), Box::from(p.1.as_bytes())))
             .unzip();
 
-        let generated_shares = SharedKeys::generate(&mut fixed_rng,pub_keys.clone()).unwrap();
+        // Now generate the key shares for the public keys
+        let generated_shares = SharedKeys::generate(&mut used_rng, pub_keys.clone()).unwrap();
 
         let mut alpha_cpy = generated_shares.alpha.clone();
-
         for i in 0..COUNT_KEYPAIRS {
             let priv_key = priv_keys[i].to_vec();
             let pub_key = pub_keys[i].to_vec();
@@ -191,10 +193,7 @@ mod tests {
                                                            pub_key.as_slice(),
                                                            priv_key.as_slice()).unwrap();
 
-            let a = &shared_key.secrets[0];
-            let b = &generated_shares.secrets[i];
-
-            assert_eq!(a, b);
+            assert_eq!(&shared_key.secrets[0], &generated_shares.secrets[i]);
 
             alpha_cpy = shared_key.alpha.clone();
         }

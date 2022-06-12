@@ -11,7 +11,7 @@ all: $(JS_FILES)
 	@echo "All WASM modules built successfully"
 
 test: $(JS_FILES)
-	$(foreach pkg,$(PACKAGES),wasm-pack test --node $(pkg))
+	$(foreach pkg,$(PACKAGES),cargo test -p $(pkg) && wasm-pack test --node $(pkg))
 
 $(JS_FILES):
 	@echo "--- Building WASM module to '$(@D)' ... ---"

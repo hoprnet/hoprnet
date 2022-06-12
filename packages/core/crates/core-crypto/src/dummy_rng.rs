@@ -20,7 +20,7 @@ const RNG_BYTES: [u8; 512] = hex!("cc6cb43c4928eea3c31e0d3bfcf8563f85d4bcc771e8e
 
 /// Dummy RNG that cyclically outputs same set of random bytes
 #[derive(Clone, Copy, Debug, Default)]
-pub struct DummyFixedRng {
+pub(crate) struct DummyFixedRng {
     ptr: usize
 }
 
