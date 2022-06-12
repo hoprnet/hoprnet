@@ -19,6 +19,8 @@ use crate::parameters;
 /// public interfaces.
 pub type KeyBytes = GenericArray<u8, typenum::U32>;
 
+// TODO: Define custom error type instead of using String in the Result<>
+
 /// Extract a keying material from an EC point using HKDF extract
 fn extract_key_from_group_element(group_element: &AffinePoint, salt: &[u8]) -> KeyBytes {
     // Create the compressed EC point representation first

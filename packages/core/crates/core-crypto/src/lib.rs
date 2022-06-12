@@ -3,7 +3,7 @@ pub(crate) mod dummy_rng;
 
 pub mod commitment;
 pub mod parameters;
-pub mod keys;
+pub mod shared_keys;
 pub mod primitive;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
