@@ -1,5 +1,5 @@
 mod utils;
-mod dummy_rng;
+pub(crate) mod dummy_rng;
 
 pub mod commitment;
 pub mod parameters;

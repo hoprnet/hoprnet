@@ -2,7 +2,7 @@ use std::ops::Mul;
 use blake2::Blake2s256;
 
 use elliptic_curve::{ProjectivePoint, PublicKey};
-use elliptic_curve::rand_core::OsRng;
+use elliptic_curve::rand_core::{CryptoRng, RngCore};
 use elliptic_curve::sec1::ToEncodedPoint;
 
 use generic_array::GenericArray;
@@ -67,23 +67,23 @@ impl SharedKeys {
 
     /// Generates shared secrets given the peer public keys array.
     /// The order of the peer public keys is preserved for resulting shared keys.
-    pub fn generate(peer_pubkeys: Vec<Box<[u8]>>) -> Result<SharedKeys, String> {
+    /// The specified random number generator will be used.
+    pub fn generate(rng: impl CryptoRng + RngCore, peer_pubkeys: Vec<Box<[u8]>>) -> Result<SharedKeys, String> {
 
         let mut shared_keys = Vec::new();
 
         // This becomes: x * b_0 * b_1 * b_2 * ...
-        let mut coeff_prev = NonZeroScalar::random(&mut OsRng);
+        let mut coeff_prev = NonZeroScalar::random(rng);
 
         // This becomes: x * b_0 * b_1 * b_2 * ... * G
         // We remain in projective coordinates to save some cycles
         let mut alpha_prev = k256::ProjectivePoint::GENERATOR * coeff_prev.as_ref();
+        let alpha = alpha_prev.to_encoded_point(true);
 
         // Iterate through all the given peer public keys
         for (i, pk) in peer_pubkeys.iter().enumerate() {
-            // Try to decode the given point
+            // Try to decode the given public key point & multiply by the current coefficient
             let decoded_proj_point = decode_public_key_to_point(pk)?;
-
-            // Multiply the decoded public key point using the current coefficient
             let shared_secret = (decoded_proj_point * coeff_prev.as_ref()).to_affine();
 
             // Extract the shared secret from the computed EC point and copy it into the shared keys structure
@@ -105,10 +105,8 @@ impl SharedKeys {
             alpha_prev = alpha_prev * b_k_checked.as_ref();
         }
 
-        // Compress alpha
-        let alpha_comp = alpha_prev.to_encoded_point(true);
         Ok(SharedKeys {
-            alpha: alpha_comp.as_bytes().into(),
+            alpha: alpha.as_bytes().into(),
             secrets: shared_keys
         })
     }
@@ -137,18 +135,33 @@ impl SharedKeys {
 /// Unit tests of the Rust code
 #[cfg(test)]
 mod tests {
-
     use super::*;
     use crate::dummy_rng;
+    use hex_literal::hex;
+    use elliptic_curve::group::prime::PrimeCurveAffine;
 
     #[test]
     fn test_extract_key_from_group_element() {
+        let salt = [0xde, 0xad, 0xbe, 0xef ];
+        let pt = AffinePoint::generator();
 
+        let key = extract_key_from_group_element(&pt, &salt);
+        assert_eq!(parameters::SECRET_KEY_LENGTH, key.len());
+
+        let res = hex!("54BF34178075E153F481CE05B113C1530ECC45A2F1F13A3366D4389F65470DE6");
+        assert_eq!(res, key.as_slice());
     }
 
     #[test]
     fn test_expand_key_from_group_element() {
+        let salt = [0xde, 0xad, 0xbe, 0xef ];
+        let pt = AffinePoint::generator();
 
+        let key = expand_key_from_group_element(&pt, &salt);
+        assert_eq!(parameters::SECRET_KEY_LENGTH, key.len());
+
+        let res = hex!("D138D9367474911F7124B95BE844D2F8A6D34E962694E37E8717BDBD3C15690B");
+        assert_eq!(res, key.as_slice());
     }
 
     #[test]
@@ -156,15 +169,17 @@ mod tests {
 
         const COUNT_KEYPAIRS: usize = 3;
 
+        let mut fixed_rng = dummy_rng::DummyFixedRng::new();
+
         let (priv_keys, pub_keys): (Vec<Box<[u8]>>, Vec<Box<[u8]>>) = (0..COUNT_KEYPAIRS)
-            .map(|_i| NonZeroScalar::random(&mut dummy_rng::DummyFixedRng::new()))
+            .map(|_i| NonZeroScalar::random(&mut fixed_rng))
             .map(|s| (s, k256::ProjectivePoint::GENERATOR * s.as_ref()))
             .map(|p| (p.0, p.1.to_encoded_point(true)))
             .map(|p| (p.0.to_bytes(), p.1))
             .map(|p| (Box::from(p.0.as_slice()), Box::from(p.1.as_bytes())))
             .unzip();
 
-        let generated_shares = SharedKeys::generate(pub_keys.clone()).unwrap();
+        let generated_shares = SharedKeys::generate(&mut fixed_rng,pub_keys.clone()).unwrap();
 
         let mut alpha_cpy = generated_shares.alpha.clone();
 
@@ -192,9 +207,9 @@ mod tests {
 /// Code in this module does not need to be unit tested, as it already
 /// wraps code that has been unit tested in pure Rust.
 pub mod wasm {
-
+    use elliptic_curve::rand_core::OsRng;
     use wasm_bindgen::prelude::*;
-    use js_sys::{Uint16Array, Uint8Array};
+    use js_sys::Uint8Array;
     use crate::utils::as_jsvalue;
 
     #[wasm_bindgen]
@@ -233,7 +248,7 @@ pub mod wasm {
         }
 
         pub fn generate(peer_pubkeys: Vec<Uint8Array>) -> Result<SharedKeys, JsValue> {
-            super::SharedKeys::generate(peer_pubkeys.iter().map(|v| v.to_vec().into_boxed_slice()).collect())
+            super::SharedKeys::generate(&mut OsRng, peer_pubkeys.iter().map(|v| v.to_vec().into_boxed_slice()).collect())
                 .map(|m| SharedKeys { w: m})
                 .map_err(as_jsvalue)
         }
