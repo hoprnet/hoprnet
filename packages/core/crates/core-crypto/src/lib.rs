@@ -1,4 +1,5 @@
 mod utils;
+mod dummy_rng;
 
 pub mod commitment;
 pub mod parameters;
