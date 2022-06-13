@@ -93,7 +93,7 @@ cd hoprnet-release-lisbon
    to install and build the required packages and project modules. Ideally you will also have basic development toolsets[^2] set up on your computer. Please bear in mind that this process will take at least 5-10 minutes depending on your computer.
 
 ```bash
-yarn && yarn build
+make deps build
 ```
 
 3. **Run the one-line setup script**: Run the following script:

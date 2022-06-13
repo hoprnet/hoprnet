@@ -17,7 +17,7 @@
     "clean:wasm": "make -C crates clean",
     "build:wasm": "make -C crates all && make -C crates install",
     "test:wasm": "make -C crates test",
-    "clean": "yarn clean:wasm && rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
+    "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo",
     "build": "yarn clean && yarn build:wasm && tsc -p .",
     "test": "yarn test:wasm && NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
     "docs:generate": "typedoc",
@@ -25,7 +25,6 @@
   },
   "devDependencies": {
     "mocha": "9.2.2",
-    "rimraf": "^3.0.0",
     "typedoc": "0.22.13",
     "typedoc-plugin-markdown": "3.11.14"
   },

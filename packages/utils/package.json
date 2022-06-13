@@ -12,7 +12,7 @@
     "clean:wasm": "make -C crates clean",
     "build:wasm": "make -C crates all && make -C crates install",
     "test:wasm": "make -C crates test",
-    "clean": "yarn clean:wasm && rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
+    "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo",
     "test": "yarn test:wasm && mocha --parallel",
     "dev": "yarn clean && yarn build:wasm && tsc -w",
     "build": "yarn clean && yarn build:wasm && tsc -p .",
@@ -60,7 +60,6 @@
     "libp2p-tcp": "0.17.2",
     "mocha": "9.2.2",
     "rewiremock": "3.14.3",
-    "rimraf": "3.0.2",
     "sinon": "12.0.1",
     "typedoc": "0.22.13",
     "typedoc-plugin-markdown": "3.11.14"
