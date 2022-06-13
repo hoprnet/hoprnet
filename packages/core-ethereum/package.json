@@ -12,7 +12,7 @@
     "clean:wasm": "make -C crates clean",
     "build:wasm": "make -s -C crates all && make -s -C crates install",
     "test:wasm": "make -C crates test",
-    "clean": "yarn clean:wasm && rimraf ./lib ./tsconfig.tsbuildinfo",
+    "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo",
     "coverage": "nyc --reporter=html mocha",
     "test": "yarn test:wasm && NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
     "dev": "yarn clean && yarn build:wasm && tsc -w",
@@ -47,7 +47,6 @@
     "chai-as-promised": "7.1.1",
     "mocha": "9.2.2",
     "nyc": "15.1.0",
-    "rimraf": "3.0.2",
     "sinon": "12.0.1",
     "typedoc": "0.22.13",
     "typedoc-plugin-markdown": "3.11.14"
