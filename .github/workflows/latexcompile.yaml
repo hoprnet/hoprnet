@@ -30,8 +30,7 @@ jobs:
           texlive-bibtex-extra latexmk
 
       - name: Compile LaTeX document
-        run: |
-          make -C docs/yellowpaper/
+        run: make build-yellowpaper
 
       - name: Commit & Push changes
         run: ./scripts/commit-and-push-all-changes.sh

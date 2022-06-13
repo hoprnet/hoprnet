@@ -5,6 +5,7 @@ all: help
 .PHONY: deps
 deps: ## install dependencies
 	yarn
+	command -v rustup && rustup update || echo "No rustup installed, ignoring"
 
 .PHONY: build
 build: ## build all packages
@@ -23,9 +24,12 @@ build-yarn-utils: ## build yarn package 'hopr-utils' only
 .PHONY: build-cargo
 build-cargo: ## build cargo packages
 build-cargo: build-yarn-utils
-	rustup target add wasm32-unknown-unknown
 	cargo build --release --target wasm32-unknown-unknown
 	yarn workspaces foreach -p --exclude hoprnet --exclude hopr-docs run build:wasm
+
+.PHONY: build-yellowpaper
+build-yellowpaper: ## build the yellowpaper ind docs/yellowpaper
+	make -C docs/yellowpaper
 
 .PHONY: help
 help:

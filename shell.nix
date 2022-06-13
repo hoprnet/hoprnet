@@ -1,4 +1,4 @@
-{ pkgs ? import <nixpkgs> {}, ... }:
+{ pkgs ? import <nixpkgs> { }, ... }:
 let
   linuxPkgs = with pkgs; lib.optional stdenv.isLinux (
     inotifyTools
@@ -22,7 +22,7 @@ mkShell {
     (yarn.override { nodejs = nodejs-16_x; }) # v1.22.10
 
     ## rust for core development
-    rust-bin.fromRustupToolchainFile ./rust-toolchain.toml
+    (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
 
     ## python is required by node module bcrypto
     python3

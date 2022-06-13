@@ -30,7 +30,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: restore cargo cache
         uses: actions/cache@v3
         with:
@@ -50,9 +50,7 @@ jobs:
           cache: yarn
 
       - name: Build
-        run: |
-          yarn
-          yarn build
+        run: make deps builds
 
       - name: Install websocat
         run: ./scripts/install-websocat.sh
