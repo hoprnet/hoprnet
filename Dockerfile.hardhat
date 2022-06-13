@@ -3,6 +3,7 @@ FROM node:16-bullseye-slim@sha256:8265ac132f720998222008355e11535caf53d6bccecbb5
 
 LABEL description="This image launches a hardhat node running a local network with the HOPR contracts deployed and available."
 
+
 # python is used by some nodejs dependencies as an installation requirement
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
@@ -71,7 +72,7 @@ COPY --from=build /app/packages/core/protocol-config.json /core/
 
 RUN rm package.json \
  && mv package.hardhat.json package.json \
- && yarn
+ && make deps
 
 EXPOSE 8454
 
