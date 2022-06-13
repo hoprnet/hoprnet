@@ -13,6 +13,7 @@ build: | build-yarn-utils build-solidity-types build-hopr-admin build-cargo buil
 
 .PHONY: build-yarn
 build-yarn: ## build yarn packages
+build-yarn: build-cargo ## requires WASM boilerplate code
 	npx tsc --build tsconfig.build.json
 
 .PHONY: build-hopr-admin

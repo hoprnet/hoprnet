@@ -9,6 +9,7 @@
     { "path": "packages/cover-traffic-daemon" },
     { "path": "packages/ethereum" },
     { "path": "packages/hoprd" },
+    { "path": "packages/real" },
     { "path": "packages/utils" },
     { "path": "./tsconfig.scripts.json" },
     // Hardhat environment within ethereum packages
