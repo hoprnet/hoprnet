@@ -38,10 +38,16 @@ export async function setupRestApi(
 
   // assign internal objects to each requests so they can be accessed within
   // handlers
-  service.use(urlPath, (req, _res, next) => {
-    req.context = new Context(node, stateOps)
-    next()
-  })
+  service.use(
+    urlPath,
+    function addNodeContext(req, _res, next) {
+      req.context = { node: this.node, stateOps: this.stateOps }
+      next()
+    }
+      // Need to explicitly bind the instances to the function
+      // to make sure the right instances are present
+      .bind({ node, stateOps })
+  )
   // because express-openapi uses relative paths we need to figure out where
   // we are exactly
   const cwd = process.cwd()
@@ -65,6 +71,7 @@ export async function setupRestApi(
     // since we pass the spec directly we don't need to expose it via HTTP
     exposeApiDocs: false,
     errorMiddleware: function (err, _, res, next) {
+      // @fixme index-0 access does not always work
       if (err.status === 400) {
         const path = String(err.errors[0].path) || ''
         res.status(err.status).send({ status: getStatusCodeForInvalidInputInRequest(path) })
@@ -95,41 +102,50 @@ export async function setupRestApi(
       settingKey: (input) => {
         return Object.values(SettingKey).includes(input)
       }
-    },
-    securityHandlers: {
-      // TODO: We assume the handlers are always called in order. This isn't a
-      // given and might change in the future. Thus, they should be made order-erindependent.
-      keyScheme: function (req: Request, _scopes, _securityDefinition) {
-        const apiToken = decodeURI(req.get('x-auth-token') || '')
-
-        if (!options.testNoAuthentication && options.apiToken !== undefined && apiToken !== options.apiToken) {
-          // because this is not the last auth check, we just indicate that
-          // the authentication failed so the auth chain can continue
-          return false
-        }
-
-        // successfully authenticated, will stop the auth chain and proceed with the request
-        return true
-      },
-      passwordScheme: function (req: Request, _scopes, _securityDefinition) {
-        const authEncoded = (req.get('authorization') || '').replace('Basic ', '')
-        // we only expect a single value here, instead of the usual user:password
-        const [apiToken, ..._rest] = decodeURI(Buffer.from(authEncoded, 'base64').toString('binary')).split(':')
-
-        if (!options.testNoAuthentication && options.apiToken !== undefined && apiToken !== options.apiToken) {
-          // because this is the last auth check, we must throw the appropriate
-          // error to be sent back to the user
-          throw {
-            status: 403,
-            challenge: 'Basic realm=hoprd',
-            message: 'You must authenticate to access hoprd.'
-          }
-        }
-
-        // successfully authenticated
-        return true
-      }
     }
+    // securityHandlers: {
+    //   // TODO: We assume the handlers are always called in order. This isn't a
+    //   // given and might change in the future. Thus, they should be made order-erindependent.
+    //   keyScheme: function (req: Request, _scopes, _securityDefinition) {
+    //     const apiToken = decodeURI(req.get('x-auth-token') || '')
+
+    //     if (
+    //       !this.options.testNoAuthentication &&
+    //       this.options.apiToken !== undefined &&
+    //       apiToken !== this.options.apiToken
+    //     ) {
+    //       // because this is not the last auth check, we just indicate that
+    //       // the authentication failed so the auth chain can continue
+    //       return false
+    //     }
+
+    //     // successfully authenticated, will stop the auth chain and proceed with the request
+    //     return true
+    //   }.bind({ options }),
+    //   passwordScheme: function (req: Request, _scopes, _securityDefinition) {
+    //     console.log(this)
+    //     // const authEncoded = (req.get('authorization') || '').replace('Basic ', '')
+    //     // // we only expect a single value here, instead of the usual user:password
+    //     // const [apiToken, ..._rest] = decodeURI(Buffer.from(authEncoded, 'base64').toString('binary')).split(':')
+
+    //     // if (
+    //     //   !this.options.testNoAuthentication &&
+    //     //   this.options.apiToken !== undefined &&
+    //     //   apiToken !== this.options.apiToken
+    //     // ) {
+    //     //   // because this is the last auth check, we must throw the appropriate
+    //     //   // error to be sent back to the user
+    //     //   throw {
+    //     //     status: 403,
+    //     //     challenge: 'Basic realm=hoprd',
+    //     //     message: 'You must authenticate to access hoprd.'
+    //     //   }
+    //     // }
+
+    //     // successfully authenticated
+    //     return true
+    //   }.bind({ options })
+    // }
   })
 
   // hook up the Swagger UI for our API spec
@@ -155,6 +171,7 @@ export async function setupRestApi(
   }
 
   service.use(urlPath, ((err, _req, res, _next) => {
+    console.log(err)
     res.status(err.status).json(err)
   }) as express.ErrorRequestHandler)
 
@@ -244,7 +261,10 @@ export class Context {
 declare global {
   namespace Express {
     interface Request {
-      context: Context
+      context: {
+        node: Hopr
+        stateOps: StateOps
+      }
     }
   }
 }

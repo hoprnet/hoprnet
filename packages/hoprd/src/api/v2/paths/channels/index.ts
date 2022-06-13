@@ -1,6 +1,13 @@
 import type { Operation } from 'express-openapi'
 import type { default as Hopr } from '@hoprnet/hopr-core'
-import { ChannelEntry, ChannelStatus, PublicKey } from '@hoprnet/hopr-utils'
+import {
+  type ChannelEntry,
+  ChannelStatus,
+  defer,
+  generateChannelId,
+  PublicKey,
+  type DeferType
+} from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import BN from 'bn.js'
 import { STATUS_CODES } from '../../utils.js'
@@ -33,6 +40,8 @@ export const formatIncomingChannel = (channel: ChannelEntry): ChannelInfo => {
     balance: channel.balance.toBN().toString()
   }
 }
+
+const openingRequests = new Map<string, DeferType<void>>()
 
 /**
  * @returns List of incoming and outgoing channels associated with the node.
@@ -128,61 +137,138 @@ GET.apiDoc = {
   }
 }
 
-/**
- * Opens channel between two parties.
- * @returns The PeerId associated with the alias.
- */
-export const openChannel = async (node: Hopr, counterpartyStr: string, amountStr: string) => {
+async function validateOpenChannelParameters(
+  node: Hopr,
+  counterpartyStr: string,
+  amountStr: string
+): Promise<
+  | {
+      valid: false
+      reason: keyof typeof STATUS_CODES
+    }
+  | {
+      valid: true
+      counterparty: PeerId
+      amount: BN
+    }
+> {
   let counterparty: PeerId
   try {
     counterparty = PeerId.createFromB58String(counterpartyStr)
   } catch (err) {
-    throw Error(STATUS_CODES.INVALID_PEERID)
+    return {
+      valid: false,
+      reason: STATUS_CODES.INVALID_PEERID
+    }
   }
 
-  if (isNaN(Number(amountStr))) {
-    throw Error(STATUS_CODES.INVALID_AMOUNT)
+  let amount: BN
+  try {
+    amount = new BN(amountStr)
+  } catch {
+    return {
+      valid: false,
+      reason: STATUS_CODES.INVALID_AMOUNT
+    }
   }
 
-  const amount = new BN(amountStr)
   const balance = await node.getBalance()
   if (amount.lten(0) || balance.toBN().lt(amount)) {
-    throw Error(STATUS_CODES.NOT_ENOUGH_BALANCE)
+    return {
+      valid: false,
+      reason: STATUS_CODES.NOT_ENOUGH_BALANCE
+    }
+  }
+
+  return {
+    valid: true,
+    amount,
+    counterparty
+  }
+}
+
+/**
+ * Opens channel between two parties.
+ * @returns The PeerId associated with the alias.
+ */
+export async function openChannel(
+  node: Hopr,
+  counterpartyStr: string,
+  amountStr: string
+): Promise<
+  | {
+      success: false
+      reason: keyof typeof STATUS_CODES
+    }
+  | {
+      success: true
+      channelId: string
+      receipt: string
+    }
+> {
+  const validationResult = await validateOpenChannelParameters(node, counterpartyStr, amountStr)
+
+  if (validationResult.valid == false) {
+    return { success: false, reason: validationResult.reason }
+  }
+
+  const channelId = generateChannelId(
+    node.getEthereumAddress(),
+    PublicKey.fromPeerId(validationResult.counterparty).toAddress()
+  )
+
+  let openingRequest = openingRequests.get(channelId.toHex())
+
+  if (openingRequest == null) {
+    openingRequest = defer<void>()
+    openingRequests.set(channelId.toHex(), openingRequest)
+  } else {
+    await openingRequest.promise
+  }
+
+  try {
+    const { channelId, receipt } = await node.openChannel(validationResult.counterparty, validationResult.amount)
+    return { success: true, channelId: channelId.toHex(), receipt }
+  } catch (err) {
+    const errString = err instanceof Error ? err.message : err?.toString?.() ?? STATUS_CODES.UNKNOWN_FAILURE
+
+    if (errString.includes('Channel is already opened')) {
+      // @TODO insert correct receipt
+      return { success: true, channelId: channelId.toHex(), receipt: /* @fixme */ '0x' }
+    } else {
+      return { success: false, reason: STATUS_CODES.UNKNOWN_FAILURE }
+    }
+  } finally {
+    console.log(`RESOLVING`)
+    openingRequests.delete(channelId.toHex())
+    openingRequest.resolve()
   }
 
   // @TODO: handle errors from open channel, inconsistent return value
-  try {
-    const { channelId, receipt } = await node.openChannel(counterparty, amount)
-    return { channelId: channelId.toHex(), receipt }
-  } catch (err) {
-    const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
-
-    if (errString.includes('Channel is already opened')) {
-      throw Error(STATUS_CODES.CHANNEL_ALREADY_OPEN)
-    } else {
-      throw Error(errString)
-    }
-  }
 }
 
 const POST: Operation = [
   async (req, res, _next) => {
-    const { node } = req.context
-    const { peerId, amount } = req.body
-
     try {
-      const { channelId, receipt } = await openChannel(node, peerId, amount)
-      return res.status(201).send({ channelId, receipt })
-    } catch (err) {
-      const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
+      const { node } = req.context
+      const { peerId, amount } = req.body
 
-      if (errString.includes(STATUS_CODES.NOT_ENOUGH_BALANCE)) {
-        return res.status(403).send({ status: STATUS_CODES.NOT_ENOUGH_BALANCE })
-      } else if (errString.includes(STATUS_CODES.CHANNEL_ALREADY_OPEN)) {
-        return res.status(409).send({ status: STATUS_CODES.CHANNEL_ALREADY_OPEN })
+      const openingResult = await openChannel(node, peerId, amount)
+
+      if (openingResult.success == true) {
+        res.status(201).send({ channelId: openingResult.channelId, receipt: openingResult.receipt })
       } else {
-        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: errString })
+        switch (openingResult.reason) {
+          case STATUS_CODES.NOT_ENOUGH_BALANCE:
+            res.status(403).send({ status: STATUS_CODES.NOT_ENOUGH_BALANCE })
+          case STATUS_CODES.CHANNEL_ALREADY_OPEN:
+            res.status(409).send({ status: STATUS_CODES.CHANNEL_ALREADY_OPEN })
+          default:
+            res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE })
+        }
       }
+    } catch (err) {
+      console.log(err)
     }
   }
 ]
