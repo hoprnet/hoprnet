@@ -15,16 +15,18 @@ source "${mydir}/utils.sh"
 
 usage() {
   msg
-  msg "Usage: $0 [-h|--help] [-f|--force] [-n|--no-tags]"
+  msg "Usage: $0 [-h|--help] [-f|--force] [-n|--no-tags] [-l|--local]"
   msg
   msg "This script builds all docker images defined within the monorepo using Google Cloud Build."
   msg "The images are defined in ${mydir}/../cloudbuild.yaml"
+  msg
+  msg "Use -l to build the images locally instead and not publish them to a remote Docker repository."
   msg
   msg "Use -f to force a Docker builds even though no environment can be found. This is useful for local testing. No additional docker tags will be applied though if no environment has been found which is in contrast to the normal execution of the script."
   msg
 }
 
-declare image_version package_version releases branch force no_tags
+declare image_version package_version releases branch force no_tags local_build
 
 while (( "$#" )); do
   case "$1" in
@@ -39,6 +41,10 @@ while (( "$#" )); do
       ;;
     -n|--no-tags)
       no_tags="true"
+      shift
+      ;;
+    -l|--local)
+      local_build="true"
       shift
       ;;
     -*|--*=)
@@ -57,13 +63,36 @@ package_version="$("${mydir}/get-package-version.sh")"
 releases=""
 
 build_and_tag_images() {
-  local built_image_version="$1"
-  local required_pkg_version="$2"
-
   cd "${mydir}/.."
 
-  gcloud builds submit --config cloudbuild.yaml \
-    --substitutions=_PACKAGE_VERSION="${required_pkg_version}",_IMAGE_VERSION="${built_image_version}",_RELEASES="${releases}",_NO_TAGS="${no_tags:-}"
+  if [ "${local_build:-}" = "true" ]; then
+    log "Building Docker image hoprd:local"
+    docker build -t hoprd:local \
+      --build-arg=PACKAGE_VERSION="${package_version}" \
+      packages/hoprd
+
+    log "Building Docker image hopr-cover-traffic-daemon:local"
+    docker build -t hopr-cover-traffic-daemon:local \
+      --build-arg=PACKAGE_VERSION="${package_version}" \
+      packages/cover-traffic-daemon
+
+    log "Building Docker image hoprd-nat:local"
+    docker build -t hoprd-nat:local \
+      --build-arg=PACKAGE_VERSION="${package_version}" \
+      --build-arg=HOPRD_RELEASE="${image_version}" \
+      scripts/nat
+
+    log "Building Docker image hopr-hardhat:local"
+    docker build -t hopr-hardhat:local \
+      -f Dockerfile.hardhat .
+
+    log "Building Docker image hopr-pluto:local"
+    docker build -t hopr-pluto:local \
+      scripts/pluto
+  else
+    gcloud builds submit --config cloudbuild.yaml \
+      --substitutions=_PACKAGE_VERSION="${package_version}",_IMAGE_VERSION="${image_version}",_RELEASES="${releases}",_NO_TAGS="${no_tags:-}"
+  fi
 }
 
 for git_ref in $(jq -r "to_entries[] | .value.git_ref" < "${mydir}/../packages/hoprd/releases.json" | uniq); do
@@ -80,4 +109,4 @@ if [ -z "${releases}" ] && [ "${force:-}" != "true" ]; then
   exit 1
 fi
 
-build_and_tag_images "${image_version}" "${package_version}"
+build_and_tag_images
