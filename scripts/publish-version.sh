@@ -61,8 +61,7 @@ git pull origin "${branch}" --rebase --tags
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
 # ensure the build is up-to-date
-yarn
-yarn build
+make -C "${mydir}/.." deps build
 
 declare current_version
 current_version=$(${mydir}/get-package-version.sh)
@@ -78,7 +77,7 @@ log "get default environment id"
 
 declare environment_id="$(${mydir}/get-default-environment.sh)"
 
-log "creating new version ${current_version} + ${version_type}"
+log "using version template ${current_version} + ${version_type}"
 
 # create new version in each package
 yarn workspaces foreach -piv --topological-dev \
@@ -86,6 +85,7 @@ yarn workspaces foreach -piv --topological-dev \
   exec -- npm version ${version_type} --preid=next
 declare new_version
 new_version=$(${mydir}/get-package-version.sh)
+log "creating new version ${new_version}"
 
 # commit changes and create Git tag
 git add packages/*/package.json

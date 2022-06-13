@@ -68,10 +68,8 @@ jobs:
 
       - name: '[BUILD] Install dependencies / link / build'
         run: |
-          # Deploying smart contracts requires hardhat to be installed
-          yarn
           # Deploying with hardhat requires built hopr-utils package
-          yarn build; yarn build
+          make deps build
 
       - name: '[SMART-CONTRACTS] Deploy for known environments'
         if: ${{ !env.ACT }}
@@ -377,10 +375,8 @@ jobs:
         run: |
           # get latest version
           git pull
-          # need to install tools first which may be used during deployment
-          yarn
           # need to build our packages which might by used by the scripts, such as the fund script
-          yarn build; yarn build
+          make deps build
 
       - name: Run deploy script for public nodes
         if: ${{ !env.ACT }}
@@ -455,10 +451,8 @@ jobs:
         run: |
           # get latest version
           git pull
-          # need to install tools first which may be used during deployment
-          yarn
           # need to build our packages which might by used by the scripts, such as the fund script
-          yarn build; yarn build
+          make deps build
 
       - name: Run deploy script for nodes behind NAT
         if: ${{ !env.ACT }}

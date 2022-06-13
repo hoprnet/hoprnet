@@ -13,14 +13,11 @@
     "docs/hopr-documentation"
   ],
   "scripts": {
-    "build": "./build.sh",
     "build:core": "yarn workspace @hoprnet/hopr-core run build",
     "build:core:all": "yarn workspaces foreach -ptv --include @hoprnet/hopr-core --include @hoprnet/hopr-core-ethereum run build",
     "build:hoprd": "yarn workspace @hoprnet/hoprd run build",
-    "build:wasm": "yarn workspaces foreach -pt run build:wasm",
     "build:utils": "yarn workspace @hoprnet/hopr-utils run build",
     "build:chain": "yarn workspace @hoprnet/hopr-core-ethereum run build",
-    "build:yp": "yarn exec \"make -C docs/yellowpaper\"",
     "lint": "prettier --check .",
     "lint:fix": "prettier --write .",
     "test": "yarn workspaces foreach -pv run test",
@@ -44,12 +41,11 @@
     "run:faucet:all": "yarn workspace @hoprnet/hopr-ethereum run faucet",
     "docs:generate": "yarn workspaces foreach -pv run docs:generate",
     "clean": "yarn workspaces foreach --exclude hoprnet --exclude hopr-docs -v run clean && rm -Rf ./target ./tsconfig.scripts.tsbuildinfo ./tsconfig.build.tsbuildinfo",
-    "reset": "rimraf packages/*/node_modules node_modules"
+    "reset": "rm -Rf packages/*/node_modules node_modules"
   },
   "devDependencies": {
     "@ethersproject/cli": "5.5.0",
     "prettier": "2.6.1",
-    "rimraf": "3.0.2",
     "ts-node": "10.7.0",
     "typescript": "4.7.0-beta",
     "wasm-opt": "1.3.0",

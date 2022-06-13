@@ -29,7 +29,7 @@ cd hoprnet-master
    to install and build the required packages and project modules. Ideally, you also have setup your computer with basic development toolset[^5]. Please bear in mind that this process will take at least 5-10 minutes depending on your computer.
 
 ```
-yarn && yarn build
+make deps build
 ```
 
 3. **Run the one-line setup script**: Proceed to run the following script. If you are planning to run [MyneChat](http://app.myne.chat/)

@@ -2,7 +2,7 @@ mod utils;
 
 use std::fmt::Display;
 use wasm_bindgen::prelude::*;
-use hopr_real::real;
+use real_base::real;
 use serde::{Deserialize};
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global

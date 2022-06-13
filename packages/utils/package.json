@@ -10,7 +10,7 @@
   "type": "commonjs",
   "scripts": {
     "clean:wasm": "make -C crates clean",
-    "build:wasm": "make -s -C crates all && make -s -C crates install",
+    "build:wasm": "make -C crates all && make -C crates install",
     "test:wasm": "make -C crates test",
     "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo",
     "test": "yarn test:wasm && mocha --parallel",
@@ -60,7 +60,6 @@
     "libp2p-tcp": "0.17.2",
     "mocha": "9.2.2",
     "rewiremock": "3.14.3",
-    "rimraf": "3.0.2",
     "sinon": "12.0.1",
     "typedoc": "0.22.13",
     "typedoc-plugin-markdown": "3.11.14"
