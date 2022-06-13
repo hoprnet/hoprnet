@@ -11,7 +11,7 @@
     "clean:wasm": "make -C crates clean",
     "build:wasm": "make -C crates all && make -C crates install",
     "test:wasm": "make -C crates test",
-    "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo ./tsconfig.hardhat.tsbuildinfo ./hardhat ./deployments/default/localhost ./deployments/hardhat-localhost",
+    "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo ./tsconfig.hardhat.tsbuildinfo ./hardhat ./deployments/default/localhost ./deployments/hardhat-localhost ./deployments/hardhat",
     "build": "yarn clean && yarn build:wasm && yarn build:sol:types && yarn build:tsc",
     "build:tsc": "tsc -p .",
     "build:sol": "TS_NODE_PROJECT=./tsconfig.hardhat.json hardhat compile",

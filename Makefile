@@ -9,7 +9,7 @@ deps: ## install dependencies
 
 .PHONY: build
 build: ## build all packages
-build: | build-yarn-utils build-solidity-types build-hopr-admin build-cargo build-yarn
+build: build-solidity-types build-hopr-admin build-cargo build-yarn
 
 .PHONY: build-hopr-admin
 build-hopr-admin: ## build hopr admin React frontend
@@ -17,21 +17,16 @@ build-hopr-admin: ## build hopr admin React frontend
 
 .PHONY: build-solidity-types
 build-solidity-types: ## generate Solidity typings
-build-solidity-types: build-yarn-utils
+	npx tsc -p packages/utils/tsconfig.json
 	yarn workspace @hoprnet/hopr-ethereum run build:sol:types
 
 .PHONY: build-yarn
 build-yarn: ## build yarn packages
-build-yarn: build-solidity-types
+build-yarn: build-solidity-types build-cargo
 	npx tsc --build tsconfig.build.json
-	
-.PHONY: build-yarn-utils
-build-yarn-utils: ## build yarn package 'hopr-utils' only
-	npx tsc -p packages/utils/tsconfig.json
 
 .PHONY: build-cargo
 build-cargo: ## build cargo packages
-build-cargo: build-yarn-utils ## Use cargo workspaces to resolve Rust package dependencies and precompile all dependencies within a single run
 	cargo build --release --target wasm32-unknown-unknown
 	yarn workspaces foreach -p --exclude hoprnet --exclude hopr-docs run build:wasm
 

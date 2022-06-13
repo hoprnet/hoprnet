@@ -10,6 +10,7 @@
     { "path": "packages/ethereum" },
     { "path": "packages/real" },
     { "path": "packages/hoprd" },
+    { "path": "packages/real" },
     { "path": "packages/utils" },
     { "path": "./tsconfig.scripts.json" },
     // Hardhat environment within ethereum packages
