@@ -39,7 +39,9 @@ jobs:
         run: make deps
 
       - name: Generate docs
-        run: ./scripts/regenerate-typedocs.sh
+        run: |
+          make build
+          yarn docs:generate
 
       - name: Generate OpenAPI spec file
         run: ./scripts/build-rest-api-spec.sh
