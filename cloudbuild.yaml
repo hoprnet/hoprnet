@@ -1,0 +1,73 @@
+steps:
+  - name: 'gcr.io/kaniko-project/executor:latest'
+    id: buildHoprd
+    args:
+      - --context=dir://packages/hoprd
+      - --destination=gcr.io/hoprassociation/hoprd:${_IMAGE_VERSION}
+      - --cache=true
+      - --cache-ttl=96h
+      - --build-arg=PACKAGE_VERSION=${_PACKAGE_VERSION}
+    timeout: 2400s
+    waitFor: ['-']
+  - name: 'gcr.io/kaniko-project/executor:latest'
+    id: buildHoprdNat
+    args:
+      - --context=dir://scripts/nat
+      - --destination=gcr.io/hoprassociation/hoprd-nat:${_IMAGE_VERSION}
+      - --cache=true
+      - --cache-ttl=96h
+      - --build-arg=PACKAGE_VERSION=${_PACKAGE_VERSION}
+      - --build-arg=HOPRD_RELEASE=${_IMAGE_VERSION}
+    timeout: 2400s
+    waitFor:
+      - buildHoprd
+  - name: 'gcr.io/kaniko-project/executor:latest'
+    id: buildCoverTrafficDaemon
+    args:
+      - --context=dir://packages/cover-traffic-daemon
+      - --destination=gcr.io/hoprassociation/hopr-cover-traffic-daemon:${_IMAGE_VERSION}
+      - --cache=true
+      - --cache-ttl=96h
+      - --build-arg=PACKAGE_VERSION=${_PACKAGE_VERSION}
+    timeout: 2400s
+    waitFor: ['-']
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: testImages
+    script: |
+      #!/usr/bin/env bash
+      set -Eeuo pipefail
+      for image in hoprd hoprd-nat hopr-cover-traffic-daemon; do
+        full_image="gcr.io/${PROJECT_ID}/${image}"
+        v=$(docker run --pull always -v /var/run/docker.sock:/var/run/docker.sock ${full_image}:${_IMAGE_VERSION} --version 2> /dev/null | sed -n '3p')
+        if [ "${v}" != "${_PACKAGE_VERSION}" ]; then
+          echo "bundled ${image} version ${v}, expected ${_PACKAGE_VERSION}"
+          exit 1
+        fi
+      done
+    waitFor:
+      - buildHoprd
+      - buildHoprdNat
+      - buildCoverTrafficDaemon
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: tagImages
+    script: |
+      #!/usr/bin/env bash
+      set -Eeuo pipefail
+      [ "${_NO_TAGS}" = "true"] && { exit 0; }
+      for image in hoprd hoprd-nat hopr-cover-traffic-daemon; do
+        full_image="gcr.io/${PROJECT_ID}/${image}"
+        gcloud container images add-tag ${full_image}:${_IMAGE_VERSION} ${full_image}:${_PACKAGE_VERSION}
+        for release in ${_RELEASES}; do
+          gcloud container images add-tag ${full_image}:${_IMAGE_VERSION} ${full_image}:${release}
+        done
+      done
+    waitFor:
+      - testImages
+options:
+  logStreamingOption: STREAM_ON
+  substitutionOption: MUST_MATCH
+  machineType: E2_HIGHCPU_8
+images:
+  - gcr.io/${PROJECT_ID}/hoprd:${_IMAGE_VERSION}
+  - gcr.io/${PROJECT_ID}/hoprd-nat:${_IMAGE_VERSION}
+  - gcr.io/${PROJECT_ID}/hopr-cover-traffic-daemon:${_IMAGE_VERSION}
