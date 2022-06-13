@@ -22,4 +22,4 @@ Dummy function to test WASM.
 
 #### Defined in
 
-lib/hopr_real.d.ts:7
+lib/real_base.d.ts:7
