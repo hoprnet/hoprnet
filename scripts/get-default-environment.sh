@@ -10,6 +10,7 @@ set -Eeuo pipefail
 # set log id and use shared log function for readable logs
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+declare HOPR_LOG_ID="get-default-environment"
 
 source "${mydir}/utils.sh"
 

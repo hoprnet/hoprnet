@@ -43,11 +43,10 @@ jobs:
           cache: yarn
 
       - name: Install dependencies
-        run: yarn
+        run: make deps
 
       - name: Build
-        run: 
-          yarn build
+        run: make build
 
       - name: Test
         run: yarn test

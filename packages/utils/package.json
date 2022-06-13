@@ -10,7 +10,7 @@
   "type": "commonjs",
   "scripts": {
     "clean:wasm": "make -C crates clean",
-    "build:wasm": "make -s -C crates all && make -s -C crates install",
+    "build:wasm": "make -C crates all && make -C crates install",
     "test:wasm": "make -C crates test",
     "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo",
     "test": "yarn test:wasm && mocha --parallel",
