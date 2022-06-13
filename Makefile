@@ -13,12 +13,12 @@ build: | build-yarn-utils build-cargo build-yarn
 .PHONY: build-yarn
 build-yarn: ## build yarn packages
 	yarn workspace @hoprnet/hopr-ethereum run build:sol:types
-	tsc --build tsconfig.build.json
+	npx tsc --build tsconfig.build.json
 	yarn workspace @hoprnet/hoprd run buildAdmin
 
 .PHONY: build-yarn-utils
 build-yarn-utils: ## build yarn package 'hopr-utils' only
-	tsc -p packages/utils/tsconfig.json
+	npx tsc -p packages/utils/tsconfig.json
 
 .PHONY: build-cargo
 build-cargo: ## build cargo packages
