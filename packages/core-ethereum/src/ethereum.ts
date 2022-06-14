@@ -8,7 +8,7 @@ import {
   ethers,
   type UnsignedTransaction,
   type ContractTransaction,
-  type BaseContract
+  type BaseContract,
 } from 'ethers'
 import { getContractData, type HoprToken, type HoprChannels, type HoprNetworkRegistry } from '@hoprnet/hopr-ethereum'
 import {
@@ -165,26 +165,47 @@ export async function createChainWrapper(
   )
 
   /**
-   * Update nonce-tracker and transaction-manager, broadcast the transaction on chain, and listen
-   * to the response until reaching block confirmation.
-   * @param checkDuplicate If the flag is true (default), check if an unconfirmed (pending/mined) transaction with the same payload has been sent
+   * Build an essential transaction payload from contract parameters
    * @param value amount of native token to send
    * @param contract destination to send funds to or contract to execute the requested method
    * @param method contract method
    * @param rest contract method arguments
-   * @returns Promise of a ContractTransaction
+   * @returns TransactionPayload
    */
-  const sendTransaction = async <T extends BaseContract>(
-    checkDuplicate: Boolean,
+  const buildEssentialTxPayload = <T extends BaseContract> (
     value: BigNumber | string | number,
     contract: T | string,
     method: keyof T['functions'],
-    handleTxListener: (tx: string) => DeferType<string>,
     ...rest: Parameters<T['functions'][keyof T['functions']]>
-  ): Promise<SendTransactionReturn> => {
+  ): TransactionPayload => {
     if (rest.length > 0 && typeof contract === 'string') {
       throw Error(`sendTransaction: passing arguments to non-contract instances is not implemented`)
     }
+
+    const essentialTxPayload: TransactionPayload = {
+      to: typeof contract === 'string' ? contract : contract.address,
+      data: rest.length > 0 && typeof contract !== 'string'
+      ? contract.interface.encodeFunctionData(method as string, rest)
+      : '',
+      value: BigNumber.from(value ?? 0)
+    }
+    log('essentialTxPayload %o', essentialTxPayload)
+    return essentialTxPayload
+  }
+
+  /**
+   * Update nonce-tracker and transaction-manager, broadcast the transaction on chain, and listen
+   * to the response until reaching block confirmation.
+   * Transaction is built on essential transaction payload
+   * @param checkDuplicate If the flag is true (default), check if an unconfirmed (pending/mined) transaction with the same payload has been sent
+   * @param handleTxListener build listener to transaction hash
+   * @returns Promise of a ContractTransaction
+   */
+  const sendTransaction = async (
+    checkDuplicate: Boolean,
+    essentialTxPayload: TransactionPayload,
+    handleTxListener: (tx: string) => DeferType<string>,
+  ): Promise<SendTransactionReturn> => {
 
     const gasLimit = 400e3
     const nonceLock = await nonceTracker.getNonceLock(address)
@@ -214,28 +235,18 @@ export async function createChainWrapper(
     // breakdown steps in ethersjs
     // https://github.com/ethers-io/ethers.js/blob/master/packages/abstract-signer/src.ts/index.ts#L122
     // 1. omit this._checkProvider("sendTransaction");
-    // 2. populate transaction
+    // 2. populate transaction, from essential tx payload
     const populatedTx: UnsignedTransaction = {
-      to: typeof contract === 'string' ? contract : contract.address,
-      value,
+      to: essentialTxPayload.to,
+      value: essentialTxPayload.value,
       type: 2,
       nonce,
       gasLimit,
       maxFeePerGas: feeData.maxFeePerGas,
       maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
       chainId: providerChainId,
-      data:
-        rest.length > 0 && typeof contract !== 'string'
-          ? contract.interface.encodeFunctionData(method as string, rest)
-          : ''
+      data: essentialTxPayload.data
     }
-
-    const essentialTxPayload: TransactionPayload = {
-      to: populatedTx.to,
-      data: populatedTx.data as string,
-      value: BigNumber.from(populatedTx.value ?? 0)
-    }
-    log('essentialTxPayload %o', essentialTxPayload)
 
     if (checkDuplicate) {
       const [isDuplicate, hash] = transactions.existInMinedOrPendingWithHigherFee(
@@ -360,14 +371,17 @@ export async function createChainWrapper(
    */
   const announce = async (multiaddr: Multiaddr, txHandler: (tx: string) => DeferType<string>): Promise<string> => {
     try {
-      const confirmation = await sendTransaction(
-        checkDuplicate,
+      const confirmationEssentialTxPayload = buildEssentialTxPayload(
         0,
         channels,
         'announce',
-        txHandler,
         publicKey.toUncompressedPubKeyHex(),
         multiaddr.bytes
+      );
+      const confirmation = await sendTransaction(
+        checkDuplicate,
+        confirmationEssentialTxPayload,
+        txHandler
       )
       return confirmation.tx.hash
     } catch (error) {
@@ -391,10 +405,18 @@ export async function createChainWrapper(
   ): Promise<string> => {
     try {
       if (currency === 'NATIVE') {
-        const transaction = await sendTransaction(checkDuplicate, amount, recipient, undefined, txHandler)
+        const withdrawEssentialTxPayload = buildEssentialTxPayload(
+          amount,
+          recipient,
+          undefined
+        );
+        const transaction = await sendTransaction(checkDuplicate, withdrawEssentialTxPayload, txHandler)
         return transaction.tx.hash
       } else {
-        const transaction = await sendTransaction(checkDuplicate, 0, token, 'transfer', txHandler, recipient, amount)
+        const withdrawEssentialTxPayload = buildEssentialTxPayload(
+          0, token, 'transfer', recipient, amount
+        );
+        const transaction = await sendTransaction(checkDuplicate, withdrawEssentialTxPayload, txHandler)
         return transaction.tx.hash
       }
     } catch (error) {
@@ -421,18 +443,21 @@ export async function createChainWrapper(
     const totalFund = fundsA.toBN().add(fundsB.toBN())
 
     try {
-      const transaction = await sendTransaction(
-        checkDuplicate,
+      const fundChannelEssentialTxPayload = buildEssentialTxPayload(
         0,
         token,
         'send',
-        txHandler,
         channels.address,
         totalFund.toString(),
         abiCoder.encode(
           ['address', 'address', 'uint256', 'uint256'],
           [partyA.toHex(), partyB.toHex(), fundsA.toBN().toString(), fundsB.toBN().toString()]
         )
+      );
+      const transaction = await sendTransaction(
+        checkDuplicate,
+        fundChannelEssentialTxPayload,
+        txHandler
       )
       return transaction.tx.hash
     } catch (error) {
@@ -451,13 +476,16 @@ export async function createChainWrapper(
     txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> => {
     try {
-      const transaction = await sendTransaction(
-        checkDuplicate,
+      const initiateChannelClosureEssentialTxPayload = buildEssentialTxPayload(
         0,
         channels,
         'initiateChannelClosure',
-        txHandler,
         counterparty.toHex()
+      )
+      const transaction = await sendTransaction(
+        checkDuplicate,
+        initiateChannelClosureEssentialTxPayload,
+        txHandler
       )
       return transaction.tx.hash
     } catch (error) {
@@ -478,13 +506,16 @@ export async function createChainWrapper(
     txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> => {
     try {
-      const transaction = await sendTransaction(
-        checkDuplicate,
+      const finalizeChannelClosureEssentialTxPayload = buildEssentialTxPayload(
         0,
         channels,
         'finalizeChannelClosure',
-        txHandler,
         counterparty.toHex()
+      );
+      const transaction = await sendTransaction(
+        checkDuplicate,
+        finalizeChannelClosureEssentialTxPayload,
+        txHandler
       )
       return transaction.tx.hash
     } catch (error) {
@@ -506,12 +537,10 @@ export async function createChainWrapper(
     txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> => {
     try {
-      const transaction = await sendTransaction(
-        checkDuplicate,
+      const redeemTicketEssentialTxPayload = buildEssentialTxPayload(
         0,
         channels,
         'redeemTicket',
-        txHandler,
         counterparty.toHex(),
         ackTicket.preImage.toHex(),
         ackTicket.ticket.epoch.toHex(),
@@ -520,6 +549,11 @@ export async function createChainWrapper(
         ackTicket.ticket.amount.toBN().toString(),
         ackTicket.ticket.winProb.toBN().toString(),
         ackTicket.ticket.signature.toHex()
+      )
+      const transaction = await sendTransaction(
+        checkDuplicate,
+        redeemTicketEssentialTxPayload,
+        txHandler
       )
       return transaction.tx.hash
     } catch (error) {
@@ -540,14 +574,17 @@ export async function createChainWrapper(
     txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> => {
     try {
-      const transaction = await sendTransaction(
-        checkDuplicate,
+      const setCommitmentEssentialTxPayload = buildEssentialTxPayload(
         0,
         channels,
         'bumpChannel',
-        txHandler,
         counterparty.toHex(),
         commitment.toHex()
+      )
+      const transaction = await sendTransaction(
+        checkDuplicate,
+        setCommitmentEssentialTxPayload,
+        txHandler
       )
       return transaction.tx.hash
     } catch (error) {
@@ -644,7 +681,7 @@ export async function createChainWrapper(
     redeemTicket,
     getGenesisBlock: () => genesisBlock,
     setCommitment,
-    sendTransaction: provider.sendTransaction.bind(provider) as typeof provider['sendTransaction'],
+    sendTransaction, //: provider.sendTransaction.bind(provider) as typeof provider['sendTransaction'],
     waitUntilReady: async () => await provider.ready,
     getLatestBlockNumber, // TODO: use indexer when it's done syncing
     subscribeBlock,

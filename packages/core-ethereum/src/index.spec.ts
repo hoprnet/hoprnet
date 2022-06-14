@@ -3,7 +3,7 @@ import sinon from 'sinon'
 import { dbMock, debug, stringToU8a, PublicKey, Address } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { Indexer, useFixtures } from '.'
 import { sampleChainOptions } from './ethereum.mock'
-import { ACCOUNT_A, PARTY_A } from './fixtures'
+import { ACCOUNT_A, ACCOUNT_B, PARTY_A, PARTY_B } from './fixtures'
 
 const namespace = 'hopr:test:hopr-ethereum'
 const log = debug(namespace)
