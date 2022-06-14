@@ -18,7 +18,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // mint xHOPR to admin
   const xhoprToken = (await ethers.getContractFactory('ERC677Mock')).attach(xHoprContract.address) as ERC677Mock
   await xhoprToken.batchMintInternal([admin], ethers.utils.parseUnits(MINTED_AMOUNT, 'ether'))
-  console.log(`Admin gets minted ${MINTED_AMOUNT} xHOPR (mock) tokens`)
+  console.log(`Admin minted ${MINTED_AMOUNT} xHOPR (mock) tokens`)
 }
 
 main.tags = ['xHoprMock']
