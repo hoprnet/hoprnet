@@ -249,26 +249,25 @@ export async function openChannel(
 
 const POST: Operation = [
   async (req, res, _next) => {
-    try {
-      const { node } = req.context
-      const { peerId, amount } = req.body
+    const { node } = req.context
+    const { peerId, amount } = req.body
 
-      const openingResult = await openChannel(node, peerId, amount)
+    const openingResult = await openChannel(node, peerId, amount)
 
-      if (openingResult.success == true) {
-        res.status(201).send({ channelId: openingResult.channelId, receipt: openingResult.receipt })
-      } else {
-        switch (openingResult.reason) {
-          case STATUS_CODES.NOT_ENOUGH_BALANCE:
-            res.status(403).send({ status: STATUS_CODES.NOT_ENOUGH_BALANCE })
-          case STATUS_CODES.CHANNEL_ALREADY_OPEN:
-            res.status(409).send({ status: STATUS_CODES.CHANNEL_ALREADY_OPEN })
-          default:
-            res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE })
-        }
+    if (openingResult.success == true) {
+      res.status(201).send({ channelId: openingResult.channelId, receipt: openingResult.receipt })
+    } else {
+      switch (openingResult.reason) {
+        case STATUS_CODES.NOT_ENOUGH_BALANCE:
+          res.status(403).send({ status: STATUS_CODES.NOT_ENOUGH_BALANCE })
+          break
+        case STATUS_CODES.CHANNEL_ALREADY_OPEN:
+          res.status(409).send({ status: STATUS_CODES.CHANNEL_ALREADY_OPEN })
+          break
+        default:
+          res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE })
+          break
       }
-    } catch (err) {
-      console.log(err)
     }
   }
 ]

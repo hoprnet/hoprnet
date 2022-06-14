@@ -17,6 +17,7 @@ import type { WebSocketServer } from 'ws'
 import type { default as Hopr } from '@hoprnet/hopr-core'
 import { SettingKey, StateOps } from '../types.js'
 import type { LogStream } from './../logs.js'
+import BN from 'bn.js'
 
 const debugLog = debug('hoprd:api:v2')
 
@@ -84,20 +85,27 @@ export async function setupRestApi(
       peerId: (input) => {
         try {
           // this call will throw if the input is no peer id
-          return !!PeerId.createFromB58String(input)
-        } catch (_err) {
+          PeerId.createFromB58String(input)
+        } catch (err) {
           return false
         }
+        return true
       },
       address: (input) => {
         try {
-          return !!Address.fromString(input)
-        } catch (_err) {
+          Address.fromString(input)
+        } catch (err) {
           return false
         }
+        return true
       },
       amount: (input) => {
-        return !isNaN(Number(input))
+        try {
+          new BN(input)
+        } catch (err) {
+          return false
+        }
+        return true
       },
       settingKey: (input) => {
         return Object.values(SettingKey).includes(input)
@@ -171,7 +179,6 @@ export async function setupRestApi(
   }
 
   service.use(urlPath, ((err, _req, res, _next) => {
-    console.log(err)
     res.status(err.status).json(err)
   }) as express.ErrorRequestHandler)
 

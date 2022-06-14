@@ -112,17 +112,23 @@ class TranscationManager {
    * Adds queuing transaction
    * @param hash transaction hash
    * @param transaction object
+   * @returns true if transaction got added to queue, otherwise false
    */
   public addToQueuing(
     hash: string,
     transaction: Omit<Transaction, 'createdAt'>,
     transactionPayload: TransactionPayload
-  ): void {
-    if (this.queuing.has(hash)) return
+  ): boolean {
+    if (this.queuing.has(hash)) {
+      console.log(`FOUND DUPLICATE`, transactionPayload)
+      return false
+    }
 
     log('Adding queuing transaction %s %i', hash, transaction.nonce)
     this.payloads.set(hash, transactionPayload)
     this.queuing.set(hash, { nonce: transaction.nonce, createdAt: 0, maxPrority: transaction.maxPrority })
+
+    return true
   }
 
   /**
