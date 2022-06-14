@@ -8,7 +8,7 @@ import {
   ethers,
   type UnsignedTransaction,
   type ContractTransaction,
-  type BaseContract,
+  type BaseContract
 } from 'ethers'
 import { getContractData, type HoprToken, type HoprChannels, type HoprNetworkRegistry } from '@hoprnet/hopr-ethereum'
 import {
@@ -172,7 +172,7 @@ export async function createChainWrapper(
    * @param rest contract method arguments
    * @returns TransactionPayload
    */
-  const buildEssentialTxPayload = <T extends BaseContract> (
+  const buildEssentialTxPayload = <T extends BaseContract>(
     value: BigNumber | string | number,
     contract: T | string,
     method: keyof T['functions'],
@@ -184,9 +184,10 @@ export async function createChainWrapper(
 
     const essentialTxPayload: TransactionPayload = {
       to: typeof contract === 'string' ? contract : contract.address,
-      data: rest.length > 0 && typeof contract !== 'string'
-      ? contract.interface.encodeFunctionData(method as string, rest)
-      : '',
+      data:
+        rest.length > 0 && typeof contract !== 'string'
+          ? contract.interface.encodeFunctionData(method as string, rest)
+          : '',
       value: BigNumber.from(value ?? 0)
     }
     log('essentialTxPayload %o', essentialTxPayload)
@@ -204,9 +205,8 @@ export async function createChainWrapper(
   const sendTransaction = async (
     checkDuplicate: Boolean,
     essentialTxPayload: TransactionPayload,
-    handleTxListener: (tx: string) => DeferType<string>,
+    handleTxListener: (tx: string) => DeferType<string>
   ): Promise<SendTransactionReturn> => {
-
     const gasLimit = 400e3
     const nonceLock = await nonceTracker.getNonceLock(address)
     const nonce = nonceLock.nextNonce
@@ -377,12 +377,8 @@ export async function createChainWrapper(
         'announce',
         publicKey.toUncompressedPubKeyHex(),
         multiaddr.bytes
-      );
-      const confirmation = await sendTransaction(
-        checkDuplicate,
-        confirmationEssentialTxPayload,
-        txHandler
       )
+      const confirmation = await sendTransaction(checkDuplicate, confirmationEssentialTxPayload, txHandler)
       return confirmation.tx.hash
     } catch (error) {
       throw new Error(`Failed in sending announce transaction ${error}`)
@@ -405,17 +401,11 @@ export async function createChainWrapper(
   ): Promise<string> => {
     try {
       if (currency === 'NATIVE') {
-        const withdrawEssentialTxPayload = buildEssentialTxPayload(
-          amount,
-          recipient,
-          undefined
-        );
+        const withdrawEssentialTxPayload = buildEssentialTxPayload(amount, recipient, undefined)
         const transaction = await sendTransaction(checkDuplicate, withdrawEssentialTxPayload, txHandler)
         return transaction.tx.hash
       } else {
-        const withdrawEssentialTxPayload = buildEssentialTxPayload(
-          0, token, 'transfer', recipient, amount
-        );
+        const withdrawEssentialTxPayload = buildEssentialTxPayload(0, token, 'transfer', recipient, amount)
         const transaction = await sendTransaction(checkDuplicate, withdrawEssentialTxPayload, txHandler)
         return transaction.tx.hash
       }
@@ -453,12 +443,8 @@ export async function createChainWrapper(
           ['address', 'address', 'uint256', 'uint256'],
           [partyA.toHex(), partyB.toHex(), fundsA.toBN().toString(), fundsB.toBN().toString()]
         )
-      );
-      const transaction = await sendTransaction(
-        checkDuplicate,
-        fundChannelEssentialTxPayload,
-        txHandler
       )
+      const transaction = await sendTransaction(checkDuplicate, fundChannelEssentialTxPayload, txHandler)
       return transaction.tx.hash
     } catch (error) {
       throw new Error(`Failed in sending fundChannel transaction ${error}`)
@@ -482,11 +468,7 @@ export async function createChainWrapper(
         'initiateChannelClosure',
         counterparty.toHex()
       )
-      const transaction = await sendTransaction(
-        checkDuplicate,
-        initiateChannelClosureEssentialTxPayload,
-        txHandler
-      )
+      const transaction = await sendTransaction(checkDuplicate, initiateChannelClosureEssentialTxPayload, txHandler)
       return transaction.tx.hash
     } catch (error) {
       throw new Error(`Failed in sending initiateChannelClosure transaction ${error}`)
@@ -511,12 +493,8 @@ export async function createChainWrapper(
         channels,
         'finalizeChannelClosure',
         counterparty.toHex()
-      );
-      const transaction = await sendTransaction(
-        checkDuplicate,
-        finalizeChannelClosureEssentialTxPayload,
-        txHandler
       )
+      const transaction = await sendTransaction(checkDuplicate, finalizeChannelClosureEssentialTxPayload, txHandler)
       return transaction.tx.hash
     } catch (error) {
       throw new Error(`Failed in sending finalizeChannelClosure transaction ${error}`)
@@ -550,11 +528,7 @@ export async function createChainWrapper(
         ackTicket.ticket.winProb.toBN().toString(),
         ackTicket.ticket.signature.toHex()
       )
-      const transaction = await sendTransaction(
-        checkDuplicate,
-        redeemTicketEssentialTxPayload,
-        txHandler
-      )
+      const transaction = await sendTransaction(checkDuplicate, redeemTicketEssentialTxPayload, txHandler)
       return transaction.tx.hash
     } catch (error) {
       throw new Error(`Failed in sending redeemticket transaction ${error}`)
@@ -581,11 +555,7 @@ export async function createChainWrapper(
         counterparty.toHex(),
         commitment.toHex()
       )
-      const transaction = await sendTransaction(
-        checkDuplicate,
-        setCommitmentEssentialTxPayload,
-        txHandler
-      )
+      const transaction = await sendTransaction(checkDuplicate, setCommitmentEssentialTxPayload, txHandler)
       return transaction.tx.hash
     } catch (error) {
       throw new Error(`Failed in sending setCommitment transaction ${error}`)

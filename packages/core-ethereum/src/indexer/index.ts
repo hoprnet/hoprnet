@@ -401,14 +401,14 @@ class Indexer extends EventEmitter {
           await retryWithBackoff(
             () =>
               Promise.allSettled([
-                ...this.chain
-                  .getAllQueuingTransactionRequests()
-                  .map((request) => {
-                    // convert TransactionRequest to signed transaction and send out
-                    return this.chain.sendTransaction(true, {to: request.to, value: request.value as BigNumber, data: request.data as string}, (txHash: string) =>
-                      this.resolvePendingTransaction(`on-provider-error-${txHash}`, txHash)
-                    )
-                  }),
+                ...this.chain.getAllQueuingTransactionRequests().map((request) => {
+                  // convert TransactionRequest to signed transaction and send out
+                  return this.chain.sendTransaction(
+                    true,
+                    { to: request.to, value: request.value as BigNumber, data: request.data as string },
+                    (txHash: string) => this.resolvePendingTransaction(`on-provider-error-${txHash}`, txHash)
+                  )
+                }),
                 this.restart()
               ]),
             backoffOption
@@ -527,16 +527,21 @@ class Indexer extends EventEmitter {
     await this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot, blocking)
 
     // resend queuing transactions
-    if (this.chain.getAllQueuingTransactionRequests().length > 0 && (await this.chain.getNativeBalance(this.address)).toBN().gt(new BN(0))) {
+    if (
+      this.chain.getAllQueuingTransactionRequests().length > 0 &&
+      (await this.chain.getNativeBalance(this.address)).toBN().gt(new BN(0))
+    ) {
       try {
-        await Promise.all(this.chain
-          .getAllQueuingTransactionRequests()
-          .map((request) => {
+        await Promise.all(
+          this.chain.getAllQueuingTransactionRequests().map((request) => {
             // convert TransactionRequest to signed transaction and send out
-            return this.chain.sendTransaction(true, {to: request.to, value: request.value as BigNumber, data: request.data as string}, (txHash: string) =>
-              this.resolvePendingTransaction(`on-new-block-${txHash}`, txHash)
+            return this.chain.sendTransaction(
+              true,
+              { to: request.to, value: request.value as BigNumber, data: request.data as string },
+              (txHash: string) => this.resolvePendingTransaction(`on-new-block-${txHash}`, txHash)
             )
-        }))
+          })
+        )
       } catch (err) {
         log(`error: failed to send queuing transaction on new block`, err)
       }
