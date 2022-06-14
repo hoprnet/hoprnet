@@ -239,7 +239,6 @@ export async function openChannel(
       return { success: false, reason: STATUS_CODES.UNKNOWN_FAILURE }
     }
   } finally {
-    console.log(`RESOLVING`)
     openingRequests.delete(channelId.toHex())
     openingRequest.resolve()
   }
