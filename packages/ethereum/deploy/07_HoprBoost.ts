@@ -13,7 +13,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 }
 
 main.tags = ['HoprBoost']
-main.dependencies = ['preDeploy']
+main.dependencies = ['preDeploy', 'xHoprMock']
 main.skip = async (env: HardhatRuntimeEnvironment) => !!env.network.tags.production || !!env.network.tags.staging
 
 export default main
