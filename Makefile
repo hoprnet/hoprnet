@@ -39,6 +39,14 @@ build-cargo: build-yarn-utils
 build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
 	make -C docs/yellowpaper
 
+.PHONY: test
+test: ## run unit tests for all packages, or a single package if package= is set
+ifdef package
+	yarn workspace @hoprnet/${package} run test
+else
+	yarn workspaces foreach -pv run test
+endif
+
 .PHONY: help
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'

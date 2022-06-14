@@ -22,7 +22,7 @@ describe('commitment', function () {
   })
 
   it('should publish a hashed secret', async function () {
-    this.timeout(3000)
+    this.timeout(5e3)
 
     await initializeCommitment(fakeDB, fakeKey, fakeCommInfo, fakeGet, fakeSet)
     let c1 = await findCommitmentPreImage(fakeDB, fakeCommInfo.channelId)

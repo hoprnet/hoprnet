@@ -266,13 +266,13 @@ We use [mocha][9] for our tests. You can run our test suite across all
 packages using the following command:
 
 ```sh
-yarn test
+make test
 ```
 
 To run tests of a single package (e.g. hoprd) execute:
 
 ```sh
-yarn --cwd packages/hoprd test
+make test package=hoprd
 ```
 
 To run tests of a single test suite (e.g. Identity) within a
