@@ -52,12 +52,11 @@ import {
 import { type default as HoprCoreEthereum, type Indexer } from '@hoprnet/hopr-core-ethereum'
 
 import {
-  ChannelStrategy,
+  type StrategyTickResult,
+  type ChannelStrategyInterface,
   PassiveStrategy,
   PromiscuousStrategy,
-  SaneDefaults,
-  type ChannelsToOpen,
-  type ChannelsToClose
+  SaneDefaults
 } from './channel-strategy'
 
 import { subscribeToAcknowledgements } from './interactions/packet/acknowledgement'
@@ -92,7 +91,7 @@ export type HoprOptions = {
   allowPrivateConnections?: boolean
   password?: string
   connector?: HoprCoreEthereum
-  strategy?: ChannelStrategy
+  strategy?: ChannelStrategyInterface
   hosts?: {
     ip4?: NetOptions
     ip6?: NetOptions
@@ -154,7 +153,7 @@ class Hopr extends EventEmitter {
   public status: NodeStatus = 'UNINITIALIZED'
 
   private stopPeriodicCheck: (() => void) | undefined
-  private strategy: ChannelStrategy
+  private strategy: ChannelStrategyInterface
   private networkPeers: NetworkPeers
   private heartbeat: Heartbeat
   private forward: PacketForwardInteraction
@@ -179,7 +178,7 @@ class Hopr extends EventEmitter {
     private db: HoprDB,
     private connector: HoprCoreEthereum,
     private options: HoprOptions,
-    private publicNodesEmitter: HoprConnectConfig['config']['publicNodes'] = new EventEmitter()
+    private publicNodesEmitter = new (EventEmitter as new () => HoprConnectConfig['config']['publicNodes'])()
   ) {
     super()
 
@@ -522,8 +521,12 @@ class Hopr extends EventEmitter {
       throw new Error('node is not RUNNING')
     }
 
-    const currentChannels: ChannelEntry[] | undefined = await this.getAllChannels()
-    verbose('Channels obtained', currentChannels.map((entry) => entry.toString()).join(`\n`))
+    const currentChannels: ChannelEntry[] = (await this.getAllChannels()) ?? []
+
+    verbose(`Channels obtained:`)
+    for (const currentChannel of currentChannels) {
+      verbose(currentChannel.toString())
+    }
 
     if (currentChannels === undefined) {
       throw new Error('invalid channels retrieved from database')
@@ -539,32 +542,34 @@ class Hopr extends EventEmitter {
     } catch (e) {
       throw new Error('failed to getBalance, aborting tick')
     }
-    const [nextChannelDestinations, closeChannelDestinations]: [ChannelsToOpen[], ChannelsToClose[]] =
-      await this.strategy.tick(
-        balance.toBN(),
-        currentChannels,
-        this.networkPeers,
-        this.connector.getRandomOpenChannel.bind(this.connector)
-      )
+    const tickResult: StrategyTickResult = await this.strategy.tick(
+      balance.toBN(),
+      currentChannels,
+      this.networkPeers,
+      this.connector.getRandomOpenChannel.bind(this.connector)
+    )
 
-    const closeChannelDestinationsCount = closeChannelDestinations.length
+    const closeChannelDestinationsCount = tickResult.toClose.length
     verbose(`strategy wants to close ${closeChannelDestinationsCount} channels`)
 
     for (const channel of currentChannels) {
-      if (channel.status == ChannelStatus.PendingToClose && !closeChannelDestinations.includes(channel.destination)) {
+      if (
+        channel.status == ChannelStatus.PendingToClose &&
+        !tickResult.toClose.find((x: typeof tickResult['toClose'][number]) => x.destination.eq(channel.destination))
+      ) {
         // attempt to finalize closure
-        closeChannelDestinations.push(channel.destination)
+        tickResult.toClose.push({
+          destination: channel.destination
+        })
       }
     }
 
     verbose(
-      `strategy wants to finalize closure of ${
-        closeChannelDestinations.length - closeChannelDestinationsCount
-      } channels`
+      `strategy wants to finalize closure of ${tickResult.toClose.length - closeChannelDestinationsCount} channels`
     )
 
-    for (let i = 0; i < closeChannelDestinations.length; i++) {
-      const destination = closeChannelDestinations[i]
+    for (let i = 0; i < tickResult.toClose.length; i++) {
+      const destination = tickResult.toClose[i].destination
       verbose(`closing channel to ${destination.toB58String()}`)
       try {
         await this.closeChannel(destination.toPeerId(), 'outgoing')
@@ -574,28 +579,28 @@ class Hopr extends EventEmitter {
         log(`error when strategy trying to close channel to ${destination.toString()}`, e)
       }
 
-      if (i + 1 < closeChannelDestinations.length) {
+      if (i + 1 < tickResult.toClose.length) {
         // Give other tasks CPU time to happen
         // Push next loop iteration to end of next event loop iteration
         await setImmediate()
       }
     }
 
-    verbose(`strategy wants to open ${nextChannelDestinations.length} new channels`)
+    verbose(`strategy wants to open ${tickResult.toOpen.length} new channels`)
 
-    for (let i = 0; i < nextChannelDestinations.length; i++) {
-      const channel = nextChannelDestinations[i]
-      this.networkPeers.register(channel[0].toPeerId(), 'channel strategy tick (new channel)')
+    for (let i = 0; i < tickResult.toOpen.length; i++) {
+      const channel = tickResult.toOpen[i]
+      this.networkPeers.register(channel.destination.toPeerId(), 'channel strategy tick (new channel)')
       try {
         // Opening channels can fail if we can't establish a connection.
-        const hash = await this.openChannel(channel[0].toPeerId(), channel[1])
+        const hash = await this.openChannel(channel.destination.toPeerId(), channel.stake)
         verbose('- opened', channel, hash)
         this.emit('hopr:channel:opened', channel)
       } catch (e) {
-        log(`error when strategy trying to open channel to ${channel[0].toString()}`, e)
+        log(`error when strategy trying to open channel to ${channel.destination.toString()}`, e)
       }
 
-      if (i + 1 < nextChannelDestinations.length) {
+      if (i + 1 < tickResult.toOpen.length) {
         // Give other tasks CPU time to happen
         // Push next loop iteration to end of next event loop iteration
         await setImmediate()
@@ -949,24 +954,23 @@ class Hopr extends EventEmitter {
 
     try {
       log(
-        `announcing address ${addrToAnnounce.toString()} ${
-          announceRoutableAddress && routableAddressAvailable ? 'with' : 'without'
-        } routing`
+        'announcing on-chain %s routable address',
+        announceRoutableAddress && routableAddressAvailable ? 'with' : 'without'
       )
       const announceTxHash = await this.connector.announce(addrToAnnounce)
-      log(`announcing address ${addrToAnnounce.toString()} done in tx ${announceTxHash}`)
+      log('announcing address %s done in tx %s', addrToAnnounce.toString(), announceTxHash)
     } catch (err) {
-      log(`announcing address ${addrToAnnounce.toString()} failed`)
+      log('announcing address %s failed', addrToAnnounce.toString())
       this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to announce address ${addrToAnnounce.toString()}: ${err}`)
     }
   }
 
-  public setChannelStrategy(strategy: ChannelStrategy): void {
+  public setChannelStrategy(strategy: ChannelStrategyInterface): void {
     log('setting channel strategy from', this.strategy?.name, 'to', strategy.name)
     this.strategy = strategy
 
-    this.connector.on('ticket:win', async (ack) => {
+    this.connector.on('ticket:win', async (ack: AcknowledgedTicket) => {
       try {
         await this.strategy.onWinningTicket(ack, this.connector)
       } catch (err) {
@@ -1093,7 +1097,6 @@ class Hopr extends EventEmitter {
         // on-chain transactions
 
         if (channel.closureTimePassed()) {
-          log('finalizing closure of channel', channel.getId().toHex())
           txHash = await this.connector.finalizeClosure(counterpartyPubKey)
         } else {
           log(
@@ -1287,8 +1290,15 @@ class Hopr extends EventEmitter {
 export default Hopr
 export * from './constants'
 export { createHoprNode } from './main'
-export { PassiveStrategy, PromiscuousStrategy, SaneDefaults, findPath }
-export type { ChannelsToOpen, ChannelsToClose, NetworkHealthIndicator }
+export {
+  PassiveStrategy,
+  PromiscuousStrategy,
+  SaneDefaults,
+  findPath,
+  type StrategyTickResult,
+  type NetworkHealthIndicator,
+  type ChannelStrategyInterface
+}
 export { resolveEnvironment, supportedEnvironments, type ResolvedEnvironment } from './environment'
 export { createLibp2pMock } from './libp2p.mock'
 export { sampleOptions } from './index.mock'

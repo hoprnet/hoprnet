@@ -189,12 +189,12 @@ class NetworkPeers {
     return this.entries.size
   }
 
-  public allEntries(): Entry[] {
-    return Array.from(this.entries.values())
+  public allEntries(): IterableIterator<Entry> {
+    return this.entries.values()
   }
 
   public all(): PeerId[] {
-    return this.allEntries().map((entry) => entry.id)
+    return Array.from(this.allEntries()).map((entry) => entry.id)
   }
 
   /**
@@ -206,11 +206,11 @@ class NetworkPeers {
     const peers = this.all()
 
     // Sort a copy of peers in-place
-    peers.sort((a, b) => this.qualityOf(b) - this.qualityOf(a))
+    peers.sort((a: PeerId, b: PeerId) => this.qualityOf(b) - this.qualityOf(a))
 
     let bestAvailabilityNodes = 0
     let badAvailabilityNodes = 0
-    let out = ''
+    let out = '\n'
 
     for (const peer of peers) {
       if (!this.has(peer)) {
@@ -262,8 +262,8 @@ class NetworkPeers {
     }
   }
 
-  public getAllDenied(): Pick<Entry, 'id' | 'origin'>[] {
-    return Array.from(this.deniedEntries.values())
+  public getAllDenied(): IterableIterator<Pick<Entry, 'id' | 'origin'>> {
+    return this.deniedEntries.values()
   }
 
   public addPeerToDenied(peerId: PeerId, origin: string): void {
@@ -274,8 +274,11 @@ class NetworkPeers {
 
   public removePeerFromDenied(peerId: PeerId): void {
     const peerIdStr = peerId.toB58String()
-    log('removing peer from denied', peerIdStr)
-    this.deniedEntries.delete(peerIdStr)
+    const existed = this.deniedEntries.delete(peerIdStr)
+
+    if (existed) {
+      log('removing peer from denied', peerIdStr)
+    }
   }
 }
 
