@@ -50,7 +50,7 @@ jobs:
           cache: yarn
 
       - name: Build
-        run: make deps builds
+        run: make -j deps builds
 
       - name: Install websocat
         run: ./scripts/install-websocat.sh

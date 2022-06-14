@@ -36,11 +36,11 @@ jobs:
           apt install --no-install-recommends yarn
 
       - name: Install dependencies
-        run: make deps
+        run: make -j deps
 
       - name: Generate docs
         run: |
-          make build
+          make -j build
           yarn docs:generate
 
       - name: Generate OpenAPI spec file

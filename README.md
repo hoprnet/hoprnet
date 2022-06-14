@@ -240,7 +240,7 @@ We attempt to provide instructions on how to migrate your tokens between release
 ## Develop
 
 ```sh
-make deps build
+make -j deps build
 
 # starting network
 HOPR_ENVIRONMENT_ID=hardhat-localhost yarn run:network
