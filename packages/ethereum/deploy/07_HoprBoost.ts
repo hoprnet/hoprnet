@@ -6,7 +6,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const deployer = await getNamedAccounts().then((o) => ethers.getSigner(o.deployer))
 
   await deployments.deploy('HoprBoost', {
-    from: deployer,
+    from: deployer.address,
     args: [deployer, ''],
     log: true
   })
