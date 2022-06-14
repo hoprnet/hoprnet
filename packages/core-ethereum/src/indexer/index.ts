@@ -26,14 +26,16 @@ import {
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum'
-import type {
-  Event,
-  EventNames,
-  IndexerEvents,
-  TokenEvent,
-  TokenEventNames,
-  RegistryEvent,
-  RegistryEventNames
+import {
+  type Event,
+  type EventNames,
+  type IndexerEvents,
+  type TokenEvent,
+  type TokenEventNames,
+  type RegistryEvent,
+  type RegistryEventNames,
+  type IndexerEventEmitter,
+  IndexerStatus
 } from './types'
 import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils'
 import { Contract, errors } from 'ethers'
@@ -47,19 +49,12 @@ const getSyncPercentage = (start: number, current: number, end: number) =>
   (((current - start) / (end - start)) * 100).toFixed(2)
 const backoffOption: Parameters<typeof retryWithBackoff>[1] = { maxDelay: MAX_TRANSACTION_BACKOFF }
 
-export enum IndexerStatus {
-  STARTING = 'starting',
-  STARTED = 'started',
-  RESTARTING = 'restarting',
-  STOPPED = 'stopped'
-}
-
 /**
  * Indexes HoprChannels smart contract and stores to the DB,
  * all channels in the network.
  * Also keeps track of the latest block number.
  */
-class Indexer extends EventEmitter {
+class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   public status: IndexerStatus = IndexerStatus.STOPPED
   public latestBlock: number = 0 // latest known on-chain block number
 
@@ -162,7 +157,7 @@ class Indexer extends EventEmitter {
     log('Subscribing to events from block %d', fromBlock)
 
     this.status = IndexerStatus.STARTED
-    this.emit('status', 'started')
+    this.emit('status', IndexerStatus.STARTED)
     log(chalk.green('Indexer started!'))
   }
 
@@ -182,7 +177,7 @@ class Indexer extends EventEmitter {
     this.blockProcessingLock && (await this.blockProcessingLock.promise)
 
     this.status = IndexerStatus.STOPPED
-    this.emit('status', 'stopped')
+    this.emit('status', IndexerStatus.STOPPED)
     log(chalk.green('Indexer stopped!'))
   }
 
@@ -205,7 +200,7 @@ class Indexer extends EventEmitter {
       await this.start(this.chain, this.genesisBlock)
     } catch (err) {
       this.status = IndexerStatus.STOPPED
-      this.emit('status', 'stopped')
+      this.emit('status', IndexerStatus.STOPPED)
       log(chalk.red('Failed to restart: %s', err.message))
       throw err
     }
