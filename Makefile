@@ -9,7 +9,7 @@ deps: ## install dependencies
 
 .PHONY: build
 build: ## build all packages
-build: build-solidity-types build-hopr-admin build-cargo build-yarn
+build: build-hopr-admin build-yarn
 
 .PHONY: build-hopr-admin
 build-hopr-admin: ## build hopr admin React frontend
@@ -25,8 +25,13 @@ build-yarn: ## build yarn packages
 build-yarn: build-solidity-types build-cargo
 	npx tsc --build tsconfig.build.json
 
+.PHONY: build-yarn-utils
+build-yarn-utils: ## build yarn package 'hopr-utils
+	npx tsc -p packages/utils/tsconfig.json
+
 .PHONY: build-cargo
 build-cargo: ## build cargo packages
+build-cargo: build-yarn-utils
 	cargo build --release --target wasm32-unknown-unknown
 	yarn workspaces foreach -p --exclude hoprnet --exclude hopr-docs run build:wasm
 
