@@ -354,6 +354,10 @@ get_tickets_statistics() {
 
 log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5}, ${api6}, ${api7}, ${api8}"
 
+# Setup is done, so disable hardhat's auto-mining to correctly mimic 
+# real blockchain networks
+disable_hardhat_auto_mining
+
 validate_native_address "${api1}" "${api_token}"
 validate_native_address "${api2}" "${api_token}"
 validate_native_address "${api3}" "${api_token}"
