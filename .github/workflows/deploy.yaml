@@ -64,7 +64,8 @@ jobs:
       - name: '[BUILD] Install dependencies / link / build'
         run: |
           # Deploying with hardhat requires built hopr-utils package
-          make -j deps build
+          make -j deps
+          make -j build
 
       - name: '[SMART-CONTRACTS] Deploy for known environments'
         if: ${{ !env.ACT }}
@@ -366,7 +367,8 @@ jobs:
           # get latest version
           git pull
           # need to build our packages which might by used by the scripts, such as the fund script
-          make -j deps build
+          make -j deps
+          make -j build
 
       - name: Run deploy script for public nodes
         if: ${{ !env.ACT }}
@@ -437,7 +439,8 @@ jobs:
           # get latest version
           git pull
           # need to build our packages which might by used by the scripts, such as the fund script
-          make -j deps build
+          make -j deps
+          make -j build
 
       - name: Run deploy script for nodes behind NAT
         if: ${{ !env.ACT }}
