@@ -7,7 +7,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   await deployments.deploy('HoprBoost', {
     from: deployer.address,
-    args: [deployer, ''],
+    args: [deployer.address, ''],
     log: true
   })
 }
