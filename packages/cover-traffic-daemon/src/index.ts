@@ -6,7 +6,16 @@ import BN from 'bn.js'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
 import { hideBin } from 'yargs/helpers'
-import { createHoprNode, resolveEnvironment, supportedEnvironments, type ResolvedEnvironment } from '@hoprnet/hopr-core'
+import {
+  createHoprNode,
+  resolveEnvironment,
+  supportedEnvironments,
+  type ResolvedEnvironment,
+  HEARTBEAT_INTERVAL,
+  HEARTBEAT_THRESHOLD,
+  HEARTBEAT_INTERVAL_VARIANCE
+} from '@hoprnet/hopr-core'
+
 import { type ChannelEntry, privKeyToPeerId, PublicKey, debug } from '@hoprnet/hopr-utils'
 
 import { PersistedState } from './state'
@@ -105,6 +114,23 @@ const argv = yargs(hideBin(process.argv))
     describe: 'For testing local testnets. Prefer local peers to remote [env: HOPR_CTD_TEST_PREFER_LOCAL_ADDRESSES]',
     default: false
   })
+  .option('heartbeatInterval', {
+    number: true,
+    describe:
+      'Interval in milliseconds in which the availability of other nodes get measured [env: HOPRD_HEARTBEAT_INTERVAL]',
+    default: HEARTBEAT_INTERVAL
+  })
+  .option('heartbeatThreshold', {
+    number: true,
+    describe:
+      "Timeframe in milliseconds after which a heartbeat to another peer is performed, if it hasn't been seen since [env: HOPRD_HEARTBEAT_THRESHOLD]",
+    default: HEARTBEAT_THRESHOLD
+  })
+  .option('heartbeatVariance', {
+    number: true,
+    describe: 'Upper bound for variance applied to heartbeat interval in milliseconds [env: HOPRD_HEARTBEAT_VARIANCE]',
+    default: HEARTBEAT_INTERVAL_VARIANCE
+  })
   .wrap(Math.min(120, terminalWidth()))
   .parseSync()
 
@@ -117,6 +143,9 @@ function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
     password: '',
     dataPath: argv.data,
     allowLocalConnections: argv.allowLocalNodeConnections,
+    heartbeatInterval: argv.heartbeatInterval,
+    heartbeatThreshold: argv.heartbeatThreshold,
+    heartbeatVariance: argv.heartbeatVariance,
     testing: {
       announceLocalAddresses: argv.testAnnounceLocalAddresses,
       preferLocalAddresses: argv.testPreferLocalAddresses
