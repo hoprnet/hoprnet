@@ -43,6 +43,13 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
+      - name: '[SETUP] Print additional information'
+        run: |
+          node --version
+          npm --version
+          yarn --version
+          rustc --version
+
       - name: '[SETUP] Configure Git info'
         run: ./scripts/configure-git-info.sh
 
