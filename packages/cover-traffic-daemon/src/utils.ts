@@ -1,10 +1,17 @@
 import { findPath } from '@hoprnet/hopr-core'
 import BN from 'bn.js'
-import { BigNumber } from 'bignumber.js'
+import BigNumberPkg from 'bignumber.js'
 import { type PublicKey, type ChannelEntry, randomFloat } from '@hoprnet/hopr-utils'
-import type { State, PersistedState } from './state'
-import { CT_PATH_RANDOMNESS, CT_INTERMEDIATE_HOPS } from './constants'
+import type { State, PersistedState } from './state.js'
+import { CT_PATH_RANDOMNESS, CT_INTERMEDIATE_HOPS } from './constants.js'
 import { debug } from '@hoprnet/hopr-utils'
+
+// @TODO inefficient & does not support runtime updates
+// Don't do typechecks on JSON files
+// @ts-ignore
+import unreleasedTokens from '../unreleasedTokens.json' assert { type: 'json' }
+
+const { BigNumber } = BigNumberPkg
 
 const log = debug('hopr:cover-traffic')
 
@@ -29,9 +36,6 @@ export type UnreleasedTokens = {
     [index: string]: UnreleasedSchedule[]
   }
 }
-
-// @TODO inefficient & does not support runtime updates
-const unreleasedTokens: UnreleasedTokens = require('../unreleasedTokens.json')
 
 /**
  * Gets the integer part of the sqaure root of a an integer

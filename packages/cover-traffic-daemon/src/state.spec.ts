@@ -1,24 +1,21 @@
 import sinon from 'sinon'
-import { State, type PersistedState } from './state'
-import { log, mockChannelEntry, mockOpenChannel, mockPeerData, mockPublicKey, mockState } from './state.mock'
-import proxyquire from 'proxyquire'
-import fs from 'fs'
+import { PersistedState, State } from './state.js'
+import {
+  log,
+  mockChannelEntry,
+  mockOpenChannel,
+  mockPeerData,
+  mockPublicKey,
+  mockState,
+  TestingPersistedState
+} from './state.mock.js'
 import { expect } from 'chai'
 import BN from 'bn.js'
 
 describe('cover traffic state', async function () {
   let mockPersistedState: PersistedState
   beforeEach(async function () {
-    const existsSyncStub = sinon.stub(fs, 'existsSync').callsFake((_path) => false)
-    const writeFileSyncStub = sinon.stub(fs, 'writeFileSync').callsFake((..._args) => null)
-    const persistMock = proxyquire('./state', {
-      fs: {
-        existsSync: existsSyncStub,
-        readFileSync: null,
-        writeFileSync: writeFileSyncStub
-      }
-    })
-    mockPersistedState = new persistMock.PersistedState((state: State) => {
+    mockPersistedState = new TestingPersistedState((state: State) => {
       log(`State update: ${Object.keys(state.nodes).length} nodes, ${Object.keys(state.channels).length} channels`)
     }, './test/ct.json')
   })

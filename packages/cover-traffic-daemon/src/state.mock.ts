@@ -2,13 +2,33 @@ import { Balance, ChannelEntry, ChannelStatus, debug, Hash, PublicKey, stringToU
 import BN from 'bn.js'
 import PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'
-import { OpenChannels, PeerData, PersistedState, State } from './state'
+import { OpenChannels, PeerData, PersistedState, State, deserializeState, serializeState } from './state.js'
 
 export const log = debug('hopr:cover-traffic:mock')
 
 export const sampleData = {} as unknown as PersistedState
 
-export const mockPersistedState: PersistedState = new PersistedState((state: State) => {
+/**
+ * Just as the PersistedState class, except that it does not
+ * do any filesystem operation. Thus, the state is not persisted.
+ * @dev do *not* use in production
+ */
+export class TestingPersistedState extends PersistedState {
+  private dbString: string
+
+  override load(): void {
+    this._data = deserializeState(this.dbString)
+  }
+
+  override set(s: State): void {
+    this._data = s
+    this.dbString = serializeState(s)
+    this.update(s)
+    return
+  }
+}
+
+export const mockPersistedState: PersistedState = new TestingPersistedState((state: State) => {
   log(`State update: ${Object.keys(state.nodes).length} nodes, ${Object.keys(state.channels).length} channels`)
 }, './test/db.json')
 

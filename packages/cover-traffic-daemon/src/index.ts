@@ -4,7 +4,6 @@ import path from 'path'
 
 import BN from 'bn.js'
 import yargs from 'yargs/yargs'
-import { terminalWidth } from 'yargs'
 import { hideBin } from 'yargs/helpers'
 import {
   createHoprNode,
@@ -18,13 +17,13 @@ import {
 
 import { type ChannelEntry, privKeyToPeerId, PublicKey, debug } from '@hoprnet/hopr-utils'
 
-import { PersistedState } from './state'
-import { CoverTrafficStrategy } from './strategy'
-import setupHealthcheck from './healthcheck'
+import { PersistedState } from './state.js'
+import { CoverTrafficStrategy } from './strategy.js'
+import setupHealthcheck from './healthcheck.js'
 
 import type PeerId from 'peer-id'
 import type { HoprOptions } from '@hoprnet/hopr-core'
-import type { PeerData, State } from './state'
+import type { PeerData, State } from './state.js'
 
 const log = debug('hopr:cover-traffic')
 const verbose = debug('hopr:cover-traffic:verbose')
@@ -34,15 +33,15 @@ function stopGracefully(signal: number) {
   process.exit()
 }
 
-process.title = 'hopr-cover-traffic-daemon'
-
 export type DefaultEnvironment = {
   id?: string
 }
 
 function defaultEnvironment(): string {
   try {
-    const config = require('../default-environment.json') as DefaultEnvironment
+    // Don't do typechecks on JSON files
+    // @ts-ignore
+    const config = import('../default-environment.json', { assert: { type: 'json' } }) as DefaultEnvironment
     return config?.id || ''
   } catch (error) {
     // its ok if the file isn't there or cannot be read
@@ -56,7 +55,9 @@ process.title = 'hopr-cover-traffic-daemon'
 // Use environment-specific default data path
 const defaultDataPath = path.join(process.cwd(), 'hopr-cover-traffic-daemon-db', defaultEnvironment())
 
-const argv = yargs(hideBin(process.argv))
+const yargsInstance = yargs(hideBin(process.argv))
+
+const argv = yargsInstance
   .env('HOPR_CTD') // enable options to be set as environment variables with the HOPR_CTD prefix
   .epilogue(
     'All CLI options can be configured through environment variables as well. CLI parameters have precedence over environment variables.'
@@ -131,7 +132,7 @@ const argv = yargs(hideBin(process.argv))
     describe: 'Upper bound for variance applied to heartbeat interval in milliseconds [env: HOPRD_HEARTBEAT_VARIANCE]',
     default: HEARTBEAT_INTERVAL_VARIANCE
   })
-  .wrap(Math.min(120, terminalWidth()))
+  .wrap(Math.min(120, yargsInstance.terminalWidth()))
   .parseSync()
 
 function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
