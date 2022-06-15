@@ -19,7 +19,7 @@ tasks:
       ./scripts/install-websocat.sh
       yarn
       echo '🦄 📦 Building latest version of hoprnet monorepo'
-      yarn build; yarn build
+      yarn build
 
     command: |
       echo '🟡 Running HOPR nodes and topology'
