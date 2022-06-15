@@ -33,8 +33,6 @@ function stopGracefully(signal: number) {
   process.exit()
 }
 
-process.title = 'hopr-cover-traffic-daemon'
-
 export type DefaultEnvironment = {
   id?: string
 }
