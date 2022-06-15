@@ -352,6 +352,16 @@ get_tickets_statistics() {
   echo $(call_api ${1} "/tickets/statistics" "GET" "" ${assertion} 600)
 }
 
+# Performs a hardhat-specific EVM RPC call
+# to disable auto-mining at runtime
+disable_hardhat_auto_mining() {
+  log "Disabling hardhat automining"
+  HOPR_ENVIRONMENT_ID=hardhat-localhost \
+  TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
+  yarn workspace @hoprnet/hopr-ethereum hardhat disable-automine \
+    --network hardhat
+}
+
 log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5}, ${api6}, ${api7}, ${api8}"
 
 # Setup is done, so disable hardhat's auto-mining to correctly mimic 
