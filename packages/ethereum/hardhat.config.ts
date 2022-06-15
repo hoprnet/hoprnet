@@ -21,6 +21,7 @@ import '@typechain/hardhat'
 import faucet, { type FaucetCLIOPts } from './tasks/faucet'
 import parallelTest, { type ParallelTestCLIOpts } from './tasks/parallelTest'
 import register, { type RegisterOpts } from './tasks/register'
+import disableAutoMine from './tasks/disableAutoMine'
 import getAccounts from './tasks/getAccounts'
 
 import { expandVars } from '@hoprnet/hopr-utils'
@@ -75,6 +76,7 @@ function networkToHardhatNetwork(name: String, input: ResolvedEnvironment['netwo
   }
   if (cfg.tags && cfg.tags.indexOf('development') >= 0) {
     ;(cfg as HardhatNetworkUserConfig).mining = {
+      // Disabled using hardhat-specific RPC call after deployment
       auto: true, // every transaction will trigger a new block (without this deployments fail)
       interval: [1000, 3000] // mine new block every 1 - 3s
     }
@@ -179,6 +181,8 @@ task<FaucetCLIOPts>('faucet', 'Faucets a local development HOPR node account wit
   .addOptionalParam<string>('identityPrefix', `only use identity files with prefix`, undefined, types.string)
 
 task('accounts', 'View unlocked accounts', getAccounts)
+
+task('disable-automine', 'Used by E2E tests to disable auto-mining once setup is done', disableAutoMine)
 
 task<RegisterOpts>(
   'register',
