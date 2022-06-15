@@ -78,6 +78,5 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "stableVersion": "1.76.0-next.31"
+  }
 }

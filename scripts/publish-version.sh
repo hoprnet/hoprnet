@@ -53,6 +53,9 @@ if [ ! "${version_type}" = "patch" ] &&
   exit 1
 fi
 
+# define packages
+declare -A versioned_packages=(utils connect ethereum core-ethereum core real hoprd cover-traffic-daemon)
+
 # ensure local copy is up-to-date with origin
 branch=$(git rev-parse --abbrev-ref HEAD)
 git pull origin "${branch}" --rebase --tags
@@ -78,14 +81,16 @@ log "get default environment id"
 declare environment_id="$(${mydir}/get-default-environment.sh)"
 
 log "using version template ${current_version} + ${version_type}"
+declare new_version
+new_version=$(npx semver --preid next -i ${version_type} ${current_version})
+log "creating new version ${new_version}"
 
 # create new version in each package
-yarn workspaces foreach -piv --topological-dev \
-  --exclude hoprnet --exclude hopr-docs \
-  exec -- npm version ${version_type} --preid=next
-declare new_version
-new_version=$(${mydir}/get-package-version.sh)
-log "creating new version ${new_version}"
+for p in ${versioned_packages}; do
+  cd packages/${p} && \
+    jq ".version = \"${new_version}\"" < package.json > package.json.new && \
+    mv package.json.new package.json
+done
 
 # commit changes and create Git tag
 git add packages/*/package.json
