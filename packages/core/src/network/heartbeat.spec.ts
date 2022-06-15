@@ -1,10 +1,10 @@
-import Heartbeat, { type HeartbeatConfig, NetworkHealthIndicator } from './heartbeat'
-import NetworkPeers from './network-peers'
+import Heartbeat, { type HeartbeatConfig, NetworkHealthIndicator } from './heartbeat.js'
+import NetworkPeers from './network-peers.js'
 import { assert } from 'chai'
 import { type LibP2PHandlerFunction, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { EventEmitter, once } from 'events'
 import type PeerId from 'peer-id'
-import { NETWORK_QUALITY_THRESHOLD } from '../constants'
+import { NETWORK_QUALITY_THRESHOLD } from '../constants.js'
 
 class TestingHeartbeat extends Heartbeat {
   public async checkNodes() {

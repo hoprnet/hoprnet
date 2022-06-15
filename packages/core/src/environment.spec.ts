@@ -1,4 +1,4 @@
-import { resolveEnvironment } from './environment'
+import { resolveEnvironment } from './environment.js'
 import assert from 'assert'
 
 describe('test environment and flags', async function () {

@@ -1,7 +1,7 @@
-import type { Packet } from './messages'
-import { Mixer } from './mixer'
+import type { Packet } from './messages/index.js'
+import { Mixer } from './mixer.js'
 import assert from 'assert'
-import { MAX_PACKET_DELAY } from './constants'
+import { MAX_PACKET_DELAY } from './constants.js'
 import sinon from 'sinon'
 
 let i = 0

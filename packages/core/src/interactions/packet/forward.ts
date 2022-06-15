@@ -5,10 +5,10 @@ import type PeerId from 'peer-id'
 import { durations, pubKeyToPeerId, HoprDB } from '@hoprnet/hopr-utils'
 import { debug } from '@hoprnet/hopr-utils'
 
-import { Packet } from '../../messages'
-import { Mixer } from '../../mixer'
-import { sendAcknowledgement } from './acknowledgement'
-import type { SendMessage, Subscribe } from '../../index'
+import { Packet } from '../../messages/index.js'
+import { Mixer } from '../../mixer.js'
+import { sendAcknowledgement } from './acknowledgement.js'
+import type { SendMessage, Subscribe } from '../../index.js'
 
 const log = debug('hopr-core:packet:forward')
 const error = debug('hopr-core:packet:forward:error')

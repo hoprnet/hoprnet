@@ -1,4 +1,4 @@
-import { AcknowledgementChallenge } from './acknowledgementChallenge'
+import { AcknowledgementChallenge } from './acknowledgementChallenge.js'
 import { HalfKeyChallenge, sampleGroupElement } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import assert from 'assert'
