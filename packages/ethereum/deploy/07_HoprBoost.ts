@@ -2,18 +2,18 @@ import { HardhatRuntimeEnvironment } from 'hardhat/types'
 import { DeployFunction } from 'hardhat-deploy/types'
 
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const { deployments, getNamedAccounts } = hre
+  const { ethers, deployments, getNamedAccounts } = hre
+  const deployer = await getNamedAccounts().then((o) => ethers.getSigner(o.deployer))
 
-  const { deploy } = deployments
-  const { deployer } = await getNamedAccounts() // Deployer is still the admin and minter
-
-  await deploy('HoprBoost', {
-    from: deployer,
-    args: [deployer, ''],
+  await deployments.deploy('HoprBoost', {
+    from: deployer.address,
+    args: [deployer.address, ''],
     log: true
   })
 }
+
 main.tags = ['HoprBoost']
+main.dependencies = ['preDeploy', 'xHoprMock']
 main.skip = async (env: HardhatRuntimeEnvironment) => !!env.network.tags.production || !!env.network.tags.staging
 
 export default main

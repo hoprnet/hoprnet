@@ -47,7 +47,7 @@ const main: DeployFunction = async function ({
 }
 
 main.tags = ['HoprStake']
-main.dependencies = ['HoprBoost', 'HoprToken']
+main.dependencies = ['preDeploy', 'HoprBoost', 'HoprToken']
 main.skip = async (env: HardhatRuntimeEnvironment) => !!env.network.tags.production || !!env.network.tags.staging
 
 export default main
