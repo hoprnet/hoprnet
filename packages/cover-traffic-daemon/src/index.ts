@@ -33,8 +33,6 @@ function stopGracefully(signal: number) {
   process.exit()
 }
 
-process.title = 'hopr-cover-traffic-daemon'
-
 export type DefaultEnvironment = {
   id?: string
 }
@@ -50,9 +48,6 @@ function defaultEnvironment(): string {
     return ''
   }
 }
-
-// Replace default process name (`node`) by `hopr-cover-traffic-daemon`
-process.title = 'hopr-cover-traffic-daemon'
 
 // Use environment-specific default data path
 const defaultDataPath = path.join(process.cwd(), 'hopr-cover-traffic-daemon-db', defaultEnvironment())
