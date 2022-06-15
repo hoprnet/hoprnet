@@ -108,10 +108,6 @@ function networkToHardhatNetwork(name: String, input: NetworkOptions): NetworkUs
 
 const networks: NetworksUserConfig = {}
 
-if (!HOPR_ENVIRONMENT_ID) {
-  throw Error(`Required environment variable 'HOPR_ENVIRONMENT_ID' is not set`)
-}
-
 for (const [networkId, network] of Object.entries<NetworkOptions>(PROTOCOL_CONFIG.networks)) {
   if (
     PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID] &&
@@ -378,7 +374,7 @@ subtask(TASK_DEPLOY_RUN_DEPLOY, 'Override the deploy task, with an explicit gas 
       )
     }
 
-    const hardhatDeployGasPrice = (protocolConfigNetwork as ResolvedEnvironment['network']).hardhat_deploy_gas_price
+    const hardhatDeployGasPrice = (protocolConfigNetwork as NetworkOptions).hardhat_deploy_gas_price
     const parsedGasPrice = hardhatDeployGasPrice.split(' ')
 
     // as in https://github.com/wighawag/hardhat-deploy/blob/819df0fad56d75a5de5218c3307bec2093f8794c/src/DeploymentsManager.ts#L974
