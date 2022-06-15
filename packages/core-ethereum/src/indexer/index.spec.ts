@@ -5,9 +5,8 @@ import { ChannelEntry, Hash, ChannelStatus, defer, PublicKey } from '@hoprnet/ho
 import { expectAccountsToBeEqual, expectChannelsToBeEqual } from './fixtures'
 import * as fixtures from './fixtures'
 import { PARTY_A, PARTY_B, PARTY_B_MULTIADDR } from '../fixtures'
-import type { Event } from './types'
+import { type Event, IndexerStatus } from './types'
 import { useFixtures } from './index.mock'
-import { IndexerStatus } from '.'
 
 describe('test indexer', function () {
   it('should start indexer', async function () {
