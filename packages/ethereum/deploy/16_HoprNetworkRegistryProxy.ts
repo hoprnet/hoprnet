@@ -28,7 +28,7 @@ const main = async function ({ deployments, getNamedAccounts, network, environme
   console.log(`"HoprNetworkRegistryProxy" deployed at ${registryProxy.address}`)
 }
 
-main.dependencies = ['preDeploy']
+main.dependencies = ['preDeploy', 'HoprStake']
 main.tags = ['HoprNetworkRegistryProxy']
 
 export default main

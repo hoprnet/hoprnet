@@ -15,14 +15,17 @@
 - [SaneDefaults](classes/SaneDefaults.md)
 - [default](classes/default.md)
 
+### Interfaces
+
+- [ChannelStrategyInterface](interfaces/ChannelStrategyInterface.md)
+
 ### Type aliases
 
-- [ChannelsToClose](modules.md#channelstoclose)
-- [ChannelsToOpen](modules.md#channelstoopen)
 - [HoprOptions](modules.md#hoproptions)
 - [NodeStatus](modules.md#nodestatus)
 - [ResolvedEnvironment](modules.md#resolvedenvironment)
 - [SendMessage](modules.md#sendmessage)
+- [StrategyTickResult](modules.md#strategytickresult)
 - [Subscribe](modules.md#subscribe)
 
 ### Variables
@@ -56,26 +59,6 @@
 
 ## Type aliases
 
-### ChannelsToClose
-
-Ƭ **ChannelsToClose**: `PublicKey`
-
-#### Defined in
-
-[packages/core/src/channel-strategy.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L17)
-
-___
-
-### ChannelsToOpen
-
-Ƭ **ChannelsToOpen**: [`PublicKey`, `BN`]
-
-#### Defined in
-
-[packages/core/src/channel-strategy.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L16)
-
-___
-
 ### HoprOptions
 
 Ƭ **HoprOptions**: `Object`
@@ -101,7 +84,7 @@ ___
 | `networkQualityThreshold?` | `number` |
 | `onChainConfirmations?` | `number` |
 | `password?` | `string` |
-| `strategy?` | `ChannelStrategy` |
+| `strategy?` | [`ChannelStrategyInterface`](interfaces/ChannelStrategyInterface.md) |
 | `testing?` | { `announceLocalAddresses?`: `boolean` ; `noDirectConnections?`: `boolean` ; `noUPNP?`: `boolean` ; `noWebRTCUpgrade?`: `boolean` ; `preferLocalAddresses?`: `boolean`  } |
 | `testing.announceLocalAddresses?` | `boolean` |
 | `testing.noDirectConnections?` | `boolean` |
@@ -111,7 +94,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:85](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L85)
+[packages/core/src/index.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L84)
 
 ___
 
@@ -121,7 +104,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:129](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L129)
+[packages/core/src/index.ts:128](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L128)
 
 ___
 
@@ -156,7 +139,24 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:144](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L144)
+[packages/core/src/index.ts:143](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L143)
+
+___
+
+### StrategyTickResult
+
+Ƭ **StrategyTickResult**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `toClose` | { `destination`: `PublicKey`  }[] |
+| `toOpen` | { `destination`: `PublicKey` ; `stake`: `BN`  }[] |
+
+#### Defined in
+
+[packages/core/src/channel-strategy.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L16)
 
 ___
 
@@ -166,7 +166,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:131](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L131)
+[packages/core/src/index.ts:130](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L130)
 
 ## Variables
 
@@ -368,7 +368,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/main.ts:186](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L186)
+[packages/core/src/main.ts:178](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L178)
 
 ___
 
@@ -420,7 +420,7 @@ destination
 
 #### Defined in
 
-[packages/core/src/path/index.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/path/index.ts#L38)
+[packages/core/src/path/index.ts:36](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/path/index.ts#L36)
 
 ___
 

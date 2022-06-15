@@ -9,7 +9,7 @@ if (!process) {
 }
 
 // Gives the process a meaningful name, Node.js default is `node`
-process.title = 'hoprd'
+process.title = 'hopr-cover-traffic-daemon'
 
 const nodeVersion = process.version
 

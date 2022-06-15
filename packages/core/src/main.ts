@@ -1,7 +1,7 @@
 import path from 'path'
 import { mkdir } from 'fs/promises'
 
-import { default as LibP2P, type Connection } from 'libp2p'
+import { default as LibP2P } from 'libp2p'
 import { LevelDatastore } from 'datastore-level'
 import { type AddressSorter, HoprDB, PublicKey, debug } from '@hoprnet/hopr-utils'
 import { default as HoprCoreEthereum } from '@hoprnet/hopr-core-ethereum'
@@ -138,6 +138,14 @@ export async function createLibp2pInstance(
       maxParallelDials: options.announce ? 250 : 50,
       // default timeout of 30s appears to be too long
       dialTimeout: 10e3
+    },
+    connectionGater: {
+      denyDialPeer: async (peer: PeerId) => {
+        return !(await reviewConnection(peer, 'libp2p peer connect'))
+      },
+      denyInboundEncryptedConnection: async (peer: PeerId) => {
+        return !(await reviewConnection(peer, 'libp2p peer connect'))
+      }
     }
   })
 
@@ -158,22 +166,6 @@ export async function createLibp2pInstance(
   libp2p._dht._lan._protocol = HOPR_DHT_LAN_PROTOCOL
   libp2p._dht._lan._network._protocol = HOPR_DHT_LAN_PROTOCOL
   libp2p._dht._lan._topologyListener._protocol = HOPR_DHT_LAN_PROTOCOL
-
-  const onConnectionOriginal = libp2p.upgrader.onConnection
-  // check if connection is allowed
-  libp2p.upgrader.onConnection = async (conn: Connection) => {
-    const allowed = await reviewConnection(conn.remotePeer, 'libp2p peer connect')
-    if (allowed) {
-      // continue connection
-      onConnectionOriginal(conn)
-    } else {
-      try {
-        await conn.close()
-      } catch (err: any) {
-        log(`Error while closing connection to non-registered node`, err)
-      }
-    }
-  }
 
   return libp2p
 }
