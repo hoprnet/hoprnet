@@ -97,6 +97,8 @@ const main: DeployFunction = async function ({ ethers, deployments, getNamedAcco
   }
 }
 
+main.dependencies = ['preDeploy', 'HoprNetworkRegistry', 'HoprBoost', 'HoprStake']
+main.tags = ['MintDevNftTransferOwnership']
 main.skip = async (env: HardhatRuntimeEnvironment) => !!env.network.tags.production
 
 export default main

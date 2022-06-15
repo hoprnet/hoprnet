@@ -9,7 +9,7 @@ deps: ## install dependencies
 
 .PHONY: build
 build: ## build all packages
-build: build-solidity-types build-hopr-admin build-cargo build-yarn
+build: build-hopr-admin build-yarn
 
 .PHONY: build-hopr-admin
 build-hopr-admin: ## build hopr admin React frontend
@@ -25,6 +25,7 @@ build-yarn: ## build yarn packages
 build-yarn: build-solidity-types build-cargo
 	npx tsc --build tsconfig.build.json
 
+
 .PHONY: build-cargo
 build-cargo: ## build cargo packages
 	cargo build --release --target wasm32-unknown-unknown
@@ -33,6 +34,14 @@ build-cargo: ## build cargo packages
 .PHONY: build-yellowpaper
 build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
 	make -C docs/yellowpaper
+
+.PHONY: test
+test: ## run unit tests for all packages, or a single package if package= is set
+ifdef package
+	yarn workspace @hoprnet/${package} run test
+else
+	yarn workspaces foreach -pv run test
+endif
 
 .PHONY: help
 help:

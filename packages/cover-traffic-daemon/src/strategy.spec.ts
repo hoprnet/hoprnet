@@ -1,30 +1,21 @@
 import sinon from 'sinon'
-import { State, type PersistedState } from './state'
-import { log, mockChannelEntry } from './state.mock'
-import proxyquire from 'proxyquire'
-import fs from 'fs'
+import { State, type PersistedState } from './state.js'
+import { log, mockChannelEntry, TestingPersistedState } from './state.mock.js'
 import { expect } from 'chai'
-import Hopr from '@hoprnet/hopr-core'
-import { CoverTrafficStrategy } from './strategy'
+import { default as Hopr, type ChannelStrategyInterface } from '@hoprnet/hopr-core'
+import { CoverTrafficStrategy } from './strategy.js'
 
 describe('cover traffic strategy', async function () {
-  let mockCoverTrafficStrategy
+  let mockCoverTrafficStrategy: ChannelStrategyInterface
   beforeEach(async function () {
     // have a mock state
-    const existsSyncStub = sinon.stub(fs, 'existsSync').callsFake((_path) => false)
-    const writeFileSyncStub = sinon.stub(fs, 'writeFileSync').callsFake((..._args) => null)
-    const persistMock = proxyquire('./state', {
-      fs: {
-        existsSync: existsSyncStub,
-        readFileSync: null,
-        writeFileSync: writeFileSyncStub
-      }
-    })
-    const mockPersistedState: PersistedState = new persistMock.PersistedState((state: State) => {
+    const mockPersistedState: PersistedState = new TestingPersistedState((state: State) => {
       log(`State update: ${Object.keys(state.nodes).length} nodes, ${Object.keys(state.channels).length} channels`)
     }, './test/ct.json')
 
-    const mockHoprNode = sinon.createStubInstance(Hopr)
+    // ESM / Common.js problem
+    // @ts-ignore
+    const mockHoprNode = sinon.createStubInstance<Hopr>(Hopr.default)
     mockHoprNode.sendMessage.resolves()
 
     mockCoverTrafficStrategy = new CoverTrafficStrategy(mockChannelEntry.source, mockHoprNode, mockPersistedState)

@@ -43,6 +43,13 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
+      - name: '[SETUP] Print additional information'
+        run: |
+          node --version
+          npm --version
+          yarn --version
+          rustc --version
+
       - name: '[SETUP] Configure Git info'
         run: ./scripts/configure-git-info.sh
 
@@ -69,7 +76,8 @@ jobs:
       - name: '[BUILD] Install dependencies / link / build'
         run: |
           # Deploying with hardhat requires built hopr-utils package
-          make deps build
+          make -j deps
+          make -j build
 
       - name: '[SMART-CONTRACTS] Deploy for known environments'
         if: ${{ !env.ACT }}
@@ -376,7 +384,8 @@ jobs:
           # get latest version
           git pull
           # need to build our packages which might by used by the scripts, such as the fund script
-          make deps build
+          make -j deps
+          make -j build
 
       - name: Run deploy script for public nodes
         if: ${{ !env.ACT }}
@@ -452,7 +461,8 @@ jobs:
           # get latest version
           git pull
           # need to build our packages which might by used by the scripts, such as the fund script
-          make deps build
+          make -j deps
+          make -j build
 
       - name: Run deploy script for nodes behind NAT
         if: ${{ !env.ACT }}

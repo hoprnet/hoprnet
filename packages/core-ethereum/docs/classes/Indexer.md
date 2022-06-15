@@ -8,7 +8,7 @@ Also keeps track of the latest block number.
 
 ## Hierarchy
 
-- `EventEmitter`
+- `IndexerEventEmitter`<`this`\>
 
   ↳ **`Indexer`**
 
@@ -29,26 +29,19 @@ Also keeps track of the latest block number.
 - [unconfirmedEvents](Indexer.md#unconfirmedevents)
 - [unsubscribeBlock](Indexer.md#unsubscribeblock)
 - [unsubscribeErrors](Indexer.md#unsubscribeerrors)
-- [captureRejectionSymbol](Indexer.md#capturerejectionsymbol)
-- [captureRejections](Indexer.md#capturerejections)
-- [defaultMaxListeners](Indexer.md#defaultmaxlisteners)
-- [errorMonitor](Indexer.md#errormonitor)
 
 ### Methods
 
 - [addListener](Indexer.md#addlistener)
 - [emit](Indexer.md#emit)
-- [eventNames](Indexer.md#eventnames)
 - [getAccount](Indexer.md#getaccount)
 - [getAddressesAnnouncedOnChain](Indexer.md#getaddressesannouncedonchain)
 - [getEvents](Indexer.md#getevents)
-- [getMaxListeners](Indexer.md#getmaxlisteners)
 - [getOpenChannelsFrom](Indexer.md#getopenchannelsfrom)
 - [getPublicKeyOf](Indexer.md#getpublickeyof)
 - [getPublicNodes](Indexer.md#getpublicnodes)
 - [getRandomOpenChannel](Indexer.md#getrandomopenchannel)
 - [indexEvent](Indexer.md#indexevent)
-- [listenerCount](Indexer.md#listenercount)
 - [listeners](Indexer.md#listeners)
 - [off](Indexer.md#off)
 - [on](Indexer.md#on)
@@ -69,18 +62,11 @@ Also keeps track of the latest block number.
 - [prependOnceListener](Indexer.md#prependoncelistener)
 - [processPastEvents](Indexer.md#processpastevents)
 - [processUnconfirmedEvents](Indexer.md#processunconfirmedevents)
-- [rawListeners](Indexer.md#rawlisteners)
-- [removeAllListeners](Indexer.md#removealllisteners)
 - [removeListener](Indexer.md#removelistener)
 - [resolvePendingTransaction](Indexer.md#resolvependingtransaction)
 - [restart](Indexer.md#restart)
-- [setMaxListeners](Indexer.md#setmaxlisteners)
 - [start](Indexer.md#start)
 - [stop](Indexer.md#stop)
-- [getEventListeners](Indexer.md#geteventlisteners)
-- [listenerCount](Indexer.md#listenercount)
-- [on](Indexer.md#on)
-- [once](Indexer.md#once)
 
 ## Constructors
 
@@ -99,11 +85,11 @@ Also keeps track of the latest block number.
 
 #### Overrides
 
-EventEmitter.constructor
+(EventEmitter as new () &#x3D;\&gt; IndexerEventEmitter).constructor
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:78](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L78)
+[packages/core-ethereum/src/indexer/index.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L73)
 
 ## Properties
 
@@ -113,7 +99,7 @@ EventEmitter.constructor
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L73)
+[packages/core-ethereum/src/indexer/index.ts:68](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L68)
 
 ___
 
@@ -139,6 +125,7 @@ ___
 | `getNetworkRegistry` | () => `HoprNetworkRegistry` |
 | `getPrivateKey` | () => `Uint8Array` |
 | `getPublicKey` | () => `PublicKey` |
+| `getTimestamp` | (`blockNumber`: `number`) => `Promise`<`number`\> |
 | `getToken` | () => `HoprToken` |
 | `getTransactionsInBlock` | (`blockNumber`: `number`) => `Promise`<`string`[]\> |
 | `initiateChannelClosure` | (`counterparty`: `Address`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
@@ -154,7 +141,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:69](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L69)
+[packages/core-ethereum/src/indexer/index.ts:64](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L64)
 
 ___
 
@@ -164,7 +151,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L70)
+[packages/core-ethereum/src/indexer/index.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L65)
 
 ___
 
@@ -174,7 +161,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L71)
+[packages/core-ethereum/src/indexer/index.ts:66](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L66)
 
 ___
 
@@ -184,7 +171,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:64](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L64)
+[packages/core-ethereum/src/indexer/index.ts:59](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L59)
 
 ___
 
@@ -194,7 +181,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L63)
+[packages/core-ethereum/src/indexer/index.ts:58](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L58)
 
 ___
 
@@ -204,7 +191,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L67)
+[packages/core-ethereum/src/indexer/index.ts:62](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L62)
 
 ___
 
@@ -222,7 +209,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:76](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L76)
+[packages/core-ethereum/src/indexer/index.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L71)
 
 ___
 
@@ -240,90 +227,20 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:75](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L75)
-
-___
-
-### captureRejectionSymbol
-
-▪ `Static` `Readonly` **captureRejectionSymbol**: typeof [`captureRejectionSymbol`](default.md#capturerejectionsymbol)
-
-#### Inherited from
-
-EventEmitter.captureRejectionSymbol
-
-#### Defined in
-
-node_modules/@types/node/events.d.ts:273
-
-___
-
-### captureRejections
-
-▪ `Static` **captureRejections**: `boolean`
-
-Sets or gets the default captureRejection value for all emitters.
-
-#### Inherited from
-
-EventEmitter.captureRejections
-
-#### Defined in
-
-node_modules/@types/node/events.d.ts:278
-
-___
-
-### defaultMaxListeners
-
-▪ `Static` **defaultMaxListeners**: `number`
-
-#### Inherited from
-
-EventEmitter.defaultMaxListeners
-
-#### Defined in
-
-node_modules/@types/node/events.d.ts:279
-
-___
-
-### errorMonitor
-
-▪ `Static` `Readonly` **errorMonitor**: typeof [`errorMonitor`](default.md#errormonitor)
-
-This symbol shall be used to install a listener for only monitoring `'error'`
-events. Listeners installed using this symbol are called before the regular
-`'error'` listeners are called.
-
-Installing a listener using this symbol does not change the behavior once an
-`'error'` event is emitted, therefore the process will still crash if no
-regular `'error'` listener is installed.
-
-#### Inherited from
-
-EventEmitter.errorMonitor
-
-#### Defined in
-
-node_modules/@types/node/events.d.ts:272
+[packages/core-ethereum/src/indexer/index.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L70)
 
 ## Methods
 
 ### addListener
 
-▸ **addListener**(`eventName`, `listener`): [`Indexer`](Indexer.md)
-
-Alias for `emitter.on(eventName, listener)`.
-
-**`since`** v0.1.26
+▸ **addListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | `string` \| `symbol` |
-| `listener` | (...`args`: `any`[]) => `void` |
+| `event` | `IndexerEventNames` |
+| `listener` | () => `void` |
 
 #### Returns
 
@@ -331,64 +248,191 @@ Alias for `emitter.on(eventName, listener)`.
 
 #### Inherited from
 
-EventEmitter.addListener
+(EventEmitter as new () =\> IndexerEventEmitter).addListener
 
 #### Defined in
 
-node_modules/@types/node/events.d.ts:299
+[packages/core-ethereum/src/indexer/types.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L70)
 
-___
-
-### emit
-
-▸ **emit**(`eventName`, ...`args`): `boolean`
-
-Synchronously calls each of the listeners registered for the event named`eventName`, in the order they were registered, passing the supplied arguments
-to each.
-
-Returns `true` if the event had listeners, `false` otherwise.
-
-```js
-const EventEmitter = require('events');
-const myEmitter = new EventEmitter();
-
-// First listener
-myEmitter.on('event', function firstListener() {
-  console.log('Helloooo! first listener');
-});
-// Second listener
-myEmitter.on('event', function secondListener(arg1, arg2) {
-  console.log(`event with parameters ${arg1}, ${arg2} in second listener`);
-});
-// Third listener
-myEmitter.on('event', function thirdListener(...args) {
-  const parameters = args.join(', ');
-  console.log(`event with parameters ${parameters} in third listener`);
-});
-
-console.log(myEmitter.listeners('event'));
-
-myEmitter.emit('event', 1, 2, 3, 4, 5);
-
-// Prints:
-// [
-//   [Function: firstListener],
-//   [Function: secondListener],
-//   [Function: thirdListener]
-// ]
-// Helloooo! first listener
-// event with parameters 1, 2 in second listener
-// event with parameters 1, 2, 3, 4, 5 in third listener
-```
-
-**`since`** v0.1.26
+▸ **addListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | `string` \| `symbol` |
-| `...args` | `any`[] |
+| `event` | ``"block"`` |
+| `listener` | `BlockListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).addListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L71)
+
+▸ **addListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"block-processed"`` |
+| `listener` | `BlockProcessedListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).addListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L72)
+
+▸ **addListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"status"`` |
+| `listener` | `StatusListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).addListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L73)
+
+▸ **addListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"peer"`` |
+| `listener` | `PeerListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).addListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L74)
+
+▸ **addListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `ChannelUpdateEventNames` |
+| `listener` | `ChannelUpdateListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).addListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:75](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L75)
+
+▸ **addListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `IndexerEvents` |
+| `listener` | `IndexerEventsListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).addListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:76](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L76)
+
+▸ **addListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"network-registry-eligibility-changed"`` |
+| `listener` | `NetworkRegistryEligibilityChangedListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).addListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:77](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L77)
+
+▸ **addListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"network-registry-status-changed"`` |
+| `listener` | `NetworkRegistryStatusChangedListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).addListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:81](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L81)
+
+___
+
+### emit
+
+▸ **emit**(`event`): `boolean`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `IndexerEventNames` |
 
 #### Returns
 
@@ -396,47 +440,183 @@ myEmitter.emit('event', 1, 2, 3, 4, 5);
 
 #### Inherited from
 
-EventEmitter.emit
+(EventEmitter as new () =\> IndexerEventEmitter).emit
 
 #### Defined in
 
-node_modules/@types/node/events.d.ts:555
+[packages/core-ethereum/src/indexer/types.ts:83](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L83)
 
-___
+▸ **emit**(`event`, `block`): `boolean`
 
-### eventNames
+#### Parameters
 
-▸ **eventNames**(): (`string` \| `symbol`)[]
-
-Returns an array listing the events for which the emitter has registered
-listeners. The values in the array are strings or `Symbol`s.
-
-```js
-const EventEmitter = require('events');
-const myEE = new EventEmitter();
-myEE.on('foo', () => {});
-myEE.on('bar', () => {});
-
-const sym = Symbol('symbol');
-myEE.on(sym, () => {});
-
-console.log(myEE.eventNames());
-// Prints: [ 'foo', 'bar', Symbol(symbol) ]
-```
-
-**`since`** v6.0.0
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"block"`` |
+| `block` | `number` |
 
 #### Returns
 
-(`string` \| `symbol`)[]
+`boolean`
 
 #### Inherited from
 
-EventEmitter.eventNames
+(EventEmitter as new () =\> IndexerEventEmitter).emit
 
 #### Defined in
 
-node_modules/@types/node/events.d.ts:614
+[packages/core-ethereum/src/indexer/types.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L84)
+
+▸ **emit**(`event`, `block`): `boolean`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"block-processed"`` |
+| `block` | `number` |
+
+#### Returns
+
+`boolean`
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).emit
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:85](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L85)
+
+▸ **emit**(`event`, `status`): `boolean`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"status"`` |
+| `status` | `IndexerStatus` |
+
+#### Returns
+
+`boolean`
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).emit
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:86](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L86)
+
+▸ **emit**(`event`, `peerData`): `boolean`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"peer"`` |
+| `peerData` | `Object` |
+| `peerData.id` | `PeerId` |
+| `peerData.multiaddrs` | `Multiaddr`[] |
+
+#### Returns
+
+`boolean`
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).emit
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:87](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L87)
+
+▸ **emit**(`event`, `channel`): `boolean`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `ChannelUpdateEventNames` |
+| `channel` | [`ChannelEntry`](ChannelEntry.md) |
+
+#### Returns
+
+`boolean`
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).emit
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:88](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L88)
+
+▸ **emit**(`event`, `txHash`): `boolean`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `IndexerEvents` |
+| `txHash` | `string` |
+
+#### Returns
+
+`boolean`
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).emit
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:89](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L89)
+
+▸ **emit**(`event`, `account`, `hoprNode`, `eligibility`): `boolean`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"network-registry-eligibility-changed"`` |
+| `account` | `Address` |
+| `hoprNode` | `PublicKey` |
+| `eligibility` | `boolean` |
+
+#### Returns
+
+`boolean`
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).emit
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L90)
+
+▸ **emit**(`event`, `isEnabled`): `boolean`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"network-registry-status-changed"`` |
+| `isEnabled` | `boolean` |
+
+#### Returns
+
+`boolean`
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).emit
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:96](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L96)
 
 ___
 
@@ -456,7 +636,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:872](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L872)
+[packages/core-ethereum/src/indexer/index.ts:867](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L867)
 
 ___
 
@@ -470,7 +650,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:884](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L884)
+[packages/core-ethereum/src/indexer/index.ts:879](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L879)
 
 ___
 
@@ -497,30 +677,7 @@ all relevant events in the specified block range
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:222](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L222)
-
-___
-
-### getMaxListeners
-
-▸ **getMaxListeners**(): `number`
-
-Returns the current max listener value for the `EventEmitter` which is either
-set by `emitter.setMaxListeners(n)` or defaults to [defaultMaxListeners](Indexer.md#defaultmaxlisteners).
-
-**`since`** v1.0.0
-
-#### Returns
-
-`number`
-
-#### Inherited from
-
-EventEmitter.getMaxListeners
-
-#### Defined in
-
-node_modules/@types/node/events.d.ts:471
+[packages/core-ethereum/src/indexer/index.ts:217](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L217)
 
 ___
 
@@ -545,7 +702,7 @@ peer's open channels
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:927](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L927)
+[packages/core-ethereum/src/indexer/index.ts:922](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L922)
 
 ___
 
@@ -565,7 +722,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:876](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L876)
+[packages/core-ethereum/src/indexer/index.ts:871](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L871)
 
 ___
 
@@ -579,7 +736,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:888](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L888)
+[packages/core-ethereum/src/indexer/index.ts:883](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L883)
 
 ___
 
@@ -598,7 +755,7 @@ an open channel
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:910](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L910)
+[packages/core-ethereum/src/indexer/index.ts:905](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L905)
 
 ___
 
@@ -618,59 +775,19 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:867](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L867)
-
-___
-
-### listenerCount
-
-▸ **listenerCount**(`eventName`): `number`
-
-Returns the number of listeners listening to the event named `eventName`.
-
-**`since`** v3.2.0
-
-#### Parameters
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `eventName` | `string` \| `symbol` | The name of the event being listened for |
-
-#### Returns
-
-`number`
-
-#### Inherited from
-
-EventEmitter.listenerCount
-
-#### Defined in
-
-node_modules/@types/node/events.d.ts:561
+[packages/core-ethereum/src/indexer/index.ts:862](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L862)
 
 ___
 
 ### listeners
 
-▸ **listeners**(`eventName`): `Function`[]
-
-Returns a copy of the array of listeners for the event named `eventName`.
-
-```js
-server.on('connection', (stream) => {
-  console.log('someone connected!');
-});
-console.log(util.inspect(server.listeners('connection')));
-// Prints: [ [Function] ]
-```
-
-**`since`** v0.1.26
+▸ **listeners**(`event`): `Function`[]
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | `string` \| `symbol` |
+| `event` | `IndexerEventNames` |
 
 #### Returns
 
@@ -678,28 +795,24 @@ console.log(util.inspect(server.listeners('connection')));
 
 #### Inherited from
 
-EventEmitter.listeners
+(EventEmitter as new () =\> IndexerEventEmitter).listeners
 
 #### Defined in
 
-node_modules/@types/node/events.d.ts:484
+[packages/core-ethereum/src/indexer/types.ts:170](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L170)
 
 ___
 
 ### off
 
-▸ **off**(`eventName`, `listener`): [`Indexer`](Indexer.md)
-
-Alias for `emitter.removeListener()`.
-
-**`since`** v10.0.0
+▸ **off**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | `string` \| `symbol` |
-| `listener` | (...`args`: `any`[]) => `void` |
+| `event` | `IndexerEventNames` |
+| `listener` | () => `void` |
 
 #### Returns
 
@@ -707,52 +820,192 @@ Alias for `emitter.removeListener()`.
 
 #### Inherited from
 
-EventEmitter.off
+(EventEmitter as new () =\> IndexerEventEmitter).off
 
 #### Defined in
 
-node_modules/@types/node/events.d.ts:444
+[packages/core-ethereum/src/indexer/types.ts:160](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L160)
+
+▸ **off**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"block"`` |
+| `listener` | `BlockListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).off
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:161](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L161)
+
+▸ **off**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"block-processed"`` |
+| `listener` | `BlockProcessedListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).off
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:162](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L162)
+
+▸ **off**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"status"`` |
+| `listener` | `StatusListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).off
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:163](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L163)
+
+▸ **off**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"peer"`` |
+| `listener` | `PeerListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).off
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:164](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L164)
+
+▸ **off**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `ChannelUpdateEventNames` |
+| `listener` | `ChannelUpdateListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).off
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:165](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L165)
+
+▸ **off**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `IndexerEvents` |
+| `listener` | `IndexerEventsListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).off
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:166](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L166)
+
+▸ **off**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"network-registry-eligibility-changed"`` |
+| `listener` | `NetworkRegistryEligibilityChangedListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).off
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:167](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L167)
+
+▸ **off**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"network-registry-status-changed"`` |
+| `listener` | `NetworkRegistryStatusChangedListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).off
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:168](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L168)
 
 ___
 
 ### on
 
-▸ **on**(`eventName`, `listener`): [`Indexer`](Indexer.md)
-
-Adds the `listener` function to the end of the listeners array for the
-event named `eventName`. No checks are made to see if the `listener` has
-already been added. Multiple calls passing the same combination of `eventName`and `listener` will result in the `listener` being added, and called, multiple
-times.
-
-```js
-server.on('connection', (stream) => {
-  console.log('someone connected!');
-});
-```
-
-Returns a reference to the `EventEmitter`, so that calls can be chained.
-
-By default, event listeners are invoked in the order they are added. The`emitter.prependListener()` method can be used as an alternative to add the
-event listener to the beginning of the listeners array.
-
-```js
-const myEE = new EventEmitter();
-myEE.on('foo', () => console.log('a'));
-myEE.prependListener('foo', () => console.log('b'));
-myEE.emit('foo');
-// Prints:
-//   b
-//   a
-```
-
-**`since`** v0.1.101
+▸ **on**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `eventName` | `string` \| `symbol` | The name of the event. |
-| `listener` | (...`args`: `any`[]) => `void` | The callback function |
+| Name | Type |
+| :------ | :------ |
+| `event` | `IndexerEventNames` |
+| `listener` | () => `void` |
 
 #### Returns
 
@@ -760,11 +1013,179 @@ myEE.emit('foo');
 
 #### Inherited from
 
-EventEmitter.on
+(EventEmitter as new () =\> IndexerEventEmitter).on
 
 #### Defined in
 
-node_modules/@types/node/events.d.ts:330
+[packages/core-ethereum/src/indexer/types.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L98)
+
+▸ **on**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"block"`` |
+| `listener` | `BlockListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).on
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:99](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L99)
+
+▸ **on**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"block-processed"`` |
+| `listener` | `BlockProcessedListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).on
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:100](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L100)
+
+▸ **on**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"status"`` |
+| `listener` | `StatusListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).on
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:101](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L101)
+
+▸ **on**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"peer"`` |
+| `listener` | `PeerListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).on
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:102](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L102)
+
+▸ **on**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `ChannelUpdateEventNames` |
+| `listener` | `ChannelUpdateListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).on
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:103](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L103)
+
+▸ **on**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `IndexerEvents` |
+| `listener` | `IndexerEventsListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).on
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:104](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L104)
+
+▸ **on**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"network-registry-eligibility-changed"`` |
+| `listener` | `NetworkRegistryEligibilityChangedListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).on
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:105](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L105)
+
+▸ **on**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"network-registry-status-changed"`` |
+| `listener` | `NetworkRegistryStatusChangedListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).on
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:106](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L106)
 
 ___
 
@@ -786,7 +1207,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:714](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L714)
+[packages/core-ethereum/src/indexer/index.ts:709](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L709)
 
 ___
 
@@ -806,7 +1227,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:811](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L811)
+[packages/core-ethereum/src/indexer/index.ts:806](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L806)
 
 ___
 
@@ -827,7 +1248,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:743](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L743)
+[packages/core-ethereum/src/indexer/index.ts:738](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L738)
 
 ___
 
@@ -848,7 +1269,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:844](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L844)
+[packages/core-ethereum/src/indexer/index.ts:839](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L839)
 
 ___
 
@@ -869,7 +1290,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:816](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L816)
+[packages/core-ethereum/src/indexer/index.ts:811](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L811)
 
 ___
 
@@ -890,7 +1311,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:848](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L848)
+[packages/core-ethereum/src/indexer/index.ts:843](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L843)
 
 ___
 
@@ -918,7 +1339,7 @@ confirmed blocks.
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:428](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L428)
+[packages/core-ethereum/src/indexer/index.ts:423](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L423)
 
 ___
 
@@ -942,7 +1363,7 @@ Adds new events to the queue of unprocessed events
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:540](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L540)
+[packages/core-ethereum/src/indexer/index.ts:535](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L535)
 
 ___
 
@@ -965,7 +1386,7 @@ Will restart the indexer if needed.
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:384](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L384)
+[packages/core-ethereum/src/indexer/index.ts:379](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L379)
 
 ___
 
@@ -986,7 +1407,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:830](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L830)
+[packages/core-ethereum/src/indexer/index.ts:825](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L825)
 
 ___
 
@@ -1007,7 +1428,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:779](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L779)
+[packages/core-ethereum/src/indexer/index.ts:774](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L774)
 
 ___
 
@@ -1028,46 +1449,20 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:856](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L856)
+[packages/core-ethereum/src/indexer/index.ts:851](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L851)
 
 ___
 
 ### once
 
-▸ **once**(`eventName`, `listener`): [`Indexer`](Indexer.md)
-
-Adds a **one-time**`listener` function for the event named `eventName`. The
-next time `eventName` is triggered, this listener is removed and then invoked.
-
-```js
-server.once('connection', (stream) => {
-  console.log('Ah, we have our first user!');
-});
-```
-
-Returns a reference to the `EventEmitter`, so that calls can be chained.
-
-By default, event listeners are invoked in the order they are added. The`emitter.prependOnceListener()` method can be used as an alternative to add the
-event listener to the beginning of the listeners array.
-
-```js
-const myEE = new EventEmitter();
-myEE.once('foo', () => console.log('a'));
-myEE.prependOnceListener('foo', () => console.log('b'));
-myEE.emit('foo');
-// Prints:
-//   b
-//   a
-```
-
-**`since`** v0.3.0
+▸ **once**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `eventName` | `string` \| `symbol` | The name of the event. |
-| `listener` | (...`args`: `any`[]) => `void` | The callback function |
+| Name | Type |
+| :------ | :------ |
+| `event` | `IndexerEventNames` |
+| `listener` | () => `void` |
 
 #### Returns
 
@@ -1075,39 +1470,192 @@ myEE.emit('foo');
 
 #### Inherited from
 
-EventEmitter.once
+(EventEmitter as new () =\> IndexerEventEmitter).once
 
 #### Defined in
 
-node_modules/@types/node/events.d.ts:359
+[packages/core-ethereum/src/indexer/types.ts:108](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L108)
+
+▸ **once**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"block"`` |
+| `listener` | `BlockListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).once
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:109](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L109)
+
+▸ **once**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"block-processed"`` |
+| `listener` | `BlockProcessedListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).once
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:110](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L110)
+
+▸ **once**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"status"`` |
+| `listener` | `StatusListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).once
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:111](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L111)
+
+▸ **once**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"peer"`` |
+| `listener` | `PeerListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).once
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:112](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L112)
+
+▸ **once**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `ChannelUpdateEventNames` |
+| `listener` | `ChannelUpdateListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).once
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:113](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L113)
+
+▸ **once**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `IndexerEvents` |
+| `listener` | `IndexerEventsListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).once
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:114](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L114)
+
+▸ **once**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"network-registry-eligibility-changed"`` |
+| `listener` | `NetworkRegistryEligibilityChangedListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).once
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:115](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L115)
+
+▸ **once**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"network-registry-status-changed"`` |
+| `listener` | `NetworkRegistryStatusChangedListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).once
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:116](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L116)
 
 ___
 
 ### prependListener
 
-▸ **prependListener**(`eventName`, `listener`): [`Indexer`](Indexer.md)
-
-Adds the `listener` function to the _beginning_ of the listeners array for the
-event named `eventName`. No checks are made to see if the `listener` has
-already been added. Multiple calls passing the same combination of `eventName`and `listener` will result in the `listener` being added, and called, multiple
-times.
-
-```js
-server.prependListener('connection', (stream) => {
-  console.log('someone connected!');
-});
-```
-
-Returns a reference to the `EventEmitter`, so that calls can be chained.
-
-**`since`** v6.0.0
+▸ **prependListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `eventName` | `string` \| `symbol` | The name of the event. |
-| `listener` | (...`args`: `any`[]) => `void` | The callback function |
+| Name | Type |
+| :------ | :------ |
+| `event` | `IndexerEventNames` |
+| `listener` | () => `void` |
 
 #### Returns
 
@@ -1115,37 +1663,192 @@ Returns a reference to the `EventEmitter`, so that calls can be chained.
 
 #### Inherited from
 
-EventEmitter.prependListener
+(EventEmitter as new () =\> IndexerEventEmitter).prependListener
 
 #### Defined in
 
-node_modules/@types/node/events.d.ts:579
+[packages/core-ethereum/src/indexer/types.ts:118](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L118)
+
+▸ **prependListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"block"`` |
+| `listener` | `BlockListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).prependListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L119)
+
+▸ **prependListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"block-processed"`` |
+| `listener` | `BlockProcessedListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).prependListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:120](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L120)
+
+▸ **prependListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"status"`` |
+| `listener` | `StatusListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).prependListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:121](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L121)
+
+▸ **prependListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"peer"`` |
+| `listener` | `PeerListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).prependListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:122](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L122)
+
+▸ **prependListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `ChannelUpdateEventNames` |
+| `listener` | `ChannelUpdateListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).prependListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:123](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L123)
+
+▸ **prependListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `IndexerEvents` |
+| `listener` | `IndexerEventsListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).prependListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:124](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L124)
+
+▸ **prependListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"network-registry-eligibility-changed"`` |
+| `listener` | `NetworkRegistryEligibilityChangedListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).prependListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:125](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L125)
+
+▸ **prependListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"network-registry-status-changed"`` |
+| `listener` | `NetworkRegistryStatusChangedListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).prependListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:129](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L129)
 
 ___
 
 ### prependOnceListener
 
-▸ **prependOnceListener**(`eventName`, `listener`): [`Indexer`](Indexer.md)
-
-Adds a **one-time**`listener` function for the event named `eventName` to the_beginning_ of the listeners array. The next time `eventName` is triggered, this
-listener is removed, and then invoked.
-
-```js
-server.prependOnceListener('connection', (stream) => {
-  console.log('Ah, we have our first user!');
-});
-```
-
-Returns a reference to the `EventEmitter`, so that calls can be chained.
-
-**`since`** v6.0.0
+▸ **prependOnceListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `eventName` | `string` \| `symbol` | The name of the event. |
-| `listener` | (...`args`: `any`[]) => `void` | The callback function |
+| Name | Type |
+| :------ | :------ |
+| `event` | `IndexerEventNames` |
+| `listener` | () => `void` |
 
 #### Returns
 
@@ -1153,11 +1856,179 @@ Returns a reference to the `EventEmitter`, so that calls can be chained.
 
 #### Inherited from
 
-EventEmitter.prependOnceListener
+(EventEmitter as new () =\> IndexerEventEmitter).prependOnceListener
 
 #### Defined in
 
-node_modules/@types/node/events.d.ts:595
+[packages/core-ethereum/src/indexer/types.ts:131](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L131)
+
+▸ **prependOnceListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"block"`` |
+| `listener` | `BlockListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).prependOnceListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:132](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L132)
+
+▸ **prependOnceListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"block-processed"`` |
+| `listener` | `BlockProcessedListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).prependOnceListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:133](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L133)
+
+▸ **prependOnceListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"status"`` |
+| `listener` | `StatusListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).prependOnceListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:134](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L134)
+
+▸ **prependOnceListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"peer"`` |
+| `listener` | `PeerListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).prependOnceListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:135](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L135)
+
+▸ **prependOnceListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `ChannelUpdateEventNames` |
+| `listener` | `ChannelUpdateListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).prependOnceListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:136](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L136)
+
+▸ **prependOnceListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `IndexerEvents` |
+| `listener` | `IndexerEventsListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).prependOnceListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:137](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L137)
+
+▸ **prependOnceListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"network-registry-eligibility-changed"`` |
+| `listener` | `NetworkRegistryEligibilityChangedListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).prependOnceListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:138](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L138)
+
+▸ **prependOnceListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"network-registry-status-changed"`` |
+| `listener` | `NetworkRegistryStatusChangedListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).prependOnceListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:142](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L142)
 
 ___
 
@@ -1185,7 +2056,7 @@ past events and last queried block
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:336](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L336)
+[packages/core-ethereum/src/indexer/index.ts:331](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L331)
 
 ___
 
@@ -1210,186 +2081,20 @@ confirmed block (latestBlock - confirmationTime)
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:597](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L597)
-
-___
-
-### rawListeners
-
-▸ **rawListeners**(`eventName`): `Function`[]
-
-Returns a copy of the array of listeners for the event named `eventName`,
-including any wrappers (such as those created by `.once()`).
-
-```js
-const emitter = new EventEmitter();
-emitter.once('log', () => console.log('log once'));
-
-// Returns a new Array with a function `onceWrapper` which has a property
-// `listener` which contains the original listener bound above
-const listeners = emitter.rawListeners('log');
-const logFnWrapper = listeners[0];
-
-// Logs "log once" to the console and does not unbind the `once` event
-logFnWrapper.listener();
-
-// Logs "log once" to the console and removes the listener
-logFnWrapper();
-
-emitter.on('log', () => console.log('log persistently'));
-// Will return a new Array with a single function bound by `.on()` above
-const newListeners = emitter.rawListeners('log');
-
-// Logs "log persistently" twice
-newListeners[0]();
-emitter.emit('log');
-```
-
-**`since`** v9.4.0
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `eventName` | `string` \| `symbol` |
-
-#### Returns
-
-`Function`[]
-
-#### Inherited from
-
-EventEmitter.rawListeners
-
-#### Defined in
-
-node_modules/@types/node/events.d.ts:514
-
-___
-
-### removeAllListeners
-
-▸ **removeAllListeners**(`event?`): [`Indexer`](Indexer.md)
-
-Removes all listeners, or those of the specified `eventName`.
-
-It is bad practice to remove listeners added elsewhere in the code,
-particularly when the `EventEmitter` instance was created by some other
-component or module (e.g. sockets or file streams).
-
-Returns a reference to the `EventEmitter`, so that calls can be chained.
-
-**`since`** v0.1.26
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `event?` | `string` \| `symbol` |
-
-#### Returns
-
-[`Indexer`](Indexer.md)
-
-#### Inherited from
-
-EventEmitter.removeAllListeners
-
-#### Defined in
-
-node_modules/@types/node/events.d.ts:455
+[packages/core-ethereum/src/indexer/index.ts:592](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L592)
 
 ___
 
 ### removeListener
 
-▸ **removeListener**(`eventName`, `listener`): [`Indexer`](Indexer.md)
-
-Removes the specified `listener` from the listener array for the event named`eventName`.
-
-```js
-const callback = (stream) => {
-  console.log('someone connected!');
-};
-server.on('connection', callback);
-// ...
-server.removeListener('connection', callback);
-```
-
-`removeListener()` will remove, at most, one instance of a listener from the
-listener array. If any single listener has been added multiple times to the
-listener array for the specified `eventName`, then `removeListener()` must be
-called multiple times to remove each instance.
-
-Once an event is emitted, all listeners attached to it at the
-time of emitting are called in order. This implies that any`removeListener()` or `removeAllListeners()` calls _after_ emitting and_before_ the last listener finishes execution will
-not remove them from`emit()` in progress. Subsequent events behave as expected.
-
-```js
-const myEmitter = new MyEmitter();
-
-const callbackA = () => {
-  console.log('A');
-  myEmitter.removeListener('event', callbackB);
-};
-
-const callbackB = () => {
-  console.log('B');
-};
-
-myEmitter.on('event', callbackA);
-
-myEmitter.on('event', callbackB);
-
-// callbackA removes listener callbackB but it will still be called.
-// Internal listener array at time of emit [callbackA, callbackB]
-myEmitter.emit('event');
-// Prints:
-//   A
-//   B
-
-// callbackB is now removed.
-// Internal listener array [callbackA]
-myEmitter.emit('event');
-// Prints:
-//   A
-```
-
-Because listeners are managed using an internal array, calling this will
-change the position indices of any listener registered _after_ the listener
-being removed. This will not impact the order in which listeners are called,
-but it means that any copies of the listener array as returned by
-the `emitter.listeners()` method will need to be recreated.
-
-When a single function has been added as a handler multiple times for a single
-event (as in the example below), `removeListener()` will remove the most
-recently added instance. In the example the `once('ping')`listener is removed:
-
-```js
-const ee = new EventEmitter();
-
-function pong() {
-  console.log('pong');
-}
-
-ee.on('ping', pong);
-ee.once('ping', pong);
-ee.removeListener('ping', pong);
-
-ee.emit('ping');
-ee.emit('ping');
-```
-
-Returns a reference to the `EventEmitter`, so that calls can be chained.
-
-**`since`** v0.1.26
+▸ **removeListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | `string` \| `symbol` |
-| `listener` | (...`args`: `any`[]) => `void` |
+| `event` | `IndexerEventNames` |
+| `listener` | () => `void` |
 
 #### Returns
 
@@ -1397,11 +2102,179 @@ Returns a reference to the `EventEmitter`, so that calls can be chained.
 
 #### Inherited from
 
-EventEmitter.removeListener
+(EventEmitter as new () =\> IndexerEventEmitter).removeListener
 
 #### Defined in
 
-node_modules/@types/node/events.d.ts:439
+[packages/core-ethereum/src/indexer/types.ts:147](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L147)
+
+▸ **removeListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"block"`` |
+| `listener` | `BlockListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).removeListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:148](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L148)
+
+▸ **removeListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"block-processed"`` |
+| `listener` | `BlockProcessedListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).removeListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:149](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L149)
+
+▸ **removeListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"status"`` |
+| `listener` | `StatusListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).removeListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:150](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L150)
+
+▸ **removeListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"peer"`` |
+| `listener` | `PeerListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).removeListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:151](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L151)
+
+▸ **removeListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `ChannelUpdateEventNames` |
+| `listener` | `ChannelUpdateListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).removeListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:152](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L152)
+
+▸ **removeListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `IndexerEvents` |
+| `listener` | `IndexerEventsListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).removeListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:153](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L153)
+
+▸ **removeListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"network-registry-eligibility-changed"`` |
+| `listener` | `NetworkRegistryEligibilityChangedListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).removeListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:154](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L154)
+
+▸ **removeListener**(`event`, `listener`): [`Indexer`](Indexer.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | ``"network-registry-status-changed"`` |
+| `listener` | `NetworkRegistryStatusChangedListener` |
+
+#### Returns
+
+[`Indexer`](Indexer.md)
+
+#### Inherited from
+
+(EventEmitter as new () =\> IndexerEventEmitter).removeListener
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/types.ts:158](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L158)
 
 ___
 
@@ -1422,7 +2295,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:933](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L933)
+[packages/core-ethereum/src/indexer/index.ts:928](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L928)
 
 ___
 
@@ -1441,40 +2314,7 @@ has been restarted
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:194](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L194)
-
-___
-
-### setMaxListeners
-
-▸ **setMaxListeners**(`n`): [`Indexer`](Indexer.md)
-
-By default `EventEmitter`s will print a warning if more than `10` listeners are
-added for a particular event. This is a useful default that helps finding
-memory leaks. The `emitter.setMaxListeners()` method allows the limit to be
-modified for this specific `EventEmitter` instance. The value can be set to`Infinity` (or `0`) to indicate an unlimited number of listeners.
-
-Returns a reference to the `EventEmitter`, so that calls can be chained.
-
-**`since`** v0.3.5
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `n` | `number` |
-
-#### Returns
-
-[`Indexer`](Indexer.md)
-
-#### Inherited from
-
-EventEmitter.setMaxListeners
-
-#### Defined in
-
-node_modules/@types/node/events.d.ts:465
+[packages/core-ethereum/src/indexer/index.ts:189](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L189)
 
 ___
 
@@ -1503,6 +2343,7 @@ Starts indexing.
 | `chain.getNetworkRegistry` | () => `HoprNetworkRegistry` |
 | `chain.getPrivateKey` | () => `Uint8Array` |
 | `chain.getPublicKey` | () => `PublicKey` |
+| `chain.getTimestamp` | (`blockNumber`: `number`) => `Promise`<`number`\> |
 | `chain.getToken` | () => `HoprToken` |
 | `chain.getTransactionsInBlock` | (`blockNumber`: `number`) => `Promise`<`string`[]\> |
 | `chain.initiateChannelClosure` | (`counterparty`: `Address`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
@@ -1523,7 +2364,7 @@ Starts indexing.
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:92](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L92)
+[packages/core-ethereum/src/indexer/index.ts:87](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L87)
 
 ___
 
@@ -1539,310 +2380,4 @@ Stops indexing.
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:172](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L172)
-
-___
-
-### getEventListeners
-
-▸ `Static` **getEventListeners**(`emitter`, `name`): `Function`[]
-
-Returns a copy of the array of listeners for the event named `eventName`.
-
-For `EventEmitter`s this behaves exactly the same as calling `.listeners` on
-the emitter.
-
-For `EventTarget`s this is the only way to get the event listeners for the
-event target. This is useful for debugging and diagnostic purposes.
-
-```js
-const { getEventListeners, EventEmitter } = require('events');
-
-{
-  const ee = new EventEmitter();
-  const listener = () => console.log('Events are fun');
-  ee.on('foo', listener);
-  getEventListeners(ee, 'foo'); // [listener]
-}
-{
-  const et = new EventTarget();
-  const listener = () => console.log('Events are fun');
-  et.addEventListener('foo', listener);
-  getEventListeners(et, 'foo'); // [listener]
-}
-```
-
-**`since`** v15.2.0
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `emitter` | `EventEmitter` \| `DOMEventTarget` |
-| `name` | `string` \| `symbol` |
-
-#### Returns
-
-`Function`[]
-
-#### Inherited from
-
-EventEmitter.getEventListeners
-
-#### Defined in
-
-node_modules/@types/node/events.d.ts:262
-
-___
-
-### listenerCount
-
-▸ `Static` **listenerCount**(`emitter`, `eventName`): `number`
-
-A class method that returns the number of listeners for the given `eventName`registered on the given `emitter`.
-
-```js
-const { EventEmitter, listenerCount } = require('events');
-const myEmitter = new EventEmitter();
-myEmitter.on('event', () => {});
-myEmitter.on('event', () => {});
-console.log(listenerCount(myEmitter, 'event'));
-// Prints: 2
-```
-
-**`since`** v0.9.12
-
-**`deprecated`** Since v3.2.0 - Use `listenerCount` instead.
-
-#### Parameters
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `emitter` | `EventEmitter` | The emitter to query |
-| `eventName` | `string` \| `symbol` | The event name |
-
-#### Returns
-
-`number`
-
-#### Inherited from
-
-EventEmitter.listenerCount
-
-#### Defined in
-
-node_modules/@types/node/events.d.ts:234
-
-___
-
-### on
-
-▸ `Static` **on**(`emitter`, `eventName`, `options?`): `AsyncIterableIterator`<`any`\>
-
-```js
-const { on, EventEmitter } = require('events');
-
-(async () => {
-  const ee = new EventEmitter();
-
-  // Emit later on
-  process.nextTick(() => {
-    ee.emit('foo', 'bar');
-    ee.emit('foo', 42);
-  });
-
-  for await (const event of on(ee, 'foo')) {
-    // The execution of this inner block is synchronous and it
-    // processes one event at a time (even with await). Do not use
-    // if concurrent execution is required.
-    console.log(event); // prints ['bar'] [42]
-  }
-  // Unreachable here
-})();
-```
-
-Returns an `AsyncIterator` that iterates `eventName` events. It will throw
-if the `EventEmitter` emits `'error'`. It removes all listeners when
-exiting the loop. The `value` returned by each iteration is an array
-composed of the emitted event arguments.
-
-An `AbortSignal` can be used to cancel waiting on events:
-
-```js
-const { on, EventEmitter } = require('events');
-const ac = new AbortController();
-
-(async () => {
-  const ee = new EventEmitter();
-
-  // Emit later on
-  process.nextTick(() => {
-    ee.emit('foo', 'bar');
-    ee.emit('foo', 42);
-  });
-
-  for await (const event of on(ee, 'foo', { signal: ac.signal })) {
-    // The execution of this inner block is synchronous and it
-    // processes one event at a time (even with await). Do not use
-    // if concurrent execution is required.
-    console.log(event); // prints ['bar'] [42]
-  }
-  // Unreachable here
-})();
-
-process.nextTick(() => ac.abort());
-```
-
-**`since`** v13.6.0, v12.16.0
-
-#### Parameters
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `emitter` | `EventEmitter` | - |
-| `eventName` | `string` | The name of the event being listened for |
-| `options?` | `StaticEventEmitterOptions` | - |
-
-#### Returns
-
-`AsyncIterableIterator`<`any`\>
-
-that iterates `eventName` events emitted by the `emitter`
-
-#### Inherited from
-
-EventEmitter.on
-
-#### Defined in
-
-node_modules/@types/node/events.d.ts:217
-
-___
-
-### once
-
-▸ `Static` **once**(`emitter`, `eventName`, `options?`): `Promise`<`any`[]\>
-
-Creates a `Promise` that is fulfilled when the `EventEmitter` emits the given
-event or that is rejected if the `EventEmitter` emits `'error'` while waiting.
-The `Promise` will resolve with an array of all the arguments emitted to the
-given event.
-
-This method is intentionally generic and works with the web platform [EventTarget](https://dom.spec.whatwg.org/#interface-eventtarget) interface, which has no special`'error'` event
-semantics and does not listen to the `'error'` event.
-
-```js
-const { once, EventEmitter } = require('events');
-
-async function run() {
-  const ee = new EventEmitter();
-
-  process.nextTick(() => {
-    ee.emit('myevent', 42);
-  });
-
-  const [value] = await once(ee, 'myevent');
-  console.log(value);
-
-  const err = new Error('kaboom');
-  process.nextTick(() => {
-    ee.emit('error', err);
-  });
-
-  try {
-    await once(ee, 'myevent');
-  } catch (err) {
-    console.log('error happened', err);
-  }
-}
-
-run();
-```
-
-The special handling of the `'error'` event is only used when `events.once()`is used to wait for another event. If `events.once()` is used to wait for the
-'`error'` event itself, then it is treated as any other kind of event without
-special handling:
-
-```js
-const { EventEmitter, once } = require('events');
-
-const ee = new EventEmitter();
-
-once(ee, 'error')
-  .then(([err]) => console.log('ok', err.message))
-  .catch((err) => console.log('error', err.message));
-
-ee.emit('error', new Error('boom'));
-
-// Prints: ok boom
-```
-
-An `AbortSignal` can be used to cancel waiting for the event:
-
-```js
-const { EventEmitter, once } = require('events');
-
-const ee = new EventEmitter();
-const ac = new AbortController();
-
-async function foo(emitter, event, signal) {
-  try {
-    await once(emitter, event, { signal });
-    console.log('event emitted!');
-  } catch (error) {
-    if (error.name === 'AbortError') {
-      console.error('Waiting for the event was canceled!');
-    } else {
-      console.error('There was an error', error.message);
-    }
-  }
-}
-
-foo(ee, 'foo', ac.signal);
-ac.abort(); // Abort waiting for the event
-ee.emit('foo'); // Prints: Waiting for the event was canceled!
-```
-
-**`since`** v11.13.0, v10.16.0
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `emitter` | `NodeEventTarget` |
-| `eventName` | `string` \| `symbol` |
-| `options?` | `StaticEventEmitterOptions` |
-
-#### Returns
-
-`Promise`<`any`[]\>
-
-#### Inherited from
-
-EventEmitter.once
-
-#### Defined in
-
-node_modules/@types/node/events.d.ts:157
-
-▸ `Static` **once**(`emitter`, `eventName`, `options?`): `Promise`<`any`[]\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `emitter` | `DOMEventTarget` |
-| `eventName` | `string` |
-| `options?` | `StaticEventEmitterOptions` |
-
-#### Returns
-
-`Promise`<`any`[]\>
-
-#### Inherited from
-
-EventEmitter.once
-
-#### Defined in
-
-node_modules/@types/node/events.d.ts:158
+[packages/core-ethereum/src/indexer/index.ts:167](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L167)

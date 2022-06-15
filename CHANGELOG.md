@@ -21,6 +21,8 @@
 - Add connectivity health indicator updates to the logs ([#3816](https://github.com/hoprnet/hoprnet/pull/3816))
 - Introduce Rust WASM support into the build toolchain ([#3829](https://github.com/hoprnet/hoprnet/pull/3829))
 - Optimize build pipeline and migrate to Makefile ([#3851](https://github.com/hoprnet/hoprnet/pull/3851))
+- When sending an Ethereum transaction, also release nonce lock if transaction is considered a duplicate ([#3856](https://github.com/hoprnet/hoprnet/pull/3856))
+- Within E2E tests, disable hardhat autmining after deployment is done ([#3851](https://github.com/hoprnet/hoprnet/pull/3857))
 
 ### Breaking changes
 

@@ -1,9 +1,9 @@
 import { type StrategyTickResult, SaneDefaults, type ChannelStrategyInterface } from '@hoprnet/hopr-core'
-import type Hopr from '@hoprnet/hopr-core'
+import { type default as Hopr } from '@hoprnet/hopr-core'
 import type BN from 'bn.js'
 import { type PublicKey, type ChannelEntry, ChannelStatus } from '@hoprnet/hopr-utils'
-import type { PersistedState, State } from './state'
-import { findCtChannelOpenTime, sendCTMessage } from './utils'
+import type { PersistedState, State } from './state.js'
+import { findCtChannelOpenTime, sendCTMessage } from './utils.js'
 import {
   CT_INTERMEDIATE_HOPS,
   MESSAGE_FAIL_THRESHOLD,
@@ -13,7 +13,7 @@ import {
   CT_NETWORK_QUALITY_THRESHOLD,
   CT_CHANNEL_STALL_TIMEOUT,
   CT_OPEN_CHANNEL_QUALITY_THRESHOLD
-} from './constants'
+} from './constants.js'
 import { debug } from '@hoprnet/hopr-utils'
 
 const log = debug('hopr:cover-traffic')

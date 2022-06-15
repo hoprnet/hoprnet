@@ -2,7 +2,7 @@ import BN from 'bn.js'
 import { PublicKey, ChannelEntry, ChannelStatus, randomFloat } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import type { Multiaddr } from 'multiaddr'
-import { findChannel, importance } from './utils'
+import { findChannel, importance } from './utils.js'
 import fs from 'fs'
 
 export type ChannelData = {
@@ -56,7 +56,7 @@ type SerializedState = {
   block: string
 }
 
-function serializeState(state: State): string {
+export function serializeState(state: State): string {
   return JSON.stringify({
     nodes: Object.values(state.nodes).map((node: PeerData) => ({
       // Using hex representation since deserializing Base58 encoded
@@ -77,7 +77,7 @@ function serializeState(state: State): string {
   } as SerializedState)
 }
 
-function deserializeState(serialized: string): State {
+export function deserializeState(serialized: string): State {
   const parsed = JSON.parse(serialized) as SerializedState
 
   return {
@@ -113,13 +113,13 @@ export class PersistedState {
   // Caveats:
   // - Must live in same timeline as the hoprdb, as it relies on
   //   the indexer being in the same state.
-  private _data: State
+  protected _data: State
 
   /**
    * Initiate the persisted state of the network attached to the CT node
    * @param update function that is called at every change of the state
    */
-  constructor(private update: (s: State) => void, private db_path: string) {
+  constructor(protected update: (s: State) => void, protected db_path: string) {
     if (fs.existsSync(this.db_path)) {
       this.load()
     } else {

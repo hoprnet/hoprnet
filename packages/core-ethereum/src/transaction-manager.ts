@@ -120,7 +120,6 @@ class TranscationManager {
     transactionPayload: TransactionPayload
   ): boolean {
     if (this.queuing.has(hash)) {
-      console.log(`FOUND DUPLICATE`, transactionPayload)
       return false
     }
 
