@@ -10,7 +10,7 @@
 
 ## Implements
 
-- `ChannelStrategy`
+- [`ChannelStrategyInterface`](../interfaces/ChannelStrategyInterface.md)
 
 ## Table of contents
 
@@ -48,11 +48,11 @@
 
 #### Implementation of
 
-ChannelStrategy.name
+[ChannelStrategyInterface](../interfaces/ChannelStrategyInterface.md).[name](../interfaces/ChannelStrategyInterface.md#name)
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L90)
+[packages/core/src/channel-strategy.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L97)
 
 ___
 
@@ -62,7 +62,7 @@ ___
 
 #### Implementation of
 
-ChannelStrategy.tickInterval
+[ChannelStrategyInterface](../interfaces/ChannelStrategyInterface.md).[tickInterval](../interfaces/ChannelStrategyInterface.md#tickinterval)
 
 #### Inherited from
 
@@ -70,7 +70,7 @@ ChannelStrategy.tickInterval
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:76](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L76)
+[packages/core/src/channel-strategy.ts:83](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L83)
 
 ## Methods
 
@@ -91,7 +91,7 @@ ChannelStrategy.tickInterval
 
 #### Implementation of
 
-ChannelStrategy.onChannelWillClose
+[ChannelStrategyInterface](../interfaces/ChannelStrategyInterface.md).[onChannelWillClose](../interfaces/ChannelStrategyInterface.md#onchannelwillclose)
 
 #### Inherited from
 
@@ -99,7 +99,7 @@ ChannelStrategy.onChannelWillClose
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:58](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L58)
+[packages/core/src/channel-strategy.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L65)
 
 ___
 
@@ -120,7 +120,7 @@ ___
 
 #### Implementation of
 
-ChannelStrategy.onWinningTicket
+[ChannelStrategyInterface](../interfaces/ChannelStrategyInterface.md).[onWinningTicket](../interfaces/ChannelStrategyInterface.md#onwinningticket)
 
 #### Inherited from
 
@@ -128,7 +128,7 @@ ChannelStrategy.onWinningTicket
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L52)
+[packages/core/src/channel-strategy.ts:59](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L59)
 
 ___
 
@@ -148,7 +148,7 @@ ___
 
 #### Implementation of
 
-ChannelStrategy.shouldCommitToChannel
+[ChannelStrategyInterface](../interfaces/ChannelStrategyInterface.md).[shouldCommitToChannel](../interfaces/ChannelStrategyInterface.md#shouldcommittochannel)
 
 #### Inherited from
 
@@ -156,13 +156,13 @@ ChannelStrategy.shouldCommitToChannel
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L71)
+[packages/core/src/channel-strategy.ts:78](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L78)
 
 ___
 
 ### tick
 
-▸ **tick**(`balance`, `currentChannels`, `peers`, `getRandomChannel`): `Promise`<[[`ChannelsToOpen`](../modules.md#channelstoopen)[], `PublicKey`[]]\>
+▸ **tick**(`balance`, `currentChannels`, `peers`, `getRandomChannel`): `Promise`<[`StrategyTickResult`](../modules.md#strategytickresult)\>
 
 #### Parameters
 
@@ -175,12 +175,12 @@ ___
 
 #### Returns
 
-`Promise`<[[`ChannelsToOpen`](../modules.md#channelstoopen)[], `PublicKey`[]]\>
+`Promise`<[`StrategyTickResult`](../modules.md#strategytickresult)\>
 
 #### Implementation of
 
-ChannelStrategy.tick
+[ChannelStrategyInterface](../interfaces/ChannelStrategyInterface.md).[tick](../interfaces/ChannelStrategyInterface.md#tick)
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:92](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L92)
+[packages/core/src/channel-strategy.ts:99](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L99)
