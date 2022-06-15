@@ -3531,7 +3531,6 @@ __metadata:
     bn.js: 5.2.0
     chai: 4.3.6
     dotenv: 10.0.0
-    esm: 3.2.25
     ethereum-waffle: 3.4.0
     ethers: 5.5.4
     hardhat: 2.8.4
@@ -11380,13 +11379,6 @@ __metadata:
   bin:
     eslint: ./bin/eslint.js
   checksum: 53c6b9420992df95f986dc031f76949edbea14bdeed4e40d8cda8970fbf0fc013c6d91b98f469b6477753e50c9af133c1a768e421a1c160ec2cac7a246e05494
-  languageName: node
-  linkType: hard
-
-"esm@npm:3.2.25":
-  version: 3.2.25
-  resolution: "esm@npm:3.2.25"
-  checksum: 978aabe2de83541c105605a6d60a26ed8e627ef6bb0a7605fe15a95bbdea6b8348bd045255cb22219c054dd09a81a94823df00843d9e97f42419c92015ce3a64
   languageName: node
   linkType: hard
 
