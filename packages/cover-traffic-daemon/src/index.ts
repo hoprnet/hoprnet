@@ -4,17 +4,26 @@ import path from 'path'
 
 import BN from 'bn.js'
 import yargs from 'yargs/yargs'
-import { terminalWidth } from 'yargs'
-import { createHoprNode, resolveEnvironment, supportedEnvironments, type ResolvedEnvironment } from '@hoprnet/hopr-core'
+import { hideBin } from 'yargs/helpers'
+import {
+  createHoprNode,
+  resolveEnvironment,
+  supportedEnvironments,
+  type ResolvedEnvironment,
+  HEARTBEAT_INTERVAL,
+  HEARTBEAT_THRESHOLD,
+  HEARTBEAT_INTERVAL_VARIANCE
+} from '@hoprnet/hopr-core'
+
 import { type ChannelEntry, privKeyToPeerId, PublicKey, debug } from '@hoprnet/hopr-utils'
 
-import { PersistedState } from './state'
-import { CoverTrafficStrategy } from './strategy'
-import setupHealthcheck from './healthcheck'
+import { PersistedState } from './state.js'
+import { CoverTrafficStrategy } from './strategy.js'
+import setupHealthcheck from './healthcheck.js'
 
 import type PeerId from 'peer-id'
 import type { HoprOptions } from '@hoprnet/hopr-core'
-import type { PeerData, State } from './state'
+import type { PeerData, State } from './state.js'
 
 const log = debug('hopr:cover-traffic')
 const verbose = debug('hopr:cover-traffic:verbose')
@@ -30,7 +39,9 @@ export type DefaultEnvironment = {
 
 function defaultEnvironment(): string {
   try {
-    const config = require('../default-environment.json') as DefaultEnvironment
+    // Don't do typechecks on JSON files
+    // @ts-ignore
+    const config = import('../default-environment.json', { assert: { type: 'json' } }) as DefaultEnvironment
     return config?.id || ''
   } catch (error) {
     // its ok if the file isn't there or cannot be read
@@ -44,7 +55,9 @@ process.title = 'hopr-cover-traffic-daemon'
 // Use environment-specific default data path
 const defaultDataPath = path.join(process.cwd(), 'hopr-cover-traffic-daemon-db', defaultEnvironment())
 
-const argv = yargs(process.argv.slice(2))
+const yargsInstance = yargs(hideBin(process.argv))
+
+const argv = yargsInstance
   .env('HOPR_CTD') // enable options to be set as environment variables with the HOPR_CTD prefix
   .epilogue(
     'All CLI options can be configured through environment variables as well. CLI parameters have precedence over environment variables.'
@@ -102,10 +115,27 @@ const argv = yargs(process.argv.slice(2))
     describe: 'For testing local testnets. Prefer local peers to remote [env: HOPR_CTD_TEST_PREFER_LOCAL_ADDRESSES]',
     default: false
   })
-  .wrap(Math.min(120, terminalWidth()))
+  .option('heartbeatInterval', {
+    number: true,
+    describe:
+      'Interval in milliseconds in which the availability of other nodes get measured [env: HOPRD_HEARTBEAT_INTERVAL]',
+    default: HEARTBEAT_INTERVAL
+  })
+  .option('heartbeatThreshold', {
+    number: true,
+    describe:
+      "Timeframe in milliseconds after which a heartbeat to another peer is performed, if it hasn't been seen since [env: HOPRD_HEARTBEAT_THRESHOLD]",
+    default: HEARTBEAT_THRESHOLD
+  })
+  .option('heartbeatVariance', {
+    number: true,
+    describe: 'Upper bound for variance applied to heartbeat interval in milliseconds [env: HOPRD_HEARTBEAT_VARIANCE]',
+    default: HEARTBEAT_INTERVAL_VARIANCE
+  })
+  .wrap(Math.min(120, yargsInstance.terminalWidth()))
   .parseSync()
 
-async function generateNodeOptions(environment: ResolvedEnvironment): Promise<HoprOptions> {
+function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
   const options: HoprOptions = {
     announce: false,
     createDbIfNotExist: true,
@@ -114,6 +144,9 @@ async function generateNodeOptions(environment: ResolvedEnvironment): Promise<Ho
     password: '',
     dataPath: argv.data,
     allowLocalConnections: argv.allowLocalNodeConnections,
+    heartbeatInterval: argv.heartbeatInterval,
+    heartbeatThreshold: argv.heartbeatThreshold,
+    heartbeatVariance: argv.heartbeatVariance,
     testing: {
       announceLocalAddresses: argv.testAnnounceLocalAddresses,
       preferLocalAddresses: argv.testPreferLocalAddresses
@@ -125,7 +158,7 @@ async function generateNodeOptions(environment: ResolvedEnvironment): Promise<Ho
 
 export async function main(update: (State: State) => void, peerId?: PeerId) {
   const environment = resolveEnvironment(argv.environment, argv.provider)
-  const options = await generateNodeOptions(environment)
+  const options = generateNodeOptions(environment)
   if (!peerId) {
     peerId = privKeyToPeerId(argv.privateKey)
   }
@@ -191,7 +224,7 @@ if (require.main === module) {
 
   process.on('uncaughtExceptionMonitor', (err, origin) => {
     // Make sure we get a log.
-    log(`FATAL ERROR, exiting with uncaught exception: ${origin} ${err}`)
+    log(`FATAL ERROR, exiting with uncaught exception:`, origin, err)
   })
 
   main((state: State) => {

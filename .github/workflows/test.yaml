@@ -43,12 +43,12 @@ jobs:
           cache: yarn
 
       - name: Install dependencies
-        run: make deps
+        run: make -j deps
 
       - name: Build
-        run: make build
+        run: make -j build
 
       - name: Test
-        run: yarn test
+        run: make -j test
         env:
           HOPR_ENVIRONMENT_ID: hardhat-localhost

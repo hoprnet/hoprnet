@@ -1,7 +1,6 @@
 import Heap from 'heap-js'
 import { NETWORK_QUALITY_THRESHOLD, MAX_PATH_ITERATIONS } from '../constants'
-import { debug } from '@hoprnet/hopr-utils'
-import type { ChannelEntry, PublicKey } from '@hoprnet/hopr-utils'
+import { debug, randomFloat, type ChannelEntry, type PublicKey } from '@hoprnet/hopr-utils'
 import { PATH_RANDOMNESS, MAX_HOPS } from '../constants'
 
 import BN from 'bn.js'
@@ -13,7 +12,6 @@ type ChannelPath = { weight: BN; path: ChannelEntry[] }
 const sum = (a: BN, b: BN) => a.add(b)
 const pathFrom = (c: ChannelPath): Path => c.path.map((ce) => ce.destination) // Doesn't include ourself [0]
 const filterCycles = (c: ChannelEntry, p: ChannelPath): boolean => !pathFrom(p).find((x) => x.eq(c.destination))
-const rand = () => Math.random() // TODO - swap for something crypto safe
 const debugPath = (p: ChannelPath) =>
   pathFrom(p)
     .map((x) => x.toB58String())
@@ -22,7 +20,7 @@ const debugPath = (p: ChannelPath) =>
 // Weight a node based on stake, and a random component.
 const defaultWeight = async (edge: ChannelEntry): Promise<BN> => {
   // Minimum is 'stake', therefore weight is monotonically increasing
-  const r = 1 + rand() * PATH_RANDOMNESS
+  const r = 1 + randomFloat() * PATH_RANDOMNESS
   // Log scale, but minimum 1 weight per edge
   return edge.balance.toBN().addn(1).muln(r) //log()
 }

@@ -36,8 +36,11 @@ export default class AccessControl {
 
     try {
       allowed = await this.isAllowedAccessToNetwork(peerId)
-      if (allowed) await this.allowConnectionWithPeer(peerId, origin)
-      else await this.denyConnectionWithPeer(peerId, origin)
+      if (allowed) {
+        await this.allowConnectionWithPeer(peerId, origin)
+      } else {
+        await this.denyConnectionWithPeer(peerId, origin)
+      }
     } catch (error) {
       logError(`unexpected error when reviewing connection ${peerId.toB58String()} from ${origin}`, error)
     }
@@ -49,7 +52,14 @@ export default class AccessControl {
    * Iterate all peers and update their connection status.
    */
   public async reviewConnections(): Promise<void> {
-    const allPeers = [...this.networkPeers.allEntries(), ...this.networkPeers.getAllDenied()]
-    for (const { id, origin } of allPeers) await this.reviewConnection(id, origin)
+    // Use iterator to prevent from cloning elements
+    for (const { id, origin } of this.networkPeers.allEntries()) {
+      await this.reviewConnection(id, origin)
+    }
+
+    // Use iterator to prevent from cloning elements
+    for (const { id, origin } of this.networkPeers.getAllDenied()) {
+      await this.reviewConnection(id, origin)
+    }
   }
 }

@@ -1,11 +1,11 @@
 import assert from 'assert'
 import LibP2P from 'libp2p'
-import Hopr, { type HoprOptions } from '@hoprnet/hopr-core'
+import { default as Hopr, type HoprOptions } from '@hoprnet/hopr-core'
 import { debug, PublicKey, wait, dbMock, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import sinon from 'sinon'
-import { PersistedState } from './state'
-import { CoverTrafficStrategy } from './strategy'
-import { sampleData } from './state.mock'
+import { PersistedState } from './state.js'
+import { CoverTrafficStrategy } from './strategy.js'
+import { sampleData } from './state.mock.js'
 import { sampleOptions, createLibp2pMock } from '@hoprnet/hopr-core'
 import { createConnectorMock } from '@hoprnet/hopr-core-ethereum'
 
@@ -29,7 +29,9 @@ describe('cover-traffic daemon', async function () {
     stubLibp2p()
     const connectorMock = createConnectorMock(mockPeerId)
     log('Mocked chain', connectorMock)
-    node = new Hopr(mockPeerId, dbMock, connectorMock, sampleOptions as HoprOptions)
+    // CommonJS / ESM issue
+    // @ts-ignore
+    node = new Hopr.default(mockPeerId, dbMock, connectorMock, sampleOptions as HoprOptions)
   })
 
   afterEach(function () {
@@ -37,7 +39,9 @@ describe('cover-traffic daemon', async function () {
   })
 
   it('should run and stop properly', async function () {
-    assert(node instanceof Hopr)
+    // CommonJS / ESM issue
+    // @ts-ignore
+    assert(node instanceof Hopr.default)
     log('starting stubbed hopr node')
     await node.start()
     log('completed stubbed hopr node, starting cover-traffic strategy')
