@@ -25,7 +25,7 @@ import {
   type Ticket
 } from '@hoprnet/hopr-utils'
 
-import type { ChainWrapper } from '../ethereum'
+import type { ChainWrapper } from '../ethereum.js'
 import type {
   Event,
   EventNames,
@@ -34,10 +34,10 @@ import type {
   TokenEventNames,
   RegistryEvent,
   RegistryEventNames
-} from './types'
-import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils'
+} from './types.js'
+import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils.js'
 import { Contract, errors } from 'ethers'
-import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants'
+import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants.js'
 import type { TypedEvent, TypedEventFilter } from '@hoprnet/hopr-ethereum'
 
 const log = debug('hopr-core-ethereum:indexer')
