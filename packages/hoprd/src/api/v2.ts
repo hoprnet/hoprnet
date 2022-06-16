@@ -100,7 +100,15 @@ export async function setupRestApi(
       // TODO: We assume the handlers are always called in order. This isn't a
       // given and might change in the future. Thus, they should be made order-erindependent.
       keyScheme: function (req: Request, _scopes, _securityDefinition) {
-        const apiToken = decodeURI(req.get('x-auth-token') || '')
+        let apiToken: string
+        try {
+          apiToken = decodeURI(req.get('x-auth-token') || '')
+        } catch (e) {
+          throw {
+            status: 400,
+            message: `Failed to decode 'x-auth-token' with error '${e}'`
+          }
+        }
 
         if (!options.testNoAuthentication && options.apiToken !== undefined && apiToken !== options.apiToken) {
           // because this is not the last auth check, we just indicate that
@@ -113,8 +121,17 @@ export async function setupRestApi(
       },
       passwordScheme: function (req: Request, _scopes, _securityDefinition) {
         const authEncoded = (req.get('authorization') || '').replace('Basic ', '')
-        // we only expect a single value here, instead of the usual user:password
-        const [apiToken, ..._rest] = decodeURI(Buffer.from(authEncoded, 'base64').toString('binary')).split(':')
+
+        let apiToken: string
+        try {
+          // we only expect a single value here, instead of the usual user:password
+          ;[apiToken] = decodeURI(Buffer.from(authEncoded, 'base64').toString('binary')).split(':')
+        } catch (e) {
+          throw {
+            status: 400,
+            message: `Failed to decode 'Basic realm=hoprd' with error '${e}'`
+          }
+        }
 
         if (!options.testNoAuthentication && options.apiToken !== undefined && apiToken !== options.apiToken) {
           // because this is the last auth check, we must throw the appropriate

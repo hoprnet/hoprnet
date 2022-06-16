@@ -41,12 +41,16 @@ export const authenticateWsConnection = (
       debugLog(`failed parsing cookies`, e)
     }
 
-    if (
-      cookies &&
-      (decodeURI(cookies['X-Auth-Token'] || '') === apiToken || decodeURI(cookies['x-auth-token'] || '') === apiToken)
-    ) {
-      debugLog('ws client connected [ authentication SUCCESS via cookie ]')
-      return true
+    try {
+      if (
+        cookies &&
+        (decodeURI(cookies['X-Auth-Token'] || '') === apiToken || decodeURI(cookies['x-auth-token'] || '') === apiToken)
+      ) {
+        debugLog('ws client connected [ authentication SUCCESS via cookie ]')
+        return true
+      }
+    } catch (e) {
+      debugLog(`failed parsing 'x-auth-token' cookies`, e)
     }
   }
 
