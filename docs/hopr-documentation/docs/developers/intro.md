@@ -9,7 +9,7 @@ traffic, making it impossible for malicious actors to substract meaningful infor
 
 HOPR apps are a key component in providing this flow of data. Developers can build applications on top of the HOPR network to
 provide users with a private channel for exchanging information. At the same time, HOPR apps create traffic within
-the network, increasing the amount of noise mixers use to protect the entire ecosystem.
+the network, increasing the amount of noise mixers use to protect the entire ecosystem. You can learn more about the HOPR protocol in the [HOPR Basics blog series](https://medium.com/hoprnet/basics/home).
 
 There are two ways to build applications with the HOPR protocol:
 
