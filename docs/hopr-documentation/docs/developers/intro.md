@@ -30,7 +30,7 @@ Here are just some of the many use cases we believe the HOPR network is a great 
 
 The easiest way to build HOPR apps is by launching your own local HOPR cluster, connecting to these nodes via a REST/WebSocket
 client, and building on top of the REST API. Use our walkthrough to become familiar with this entire process, and read our
-OpenAPI documentation to learn how to interact with HOPR nodes once they are up and running.
+OpenAPI documentation to learn how to interact with HOPR nodes once they are up and running. You can check out our continuously updated [HOPR Bounties to earn money for learning and building](https://bounties.hoprnet.org).
 
 #### Walkthrough
 
