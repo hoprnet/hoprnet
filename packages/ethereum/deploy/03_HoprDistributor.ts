@@ -22,16 +22,20 @@ const maxMintAmounts: {
   production: ethers.utils.parseEther('100000000').toString()
 }
 
-const main: DeployFunction = async function ({
-  ethers,
-  deployments,
-  getNamedAccounts,
-  network
-}: HardhatRuntimeEnvironment) {
+const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+  const { ethers, deployments, getNamedAccounts, network, environment } = hre
   const deployer = await getNamedAccounts().then((o) => ethers.getSigner(o.deployer))
   const deploymentType = Object.keys(network.tags).find((tag) => startTimes[tag])
 
   const hoprToken = await deployments.get('HoprToken')
+
+  const deployOptions = {
+    log: true
+  }
+  // don't wait when using local hardhat because its using auto-mine
+  if (!environment.match('hardhat')) {
+    deployOptions['waitConfirmations'] = 2
+  }
 
   await deployments.deploy('HoprDistributor', {
     from: deployer.address,
@@ -40,7 +44,7 @@ const main: DeployFunction = async function ({
       Math.floor(startTimes[deploymentType] ?? startTimes.testing / 1e3),
       maxMintAmounts[deploymentType] ?? maxMintAmounts.testing
     ],
-    log: true
+    ...deployOptions
   })
 }
 

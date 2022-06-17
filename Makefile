@@ -47,6 +47,14 @@ else
 	yarn workspaces foreach -pv run test
 endif
 
+.PHONY: lint-check
+lint-check: ## run linter in check mode
+	npx prettier --check .
+
+.PHONY: lint-check
+lint-fix: ## run linter in fix mode
+	npx prettier --write .
+
 .PHONY: help
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
