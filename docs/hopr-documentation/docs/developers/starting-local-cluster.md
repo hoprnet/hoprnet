@@ -6,9 +6,6 @@ title: Development Setup
 The best way to learn and develop the HOPR protocol is by interacting with a HOPR node which is part of a small and isolated network of a few nodes that you control.
 A series of HOPR nodes fully interconnected with each other is called a HOPR cluster.
 
-
-## Requirements
-
 There are two ways to run a HOPR cluster: locally or via [Gitpod](https://gitpod.io). Please note that currently the HOPR development setup does not support Windows and thus Windows users have to choose the Gitpod option and cannot run HOPR locally.
 
 Due to the rapid development of this early version of the HOPR protocol, we strongly recommend using a stable

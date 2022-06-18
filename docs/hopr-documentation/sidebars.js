@@ -69,6 +69,7 @@ const sidebars = {
         'developers/starting-local-cluster',
         'developers/connecting-node',
         'developers/tutorial-hello-world',
+        'developers/tutorial-js-hello',
         'developers/demo-boomerang-chat',
         'developers/demo-rps-game',
         'developers/rest-api',
