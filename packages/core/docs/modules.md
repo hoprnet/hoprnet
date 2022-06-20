@@ -368,7 +368,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/main.ts:180](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L180)
+[packages/core/src/main.ts:178](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L178)
 
 ___
 
