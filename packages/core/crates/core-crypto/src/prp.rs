@@ -2,7 +2,7 @@ use crate::primitives::{calculate_mac, SimpleStreamCipher};
 
 const INTERMEDIATE_KEY_LENGTH: usize = 32;
 const INTERMEDIATE_IV_LENGTH: usize = 16;
-const HASH_LENGTH: usize = 32;
+//const HASH_LENGTH: usize = 32;
 const PRP_MIN_LENGTH: usize = 32;
 
 pub struct PRP {
@@ -34,7 +34,7 @@ impl PRP {
         }
 
         let mut out = Vec::from(plaintext);
-        let mut data = out.as_mut_slice();
+        let data = out.as_mut_slice();
 
         Self::xor_keystream(data, &self.keys[0], &self.ivs[0])?;
         Self::xor_hash(data, &self.keys[1], &self.ivs[1])?;
@@ -50,7 +50,7 @@ impl PRP {
         }
 
         let mut out = Vec::from(plaintext);
-        let mut data = out.as_mut_slice();
+        let data = out.as_mut_slice();
 
         Self::xor_hash(data, &self.keys[3], &self.ivs[3])?;
         Self::xor_keystream(data, &self.keys[2], &self.ivs[2])?;

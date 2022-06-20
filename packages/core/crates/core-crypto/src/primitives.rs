@@ -3,8 +3,7 @@ use chacha20::ChaCha20;
 use chacha20::cipher::StreamCipher;
 use hmac::{Mac, SimpleHmac};
 use chacha20::cipher::KeyIvInit;
-use digest::FixedOutput;
-use crate::shared_keys::KeyBytes;
+use digest::FixedOutputReset;
 
 pub struct SimpleMac {
     instance: SimpleHmac<Blake2s256>
@@ -21,10 +20,8 @@ impl SimpleMac {
         self.instance.update(data);
     }
 
-    pub fn finalize(&self) -> Box<[u8]> {
-        let mut ret = [0u8; crate::parameters::SECRET_KEY_LENGTH];
-        self.instance.finalize_into(KeyBytes::from_mut_slice(&mut ret));
-        ret.into()
+    pub fn finalize(&mut self) -> Box<[u8]> {
+        self.instance.finalize_fixed_reset().to_vec().into_boxed_slice()
     }
 }
 
