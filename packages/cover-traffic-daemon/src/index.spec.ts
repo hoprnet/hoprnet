@@ -29,9 +29,7 @@ describe('cover-traffic daemon', async function () {
     stubLibp2p()
     const connectorMock = createConnectorMock(mockPeerId)
     log('Mocked chain', connectorMock)
-    // CommonJS / ESM issue
-    // @ts-ignore
-    node = new Hopr.default(mockPeerId, dbMock, connectorMock, sampleOptions as HoprOptions)
+    node = new Hopr(mockPeerId, dbMock, connectorMock, sampleOptions as HoprOptions)
   })
 
   afterEach(function () {
