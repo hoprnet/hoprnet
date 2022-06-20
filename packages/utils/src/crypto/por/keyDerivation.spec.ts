@@ -1,5 +1,5 @@
-import { SECRET_LENGTH } from './constants'
-import { sampleFieldElement } from './keyDerivation'
+import { SECRET_LENGTH } from './constants.js'
+import { sampleFieldElement } from './keyDerivation.js'
 import assert from 'assert'
 
 describe(`PoR key derivation`, function () {

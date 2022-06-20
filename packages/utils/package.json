@@ -7,7 +7,7 @@
   "license": "GPL-3.0",
   "types": "lib/index.d.ts",
   "main": "lib/index.js",
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
     "clean:wasm": "make -C crates clean",
     "build:wasm": "make -C crates all && make -C crates install",
@@ -29,12 +29,12 @@
     "abort-controller": "~3.0.0",
     "bignumber.js": "9.0.2",
     "bn.js": "5.2.0",
-    "chalk": "4.1.2",
+    "chalk": "5.0.1",
     "debug": "4.3.4",
     "ethers": "5.5.4",
     "futoin-hkdf": "1.5.0",
     "hjson": "3.2.2",
-    "it-pipe": "1.1.0",
+    "it-pipe": "2.0.3",
     "jsonschema": "1.4.0",
     "leveldown": "6.1.1",
     "levelup": "5.1.1",
@@ -65,10 +65,6 @@
     "typedoc-plugin-markdown": "3.11.14"
   },
   "mocha": {
-    "extension": [
-      "ts"
-    ],
-    "spec": "src/**/*.spec.ts",
-    "require": "ts-node/register"
+    "spec": "lib/**/*.spec.ts"
   }
 }

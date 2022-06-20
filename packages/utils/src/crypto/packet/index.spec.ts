@@ -1,10 +1,10 @@
 import PeerId from 'peer-id'
 import { randomBytes } from 'crypto'
-import { getPacketLength, createPacket, forwardTransform, generateKeyShares } from '.'
-import { PAYLOAD_SIZE } from './constants'
+import { getPacketLength, createPacket, forwardTransform, generateKeyShares } from './index.js'
+import { PAYLOAD_SIZE } from './constants.js'
 import assert from 'assert'
-import { u8aEquals } from '../../u8a'
-import { PADDING_TAG_LENGTH } from './padding'
+import { u8aEquals } from '../../u8a/index.js'
+import { PADDING_TAG_LENGTH } from './padding.js'
 
 describe('header', function () {
   it('create a header and transform', async function () {

@@ -1,5 +1,5 @@
-import { u8aSplit, serializeToU8a, validatePoRHalfKeys } from '..'
-import { HalfKeyChallenge, HalfKey, PublicKey, Ticket, Response } from '.'
+import { u8aSplit, serializeToU8a, validatePoRHalfKeys } from '../index.js'
+import { HalfKeyChallenge, HalfKey, PublicKey, Ticket, Response } from './index.js'
 
 export class UnacknowledgedTicket {
   constructor(public readonly ticket: Ticket, public readonly ownKey: HalfKey, public readonly signer: PublicKey) {

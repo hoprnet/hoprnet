@@ -1,7 +1,7 @@
 import PeerId from 'peer-id'
 import { keys as libp2p_crypto } from 'libp2p-crypto'
 
-import { stringToU8a } from '../u8a'
+import { stringToU8a } from '../u8a/index.js'
 
 import secp256k1 from 'secp256k1'
 import { encode } from 'multihashes'

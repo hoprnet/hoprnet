@@ -1,7 +1,7 @@
-import { addPadding, removePadding, PADDING_TAG, PADDING_TAG_LENGTH } from './padding'
-import { u8aEquals } from '../../u8a'
+import { addPadding, removePadding, PADDING_TAG, PADDING_TAG_LENGTH } from './padding.js'
+import { u8aEquals } from '../../u8a/index.js'
 import assert from 'assert'
-import { PAYLOAD_SIZE } from './constants'
+import { PAYLOAD_SIZE } from './constants.js'
 
 describe('padding', function () {
   it('test adding padding and removing it', function () {

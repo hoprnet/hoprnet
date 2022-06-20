@@ -1,6 +1,6 @@
 import { expand } from 'futoin-hkdf'
 import { createHmac } from 'crypto'
-import { HASH_ALGORITHM, HASH_LENGTH, SECRET_LENGTH } from './constants'
+import { HASH_ALGORITHM, HASH_LENGTH, SECRET_LENGTH } from './constants.js'
 
 const HASH_KEY_COMMITMENT_SEED = 'HASH_KEY_COMMITMENT_SEED'
 

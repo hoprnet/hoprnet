@@ -1,4 +1,4 @@
-import { pubKeyToPeerId } from './pubKeyToPeerId'
+import { pubKeyToPeerId } from './pubKeyToPeerId.js'
 import PeerId from 'peer-id'
 import assert from 'assert'
 

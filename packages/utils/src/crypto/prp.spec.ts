@@ -1,5 +1,5 @@
-import { PRP, PRP_IV_LENGTH, PRP_KEY_LENGTH } from './prp'
-import { u8aEquals } from '../u8a'
+import { PRP, PRP_IV_LENGTH, PRP_KEY_LENGTH } from './prp.js'
+import { u8aEquals } from '../u8a/index.js'
 import assert from 'assert'
 import { randomBytes } from 'crypto'
 

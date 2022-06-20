@@ -1,5 +1,5 @@
-import { toU8a, u8aAdd, u8aEquals } from '../u8a'
-import { iterateHash, recoverIteratedHash } from './hashIterator'
+import { toU8a, u8aAdd, u8aEquals } from '../u8a/index.js'
+import { iterateHash, recoverIteratedHash } from './hashIterator.js'
 import assert from 'assert'
 
 describe('test hash iterator', function () {

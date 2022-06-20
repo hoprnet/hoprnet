@@ -1,10 +1,10 @@
 import assert from 'assert'
-import { stringToU8a, SIGNATURE_LENGTH } from '..'
-import { Address, Ticket, Hash, Balance, PublicKey, Signature, UINT256, Response, Challenge } from '.'
+import { stringToU8a, SIGNATURE_LENGTH } from '../index.js'
+import { Address, Ticket, Hash, Balance, PublicKey, Signature, UINT256, Response, Challenge } from './index.js'
 import BN from 'bn.js'
 import { randomBytes } from 'crypto'
 import { Wallet } from 'ethers'
-import { INVERSE_TICKET_WIN_PROB, PRICE_PER_PACKET } from '../constants'
+import { INVERSE_TICKET_WIN_PROB, PRICE_PER_PACKET } from '../constants.js'
 
 const ACCOUNT_A = new Wallet('0x4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b')
 const ACCOUNT_B = new Wallet('0x18a664889e28a432495758f0522b53b2f04a35f810b78c6ea01db305141bcba2')

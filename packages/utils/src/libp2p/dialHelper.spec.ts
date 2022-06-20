@@ -1,17 +1,17 @@
 import { NOISE } from '@chainsafe/libp2p-noise'
 import MPLEX from 'libp2p-mplex'
 import LibP2P from 'libp2p'
-import type { Address } from 'libp2p/src/peer-store/address-book'
-import type { Connection } from 'libp2p/src/connection-manager'
-import { dial as dialHelper, DialStatus } from './dialHelper'
-import { privKeyToPeerId } from './privKeyToPeerId'
+import type { Address } from 'libp2p/src/peer-store/address-book.js'
+import type { Connection } from 'libp2p/src/connection-manager/index.js'
+import { dial as dialHelper, DialStatus } from './dialHelper.js'
+import { privKeyToPeerId } from './privKeyToPeerId.js'
 import TCP from 'libp2p-tcp'
 import KadDHT from 'libp2p-kad-dht'
 import assert from 'assert'
 import { Multiaddr } from 'multiaddr'
-import pipe from 'it-pipe'
-import { u8aEquals, stringToU8a } from '../u8a'
-import { createRelayerKey } from '../libp2p'
+import { pipe } from 'it-pipe'
+import { u8aEquals, stringToU8a } from '../u8a/index.js'
+import { createRelayerKey } from './relayCode.js'
 import PeerId from 'peer-id'
 
 const TEST_PROTOCOL = '/test'
@@ -137,7 +137,8 @@ describe('test dialHelper', function () {
 
     assert(result.status === DialStatus.SUCCESS)
 
-    pipe(TEST_MESSAGE, result.resp.stream.sink)
+    // @fixme
+    pipe(TEST_MESSAGE, result.resp.stream.sink as any)
 
     for await (const msg of result.resp.stream.source) {
       assert(u8aEquals(msg.slice(), TEST_MESSAGE))
@@ -190,7 +191,8 @@ describe('test dialHelper', function () {
 
     assert(result.status === DialStatus.SUCCESS, `Dial must be successful`)
 
-    pipe(TEST_MESSAGE, result.resp.stream.sink)
+    // @fixme
+    pipe(TEST_MESSAGE, result.resp.stream.sink as any)
 
     for await (const msg of result.resp.stream.source) {
       assert(u8aEquals(msg.slice(), TEST_MESSAGE))
