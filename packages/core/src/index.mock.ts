@@ -1,4 +1,4 @@
-import type { HoprOptions } from '.'
+import type { HoprOptions } from './index.js'
 
 export const sampleOptions: Partial<HoprOptions> = {
   // TODO: find better sample options

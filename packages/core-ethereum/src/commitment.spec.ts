@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { bumpCommitment, ChannelCommitmentInfo, findCommitmentPreImage, initializeCommitment } from './commitment'
+import { bumpCommitment, ChannelCommitmentInfo, findCommitmentPreImage, initializeCommitment } from './commitment.js'
 import sinon from 'sinon'
 import { Hash, HoprDB, privKeyToPeerId, stringToU8a, UINT256 } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'

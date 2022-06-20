@@ -7,18 +7,18 @@ import chalk from 'chalk'
 
 import type BN from 'bn.js'
 import type { default as LibP2P, Connection } from 'libp2p'
-import type { Peer } from 'libp2p/src/peer-store/types'
+import type { Peer } from 'libp2p/src/peer-store/types.js'
 import type PeerId from 'peer-id'
 
 import { compareAddressesLocalMode, compareAddressesPublicMode, type HoprConnectConfig } from '@hoprnet/hopr-connect'
 
-import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants'
+import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants.js'
 
-import AccessControl from './network/access-control'
-import NetworkPeers, { Entry } from './network/network-peers'
-import Heartbeat, { type HeartbeatPingResult, type NetworkHealthIndicator } from './network/heartbeat'
+import AccessControl from './network/access-control.js'
+import NetworkPeers, { Entry } from './network/network-peers.js'
+import Heartbeat, { type HeartbeatPingResult, type NetworkHealthIndicator } from './network/heartbeat.js'
 
-import { findPath } from './path'
+import { findPath } from './path/index.js'
 
 import {
   PublicKey,
@@ -57,14 +57,14 @@ import {
   PassiveStrategy,
   PromiscuousStrategy,
   SaneDefaults
-} from './channel-strategy'
+} from './channel-strategy.js'
 
-import { subscribeToAcknowledgements } from './interactions/packet/acknowledgement'
-import { PacketForwardInteraction } from './interactions/packet/forward'
+import { subscribeToAcknowledgements } from './interactions/packet/acknowledgement.js'
+import { PacketForwardInteraction } from './interactions/packet/forward.js'
 
-import { Packet } from './messages'
-import type { ResolvedEnvironment } from './environment'
-import { createLibp2pInstance } from './main'
+import { Packet } from './messages/index.js'
+import type { ResolvedEnvironment } from './environment.js'
+import { createLibp2pInstance } from './main.js'
 
 const DEBUG_PREFIX = `hopr-core`
 const log = debug(DEBUG_PREFIX)
@@ -1288,8 +1288,8 @@ class Hopr extends EventEmitter {
 }
 
 export default Hopr
-export * from './constants'
-export { createHoprNode } from './main'
+export * from './constants.js'
+export { createHoprNode } from './main.js'
 export {
   PassiveStrategy,
   PromiscuousStrategy,
@@ -1299,7 +1299,7 @@ export {
   type NetworkHealthIndicator,
   type ChannelStrategyInterface
 }
-export { resolveEnvironment, supportedEnvironments, type ResolvedEnvironment } from './environment'
-export { createLibp2pMock } from './libp2p.mock'
-export { sampleOptions } from './index.mock'
+export { resolveEnvironment, supportedEnvironments, type ResolvedEnvironment } from './environment.js'
+export { createLibp2pMock } from './libp2p.mock.js'
+export { sampleOptions } from './index.mock.js'
 export { CONFIRMATIONS } from '@hoprnet/hopr-core-ethereum'

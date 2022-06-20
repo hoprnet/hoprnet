@@ -7,5 +7,5 @@
     "rootDir": "."
   },
   "include": ["type-extension.ts", "hardhat.config.ts", "tasks", "test", "deploy", "src"],
-  "references": [{ "path": "../utils" }, { "path": "../core" }]
+  "references": [{ "path": "../utils" }]
 }

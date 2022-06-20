@@ -1,3 +1,8 @@
+// May not change at runtime
+// Don't do type-checks on JSON files
+// @ts-ignore
+import protocolConfig from '../protocol-config.json' assert { type: 'json' }
+
 export type NetworkOptions = {
   id: string
   description: string
@@ -45,15 +50,16 @@ export type ResolvedEnvironment = {
 }
 
 export function supportedEnvironments(): Environment[] {
-  const protocolConfig = require('../protocol-config.json') as ProtocolConfig
-  const environments = Object.entries(protocolConfig.environments).map(([id, env]) => ({ id, ...env }))
+  const environments = Object.entries((protocolConfig as ProtocolConfig).environments).map(([id, env]) => ({
+    id,
+    ...env
+  }))
   return environments
 }
 
 export function resolveEnvironment(environment_id: string, customProvider?: string): ResolvedEnvironment {
-  const protocolConfig = require('../protocol-config.json') as ProtocolConfig
-  const environment = protocolConfig.environments[environment_id]
-  const network = protocolConfig.networks[environment?.network_id]
+  const environment = (protocolConfig as ProtocolConfig).environments[environment_id]
+  const network = (protocolConfig as ProtocolConfig).networks[environment?.network_id]
   if (environment && network) {
     network.id = environment?.network_id
     network.default_provider = customProvider ?? network?.default_provider

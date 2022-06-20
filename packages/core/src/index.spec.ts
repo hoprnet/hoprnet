@@ -2,7 +2,7 @@ import { rm } from 'fs/promises'
 import assert from 'assert'
 import { createConnectorMock } from '@hoprnet/hopr-core-ethereum'
 import { dbMock, debug, privKeyToPeerId } from '@hoprnet/hopr-utils'
-import Hopr, { type HoprOptions, sampleOptions } from '.'
+import Hopr, { type HoprOptions, sampleOptions } from './index.js'
 import { setTimeout } from 'timers/promises'
 
 const log = debug('hopr-core:test:index')

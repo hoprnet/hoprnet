@@ -1,6 +1,6 @@
 import assert from 'assert'
-import { fakePeerId, showBackoff } from '../test-utils.spec'
-import PeerStore, { MAX_BACKOFF } from './network-peers'
+import { fakePeerId, showBackoff } from '../test-utils.spec.js'
+import PeerStore, { MAX_BACKOFF } from './network-peers.js'
 
 const NETWORK_QUALITY_THRESHOLD = 0.5
 

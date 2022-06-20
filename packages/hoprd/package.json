@@ -40,7 +40,7 @@
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "bn.js": "5.2.0",
     "body-parser": "1.19.2",
-    "chalk": "4.1.2",
+    "chalk": "5.0.1",
     "check-password-strength": "2.0.4",
     "cookie": "0.4.2",
     "cors": "2.8.5",
