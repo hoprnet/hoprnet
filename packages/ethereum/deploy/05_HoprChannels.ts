@@ -13,7 +13,7 @@ const closures: {
 }
 
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const { ethers, deployments, getNamedAccounts, network } = hre
+  const { ethers, deployments, getNamedAccounts, network, environment } = hre
   const deployer = await getNamedAccounts().then((o) => ethers.getSigner(o.deployer))
   const hoprToken = await deployments.get('HoprToken')
 
@@ -27,11 +27,19 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const deploymentType = Object.keys(network.tags).find((tag) => closures[tag])
   const closure = Math.floor((closures[deploymentType] ?? closures.testing) / 1e3)
 
+  const deployOptions = {
+    log: true
+  }
+  // don't wait when using local hardhat because its using auto-mine
+  if (!environment.match('hardhat')) {
+    deployOptions['waitConfirmations'] = 2
+  }
+
   const result = await deployments.deterministic('HoprChannels', {
     from: deployer.address,
     args: [hoprToken.address, closure],
     salt: u8aToHex(new TextEncoder().encode(salt)),
-    log: true
+    ...deployOptions
   })
 
   await result.deploy()

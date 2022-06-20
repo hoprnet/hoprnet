@@ -84,7 +84,7 @@ jobs:
       - name: '[SMART-CONTRACTS] Commit & push changes'
         if: ${{ !env.ACT }}
         run: |
-          yarn lint:fix
+          make lint-fix
           ./scripts/commit-and-push-all-changes.sh
         env:
           HOPR_GIT_MSG: 'chore(release): update smart contract deployments'

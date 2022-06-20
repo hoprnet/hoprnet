@@ -6,7 +6,8 @@ const DUMMY_PROXY = 'HoprDummyProxyForNetworkRegistry'
 const STAKING_PROXY = 'HoprStakingProxyForNetworkRegistry'
 
 // Deploy directly a HoprNetworkRegistry contract, using hardcoded staking contract.
-const main = async function ({ deployments, getNamedAccounts, network, environment }: HardhatRuntimeEnvironment) {
+const main = async function (hre: HardhatRuntimeEnvironment) {
+  const { deployments, getNamedAccounts, network, environment } = hre
   const environmentConfig = PROTOCOL_CONFIG.environments[environment]
   const { deployer } = await getNamedAccounts()
 
@@ -18,11 +19,19 @@ const main = async function ({ deployments, getNamedAccounts, network, environme
   // Local development environment uses HoprDummyProxyForNetworkRegistry. All the other network uses HoprStakingProxyForNetworkRegistry
   const registryProxyName = network.name == 'hardhat' ? DUMMY_PROXY : STAKING_PROXY
 
+  const deployOptions = {
+    log: true
+  }
+  // don't wait when using local hardhat because its using auto-mine
+  if (!environment.match('hardhat')) {
+    deployOptions['waitConfirmations'] = 2
+  }
+
   const registryProxy = await deployments.deploy('HoprNetworkRegistryProxy', {
     contract: registryProxyName,
     from: deployer,
-    log: true,
-    args: registryProxyName === STAKING_PROXY ? [stakeAddress, deployer, MIN_STAKE] : [deployer]
+    args: registryProxyName === STAKING_PROXY ? [stakeAddress, deployer, MIN_STAKE] : [deployer],
+    ...deployOptions
   })
 
   console.log(`"HoprNetworkRegistryProxy" deployed at ${registryProxy.address}`)

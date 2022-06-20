@@ -4,13 +4,8 @@ import { DeployFunction } from 'hardhat-deploy/types'
 const S3_PROGRAM_END = 1658836800
 const PROTOCOL_CONFIG = require('../../core/protocol-config.json')
 
-const main: DeployFunction = async function ({
-  ethers,
-  deployments,
-  network,
-  getNamedAccounts,
-  environment
-}: HardhatRuntimeEnvironment) {
+const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+  const { ethers, deployments, getNamedAccounts, network, environment } = hre
   const { deploy } = deployments
   const { deployer, admin } = await getNamedAccounts()
   const environmentConfig = PROTOCOL_CONFIG.environments[environment]
@@ -27,13 +22,21 @@ const main: DeployFunction = async function ({
   const latestBlockTimestamp = (await ethers.provider.getBlock('latest')).timestamp
   console.log(`Latest block timestamp is ${latestBlockTimestamp}`)
 
+  const deployOptions = {
+    log: true
+  }
+  // don't wait when using local hardhat because its using auto-mine
+  if (!environment.match('hardhat')) {
+    deployOptions['waitConfirmations'] = 2
+  }
+
   if (latestBlockTimestamp <= S3_PROGRAM_END) {
     // deploy season 3
     await deploy('HoprStake', {
       contract: 'HoprStakeSeason3',
       from: deployer,
       args: [HoprBoost.address, admin, xHOPR.address, wxHOPR.address],
-      log: true
+      ...deployOptions
     })
   } else {
     // deploy season 4
@@ -41,7 +44,7 @@ const main: DeployFunction = async function ({
       contract: 'HoprStakeSeason4',
       from: deployer,
       args: [HoprBoost.address, admin, xHOPR.address, wxHOPR.address],
-      log: true
+      ...deployOptions
     })
   }
 }

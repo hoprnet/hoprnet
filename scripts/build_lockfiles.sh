@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 # prevent sourcing of this script, only allow execution
+# shellcheck disable=SC2091
 $(return >/dev/null 2>&1)
 test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
 
@@ -9,7 +10,9 @@ set -Eeuo pipefail
 
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
-
+# shellcheck disable=SC2034
+declare HOPR_LOG_ID="build-lockfiles"
+# shellcheck disable=SC1091
 source "${mydir}/utils.sh"
 
 usage() {
@@ -31,7 +34,8 @@ fi
 
 declare package_name="${1}"
 
-declare build_dir="$(find_tmp_dir)/hopr_lockfile_generation"
+declare build_dir
+build_dir="$(find_tmp_dir)/hopr_lockfile_generation"
 
 log "Creating temporary build directory ${build_dir} (will be removed)"
 mkdir "${build_dir}"
@@ -50,7 +54,8 @@ trap restore SIGINT SIGTERM ERR
 
 log "Install workspace package in temporary directory"
 
-declare package_npm_name=$(jq -r '.name' "${package_dir}/package.json")
+declare package_npm_name
+package_npm_name=$(jq -r '.name' "${package_dir}/package.json")
 
 # Resolve workspace links by packing a NPM package
 yarn workspace "${package_npm_name}" pack
@@ -62,7 +67,7 @@ tar -xf "${package_dir}/package.tgz"
 
 # Turn yarn `resolutions` from workspace root into npm `overrides` for selected package
 jq -s '.[1] * (.[0].resolutions | { "overrides": . ,"resolutions": . })' "${mydir}/../package.json" "${build_dir}/package/package.json" > "${build_dir}/package.json"
- 
+
 # # NPM package is now useless
 rm "${package_dir}/package.tgz"
 rm -R "${build_dir}/package"
