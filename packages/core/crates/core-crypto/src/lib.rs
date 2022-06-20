@@ -16,6 +16,7 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[macro_use]
 extern crate static_assertions;
+extern crate core;
 
 // Static assertions on cryptographic parameters
 
