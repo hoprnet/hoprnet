@@ -39,6 +39,24 @@ build-cargo: build-yarn-utils
 build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
 	make -C docs/yellowpaper
 
+.PHONY: build-docs
+build-docs: ## build typedocs, Rest API docs, and docs website
+build-docs: build-docs-typescript build-docs-website build-docs-api
+
+.PHONY: build-docs-typescript
+build-docs-typescript: ## build typedocs
+build-docs-typescript: build
+	yarn workspaces foreach -pv run docs:generate
+
+.PHONY: build-docs-website
+build-docs-website: ## build docs website
+	yarn workspace hopr-docs build
+
+.PHONY: build-docs-api
+build-docs-api: ## build Rest API docs
+build-docs-api: build
+	./scripts/build-rest-api-spec.sh
+
 .PHONY: test
 test: ## run unit tests for all packages, or a single package if package= is set
 ifdef package
