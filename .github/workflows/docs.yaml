@@ -47,7 +47,7 @@ jobs:
         run: ./scripts/build-rest-api-spec.sh
 
       - name: Format newly created files
-        run: yarn lint:fix
+        run: make lint-fix
 
       - name: Move OpenAPI spec file into documentation directory
         run: |
