@@ -37,9 +37,7 @@ describe('cover-traffic daemon', async function () {
   })
 
   it('should run and stop properly', async function () {
-    // CommonJS / ESM issue
-    // @ts-ignore
-    assert(node instanceof Hopr.default)
+    assert(node instanceof Hopr)
     log('starting stubbed hopr node')
     await node.start()
     log('completed stubbed hopr node, starting cover-traffic strategy')
