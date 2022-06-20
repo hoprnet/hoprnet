@@ -3620,7 +3620,7 @@ __metadata:
     debug: 4.3.4
     dids: 2.4.3
     express: 4.17.3
-    express-openapi: 9.3.1
+    express-openapi: "https://github.com/hoprnet/open-api/raw/robertkiel/built-esm-support/packages/express-openapi/express-openapi-11.0.4.tgz"
     jazzicon: 1.5.0
     js-cookie: 3.0.1
     key-did-provider-ed25519: 1.1.0
