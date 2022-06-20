@@ -12,7 +12,7 @@ import { Filter } from './filter.js'
 import { Discovery } from './discovery.js'
 // Do not type-check JSON files
 // @ts-ignore
-import { version } from '../package.json' assert { type: 'json' }
+import pkg from '../package.json' assert { type: 'json' }
 
 import type {
   PublicNodesEmitter,
@@ -86,7 +86,7 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
 
     this.relay = new Relay(this._libp2p, this._dialDirectly, this.filter.bind(this), this.options, this.testingOptions)
 
-    log(`HoprConnect: `, version)
+    log(`HoprConnect: `, pkg.version)
 
     if (!!this.testingOptions.__noDirectConnections) {
       verbose(`DEBUG mode: always using relayed or WebRTC connections.`)
