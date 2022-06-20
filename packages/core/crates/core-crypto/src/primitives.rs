@@ -13,16 +13,21 @@ pub struct SimpleMac {
 }
 
 impl SimpleMac {
+
+    /// Create new instance of the MAC using the given secret key.
     pub fn new(key: &[u8]) -> Result<Self, String> {
         Ok(Self {
             instance: SimpleHmac::<Blake2s256>::new_from_slice(key).map_err(|e| e.to_string())?
         })
     }
 
+    /// Update the internal state of the MAC using the given input data.
     pub fn update(&mut self, data: &[u8]) {
         self.instance.update(data);
     }
 
+    /// Retrieve the final MAC and reset this instance so it could be reused for
+    /// a new MAC computation.
     pub fn finalize(&mut self) -> Box<[u8]> {
         self.instance.finalize_fixed_reset().to_vec().into_boxed_slice()
     }
@@ -36,15 +41,19 @@ pub struct SimpleStreamCipher {
 }
 
 impl SimpleStreamCipher {
+
+    /// Create new instance of the stream cipher initialized
+    /// with the given secret key and IV.
     pub fn new(key: &[u8], iv: &[u8]) -> Result<Self, String> {
         let chacha_iv_size = ChaCha20::iv_size();
-        if iv.len() >= chacha_iv_size {
+        let chacha_key_size = ChaCha20::key_size();
+        if iv.len() >= chacha_iv_size || key.len() != chacha_key_size {
             Ok(Self {
                 instance: ChaCha20::new_from_slices(key, &iv[0..chacha_iv_size]).map_err(|e| e.to_string())?
             })
         }
         else {
-            Err("IV too small".into())
+            Err("Incorrect key size or IV too small".into())
         }
     }
 

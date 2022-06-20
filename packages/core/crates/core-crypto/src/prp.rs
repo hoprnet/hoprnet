@@ -3,7 +3,6 @@ use crate::primitives::{calculate_mac, SimpleStreamCipher};
 
 const INTERMEDIATE_KEY_LENGTH: usize = 32;
 const INTERMEDIATE_IV_LENGTH: usize = 16;
-//const HASH_LENGTH: usize = 32;
 
 // The minimum input length must be at least size of the key, which is XORed with plaintext/ciphertext
 const PRP_MIN_LENGTH: usize = INTERMEDIATE_KEY_LENGTH;
@@ -70,6 +69,8 @@ impl PRP {
 
         Ok(out.into_boxed_slice())
     }
+
+    // Internal helper functions
 
     fn xor_hash(data: &mut [u8], key: &[u8], iv: &[u8]) -> Result<(), String> {
         let res = calculate_mac([key, iv].concat().as_slice(), &data[PRP_MIN_LENGTH..])?;

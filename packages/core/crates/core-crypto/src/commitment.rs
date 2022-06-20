@@ -4,6 +4,8 @@ use blake2::Blake2s256;
 use hkdf::SimpleHkdf;
 use hmac::{SimpleHmac, Mac};
 
+/// Derives the commitment seed given the compressed private key representation
+/// and the serialized channel information.
 pub fn derive_commitment_seed(private_key: &[u8], channel_info: &[u8]) -> Result<Box<[u8]>, String> {
 
     // Create HKDF instance and call the `expand` on with the given private key
