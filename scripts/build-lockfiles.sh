@@ -34,28 +34,28 @@ fi
 
 declare package_name="${1}"
 
-declare build_dir
+declare build_dir package_dir package_npm_name
 build_dir="$(find_tmp_dir)/hopr_lockfile_generation"
-
-log "Creating temporary build directory ${build_dir} (will be removed)"
-mkdir "${build_dir}"
-
-declare package_dir="${mydir}/../packages/${package_name}"
+package_dir="${mydir}/../packages/${package_name}"
+package_npm_name="$(jq -r '.name' "${package_dir}/package.json")"
 
 restore() {
-  log "Restoring previous state"
+  log "Delete temporary files and folders"
   rm -Rf "${build_dir}"
   rm -f "${package_dir}/npm-shrinkwrap.json"
   rm -f "${package_dir}/package.tgz"
 }
 
 # Remove temporary build dir if failed
-trap restore SIGINT SIGTERM ERR
+trap restore SIGINT SIGTERM ERR EXIT
+
+log "Clean up previous lockfile generation attempts"
+restore
+
+log "Creating temporary build directory ${build_dir} (will be removed)"
+mkdir "${build_dir}"
 
 log "Install workspace package in temporary directory"
-
-declare package_npm_name
-package_npm_name=$(jq -r '.name' "${package_dir}/package.json")
 
 # Resolve workspace links by packing a NPM package
 yarn workspace "${package_npm_name}" pack
@@ -69,7 +69,6 @@ tar -xf "${package_dir}/package.tgz"
 jq -s '.[1] * (.[0].resolutions | { "overrides": . ,"resolutions": . })' "${mydir}/../package.json" "${build_dir}/package/package.json" > "${build_dir}/package.json"
 
 # # NPM package is now useless
-rm "${package_dir}/package.tgz"
 rm -R "${build_dir}/package"
 
 log "Creating NPM lock file for ${package_name} package"
