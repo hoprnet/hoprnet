@@ -7,6 +7,7 @@
   "license": "LGPL-3.0-only",
   "types": "lib/main.d.cts",
   "type": "module",
+  "main": "lib/main.cjs",
   "bin": "lib/main.cjs",
   "files": [
     "lib",
