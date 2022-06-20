@@ -3506,7 +3506,7 @@ __metadata:
     typedoc-plugin-markdown: 3.11.14
     yargs: 17.4.0
   bin:
-    hopr-cover-traffic-daemon: lib/main.js
+    hopr-cover-traffic-daemon: lib/main.cjs
   languageName: unknown
   linkType: soft
 

@@ -8,9 +8,7 @@
   "types": "lib/main.d.cts",
   "type": "module",
   "main": "lib/main.cjs",
-  "bin": {
-    "hoprd": "lib/main.cjs"
-  },
+  "bin": "lib/main.cjs",
   "files": [
     "lib",
     "npm-shrinkwrap.json",
