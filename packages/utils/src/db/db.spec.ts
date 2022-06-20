@@ -1,4 +1,4 @@
-import { HoprDB } from './db'
+import { HoprDB } from './db.js'
 import { randomBytes } from 'crypto'
 
 import assert from 'assert'
@@ -16,10 +16,10 @@ import {
   PublicKey,
   Address,
   Snapshot
-} from '../types'
+} from '../types/index.js'
 import BN from 'bn.js'
-import { SECP256K1_CONSTANTS } from '../crypto'
-import { u8aEquals } from '../u8a'
+import { SECP256K1_CONSTANTS } from '../crypto/index.js'
+import { u8aEquals } from '../u8a/index.js'
 
 const TestingSnapshot = new Snapshot(new BN(0), new BN(0), new BN(0))
 

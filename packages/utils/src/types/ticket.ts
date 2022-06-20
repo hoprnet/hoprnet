@@ -1,10 +1,10 @@
 import BN from 'bn.js'
-import { stringToU8a, u8aSplit, serializeToU8a } from '..'
-import { Address, Balance, Hash, Signature, UINT256, PublicKey, Response } from '.'
+import { stringToU8a, u8aSplit, serializeToU8a } from '../index.js'
+import { Address, Balance, Hash, Signature, UINT256, PublicKey, Response } from './index.js'
 import { ethers } from 'ethers'
-import type { Challenge } from './challenge'
-import { EthereumChallenge } from './ethereumChallenge'
-import { PRICE_PER_PACKET, INVERSE_TICKET_WIN_PROB } from '../constants'
+import type { Challenge } from './challenge.js'
+import { EthereumChallenge } from './ethereumChallenge.js'
+import { PRICE_PER_PACKET, INVERSE_TICKET_WIN_PROB } from '../constants.js'
 
 // Prefix message with "\x19Ethereum Signed Message:\n {length} HOPRnet {message}" and return hash
 function toEthSignedMessageHash(message: Hash): Hash {

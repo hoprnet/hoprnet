@@ -3,7 +3,6 @@ import type { UnsignedTransaction, BigNumber, providers } from 'ethers'
 import type { HoprToken } from '@hoprnet/hopr-ethereum'
 
 import { utils, constants } from 'ethers'
-import { deserializeKeyPair, PublicKey, hasB58String } from '@hoprnet/hopr-utils'
 import { readdir, readFile } from 'fs/promises'
 import { join } from 'path'
 
@@ -31,6 +30,9 @@ async function send(signer: providers.JsonRpcSigner, txparams: UnsignedTransacti
  * @returns the identities' Ethereum addresses
  */
 async function getIdentities(directory: string, password: string, prefix?: string): Promise<string[]> {
+  // Loading ES modules requires code changes in `hardhat-core`
+  const { deserializeKeyPair, PublicKey } = await import('@hoprnet/hopr-utils')
+
   let fileNames: string[]
   try {
     fileNames = await readdir(directory)
@@ -120,6 +122,7 @@ async function main(
   { network, ethers, deployments, environment }: HardhatRuntimeEnvironment,
   _runSuper: RunSuperFunction<any>
 ): Promise<void> {
+  const { hasB58String, PublicKey } = await import('@hoprnet/hopr-utils')
   if (environment == undefined) {
     console.error(`HOPR_ENVIRONMENT_ID is not set. Run with "HOPR_ENVIRONMENT_ID=<environment> ..."`)
     process.exit(1)

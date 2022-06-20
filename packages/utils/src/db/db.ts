@@ -3,8 +3,8 @@ import levelup from 'levelup'
 import leveldown from 'leveldown'
 import MemDown from 'memdown'
 import { stat, mkdir, rm } from 'fs/promises'
-import { debug } from '../process'
-import { Intermediate } from '../crypto'
+import { debug } from '../process/index.js'
+import { Intermediate } from '../crypto/index.js'
 import {
   AcknowledgedTicket,
   UnacknowledgedTicket,
@@ -20,9 +20,9 @@ import {
   Address,
   Hash,
   generateChannelId
-} from '../types'
+} from '../types/index.js'
 import BN from 'bn.js'
-import { u8aToNumber, u8aConcat, toU8a } from '../u8a'
+import { u8aToNumber, u8aConcat, toU8a } from '../u8a/index.js'
 
 const log = debug(`hopr-core:db`)
 
@@ -175,6 +175,8 @@ export class HoprDB {
         throw new Error('Database does not exist: ' + dbPath)
       }
     }
+    // CommonJS / ESM issue
+    // @ts-ignore
     this.db = levelup(leveldown(dbPath))
 
     // Fully initialize database
@@ -846,6 +848,8 @@ export class HoprDB {
   static createMock(id?: PublicKey): HoprDB {
     const mock: HoprDB = {
       id: id ?? PublicKey.createMock(),
+      // CommonJS / ESM issue
+      // @ts-ignore
       db: levelup(MemDown())
     } as any
     Object.setPrototypeOf(mock, HoprDB.prototype)

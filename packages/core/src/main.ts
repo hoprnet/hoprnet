@@ -69,9 +69,7 @@ export async function createLibp2pInstance(
     addresses: { listen: getAddrs(peerId, options).map((x) => x.toString()) },
     // libp2p modules
     modules: {
-      // CommonJS / ESM issue
-      // @ts-ignore
-      transport: [HoprConnect.default as any],
+      transport: [HoprConnect as any],
       streamMuxer: [Mplex],
       connEncryption: [NOISE as any],
       dht: KadDHT

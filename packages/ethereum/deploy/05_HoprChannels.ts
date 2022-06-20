@@ -1,19 +1,22 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
 import type { DeploymentTypes } from '../src/constants'
-import { durations, u8aToHex, pickVersion } from '@hoprnet/hopr-utils'
-
-const closures: {
-  [key in DeploymentTypes]: number
-} = {
-  testing: durations.seconds(15),
-  development: durations.seconds(15),
-  staging: durations.minutes(5),
-  production: durations.minutes(5)
-}
 
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { ethers, deployments, getNamedAccounts, network, environment } = hre
+
+  // CommonJS / ESM issue of `hardhat-core`
+  const { durations, u8aToHex, pickVersion } = await import('@hoprnet/hopr-utils')
+
+  const closures: {
+    [key in DeploymentTypes]: number
+  } = {
+    testing: durations.seconds(15),
+    development: durations.seconds(15),
+    staging: durations.minutes(5),
+    production: durations.minutes(5)
+  }
+
   const deployer = await getNamedAccounts().then((o) => ethers.getSigner(o.deployer))
   const hoprToken = await deployments.get('HoprToken')
 

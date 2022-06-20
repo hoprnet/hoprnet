@@ -1,13 +1,12 @@
 import type PeerId from 'peer-id'
 
-import { MAC_LENGTH, END_PREFIX_LENGTH } from './constants'
-import { SECP256K1_CONSTANTS } from '../constants'
-import { createRoutingInfo, forwardTransform as routingInfoTransform } from './routingInfo'
-import { generateKeyShares, forwardTransform as keyShareTransform } from './keyShares'
-import { PRP } from '../prp'
-import { PAYLOAD_SIZE } from './constants'
-import { derivePacketTag, derivePRPParameters } from './keyDerivation'
-import { addPadding, removePadding } from './padding'
+import { MAC_LENGTH, END_PREFIX_LENGTH, PAYLOAD_SIZE } from './constants.js'
+import { SECP256K1_CONSTANTS } from '../constants.js'
+import { createRoutingInfo, forwardTransform as routingInfoTransform } from './routingInfo.js'
+import { generateKeyShares, forwardTransform as keyShareTransform } from './keyShares.js'
+import { PRP } from '../prp.js'
+import { derivePacketTag, derivePRPParameters } from './keyDerivation.js'
+import { addPadding, removePadding } from './padding.js'
 
 /**
  * Encrypts the plaintext in the reverse order of the path

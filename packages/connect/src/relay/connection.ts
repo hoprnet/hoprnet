@@ -1,18 +1,20 @@
 import { Multiaddr } from 'multiaddr'
-import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
-import type { Stream, StreamSink, StreamSource, StreamSourceAsync, StreamResult, StreamType } from '../types'
+import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types.js'
+import type { Stream, StreamSink, StreamSource, StreamSourceAsync, StreamResult, StreamType } from '../types.js'
 import { randomBytes } from 'crypto'
-import { RelayPrefix, ConnectionStatusMessages, StatusMessages } from '../constants'
+import { RelayPrefix, ConnectionStatusMessages, StatusMessages } from '../constants.js'
 import { u8aEquals, u8aToHex, defer, createCircuitAddress, type DeferType } from '@hoprnet/hopr-utils'
-import Heap from 'heap-js'
+import HeapPkg, { type Heap as HeapType } from 'heap-js'
 
 import type { Instance as SimplePeer } from 'simple-peer'
 import type PeerId from 'peer-id'
 
 import Debug from 'debug'
 import { EventEmitter } from 'events'
-import { toU8aStream, eagerIterator } from '../utils'
+import { toU8aStream, eagerIterator } from '../utils/index.js'
 import assert from 'assert'
+
+const { Heap } = HeapPkg
 
 const DEBUG_PREFIX = 'hopr-connect'
 
@@ -77,7 +79,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   private _sourceSwitched: boolean
   private _streamClosed: boolean
 
-  private statusMessages: Heap<Uint8Array>
+  private statusMessages: HeapType<Uint8Array>
 
   public _iteration: number
 
@@ -104,6 +106,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   private _counterparty: PeerId
 
   public source: StreamSourceAsync
+
+  // @ts-ignore
   public sink: StreamSink
 
   public conn: Stream

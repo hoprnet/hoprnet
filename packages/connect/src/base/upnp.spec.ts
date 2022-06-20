@@ -1,4 +1,4 @@
-import { UpnpManager } from './upnp'
+import { UpnpManager } from './upnp.js'
 import assert from 'assert'
 import type NatApi from 'nat-api'
 

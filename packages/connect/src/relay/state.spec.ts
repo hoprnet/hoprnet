@@ -1,11 +1,11 @@
-import handshake from 'it-handshake'
-import Pair from 'it-pair'
+import { handshake } from 'it-handshake'
+import { pair } from 'it-pair'
 
-import type { StreamType } from '../types'
+import type { StreamType } from '../types.js'
 
 import assert from 'assert'
-import { RelayState } from './state'
-import { ConnectionStatusMessages, RelayPrefix, StatusMessages } from '../constants'
+import { RelayState } from './state.js'
+import { ConnectionStatusMessages, RelayPrefix, StatusMessages } from '../constants.js'
 import { u8aEquals, privKeyToPeerId } from '@hoprnet/hopr-utils'
 
 const initiator = privKeyToPeerId('0x9feb47f140eb4ebc8b233214451dd097240699f50728a2cdc290643c2f71eb98')
@@ -28,11 +28,11 @@ describe('relay state management', function () {
 
     assert(!(await state.isActive(initiator, destination)), 'empty state must not be active')
 
-    const initiatorToRelay = Pair<StreamType>()
-    const relayToInitiator = Pair<StreamType>()
+    const initiatorToRelay = pair<StreamType>()
+    const relayToInitiator = pair<StreamType>()
 
-    const destinationToRelay = Pair<StreamType>()
-    const relayToDestination = Pair<StreamType>()
+    const destinationToRelay = pair<StreamType>()
+    const relayToDestination = pair<StreamType>()
 
     const initiatorShaker = handshake({
       source: relayToInitiator.source,
@@ -61,7 +61,7 @@ describe('relay state management', function () {
 
     assert(
       u8aEquals(
-        (await destinationShaker.read()).slice(),
+        ((await destinationShaker.read()) as Uint8Array).slice(),
         Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PING)
       )
     )
@@ -73,7 +73,10 @@ describe('relay state management', function () {
     const initiatorIsActivePromise = state.isActive(destination, initiator)
 
     assert(
-      u8aEquals((await initiatorShaker.read()).slice(), Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PING))
+      u8aEquals(
+        ((await initiatorShaker.read()) as Uint8Array).slice(),
+        Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PING)
+      )
     )
 
     initiatorShaker.write(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PONG))
@@ -85,18 +88,24 @@ describe('relay state management', function () {
     initiatorShaker.write(Uint8Array.from([RelayPrefix.PAYLOAD, ...initiatorHello]))
 
     assert(
-      u8aEquals((await destinationShaker.read()).slice(), Uint8Array.from([RelayPrefix.PAYLOAD, ...initiatorHello]))
+      u8aEquals(
+        ((await destinationShaker.read()) as Uint8Array).slice(),
+        Uint8Array.from([RelayPrefix.PAYLOAD, ...initiatorHello])
+      )
     )
 
     const destinationHello = new TextEncoder().encode('Hello from the other side!')
     destinationShaker.write(Uint8Array.from([RelayPrefix.PAYLOAD, ...destinationHello]))
 
     assert(
-      u8aEquals((await initiatorShaker.read()).slice(), Uint8Array.from([RelayPrefix.PAYLOAD, ...destinationHello]))
+      u8aEquals(
+        ((await initiatorShaker.read()) as Uint8Array).slice(),
+        Uint8Array.from([RelayPrefix.PAYLOAD, ...destinationHello])
+      )
     )
 
-    const initiatorToRelayAfterUpdate = Pair<StreamType>()
-    const relayToInitiatorAfterUpdate = Pair<StreamType>()
+    const initiatorToRelayAfterUpdate = pair<StreamType>()
+    const relayToInitiatorAfterUpdate = pair<StreamType>()
 
     state.updateExisting(initiator, destination, {
       source: initiatorToRelayAfterUpdate.source as any,
@@ -113,14 +122,14 @@ describe('relay state management', function () {
 
     assert(
       u8aEquals(
-        (await destinationShaker.read()).slice(),
+        ((await destinationShaker.read()) as Uint8Array).slice(),
         Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.RESTART)
       )
     )
 
     assert(
       u8aEquals(
-        (await destinationShaker.read()).slice(),
+        ((await destinationShaker.read()) as Uint8Array).slice(),
         Uint8Array.from([RelayPrefix.PAYLOAD, ...initiatorHelloAfterUpdate])
       )
     )
@@ -130,11 +139,11 @@ describe('relay state management', function () {
     const state = new RelayState()
 
     assert(!state.exists(initiator, destination))
-    const initiatorToRelay = Pair<StreamType>()
-    const relayToInitiator = Pair<StreamType>()
+    const initiatorToRelay = pair<StreamType>()
+    const relayToInitiator = pair<StreamType>()
 
-    const destinationToRelay = Pair<StreamType>()
-    const relayToDestination = Pair<StreamType>()
+    const destinationToRelay = pair<StreamType>()
+    const relayToDestination = pair<StreamType>()
 
     const initiatorShaker = handshake({
       source: relayToInitiator.source,
@@ -163,7 +172,7 @@ describe('relay state management', function () {
 
     assert(
       u8aEquals(
-        (await destinationShaker.read()).slice(),
+        ((await destinationShaker.read()) as Uint8Array).slice(),
         Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP)
       )
     )
@@ -188,7 +197,7 @@ describe('relay state management - errors', function () {
           initiator,
           destination,
           {
-            source: (async function* () {})(),
+            source: (async function* () {})() as any,
             sink: async (_source: any) => {
               throw Error(`boom`)
             }
@@ -218,7 +227,7 @@ describe('relay state management - errors', function () {
           initiator,
           destination,
           {
-            source: (async function* () {})(),
+            source: (async function* () {})() as any,
             sink: async (_source: any) => Promise.reject(Error(`boom`))
           },
           {

@@ -1,4 +1,4 @@
-import { startResourceUsageLogger } from './resourceLogger'
+import { startResourceUsageLogger } from './resourceLogger.js'
 
 describe('check resource logger', function () {
   it('should start and stop a resource logger', async function () {

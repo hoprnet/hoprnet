@@ -1,5 +1,5 @@
-import { Response } from './response'
-import { stringToU8a, u8aAdd, toU8a } from '../u8a'
+import { Response } from './response.js'
+import { stringToU8a, u8aAdd, toU8a } from '../u8a/index.js'
 import assert from 'assert'
 
 describe(`test response`, function () {

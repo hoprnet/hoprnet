@@ -1,10 +1,10 @@
 import { utils } from 'ethers'
 import BN from 'bn.js'
-import { ecdsaSign, ecdsaVerify } from 'secp256k1'
-import { moveDecimalPoint } from '../math'
-import { u8aToHex, u8aEquals, stringToU8a, u8aConcat } from '../u8a'
-import { ADDRESS_LENGTH, HASH_LENGTH, SIGNATURE_LENGTH } from '../constants'
-import type { PublicKey } from './publicKey'
+import secp256k1 from 'secp256k1'
+import { moveDecimalPoint } from '../math/index.js'
+import { u8aToHex, u8aEquals, stringToU8a, u8aConcat } from '../u8a/index.js'
+import { ADDRESS_LENGTH, HASH_LENGTH, SIGNATURE_LENGTH } from '../constants.js'
+import type { PublicKey } from './publicKey.js'
 
 export class Address {
   constructor(private arr: Uint8Array) {
@@ -140,7 +140,7 @@ export class Signature {
   }
 
   static create(msg: Uint8Array, privKey: Uint8Array): Signature {
-    const result = ecdsaSign(msg, privKey)
+    const result = secp256k1.ecdsaSign(msg, privKey)
     return new Signature(result.signature, result.recid)
   }
 
@@ -152,7 +152,7 @@ export class Signature {
   }
 
   verify(msg: Uint8Array, pubKey: PublicKey): boolean {
-    return ecdsaVerify(this.signature, msg, pubKey.serializeUncompressed())
+    return secp256k1.ecdsaVerify(this.signature, msg, pubKey.serializeUncompressed())
   }
 
   toHex(): string {

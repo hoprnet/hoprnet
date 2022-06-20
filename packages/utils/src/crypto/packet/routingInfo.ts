@@ -1,12 +1,12 @@
-import { u8aEquals, u8aXOR } from '../../u8a'
-import { derivePRGParameters } from './keyDerivation'
-import { MAC_LENGTH, END_PREFIX, END_PREFIX_LENGTH, SECRET_LENGTH } from './constants'
-import { SECP256K1_CONSTANTS } from '../constants'
+import { u8aEquals, u8aXOR } from '../../u8a/index.js'
+import { derivePRGParameters } from './keyDerivation.js'
+import { MAC_LENGTH, END_PREFIX, END_PREFIX_LENGTH, SECRET_LENGTH } from './constants.js'
+import { SECP256K1_CONSTANTS } from '../constants.js'
 import { randomFillSync } from 'crypto'
-import { PRG } from '../prg'
-import { generateFiller } from './filler'
-import { createMAC } from './mac'
-import { publicKeyVerify } from 'secp256k1'
+import { PRG } from '../prg.js'
+import { generateFiller } from './filler.js'
+import { createMAC } from './mac.js'
+import secp256k1 from 'secp256k1'
 import type PeerId from 'peer-id'
 
 /**
@@ -169,7 +169,7 @@ export function forwardTransform(
     SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH + additionalDataRelayerLength
   )
 
-  if (!publicKeyVerify(nextHop)) {
+  if (!secp256k1.publicKeyVerify(nextHop)) {
     throw Error(`Blinding of the group element failed. Result is not a valid curve point.`)
   }
 

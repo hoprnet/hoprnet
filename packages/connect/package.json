@@ -12,7 +12,7 @@
   ],
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
-  "type": "commonjs",
+  "type": "module",
   "engines": {
     "node": "16"
   },
@@ -30,11 +30,12 @@
   },
   "dependencies": {
     "@hoprnet/hopr-utils": "workspace:packages/utils",
-    "abortable-iterator": "3.0.2",
+    "abortable-iterator": "4.0.2",
     "bl": "5.0.0",
+    "chalk": "5.0.1",
     "debug": "4.3.4",
     "heap-js": "2.1.6",
-    "it-handshake": "2.0.0",
+    "it-handshake": "4.0.0",
     "multiaddr": "10.0.1",
     "multihashes": "4.0.3",
     "nat-api": "0.3.1",
@@ -54,12 +55,11 @@
     "@types/node": "16.11.26",
     "@types/simple-peer": "9.11.4",
     "@types/yargs": "17.0.10",
-    "abortable-iterator": "3.0.2",
     "chai": "4.3.6",
     "chai-spies": "1.0.0",
-    "it-pair": "1.0.0",
-    "it-pipe": "1.1.0",
-    "it-pushable": "1.4.2",
+    "it-pair": "2.0.2",
+    "it-pipe": "2.0.3",
+    "it-pushable": "3.0.0",
     "libp2p": "0.36.2",
     "libp2p-interfaces": "4.0.6",
     "libp2p-mplex": "0.10.7",
@@ -67,14 +67,8 @@
     "yargs": "17.4.0"
   },
   "mocha": {
-    "extension": [
-      "ts"
-    ],
     "spec": [
-      "src/**/*.spec.ts"
-    ],
-    "require": [
-      "ts-node/register"
+      "lib/**/*.spec.js"
     ]
   },
   "publishConfig": {

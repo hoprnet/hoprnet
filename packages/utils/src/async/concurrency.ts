@@ -1,5 +1,5 @@
-import { FIFO } from '../collection'
-import { debug } from '../process'
+import { FIFO } from '../collection/index.js'
+import { debug } from '../process/index.js'
 
 const log = debug('hopr:concurrency-limitter')
 /**

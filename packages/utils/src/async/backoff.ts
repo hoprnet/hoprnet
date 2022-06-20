@@ -1,5 +1,5 @@
-import { durations } from '../time'
-import { debug } from '../process'
+import { durations } from '../time.js'
+import { debug } from '../process/index.js'
 import { setTimeout, setImmediate } from 'timers/promises'
 
 const log = debug('hopr:utils:retry')

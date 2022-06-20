@@ -1,2 +1,2 @@
-export * from './gcd'
-export * from './moveDecimalPoint'
+export * from './gcd.js'
+export * from './moveDecimalPoint.js'
