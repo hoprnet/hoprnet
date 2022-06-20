@@ -175,7 +175,9 @@ export class HoprDB {
         throw new Error('Database does not exist: ' + dbPath)
       }
     }
-    this.db = levelup.default(leveldown(dbPath))
+    // CommonJS / ESM issue
+    // @ts-ignore
+    this.db = levelup(leveldown(dbPath))
 
     // Fully initialize database
     await this.db.open()
@@ -846,7 +848,9 @@ export class HoprDB {
   static createMock(id?: PublicKey): HoprDB {
     const mock: HoprDB = {
       id: id ?? PublicKey.createMock(),
-      db: levelup.default(MemDown())
+      // CommonJS / ESM issue
+      // @ts-ignore
+      db: levelup(MemDown())
     } as any
     Object.setPrototypeOf(mock, HoprDB.prototype)
 

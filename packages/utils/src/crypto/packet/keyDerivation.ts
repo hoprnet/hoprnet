@@ -1,4 +1,4 @@
-import { expand } from 'futoin-hkdf'
+import hkdf from 'futoin-hkdf'
 import { HASH_ALGORITHM, HASH_LENGTH, TAG_LENGTH, SECRET_LENGTH } from './constants.js'
 import { SECP256K1_CONSTANTS } from '../constants.js'
 import { PRG_IV_LENGTH, PRG_KEY_LENGTH } from '../prg.js'
@@ -22,7 +22,7 @@ export function deriveBlinding(secret: Uint8Array): Uint8Array {
     throw Error(`Invalid arguments`)
   }
 
-  return expand(
+  return hkdf.expand(
     HASH_ALGORITHM,
     HASH_LENGTH,
     Buffer.from(secret),
@@ -42,7 +42,13 @@ export function derivePRGParameters(secret: Uint8Array): PRGParameters {
     throw Error(`Invalid arguments`)
   }
 
-  const rand = expand(HASH_ALGORITHM, HASH_LENGTH, Buffer.from(secret), PRG_KEY_LENGTH + PRG_IV_LENGTH, HASH_KEY_PRG)
+  const rand = hkdf.expand(
+    HASH_ALGORITHM,
+    HASH_LENGTH,
+    Buffer.from(secret),
+    PRG_KEY_LENGTH + PRG_IV_LENGTH,
+    HASH_KEY_PRG
+  )
 
   return {
     iv: rand.subarray(0, PRG_IV_LENGTH),
@@ -61,7 +67,13 @@ export function derivePRPParameters(secret: Uint8Array): PRPParameters {
     throw Error(`Invalid arguments`)
   }
 
-  const rand = expand(HASH_ALGORITHM, HASH_LENGTH, Buffer.from(secret), PRP_KEY_LENGTH + PRP_IV_LENGTH, HASH_KEY_PRP)
+  const rand = hkdf.expand(
+    HASH_ALGORITHM,
+    HASH_LENGTH,
+    Buffer.from(secret),
+    PRP_KEY_LENGTH + PRP_IV_LENGTH,
+    HASH_KEY_PRP
+  )
 
   const key = rand.subarray(0, PRP_KEY_LENGTH)
   const iv = rand.subarray(PRP_KEY_LENGTH)
@@ -74,5 +86,5 @@ export function derivePacketTag(secret: Uint8Array): Uint8Array {
     throw Error(`Invalid arguments`)
   }
 
-  return expand(HASH_ALGORITHM, HASH_LENGTH, Buffer.from(secret), TAG_LENGTH, HASH_KEY_PACKET_TAG)
+  return hkdf.expand(HASH_ALGORITHM, HASH_LENGTH, Buffer.from(secret), TAG_LENGTH, HASH_KEY_PACKET_TAG)
 }

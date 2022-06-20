@@ -1,8 +1,8 @@
-import type { HoprConnectOptions, PeerStoreType } from '../types'
-import type Connection from 'libp2p-interfaces/src/connection/connection'
+import type { HoprConnectOptions, PeerStoreType } from '../types.js'
+import type Connection from 'libp2p-interfaces/src/connection/connection.js'
 import PeerId from 'peer-id'
 import type { Multiaddr } from 'multiaddr'
-import type HoprConnect from '..'
+import type HoprConnect from '../index.js'
 import { type default as Libp2p, MuxedStream } from 'libp2p'
 
 import { EventEmitter } from 'events'
@@ -18,7 +18,7 @@ import {
   CAN_RELAY_PROTCOL,
   OK,
   DEFAULT_DHT_ENTRY_RENEWAL
-} from '../constants'
+} from '../constants.js'
 
 import {
   createCircuitAddress,
@@ -29,8 +29,8 @@ import {
   tryExistingConnections,
   retryWithBackoff
 } from '@hoprnet/hopr-utils'
-import { attemptClose, relayFromRelayAddress } from '../utils'
-import { compareDirectConnectionInfo } from '../utils/addrs'
+import { attemptClose, relayFromRelayAddress } from '../utils/index.js'
+import { compareDirectConnectionInfo } from '../utils/index.js'
 
 const DEBUG_PREFIX = 'hopr-connect:entry'
 const log = Debug(DEBUG_PREFIX)

@@ -142,7 +142,7 @@ export async function libp2pSendMessage(
       async function collect(source: AsyncIterable<any>) {
         const vals = []
         for await (const val of source) {
-          // Convert from BufferList to Uint8Array
+          // Convert from potential BufferList to Uint8Array
           vals.push(Uint8Array.from(val.slice()))
         }
         return vals
@@ -197,7 +197,7 @@ function generateHandler(
           props.stream,
           async function* pipeToHandler(source: AsyncIterable<Uint8Array>) {
             for await (const msg of source) {
-              // Convert from BufferList to Uint8Array
+              // Convert from potential BufferList to Uint8Array
               yield await handlerFunction(Uint8Array.from(msg.slice()), props.connection.remotePeer)
             }
           },
@@ -223,7 +223,7 @@ function generateHandler(
         props.stream,
         async function collect(source: AsyncIterable<Uint8Array>) {
           for await (const msg of source) {
-            // Convert from BufferList to Uint8Array
+            // Convert from potential BufferList to Uint8Array
             await handlerFunction(Uint8Array.from(msg.slice()), props.connection.remotePeer)
           }
         }

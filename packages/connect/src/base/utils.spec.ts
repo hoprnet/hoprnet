@@ -1,12 +1,12 @@
 import { once, type EventEmitter } from 'events'
-import { handleStunRequest } from './stun'
-import type { PeerStoreType } from '../types'
+import { handleStunRequest } from './stun.js'
+import type { PeerStoreType } from '../types.js'
 import { createSocket, type RemoteInfo, type Socket } from 'dgram'
 import { type DeferType, privKeyToPeerId, u8aToHex } from '@hoprnet/hopr-utils'
 import { randomBytes } from 'crypto'
 import PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'
-import { CODE_P2P } from '../constants'
+import { CODE_P2P } from '../constants.js'
 
 interface Listening<ListenOpts> extends EventEmitter {
   listen: (opts: ListenOpts) => void

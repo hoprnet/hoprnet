@@ -1,4 +1,4 @@
-import { expand } from 'futoin-hkdf'
+import hkdf from 'futoin-hkdf'
 import { createHmac } from 'crypto'
 import { HASH_ALGORITHM, HASH_LENGTH, SECRET_LENGTH } from './constants.js'
 
@@ -14,7 +14,7 @@ export function deriveCommitmentSeed(privateKey: Uint8Array, channelInfo: Uint8A
     throw Error(`Invalid arguments`)
   }
 
-  const key = expand(HASH_ALGORITHM, HASH_LENGTH, Buffer.from(privateKey), SECRET_LENGTH, HASH_KEY_COMMITMENT_SEED)
+  const key = hkdf.expand(HASH_ALGORITHM, HASH_LENGTH, Buffer.from(privateKey), SECRET_LENGTH, HASH_KEY_COMMITMENT_SEED)
 
   return new Uint8Array(createHmac(HASH_ALGORITHM, key).update(channelInfo).digest().buffer)
 }

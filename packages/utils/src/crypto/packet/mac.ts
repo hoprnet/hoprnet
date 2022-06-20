@@ -1,6 +1,6 @@
 import { createHmac } from 'crypto'
 import { HASH_ALGORITHM, HASH_LENGTH, SECRET_LENGTH } from './constants.js'
-import { expand } from 'futoin-hkdf'
+import hkdf from 'futoin-hkdf'
 
 const HASH_KEY_HMAC = 'HASH_KEY_HMAC'
 
@@ -16,7 +16,7 @@ export function createMAC(secret: Uint8Array, header: Uint8Array): Uint8Array {
     throw Error(`Invalid arguments`)
   }
 
-  const key = expand(HASH_ALGORITHM, HASH_LENGTH, Buffer.from(secret), SECRET_LENGTH, HASH_KEY_HMAC)
+  const key = hkdf.expand(HASH_ALGORITHM, HASH_LENGTH, Buffer.from(secret), SECRET_LENGTH, HASH_KEY_HMAC)
 
   return createHmac(HASH_ALGORITHM, key).update(header).digest()
 }

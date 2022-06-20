@@ -20,7 +20,7 @@
     "docs:watch": "typedoc --watch"
   },
   "engines": {
-    "node": "14 || 16"
+    "node": ">=16.15"
   },
   "files": [
     "lib"
@@ -65,6 +65,6 @@
     "typedoc-plugin-markdown": "3.11.14"
   },
   "mocha": {
-    "spec": "lib/**/*.spec.ts"
+    "spec": "lib/**/*.spec.js"
   }
 }

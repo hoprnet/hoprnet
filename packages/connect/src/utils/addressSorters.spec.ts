@@ -1,7 +1,7 @@
 import { Multiaddr } from 'multiaddr'
 import assert from 'assert'
 
-import { maToClass, AddressClass, compareAddressesPublicMode, compareAddressesLocalMode } from './addressSorters'
+import { maToClass, AddressClass, compareAddressesPublicMode, compareAddressesLocalMode } from './addressSorters.js'
 
 const PUBLIC_ADDRESS = new Multiaddr(
   `/ip4/84.148.73.225/tcp/62492/p2p/16Uiu2HAm85aCSXNVxwQPBsfHm2hZEvNRmYxvfBhHSQgNgKyKBnWG`

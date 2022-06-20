@@ -1,13 +1,13 @@
-import { EntryNodes, ENTRY_NODES_MAX_PARALLEL_DIALS, RELAY_CHANGED_EVENT } from './entry'
+import { EntryNodes, ENTRY_NODES_MAX_PARALLEL_DIALS, RELAY_CHANGED_EVENT } from './entry.js'
 import type PeerId from 'peer-id'
 import assert from 'assert'
-import { createPeerId, getPeerStoreEntry } from './utils.spec'
+import { createPeerId, getPeerStoreEntry } from './utils.spec.js'
 import { once, EventEmitter } from 'events'
 import { Multiaddr } from 'multiaddr'
-import type Connection from 'libp2p-interfaces/dist/src/connection/connection'
+import type Connection from 'libp2p-interfaces/dist/src/connection/connection.js'
 
-import { MAX_RELAYS_PER_NODE, OK } from '../constants'
-import type { HoprConnectDialOptions, PeerStoreType, PublicNodesEmitter } from '../types'
+import { MAX_RELAYS_PER_NODE, OK } from '../constants.js'
+import type { HoprConnectDialOptions, PeerStoreType, PublicNodesEmitter } from '../types.js'
 // import { defer } from '@hoprnet/hopr-utils'
 
 class FakeConnectionManager {
