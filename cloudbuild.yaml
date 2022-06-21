@@ -3,7 +3,7 @@ steps:
     id: buildHoprd
     args:
       - --context=dir://packages/hoprd
-      - --destination=gcr.io/hoprassociation/hoprd:${_IMAGE_VERSION}
+      - --destination=gcr.io/${PROJECT_ID}/hoprd:${_IMAGE_VERSION}
       - --cache=true
       - --cache-ttl=96h
       - --build-arg=PACKAGE_VERSION=${_PACKAGE_VERSION}
@@ -13,7 +13,7 @@ steps:
     id: buildHoprdNat
     args:
       - --context=dir://scripts/nat
-      - --destination=gcr.io/hoprassociation/hoprd-nat:${_IMAGE_VERSION}
+      - --destination=gcr.io/${PROJECT_ID}/hoprd-nat:${_IMAGE_VERSION}
       - --cache=true
       - --cache-ttl=96h
       - --build-arg=PACKAGE_VERSION=${_PACKAGE_VERSION}
@@ -25,10 +25,18 @@ steps:
     id: buildCoverTrafficDaemon
     args:
       - --context=dir://packages/cover-traffic-daemon
-      - --destination=gcr.io/hoprassociation/hopr-cover-traffic-daemon:${_IMAGE_VERSION}
+      - --destination=gcr.io/${PROJECT_ID}/hopr-cover-traffic-daemon:${_IMAGE_VERSION}
       - --cache=true
       - --cache-ttl=96h
       - --build-arg=PACKAGE_VERSION=${_PACKAGE_VERSION}
+    timeout: 2400s
+    waitFor: ['-']
+  - name: 'gcr.io/kaniko-project/executor:latest'
+    id: buildHardhat
+    args:
+      - --destination=gcr.io/${PROJECT_ID}/hopr-hardhat:${_IMAGE_VERSION}
+      - --cache=true
+      - --cache-ttl=96h
     timeout: 2400s
     waitFor: ['-']
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -48,13 +56,25 @@ steps:
       - buildHoprd
       - buildHoprdNat
       - buildCoverTrafficDaemon
+      - buildHardhat
+  - name: 'gcr.io/kaniko-project/executor:latest'
+    id: buildPluto
+    args:
+      - --context=dir://scripts/pluto
+      - --destination=gcr.io/${PROJECT_ID}/hopr-pluto:${_IMAGE_VERSION}
+      - --cache=true
+      - --cache-ttl=96h
+      - --build-arg=HARDHAT_VERSION=${_IMAGE_VERSION}
+      - --build-arg=HOPRD_RELEASE=${_IMAGE_VERSION}
+    timeout: 2400s
+    waitFor: ['-']
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: tagImages
     script: |
       #!/usr/bin/env bash
       set -Eeuo pipefail
       [ "${_NO_TAGS}" = "true"] && { exit 0; }
-      for image in hoprd hoprd-nat hopr-cover-traffic-daemon; do
+      for image in hoprd hoprd-nat hopr-cover-traffic-daemon hopr-hardhat hopr-pluto; do
         full_image="gcr.io/${PROJECT_ID}/${image}"
         gcloud container images add-tag ${full_image}:${_IMAGE_VERSION} ${full_image}:${_PACKAGE_VERSION}
         for release in ${_RELEASES}; do
@@ -71,3 +91,5 @@ images:
   - gcr.io/${PROJECT_ID}/hoprd:${_IMAGE_VERSION}
   - gcr.io/${PROJECT_ID}/hoprd-nat:${_IMAGE_VERSION}
   - gcr.io/${PROJECT_ID}/hopr-cover-traffic-daemon:${_IMAGE_VERSION}
+  - gcr.io/${PROJECT_ID}/hopr-hardhat:${_IMAGE_VERSION}
+  - gcr.io/${PROJECT_ID}/hopr-pluto:${_IMAGE_VERSION}

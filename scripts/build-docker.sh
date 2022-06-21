@@ -67,28 +67,32 @@ build_and_tag_images() {
 
   if [ "${local_build:-}" = "true" ]; then
     log "Building Docker image hoprd:local"
-    docker build -t hoprd:local \
+    docker build -q -t hoprd:local \
       --build-arg=PACKAGE_VERSION="${package_version}" \
-      packages/hoprd
+      packages/hoprd &
 
     log "Building Docker image hopr-cover-traffic-daemon:local"
-    docker build -t hopr-cover-traffic-daemon:local \
+    docker build -q -t hopr-cover-traffic-daemon:local \
       --build-arg=PACKAGE_VERSION="${package_version}" \
-      packages/cover-traffic-daemon
+      packages/cover-traffic-daemon &
 
     log "Building Docker image hoprd-nat:local"
-    docker build -t hoprd-nat:local \
+    docker build -q -t hoprd-nat:local \
       --build-arg=PACKAGE_VERSION="${package_version}" \
       --build-arg=HOPRD_RELEASE="${image_version}" \
-      scripts/nat
+      scripts/nat &
 
     log "Building Docker image hopr-hardhat:local"
-    docker build -t hopr-hardhat:local \
-      -f Dockerfile.hardhat .
+    docker build -q -t hopr-hardhat:local \
+      -f Dockerfile.hardhat . &
 
     log "Building Docker image hopr-pluto:local"
-    docker build -t hopr-pluto:local \
-      scripts/pluto
+    docker build -q -t hopr-pluto:local \
+      --build-arg=PACKAGE_VERSION="${package_version}" \
+      scripts/pluto &
+
+    log "Waiting for Docker builds to finish"
+    wait
   else
     gcloud builds submit --config cloudbuild.yaml \
       --substitutions=_PACKAGE_VERSION="${package_version}",_IMAGE_VERSION="${image_version}",_RELEASES="${releases}",_NO_TAGS="${no_tags:-}"

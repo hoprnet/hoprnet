@@ -72,6 +72,10 @@ lint-fix: ## run linter in fix mode
 docker-build-local: ## build Docker images locally
 	./scripts/build-docker.sh --local --force
 
+.PHONY: docker-build-gcb
+docker-build-gcb: ## build Docker images on Google Cloud Build
+	./scripts/build-docker.sh --no-tags --force
+
 .PHONY: help
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
