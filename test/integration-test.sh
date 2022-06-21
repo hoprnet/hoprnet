@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # HOPR interaction tests via HOPRd API v2
 
-# prevent souring of this script, only allow execution
+# prevent sourcing of this script, only allow execution
 $(return >/dev/null 2>&1)
 test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
 
@@ -47,6 +47,8 @@ declare api6="${6}"
 declare api7="${7}"
 declare api8="${8}"
 declare api_token=${HOPRD_API_TOKEN}
+declare additional_nodes_addrs="${ADDITIONAL_NODE_ADDRS:-}"
+declare additional_nodes_peerids="${ADDITIONAL_NODE_PEERIDS:-}"
 
 # $1 = node api address (origin)
 # validate that node is funded
@@ -428,24 +430,35 @@ log "hopr addr7: ${addr7} ${native_addr7} ${hopr_addr7}"
 log "hopr addr8: ${addr8} ${native_addr8} ${hopr_addr8}"
 
 # enable register
-# log "Enabling register"
-# HOPR_ENVIRONMENT_ID=hardhat-localhost \
-# TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-# yarn workspace @hoprnet/hopr-ethereum hardhat register \
-#   --network hardhat \
-#   --task enable
-# log "Register enabled"
+log "Enabling register"
+HOPR_ENVIRONMENT_ID=hardhat-localhost \
+TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
+yarn workspace @hoprnet/hopr-ethereum hardhat register \
+  --network hardhat \
+  --task enable
+log "Register enabled"
 
-# add nodes 1,2,3,4,5,7 in register, do NOT add node 8
-# log "Adding nodes to register"
-# HOPR_ENVIRONMENT_ID=hardhat-localhost \
-# TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-# yarn workspace @hoprnet/hopr-ethereum hardhat register \
-#   --network hardhat \
-#   --task add \
-#   --native-addresses "$native_addr1,$native_addr2,$native_addr3,$native_addr4,$native_addr5,$native_addr7" \
-#   --peer-ids "$hopr_addr1,$hopr_addr2,$hopr_addr3,$hopr_addr4,$hopr_addr5,$hopr_addr7"
 # log "Nodes added to register"
+
+declare native_addrs_to_register="$native_addr1,$native_addr2,$native_addr3,$native_addr4,$native_addr5,$native_addr7"
+declare native_peerids_to_register="$hopr_addr1,$hopr_addr2,$hopr_addr3,$hopr_addr4,$hopr_addr5,$hopr_addr7"
+
+# add nodes 1,2,3,4,5,7 plus additional nodes in register, do NOT add node 8
+log "Adding nodes to register"
+if ! [ -z $additional_nodes_addrs ] && ! [ -z $additional_nodes_peerids ]; then
+  native_addrs_to_register+=",${additional_nodes_addrs}"
+  native_peerids_to_register+=",${additional_nodes_peerids}"
+fi
+# add nodes 1,2,3,4,5,7 + additional nodes to register, do NOT add node 8
+log "Adding nodes to register"
+HOPR_ENVIRONMENT_ID=hardhat-localhost \
+TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
+yarn workspace @hoprnet/hopr-ethereum hardhat register \
+  --network hardhat \
+  --task add \
+  --native-addresses "${native_addrs_to_register}" \
+  --peer-ids "${native_peerids_to_register}"
+log "Nodes added to register"
 
 # running withdraw and checking it results at the end of this test run
 balances=$(get_balances ${api1})
