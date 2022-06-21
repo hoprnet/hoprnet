@@ -158,8 +158,8 @@ jobs:
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
             "${{ github.workflow }}" "${{ github.run_id }}"
 
-  build_hoprd_docker:
-    name: Build HOPRD Docker
+  build_docker:
+    name: Build Docker Images
     runs-on: ubuntu-latest
     needs: [build_deploy_sc_npm]
     steps:
@@ -189,88 +189,8 @@ jobs:
           branch=$(git rev-parse --abbrev-ref HEAD)
           git pull origin "${branch}" --rebase
 
-      - name: Build Docker image
-        run: ./scripts/build-docker.sh -p hoprd
-
-      - name: Send notification if anything failed on master or release branches
-        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
-        run: |
-          ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
-            "${{ github.workflow }}" "${{ github.run_id }}"
-
-  build_hoprd_nat_docker:
-    name: Build HOPRD NAT Docker
-    runs-on: ubuntu-latest
-    needs: [build_deploy_sc_npm]
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Configure Git info
-        run: ./scripts/configure-git-info.sh
-
-      - name: Set up Google Cloud Credentials
-        uses: google-github-actions/auth@v0
-        with:
-          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-
-      - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v0
-        with:
-          project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
-          install_components: beta
-
-      - name: Pull recent Git changes
-        if: ${{ !env.ACT }}
-        run: |
-          # need to pull changes because we've updated the package versions in
-          # the job publish_npm beforehand
-          branch=$(git rev-parse --abbrev-ref HEAD)
-          git pull origin "${branch}" --rebase
-
-      - name: Build Docker image
-        run: ./scripts/build-docker.sh -p hoprd-nat
-
-      - name: Send notification if anything failed on master or release branches
-        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
-        run: |
-          ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
-            "${{ github.workflow }}" "${{ github.run_id }}"
-
-  build_hopr_cover_traffic_daemon_docker:
-    name: Build HOPR cover traffic daemon docker
-    runs-on: ubuntu-latest
-    needs: [build_deploy_sc_npm]
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Configure Git info
-        run: ./scripts/configure-git-info.sh
-
-      - name: Set up Google Cloud Credentials
-        uses: google-github-actions/auth@v0
-        with:
-          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-
-      - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v0
-        with:
-          project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
-          install_components: beta
-
-      - name: Pull recent Git changes
-        if: ${{ !env.ACT }}
-        run: |
-          # need to pull changes because we've updated the package versions in
-          # the job publish_npm beforehand
-          branch=$(git rev-parse --abbrev-ref HEAD)
-          git pull origin "${branch}" --rebase
-
-      - name: Build Docker image
-        run: ./scripts/build-docker.sh -p hopr-cover-traffic-daemon
+      - name: Build Docker images
+        run: ./scripts/build-docker.sh
 
       - name: Send notification if anything failed on master or release branches
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
@@ -281,7 +201,7 @@ jobs:
   avado:
     name: Build Avado (master or release pushes)
     runs-on: ubuntu-latest
-    needs: [build_deploy_sc_npm,build_hoprd_docker]
+    needs: [build_deploy_sc_npm,build_docker]
     steps:
       - uses: actions/checkout@v3
         with:
@@ -341,7 +261,7 @@ jobs:
         os: ['ubuntu-latest']
         rust: ['stable']
     runs-on: ${{ matrix.os }}
-    needs: [build_hoprd_docker]
+    needs: [build_docker]
     steps:
       - uses: actions/checkout@v3
         with:
@@ -419,7 +339,7 @@ jobs:
         rust: ['stable']
 
     runs-on: ${{ matrix.os }}
-    needs: [build_hoprd_nat_docker]
+    needs: [build_docker]
     steps:
       - uses: actions/checkout@v3
         with:
