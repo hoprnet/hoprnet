@@ -182,7 +182,7 @@ export class HoprDB {
     // Fully initialize database
     await this.db.open()
 
-    log(`namespacing db by native address: ${this.id.toCompressedPubKeyHex()}`)
+    log(`namespacing db by public key: ${this.id.toCompressedPubKeyHex()}`)
     if (setEnvironment) {
       log(`setting environment id ${environmentId} to db`)
       await this.setEnvironmentId(environmentId)
@@ -198,7 +198,7 @@ export class HoprDB {
   }
 
   private keyOf(...segments: Uint8Array[]): Uint8Array {
-    return u8aConcat(this.id.serializeUncompressed().slice(1), ...segments)
+    return u8aConcat(this.id.serializeCompressed(), ...segments)
   }
 
   private async has(key: Uint8Array): Promise<boolean> {

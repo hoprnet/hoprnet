@@ -161,8 +161,8 @@ export class ChannelEntry {
     return (
       // prettier-ignore
       `ChannelEntry   (${chalk.green(this.getId().toHex())}):\n` +
-      `  source:       ${chalk.yellow(this.source.toCompressedPubKeyHex())}\n` +
-      `  destination:  ${chalk.yellow(this.destination.toCompressedPubKeyHex())}\n` +
+      `  source:       ${chalk.yellow(this.source.toAddress())} (${this.source.toB58String()})\n` +
+      `  destination:  ${chalk.yellow(this.destination.toAddress())} (${this.destination.toB58String()})\n` +
       `  balance:      ${this.balance.toFormattedString()}\n` +
       `  commitment:   ${this.commitment.toHex()}\n` +
       `  ticketEpoch:  ${this.ticketEpoch.toBN().toString(10)}\n` +
@@ -183,7 +183,7 @@ export class ChannelEntry {
    * @returns true if the time window passed, false if not
    */
   public closureTimePassed(): boolean {
-    const nowInSeconds = Math.round(new Date().getTime() / 1000)
+    const nowInSeconds = Math.floor(Date.now() / 1000)
     const now = new BN(nowInSeconds)
     return !!this.closureTime && now.gt(this.closureTime.toBN())
   }

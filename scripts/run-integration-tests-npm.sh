@@ -176,6 +176,9 @@ function setup_node() {
   install_npm_packages
   cd "${npm_install_dir}"
 
+  # Remove previous logs to make sure the regex does not match
+  rm -Rf "${log}"
+
   DEBUG="hopr*" npx hoprd \
     --admin \
     --adminHost "127.0.0.1" \

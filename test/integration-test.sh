@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # HOPR interaction tests via HOPRd API v2
 
-# prevent souring of this script, only allow execution
+# prevent sourcing of this script, only allow execution
 $(return >/dev/null 2>&1)
 test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
 
@@ -47,6 +47,8 @@ declare api6="${6}"
 declare api7="${7}"
 declare api8="${8}"
 declare api_token=${HOPRD_API_TOKEN}
+declare additional_nodes_addrs="${ADDITIONAL_NODE_ADDRS:-}"
+declare additional_nodes_peerids="${ADDITIONAL_NODE_PEERIDS:-}"
 
 # $1 = node api address (origin)
 # validate that node is funded
@@ -107,10 +109,10 @@ call_api(){
   else
     now=$(node -e "console.log(process.hrtime.bigint().toString());")
     if [ ${end_time_ns} -lt ${now} ]; then
-      log "${RED}call_api (${cmd} \"${request_body}\") FAILED, received: ${result}${NOFORMAT}"
+      log "${RED}call_api (${cmd} \"${request_body}\") FAILED, received: ${result} but expected ${assertion}${NOFORMAT}"
       exit 1
     else
-      log "${YELLOW}call_api (${cmd} \"${request_body}\") FAILED, received: ${result}, retrying in ${step_time} seconds${NOFORMAT}"
+      log "${YELLOW}call_api (${cmd} \"${request_body}\") FAILED, received: ${result} but expected ${assertion}, retrying in ${step_time} seconds${NOFORMAT}"
       sleep ${step_time}
       call_api "${source_api}" "${api_endpoint}" "${rest_method}" "${request_body}" "${assertion}" "${wait_time}" \
         "${step_time}" "${end_time_ns}" "${should_assert_status_code}"
@@ -172,7 +174,7 @@ open_channel() {
   local result
 
   log "Node ${source_id} open channel to Node ${destination_id}"
-  result=$(call_api ${source_api} "/channels" "POST" "{ \"peerId\": \"${destination_peer_id}\", \"amount\": \"100000000000000000000\" }" "channelId" 600 60)
+  result=$(call_api ${source_api} "/channels" "POST" "{ \"peerId\": \"${destination_peer_id}\", \"amount\": \"100000000000000000000\" }" 'channelId|CHANNEL_ALREADY_OPEN' 600 60)
   log "Node ${source_id} open channel to Node ${destination_id} result -- ${result}"
 }
 
@@ -428,24 +430,33 @@ log "hopr addr7: ${addr7} ${native_addr7} ${hopr_addr7}"
 log "hopr addr8: ${addr8} ${native_addr8} ${hopr_addr8}"
 
 # enable register
-# log "Enabling register"
-# HOPR_ENVIRONMENT_ID=hardhat-localhost \
-# TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-# yarn workspace @hoprnet/hopr-ethereum hardhat register \
-#   --network hardhat \
-#   --task enable
-# log "Register enabled"
+log "Enabling register"
+HOPR_ENVIRONMENT_ID=hardhat-localhost \
+TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
+yarn workspace @hoprnet/hopr-ethereum hardhat register \
+  --network hardhat \
+  --task enable
+log "Register enabled"
 
-# add nodes 1,2,3,4,5,7 in register, do NOT add node 8
-# log "Adding nodes to register"
-# HOPR_ENVIRONMENT_ID=hardhat-localhost \
-# TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-# yarn workspace @hoprnet/hopr-ethereum hardhat register \
-#   --network hardhat \
-#   --task add \
-#   --native-addresses "$native_addr1,$native_addr2,$native_addr3,$native_addr4,$native_addr5,$native_addr7" \
-#   --peer-ids "$hopr_addr1,$hopr_addr2,$hopr_addr3,$hopr_addr4,$hopr_addr5,$hopr_addr7"
 # log "Nodes added to register"
+
+declare native_addrs_to_register="$native_addr1,$native_addr2,$native_addr3,$native_addr4,$native_addr5,$native_addr7"
+declare native_peerids_to_register="$hopr_addr1,$hopr_addr2,$hopr_addr3,$hopr_addr4,$hopr_addr5,$hopr_addr7"
+
+# add nodes 1,2,3,4,5,7 plus additional nodes in register, do NOT add node 8
+log "Adding nodes to register"
+if ! [ -z $additional_nodes_addrs ] && ! [ -z $additional_nodes_peerids ]; then
+  native_addrs_to_register+=",${additional_nodes_addrs}"
+  native_peerids_to_register+=",${additional_nodes_peerids}"
+fi
+HOPR_ENVIRONMENT_ID=hardhat-localhost \
+TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
+yarn workspace @hoprnet/hopr-ethereum hardhat register \
+  --network hardhat \
+  --task add \
+  --native-addresses "${native_addrs_to_register}" \
+  --peer-ids "${native_peerids_to_register}"
+log "Nodes added to register"
 
 # running withdraw and checking it results at the end of this test run
 balances=$(get_balances ${api1})
