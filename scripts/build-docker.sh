@@ -86,15 +86,11 @@ build_and_tag_images() {
     docker build -q -t hopr-hardhat:local \
       -f Dockerfile.hardhat . &
 
-    log "Building Docker image hopr-pluto:local"
-    docker build -q -t hopr-pluto:local \
-      --build-arg=PACKAGE_VERSION="${package_version}" \
-      scripts/pluto &
-
     log "Waiting for Docker builds to finish"
     wait
   else
     gcloud builds submit --config cloudbuild.yaml \
+      --verbosity=info \
       --substitutions=_PACKAGE_VERSION="${package_version}",_IMAGE_VERSION="${image_version}",_RELEASES="${releases}",_NO_TAGS="${no_tags:-}"
   fi
 }

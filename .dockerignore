@@ -1,4 +1,4 @@
-/node_modules
+node_modules/
 **/.DS_Store
 /.bin
 /build
@@ -32,9 +32,31 @@ logs.txt
 **/*.tsbuildinfo
 
 .dockerignore
-Dockerfile
 .git
 .gitignore
 
-# no generated JS files
+# generated JS files
 packages/*/lib/
+
+# generated wasm files
+packages/*/crates/*/pkg
+
+# hoprd artifacts
+/packages/hoprd/db
+/packages/hoprd/hoprd-db
+/packages/hoprd/hopr-admin/build
+/packages/hoprd/hopr-admin/.next
+
+# ethereum hardhat artifacts
+/packages/ethereum/hardhat/artifacts
+/packages/ethereum/hardhat/cache
+/packages/ethereum/deployments/**/solcInputs
+/packages/ethereum/deployments/hardhat-localhost
+/packages/ethereum/deployments/hardhat-localhost2
+
+# docusaurus builds
+/docs/hopr-documentation/build
+/docs/hopr-documentation/.docusaurus
+
+# vagrant metadata
+/scripts/vm-nat-testing/.vagrant

@@ -7,7 +7,7 @@ steps:
       - --cache=true
       - --cache-ttl=96h
       - --build-arg=PACKAGE_VERSION=${_PACKAGE_VERSION}
-    timeout: 2400s
+    timeout: 600s
     waitFor: ['-']
   - name: 'gcr.io/kaniko-project/executor:latest'
     id: buildHoprdNat
@@ -18,7 +18,7 @@ steps:
       - --cache-ttl=96h
       - --build-arg=PACKAGE_VERSION=${_PACKAGE_VERSION}
       - --build-arg=HOPRD_RELEASE=${_IMAGE_VERSION}
-    timeout: 2400s
+    timeout: 600s
     waitFor:
       - buildHoprd
   - name: 'gcr.io/kaniko-project/executor:latest'
@@ -29,15 +29,16 @@ steps:
       - --cache=true
       - --cache-ttl=96h
       - --build-arg=PACKAGE_VERSION=${_PACKAGE_VERSION}
-    timeout: 2400s
+    timeout: 600s
     waitFor: ['-']
   - name: 'gcr.io/kaniko-project/executor:latest'
     id: buildHardhat
     args:
+      - --dockerfile=Dockerfile.hardhat
       - --destination=gcr.io/${PROJECT_ID}/hopr-hardhat:${_IMAGE_VERSION}
       - --cache=true
       - --cache-ttl=96h
-    timeout: 2400s
+    timeout: 600s
     waitFor: ['-']
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: testImages
@@ -46,50 +47,51 @@ steps:
       set -Eeuo pipefail
       for image in hoprd hoprd-nat hopr-cover-traffic-daemon; do
         full_image="gcr.io/${PROJECT_ID}/${image}"
-        v=$(docker run --pull always -v /var/run/docker.sock:/var/run/docker.sock ${full_image}:${_IMAGE_VERSION} --version 2> /dev/null | sed -n '3p')
-        if [ "${v}" != "${_PACKAGE_VERSION}" ]; then
-          echo "bundled ${image} version ${v}, expected ${_PACKAGE_VERSION}"
+        v=$(docker run ${full_image}:${IMAGE_VERSION} --version 2> /dev/null | sed -n '3p')
+        if [ "${v}" != "${PACKAGE_VERSION}" ]; then
+          echo "bundled ${image} version ${v}, expected ${PACKAGE_VERSION}"
           exit 1
         fi
       done
+    env:
+      - 'PACKAGE_VERSION=$_PACKAGE_VERSION'
+      - 'IMAGE_VERSION=$_IMAGE_VERSION'
+      - 'PROJECT_ID=$PROJECT_ID'
+    timeout: 600s
     waitFor:
       - buildHoprd
       - buildHoprdNat
       - buildCoverTrafficDaemon
       - buildHardhat
-  - name: 'gcr.io/kaniko-project/executor:latest'
-    id: buildPluto
-    args:
-      - --context=dir://scripts/pluto
-      - --destination=gcr.io/${PROJECT_ID}/hopr-pluto:${_IMAGE_VERSION}
-      - --cache=true
-      - --cache-ttl=96h
-      - --build-arg=HARDHAT_VERSION=${_IMAGE_VERSION}
-      - --build-arg=HOPRD_RELEASE=${_IMAGE_VERSION}
-    timeout: 2400s
-    waitFor: ['-']
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: tagImages
     script: |
       #!/usr/bin/env bash
       set -Eeuo pipefail
-      [ "${_NO_TAGS}" = "true"] && { exit 0; }
-      for image in hoprd hoprd-nat hopr-cover-traffic-daemon hopr-hardhat hopr-pluto; do
+      [ "${NO_TAGS}" = "true"] && { exit 0; }
+      for image in hoprd hoprd-nat hopr-cover-traffic-daemon hopr-hardhat; do
         full_image="gcr.io/${PROJECT_ID}/${image}"
-        gcloud container images add-tag ${full_image}:${_IMAGE_VERSION} ${full_image}:${_PACKAGE_VERSION}
-        for release in ${_RELEASES}; do
-          gcloud container images add-tag ${full_image}:${_IMAGE_VERSION} ${full_image}:${release}
+        gcloud container images add-tag ${full_image}:${IMAGE_VERSION} ${full_image}:${PACKAGE_VERSION}
+        for release in ${RELEASES}; do
+          gcloud container images add-tag ${full_image}:${IMAGE_VERSION} ${full_image}:${release}
         done
       done
+    env:
+      - 'PACKAGE_VERSION=$_PACKAGE_VERSION'
+      - 'IMAGE_VERSION=$_IMAGE_VERSION'
+      - 'RELEASES=$_RELEASES'
+      - 'NO_TAGS=$_NO_TAGS'
+      - 'PROJECT_ID=$PROJECT_ID'
+    timeout: 600s
     waitFor:
       - testImages
 options:
   logStreamingOption: STREAM_ON
   substitutionOption: MUST_MATCH
-  machineType: E2_HIGHCPU_8
+  machineType: N1_HIGHCPU_32
 images:
   - gcr.io/${PROJECT_ID}/hoprd:${_IMAGE_VERSION}
   - gcr.io/${PROJECT_ID}/hoprd-nat:${_IMAGE_VERSION}
   - gcr.io/${PROJECT_ID}/hopr-cover-traffic-daemon:${_IMAGE_VERSION}
   - gcr.io/${PROJECT_ID}/hopr-hardhat:${_IMAGE_VERSION}
-  - gcr.io/${PROJECT_ID}/hopr-pluto:${_IMAGE_VERSION}
+timeout: 1200s
