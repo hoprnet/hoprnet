@@ -377,6 +377,21 @@ gcloud_get_managed_instance_group_instances_ips() {
       --format 'csv[no-heading](networkInterfaces.accessConfigs.natIP)'
 }
 
+# $1=group name
+gcloud_get_managed_instance_group_instances_names() {
+  local name="${1}"
+
+  gcloud compute instance-groups list-instances "${name}" ${gcloud_region} \
+    --format=json | jq '.[1].instance' | tr -d '"'
+}
+
+# $1=instance uri
+gcloud_get_instance_tags() {
+  local name="${1}"
+
+  gcloud compute instances describe "${name}" --format=json | jq ".tags.items[]" | tr -d '"'
+}
+
 gcloud_get_unused_static_ip_addresses() {
   local json
 

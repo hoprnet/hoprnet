@@ -128,25 +128,46 @@ gcloud_create_or_update_managed_instance_group  \
 # get IPs of newly started VMs which run hoprd
 declare node_ips
 node_ips=$(gcloud_get_managed_instance_group_instances_ips "${cluster_id}")
-declare node_ips_arr=( ${node_ips} )
 
-#  --- Fund nodes --- {{{
-declare eth_address
+declare node_ips_arr=( ${node_ips} )
+declare eth_addrs_arr=()
+declare hopr_addrs_arr=()
+
+#  --- Retrieve node information & fund nodes --- {{{
+declare eth_addr
+declare hopr_addr
 for ip in ${node_ips}; do
   wait_until_node_is_ready "${ip}"
-  eth_address=$(get_native_address "${api_token}@${ip}:3001")
-  fund_if_empty "${eth_address}" "${environment}"
+
+  eth_addr="$(get_native_address "${api_token}@${ip}:3001")"
+  eth_addrs_arr+=( "${eth_addr}" )
+
+  hopr_addr="$(get_hopr_address "${api_token}@${ip}:3001")"
+  hopr_addrs_arr+=( "${hopr_addr}" )
+
+  fund_if_empty "${eth_addr}" "${environment}"
 done
 
-# To test Network registry, the cluster_size is greater or equal to 2 and staker_addresses are provided as parameters
+# To test Network registry, the cluster_size is greater or equal to 3 and staker_addresses are provided as parameters
+
 # TODO: call stake API so that the first staker_addresses[0] stake in the current program
 # TODO: call register API and register staker_addresses with node peer ids
 
-# We cannot poll for NAT nodes, because they do not expose 9091 to the outside world
 if [[ "${docker_image}" != *-nat:* ]]; then
+  # -- Public nodes --
+
+  # The first public node will be left unstaked
+
+  # Finally wait for the public nodes to come up
   for ip in ${node_ips}; do
     wait_for_port "9091" "${ip}"
   done
+
+else
+  # -- NAT nodes --
+
+
+ # We cannot wait for NAT nodes to come up, because their port 9091 is not exposed
 fi
 # }}}
 
