@@ -1,4 +1,4 @@
-import type { Event, TokenEvent, RegistryEvent } from './types'
+import type { Event, TokenEvent, RegistryEvent } from './types.js'
 import BN from 'bn.js'
 import assert from 'assert'
 import { BigNumber } from 'ethers'
@@ -15,9 +15,9 @@ import {
   Signature,
   SIGNATURE_LENGTH
 } from '@hoprnet/hopr-utils'
-import { PARTY_A, PARTY_B, PARTY_A_MULTIADDR, PARTY_B_MULTIADDR } from '../fixtures'
+import { PARTY_A, PARTY_B, PARTY_A_MULTIADDR, PARTY_B_MULTIADDR } from '../fixtures.js'
 
-export * from '../fixtures'
+export * from '../fixtures.js'
 
 export const expectAccountsToBeEqual = (actual: AccountEntry, expected: AccountEntry) => {
   assert(actual, 'account is null')

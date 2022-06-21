@@ -1,8 +1,8 @@
-import { Stream } from '../types'
+import { Stream } from '../types.js'
 import type PeerId from 'peer-id'
 
 import { nAtATime, u8aCompare } from '@hoprnet/hopr-utils'
-import { RelayContext } from './context'
+import { RelayContext } from './context.js'
 
 import debug from 'debug'
 

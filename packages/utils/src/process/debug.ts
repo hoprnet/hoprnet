@@ -1,6 +1,6 @@
 import debug from 'debug'
 import { format } from 'util'
-import pino from 'pino'
+import { pino } from 'pino'
 import { createWriteStream } from 'pino-logflare'
 
 // create pino-logflare stream

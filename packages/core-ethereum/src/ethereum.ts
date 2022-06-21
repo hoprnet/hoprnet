@@ -22,10 +22,10 @@ import {
   type Hash
 } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import NonceTracker from './nonce-tracker'
-import TransactionManager, { type TransactionPayload } from './transaction-manager'
+import NonceTracker from './nonce-tracker.js'
+import TransactionManager, { type TransactionPayload } from './transaction-manager.js'
 import { debug } from '@hoprnet/hopr-utils'
-import { TX_CONFIRMATION_WAIT } from './constants'
+import { TX_CONFIRMATION_WAIT } from './constants.js'
 import type { Block } from '@ethersproject/abstract-provider'
 
 const log = debug('hopr:core-ethereum:ethereum')

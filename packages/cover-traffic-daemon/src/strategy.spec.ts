@@ -12,10 +12,7 @@ describe('cover traffic strategy', async function () {
     const mockPersistedState: PersistedState = new TestingPersistedState((state: State) => {
       log(`State update: ${Object.keys(state.nodes).length} nodes, ${Object.keys(state.channels).length} channels`)
     }, './test/ct.json')
-
-    // ESM / Common.js problem
-    // @ts-ignore
-    const mockHoprNode = sinon.createStubInstance<Hopr>(Hopr.default)
+    const mockHoprNode = sinon.createStubInstance<Hopr>(Hopr)
     mockHoprNode.sendMessage.resolves()
 
     mockCoverTrafficStrategy = new CoverTrafficStrategy(mockChannelEntry.source, mockHoprNode, mockPersistedState)

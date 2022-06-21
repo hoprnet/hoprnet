@@ -9,8 +9,8 @@ import { Multiaddr } from 'multiaddr'
 
 import type PeerId from 'peer-id'
 
-import { createRelayerKey } from './relayCode'
-import { privKeyToPeerId } from './privKeyToPeerId'
+import { createRelayerKey } from './relayCode.js'
+import { privKeyToPeerId } from './privKeyToPeerId.js'
 import assert from 'assert'
 
 const peerA = privKeyToPeerId('0x06243fcfd7d7ba9364c9903b95cb8cfb3a3e6e95a80c96656598bda6942ae1c2')

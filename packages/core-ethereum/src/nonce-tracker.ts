@@ -1,4 +1,4 @@
-import type { Transaction as ITransaction } from './transaction-manager'
+import type { Transaction as ITransaction } from './transaction-manager.js'
 import { debug } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import { Mutex } from 'async-mutex'

@@ -1,10 +1,10 @@
-import { publicKeyCreate, publicKeyConvert } from 'secp256k1'
+import secp256k1 from 'secp256k1'
 import type PeerId from 'peer-id'
 
-import { u8aToHex, u8aEquals, stringToU8a } from '../u8a'
-import { SECP256K1_CONSTANTS } from '../crypto'
-import { pubKeyToPeerId } from '../libp2p'
-import { Address, Hash } from '.'
+import { u8aToHex, u8aEquals, stringToU8a } from '../u8a/index.js'
+import { SECP256K1_CONSTANTS } from '../crypto/index.js'
+import { pubKeyToPeerId } from '../libp2p/index.js'
+import { Address, Hash } from './index.js'
 
 export class CurvePoint {
   // @TODO use uncompressed point internally
@@ -19,7 +19,7 @@ export class CurvePoint {
       throw new Error('Incorrect size Uint8Array for private key')
     }
 
-    return new CurvePoint(publicKeyCreate(exponent, true))
+    return new CurvePoint(secp256k1.publicKeyCreate(exponent, true))
   }
 
   static fromUncompressedUncompressedCurvePoint(arr: Uint8Array) {
@@ -27,7 +27,7 @@ export class CurvePoint {
       throw new Error('Incorrect size Uint8Array for uncompressed public key')
     }
 
-    return new CurvePoint(publicKeyConvert(arr, true))
+    return new CurvePoint(secp256k1.publicKeyConvert(arr, true))
   }
 
   static fromPeerId(peerId: PeerId) {
@@ -35,12 +35,12 @@ export class CurvePoint {
   }
 
   toAddress(): Address {
-    return new Address(Hash.create(publicKeyConvert(this.arr, false).slice(1)).serialize().slice(12))
+    return new Address(Hash.create(secp256k1.publicKeyConvert(this.arr, false).slice(1)).serialize().slice(12))
   }
 
   toUncompressedCurvePoint(): string {
     // Needed in only a few cases for interacting with secp256k1
-    return u8aToHex(publicKeyConvert(this.arr, false).slice(1))
+    return u8aToHex(secp256k1.publicKeyConvert(this.arr, false).slice(1))
   }
 
   toPeerId(): PeerId {

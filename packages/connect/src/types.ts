@@ -1,6 +1,5 @@
 import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
-import type BufferList from 'bl/BufferList'
 
 type Suffix = 'PublicNode'
 type AddEventName = `add${Suffix}`
@@ -43,7 +42,7 @@ export interface PublicNodesEmitter {
   off(event: RemoveEventName, listener: (removeNode: PeerId) => void): this
 }
 
-export type StreamType = BufferList | Uint8Array
+export type StreamType = Uint8Array
 
 export type StreamSourceAsync<T = StreamType> = AsyncIterable<T>
 export type StreamSource<T = StreamType> = AsyncIterable<T> | Iterable<T>

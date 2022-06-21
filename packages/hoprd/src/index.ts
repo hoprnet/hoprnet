@@ -5,7 +5,7 @@ import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 import { setTimeout } from 'timers/promises'
 
-import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
+import { loadJson, NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
 import {
   default as Hopr,
   type HoprOptions,
@@ -42,7 +42,7 @@ export type DefaultEnvironment = {
 
 function defaultEnvironment(): string {
   try {
-    const config = require('../default-environment.json') as DefaultEnvironment
+    const config = loadJson('../default-environment.json') as DefaultEnvironment
     return config?.id || ''
   } catch (error) {
     // its ok if the file isn't there or cannot be read

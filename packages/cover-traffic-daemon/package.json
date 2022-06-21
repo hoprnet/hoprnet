@@ -1,13 +1,13 @@
 {
   "name": "@hoprnet/hopr-cover-traffic-daemon",
   "description": "Generate chaffing traffic",
-  "version": "1.89.0-next.21",
+  "version": "1.89.0-next.28",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
   "types": "lib/index.d.ts",
-  "main": "lib/main.js",
-  "bin": "lib/main.js",
+  "main": "lib/main.cjs",
+  "bin": "lib/main.cjs",
   "type": "module",
   "scripts": {
     "clean:wasm": "make -C crates clean",

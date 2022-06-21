@@ -1,13 +1,13 @@
 import { createServer, type Socket, type AddressInfo } from 'net'
 
-import { SOCKET_CLOSE_TIMEOUT, TCPConnection } from './tcp'
+import { SOCKET_CLOSE_TIMEOUT, TCPConnection } from './tcp.js'
 import { once } from 'events'
 import { Multiaddr } from 'multiaddr'
 import { u8aEquals, defer } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import type { EventEmitter } from 'events'
 
-import { waitUntilListening, stopNode, createPeerId } from './utils.spec'
+import { waitUntilListening, stopNode, createPeerId } from './utils.spec.js'
 
 describe('test TCP connection', function () {
   it('should test TCPConnection against Node.js APIs', async function () {

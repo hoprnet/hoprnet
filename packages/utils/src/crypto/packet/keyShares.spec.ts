@@ -1,5 +1,5 @@
-import { generateKeyShares, forwardTransform } from './keyShares'
-import { u8aEquals } from '../../u8a'
+import { generateKeyShares, forwardTransform } from './keyShares.js'
+import { u8aEquals } from '../../u8a/index.js'
 
 import PeerId from 'peer-id'
 import assert from 'assert'

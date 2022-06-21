@@ -1,7 +1,7 @@
 import net, { type Socket, type AddressInfo } from 'net'
-import abortable from 'abortable-iterator'
+import { abortableSource } from 'abortable-iterator'
 import Debug from 'debug'
-import { nodeToMultiaddr, toU8aStream } from '../utils'
+import { nodeToMultiaddr, toU8aStream } from '../utils/index.js'
 
 const log = Debug('hopr-connect:tcp')
 const error = Debug('hopr-connect:tcp:error')
@@ -10,18 +10,27 @@ const verbose = Debug('hopr-connect:verbose:tcp')
 // Timeout to wait for socket close before destroying it
 export const SOCKET_CLOSE_TIMEOUT = 1000
 
-import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
+import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types.js'
 
 import type { Multiaddr } from 'multiaddr'
 import toIterable from 'stream-to-it'
 import type PeerId from 'peer-id'
-import type { Stream, StreamSink, StreamSource, StreamSourceAsync, StreamType, HoprConnectDialOptions } from '../types'
+import type {
+  Stream,
+  StreamSink,
+  StreamSource,
+  StreamSourceAsync,
+  StreamType,
+  HoprConnectDialOptions
+} from '../types.js'
 
 /**
  * Class to encapsulate TCP sockets
  */
 class TCPConnection implements MultiaddrConnection {
   public localAddr: Multiaddr
+
+  // @ts-ignore
   public sink: StreamSink
   public source: StreamSourceAsync
   public closed: boolean
@@ -58,7 +67,7 @@ class TCPConnection implements MultiaddrConnection {
 
     this.source =
       this._signal != undefined
-        ? abortable(this._stream.source, this._signal)
+        ? abortableSource(this._stream.source, this._signal)
         : (this._stream.source as AsyncIterable<StreamType>)
   }
 
@@ -118,7 +127,7 @@ class TCPConnection implements MultiaddrConnection {
     const u8aStream = toU8aStream(source)
     try {
       await this._stream.sink(
-        this._signal != undefined ? (abortable(u8aStream, this._signal) as StreamSource) : u8aStream
+        this._signal != undefined ? (abortableSource(u8aStream, this._signal) as StreamSource) : u8aStream
       )
     } catch (err: any) {
       // If aborted we can safely ignore

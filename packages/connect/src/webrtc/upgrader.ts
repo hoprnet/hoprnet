@@ -2,12 +2,14 @@ import SimplePeer from 'simple-peer'
 import debug from 'debug'
 
 import { Multiaddr } from 'multiaddr'
-import type { PeerStoreType, HoprConnectOptions } from '../types'
-import { CODE_IP4, CODE_TCP, CODE_UDP } from '../constants'
+import type { PeerStoreType, HoprConnectOptions } from '../types.js'
+import { CODE_IP4, CODE_TCP, CODE_UDP } from '../constants.js'
 import type PeerId from 'peer-id'
 import { AbortError } from 'abortable-iterator'
 
-const wrtc = require('wrtc')
+// No types for wrtc
+// @ts-ignore
+import * as wrtc from 'wrtc'
 
 const DEBUG_PREFIX = `hopr-connect:webrtc`
 

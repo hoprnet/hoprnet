@@ -1,4 +1,4 @@
-import { type HeartbeatPingResult } from './heartbeat'
+import { type HeartbeatPingResult } from './heartbeat.js'
 import PeerId from 'peer-id'
 import { randomSubset, debug } from '@hoprnet/hopr-utils'
 

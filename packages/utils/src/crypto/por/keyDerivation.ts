@@ -1,7 +1,7 @@
-import { expand } from 'futoin-hkdf'
-import { privateKeyVerify } from 'secp256k1'
-import { SECRET_LENGTH, HASH_ALGORITHM, HASH_LENGTH } from './constants'
-import { HalfKey } from '../../types'
+import hkdf from 'futoin-hkdf'
+import secp256k1 from 'secp256k1'
+import { SECRET_LENGTH, HASH_ALGORITHM, HASH_LENGTH } from './constants.js'
+import { HalfKey } from '../../types/index.js'
 
 const HASH_KEY_OWN_KEY = 'HASH_KEY_OWN_KEY'
 const HASH_KEY_ACK_KEY = 'HASH_KEY_ACK_KEY'
@@ -59,9 +59,9 @@ export function sampleFieldElement(
   do {
     result =
       __fakeExpand?.(hashKey) ??
-      Uint8Array.from(expand(HASH_ALGORITHM, HASH_LENGTH, Buffer.from(secret), SECRET_LENGTH, hashKey))
+      Uint8Array.from(hkdf.expand(HASH_ALGORITHM, HASH_LENGTH, Buffer.from(secret), SECRET_LENGTH, hashKey))
 
-    if (!privateKeyVerify(result)) {
+    if (!secp256k1.privateKeyVerify(result)) {
       if (i == MAX_ITERATIONS) {
         throw Error(`Cannot derive a group element.`)
       }

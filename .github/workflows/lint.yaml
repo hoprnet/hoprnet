@@ -28,7 +28,9 @@ jobs:
           cache: yarn
 
       - name: Run linter
-        run: yarn && yarn lint:fix
+        run: |
+          make deps
+          make lint-fix
 
       - name: Commit and push changes
         run: ./scripts/commit-and-push-all-changes.sh

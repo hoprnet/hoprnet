@@ -1,13 +1,13 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "1.89.0-next.21",
+  "version": "1.89.0-next.28",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
   "types": "lib/index.d.ts",
   "main": "lib/index.js",
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
     "clean:wasm": "make -C crates clean",
     "build:wasm": "make -C crates all && make -C crates install",
@@ -32,7 +32,7 @@
     "@sinonjs/referee": "9.1.1",
     "async-mutex": "0.3.2",
     "bn.js": "5.2.0",
-    "chalk": "4.1.2",
+    "chalk": "5.0.1",
     "debug": "4.3.4",
     "ethers": "5.5.4",
     "heap-js": "2.1.6",
@@ -52,16 +52,9 @@
     "typedoc-plugin-markdown": "3.11.14"
   },
   "mocha": {
-    "extension": [
-      "ts"
-    ],
-    "spec": "**/*.spec.ts",
-    "require": [
-      "ts-node/register"
-    ]
+    "spec": "lib/**/*.spec.js"
   },
   "publishConfig": {
     "access": "public"
-  },
-  "stableVersion": "1.76.0-next.31"
+  }
 }

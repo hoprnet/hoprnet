@@ -1,16 +1,16 @@
-import type { StreamType } from '../types'
+import type { StreamType } from '../types.js'
 import type { HandlerProps } from 'libp2p'
-import type Connection from 'libp2p-interfaces/src/connection/connection'
-import type { Address } from 'libp2p/src/peer-store/address-book'
+import type Connection from 'libp2p-interfaces/src/connection/connection.js'
+import type { Address } from 'libp2p/src/peer-store/address-book.js'
 
-import { Relay } from './index'
+import { Relay } from './index.js'
 import PeerId from 'peer-id'
 import EventEmitter from 'events'
 import { privKeyToPeerId, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
-import handshake from 'it-handshake'
-import { RelayConnection } from './connection'
+import { handshake } from 'it-handshake'
+import { RelayConnection } from './connection.js'
 import assert from 'assert'
-import Pair from 'it-pair'
+import { pair } from 'it-pair'
 import { Multiaddr } from 'multiaddr'
 
 const initiator = privKeyToPeerId(stringToU8a('0xa889bad3e2a31cceff4faccdd374af67db485ac0e05e7e654530aff0da5199f7'))
@@ -36,8 +36,8 @@ function getPeer(peerId: PeerId, network: EventEmitter) {
     return {
       remotePeer: peerId,
       newStream: async (protocol: string) => {
-        const AtoB = Pair<StreamType>()
-        const BtoA = Pair<StreamType>()
+        const AtoB = pair<StreamType>()
+        const BtoA = pair<StreamType>()
 
         network.emit(getPeerProtocol(peerId, protocol), {
           stream: {
@@ -68,7 +68,7 @@ function getPeer(peerId: PeerId, network: EventEmitter) {
         upgradeInbound: (async (conn: RelayConnection) => {
           const shaker = handshake(conn)
 
-          const message = new TextDecoder().decode((await shaker.read()).slice())
+          const message = new TextDecoder().decode(((await shaker.read()) as Uint8Array).slice())
 
           shaker.write(msgToEchoedMessage(message))
 
@@ -119,12 +119,12 @@ describe('test relay', function () {
       const conn = await Alice.connect(Bob.libp2p.peerId, Charly.libp2p.peerId)
 
       assert(conn != undefined, `Should be able to connect`)
-      const shaker = handshake<StreamType>(conn as any)
+      const shaker = handshake(conn as any)
 
       const msg = '<Hello>, that should be sent and echoed through relayed connection'
       shaker.write(new TextEncoder().encode(msg))
 
-      assert(u8aEquals((await shaker.read()).slice(), msgToEchoedMessage(msg)))
+      assert(u8aEquals(((await shaker.read()) as Uint8Array).slice(), msgToEchoedMessage(msg)))
 
       shaker.rest()
 
@@ -156,12 +156,12 @@ describe('test relay', function () {
       const conn = await Alice.connect(Bob.libp2p.peerId, Charly.libp2p.peerId)
 
       assert(conn != undefined, `Should be able to connect`)
-      const shaker = handshake<StreamType>(conn as any)
+      const shaker = handshake(conn as any)
 
       const msg = '<Hello>, that should be sent and echoed through relayed connection'
       shaker.write(new TextEncoder().encode(msg))
 
-      assert(u8aEquals((await shaker.read()).slice(), msgToEchoedMessage(msg)))
+      assert(u8aEquals(((await shaker.read()) as Uint8Array).slice(), msgToEchoedMessage(msg)))
 
       shaker.rest()
 
