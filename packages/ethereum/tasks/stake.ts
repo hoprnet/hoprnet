@@ -22,7 +22,7 @@ async function main(
   // run its own in-memory hardhat instance, which is undesirable
   const provider = new ethers.providers.JsonRpcProvider()
 
-  let signer: Signer;
+  let signer: Signer
   if (!opts.privatekey) {
     signer = provider.getSigner()
   } else {
@@ -30,8 +30,8 @@ async function main(
   }
   const signerAddress = await signer.getAddress()
 
-  console.log("Signer Address", signerAddress)
-  
+  console.log('Signer Address', signerAddress)
+
   const hoprToken = (await ethers.getContractFactory('ERC677Mock')).connect(signer).attach(tokenContract.address)
   const hoprStake = (await ethers.getContractFactory('HoprStakeSeason3'))
     .connect(signer)
