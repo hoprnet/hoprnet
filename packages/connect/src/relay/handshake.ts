@@ -1,4 +1,5 @@
 import type { HoprConnectOptions, Stream, StreamType } from '../types.js'
+import { toU8aStream } from '../utils/index.js'
 import { handshake } from 'it-handshake'
 import type { Handshake } from 'it-handshake'
 import type PeerId from 'peer-id'
@@ -75,7 +76,10 @@ class RelayHandshake {
   private shaker: Handshake
 
   constructor(stream: Stream, private options: HoprConnectOptions = {}) {
-    this.shaker = handshake(stream as Stream<Uint8Array>)
+    this.shaker = handshake({
+      source: toU8aStream(stream.source),
+      sink: stream.sink
+    })
   }
 
   /**
@@ -241,7 +245,10 @@ class RelayHandshake {
       return
     }
 
-    const destinationShaker = handshake(toDestinationStruct.stream as Stream)
+    const destinationShaker = handshake({
+      source: toU8aStream(toDestinationStruct.stream.source as any),
+      sink: toDestinationStruct.stream.sink as any
+    })
 
     destinationShaker.write(source.pubKey.marshal())
 

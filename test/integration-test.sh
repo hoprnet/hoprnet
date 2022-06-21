@@ -109,10 +109,10 @@ call_api(){
   else
     now=$(node -e "console.log(process.hrtime.bigint().toString());")
     if [ ${end_time_ns} -lt ${now} ]; then
-      log "${RED}call_api (${cmd} \"${request_body}\") FAILED, received: ${result}${NOFORMAT}"
+      log "${RED}call_api (${cmd} \"${request_body}\") FAILED, received: ${result} but expected ${assertion}${NOFORMAT}"
       exit 1
     else
-      log "${YELLOW}call_api (${cmd} \"${request_body}\") FAILED, received: ${result}, retrying in ${step_time} seconds${NOFORMAT}"
+      log "${YELLOW}call_api (${cmd} \"${request_body}\") FAILED, received: ${result} but expected ${assertion}, retrying in ${step_time} seconds${NOFORMAT}"
       sleep ${step_time}
       call_api "${source_api}" "${api_endpoint}" "${rest_method}" "${request_body}" "${assertion}" "${wait_time}" \
         "${step_time}" "${end_time_ns}" "${should_assert_status_code}"
@@ -174,7 +174,7 @@ open_channel() {
   local result
 
   log "Node ${source_id} open channel to Node ${destination_id}"
-  result=$(call_api ${source_api} "/channels" "POST" "{ \"peerId\": \"${destination_peer_id}\", \"amount\": \"100000000000000000000\" }" "channelId" 600 60)
+  result=$(call_api ${source_api} "/channels" "POST" "{ \"peerId\": \"${destination_peer_id}\", \"amount\": \"100000000000000000000\" }" 'channelId|CHANNEL_ALREADY_OPEN' 600 60)
   log "Node ${source_id} open channel to Node ${destination_id} result -- ${result}"
 }
 
@@ -450,7 +450,6 @@ if ! [ -z $additional_nodes_addrs ] && ! [ -z $additional_nodes_peerids ]; then
   native_peerids_to_register+=",${additional_nodes_peerids}"
 fi
 # add nodes 1,2,3,4,5,7 + additional nodes to register, do NOT add node 8
-log "Adding nodes to register"
 HOPR_ENVIRONMENT_ID=hardhat-localhost \
 TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
 yarn workspace @hoprnet/hopr-ethereum hardhat register \
