@@ -371,7 +371,7 @@ gcloud_get_managed_instance_group_instances_ips() {
   fi
 
   gcloud compute instance-groups list-instances "${name}" \
-    ${gcloud_region} --uri | \
+    ${gcloud_region} --sort-by=instance --uri | \
     xargs -P `${nproc_cmd}` -I '{}' gcloud compute instances describe '{}' \
       --flatten 'networkInterfaces[].accessConfigs[]' \
       --format 'csv[no-heading](networkInterfaces.accessConfigs.natIP)'
@@ -381,7 +381,7 @@ gcloud_get_managed_instance_group_instances_ips() {
 gcloud_get_managed_instance_group_instances_names() {
   local name="${1}"
 
-  gcloud compute instance-groups list-instances "${name}" ${gcloud_region} \
+  gcloud compute instance-groups list-instances "${name}" ${gcloud_region} --sort-by=instance \
     --format=json | jq '.[1].instance' | tr -d '"'
 }
 
