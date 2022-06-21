@@ -449,7 +449,6 @@ if ! [ -z $additional_nodes_addrs ] && ! [ -z $additional_nodes_peerids ]; then
   native_addrs_to_register+=",${additional_nodes_addrs}"
   native_peerids_to_register+=",${additional_nodes_peerids}"
 fi
-# add nodes 1,2,3,4,5,7 + additional nodes to register, do NOT add node 8
 HOPR_ENVIRONMENT_ID=hardhat-localhost \
 TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
 yarn workspace @hoprnet/hopr-ethereum hardhat register \
