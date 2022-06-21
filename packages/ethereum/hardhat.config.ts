@@ -72,16 +72,6 @@ extendEnvironment((hre: HardhatRuntimeEnvironment) => {
   hre.environment = HOPR_ENVIRONMENT_ID
 })
 
-// inlined from @hoprnet/hopr-utils to remove dependency on whole package
-function expandVars(input: string, vars: { [key: string]: any }) {
-  return input.replace(/\$\{(.*)\}/g, (_, varName) => {
-    if (!(varName in vars)) {
-      throw new Error(`failed to expand vars in string '${input}', var ${varName} not defined`)
-    }
-    return vars[varName]
-  })
-}
-
 // For reference on how the configuration is structured refer to:
 //
 // https://hardhat.org/hardhat-network/reference/#config
