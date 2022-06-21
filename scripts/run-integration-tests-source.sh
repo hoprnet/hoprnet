@@ -237,6 +237,9 @@ function setup_ct_node() {
   fi
   log "Additional args: \"${additional_args}\""
 
+  # Remove previous logs to make sure the regex does not match
+  rm -f "${log}"
+
   HOPR_CTD_HEARTBEAT_INTERVAL=2500 \
   HOPR_CTD_HEARTBEAT_THRESHOLD=2500 \
   HOPR_CTD_HEARTBEAT_VARIANCE=1000 \
@@ -351,7 +354,7 @@ setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "${node
 setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "${node7_privkey}" "--announce --environment hardhat-localhost2"
 # node n8 will be the only one NOT registered
 setup_node 13308 19098 19508 "${node8_dir}" "${node8_log}" "${node8_id}" "${node8_privkey}" "--announce"
-setup_ct_node "${ct_node1_log}" "0xa08666bca1363cb00b5402bbeb6d47f6b84296f3bba0f2f95b1081df5588a613" 20000 "${ct_node1_dir}" 
+setup_ct_node "${ct_node1_log}" "0xa08666bca1363cb00b5402bbeb6d47f6b84296f3bba0f2f95b1081df5588a613" 20000 "${ct_node1_dir}"
 # }}}
 
 log "CT node1 address: ${ct_node1_address}"
@@ -414,6 +417,7 @@ ${mydir}/../test/integration-test.sh \
 # -- Verify node6 has executed the commands {{{
 log "Verifying node6 log output"
 grep -E "HOPR Balance: +20000 txHOPR" "${node6_log}"
+# Node balance must be a little bit smaller than 10 xDAI due to the announce transaction
 grep -E "ETH Balance: +[789]\.[[:digit:]]?.+ xDAI" "${node6_log}"
 grep -E "Running on: hardhat" "${node6_log}"
 log "Output of node6 correct"

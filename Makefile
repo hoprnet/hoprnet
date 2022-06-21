@@ -25,7 +25,6 @@ build-yarn: ## build yarn packages
 build-yarn: build-solidity-types build-cargo
 	npx tsc --build tsconfig.build.json
 
-
 .PHONY: build-cargo
 build-cargo: ## build cargo packages
 	cargo build --release --target wasm32-unknown-unknown

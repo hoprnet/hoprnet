@@ -38,7 +38,7 @@
     "express": "4.17.3",
     "multiaddr": "^10.0.1",
     "peer-id": "^0.16.0",
-    "yargs": "17.4.0"
+    "yargs": "17.5.1"
   },
   "devDependencies": {
     "@types/express": "4",

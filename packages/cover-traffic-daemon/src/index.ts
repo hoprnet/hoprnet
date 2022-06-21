@@ -15,7 +15,7 @@ import {
   HEARTBEAT_INTERVAL_VARIANCE
 } from '@hoprnet/hopr-core'
 
-import { type ChannelEntry, privKeyToPeerId, PublicKey, debug } from '@hoprnet/hopr-utils'
+import { type ChannelEntry, privKeyToPeerId, PublicKey, debug, loadJson } from '@hoprnet/hopr-utils'
 
 import { PersistedState } from './state.js'
 import { CoverTrafficStrategy } from './strategy.js'
@@ -41,7 +41,7 @@ function defaultEnvironment(): string {
   try {
     // Don't do typechecks on JSON files
     // @ts-ignore
-    const config = import('../default-environment.json', { assert: { type: 'json' } }) as DefaultEnvironment
+    const config = loadJson('../default-environment.json') as DefaultEnvironment
     return config?.id || ''
   } catch (error) {
     // its ok if the file isn't there or cannot be read
@@ -214,7 +214,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   }, 5000)
 }
 
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   process.once('exit', stopGracefully)
   process.on('SIGINT', stopGracefully)
   process.on('SIGTERM', stopGracefully)

@@ -26,7 +26,12 @@ concurrency:
 jobs:
   build_deploy_sc_npm:
     name: Build / Deploy SCs / Publish NPM
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [16]
+        os: ['ubuntu-latest']
+        rust: ['stable']
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -330,7 +335,12 @@ jobs:
 
   deploy_public_instances:
     name: 'Continuous Deployment: Deploy public instances'
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [16]
+        os: ['ubuntu-latest']
+        rust: ['stable']
+    runs-on: ${{ matrix.os }}
     needs: [build_hoprd_docker]
     steps:
       - uses: actions/checkout@v3
@@ -402,7 +412,13 @@ jobs:
 
   deploy_nat_instances:
     name: 'Continuous Deployment: Deploy NAT instances'
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [16]
+        os: ['ubuntu-latest']
+        rust: ['stable']
+
+    runs-on: ${{ matrix.os }}
     needs: [build_hoprd_nat_docker]
     steps:
       - uses: actions/checkout@v3

@@ -67,7 +67,7 @@
     "trace-unhandled": "2.0.1",
     "ws": "8.3.0",
     "yamljs": "0.3.0",
-    "yargs": "17.4.0"
+    "yargs": "17.5.1"
   },
   "devDependencies": {
     "@types/chai": "^4",
