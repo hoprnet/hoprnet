@@ -1,8 +1,7 @@
 # use slim version of node on Debian bullseye for smaller image sizes during build
-FROM node:16-bullseye-slim as build
+FROM node:16-bullseye-slim@sha256:8265ac132f720998222008355e11535caf53d6bccecbb562a055605138975b4e as build
 
 LABEL description="This image launches a hardhat node running a local network with the HOPR contracts deployed and available."
-
 
 # python is used by some nodejs dependencies as an installation requirement
 RUN apt-get update \
@@ -48,7 +47,8 @@ WORKDIR /app
 
 COPY . /app
 
-RUN make deps build \
+RUN make -j deps \
+ && make -j build \
  && cp tsconfig.json packages/ethereum/tsconfig.base.json \
  && cd packages/ethereum \
  && cat tsconfig.hardhat.json | jq '.extends = "./tsconfig.base.json" | del(.references)' > tsconfig.hardhat.json.new \
@@ -66,7 +66,7 @@ COPY --from=build /app/packages/core/protocol-config.json /core/
 
 RUN rm package.json \
  && mv package.hardhat.json package.json \
- && make deps
+ && yarn
 
 EXPOSE 8454
 

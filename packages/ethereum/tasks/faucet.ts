@@ -122,7 +122,7 @@ async function main(
   { network, ethers, deployments, environment }: HardhatRuntimeEnvironment,
   _runSuper: RunSuperFunction<any>
 ): Promise<void> {
-  const { hasB58String, PublicKey } = await import('@hoprnet/hopr-utils')
+  const { PublicKey } = await import('@hoprnet/hopr-utils')
   if (environment == undefined) {
     console.error(`HOPR_ENVIRONMENT_ID is not set. Run with "HOPR_ENVIRONMENT_ID=<environment> ..."`)
     process.exit(1)

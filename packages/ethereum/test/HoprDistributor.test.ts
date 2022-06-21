@@ -44,9 +44,6 @@ const useFixtures = deployments.createFixture(async (hre, ops: { startTime?: str
 })
 
 describe('HoprDistributor', async function () {
-  // CommonJS / ESM issue with `hardhat-core`
-  const { durations } = await import('@hoprnet/hopr-utils')
-
   describe('start time', function () {
     let f: Awaited<ReturnType<typeof useFixtures>>
 
