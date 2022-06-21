@@ -194,10 +194,14 @@ task<RegisterOpts>(
   .addParam<RegisterOpts['task']>('task', 'The task to run', undefined, types.string)
   .addOptionalParam<string>('nativeAddresses', 'A list of native addresses', undefined, types.string)
   .addOptionalParam<string>('peerIds', 'A list of peerIds', undefined, types.string)
-
-task<StakeOpts>('stake', 'Used by CI tests to stake tokens to the running staking program.', stake).addParam<
-  StakeOpts['amount']
->('amount', 'target txHOPR token amount (in wei) that will be staked', MIN_STAKE.toString(), types.string)
+  
+  task<StakeOpts>(
+    'stake', 
+    'Used by CI tests to stake tokens to the running staking program.', 
+    stake
+  )
+    .addParam<string>('amount', 'target txHOPR token amount (in wei) that will be staked', MIN_STAKE.toString(), types.string)
+    .addOptionalParam<string>('privatekey', 'Private key of the signer', undefined, types.string)
 
 function getSortedFiles(dependenciesGraph) {
   const tsort = require('tsort')

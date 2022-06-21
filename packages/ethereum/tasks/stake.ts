@@ -1,7 +1,9 @@
+import { Signer, Wallet } from 'ethers'
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 
 export type StakeOpts = {
   amount: string // target amount in wei
+  privatekey: string // private key of the caller
 }
 
 /**
@@ -19,9 +21,17 @@ async function main(
   // hre which is managed by hardhat-ethers, because that one seems to
   // run its own in-memory hardhat instance, which is undesirable
   const provider = new ethers.providers.JsonRpcProvider()
-  const signer = provider.getSigner()
+
+  let signer: Signer;
+  if (!opts.privatekey) {
+    signer = provider.getSigner()
+  } else {
+    signer = new Wallet(opts.privatekey, provider)
+  }
   const signerAddress = await signer.getAddress()
 
+  console.log("Signer Address", signerAddress)
+  
   const hoprToken = (await ethers.getContractFactory('ERC677Mock')).connect(signer).attach(tokenContract.address)
   const hoprStake = (await ethers.getContractFactory('HoprStakeSeason3'))
     .connect(signer)
