@@ -17,6 +17,7 @@ build-hopr-admin: ## build hopr admin React frontend
 
 .PHONY: build-solidity-types
 build-solidity-types: ## generate Solidity typings
+build-solidity-types: build-cargo
 	npx tsc -p packages/utils/tsconfig.json
 	yarn workspace @hoprnet/hopr-ethereum run build:sol:types
 
