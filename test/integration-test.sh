@@ -84,7 +84,7 @@ validate_node_balance_gt0() {
 # $8 = OPTIONAL: end time for busy wait in nanoseconds since epoch, has higher priority than wait time, defaults to 0
 # $9 = OPTIONAL: should assert status code
 call_api(){
-  local result now
+  local result
   local source_api="${1}"
   local api_endpoint="${2}"
   local rest_method="${3}"
@@ -95,33 +95,53 @@ call_api(){
   local end_time_ns=${8:-0}
   local should_assert_status_code=${9:-false}
 
+  local response_type
+
   # no timeout set since the test execution environment should cancel the test if it takes too long
-  local response_type="-d" && [[ "$should_assert_status_code" == true ]] && response_type="-o /dev/null -w %{http_code} -d"
+  if [[ "$should_assert_status_code" == true ]]; then 
+    response_type="-o /dev/null -w %{http_code} -d"
+  else
+    response_type="-d"
+  fi
+
   local cmd="curl -X ${rest_method} -m ${step_time} --connect-timeout ${step_time} -s -H X-Auth-Token:${api_token} -H Content-Type:application/json --url ${source_api}/api/v2${api_endpoint} ${response_type}"
   # if no end time was given we need to calculate it once
-  if [ ${end_time_ns} -eq 0 ]; then
-    now=$(node -e "console.log(process.hrtime.bigint().toString());")
+  
+  local now=$(node -e "console.log(process.hrtime.bigint().toString());")
+
+  if [ ${end_time_ns} -eq 0 ] || [ -z ${end_time_ns} ]; then
     # need to calculate in nanoseconds
-    ((end_time_ns=now+wait_time*1000000000))
+    log "setting end time"
+    end_time_ns=$((now+wait_time*1000000000))
   fi
 
-  result=$(${cmd} "${request_body}")
+  local done=false
+  local attempt=0
 
-  # if an assertion was given and has not been fulfilled, we fail
-  if [ -z "${assertion}" ] || [[ -n  $(echo "${result}" | sed -nE "/${assertion}/p") ]]; then
-    echo "${result}"
-  else
-    now=$(node -e "console.log(process.hrtime.bigint().toString());")
-    if [ ${end_time_ns} -lt ${now} ]; then
-      log "${RED}call_api (${cmd} \"${request_body}\") FAILED, received: ${result} but expected ${assertion}${NOFORMAT}"
-      exit 1
-    else
-      log "${YELLOW}call_api (${cmd} \"${request_body}\") FAILED, received: ${result} but expected ${assertion}, retrying in ${step_time} seconds${NOFORMAT}"
+  while [[ "${done}" == false ]]; do
+    log "${end_time_ns} ${now} ${attempt} ${wait_time}"
+
+    result=$(${cmd} "${request_body}")
+
+    if [ -z "${assertion}" ] || [[ -n $(echo "${result}" | sed -nE "/${assertion}/p") ]]; then
+      log "setting done true"
+      done=true
+    else 
+      if [ ${end_time_ns} -lt ${now} ]; then
+        log "${RED}call_api (${cmd} \"${request_body}\") FAILED, received: ${result} but expected ${assertion}${NOFORMAT}"
+        exit 1
+      else
+        log "${YELLOW}call_api (${cmd} \"${request_body}\") FAILED, received: ${result} but expected ${assertion}, retrying in ${step_time} seconds${NOFORMAT}"
+      fi
+
       sleep ${step_time}
-      call_api "${source_api}" "${api_endpoint}" "${rest_method}" "${request_body}" "${assertion}" "${wait_time}" \
-        "${step_time}" "${end_time_ns}" "${should_assert_status_code}"
+
+      now=$(node -e "console.log(process.hrtime.bigint().toString());")
+      (( attempt++ ))
     fi
-  fi
+  done
+
+  echo "${result}"
 }
 
 # $1 = source api url
@@ -129,7 +149,7 @@ call_api(){
 # $3 = message
 # $4 = OPTIONAL: peers in the message path
 send_message(){
-  local result now
+  local result
   local source_api="${1}"
   local recipient="${2}"
   local msg="${3}"
@@ -137,7 +157,7 @@ send_message(){
 
   local path=$(echo ${peers} | tr -d '\n' | jq -R -s 'split(" ")')
   local payload='{"body":"'${msg}'","path":'${path}',"recipient":"'${recipient}'"}'
-  result="$(call_api ${source_api} "/messages" "POST" "${payload}" "204" 60 15 "" true)"
+  result="$(call_api ${source_api} "/messages" "POST" "${payload}" "204" 300 15 "" true)"
 }
 
 # $1 = source node id
@@ -170,27 +190,6 @@ close_channel() {
 # $2 = destination node id
 # $3 = channel source api endpoint
 # $4 = channel destination peer id
-# $5 = channel direction, either incoming or outgoing
-# $6 = OPTIONAL: verify closure strictly
-finalize_close_channel() {
-  local source_id="${1}"
-  local destination_id="${2}"
-  local source_api="${3}"
-  local destination_peer_id="${4}"
-  local channel_direction="${5}"
-  local result
-
-  log "Node ${source_id} finalizes closure of channel to Node ${destination_id}"
-
-  result="$(call_api ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" "Closed" 600)"
-
-  log "Node ${source_id} finalized closure of channel to Node ${destination_id} result -- ${result}"
-}
-
-# $1 = source node id
-# $2 = destination node id
-# $3 = channel source api endpoint
-# $4 = channel destination peer id
 open_channel() {
   local source_id="${1}"
   local destination_id="${2}"
@@ -199,7 +198,7 @@ open_channel() {
   local result
 
   log "Node ${source_id} open channel to Node ${destination_id}"
-  result=$(call_api ${source_api} "/channels" "POST" "{ \"peerId\": \"${destination_peer_id}\", \"amount\": \"100000000000000000000\" }" 'channelId|CHANNEL_ALREADY_OPEN' 600 60)
+  result=$(call_api ${source_api} "/channels" "POST" "{ \"peerId\": \"${destination_peer_id}\", \"amount\": \"100000000000000000000\" }" 'channelId|CHANNEL_ALREADY_OPEN' 600 30)
   log "Node ${source_id} open channel to Node ${destination_id} result -- ${result}"
 }
 
@@ -418,14 +417,14 @@ log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5}, ${a
 # real blockchain networks
 disable_hardhat_auto_mining
 
-validate_native_address "${api1}" "${api_token}"
-validate_native_address "${api2}" "${api_token}"
-validate_native_address "${api3}" "${api_token}"
-validate_native_address "${api4}" "${api_token}"
-validate_native_address "${api5}" "${api_token}"
+validate_native_address "${api1}" "${api_token}" &
+validate_hopr_address "${api2}" "${api_token}" &
+validate_hopr_address "${api3}" "${api_token}" &
+validate_hopr_address "${api4}" "${api_token}" &
+validate_hopr_address "${api5}" "${api_token}" &
 # we don't need node6 because it's short-living
-validate_native_address "${api7}" "${api_token}"
-validate_native_address "${api8}" "${api_token}"
+validate_hopr_address "${api7}" "${api_token}" &
+validate_hopr_address "${api8}" "${api_token}" &
 log "ETH addresses exist"
 
 validate_node_balance_gt0 "${api1}"
@@ -495,20 +494,6 @@ log "Nodes added to register"
 declare native_addrs_to_register="$native_addr1,$native_addr2,$native_addr3,$native_addr4,$native_addr5,$native_addr7"
 declare native_peerids_to_register="$hopr_addr1,$hopr_addr2,$hopr_addr3,$hopr_addr4,$hopr_addr5,$hopr_addr7"
 
-# add nodes 1,2,3,4,5,7 plus additional nodes in register, do NOT add node 8
-log "Adding nodes to register"
-if ! [ -z $additional_nodes_addrs ] && ! [ -z $additional_nodes_peerids ]; then
-  native_addrs_to_register+=",${additional_nodes_addrs}"
-  native_peerids_to_register+=",${additional_nodes_peerids}"
-fi
-HOPR_ENVIRONMENT_ID=hardhat-localhost \
-TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-yarn workspace @hoprnet/hopr-ethereum hardhat register \
-  --network hardhat \
-  --task add \
-  --native-addresses "${native_addrs_to_register}" \
-  --peer-ids "${native_peerids_to_register}"
-log "Nodes added to register"
 
 # running withdraw and checking it results at the end of this test run
 balances=$(get_balances ${api1})
@@ -584,7 +569,7 @@ result=$(get_tickets_statistics "${api2}" "\"unredeemedValue\":\"0\"")
 log "-- ${result}"
 
 log "Node 1 send 0-hop message to node 2"
-send_message "${api1}" "${addr2}" "hello, world" "" 600
+send_message "${api1}" "${addr2}" "hello, world" ""
 
 # opening channels in parallel
 open_channel 1 2 "${api1}" "${addr2}" &
@@ -605,16 +590,16 @@ wait
 close_channel 1 4 "${api1}" "${addr4}" "outgoing" "true"
 
 for i in `seq 1 10`; do
-  log "Node 1 send 1 hop message to self via node 2" &
-  send_message "${api1}" "${addr1}" 'hello, world' "${addr2}" & 
+  log "Node 1 send 1 hop message to self via node 2"
+  send_message "${api1}" "${addr1}" 'hello, world' "${addr2}"
 
-  log "Node 2 send 1 hop message to self via node 3" &
-  send_message "${api2}" "${addr2}" 'hello, world' "${addr3}" &
+  log "Node 2 send 1 hop message to self via node 3"
+  send_message "${api2}" "${addr2}" 'hello, world' "${addr3}"
 
-  log "Node 3 send 1 hop message to self via node 4" &
-  send_message "${api3}" "${addr3}" 'hello, world' "${addr4}" &
+  log "Node 3 send 1 hop message to self via node 4"
+  send_message "${api3}" "${addr3}" 'hello, world' "${addr4}"
 
-  log "Node 4 send 1 hop message to self via node 5" &
+  log "Node 4 send 1 hop message to self via node 5"
   send_message "${api4}" "${addr4}" 'hello, world' "${addr5}"
 done
 

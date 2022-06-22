@@ -194,16 +194,6 @@ fund_nodes() {
       $addr_arg
 }
 
-enable_network_registry() {
-  log "Enabling register"
-  HOPR_ENVIRONMENT_ID=hardhat-localhost \
-    TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
-    yarn workspace @hoprnet/hopr-ethereum hardhat register \
-      --network hardhat \
-      --task enable
-  
-  log "Register enabled"
-}
 
 disable_network_registry() {
   log "Disabling register"
@@ -214,24 +204,4 @@ disable_network_registry() {
     --task disable
   
   log "Register disabled"
-}
-
-# $1 native addresses ("Ethereum addresses"), comma-separated list
-# $2 peerIds, comma-separated list
-register_nodes() {
-  HOPR_ENVIRONMENT_ID=hardhat-localhost \
-  TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
-  yarn workspace @hoprnet/hopr-ethereum hardhat register \
-    --network hardhat \
-    --task add \
-    --native-addresses "${1}" \
-    --peer-ids "${2}"
-}
-
-disable_hardhat_auto_mining() {
-  log "Disabling hardhat automining"
-  HOPR_ENVIRONMENT_ID=hardhat-localhost \
-  TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
-  yarn workspace @hoprnet/hopr-ethereum hardhat disable-automine \
-    --network hardhat
 }

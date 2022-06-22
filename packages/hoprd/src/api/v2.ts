@@ -110,50 +110,49 @@ export async function setupRestApi(
       settingKey: (input) => {
         return Object.values(SettingKey).includes(input)
       }
+    },
+    securityHandlers: {
+      // TODO: We assume the handlers are always called in order. This isn't a
+      // given and might change in the future. Thus, they should be made order-erindependent.
+      keyScheme: function (req: Request, _scopes, _securityDefinition) {
+        const apiToken = decodeURI(req.get('x-auth-token') || '')
+
+        if (
+          !this.options.testNoAuthentication &&
+          this.options.apiToken !== undefined &&
+          apiToken !== this.options.apiToken
+        ) {
+          // because this is not the last auth check, we just indicate that
+          // the authentication failed so the auth chain can continue
+          return false
+        }
+
+        // successfully authenticated, will stop the auth chain and proceed with the request
+        return true
+      }.bind({ options }),
+      passwordScheme: function (req: Request, _scopes, _securityDefinition) {
+        const authEncoded = (req.get('authorization') || '').replace('Basic ', '')
+        // we only expect a single value here, instead of the usual user:password
+        const [apiToken, ..._rest] = decodeURI(Buffer.from(authEncoded, 'base64').toString('binary')).split(':')
+
+        if (
+          !this.options.testNoAuthentication &&
+          this.options.apiToken !== undefined &&
+          apiToken !== this.options.apiToken
+        ) {
+          // because this is the last auth check, we must throw the appropriate
+          // error to be sent back to the user
+          throw {
+            status: 403,
+            challenge: 'Basic realm=hoprd',
+            message: 'You must authenticate to access hoprd.'
+          }
+        }
+
+        // successfully authenticated
+        return true
+      }.bind({ options })
     }
-    // securityHandlers: {
-    //   // TODO: We assume the handlers are always called in order. This isn't a
-    //   // given and might change in the future. Thus, they should be made order-erindependent.
-    //   keyScheme: function (req: Request, _scopes, _securityDefinition) {
-    //     const apiToken = decodeURI(req.get('x-auth-token') || '')
-
-    //     if (
-    //       !this.options.testNoAuthentication &&
-    //       this.options.apiToken !== undefined &&
-    //       apiToken !== this.options.apiToken
-    //     ) {
-    //       // because this is not the last auth check, we just indicate that
-    //       // the authentication failed so the auth chain can continue
-    //       return false
-    //     }
-
-    //     // successfully authenticated, will stop the auth chain and proceed with the request
-    //     return true
-    //   }.bind({ options }),
-    //   passwordScheme: function (req: Request, _scopes, _securityDefinition) {
-    //     console.log(this)
-    //     // const authEncoded = (req.get('authorization') || '').replace('Basic ', '')
-    //     // // we only expect a single value here, instead of the usual user:password
-    //     // const [apiToken, ..._rest] = decodeURI(Buffer.from(authEncoded, 'base64').toString('binary')).split(':')
-
-    //     // if (
-    //     //   !this.options.testNoAuthentication &&
-    //     //   this.options.apiToken !== undefined &&
-    //     //   apiToken !== this.options.apiToken
-    //     // ) {
-    //     //   // because this is the last auth check, we must throw the appropriate
-    //     //   // error to be sent back to the user
-    //     //   throw {
-    //     //     status: 403,
-    //     //     challenge: 'Basic realm=hoprd',
-    //     //     message: 'You must authenticate to access hoprd.'
-    //     //   }
-    //     // }
-
-    //     // successfully authenticated
-    //     return true
-    //   }.bind({ options })
-    // }
   })
 
   // hook up the Swagger UI for our API spec

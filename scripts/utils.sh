@@ -225,9 +225,32 @@ get_hopr_address() {
 }
 
 # $1 = endpoint
-# $1 = api token
+# $2 = api token
+validate_hopr_address() {
+  local hopr_address
+  local endpoint="${1}"
+  local api_token="${2}"
+
+  hopr_address="$(get_hopr_address "${api_token}@${endpoint}")"
+  if [ -z "${hopr_address}" ]; then
+    log "-- could not derive hopr address from endpoint ${endpoint}"
+    exit 1
+  fi
+
+  local valid="$(node -e "(import('@hoprnet/hopr-utils')).then(pId => console.log(pId.hasB58String('${hopr_address}')))")"
+
+  if ! [[ $valid == "true" ]]; then
+    log "Node returns an invalid hopr address: ${hopr_address} derived from endpoint ${endpoint}"
+    exit 1
+  fi
+
+  echo "valid hopr address: ${hopr_address}"
+}
+
+# $1 = endpoint
+# $2 = api token
 validate_native_address() {
-  local native_address is_valid_native_address
+  local native_address
   local endpoint="${1}"
   local api_token="${2}"
 
@@ -237,13 +260,12 @@ validate_native_address() {
     exit 1
   fi
 
-  is_valid_native_address="$(curl --silent https://api.hoprnet.org/api/validate/$native_address/get\?text=true)"
-  if [ "${is_valid_native_address}" == "false" ]; then
-    log "--⛔️ Node returns an invalidddress: ${native_address} derived from endpoint ${endpoint}"
+  if ! [[ -n $(echo "${native_address}" | sed -nE "/0x[0-9a-fA-F]{40}/p") ]]; then
+    log "Node returns an invalid native address: ${native_address} derived from endpoint ${endpoint}"
     exit 1
   fi
 
-  echo "${native_address}"
+  echo "valid native address: ${native_address}"
 }
 
 # $1 = endpoint

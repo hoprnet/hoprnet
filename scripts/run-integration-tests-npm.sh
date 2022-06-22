@@ -179,7 +179,7 @@ function setup_node() {
   cd "${npm_install_dir}"
 
   # Remove previous logs to make sure the regex does not match
-  rm -Rf "${log}"
+  rm -f "${log}"
 
   DEBUG="hopr*" npx hoprd \
     --admin \
