@@ -392,6 +392,15 @@ gcloud_get_instance_tags() {
   gcloud compute instances describe "${name}" --format=json | jq ".tags.items[]" | tr -d '"'
 }
 
+# $1=instance uri
+# $2=comma separated list of tags
+gcloud_add_instance_tags() {
+  local name="${1}"
+  local tags="${2}"
+
+  gcloud compute instances add-tags "${name}" --tags="${tags}"
+}
+
 gcloud_get_unused_static_ip_addresses() {
   local json
 
