@@ -15,7 +15,14 @@ import {
   HEARTBEAT_INTERVAL_VARIANCE
 } from '@hoprnet/hopr-core'
 
-import { type ChannelEntry, privKeyToPeerId, PublicKey, debug, loadJson, get_package_version } from '@hoprnet/hopr-utils'
+import {
+  type ChannelEntry,
+  privKeyToPeerId,
+  PublicKey,
+  debug,
+  loadJson,
+  get_package_version
+} from '@hoprnet/hopr-utils'
 
 import { PersistedState } from './state.js'
 import { CoverTrafficStrategy } from './strategy.js'
