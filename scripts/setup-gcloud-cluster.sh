@@ -128,8 +128,15 @@ gcloud_create_or_update_managed_instance_group  \
 # get IPs of newly started VMs which run hoprd
 declare node_ips
 node_ips=$(gcloud_get_managed_instance_group_instances_ips "${cluster_id}")
-
 declare node_ips_arr=( ${node_ips} )
+
+declare instance_names
+instance_names=$(gcloud_get_managed_instance_group_instances_names "${cluster_id}")
+declare instance_names_arr=( ${instance_names} )
+
+# TODO: Feed in the staking account
+declare staking_addrs=()
+
 declare eth_addrs_arr=()
 declare hopr_addrs_arr=()
 
@@ -153,10 +160,14 @@ done
 # TODO: call stake API so that the first staker_addresses[0] stake in the current program
 # TODO: call register API and register staker_addresses with node peer ids
 
+
 if [[ "${docker_image}" != *-nat:* ]]; then
   # -- Public nodes --
 
-  # The first public node will be left unstaked
+  # TODO: The first public node will be left unstaked
+
+  for
+
 
   # Finally wait for the public nodes to come up
   for ip in ${node_ips}; do
