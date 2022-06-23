@@ -155,28 +155,67 @@ for ip in ${node_ips}; do
   fund_if_empty "${eth_addr}" "${environment}"
 done
 
+# $1 = instance name
+get_node_info_tag() {
+  local instance_name="${1}"
+
+  local current_tag_set=$(gcloud_get_instance_tags "${instance_name}")
+  local -a current_tag_set_arr=( "${current_tag_set}" )
+
+  # Find the tag containing the "info:" prefix
+  local info_tag=""
+  for tag in "${current_tag_set_arr[@]}"
+  do
+    echo "-- tag in $instance_name: $tag"
+    if [[ ${tag} == info:* ]]; then
+         info_tag="${info_tag#info:}"
+         break
+    fi
+  done
+
+  echo "${info_tag}"
+}
 
 # $1 = instance names array
 # $2 = peer ids array
 # $3 = wallet address array
 # $4 = staking accounts to use
 assign_staking_accounts() {
-  local instance_names_arr=$1
-  local peer_ids_arr=$2
-  local native_addrs_arr=$3
-  local staking_accs_arr=$4
+  local -n instance_names_arr="${1}"
+  local -n peer_ids_arr="${2}"
+  local -n native_addrs_arr="${3}"
+  local -n staking_accs_arr="${4}"
 
   local current_staking_index=0
   local count_staking_accs=${#staking_accs_arr[@]}
 
   # Assign staking accounts to instances round-robin fashion
-  for vm in ${instance_names_arr}; do
-    local tag_set="peer_id=${peer_ids_arr[]}"
+  local -a assigned_staking_accs_arr=()
+  for i in "${!instance_names_arr[@]}"
+  do
+    local instance_name="${instance_names_arr[i]}"
+    local instance_peer_id="${peer_ids_arr[i]}"
+    local instance_native_addr="${native_addrs_arr[i]}"
 
+    local existing_info_tag=$(get_node_info_tag ${instance_name})
+
+    if [[ -z "${existing_info_tag}" ]]; then
+      # Assign the new staking account
+      local new_staking_addr="${staking_accs_arr[current_staking_index]}"
+      local new_info_tag="info:peer_id=${instance_peer_id};native_addr=${instance_native_addr};nr_staking_addr=${new_staking_addr}"
+      assigned_staking_accs_arr+=( "$new_staking_addr" )
+      gcloud_add_instance_tags "${instance_name}" "${new_info_tag}"
+    else
+      # Use the existing staking account
+      existing_staking_addr=$(echo "${existing_info_tag}" | sed -E 's/.*nr_staking_addr=([Xxa-f0-9A-F]+).*/\1/g')
+      assigned_staking_accs_arr+=( "${existing_staking_addr}" )
+    fi
 
     current_staking_index=$(( (current_staking_index + 1) % count_staking_accs ))
   done
 
+  # Return the assigned staking accounts array
+  echo "${assigned_staking_accs_arr[@]}"
 }
 
 # To test Network registry, the cluster_size is greater or equal to 3 and staker_addresses are provided as parameters
