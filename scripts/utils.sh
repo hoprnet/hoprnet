@@ -232,7 +232,7 @@ validate_hopr_address() {
   local api_token="${2}"
 
   hopr_address="$(get_hopr_address "${api_token}@${endpoint}")"
-  if [ -z "${hopr_address}" ]; then
+  if [[ -z "${hopr_address}" ]]; then
     log "-- could not derive hopr address from endpoint ${endpoint}"
     exit 1
   fi
@@ -255,7 +255,7 @@ validate_native_address() {
   local api_token="${2}"
 
   native_address="$(get_native_address "${api_token}@${endpoint}")"
-  if [ -z "${native_address}" ]; then
+  if [[ -z "${native_address}" ]]; then
     log "-- could not derive native address from endpoint ${endpoint}"
     exit 1
   fi

@@ -176,12 +176,9 @@ start_local_hardhat() {
 # $3 password, e.g. "dummy e2e password"
 # $4 additional address, e.g CT node address
 fund_nodes() {
-  local addr_arg
-  if [ -z $4 ]; then
-    addr_arg=""
-  else
-    addr_arg="--address $4"
-  fi
+  local addr_arg=""
+  [[ -n "$4" ]] && addr_arg="--address $4"
+
 
   HOPR_ENVIRONMENT_ID=hardhat-localhost \
     TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \

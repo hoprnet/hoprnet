@@ -107,7 +107,7 @@ call_api(){
   
   local now=$(node -e "console.log(process.hrtime.bigint().toString());")
 
-  if [ ${end_time_ns} -eq 0 ]; then
+  if [[ ${end_time_ns} -eq 0 ]]; then
     # need to calculate in nanoseconds
     end_time_ns=$((now+wait_time*1000000000))
   fi
@@ -119,10 +119,10 @@ call_api(){
     result=$(${cmd} "${request_body}")
 
     # if an assertion was given and has not been fulfilled, we fail
-    if [ -z "${assertion}" ] || [[ -n $(echo "${result}" | sed -nE "/${assertion}/p") ]]; then
+    if [[ -z "${assertion}" ]] || [[ -n $(echo "${result}" | sed -nE "/${assertion}/p") ]]; then
       done=true
     else 
-      if [ ${end_time_ns} -lt ${now} ]; then
+      if [[ ${end_time_ns} -lt ${now} ]]; then
         log "${RED}attempt: ${attempt} - call_api (${cmd} \"${request_body}\") FAILED, received: ${result} but expected ${assertion}${NOFORMAT}"
         exit 1
       else
@@ -629,18 +629,21 @@ for i in `seq 1 10`; do
   send_message "${api3}" "${addr5}" 'hello, world' "${addr4}" &
 
   log "Node 5 send 1 hop message to node 2 via node 1" &
-  send_message "${api5}" "${addr2}" 'hello, world' "${addr1}" 
+  send_message "${api5}" "${addr2}" 'hello, world' "${addr1}" &
 done
+wait
 
 for i in `seq 1 10`; do
-  log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4"
-  send_message "${api1}" "${addr5}" "hello, world" "${addr2} ${addr3} ${addr4}" 
+  log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4" &
+  send_message "${api1}" "${addr5}" "hello, world" "${addr2} ${addr3} ${addr4}" &
 done
+wait
 
 for i in `seq 1 10`; do
-  log "Node 1 send message to node 5"
-  send_message "${api1}" "${addr5}" "hello, world" "" 
+  log "Node 1 send message to node 5" &
+  send_message "${api1}" "${addr5}" "hello, world" "" & 
 done
+wait
 
 test_redeem_in_specific_channel() {
   local node_id="${1}"
