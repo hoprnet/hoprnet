@@ -402,8 +402,8 @@ done
 log "All nodes came up online"
 
 # --- Run security tests --- {{{
-# ${mydir}/../test/security-test.sh \
-#   127.0.0.1 13301 13302 19501 19502 "${api_token}"
+${mydir}/../test/security-test.sh \
+  127.0.0.1 13301 13302 19501 19502 "${api_token}"
 # }}}
 
 # --- Run protocol test --- {{{

@@ -8,7 +8,6 @@
     { "path": "packages/core-ethereum" },
     { "path": "packages/cover-traffic-daemon" },
     { "path": "packages/ethereum" },
-    { "path": "packages/real" },
     { "path": "packages/hoprd" },
     { "path": "packages/real" },
     { "path": "packages/utils" },

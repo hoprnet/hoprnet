@@ -54,9 +54,7 @@ export async function closeChannel(
     const { status: channelStatus, receipt } = await node.closeChannel(peerId, direction)
     return { success: true, channelStatus, receipt }
   } catch (err) {
-    console.log(err)
     const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
-    console.log(`errString`, errString)
 
     if (errString.match(/Channel is already closed/)) {
       // @TODO insert receipt
@@ -72,9 +70,6 @@ export async function closeChannel(
 
 const DELETE: Operation = [
   async (req, res, _next) => {
-    console.log(`DELETE CONTEXT`, req.context, req.params)
-    console.log(`DELETE request received`)
-
     const { node } = req.context
     const { peerid, direction } = req.params
 

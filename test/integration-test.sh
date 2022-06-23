@@ -486,21 +486,6 @@ if ! [ -z $additional_nodes_addrs ] && ! [ -z $additional_nodes_peerids ]; then
   native_addrs_to_register+=",${additional_nodes_addrs}"
   native_peerids_to_register+=",${additional_nodes_peerids}"
 fi
-register_nodes "${native_addrs_to_register}" "${native_peerids_to_register}"
-log "Nodes added to register"
-
-declare native_addrs_to_register="$native_addr1,$native_addr2,$native_addr3,$native_addr4,$native_addr5,$native_addr7"
-declare native_peerids_to_register="$hopr_addr1,$hopr_addr2,$hopr_addr3,$hopr_addr4,$hopr_addr5,$hopr_addr7"
-
-declare native_addrs_to_register="$native_addr1,$native_addr2,$native_addr3,$native_addr4,$native_addr5,$native_addr7"
-declare native_peerids_to_register="$hopr_addr1,$hopr_addr2,$hopr_addr3,$hopr_addr4,$hopr_addr5,$hopr_addr7"
-
-# add nodes 1,2,3,4,5,7 plus additional nodes in register, do NOT add node 8
-log "Adding nodes to register"
-if ! [ -z $additional_nodes_addrs ] && ! [ -z $additional_nodes_peerids ]; then
-  native_addrs_to_register+=",${additional_nodes_addrs}"
-  native_peerids_to_register+=",${additional_nodes_peerids}"
-fi
 
 HOPR_ENVIRONMENT_ID=hardhat-localhost \
 TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
