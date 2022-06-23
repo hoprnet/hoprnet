@@ -155,6 +155,30 @@ for ip in ${node_ips}; do
   fund_if_empty "${eth_addr}" "${environment}"
 done
 
+
+# $1 = instance names array
+# $2 = peer ids array
+# $3 = wallet address array
+# $4 = staking accounts to use
+assign_staking_accounts() {
+  local instance_names_arr=$1
+  local peer_ids_arr=$2
+  local native_addrs_arr=$3
+  local staking_accs_arr=$4
+
+  local current_staking_index=0
+  local count_staking_accs=${#staking_accs_arr[@]}
+
+  # Assign staking accounts to instances round-robin fashion
+  for vm in ${instance_names_arr}; do
+    local tag_set="peer_id=${peer_ids_arr[]}"
+
+
+    current_staking_index=$(( (current_staking_index + 1) % count_staking_accs ))
+  done
+
+}
+
 # To test Network registry, the cluster_size is greater or equal to 3 and staker_addresses are provided as parameters
 
 # TODO: call stake API so that the first staker_addresses[0] stake in the current program
@@ -166,7 +190,9 @@ if [[ "${docker_image}" != *-nat:* ]]; then
 
   # TODO: The first public node will be left unstaked
 
-  for
+  for vm in ${instance_names_arr}; do
+
+  done
 
 
   # Finally wait for the public nodes to come up
