@@ -26,6 +26,7 @@
     "lib"
   ],
   "dependencies": {
+    "@hoprnet/hopr-real": "workspace:packages/real",
     "abort-controller": "~3.0.0",
     "bignumber.js": "9.0.2",
     "bn.js": "5.2.0",

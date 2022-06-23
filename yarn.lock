@@ -3554,6 +3554,7 @@ __metadata:
   resolution: "@hoprnet/hopr-utils@workspace:packages/utils"
   dependencies:
     "@chainsafe/libp2p-noise": 5.0.3
+    "@hoprnet/hopr-real": "workspace:packages/real"
     "@types/mocha": 9.1.0
     abort-controller: ~3.0.0
     bignumber.js: 9.0.2

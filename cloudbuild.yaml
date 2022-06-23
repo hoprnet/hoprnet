@@ -46,17 +46,11 @@ steps:
       #!/usr/bin/env bash
       set -Eeuo pipefail
       for image in hoprd hoprd-nat hopr-cover-traffic-daemon; do
-        full_image="gcr.io/${PROJECT_ID}/${image}"
-        v=$(docker run ${full_image}:${IMAGE_VERSION} --version 2> /dev/null | sed -n '3p')
-        if [ "${v}" != "${PACKAGE_VERSION}" ]; then
-          echo "bundled ${image} version ${v}, expected ${PACKAGE_VERSION}"
-          exit 1
-        fi
+        ./scripts/verify-docker-image.sh "${image}" "${IMAGE_VERSION}" "${PACKAGE_VERSION}"
       done
     env:
       - 'PACKAGE_VERSION=$_PACKAGE_VERSION'
       - 'IMAGE_VERSION=$_IMAGE_VERSION'
-      - 'PROJECT_ID=$PROJECT_ID'
     timeout: 600s
     waitFor:
       - buildHoprd
