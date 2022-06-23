@@ -120,6 +120,7 @@ call_api(){
   while [[ "${done}" == false ]]; do
     result=$(${cmd} "${request_body}")
 
+    # if an assertion was given and has not been fulfilled, we fail
     if [ -z "${assertion}" ] || [[ -n $(echo "${result}" | sed -nE "/${assertion}/p") ]]; then
       done=true
     else 
@@ -491,6 +492,24 @@ log "Nodes added to register"
 declare native_addrs_to_register="$native_addr1,$native_addr2,$native_addr3,$native_addr4,$native_addr5,$native_addr7"
 declare native_peerids_to_register="$hopr_addr1,$hopr_addr2,$hopr_addr3,$hopr_addr4,$hopr_addr5,$hopr_addr7"
 
+declare native_addrs_to_register="$native_addr1,$native_addr2,$native_addr3,$native_addr4,$native_addr5,$native_addr7"
+declare native_peerids_to_register="$hopr_addr1,$hopr_addr2,$hopr_addr3,$hopr_addr4,$hopr_addr5,$hopr_addr7"
+
+# add nodes 1,2,3,4,5,7 plus additional nodes in register, do NOT add node 8
+log "Adding nodes to register"
+if ! [ -z $additional_nodes_addrs ] && ! [ -z $additional_nodes_peerids ]; then
+  native_addrs_to_register+=",${additional_nodes_addrs}"
+  native_peerids_to_register+=",${additional_nodes_peerids}"
+fi
+
+HOPR_ENVIRONMENT_ID=hardhat-localhost \
+TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
+yarn workspace @hoprnet/hopr-ethereum hardhat register \
+  --network hardhat \
+  --task add \
+  --native-addresses "${native_addrs_to_register}" \
+  --peer-ids "${native_peerids_to_register}"
+log "Nodes added to register"
 
 # running withdraw and checking it results at the end of this test run
 balances=$(get_balances ${api1})
