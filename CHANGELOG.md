@@ -8,6 +8,7 @@
 - Marge hopr-stake contracs into monorepo and relevant deploy scripts
 - Add additional CLI parameters `--heartbeatThreshold`, `--networkQualityThreshold` and `--onChainConfirmations`
 - Allow configuration via environment variables instead of CLI parameters for all supported options
+- Reenable e2e tests and enhance REST API ([#3836](https://github.com/hoprnet/hoprnet/pull/3836))
 
 <a name="1.89"></a>
 
