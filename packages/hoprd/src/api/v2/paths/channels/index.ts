@@ -233,8 +233,7 @@ export async function openChannel(
     const errString = err instanceof Error ? err.message : err?.toString?.() ?? STATUS_CODES.UNKNOWN_FAILURE
 
     if (errString.includes('Channel is already opened')) {
-      // @TODO insert correct receipt
-      return { success: true, channelId: channelId.toHex(), receipt: /* @fixme */ '0x' }
+      return { success: false, reason: STATUS_CODES.CHANNEL_ALREADY_OPEN }
     } else {
       return { success: false, reason: STATUS_CODES.UNKNOWN_FAILURE }
     }
