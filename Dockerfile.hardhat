@@ -11,7 +11,8 @@ RUN apt-get update \
      build-essential \
      jq \
      wget \
-     ca-certificates
+     ca-certificates \
+     pkg-config
 
 # taken from
 # https://github.com/rust-lang/docker-rust/blob/186e4d580b5581861907c015d6b58919c809e375/1.61.0/bullseye/Dockerfile
