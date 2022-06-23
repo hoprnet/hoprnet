@@ -164,11 +164,10 @@ get_node_info_tag() {
 
   # Find the tag containing the "info:" prefix
   local info_tag=""
-  for tag in "${current_tag_set_arr[@]}"
+  for tag in ${current_tag_set_arr}
   do
-    echo "-- tag in $instance_name: $tag"
-    if [[ ${tag} == info:* ]]; then
-         info_tag="${info_tag#info:}"
+    if [[ ${tag} =~ info:.+ ]]; then
+         info_tag="${tag#info:}"
          break
     fi
   done
