@@ -6,13 +6,15 @@ LABEL description="This image launches a hardhat node running a local network wi
 # python is used by some nodejs dependencies as an installation requirement
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
-     git \
-     python3 \
      build-essential \
-     jq \
-     wget \
      ca-certificates \
-     pkg-config
+     git \
+     jq \
+     libssl-dev \
+     openssl \
+     pkg-config \
+     python3 \
+     wget
 
 # taken from
 # https://github.com/rust-lang/docker-rust/blob/186e4d580b5581861907c015d6b58919c809e375/1.61.0/bullseye/Dockerfile

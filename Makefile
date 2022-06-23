@@ -29,7 +29,7 @@ build-yarn: build-solidity-types build-cargo
 .PHONY: build-cargo
 build-cargo: ## build cargo packages
 	cargo build --release --target wasm32-unknown-unknown
-	yarn workspaces foreach -p --exclude hoprnet --exclude hopr-docs run build:wasm
+	yarn workspaces foreach --exclude hoprnet --exclude hopr-docs run build:wasm
 
 .PHONY: build-yellowpaper
 build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
