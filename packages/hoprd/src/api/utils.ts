@@ -16,6 +16,7 @@ export const authenticateWsConnection = (
 ): boolean => {
   // throw if apiToken is empty
   if (apiToken === '') throw Error('Cannot authenticate empty apiToken')
+  let encodedApiToken = encodeURI(apiToken)
 
   // attempt to authenticate via URL parameter
   if (req.url) {
@@ -41,16 +42,15 @@ export const authenticateWsConnection = (
       debugLog(`failed parsing cookies`, e)
     }
 
-    try {
-      if (
-        cookies &&
-        (decodeURI(cookies['X-Auth-Token'] || '') === apiToken || decodeURI(cookies['x-auth-token'] || '') === apiToken)
-      ) {
-        debugLog('ws client connected [ authentication SUCCESS via cookie ]')
-        return true
-      }
-    } catch (e) {
-      debugLog(`failed parsing 'x-auth-token' cookies`, e)
+    // We compare the encoded token against an encoded token from the user, thus avoiding having to decodeURI on the user input
+    // and therefore avoiding the need to handle any decoding errors at all.
+    // The encodeURI function on an already encoded input acts as an identity function
+    if (
+      cookies &&
+      (encodeURI(cookies['X-Auth-Token'] || '') === encodedApiToken || encodeURI(cookies['x-auth-token'] || '') === encodedApiToken)
+    ) {
+      debugLog('ws client connected [ authentication SUCCESS via cookie ]')
+      return true
     }
   }
 
