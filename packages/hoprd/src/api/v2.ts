@@ -50,6 +50,7 @@ export async function setupRestApi(
   const apiBaseSpecPath = path.join(relPath, 'rest-api-v2-spec.yaml')
   const apiFullSpecPath = path.join(relPath, 'rest-api-v2-full-spec.json')
   const apiPathsPath = path.join(relPath, 'lib/api/v2/paths')
+  const encodedApiToken = encodeURI(options.apiToken)
 
   // useful documentation for the configuration of express-openapi can be found at:
   // https://github.com/kogosoftwarellc/open-api/tree/master/packages/express-openapi
@@ -98,11 +99,12 @@ export async function setupRestApi(
     },
     securityHandlers: {
       // TODO: We assume the handlers are always called in order. This isn't a
-      // given and might change in the future. Thus, they should be made order-erindependent.
+      // given and might change in the future. Thus, they should be made order-independent.
       keyScheme: function (req: Request, _scopes, _securityDefinition) {
-        const apiToken = decodeURI(req.get('x-auth-token') || '')
+        // Applying multiple URI encoding is an identity
+        let apiTokenFromUser = encodeURI(req.get('x-auth-token') || '')
 
-        if (!options.testNoAuthentication && options.apiToken !== undefined && apiToken !== options.apiToken) {
+        if (!options.testNoAuthentication && options.apiToken !== undefined && apiTokenFromUser !== encodedApiToken) {
           // because this is not the last auth check, we just indicate that
           // the authentication failed so the auth chain can continue
           return false
@@ -113,10 +115,11 @@ export async function setupRestApi(
       },
       passwordScheme: function (req: Request, _scopes, _securityDefinition) {
         const authEncoded = (req.get('authorization') || '').replace('Basic ', '')
-        // we only expect a single value here, instead of the usual user:password
-        const [apiToken, ..._rest] = decodeURI(Buffer.from(authEncoded, 'base64').toString('binary')).split(':')
 
-        if (!options.testNoAuthentication && options.apiToken !== undefined && apiToken !== options.apiToken) {
+        // We only expect a single value here, instead of the usual user:password, so we take the user part as token
+        let apiTokenFromUser = encodeURI(Buffer.from(authEncoded, 'base64').toString('binary')).split(':')[0] // The colon ':' does not get encoded by encodeURI
+
+        if (!options.testNoAuthentication && options.apiToken !== undefined && apiTokenFromUser !== encodedApiToken) {
           // because this is the last auth check, we must throw the appropriate
           // error to be sent back to the user
           throw {
