@@ -43,7 +43,7 @@
       "network_id": "goerli",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xC3Ff0A2C4F404D6a9B31a7ABc2a41E616bd4F34C",
-      "channels_contract_address": "0xC0a304DC0d7E988c768d04E7F79a245C6016aE17",
+      "channels_contract_address": "0x3F766C4f0414CDA4A7B699Cf8927CA82a521ADd4",
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
       "stake_contract_address": "0x208Bd0F5Bd13357Ba077dd4888a76D40d947F9f4",
       "network_registry_contract_address": "0x69C201Df0b4c54f600d49Dde1953F46b89EBa23B",

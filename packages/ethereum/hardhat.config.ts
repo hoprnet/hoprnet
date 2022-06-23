@@ -380,8 +380,6 @@ task('test:in-group', 'Reset the hardhat node instances per testFiles array.').s
  */
 subtask(TASK_DEPLOY_RUN_DEPLOY, 'Override the deploy task, with an explicit gas price.').setAction(
   async (taskArgs, { network, ethers }, runSuper) => {
-    // const protocolConfigNetworkNames = Object.keys<ResolvedEnvironment['network']>(PROTOCOL_CONFIG.networks);
-    // const protocolConfigNetworks = Object.values<ResolvedEnvironment['network']>(PROTOCOL_CONFIG.networks);
     const protocolConfigNetwork = PROTOCOL_CONFIG.networks[network.name] ?? undefined
     if (!protocolConfigNetwork) {
       throw Error(

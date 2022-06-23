@@ -1,9 +1,9 @@
 [package]
-name = "hoprd-misc"
+name = "utils-misc"
 version = "0.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
-description = "Rust WASM modules for HOPRd"
+description = "Rust WASM modules for hopr-utils"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "LGPL-3.0-only"
@@ -13,7 +13,9 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 real-base = { path = "../../../real/crates/real-base" }
-wasm-bindgen = { version = "0.2.81", features = [] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+wasm-bindgen = { version = "0.2.81", features = ["serde-serialize"] }
 wasm-bindgen-test = "0.3.30"
 
 # Unfortunately, `wee_alloc` requires nightly Rust when targeting real for now.

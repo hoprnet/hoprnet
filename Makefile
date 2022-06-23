@@ -17,6 +17,7 @@ build-hopr-admin: ## build hopr admin React frontend
 
 .PHONY: build-solidity-types
 build-solidity-types: ## generate Solidity typings
+build-solidity-types: build-cargo
 	npx tsc -p packages/utils/tsconfig.json
 	yarn workspace @hoprnet/hopr-ethereum run build:sol:types
 
@@ -28,7 +29,7 @@ build-yarn: build-solidity-types build-cargo
 .PHONY: build-cargo
 build-cargo: ## build cargo packages
 	cargo build --release --target wasm32-unknown-unknown
-	yarn workspaces foreach -p --exclude hoprnet --exclude hopr-docs run build:wasm
+	yarn workspaces foreach --exclude hoprnet --exclude hopr-docs run build:wasm
 
 .PHONY: build-yellowpaper
 build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
@@ -67,6 +68,14 @@ lint-check: ## run linter in check mode
 .PHONY: lint-check
 lint-fix: ## run linter in fix mode
 	npx prettier --write .
+
+.PHONY: docker-build-local
+docker-build-local: ## build Docker images locally
+	./scripts/build-docker.sh --local --force
+
+.PHONY: docker-build-gcb
+docker-build-gcb: ## build Docker images on Google Cloud Build
+	./scripts/build-docker.sh --no-tags --force
 
 .PHONY: help
 help:
