@@ -47,7 +47,8 @@ export const authenticateWsConnection = (
     // The encodeURI function on an already encoded input acts as an identity function
     if (
       cookies &&
-      (encodeURI(cookies['X-Auth-Token'] || '') === encodedApiToken || encodeURI(cookies['x-auth-token'] || '') === encodedApiToken)
+      (encodeURI(cookies['X-Auth-Token'] || '') === encodedApiToken ||
+        encodeURI(cookies['x-auth-token'] || '') === encodedApiToken)
     ) {
       debugLog('ws client connected [ authentication SUCCESS via cookie ]')
       return true
