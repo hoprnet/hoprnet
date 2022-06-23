@@ -1,4 +1,4 @@
-import { debug } from '../process'
+import { debug } from '../process/index.js'
 
 const logError = debug('hopr:lateTimeout')
 

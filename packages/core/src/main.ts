@@ -4,21 +4,21 @@ import { mkdir } from 'fs/promises'
 import { default as LibP2P } from 'libp2p'
 import { LevelDatastore } from 'datastore-level'
 import { type AddressSorter, HoprDB, PublicKey, debug } from '@hoprnet/hopr-utils'
-import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+import { default as HoprCoreEthereum } from '@hoprnet/hopr-core-ethereum'
 
 import Mplex from 'libp2p-mplex'
 import KadDHT from 'libp2p-kad-dht'
 import { NOISE } from '@chainsafe/libp2p-noise'
 import type PeerId from 'peer-id'
-import Hopr, { type HoprOptions } from '.'
-import { getAddrs } from './identity'
+import Hopr, { type HoprOptions } from './index.js'
+import { getAddrs } from './identity.js'
 import HoprConnect, {
   compareAddressesLocalMode,
   type HoprConnectConfig,
   type PublicNodesEmitter
 } from '@hoprnet/hopr-connect'
 import type { Multiaddr } from 'multiaddr'
-import type AccessControl from './network/access-control'
+import type AccessControl from './network/access-control.js'
 
 const log = debug(`hopr-core:create-hopr`)
 
@@ -209,6 +209,5 @@ export async function createHoprNode(
   // Initialize connection to the blockchain
   await chain.initializeChainWrapper()
 
-  const node = new Hopr(peerId, db, chain, options)
-  return node
+  return new Hopr(peerId, db, chain, options)
 }

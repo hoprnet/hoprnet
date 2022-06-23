@@ -1,3 +1,5 @@
+# Changelog
+
 <a name="1.90"></a>
 
 ## 1.90
@@ -9,6 +11,7 @@
 - Add additional CLI parameters `--heartbeatThreshold`, `--networkQualityThreshold` and `--onChainConfirmations`
 - Allow configuration via environment variables instead of CLI parameters for all supported options
 - Fix decoding error when API token contains certain characters
+- Add Docker image running hardhat using the Hopr environment and smart contracts (useful for testing and development)
 
 <a name="1.89"></a>
 

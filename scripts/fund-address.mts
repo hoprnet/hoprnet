@@ -3,7 +3,6 @@
 
 import yargs from 'yargs/yargs'
 import BN from 'bn.js'
-import { createChainWrapper } from '@hoprnet/hopr-core-ethereum'
 import {
   expandVars,
   moveDecimalPoint,
@@ -13,11 +12,8 @@ import {
   DeferType,
   stringToU8a
 } from '@hoprnet/hopr-utils'
-import { resolveEnvironment } from '@hoprnet/hopr-core'
 
 const { PRIVATE_KEY } = process.env
-
-type ChainWrapper = Awaited<ReturnType<typeof createChainWrapper>>
 
 // naive mock of indexer waiting for confirmation
 function createTxHandler(tx: string): DeferType<string> {
@@ -36,15 +32,18 @@ function createTxHandler(tx: string): DeferType<string> {
   return state as unknown as DeferType<string>
 }
 
-async function getNativeBalance(chain: ChainWrapper, address: string) {
+// @fixme fix ESM issue and use ChainWrapper type
+async function getNativeBalance(chain: any, address: string) {
   return await chain.getNativeBalance(Address.fromString(address))
 }
 
-async function getERC20Balance(chain: ChainWrapper, address: string) {
+// @fixme fix ESM issue and use ChainWrapper type
+async function getERC20Balance(chain: any, address: string) {
   return await chain.getBalance(Address.fromString(address))
 }
 
-async function fundERC20(chain: ChainWrapper, sender: string, receiver: string, targetBalanceStr: string) {
+// @fixme fix ESM issue and use ChainWrapper type
+async function fundERC20(chain: any, sender: string, receiver: string, targetBalanceStr: string) {
   const senderBalance = await getNativeBalance(chain, sender)
   const balance = await getERC20Balance(chain, receiver)
   const targetBalanceNr = moveDecimalPoint(targetBalanceStr, Balance.DECIMALS)
@@ -74,7 +73,8 @@ async function fundERC20(chain: ChainWrapper, sender: string, receiver: string, 
   await chain.withdraw('HOPR', receiver, diff.toString(), createTxHandler)
 }
 
-async function fundNative(chain: ChainWrapper, sender: string, receiver: string, targetBalanceStr: string) {
+// @fixme fix ESM issue and use ChainWrapper type
+async function fundNative(chain: any, sender: string, receiver: string, targetBalanceStr: string) {
   const senderBalance = await getNativeBalance(chain, sender)
   const balance = await getNativeBalance(chain, receiver)
   const targetBalanceNr = moveDecimalPoint(targetBalanceStr, Balance.DECIMALS)
@@ -131,6 +131,7 @@ async function main() {
     process.exit(1)
   }
 
+  const { resolveEnvironment } = await import('@hoprnet/hopr-core')
   const environment = resolveEnvironment(argv.environment)
   if (!environment) {
     console.error(`Cannot find environment ${environment}`)
@@ -154,6 +155,7 @@ async function main() {
 
   const privKey = stringToU8a(PRIVATE_KEY)
 
+  const { createChainWrapper } = await import('@hoprnet/hopr-core-ethereum')
   // Wait as long as it takes to mine the transaction, i.e. timeout=0
   const chain = await createChainWrapper(chainOptions, privKey, true, 0)
   const sender = chain.getPublicKey().toAddress().toString()

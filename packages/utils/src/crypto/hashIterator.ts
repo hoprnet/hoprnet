@@ -1,4 +1,4 @@
-import { u8aEquals } from '../u8a'
+import { u8aEquals } from '../u8a/index.js'
 
 export interface Intermediate {
   iteration: number

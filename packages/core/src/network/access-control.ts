@@ -1,5 +1,5 @@
 import type PeerId from 'peer-id'
-import type NetworkPeers from './network-peers'
+import type NetworkPeers from './network-peers.js'
 import { debug } from '@hoprnet/hopr-utils'
 
 // const log = debug('hopr-core:access-control')

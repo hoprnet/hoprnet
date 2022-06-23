@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import NonceTracker, { Transaction } from './nonce-tracker'
+import NonceTracker, { Transaction } from './nonce-tracker.js'
 import { durations, Address } from '@hoprnet/hopr-utils'
 import { BigNumber } from 'ethers'
 

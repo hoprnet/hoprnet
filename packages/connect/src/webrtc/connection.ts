@@ -1,13 +1,13 @@
-import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
+import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types.js'
 import type { Instance as SimplePeer } from 'simple-peer'
 import { durations, u8aToHex, defer, type DeferType } from '@hoprnet/hopr-utils'
 
 import toIterable from 'stream-to-it'
 import Debug from 'debug'
-import type { RelayConnection } from '../relay/connection'
+import type { RelayConnection } from '../relay/connection.js'
 import { randomBytes } from 'crypto'
-import { toU8aStream, encodeWithLengthPrefix, decodeWithLengthPrefix, eagerIterator } from '../utils'
-import abortable from 'abortable-iterator'
+import { toU8aStream, encodeWithLengthPrefix, decodeWithLengthPrefix, eagerIterator } from '../utils/index.js'
+import { abortableSource } from 'abortable-iterator'
 import type {
   StreamSink,
   StreamResult,
@@ -15,7 +15,7 @@ import type {
   StreamSource,
   StreamSourceAsync,
   HoprConnectDialOptions
-} from '../types'
+} from '../types.js'
 import assert from 'assert'
 
 const DEBUG_PREFIX = `hopr-connect`
@@ -34,7 +34,7 @@ export enum MigrationStatus {
 
 function getAbortableSource(source: StreamSource, signal?: AbortSignal) {
   if (signal != undefined) {
-    source = abortable(source, signal) as StreamSource
+    source = abortableSource(source, signal) as StreamSource
   }
 
   return source
@@ -58,6 +58,7 @@ class WebRTCConnection implements MultiaddrConnection {
   public remoteAddr: MultiaddrConnection['remoteAddr']
   public localAddr: MultiaddrConnection['localAddr']
 
+  // @ts-ignore
   public sink: StreamSink
   public source: StreamSourceAsync
 

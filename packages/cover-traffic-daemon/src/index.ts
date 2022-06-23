@@ -15,7 +15,14 @@ import {
   HEARTBEAT_INTERVAL_VARIANCE
 } from '@hoprnet/hopr-core'
 
-import { type ChannelEntry, privKeyToPeerId, PublicKey, debug } from '@hoprnet/hopr-utils'
+import {
+  type ChannelEntry,
+  privKeyToPeerId,
+  PublicKey,
+  debug,
+  loadJson,
+  get_package_version
+} from '@hoprnet/hopr-utils'
 
 import { PersistedState } from './state.js'
 import { CoverTrafficStrategy } from './strategy.js'
@@ -41,7 +48,7 @@ function defaultEnvironment(): string {
   try {
     // Don't do typechecks on JSON files
     // @ts-ignore
-    const config = import('../default-environment.json', { assert: { type: 'json' } }) as DefaultEnvironment
+    const config = loadJson('../default-environment.json') as DefaultEnvironment
     return config?.id || ''
   } catch (error) {
     // its ok if the file isn't there or cannot be read
@@ -49,11 +56,12 @@ function defaultEnvironment(): string {
   }
 }
 
-// Replace default process name (`node`) by `hopr-cover-traffic-daemon`
-process.title = 'hopr-cover-traffic-daemon'
-
 // Use environment-specific default data path
 const defaultDataPath = path.join(process.cwd(), 'hopr-cover-traffic-daemon-db', defaultEnvironment())
+
+// reading the version manually to ensure the path is read correctly
+const packageFile = path.normalize(new URL('../package.json', import.meta.url).pathname)
+const version = get_package_version(packageFile)
 
 const yargsInstance = yargs(hideBin(process.argv))
 
@@ -62,6 +70,7 @@ const argv = yargsInstance
   .epilogue(
     'All CLI options can be configured through environment variables as well. CLI parameters have precedence over environment variables.'
   )
+  .version(version)
   .option('environment', {
     string: true,
     describe: 'Environment id which the node shall run on (HOPR_CTD_ENVIRONMENT)',
@@ -180,6 +189,8 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
     data.setNode(peer)
   }
 
+  log(`This is hopr-cover-traffic-daemon version ${version}`)
+
   log('creating a node')
   const node = await createHoprNode(peerId, options)
 
@@ -217,7 +228,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   }, 5000)
 }
 
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   process.once('exit', stopGracefully)
   process.on('SIGINT', stopGracefully)
   process.on('SIGTERM', stopGracefully)

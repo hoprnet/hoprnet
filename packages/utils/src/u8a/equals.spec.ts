@@ -1,6 +1,6 @@
 import assert from 'assert'
 
-import { u8aEquals } from './equals'
+import { u8aEquals } from './equals.js'
 
 describe('test u8a equals', function () {
   it('array equality', function () {

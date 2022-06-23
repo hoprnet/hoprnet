@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { durations, isExpired } from './time'
+import { durations, isExpired } from './time.js'
 
 describe('test time', function () {
   context('durations', function () {

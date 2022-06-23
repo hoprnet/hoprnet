@@ -1,8 +1,8 @@
 import assert from 'assert'
 import PeerId from 'peer-id'
-import { stringToU8a, u8aToHex } from '../u8a'
-import { PublicKey } from './publicKey'
-import { Address } from './primitives'
+import { stringToU8a, u8aToHex } from '../u8a/index.js'
+import { PublicKey } from './publicKey.js'
+import { Address } from './primitives.js'
 
 const privateKey = '0xe17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8'
 const uncompressedPubKey =

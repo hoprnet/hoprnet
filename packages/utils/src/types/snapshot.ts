@@ -1,6 +1,6 @@
 import BN from 'bn.js'
-import { u8aSplit, serializeToU8a } from '..'
-import { UINT256 } from '../types/solidity'
+import { u8aSplit, serializeToU8a } from '../index.js'
+import { UINT256 } from './solidity.js'
 
 /**
  * Represents a snapshot in the blockchain.

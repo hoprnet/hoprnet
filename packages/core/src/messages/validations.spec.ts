@@ -4,7 +4,7 @@ import PeerId from 'peer-id'
 import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
 import { Address, Balance, PublicKey, UINT256, Ticket, ChannelEntry, ChannelStatus } from '@hoprnet/hopr-utils'
-import { validateUnacknowledgedTicket } from '.'
+import { validateUnacknowledgedTicket } from './index.js'
 
 chai.use(chaiAsPromised)
 

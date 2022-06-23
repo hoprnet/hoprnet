@@ -12,7 +12,8 @@ const MINTER_ROLE = utils.keccak256(utils.toUtf8Bytes('MINTER_ROLE'))
 const DEFAULT_ADMIN_ROLE = '0x0000000000000000000000000000000000000000000000000000000000000000'
 const NFT_BLOCKED = utils.keccak256(utils.toUtf8Bytes('NftBlocked(uint256)'))
 
-const main: DeployFunction = async function ({ ethers, deployments, getNamedAccounts }: HardhatRuntimeEnvironment) {
+const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+  const { ethers, deployments, getNamedAccounts, environment } = hre
   const { deployer, admin } = await getNamedAccounts()
 
   // check boost types being created
@@ -68,15 +69,31 @@ const main: DeployFunction = async function ({ ethers, deployments, getNamedAcco
     // mint all the dummy NFTs (especially those are blocked in the constructor). Mint some dev NFTs
     while (index <= blockNftTypeMax || index <= devNftIndex) {
       console.log(`Minting type of index ${index}`)
+      let mintTx
       if (index === devNftIndex) {
-        await hoprBoost.batchMint(new Array(NUM_DEV_NFT).fill(admin), DEV_NFT_TYPE, DEV_NFT_TYPE, DEV_NFT_BOOST, 0, {
-          gasLimit: 4e6
-        })
+        mintTx = await hoprBoost.batchMint(
+          new Array(NUM_DEV_NFT).fill(admin),
+          DEV_NFT_TYPE,
+          DEV_NFT_TYPE,
+          DEV_NFT_BOOST,
+          0,
+          {
+            gasLimit: 4e6
+          }
+        )
         console.log(`... minting ${NUM_DEV_NFT} ${DEV_NFT_TYPE} NFTs type of index ${index}`)
       } else {
-        await hoprBoost.mint(admin, `${DUMMY_NFT_TYPE}_${index}`, DUMMY_NFT_TYPE, DUMMY_NFT_BOOST, 0, { gasLimit: 4e6 })
+        mintTx = await hoprBoost.mint(admin, `${DUMMY_NFT_TYPE}_${index}`, DUMMY_NFT_TYPE, DUMMY_NFT_BOOST, 0, {
+          gasLimit: 4e6
+        })
         console.log(`... minting 1 ${DUMMY_NFT_TYPE} NFTs type of index ${index}`)
       }
+
+      // don't wait when using local hardhat because its using auto-mine
+      if (!environment.match('hardhat')) {
+        await ethers.provider.waitForTransaction(mintTx.hash, 2)
+      }
+
       index++
     }
 
@@ -88,11 +105,25 @@ const main: DeployFunction = async function ({ ethers, deployments, getNamedAcco
   const isDeployerAdmin = await hoprBoost.hasRole(DEFAULT_ADMIN_ROLE, deployer)
   if (isDeployerAdmin && deployer !== admin) {
     // make admin MINTER
-    await hoprBoost.grantRole(MINTER_ROLE, admin)
+    const grantMinterTx = await hoprBoost.grantRole(MINTER_ROLE, admin)
+    // don't wait when using local hardhat because its using auto-mine
+    if (!environment.match('hardhat')) {
+      await ethers.provider.waitForTransaction(grantMinterTx.hash, 2)
+    }
+
     // transfer DEFAULT_ADMIN_ROLE from deployer to admin
-    await hoprBoost.grantRole(DEFAULT_ADMIN_ROLE, admin)
+    const grantAdminTx = await hoprBoost.grantRole(DEFAULT_ADMIN_ROLE, admin)
+    // don't wait when using local hardhat because its using auto-mine
+    if (!environment.match('hardhat')) {
+      await ethers.provider.waitForTransaction(grantAdminTx.hash, 2)
+    }
     console.log('DEFAULT_ADMIN_ROLE is transferred.')
-    await hoprBoost.renounceRole(DEFAULT_ADMIN_ROLE, deployer)
+
+    const renounceAdminTx = await hoprBoost.renounceRole(DEFAULT_ADMIN_ROLE, deployer)
+    // don't wait when using local hardhat because its using auto-mine
+    if (!environment.match('hardhat')) {
+      await ethers.provider.waitForTransaction(renounceAdminTx.hash, 2)
+    }
     console.log('DEFAULT_ADMIN_ROLE is transferred.')
   }
 }

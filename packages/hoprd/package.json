@@ -1,12 +1,13 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.89.0-next.21",
+  "version": "1.89.0-next.39",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "LGPL-3.0-only",
   "types": "lib/main.d.cts",
   "type": "module",
+  "main": "lib/main.cjs",
   "bin": "lib/main.cjs",
   "files": [
     "lib",
@@ -40,14 +41,14 @@
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "bn.js": "5.2.0",
     "body-parser": "1.19.2",
-    "chalk": "4.1.2",
+    "chalk": "5.0.1",
     "check-password-strength": "2.0.4",
     "cookie": "0.4.2",
     "cors": "2.8.5",
     "debug": "4.3.4",
     "dids": "2.4.3",
     "express": "4.17.3",
-    "express-openapi": "9.3.1",
+    "express-openapi": "https://github.com/hoprnet/open-api/raw/robertkiel/built-esm-support/packages/express-openapi/express-openapi-11.0.4.tgz",
     "jazzicon": "1.5.0",
     "js-cookie": "3.0.1",
     "key-did-provider-ed25519": "1.1.0",
@@ -66,7 +67,7 @@
     "trace-unhandled": "2.0.1",
     "ws": "8.3.0",
     "yamljs": "0.3.0",
-    "yargs": "17.4.0"
+    "yargs": "17.5.1"
   },
   "devDependencies": {
     "@types/chai": "^4",
@@ -87,6 +88,5 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "stableVersion": "1.76.0-next.31"
+  }
 }

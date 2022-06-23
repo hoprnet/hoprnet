@@ -1,5 +1,5 @@
 # Append here when new Rust WASM crate is added (the list is space separated)
-PACKAGES =
+PACKAGES = utils-misc
 ##########################################
 
 PKG_DIRS = $(addsuffix /pkg, $(PACKAGES))
@@ -14,12 +14,13 @@ test: $(JS_FILES)
 
 $(JS_FILES):
 	mkdir -p $(@D)
-	cd $(@D)/.. && npx wasm-pack build --target=nodejs
+	npx wasm-pack build --target=nodejs `pwd`/$(@D)/..
+	mv $@ $(subst .js,.cjs,$@)
 
 install:
 ifneq ($(PACKAGES),)
 	@mkdir -p ../lib
-	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.js) ../lib/
+	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.cjs) ../lib/
 	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.ts) ../lib/
 	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.wasm) ../lib/
 endif

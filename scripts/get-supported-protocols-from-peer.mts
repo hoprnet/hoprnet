@@ -2,14 +2,14 @@
 // Used to get a node's spoken protocols and to test connectivity
 // Example usage: `./scripts/get-supported-protocols-from-peer.ts --addr /ip4/34.65.6.139/tcp/9091/p2p/16Uiu2HAm5Ym8minpwct7aZ9dYYnpbjfsfr8wa6o7GbRFcmXLcmFW`
 
-import pipe from 'it-pipe'
+import { pipe } from 'it-pipe'
 import chalk from 'chalk'
 import yargs from 'yargs/yargs'
 
 import { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
 import { NOISE } from '@chainsafe/libp2p-noise'
-import Upgrader from 'libp2p/src/upgrader'
+import Upgrader from 'libp2p/src/upgrader.js'
 import Mplex from 'libp2p-mplex'
 const Multistream = require('multistream-select')
 

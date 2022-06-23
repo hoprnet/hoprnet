@@ -8,8 +8,8 @@ import {
   debug
 } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { MAX_NEW_CHANNELS_PER_TICK, NETWORK_QUALITY_THRESHOLD, INTERMEDIATE_HOPS, CHECK_TIMEOUT } from './constants'
-import type NetworkPeers from './network/network-peers'
+import { MAX_NEW_CHANNELS_PER_TICK, NETWORK_QUALITY_THRESHOLD, INTERMEDIATE_HOPS, CHECK_TIMEOUT } from './constants.js'
+import type NetworkPeers from './network/network-peers.js'
 
 const log = debug('hopr-core:channel-strategy')
 

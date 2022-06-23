@@ -17,6 +17,7 @@ build-hopr-admin: ## build hopr admin React frontend
 
 .PHONY: build-solidity-types
 build-solidity-types: ## generate Solidity typings
+build-solidity-types: build-cargo
 	npx tsc -p packages/utils/tsconfig.json
 	yarn workspace @hoprnet/hopr-ethereum run build:sol:types
 
@@ -25,19 +26,32 @@ build-yarn: ## build yarn packages
 build-yarn: build-solidity-types build-cargo
 	npx tsc --build tsconfig.build.json
 
-.PHONY: build-yarn-utils
-build-yarn-utils: ## build yarn package 'hopr-utils
-	npx tsc -p packages/utils/tsconfig.json
-
 .PHONY: build-cargo
 build-cargo: ## build cargo packages
-build-cargo: build-yarn-utils
 	cargo build --release --target wasm32-unknown-unknown
-	yarn workspaces foreach -p --exclude hoprnet --exclude hopr-docs run build:wasm
+	yarn workspaces foreach --exclude hoprnet --exclude hopr-docs run build:wasm
 
 .PHONY: build-yellowpaper
 build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
 	make -C docs/yellowpaper
+
+.PHONY: build-docs
+build-docs: ## build typedocs, Rest API docs, and docs website
+build-docs: build-docs-typescript build-docs-website build-docs-api
+
+.PHONY: build-docs-typescript
+build-docs-typescript: ## build typedocs
+build-docs-typescript: build
+	yarn workspaces foreach -pv run docs:generate
+
+.PHONY: build-docs-website
+build-docs-website: ## build docs website
+	yarn workspace hopr-docs build
+
+.PHONY: build-docs-api
+build-docs-api: ## build Rest API docs
+build-docs-api: build
+	./scripts/build-rest-api-spec.sh
 
 .PHONY: test
 test: ## run unit tests for all packages, or a single package if package= is set
@@ -46,6 +60,22 @@ ifdef package
 else
 	yarn workspaces foreach -pv run test
 endif
+
+.PHONY: lint-check
+lint-check: ## run linter in check mode
+	npx prettier --check .
+
+.PHONY: lint-check
+lint-fix: ## run linter in fix mode
+	npx prettier --write .
+
+.PHONY: docker-build-local
+docker-build-local: ## build Docker images locally
+	./scripts/build-docker.sh --local --force
+
+.PHONY: docker-build-gcb
+docker-build-gcb: ## build Docker images on Google Cloud Build
+	./scripts/build-docker.sh --no-tags --force
 
 .PHONY: help
 help:

@@ -156,7 +156,6 @@
 - [isReservedAddress](modules.md#isreservedaddress)
 - [isSecp256k1PeerId](modules.md#issecp256k1peerid)
 - [iterateHash](modules.md#iteratehash)
-- [lengthPrefixedToU8a](modules.md#lengthprefixedtou8a)
 - [libp2pSendMessage](modules.md#libp2psendmessage)
 - [libp2pSubscribe](modules.md#libp2psubscribe)
 - [loadJson](modules.md#loadjson)
@@ -187,7 +186,6 @@
 - [stringToU8a](modules.md#stringtou8a)
 - [timeout](modules.md#timeout)
 - [timer](modules.md#timer)
-- [toLengthPrefixedU8a](modules.md#tolengthprefixedu8a)
 - [toNetworkPrefix](modules.md#tonetworkprefix)
 - [toU8a](modules.md#tou8a)
 - [tryExistingConnections](modules.md#tryexistingconnections)
@@ -427,7 +425,7 @@ ___
 
 #### Defined in
 
-[u8a/index.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L21)
+[u8a/index.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L18)
 
 ___
 
@@ -508,7 +506,7 @@ and feeds them to the given handler.
 
 #### Defined in
 
-[libp2p/index.ts:244](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L244)
+[libp2p/index.ts:245](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L245)
 
 ## Variables
 
@@ -682,7 +680,7 @@ ___
 
 #### Defined in
 
-[crypto/por/index.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L9)
+[crypto/por/index.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L8)
 
 ___
 
@@ -1180,7 +1178,7 @@ the packet as u8a
 
 #### Defined in
 
-[crypto/packet/index.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/index.ts#L65)
+[crypto/packet/index.ts:64](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/index.ts#L64)
 
 ___
 
@@ -1208,7 +1206,7 @@ information for each relayer
 
 #### Defined in
 
-[crypto/por/index.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L47)
+[crypto/por/index.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L46)
 
 ___
 
@@ -1241,7 +1239,7 @@ the challenge for the first ticket sent to the first relayer
 
 #### Defined in
 
-[crypto/por/index.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L21)
+[crypto/por/index.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L20)
 
 ___
 
@@ -1325,7 +1323,7 @@ ___
 
 #### Defined in
 
-[crypto/por/index.ts:112](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L112)
+[crypto/por/index.ts:111](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L111)
 
 ___
 
@@ -1503,7 +1501,7 @@ hop is the final recipient, it returns the plaintext
 
 #### Defined in
 
-[crypto/packet/index.ts:128](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/index.ts#L128)
+[crypto/packet/index.ts:127](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/index.ts#L127)
 
 ___
 
@@ -1622,7 +1620,7 @@ ___
 
 #### Defined in
 
-[crypto/packet/index.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/index.ts#L28)
+[crypto/packet/index.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/index.ts#L27)
 
 ___
 
@@ -1706,7 +1704,7 @@ ___
 
 #### Defined in
 
-[crypto/packet/index.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/index.ts#L39)
+[crypto/packet/index.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/index.ts#L38)
 
 ___
 
@@ -2101,30 +2099,6 @@ ___
 
 ___
 
-### lengthPrefixedToU8a
-
-▸ **lengthPrefixedToU8a**(`arg`, `additionalPadding?`, `targetLength?`): `Uint8Array`
-
-Decodes a length-prefixed array and returns the encoded data.
-
-#### Parameters
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `arg` | `Uint8Array` | array to decode |
-| `additionalPadding?` | `Uint8Array` | additional padding to remove |
-| `targetLength?` | `number` | optional target length |
-
-#### Returns
-
-`Uint8Array`
-
-#### Defined in
-
-[u8a/lengthPrefixedToU8a.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/lengthPrefixedToU8a.ts#L11)
-
-___
-
 ### libp2pSendMessage
 
 ▸ **libp2pSendMessage**(`libp2p`, `destination`, `protocol`, `message`, `includeReply`, `opts?`): `Promise`<`void` \| `Uint8Array`[]\>
@@ -2170,7 +2144,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:259](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L259)
+[libp2p/index.ts:260](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L260)
 
 ___
 
@@ -2456,7 +2430,7 @@ to create it and the challenge for the next relayer.
 
 #### Defined in
 
-[crypto/por/index.ts:83](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L83)
+[crypto/por/index.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L82)
 
 ___
 
@@ -2868,7 +2842,7 @@ ___
 
 #### Defined in
 
-[u8a/index.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L23)
+[u8a/index.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L20)
 
 ___
 
@@ -2984,30 +2958,6 @@ ___
 #### Defined in
 
 [utils.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L6)
-
-___
-
-### toLengthPrefixedU8a
-
-▸ **toLengthPrefixedU8a**(`arg`, `additionalPadding?`, `length?`): `Uint8Array`
-
-Adds a length-prefix to a Uint8Array
-
-#### Parameters
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `arg` | `Uint8Array` | data to add padding |
-| `additionalPadding?` | `Uint8Array` | optional additional padding that is inserted between length and data |
-| `length?` | `number` | optional target length |
-
-#### Returns
-
-`Uint8Array`
-
-#### Defined in
-
-[u8a/toLengthPrefixedU8a.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/toLengthPrefixedU8a.ts#L12)
 
 ___
 
@@ -3276,7 +3226,7 @@ ___
 
 #### Defined in
 
-[u8a/index.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L37)
+[u8a/index.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L34)
 
 ___
 
@@ -3414,7 +3364,7 @@ ___
 
 #### Defined in
 
-[crypto/por/index.ts:128](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L128)
+[crypto/por/index.ts:127](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L127)
 
 ___
 
@@ -3436,7 +3386,7 @@ ___
 
 #### Defined in
 
-[crypto/por/index.ts:139](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L139)
+[crypto/por/index.ts:138](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L138)
 
 ___
 
@@ -3457,7 +3407,7 @@ ___
 
 #### Defined in
 
-[crypto/por/index.ts:133](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L133)
+[crypto/por/index.ts:132](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L132)
 
 ___
 

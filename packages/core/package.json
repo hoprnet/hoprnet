@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "1.89.0-next.21",
+  "version": "1.89.0-next.39",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -13,9 +13,9 @@
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "engines": {
-    "node": "16"
+    "node": ">=16.15"
   },
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
     "clean:wasm": "make -C crates clean",
     "build:wasm": "make -C crates all && make -C crates install",
@@ -39,7 +39,7 @@
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "abort-controller": "3.0.0",
     "bn.js": "5.2.0",
-    "chalk": "4.1.2",
+    "chalk": "5.0.1",
     "datastore-level": "^8.0.0",
     "debug": "4.3.4",
     "heap-js": "2.1.6",
@@ -68,16 +68,9 @@
     "typedoc-plugin-markdown": "3.11.14"
   },
   "mocha": {
-    "extension": [
-      "ts"
-    ],
-    "spec": "src/**/*.spec.ts",
-    "require": [
-      "ts-node/register"
-    ]
+    "spec": "lib/**/*.spec.js"
   },
   "publishConfig": {
     "access": "public"
-  },
-  "stableVersion": "1.76.0-next.31"
+  }
 }

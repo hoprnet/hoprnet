@@ -3,9 +3,9 @@ import { Multiaddr } from 'multiaddr'
 
 import assert from 'assert'
 
-import { MAX_STUN_SERVERS, multiaddrToIceServer, WebRTCUpgrader } from './upgrader'
-import type { PublicNodesEmitter, PeerStoreType } from '../types'
-import { createPeerId } from '../base/utils.spec'
+import { MAX_STUN_SERVERS, multiaddrToIceServer, WebRTCUpgrader } from './upgrader.js'
+import type { PublicNodesEmitter, PeerStoreType } from '../types.js'
+import { createPeerId } from '../base/utils.spec.js'
 import type PeerId from 'peer-id'
 
 async function getPeerStoreEntry(addr: string): Promise<PeerStoreType> {

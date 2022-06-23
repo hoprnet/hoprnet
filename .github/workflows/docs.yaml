@@ -15,13 +15,13 @@ jobs:
     name: Generate API docs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
 
       - name: Use Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: 16
           registry-url: https://registry.npmjs.org/
@@ -35,19 +35,13 @@ jobs:
           apt update
           apt install --no-install-recommends yarn
 
-      - name: Install dependencies
-        run: make -j deps
-
       - name: Generate docs
         run: |
-          make -j build
-          yarn docs:generate
-
-      - name: Generate OpenAPI spec file
-        run: ./scripts/build-rest-api-spec.sh
+          make -j deps
+          make -j build-docs
 
       - name: Format newly created files
-        run: yarn lint:fix
+        run: make lint-fix
 
       - name: Move OpenAPI spec file into documentation directory
         run: |

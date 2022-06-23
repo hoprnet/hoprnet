@@ -1,8 +1,8 @@
-import { publicKeyConvert, publicKeyCreate, ecdsaRecover } from 'secp256k1'
-import { u8aToHex, u8aEquals, stringToU8a } from '../u8a'
+import secp256k1 from 'secp256k1'
+import { u8aToHex, u8aEquals, stringToU8a } from '../u8a/index.js'
 import PeerId from 'peer-id'
-import { pubKeyToPeerId } from '../libp2p'
-import { Address, Hash } from './primitives'
+import { pubKeyToPeerId } from '../libp2p/index.js'
+import { Address, Hash } from './primitives.js'
 
 export class PublicKey {
   // Cache expensive computation result
@@ -19,7 +19,7 @@ export class PublicKey {
       throw new Error('Incorrect size Uint8Array for private key')
     }
 
-    return new PublicKey(publicKeyCreate(privKey, false))
+    return new PublicKey(secp256k1.publicKeyCreate(privKey, false))
   }
 
   static deserialize(arr: Uint8Array) {
@@ -50,7 +50,7 @@ export class PublicKey {
   }
 
   static fromSignature(hash: Uint8Array, signature: Uint8Array, v: number): PublicKey {
-    return new PublicKey(ecdsaRecover(signature, v, hash, false))
+    return new PublicKey(secp256k1.ecdsaRecover(signature, v, hash, false))
   }
 
   static fromSignatureString(hash: string, r: string, s: string, v: number): PublicKey {
@@ -83,7 +83,7 @@ export class PublicKey {
 
     if (this.isCompressed) {
       // Expensive EC-operation, only do if necessary
-      this.arr = publicKeyConvert(this.arr, false)
+      this.arr = secp256k1.publicKeyConvert(this.arr, false)
     }
 
     this._address = new Address(Hash.create(this.arr.slice(1)).serialize().slice(12))
@@ -107,14 +107,14 @@ export class PublicKey {
     if (this.isCompressed) {
       return this.arr
     } else {
-      return publicKeyConvert(this.arr, true)
+      return secp256k1.publicKeyConvert(this.arr, true)
     }
   }
 
   public serializeUncompressed() {
     if (this.isCompressed) {
-      // Expensive EC-operation, only do if necessary
-      this.arr = publicKeyConvert(this.arr, false)
+      // Expensive EC-operation, only do if really necessary
+      this.arr = secp256k1.publicKeyConvert(this.arr, false)
     }
 
     return this.arr

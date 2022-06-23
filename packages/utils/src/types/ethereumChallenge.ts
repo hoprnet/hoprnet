@@ -1,4 +1,4 @@
-import { u8aEquals, u8aToHex } from '../u8a'
+import { u8aEquals, u8aToHex } from '../u8a/index.js'
 
 export class EthereumChallenge {
   constructor(private readonly arr: Uint8Array) {

@@ -1,9 +1,9 @@
-import { generateFiller } from './filler'
+import { generateFiller } from './filler.js'
 import { randomBytes } from 'crypto'
-import { SECRET_LENGTH } from './constants'
-import { u8aXOR } from '../../u8a'
-import { PRG } from '../prg'
-import { derivePRGParameters } from './keyDerivation'
+import { SECRET_LENGTH } from './constants.js'
+import { u8aXOR } from '../../u8a/index.js'
+import { PRG } from '../prg.js'
+import { derivePRGParameters } from './keyDerivation.js'
 import assert from 'assert'
 
 describe('test filler', function () {

@@ -4,7 +4,7 @@ import type { DeferType } from '@hoprnet/hopr-utils'
 import { randomBytes } from 'crypto'
 import EventEmitter from 'events'
 
-import type { Stream, StreamResult, StreamType } from '../types'
+import type { Stream, StreamResult, StreamType } from '../types.js'
 
 import Debug from 'debug'
 
@@ -15,8 +15,8 @@ const _verbose = Debug(`${DEBUG_PREFIX}:verbose`)
 const _flow = Debug(`flow:${DEBUG_PREFIX}`)
 const _error = Debug(`${DEBUG_PREFIX}:error`)
 
-import { RelayPrefix, StatusMessages, ConnectionStatusMessages, isValidPrefix } from '../constants'
-import { eagerIterator } from '../utils'
+import { RelayPrefix, StatusMessages, ConnectionStatusMessages, isValidPrefix } from '../constants.js'
+import { eagerIterator } from '../utils/index.js'
 import assert from 'assert'
 
 export const DEFAULT_PING_TIMEOUT = 300

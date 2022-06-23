@@ -47,4 +47,4 @@
 
 #### Defined in
 
-[index.ts:159](https://github.com/hoprnet/hoprnet/blob/master/packages/cover-traffic-daemon/src/index.ts#L159)
+[index.ts:156](https://github.com/hoprnet/hoprnet/blob/master/packages/cover-traffic-daemon/src/index.ts#L156)
