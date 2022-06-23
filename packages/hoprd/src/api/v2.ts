@@ -120,7 +120,7 @@ export async function setupRestApi(
         let apiTokenFromUser = encodeURI(Buffer.from(authEncoded, 'base64').toString('binary'))
           .split('%3A')[0] // If there was colon in the input, take only the string before it (%3A is URI encoded :)
 
-        if (!options.testNoAuthentication && options.apiToken !== undefined && apiTokenFromUser !== options.apiToken) {
+        if (!options.testNoAuthentication && options.apiToken !== undefined && apiTokenFromUser !== encodedApiToken) {
           // because this is the last auth check, we must throw the appropriate
           // error to be sent back to the user
           throw {
