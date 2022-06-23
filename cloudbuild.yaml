@@ -83,9 +83,4 @@ options:
   logStreamingOption: STREAM_ON
   substitutionOption: MUST_MATCH
   machineType: N1_HIGHCPU_32
-images:
-  - gcr.io/${PROJECT_ID}/hoprd:${_IMAGE_VERSION}
-  - gcr.io/${PROJECT_ID}/hoprd-nat:${_IMAGE_VERSION}
-  - gcr.io/${PROJECT_ID}/hopr-cover-traffic-daemon:${_IMAGE_VERSION}
-  - gcr.io/${PROJECT_ID}/hopr-hardhat:${_IMAGE_VERSION}
 timeout: 1200s
