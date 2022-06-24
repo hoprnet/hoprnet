@@ -692,58 +692,6 @@
     },
     "/channels/": {
       "parameters": [],
-      "get": {
-        "description": "Lists all active channels between this node and other nodes on the Hopr network. By default response will contain all incomming and outgoing channels that are either open, waiting to be opened, or waiting to be closed. If you also want to receive past channels that were closed, you can pass `includingClosed` in the request url query.",
-        "tags": ["Channels"],
-        "operationId": "channelsGetChannels",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "includingClosed",
-            "description": "When includingClosed is passed the response will include closed channels which are ommited by default.",
-            "schema": { "type": "string", "example": "false" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Channels fetched succesfully.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "incoming": {
-                      "type": "array",
-                      "items": { "$ref": "#/components/schemas/Channel" },
-                      "description": "Incomming channels are the ones that were opened by a different node and this node acts as relay."
-                    },
-                    "outgoing": {
-                      "type": "array",
-                      "items": { "$ref": "#/components/schemas/Channel" },
-                      "description": "Outgoing channels are the ones that were opened by this node and is using other node as relay."
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Unknown failure.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
-                  }
-                },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
-              }
-            }
-          }
-        }
-      },
       "post": {
         "description": "Opens a payment channel between this node and the counter party provided. This channel can be used to send messages between two nodes using other nodes on the network to relay the messages. Each message will deduce its cost from the funded amount to pay other nodes for relaying your messages. Opening a channel can take a little bit of time, because it requires some block confirmations on the blockchain.",
         "tags": ["Channels"],
@@ -836,6 +784,58 @@
                   }
                 },
                 "example": { "status": "CHANNEL_ALREADY_OPEN" }
+              }
+            }
+          },
+          "422": {
+            "description": "Unknown failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
+                  }
+                },
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "description": "Lists all active channels between this node and other nodes on the Hopr network. By default response will contain all incomming and outgoing channels that are either open, waiting to be opened, or waiting to be closed. If you also want to receive past channels that were closed, you can pass `includingClosed` in the request url query.",
+        "tags": ["Channels"],
+        "operationId": "channelsGetChannels",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "includingClosed",
+            "description": "When includingClosed is passed the response will include closed channels which are ommited by default.",
+            "schema": { "type": "string", "example": "false" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Channels fetched succesfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "incoming": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Channel" },
+                      "description": "Incomming channels are the ones that were opened by a different node and this node acts as relay."
+                    },
+                    "outgoing": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Channel" },
+                      "description": "Outgoing channels are the ones that were opened by this node and is using other node as relay."
+                    }
+                  }
+                }
               }
             }
           },
@@ -1329,10 +1329,10 @@
         }
       }
     },
-    "/channels/{peerid}/{direction}": {
+    "/channels/{peerid}/{direction}/": {
       "parameters": [],
       "delete": {
-        "description": "Close a opened channel between this node and other node. Once you’ve initiated channel closure, you have to wait for a specified closure time, it will show you a closure initiation message with cool-off time you need to wait.\n  Then you will need to send the same command again to finalize closure. This is a cool down period to give the other party in the channel sufficient time to redeem their tickets.",
+        "description": "Close a opened channel between this node and other node. Once you've initiated channel closure, you have to wait for a specified closure time, it will show you a closure initiation message with cool-off time you need to wait.\n  Then you will need to send the same command again to finalize closure. This is a cool down period to give the other party in the channel sufficient time to redeem their tickets.",
         "tags": ["Channels"],
         "operationId": "channelsCloseChannel",
         "parameters": [
@@ -1467,38 +1467,6 @@
     },
     "/aliases/{alias}": {
       "parameters": [],
-      "delete": {
-        "description": "Unassign an alias from a PeerId. You can always assign back alias to that PeerId using /aliases endpoint.",
-        "tags": ["Aliases"],
-        "operationId": "aliasesRemoveAlias",
-        "parameters": [
-          {
-            "name": "alias",
-            "in": "path",
-            "description": "Alias that we want to remove.",
-            "required": true,
-            "schema": { "type": "string", "example": "Alice" }
-          }
-        ],
-        "responses": {
-          "204": { "description": "Alias removed succesfully." },
-          "422": {
-            "description": "Unknown failure.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
-                  }
-                },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
-              }
-            }
-          }
-        }
-      },
       "get": {
         "description": "Get the PeerId (Hopr address) that have this alias assigned to it.",
         "tags": ["Aliases"],
@@ -1533,6 +1501,38 @@
               }
             }
           },
+          "422": {
+            "description": "Unknown failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
+                  }
+                },
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "description": "Unassign an alias from a PeerId. You can always assign back alias to that PeerId using /aliases endpoint.",
+        "tags": ["Aliases"],
+        "operationId": "aliasesRemoveAlias",
+        "parameters": [
+          {
+            "name": "alias",
+            "in": "path",
+            "description": "Alias that we want to remove.",
+            "required": true,
+            "schema": { "type": "string", "example": "Alice" }
+          }
+        ],
+        "responses": {
+          "204": { "description": "Alias removed succesfully." },
           "422": {
             "description": "Unknown failure.",
             "content": {
