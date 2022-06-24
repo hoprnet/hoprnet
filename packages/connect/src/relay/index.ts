@@ -36,23 +36,23 @@ type ConnResult = {
 // Specify which libp2p methods this class uses
 // such that Typescript fails to build if anything changes
 type ReducedAddressBook = {
-  get: (peerId: PeerId) => ReturnType<LibP2P['peerStore']['addressBook']['get']>
+  get: (peerId: PeerId) => ReturnType<Libp2p['peerStore']['addressBook']['get']>
 }
 type ReducedPeerStore = {
   peerStore: {
     addressBook: ReducedAddressBook
   }
 }
-type ReducedDHT = { contentRouting: Pick<LibP2P['contentRouting'], 'provide'> }
-type ReducedDialer = { dialer: Pick<LibP2P['dialer'], '_pendingDials'> }
-type ReducedUpgrader = { upgrader: Pick<LibP2P['upgrader'], 'upgradeInbound' | 'upgradeOutbound'> }
-type ReducedConnectionManager = { connectionManager: Pick<LibP2P['connectionManager'], 'getAll' | 'onDisconnect'> }
+type ReducedDHT = { contentRouting: Pick<Libp2p['contentRouting'], 'provide'> }
+type ReducedDialer = { dialer: Pick<Libp2p['dialer'], '_pendingDials'> }
+type ReducedUpgrader = { upgrader: Pick<Libp2p['upgrader'], 'upgradeInbound' | 'upgradeOutbound'> }
+type ReducedConnectionManager = { connectionManager: Pick<Libp2p['connectionManager'], 'getAll' | 'onDisconnect'> }
 type ReducedLibp2p = ReducedPeerStore &
   ReducedDialer &
   ReducedConnectionManager &
   ReducedUpgrader & {
     peerId: PeerId
-    handle: LibP2P['handle']
+    handle: Libp2p['handle']
   } & ReducedDHT
 
 /**

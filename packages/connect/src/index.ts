@@ -2,7 +2,7 @@ import Debug from 'debug'
 import { CODE_DNS4, CODE_DNS6, CODE_IP4, CODE_IP6, CODE_P2P } from './constants.js'
 import type { Multiaddr } from '@multiformats/multiaddr'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import { createPeerId } from '@libp2p/peer-id'
+import { peerIdFromBytes } from '@libp2p/peer-id'
 import type Connection from 'libp2p-interfaces/src/connection/connection.js'
 import type { Upgrader, Transport, MultiaddrConnection } from 'libp2p-interfaces/src/transport/types.js'
 import type { Libp2p } from 'libp2p'
@@ -146,7 +146,7 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
     // This works because destination peerId is for both address
     // types at the third place.
     // Other addresses are not supported.
-    const destination = PeerId.createFromBytes((maTuples[2][1] as Uint8Array).slice(1))
+    const destination = peerIdFromBytes((maTuples[2][1] as Uint8Array).slice(1))
 
     if (destination.equals(this._peerId)) {
       throw new Error(`Cannot dial ourself`)
@@ -159,7 +159,7 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
       case CODE_IP6:
         return this.dialDirectly(ma, options)
       case CODE_P2P:
-        const relay = PeerId.createFromBytes((maTuples[0][1] as Uint8Array).slice(1))
+        const relay = peerIdFromBytes((maTuples[0][1] as Uint8Array).slice(1))
 
         return this.dialWithRelay(relay, destination, options)
       default:
@@ -222,9 +222,7 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
     destination: PeerId,
     options: HoprConnectDialOptions
   ): Promise<Connection> {
-    log(
-      `Attempting to dial ${chalk.yellow(`/p2p/${relay.toB58String()}/p2p-circuit/p2p/${destination.toB58String()}`)}`
-    )
+    log(`Attempting to dial ${chalk.yellow(`/p2p/${relay.toString()}/p2p-circuit/p2p/${destination.toString()}`)}`)
 
     let maConn = await this.relay.connect(relay, destination, options)
 
@@ -236,7 +234,7 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
 
     try {
       conn = await this._upgradeOutbound(maConn)
-      log(`Successfully established relayed connection to ${destination.toB58String()}`)
+      log(`Successfully established relayed connection to ${destination.toString()}`)
     } catch (err) {
       error(err)
       // libp2p needs this error to understand that this connection attempt failed but we

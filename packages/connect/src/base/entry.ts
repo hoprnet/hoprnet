@@ -3,6 +3,7 @@ import type Connection from 'libp2p-interfaces/src/connection/connection.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Multiaddr } from '@multiformats/multiaddr'
 import type HoprConnect from '../index.js'
+import { peerIdFromBytes } from '@libp2p/peer-id'
 import { Libp2p, MuxedStream } from 'libp2p'
 
 import { EventEmitter } from 'events'
@@ -154,9 +155,9 @@ export class EntryNodes extends EventEmitter {
 
   private onEntryDisconnect(ma: Multiaddr) {
     const tuples = ma.tuples() as [code: number, addr: Uint8Array][]
-    const peer = PeerId.createFromBytes(tuples[2][1].slice(1))
+    const peer = peerIdFromBytes(tuples[2][1].slice(1))
 
-    log(`Disconnected from entry node ${peer.toB58String()}`)
+    log(`Disconnected from entry node ${peer.toString()}`)
 
     for (const usedRelay of this.usedRelays) {
       const relayTuples = usedRelay.relayDirectAddress.tuples()
@@ -169,7 +170,7 @@ export class EntryNodes extends EventEmitter {
             attempt++
             const result = await this.connectToRelay(peer, usedRelay.relayDirectAddress, ENTRY_NODE_CONTACT_TIMEOUT)
             log(
-              `Reconnect attempt ${attempt} to entry node ${peer.toB58String()} was ${
+              `Reconnect attempt ${attempt} to entry node ${peer.toString()} was ${
                 result.entry.latency >= 0 ? 'successful' : 'not successful'
               }`
             )
@@ -192,7 +193,7 @@ export class EntryNodes extends EventEmitter {
           } else {
             // Keep the entry node on the list, to avoid losing information about ALL of them
             //this.onRemoveRelay(peer)
-            error(`Re-connection to relay ${peer.toB58String()} failed.`)
+            error(`Re-connection to relay ${peer.toString()} failed.`)
           }
         })
 
@@ -209,9 +210,7 @@ export class EntryNodes extends EventEmitter {
         const relayEntry = this.availableEntryNodes.find((entry: EntryNodeData) => entry.id.equals(relay))
 
         if (relayEntry == undefined) {
-          log(
-            `Relay ${relay.toB58String()} has been removed from list of available entry nodes. Not renewing this entry`
-          )
+          log(`Relay ${relay.toString()} has been removed from list of available entry nodes. Not renewing this entry`)
           continue
         }
 
@@ -321,7 +320,7 @@ export class EntryNodes extends EventEmitter {
    * @returns a filtered list of entry nodes
    */
   private filterUncheckedNodes(): PeerStoreType[] {
-    const knownNodes = new Set<string>(this.availableEntryNodes.map((entry: EntryNodeData) => entry.id.toB58String()))
+    const knownNodes = new Set<string>(this.availableEntryNodes.map((entry: EntryNodeData) => entry.id.toString()))
     const nodesToCheck: PeerStoreType[] = []
 
     for (const uncheckedNode of this.uncheckedEntryNodes) {
@@ -404,7 +403,7 @@ export class EntryNodes extends EventEmitter {
 
     const positiveOnes = results.findIndex((result: ConnectionResult) => result.entry.latency >= 0)
 
-    const previous = new Set<string>(this.getUsedRelayPeerIds().map((p: PeerId) => p.toB58String()))
+    const previous = new Set<string>(this.getUsedRelayPeerIds().map((p: PeerId) => p.toString()))
 
     if (positiveOnes >= 0) {
       // Close all unnecessary connections
@@ -444,7 +443,7 @@ export class EntryNodes extends EventEmitter {
       isDifferent = true
     } else {
       for (const usedRelayPeerIds of this.getUsedRelayPeerIds()) {
-        if (!previous.has(usedRelayPeerIds.toB58String())) {
+        if (!previous.has(usedRelayPeerIds.toString())) {
           isDifferent = true
           break
         }

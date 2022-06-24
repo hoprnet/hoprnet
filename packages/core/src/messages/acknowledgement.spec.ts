@@ -5,10 +5,10 @@ import { randomBytes } from 'crypto'
 import { deriveAckKeyShare, HalfKey } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 
-import { createPeerId } from '@libp2p/peer-id'
+import { createSecp256k1PeerId } from '@libp2p/peer-id-factory'
 
-describe('acknowledement message', function () {
-  let [self, counterparty] = createPeerId({ type: 'secp256k1' })
+describe('acknowledement message', async function () {
+  let [self, counterparty] = [await createSecp256k1PeerId(), await createSecp256k1PeerId()]
   it('create, serialize and deserialize', async function () {
     const ackKey = new HalfKey(Uint8Array.from(randomBytes(SECRET_LENGTH)))
 

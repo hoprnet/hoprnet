@@ -1,4 +1,4 @@
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import chalk from 'chalk'
 import BN from 'bn.js'

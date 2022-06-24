@@ -1,6 +1,6 @@
 import type { Multiaddr } from '@multiformats/multiaddr'
 import { CODE_IP4, CODE_IP6, CODE_P2P, CODE_CIRCUIT, CODE_TCP } from '../constants.js'
-import { decode } from 'multihashes'
+import { hasher } from 'multiformats'
 import { u8aEquals, u8aToNumber, u8aCompare } from '@hoprnet/hopr-utils'
 import Debug from 'debug'
 
@@ -44,6 +44,7 @@ const log = Debug('hopr-connect:addr')
  * @param mh Multihash to check
  */
 function parseMultihash(mh: Uint8Array): { valid: false } | { valid: true; result: ReturnType<typeof decode> } {
+  hasher()
   let decoded: ReturnType<typeof decode>
   try {
     decoded = decode(mh)

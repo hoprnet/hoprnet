@@ -57,17 +57,17 @@ HoprConnect binds to a TCP socket as given by the configuration. **It also bind 
 Start a bootstrapServer
 
 ```ts
-const libp2p = require('libp2p')
+import { createLibp2p } from 'libp2p'
 const Mplex = require('libp2p-mplex')
 import { NOISE } from '@chainsafe/libp2p-noise'
-const PeerId = require('peer-id')
 
 import HoprConnect from 'hopr-connect'
 import { Multiaddr } from '@multiformats/multiaddr'
+import { createSecp256k1PeerId } from '@libp2p/peer-id-factory'
 
-const peerId = await PeerId.create({ keyType: 'secp256k1' })
+const peerId = await createSecp256k1PeerId()
 
-const node = await libp2p.create({
+const node = await createLibp2p({
   peerId,
   modules: {
     transport: [HoprConnect],
@@ -88,18 +88,18 @@ const node = await libp2p.create({
 Start another client
 
 ```ts
-const libp2p = require('libp2p')
+import { createLibp2p } from 'libp2p'
 const MPLEX = require('libp2p-mplex')
 import { NOISE } from '@chainsafe/libp2p-noise'
-const PeerId = require('peer-id')
 
 import HoprConnect from 'hopr-connect'
 import { Multiaddr } from '@multiformats/multiaddr'
+import { createSecp256k1PeerId } from '@libp2p/peer-id-factory'
 
 const bootstrapId = '16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg' // Change this
-const peerId = await PeerId.create({ keyType: 'secp256k1' })
+const peerId = await createSecp256k1PeerId()
 
-const node = await libp2p.create({
+const node = await createLibp2p({
   peerId
   modules: {
     transport: [HoprConnect],

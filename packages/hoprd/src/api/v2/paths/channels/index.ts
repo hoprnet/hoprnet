@@ -1,5 +1,5 @@
 import type { Operation } from 'express-openapi'
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import { ChannelEntry, ChannelStatus, PublicKey } from '@hoprnet/hopr-utils'
 import { PeerId } from '@libp2p/interface-peer-id'
 import { peerIdFromString } from '@libp2p/peer-id'

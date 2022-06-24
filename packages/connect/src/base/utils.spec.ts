@@ -5,6 +5,7 @@ import { createSocket, type RemoteInfo, type Socket } from 'dgram'
 import { type DeferType, privKeyToPeerId, u8aToHex } from '@hoprnet/hopr-utils'
 import { randomBytes } from 'crypto'
 import type { PeerId } from '@libp2p/interface-peer-id'
+import { peerIdFromBytes } from '@libp2p/peer-id'
 import { Multiaddr } from '@multiformats/multiaddr'
 import { CODE_P2P } from '../constants.js'
 
@@ -89,7 +90,7 @@ export function getPeerStoreEntry(addr: string, id = createPeerId()): PeerStoreT
   const tuples = ma.tuples()
   const index = tuples.findIndex((val) => val[0] == CODE_P2P)
 
-  if (index >= 0 && PeerId.createFromBytes(tuples[index][1] as Uint8Array).equals(id)) {
+  if (index >= 0 && peerIdFromBytes(tuples[index][1] as Uint8Array).equals(id)) {
     ma = ma.decapsulateCode(CODE_P2P).encapsulate(`/p2p/${id.toString()}`)
   } else {
     ma = ma.encapsulate(`/p2p/${id.toString()}`)

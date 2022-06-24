@@ -1,4 +1,4 @@
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import { u8aToHex } from '@hoprnet/hopr-utils'
 
 import { AbstractCommand } from './abstractCommand.js'
@@ -14,7 +14,7 @@ export default class Sign extends AbstractCommand {
   }
 
   public help() {
-    return 'Signs a message with a node’s key and the prefix "HOPR Signed Message: "'
+    return `Signs a message with a node's key and the prefix "HOPR Signed Message: "`
   }
 
   public async execute(log, query: string): Promise<void> {

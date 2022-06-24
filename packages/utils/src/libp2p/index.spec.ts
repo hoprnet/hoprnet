@@ -1,6 +1,7 @@
 import assert from 'assert'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { peerIdFromString } from '@libp2p/peer-id'
+import { createSecp256k1PeerId } from '@libp2p/peer-id-factory'
 import {
   isSecp256k1PeerId,
   convertPubKeyFromPeerId,
@@ -19,7 +20,7 @@ import { Multiaddr } from '@multiformats/multiaddr'
 
 describe(`test convertPubKeyFromPeerId`, function () {
   it(`should equal to a newly created pubkey from PeerId`, async function () {
-    const id = await PeerId.create({ keyType: 'secp256k1', bits: 256 })
+    const id = await createSecp256k1PeerId()
     const pubKey = convertPubKeyFromPeerId(id)
     assert(id.pubKey.toString() === pubKey.toString())
   })
@@ -145,7 +146,7 @@ describe(`test libp2pSendMessage`, function () {
   it(`send message`, async function () {
     const msgToReceive = new TextEncoder().encode(`This message should be received.`)
 
-    const destination = await PeerId.create({ keyType: 'secp256k1' })
+    const destination = await createSecp256k1PeerId()
     const msgReceived = defer<void>()
 
     const fakeLibp2p = getFakeLibp2p(
@@ -168,7 +169,7 @@ describe(`test libp2pSendMessage with response`, function () {
     const msgToReceive = new TextEncoder().encode(`This message should be received.`)
     const msgToReplyWith = new TextEncoder().encode(`This message should be received.`)
 
-    const destination = await PeerId.create({ keyType: 'secp256k1' })
+    const destination = await createSecp256k1PeerId()
 
     const msgReceived = defer<void>()
 
@@ -201,7 +202,7 @@ describe(`test libp2pSubscribe`, async function () {
     const msgToReceive = new TextEncoder().encode(`This message should be received.`)
     const msgToReplyWith = new TextEncoder().encode(`This message should be replied by the handler.`)
 
-    const remotePeer = await PeerId.create({ keyType: 'secp256k1' })
+    const remotePeer = await createSecp256k1PeerId()
 
     let msgReceived = defer<void>()
     let msgReplied = defer<void>()
@@ -251,8 +252,7 @@ describe(`test libp2pSubscribe`, async function () {
   it(`subscribe and consume`, async function () {
     const msgToReceive = new TextEncoder().encode(`This message should be received.`)
 
-    const remotePeer = await PeerId.create({ keyType: 'secp256k1' })
-
+    const remotePeer = await createSecp256k1PeerId()
     let msgReceived = defer<void>()
 
     const fakeOnMessage = async (msg: Uint8Array) => {
@@ -290,11 +290,11 @@ describe(`test libp2pSubscribe`, async function () {
 
 describe('test libp2p utils', function () {
   it('should be a secp256k1 peerId', async function () {
-    const pId = await PeerId.create({ keyType: 'secp256k1' })
+    const pId = await createSecp256k1PeerId()
 
     assert(isSecp256k1PeerId(pId) == true, 'peerId must have a secp256k1 keypair')
 
-    const pIdDifferentKey = await PeerId.create({ keyType: 'Ed25519' })
+    const pIdDifferentKey = await createSecp256k1PeerId()
 
     assert(isSecp256k1PeerId(pIdDifferentKey) == false, 'peerId does not have a secp256k1 keypair')
   })

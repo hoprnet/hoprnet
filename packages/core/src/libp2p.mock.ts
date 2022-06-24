@@ -35,7 +35,7 @@ function createLibp2pMock(peerId: PeerId): Libp2p {
     libp2pLogger(`Libp2 hangUp method called`)
     return Promise.resolve()
   }
-  libp2p.connectionManager = {} as unknown as LibP2P['connectionManager']
+  libp2p.connectionManager = {} as unknown as Libp2p['connectionManager']
   libp2p.connectionManager.on = (event: string) => {
     libp2pLogger(`Connection manager event handler called with event "${event}"`)
     return libp2p.connectionManager

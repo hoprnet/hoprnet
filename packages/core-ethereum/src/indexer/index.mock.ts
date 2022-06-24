@@ -260,7 +260,7 @@ const createChainMock = (
       return Promise.resolve(
         new AccountEntry(
           fixtures.PARTY_A,
-          new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${fixtures.PARTY_A.toB58String()}`),
+          new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${fixtures.PARTY_A.toString()}`),
           new BN('1')
         )
       )

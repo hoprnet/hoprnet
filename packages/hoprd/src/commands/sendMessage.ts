@@ -1,4 +1,4 @@
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { StateOps, State } from '../types.js'
 import { PublicKey } from '@hoprnet/hopr-utils'

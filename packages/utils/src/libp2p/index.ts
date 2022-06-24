@@ -85,9 +85,7 @@ export function getB58String(content: string): string {
  * @returns whether embedded privKey is a secp256k1 key
  */
 export function isSecp256k1PeerId(peer: PeerId): boolean {
-  const decoded = keys.keysPBM.PrivateKey.decode(peer.privKey.bytes)
-
-  return decoded.Type == keys.keysPBM.KeyType.Secp256k1
+  return peer.type === 'secp256k1'
 }
 
 const logError = debug(`hopr-core:libp2p:error`)

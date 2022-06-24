@@ -3,7 +3,8 @@ import type { AddressInfo, Server as TCPServer } from 'net'
 import type { Socket as UDPSocket } from 'dgram'
 import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types.js'
 import type Connection from 'libp2p-interfaces/src/connection/connection.js'
-import { PeerId } from '@libp2p/interface-peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { peerIdFromBytes } from '@libp2p/peer-id'
 
 import { isAnyAddress } from '@hoprnet/hopr-utils'
 
@@ -258,5 +259,5 @@ export function relayFromRelayAddress(ma: Multiaddr): PeerId {
   }
 
   // Remove length prefix
-  return PeerId.createFromBytes(tuples[0][1].slice(1))
+  return peerIdFromBytes(tuples[0][1].slice(1))
 }

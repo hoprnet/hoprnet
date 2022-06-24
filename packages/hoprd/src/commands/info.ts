@@ -1,5 +1,6 @@
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from './abstractCommand.js'
+import type { Multiaddr } from '@multiformats/multiaddr'
 
 export class Info extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -22,7 +23,7 @@ export class Info extends AbstractCommand {
     return log(
       [
         `Announcing to other nodes as: ${(await this.node.getAddressesAnnouncedToDHT()).map((ma) => ma.toString())}`,
-        `Listening on: ${this.node.getListeningAddresses().map((ma) => ma.toString())}`,
+        `Listening on: ${this.node.getListeningAddresses().map((ma: Multiaddr) => ma.toString())}`,
         `Running on: ${smartContractInfo.network}`,
         `HOPR Token: ${smartContractInfo.hoprTokenAddress}`,
         `HOPR Channels: ${smartContractInfo.hoprChannelsAddress}`,

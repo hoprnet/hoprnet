@@ -14,7 +14,7 @@ import { authenticateWsConnection, getStatusCodeForInvalidInputInRequest, remove
 import type { Server } from 'http'
 import type { Application, Request } from 'express'
 import type { WebSocketServer } from 'ws'
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import { SettingKey, StateOps } from '../types.js'
 import type { LogStream } from './../logs.js'
 

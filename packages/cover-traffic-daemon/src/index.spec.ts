@@ -1,6 +1,6 @@
 import assert from 'assert'
-import LibP2P from 'libp2p'
-import { default as Hopr, type HoprOptions } from '@hoprnet/hopr-core'
+import { Libp2p } from 'libp2p'
+import Hopr, { type HoprOptions } from '@hoprnet/hopr-core'
 import { debug, PublicKey, wait, dbMock, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import sinon from 'sinon'
 import { PersistedState } from './state.js'
@@ -20,7 +20,7 @@ describe('cover-traffic daemon', async function () {
 
   beforeEach(function () {
     function stubLibp2p() {
-      sinon.stub(LibP2P, 'create').callsFake(() => {
+      sinon.stub<Libp2p>({}, 'create').callsFake(() => {
         log('libp2p stub started')
         return Promise.resolve(createLibp2pMock(mockPeerId))
       })

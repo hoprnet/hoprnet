@@ -7,7 +7,8 @@
 // // @ts-ignore
 // import SECIO = require('libp2p-secio')
 
-// import PeerId from '@libp2p/peer-id'
+// import { createSecp256k1PeerId } from '@libp2p/peer-id-factory'
+// import PeerId from '@libp2p/interface-peer-id'
 
 // import { Connection, Handler } from 'libp2p'
 

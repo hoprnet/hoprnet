@@ -118,7 +118,7 @@ export async function tryExistingConnections(
   }
 
   for (const deadConnection of deadConnections) {
-    libp2p.connectionManager.onDisconnect(deadConnection)LibP2P
+    libp2p.connectionManager.onDisconnect(deadConnection)
 
   if (stream != undefined && conn != undefined) {
     return { conn, stream, protocol }

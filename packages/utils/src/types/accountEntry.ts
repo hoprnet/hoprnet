@@ -94,7 +94,7 @@ export class AccountEntry {
   public toString(): string {
     return (
       // prettier-ignore
-      `AccountEntry: ${this.publicKey.toB58String()}\n` +
+      `AccountEntry: ${this.publicKey.toString()}\n` +
       `  PublicKey: ${this.publicKey.toCompressedPubKeyHex()}\n` +
       `  Multiaddr: ${this.multiAddr ? this.multiAddr.toString() : 'not announced'}\n` +
       `  updatedAt: ${this.updatedBlock ? `Block ${this.updatedBlock.toString(10)}` : `not annonced`}\n` +

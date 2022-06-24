@@ -232,7 +232,7 @@ describe('test webrtc connection', function () {
       {
         source: BobAlice.source,
         sink: AliceBob.sink,
-        remoteAddr: new Multiaddr(`/p2p/${Bob.toB58String()}`),
+        remoteAddr: new Multiaddr(`/p2p/${Bob.toString()}`),
         sendUpgraded: () => {}
       } as RelayConnection,
       webRTCInstance

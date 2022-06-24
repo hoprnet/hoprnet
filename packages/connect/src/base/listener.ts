@@ -21,6 +21,7 @@ import type {
 } from 'libp2p-interfaces/src/transport/types.js'
 
 import type { PeerId } from '@libp2p/interface-peer-id'
+import { peerIdFromBytes } from '@libp2p/peer-id'
 import { Multiaddr } from '@multiformats/multiaddr'
 
 import { handleStunRequest, getExternalIp } from './stun.js'
@@ -33,7 +34,7 @@ import type HoprConnect from '../index.js'
 import { UpnpManager } from './upnp.js'
 import type { Filter } from '../filter.js'
 import type { Relay } from '../relay/index.js'
-import type Libp2p from 'libp2p'
+import type { Libp2p } from 'libp2p'
 
 const log = Debug('hopr-connect:listener')
 const error = Debug('hopr-connect:listener:error')
@@ -126,7 +127,7 @@ class Listener extends EventEmitter implements InterfaceListener {
         const relayPeerIds = this.entry.getUsedRelayAddresses().map((ma: Multiaddr) => {
           const tuples = ma.tuples()
 
-          return PeerId.createFromBytes((tuples[0][1] as Uint8Array).slice(1))
+          return peerIdFromBytes((tuples[0][1] as Uint8Array).slice(1))
         })
 
         this.relay.setUsedRelays(relayPeerIds)
@@ -194,8 +195,8 @@ class Listener extends EventEmitter implements InterfaceListener {
       }
 
       // Replace wrong PeerId in given listeningAddr with own PeerId
-      log(`replacing peerId in ${ma.toString()} by our peerId which is ${this.peerId.toB58String()}`)
-      this.listeningAddr = tmpListeningAddr.encapsulate(`/p2p/${this.peerId.toB58String()}`)
+      log(`replacing peerId in ${ma.toString()} by our peerId which is ${this.peerId.toString()}`)
+      this.listeningAddr = tmpListeningAddr.encapsulate(`/p2p/${this.peerId.toString()}`)
     } else {
       this.listeningAddr = ma
     }

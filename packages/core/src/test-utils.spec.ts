@@ -16,8 +16,8 @@ export function fakePeerId(i: number | string): PeerId {
   return {
     id: i as unknown as Uint8Array,
     equals: (x: PeerId) => (x.id as unknown as number) == i,
-    toB58String: () => i
-  } as PeerId
+    toString: () => i
+  } as any
 }
 
 export function fakeAddress(id: PeerId): Multiaddr {

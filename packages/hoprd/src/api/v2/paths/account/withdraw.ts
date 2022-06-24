@@ -1,5 +1,5 @@
 import type { Operation } from 'express-openapi'
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import { Address } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { STATUS_CODES } from '../../utils.js'

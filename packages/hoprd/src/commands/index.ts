@@ -1,4 +1,4 @@
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import type { StateOps } from '../types.js'
 import { AbstractCommand } from './abstractCommand.js'
 import FundChannel from './fundChannel.js'

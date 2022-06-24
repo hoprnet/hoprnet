@@ -24,7 +24,7 @@ class FakeConnectionManager {
   }
 
   public getAll(peer: PeerId): Connection[] {
-    return this.connections.get(peer.toB58String()) ?? []
+    return this.connections.get(peer.toString()) ?? []
   }
 
   public onDisconnect(_conn: Connection): void {}
@@ -219,7 +219,7 @@ describe('entry node functionality', function () {
     assert(usedRelays != undefined, `must expose relay addrs`)
     assert(usedRelays.length == 1, `must expose exactly one relay addrs`)
     assert(
-      usedRelays[0].toString() === `/p2p/${relay.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`,
+      usedRelays[0].toString() === `/p2p/${relay.id.toString()}/p2p-circuit/p2p/${peerId.toString()}`,
       `must expose the right relay address`
     )
 
@@ -305,7 +305,7 @@ describe('entry node functionality', function () {
 
     let usedRelay = {
       relayDirectAddress: new Multiaddr('/ip4/127.0.0.1/tcp/1234'),
-      ourCircuitAddress: new Multiaddr(`/p2p/${relay.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`)
+      ourCircuitAddress: new Multiaddr(`/p2p/${relay.id.toString()}/p2p-circuit/p2p/${peerId.toString()}`)
     }
 
     entryNodes.usedRelays.push(usedRelay)
@@ -327,9 +327,7 @@ describe('entry node functionality', function () {
     const usedRelays = entryNodes.getUsedRelayAddresses()
     assert(entryNodes.getUsedRelayAddresses().length == 1)
 
-    assert(
-      usedRelays[0].equals(new Multiaddr(`/p2p/${newNode.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`))
-    )
+    assert(usedRelays[0].equals(new Multiaddr(`/p2p/${newNode.id.toString()}/p2p-circuit/p2p/${peerId.toString()}`)))
 
     newNodeListener.removeAllListeners()
     network.stop()
@@ -370,9 +368,7 @@ describe('entry node functionality', function () {
 
     const usedRelays = entryNodes.getUsedRelayAddresses()
     assert(usedRelays.length == 1)
-    assert(
-      usedRelays[0].equals(new Multiaddr(`/p2p/${relay.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`))
-    )
+    assert(usedRelays[0].equals(new Multiaddr(`/p2p/${relay.id.toString()}/p2p-circuit/p2p/${peerId.toString()}`)))
 
     network.stop()
     relayListener.removeAllListeners()
@@ -422,7 +418,7 @@ describe('entry node functionality', function () {
 
     let usedRelay = {
       relayDirectAddress: new Multiaddr(`/ip4/127.0.0.1/tcp/1`),
-      ourCircuitAddress: new Multiaddr(`/p2p/${relay.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`)
+      ourCircuitAddress: new Multiaddr(`/p2p/${relay.id.toString()}/p2p-circuit/p2p/${peerId.toString()}`)
     }
 
     entryNodes.availableEntryNodes.push({ ...relay, latency: 23 })
@@ -538,9 +534,7 @@ describe('entry node functionality', function () {
 
     entryNodes.usedRelays.push({
       relayDirectAddress: ma,
-      ourCircuitAddress: new Multiaddr(
-        `/p2p/${peerStoreEntry.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`
-      )
+      ourCircuitAddress: new Multiaddr(`/p2p/${peerStoreEntry.id.toString()}/p2p-circuit/p2p/${peerId.toString()}`)
     })
 
     entryNodes.start()

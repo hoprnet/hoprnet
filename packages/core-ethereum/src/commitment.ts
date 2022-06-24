@@ -80,7 +80,7 @@ export class ChannelCommitmentInfo {
    * @param peerId Local node ID.
    */
   public createInitialCommitmentSeed(peerId: PeerId): Uint8Array {
-    if (peerId.privKey == null) {
+    if (peerId.privateKey == null) {
       throw Error('Invalid peerId')
     }
 

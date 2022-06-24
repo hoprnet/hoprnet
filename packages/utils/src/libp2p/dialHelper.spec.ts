@@ -59,11 +59,7 @@ async function getNode(id: PeerId, withDHT = false, maDestination?: Multiaddr): 
 
   const dial = node.dial.bind(node)
 
-  node.dial = async (peer: PeerId | Multiaddr, options: any) => {
-    if (PeerId.isPeerId(peer)) {
-      return dial(peer, options)
-    }
-
+  node.dial = async (_peer: PeerId | Multiaddr, options: any) => {
     return dial(maDestination, options)
   }
 

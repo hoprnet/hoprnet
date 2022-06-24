@@ -5,6 +5,7 @@ import type { Address } from 'libp2p/src/peer-store/address-book.js'
 
 import { Relay } from './index.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import EventEmitter from 'events'
 import { privKeyToPeerId, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
 import { handshake } from 'it-handshake'
@@ -31,7 +32,7 @@ function getPeer(peerId: PeerId, network: EventEmitter) {
   }
 
   async function dialDirectly(ma: Multiaddr): Promise<Connection> {
-    const peerId = PeerId.createFromB58String(ma.getPeerId() as string)
+    const peerId = peerIdFromString(ma.getPeerId() as string)
 
     return {
       remotePeer: peerId,

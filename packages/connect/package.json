@@ -39,7 +39,7 @@
     "debug": "4.3.4",
     "heap-js": "2.1.6",
     "it-handshake": "4.0.0",
-    "multihashes": "4.0.3",
+    "multiformats": "9.6.5",
     "nat-api": "0.3.1",
     "simple-peer": "9.11.1",
     "stream-to-it": "0.2.4",

@@ -49,7 +49,7 @@ import {
   createCircuitAddress,
   convertPubKeyFromPeerId
 } from '@hoprnet/hopr-utils'
-import { type default as HoprCoreEthereum, type Indexer } from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum, { type Indexer } from '@hoprnet/hopr-core-ethereum'
 
 import {
   type StrategyTickResult,

@@ -4,7 +4,7 @@ import { mkdir } from 'fs/promises'
 import { type Libp2p, createLibp2p } from 'libp2p'
 import { LevelDatastore } from 'datastore-level'
 import { type AddressSorter, HoprDB, PublicKey, debug } from '@hoprnet/hopr-utils'
-import { default as HoprCoreEthereum } from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
 import Mplex from 'libp2p-mplex'
 import KadDHT from 'libp2p-kad-dht'

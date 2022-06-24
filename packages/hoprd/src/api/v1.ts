@@ -3,7 +3,7 @@ import bodyParser from 'body-parser'
 
 import type { Application } from 'express'
 import type { WebSocketServer } from 'ws'
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import type { AdminServer } from '../admin.js'
 
 import type { LogStream } from './../logs.js'

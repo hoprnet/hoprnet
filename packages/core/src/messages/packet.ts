@@ -444,7 +444,7 @@ export class Packet {
   }
 
   async forwardTransform(privKey: PeerId, db: HoprDB): Promise<void> {
-    if (privKey.privKey == null) {
+    if (privKey.privateKey == null) {
       throw Error(`Invalid arguments`)
     }
 

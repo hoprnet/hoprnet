@@ -6,8 +6,7 @@ import { hideBin } from 'yargs/helpers'
 import { setTimeout } from 'timers/promises'
 
 import { loadJson, NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
-import {
-  default as Hopr,
+import Hopr, {
   type HoprOptions,
   type NetworkHealthIndicator,
   createHoprNode,
@@ -462,7 +461,7 @@ async function main() {
         setupHealthcheck(node, logs, argv.healthCheckHost, argv.healthCheckPort)
       }
 
-      logs.log(`Node address: ${node.getId().toB58String()}`)
+      logs.log(`Node address: ${node.getId().toString()}`)
 
       const ethAddr = node.getEthereumAddress().toHex()
       const fundsReq = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()

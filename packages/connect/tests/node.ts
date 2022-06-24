@@ -6,7 +6,7 @@ import { setTimeout } from 'timers/promises'
 import { NOISE } from '@chainsafe/libp2p-noise'
 const Mplex = require('libp2p-mplex')
 
-import { default as HoprConnect, type HoprConnectConfig } from '@hoprnet/hopr-connect'
+import HoprConnect, { type HoprConnectConfig } from '@hoprnet/hopr-connect'
 import { Multiaddr } from '@multiformats/multiaddr'
 import { pipe } from 'it-pipe'
 import yargs from 'yargs/yargs'
