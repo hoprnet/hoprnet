@@ -151,6 +151,7 @@ done
 declare -A staking_acc_dict=()
 declare staking_acc_arr=( "${!staking_acc_dict[@]}" ) # staking accounts addresses only
 
+# TODO: retrieve also native & hopr addresses
 assign_staking_accounts instance_stake_dict staking_acc_arr
 
 declare instance_staking_account
