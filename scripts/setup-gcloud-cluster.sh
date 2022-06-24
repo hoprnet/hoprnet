@@ -130,119 +130,41 @@ declare node_ips
 node_ips=$(gcloud_get_managed_instance_group_instances_ips "${cluster_id}")
 declare node_ips_arr=( ${node_ips} )
 
+#  --- Fund nodes --- {{{
+for ip in ${node_ips}; do
+  wait_until_node_is_ready "${ip}"
+  eth_addr="$(get_native_address "${api_token}@${ip}:3001")"
+  fund_if_empty "${eth_addr}" "${environment}"
+done
+
 declare instance_names
 instance_names=$(gcloud_get_managed_instance_group_instances_names "${cluster_id}")
 declare instance_names_arr=( ${instance_names} )
 
-# TODO: Feed in the staking account
-declare staking_addrs=()
-
-declare eth_addrs_arr=()
-declare hopr_addrs_arr=()
-
-#  --- Retrieve node information & fund nodes --- {{{
-declare eth_addr
-declare hopr_addr
-for ip in ${node_ips}; do
-  wait_until_node_is_ready "${ip}"
-
-  eth_addr="$(get_native_address "${api_token}@${ip}:3001")"
-  eth_addrs_arr+=( "${eth_addr}" )
-
-  hopr_addr="$(get_hopr_address "${api_token}@${ip}:3001")"
-  hopr_addrs_arr+=( "${hopr_addr}" )
-
-  fund_if_empty "${eth_addr}" "${environment}"
+# Create dictionary to map "VM instance name" => ""
+declare -A instance_stake_dict
+for instance_name in ${instance_names_arr}; do
+  instance_stake_dict+=( [$instance_name]="" )
 done
 
-# $1 = instance name
-get_node_info_tag() {
-  local instance_name="${1}"
+# TODO: Feed the staking accounts & their private keys into this dictionary
+declare -A staking_acc_dict=()
+declare staking_acc_arr=( "${!staking_acc_dict[@]}" ) # staking accounts addresses only
 
-  local current_tag_set=$(gcloud_get_instance_tags "${instance_name}")
-  local -a current_tag_set_arr=( "${current_tag_set}" )
+assign_staking_accounts instance_stake_dict staking_acc_arr
 
-  # Find the tag containing the "info:" prefix
-  local info_tag=""
-  for tag in ${current_tag_set_arr}
-  do
-    if [[ ${tag} =~ info:.+ ]]; then
-         info_tag="${tag#info:}"
-         break
-    fi
-  done
 
-  echo "${info_tag}"
-}
-
-# $1 = instance names array
-# $2 = peer ids array
-# $3 = wallet address array
-# $4 = staking accounts to use
-assign_staking_accounts() {
-  local -n instance_names_arr="${1}"
-  local -n peer_ids_arr="${2}"
-  local -n native_addrs_arr="${3}"
-  local -n staking_accs_arr="${4}"
-
-  local current_staking_index=0
-  local count_staking_accs=${#staking_accs_arr[@]}
-
-  # Assign staking accounts to instances round-robin fashion
-  local -a assigned_staking_accs_arr=()
-  for i in "${!instance_names_arr[@]}"
-  do
-    local instance_name="${instance_names_arr[i]}"
-    local instance_peer_id="${peer_ids_arr[i]}"
-    local instance_native_addr="${native_addrs_arr[i]}"
-
-    local existing_info_tag=$(get_node_info_tag ${instance_name})
-
-    if [[ -z "${existing_info_tag}" ]]; then
-      # Assign the new staking account
-      local new_staking_addr="${staking_accs_arr[current_staking_index]}"
-      local new_info_tag="info:peer_id=${instance_peer_id};native_addr=${instance_native_addr};nr_staking_addr=${new_staking_addr}"
-      assigned_staking_accs_arr+=( "$new_staking_addr" )
-      gcloud_add_instance_tags "${instance_name}" "${new_info_tag}"
-    else
-      # Use the existing staking account
-      existing_staking_addr=$(echo "${existing_info_tag}" | sed -E 's/.*nr_staking_addr=([Xxa-f0-9A-F]+).*/\1/g')
-      assigned_staking_accs_arr+=( "${existing_staking_addr}" )
-    fi
-
-    current_staking_index=$(( (current_staking_index + 1) % count_staking_accs ))
-  done
-
-  # Return the assigned staking accounts array
-  echo "${assigned_staking_accs_arr[@]}"
-}
 
 # To test Network registry, the cluster_size is greater or equal to 3 and staker_addresses are provided as parameters
 
 # TODO: call stake API so that the first staker_addresses[0] stake in the current program
 # TODO: call register API and register staker_addresses with node peer ids
 
-
 if [[ "${docker_image}" != *-nat:* ]]; then
-  # -- Public nodes --
-
-  # TODO: The first public node will be left unstaked
-
-  for vm in ${instance_names_arr}; do
-
-  done
-
-
   # Finally wait for the public nodes to come up
   for ip in ${node_ips}; do
     wait_for_port "9091" "${ip}"
   done
-
-else
-  # -- NAT nodes --
-
-
- # We cannot wait for NAT nodes to come up, because their port 9091 is not exposed
 fi
 # }}}
 
