@@ -143,7 +143,7 @@ declare instance_names_arr=( ${instance_names} )
 
 # Create dictionary to map "VM instance name" => ""
 declare -A instance_stake_dict
-for instance_name in ${instance_names_arr}; do
+for instance_name in ${instance_names_arr} ; do
   instance_stake_dict+=( [$instance_name]="" )
 done
 
@@ -153,7 +153,15 @@ declare staking_acc_arr=( "${!staking_acc_dict[@]}" ) # staking accounts address
 
 assign_staking_accounts instance_stake_dict staking_acc_arr
 
-
+declare instance_staking_account
+for instance_name in "${!instance_stake_dict[@]}"; do
+  instance_staking_account="${instance_stake_dict[instance_name]}"
+  # Only for accounts that stake via tokens
+  if [[ ${instance_staking_account} =~ stake_tokens.+ ]]; then
+    staking_priv_key="${staking_acc_dict[instance_staking_account]}"
+    yarn hardhat stake --network hardhat --amount 1000000000000000000000 --privatekey "${staking_priv_key}"
+  fi
+done
 
 # To test Network registry, the cluster_size is greater or equal to 3 and staker_addresses are provided as parameters
 
