@@ -3,8 +3,7 @@
  */
 import { PeerId } from '@libp2p/interface-peer-id'
 import type { Libp2p } from 'libp2p'
-import type { Connection } from 'libp2p/src/connection-manager/index.js'
-import type { MuxedStream } from 'libp2p/src/upgrader.js'
+import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
 import { Multiaddr, protocols } from '@multiformats/multiaddr'
 
 import { timeout, abortableTimeout, type TimeoutOpts } from '../async/index.js'
@@ -32,10 +31,8 @@ export enum DialStatus {
 export type DialResponse =
   | {
       status: DialStatus.SUCCESS
-      resp: {
-        stream: MuxedStream
+      resp: ProtocolStream & {
         conn: Connection
-        protocol: string
       }
     }
   | {
@@ -81,18 +78,19 @@ export async function tryExistingConnections(
   libp2p: Pick<ReducedLibp2p, 'connectionManager'>,
   destination: PeerId,
   protocol: string
-): Promise<void | {
-  conn: Connection
-  stream: MuxedStream
-  protocol: string
-}> {
+): Promise<
+  | void
+  | (ProtocolStream & {
+      conn: Connection
+    })
+> {
   const existingConnections = libp2p.connectionManager.getAll(destination)
 
   if (existingConnections == undefined || existingConnections.length == 0) {
     return
   }
 
-  let stream: MuxedStream | undefined
+  let stream: ProtocolStream | undefined
   let conn: Connection | undefined
 
   const deadConnections: Connection[] = []
@@ -120,8 +118,9 @@ export async function tryExistingConnections(
   for (const deadConnection of deadConnections) {
     libp2p.connectionManager.onDisconnect(deadConnection)
 
-  if (stream != undefined && conn != undefined) {
-    return { conn, stream, protocol }
+    if (stream != undefined && conn != undefined) {
+      return { conn, stream, protocol }
+    }
   }
 }
 
@@ -318,9 +317,7 @@ async function doDial(
       .map((address) => address.toString())
   )
 
-  let relayStruct: {
-    stream: MuxedStream
-    protocol: string
+  let relayStruct: ProtocolStream & {
     conn: Connection
   }
 

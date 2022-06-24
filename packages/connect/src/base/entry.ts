@@ -1,10 +1,10 @@
 import type { HoprConnectOptions, PeerStoreType } from '../types.js'
-import type Connection from 'libp2p-interfaces/src/connection/connection.js'
+import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Multiaddr } from '@multiformats/multiaddr'
 import type HoprConnect from '../index.js'
 import { peerIdFromBytes } from '@libp2p/peer-id'
-import { Libp2p, MuxedStream } from 'libp2p'
+import { Libp2p } from 'libp2p'
 
 import { EventEmitter } from 'events'
 import Debug from 'debug'
@@ -54,10 +54,8 @@ type ConnectionResult = {
   conn?: Connection
 }
 
-type ConnResult = {
+type ConnResult = ProtocolStream & {
   conn: Connection
-  stream: MuxedStream
-  protocol: string
 }
 
 function latencyCompare(a: ConnectionResult, b: ConnectionResult) {
@@ -493,7 +491,7 @@ export class EntryNodes extends EventEmitter {
 
     const protocol = CAN_RELAY_PROTCOL(this.options.environment)
 
-    let stream: MuxedStream | undefined
+    let stream: ProtocolStream['stream'] | undefined
     try {
       stream = (await conn.newStream([protocol]))?.stream
     } catch (err) {

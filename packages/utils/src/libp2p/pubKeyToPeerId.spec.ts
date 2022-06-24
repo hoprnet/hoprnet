@@ -1,10 +1,10 @@
 import { pubKeyToPeerId } from './pubKeyToPeerId.js'
-import PeerId from 'peer-id'
+import { createSecp256k1PeerId } from '@libp2p/peer-id-factory'
 import assert from 'assert'
 
 describe(`converting pubKey to peerId`, function () {
   it('convert back and forth', async function () {
-    const pId = await PeerId.create({ keyType: 'secp256k1' })
+    const pId = await createSecp256k1PeerId()
 
     const deserialized = pubKeyToPeerId(pId.pubKey.marshal())
 

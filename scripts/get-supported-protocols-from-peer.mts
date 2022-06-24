@@ -9,11 +9,11 @@ import yargs from 'yargs/yargs'
 import { Multiaddr } from '@multiformats/multiaddr'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { NOISE } from '@chainsafe/libp2p-noise'
-import Upgrader from 'libp2p/src/upgrader.js'
-import Mplex from 'libp2p-mplex'
+import { Upgrader } from '@libp2p/interface-transport'
+import { Mplex } from '@libp2p/mplex'
 const Multistream = require('multistream-select')
 
-const { HoprConnect } = require('@hoprnet/hopr-connect')
+import { HoprConnect } from '@hoprnet/hopr-connect'
 import { privKeyToPeerId, stringToU8a } from '@hoprnet/hopr-utils'
 
 const id = '0x964e55c734330e9393a32aef61e6b75f3b526fb64df0ac55a6076045918657e1'

@@ -23,7 +23,7 @@ export default class PrintAddress extends AbstractCommand {
    */
   public async execute(log, query: string): Promise<void> {
     const hoprPrefix = 'HOPR Address:'
-    const hoprAddress = this.node.getId().toB58String()
+    const hoprAddress = this.node.getId().toString()
 
     if (query.trim() === 'hopr') {
       return log(hoprAddress)

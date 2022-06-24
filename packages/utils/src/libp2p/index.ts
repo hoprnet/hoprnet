@@ -5,7 +5,7 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { peerIdFromString } from '@libp2p/peer-id'
 import { keys, PublicKey } from 'libp2p-crypto'
 import multihashes from 'multihashes'
-import type { Connection, MuxedStream } from 'libp2p'
+import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
 import type { Libp2p } from 'libp2p'
 
 import { debug } from '../process/index.js'
@@ -163,7 +163,7 @@ export async function libp2pSendMessage(
  *  interact with - this function simply allows us to assign a handler
  *  function that is called on each 'message' of the stream.
  */
-export type LibP2PHandlerArgs = { connection: Connection; stream: MuxedStream; protocol: string }
+export type LibP2PHandlerArgs = { connection: Connection; stream: ProtocolStream['stream']; protocol: string }
 export type LibP2PHandlerFunction<T> = (msg: Uint8Array, remotePeer: PeerId) => T
 
 type HandlerFunction<T> = (props: LibP2PHandlerArgs) => T

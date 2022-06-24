@@ -1,5 +1,5 @@
 import { Multiaddr } from '@multiformats/multiaddr'
-import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types.js'
+import type { MultiaddrConnection } from '@libp2p/interface-connection'
 import type { Stream, StreamSink, StreamSource, StreamSourceAsync, StreamResult, StreamType } from '../types.js'
 import { randomBytes } from 'crypto'
 import { RelayPrefix, ConnectionStatusMessages, StatusMessages } from '../constants.js'

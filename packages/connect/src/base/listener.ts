@@ -1,3 +1,9 @@
+import type { Connection, MultiaddrConnection } from '@libp2p/interface-connection'
+import type { Upgrader, Listener as InterfaceListener } from '@libp2p/interface-transport'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import type { Libp2p } from 'libp2p'
+
+import { networkInterfaces, type NetworkInterfaceInfo } from 'os'
 import {
   createServer,
   createConnection,
@@ -6,27 +12,18 @@ import {
   type Server as TCPServer
 } from 'net'
 import { createSocket, type RemoteInfo, type Socket as UDPSocket } from 'dgram'
-import type Connection from 'libp2p-interfaces/dist/src/connection/connection.js'
-
 import { once, EventEmitter } from 'events'
-import type { PeerStoreType, HoprConnectOptions, HoprConnectTestingOptions } from '../types.js'
+
 import Debug from 'debug'
-import { networkInterfaces, type NetworkInterfaceInfo } from 'os'
-
-import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP } from '../constants.js'
-import type {
-  MultiaddrConnection,
-  Upgrader,
-  Listener as InterfaceListener
-} from 'libp2p-interfaces/src/transport/types.js'
-
-import type { PeerId } from '@libp2p/interface-peer-id'
 import { peerIdFromBytes } from '@libp2p/peer-id'
 import { Multiaddr } from '@multiformats/multiaddr'
 
+import { isAnyAddress, u8aEquals, defer } from '@hoprnet/hopr-utils'
+
+import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP } from '../constants.js'
+import type { PeerStoreType, HoprConnectOptions, HoprConnectTestingOptions } from '../types.js'
 import { handleStunRequest, getExternalIp } from './stun.js'
 import { getAddrs } from './addrs.js'
-import { isAnyAddress, u8aEquals, defer } from '@hoprnet/hopr-utils'
 import { TCPConnection } from './tcp.js'
 import { EntryNodes, RELAY_CHANGED_EVENT } from './entry.js'
 import { bindToPort, attemptClose, nodeToMultiaddr } from '../utils/index.js'
@@ -34,7 +31,6 @@ import type HoprConnect from '../index.js'
 import { UpnpManager } from './upnp.js'
 import type { Filter } from '../filter.js'
 import type { Relay } from '../relay/index.js'
-import type { Libp2p } from 'libp2p'
 
 const log = Debug('hopr-connect:listener')
 const error = Debug('hopr-connect:listener:error')

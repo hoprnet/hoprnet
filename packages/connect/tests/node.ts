@@ -1,10 +1,10 @@
-import { createLibp2p, type Connection, type HandlerProps } from 'libp2p'
+import { createLibp2p, type Libp2p, type HandlerProps } from 'libp2p'
 import { durations } from '@hoprnet/hopr-utils'
 import fs from 'fs'
 import { setTimeout } from 'timers/promises'
 
 import { NOISE } from '@chainsafe/libp2p-noise'
-const Mplex = require('libp2p-mplex')
+import { Mplex } from '@libp2p/mplex'
 
 import HoprConnect, { type HoprConnectConfig } from '@hoprnet/hopr-connect'
 import { Multiaddr } from '@multiformats/multiaddr'
@@ -12,6 +12,7 @@ import { pipe } from 'it-pipe'
 import yargs from 'yargs/yargs'
 import { peerIdForIdentity, identityFromPeerId } from './identities.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
+import type { Connection } from '@libp2p/interface-connection'
 import type { WriteStream } from 'fs'
 import type { PeerStoreType, Stream } from '../src/types.js'
 
@@ -153,7 +154,7 @@ async function executeCommands({
   cmds,
   pipeFileStream
 }: {
-  node: libp2p
+  node: Libp2p
   cmds: CmdDef[]
   pipeFileStream?: WriteStream
 }) {

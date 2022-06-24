@@ -3,8 +3,8 @@ import { CODE_DNS4, CODE_DNS6, CODE_IP4, CODE_IP6, CODE_P2P } from './constants.
 import type { Multiaddr } from '@multiformats/multiaddr'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { peerIdFromBytes } from '@libp2p/peer-id'
-import type Connection from 'libp2p-interfaces/src/connection/connection.js'
-import type { Upgrader, Transport, MultiaddrConnection } from 'libp2p-interfaces/src/transport/types.js'
+import type { Connection } from '@libp2p/interface-connection'
+import { symbol, type Transport, type Upgrader } from '@libp2p/interface-transport'
 import type { Libp2p } from 'libp2p'
 import chalk from 'chalk'
 import { TCPConnection, Listener } from './base/index.js'
@@ -37,7 +37,11 @@ type HoprConnectConfig = {
 /**
  * @class HoprConnect
  */
-class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListeningOptions> {
+class HoprConnect implements Transport {
+  get [symbol](): true {
+    return true
+  }
+
   get [Symbol.toStringTag]() {
     return 'HoprConnect'
   }

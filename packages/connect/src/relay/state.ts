@@ -1,4 +1,4 @@
-import { Stream } from '../types.js'
+import type { Stream } from '../types.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 
 import { nAtATime, u8aCompare } from '@hoprnet/hopr-utils'

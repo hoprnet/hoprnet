@@ -4,7 +4,7 @@ import assert from 'assert'
 import { createPeerId, getPeerStoreEntry } from './utils.spec.js'
 import { once, EventEmitter } from 'events'
 import { Multiaddr } from '@multiformats/multiaddr'
-import type Connection from 'libp2p-interfaces/dist/src/connection/connection.js'
+import type { Connection } from '@libp2p/interface-connection'
 
 import { MAX_RELAYS_PER_NODE, OK } from '../constants.js'
 import type { HoprConnectDialOptions, PeerStoreType, PublicNodesEmitter } from '../types.js'

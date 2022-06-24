@@ -1,7 +1,13 @@
 import assert from 'assert'
 import type { PeerId } from '@libp2p/interface-peer-id'
+import type { Connection } from '@libp2p/interface-connection'
 import { peerIdFromString } from '@libp2p/peer-id'
 import { createSecp256k1PeerId } from '@libp2p/peer-id-factory'
+import BL from 'bl'
+import { Multiaddr } from '@multiformats/multiaddr'
+
+import { defer, type DeferType } from '../async/index.js'
+import { u8aEquals } from '../u8a/index.js'
 import {
   isSecp256k1PeerId,
   convertPubKeyFromPeerId,
@@ -9,14 +15,9 @@ import {
   hasB58String,
   getB58String,
   libp2pSubscribe,
-  libp2pSendMessage
+  libp2pSendMessage,
+  type LibP2PHandlerArgs
 } from './index.js'
-import type { Connection } from 'libp2p/src/connection-manager/index.js'
-import type { LibP2PHandlerArgs } from './index.js'
-import BL from 'bl'
-import { defer, type DeferType } from '../async/index.js'
-import { u8aEquals } from '../u8a/index.js'
-import { Multiaddr } from '@multiformats/multiaddr'
 
 describe(`test convertPubKeyFromPeerId`, function () {
   it(`should equal to a newly created pubkey from PeerId`, async function () {

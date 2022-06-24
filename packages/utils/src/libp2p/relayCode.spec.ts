@@ -1,10 +1,10 @@
 import { randomBytes } from 'crypto'
 
 import { createLibp2p, type Libp2p } from 'libp2p'
-import TCP from 'libp2p-tcp'
-import Mplex from 'libp2p-mplex'
+import { TCP } from '@libp2p/tcp'
+import { Mplex } from '@libp2p/mplex'
 import { NOISE } from '@chainsafe/libp2p-noise'
-import KadDHT from 'libp2p-kad-dht'
+import { KadDHT } from '@libp2p/kad-dht'
 import { Multiaddr } from '@multiformats/multiaddr'
 
 import type { PeerId } from '@libp2p/interface-peer-id'

@@ -10,7 +10,7 @@ const verbose = Debug('hopr-connect:verbose:tcp')
 // Timeout to wait for socket close before destroying it
 export const SOCKET_CLOSE_TIMEOUT = 1000
 
-import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types.js'
+import type { MultiaddrConnection } from '@libp2p/interface-connection'
 
 import type { Multiaddr } from '@multiformats/multiaddr'
 import toIterable from 'stream-to-it'

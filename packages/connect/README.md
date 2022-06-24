@@ -58,7 +58,7 @@ Start a bootstrapServer
 
 ```ts
 import { createLibp2p } from 'libp2p'
-const Mplex = require('libp2p-mplex')
+import { Mplex } from '@libp2p/mplex'
 import { NOISE } from '@chainsafe/libp2p-noise'
 
 import HoprConnect from 'hopr-connect'
@@ -89,7 +89,7 @@ Start another client
 
 ```ts
 import { createLibp2p } from 'libp2p'
-const MPLEX = require('libp2p-mplex')
+import { Mplex } from '@libp2p/mplex'
 import { NOISE } from '@chainsafe/libp2p-noise'
 
 import HoprConnect from 'hopr-connect'

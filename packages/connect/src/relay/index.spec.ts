@@ -1,6 +1,6 @@
 import type { StreamType } from '../types.js'
 import type { HandlerProps } from 'libp2p'
-import type Connection from 'libp2p-interfaces/src/connection/connection.js'
+import type { Connection } from '@libp2p/interface-connection'
 import type { Address } from 'libp2p/src/peer-store/address-book.js'
 
 import { Relay } from './index.js'

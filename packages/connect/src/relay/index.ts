@@ -1,7 +1,6 @@
-import type { Libp2p, MuxedStream, HandlerProps } from 'libp2p'
-import { PeerId } from '@libp2p/interface-peer-id'
-import type Connection from 'libp2p-interfaces/src/connection/connection.js'
-import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types.js'
+import type { Libp2p } from 'libp2p'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import type { Connection, ProtocolStream, MultiaddrConnection } from '@libp2p/interface-connection'
 import { type Multiaddr } from '@multiformats/multiaddr'
 import type { Address } from 'libp2p/src/peer-store/address-book.js'
 import type HoprConnect from '../index.js'
@@ -19,6 +18,7 @@ import { RelayState } from './state.js'
 import { createRelayerKey, randomInteger, retimer, tryExistingConnections } from '@hoprnet/hopr-utils'
 
 import { attemptClose } from '../utils/index.js'
+import { Upgrader } from '@libp2p/interface-transport'
 
 const DEBUG_PREFIX = 'hopr-connect:relay'
 const DEFAULT_MAX_RELAYED_CONNECTIONS = 10
@@ -27,10 +27,8 @@ const log = debug(DEBUG_PREFIX)
 const error = debug(DEBUG_PREFIX.concat(':error'))
 const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
 
-type ConnResult = {
+type ConnResult = ProtocolStream & {
   conn: Connection
-  stream: MuxedStream
-  protocol: string
 }
 
 // Specify which libp2p methods this class uses
@@ -45,7 +43,7 @@ type ReducedPeerStore = {
 }
 type ReducedDHT = { contentRouting: Pick<Libp2p['contentRouting'], 'provide'> }
 type ReducedDialer = { dialer: Pick<Libp2p['dialer'], '_pendingDials'> }
-type ReducedUpgrader = { upgrader: Pick<Libp2p['upgrader'], 'upgradeInbound' | 'upgradeOutbound'> }
+type ReducedUpgrader = { upgrader: Pick<Upgrader, 'upgradeInbound' | 'upgradeOutbound'> }
 type ReducedConnectionManager = { connectionManager: Pick<Libp2p['connectionManager'], 'getAll' | 'onDisconnect'> }
 type ReducedLibp2p = ReducedPeerStore &
   ReducedDialer &
@@ -468,7 +466,7 @@ class Relay {
       return
     }
 
-    let stream: MuxedStream | undefined
+    let stream: ProtocolStream['stream'] | undefined
     let conn: Connection | undefined
 
     for (const usable of usableAddresses) {
@@ -481,7 +479,7 @@ class Relay {
 
       if (conn != undefined) {
         try {
-          stream = (await conn.newStream([protocol]))?.stream as MuxedStream
+          stream = (await conn.newStream([protocol]))?.stream as ProtocolStream['stream']
         } catch (err) {
           await attemptClose(conn, error)
           continue

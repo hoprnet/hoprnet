@@ -1,12 +1,12 @@
 import { NOISE } from '@chainsafe/libp2p-noise'
-import MPLEX from 'libp2p-mplex'
+import { Mplex } from '@libp2p/mplex'
 import { createLibp2p, type Libp2p } from 'libp2p'
 import type { Address } from 'libp2p/src/peer-store/address-book.js'
-import type { Connection } from 'libp2p/src/connection-manager/index.js'
+import type { Connection } from '@libp2p/interface-connection'
 import { dial as dialHelper, DialStatus } from './dialHelper.js'
 import { privKeyToPeerId } from './privKeyToPeerId.js'
-import TCP from 'libp2p-tcp'
-import KadDHT from 'libp2p-kad-dht'
+import { TCP } from '@libp2p/tcp'
+import { KadDHT } from '@libp2p/kad-dht'
 import assert from 'assert'
 import { Multiaddr } from '@multiformats/multiaddr'
 import { pipe } from 'it-pipe'
@@ -29,7 +29,7 @@ async function getNode(id: PeerId, withDHT = false, maDestination?: Multiaddr): 
     peerId: id,
     modules: {
       transport: [TCP],
-      streamMuxer: [MPLEX],
+      streamMuxer: [Mplex],
       connEncryption: [NOISE],
       dht: withDHT ? KadDHT : undefined
     },
