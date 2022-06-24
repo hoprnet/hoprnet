@@ -8,12 +8,12 @@ import {
   getB58String,
   libp2pSubscribe,
   libp2pSendMessage
-} from '.'
-import type { Connection } from 'libp2p/src/connection-manager'
-import type { LibP2PHandlerArgs } from './index'
+} from './index.js'
+import type { Connection } from 'libp2p/src/connection-manager/index.js'
+import type { LibP2PHandlerArgs } from './index.js'
 import BL from 'bl'
-import { defer, type DeferType } from '../async'
-import { u8aEquals } from '../u8a'
+import { defer, type DeferType } from '../async/index.js'
+import { u8aEquals } from '../u8a/index.js'
 import { Multiaddr } from 'multiaddr'
 
 describe(`test convertPubKeyFromPeerId`, function () {

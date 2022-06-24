@@ -1,9 +1,9 @@
-import { Challenge } from '.'
-import { u8aToHex, stringToU8a } from '../u8a'
-import { SECP256K1_CONSTANTS } from '../crypto'
-import type { HalfKey } from '.'
+import { Challenge } from './index.js'
+import { u8aToHex, stringToU8a } from '../u8a/index.js'
+import { SECP256K1_CONSTANTS } from '../crypto/index.js'
+import type { HalfKey } from './index.js'
 
-import { publicKeyCreate, privateKeyTweakAdd, privateKeyVerify } from 'secp256k1'
+import secp256k1 from 'secp256k1'
 
 const MOCK_RESPONSE = '0x0364e9fee43e1625e38aaf4b1efa44b265e2403377e8fed0963ed8b698f14b66'
 
@@ -17,13 +17,13 @@ export class Response {
       throw new Error('Incorrect size Uint8Array for hash')
     }
 
-    if (!privateKeyVerify(arr)) {
+    if (!secp256k1.privateKeyVerify(arr)) {
       throw new Error(`Invalid input argument. Given value is not a valid field element.`)
     }
   }
 
   static fromHalfKeys(firstHalfKey: HalfKey, secondHalfKey: HalfKey): Response {
-    return new Response(privateKeyTweakAdd(firstHalfKey.clone().serialize(), secondHalfKey.serialize()))
+    return new Response(secp256k1.privateKeyTweakAdd(firstHalfKey.clone().serialize(), secondHalfKey.serialize()))
   }
 
   static deserialize(arr: Uint8Array): Response {
@@ -39,7 +39,7 @@ export class Response {
   }
 
   toChallenge(): Challenge {
-    return new Challenge(publicKeyCreate(this.arr))
+    return new Challenge(secp256k1.publicKeyCreate(this.arr))
   }
 
   static SIZE = SECP256K1_CONSTANTS.PRIVATE_KEY_LENGTH

@@ -1,4 +1,4 @@
-import { nAtATime } from './parallel'
+import { nAtATime } from './parallel.js'
 import assert from 'assert'
 
 type TestFunctionParameters = [timeout: number, result: number, throwException: boolean]

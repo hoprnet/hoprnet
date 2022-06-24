@@ -1,5 +1,5 @@
 import { createCipheriv } from 'crypto'
-import { toU8a } from '../u8a'
+import { toU8a } from '../u8a/index.js'
 
 const BLOCK_LENGTH = 16
 export const PRG_KEY_LENGTH = BLOCK_LENGTH

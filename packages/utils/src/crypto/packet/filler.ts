@@ -1,6 +1,6 @@
-import { u8aXOR } from '../../u8a'
-import { PRG } from '../prg'
-import { derivePRGParameters } from './keyDerivation'
+import { u8aXOR } from '../../u8a/index.js'
+import { PRG } from '../prg.js'
+import { derivePRGParameters } from './keyDerivation.js'
 
 /**
  * Writes the filler bitstring into the header such

@@ -1,24 +1,24 @@
 import type { default as LibP2P, MuxedStream, HandlerProps } from 'libp2p'
 import PeerId from 'peer-id'
-import type Connection from 'libp2p-interfaces/src/connection/connection'
-import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
+import type Connection from 'libp2p-interfaces/src/connection/connection.js'
+import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types.js'
 import { type Multiaddr } from 'multiaddr'
-import type { Address } from 'libp2p/src/peer-store/address-book'
-import type HoprConnect from '..'
+import type { Address } from 'libp2p/src/peer-store/address-book.js'
+import type HoprConnect from '../index.js'
 
-import type { Stream, HoprConnectOptions, HoprConnectDialOptions, HoprConnectTestingOptions } from '../types'
+import type { Stream, HoprConnectOptions, HoprConnectDialOptions, HoprConnectTestingOptions } from '../types.js'
 
 import debug from 'debug'
 
-import { WebRTCUpgrader, WebRTCConnection } from '../webrtc'
+import { WebRTCUpgrader, WebRTCConnection } from '../webrtc/index.js'
 import chalk from 'chalk'
-import { RELAY_PROTCOL, DELIVERY_PROTOCOL, CODE_P2P, OK, CAN_RELAY_PROTCOL } from '../constants'
-import { RelayConnection } from './connection'
-import { RelayHandshake, RelayHandshakeMessage } from './handshake'
-import { RelayState } from './state'
+import { RELAY_PROTCOL, DELIVERY_PROTOCOL, CODE_P2P, OK, CAN_RELAY_PROTCOL } from '../constants.js'
+import { RelayConnection } from './connection.js'
+import { RelayHandshake, RelayHandshakeMessage } from './handshake.js'
+import { RelayState } from './state.js'
 import { createRelayerKey, randomInteger, retimer, tryExistingConnections } from '@hoprnet/hopr-utils'
 
-import { attemptClose } from '../utils'
+import { attemptClose } from '../utils/index.js'
 
 const DEBUG_PREFIX = 'hopr-connect:relay'
 const DEFAULT_MAX_RELAYED_CONNECTIONS = 10
@@ -222,7 +222,7 @@ class Relay {
         relay,
         counterparty: destination,
         onReconnect: this._onReconnect
-      })
+      }) as MultiaddrConnection
     } else {
       let channel = this.webRTCUpgrader.upgradeOutbound()
 
@@ -241,7 +241,7 @@ class Relay {
       return new WebRTCConnection(newConn, channel, {
         __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade,
         ...opts
-      })
+      }) as MultiaddrConnection
     }
   }
 
@@ -366,7 +366,7 @@ class Relay {
 
     try {
       // Will call internal libp2p event handler, so no further action required
-      await this.libp2p.upgrader.upgradeInbound(newConn)
+      await this.libp2p.upgrader.upgradeInbound(newConn as MultiaddrConnection)
     } catch (err) {
       error(`Could not upgrade relayed connection. Error was: ${err}`)
       return
@@ -390,12 +390,12 @@ class Relay {
 
     try {
       if (!!this.testingOptions.__noWebRTCUpgrade) {
-        newConn = await this.libp2p.upgrader.upgradeInbound(newStream)
+        newConn = await this.libp2p.upgrader.upgradeInbound(newStream as MultiaddrConnection)
       } else {
         newConn = await this.libp2p.upgrader.upgradeInbound(
           new WebRTCConnection(newStream, newStream.webRTC!.channel, {
             __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade
-          })
+          }) as MultiaddrConnection
         )
       }
     } catch (err) {

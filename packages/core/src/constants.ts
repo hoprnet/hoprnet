@@ -1,6 +1,8 @@
 import { pickVersion } from '@hoprnet/hopr-utils'
 
-const pkg = require('../package.json')
+// Don't do typechecks on JSON files
+// @ts-ignore
+import pkg from '../package.json' assert { type: 'json' }
 
 export const PACKET_SIZE = 500
 export const FULL_VERSION = pkg.version

@@ -1,6 +1,6 @@
-import { publicKeyCreate } from 'secp256k1'
-import { u8aToHex, u8aEquals } from '../u8a'
-import { HalfKeyChallenge } from '.'
+import secp256k1 from 'secp256k1'
+import { u8aToHex, u8aEquals } from '../u8a/index.js'
+import { HalfKeyChallenge } from './index.js'
 
 export class HalfKey {
   constructor(private readonly arr: Uint8Array) {
@@ -14,7 +14,7 @@ export class HalfKey {
   }
 
   toChallenge(): HalfKeyChallenge {
-    return new HalfKeyChallenge(publicKeyCreate(this.arr))
+    return new HalfKeyChallenge(secp256k1.publicKeyCreate(this.arr))
   }
 
   serialize(): Uint8Array {

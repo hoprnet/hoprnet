@@ -1,7 +1,7 @@
-import Heap from 'heap-js'
+import HeapPackage, { type default as HeapType } from 'heap-js'
 import { randomInteger } from '@hoprnet/hopr-utils'
-import type { Packet } from './messages'
-import { MAX_PACKET_DELAY } from './constants'
+import type { Packet } from './messages/index.js'
+import { MAX_PACKET_DELAY } from './constants.js'
 //import debug from 'debug'
 //const log = debug('hopr-core:mixer')
 
@@ -16,6 +16,8 @@ const comparator = (a: HeapElement, b: HeapElement): number => {
   return 0
 }
 
+const { Heap } = HeapPackage
+
 /**
  * Mix packets.
  *
@@ -23,7 +25,7 @@ const comparator = (a: HeapElement, b: HeapElement): number => {
  * priority.
  */
 export class Mixer {
-  private queue: Heap<HeapElement>
+  private queue: HeapType<HeapElement>
   private next: NodeJS.Timeout
 
   public WAIT_TIME = MAX_PACKET_DELAY

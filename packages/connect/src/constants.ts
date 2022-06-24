@@ -1,11 +1,13 @@
 import Multiaddr from 'multiaddr'
 import { pickVersion } from '@hoprnet/hopr-utils'
+// Do not type-check JSON files
+// @ts-ignore
+import pkg from '../package.json' assert { type: 'json' }
 
-const { name, version } = require('../package.json')
-const NORMALIZED_VERSION = pickVersion(version)
+const NORMALIZED_VERSION = pickVersion(pkg.version)
 
 // Use name without organisation prefix
-export const NAME = name.replace(/@[a-zA-z0-9\-]+\//, '')
+export const NAME = pkg.name.replace(/@[a-zA-z0-9\-]+\//, '')
 
 // p2p multi-address code
 export const CODE_P2P = Multiaddr.protocols.names['p2p'].code

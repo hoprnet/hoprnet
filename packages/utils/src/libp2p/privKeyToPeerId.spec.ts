@@ -1,4 +1,4 @@
-import { privKeyToPeerId } from './privKeyToPeerId'
+import { privKeyToPeerId } from './privKeyToPeerId.js'
 import PeerId from 'peer-id'
 import assert from 'assert'
 

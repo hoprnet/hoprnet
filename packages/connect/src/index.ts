@@ -1,15 +1,18 @@
 import Debug from 'debug'
-import { CODE_DNS4, CODE_DNS6, CODE_IP4, CODE_IP6, CODE_P2P } from './constants'
+import { CODE_DNS4, CODE_DNS6, CODE_IP4, CODE_IP6, CODE_P2P } from './constants.js'
 import type { Multiaddr } from 'multiaddr'
 import PeerId from 'peer-id'
-import type Connection from 'libp2p-interfaces/src/connection/connection'
-import type { Upgrader, Transport } from 'libp2p-interfaces/src/transport/types'
+import type Connection from 'libp2p-interfaces/src/connection/connection.js'
+import type { Upgrader, Transport, MultiaddrConnection } from 'libp2p-interfaces/src/transport/types.js'
 import type libp2p from 'libp2p'
 import chalk from 'chalk'
-import { TCPConnection, Listener } from './base'
-import { Relay } from './relay'
-import { Filter } from './filter'
-import { Discovery } from './discovery'
+import { TCPConnection, Listener } from './base/index.js'
+import { Relay } from './relay/index.js'
+import { Filter } from './filter.js'
+import { Discovery } from './discovery.js'
+// Do not type-check JSON files
+// @ts-ignore
+import pkg from '../package.json' assert { type: 'json' }
 
 import type {
   PublicNodesEmitter,
@@ -17,7 +20,7 @@ import type {
   HoprConnectDialOptions,
   HoprConnectOptions,
   HoprConnectTestingOptions
-} from './types'
+} from './types.js'
 
 const DEBUG_PREFIX = 'hopr-connect'
 const log = Debug(DEBUG_PREFIX)
@@ -83,13 +86,7 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
 
     this.relay = new Relay(this._libp2p, this._dialDirectly, this.filter.bind(this), this.options, this.testingOptions)
 
-    try {
-      const { version } = require('../package.json')
-
-      log(`HoprConnect: `, version)
-    } catch {
-      throw Error(`Cannot find package.json to load version tag. Exitting.`)
-    }
+    log(`HoprConnect: `, pkg.version)
 
     if (!!this.testingOptions.__noDirectConnections) {
       verbose(`DEBUG mode: always using relayed or WebRTC connections.`)
@@ -263,7 +260,7 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
       `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshake.`
     )
 
-    const conn = await this._upgradeOutbound(maConn)
+    const conn = await this._upgradeOutbound(maConn as MultiaddrConnection)
 
     // Assign various connection properties once we're sure that public keys match,
     // i.e. dialed node == desired destination
@@ -298,6 +295,6 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
 }
 
 export type { PublicNodesEmitter, HoprConnectConfig, HoprConnectDialOptions, HoprConnectListeningOptions }
-export { compareAddressesLocalMode, compareAddressesPublicMode } from './utils'
+export { compareAddressesLocalMode, compareAddressesPublicMode } from './utils/index.js'
 
 export default HoprConnect

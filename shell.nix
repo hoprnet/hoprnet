@@ -1,4 +1,4 @@
-{ pkgs ? import <nixpkgs> {}, ... }:
+{ pkgs ? import <nixpkgs> { }, ... }:
 let
   linuxPkgs = with pkgs; lib.optional stdenv.isLinux (
     inotifyTools
@@ -13,7 +13,6 @@ let
 in
 with pkgs;
 mkShell {
-  name = "hoprnet";
   buildInputs = [
     ## base
     envsubst
@@ -21,6 +20,9 @@ mkShell {
     ## node, minimum recommended version is v16, see README for more details
     nodejs-16_x # v16.5.0
     (yarn.override { nodejs = nodejs-16_x; }) # v1.22.10
+
+    ## rust for core development
+    (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
 
     ## python is required by node module bcrypto
     python3
@@ -33,6 +35,9 @@ mkShell {
     jq
     vagrant
     shellcheck
+
+    # devops tooling
+    google-cloud-sdk
 
     # custom pkg groups
     macosPkgs

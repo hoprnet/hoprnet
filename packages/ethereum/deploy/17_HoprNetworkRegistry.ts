@@ -1,7 +1,8 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { HoprNetworkRegistry } from '../src/types'
 
-const main = async function ({ ethers, deployments, getNamedAccounts, network }: HardhatRuntimeEnvironment) {
+const main = async function (hre: HardhatRuntimeEnvironment) {
+  const { ethers, deployments, getNamedAccounts, network, environment } = hre
   const { deployer } = await getNamedAccounts()
 
   const inProd = network.name === 'xdai'
@@ -9,10 +10,18 @@ const main = async function ({ ethers, deployments, getNamedAccounts, network }:
   // Local development environment uses HoprDummyProxyForNetworkRegistry. All the other network uses HoprStakingProxyForNetworkRegistry
   const registryProxy = await deployments.get('HoprNetworkRegistryProxy')
 
+  const deployOptions = {
+    log: true
+  }
+  // don't wait when using local hardhat because its using auto-mine
+  if (!environment.match('hardhat')) {
+    deployOptions['waitConfirmations'] = 2
+  }
+
   const networkRegistryContract = await deployments.deploy('HoprNetworkRegistry', {
     from: deployer,
-    log: true,
-    args: [registryProxy.address, deployer]
+    args: [registryProxy.address, deployer],
+    ...deployOptions
   })
   console.log(`"HoprNetworkRegistry" deployed at ${networkRegistryContract.address}`)
 
@@ -23,7 +32,13 @@ const main = async function ({ ethers, deployments, getNamedAccounts, network }:
   if (!inProd) {
     const isEnabled = await networkRegistry.enabled()
     if (isEnabled) {
-      await networkRegistry.disableRegistry()
+      const disableTx = await networkRegistry.disableRegistry()
+
+      // don't wait when using local hardhat because its using auto-mine
+      if (!environment.match('hardhat')) {
+        await ethers.provider.waitForTransaction(disableTx.hash, 2)
+      }
+
       console.log(`Disabled "HoprNetworkRegistry" in production.`)
     }
   }

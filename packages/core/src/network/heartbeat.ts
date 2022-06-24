@@ -1,13 +1,13 @@
 import { setImmediate } from 'timers/promises'
 
-import type NetworkPeers from './network-peers'
-import type AccessControl from './access-control'
+import type NetworkPeers from './network-peers.js'
+import type AccessControl from './access-control.js'
 import type PeerId from 'peer-id'
 import { randomInteger, u8aEquals, debug, retimer, nAtATime, u8aToHex } from '@hoprnet/hopr-utils'
-import { HEARTBEAT_TIMEOUT } from '../constants'
+import { HEARTBEAT_TIMEOUT } from '../constants.js'
 import { createHash, randomBytes } from 'crypto'
 
-import type { Subscribe, SendMessage } from '../index'
+import type { Subscribe, SendMessage } from '../index.js'
 import EventEmitter from 'events'
 
 const log = debug('hopr-core:heartbeat')

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 # prevent sourcing of this script, only allow execution
+# shellcheck disable=SC2091
 $(return >/dev/null 2>&1)
 test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
 
@@ -10,7 +11,9 @@ set -Eeuo pipefail
 # set log id and use shared log function for readable logs
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+# shellcheck disable=SC2034
 declare HOPR_LOG_ID="publish-version"
+# shellcheck disable=SC1091
 source "${mydir}/utils.sh"
 
 usage() {
@@ -39,7 +42,7 @@ cleanup() {
 }
 
 # return early with help info when requested
-([ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]) && { usage; exit 0; }
+{ [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
 
 # verify and set parameters
 declare branch version_type
@@ -53,6 +56,9 @@ if [ ! "${version_type}" = "patch" ] &&
   exit 1
 fi
 
+# define packages
+declare -a versioned_packages=( utils connect ethereum core-ethereum core real hoprd cover-traffic-daemon )
+
 # ensure local copy is up-to-date with origin
 branch=$(git rev-parse --abbrev-ref HEAD)
 git pull origin "${branch}" --rebase --tags
@@ -61,11 +67,10 @@ git pull origin "${branch}" --rebase --tags
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
 # ensure the build is up-to-date
-yarn
-yarn build
+make -C "${mydir}/.." deps build
 
 declare current_version
-current_version=$(${mydir}/get-package-version.sh)
+current_version="$("${mydir}/get-package-version.sh")"
 if [[ "${version_type}" = "prerelease" ]]; then
   # turn prerelease into preminor if the current version is not a prerelease
   # already, thus update from a patch version to a new minor prerelease
@@ -76,16 +81,21 @@ fi
 
 log "get default environment id"
 
-declare environment_id="$(${mydir}/get-default-environment.sh)"
+declare environment_id
+environment_id="$("${mydir}/get-default-environment.sh")"
 
-log "creating new version ${current_version} + ${version_type}"
+log "using version template ${current_version} + ${version_type}"
+declare new_version
+new_version=$(npx semver --preid next -i "${version_type}" "${current_version}")
+log "creating new version ${new_version}"
 
 # create new version in each package
-yarn workspaces foreach -piv --topological-dev \
-  --exclude hoprnet --exclude hopr-docs \
-  exec -- npm version ${version_type} --preid=next
-declare new_version
-new_version=$(${mydir}/get-package-version.sh)
+for p in "${versioned_packages[@]}"; do
+  cd "${mydir}/../packages/${p}"
+  jq ".version = \"${new_version}\"" package.json > package.json.new
+  mv package.json.new package.json
+  cd "${mydir}/.."
+done
 
 # commit changes and create Git tag
 git add packages/*/package.json
@@ -95,7 +105,7 @@ git commit -m "chore(release): publish ${new_version}"
 git pull origin "${branch}" --rebase --tags
 
 # now tag and proceed
-git tag v${new_version}
+git tag "v${new_version}"
 
 # only make remote changes if running in CI
 if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
@@ -115,12 +125,12 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
     --exclude @hoprnet/hoprd --exclude @hoprnet/hopr-cover-traffic-daemon \
     npm publish --access public
 
-  ${mydir}/wait-for-npm-package.sh utils
-  ${mydir}/wait-for-npm-package.sh connect
-  ${mydir}/wait-for-npm-package.sh ethereum
-  ${mydir}/wait-for-npm-package.sh core-ethereum
-  ${mydir}/wait-for-npm-package.sh core
-  ${mydir}/wait-for-npm-package.sh real
+  "${mydir}/wait-for-npm-package.sh" utils
+  "${mydir}/wait-for-npm-package.sh" connect
+  "${mydir}/wait-for-npm-package.sh" ethereum
+  "${mydir}/wait-for-npm-package.sh" core-ethereum
+  "${mydir}/wait-for-npm-package.sh" core
+  "${mydir}/wait-for-npm-package.sh" real
 
   trap cleanup SIGINT SIGTERM ERR
 
@@ -131,8 +141,8 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
 
   # special treatment for end-of-chain packages
   # to create lockfiles with resolution overrides
-  ${mydir}/build_lockfiles.sh hoprd
-  ${mydir}/build_lockfiles.sh cover-traffic-daemon
+  "${mydir}/build-lockfiles.sh" hoprd
+  "${mydir}/build-lockfiles.sh" cover-traffic-daemon
 
   yarn workspace @hoprnet/hoprd npm publish --access public
   yarn workspace @hoprnet/hopr-cover-traffic-daemon npm publish --access public

@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "1.89.0-next.21",
+  "version": "1.89.0-next.41",
   "description": "On-chain logic for hoprnet.org",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "license": "GPL-3.0",
@@ -11,7 +11,7 @@
     "clean:wasm": "make -C crates clean",
     "build:wasm": "make -C crates all && make -C crates install",
     "test:wasm": "make -C crates test",
-    "clean": "yarn clean:wasm && rimraf ./lib ./src/types ./tsconfig.tsbuildinfo ./tsconfig.hardhat.tsbuildinfo ./tsconfig.spec.tsbuildinfo ./hardhat ./deployments/default/localhost ./deployments/hardhat*",
+    "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo ./tsconfig.hardhat.tsbuildinfo ./hardhat ./deployments/default/localhost ./deployments/hardhat-localhost ./deployments/hardhat",
     "build": "yarn clean && yarn build:wasm && yarn build:sol:types && yarn build:tsc",
     "build:tsc": "tsc -p .",
     "build:sol": "TS_NODE_PROJECT=./tsconfig.hardhat.json hardhat compile",
@@ -59,7 +59,6 @@
     "hardhat-deploy": "^0.11.5",
     "hardhat-gas-reporter": "1.0.8",
     "multiaddr": "10.0.1",
-    "rimraf": "3.0.2",
     "solidity-coverage": "0.7.18",
     "ts-generator": "0.1.1",
     "typechain": "7.0.1",
@@ -68,6 +67,5 @@
   },
   "engines": {
     "node": "16"
-  },
-  "stableVersion": "1.76.0-next.31"
+  }
 }

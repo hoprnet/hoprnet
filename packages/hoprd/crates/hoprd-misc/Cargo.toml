@@ -12,21 +12,15 @@ license = "LGPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-
-# Workspace dependencies
-hopr-real = { path = "../../../real/crates/real-base" }
-
-# 3rd party dependencies
-wasm-bindgen = { version = "0.2.80", features = ["serde-serialize"] }
+real-base = { path = "../../../real/crates/real-base" }
+wasm-bindgen = { version = "0.2.81", features = [] }
 wasm-bindgen-test = "0.3.30"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 
 # Unfortunately, `wee_alloc` requires nightly Rust when targeting real for now.
 wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
-wasm-bindgen-test = "0.3.13"
+wasm-bindgen-test = "0.3.30"
 
 [profile.release]
 # Tell `rustc` to optimize for small code size.

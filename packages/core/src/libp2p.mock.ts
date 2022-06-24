@@ -1,7 +1,7 @@
 import PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'
-import PeerStore from 'libp2p/src/peer-store'
-import AddressManager from 'libp2p/src/address-manager'
+import PeerStore from 'libp2p/src/peer-store/index.js'
+import AddressManager from 'libp2p/src/address-manager/index.js'
 import { MemoryDatastore } from 'datastore-core/memory'
 
 import { debug } from '@hoprnet/hopr-utils'

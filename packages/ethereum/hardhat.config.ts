@@ -21,11 +21,42 @@ import '@typechain/hardhat'
 import faucet, { type FaucetCLIOPts } from './tasks/faucet'
 import parallelTest, { type ParallelTestCLIOpts } from './tasks/parallelTest'
 import register, { type RegisterOpts } from './tasks/register'
+import disableAutoMine from './tasks/disableAutoMine'
 import getAccounts from './tasks/getAccounts'
 
-import { expandVars } from '@hoprnet/hopr-utils'
-import type { ResolvedEnvironment } from '@hoprnet/hopr-core'
+// Copied from `utils` to prevent from ESM import issues
+// ESM support requires code changes within `hardhat-core`
+/**
+ *
+ * @param input a string containing templated references to environment variables e.g. 'foo ${bar}'
+ * @param vars a key-value vars storage object, e.g. { 'bar': 'bar_value' }
+ * @returns a string with variables resolved to the actual values
+ */
+export function expandVars(input: string, vars: { [key: string]: any }) {
+  return input.replace(/\$\{(.*)\}/g, (_, varName) => {
+    if (!(varName in vars)) {
+      throw new Error(`failed to expand vars in string '${input}', var ${varName} not defined`)
+    }
+    return vars[varName]
+  })
+}
 
+// Copied from `core` to prevent from ESM import issues
+// ESM support requires code changes within `hardhat-core`
+type NetworkOptions = {
+  id: string
+  description: string
+  chain_id: number // >= 0
+  live: boolean
+  hardhat_deploy_gas_price: string // Gas price as either a number string '11' or a value which should be converted like '1 gwei'. Used in hardhat-deploy plugin.
+  default_provider: string // a valid HTTP url pointing at a RPC endpoint
+  etherscan_api_url?: string // a valid HTTP url pointing at a RPC endpoint
+  max_fee_per_gas: string // The absolute maximum you are willing to pay per unit of gas to get your transaction included in a block, e.g. '10 gwei'
+  max_priority_fee_per_gas: string // Tips paid directly to miners, e.g. '2 gwei'
+  native_token_name: string
+  hopr_token_name: string
+  tags: string[]
+}
 // rest
 import { task, types, extendEnvironment, subtask } from 'hardhat/config'
 import { writeFileSync, realpathSync } from 'fs'
@@ -45,7 +76,7 @@ extendEnvironment((hre: HardhatRuntimeEnvironment) => {
 //
 // https://hardhat.org/hardhat-network/reference/#config
 // https://github.com/wighawag/hardhat-deploy/blob/master/README.md
-function networkToHardhatNetwork(name: String, input: ResolvedEnvironment['network']): NetworkUserConfig {
+function networkToHardhatNetwork(name: String, input: NetworkOptions): NetworkUserConfig {
   let cfg: NetworkUserConfig = {
     chainId: input.chain_id,
     live: input.live,
@@ -75,6 +106,7 @@ function networkToHardhatNetwork(name: String, input: ResolvedEnvironment['netwo
   }
   if (cfg.tags && cfg.tags.indexOf('development') >= 0) {
     ;(cfg as HardhatNetworkUserConfig).mining = {
+      // Disabled using hardhat-specific RPC call after deployment
       auto: true, // every transaction will trigger a new block (without this deployments fail)
       interval: [1000, 3000] // mine new block every 1 - 3s
     }
@@ -91,7 +123,7 @@ function networkToHardhatNetwork(name: String, input: ResolvedEnvironment['netwo
 
 const networks: NetworksUserConfig = {}
 
-for (const [networkId, network] of Object.entries<ResolvedEnvironment['network']>(PROTOCOL_CONFIG.networks)) {
+for (const [networkId, network] of Object.entries<NetworkOptions>(PROTOCOL_CONFIG.networks)) {
   if (
     PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID] &&
     PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID].network_id === networkId
@@ -179,6 +211,8 @@ task<FaucetCLIOPts>('faucet', 'Faucets a local development HOPR node account wit
   .addOptionalParam<string>('identityPrefix', `only use identity files with prefix`, undefined, types.string)
 
 task('accounts', 'View unlocked accounts', getAccounts)
+
+task('disable-automine', 'Used by E2E tests to disable auto-mining once setup is done', disableAutoMine)
 
 task<RegisterOpts>(
   'register',
@@ -346,8 +380,6 @@ task('test:in-group', 'Reset the hardhat node instances per testFiles array.').s
  */
 subtask(TASK_DEPLOY_RUN_DEPLOY, 'Override the deploy task, with an explicit gas price.').setAction(
   async (taskArgs, { network, ethers }, runSuper) => {
-    // const protocolConfigNetworkNames = Object.keys<ResolvedEnvironment['network']>(PROTOCOL_CONFIG.networks);
-    // const protocolConfigNetworks = Object.values<ResolvedEnvironment['network']>(PROTOCOL_CONFIG.networks);
     const protocolConfigNetwork = PROTOCOL_CONFIG.networks[network.name] ?? undefined
     if (!protocolConfigNetwork) {
       throw Error(
@@ -355,7 +387,7 @@ subtask(TASK_DEPLOY_RUN_DEPLOY, 'Override the deploy task, with an explicit gas 
       )
     }
 
-    const hardhatDeployGasPrice = (protocolConfigNetwork as ResolvedEnvironment['network']).hardhat_deploy_gas_price
+    const hardhatDeployGasPrice = (protocolConfigNetwork as NetworkOptions).hardhat_deploy_gas_price
     const parsedGasPrice = hardhatDeployGasPrice.split(' ')
 
     // as in https://github.com/wighawag/hardhat-deploy/blob/819df0fad56d75a5de5218c3307bec2093f8794c/src/DeploymentsManager.ts#L974

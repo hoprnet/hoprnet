@@ -1,4 +1,4 @@
-import { randomFloat } from './randomFloat'
+import { randomFloat } from './randomFloat.js'
 import assert from 'assert'
 
 describe('test randomFloat', function () {

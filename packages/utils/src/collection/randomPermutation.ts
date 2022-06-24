@@ -1,4 +1,4 @@
-import { randomInteger } from '../crypto/randomInteger'
+import { randomInteger } from '../crypto/randomInteger.js'
 
 /**
  * Return a random permutation of the given `array`

@@ -2,5 +2,6 @@
 
 members = [
     "packages/real/crates/real-base",
-    "packages/hoprd/crates/hoprd-misc"
+    "packages/hoprd/crates/hoprd-misc",
+    "packages/utils/crates/utils-misc"
 ]

@@ -1,8 +1,7 @@
-import { createRoutingInfo, forwardTransform } from './routingInfo'
-import type { RelayNodeOutput } from './routingInfo'
-import { generateKeyShares } from './keyShares'
+import { createRoutingInfo, forwardTransform, type RelayNodeOutput } from './routingInfo.js'
+import { generateKeyShares } from './keyShares.js'
 import PeerId from 'peer-id'
-import { u8aEquals } from '../../u8a'
+import { u8aEquals } from '../../u8a/index.js'
 import assert from 'assert'
 
 describe('routing info generation and mutation', function () {

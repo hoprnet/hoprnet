@@ -14,11 +14,11 @@ import {
   PublicKey
 } from '@hoprnet/hopr-utils'
 
-import Indexer from '.'
-import type { ChainWrapper } from '../ethereum'
-import type { Event, TokenEvent, RegistryEvent } from './types'
-import * as fixtures from './fixtures'
-import { ACCOUNT_A, PARTY_A, PARTY_A_MULTIADDR, PARTY_B } from '../fixtures'
+import Indexer from './index.js'
+import type { ChainWrapper } from '../ethereum.js'
+import type { Event, TokenEvent, RegistryEvent } from './types.js'
+import * as fixtures from './fixtures.js'
+import { ACCOUNT_A, PARTY_A, PARTY_A_MULTIADDR, PARTY_B } from '../fixtures.js'
 import { Multiaddr } from 'multiaddr'
 import BN from 'bn.js'
 

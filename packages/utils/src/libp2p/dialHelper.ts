@@ -3,15 +3,15 @@
  */
 import PeerId from 'peer-id'
 import type LibP2P from 'libp2p'
-import type { Connection } from 'libp2p/src/connection-manager'
-import type { MuxedStream } from 'libp2p/src/upgrader'
+import type { Connection } from 'libp2p/src/connection-manager/index.js'
+import type { MuxedStream } from 'libp2p/src/upgrader.js'
 import { Multiaddr } from 'multiaddr'
 
-import { timeout, abortableTimeout, type TimeoutOpts } from '../async'
+import { timeout, abortableTimeout, type TimeoutOpts } from '../async/index.js'
 
-import { debug } from '../process'
-import { createRelayerKey } from './relayCode'
-import { createCircuitAddress } from '../network'
+import { debug } from '../process/index.js'
+import { createRelayerKey } from './relayCode.js'
+import { createCircuitAddress } from '../network/index.js'
 
 const DEBUG_PREFIX = `hopr-core:libp2p`
 

@@ -1,5 +1,5 @@
-import { Hash, Ticket, PublicKey, Response } from '.'
-import { serializeToU8a, u8aSplit, validatePoRResponse } from '..'
+import { Hash, Ticket, PublicKey, Response } from './index.js'
+import { serializeToU8a, u8aSplit, validatePoRResponse } from '../index.js'
 
 export class AcknowledgedTicket {
   constructor(

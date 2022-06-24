@@ -1,6 +1,5 @@
 {
-  // Use special tsconfig when running hardhat,
-  // makes sure that `src` folder is not built
+  "comment": "Use special tsconfig when running hardhat, makes sure that `src` folder is not built",
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "noEmit": true,

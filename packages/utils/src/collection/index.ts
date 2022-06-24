@@ -1,3 +1,3 @@
-export * from './fifo'
-export * from './randomPermutation'
-export * from './randomSubset'
+export * from './fifo.js'
+export * from './randomPermutation.js'
+export * from './randomSubset.js'

@@ -1,15 +1,15 @@
-import type { StreamType } from '../types'
+import type { StreamType } from '../types.js'
 import type { Instance as SimplePeerInstance } from 'simple-peer'
-import type { RelayConnection } from '../relay/connection'
+import type { RelayConnection } from '../relay/connection.js'
 
-import handshake from 'it-handshake'
-import Pair from 'it-pair'
+import { handshake } from 'it-handshake'
+import { pair } from 'it-pair'
 import { Multiaddr } from 'multiaddr'
 
-import { WebRTCConnection, MigrationStatus } from './connection'
-import { encodeWithLengthPrefix } from '../utils'
+import { WebRTCConnection, MigrationStatus } from './connection.js'
+import { encodeWithLengthPrefix } from '../utils/index.js'
 import { privKeyToPeerId, stringToU8a, u8aEquals, defer } from '@hoprnet/hopr-utils'
-import pushable from 'it-pushable'
+import { pushable } from 'it-pushable'
 
 import { EventEmitter } from 'events'
 import assert from 'assert'
@@ -19,8 +19,8 @@ const Bob = privKeyToPeerId(stringToU8a(`0xf8860ccb336f4aad751f55765b4adbefc538f
 
 describe('test webrtc connection', function () {
   it('exchange messages without upgrade', async function () {
-    const AliceBob = Pair<StreamType>()
-    const BobAlice = Pair<StreamType>()
+    const AliceBob = pair<StreamType>()
+    const BobAlice = pair<StreamType>()
 
     const fakedWebRTCInstance = new EventEmitter() as SimplePeerInstance
 
@@ -49,18 +49,23 @@ describe('test webrtc connection', function () {
       const firstMessage = new TextEncoder().encode(`first message`)
       AliceShaker.write(firstMessage)
 
-      assert(u8aEquals((await BobShaker.read()).slice(), Uint8Array.from([MigrationStatus.NOT_DONE, ...firstMessage])))
+      assert(
+        u8aEquals(
+          ((await BobShaker.read()) as Uint8Array).slice(),
+          Uint8Array.from([MigrationStatus.NOT_DONE, ...firstMessage])
+        )
+      )
 
       const secondMessage = new TextEncoder().encode(`second message`)
       BobShaker.write(Uint8Array.from([MigrationStatus.NOT_DONE, ...secondMessage]))
 
-      assert(u8aEquals((await AliceShaker.read()).slice(), secondMessage))
+      assert(u8aEquals(((await AliceShaker.read()) as Uint8Array).slice(), secondMessage))
     }
   })
 
   it('sends UPGRADED to the relayed connection', async function () {
-    const AliceBob = Pair<StreamType>()
-    const BobAlice = Pair<StreamType>()
+    const AliceBob = pair<StreamType>()
+    const BobAlice = pair<StreamType>()
 
     const webRTCInstance = new EventEmitter() as SimplePeerInstance
 
@@ -83,14 +88,14 @@ describe('test webrtc connection', function () {
 
     webRTCInstance.emit(`connect`)
 
-    assert(u8aEquals((await BobShaker.read()).slice(), Uint8Array.of(MigrationStatus.DONE)))
+    assert(u8aEquals(((await BobShaker.read()) as Uint8Array).slice(), Uint8Array.of(MigrationStatus.DONE)))
 
     assert(upgradeCalls == 1)
   })
 
   it('send DONE after webRTC connect event', async function () {
-    const AliceBob = Pair<StreamType>()
-    const BobAlice = Pair<StreamType>()
+    const AliceBob = pair<StreamType>()
+    const BobAlice = pair<StreamType>()
 
     const webRTCInstance = new EventEmitter() as SimplePeerInstance
 
@@ -110,12 +115,12 @@ describe('test webrtc connection', function () {
 
     webRTCInstance.emit(`connect`)
 
-    assert(u8aEquals((await BobShaker.read()).slice(), Uint8Array.of(MigrationStatus.DONE)))
+    assert(u8aEquals(((await BobShaker.read()) as Uint8Array).slice(), Uint8Array.of(MigrationStatus.DONE)))
   })
 
   it('sending messages after webRTC error event', async function () {
-    const AliceBob = Pair<StreamType>()
-    const BobAlice = Pair<StreamType>()
+    const AliceBob = pair<StreamType>()
+    const BobAlice = pair<StreamType>()
 
     const webRTCInstance = new EventEmitter() as SimplePeerInstance
 
@@ -142,17 +147,22 @@ describe('test webrtc connection', function () {
     const firstMessage = new TextEncoder().encode(`first message`)
     AliceShaker.write(firstMessage)
 
-    assert(u8aEquals((await BobShaker.read()).slice(), Uint8Array.from([MigrationStatus.NOT_DONE, ...firstMessage])))
+    assert(
+      u8aEquals(
+        ((await BobShaker.read()) as Uint8Array).slice(),
+        Uint8Array.from([MigrationStatus.NOT_DONE, ...firstMessage])
+      )
+    )
 
     const secondMessage = new TextEncoder().encode(`second message`)
     BobShaker.write(Uint8Array.from([MigrationStatus.NOT_DONE, ...secondMessage]))
 
-    assert(u8aEquals((await AliceShaker.read()).slice(), secondMessage))
+    assert(u8aEquals(((await AliceShaker.read()) as Uint8Array).slice(), secondMessage))
   })
 
   it('exchange messages and send DONE after webRTC connect event', async function () {
-    const AliceBob = Pair<StreamType>()
-    const BobAlice = Pair<StreamType>()
+    const AliceBob = pair<StreamType>()
+    const BobAlice = pair<StreamType>()
 
     const webRTCInstance = new EventEmitter() as SimplePeerInstance
 
@@ -174,24 +184,29 @@ describe('test webrtc connection', function () {
     const firstMessage = new TextEncoder().encode(`first message`)
     AliceShaker.write(firstMessage)
 
-    assert(u8aEquals((await BobShaker.read()).slice(), Uint8Array.from([MigrationStatus.NOT_DONE, ...firstMessage])))
+    assert(
+      u8aEquals(
+        ((await BobShaker.read()) as Uint8Array).slice(),
+        Uint8Array.from([MigrationStatus.NOT_DONE, ...firstMessage])
+      )
+    )
 
     const secondMessage = new TextEncoder().encode(`second message`)
     BobShaker.write(Uint8Array.from([MigrationStatus.NOT_DONE, ...secondMessage]))
 
-    assert(u8aEquals((await AliceShaker.read()).slice(), secondMessage))
+    assert(u8aEquals(((await AliceShaker.read()) as Uint8Array).slice(), secondMessage))
 
     webRTCInstance.emit(`connect`)
 
-    assert(u8aEquals((await BobShaker.read()).slice(), Uint8Array.of(MigrationStatus.DONE)))
+    assert(u8aEquals(((await BobShaker.read()) as Uint8Array).slice(), Uint8Array.of(MigrationStatus.DONE)))
   })
 
   it('exchange messages through webRTC', async function () {
-    const AliceBob = Pair<StreamType>()
-    const BobAlice = Pair<StreamType>()
+    const AliceBob = pair<StreamType>()
+    const BobAlice = pair<StreamType>()
 
-    const BobAliceWebRTC = pushable<StreamType>()
-    const AliceBobWebRTC = pushable<StreamType>()
+    const BobAliceWebRTC = pushable()
+    const AliceBobWebRTC = pushable()
 
     const webRTCInstance = new EventEmitter() as SimplePeerInstance
 
@@ -232,23 +247,28 @@ describe('test webrtc connection', function () {
     const firstMessage = new TextEncoder().encode(`first message`)
     AliceShaker.write(firstMessage)
 
-    assert(u8aEquals((await BobShaker.read()).slice(), Uint8Array.from([MigrationStatus.NOT_DONE, ...firstMessage])))
+    assert(
+      u8aEquals(
+        ((await BobShaker.read()) as Uint8Array).slice(),
+        Uint8Array.from([MigrationStatus.NOT_DONE, ...firstMessage])
+      )
+    )
 
     const secondMessage = new TextEncoder().encode(`second message`)
     BobShaker.write(Uint8Array.from([MigrationStatus.NOT_DONE, ...secondMessage]))
 
-    assert(u8aEquals((await AliceShaker.read()).slice(), secondMessage))
+    assert(u8aEquals(((await AliceShaker.read()) as Uint8Array).slice(), secondMessage))
 
     webRTCInstance.emit(`connect`)
 
-    assert(u8aEquals((await BobShaker.read()).slice(), Uint8Array.of(MigrationStatus.DONE)))
+    assert(u8aEquals(((await BobShaker.read()) as Uint8Array).slice(), Uint8Array.of(MigrationStatus.DONE)))
 
     BobShaker.write(Uint8Array.of(MigrationStatus.DONE))
 
     const msgSentThroughWebRTC = new TextEncoder().encode(`message that is sent through faked WebRTC`)
     BobAliceWebRTC.push(encodeWithLengthPrefix(Uint8Array.from([MigrationStatus.NOT_DONE, ...msgSentThroughWebRTC])))
 
-    assert(u8aEquals((await AliceShaker.read()).slice(), msgSentThroughWebRTC))
+    assert(u8aEquals(((await AliceShaker.read()) as Uint8Array).slice(), msgSentThroughWebRTC))
 
     const msgSentBackThroughWebRTC = new TextEncoder().encode(`message that is sent back through faked WebRTC`)
 
@@ -263,8 +283,8 @@ describe('test webrtc connection', function () {
   })
 
   it('use abortController to end stream', async function () {
-    const AliceBob = Pair<StreamType>()
-    const BobAlice = Pair<StreamType>()
+    const AliceBob = pair<StreamType>()
+    const BobAlice = pair<StreamType>()
 
     const webRTCInstance = new EventEmitter() as SimplePeerInstance
 
@@ -299,7 +319,7 @@ describe('test webrtc connection', function () {
 
 describe('webrtc connection - stream error propagation', function () {
   it('falsy sink', async function () {
-    const BobAlice = Pair<StreamType>()
+    const BobAlice = pair<StreamType>()
 
     const falsySinkError = 'falsy sink error'
 
@@ -332,7 +352,7 @@ describe('webrtc connection - stream error propagation', function () {
   })
 
   it('falsy sink before sink source attach', async function () {
-    const BobAlice = Pair<StreamType>()
+    const BobAlice = pair<StreamType>()
 
     const falsySinkError = 'falsy sink error'
 
@@ -361,8 +381,8 @@ describe('webrtc connection - stream error propagation', function () {
   })
 
   it('falsy sink source', async function () {
-    const AliceBob = Pair<StreamType>()
-    const BobAlice = Pair<StreamType>()
+    const AliceBob = pair<StreamType>()
+    const BobAlice = pair<StreamType>()
 
     const fakedWebRTCInstance = new EventEmitter() as SimplePeerInstance
 
@@ -391,7 +411,7 @@ describe('webrtc connection - stream error propagation', function () {
   })
 
   it('falsy source', async function () {
-    const AliceBob = Pair<StreamType>()
+    const AliceBob = pair<StreamType>()
 
     const fakedWebRTCInstance = new EventEmitter() as SimplePeerInstance
 

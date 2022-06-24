@@ -1,4 +1,4 @@
-import { retimer } from './retimer'
+import { retimer } from './retimer.js'
 import assert from 'assert'
 import { setTimeout } from 'timers/promises'
 

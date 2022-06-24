@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { gcd } from './gcd'
+import { gcd } from './gcd.js'
 
 describe('check gcd computation', function () {
   it('should compute the gcd of two integers', function () {
