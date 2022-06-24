@@ -1,7 +1,7 @@
 import { HoprDB, UINT256, u8aEquals, Balance, u8aToHex } from '@hoprnet/hopr-utils'
 import { PRICE_PER_PACKET } from '@hoprnet/hopr-utils'
 import { Packet, INTERMEDIATE_HOPS } from './packet.js'
-import PeerId from 'peer-id'
+import { PeerId } from '@libp2p/interface-peer-id'
 import assert from 'assert'
 import BN from 'bn.js'
 

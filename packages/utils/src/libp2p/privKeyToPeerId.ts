@@ -1,4 +1,5 @@
-import PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { peerIdFromKeys } from '@libp2p/peer-id'
 import { keys as libp2p_crypto } from 'libp2p-crypto'
 
 import { stringToU8a } from '../u8a/index.js'
@@ -40,5 +41,5 @@ export function privKeyToPeerId(privKey: Uint8Array | string): PeerId {
 
   const id = encode(secp256k1PrivKey.public.bytes, 'identity')
 
-  return new PeerId(id, secp256k1PrivKey, secp256k1PrivKey.public)
+  return peerIdFromKeys(id, secp256k1PrivKey, secp256k1PrivKey.public)
 }

@@ -1,5 +1,5 @@
 import assert from 'assert'
-import PeerId from 'peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import { stringToU8a, u8aToHex } from '../u8a/index.js'
 import { PublicKey } from './publicKey.js'
 import { Address } from './primitives.js'
@@ -26,7 +26,7 @@ describe('test PublicKey primitive', function () {
 
     assert(u8aToHex(pKey.serializeUncompressed()) === uncompressedPubKey)
     assert(u8aToHex(pKey.serializeCompressed()) === compressedPubKey)
-    assert(pKey.toB58String() === b58String)
+    assert(pKey.toString() === b58String)
   })
 
   it('from Uint8Array', function () {
@@ -34,19 +34,19 @@ describe('test PublicKey primitive', function () {
 
     assert(u8aToHex(pKeyFromUncompressed.serializeUncompressed()) === uncompressedPubKey)
     assert(u8aToHex(pKeyFromUncompressed.serializeCompressed()) === compressedPubKey)
-    assert(pKeyFromUncompressed.toB58String() === b58String)
+    assert(pKeyFromUncompressed.toString() === b58String)
 
     const pKeyFromCompressed = PublicKey.deserialize(stringToU8a(compressedPubKey))
 
     assert(u8aToHex(pKeyFromCompressed.serializeUncompressed()) === uncompressedPubKey)
     assert(u8aToHex(pKeyFromCompressed.serializeCompressed()) === compressedPubKey)
-    assert(pKeyFromCompressed.toB58String() === b58String)
+    assert(pKeyFromCompressed.toString() === b58String)
 
     const pKeyFromUnPrefixedUncompressed = PublicKey.deserialize(stringToU8a(uncompressedPubKeyWithoutPrefix))
 
     assert(u8aToHex(pKeyFromUnPrefixedUncompressed.serializeUncompressed()) === uncompressedPubKey)
     assert(u8aToHex(pKeyFromUnPrefixedUncompressed.serializeCompressed()) === compressedPubKey)
-    assert(pKeyFromUnPrefixedUncompressed.toB58String() === b58String)
+    assert(pKeyFromUnPrefixedUncompressed.toString() === b58String)
 
     assert.throws(() => PublicKey.deserialize(stringToU8a(uncompressedInvalidPubKey)))
     assert.throws(() => PublicKey.deserialize(stringToU8a(compressedInvalidPubKey)))
@@ -57,38 +57,38 @@ describe('test PublicKey primitive', function () {
 
     assert(u8aToHex(pKeyFromUncompressed.serializeUncompressed()) === uncompressedPubKey)
     assert(u8aToHex(pKeyFromUncompressed.serializeCompressed()) === compressedPubKey)
-    assert(pKeyFromUncompressed.toB58String() === b58String)
+    assert(pKeyFromUncompressed.toString() === b58String)
 
     const pKeyFromCompressed = PublicKey.fromString(compressedPubKey)
 
     assert(u8aToHex(pKeyFromCompressed.serializeUncompressed()) === uncompressedPubKey)
     assert(u8aToHex(pKeyFromCompressed.serializeCompressed()) === compressedPubKey)
-    assert(pKeyFromCompressed.toB58String() === b58String)
+    assert(pKeyFromCompressed.toString() === b58String)
 
     const pKeyFromUnPrefixedUncompressed = PublicKey.fromString(uncompressedPubKeyWithoutPrefix)
 
     assert(u8aToHex(pKeyFromUnPrefixedUncompressed.serializeUncompressed()) === uncompressedPubKey)
     assert(u8aToHex(pKeyFromUnPrefixedUncompressed.serializeCompressed()) === compressedPubKey)
-    assert(pKeyFromUnPrefixedUncompressed.toB58String() === b58String)
+    assert(pKeyFromUnPrefixedUncompressed.toString() === b58String)
 
     assert.throws(() => PublicKey.fromString(uncompressedInvalidPubKey))
     assert.throws(() => PublicKey.fromString(compressedInvalidPubKey))
   })
 
   it('from PeerId', function () {
-    const pId = PeerId.createFromB58String(b58String)
+    const pId = peerIdFromString(b58String)
 
     const pKey = PublicKey.fromPeerId(pId)
 
     assert(u8aToHex(pKey.serializeUncompressed()) === uncompressedPubKey)
     assert(u8aToHex(pKey.serializeCompressed()) === compressedPubKey)
-    assert(pKey.toB58String() === b58String)
+    assert(pKey.toString() === b58String)
 
     const pKeyfromB58String = PublicKey.fromPeerIdString(b58String)
 
     assert(u8aToHex(pKeyfromB58String.serializeUncompressed()) === uncompressedPubKey)
     assert(u8aToHex(pKeyfromB58String.serializeCompressed()) === compressedPubKey)
-    assert(pKeyfromB58String.toB58String() === b58String)
+    assert(pKeyfromB58String.toString() === b58String)
   })
 
   it('equals', function () {

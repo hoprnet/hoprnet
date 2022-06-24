@@ -32,11 +32,14 @@
     "lib"
   ],
   "dependencies": {
-    "@chainsafe/libp2p-noise": "5.0.3",
+    "@chainsafe/libp2p-noise": "7.0.0",
     "@google-cloud/profiler": "4.1.7",
     "@hoprnet/hopr-connect": "workspace:packages/connect",
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
+    "@libp2p/interface-peer-id": "1.0.2",
+    "@libp2p/peer-id": "1.1.10",
+    "@multiformats/multiaddr": "10.1.8",
     "abort-controller": "3.0.0",
     "bn.js": "5.2.0",
     "chalk": "5.0.1",
@@ -45,11 +48,9 @@
     "heap-js": "2.1.6",
     "leveldown": "6.1.1",
     "levelup": "5.1.1",
-    "libp2p": "0.36.2",
+    "libp2p": "0.37.3",
     "libp2p-kad-dht": "0.28.6",
     "libp2p-mplex": "0.10.7",
-    "multiaddr": "10.0.1",
-    "peer-id": "0.16.0",
     "secp256k1": "4.0.3"
   },
   "devDependencies": {

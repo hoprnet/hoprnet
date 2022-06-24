@@ -1,7 +1,7 @@
 import { createBlank, createBindingRequest, generateTransactionId } from 'webrtc-stun'
 
 import type { Socket, RemoteInfo } from 'dgram'
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 import debug from 'debug'
 import { randomSubset, ipToU8aAddress, isLocalhost, isPrivateAddress } from '@hoprnet/hopr-utils'
 import { CODE_IP4, CODE_IP6, CODE_DNS4, CODE_DNS6 } from '../constants.js'

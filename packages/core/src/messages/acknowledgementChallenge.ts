@@ -4,7 +4,7 @@ import secp256k1 from 'secp256k1'
 
 import { createHash } from 'crypto'
 
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 
 export class AcknowledgementChallenge {
   private constructor(private ackChallenge: HalfKeyChallenge, private signature: Uint8Array) {}

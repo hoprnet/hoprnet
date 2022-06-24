@@ -6,7 +6,7 @@
 // syncing back and forth with those that have been persisted on chain.
 import { debug, Hash, HoprDB, iterateHash, recoverIteratedHash, toU8a, u8aConcat, UINT256 } from '@hoprnet/hopr-utils'
 import { deriveCommitmentSeed } from '@hoprnet/hopr-utils'
-import PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 
 const log = debug('hopr-core-ethereum:commitment')
 

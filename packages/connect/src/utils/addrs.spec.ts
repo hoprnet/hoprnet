@@ -1,6 +1,6 @@
 import assert from 'assert'
 import { parseAddress } from './addrs.js'
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 
 describe('test address parsing', function () {
   it('good examples', function () {

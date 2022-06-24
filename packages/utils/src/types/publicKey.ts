@@ -1,6 +1,7 @@
 import secp256k1 from 'secp256k1'
 import { u8aToHex, u8aEquals, stringToU8a } from '../u8a/index.js'
-import PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import { pubKeyToPeerId } from '../libp2p/index.js'
 import { Address, Hash } from './primitives.js'
 
@@ -46,7 +47,7 @@ export class PublicKey {
   }
 
   static fromPeerIdString(peerIdString: string) {
-    return PublicKey.fromPeerId(PeerId.createFromB58String(peerIdString))
+    return PublicKey.fromPeerId(peerIdFromString(peerIdString))
   }
 
   static fromSignature(hash: Uint8Array, signature: Uint8Array, v: number): PublicKey {
@@ -121,11 +122,7 @@ export class PublicKey {
   }
 
   toString(): string {
-    return `<PubKey:${this.toB58String()}>`
-  }
-
-  toB58String(): string {
-    return this.toPeerId().toB58String()
+    return this.toPeerId().toString()
   }
 
   eq(b: PublicKey) {

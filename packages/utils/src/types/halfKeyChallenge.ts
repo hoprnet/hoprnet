@@ -1,4 +1,4 @@
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 
 import secp256k1 from 'secp256k1'
 import { Address, Hash } from './index.js'

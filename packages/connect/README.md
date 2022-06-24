@@ -63,7 +63,7 @@ import { NOISE } from '@chainsafe/libp2p-noise'
 const PeerId = require('peer-id')
 
 import HoprConnect from 'hopr-connect'
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 
 const peerId = await PeerId.create({ keyType: 'secp256k1' })
 
@@ -94,7 +94,7 @@ import { NOISE } from '@chainsafe/libp2p-noise'
 const PeerId = require('peer-id')
 
 import HoprConnect from 'hopr-connect'
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 
 const bootstrapId = '16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg' // Change this
 const peerId = await PeerId.create({ keyType: 'secp256k1' })

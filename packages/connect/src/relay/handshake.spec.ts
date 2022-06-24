@@ -1,7 +1,7 @@
 import { RelayHandshake, RelayHandshakeMessage } from './handshake.js'
 import { u8aEquals, defer, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { duplexPair } from 'it-pair/duplex'
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import assert from 'assert'
 import type { Stream, StreamType } from '../types.js'
 import type Connection from 'libp2p-interfaces/src/connection/connection.js'

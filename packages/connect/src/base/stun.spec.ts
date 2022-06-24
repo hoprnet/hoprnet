@@ -11,7 +11,7 @@ import {
   intepreteResults,
   getExternalIp
 } from './stun.js'
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 import assert from 'assert'
 import { defer, type DeferType } from '@hoprnet/hopr-utils'
 import { stopNode, startStunServer, bindToUdpSocket } from './utils.spec.js'

@@ -1,6 +1,7 @@
 import type { default as Hopr } from '@hoprnet/hopr-core'
 import type { State } from '../../types.js'
-import PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 
 /**
  * Takes a string, and checks whether it's an alias or a valid peerId,
@@ -15,7 +16,7 @@ export function checkPeerIdInput(peerIdString: string, state?: State): PeerId {
       return state.aliases.get(peerIdString)!
     }
 
-    return PeerId.createFromB58String(peerIdString)
+    return peerIdFromString(peerIdString)
   } catch (err) {
     throw Error(`Invalid peerId. ${err.message}`)
   }
@@ -55,18 +56,16 @@ export function getPeerIdsAndAliases(
   let peers = node.getConnectedPeers()
 
   // update map
-  peers
-    .map((p) => p.toB58String())
-    .forEach((value) => {
-      peerIds.set(value, {
-        value,
-        isOnline: true
-      })
+  peers.forEach((value) => {
+    peerIds.set(value.toString(), {
+      value: value.toString(),
+      isOnline: true
     })
+  })
 
   // add aliases peer ids into map
   Array.from(state.aliases.entries()).forEach(([alias, peerId]) => {
-    const value = peerId.toB58String()
+    const value = peerId.toString()
 
     peerIds.set(value, {
       value,

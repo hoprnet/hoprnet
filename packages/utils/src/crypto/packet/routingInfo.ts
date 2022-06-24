@@ -7,7 +7,7 @@ import { PRG } from '../prg.js'
 import { generateFiller } from './filler.js'
 import { createMAC } from './mac.js'
 import secp256k1 from 'secp256k1'
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 
 /**
  * Creates the routing information of the mixnet packet

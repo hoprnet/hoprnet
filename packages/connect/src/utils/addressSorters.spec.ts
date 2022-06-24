@@ -1,4 +1,4 @@
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 import assert from 'assert'
 
 import { maToClass, AddressClass, compareAddressesPublicMode, compareAddressesLocalMode } from './addressSorters.js'

@@ -1,7 +1,7 @@
 import { CID } from 'multiformats/cid'
 import * as raw from 'multiformats/codecs/raw'
 import { sha256 } from 'multiformats/hashes/sha2'
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 
 /**
  * Creates a DHT entry to give relays the opportunity to signal
@@ -11,7 +11,7 @@ import type PeerId from 'peer-id'
  * @returns the DHT entry key
  */
 export async function createRelayerKey(destination: PeerId): Promise<CID> {
-  const bytes = raw.encode(new TextEncoder().encode(`/relay/${destination.toB58String()}`))
+  const bytes = raw.encode(new TextEncoder().encode(`/relay/${destination.toString()}`))
   const hash = await sha256.digest(bytes)
 
   return CID.create(1, raw.code, hash)

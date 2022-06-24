@@ -1,4 +1,4 @@
-import PeerId from 'peer-id'
+import { PeerId } from '@libp2p/interface-peer-id'
 import { randomBytes } from 'crypto'
 import { getPacketLength, createPacket, forwardTransform, generateKeyShares } from './index.js'
 import { PAYLOAD_SIZE } from './constants.js'

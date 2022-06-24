@@ -1,13 +1,13 @@
 import { randomBytes } from 'crypto'
 
-import Libp2p from 'libp2p'
+import { createLibp2p, type Libp2p } from 'libp2p'
 import TCP from 'libp2p-tcp'
 import Mplex from 'libp2p-mplex'
 import { NOISE } from '@chainsafe/libp2p-noise'
 import KadDHT from 'libp2p-kad-dht'
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 
 import { createRelayerKey } from './relayCode.js'
 import { privKeyToPeerId } from './privKeyToPeerId.js'
@@ -31,9 +31,9 @@ function getPeerId(): PeerId {
  * @returns a started libp2p instance with a DHT
  */
 async function getNode(id = getPeerId()): Promise<Libp2p> {
-  const node = await Libp2p.create({
+  const node = await createLibp2p({
     addresses: {
-      listen: [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${id.toB58String()}`).toString()]
+      listen: [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${id.toString()}`).toString()]
     },
     peerId: id,
     modules: {

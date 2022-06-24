@@ -1,9 +1,10 @@
 import { setImmediate as setImmediatePromise } from 'timers/promises'
 import BN from 'bn.js'
-import PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import chalk from 'chalk'
 import { EventEmitter } from 'events'
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 import {
   randomChoice,
   defer,
@@ -716,7 +717,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         // remove "p2p" and corresponding peerID
         .decapsulateCode(421)
         // add new peerID
-        .encapsulate(`/p2p/${publicKey.toPeerId().toB58String()}`)
+        .encapsulate(`/p2p/${publicKey.toPeerId().toString()}`)
     } catch (error) {
       log(`Invalid multiaddr '${event.args.multiaddr}' given in event 'onAnnouncement'`)
       log(error)
@@ -825,7 +826,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   private async onRegistered(event: RegistryEvent<'Registered'>, lastSnapshot: Snapshot): Promise<void> {
     let hoprNode: PeerId
     try {
-      hoprNode = PeerId.createFromB58String(event.args.hoprPeerId)
+      hoprNode = peerIdFromString(event.args.hoprPeerId)
     } catch (error) {
       log(`Invalid peer Id '${event.args.hoprPeerId}' given in event 'onRegistered'`)
       log(error)
@@ -891,7 +892,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         id: account.getPeerId(),
         multiaddrs: [account.multiAddr]
       }
-      log(`\t${account.getPeerId().toB58String()} ${account.multiAddr.toString()}`)
+      log(`\t${account.getPeerId().toString()} ${account.multiAddr.toString()}`)
     }
 
     return result

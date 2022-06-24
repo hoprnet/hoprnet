@@ -1,11 +1,12 @@
 /*
  * Add a more usable API on top of LibP2P
  */
-import PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import { keys, PublicKey } from 'libp2p-crypto'
 import multihashes from 'multihashes'
 import type { Connection, MuxedStream } from 'libp2p'
-import type LibP2P from 'libp2p'
+import type { Libp2p } from 'libp2p'
 
 import { debug } from '../process/index.js'
 import { pipe } from 'it-pipe'
@@ -41,7 +42,7 @@ export function convertPubKeyFromPeerId(peerId: PeerId): PublicKey {
  * @param string the B58String used to represent the PeerId
  */
 export function convertPubKeyFromB58String(b58string: string): PublicKey {
-  return convertPubKeyFromPeerId(PeerId.createFromB58String(b58string))
+  return convertPubKeyFromPeerId(peerIdFromString(b58string))
 }
 
 /**
@@ -103,7 +104,7 @@ const logError = debug(`hopr-core:libp2p:error`)
  */
 
 export type libp2pSendMessage = ((
-  libp2p: LibP2P,
+  libp2p: Libp2p,
   destination: PeerId,
   protocol: string,
   message: Uint8Array,
@@ -111,7 +112,7 @@ export type libp2pSendMessage = ((
   opts?: DialOpts
 ) => Promise<void>) &
   ((
-    libp2p: LibP2P,
+    libp2p: Libp2p,
     destination: PeerId,
     protocol: string,
     message: Uint8Array,
@@ -120,7 +121,7 @@ export type libp2pSendMessage = ((
   ) => Promise<Uint8Array[]>)
 
 export async function libp2pSendMessage(
-  libp2p: LibP2P,
+  libp2p: Libp2p,
   destination: PeerId,
   protocol: string,
   message: Uint8Array,
@@ -243,14 +244,14 @@ function generateHandler(
  */
 
 export type libp2pSubscribe = ((
-  libp2p: LibP2P,
+  libp2p: Libp2p,
   protocol: string,
   handler: LibP2PHandlerFunction<Promise<void> | void>,
   errHandler: ErrHandler,
   includeReply: false
 ) => void) &
   ((
-    libp2p: LibP2P,
+    libp2p: Libp2p,
     protocol: string,
     handler: LibP2PHandlerFunction<Promise<Uint8Array>>,
     errHandler: ErrHandler,
@@ -258,7 +259,7 @@ export type libp2pSubscribe = ((
   ) => void)
 
 export async function libp2pSubscribe(
-  libp2p: LibP2P,
+  libp2p: Libp2p,
   protocol: string,
   handler: LibP2PHandlerFunction<Promise<void | Uint8Array> | void>,
   errHandler: ErrHandler,

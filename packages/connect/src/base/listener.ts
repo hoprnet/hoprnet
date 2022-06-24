@@ -20,8 +20,8 @@ import type {
   Listener as InterfaceListener
 } from 'libp2p-interfaces/src/transport/types.js'
 
-import PeerId from 'peer-id'
-import { Multiaddr } from 'multiaddr'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { Multiaddr } from '@multiformats/multiaddr'
 
 import { handleStunRequest, getExternalIp } from './stun.js'
 import { getAddrs } from './addrs.js'
@@ -186,7 +186,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       throw Error(`Can only bind to TCP sockets`)
     }
 
-    if (this.peerId.toB58String() !== ma.getPeerId()) {
+    if (this.peerId.toString() !== ma.getPeerId()) {
       let tmpListeningAddr = ma.decapsulateCode(CODE_P2P)
 
       if (!tmpListeningAddr.isThinWaistAddress()) {

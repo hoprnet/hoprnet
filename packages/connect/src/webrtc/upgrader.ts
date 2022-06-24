@@ -1,10 +1,10 @@
 import SimplePeer from 'simple-peer'
 import debug from 'debug'
 
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 import type { PeerStoreType, HoprConnectOptions } from '../types.js'
 import { CODE_IP4, CODE_TCP, CODE_UDP } from '../constants.js'
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import { AbortError } from 'abortable-iterator'
 
 // No types for wrtc

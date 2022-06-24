@@ -1,9 +1,9 @@
 import type { HoprConnectOptions, PeerStoreType } from '../types.js'
 import type Connection from 'libp2p-interfaces/src/connection/connection.js'
-import PeerId from 'peer-id'
-import type { Multiaddr } from 'multiaddr'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import type { Multiaddr } from '@multiformats/multiaddr'
 import type HoprConnect from '../index.js'
-import { type default as Libp2p, MuxedStream } from 'libp2p'
+import { Libp2p, MuxedStream } from 'libp2p'
 
 import { EventEmitter } from 'events'
 import Debug from 'debug'
@@ -121,13 +121,13 @@ export class EntryNodes extends EventEmitter {
       const limiter = oneAtATime()
       this._onNewRelay = (peer: PeerStoreType) => {
         limiter(async () => {
-          log(`peer online`, peer.id.toB58String())
+          log(`peer online`, peer.id.toString())
           await this.onNewRelay(peer)
         })
       }
       this._onRemoveRelay = (peer: PeerId) => {
         limiter(async () => {
-          log(`peer offline`, peer.toB58String())
+          log(`peer offline`, peer.toString())
           await this.onRemoveRelay(peer)
         })
       }
@@ -263,13 +263,13 @@ export class EntryNodes extends EventEmitter {
       return
     }
     if (peer.multiaddrs == undefined || peer.multiaddrs.length == 0) {
-      log(`Received entry node ${peer.id.toB58String()} without any multiaddr`)
+      log(`Received entry node ${peer.id.toString()} without any multiaddr`)
       return
     }
 
     for (const uncheckedNode of this.uncheckedEntryNodes) {
       if (uncheckedNode.id.equals(peer.id)) {
-        log(`Received duplicate entry node ${peer.id.toB58String()}`)
+        log(`Received duplicate entry node ${peer.id.toString()}`)
         // TODO add difference to previous multiaddrs
         return
       }
@@ -331,7 +331,7 @@ export class EntryNodes extends EventEmitter {
 
       const usableAddresses: Multiaddr[] = uncheckedNode.multiaddrs.filter(isUsableRelay)
 
-      if (knownNodes.has(uncheckedNode.id.toB58String())) {
+      if (knownNodes.has(uncheckedNode.id.toString())) {
         const index = this.availableEntryNodes.findIndex((entry) => entry.id.equals(uncheckedNode.id))
 
         if (index < 0) {
@@ -481,7 +481,7 @@ export class EntryNodes extends EventEmitter {
     try {
       conn = await this.dialDirectly(destinationAddress, { signal: abort.signal, onDisconnect })
     } catch (err: any) {
-      error(`error while contacting entry node ${destination.toB58String()}.`, err.message)
+      error(`error while contacting entry node ${destination.toString()}.`, err.message)
       await attemptClose(conn, error)
     }
 
@@ -551,7 +551,7 @@ export class EntryNodes extends EventEmitter {
     // calls the iterator, thereby starts the stream and
     // consumes the first messages, afterwards closes the stream
     for await (const msg of conn.stream.source) {
-      verbose(`can relay received ${new TextDecoder().decode(msg.slice())} from ${id.toB58String()}`)
+      verbose(`can relay received ${new TextDecoder().decode(msg.slice())} from ${id.toString()}`)
       if (u8aEquals(msg.slice(), OK)) {
         done = true
       }

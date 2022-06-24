@@ -1,6 +1,6 @@
-import type { Multiaddr } from 'multiaddr'
+import type { Multiaddr } from '@multiformats/multiaddr'
 import type { ValidAddress } from './utils/index.js'
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 
 import {
   u8aEquals,
@@ -32,7 +32,7 @@ export class Filter {
 
   constructor(peerId: PeerId, private opts: HoprConnectOptions) {
     this.myPrivateNetworks = getPrivateAddresses()
-    this.myPublicKey = peerId.marshalPubKey()
+    this.myPublicKey = peerId.publicKey as Uint8Array
   }
 
   /**

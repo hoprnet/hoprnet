@@ -19,7 +19,7 @@ import type { ChainWrapper } from '../ethereum.js'
 import type { Event, TokenEvent, RegistryEvent } from './types.js'
 import * as fixtures from './fixtures.js'
 import { ACCOUNT_A, PARTY_A, PARTY_A_MULTIADDR, PARTY_B } from '../fixtures.js'
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 import BN from 'bn.js'
 
 //@TODO: Refactor this logger and mock outside of indexer

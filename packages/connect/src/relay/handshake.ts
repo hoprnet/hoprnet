@@ -2,7 +2,7 @@ import type { HoprConnectOptions, Stream, StreamType } from '../types.js'
 import { toU8aStream } from '../utils/index.js'
 import { handshake } from 'it-handshake'
 import type { Handshake } from 'it-handshake'
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 
 import chalk from 'chalk'
 import { pubKeyToPeerId } from '@hoprnet/hopr-utils'
@@ -109,7 +109,7 @@ class RelayHandshake {
     try {
       chunk = await this.shaker.read()
     } catch (err: any) {
-      error(`Error while reading answer from ${chalk.green(relay.toB58String())}.`, err.message)
+      error(`Error while reading answer from ${chalk.green(relay.toString())}.`, err.message)
     }
 
     if (chunk == null || chunk.length == 0) {
@@ -130,8 +130,8 @@ class RelayHandshake {
       case RelayHandshakeMessage.OK:
         log(
           `Successfully established outbound relayed connection with ${chalk.green(
-            destination.toB58String()
-          )} over relay ${chalk.green(relay.toB58String())}`
+            destination.toString()
+          )} over relay ${chalk.green(relay.toString())}`
         )
         return {
           success: true,
@@ -139,8 +139,8 @@ class RelayHandshake {
         }
       default:
         error(
-          `Could not establish relayed connection to ${chalk.green(destination.toB58String())} over relay ${chalk.green(
-            relay.toB58String()
+          `Could not establish relayed connection to ${chalk.green(destination.toString())} over relay ${chalk.green(
+            relay.toString()
           )}. Answer was: <${chalk.yellow(handshakeMessageToString(answer))}>`
         )
 
@@ -203,10 +203,10 @@ class RelayHandshake {
       return
     }
 
-    log(`counterparty identified as ${destination.toB58String()}`)
+    log(`counterparty identified as ${destination.toString()}`)
 
     if (source.equals(destination)) {
-      error(`Peer ${source.toB58String()} is trying to loopback to itself. Dropping connection.`)
+      error(`Peer ${source.toString()} is trying to loopback to itself. Dropping connection.`)
       this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_LOOPBACKS_ARE_NOT_ALLOWED))
       this.shaker.rest()
       return
@@ -238,7 +238,7 @@ class RelayHandshake {
     // Anything can happen while attempting to connect
     if (toDestinationStruct == null) {
       error(
-        `Failed to create circuit from ${source.toB58String()} to ${destination.toB58String()} because destination is not reachable`
+        `Failed to create circuit from ${source.toString()} to ${destination.toString()} because destination is not reachable`
       )
       this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY))
       this.shaker.rest()
@@ -268,7 +268,7 @@ class RelayHandshake {
       try {
         await toDestinationStruct.conn.close()
       } catch (err) {
-        error(`Error while closing connection to destination ${destination.toB58String()}.`, err)
+        error(`Error while closing connection to destination ${destination.toString()}.`, err)
       }
       return
     }
@@ -291,10 +291,7 @@ class RelayHandshake {
             this.options.relayFreeTimeout
           )
         } catch (err) {
-          error(
-            `Cannot establish relayed connection between ${destination.toB58String()} and ${source.toB58String()}`,
-            err
-          )
+          error(`Cannot establish relayed connection between ${destination.toString()} and ${source.toString()}`, err)
           // @TODO find a way how to forward the error to source and destination
           return
         }
@@ -353,8 +350,8 @@ class RelayHandshake {
 
     log(
       `Successfully established inbound relayed connection from initiator ${chalk.green(
-        initiator.toB58String()
-      )} over relay ${chalk.green(source.toB58String())}.`
+        initiator.toString()
+      )} over relay ${chalk.green(source.toString())}.`
     )
 
     this.shaker.write(Uint8Array.of(RelayHandshakeMessage.OK))

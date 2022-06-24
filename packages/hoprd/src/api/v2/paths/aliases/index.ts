@@ -1,7 +1,7 @@
 import type { Operation } from 'express-openapi'
-import PeerId from 'peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import { STATUS_CODES } from '../../utils.js'
-import { State, StateOps } from '../../../../types.js'
+import type { State, StateOps } from '../../../../types.js'
 
 /**
  * Sets an alias and assigns the PeerId to it.
@@ -11,7 +11,7 @@ import { State, StateOps } from '../../../../types.js'
 export const setAlias = (stateOps: StateOps, alias: string, peerId: string): State => {
   try {
     const state = stateOps.getState()
-    state.aliases.set(alias, PeerId.createFromB58String(peerId))
+    state.aliases.set(alias, peerIdFromString(peerId))
     stateOps.setState(state)
     return state
   } catch {
@@ -24,7 +24,7 @@ export const setAlias = (stateOps: StateOps, alias: string, peerId: string): Sta
  */
 export const getAliases = (state: Readonly<State>): { [alias: string]: string } => {
   return Array.from(state.aliases).reduce((result, [alias, peerId]) => {
-    result[alias] = peerId.toB58String()
+    result[alias] = peerId.toString()
     return result
   }, {})
 }

@@ -1,4 +1,4 @@
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types.js'
 import type { Stream, StreamSink, StreamSource, StreamSourceAsync, StreamResult, StreamType } from '../types.js'
 import { randomBytes } from 'crypto'
@@ -7,7 +7,7 @@ import { u8aEquals, u8aToHex, defer, createCircuitAddress, type DeferType } from
 import HeapPkg, { type Heap as HeapType } from 'heap-js'
 
 import type { Instance as SimplePeer } from 'simple-peer'
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 
 import Debug from 'debug'
 import { EventEmitter } from 'events'

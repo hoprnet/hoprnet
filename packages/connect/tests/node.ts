@@ -1,4 +1,4 @@
-import { default as libp2p, type Connection, type HandlerProps } from 'libp2p'
+import { createLibp2p, type Connection, type HandlerProps } from 'libp2p'
 import { durations } from '@hoprnet/hopr-utils'
 import fs from 'fs'
 import { setTimeout } from 'timers/promises'
@@ -7,11 +7,11 @@ import { NOISE } from '@chainsafe/libp2p-noise'
 const Mplex = require('libp2p-mplex')
 
 import { default as HoprConnect, type HoprConnectConfig } from '@hoprnet/hopr-connect'
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 import { pipe } from 'it-pipe'
 import yargs from 'yargs/yargs'
 import { peerIdForIdentity, identityFromPeerId } from './identities.js'
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import type { WriteStream } from 'fs'
 import type { PeerStoreType, Stream } from '../src/types.js'
 
@@ -74,15 +74,15 @@ async function startNode(
   console.log(
     `starting node, bootstrap address ${
       options.config?.initialNodes != undefined && options.config?.initialNodes.length > 0
-        ? options.config.initialNodes[0].id.toB58String()
+        ? options.config.initialNodes[0].id.toString()
         : 'undefined'
     }`
   )
 
-  const node = await libp2p.create({
+  const node = await createLibp2p({
     peerId,
     addresses: {
-      listen: [`/ip4/0.0.0.0/tcp/${port}/p2p/${peerId.toB58String()}`]
+      listen: [`/ip4/0.0.0.0/tcp/${port}/p2p/${peerId.toString()}`]
     },
     modules: {
       transport: [HoprConnect as any],
@@ -167,7 +167,7 @@ async function executeCommands({
       }
       case 'dial': {
         const targetPeerId = peerIdForIdentity(cmdDef.targetIdentityName)
-        const targetAddress = new Multiaddr(`/ip4/127.0.0.1/tcp/${cmdDef.targetPort}/p2p/${targetPeerId.toB58String()}`)
+        const targetAddress = new Multiaddr(`/ip4/127.0.0.1/tcp/${cmdDef.targetPort}/p2p/${targetPeerId.toString()}`)
         console.log(`dialing ${cmdDef.targetIdentityName}`)
         await node.dial(targetAddress)
 
@@ -180,11 +180,8 @@ async function executeCommands({
 
         console.log(`msg: dialing ${cmdDef.targetIdentityName} though relay ${cmdDef.relayIdentityName}`)
         const { stream } = await node
-          .dialProtocol(
-            new Multiaddr(`/p2p/${relayPeerId}/p2p-circuit/p2p/${targetPeerId.toB58String()}`),
-            TEST_PROTOCOL
-          )
-          .catch((err) => {
+          .dialProtocol(new Multiaddr(`/p2p/${relayPeerId}/p2p-circuit/p2p/${targetPeerId.toString()}`), TEST_PROTOCOL)
+          .catch((err: unknown) => {
             console.log(`dialProtocol to ${cmdDef.targetIdentityName} failed`)
             console.log(err)
             process.exit(1)
@@ -301,7 +298,7 @@ async function main() {
     const bootstrapPeerId = peerIdForIdentity(parsedOpts.bootstrapIdentityName)
     bootstrapAddress = {
       id: bootstrapPeerId,
-      multiaddrs: [new Multiaddr(`/ip4/127.0.0.1/tcp/${parsedOpts.bootstrapPort}/p2p/${bootstrapPeerId.toB58String()}`)]
+      multiaddrs: [new Multiaddr(`/ip4/127.0.0.1/tcp/${parsedOpts.bootstrapPort}/p2p/${bootstrapPeerId.toString()}`)]
     }
   }
   const peerId = peerIdForIdentity(parsedOpts.identityName)

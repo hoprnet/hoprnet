@@ -4,14 +4,14 @@ import type Connection from 'libp2p-interfaces/src/connection/connection.js'
 import type { Address } from 'libp2p/src/peer-store/address-book.js'
 
 import { Relay } from './index.js'
-import PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import EventEmitter from 'events'
 import { privKeyToPeerId, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
 import { handshake } from 'it-handshake'
 import { RelayConnection } from './connection.js'
 import assert from 'assert'
 import { pair } from 'it-pair'
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 
 const initiator = privKeyToPeerId(stringToU8a('0xa889bad3e2a31cceff4faccdd374af67db485ac0e05e7e654530aff0da5199f7'))
 const relay = privKeyToPeerId(stringToU8a('0xcd1fb76053833d9bb5b3ff243b2d17b96dc5ad7cc09b33c4cf77ba83c297443f'))
@@ -22,7 +22,7 @@ function msgToEchoedMessage(message: string): Uint8Array {
 }
 
 function getPeerProtocol(peer: PeerId, protocol: string) {
-  return `${peer.toB58String()}${protocol}`
+  return `${peer.toString()}${protocol}`
 }
 
 function getPeer(peerId: PeerId, network: EventEmitter) {
@@ -81,7 +81,7 @@ function getPeer(peerId: PeerId, network: EventEmitter) {
           get: async (peer: PeerId): Promise<Address[]> => {
             return [
               {
-                multiaddr: new Multiaddr(`/ip4/127.0.0.1/tcp/1/p2p/${peer.toB58String()}`),
+                multiaddr: new Multiaddr(`/ip4/127.0.0.1/tcp/1/p2p/${peer.toString()}`),
                 isCertified: true
               }
             ]

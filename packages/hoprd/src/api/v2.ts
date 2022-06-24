@@ -7,7 +7,7 @@ import swaggerUi from 'swagger-ui-express'
 import bodyParser from 'body-parser'
 import { initialize } from 'express-openapi'
 import type { default as OpenAPIFramework } from 'openapi-framework'
-import PeerId from 'peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import { debug, Address } from '@hoprnet/hopr-utils'
 import { authenticateWsConnection, getStatusCodeForInvalidInputInRequest, removeQueryParams } from './utils.js'
 
@@ -77,7 +77,7 @@ export async function setupRestApi(
       peerId: (input) => {
         try {
           // this call will throw if the input is no peer id
-          return !!PeerId.createFromB58String(input)
+          return !!peerIdFromString(input)
         } catch (_err) {
           return false
         }

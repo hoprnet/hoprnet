@@ -4,7 +4,7 @@ import type { RelayConnection } from '../relay/connection.js'
 
 import { handshake } from 'it-handshake'
 import { pair } from 'it-pair'
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 
 import { WebRTCConnection, MigrationStatus } from './connection.js'
 import { encodeWithLengthPrefix } from '../utils/index.js'

@@ -29,6 +29,9 @@
   "dependencies": {
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
+    "@libp2p/interface-peer-id": "1.0.2",
+    "@libp2p/peer-id": "1.1.10",
+    "@multiformats/multiaddr": "10.1.8",
     "@sinonjs/referee": "9.1.1",
     "async-mutex": "0.3.2",
     "bn.js": "5.2.0",
@@ -36,8 +39,6 @@
     "debug": "4.3.4",
     "ethers": "5.5.4",
     "heap-js": "2.1.6",
-    "multiaddr": "10.0.1",
-    "peer-id": "0.16.0",
     "secp256k1": "4.0.3"
   },
   "devDependencies": {

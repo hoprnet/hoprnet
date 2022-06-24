@@ -1,5 +1,5 @@
 import { Stream } from '../types.js'
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 
 import { nAtATime, u8aCompare } from '@hoprnet/hopr-utils'
 import { RelayContext } from './context.js'
@@ -52,7 +52,7 @@ class RelayState {
   async isActive(source: PeerId, destination: PeerId, timeout?: number): Promise<boolean> {
     const id = RelayState.getId(source, destination)
     if (!this.relayedConnections.has(id)) {
-      verbose(`Connection from ${source.toB58String()} to ${destination.toB58String()} does not exist.`)
+      verbose(`Connection from ${source.toString()} to ${destination.toString()} does not exist.`)
       return false
     }
 
@@ -60,18 +60,18 @@ class RelayState {
 
     let latency: number
     try {
-      latency = await context[destination.toB58String()].ping(timeout)
+      latency = await context[destination.toString()].ping(timeout)
     } catch (err) {
       error(err)
       return false
     }
 
     if (latency >= 0) {
-      verbose(`Connection from ${source.toB58String()} to ${destination.toB58String()} is active.`)
+      verbose(`Connection from ${source.toString()} to ${destination.toString()} is active.`)
       return true
     }
 
-    error(`Connection from ${source.toB58String()} to ${destination.toB58String()} is NOT active.`)
+    error(`Connection from ${source.toString()} to ${destination.toString()} is NOT active.`)
     return false
   }
 
@@ -91,7 +91,7 @@ class RelayState {
 
     const context = this.relayedConnections.get(id) as State
 
-    context[source.toB58String()].update(toSource)
+    context[source.toString()].update(toSource)
   }
 
   /**
@@ -129,8 +129,8 @@ class RelayState {
     let destinationPromise = toDestinationContext.sink(toSourceContext.source)
 
     let relayedConnection: State = {
-      [source.toB58String()]: toSourceContext,
-      [destination.toB58String()]: toDestinationContext
+      [source.toString()]: toSourceContext,
+      [destination.toString()]: toDestinationContext
     }
 
     toSourceContext.once('close', this.cleanListener(source, destination))
@@ -162,9 +162,9 @@ class RelayState {
       let found = this.relayedConnections.get(id)
 
       if (found) {
-        delete found[source.toB58String()]
+        delete found[source.toString()]
 
-        if (!found.hasOwnProperty(destination.toB58String())) {
+        if (!found.hasOwnProperty(destination.toString())) {
           this.relayedConnections.delete(id)
         }
       }
@@ -183,9 +183,9 @@ class RelayState {
 
     switch (cmpResult) {
       case 1:
-        return `${a.toB58String()}${b.toB58String()}`
+        return `${a.toString()}${b.toString()}`
       case -1:
-        return `${b.toB58String()}${a.toB58String()}`
+        return `${b.toString()}${a.toString()}`
       default:
         throw Error(`Invalid compare result. Loopbacks are not allowed.`)
     }

@@ -1,7 +1,8 @@
 import type { Operation } from 'express-openapi'
 import type { default as Hopr } from '@hoprnet/hopr-core'
 import { ChannelEntry, ChannelStatus, PublicKey } from '@hoprnet/hopr-utils'
-import PeerId from 'peer-id'
+import { PeerId } from '@libp2p/interface-peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import BN from 'bn.js'
 import { STATUS_CODES } from '../../utils.js'
 
@@ -25,7 +26,7 @@ export const formatOutgoingChannel = (channel: ChannelEntry): ChannelInfo => {
   return {
     type: 'outgoing',
     channelId: channel.getId().toHex(),
-    peerId: channel.source.toPeerId().toB58String(),
+    peerId: channel.source.toPeerId().toString(),
     status: channelStatusToString(channel.status),
     balance: channel.balance.toBN().toString()
   }
@@ -35,7 +36,7 @@ export const formatIncomingChannel = (channel: ChannelEntry): ChannelInfo => {
   return {
     type: 'incoming',
     channelId: channel.getId().toHex(),
-    peerId: channel.destination.toPeerId().toB58String(),
+    peerId: channel.destination.toPeerId().toString(),
     status: channelStatusToString(channel.status),
     balance: channel.balance.toBN().toString()
   }
@@ -140,7 +141,7 @@ GET.apiDoc = {
 export const openChannel = async (node: Hopr, counterpartyStr: string, amountStr: string) => {
   let counterparty: PeerId
   try {
-    counterparty = PeerId.createFromB58String(counterpartyStr)
+    counterparty = peerIdFromString(counterpartyStr)
   } catch (err) {
     throw Error(STATUS_CODES.INVALID_PEERID)
   }

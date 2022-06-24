@@ -3,11 +3,11 @@ import type { AddressInfo, Server as TCPServer } from 'net'
 import type { Socket as UDPSocket } from 'dgram'
 import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types.js'
 import type Connection from 'libp2p-interfaces/src/connection/connection.js'
-import PeerId from 'peer-id'
+import { PeerId } from '@libp2p/interface-peer-id'
 
 import { isAnyAddress } from '@hoprnet/hopr-utils'
 
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 import { CODE_CIRCUIT, CODE_P2P } from '../constants.js'
 
 export * from './addrs.js'
@@ -148,7 +148,7 @@ export function nodeToMultiaddr(addr: AddressInfo, peerId: PeerId | undefined): 
   )
 
   if (peerId != undefined) {
-    ma = ma.encapsulate(`/p2p/${peerId.toB58String()}`)
+    ma = ma.encapsulate(`/p2p/${peerId.toString()}`)
   }
 
   return ma

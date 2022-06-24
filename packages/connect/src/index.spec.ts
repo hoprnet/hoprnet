@@ -7,12 +7,12 @@
 // // @ts-ignore
 // import SECIO = require('libp2p-secio')
 
-// import PeerId from 'peer-id'
+// import PeerId from '@libp2p/peer-id'
 
 // import { Connection, Handler } from 'libp2p'
 
 // import TCP from '.'
-// import Multiaddr from 'multiaddr'
+// import Multiaddr from '@multiformats/multiaddr'
 // import pipe from 'it-pipe'
 
 // import { u8aEquals } from '@hoprnet/hopr-utils'

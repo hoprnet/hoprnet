@@ -1,5 +1,5 @@
-import { Multiaddr, protocols } from 'multiaddr'
-import PeerId from 'peer-id'
+import { Multiaddr, protocols } from '@multiformats/multiaddr'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import { u8aSplit, serializeToU8a, MULTI_ADDR_MAX_LENGTH, toU8a, u8aToNumber } from '../index.js'
 import BN from 'bn.js'
 import { PublicKey } from './publicKey.js'

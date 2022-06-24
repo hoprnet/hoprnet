@@ -22,7 +22,7 @@ import {
 } from '@hoprnet/hopr-utils'
 import type { HalfKey, HalfKeyChallenge, ChannelEntry, Challenge, Hash } from '@hoprnet/hopr-utils'
 import { AcknowledgementChallenge } from './acknowledgementChallenge.js'
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import BN from 'bn.js'
 import { Acknowledgement } from './acknowledgement.js'
 import chalk from 'chalk'
@@ -80,14 +80,14 @@ export async function createTicket(
     `balances ${channel.balance.toFormattedString()} - ${outstandingTicketBalance.toFormattedString()} = ${new Balance(
       balance
     ).toFormattedString()} should >= ${amount.toFormattedString()} in channel open to ${
-      !channel.destination ? '' : channel.destination.toB58String()
+      !channel.destination ? '' : channel.destination.toString()
     }`
   )
   if (balance.lt(amount.toBN())) {
     throw Error(
       `We don't have enough funds in channel ${channel
         .getId()
-        .toHex()} with counterparty ${dest.toB58String()} to create ticket`
+        .toHex()} with counterparty ${dest.toString()} to create ticket`
     )
   }
 
@@ -169,7 +169,7 @@ export async function validateUnacknowledgedTicket(
 
   // channel MUST be open or pending to close
   if (channel.status === ChannelStatus.Closed) {
-    throw Error(`Payment channel with '${them.toB58String()}' is not open or pending to close`)
+    throw Error(`Payment channel with '${them.toString()}' is not open or pending to close`)
   }
 
   // ticket's epoch MUST match our channel's epoch
@@ -401,7 +401,7 @@ export class Packet {
     log(
       `Storing unacknowledged ticket. Expecting to receive a preImage for ${chalk.green(
         this.ackChallenge.toHex()
-      )} from ${chalk.blue(pubKeyToPeerId(this.nextHop).toB58String())}`
+      )} from ${chalk.blue(pubKeyToPeerId(this.nextHop).toString())}`
     )
 
     await db.storePendingAcknowledgement(this.ackChallenge, false, unacknowledged)

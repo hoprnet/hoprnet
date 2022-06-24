@@ -6,8 +6,8 @@ import { pipe } from 'it-pipe'
 import chalk from 'chalk'
 import yargs from 'yargs/yargs'
 
-import { Multiaddr } from 'multiaddr'
-import type PeerId from 'peer-id'
+import { Multiaddr } from '@multiformats/multiaddr'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import { NOISE } from '@chainsafe/libp2p-noise'
 import Upgrader from 'libp2p/src/upgrader.js'
 import Mplex from 'libp2p-mplex'
@@ -118,7 +118,7 @@ async function main() {
   const protocols = await _conn.getProtocols()
 
   console.log(
-    `Node identified as ${chalk.blue(_conn.remotePeer.toB58String())}, supported protocol${
+    `Node identified as ${chalk.blue(_conn.remotePeer.toString())}, supported protocol${
       protocols.length == 1 ? '' : 's'
     }:\n  ${protocols.map((str) => chalk.green(str)).join('\n  ')}`
   )

@@ -2,13 +2,13 @@ import { setImmediate } from 'timers/promises'
 import EventEmitter from 'events'
 
 import all from 'it-all'
-import { protocols, Multiaddr } from 'multiaddr'
+import { protocols, Multiaddr } from '@multiformats/multiaddr'
 import chalk from 'chalk'
 
 import type BN from 'bn.js'
-import type { default as LibP2P, Connection } from 'libp2p'
+import type { Libp2p, Connection } from 'libp2p'
 import type { Peer } from 'libp2p/src/peer-store/types.js'
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 
 import { compareAddressesLocalMode, compareAddressesPublicMode, type HoprConnectConfig } from '@hoprnet/hopr-connect'
 
@@ -238,7 +238,7 @@ class Hopr extends EventEmitter {
     const initialNodes = await this.connector.waitForPublicNodes()
 
     // Add all initial public nodes to public nodes cache
-    initialNodes.forEach((initialNode) => this.knownPublicNodesCache.add(initialNode.id.toB58String()))
+    initialNodes.forEach((initialNode) => this.knownPublicNodesCache.add(initialNode.id.toString()))
 
     // Fetch all nodes that will announces themselves during startup
     const recentlyAnnouncedNodes: PeerStoreAddress[] = []
@@ -302,7 +302,7 @@ class Hopr extends EventEmitter {
       }
     )
 
-    peers.forEach((peer) => log(`peer store: loaded peer ${peer.id.toB58String()}`))
+    peers.forEach((peer) => log(`peer store: loaded peer ${peer.id.toString()}`))
 
     this.heartbeat = new Heartbeat(
       this.networkPeers,
@@ -311,7 +311,7 @@ class Hopr extends EventEmitter {
       this.closeConnectionsTo.bind(this),
       accessControl.reviewConnection.bind(accessControl),
       this,
-      (peerId: PeerId) => this.knownPublicNodesCache.has(peerId.toB58String()),
+      (peerId: PeerId) => this.knownPublicNodesCache.has(peerId.toString()),
       this.environment.id,
       this.options
     )
@@ -384,7 +384,7 @@ class Hopr extends EventEmitter {
     // Log information
     // Debug log used in e2e integration tests, please don't change
     log('# STARTED NODE')
-    log('ID', this.getId().toB58String())
+    log('ID', this.getId().toString())
     log('Protocol version', VERSION)
     if (this.libp2p.multiaddrs !== undefined) {
       log(`Available under the following addresses:`)
@@ -401,7 +401,7 @@ class Hopr extends EventEmitter {
   private async maybeLogProfilingToGCloud() {
     if (process.env.GCLOUD) {
       try {
-        var name = 'hopr_node_' + this.getId().toB58String().slice(-5).toLowerCase()
+        var name = 'hopr_node_' + this.getId().toString().slice(-5).toLowerCase()
         ;(await import('@google-cloud/profiler'))
           .start({
             projectId: 'hoprassociation',
@@ -484,10 +484,10 @@ class Hopr extends EventEmitter {
       }
 
       // Mark the corresponding entry as public & recalculate network health indicator
-      this.knownPublicNodesCache.add(peer.id.toB58String())
+      this.knownPublicNodesCache.add(peer.id.toString())
       this.heartbeat.recalculateNetworkHealth()
     } catch (err) {
-      log(`Failed to update peer-store with new peer ${peer.id.toB58String()} info`, err)
+      log(`Failed to update peer-store with new peer ${peer.id.toString()} info`, err)
     }
   }
 
@@ -570,7 +570,7 @@ class Hopr extends EventEmitter {
 
     for (let i = 0; i < tickResult.toClose.length; i++) {
       const destination = tickResult.toClose[i].destination
-      verbose(`closing channel to ${destination.toB58String()}`)
+      verbose(`closing channel to ${destination.toString()}`)
       try {
         await this.closeChannel(destination.toPeerId(), 'outgoing')
         verbose(`closed channel to ${destination.toString()}`)
@@ -666,7 +666,7 @@ class Hopr extends EventEmitter {
           }
         }
       } catch (err) {
-        log(`Could not find any relayer key for ${peer.toB58String()}`)
+        log(`Could not find any relayer key for ${peer.toString()}`)
       }
     }
 
@@ -788,7 +788,7 @@ class Hopr extends EventEmitter {
     try {
       pingResult = await this.heartbeat.pingNode(destination)
     } catch (err) {
-      log(`Could not ping ${destination.toB58String()}.`, err)
+      log(`Could not ping ${destination.toString()}.`, err)
       return { latency: -1, info: 'error' }
     }
 
@@ -843,7 +843,7 @@ class Hopr extends EventEmitter {
       try {
         await conn.close()
       } catch (err: any) {
-        error(`Error while intentionally closing connection to ${peer.toB58String()}`, err)
+        error(`Error while intentionally closing connection to ${peer.toString()}`, err)
       }
     }
   }
@@ -935,12 +935,12 @@ class Hopr extends EventEmitter {
       // Submit P2P address if IPv4 or IPv6 address is not routable because link-locale, reserved or private address
       // except if testing locally, e.g. as part of an integration test
       if (addrToAnnounce == undefined) {
-        addrToAnnounce = new Multiaddr('/p2p/' + this.getId().toB58String())
+        addrToAnnounce = new Multiaddr('/p2p/' + this.getId().toString())
       } else {
         routableAddressAvailable = true
       }
     } else {
-      addrToAnnounce = new Multiaddr('/p2p/' + this.getId().toB58String())
+      addrToAnnounce = new Multiaddr('/p2p/' + this.getId().toString())
     }
 
     // Check if there was a previous annoucement from us

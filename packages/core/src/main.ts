@@ -1,7 +1,7 @@
 import path from 'path'
 import { mkdir } from 'fs/promises'
 
-import { default as LibP2P } from 'libp2p'
+import { type Libp2p, createLibp2p } from 'libp2p'
 import { LevelDatastore } from 'datastore-level'
 import { type AddressSorter, HoprDB, PublicKey, debug } from '@hoprnet/hopr-utils'
 import { default as HoprCoreEthereum } from '@hoprnet/hopr-core-ethereum'
@@ -9,7 +9,7 @@ import { default as HoprCoreEthereum } from '@hoprnet/hopr-core-ethereum'
 import Mplex from 'libp2p-mplex'
 import KadDHT from 'libp2p-kad-dht'
 import { NOISE } from '@chainsafe/libp2p-noise'
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import Hopr, { type HoprOptions } from './index.js'
 import { getAddrs } from './identity.js'
 import HoprConnect, {
@@ -17,7 +17,7 @@ import HoprConnect, {
   type HoprConnectConfig,
   type PublicNodesEmitter
 } from '@hoprnet/hopr-connect'
-import type { Multiaddr } from 'multiaddr'
+import type { Multiaddr } from '@multiformats/multiaddr'
 import type AccessControl from './network/access-control.js'
 
 const log = debug(`hopr-core:create-hopr`)
@@ -38,7 +38,7 @@ export async function createLibp2pInstance(
   initialNodes: { id: PeerId; multiaddrs: Multiaddr[] }[],
   publicNodes: PublicNodesEmitter,
   reviewConnection: AccessControl['reviewConnection']
-): Promise<LibP2P> {
+): Promise<Libp2p> {
   let addressSorter: AddressSorter
 
   if (options.testing?.preferLocalAddresses) {
@@ -64,7 +64,7 @@ export async function createLibp2pInstance(
 
   log(`using peerstore at ${datastorePath}`)
 
-  const libp2p = await LibP2P.create({
+  const libp2p = await createLibp2p({
     peerId,
     addresses: { listen: getAddrs(peerId, options).map((x) => x.toString()) },
     // libp2p modules

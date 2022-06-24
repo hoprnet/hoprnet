@@ -3,7 +3,7 @@ import { SECP256K1_CONSTANTS } from '../constants.js'
 import { sampleGroupElement } from '../sampleGroupElement.js'
 import secp256k1 from 'secp256k1'
 
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import hkdf from 'futoin-hkdf'
 
 /**
@@ -74,7 +74,7 @@ export function generateKeyShares(path: PeerId[]): { alpha: Uint8Array; secrets:
  * @return Next public key (compressed EC point) and derived secret
  */
 export function forwardTransform(alpha: Uint8Array, peerId: PeerId): { alpha: Uint8Array; secret: Uint8Array } {
-  if (!secp256k1.publicKeyVerify(alpha) || peerId.privKey == null || peerId.pubKey == null) {
+  if (!secp256k1.publicKeyVerify(alpha) || peerId.privateKey == null || peerId.publicKey == null) {
     throw Error(`Invalid arguments`)
   }
 

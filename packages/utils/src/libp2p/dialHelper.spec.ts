@@ -1,6 +1,6 @@
 import { NOISE } from '@chainsafe/libp2p-noise'
 import MPLEX from 'libp2p-mplex'
-import LibP2P from 'libp2p'
+import { createLibp2p, type Libp2p } from 'libp2p'
 import type { Address } from 'libp2p/src/peer-store/address-book.js'
 import type { Connection } from 'libp2p/src/connection-manager/index.js'
 import { dial as dialHelper, DialStatus } from './dialHelper.js'
@@ -8,11 +8,11 @@ import { privKeyToPeerId } from './privKeyToPeerId.js'
 import TCP from 'libp2p-tcp'
 import KadDHT from 'libp2p-kad-dht'
 import assert from 'assert'
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 import { pipe } from 'it-pipe'
 import { u8aEquals, stringToU8a } from '../u8a/index.js'
 import { createRelayerKey } from './relayCode.js'
-import PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 
 const TEST_PROTOCOL = '/test'
 const TEST_MESSAGE = new TextEncoder().encode('test msg')
@@ -21,10 +21,10 @@ const Alice = privKeyToPeerId(stringToU8a('0xcf0b158c5f9d83dabf81a43391cce6cced6
 const Bob = privKeyToPeerId(stringToU8a('0x801f499e287fa0e5ac546a86d7f1e3ca766249f62759e6a1f2c90de6090cc4c0'))
 const Chris = privKeyToPeerId(stringToU8a('0x1bbb9a915ddd6e19d0f533da6c0fbe8820541a370110728f647829cd2c91bc79'))
 
-async function getNode(id: PeerId, withDHT = false, maDestination?: Multiaddr): Promise<LibP2P> {
-  const node = await LibP2P.create({
+async function getNode(id: PeerId, withDHT = false, maDestination?: Multiaddr): Promise<Libp2p> {
+  const node = await createLibp2p({
     addresses: {
-      listen: [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${id.toB58String()}`).toString()]
+      listen: [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${id.toString()}`).toString()]
     },
     peerId: id,
     modules: {
@@ -104,7 +104,7 @@ function getPeerStore() {
 function getConnectionManager() {
   const connections = new Map<string, Connection[]>()
   const getAll = (peer: PeerId) => {
-    return connections.get(peer.toB58String()) ?? []
+    return connections.get(peer.toString()) ?? []
   }
 
   const onDisconnect = (_conn: Connection) => {}

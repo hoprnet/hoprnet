@@ -1,5 +1,5 @@
 import type { Operation } from 'express-openapi'
-import PeerId from 'peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import { STATUS_CODES } from '../../../../utils.js'
 
 export const POST: Operation = [
@@ -8,7 +8,7 @@ export const POST: Operation = [
     const { peerid } = req.params
 
     try {
-      const validPeerId = PeerId.createFromB58String(peerid)
+      const validPeerId = peerIdFromString(peerid)
       const tickets = await node.getTickets(validPeerId)
       if (tickets.length <= 0) {
         return res.status(404).send({ status: STATUS_CODES.TICKETS_NOT_FOUND })

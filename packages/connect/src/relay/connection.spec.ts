@@ -2,7 +2,7 @@ import { RelayConnection, statusMessagesCompare } from './connection.js'
 import assert from 'assert'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 
-import PeerId from 'peer-id'
+import { PeerId } from '@libp2p/interface-peer-id'
 import { EventEmitter, once } from 'events'
 import { pair } from 'it-pair'
 import { duplexPair } from 'it-pair/duplex'

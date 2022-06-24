@@ -1,6 +1,6 @@
 import type { HoprOptions } from './index.js'
-import PeerId from 'peer-id'
-import { Multiaddr } from 'multiaddr'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { Multiaddr } from '@multiformats/multiaddr'
 
 const DEFAULT_PORT = 9091
 
@@ -28,5 +28,5 @@ export function getAddrs(id: PeerId, options: HoprOptions): Multiaddr[] {
     }
   }
 
-  return addrs.map((addr: Multiaddr) => addr.encapsulate(`/p2p/${id.toB58String()}`))
+  return addrs.map((addr: Multiaddr) => addr.encapsulate(`/p2p/${id.toString()}`))
 }

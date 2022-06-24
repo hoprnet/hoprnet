@@ -1,6 +1,6 @@
 import type { Address } from 'libp2p/src/peer-store/address-book.js'
 import { isPrivateAddress, isLocalhost } from '../network/index.js'
-import { type Multiaddr, protocols } from 'multiaddr'
+import { type Multiaddr, protocols } from '@multiformats/multiaddr'
 import type { NetworkInterfaceInfo } from 'os'
 
 const CODE_IP4 = protocols('ip4').code

@@ -1,4 +1,4 @@
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import type NetworkPeers from './network-peers.js'
 import { debug } from '@hoprnet/hopr-utils'
 
@@ -42,7 +42,7 @@ export default class AccessControl {
         await this.denyConnectionWithPeer(peerId, origin)
       }
     } catch (error) {
-      logError(`unexpected error when reviewing connection ${peerId.toB58String()} from ${origin}`, error)
+      logError(`unexpected error when reviewing connection ${peerId.toString()} from ${origin}`, error)
     }
 
     return allowed

@@ -1,5 +1,5 @@
 import { utils } from 'ethers'
-import PeerId from 'peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 
 /**
  * Verifies a given signature comes from a specific PeerId, based on the
@@ -13,6 +13,6 @@ import PeerId from 'peer-id'
  * @param signature the generated signature created by the PeerId
  */
 export async function verifySignatureFromPeerId(peerId: string, message: string, signature: string): Promise<boolean> {
-  const pId = PeerId.createFromB58String(peerId)
+  const pId = peerIdFromString(peerId)
   return await pId.pubKey.verify(new TextEncoder().encode(message), utils.arrayify(signature))
 }

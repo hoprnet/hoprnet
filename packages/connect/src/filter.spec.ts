@@ -1,6 +1,6 @@
 import type { NetworkInterfaceInfo } from 'os'
 
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 import { Filter } from './filter.js'
 import assert from 'assert'
 import { toNetworkPrefix, privKeyToPeerId, type Network } from '@hoprnet/hopr-utils'

@@ -1,6 +1,7 @@
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
-import PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import { STATUS_CODES } from '../../../utils.js'
 import { ChannelInfo, channelStatusToString, formatIncomingChannel, formatOutgoingChannel } from '../index.js'
 
@@ -11,7 +12,7 @@ import { ChannelInfo, channelStatusToString, formatIncomingChannel, formatOutgoi
 export const closeChannel = async (node: Hopr, peerIdStr: string, direction: ChannelInfo['type']) => {
   let peerId: PeerId
   try {
-    peerId = PeerId.createFromB58String(peerIdStr)
+    peerId = peerIdFromString(peerIdStr)
   } catch (err) {
     throw Error(STATUS_CODES.INVALID_PEERID)
   }
@@ -127,7 +128,7 @@ export const getChannel = async (
 ): Promise<ChannelInfo> => {
   let counterpartyPeerId: PeerId
   try {
-    counterpartyPeerId = PeerId.createFromB58String(counterparty)
+    counterpartyPeerId = peerIdFromString(counterparty)
   } catch (err) {
     throw Error(STATUS_CODES.INVALID_PEERID)
   }

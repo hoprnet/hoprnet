@@ -1,4 +1,4 @@
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import { randomBytes } from 'crypto'
 import { EventEmitter } from 'events'
 import BN from 'bn.js'

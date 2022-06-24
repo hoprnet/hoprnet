@@ -1,6 +1,6 @@
 import { setImmediate } from 'timers/promises'
 
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 
 import { durations, pubKeyToPeerId, HoprDB } from '@hoprnet/hopr-utils'
 import { debug } from '@hoprnet/hopr-utils'

@@ -1,6 +1,7 @@
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
-import PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import { STATUS_CODES } from '../../utils.js'
 
 /**
@@ -10,7 +11,7 @@ import { STATUS_CODES } from '../../utils.js'
 export const ping = async ({ node, peerId }: { node: Hopr; peerId: string }) => {
   let validPeerId: PeerId
   try {
-    validPeerId = PeerId.createFromB58String(peerId)
+    validPeerId = peerIdFromString(peerId)
   } catch (err) {
     throw Error(STATUS_CODES.INVALID_PEERID)
   }
@@ -24,13 +25,14 @@ export const ping = async ({ node, peerId }: { node: Hopr; peerId: string }) => 
     error = err
   }
 
+  if (error && error.message) {
+    throw error
+  }
+
   if (pingResult.latency >= 0) {
     return { latency: pingResult.latency }
   }
 
-  if (error && error.message) {
-    throw error
-  }
   throw Error(STATUS_CODES.TIMEOUT)
 }
 

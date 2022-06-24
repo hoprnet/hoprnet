@@ -12,9 +12,9 @@ export const SOCKET_CLOSE_TIMEOUT = 1000
 
 import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types.js'
 
-import type { Multiaddr } from 'multiaddr'
+import type { Multiaddr } from '@multiformats/multiaddr'
 import toIterable from 'stream-to-it'
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import type {
   Stream,
   StreamSink,

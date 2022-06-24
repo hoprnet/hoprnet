@@ -1,10 +1,11 @@
 import Debug from 'debug'
 import { CODE_DNS4, CODE_DNS6, CODE_IP4, CODE_IP6, CODE_P2P } from './constants.js'
-import type { Multiaddr } from 'multiaddr'
-import PeerId from 'peer-id'
+import type { Multiaddr } from '@multiformats/multiaddr'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { createPeerId } from '@libp2p/peer-id'
 import type Connection from 'libp2p-interfaces/src/connection/connection.js'
 import type { Upgrader, Transport, MultiaddrConnection } from 'libp2p-interfaces/src/transport/types.js'
-import type libp2p from 'libp2p'
+import type { Libp2p } from 'libp2p'
 import chalk from 'chalk'
 import { TCPConnection, Listener } from './base/index.js'
 import { Relay } from './relay/index.js'
@@ -53,12 +54,12 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
   private _peerId: PeerId
   private relay: Relay
   private _addressFilter: Filter
-  private _libp2p: libp2p
+  private _libp2p: Libp2p
 
   constructor(
     opts: {
       upgrader: Upgrader
-      libp2p: libp2p
+      libp2p: Libp2p
     } & HoprConnectConfig
   ) {
     if (!opts.upgrader) {

@@ -1,6 +1,6 @@
 import { AcknowledgementChallenge } from './acknowledgementChallenge.js'
 import { HalfKeyChallenge, sampleGroupElement } from '@hoprnet/hopr-utils'
-import PeerId from 'peer-id'
+import { PeerId } from '@libp2p/interface-peer-id'
 import assert from 'assert'
 import { randomBytes } from 'crypto'
 

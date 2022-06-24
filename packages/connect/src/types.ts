@@ -1,5 +1,5 @@
-import type { Multiaddr } from 'multiaddr'
-import type PeerId from 'peer-id'
+import type { Multiaddr } from '@multiformats/multiaddr'
+import type { PeerId } from '@libp2p/interface-peer-id'
 
 type Suffix = 'PublicNode'
 type AddEventName = `add${Suffix}`

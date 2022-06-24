@@ -1,8 +1,8 @@
-import type { default as LibP2P, MuxedStream, HandlerProps } from 'libp2p'
-import PeerId from 'peer-id'
+import type { Libp2p, MuxedStream, HandlerProps } from 'libp2p'
+import { PeerId } from '@libp2p/interface-peer-id'
 import type Connection from 'libp2p-interfaces/src/connection/connection.js'
 import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types.js'
-import { type Multiaddr } from 'multiaddr'
+import { type Multiaddr } from '@multiformats/multiaddr'
 import type { Address } from 'libp2p/src/peer-store/address-book.js'
 import type HoprConnect from '../index.js'
 
@@ -175,8 +175,8 @@ class Relay {
 
     if (baseConnection == undefined) {
       error(
-        `Cannot establish a connection to ${chalk.green(destination.toB58String())} because relay ${chalk.green(
-          relay.toB58String()
+        `Cannot establish a connection to ${chalk.green(destination.toString())} because relay ${chalk.green(
+          relay.toString()
         )} is not reachable`
       )
       return
@@ -187,24 +187,24 @@ class Relay {
     const handshakeResult = await shaker.initiate(relay, destination)
 
     if (!handshakeResult.success) {
-      error(`Handshake with ${relay.toB58String()} led to empty stream. Giving up.`)
+      error(`Handshake with ${relay.toString()} led to empty stream. Giving up.`)
       // Only close the connection to the relay if it does not perform relay services
       // for us.
       if (this.usedRelays.findIndex((usedRelay: PeerId) => usedRelay.equals(relay)) < 0) {
         try {
           await baseConnection.conn.close()
         } catch (err) {
-          error(`Error while closing unused connection to relay ${relay.toB58String()}`, err)
+          error(`Error while closing unused connection to relay ${relay.toString()}`, err)
         }
       }
       return
     }
 
-    this.connectedToRelays.add(relay.toB58String())
+    this.connectedToRelays.add(relay.toString())
 
     const conn = this.upgradeOutbound(relay, destination, handshakeResult.stream, options)
 
-    log(`successfully established relay connection to ${relay.toB58String()}`)
+    log(`successfully established relay connection to ${relay.toString()}`)
 
     return conn
   }
@@ -291,9 +291,9 @@ class Relay {
 
               await this.libp2p.contentRouting.provide(key)
 
-              log(`announced in the DHT as relayer for node ${conn.connection.remotePeer.toB58String()}`, key)
+              log(`announced in the DHT as relayer for node ${conn.connection.remotePeer.toString()}`, key)
             } catch (err) {
-              error(`error while attempting to provide relayer key for ${conn.connection.remotePeer.toB58String()}`)
+              error(`error while attempting to provide relayer key for ${conn.connection.remotePeer.toString()}`)
             }
           }.call(this))
 
@@ -313,7 +313,7 @@ class Relay {
 
     const shaker = new RelayHandshake(conn.stream as Stream, this.options)
 
-    log(`handling relay request from ${conn.connection.remotePeer.toB58String()}`)
+    log(`handling relay request from ${conn.connection.remotePeer.toString()}`)
     log(`relayed connection count: ${this.relayState.relayedConnectionCount()}`)
 
     try {
@@ -330,7 +330,7 @@ class Relay {
         )
       }
     } catch (e) {
-      error(`Error while processing relay request from ${conn.connection.remotePeer.toB58String()}: ${e}`)
+      error(`Error while processing relay request from ${conn.connection.remotePeer.toString()}: ${e}`)
     }
   }
 
@@ -356,7 +356,7 @@ class Relay {
       return
     }
 
-    log(`incoming connection from ${handShakeResult.counterparty.toB58String()}`)
+    log(`incoming connection from ${handShakeResult.counterparty.toString()}`)
 
     const newConn = this.upgradeInbound(
       handShakeResult.counterparty,
@@ -386,7 +386,7 @@ class Relay {
 
     let newConn: Connection
 
-    log(`Handling reconnection to ${counterparty.toB58String()}`)
+    log(`Handling reconnection to ${counterparty.toString()}`)
 
     try {
       if (!!this.testingOptions.__noWebRTCUpgrade) {
@@ -404,7 +404,7 @@ class Relay {
     }
 
     // @TODO remove this (1/2 done)
-    this.libp2p.dialer._pendingDials?.get(counterparty.toB58String())?.destroy()
+    this.libp2p.dialer._pendingDials?.get(counterparty.toString())?.destroy()
 
     const existingConnections = this.libp2p.connectionManager.getAll(counterparty)
     for (const existingConnection of existingConnections) {

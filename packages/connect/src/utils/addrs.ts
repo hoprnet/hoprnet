@@ -1,4 +1,4 @@
-import type { Multiaddr } from 'multiaddr'
+import type { Multiaddr } from '@multiformats/multiaddr'
 import { CODE_IP4, CODE_IP6, CODE_P2P, CODE_CIRCUIT, CODE_TCP } from '../constants.js'
 import { decode } from 'multihashes'
 import { u8aEquals, u8aToNumber, u8aCompare } from '@hoprnet/hopr-utils'
