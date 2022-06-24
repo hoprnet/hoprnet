@@ -449,13 +449,13 @@ export async function createChainWrapper(
     try {
       switch (currency) {
         case 'NATIVE':
-        withdrawEssentialTxPayload = buildEssentialTxPayload(amount, recipient, undefined)
-        sendResult = await sendTransaction(checkDuplicate, withdrawEssentialTxPayload, txHandler)
-        break
-      case 'HOPR':
-        withdrawEssentialTxPayload = buildEssentialTxPayload(0, token, 'transfer', recipient, amount)
-        sendResult = await sendTransaction(checkDuplicate, withdrawEssentialTxPayload, txHandler)
-        break
+          withdrawEssentialTxPayload = buildEssentialTxPayload(amount, recipient, undefined)
+          sendResult = await sendTransaction(checkDuplicate, withdrawEssentialTxPayload, txHandler)
+          break
+        case 'HOPR':
+          withdrawEssentialTxPayload = buildEssentialTxPayload(0, token, 'transfer', recipient, amount)
+          sendResult = await sendTransaction(checkDuplicate, withdrawEssentialTxPayload, txHandler)
+          break
       }
     } catch (err) {
       error = err
@@ -545,7 +545,7 @@ export async function createChainWrapper(
         'initiateChannelClosure',
         counterparty.toHex()
       )
-    sendResult = await sendTransaction(checkDuplicate, initiateChannelClosureEssentialTxPayload, txHandler)
+      sendResult = await sendTransaction(checkDuplicate, initiateChannelClosureEssentialTxPayload, txHandler)
     } catch (err) {
       error
     }
