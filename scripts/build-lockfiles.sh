@@ -47,7 +47,7 @@ restore() {
 }
 
 # Remove temporary build dir if failed
-trap restore SIGINT SIGTERM ERR EXIT
+trap restore SIGINT SIGTERM ERR
 
 log "Clean up previous lockfile generation attempts"
 restore

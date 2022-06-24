@@ -106,6 +106,7 @@
 - [b58StringRegex](modules.md#b58stringregex)
 - [dbMock](modules.md#dbmock)
 - [durations](modules.md#durations)
+- [get\_package\_version](modules.md#get_package_version)
 
 ### Functions
 
@@ -945,6 +946,12 @@ ___
 
 [time.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/time.ts#L1)
 
+___
+
+### get\_package\_version
+
+• **get\_package\_version**: `any`
+
 ## Functions
 
 ### FIFO
@@ -1298,7 +1305,7 @@ ___
 
 #### Defined in
 
-[process/debug.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/process/debug.ts#L14)
+[process/debug.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/process/debug.ts#L3)
 
 ___
 

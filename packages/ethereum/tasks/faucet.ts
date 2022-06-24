@@ -122,7 +122,7 @@ async function main(
   { network, ethers, deployments, environment }: HardhatRuntimeEnvironment,
   _runSuper: RunSuperFunction<any>
 ): Promise<void> {
-  const { hasB58String, PublicKey } = await import('@hoprnet/hopr-utils')
+  const { PublicKey } = await import('@hoprnet/hopr-utils')
   if (environment == undefined) {
     console.error(`HOPR_ENVIRONMENT_ID is not set. Run with "HOPR_ENVIRONMENT_ID=<environment> ..."`)
     process.exit(1)
@@ -151,14 +151,12 @@ async function main(
   if (opts.address) {
     if (opts.address.match(/0x[0-9a-fA-F]{40}|[0-9a-fA-F]{40}/)) {
       identities.push(opts.address)
-    } else if (hasB58String(opts.address)) {
+    } else {
       try {
         identities.push(PublicKey.fromPeerIdString(opts.address).toAddress().toHex())
       } catch (err) {
-        console.log(`error while parsing ${opts.address}`)
+        console.error(`Could not parse address ${opts.address}: ${err}`)
       }
-    } else {
-      console.log(`Address ${opts.address} has unknown format.`)
     }
   }
 
