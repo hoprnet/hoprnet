@@ -48,7 +48,7 @@ export default class FundChannel extends AbstractCommand {
       if (isNaN(Number(counterpartyFundInput))) throw Error('Argument <counterpartyFund> is not a number')
       counterpartyFund = new BN(moveDecimalPoint(counterpartyFundInput, Balance.DECIMALS))
     } catch (err) {
-      return log(styleValue(err.message, 'failure'))
+      return log(styleValue(err instanceof Error ? err.message : 'Unknown error', 'failure'))
     }
 
     log('Funding channel...')
@@ -57,7 +57,7 @@ export default class FundChannel extends AbstractCommand {
       await this.node.fundChannel(peerId, myFund, counterpartyFund)
       return log(`${chalk.green(`Successfully funded channel`)} to ${peerId.toB58String()}`)
     } catch (err) {
-      return log(styleValue(err.message, 'failure'))
+      return log(styleValue(err instanceof Error ? err.message : 'Unknown error', 'failure'))
     }
   }
 }

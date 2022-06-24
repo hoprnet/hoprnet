@@ -58,7 +58,7 @@ export default class ListOpenChannels extends AbstractCommand {
       }
       return
     } catch (err) {
-      return log(styleValue(err.message, 'failure'))
+      return log(styleValue(err instanceof Error ? err.message : 'Unknown error', 'failure'))
     }
   }
 }

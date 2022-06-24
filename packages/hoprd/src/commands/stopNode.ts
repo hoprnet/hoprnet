@@ -28,7 +28,7 @@ export default class StopNode extends AbstractCommand {
       clearTimeout(timeout)
       process.exit(0)
     } catch (error) {
-      log(styleValue(error.message, 'failure'))
+      log(styleValue(error instanceof Error ? error.message : 'Unknown error', 'failure'))
       process.exit(1)
     }
   }

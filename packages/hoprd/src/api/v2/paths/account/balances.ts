@@ -14,7 +14,7 @@ export const getBalances = async (node: Hopr) => {
   }
 }
 
-export const GET: Operation = [
+const GET: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
 
@@ -25,7 +25,9 @@ export const GET: Operation = [
         hopr: hopr.toBN().toString()
       })
     } catch (err) {
-      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+      return res
+        .status(422)
+        .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 ]
@@ -71,3 +73,5 @@ GET.apiDoc = {
     }
   }
 }
+
+export default { GET }
