@@ -15,18 +15,21 @@ source "${mydir}/utils.sh"
 
 usage() {
   msg
-  msg "Usage: $0 [-h|--help] [-f|--force] [-n|--no-tags] [-l|--local]"
+  msg "Usage: $0 [-h|--help] [-f|--force] [-n|--no-tags] [-l|--local] [-i|--image]"
   msg
   msg "This script builds all docker images defined within the monorepo using Google Cloud Build."
   msg "The images are defined in ${mydir}/../cloudbuild.yaml"
   msg
-  msg "Use -l to build the images locally instead and not publish them to a remote Docker repository."
+  msg "Use -l to build the images locally instead and not publish them to a
+  remote Docker repository. In addition -i can be used to build a single image locally instead of all images."
+  msg "Supported values for -p are 'hoprd', 'hoprd-nat', 'cover-traffic-daemon',
+  'hardhat', 'pluto', 'pluto-complete'"
   msg
   msg "Use -f to force a Docker builds even though no environment can be found. This is useful for local testing. No additional docker tags will be applied though if no environment has been found which is in contrast to the normal execution of the script."
   msg
 }
 
-declare image_version package_version releases branch force no_tags local_build
+declare image_version package_version releases branch force no_tags local_build image_name
 
 while (( "$#" )); do
   case "$1" in
@@ -45,6 +48,11 @@ while (( "$#" )); do
       ;;
     -l|--local)
       local_build="true"
+      shift
+      ;;
+    -i|--image)
+      image_name="${2}"
+      shift
       shift
       ;;
     -*|--*=)
@@ -66,32 +74,46 @@ build_and_tag_images() {
   cd "${mydir}/.."
 
   if [ "${local_build:-}" = "true" ]; then
-    log "Building Docker image hoprd:local"
-    docker build -q -t hoprd:local \
-      --build-arg=PACKAGE_VERSION="${package_version}" \
-      packages/hoprd &
+    if [ -z "${image_name}" ] || [ "${image_name}" = "hoprd" ] || [ "${image_name}" = "pluto-complete" ]; then
+      log "Building Docker image hoprd-local"
+      docker build -q -t hoprd-local \
+        --build-arg=PACKAGE_VERSION="${package_version}" \
+        packages/hoprd &
+    fi
 
-    log "Building Docker image hopr-cover-traffic-daemon:local"
-    docker build -q -t hopr-cover-traffic-daemon:local \
+    if [ -z "${image_name}" ] || [ "${image_name}" = "cover-traffic-daemon" ]; then
+    log "Building Docker image hopr-cover-traffic-daemon-local"
+    docker build -q -t hopr-cover-traffic-daemon-local \
       --build-arg=PACKAGE_VERSION="${package_version}" \
       packages/cover-traffic-daemon &
+    fi
 
-    log "Building Docker image hoprd-nat:local"
-    docker build -q -t hoprd-nat:local \
+    if [ -z "${image_name}" ] || [ "${image_name}" = "hoprd-nat" ]; then
+    log "Building Docker image hoprd-nat-local"
+    docker build -q -t hoprd-nat-local \
       --build-arg=PACKAGE_VERSION="${package_version}" \
       --build-arg=HOPRD_RELEASE="${image_version}" \
       scripts/nat &
+    fi
 
-    log "Building Docker image hopr-hardhat:local"
-    docker build -q -t hopr-hardhat:local \
+    if [ -z "${image_name}" ] || [ "${image_name}" = "hardhat" ] || [ "${image_name}" = "pluto-complete" ]; then
+    log "Building Docker image hopr-hardhat-local"
+    docker build -q -t hopr-hardhat-local \
       -f Dockerfile.hardhat . &
+    fi
 
-    log "Building Docker image hopr-pluto:local"
-    docker build -q -t hopr-pluto:local \
-      --build-arg=PACKAGE_VERSION="${package_version}" \
+    log "Waiting for Docker builds (part 1) to finish"
+    wait
+
+    if [ -z "${image_name}" ] || [ "${image_name}" = "pluto" ] || [ "${image_name}" = "pluto-complete" ]; then
+    log "Building Docker image hopr-pluto-local"
+    docker build -q -t hopr-pluto-local \
+      --build-arg=HARDHAT_IMAGE="hopr-hardhat-local" \
+      --build-arg=HOPRD_IMAGE="hoprd-local" \
       scripts/pluto &
+    fi
 
-    log "Waiting for Docker builds to finish"
+    log "Waiting for Docker builds (part 2) to finish"
     wait
   else
     gcloud builds submit --config cloudbuild.yaml \

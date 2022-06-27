@@ -6,6 +6,7 @@ test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; 
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
+set -x
 
 # set log id and use shared log function for readable logs
 declare mydir
@@ -17,14 +18,20 @@ source "${mydir}/utils.sh"
 declare api_token="^^LOCAL-testing-123^^"
 declare myne_chat_url="http://app.myne.chat"
 declare init_script=""
+declare hoprd_command="node packages/hoprd/lib/main.cjs"
+declare hardhat_command="yarn run:network"
+declare hardhat_basedir="."
 
 usage() {
   msg
-  msg "Usage: $0 [-h|--help] [-t|--api-token <api_token>] [-m|--myne-chat-url <myne_chat_url>] [-i|--init-script <init_script>]"
+  msg "Usage: $0 [-h|--help] [-t|--api-token <api_token>] [-m|--myne-chat-url <myne_chat_url>] [-i|--init-script <init_script>] [--hoprd-command <hoprd_command>] [--hardhat-command <hardhat_command] [--hardhat-basedir <hardhat_basedir]"
   msg
   msg "<api_token> is set to '${api_token}' by default"
   msg "<myne_chat_url> is set to '${myne_chat_url}' by default"
   msg "<init_script> is empty by default, expected to be path to a script which is called with all node API endpoints as parameters"
+  msg "<hoprd_command> is used to start hoprd, default is '${hoprd_command}'"
+  msg "<hardhat_command> is used to start hardhat, default is '${hardhat_command}'"
+  msg "<hardhat_basedir> is entered before hardhat is started, default is '${hardhat_basedir}'"
 }
 
 while (( "$#" )); do
@@ -46,6 +53,21 @@ while (( "$#" )); do
       ;;
     -i|--init-script)
       init_script="${2}"
+      shift
+      shift
+      ;;
+    --hoprd-command)
+      hoprd_command="${2}"
+      shift
+      shift
+      ;;
+    --hardhat-command)
+      hardhat_command="${2}"
+      shift
+      shift
+      ;;
+    --hardhat-basedir)
+      hardhat_basedir="${2}"
       shift
       shift
       ;;
@@ -103,7 +125,8 @@ function cleanup {
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
 
-  rm ${env_file}
+  log "Removing cluster env file"
+  rm -f ${env_file}
 
   exit $EXIT_CODE
 }
@@ -146,7 +169,7 @@ function setup_node() {
     HOPRD_HEARTBEAT_VARIANCE=1000 \
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
     HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
-    node packages/hoprd/lib/main.cjs \
+    ${hoprd_command} \
       --admin \
       --adminHost "127.0.0.1" \
       --adminPort ${admin_port} \
@@ -220,18 +243,19 @@ rm -Rfv \
 
 # --- Running Mock Blockchain --- {{{
 log "Running hardhat local node"
-HOPR_ENVIRONMENT_ID="hardhat-localhost" yarn workspace @hoprnet/hopr-ethereum hardhat node \
-  --network hardhat --show-stack-traces > \
-  "${hardhat_rpc_log}" 2>&1 &
+cd "${hardhat_basedir}" && \
+  ${hardhat_command} \
+    --network hardhat --show-stack-traces > \
+    "${hardhat_rpc_log}" 2>&1 &
 
 wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
 log "Hardhat node started (127.0.0.1:8545)"
 
 # need to mirror contract data because of hardhat-deploy node only writing to localhost
-cp -R \
+: cp -R \
   "${mydir}/../packages/ethereum/deployments/hardhat-localhost/localhost" \
   "${mydir}/../packages/ethereum/deployments/hardhat-localhost/hardhat"
-cp -R \
+: cp -R \
   "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
   "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
 # }}}

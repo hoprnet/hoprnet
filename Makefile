@@ -70,8 +70,12 @@ lint-fix: ## run linter in fix mode
 	npx prettier --write .
 
 .PHONY: docker-build-local
-docker-build-local: ## build Docker images locally
+docker-build-local: ## build Docker images locally, or single image if image= is set
+ifeq ($(image),)
 	./scripts/build-docker.sh --local --force
+else
+	./scripts/build-docker.sh --local --force -i $(image)
+endif
 
 .PHONY: docker-build-gcb
 docker-build-gcb: ## build Docker images on Google Cloud Build

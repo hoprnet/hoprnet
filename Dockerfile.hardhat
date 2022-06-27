@@ -73,7 +73,9 @@ RUN rm package.json \
  && mv package.hardhat.json package.json \
  && yarn
 
-EXPOSE 8454
+COPY --from=build /app/scripts scripts
+
+EXPOSE 8545
 
 ENV NODE_OPTIONS=--max_old_space_size=1024
 
