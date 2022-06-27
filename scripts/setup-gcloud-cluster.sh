@@ -125,53 +125,77 @@ gcloud_create_or_update_managed_instance_group  \
   ${cluster_size} \
   "${instance_template_name}"
 
-# get IPs of newly started VMs which run hoprd
-declare node_ips
-node_ips=$(gcloud_get_managed_instance_group_instances_ips "${cluster_id}")
-declare node_ips_arr=( ${node_ips} )
 
-#  --- Fund nodes --- {{{
-for ip in ${node_ips}; do
-  wait_until_node_is_ready "${ip}"
-  eth_addr="$(get_native_address "${api_token}@${ip}:3001")"
-  fund_if_empty "${eth_addr}" "${environment}"
-done
+# TODO: Populate this from GH Secrets
+declare -A staking_acc_dict=() # Maps "staking account address/name" => "private key"
+
+# TODO: Call this always?
+# yarn hardhat stake --network hardhat --amount 1000000000000000000000 --privatekey "${staking_priv_key[staking_acc_name]}"
+
+declare -A ip_addrs
+declare -A hopr_addrs
+declare -A native_addrs
 
 declare instance_names
 instance_names=$(gcloud_get_managed_instance_group_instances_names "${cluster_id}")
 declare instance_names_arr=( ${instance_names} )
 
-# Create dictionary to map "VM instance name" => ""
-declare -A instance_stake_dict
-for instance_name in ${instance_names_arr} ; do
-  instance_stake_dict+=( [$instance_name]="" )
-done
+# Iterate through all instances in this cluster
+declare staking_acc_names_arr=( "${!staking_acc_dict[@]}" ) # staking accounts addresses/names only
+declare count_staking_accs=${#staking_acc_names_arr[@]}
+declare current_staking_index=0
+for instance_name in "${instance_names_arr[@]}" ; do
 
-# TODO: Feed the staking accounts & their private keys into this dictionary
-declare -A staking_acc_dict=()
-declare staking_acc_arr=( "${!staking_acc_dict[@]}" ) # staking accounts addresses only
+  declare info_tag=$(gcloud_get_node_info_tag "${instance_name}")
+  declare node_ip=$(gcloud_get_ip "${instance_name}")
 
-# TODO: retrieve also native & hopr addresses
-assign_staking_accounts instance_stake_dict staking_acc_arr
+  declare wallet_addr
+  declare peer_id
+  declare staking_acc
+  if [[ -z "${info_tag}" ]]; then
+    # If the instance does not have the INFO tag yet, we need to retrieve all info
+    wallet_addr=$(get_native_address "${api_token}@${node_ip}:3001")
+    peer_id=$(get_hopr_address "${api_token}@${node_ip}:3001")
+    staking_acc="${staking_acc_names_arr[current_staking_index]}"
 
-declare instance_staking_account
-for instance_name in "${!instance_stake_dict[@]}"; do
-  instance_staking_account="${instance_stake_dict[instance_name]}"
-  # Only for accounts that stake via tokens
-  if [[ ${instance_staking_account} =~ stake_tokens.+ ]]; then
-    staking_priv_key="${staking_acc_dict[instance_staking_account]}"
-    yarn hardhat stake --network hardhat --amount 1000000000000000000000 --privatekey "${staking_priv_key}"
+    # Save the info tag
+    info_tag="info:native_addr=${wallet_addr};peer_id=${peer_id};nr_staking_account=${staking_acc}"
+    gcloud_add_instance_tags "${instance_name}" "${info_tag}"
+  else
+    # Retrieve all information from the INFO tag
+    wallet_addr=$(echo "${info_tag}" | sed -E 's/.*native_addr=([Xxa-f0-9A-F]+).*/\1/g')
+    peer_id=$(echo "${info_tag}" | sed -E 's/.*peer_id=([a-zA-Z0-9]+).*/\1/g')
+    staking_acc=$(echo "${info_tag}" | sed -E 's/.*nr_staking_account=([a-zA-Z0-9]+).*/\1/g')
   fi
+
+  # Also use the staking account address here?
+  ip_addrs+=( [$instance_name]="${node_ip}" )
+  native_addrs+=( [$instance_name]="${wallet_addr}" )
+  hopr_addrs+=( [$instance_name]="${peer_id}" )
+
+  # Staking accounts are assigned round-robin
+  current_staking_index=$(( (current_staking_index + 1) % count_staking_accs ))
+
+  # Fund the node as well
+  wait_until_node_is_ready "${node_ip}"
+  fund_if_empty "${wallet_addr}" "${environment}"
+
 done
 
-# To test Network registry, the cluster_size is greater or equal to 3 and staker_addresses are provided as parameters
+# Register all nodes in cluster
+declare cifs="$IFS"
+IFS=','
+yarn workspace @hoprnet/hopr-ethereum hardhat register \
+   --network hardhat \
+   --task add \
+   --native-addresses "${native_addrs[*]}" \
+   --peer-ids "${hopr_addrs[*]}"
+IFS="${cifs}"
 
-# TODO: call stake API so that the first staker_addresses[0] stake in the current program
-# TODO: call register API and register staker_addresses with node peer ids
 
 if [[ "${docker_image}" != *-nat:* ]]; then
   # Finally wait for the public nodes to come up
-  for ip in ${node_ips}; do
+  for ip in "${ip_addrs[@]}"; do
     wait_for_port "9091" "${ip}"
   done
 fi
