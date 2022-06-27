@@ -285,7 +285,7 @@ class Relay {
           // takes more than 10 seconds
           ;(async function (this: Relay) {
             try {
-              const key = await createRelayerKey(conn.connection.remotePeer)
+              const key = createRelayerKey(conn.connection.remotePeer)
 
               await this.libp2p.contentRouting.provide(key)
 

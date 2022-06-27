@@ -1,11 +1,11 @@
 import type { PeerId } from '@libp2p/interface-peer-id'
-import { peerIdFromKeys } from '@libp2p/peer-id'
-import { keys as libp2p_crypto } from 'libp2p-crypto'
+import { peerIdFromPeerId } from '@libp2p/peer-id'
+import { keys } from '@libp2p/crypto'
 
 import { stringToU8a } from '../u8a/index.js'
+import { identity } from 'multiformats/hashes/identity'
 
 import secp256k1 from 'secp256k1'
-import { encode } from 'multiformats/hashes/sha2'
 
 const PRIVKEY_LENGTH = 32
 
@@ -17,29 +17,37 @@ const PRIVKEY_LENGTH = 32
  * @param privKey the plain private key
  */
 export function privKeyToPeerId(privKey: Uint8Array | string): PeerId {
-  if (typeof privKey === 'string') {
-    if (privKey.startsWith('0x')) {
-      privKey = privKey.slice(2)
-    }
+  let internalPrivKey: Uint8Array
+  switch (typeof privKey) {
+    case 'string':
+      const matched = privKey.match(/(?<=^0x|^)[0-9a-fA-F]{64}/)
 
-    if (privKey.length != PRIVKEY_LENGTH * 2) {
-      throw Error(`Incorrect private key size.`)
-    }
-    privKey = stringToU8a(privKey, PRIVKEY_LENGTH)
+      if (!matched) {
+        throw Error(`Invalid input argument. Either key length or key characters were incorrect.`)
+      }
+      internalPrivKey = stringToU8a(privKey, PRIVKEY_LENGTH)
+      break
+    case 'object':
+      if (privKey.length != PRIVKEY_LENGTH) {
+        throw Error(
+          `Invalid private key. Expected a buffer of size ${PRIVKEY_LENGTH} bytes. Got one of ${privKey.length} bytes.`
+        )
+      }
+      internalPrivKey = privKey
+      break
+    default:
+      throw Error(`Invalid input arguments`)
   }
 
-  if (privKey.length != PRIVKEY_LENGTH) {
-    throw Error(
-      `Invalid private key. Expected a buffer of size ${PRIVKEY_LENGTH} bytes. Got one of ${privKey.length} bytes.`
-    )
-  }
-
-  const secp256k1PrivKey = new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PrivateKey(
-    Buffer.from(privKey),
-    secp256k1.publicKeyCreate(privKey)
+  const secp256k1PrivKey = new keys.supportedKeys.secp256k1.Secp256k1PrivateKey(
+    internalPrivKey,
+    secp256k1.publicKeyCreate(internalPrivKey)
   )
 
-  const id = encode(secp256k1PrivKey.public.bytes, 'identity')
-
-  return peerIdFromKeys(id, secp256k1PrivKey, secp256k1PrivKey.public)
+  return peerIdFromPeerId({
+    type: 'secp256k1',
+    multihash: identity.digest(secp256k1PrivKey.public.bytes),
+    privateKey: secp256k1PrivKey.bytes,
+    publicKey: secp256k1PrivKey.public.bytes
+  })
 }

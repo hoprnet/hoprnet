@@ -657,7 +657,7 @@ class Hopr extends EventEmitter {
       addrs = await this.getObservedAddresses(peer)
 
       try {
-        for await (const relayer of this.libp2p.contentRouting.findProviders(await createRelayerKey(peer), {
+        for await (const relayer of this.libp2p.contentRouting.findProviders(createRelayerKey(peer), {
           timeout
         })) {
           const relayAddress = createCircuitAddress(relayer.id, peer)
