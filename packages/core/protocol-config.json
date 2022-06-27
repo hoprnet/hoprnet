@@ -11,9 +11,7 @@
       "stake_contract_address": "${HARDHAT_STAKE_CONTACT_ADDRESS}",
       "network_registry_proxy_contract_address": "${HARDHAT_REGISTRY_PROXY_CONTACT_ADDRESS}",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "tags": [
-        "development"
-      ]
+      "tags": ["development"]
     },
     "hardhat-localhost2": {
       "network_id": "hardhat",
@@ -26,9 +24,7 @@
       "stake_contract_address": "${HARDHAT_STAKE_CONTACT_ADDRESS}",
       "network_registry_proxy_contract_address": "${HARDHAT_REGISTRY_PROXY_CONTACT_ADDRESS}",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "tags": [
-        "development"
-      ]
+      "tags": ["development"]
     },
     "master-goerli": {
       "network_id": "goerli",
@@ -41,9 +37,7 @@
       "stake_contract_address": "0x0d4Ec37e692BcD36FE7dDcB37a14358d7F44d72C",
       "network_registry_proxy_contract_address": "0x3ee6e1eaE59C44EC30bc5e8FEeE587f95C9F2626",
       "network_registry_contract_address": "0x3e5AA27125C90686444b2d093BFe9b843E82D2F5",
-      "tags": [
-        "development"
-      ]
+      "tags": ["development"]
     },
     "debug-goerli": {
       "network_id": "goerli",
@@ -56,9 +50,7 @@
       "xhopr_contract_address": "0x552aBf0EBCd6B6162519132A831C181f87e46874",
       "boost_contract_address": "0x20d7182F9f16E0eda619bBe1Fe8732169B90fab5",
       "network_registry_proxy_contract_address": "0x913bF9D5bd22eD468b628c1212EAF3a06C8fF3b6",
-      "tags": [
-        "development"
-      ]
+      "tags": ["development"]
     },
     "tuttlingen": {
       "network_id": "xdai",
@@ -67,9 +59,7 @@
       "channels_contract_address": "0xd2229d5d54bE8ABC9A2b2d5cFdEd22B48FB8ce2c",
       "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "tags": [
-        "production"
-      ]
+      "tags": ["production"]
     },
     "prague": {
       "network_id": "xdai",
@@ -78,9 +68,7 @@
       "channels_contract_address": "0x4f98F01cb02083eb5457CA0DDC6B37073ec5388a",
       "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "tags": [
-        "production"
-      ]
+      "tags": ["production"]
     },
     "budapest": {
       "network_id": "xdai",
@@ -89,27 +77,21 @@
       "channels_contract_address": "0xEee8AB66b7169b3f9024676165fB1D2a25E472c5",
       "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "tags": [
-        "production"
-      ]
+      "tags": ["production"]
     },
     "athens": {
       "network_id": "xdai",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
       "channels_contract_address": "0xD2F008718EEdD7aF7E9a466F5D68bb77D03B8F7A",
-      "tags": [
-        "production"
-      ]
+      "tags": ["production"]
     },
     "lisbon": {
       "network_id": "xdai",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0x978D91ddFdb0c6eaCC22A258fE498957a79c5F4C",
       "channels_contract_address": "0x1753C9eE656c54f443ce2Fe7248076f9bA4eC100",
-      "tags": [
-        "production"
-      ]
+      "tags": ["production"]
     },
     "ouagadougou": {
       "network_id": "xdai",
@@ -119,9 +101,7 @@
       "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
       "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
       "stake_contract_address": "0xae933331ef0bE122f9499512d3ed4Fa3896DCf20",
-      "tags": [
-        "production"
-      ]
+      "tags": ["production"]
     }
   },
   "networks": {

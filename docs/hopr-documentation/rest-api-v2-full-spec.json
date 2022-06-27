@@ -22,9 +22,7 @@
       "parameters": [],
       "get": {
         "description": "Get statistics regarding all your tickets. Node gets a ticket everytime it relays data packet in channel.",
-        "tags": [
-          "Tickets"
-        ],
+        "tags": ["Tickets"],
         "operationId": "ticketsGetStatistics",
         "responses": {
           "200": {
@@ -110,9 +108,7 @@
       "parameters": [],
       "post": {
         "description": "Redeems all tickets from all the channels and exchanges them for Hopr tokens. Every ticket have a chance to be winning one, rewarding you with Hopr tokens.",
-        "tags": [
-          "Tickets"
-        ],
+        "tags": ["Tickets"],
         "operationId": "ticketsRedeemTickets",
         "responses": {
           "204": {
@@ -149,9 +145,7 @@
       "parameters": [],
       "get": {
         "description": "Get all tickets earned by relaying data packets by your node from every channel.",
-        "tags": [
-          "Tickets"
-        ],
+        "tags": ["Tickets"],
         "operationId": "ticketsGetTickets",
         "responses": {
           "200": {
@@ -198,9 +192,7 @@
       "parameters": [],
       "get": {
         "description": "Get all of the node's settings.",
-        "tags": [
-          "Settings"
-        ],
+        "tags": ["Settings"],
         "operationId": "settingsGetSettings",
         "responses": {
           "200": {
@@ -244,9 +236,7 @@
       "parameters": [],
       "get": {
         "description": "Get release version of the running node.",
-        "tags": [
-          "Node"
-        ],
+        "tags": ["Node"],
         "operationId": "nodeGetVersion",
         "responses": {
           "200": {
@@ -292,9 +282,7 @@
       "parameters": [],
       "get": {
         "description": "This is a websocket endpoint which streams legacy hopr-admin data excluding messages. Authentication (if enabled) is done via either passing an `apiToken` parameter in the url or cookie `X-Auth-Token`. Connect to the endpoint by using a WS client. No preview available. Example: `ws://127.0.0.1:3001/api/v2/node/stream/websocket/?apiToken=myApiToken`",
-        "tags": [
-          "Node"
-        ],
+        "tags": ["Node"],
         "operationId": "nodeStreamWebsocket",
         "deprecated": true,
         "responses": {
@@ -311,12 +299,7 @@
                     "type": {
                       "type": "string",
                       "description": "Type of data",
-                      "example": [
-                        "log",
-                        "fatal-error",
-                        "status",
-                        "connected"
-                      ]
+                      "example": ["log", "fatal-error", "status", "connected"]
                     },
                     "timestamp": {
                       "type": "number",
@@ -351,18 +334,14 @@
       "parameters": [],
       "post": {
         "description": "Pings another node to check its availability.",
-        "tags": [
-          "Node"
-        ],
+        "tags": ["Node"],
         "operationId": "nodePing",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "peerId"
-                ],
+                "required": ["peerId"],
                 "properties": {
                   "peerId": {
                     "format": "peerId",
@@ -428,9 +407,7 @@
       "parameters": [],
       "get": {
         "description": "Lists information for `connected peers` and `announced peers`.\nConnected peers are nodes which are connected to the node while announced peers are nodes which have announced to the network.\nOptionally, you can pass `quality` parameter which would filter out peers with lower quality to the one specified.",
-        "tags": [
-          "Node"
-        ],
+        "tags": ["Node"],
         "operationId": "nodeGetPeers",
         "parameters": [
           {
@@ -592,9 +569,7 @@
       "parameters": [],
       "get": {
         "description": "Information about the HOPR Node, including any options it started with. See the schema of the response to get more information on each field.",
-        "tags": [
-          "Node"
-        ],
+        "tags": ["Node"],
         "operationId": "nodeGetInfo",
         "responses": {
           "200": {
@@ -628,9 +603,7 @@
                         "type": "string",
                         "description": "Other nodes IP address that this node is listening to for websocket events."
                       },
-                      "example": [
-                        "/ip4/0.0.0.0/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit"
-                      ]
+                      "example": ["/ip4/0.0.0.0/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit"]
                     },
                     "network": {
                       "type": "string",
@@ -688,9 +661,7 @@
       "parameters": [],
       "get": {
         "description": "This is a websocket endpoint which streams incoming messages from other nodes. Data is streamed in a stringified Uint8Array instance. Authentication (if enabled) is done via either passing an `apiToken` parameter in the url or cookie `X-Auth-Token`. Connect to the endpoint by using a WS client. No preview available. Example: `ws://127.0.0.1:3001/api/v2/messages/websocket/?apiToken=myApiToken`",
-        "tags": [
-          "Messages"
-        ],
+        "tags": ["Messages"],
         "operationId": "messagesWebsocket",
         "responses": {
           "101": {
@@ -720,18 +691,14 @@
       "parameters": [],
       "post": {
         "description": "Signs a message given using the node’s private key. Prefixes messsage with “HOPR Signed Message: ” before signing.",
-        "tags": [
-          "Messages"
-        ],
+        "tags": ["Messages"],
         "operationId": "messagesSign",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "message"
-                ],
+                "required": ["message"],
                 "properties": {
                   "message": {
                     "description": "The message to be signed.",
@@ -789,19 +756,14 @@
       "parameters": [],
       "post": {
         "description": "Send a message to another peer using a given path (list of node addresses that should relay our message through network). If no path is given, HOPR will attempt to find a path.",
-        "tags": [
-          "Messages"
-        ],
+        "tags": ["Messages"],
         "operationId": "messagesSendMessage",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "body",
-                  "recipient"
-                ],
+                "required": ["body", "recipient"],
                 "properties": {
                   "body": {
                     "description": "The message body which should be sent.",
@@ -866,18 +828,14 @@
       "parameters": [],
       "post": {
         "description": "Signs a message given using the node’s private key. Prefixes messsage with “HOPR Signed Message: ” before signing.",
-        "tags": [
-          "Messages"
-        ],
+        "tags": ["Messages"],
         "operationId": "messageSign",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "message"
-                ],
+                "required": ["message"],
                 "properties": {
                   "message": {
                     "description": "The message to be signed.",
@@ -936,19 +894,14 @@
       "parameters": [],
       "post": {
         "description": "Opens a payment channel between this node and the counter party provided. This channel can be used to send messages between two nodes using other nodes on the network to relay the messages. Each message will deduce its cost from the funded amount to pay other nodes for relaying your messages. Opening a channel can take a little bit of time, because it requires some block confirmations on the blockchain.",
-        "tags": [
-          "Channels"
-        ],
+        "tags": ["Channels"],
         "operationId": "channelsOpenChannel",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "peerId",
-                  "amount"
-                ],
+                "required": ["peerId", "amount"],
                 "properties": {
                   "peerId": {
                     "format": "peerId",
@@ -1073,9 +1026,7 @@
       },
       "get": {
         "description": "Lists all active channels between this node and other nodes on the Hopr network. By default response will contain all incomming and outgoing channels that are either open, waiting to be opened, or waiting to be closed. If you also want to receive past channels that were closed, you can pass `includingClosed` in the request url query.",
-        "tags": [
-          "Channels"
-        ],
+        "tags": ["Channels"],
         "operationId": "channelsGetChannels",
         "parameters": [
           {
@@ -1146,9 +1097,7 @@
       "parameters": [],
       "get": {
         "description": "Get all aliases you set previously and thier corresponding peer IDs.",
-        "tags": [
-          "Aliases"
-        ],
+        "tags": ["Aliases"],
         "operationId": "aliasesGetAliases",
         "responses": {
           "200": {
@@ -1197,19 +1146,14 @@
       },
       "post": {
         "description": "Instead of using HOPR address, we can assign HOPR address to a specific name called alias. Give an address a more memorable alias and use it instead of Hopr address. Aliases are kept locally and are not saved or shared on the network.",
-        "tags": [
-          "Aliases"
-        ],
+        "tags": ["Aliases"],
         "operationId": "aliasesSetAlias",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "peerId",
-                  "alias"
-                ],
+                "required": ["peerId", "alias"],
                 "properties": {
                   "peerId": {
                     "format": "peerId",
@@ -1277,20 +1221,14 @@
       "parameters": [],
       "post": {
         "description": "Withdraw funds from this node to your ethereum wallet address. You can choose whitch currency you want to withdraw, NATIVE or HOPR.",
-        "tags": [
-          "Account"
-        ],
+        "tags": ["Account"],
         "operationId": "accountWithdraw",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "currency",
-                  "amount",
-                  "recipient"
-                ],
+                "required": ["currency", "amount", "recipient"],
                 "properties": {
                   "currency": {
                     "$ref": "#/components/schemas/Currency"
@@ -1370,9 +1308,7 @@
       "parameters": [],
       "get": {
         "description": "Get node's HOPR and native balances. HOPR tokens from this balance is used to fund payment channels between this node and other nodes on the network. NATIVE balance is used to pay for the gas fees for the blockchain network.",
-        "tags": [
-          "Account"
-        ],
+        "tags": ["Account"],
         "operationId": "accountGetBalances",
         "responses": {
           "200": {
@@ -1424,9 +1360,7 @@
       "parameters": [],
       "get": {
         "description": "Get node's HOPR and native addresses. HOPR address is also called PeerId and can be used by other node owner to interact with this node.",
-        "tags": [
-          "Account"
-        ],
+        "tags": ["Account"],
         "operationId": "accountGetAddresses",
         "responses": {
           "200": {
@@ -1498,9 +1432,7 @@
       "parameters": [],
       "get": {
         "description": "Get node's HOPR and native addresses. HOPR address is also called PeerId and can be used by other node owner to interact with this node.",
-        "tags": [
-          "Account"
-        ],
+        "tags": ["Account"],
         "operationId": "accountGetAddress",
         "responses": {
           "200": {
@@ -1573,9 +1505,7 @@
       "parameters": [],
       "put": {
         "description": "Change this node's setting value. Check Settings schema to learn more about each setting and the type of value it expects.",
-        "tags": [
-          "Settings"
-        ],
+        "tags": ["Settings"],
         "operationId": "settingsSetSetting",
         "parameters": [
           {
@@ -1595,9 +1525,7 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "settingValue"
-                ],
+                "required": ["settingValue"],
                 "properties": {
                   "settingValue": {}
                 },
@@ -1656,9 +1584,7 @@
       "parameters": [],
       "post": {
         "description": "Redeems your tickets for this channel. Redeeming will change your tickets into Hopr tokens if they are winning ones. You can check how much tickets given channel has by calling /channels/{peerid}/tickets endpoint. Do this before channel is closed as neglected tickets are no longer valid for redeeming.",
-        "tags": [
-          "Channels"
-        ],
+        "tags": ["Channels"],
         "operationId": "channelsRedeemTickets",
         "parameters": [
           {
@@ -1735,9 +1661,7 @@
       "parameters": [],
       "get": {
         "description": "Get tickets earned by relaying data packets by your node for the particular channel.",
-        "tags": [
-          "Channels"
-        ],
+        "tags": ["Channels"],
         "operationId": "channelsGetTickets",
         "parameters": [
           {
@@ -1824,9 +1748,7 @@
       "parameters": [],
       "delete": {
         "description": "Close a opened channel between this node and other node. Once you've initiated channel closure, you have to wait for a specified closure time, it will show you a closure initiation message with cool-off time you need to wait.\n  Then you will need to send the same command again to finalize closure. This is a cool down period to give the other party in the channel sufficient time to redeem their tickets.",
-        "tags": [
-          "Channels"
-        ],
+        "tags": ["Channels"],
         "operationId": "channelsCloseChannel",
         "parameters": [
           {
@@ -1847,10 +1769,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": [
-                "incoming",
-                "outgoing"
-              ]
+              "enum": ["incoming", "outgoing"]
             }
           }
         ],
@@ -1918,9 +1837,7 @@
       },
       "get": {
         "description": "Returns information about the channel between this node and provided peerId.",
-        "tags": [
-          "Channels"
-        ],
+        "tags": ["Channels"],
         "operationId": "channelsGetChannel",
         "parameters": [
           {
@@ -1939,10 +1856,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": [
-                "incoming",
-                "outgoing"
-              ]
+              "enum": ["incoming", "outgoing"]
             }
           }
         ],
@@ -2016,9 +1930,7 @@
       "parameters": [],
       "get": {
         "description": "Get the PeerId (Hopr address) that have this alias assigned to it.",
-        "tags": [
-          "Aliases"
-        ],
+        "tags": ["Aliases"],
         "operationId": "aliasesGetAlias",
         "parameters": [
           {
@@ -2089,9 +2001,7 @@
       },
       "delete": {
         "description": "Unassign an alias from a PeerId. You can always assign back alias to that PeerId using /aliases endpoint.",
-        "tags": [
-          "Aliases"
-        ],
+        "tags": ["Aliases"],
         "operationId": "aliasesRemoveAlias",
         "parameters": [
           {
@@ -2139,14 +2049,10 @@
   },
   "security": [
     {
-      "keyScheme": [
-        "write"
-      ]
+      "keyScheme": ["write"]
     },
     {
-      "passwordScheme": [
-        "write"
-      ]
+      "passwordScheme": ["write"]
     }
   ],
   "externalDocs": {
@@ -2184,10 +2090,7 @@
       },
       "Currency": {
         "type": "string",
-        "enum": [
-          "NATIVE",
-          "HOPR"
-        ],
+        "enum": ["NATIVE", "HOPR"],
         "description": "Supported currencies, NATIVE used for the interacting with blockchain or HOPR used to fund channels.",
         "example": "NATIVE"
       },
@@ -2218,10 +2121,7 @@
         "properties": {
           "type": {
             "type": "string",
-            "enum": [
-              "incoming",
-              "outgoing"
-            ],
+            "enum": ["incoming", "outgoing"],
             "description": "Channel can be either incomming or outgoing. Incomming means that other node can send messages using this node as relay. Outgoing means that this node can use other node to send message as realy.",
             "example": "incoming"
           },
@@ -2235,12 +2135,7 @@
           },
           "status": {
             "type": "string",
-            "enum": [
-              "WaitingForCommitment",
-              "Open",
-              "PendingToClose",
-              "Closed"
-            ],
+            "enum": ["WaitingForCommitment", "Open", "PendingToClose", "Closed"],
             "description": "Status of the channel can be: WaitingForCommitment, Open, PendingToClose, or Closed.",
             "example": "Open"
           },
@@ -2295,10 +2190,7 @@
           },
           "strategy": {
             "type": "string",
-            "enum": [
-              "passive",
-              "promiscuous"
-            ],
+            "enum": ["passive", "promiscuous"],
             "example": "passive",
             "description": "By default, hoprd runs in **passive** mode, this means that your node will not attempt to open or close any channels automatically. When you set your strategy to **promiscuous** mode, your node will attempt to open channels to a _randomly_ selected group of nodes which you have a healthy connection to. At the same time, your node will also attempt to close channels that are running low on balance or are unhealthy."
           }
