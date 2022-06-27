@@ -58,12 +58,26 @@ development release or any other older release.
 
 ### Install via NPM
 
+Please make sure you are running a compatible version of Node.js.
+
+```sh
+node --version
+# v16.15.0
+```
+
+To always use the right version of Node.js, we recommend to install [Fast Node.js Manager (fnm)](https://github.com/Schniz/fnm) and run `fnm use`.
+
+```sh
+fnm use
+# Using Node v16.15.0
+```
+
 Using the [hoprd npm package][6]:
 
 ```sh
 mkdir MY_NEW_HOPR_TEST_FOLDER
 cd MY_NEW_HOPR_TEST_FOLDER
-npm install @hoprnet/hoprd@1.73
+npm install @hoprnet/hoprd@1.88
 ```
 
 ### Install via Docker
@@ -124,37 +138,40 @@ $ hoprd --help
 Options:
   --help                         Show help  [boolean]
   --version                      Show version number  [boolean]
-  --environment                  Environment id which the node shall run on  [string] [choices: "hardhat-localhost", "hardhat-localhost2", "master-goerli", "debug-goerli", "tuttlingen", "prague", "budapest", "athens", "ouagadougou"] [default: ""]
-  --host                         The network host to run the HOPR node on.  [string] [default: "0.0.0.0:9091"]
-  --announce                     Announce public IP to the network  [boolean] [default: false]
-  --admin                        Run an admin interface on localhost:3000, requires --apiToken  [boolean] [default: false]
-  --adminHost                    Host to listen to for admin console  [string] [default: "localhost"]
-  --adminPort                    Port to listen to for admin console  [string] [default: 3000]
-  --api                          Expose the Rest (V1, V2) and Websocket (V2) API on localhost:3001, requires --apiToken.  [boolean] [default: false]
-  --apiHost                      Set host IP to which the Rest and Websocket API server will bind.  [string] [default: "localhost"]
-  --apiPort                      Set host port to which the Rest and Websocket API server will bind.  [number] [default: 3001]
-  --healthCheck                  Run a health check end point on localhost:8080  [boolean] [default: false]
-  --healthCheckHost              Updates the host for the healthcheck server  [string] [default: "localhost"]
-  --healthCheckPort              Updates the port for the healthcheck server  [number] [default: 8080]
-  --forwardLogs                  Forwards all your node logs to a public available sink  [boolean] [default: false]
-  --forwardLogsProvider          A provider url for the logging sink node to use  [string] [default: "https://ceramic-clay.3boxlabs.com"]
-  --password                     A password to encrypt your keys  [string] [default: ""]
-  --apiToken                     A REST API token and admin panel password for user authentication  [string]
-  --privateKey                   A private key to be used for your HOPR node  [string]
-  --provider                     A custom RPC provider to be used for your HOPR node to connect to blockchain [string]
-  --identity                     The path to the identity file  [string] [default: "$HOME"]
-  --run                          Run a single hopr command, same syntax as in hopr-admin  [string] [default: ""]
-  --dryRun                       List all the options used to run the HOPR node, but quit instead of starting  [boolean] [default: false]
-  --data                         manually specify the data directory to use  [string] [default: "$PWD/hoprd-db"]
-  --init                         initialize a database if it doesn't already exist  [boolean] [default: false]
-  --allowLocalNodeConnections    Allow connections to other nodes running on localhost.  [boolean] [default: false]
-  --allowPrivateNodeConnections  Allow connections to other nodes running on private addresses.  [boolean] [default: false]
-  --testAnnounceLocalAddresses   For testing local testnets. Announce local addresses.  [boolean] [default: false]
-  --testPreferLocalAddresses     For testing local testnets. Prefer local peers to remote.  [boolean] [default: false]
-  --testUseWeakCrypto            weaker crypto for faster node startup  [boolean] [default: false]
-  --testNoAuthentication         no remote authentication for easier testing  [boolean] [default: false]
-  --heartbeatInterval            Interval in milliseconds in which the availability of other nodes get measured  [number]
-  --heartbeatVariance            Upper bound for variance applied to heartbeat interval in milliseconds  [number]
+  --environment                  Environment id which the node shall run on (HOPRD_ENVIRONMENT)  [string] [choices: "hardhat-localhost", "hardhat-localhost2", "master-goerli", "debug-goerli", "tuttlingen", "prague", "budapest", "athens", "lisbon", "ouagadougou"] [default: ""]
+  --host                         The network host to run the HOPR node on [env: HOPRD_HOST]  [string] [default: "0.0.0.0:9091"]
+  --announce                     Announce public IP to the network [env: HOPRD_ANNOUNCE]  [boolean] [default: false]
+  --admin                        Run an admin interface on localhost:3000, requires --apiToken [env: HOPRD_ADMIN]  [boolean] [default: false]
+  --adminHost                    Host to listen to for admin console [env: HOPRD_ADMIN_HOST]  [string] [default: "localhost"]
+  --adminPort                    Port to listen to for admin console [env: HOPRD_ADMIN_PORT]  [string] [default: 3000]
+  --api, --rest                  Expose the Rest (V1, V2) and Websocket (V2) API on localhost:3001, requires --apiToken. "--rest" is deprecated [env: HOPRD_API]  [boolean] [default: false]
+  --apiHost, --restHost          Set host IP to which the Rest and Websocket API server will bind. "--restHost" is deprecated [env: HOPRD_API_HOST]  [string] [default: "localhost"]
+  --apiPort, --restPort          Set host port to which the Rest and Websocket API server will bind. "--restPort" is deprecated [env: HOPRD_API_PORT]  [number] [default: 3001]
+  --healthCheck                  Run a health check end point on localhost:8080 [env: HOPRD_HEALTH_CHECK]  [boolean] [default: false]
+  --healthCheckHost              Updates the host for the healthcheck server [env: HOPRD_HEALTH_CHECK_HOST]  [string] [default: "localhost"]
+  --healthCheckPort              Updates the port for the healthcheck server [env: HOPRD_HEALTH_CHECK_PORT]  [number] [default: 8080]
+  --password                     A password to encrypt your keys [env: HOPRD_PASSWORD]  [string] [default: ""]
+  --apiToken                     A REST API token and admin panel password for user authentication [env: HOPRD_API_TOKEN]  [string]
+  --privateKey                   A private key to be used for the node [env: HOPRD_PRIVATE_KEY]  [string]
+  --provider                     A custom RPC provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER]  [string]
+  --identity                     The path to the identity file [env: HOPRD_IDENTITY]  [string] [default: "/home/tino/.hopr-identity"]
+  --run                          Run a single hopr command, same syntax as in hopr-admin [env: HOPRD_RUN]  [string] [default: ""]
+  --dryRun                       List all the options used to run the HOPR node, but quit instead of starting [env: HOPRD_DRY_RUN]  [boolean] [default: false]
+  --data                         manually specify the data directory to use [env: HOPRD_DATA]  [string] [default: "/home/tino/work/hopr/hoprnet/packages/hoprd"]
+  --init                         initialize a database if it doesn't already exist [env: HOPRD_INIT]  [boolean] [default: false]
+  --allowLocalNodeConnections    Allow connections to other nodes running on localhost [env: HOPRD_ALLOW_LOCAL_NODE_CONNECTIONS]  [boolean] [default: false]
+  --allowPrivateNodeConnections  Allow connections to other nodes running on private addresses [env: HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS]  [boolean] [default: false]
+  --testAnnounceLocalAddresses   For testing local testnets. Announce local addresses [env: HOPRD_TEST_ANNOUNCE_LOCAL_ADDRESSES]  [boolean] [default: false]
+  --testPreferLocalAddresses     For testing local testnets. Prefer local peers to remote [env: HOPRD_TEST_PREFER_LOCAL_ADDRESSES]  [boolean] [default: false]
+  --testUseWeakCrypto            weaker crypto for faster node startup [env: HOPRD_TEST_USE_WEAK_CRYPTO]  [boolean] [default: false]
+  --testNoAuthentication         no remote authentication for easier testing [env: HOPRD_TEST_NO_AUTHENTICATION]  [boolean] [default: false]
+  --heartbeatInterval            Interval in milliseconds in which the availability of other nodes get measured [env: HOPRD_HEARTBEAT_INTERVAL]  [number] [default: 60000]
+  --heartbeatThreshold           Timeframe in milliseconds after which a heartbeat to another peer is performed, if it hasn't been seen since [env: HOPRD_HEARTBEAT_THRESHOLD]  [number] [default: 60000]
+  --heartbeatVariance            Upper bound for variance applied to heartbeat interval in milliseconds [env: HOPRD_HEARTBEAT_VARIANCE]  [number] [default: 2000]
+  --networkQualityThreshold      Miniumum quality of a peer connection to be considered usable [env: HOPRD_NETWORK_QUALITY_THRESHOLD]  [number] [default: 0.5]
+  --onChainConfirmations         Number of confirmations required for on-chain transactions [env: HOPRD_ON_CHAIN_CONFIRMATIONS]  [number] [default: 8]
+
+All CLI options can be configured through environment variables as well. CLI parameters have precedence over environment variables.
 ```
 
 As you might have noticed running the node without any command-line argument might not work depending on the installation method used. Here are examples to run a node with some safe configurations set.
@@ -165,7 +182,7 @@ The following command assumes you've setup a local installation like described i
 
 ```sh
 cd MY_NEW_HOPR_TEST_FOLDER
-DEBUG=hopr* npx hoprd --admin --init --announce --identity .hopr-identity --password switzerland --forwardLogs --apiToken <MY_TOKEN>
+DEBUG=hopr* npx hoprd --admin --init --announce --identity .hopr-identity --password switzerland --apiToken <MY_TOKEN>
 ```
 
 Here is a short break-down of each argument.
@@ -177,7 +194,6 @@ hoprd
   --announce 				 # announce the node to other nodes in the network and act as relay if publicly reachable
   --identity .hopr-identity              # store your node identity information in your test folder
   --password switzerland   		 # set the encryption password for your identity
-  --forwardLogs                          # enable the node's log forwarding to the ceramic network
   --apiToken <MY_TOKEN> # specify password for accessing admin panel and REST API (REQUIRED)
 ```
 
@@ -186,21 +202,20 @@ hoprd
 The following command assumes you've setup an alias like described in [Install via Docker](#install-via-docker).
 
 ```sh
-hoprd --identity /app/db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --admin --adminHost 0.0.0.0 --forwardLogs --apiToken <MY_TOKEN> --environment jungfrau
+hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --admin --adminHost 0.0.0.0 --apiToken <MY_TOKEN> --environment jungfrau
 ```
 
 Here is a short break-down of each argument.
 
 ```sh
 hoprd
-  --identity /app/db/.hopr-identity      # store your node identity information in the persisted database folder
+  --identity /app/hoprd-db/.hopr-identity      # store your node identity information in the persisted database folder
   --password switzerland   		 # set the encryption password for your identity
   --init 				 # initialize the database and identity if not present
   --announce 				 # announce the node to other nodes in the network and act as relay if publicly reachable
   --host "0.0.0.0:9091"   		 # set IP and port of the P2P API to the container's external IP so it can be reached on your host
   --admin   	                         # enable the node's admin UI
   --adminHost 0.0.0.0                    # set IP of the Rest API to the container's external IP so it can be reached on your host
-  --forwardLogs                          # enable the node's log forwarding to the ceramic network
   --apiToken <MY_TOKEN> # specify password for accessing admin panel and REST API(REQUIRED)
   --environment jungfrau # an environment is defined as a chain plus a number of deployed smart contract addresses to use on that chain
                          # each release has a default environment id set, but the user can override this value
@@ -225,8 +240,7 @@ We attempt to provide instructions on how to migrate your tokens between release
 ## Develop
 
 ```sh
-yarn          # Install dependencies and sets up workspces
-yarn build    # Builds contracts, clients, etc
+make -j deps build
 
 # starting network
 HOPR_ENVIRONMENT_ID=hardhat-localhost yarn run:network
@@ -252,13 +266,13 @@ We use [mocha][9] for our tests. You can run our test suite across all
 packages using the following command:
 
 ```sh
-yarn test
+make test
 ```
 
 To run tests of a single package (e.g. hoprd) execute:
 
 ```sh
-yarn --cwd packages/hoprd test
+make test package=hoprd
 ```
 
 To run tests of a single test suite (e.g. Identity) within a
@@ -456,10 +470,9 @@ a guideline on how to get started.
 As some tools are only partially supported, please tag the respective team member
 whenever you need an issue about a particular tool.
 
-| Maintainer       | Technology  |
-| :--------------- | :---------: |
-| @jjperezaguinaga | Visual Code |
-| @tolbrino        |     Nix     |
+| Maintainer | Technology |
+| :--------- | :--------: |
+| @tolbrino  |    Nix     |
 
 ## Contact
 

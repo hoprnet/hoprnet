@@ -1,8 +1,8 @@
 import assert from 'assert'
 import { Multiaddr } from 'multiaddr'
-import { AccountEntry } from './accountEntry'
+import { AccountEntry } from './accountEntry.js'
 import BN from 'bn.js'
-import { PublicKey } from './publicKey'
+import { PublicKey } from './publicKey.js'
 
 // TODO: move these & similar into constants file
 const PARTY_A = PublicKey.fromPrivKeyString('0xc14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260')

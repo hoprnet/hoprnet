@@ -1,6 +1,6 @@
 import type PeerId from 'peer-id'
-import { privKeyToPeerId } from '..'
-import { debug } from '../process'
+import { privKeyToPeerId } from '../index.js'
+import { debug } from '../process/index.js'
 import { Wallet } from '@ethersproject/wallet'
 
 const logError = debug('hopr:keypair')

@@ -1,6 +1,6 @@
 import assert from 'assert'
-import { u8aConcat } from './concat'
-import { u8aEquals } from './equals'
+import { u8aConcat } from './concat.js'
+import { u8aEquals } from './equals.js'
 import { randomBytes } from 'crypto'
 
 describe('test u8a concat', function () {

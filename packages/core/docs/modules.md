@@ -4,6 +4,10 @@
 
 ## Table of contents
 
+### Enumerations
+
+- [NetworkHealthIndicator](enums/NetworkHealthIndicator.md)
+
 ### Classes
 
 - [PassiveStrategy](classes/PassiveStrategy.md)
@@ -11,23 +15,28 @@
 - [SaneDefaults](classes/SaneDefaults.md)
 - [default](classes/default.md)
 
+### Interfaces
+
+- [ChannelStrategyInterface](interfaces/ChannelStrategyInterface.md)
+
 ### Type aliases
 
-- [ChannelsToClose](modules.md#channelstoclose)
-- [ChannelsToOpen](modules.md#channelstoopen)
 - [HoprOptions](modules.md#hoproptions)
 - [NodeStatus](modules.md#nodestatus)
 - [ResolvedEnvironment](modules.md#resolvedenvironment)
 - [SendMessage](modules.md#sendmessage)
+- [StrategyTickResult](modules.md#strategytickresult)
 - [Subscribe](modules.md#subscribe)
 
 ### Variables
 
 - [ACKNOWLEDGEMENT\_TIMEOUT](modules.md#acknowledgement_timeout)
 - [CHECK\_TIMEOUT](modules.md#check_timeout)
+- [CONFIRMATIONS](modules.md#confirmations)
 - [FULL\_VERSION](modules.md#full_version)
 - [HEARTBEAT\_INTERVAL](modules.md#heartbeat_interval)
 - [HEARTBEAT\_INTERVAL\_VARIANCE](modules.md#heartbeat_interval_variance)
+- [HEARTBEAT\_THRESHOLD](modules.md#heartbeat_threshold)
 - [HEARTBEAT\_TIMEOUT](modules.md#heartbeat_timeout)
 - [INTERMEDIATE\_HOPS](modules.md#intermediate_hops)
 - [MAX\_HOPS](modules.md#max_hops)
@@ -50,26 +59,6 @@
 
 ## Type aliases
 
-### ChannelsToClose
-
-Ƭ **ChannelsToClose**: `PublicKey`
-
-#### Defined in
-
-[packages/core/src/channel-strategy.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L17)
-
-___
-
-### ChannelsToOpen
-
-Ƭ **ChannelsToOpen**: [`PublicKey`, `BN`]
-
-#### Defined in
-
-[packages/core/src/channel-strategy.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L16)
-
-___
-
 ### HoprOptions
 
 Ƭ **HoprOptions**: `Object`
@@ -87,12 +76,15 @@ ___
 | `environment` | [`ResolvedEnvironment`](modules.md#resolvedenvironment) |
 | `forceCreateDB?` | `boolean` |
 | `heartbeatInterval?` | `number` |
+| `heartbeatThreshold?` | `number` |
 | `heartbeatVariance?` | `number` |
 | `hosts?` | { `ip4?`: `NetOptions` ; `ip6?`: `NetOptions`  } |
 | `hosts.ip4?` | `NetOptions` |
 | `hosts.ip6?` | `NetOptions` |
+| `networkQualityThreshold?` | `number` |
+| `onChainConfirmations?` | `number` |
 | `password?` | `string` |
-| `strategy?` | `ChannelStrategy` |
+| `strategy?` | [`ChannelStrategyInterface`](interfaces/ChannelStrategyInterface.md) |
 | `testing?` | { `announceLocalAddresses?`: `boolean` ; `noDirectConnections?`: `boolean` ; `noUPNP?`: `boolean` ; `noWebRTCUpgrade?`: `boolean` ; `preferLocalAddresses?`: `boolean`  } |
 | `testing.announceLocalAddresses?` | `boolean` |
 | `testing.noDirectConnections?` | `boolean` |
@@ -102,7 +94,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:86](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L86)
+[packages/core/src/index.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L84)
 
 ___
 
@@ -112,7 +104,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:127](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L127)
+[packages/core/src/index.ts:128](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L128)
 
 ___
 
@@ -124,15 +116,20 @@ ___
 
 | Name | Type |
 | :------ | :------ |
+| `boost_contract_address` | `string` |
 | `channel_contract_deploy_block` | `number` |
 | `channels_contract_address` | `string` |
 | `id` | `string` |
 | `network` | `NetworkOptions` |
+| `network_registry_contract_address` | `string` |
+| `network_registry_proxy_contract_address` | `string` |
+| `stake_contract_address` | `string` |
 | `token_contract_address` | `string` |
+| `xhopr_contract_address` | `string` |
 
 #### Defined in
 
-[packages/core/src/environment.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L27)
+[packages/core/src/environment.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L39)
 
 ___
 
@@ -142,7 +139,24 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:142](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L142)
+[packages/core/src/index.ts:143](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L143)
+
+___
+
+### StrategyTickResult
+
+Ƭ **StrategyTickResult**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `toClose` | { `destination`: `PublicKey`  }[] |
+| `toOpen` | { `destination`: `PublicKey` ; `stake`: `BN`  }[] |
+
+#### Defined in
+
+[packages/core/src/channel-strategy.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L16)
 
 ___
 
@@ -152,7 +166,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:129](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L129)
+[packages/core/src/index.ts:130](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L130)
 
 ## Variables
 
@@ -162,7 +176,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L26)
+[packages/core/src/constants.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L29)
 
 ___
 
@@ -172,7 +186,17 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L25)
+[packages/core/src/constants.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L28)
+
+___
+
+### CONFIRMATIONS
+
+• `Const` **CONFIRMATIONS**: ``8``
+
+#### Defined in
+
+packages/core-ethereum/lib/constants.d.ts:6
 
 ___
 
@@ -182,17 +206,17 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L6)
+[packages/core/src/constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L8)
 
 ___
 
 ### HEARTBEAT\_INTERVAL
 
-• `Const` **HEARTBEAT\_INTERVAL**: ``30000``
+• `Const` **HEARTBEAT\_INTERVAL**: ``60000``
 
 #### Defined in
 
-[packages/core/src/constants.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L13)
+[packages/core/src/constants.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L15)
 
 ___
 
@@ -202,17 +226,27 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L14)
+[packages/core/src/constants.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L17)
+
+___
+
+### HEARTBEAT\_THRESHOLD
+
+• `Const` **HEARTBEAT\_THRESHOLD**: ``60000``
+
+#### Defined in
+
+[packages/core/src/constants.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L16)
 
 ___
 
 ### HEARTBEAT\_TIMEOUT
 
-• `Const` **HEARTBEAT\_TIMEOUT**: ``6000``
+• `Const` **HEARTBEAT\_TIMEOUT**: ``30000``
 
 #### Defined in
 
-[packages/core/src/constants.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L12)
+[packages/core/src/constants.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L14)
 
 ___
 
@@ -222,7 +256,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L18)
+[packages/core/src/constants.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L21)
 
 ___
 
@@ -232,7 +266,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L23)
+[packages/core/src/constants.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L26)
 
 ___
 
@@ -242,7 +276,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L22)
+[packages/core/src/constants.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L25)
 
 ___
 
@@ -252,7 +286,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L16)
+[packages/core/src/constants.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L19)
 
 ___
 
@@ -262,7 +296,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L20)
+[packages/core/src/constants.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L23)
 
 ___
 
@@ -272,7 +306,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L21)
+[packages/core/src/constants.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L24)
 
 ___
 
@@ -282,7 +316,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L5)
+[packages/core/src/constants.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L7)
 
 ___
 
@@ -292,7 +326,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L19)
+[packages/core/src/constants.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L22)
 
 ___
 
@@ -302,7 +336,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L8)
+[packages/core/src/constants.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L10)
 
 ___
 
@@ -334,7 +368,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/main.ts:168](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L168)
+[packages/core/src/main.ts:178](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L178)
 
 ___
 
@@ -407,7 +441,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/environment.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L41)
+[packages/core/src/environment.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L60)
 
 ___
 
@@ -421,4 +455,4 @@ ___
 
 #### Defined in
 
-[packages/core/src/environment.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L35)
+[packages/core/src/environment.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L52)

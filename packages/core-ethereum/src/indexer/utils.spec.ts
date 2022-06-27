@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import { snapshotComparator, isConfirmedBlock } from './utils'
+import { snapshotComparator, isConfirmedBlock } from './utils.js'
 
 describe('test snapshotComparator', function () {
   const EVENT_1_0_0 = {

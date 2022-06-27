@@ -1,6 +1,5 @@
 import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
-import type BufferList from 'bl/BufferList'
 
 type Suffix = 'PublicNode'
 type AddEventName = `add${Suffix}`
@@ -46,7 +45,7 @@ export interface PublicNodesEmitter {
   removeListener(event: string | symbol, listener: (...args: any[]) => void): this
 }
 
-export type StreamType = BufferList | Uint8Array
+export type StreamType = Uint8Array
 
 export type StreamSourceAsync<T = StreamType> = AsyncIterable<T>
 export type StreamSource<T = StreamType> = AsyncIterable<T> | Iterable<T>
@@ -69,6 +68,8 @@ export type HoprConnectOptions = {
   environment?: string
   relayFreeTimeout?: number
   dhtRenewalTimeout?: number
+  entryNodeReconnectBaseTimeout?: number
+  entryNodeReconnectBackoff?: number
 }
 
 export type HoprConnectTestingOptions = {
@@ -89,5 +90,9 @@ export type HoprConnectTestingOptions = {
 export type HoprConnectListeningOptions = undefined
 
 export type HoprConnectDialOptions = {
+  // Used to cancel dial attempts after a timeout
   signal?: AbortSignal
+  // Called when closing socket with the Multiaddr that
+  // was used to establish the connection
+  onDisconnect?: (ma: Multiaddr) => void
 }

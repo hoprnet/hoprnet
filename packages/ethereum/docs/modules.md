@@ -10,10 +10,19 @@
 
 ### Interfaces
 
+- [HoprBoost](interfaces/HoprBoost.md)
 - [HoprChannels](interfaces/HoprChannels.md)
+- [HoprDistributor](interfaces/HoprDistributor.md)
+- [HoprNetworkRegistry](interfaces/HoprNetworkRegistry.md)
+- [HoprStake](interfaces/HoprStake.md)
+- [HoprStake2](interfaces/HoprStake2.md)
+- [HoprStakeSeason3](interfaces/HoprStakeSeason3.md)
+- [HoprStakeSeason4](interfaces/HoprStakeSeason4.md)
 - [HoprToken](interfaces/HoprToken.md)
+- [HoprWhitehat](interfaces/HoprWhitehat.md)
 - [TypedEvent](interfaces/TypedEvent.md)
 - [TypedEventFilter](interfaces/TypedEventFilter.md)
+- [xHoprToken](interfaces/xHoprToken.md)
 
 ### Type aliases
 
@@ -45,17 +54,17 @@
 
 #### Defined in
 
-[packages/ethereum/src/index.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L9)
+[packages/ethereum/src/index.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L32)
 
 ___
 
 ### ContractNames
 
-Ƭ **ContractNames**: ``"HoprToken"`` \| ``"HoprChannels"`` \| ``"HoprDistributor"``
+Ƭ **ContractNames**: ``"HoprToken"`` \| ``"HoprChannels"`` \| ``"HoprDistributor"`` \| ``"HoprNetworkRegistry"`` \| ``"HoprBoost"`` \| ``"HoprStake"`` \| ``"HoprStake2"`` \| ``"HoprStakeSeason3"`` \| ``"HoprStakeSeason4"`` \| ``"HoprWhitehat"``
 
 #### Defined in
 
-[packages/ethereum/src/index.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L7)
+[packages/ethereum/src/index.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L20)
 
 ___
 
@@ -122,4 +131,4 @@ ___
 
 #### Defined in
 
-[packages/ethereum/src/index.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L16)
+[packages/ethereum/src/index.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L39)

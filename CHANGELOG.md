@@ -1,3 +1,14 @@
+<a name="1.90"></a>
+
+## 1.90
+
+### Changes
+
+- Reduce eth_getBlockByNumber calls when indexing and sending transactions ([#3814](https://github.com/hoprnet/hoprnet/pull/3814))
+- Marge hopr-stake contracs into monorepo and relevant deploy scripts
+- Add additional CLI parameters `--heartbeatThreshold`, `--networkQualityThreshold` and `--onChainConfirmations`
+- Allow configuration via environment variables instead of CLI parameters for all supported options
+
 <a name="1.89"></a>
 
 ## [1.89](https://github.com/hoprnet/hoprnet/compare/release/ouagadougou...hoprnet:master)
@@ -7,6 +18,15 @@
 - Improvements in our API v2 unit tests ([#3643](https://github.com/hoprnet/hoprnet/pull/3643))
 - Improvements in our integration E2E tests ([#3643](https://github.com/hoprnet/hoprnet/pull/3643))
 - API v2 `/api/v2/node/peers` now returns `multiaddr` for connected peers ([#3643](https://github.com/hoprnet/hoprnet/pull/3643))
+- Add connectivity health indicator updates to the logs ([#3816](https://github.com/hoprnet/hoprnet/pull/3816))
+- Introduce Rust WASM support into the build toolchain ([#3829](https://github.com/hoprnet/hoprnet/pull/3829))
+- Optimize build pipeline and migrate to Makefile ([#3851](https://github.com/hoprnet/hoprnet/pull/3851))
+- When sending an Ethereum transaction, also release nonce lock if transaction is considered a duplicate ([#3856](https://github.com/hoprnet/hoprnet/pull/3856))
+- Within E2E tests, disable hardhat autmining after deployment is done ([#3851](https://github.com/hoprnet/hoprnet/pull/3857))
+
+### Breaking changes
+
+- Migration to ECMAscript module standard (ESM), drop support for CommonJS ([#3825](https://github.com/hoprnet/hoprnet/pull/3825))
 
 ---
 
@@ -23,6 +43,16 @@
 - Various bug fixes in `core`
 - Performance improvements in `core`
 - Enhanced database queries through range queries and batched operations ([#3648](https://github.com/hoprnet/hoprnet/pull/3648))
+- Automatically cleanup stale connections to correctly handle reconnects ([#3688](https://github.com/hoprnet/hoprnet/pull/3688))
+- Add `--provider` flag for setting a custom blockchain RPC provider
+- Use a default address sorter for all address classes ([#3731](https://github.com/hoprnet/hoprnet/pull/3731))
+- Enhance TCP socket listening logic and cleanup keepAlice interval ([#3750](https://github.com/hoprnet/hoprnet/pull/3750))
+- Try to reconnect to entry nodes after connection has been dropped ([#3751](https://github.com/hoprnet/hoprnet/pull/3751))
+- Unhandled rejection in relay requests ([#3779](https://github.com/hoprnet/hoprnet/pull/3779))
+- Ping & DHT query timeout increased ([#3780](https://github.com/hoprnet/hoprnet/pull/3780))
+- Dial refactoring and optimization ([#3780](https://github.com/hoprnet/hoprnet/pull/3780))
+- onAbort unhandled promise rejection workaround fix ([#3780](https://github.com/hoprnet/hoprnet/pull/3780))
+- Fix event listener leak and increase maximum number of event listeners to 20 ([#3790](https://github.com/hoprnet/hoprnet/pull/3790))
 
 ---
 

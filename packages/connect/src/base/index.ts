@@ -1,2 +1,2 @@
-export { TCPConnection } from './tcp'
-export { Listener } from './listener'
+export { TCPConnection } from './tcp.js'
+export { Listener } from './listener.js'

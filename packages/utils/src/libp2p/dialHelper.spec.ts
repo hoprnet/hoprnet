@@ -1,16 +1,17 @@
 import { NOISE } from '@chainsafe/libp2p-noise'
 import MPLEX from 'libp2p-mplex'
 import LibP2P from 'libp2p'
-import type { Address } from 'libp2p/src/peer-store/address-book'
-import { dial as dialHelper, DialStatus } from './dialHelper'
-import { privKeyToPeerId } from './privKeyToPeerId'
+import type { Address } from 'libp2p/src/peer-store/address-book.js'
+import type { Connection } from 'libp2p/src/connection-manager/index.js'
+import { dial as dialHelper, DialStatus } from './dialHelper.js'
+import { privKeyToPeerId } from './privKeyToPeerId.js'
 import TCP from 'libp2p-tcp'
 import KadDHT from 'libp2p-kad-dht'
 import assert from 'assert'
 import { Multiaddr } from 'multiaddr'
-import pipe from 'it-pipe'
-import { u8aEquals, stringToU8a } from '../u8a'
-import { createRelayerKey } from '../libp2p'
+import { pipe } from 'it-pipe'
+import { u8aEquals, stringToU8a } from '../u8a/index.js'
+import { createRelayerKey } from './relayCode.js'
 import PeerId from 'peer-id'
 
 const TEST_PROTOCOL = '/test'
@@ -29,7 +30,7 @@ async function getNode(id: PeerId, withDHT = false, maDestination?: Multiaddr): 
     modules: {
       transport: [TCP],
       streamMuxer: [MPLEX],
-      connEncryption: [NOISE as any],
+      connEncryption: [NOISE],
       dht: withDHT ? KadDHT : undefined
     },
     metrics: {
@@ -48,17 +49,22 @@ async function getNode(id: PeerId, withDHT = false, maDestination?: Multiaddr): 
       peerDiscovery: {
         autoDial: false
       }
+    },
+    dialer: {
+      // Use custom sorting to prevent from problems with libp2p
+      // and HOPR's relay addresses
+      addressSorter: (addrs) => addrs
     }
   })
 
-  const dialProtocol = node.dialProtocol.bind(node)
+  const dial = node.dial.bind(node)
 
-  node.dialProtocol = async (peer: PeerId | Multiaddr, protocols: string[], options: any) => {
+  node.dial = async (peer: PeerId | Multiaddr, options: any) => {
     if (PeerId.isPeerId(peer)) {
-      return dialProtocol(peer, protocols, options)
+      return dial(peer, options)
     }
 
-    return dialProtocol(maDestination, protocols, options)
+    return dial(maDestination, options)
   }
 
   node.handle(TEST_PROTOCOL, async ({ stream }) => {
@@ -95,14 +101,27 @@ function getPeerStore() {
   }
 }
 
+function getConnectionManager() {
+  const connections = new Map<string, Connection[]>()
+  const getAll = (peer: PeerId) => {
+    return connections.get(peer.toB58String()) ?? []
+  }
+
+  const onDisconnect = (_conn: Connection) => {}
+
+  return {
+    getAll,
+    onDisconnect
+  }
+}
+
 describe('test dialHelper', function () {
   it('call non-existing', async function () {
     const peerA = await getNode(Alice)
 
     const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)
 
-    assert(result.status === DialStatus.DIAL_ERROR)
-    assert(result.dhtContacted == false)
+    assert(result.status === DialStatus.NO_DHT)
 
     // Shutdown node
     await peerA.stop()
@@ -118,7 +137,8 @@ describe('test dialHelper', function () {
 
     assert(result.status === DialStatus.SUCCESS)
 
-    pipe(TEST_MESSAGE, result.resp.stream.sink)
+    // @fixme
+    pipe(TEST_MESSAGE, result.resp.stream.sink as any)
 
     for await (const msg of result.resp.stream.source) {
       assert(u8aEquals(msg.slice(), TEST_MESSAGE))
@@ -140,6 +160,8 @@ describe('test dialHelper', function () {
   })
 
   it('regular dial with DHT', async function () {
+    this.timeout(5e3)
+
     const peerB = await getNode(Bob, true)
     const peerC = await getNode(Chris, true)
 
@@ -169,7 +191,8 @@ describe('test dialHelper', function () {
 
     assert(result.status === DialStatus.SUCCESS, `Dial must be successful`)
 
-    pipe(TEST_MESSAGE, result.resp.stream.sink)
+    // @fixme
+    pipe(TEST_MESSAGE, result.resp.stream.sink as any)
 
     for await (const msg of result.resp.stream.source) {
       assert(u8aEquals(msg.slice(), TEST_MESSAGE))
@@ -180,7 +203,6 @@ describe('test dialHelper', function () {
   })
 
   it('DHT does not find any new addresses', async function () {
-    const peerStore = getPeerStore()
     const peerA = {
       contentRouting: {
         // Non-empty array
@@ -188,11 +210,10 @@ describe('test dialHelper', function () {
         // Returning an empty iterator
         findProviders: () => (async function* () {})()
       },
-      dialProtocol: () => Promise.resolve(undefined),
-      peerStore
+      connectionManager: getConnectionManager(),
+      dial: () => Promise.resolve<Connection>(undefined),
+      peerStore: getPeerStore()
     }
-
-    await peerStore.addressBook.add(Bob, [new Multiaddr(`/ip4/127.0.0.1/tcp/123/p2p/${Bob.toB58String()}`)])
 
     // Try to call Bob but does not exist
     const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)
@@ -203,7 +224,6 @@ describe('test dialHelper', function () {
   })
 
   it('DHT throws an error', async function () {
-    const peerStore = getPeerStore()
     const peerA = {
       contentRouting: {
         // Non-empty array
@@ -214,11 +234,10 @@ describe('test dialHelper', function () {
             throw Error(`boom`)
           })()
       },
-      dialProtocol: () => Promise.resolve(undefined),
-      peerStore
+      dial: () => Promise.resolve<Connection>(undefined),
+      connectionManager: getConnectionManager(),
+      peerStore: getPeerStore()
     }
-
-    await peerStore.addressBook.add(Bob, [new Multiaddr(`/ip4/127.0.0.1/tcp/123/p2p/${Bob.toB58String()}`)])
 
     const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)
 

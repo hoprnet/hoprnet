@@ -2,13 +2,21 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
-import { createTestApiInstance } from '../../fixtures'
+import { createTestApiInstance } from '../../fixtures.js'
 
 let node = sinon.fake() as any
-const { api, service } = createTestApiInstance(node)
-chai.use(chaiResponseValidator(api.apiDoc))
 
 describe('GET /node/info', () => {
+  let service: any
+  before(async function () {
+    const loaded = await createTestApiInstance(node)
+
+    service = loaded.service
+
+    // @ts-ignore ESM / CommonJS compatibility issue
+    chai.use(chaiResponseValidator.default(loaded.api.apiDoc))
+  })
+
   it('should get info', async () => {
     node.environment = { id: 'hardhat-localhost' }
     node.smartContractInfo = sinon.fake.returns({

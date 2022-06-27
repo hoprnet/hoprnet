@@ -1,14 +1,27 @@
-import Heartbeat, { type HeartbeatConfig } from './heartbeat'
-import NetworkPeers from './network-peers'
+import Heartbeat, { type HeartbeatConfig, NetworkHealthIndicator } from './heartbeat.js'
+import NetworkPeers from './network-peers.js'
 import { assert } from 'chai'
 import { type LibP2PHandlerFunction, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { EventEmitter, once } from 'events'
 import type PeerId from 'peer-id'
-import { NETWORK_QUALITY_THRESHOLD } from '../constants'
+import { NETWORK_QUALITY_THRESHOLD } from '../constants.js'
 
 class TestingHeartbeat extends Heartbeat {
   public async checkNodes() {
     return await super.checkNodes()
+  }
+}
+
+class NetworkHealth extends EventEmitter {
+  public state: NetworkHealthIndicator = NetworkHealthIndicator.UNKNOWN
+
+  constructor() {
+    super()
+    this.on('hopr:network-health-changed', this.stateChanged.bind(this))
+  }
+
+  private stateChanged(_oldState: NetworkHealthIndicator, newState: NetworkHealthIndicator) {
+    this.state = newState
   }
 }
 
@@ -23,7 +36,8 @@ const SHORT_TIMEOUTS: Partial<HeartbeatConfig> = {
   heartbeatDialTimeout: 50,
   heartbeatRunTimeout: 100,
   heartbeatInterval: 200,
-  heartbeatVariance: 1
+  heartbeatVariance: 1,
+  networkQualityThreshold: 0.5
 }
 
 /**
@@ -104,9 +118,10 @@ function createFakeNetwork() {
 
 async function getPeer(
   self: PeerId,
-  network: ReturnType<typeof createFakeNetwork>
+  network: ReturnType<typeof createFakeNetwork>,
+  netStatEvents: EventEmitter
 ): Promise<{ heartbeat: TestingHeartbeat; peers: NetworkPeers }> {
-  const peers = new NetworkPeers([], [self])
+  const peers = new NetworkPeers([], [self], 0.3)
 
   const heartbeat = new TestingHeartbeat(
     peers,
@@ -115,6 +130,9 @@ async function getPeer(
     (async () => {
       assert.fail(`must not call hangUp`)
     }) as any,
+    () => Promise.resolve(true),
+    netStatEvents,
+    (peerId) => peerId.toB58String() !== Charly.toB58String(),
     TESTING_ENVIRONMENT,
     {
       ...SHORT_TIMEOUTS,
@@ -129,9 +147,10 @@ async function getPeer(
 }
 
 describe('unit test heartbeat', async () => {
-  it('check nodes is noop with empty store', async () => {
+  it('check nodes is noop with empty store & health indicator is red', async () => {
+    let netHealth = new NetworkHealth()
     const heartbeat = new TestingHeartbeat(
-      new NetworkPeers([], [Alice]),
+      new NetworkPeers([], [Alice], 0.3),
       (() => {}) as any,
       (async () => {
         assert.fail(`must not call send`)
@@ -139,19 +158,74 @@ describe('unit test heartbeat', async () => {
       (async () => {
         assert.fail(`must not call hangUp`)
       }) as any,
+      () => Promise.resolve(true),
+      netHealth,
+      (_) => true,
       TESTING_ENVIRONMENT,
       SHORT_TIMEOUTS
     )
     await heartbeat.checkNodes()
 
     heartbeat.stop()
+
+    assert.equal(netHealth.state, NetworkHealthIndicator.RED)
+  })
+
+  it('check network health state progression', async () => {
+    const network = createFakeNetwork()
+
+    const netHealthA = new NetworkHealth()
+
+    const peerA = await getPeer(Alice, network, netHealthA)
+    const peerB = await getPeer(Bob, network, new NetworkHealth())
+
+    peerA.heartbeat.recalculateNetworkHealth()
+
+    assert.equal(peerA.peers.qualityOf(Bob).toFixed(1), '0.2')
+    assert.equal(netHealthA.state, NetworkHealthIndicator.RED)
+
+    peerA.peers.register(Bob, 'test')
+
+    peerA.heartbeat.recalculateNetworkHealth()
+
+    assert.equal(peerA.peers.qualityOf(Bob).toFixed(1), '0.2')
+    assert.equal(netHealthA.state, NetworkHealthIndicator.ORANGE)
+
+    for (let i = 0; i < 4; i++) {
+      await peerA.heartbeat.checkNodes()
+    }
+
+    assert.equal(peerA.peers.qualityOf(Bob).toFixed(1), '0.6')
+    assert.equal(netHealthA.state, NetworkHealthIndicator.YELLOW)
+
+    const peerC = await getPeer(Charly, network, new NetworkHealth())
+    peerA.peers.register(Charly, 'test')
+
+    assert.equal(netHealthA.state, NetworkHealthIndicator.YELLOW)
+
+    for (let i = 0; i < 6; i++) {
+      await peerA.heartbeat.checkNodes()
+    }
+
+    assert.equal(netHealthA.state, NetworkHealthIndicator.GREEN)
+
+    // Losing private node Charly should take us back to yellow
+    network.unsubscribe(Charly)
+    peerC.heartbeat.stop()
+
+    await Promise.all(Array.from({ length: 6 }, (_) => peerA.heartbeat.checkNodes()))
+
+    assert.equal(peerA.heartbeat.recalculateNetworkHealth(), NetworkHealthIndicator.YELLOW)
+    assert.equal(netHealthA.state, NetworkHealthIndicator.YELLOW)
+    ;[peerA, peerB].map((peer) => peer.heartbeat.stop())
+    network.close()
   })
 
   it('check nodes does not change quality of newly registered peers', async () => {
     const network = createFakeNetwork()
-    const peerA = await getPeer(Alice, network)
 
-    const peerB = await getPeer(Bob, network)
+    const peerA = await getPeer(Alice, network, new NetworkHealth())
+    const peerB = await getPeer(Bob, network, new NetworkHealth())
 
     assert.equal(peerA.peers.qualityOf(Bob).toFixed(1), '0.2')
 
@@ -168,7 +242,7 @@ describe('unit test heartbeat', async () => {
 
   it('check nodes does not change quality of offline peer', async () => {
     const network = createFakeNetwork()
-    const peerA = await getPeer(Alice, network)
+    const peerA = await getPeer(Alice, network, new NetworkHealth())
 
     assert.equal(peerA.peers.qualityOf(Charly).toFixed(1), '0.2')
 
@@ -187,9 +261,9 @@ describe('unit test heartbeat', async () => {
   it('test heartbeat flow', async () => {
     const network = createFakeNetwork()
 
-    const peerA = await getPeer(Alice, network)
-    const peerB = await getPeer(Bob, network)
-    const peerC = await getPeer(Charly, network)
+    const peerA = await getPeer(Alice, network, new NetworkHealth())
+    const peerB = await getPeer(Bob, network, new NetworkHealth())
+    const peerC = await getPeer(Charly, network, new NetworkHealth())
 
     peerA.peers.register(Bob, 'test')
     peerA.peers.register(Charly, 'test')

@@ -1,5 +1,5 @@
-import { u8aAdd } from './u8aAdd'
-import { u8aEquals } from './equals'
+import { u8aAdd } from './u8aAdd.js'
+import { u8aEquals } from './equals.js'
 
 import assert from 'assert'
 

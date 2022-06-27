@@ -1,10 +1,9 @@
-import { getIdentity, IdentityErrors, IdentityOptions } from './identity'
+import { getIdentity, IdentityErrors, IdentityOptions } from './identity.js'
 import { unlinkSync, existsSync } from 'fs'
-import { resolve } from 'path'
 import assert from 'assert'
 
 describe('Identity', function () {
-  const DUMMY_PATH = resolve(__dirname, './hopr-test-identity')
+  const DUMMY_PATH = new URL('./hopr-test-identity', import.meta.url).pathname
   const DUMMY_PASSWORD = 'hopr-unit-test-password'
   const WRONG_DUMMY_PASSWORD = 'hopr-unit-test-wrong-password'
   const INVALID_PRIVATE_KEY = 'invalid_hex_string'

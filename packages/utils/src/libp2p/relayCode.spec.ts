@@ -2,15 +2,15 @@ import { randomBytes } from 'crypto'
 
 import Libp2p from 'libp2p'
 import TCP from 'libp2p-tcp'
-const Mplex = require('libp2p-mplex')
+import Mplex from 'libp2p-mplex'
 import { NOISE } from '@chainsafe/libp2p-noise'
 import KadDHT from 'libp2p-kad-dht'
 import { Multiaddr } from 'multiaddr'
 
 import type PeerId from 'peer-id'
 
-import { createRelayerKey } from './relayCode'
-import { privKeyToPeerId } from './privKeyToPeerId'
+import { createRelayerKey } from './relayCode.js'
+import { privKeyToPeerId } from './privKeyToPeerId.js'
 import assert from 'assert'
 
 const peerA = privKeyToPeerId('0x06243fcfd7d7ba9364c9903b95cb8cfb3a3e6e95a80c96656598bda6942ae1c2')
@@ -38,8 +38,8 @@ async function getNode(id = getPeerId()): Promise<Libp2p> {
     peerId: id,
     modules: {
       transport: [TCP],
-      streamMuxer: [Mplex as any],
-      connEncryption: [NOISE as any],
+      streamMuxer: [Mplex],
+      connEncryption: [NOISE],
       dht: KadDHT
     },
     metrics: {
@@ -70,6 +70,8 @@ async function getNode(id = getPeerId()): Promise<Libp2p> {
 
 describe('relay code generation', function () {
   it('provide and fetch CID key', async function () {
+    this.timeout(5e3)
+
     const nodeA = await getNode(peerA)
     const nodeB = await getNode(peerB)
     const nodeC = await getNode(peerC)
@@ -101,6 +103,8 @@ describe('relay code generation', function () {
 
   // Check that nodes can renew keys in the DHT
   it('renew CID key', async function () {
+    this.timeout(5e3)
+
     const nodeA = await getNode(peerA)
     const nodeB = await getNode(peerB)
     const nodeC = await getNode(peerC)

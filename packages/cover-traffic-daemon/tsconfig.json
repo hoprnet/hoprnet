@@ -4,8 +4,7 @@
     "outDir": "./lib",
     "rootDir": "./src"
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.spec.ts", "src/**/*.mock.ts"],
+  "include": ["src/**/*.ts", "src/**/*.cts"],
   "typedocOptions": {
     "entryPoints": ["src/index.ts"],
     "out": "docs",

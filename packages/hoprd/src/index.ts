@@ -1,26 +1,38 @@
-#!/usr/bin/env node
-
 import { passwordStrength } from 'check-password-strength'
 import { decode } from 'rlp'
 import path from 'path'
-import yargs from 'yargs/yargs'
+import yargs from 'yargs'
+
+import { hideBin } from 'yargs/helpers'
 import { setTimeout } from 'timers/promises'
-import { terminalWidth } from 'yargs'
+import { loadJson, NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
+import {
+  default as Hopr,
+  type HoprOptions,
+  type NetworkHealthIndicator,
+  createHoprNode,
+  resolveEnvironment,
+  supportedEnvironments,
+  ResolvedEnvironment,
+  HEARTBEAT_INTERVAL,
+  HEARTBEAT_THRESHOLD,
+  HEARTBEAT_INTERVAL_VARIANCE,
+  NETWORK_QUALITY_THRESHOLD,
+  CONFIRMATIONS
+} from '@hoprnet/hopr-core'
 
-import Hopr, { createHoprNode } from '@hoprnet/hopr-core'
-import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
-import { resolveEnvironment, supportedEnvironments, ResolvedEnvironment } from '@hoprnet/hopr-core'
+import type { State } from './types.js'
+import setupAPI from './api/index.js'
+import setupHealthcheck from './healthcheck.js'
+import { AdminServer } from './admin.js'
+import { LogStream } from './logs.js'
+import { getIdentity } from './identity.js'
+import { register as registerUnhandled } from 'trace-unhandled'
 
-import type { State } from './types'
-import setupAPI from './api'
-import setupHealthcheck from './healthcheck'
-import { AdminServer } from './admin'
-import { LogStream } from './logs'
-import { getIdentity } from './identity'
-import runCommand, { isSupported as isSupportedCommand } from './run'
-
-import type { HoprOptions } from '@hoprnet/hopr-core'
 import { setLogger } from 'trace-unhandled'
+
+import * as wasm from '../lib/hoprd_misc.cjs'
+import runCommand, { isSupported as isSupportedCommand } from './run.js'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
@@ -30,7 +42,7 @@ export type DefaultEnvironment = {
 
 function defaultEnvironment(): string {
   try {
-    const config = require('../default-environment.json') as DefaultEnvironment
+    const config = loadJson('../default-environment.json') as DefaultEnvironment
     return config?.id || ''
   } catch (error) {
     // its ok if the file isn't there or cannot be read
@@ -38,27 +50,33 @@ function defaultEnvironment(): string {
   }
 }
 
-// Replace default process name (`node`) by `hoprd`
-process.title = 'hoprd'
-
 // Use environment-specific default data path
-const defaultDataPath = path.join(process.cwd(), 'hoprd-db', defaultEnvironment())
+const defaultDataPath = path.join(
+  path.dirname(new URL('../package.json', import.meta.url).pathname),
+  defaultEnvironment()
+)
 
-const argv = yargs(process.argv.slice(2))
+const yargsInstance = yargs(hideBin(process.argv))
+
+const argv = yargsInstance
+  .env('HOPRD') // enable options to be set as environment variables with the HOPRD prefix
+  .epilogue(
+    'All CLI options can be configured through environment variables as well. CLI parameters have precedence over environment variables.'
+  )
   .option('environment', {
     string: true,
-    describe: 'Environment id which the node shall run on',
+    describe: 'Environment id which the node shall run on (HOPRD_ENVIRONMENT)',
     choices: supportedEnvironments().map((env) => env.id),
     default: defaultEnvironment()
   })
   .option('host', {
     string: true,
-    describe: 'The network host to run the HOPR node on.',
+    describe: 'The network host to run the HOPR node on [env: HOPRD_HOST]',
     default: '0.0.0.0:9091'
   })
   .option('announce', {
     boolean: true,
-    describe: 'Announce public IP to the network',
+    describe: 'Announce public IP to the network [env: HOPRD_ANNOUNCE]',
     default: false
   })
   .option('admin', {
@@ -68,167 +86,175 @@ const argv = yargs(process.argv.slice(2))
   })
   .option('adminHost', {
     string: true,
-    describe: 'Host to listen to for admin console',
+    describe: 'Host to listen to for admin console [env: HOPRD_ADMIN_HOST]',
     default: 'localhost'
   })
   .option('adminPort', {
     string: true,
-    describe: 'Port to listen to for admin console',
+    describe: 'Port to listen to for admin console [env: HOPRD_ADMIN_PORT]',
     default: 3000
   })
   .option('api', {
     boolean: true,
-    describe: 'Expose the Rest (V2) and Websocket (V2) API on localhost:3001, requires --apiToken.',
-    default: false
+    describe:
+      'Expose the Rest (V1, V2) and Websocket (V2) API on localhost:3001, requires --apiToken. "--rest" is deprecated [env: HOPRD_API]',
+    default: false,
+    alias: 'rest'
   })
   .option('apiHost', {
     string: true,
-    describe: 'Set host IP to which the Rest and Websocket API server will bind.',
-    default: 'localhost'
+    describe:
+      'Set host IP to which the Rest and Websocket API server will bind. "--restHost" is deprecated [env: HOPRD_API_HOST]',
+    default: 'localhost',
+    alias: 'restHost'
   })
   .option('apiPort', {
     number: true,
-    describe: 'Set host port to which the Rest and Websocket API server will bind.',
-    default: 3001
+    describe:
+      'Set host port to which the Rest and Websocket API server will bind. "--restPort" is deprecated [env: HOPRD_API_PORT]',
+    default: 3001,
+    alias: 'restPort'
   })
   .option('healthCheck', {
     boolean: true,
-    describe: 'Run a health check end point on localhost:8080',
+    describe: 'Run a health check end point on localhost:8080 [env: HOPRD_HEALTH_CHECK]',
     default: false
   })
   .option('healthCheckHost', {
     string: true,
-    describe: 'Updates the host for the healthcheck server',
+    describe: 'Updates the host for the healthcheck server [env: HOPRD_HEALTH_CHECK_HOST]',
     default: 'localhost'
   })
   .option('healthCheckPort', {
     number: true,
-    describe: 'Updates the port for the healthcheck server',
+    describe: 'Updates the port for the healthcheck server [env: HOPRD_HEALTH_CHECK_PORT]',
     default: 8080
-  })
-  .option('forwardLogs', {
-    boolean: true,
-    describe: 'Forwards all your node logs to a public available sink',
-    default: false
-  })
-  .option('forwardLogsProvider', {
-    string: true,
-    describe: 'A provider url for the logging sink node to use',
-    default: 'https://ceramic-clay.3boxlabs.com'
   })
   .option('password', {
     string: true,
-    describe: 'A password to encrypt your keys',
+    describe: 'A password to encrypt your keys [env: HOPRD_PASSWORD]',
     default: ''
   })
   .option('apiToken', {
     string: true,
-    describe: 'A REST API token and admin panel password for user authentication',
+    describe: 'A REST API token and admin panel password for user authentication [env: HOPRD_API_TOKEN]',
     default: undefined
   })
   .option('privateKey', {
     string: true,
-    describe: 'A private key to be used for your HOPR node',
+    describe: 'A private key to be used for the node [env: HOPRD_PRIVATE_KEY]',
     default: undefined
   })
   .option('provider', {
     string: true,
-    describe: 'A custom RPC provider to be used for your HOPR node to connect to blockchain'
+    describe: 'A custom RPC provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER]'
   })
   .option('identity', {
     string: true,
-    describe: 'The path to the identity file',
+    describe: 'The path to the identity file [env: HOPRD_IDENTITY]',
     default: DEFAULT_ID_PATH
   })
   .option('run', {
     string: true,
-    describe: 'Run a command once the node has started. Available commands: [info,balance,daemonize]',
+    describe: 'Run a command once the node has started. Available commands: [info,balance,daemonize] [env: HOPRD_RUN]',
     default: ''
   })
   .option('dryRun', {
     boolean: true,
-    describe: 'List all the options used to run the HOPR node, but quit instead of starting',
+    describe: 'List all the options used to run the HOPR node, but quit instead of starting [env: HOPRD_DRY_RUN]',
     default: false
   })
   .option('data', {
     string: true,
-    describe: 'manually specify the data directory to use',
+    describe: 'manually specify the data directory to use [env: HOPRD_DATA]',
     default: defaultDataPath
   })
   .option('init', {
     boolean: true,
-    describe: "initialize a database if it doesn't already exist",
+    describe: "initialize a database if it doesn't already exist [env: HOPRD_INIT]",
     default: false
   })
   .option('allowLocalNodeConnections', {
     boolean: true,
-    describe: 'Allow connections to other nodes running on localhost.',
+    describe: 'Allow connections to other nodes running on localhost [env: HOPRD_ALLOW_LOCAL_NODE_CONNECTIONS]',
     default: false
   })
   .option('allowPrivateNodeConnections', {
     boolean: true,
-    describe: 'Allow connections to other nodes running on private addresses.',
-    default: false
-  })
-  .option('allowLocalNodeConnections', {
-    boolean: true,
-    describe: 'Allow connections to other nodes running on localhost.',
-    default: false
-  })
-  .option('allowPrivateNodeConnections', {
-    boolean: true,
-    describe: 'Allow connections to other nodes running on private addresses.',
+    describe:
+      'Allow connections to other nodes running on private addresses [env: HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS]',
     default: false
   })
   .option('testAnnounceLocalAddresses', {
     boolean: true,
-    describe: 'For testing local testnets. Announce local addresses.',
+    describe: 'For testing local testnets. Announce local addresses [env: HOPRD_TEST_ANNOUNCE_LOCAL_ADDRESSES]',
     default: false
   })
   .option('testPreferLocalAddresses', {
     boolean: true,
-    describe: 'For testing local testnets. Prefer local peers to remote.',
+    describe: 'For testing local testnets. Prefer local peers to remote [env: HOPRD_TEST_PREFER_LOCAL_ADDRESSES]',
     default: false
   })
   .option('testUseWeakCrypto', {
     boolean: true,
-    describe: 'weaker crypto for faster node startup',
+    describe: 'weaker crypto for faster node startup [env: HOPRD_TEST_USE_WEAK_CRYPTO]',
     default: false
   })
   .option('testNoAuthentication', {
     boolean: true,
-    describe: 'no remote authentication for easier testing',
+    describe: 'no remote authentication for easier testing [env: HOPRD_TEST_NO_AUTHENTICATION]',
     default: false
   })
   .option('testNoDirectConnections', {
     boolean: true,
-    describe: 'NAT traversal testing: prevent nodes from establishing direct TCP connections',
+    describe:
+      'NAT traversal testing: prevent nodes from establishing direct TCP connections [env: HOPRD_TEST_NO_DIRECT_CONNECTIONS]',
     default: false,
     hidden: true
   })
   .option('testNoWebRTCUpgrade', {
     boolean: true,
-    describe: 'NAT traversal testing: prevent nodes from establishing direct TCP connections',
+    describe:
+      'NAT traversal testing: prevent nodes from establishing direct TCP connections [env: HOPRD_TEST_NO_WEB_RTC_UPGRADE]',
     default: false,
     hidden: true
   })
   .option('testNoUPNP', {
     boolean: true,
-    describe: 'NAT traversal testing: disable automatic detection of external IP address using UPNP',
+    describe:
+      'NAT traversal testing: disable automatic detection of external IP address using UPNP [env: HOPRD_TEST_NO_UPNP]',
     default: false,
     hidden: true
   })
   .option('heartbeatInterval', {
     number: true,
-    describe: 'Interval in milliseconds in which the availability of other nodes get measured',
-    default: undefined
+    describe:
+      'Interval in milliseconds in which the availability of other nodes get measured [env: HOPRD_HEARTBEAT_INTERVAL]',
+    default: HEARTBEAT_INTERVAL
+  })
+  .option('heartbeatThreshold', {
+    number: true,
+    describe:
+      "Timeframe in milliseconds after which a heartbeat to another peer is performed, if it hasn't been seen since [env: HOPRD_HEARTBEAT_THRESHOLD]",
+    default: HEARTBEAT_THRESHOLD
   })
   .option('heartbeatVariance', {
     number: true,
-    describe: 'Upper bound for variance applied to heartbeat interval in milliseconds',
-    default: undefined
+    describe: 'Upper bound for variance applied to heartbeat interval in milliseconds [env: HOPRD_HEARTBEAT_VARIANCE]',
+    default: HEARTBEAT_INTERVAL_VARIANCE
   })
-  .wrap(Math.min(120, terminalWidth()))
+  .option('networkQualityThreshold', {
+    number: true,
+    describe: 'Miniumum quality of a peer connection to be considered usable [env: HOPRD_NETWORK_QUALITY_THRESHOLD]',
+    default: NETWORK_QUALITY_THRESHOLD
+  })
+  .option('onChainConfirmations', {
+    number: true,
+    describe: 'Number of confirmations required for on-chain transactions [env: HOPRD_ON_CHAIN_CONFIRMATIONS]',
+    default: CONFIRMATIONS
+  })
+
+  .wrap(Math.min(120, yargsInstance.terminalWidth()))
   .parseSync()
 
 function parseHosts(): HoprOptions['hosts'] {
@@ -256,8 +282,12 @@ function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
     hosts: parseHosts(),
     environment,
     allowLocalConnections: argv.allowLocalNodeConnections,
+    allowPrivateConnections: argv.allowPrivateNodeConnections,
     heartbeatInterval: argv.heartbeatInterval,
+    heartbeatThreshold: argv.heartbeatThreshold,
     heartbeatVariance: argv.heartbeatVariance,
+    networkQualityThreshold: argv.networkQualityThreshold,
+    onChainConfirmations: argv.onChainConfirmations,
     testing: {
       announceLocalAddresses: argv.testAnnounceLocalAddresses,
       preferLocalAddresses: argv.testPreferLocalAddresses,
@@ -275,9 +305,29 @@ function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
 }
 
 function addUnhandledPromiseRejectionHandler() {
-  require('trace-unhandled/register')
+  registerUnhandled()
   setLogger((msg) => {
     console.error(msg)
+  })
+
+  // See https://github.com/hoprnet/hoprnet/issues/3755
+  process.on('unhandledRejection', (reason: any, _promise: Promise<any>) => {
+    if (reason.message && reason.message.toString) {
+      const msgString = reason.toString()
+
+      // Only silence very specific errors
+      if (
+        msgString.match(/read ECONNRESET/) ||
+        msgString.match(/write ECONNRESET/) ||
+        msgString.match(/The operation was aborted/)
+      ) {
+        console.error('Unhandled promise rejection silenced')
+        return
+      }
+    }
+
+    console.warn('UnhandledPromiseRejectionWarning')
+    console.log(reason)
     process.exit(1)
   })
 }
@@ -288,9 +338,11 @@ async function main() {
   // Therefore adding a promise rejection handler to make sure that the origin of
   // the rejected promise can be detected.
   addUnhandledPromiseRejectionHandler()
+  // Increase the default maximum number of event listeners
+  ;(await import('events')).EventEmitter.defaultMaxListeners = 20
 
   let node: Hopr
-  let logs = new LogStream(argv.forwardLogs)
+  let logs = new LogStream()
   let adminServer: AdminServer = undefined
   let state: State = {
     aliases: new Map(),
@@ -306,6 +358,12 @@ async function main() {
     return state
   }
 
+  function networkHealthChanged(oldState: NetworkHealthIndicator, newState: NetworkHealthIndicator) {
+    // Log the network health indicator state change (goes over the WS as well)
+    logs.log(`Network health indicator changed: ${oldState} -> ${newState}`)
+    logs.log(`NETWORK HEALTH: ${newState}`)
+  }
+
   function logMessageToNode(msg: Uint8Array) {
     logs.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
     try {
@@ -319,13 +377,6 @@ async function main() {
       logs.log('Could not decode message', err)
       logs.log(msg.toString())
     }
-  }
-
-  if (logs.isReadyForPublicLogging()) {
-    const publicLogsId = await logs.enablePublicLoggingNode(argv.forwardLogsProvider)
-    logs.log(`Your unique Log Id is ${publicLogsId}`)
-    logs.log(`View logs at https://documint.net/${publicLogsId}`)
-    logs.startLoggingQueue()
   }
 
   if (!argv.testNoAuthentication && argv.api) {
@@ -360,6 +411,9 @@ async function main() {
   }
 
   try {
+    let packageFile = path.normalize(new URL('../package.json', import.meta.url).pathname)
+    logs.log(`This is hoprd version ${wasm.get_package_version(packageFile)}`)
+
     // 1. Find or create an identity
     const peerId = await getIdentity({
       initialize: argv.init,
@@ -374,6 +428,7 @@ async function main() {
     node = await createHoprNode(peerId, options, false)
     logs.logStatus('PENDING')
     node.on('hopr:message', logMessageToNode)
+    node.on('hopr:network-health-changed', networkHealthChanged)
     node.subscribeOnConnector('hopr:connector:created', () => {
       // 2.b - Connector has been created, and we can now trigger the next set of steps.
       logs.log('Connector has been loaded properly.')

@@ -4,8 +4,7 @@
     "outDir": "./lib",
     "rootDir": "./src"
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.spec.ts"],
+  "include": ["src/**/*.ts", "src/main.cts"],
   "typedocOptions": {
     "entryPoints": ["src/index.ts"],
     "out": "docs",
@@ -13,5 +12,5 @@
     // when building docs for releases we can fix the revision on the cmdline
     "gitRevision": "master"
   },
-  "references": [{ "path": "../utils" }, { "path": "../core" }]
+  "references": [{ "path": "../utils" }, { "path": "../core" }, { "path": "../real" }]
 }

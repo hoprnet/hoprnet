@@ -12,9 +12,9 @@ import {
   getPublicAddresses,
   prefixLength,
   u8aAddressToCIDR
-} from './addrs'
-import type { Network } from './constants'
-import { u8aEquals, u8aToHex } from '..'
+} from './addrs.js'
+import { type Network, PRIVATE_V4_CLASS_B, PRIVATE_V4_CLASS_C } from './constants.js'
+import { u8aEquals, u8aToHex } from '../index.js'
 import assert from 'assert'
 import { type NetworkInterfaceInfo } from 'os'
 
@@ -96,16 +96,41 @@ describe('test utils', function () {
   })
 
   it('should be in subnet', function () {
-    const address = ipToU8aAddress('192.0.2.130', 'IPv4')
-    const subnet = ipToU8aAddress('255.255.255.0', 'IPv4')
+    assert(
+      inSameNetwork(
+        ipToU8aAddress('172.17.0.4', 'IPv4'),
+        PRIVATE_V4_CLASS_B.networkPrefix,
+        PRIVATE_V4_CLASS_B.subnet,
+        'IPv4'
+      )
+    )
 
-    const networkPrefix = getNetworkPrefix(address, subnet, 'IPv4')
+    assert(
+      !inSameNetwork(
+        ipToU8aAddress('172.33.0.4', 'IPv4'),
+        PRIVATE_V4_CLASS_B.networkPrefix,
+        PRIVATE_V4_CLASS_B.subnet,
+        'IPv4'
+      )
+    )
 
-    assert(!inSameNetwork(ipToU8aAddress('192.0.1.131', 'IPv4'), networkPrefix, subnet, 'IPv4'))
+    assert(
+      inSameNetwork(
+        ipToU8aAddress('192.168.2.131', 'IPv4'),
+        PRIVATE_V4_CLASS_C.networkPrefix,
+        PRIVATE_V4_CLASS_C.subnet,
+        'IPv4'
+      )
+    )
 
-    assert(inSameNetwork(ipToU8aAddress('192.0.2.131', 'IPv4'), networkPrefix, subnet, 'IPv4'))
-
-    assert(!inSameNetwork(ipToU8aAddress('192.0.3.131', 'IPv4'), networkPrefix, subnet, 'IPv4'))
+    assert(
+      !inSameNetwork(
+        ipToU8aAddress('192.0.3.131', 'IPv4'),
+        PRIVATE_V4_CLASS_C.networkPrefix,
+        PRIVATE_V4_CLASS_C.subnet,
+        'IPv4'
+      )
+    )
   })
 
   it('should convert u8aAddr back to string', function () {
@@ -129,7 +154,9 @@ describe('test utils', function () {
   it('should detect private networks', function () {
     assert(isPrivateAddress(ipToU8aAddress('192.168.1.131', 'IPv4'), 'IPv4'))
     assert(isPrivateAddress(ipToU8aAddress('10.0.27.191', 'IPv4'), 'IPv4'))
+    assert(isPrivateAddress(ipToU8aAddress('172.17.0.4', 'IPv4'), 'IPv4'))
     assert(!isPrivateAddress(ipToU8aAddress('172.15.0.131', 'IPv4'), 'IPv4'))
+    assert(!isPrivateAddress(ipToU8aAddress('172.33.0.131', 'IPv4'), 'IPv4'))
   })
 
   it('should detect local addresses', function () {

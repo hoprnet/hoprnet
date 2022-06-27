@@ -207,7 +207,7 @@ gcloud_create_or_update_instance_template() {
     extra_args="${extra_args} --container-arg=\"--announce\""
   fi
 
-  mount_path="/app/db"
+  mount_path="/app/hoprd-db"
   host_path="/var/hoprd"
 
   log "checking for instance template ${name}"
@@ -301,7 +301,7 @@ gcloud_create_or_update_managed_instance_group() {
     gcloud beta compute instance-groups managed rolling-action start-update \
       "${name}"\
       --version=template=${template} \
-      --minimal-action=refresh \
+      --minimal-action=restart \
       --most-disruptive-allowed-action=restart \
       ${gcloud_region}
 
@@ -360,9 +360,9 @@ gcloud_get_managed_instance_group_instances_ips() {
   local name="${1}"
   local nproc_cmd
 
-  if command -v nproc ; then
+  if command -v nproc 1> /dev/null ; then
     nproc_cmd="nproc"
-  elif command -v sysctl ; then
+  elif command -v sysctl 1> /dev/null ; then
     nproc_cmd="sysctl -n hw.logicalcpu"
   else
     # Default to single core

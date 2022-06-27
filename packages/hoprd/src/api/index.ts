@@ -1,21 +1,14 @@
-import type Hopr from '@hoprnet/hopr-core'
-import type { LogStream } from '../logs'
-import type { StateOps } from '../types'
+import type { default as Hopr } from '@hoprnet/hopr-core'
+import type { LogStream } from '../logs.js'
+import type { StateOps } from '../types.js'
 import express from 'express'
 import http from 'http'
-import ws from 'ws'
 import { debug } from '@hoprnet/hopr-utils'
-import * as apiV2 from './v2'
+import * as apiV2 from './v2.js'
+import ws from 'ws'
 
 const debugLog = debug('hoprd:api')
 
-/**
- * Setup API servers & configuation
- * @param node HOPR instance
- * @param logs LogStream instance
- * @param stateOps HOPRd state
- * @param options
- */
 export default function setupAPI(
   node: Hopr,
   logs: LogStream,

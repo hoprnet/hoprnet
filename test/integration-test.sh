@@ -16,7 +16,7 @@ source "${mydir}/../scripts/utils.sh"
 
 usage() {
   msg
-  msg "Usage: $0 <node_api_1> <node_api_2> <node_api_3> <node_api_4> <node_api_5> <node_api_6> <node_api_7>"
+  msg "Usage: $0 <node_api_1> <node_api_2> <node_api_3> <node_api_4> <node_api_5> <node_api_6> <node_api_7> <node_api_8>"
   msg
   msg "Required environment variables"
   msg "------------------------------"
@@ -35,6 +35,7 @@ test -z "${4:-}" && { msg "Missing 4th parameter"; usage; exit 1; }
 test -z "${5:-}" && { msg "Missing 5th parameter"; usage; exit 1; }
 test -z "${6:-}" && { msg "Missing 6th parameter"; usage; exit 1; }
 test -z "${7:-}" && { msg "Missing 7th parameter"; usage; exit 1; }
+test -z "${8:-}" && { msg "Missing 8th parameter"; usage; exit 1; }
 test -z "${HOPRD_API_TOKEN:-}" && { msg "Missing HOPRD_API_TOKEN"; usage; exit 1; }
 
 declare api1="${1}"
@@ -44,6 +45,7 @@ declare api4="${4}"
 declare api5="${5}"
 declare api6="${6}"
 declare api7="${7}"
+declare api8="${8}"
 declare api_token=${HOPRD_API_TOKEN}
 
 # $1 = node api address (origin)
@@ -100,7 +102,7 @@ call_api(){
   result=$(${cmd} "${request_body}")
 
   # if an assertion was given and has not been fulfilled, we fail
-  if [ -z "${assertion}" ] || [[ -n "${assertion}" && "${result}" == *"${assertion}"* ]]; then
+  if [ -z "${assertion}" ] || [[ -n  $(echo "${result}" | sed -nE "/${assertion}/p") ]]; then
     echo "${result}"
   else
     now=$(node -e "console.log(process.hrtime.bigint().toString());")
@@ -150,9 +152,9 @@ close_channel() {
   log "Node ${source_id} close channel to Node ${destination_id}"
 
   if [ "${close_check}" = "true" ]; then
-    result="$(call_api ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" "PendingToClose" 600)"
+    result="$(call_api ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" 'Closed|Channel is already closed' 600)"
   else
-    result="$(call_api ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" "Open" 20 20)"
+    result="$(call_api ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" 'PendingToClose|Closed' 20 20)"
   fi
 
   log "Node ${source_id} close channel to Node ${destination_id} result -- ${result}"
@@ -168,9 +170,9 @@ open_channel() {
   local source_api="${3}"
   local destination_peer_id="${4}"
   local result
-                                                                 
+
   log "Node ${source_id} open channel to Node ${destination_id}"
-  result=$(call_api ${source_api} "/channels" "POST" "{\"peerId\": \"${destination_peer_id}\", \"amount\": \"100000000000000000000\"}" "channelId" 600 60)
+  result=$(call_api ${source_api} "/channels" "POST" "{ \"peerId\": \"${destination_peer_id}\", \"amount\": \"100000000000000000000\" }" "channelId" 600 60)
   log "Node ${source_id} open channel to Node ${destination_id} result -- ${result}"
 }
 
@@ -192,7 +194,7 @@ redeem_tickets() {
   # Trigger a redemption run, but cap it at 1 minute. We only want to measure
   # progress, not redeeem all tickets which takes too long.
   log "Node ${node_id} should redeem all tickets"
-  # add 60 second timeout 
+  # add 60 second timeout
   result=$(call_api ${node_api} "/tickets/redeem" "POST" "" "" 60 60)
   log "--${result}"
 
@@ -209,7 +211,7 @@ redeem_tickets() {
   # Trigger another redemption run, but cap it at 1 minute. We only want to measure
   # progress, not redeeem all tickets which takes too long.
   log "Node ${node_id} should redeem all tickets (again to ensure re-run of operation)"
-  # add 60 second timeout 
+  # add 60 second timeout
   result=$(call_api ${node_api} "/tickets/redeem" "POST" "" "" 60 60)
   log "--${result}"
 
@@ -335,7 +337,7 @@ get_tickets_in_channel() {
 # $3 = assertion
 ping() {
   local origin=${1:-localhost:3001}
-  local peer_id="${2}" 
+  local peer_id="${2}"
   local assertion="${3}"
 
   echo $(call_api ${1} "/node/ping" "POST" "{\"peerId\": \"${peer_id}\"}" ${assertion} 600)
@@ -350,7 +352,21 @@ get_tickets_statistics() {
   echo $(call_api ${1} "/tickets/statistics" "GET" "" ${assertion} 600)
 }
 
-log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5}, ${api6}, ${api7}"
+# Performs a hardhat-specific EVM RPC call
+# to disable auto-mining at runtime
+disable_hardhat_auto_mining() {
+  log "Disabling hardhat automining"
+  HOPR_ENVIRONMENT_ID=hardhat-localhost \
+  TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
+  yarn workspace @hoprnet/hopr-ethereum hardhat disable-automine \
+    --network hardhat
+}
+
+log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5}, ${api6}, ${api7}, ${api8}"
+
+# Setup is done, so disable hardhat's auto-mining to correctly mimic 
+# real blockchain networks
+disable_hardhat_auto_mining
 
 validate_native_address "${api1}" "${api_token}"
 validate_native_address "${api2}" "${api_token}"
@@ -359,6 +375,7 @@ validate_native_address "${api4}" "${api_token}"
 validate_native_address "${api5}" "${api_token}"
 # we don't need node6 because it's short-living
 validate_native_address "${api7}" "${api_token}"
+validate_native_address "${api8}" "${api_token}"
 log "ETH addresses exist"
 
 validate_node_balance_gt0 "${api1}"
@@ -368,9 +385,10 @@ validate_node_balance_gt0 "${api4}"
 validate_node_balance_gt0 "${api5}"
 # we don't need node6 because it's short-living
 validate_node_balance_gt0 "${api7}"
+validate_node_balance_gt0 "${api8}"
 log "Nodes are funded"
 
-declare addr1 addr2 addr3 addr4 addr5 result
+declare addr1 addr2 addr3 addr4 addr5 addr7 addr8 result
 addr1="$(get_hopr_address "${api_token}@${api1}")"
 addr2="$(get_hopr_address "${api_token}@${api2}")"
 addr3="$(get_hopr_address "${api_token}@${api3}")"
@@ -378,14 +396,56 @@ addr4="$(get_hopr_address "${api_token}@${api4}")"
 addr5="$(get_hopr_address "${api_token}@${api5}")"
 # we don't need node6 because it's short-living
 addr7="$(get_hopr_address "${api_token}@${api7}")"
+addr8="$(get_hopr_address "${api_token}@${api8}")"
 
-log "hopr addr1: ${addr1}"
-log "hopr addr2: ${addr2}"
-log "hopr addr3: ${addr3}"
-log "hopr addr4: ${addr4}"
-log "hopr addr5: ${addr5}"
+declare native_addr1 native_addr2 native_addr3 native_addr4 native_addr5 native_addr7 native_addr8
+native_addr1="$(get_native_address "${api_token}@${api1}")"
+native_addr2="$(get_native_address "${api_token}@${api2}")"
+native_addr3="$(get_native_address "${api_token}@${api3}")"
+native_addr4="$(get_native_address "${api_token}@${api4}")"
+native_addr5="$(get_native_address "${api_token}@${api5}")"
 # we don't need node6 because it's short-living
-log "hopr addr7: ${addr7}"
+native_addr7="$(get_native_address "${api_token}@${api7}")"
+native_addr8="$(get_native_address "${api_token}@${api8}")"
+
+declare hopr_addr1 hopr_addr2 hopr_addr3 hopr_addr4 hopr_addr5 hopr_addr7 hopr_addr8
+hopr_addr1="$(get_hopr_address "${api_token}@${api1}")"
+hopr_addr2="$(get_hopr_address "${api_token}@${api2}")"
+hopr_addr3="$(get_hopr_address "${api_token}@${api3}")"
+hopr_addr4="$(get_hopr_address "${api_token}@${api4}")"
+hopr_addr5="$(get_hopr_address "${api_token}@${api5}")"
+# we don't need node6 because it's short-living
+hopr_addr7="$(get_hopr_address "${api_token}@${api7}")"
+hopr_addr8="$(get_hopr_address "${api_token}@${api8}")"
+
+log "hopr addr1: ${addr1} ${native_addr1} ${hopr_addr1}"
+log "hopr addr2: ${addr2} ${native_addr2} ${hopr_addr2}"
+log "hopr addr3: ${addr3} ${native_addr3} ${hopr_addr3}"
+log "hopr addr4: ${addr4} ${native_addr4} ${hopr_addr4}"
+log "hopr addr5: ${addr5} ${native_addr5} ${hopr_addr5}"
+# we don't need node6 because it's short-living
+log "hopr addr7: ${addr7} ${native_addr7} ${hopr_addr7}"
+log "hopr addr8: ${addr8} ${native_addr8} ${hopr_addr8}"
+
+# enable register
+# log "Enabling register"
+# HOPR_ENVIRONMENT_ID=hardhat-localhost \
+# TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
+# yarn workspace @hoprnet/hopr-ethereum hardhat register \
+#   --network hardhat \
+#   --task enable
+# log "Register enabled"
+
+# add nodes 1,2,3,4,5,7 in register, do NOT add node 8
+# log "Adding nodes to register"
+# HOPR_ENVIRONMENT_ID=hardhat-localhost \
+# TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
+# yarn workspace @hoprnet/hopr-ethereum hardhat register \
+#   --network hardhat \
+#   --task add \
+#   --native-addresses "$native_addr1,$native_addr2,$native_addr3,$native_addr4,$native_addr5,$native_addr7" \
+#   --peer-ids "$hopr_addr1,$hopr_addr2,$hopr_addr3,$hopr_addr4,$hopr_addr5,$hopr_addr7"
+# log "Nodes added to register"
 
 # running withdraw and checking it results at the end of this test run
 balances=$(get_balances ${api1})
@@ -448,6 +508,14 @@ log "Node 1 should not be able to talk to Node 7 (different environment id)"
 result=$(ping "${api1}" ${addr7} "TIMEOUT")
 log "-- ${result}"
 
+# log "Node 8 should not be able to talk to Node 1 (Node 8 is not in the register)"
+# result=$(ping "${api8}" ${addr1} "TIMEOUT")
+# log "-- ${result}"
+
+# log "Node 1 should not be able to talk to Node 8 (Node 8 is not in the register)"
+# result=$(ping "${api1}" ${addr8} "TIMEOUT")
+# log "-- ${result}"
+
 log "Node 2 has no unredeemed ticket value"
 result=$(get_tickets_statistics "${api2}" "\"unredeemedValue\":\"0\"")
 log "-- ${result}"
@@ -475,16 +543,16 @@ close_channel 1 4 "${api1}" "${addr4}" "outgoing" "true" &
 
 for i in `seq 1 10`; do
   log "Node 1 send 1 hop message to self via node 2"
-  send_message "${api1}" "${addr1}" 'hello, world' "${addr2}" 
+  send_message "${api1}" "${addr1}" 'hello, world' "${addr2}"
 
   log "Node 2 send 1 hop message to self via node 3"
-  send_message "${api2}" "${addr2}" 'hello, world' "${addr3}" 
+  send_message "${api2}" "${addr2}" 'hello, world' "${addr3}"
 
   log "Node 3 send 1 hop message to self via node 4"
-  send_message "${api3}" "${addr3}" 'hello, world' "${addr4}" 
+  send_message "${api3}" "${addr3}" 'hello, world' "${addr4}"
 
   log "Node 4 send 1 hop message to self via node 5"
-  send_message "${api4}" "${addr4}" 'hello, world' "${addr5}" 
+  send_message "${api4}" "${addr4}" 'hello, world' "${addr5}"
 done
 
 log "Node 2 should now have a ticket"
@@ -536,11 +604,11 @@ test_redeem_in_specific_channel() {
   peer_id=$(get_hopr_address ${api_token}@${node_api})
   second_peer_id=$(get_hopr_address ${api_token}@${second_node_api})
 
-  open_channel ${node_id} ${second_node_id} ${node_api} ${second_peer_id}
+  open_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_peer_id}"
 
   for i in `seq 1 3`; do
     log "Node ${node_id} send 1 hop message to self via node ${second_node_id}"
-    send_message "${node_api}" "${peer_id}" "hello, world" "${second_peer_id}" 
+    send_message "${node_api}" "${peer_id}" "hello, world" "${second_peer_id}"
   done
 
   # seems like there's slight delay needed for tickets endpoint to return up to date tickets, probably because of blockchain sync delay
@@ -548,11 +616,11 @@ test_redeem_in_specific_channel() {
   ticket_amount=$(get_tickets_in_channel ${second_node_api} ${peer_id} | jq '. | length')
   [[ "${ticket_amount}" != "3" ]] && { msg "Ticket ammount is different than expected: ${ticket_amount} != 3"; exit 1; }
 
-  redeem_tickets_in_channel ${second_node_api} ${peer_id}  
+  redeem_tickets_in_channel ${second_node_api} ${peer_id}
 
   get_tickets_in_channel ${second_node_api} ${peer_id} "TICKETS_NOT_FOUND"
 
-  close_channel ${node_id} ${second_node_id} ${node_api} ${second_peer_id} "outgoing"
+  close_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_peer_id}" "outgoing"
   echo "all good"
 }
 
@@ -582,8 +650,8 @@ log "Waiting for nodes to finish handling close channels calls"
 wait
 
 # Also add confirmation time
-log "Waiting 70 seconds for cool-off period"
-sleep 70
+log "Waiting 30 seconds for cool-off period"
+sleep 30
 
 # verify channel has been closed
 close_channel 1 5 "${api1}" "${addr5}" "outgoing" "true"

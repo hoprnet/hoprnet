@@ -1,6 +1,6 @@
 import EventEmitter from 'events'
 import { providers as Providers, Wallet, BigNumber, utils } from 'ethers'
-import type { HoprChannels, HoprToken, TypedEvent } from '@hoprnet/hopr-ethereum'
+import type { HoprChannels, HoprNetworkRegistry, HoprToken, TypedEvent } from '@hoprnet/hopr-ethereum'
 import {
   Address,
   ChannelEntry,
@@ -14,11 +14,11 @@ import {
   PublicKey
 } from '@hoprnet/hopr-utils'
 
-import Indexer from '.'
-import type { ChainWrapper } from '../ethereum'
-import type { Event, TokenEvent } from './types'
-import * as fixtures from './fixtures'
-import { ACCOUNT_A, PARTY_A, PARTY_A_MULTIADDR, PARTY_B } from '../fixtures'
+import Indexer from './index.js'
+import type { ChainWrapper } from '../ethereum.js'
+import type { Event, TokenEvent, RegistryEvent } from './types.js'
+import * as fixtures from './fixtures.js'
+import { ACCOUNT_A, PARTY_A, PARTY_A_MULTIADDR, PARTY_B } from '../fixtures.js'
 import { Multiaddr } from 'multiaddr'
 import BN from 'bn.js'
 
@@ -30,7 +30,8 @@ const txRequest = {
   data: '0x0',
   value: 0,
   nonce: 0,
-  gasPrice: 1
+  maxPriorityFeePerGas: utils.parseUnits('1', 'gwei'),
+  maxFeePerGas: utils.parseUnits('1', 'gwei')
 }
 
 const createProviderMock = (ops: { latestBlockNumber?: number } = {}) => {
@@ -168,10 +169,37 @@ const createHoprTokenMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
   }
 }
 
+const createHoprRegistryMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
+  const pastEvents = ops.pastEvents ?? []
+
+  class FakeHoprRegistry extends EventEmitter {
+    async queryFilter() {
+      return pastEvents
+    }
+
+    interface = {
+      // Dummy event topic but different for every event
+      getEventTopic: (arg: string) => utils.keccak256(utils.toUtf8Bytes(arg)),
+      // Events are already correctly formatted
+      parseLog: (arg: any) => arg
+    }
+  }
+
+  const hoprRegistry = new FakeHoprRegistry() as unknown as HoprNetworkRegistry
+
+  return {
+    hoprRegistry,
+    newEvent(event: Event<any>) {
+      pastEvents.push(event)
+    }
+  }
+}
+
 const createChainMock = (
   provider: Providers.WebSocketProvider,
   hoprChannels: HoprChannels,
   hoprToken: HoprToken,
+  hoprRegistry: HoprNetworkRegistry,
   account?: Wallet
 ): ChainWrapper => {
   return {
@@ -187,18 +215,13 @@ const createChainMock = (
       provider.on('error', cb)
       hoprChannels.on('error', cb)
       hoprToken.on('error', cb)
+      hoprRegistry.on('error', cb)
 
       return () => {
         provider.off('error', cb)
         hoprChannels.off('error', cb)
         hoprToken.off('error', cb)
-      }
-    },
-    subscribeChannelEvents: (cb: (event: TypedEvent<any, any>) => void | Promise<void>) => {
-      hoprChannels.on('*', cb)
-
-      return () => {
-        hoprChannels.off('*', cb)
+        hoprRegistry.off('error', cb)
       }
     },
     start: () => {},
@@ -224,19 +247,13 @@ const createChainMock = (
       on: (event: string) => chainLogger(`Indexer on handler top of chain called with event "${event}"`),
       off: (event: string) => chainLogger(`Indexer off handler top of chain called with event "${event}`)
     },
-    subscribeTokenEvents: (cb: (event: TypedEvent<any, any>) => void | Promise<void>): (() => void) => {
-      hoprToken.on('*', cb)
-
-      return () => {
-        hoprToken.off('*', cb)
-      }
-    },
     getNativeTokenTransactionInBlock: (_blockNumber: number, _isOutgoing: boolean = true) =>
       Promise.resolve<string[]>([]),
     updateConfirmedTransaction: (_hash: string) => {},
     getNativeBalance: () => new NativeBalance(SUGGESTED_NATIVE_BALANCE),
     getChannels: () => hoprChannels,
     getToken: () => hoprToken,
+    getNetworkRegistry: () => hoprRegistry,
     getWallet: () => account ?? fixtures.ACCOUNT_A,
     getAccount: () => {
       chainLogger('getAccount method was called')
@@ -251,7 +268,8 @@ const createChainMock = (
     getPublicKey: () => fixtures.PARTY_A,
     setCommitment: (counterparty: Address, commitment: Hash) =>
       hoprChannels.bumpChannel(counterparty.toHex(), commitment.toHex()),
-    getAllQueuingTransactionRequests: () => [txRequest]
+    getAllQueuingTransactionRequests: () => [txRequest],
+    getAllUnconfirmedHash: () => [fixtures.OPENED_EVENT.transactionHash]
   } as unknown as ChainWrapper
 }
 
@@ -262,24 +280,37 @@ export class TestingIndexer extends Indexer {
 }
 
 export const useFixtures = async (
-  ops: { latestBlockNumber?: number; pastEvents?: Event<any>[]; id?: PublicKey } = {}
+  ops: {
+    latestBlockNumber?: number
+    pastEvents?: Event<any>[]
+    pastHoprTokenEvents?: TokenEvent<any>[]
+    pastHoprRegistryEvents?: RegistryEvent<any>[]
+    id?: PublicKey
+  } = {}
 ) => {
   const latestBlockNumber = ops.latestBlockNumber ?? 0
-  const pastEvents = ops.pastEvents ?? []
 
   const db = HoprDB.createMock(ops.id)
   const { provider, newBlock } = createProviderMock({ latestBlockNumber })
-  const { hoprChannels, newEvent } = createHoprChannelsMock({ pastEvents })
-  const { hoprToken, newEvent: newTokenEvent } = createHoprTokenMock()
-  const chain = createChainMock(provider, hoprChannels, hoprToken)
+  const { hoprChannels, newEvent } = createHoprChannelsMock({ pastEvents: ops.pastEvents ?? [] })
+  const { hoprToken, newEvent: newTokenEvent } = createHoprTokenMock({
+    pastEvents: ops.pastHoprTokenEvents ?? []
+  })
+  const { hoprRegistry, newEvent: newRegistryEvent } = createHoprRegistryMock({
+    pastEvents: ops.pastHoprRegistryEvents ?? []
+  })
+  const chain = createChainMock(provider, hoprChannels, hoprToken, hoprRegistry)
+
   return {
     db,
     provider,
     newBlock,
     hoprChannels,
     hoprToken,
+    hoprRegistry,
     newEvent,
     newTokenEvent,
+    newRegistryEvent,
     indexer: new TestingIndexer(!ops.id ? PublicKey.createMock().toAddress() : ops.id.toAddress(), db, 1, 5),
     chain,
     OPENED_CHANNEL: await ChannelEntry.fromSCEvent(fixtures.OPENED_EVENT, (a: Address) =>

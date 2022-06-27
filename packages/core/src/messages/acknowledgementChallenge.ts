@@ -1,6 +1,7 @@
 import { SECP256K1_CONSTANTS, HalfKeyChallenge, HalfKey } from '@hoprnet/hopr-utils'
-import { HASH_ALGORITHM } from './constants'
-import { ecdsaSign, ecdsaVerify } from 'secp256k1'
+import { HASH_ALGORITHM } from './constants.js'
+import secp256k1 from 'secp256k1'
+
 import { createHash } from 'crypto'
 
 import type PeerId from 'peer-id'
@@ -46,7 +47,7 @@ export class AcknowledgementChallenge {
 
     const toSign = hashChallenge(ackChallenge)
 
-    const signature = ecdsaSign(toSign, privKey.privKey.marshal())
+    const signature = secp256k1.ecdsaSign(toSign, privKey.privKey.marshal())
 
     return new AcknowledgementChallenge(ackChallenge, signature.signature)
   }
@@ -61,7 +62,7 @@ export class AcknowledgementChallenge {
 }
 
 function verifyChallenge(pubKey: PeerId, signature: Uint8Array, challenge: HalfKeyChallenge): boolean {
-  return ecdsaVerify(signature, hashChallenge(challenge), pubKey.pubKey.marshal())
+  return secp256k1.ecdsaVerify(signature, hashChallenge(challenge), pubKey.pubKey.marshal())
 }
 
 function hashChallenge(ackChallenge: HalfKeyChallenge): Uint8Array {

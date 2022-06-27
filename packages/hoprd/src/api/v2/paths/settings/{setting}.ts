@@ -1,8 +1,8 @@
-import type Hopr from '@hoprnet/hopr-core'
+import type { default as Hopr } from '@hoprnet/hopr-core'
 import { PassiveStrategy, PromiscuousStrategy } from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
-import { STATUS_CODES } from '../../utils'
-import { SettingKey, State, StateOps } from '../../../../types'
+import { STATUS_CODES } from '../../utils.js'
+import { SettingKey, State, StateOps } from '../../../../types.js'
 
 /**
  * Sets node setting/s in HOPRd state.

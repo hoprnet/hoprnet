@@ -28,15 +28,33 @@ jobs:
     name: Build / Deploy SCs / Publish NPM
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+
+      - name: restore cargo cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: '[SETUP] Print additional information'
+        run: |
+          node --version
+          npm --version
+          yarn --version
+          rustc --version
 
       - name: '[SETUP] Configure Git info'
         run: ./scripts/configure-git-info.sh
 
       - name: '[SETUP] Use Node.js'
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: 16
           registry-url: https://registry.npmjs.org/
@@ -52,10 +70,9 @@ jobs:
 
       - name: '[BUILD] Install dependencies / link / build'
         run: |
-          # Deploying smart contracts requires hardhat to be installed
-          yarn
           # Deploying with hardhat requires built hopr-utils package
-          yarn build
+          make -j deps
+          make -j build
 
       - name: '[SMART-CONTRACTS] Deploy for known environments'
         if: ${{ !env.ACT }}
@@ -67,7 +84,7 @@ jobs:
       - name: '[SMART-CONTRACTS] Commit & push changes'
         if: ${{ !env.ACT }}
         run: |
-          yarn lint:fix
+          make lint-fix
           ./scripts/commit-and-push-all-changes.sh
         env:
           HOPR_GIT_MSG: 'chore(release): update smart contract deployments'
@@ -109,7 +126,7 @@ jobs:
     needs: [build_deploy_sc_npm]
     if: ${{ startsWith(github.ref, 'refs/heads/release/') }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
@@ -141,7 +158,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_deploy_sc_npm]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
@@ -181,7 +198,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_deploy_sc_npm]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
@@ -221,7 +238,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_deploy_sc_npm]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
@@ -261,7 +278,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_deploy_sc_npm,build_hoprd_docker]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
@@ -314,15 +333,26 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_hoprd_docker]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+
+      - name: restore cargo cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
 
       - name: Use Node.js 16
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: 16
           registry-url: https://registry.npmjs.org/
@@ -343,10 +373,9 @@ jobs:
         run: |
           # get latest version
           git pull
-          # need to install tools first which may be used during deployment
-          yarn
           # need to build our packages which might by used by the scripts, such as the fund script
-          yarn build
+          make -j deps
+          make -j build
 
       - name: Run deploy script for public nodes
         if: ${{ !env.ACT }}
@@ -376,15 +405,26 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_hoprd_nat_docker]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+
+      - name: restore cargo cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
 
       - name: Use Node.js 16
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: 16
           registry-url: https://registry.npmjs.org/
@@ -405,10 +445,9 @@ jobs:
         run: |
           # get latest version
           git pull
-          # need to install tools first which may be used during deployment
-          yarn
           # need to build our packages which might by used by the scripts, such as the fund script
-          yarn build
+          make -j deps
+          make -j build
 
       - name: Run deploy script for nodes behind NAT
         if: ${{ !env.ACT }}

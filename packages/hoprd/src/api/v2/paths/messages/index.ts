@@ -2,7 +2,7 @@ import type { Operation } from 'express-openapi'
 import PeerId from 'peer-id'
 import { encode } from 'rlp'
 import { PublicKey } from '@hoprnet/hopr-utils'
-import { STATUS_CODES } from '../../utils'
+import { STATUS_CODES } from '../../utils.js'
 
 /**
  * Adds the current timestamp to the message in order to measure the latency.

@@ -1,7 +1,8 @@
-import { type HeartbeatPingResult } from './heartbeat'
+import { type HeartbeatPingResult } from './heartbeat.js'
 import PeerId from 'peer-id'
-import { randomSubset } from '@hoprnet/hopr-utils'
-import { NETWORK_QUALITY_THRESHOLD } from '../constants'
+import { randomSubset, debug } from '@hoprnet/hopr-utils'
+
+const log = debug('hopr-core:network-peers')
 
 export type Entry = {
   id: PeerId
@@ -28,12 +29,15 @@ function nextPing(e: Entry): number {
 }
 
 class NetworkPeers {
-  private peers: Map<string, Entry> = new Map()
-  private ignoredPeers: Entry[] = []
+  private entries: Map<string, Entry> = new Map()
+  private ignoredEntries: Entry[] = []
+  // peers which were denied connection via the HoprNetworkRegistry
+  private deniedEntries: Map<string, Pick<Entry, 'id' | 'origin'>> = new Map()
 
   constructor(
-    existingPeers: Array<PeerId>,
-    private exclude: PeerId[] = [],
+    existingPeers: PeerId[],
+    private excludedPeers: PeerId[] = [], // populated only by constructor, does not change during runtime
+    private networkQualityThreshold: number,
     private onPeerOffline?: (peer: PeerId) => void
   ) {
     // register all existing peers
@@ -45,7 +49,7 @@ class NetworkPeers {
   // @returns a float between 0 (completely unreliable) and 1 (completely
   // reliable) estimating the quality of service of a peer's network connection
   public qualityOf(peerId: PeerId): number {
-    const entry = this.peers.get(peerId.toB58String())
+    const entry = this.entries.get(peerId.toB58String())
     if (entry && entry.heartbeatsSent > 0) {
       /*
       return entry.heartbeatsSuccess / entry.heartbeatsSent
@@ -61,14 +65,14 @@ class NetworkPeers {
    */
   public getConnectionInfo(peerId: PeerId): Entry {
     const id = peerId.toB58String()
-    const entry = this.peers.get(id)
+    const entry = this.entries.get(id)
     if (entry) return entry
     throw Error(`Entry for ${id} does not exist`)
   }
 
   public pingSince(thresholdTime: number): PeerId[] {
     const toPing: PeerId[] = []
-    for (const entry of this.peers.values()) {
+    for (const entry of this.entries.values()) {
       if (nextPing(entry) < thresholdTime) {
         toPing.push(entry.id)
       }
@@ -79,7 +83,7 @@ class NetworkPeers {
 
   public updateRecord(pingResult: HeartbeatPingResult): void {
     const id = pingResult.destination.toB58String()
-    const previousEntry = this.peers.get(id)
+    const previousEntry = this.entries.get(id)
     if (!previousEntry) return
 
     let newEntry: Entry
@@ -95,16 +99,16 @@ class NetworkPeers {
         quality: Math.max(0, previousEntry.quality - 0.1),
         origin: previousEntry.origin
       }
-      if (newEntry.quality < NETWORK_QUALITY_THRESHOLD) {
+      if (newEntry.quality < this.networkQualityThreshold) {
         // trigger callback first to cut connections
         this.onPeerOffline?.(pingResult.destination)
 
         // check if this node is considered offline and should be removed
         if (newEntry.quality < BAD_QUALITY) {
           // delete peer from internal store
-          this.peers.delete(id)
+          this.entries.delete(id)
           // add entry to temporarily ignored peers
-          this.ignorePeer(newEntry)
+          this.ignoreEntry(newEntry)
           // done, return early so the rest can update the entry instead
           return
         }
@@ -123,12 +127,12 @@ class NetworkPeers {
     }
 
     // update peer entry if still considered ok to keep
-    this.peers.set(id, newEntry)
+    this.entries.set(id, newEntry)
   }
 
   // Get a random sample peers.
   public randomSubset(size: number, filter?: (peer: PeerId) => boolean): PeerId[] {
-    const peers = Array.from(this.peers.values())
+    const peers = Array.from(this.entries.values())
     return randomSubset(
       peers,
       Math.min(size, peers.length),
@@ -139,10 +143,15 @@ class NetworkPeers {
   public register(peerId: PeerId, origin: string) {
     const id = peerId.toB58String()
     const now = Date.now()
+    const hasEntry = this.entries.has(id)
+    const isExcluded = !hasEntry && this.excludedPeers.some((p) => p.equals(peerId))
+    const isDenied = !hasEntry && this.deniedEntries.has(id)
 
-    // does not have peer and it's not excluded
-    if (!this.peers.has(id) && this.exclude.findIndex((p: PeerId) => peerId.equals(p)) < 0) {
-      this.peers.set(id, {
+    log('registering peer', id, { hasEntry, isExcluded, isDenied })
+
+    // does not have peer and it's not excluded or denied
+    if (!hasEntry && !isExcluded && !isDenied) {
+      this.entries.set(id, {
         id: peerId,
         heartbeatsSent: 0,
         heartbeatsSuccess: 0,
@@ -153,76 +162,69 @@ class NetworkPeers {
       })
     }
 
-    if (this.exclude.findIndex((x: PeerId) => peerId.equals(x)) >= 0) {
-      // the peer is explicitely ignored
+    // the peer is excluded or denied
+    if (isExcluded || isDenied) {
       return
     }
 
-    const ignoredIndex = this.ignoredPeers.findIndex((e: Entry) => e.id.equals(peerId) && e.origin == origin)
-
+    const ignoredIndex = this.ignoredEntries.findIndex((e: Entry) => e.id.equals(peerId) && e.origin == origin)
     if (ignoredIndex >= 0) {
       // the peer is temporarily ignored, release if time has passed
-      const ignoredEntry = this.ignoredPeers[ignoredIndex]
+      const ignoredEntry = this.ignoredEntries[ignoredIndex]
       if (ignoredEntry.ignoredAt + IGNORE_TIMEFRAME < now) {
         // release and continue
-        this.unignorePeer(ignoredEntry)
+        this.unignoreEntry(ignoredEntry)
       } else {
         // ignore still valid, thus skipping this registration
         return
       }
     }
-
-    this.peers.set(id, {
-      id: peerId,
-      heartbeatsSent: 0,
-      heartbeatsSuccess: 0,
-      lastSeen: now,
-      backoff: 2,
-      quality: BAD_QUALITY,
-      origin
-    })
   }
 
   public has(peerId: PeerId): boolean {
-    return this.peers.has(peerId.toB58String())
+    return this.entries.has(peerId.toB58String())
   }
 
   public length(): number {
-    return this.peers.size
+    return this.entries.size
+  }
+
+  public allEntries(): IterableIterator<Entry> {
+    return this.entries.values()
   }
 
   public all(): PeerId[] {
-    return Array.from(this.peers.values()).map((entry) => entry.id)
+    return Array.from(this.allEntries()).map((entry) => entry.id)
   }
 
   /**
    * @returns a string describing the connection quality of all connected peers
    */
   public debugLog(): string {
-    if (this.peers.size === 0) return 'no connected peers'
+    if (this.entries.size === 0) return 'no connected peers'
 
     const peers = this.all()
 
     // Sort a copy of peers in-place
-    peers.sort((a, b) => this.qualityOf(b) - this.qualityOf(a))
+    peers.sort((a: PeerId, b: PeerId) => this.qualityOf(b) - this.qualityOf(a))
 
-    const bestAvailabilityIndex = peers.reverse().findIndex((peer) => this.qualityOf(peer).toFixed(1) === '1.0')
-    const badAvailabilityIndex = peers.findIndex((peer) => this.qualityOf(peer) < NETWORK_QUALITY_THRESHOLD)
-
-    const bestAvailabilityNodes = bestAvailabilityIndex < 0 ? 0 : peers.length - bestAvailabilityIndex
-    const badAvailabilityNodes = badAvailabilityIndex < 0 ? 0 : peers.length - badAvailabilityIndex
-    const msgTotalNodes = `${peers.length} node${peers.length == 1 ? '' : 's'} in total`
-    const msgBestNodes = `${bestAvailabilityNodes} node${bestAvailabilityNodes == 1 ? '' : 's'} with quality 1.0`
-    const msgBadNodes = `${badAvailabilityNodes} node${badAvailabilityNodes == 1 ? '' : 's'} with quality below 0.5`
-
-    let out = `network peers status: ${msgTotalNodes}, ${msgBestNodes}, ${msgBadNodes}\n`
+    let bestAvailabilityNodes = 0
+    let badAvailabilityNodes = 0
+    let out = '\n'
 
     for (const peer of peers) {
       if (!this.has(peer)) {
         continue
       }
 
-      const entry = this.peers.get(peer.toB58String())
+      const entry = this.entries.get(peer.toB58String())
+
+      const quality = this.qualityOf(peer)
+      if (quality.toFixed(1) === '1.0') {
+        bestAvailabilityNodes++
+      } else if (quality < this.networkQualityThreshold) {
+        badAvailabilityNodes++
+      }
 
       const success =
         entry.heartbeatsSent > 0 ? ((entry.heartbeatsSuccess / entry.heartbeatsSent) * 100).toFixed() + '%' : '<new>'
@@ -233,23 +235,49 @@ class NetworkPeers {
       out += '\n'
     }
 
+    const msgTotalNodes = `${peers.length} node${peers.length == 1 ? '' : 's'} in total`
+    const msgBestNodes = `${bestAvailabilityNodes} node${bestAvailabilityNodes == 1 ? '' : 's'} with quality 1.0`
+    const msgBadNodes = `${badAvailabilityNodes} node${badAvailabilityNodes == 1 ? '' : 's'} with quality below ${
+      this.networkQualityThreshold
+    }`
+    out += `network peers status: ${msgTotalNodes}, ${msgBestNodes}, ${msgBadNodes}\n`
+
     return out
   }
 
-  private ignorePeer(entry: Entry): void {
-    const index = this.ignoredPeers.findIndex((e: Entry) => e.id.equals(entry.id) && e.origin == entry.origin)
+  private ignoreEntry(entry: Entry): void {
+    const index = this.ignoredEntries.findIndex((e: Entry) => e.id.equals(entry.id) && e.origin == entry.origin)
 
     if (index < 0) {
       entry.ignoredAt = Date.now()
-      this.ignoredPeers.push(entry)
+      this.ignoredEntries.push(entry)
     }
   }
 
-  private unignorePeer(entry: Entry): void {
-    const index = this.ignoredPeers.findIndex((e: Entry) => e.id.equals(entry.id) && e.origin == entry.origin)
+  private unignoreEntry(entry: Entry): void {
+    const index = this.ignoredEntries.findIndex((e: Entry) => e.id.equals(entry.id) && e.origin == entry.origin)
 
     if (index >= 0) {
-      this.ignoredPeers.splice(index, 1)
+      this.ignoredEntries.splice(index, 1)
+    }
+  }
+
+  public getAllDenied(): IterableIterator<Pick<Entry, 'id' | 'origin'>> {
+    return this.deniedEntries.values()
+  }
+
+  public addPeerToDenied(peerId: PeerId, origin: string): void {
+    const peerIdStr = peerId.toB58String()
+    log('adding peer to denied', peerIdStr)
+    this.deniedEntries.set(peerIdStr, { id: peerId, origin })
+  }
+
+  public removePeerFromDenied(peerId: PeerId): void {
+    const peerIdStr = peerId.toB58String()
+    const existed = this.deniedEntries.delete(peerIdStr)
+
+    if (existed) {
+      log('removing peer from denied', peerIdStr)
     }
   }
 }

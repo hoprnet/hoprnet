@@ -3,7 +3,8 @@ import React, { useEffect, useState, useRef } from 'react'
 import styles from '../../styles/log.module.css'
 import dynamic from 'next/dynamic'
 
-const Jazzicon = dynamic(() => import('./jazzicon'), { ssr: false })
+// TODO: fix type in refactor
+const Jazzicon = dynamic(() => import('./jazzicon'), { ssr: false }) as any
 
 export function AbbreviatedId({ id }: { id: string }) {
   let [expanded, setExpanded] = useState(false)

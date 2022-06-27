@@ -1,22 +1,27 @@
 import type { Multiaddr } from 'multiaddr'
-import { CODE_IP4, CODE_IP6, CODE_P2P, CODE_CIRCUIT, CODE_TCP } from '../constants'
+import { CODE_IP4, CODE_IP6, CODE_P2P, CODE_CIRCUIT, CODE_TCP } from '../constants.js'
 import { decode } from 'multihashes'
-import type { NetworkInterfaceInfo } from 'os'
-import { u8aEquals, u8aToNumber } from '@hoprnet/hopr-utils'
+import { u8aEquals, u8aToNumber, u8aCompare } from '@hoprnet/hopr-utils'
 import Debug from 'debug'
 
 const MULTIHASH_LENGTH = 37
 const MULTIHASH_TYPE = 'identity'
 
-type DirectAddress = {
-  type: NetworkInterfaceInfo['family']
+export enum AddressType {
+  IPv4 = 'IPv4',
+  IPv6 = 'IPv6',
+  P2P = 'p2p'
+}
+
+export type DirectAddress = {
+  type: AddressType.IPv4 | AddressType.IPv6
   address: Uint8Array
   port: number
   node?: Uint8Array
 }
 
-type CircuitAddress = {
-  type: 'p2p'
+export type CircuitAddress = {
+  type: AddressType.P2P
   relayer: Uint8Array
   node: Uint8Array
 }
@@ -97,7 +102,7 @@ function parseCircuitAddress(maTuples: [code: number, addr: Uint8Array][]): Pars
   return {
     valid: true,
     address: {
-      type: 'p2p',
+      type: AddressType.P2P,
       relayer: decoded[0],
       node: decoded[1]
     }
@@ -120,14 +125,14 @@ function parseDirectAddress(maTuples: [code: number, addr: Uint8Array][]): Parse
     return { valid: false }
   }
 
-  let family: NetworkInterfaceInfo['family']
+  let family: AddressType.IPv4 | AddressType.IPv6
 
   switch (maTuples[0][0]) {
     case CODE_IP4:
-      family = 'IPv4'
+      family = AddressType.IPv4
       break
     case CODE_IP6:
-      family = 'IPv6'
+      family = AddressType.IPv6
       break
     default:
       return { valid: false }
@@ -183,14 +188,21 @@ export function compareDirectConnectionInfo(a: Multiaddr, b: Multiaddr): boolean
   const va1 = parseAddress(a)
   const va2 = parseAddress(b)
 
-  if (!va1.valid || !va2.valid) return false
+  if (!va1.valid || !va2.valid) {
+    return false
+  }
 
-  if (va1.address.type != va2.address.type) return false
+  if (va1.address.type !== va2.address.type) {
+    return false
+  }
 
-  if (va1.address.type == 'p2p') return false
+  if (va1.address.type === AddressType.P2P) {
+    return false
+  }
 
-  if (va1.address.type == va2.address.type)
-    return Buffer.compare(va1.address.address, va2.address.address) == 0 && va1.address.port == va2.address.port
+  if (va1.address.type === va2.address.type) {
+    return u8aCompare(va1.address.address, va2.address.address) == 0 && va1.address.port == va2.address.port
+  }
 
   // TODO: We should also compare protocol (TCP/UDP)
 

@@ -3,7 +3,7 @@ import { randomBytes } from 'crypto'
 import { EventEmitter } from 'events'
 import BN from 'bn.js'
 
-import { subscribeToAcknowledgements, sendAcknowledgement } from './acknowledgement'
+import { subscribeToAcknowledgements, sendAcknowledgement } from './acknowledgement.js'
 import {
   Balance,
   defer,
@@ -23,8 +23,8 @@ import {
 } from '@hoprnet/hopr-utils'
 import type { HalfKeyChallenge } from '@hoprnet/hopr-utils'
 import assert from 'assert'
-import { AcknowledgementChallenge, Packet, Acknowledgement } from '../../messages'
-import { PacketForwardInteraction } from './forward'
+import { AcknowledgementChallenge, Packet, Acknowledgement } from '../../messages/index.js'
+import { PacketForwardInteraction } from './forward.js'
 import { initializeCommitment } from '@hoprnet/hopr-core-ethereum'
 import { ChannelCommitmentInfo } from '@hoprnet/hopr-core-ethereum'
 

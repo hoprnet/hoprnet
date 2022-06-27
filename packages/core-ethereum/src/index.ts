@@ -1,7 +1,7 @@
 import { setImmediate } from 'timers/promises'
 import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
-import { ChainWrapper, createChainWrapper, Receipt } from './ethereum'
+import { ChainWrapper, createChainWrapper, Receipt } from './ethereum.js'
 import chalk from 'chalk'
 import {
   AcknowledgedTicket,
@@ -19,11 +19,11 @@ import {
   type DeferType,
   type PublicKey
 } from '@hoprnet/hopr-utils'
-import Indexer from './indexer'
-import { CONFIRMATIONS, INDEXER_BLOCK_RANGE, PROVIDER_CACHE_TTL } from './constants'
+import Indexer from './indexer/index.js'
+import { CONFIRMATIONS, INDEXER_BLOCK_RANGE, PROVIDER_CACHE_TTL } from './constants.js'
 import { EventEmitter } from 'events'
-import { initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCommitmentInfo } from './commitment'
-import type { IndexerEvents } from './indexer/types'
+import { initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCommitmentInfo } from './commitment.js'
+import type { IndexerEvents } from './indexer/types.js'
 
 const log = debug('hopr-core-ethereum')
 
@@ -46,7 +46,8 @@ export type ChainOptions = {
   provider: string
   maxConfirmations?: number
   chainId: number
-  gasPrice?: string
+  maxFeePerGas: string
+  maxPriorityFeePerGas: string
   network: string
   environment: string
 }
@@ -141,7 +142,7 @@ export default class HoprCoreEthereum extends EventEmitter {
    */
   async stop(): Promise<void> {
     log('Stopping connector...')
-    this.indexer.stop()
+    await this.indexer.stop()
   }
 
   announce(multiaddr: Multiaddr): Promise<string> {
@@ -208,6 +209,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     network: string
     hoprTokenAddress: string
     hoprChannelsAddress: string
+    hoprNetworkRegistryAddress: string
     channelClosureSecs: number
   } {
     return this.chain.getInfo()
@@ -474,11 +476,34 @@ export default class HoprCoreEthereum extends EventEmitter {
       (txHash: string) => this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
   }
+
+  /**
+   * Checks whether a given `hoprNode` is allowed access.
+   * When the register is disabled, a `hoprNode` is seen as `registered`,
+   * when the register is enabled, a `hoprNode` needs to also be `eligible`.
+   * @param hoprNode the public key of the account we want to check if it's registered
+   * @returns true if registered
+   */
+  public async isAllowedAccessToNetwork(hoprNode: PublicKey): Promise<boolean> {
+    try {
+      // if register is disabled, all nodes are seen as "allowed"
+      const registerEnabled = await this.db.isNetworkRegistryEnabled()
+      if (!registerEnabled) return true
+      // find hoprNode's linked account
+      const account = await this.db.getAccountFromNetworkRegistry(hoprNode)
+      // check if account is eligible
+      return this.db.isEligible(account)
+    } catch (error) {
+      // log unexpected error
+      if (!error?.notFound) log('error: could not determine whether node is is allowed access', error)
+      return false
+    }
+  }
 }
 
-export { createConnectorMock } from './index.mock'
-export { useFixtures } from './indexer/index.mock'
-export { sampleChainOptions } from './ethereum.mock'
+export { createConnectorMock } from './index.mock.js'
+export { useFixtures } from './indexer/index.mock.js'
+export { sampleChainOptions } from './ethereum.mock.js'
 
 export {
   ChannelEntry,

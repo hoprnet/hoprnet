@@ -1,8 +1,8 @@
 import { expect } from 'chai'
 import { BigNumber } from 'ethers'
-import TransactionManager, { TransactionPayload } from './transaction-manager'
+import TransactionManager, { Transaction, TransactionPayload } from './transaction-manager.js'
 
-const TX: [string, { nonce: number; gasPrice: number }] = ['0', { nonce: 0, gasPrice: 100 }]
+const TX: [string, Omit<Transaction, 'createdAt'>] = ['0', { nonce: 0, maxPrority: BigNumber.from('2000000000') }]
 const PAYLOAD: TransactionPayload = { to: '0x0', data: '0x123', value: BigNumber.from('1') }
 
 describe('transaction-manager', function () {
@@ -94,7 +94,7 @@ describe('transaction-manager', function () {
 
     // generate mock txs
     for (let i = 0; i < 7; i++) {
-      txs.push([String(i), { nonce: i, gasPrice: 1 }])
+      txs.push([String(i), { nonce: i, maxPrority: BigNumber.from('1') }])
     }
 
     // add them to confirmed
@@ -124,7 +124,7 @@ describe('transaction-manager', function () {
       data: PAYLOAD.data,
       value: PAYLOAD.value,
       nonce: TX[1].nonce,
-      gasPrice: TX[1].gasPrice
+      maxPrority: TX[1].maxPrority
     })
   })
 })

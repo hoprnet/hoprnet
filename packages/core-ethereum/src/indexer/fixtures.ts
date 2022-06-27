@@ -1,4 +1,4 @@
-import type { Event, TokenEvent } from './types'
+import type { Event, TokenEvent, RegistryEvent } from './types.js'
 import BN from 'bn.js'
 import assert from 'assert'
 import { BigNumber } from 'ethers'
@@ -15,9 +15,9 @@ import {
   Signature,
   SIGNATURE_LENGTH
 } from '@hoprnet/hopr-utils'
-import { PARTY_A, PARTY_B, PARTY_A_MULTIADDR, PARTY_B_MULTIADDR } from '../fixtures'
+import { PARTY_A, PARTY_B, PARTY_A_MULTIADDR, PARTY_B_MULTIADDR } from '../fixtures.js'
 
-export * from '../fixtures'
+export * from '../fixtures.js'
 
 export const expectAccountsToBeEqual = (actual: AccountEntry, expected: AccountEntry) => {
   assert(actual, 'account is null')
@@ -199,3 +199,84 @@ export const PARTY_A_TRANSFER_OUTGOING = {
     value: BigNumber.from('1')
   } as any
 } as TokenEvent<'Transfer'>
+
+export const REGISTER_ENABLED = {
+  event: 'EnabledNetworkRegistry',
+  transactionHash: '',
+  blockNumber: 1,
+  transactionIndex: 0,
+  logIndex: 0,
+  args: {
+    isEnabled: true
+  } as any
+} as RegistryEvent<'EnabledNetworkRegistry'>
+
+export const REGISTER_DISABLED = {
+  event: 'EnabledNetworkRegistry',
+  transactionHash: '',
+  blockNumber: 3,
+  transactionIndex: 0,
+  logIndex: 0,
+  args: {
+    isEnabled: false
+  } as any
+} as RegistryEvent<'EnabledNetworkRegistry'>
+
+export const PARTY_A_REGISTERED = {
+  event: 'Registered',
+  transactionHash: '',
+  blockNumber: 1,
+  transactionIndex: 1,
+  logIndex: 0,
+  args: {
+    account: PARTY_A.toAddress().toHex(),
+    hoprPeerId: PARTY_B.toPeerId().toB58String()
+  } as any
+} as RegistryEvent<'Registered'>
+
+export const PARTY_A_ELEGIBLE = {
+  event: 'EligibilityUpdated',
+  transactionHash: '',
+  blockNumber: 3,
+  transactionIndex: 0,
+  logIndex: 0,
+  args: {
+    account: PARTY_A.toAddress().toHex(),
+    eligibility: true
+  } as any
+} as RegistryEvent<'EligibilityUpdated'>
+
+export const PARTY_A_NOT_ELEGIBLE = {
+  event: 'EligibilityUpdated',
+  transactionHash: '',
+  blockNumber: 5,
+  transactionIndex: 0,
+  logIndex: 0,
+  args: {
+    account: PARTY_A.toAddress().toHex(),
+    eligibility: false
+  } as any
+} as RegistryEvent<'EligibilityUpdated'>
+
+export const PARTY_A_ELEGIBLE_2 = {
+  event: 'EligibilityUpdated',
+  transactionHash: '',
+  blockNumber: 7,
+  transactionIndex: 0,
+  logIndex: 0,
+  args: {
+    account: PARTY_A.toAddress().toHex(),
+    eligibility: true
+  } as any
+} as RegistryEvent<'EligibilityUpdated'>
+
+export const PARTY_A_DEREGISTERED = {
+  event: 'DeregisteredByOwner',
+  transactionHash: '',
+  blockNumber: 9,
+  transactionIndex: 0,
+  logIndex: 0,
+  args: {
+    account: PARTY_A.toAddress().toHex()
+  } as any
+} as RegistryEvent<'DeregisteredByOwner'>

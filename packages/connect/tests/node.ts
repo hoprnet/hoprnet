@@ -8,12 +8,12 @@ const Mplex = require('libp2p-mplex')
 
 import { default as HoprConnect, type HoprConnectConfig } from '@hoprnet/hopr-connect'
 import { Multiaddr } from 'multiaddr'
-import pipe from 'it-pipe'
+import { pipe } from 'it-pipe'
 import yargs from 'yargs/yargs'
-import { peerIdForIdentity, identityFromPeerId } from './identities'
+import { peerIdForIdentity, identityFromPeerId } from './identities.js'
 import type PeerId from 'peer-id'
 import type { WriteStream } from 'fs'
-import type { PeerStoreType, Stream } from '../src/types'
+import type { PeerStoreType, Stream } from '../src/types.js'
 
 const TEST_PROTOCOL = '/hopr-connect/test/0.1.0'
 
@@ -87,7 +87,7 @@ async function startNode(
     modules: {
       transport: [HoprConnect as any],
       streamMuxer: [Mplex],
-      connEncryption: [NOISE as any]
+      connEncryption: [NOISE]
     },
     config: {
       transport: {
@@ -116,9 +116,9 @@ async function startNode(
 
   node.handle(TEST_PROTOCOL, async (conn: HandlerProps) => {
     pipe(
-      conn.stream.source,
+      conn.stream.source as any,
       createEchoReplier(await identityNameForConnection(conn.connection), pipeFileStream),
-      conn.stream.sink
+      conn.stream.sink as any
     )
   })
 
@@ -196,7 +196,7 @@ async function executeCommands({
         if (pipeFileStream) {
           pipeFileStream.write(`>${cmdDef.targetIdentityName}: ${cmdDef.msg}\n`)
         }
-        await pipe([encodedMsg], stream, createDeadEnd(cmdDef.targetIdentityName, pipeFileStream))
+        await pipe([encodedMsg], stream as any, createDeadEnd(cmdDef.targetIdentityName, pipeFileStream))
         console.log(`sent ok`)
         break
       }

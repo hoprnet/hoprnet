@@ -45,16 +45,8 @@ Depending on the medium used the process may vary.
 - via [Gitcoin](https://gitcoin.co/)
 
   1. Creator enters the GitHub issue link in Gitcoin's bounty creation portal.
-  2. Creator sets prize of the bounty.
+  2. Creator sets prize of the bounty, organisation github handle to `hoprnet`, notification email to `tech@hoprnet.org`
   3. Operator wallet is the one created in [Funding the bounty](#funding-the-bounty).
-
-### Comm
-
-As soon as the bounty is ready to be promoted, the following must happen:
-
-1. Creator pastes bounty URL within `bounties` channel in element.
-2. Creator pastes bounty URL within `bounties (TBD)` channel in discord.
-3. Comm team may use the bounty the way they see fit, with the help of the creator.
 
 ## Deadlines
 
@@ -74,6 +66,7 @@ In order to ensure that external contributions pass our CI tests, the bounty cre
 1. Create a branch prefixed by `bounty/<name>` and push it.
 2. Bounty hunter may create PRs that merge into that branch.
 3. When work is complete, PR is merged into the branch, ensuring tests pass.
+4. If the bounty is a Dune Analytics query or dashboard, ensure that the full code of all queries got submitted via PR and the query/Dashboard got forked by the `hoprnet` Dune account.
 
 ## Prizes and rewards
 
@@ -85,8 +78,3 @@ Depending on the prize's currency, there might be fluctuations in the price rela
 ## Awarding the prize
 
 Before the bounty is awarded, one of the [tech representatives](./development#tech-representatives) has to approve the PR which was created to resolve the bounty.
-
-## The Bounty Program
-
-The bounty program is a new initiative at HOPR created to kick-start and build a strong tech community.
-Learn about the bounty program [here](https://github.com/hoprnet/hoprnet/issues/3285).

@@ -2,21 +2,28 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
-import { createTestApiInstance, ALICE_PEER_ID } from '../../fixtures'
+import { createTestApiInstance, ALICE_PEER_ID } from '../../fixtures.js'
 import { Balance, NativeBalance, PublicKey } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { STATUS_CODES } from '../../utils'
+import { STATUS_CODES } from '../../utils.js'
 
 let node = sinon.fake() as any
 node.withdraw = sinon.fake.returns('receipt')
 node.getNativeBalance = sinon.fake.returns(Promise.resolve(new NativeBalance(new BN('10'))))
 node.getBalance = sinon.fake.returns(Promise.resolve(new Balance(new BN('10'))))
 
-const { api, service } = createTestApiInstance(node)
-chai.use(chaiResponseValidator(api.apiDoc))
-
 describe('POST /account/withdraw', () => {
   const ALICE_ETH_ADDRESS = PublicKey.fromPeerId(ALICE_PEER_ID).toAddress()
+
+  let service: any
+  before(async function () {
+    const loaded = await createTestApiInstance(node)
+
+    service = loaded.service
+
+    // @ts-ignore ESM / CommonJS compatibility issue
+    chai.use(chaiResponseValidator.default(loaded.api.apiDoc))
+  })
 
   it('should withdraw NATIVE successfuly', async () => {
     const res = await request(service).post('/api/v2/account/withdraw').send({

@@ -1,12 +1,14 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.89.0-next.7",
+  "version": "1.89.0-next.28",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "LGPL-3.0-only",
-  "main": "lib/index.js",
-  "bin": "lib/index.js",
+  "types": "lib/main.d.cts",
+  "type": "module",
+  "main": "lib/main.cjs",
+  "bin": "lib/main.cjs",
   "files": [
     "lib",
     "npm-shrinkwrap.json",
@@ -20,25 +22,27 @@
     "node": "16"
   },
   "scripts": {
-    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
-    "build": "yarn clean && tsc -p . && yarn buildAdmin && chmod u+x lib/*.js",
+    "clean:wasm": "make -C crates clean",
+    "build:wasm": "make -C crates all && make -C crates install",
+    "test:wasm": "make -C crates test",
+    "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo ./build ./rest-api-v2-full-spec.json",
+    "build": "yarn clean && yarn build:wasm && npx tsc -p . && yarn buildAdmin && chmod u+x lib/*.js",
     "buildAdmin": "HOPRD_GIT_COMMIT=$(git rev-parse --short HEAD) next build hopr-admin",
-    "test": "NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace --exit . test",
+    "test": "yarn test:wasm && NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace --exit . test",
     "prebuild": "next telemetry disable",
-    "start": "ts-node src/index --admin --init --api",
+    "start": "node --experimental-wasm-modules lib/main.cjs --admin --init --api",
     "dev": "NODE_ENV=development yarn start --environment hardhat-localhost --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses --testPreferLocalAddresses --testNoAuthentication",
     "devAdmin": "next dev hopr-admin",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },
   "dependencies": {
-    "@ceramicnetwork/http-client": "1.5.7",
-    "@ceramicnetwork/stream-tile": "1.5.7",
     "@hoprnet/hopr-core": "workspace:packages/core",
+    "@hoprnet/hopr-real": "workspace:packages/real",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "bn.js": "5.2.0",
     "body-parser": "1.19.2",
-    "chalk": "4.1.2",
+    "chalk": "5.0.1",
     "check-password-strength": "2.0.4",
     "cookie": "0.4.2",
     "cors": "2.8.5",
@@ -46,7 +50,7 @@
     "dids": "2.4.3",
     "ethers": "^5.6.1",
     "express": "4.17.3",
-    "express-openapi": "9.3.1",
+    "express-openapi": "https://github.com/hoprnet/open-api/raw/robertkiel/built-esm-support/packages/express-openapi/express-openapi-11.0.4.tgz",
     "jazzicon": "1.5.0",
     "js-cookie": "3.0.1",
     "key-did-provider-ed25519": "1.1.0",
@@ -58,6 +62,7 @@
     "react-dom": "17.0.2",
     "rlp": "2.2.7",
     "run-queue": "2.0.1",
+    "semver": "7.3.7",
     "strip-ansi": "6.0.1",
     "swagger-ui-express": "4.3.0",
     "tiny-hashes": "1.0.1",
@@ -71,31 +76,24 @@
     "@types/cors": "2.8.12",
     "@types/js-cookie": "^3.0.1",
     "@types/mocha": "9.1.0",
+    "@types/react": "^17.0.2",
     "@types/supertest": "^2.0.11",
     "@types/yargs": "17.0.10",
     "chai": "^4.3.6",
     "chai-openapi-response-validator": "^0.14.2",
     "mocha": "9.2.2",
-    "rimraf": "3.0.2",
     "sinon": "12.0.1",
     "supertest": "^6.2.2",
-    "ts-node": "10.7.0",
     "typedoc": "0.22.13",
-    "typedoc-plugin-markdown": "3.11.14",
-    "typescript": "4.6.3"
+    "typedoc-plugin-markdown": "3.11.14"
   },
   "mocha": {
-    "extension": [
-      "ts"
-    ],
     "spec": [
-      "src/**/*.spec.ts",
+      "lib/**/*.spec.js",
       "hopr-admin/**/*.spec.ts"
-    ],
-    "require": "ts-node/register"
+    ]
   },
   "publishConfig": {
     "access": "public"
-  },
-  "stableVersion": "1.76.0-next.31"
+  }
 }

@@ -2,16 +2,23 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
-import { createTestApiInstance, ALICE_PEER_ID, INVALID_PEER_ID, TICKET_MOCK } from '../../../fixtures'
-import { STATUS_CODES } from '../../../utils'
+import { createTestApiInstance, ALICE_PEER_ID, INVALID_PEER_ID, TICKET_MOCK } from '../../../fixtures.js'
+import { STATUS_CODES } from '../../../utils.js'
 
 let node = sinon.fake() as any
 node.getTickets = sinon.fake.returns([TICKET_MOCK])
 
-const { api, service } = createTestApiInstance(node)
-chai.use(chaiResponseValidator(api.apiDoc))
-
 describe('GET /channels/{peerId}/tickets', () => {
+  let service: any
+  before(async function () {
+    const loaded = await createTestApiInstance(node)
+
+    service = loaded.service
+
+    // @ts-ignore ESM / CommonJS compatibility issue
+    chai.use(chaiResponseValidator.default(loaded.api.apiDoc))
+  })
+
   it('should get tickets successfully', async () => {
     const res = await request(service).get(`/api/v2/channels/${ALICE_PEER_ID.toB58String()}/tickets`)
     expect(res).to.satisfyApiSpec

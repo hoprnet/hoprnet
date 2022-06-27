@@ -1,20 +1,35 @@
-import { timeoutAfter } from './timeout'
+import { timeout } from './timeout.js'
 import assert from 'assert'
 
 describe('testing timeoutAfter', () => {
-  it('if promise resolves first, it is no-op', async () => {
-    let p = timeoutAfter(() => Promise.resolve('ok'), 100)
-    assert((await p) == 'ok')
+  it('resolve promise', async () => {
+    let result = await timeout(100, () => Promise.resolve('ok'))
+    assert(result === 'ok')
   })
 
-  it('rejects if promise does not resolve', async () => {
-    let p = timeoutAfter(() => new Promise(() => {}), 2)
-    let threw = false
-    try {
-      await p
-    } catch (e) {
-      threw = true
-    }
-    assert(threw)
+  it('reject with timeout', async () => {
+    await assert.rejects(async () => await timeout(100, () => new Promise<void>(() => {})))
+  })
+
+  it('reject asynchronously', async () => {
+    await assert.rejects(
+      async () =>
+        await timeout(
+          100,
+          () =>
+            new Promise((_, reject) => {
+              setTimeout(reject, 50)
+            })
+        )
+    )
+  })
+
+  it('reject synchronously', async () => {
+    await assert.rejects(
+      async () =>
+        await timeout(100, () => {
+          throw Error()
+        })
+    )
   })
 })

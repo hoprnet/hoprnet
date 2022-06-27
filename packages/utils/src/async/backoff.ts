@@ -1,5 +1,5 @@
-import { durations } from '../time'
-import { debug } from '../process'
+import { durations } from '../time.js'
+import { debug } from '../process/index.js'
 import { setTimeout, setImmediate } from 'timers/promises'
 
 const log = debug('hopr:utils:retry')
@@ -21,14 +21,13 @@ export async function retryWithBackoff<T>(
     minDelay?: number
     maxDelay?: number
     delayMultiple?: number
-  } = {}
+  } = { minDelay: durations.seconds(1), maxDelay: durations.minutes(10), delayMultiple: 2 }
 ): Promise<T> {
-  const { minDelay = durations.seconds(1), maxDelay = durations.minutes(10), delayMultiple = 2 } = options
-  let delay = minDelay
+  let delay = options.minDelay
 
-  if (minDelay >= maxDelay) {
+  if (options.minDelay >= options.maxDelay) {
     throw Error('minDelay should be smaller than maxDelay')
-  } else if (delayMultiple <= 1) {
+  } else if (options.delayMultiple <= 1) {
     throw Error('delayMultiple should be larger than 1')
   }
 
@@ -36,7 +35,7 @@ export async function retryWithBackoff<T>(
     try {
       return await fn()
     } catch (err) {
-      if (delay >= maxDelay) {
+      if (delay >= options.maxDelay) {
         throw err
       }
       log(`failed, attempting again in ${delay} (${err})`)
@@ -48,6 +47,6 @@ export async function retryWithBackoff<T>(
     // Push next loop iteration to end of next event loop iteration
     await setImmediate()
 
-    delay = delay * delayMultiple
+    delay = delay * options.delayMultiple
   }
 }

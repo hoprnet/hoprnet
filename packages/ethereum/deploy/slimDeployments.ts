@@ -35,6 +35,8 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const contractName = contract.replace('.json', '')
     const compilerData =
       (await hre.artifacts.getBuildInfo(`contracts/${contractName}.sol:${contractName}`)) ?? data.compilerData
+    // sometimes not all contracts are deployed, depends on the deployment scripts
+    if (!compilerData) continue
     const slimmed = {
       address: data.address,
       transactionHash: data.transactionHash,
@@ -51,7 +53,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 }
 
 main.runAtTheEnd = true
-main.dependencies = ['preDeploy']
+main.dependencies = ['postDeploy']
 main.tags = ['slimDeployments']
 
 export default main

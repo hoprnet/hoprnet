@@ -1,2 +1,2 @@
-export { WebRTCConnection } from './connection'
-export { WebRTCUpgrader } from './upgrader'
+export { WebRTCConnection } from './connection.js'
+export { WebRTCUpgrader } from './upgrader.js'

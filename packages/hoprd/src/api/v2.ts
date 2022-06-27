@@ -2,7 +2,7 @@ import type { Server } from 'http'
 import type { Application, Request } from 'express'
 import type { WebSocketServer } from 'ws'
 import type Hopr from '@hoprnet/hopr-core'
-import type { LogStream } from '../logs'
+import type { LogStream } from '../logs.js'
 import process from 'process'
 import path from 'path'
 import fs from 'fs'
@@ -11,24 +11,24 @@ import cors from 'cors'
 import swaggerUi from 'swagger-ui-express'
 import bodyParser from 'body-parser'
 import { initialize } from 'express-openapi'
-import OpenAPIFramework from 'openapi-framework'
+import type { default as OpenAPIFramework } from 'openapi-framework'
 import PeerId from 'peer-id'
 import { debug, Address } from '@hoprnet/hopr-utils'
-import { authenticateWsConnection, getStatusCodeForInvalidInputInRequest, removeQueryParams } from './utils'
-import { StateOps, SettingKey } from '../types'
+import { authenticateWsConnection, getStatusCodeForInvalidInputInRequest, removeQueryParams } from './utils.js'
+import { SettingKey, StateOps } from '../types.js'
 
 const debugLog = debug('hoprd:api:v2')
 
 // The Rest API v2 is uses JSON for input and output, is validated through a
 // Swagger schema which is also accessible for testing at:
 // http://localhost:3001/api/v2/_swagger
-export function setupRestApi(
+export async function setupRestApi(
   service: Application,
   urlPath: string,
   node: Hopr,
   stateOps: StateOps,
   options: any
-): OpenAPIFramework {
+): Promise<OpenAPIFramework> {
   // this API uses JSON data only
   service.use(urlPath, bodyParser.json())
 
@@ -44,20 +44,23 @@ export function setupRestApi(
   // because express-openapi uses relative paths we need to figure out where
   // we are exactly
   const cwd = process.cwd()
-  const packagePath = path.dirname(require.resolve('@hoprnet/hoprd/package.json'))
+  const packagePath = path.dirname(new URL('../../package.json', import.meta.url).pathname)
   const relPath = path.relative(cwd, packagePath)
   const apiBaseSpecPath = path.join(relPath, 'rest-api-v2-spec.yaml')
-  const apiFullSpecPath = path.join(relPath, 'rest-api-v2-full-spec.yaml')
+  const apiFullSpecPath = path.join(relPath, 'rest-api-v2-full-spec.json')
   const apiPathsPath = path.join(relPath, 'lib/api/v2/paths')
 
   // useful documentation for the configuration of express-openapi can be found at:
   // https://github.com/kogosoftwarellc/open-api/tree/master/packages/express-openapi
-  const apiInstance = initialize({
+  const apiInstance = await initialize({
     app: service,
     // the spec resides in the package top-level folder
     apiDoc: apiBaseSpecPath,
     // path to generated HTTP operations
     paths: apiPathsPath,
+    pathsIgnore: /\.spec$/,
+    routesGlob: '**/*.js',
+    routesIndexFileRegExp: /(?:index)?\.js$/,
     // since we pass the spec directly we don't need to expose it via HTTP
     exposeApiDocs: false,
     errorMiddleware: function (err, _, res, next) {

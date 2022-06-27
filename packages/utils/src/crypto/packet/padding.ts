@@ -1,5 +1,5 @@
-import { PAYLOAD_SIZE } from './constants'
-import { u8aEquals } from '../../u8a'
+import { PAYLOAD_SIZE } from './constants.js'
+import { u8aEquals } from '../../u8a/index.js'
 
 export const PADDING_TAG = Uint8Array.from([72, 79, 80, 82]) // "HOPR"
 export const PADDING_TAG_LENGTH = 4

@@ -7,17 +7,17 @@ import multihashes from 'multihashes'
 import type { Connection, MuxedStream } from 'libp2p'
 import type LibP2P from 'libp2p'
 
-import { debug } from '../process'
-import pipe from 'it-pipe'
-import { dial, type DialOpts } from './dialHelper'
+import { debug } from '../process/index.js'
+import { pipe } from 'it-pipe'
+import { dial, type DialOpts } from './dialHelper.js'
 
-export * from './addressSorters'
-export * from './dialHelper'
-export * from './pickVersion'
-export * from './pubKeyToPeerId'
-export * from './privKeyToPeerId'
-export * from './relayCode'
-export * from './verifySignatureFromPeerId'
+export * from './addressSorters.js'
+export * from './dialHelper.js'
+export * from './pickVersion.js'
+export * from './pubKeyToPeerId.js'
+export * from './privKeyToPeerId.js'
+export * from './relayCode.js'
+export * from './verifySignatureFromPeerId.js'
 
 /**
  * Regular expresion used to match b58Strings
@@ -142,7 +142,7 @@ export async function libp2pSendMessage(
       async function collect(source: AsyncIterable<any>) {
         const vals = []
         for await (const val of source) {
-          // Convert from BufferList to Uint8Array
+          // Convert from potential BufferList to Uint8Array
           vals.push(Uint8Array.from(val.slice()))
         }
         return vals
@@ -197,11 +197,12 @@ function generateHandler(
           props.stream,
           async function* pipeToHandler(source: AsyncIterable<Uint8Array>) {
             for await (const msg of source) {
-              // Convert from BufferList to Uint8Array
+              // Convert from potential BufferList to Uint8Array
               yield await handlerFunction(Uint8Array.from(msg.slice()), props.connection.remotePeer)
             }
           },
-          props.stream
+          // @fixme correct type
+          props.stream as any
         )
       } catch (err) {
         // Mostly used to capture send errors
@@ -222,7 +223,7 @@ function generateHandler(
         props.stream,
         async function collect(source: AsyncIterable<Uint8Array>) {
           for await (const msg of source) {
-            // Convert from BufferList to Uint8Array
+            // Convert from potential BufferList to Uint8Array
             await handlerFunction(Uint8Array.from(msg.slice()), props.connection.remotePeer)
           }
         }

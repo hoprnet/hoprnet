@@ -1,7 +1,7 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 import PeerId from 'peer-id'
-import { STATUS_CODES } from '../../utils'
+import { STATUS_CODES } from '../../utils.js'
 
 export const getPeerInfo = async (node: Hopr, peerId: PeerId) => {
   const announced = await node.getAddressesAnnouncedToDHT(peerId)

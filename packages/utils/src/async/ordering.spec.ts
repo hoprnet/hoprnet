@@ -1,4 +1,4 @@
-import { ordered } from './ordering'
+import { ordered } from './ordering.js'
 
 import { setTimeout as setTimeoutPromise } from 'timers/promises'
 import assert from 'assert'

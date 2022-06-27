@@ -9,7 +9,8 @@ import useAppState from '../src/state'
 import { type Log, type Settings, createLog } from '../src/utils'
 import { readStreamEvent } from '../src/utils/stream'
 
-const Jazzicon = dynamic(() => import('../src/components/jazzicon'), { ssr: false })
+// TODO: fix type in refactor
+const Jazzicon = dynamic(() => import('../src/components/jazzicon'), { ssr: false }) as any
 const GIT_HASH = process.env.NEXT_PUBLIC_GIT_COMMIT
 
 export default function Home() {

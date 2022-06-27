@@ -1,2 +1,1 @@
-import { deriveCommitmentSeed } from './keyDerivation'
-export { deriveCommitmentSeed }
+export { deriveCommitmentSeed } from './keyDerivation.js'

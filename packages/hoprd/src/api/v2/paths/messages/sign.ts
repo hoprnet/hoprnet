@@ -1,6 +1,6 @@
 import type { Operation } from 'express-openapi'
 import { u8aToHex } from '@hoprnet/hopr-utils'
-import { STATUS_CODES } from '../../utils'
+import { STATUS_CODES } from '../../utils.js'
 
 export const POST: Operation = [
   async (req, res, _next) => {

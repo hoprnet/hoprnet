@@ -138,29 +138,37 @@ function setup_node() {
   # Set NODE_ENV=development to rebuild hopr-admin next files
   # at runtime. Necessary to start multiple instances of hoprd
   # in parallel
-  DEBUG="hopr*" NODE_ENV=development node packages/hoprd/lib/index.js \
-    --admin \
-    --adminHost "127.0.0.1" \
-    --adminPort ${admin_port} \
-    --announce \
-    --api-token "${api_token}" \
-    --data="${dir}" \
-    --host="127.0.0.1:${node_port}" \
-    --identity="${id}" \
-    --init \
-    --password="${password}" \
-    --api \
-    --apiPort "${api_port}" \
-    --testAnnounceLocalAddresses \
-    --testPreferLocalAddresses \
-    --testUseWeakCrypto \
-    --allowLocalNodeConnections \
-    --allowPrivateNodeConnections \
-    --healthCheck \
-    --healthCheckHost "0.0.0.0" \
-    --healthCheckPort "${healthcheck_port}" \
-    ${additional_args} \
-    > "${log}" 2>&1 &
+  env \
+    DEBUG="hopr*" \
+    NODE_ENV=development \
+    HOPRD_HEARTBEAT_INTERVAL=2500 \
+    HOPRD_HEARTBEAT_THRESHOLD=2500 \
+    HOPRD_HEARTBEAT_VARIANCE=1000 \
+    HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
+    HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
+    node packages/hoprd/lib/main.cjs \
+      --admin \
+      --adminHost "127.0.0.1" \
+      --adminPort ${admin_port} \
+      --announce \
+      --api-token "${api_token}" \
+      --data="${dir}" \
+      --host="127.0.0.1:${node_port}" \
+      --identity="${id}" \
+      --init \
+      --password="${password}" \
+      --api \
+      --apiPort "${api_port}" \
+      --testAnnounceLocalAddresses \
+      --testPreferLocalAddresses \
+      --testUseWeakCrypto \
+      --allowLocalNodeConnections \
+      --allowPrivateNodeConnections \
+      --healthCheck \
+      --healthCheckHost "0.0.0.0" \
+      --healthCheckPort "${healthcheck_port}" \
+      ${additional_args} \
+      > "${log}" 2>&1 &
 }
 
 # --- Log setup info {{{
@@ -345,11 +353,11 @@ echo -e "\n"
 echo "🌐 Node 1 REST API URL:  \$HOPR_NODE_1_HTTP_URL"
 echo "🔌 Node 1 WebSocket URL: \$HOPR_NODE_1_WS_URL"
 echo "💻 Node 1 HOPR Address:  \$HOPR_NODE_1_ADDR"
-echo "---" 
+echo "---"
 echo "🌐 Node 2 REST API URL:  \$HOPR_NODE_2_HTTP_URL"
 echo "🔌 Node 2 WebSocket URL: \$HOPR_NODE_2_WS_URL"
 echo "💻 Node 2 HOPR Address:  \$HOPR_NODE_2_ADDR"
-echo "---" 
+echo "---"
 echo "🌐 Node 3 REST API URL:  \$HOPR_NODE_3_HTTP_URL"
 echo "🔌 Node 3 WebSocket URL: \$HOPR_NODE_3_WS_URL"
 echo "💻 Node 3 HOPR Address:  \$HOPR_NODE_3_ADDR"

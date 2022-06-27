@@ -8,7 +8,6 @@
   "compilerOptions": {
     "esModuleInterop": true,
     "lib": ["ES2021", "dom"],
-    "module": "commonjs",
     "target": "ES2021",
     "declaration": true,
     "skipLibCheck": true,
@@ -17,6 +16,9 @@
     "sourceMap": true,
     "forceConsistentCasingInFileNames": true,
     "composite": true,
-    "declarationMap": true
+    "declarationMap": true,
+    "allowSyntheticDefaultImports": true,
+    "module": "nodenext",
+    "moduleResolution": "nodenext"
   }
 }

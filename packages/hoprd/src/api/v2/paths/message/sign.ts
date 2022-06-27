@@ -1,5 +1,5 @@
 import type { Operation } from 'express-openapi'
-import { POST as original } from '../messages/sign'
+import { POST as original } from '../messages/sign.js'
 
 /*
     Deprecated endpoint.

@@ -1,10 +1,10 @@
 import assert from 'assert'
 import sinon from 'sinon'
 import { ChannelEntry } from '@hoprnet/hopr-utils'
-import { STATUS_CODES } from '../../../utils'
-import { ALICE_PEER_ID, BOB_PEER_ID, INVALID_PEER_ID } from '../../../fixtures'
-import { getChannel, closeChannel } from './{direction}'
-import { formatIncomingChannel, formatOutgoingChannel } from '..'
+import { STATUS_CODES } from '../../../utils.js'
+import { ALICE_PEER_ID, BOB_PEER_ID, INVALID_PEER_ID } from '../../../fixtures.js'
+import { getChannel, closeChannel } from './{direction}.js'
+import { formatIncomingChannel, formatOutgoingChannel } from '../index.js'
 
 let node = sinon.fake() as any
 

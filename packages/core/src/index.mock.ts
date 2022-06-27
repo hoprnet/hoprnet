@@ -1,4 +1,4 @@
-import type { HoprOptions } from '.'
+import type { HoprOptions } from './index.js'
 
 export const sampleOptions: Partial<HoprOptions> = {
   // TODO: find better sample options
@@ -9,5 +9,10 @@ export const sampleOptions: Partial<HoprOptions> = {
       port: 0
     }
   },
-  dataPath: '/tmp/hoprd-data'
+  dataPath: '/tmp/hoprd-data',
+  heartbeatInterval: 1000,
+  heartbeatVariance: 100,
+  heartbeatThreshold: 1000,
+  networkQualityThreshold: 0.5,
+  onChainConfirmations: 8
 }

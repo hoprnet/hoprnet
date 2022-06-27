@@ -1,6 +1,6 @@
 import type Hopr from '@hoprnet/hopr-core'
-import { getBalances } from './api/v2/paths/account/balances'
-import { getInfo } from './api/v2/paths/node/info'
+import { getBalances } from './api/v2/paths/account/balances.js'
+import { getInfo } from './api/v2/paths/node/info.js'
 
 const COMMANDS = ['info', 'balance', 'daemonize'] as const
 
