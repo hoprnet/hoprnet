@@ -385,20 +385,29 @@ gcloud_get_managed_instance_group_instances_names() {
     --format=json | jq '.[1].instance' | tr -d '"'
 }
 
-# $1=instance uri
+# $1=instance name
 gcloud_get_instance_tags() {
   local name="${1}"
 
   gcloud compute instances describe "${name}" --format=json | jq ".tags.items[]" | tr -d '"'
 }
 
-# $1=instance uri
+# $1=instance name
 # $2=comma separated list of tags
 gcloud_add_instance_tags() {
   local name="${1}"
   local tags="${2}"
 
   gcloud compute instances add-tags "${name}" --tags="${tags}"
+}
+
+# $1=instance name
+# $2=comma separated list of tags to remove
+gcloud_remove_instance_tags() {
+  local name="${1}"
+  local tags="${2}"
+
+  gcloud compute instances remove-tags "${name}" --tags="${tags}"
 }
 
 gcloud_get_unused_static_ip_addresses() {

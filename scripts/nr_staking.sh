@@ -74,7 +74,16 @@ assign_staking_accounts() {
     else
       # Just retrieve the existing staking account
       local existing_staking_addr=$(echo "${existing_info_tag}" | sed -E 's/.*nr_staking_addr=([Xxa-f0-9A-F]+).*/\1/g')
-      # TODO: Handle possibility that 'nr_staking_addr` is not present
+
+
+      if [[ -z "${existing_staking_addr}" ]]; then
+        existing_staking_addr="${staking_accs_arr[current_staking_index]}"
+
+        # If the "nr_staking_addr" part of the info tag is missing, add it
+        gcloud_remove_instance_tags "${instance_name}" "${existing_info_tag}"
+        existing_info_tag="${existing_info_tag};nr_staking_addr=${existing_staking_addr}"
+        gcloud_add_instance_tags "${instance_name}" "${existing_info_tag}"
+      fi
 
       instance_names_dict+=([${instance_name}]="${existing_staking_addr}")
     fi
