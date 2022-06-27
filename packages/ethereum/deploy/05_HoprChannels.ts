@@ -2,20 +2,26 @@ import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
 import type { DeploymentTypes } from '../src/constants'
 
+const shortDuration = 15 * 1e3 // 15 seconds in ms
+const longDuration = 5 * 60 * 1e3 // 5 minutes in ms
+
+// inlined from @hoprnet/hopr-utils to remove dependency on whole package
+const pickVersion = (full_version: string): string => {
+  const split = full_version.split('.')
+  return split[0] + '.' + split[1] + '.0'
+}
+
+const closures: {
+  [key in DeploymentTypes]: number
+} = {
+  testing: shortDuration,
+  development: shortDuration,
+  staging: longDuration,
+  production: longDuration
+}
+
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { ethers, deployments, getNamedAccounts, network, environment } = hre
-
-  // CommonJS / ESM issue of `hardhat-core`
-  const { durations, u8aToHex, pickVersion } = await import('@hoprnet/hopr-utils')
-
-  const closures: {
-    [key in DeploymentTypes]: number
-  } = {
-    testing: durations.seconds(15),
-    development: durations.seconds(15),
-    staging: durations.minutes(5),
-    production: durations.minutes(5)
-  }
 
   const deployer = await getNamedAccounts().then((o) => ethers.getSigner(o.deployer))
   const hoprToken = await deployments.get('HoprToken')
@@ -41,7 +47,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const result = await deployments.deterministic('HoprChannels', {
     from: deployer.address,
     args: [hoprToken.address, closure],
-    salt: u8aToHex(new TextEncoder().encode(salt)),
+    salt: ethers.utils.formatBytes32String(salt),
     ...deployOptions
   })
 

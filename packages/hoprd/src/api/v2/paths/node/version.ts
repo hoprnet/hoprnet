@@ -1,13 +1,15 @@
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
 
-export const GET: Operation = [
+const GET: Operation = [
   (req, res, _next) => {
     try {
       const version = req.context.node.getVersion()
-      res.status(200).json(version)
-    } catch (error) {
-      res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
+      return res.status(200).json(version)
+    } catch (err) {
+      return res
+        .status(422)
+        .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 ]
@@ -46,3 +48,5 @@ GET.apiDoc = {
     }
   }
 }
+
+export default { GET }

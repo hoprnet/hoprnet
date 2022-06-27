@@ -22,7 +22,9 @@ export const GET: Operation = [
       const info = await getPeerInfo(node, PeerId.createFromB58String(peerid))
       return res.status(200).send(info)
     } catch (err) {
-      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+      return res
+        .status(422)
+        .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 ]

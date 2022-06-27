@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # HOPR interaction tests via HOPRd API v2
 
-# prevent souring of this script, only allow execution
+# prevent sourcing of this script, only allow execution
 $(return >/dev/null 2>&1)
 test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
 
@@ -13,6 +13,7 @@ declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="e2e-test"
 source "${mydir}/../scripts/utils.sh"
+source "${mydir}/../scripts/testnet.sh"
 
 usage() {
   msg
@@ -47,6 +48,8 @@ declare api6="${6}"
 declare api7="${7}"
 declare api8="${8}"
 declare api_token=${HOPRD_API_TOKEN}
+declare additional_nodes_addrs="${ADDITIONAL_NODE_ADDRS:-}"
+declare additional_nodes_peerids="${ADDITIONAL_NODE_PEERIDS:-}"
 
 # $1 = node api address (origin)
 # validate that node is funded
@@ -78,7 +81,7 @@ validate_node_balance_gt0() {
 # $8 = OPTIONAL: end time for busy wait in nanoseconds since epoch, has higher priority than wait time, defaults to 0
 # $9 = OPTIONAL: should assert status code
 call_api(){
-  local result now
+  local result
   local source_api="${1}"
   local api_endpoint="${2}"
   local rest_method="${3}"
@@ -89,33 +92,50 @@ call_api(){
   local end_time_ns=${8:-0}
   local should_assert_status_code=${9:-false}
 
+  local response_type
+
   # no timeout set since the test execution environment should cancel the test if it takes too long
-  local response_type="-d" && [[ "$should_assert_status_code" == true ]] && response_type="-o /dev/null -w %{http_code} -d"
+  if [[ "$should_assert_status_code" == true ]]; then 
+    response_type="-o /dev/null -w %{http_code} -d"
+  else
+    response_type="-d"
+  fi
+
   local cmd="curl -X ${rest_method} -m ${step_time} --connect-timeout ${step_time} -s -H X-Auth-Token:${api_token} -H Content-Type:application/json --url ${source_api}/api/v2${api_endpoint} ${response_type}"
   # if no end time was given we need to calculate it once
-  if [ ${end_time_ns} -eq 0 ]; then
-    now=$(node -e "console.log(process.hrtime.bigint().toString());")
+  
+  local now=$(node -e "console.log(process.hrtime.bigint().toString());")
+
+  if [[ ${end_time_ns} -eq 0 ]]; then
     # need to calculate in nanoseconds
-    ((end_time_ns=now+wait_time*1000000000))
+    end_time_ns=$((now+wait_time*1000000000))
   fi
 
-  result=$(${cmd} "${request_body}")
+  local done=false
+  local attempt=0
 
-  # if an assertion was given and has not been fulfilled, we fail
-  if [ -z "${assertion}" ] || [[ -n  $(echo "${result}" | sed -nE "/${assertion}/p") ]]; then
-    echo "${result}"
-  else
-    now=$(node -e "console.log(process.hrtime.bigint().toString());")
-    if [ ${end_time_ns} -lt ${now} ]; then
-      log "${RED}call_api (${cmd} \"${request_body}\") FAILED, received: ${result}${NOFORMAT}"
-      exit 1
-    else
-      log "${YELLOW}call_api (${cmd} \"${request_body}\") FAILED, received: ${result}, retrying in ${step_time} seconds${NOFORMAT}"
+  while [[ "${done}" == false ]]; do
+    result=$(${cmd} "${request_body}")
+
+    # if an assertion was given and has not been fulfilled, we fail
+    if [[ -z "${assertion}" ]] || [[ -n $(echo "${result}" | sed -nE "/${assertion}/p") ]]; then
+      done=true
+    else 
+      if [[ ${end_time_ns} -lt ${now} ]]; then
+        log "${RED}attempt: ${attempt} - call_api (${cmd} \"${request_body}\") FAILED, received: ${result} but expected ${assertion}${NOFORMAT}"
+        exit 1
+      else
+        log "${YELLOW}attempt: ${attempt} - call_api (${cmd} \"${request_body}\") FAILED, received: ${result} but expected ${assertion}, retrying in ${step_time} seconds${NOFORMAT}"
+      fi
+
       sleep ${step_time}
-      call_api "${source_api}" "${api_endpoint}" "${rest_method}" "${request_body}" "${assertion}" "${wait_time}" \
-        "${step_time}" "${end_time_ns}" "${should_assert_status_code}"
+
+      now=$(node -e "console.log(process.hrtime.bigint().toString());")
+      (( attempt++ ))
     fi
-  fi
+  done
+
+  echo "${result}"
 }
 
 # $1 = source api url
@@ -123,7 +143,7 @@ call_api(){
 # $3 = message
 # $4 = OPTIONAL: peers in the message path
 send_message(){
-  local result now
+  local result
   local source_api="${1}"
   local recipient="${2}"
   local msg="${3}"
@@ -131,7 +151,8 @@ send_message(){
 
   local path=$(echo ${peers} | tr -d '\n' | jq -R -s 'split(" ")')
   local payload='{"body":"'${msg}'","path":'${path}',"recipient":"'${recipient}'"}'
-  result="$(call_api ${source_api} "/messages" "POST" "${payload}" 204 60 15 "" true)"
+  # Node might need some time once commitment is set on-chain
+  result="$(call_api ${source_api} "/messages" "POST" "${payload}" "204" 90 15 "" true)"
 }
 
 # $1 = source node id
@@ -172,7 +193,7 @@ open_channel() {
   local result
 
   log "Node ${source_id} open channel to Node ${destination_id}"
-  result=$(call_api ${source_api} "/channels" "POST" "{ \"peerId\": \"${destination_peer_id}\", \"amount\": \"100000000000000000000\" }" "channelId" 600 60)
+  result=$(call_api ${source_api} "/channels" "POST" "{ \"peerId\": \"${destination_peer_id}\", \"amount\": \"100000000000000000000\" }" 'channelId|CHANNEL_ALREADY_OPEN' 600 30)
   log "Node ${source_id} open channel to Node ${destination_id} result -- ${result}"
 }
 
@@ -317,7 +338,7 @@ redeem_tickets_in_channel() {
   local node_api="${1}"
   local peer_id="${2}"
 
-  log "redeeming tickets in specific channel, this can take up to 5 minutes depending on the amount of uredeemed tickets in that channel"
+  log "redeeming tickets in specific channel, this can take up to 5 minutes depending on the amount of unredeemed tickets in that channel"
   echo $(call_api ${node_api} "/channels/${peer_id}/tickets/redeem" "POST" "" "" 600 600)
 }
 
@@ -362,20 +383,43 @@ disable_hardhat_auto_mining() {
     --network hardhat
 }
 
+# $1 native addresses ("Ethereum addresses"), comma-separated list
+# $2 peerIds, comma-separated list
+register_nodes() {
+  HOPR_ENVIRONMENT_ID=hardhat-localhost \
+  TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
+  yarn workspace @hoprnet/hopr-ethereum hardhat register \
+    --network hardhat \
+    --task add \
+    --native-addresses "${1}" \
+    --peer-ids "${2}"
+}
+
+enable_network_registry() {
+  log "Enabling register"
+  HOPR_ENVIRONMENT_ID=hardhat-localhost \
+    TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
+    yarn workspace @hoprnet/hopr-ethereum hardhat register \
+      --network hardhat \
+      --task enable
+  
+  log "Register enabled"
+}
+
 log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5}, ${api6}, ${api7}, ${api8}"
 
 # Setup is done, so disable hardhat's auto-mining to correctly mimic 
 # real blockchain networks
 disable_hardhat_auto_mining
 
-validate_native_address "${api1}" "${api_token}"
-validate_native_address "${api2}" "${api_token}"
-validate_native_address "${api3}" "${api_token}"
-validate_native_address "${api4}" "${api_token}"
-validate_native_address "${api5}" "${api_token}"
+validate_native_address "${api1}" "${api_token}" &
+validate_native_address "${api2}" "${api_token}" &
+validate_native_address "${api3}" "${api_token}" &
+validate_native_address "${api4}" "${api_token}" &
+validate_native_address "${api5}" "${api_token}" &
 # we don't need node6 because it's short-living
-validate_native_address "${api7}" "${api_token}"
-validate_native_address "${api8}" "${api_token}"
+validate_native_address "${api7}" "${api_token}" &
+validate_native_address "${api8}" "${api_token}" &
 log "ETH addresses exist"
 
 validate_node_balance_gt0 "${api1}"
@@ -427,25 +471,27 @@ log "hopr addr5: ${addr5} ${native_addr5} ${hopr_addr5}"
 log "hopr addr7: ${addr7} ${native_addr7} ${hopr_addr7}"
 log "hopr addr8: ${addr8} ${native_addr8} ${hopr_addr8}"
 
-# enable register
-# log "Enabling register"
-# HOPR_ENVIRONMENT_ID=hardhat-localhost \
-# TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-# yarn workspace @hoprnet/hopr-ethereum hardhat register \
-#   --network hardhat \
-#   --task enable
-# log "Register enabled"
+# enable network registry
+enable_network_registry
 
-# add nodes 1,2,3,4,5,7 in register, do NOT add node 8
-# log "Adding nodes to register"
-# HOPR_ENVIRONMENT_ID=hardhat-localhost \
-# TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-# yarn workspace @hoprnet/hopr-ethereum hardhat register \
-#   --network hardhat \
-#   --task add \
-#   --native-addresses "$native_addr1,$native_addr2,$native_addr3,$native_addr4,$native_addr5,$native_addr7" \
-#   --peer-ids "$hopr_addr1,$hopr_addr2,$hopr_addr3,$hopr_addr4,$hopr_addr5,$hopr_addr7"
-# log "Nodes added to register"
+declare native_addrs_to_register="$native_addr1,$native_addr2,$native_addr3,$native_addr4,$native_addr5,$native_addr7"
+declare native_peerids_to_register="$hopr_addr1,$hopr_addr2,$hopr_addr3,$hopr_addr4,$hopr_addr5,$hopr_addr7"
+
+# add nodes 1,2,3,4,5,7 plus additional nodes in register, do NOT add node 8
+log "Adding nodes to register"
+if ! [ -z $additional_nodes_addrs ] && ! [ -z $additional_nodes_peerids ]; then
+  native_addrs_to_register+=",${additional_nodes_addrs}"
+  native_peerids_to_register+=",${additional_nodes_peerids}"
+fi
+
+HOPR_ENVIRONMENT_ID=hardhat-localhost \
+TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
+yarn workspace @hoprnet/hopr-ethereum hardhat register \
+  --network hardhat \
+  --task add \
+  --native-addresses "${native_addrs_to_register}" \
+  --peer-ids "${native_peerids_to_register}"
+log "Nodes added to register"
 
 # running withdraw and checking it results at the end of this test run
 balances=$(get_balances ${api1})
@@ -521,7 +567,7 @@ result=$(get_tickets_statistics "${api2}" "\"unredeemedValue\":\"0\"")
 log "-- ${result}"
 
 log "Node 1 send 0-hop message to node 2"
-send_message "${api1}" "${addr2}" "hello, world" "" 600
+send_message "${api1}" "${addr2}" "hello, world" ""
 
 # opening channels in parallel
 open_channel 1 2 "${api1}" "${addr2}" &
@@ -539,19 +585,19 @@ log "Waiting for nodes to finish open channel (long running)"
 wait
 
 # closing temporary channel just to test get all channels later on
-close_channel 1 4 "${api1}" "${addr4}" "outgoing" "true" &
+close_channel 1 4 "${api1}" "${addr4}" "outgoing" "true"
 
 for i in `seq 1 10`; do
-  log "Node 1 send 1 hop message to self via node 2"
-  send_message "${api1}" "${addr1}" 'hello, world' "${addr2}"
+  log "Node 1 send 1 hop message to self via node 2" &
+  send_message "${api1}" "${addr1}" 'hello, world' "${addr2}" &
 
-  log "Node 2 send 1 hop message to self via node 3"
-  send_message "${api2}" "${addr2}" 'hello, world' "${addr3}"
+  log "Node 2 send 1 hop message to self via node 3" &
+  send_message "${api2}" "${addr2}" 'hello, world' "${addr3}" &
 
-  log "Node 3 send 1 hop message to self via node 4"
-  send_message "${api3}" "${addr3}" 'hello, world' "${addr4}"
+  log "Node 3 send 1 hop message to self via node 4" &
+  send_message "${api3}" "${addr3}" 'hello, world' "${addr4}" &
 
-  log "Node 4 send 1 hop message to self via node 5"
+  log "Node 4 send 1 hop message to self via node 5" &
   send_message "${api4}" "${addr4}" 'hello, world' "${addr5}"
 done
 
@@ -572,28 +618,31 @@ result=$(get_tickets_statistics "${api5}" "\"winProportion\":1")
 log "-- ${result}"
 
 for i in `seq 1 10`; do
-  log "Node 1 send 1 hop message to node 3 via node 2"
-  send_message "${api1}" "${addr3}" 'hello, world' "${addr2}" 
+  log "Node 1 send 1 hop message to node 3 via node 2" &
+  send_message "${api1}" "${addr3}" 'hello, world' "${addr2}" &
 
-  log "Node 2 send 1 hop message to node 4 via node 3"
-  send_message "${api2}" "${addr4}" 'hello, world' "${addr3}" 
+  log "Node 2 send 1 hop message to node 4 via node 3" &
+  send_message "${api2}" "${addr4}" 'hello, world' "${addr3}" &
 
-  log "Node 3 send 1 hop message to node 5 via node 4"
-  send_message "${api3}" "${addr5}" 'hello, world' "${addr4}" 
+  log "Node 3 send 1 hop message to node 5 via node 4" &
+  send_message "${api3}" "${addr5}" 'hello, world' "${addr4}" &
 
-  log "Node 5 send 1 hop message to node 2 via node 1"
-  send_message "${api5}" "${addr2}" 'hello, world' "${addr1}" 
+  log "Node 5 send 1 hop message to node 2 via node 1" &
+  send_message "${api5}" "${addr2}" 'hello, world' "${addr1}" &
 done
+wait
 
 for i in `seq 1 10`; do
-  log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4"
-  send_message "${api1}" "${addr5}" "hello, world" "${addr2} ${addr3} ${addr4}" 
+  log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4" &
+  send_message "${api1}" "${addr5}" "hello, world" "${addr2} ${addr3} ${addr4}" &
 done
+wait
 
 for i in `seq 1 10`; do
-  log "Node 1 send message to node 5"
-  send_message "${api1}" "${addr5}" "hello, world" "" 
+  log "Node 1 send message to node 5" &
+  send_message "${api1}" "${addr5}" "hello, world" "" & 
 done
+wait
 
 test_redeem_in_specific_channel() {
   local node_id="${1}"
@@ -644,18 +693,10 @@ close_channel 5 1 "${api5}" "${addr1}" "outgoing" &
 
 # initiate channel closures for channels without tickets so we can check
 # completeness
-close_channel 1 5 "${api1}" "${addr5}" "outgoing" &
+close_channel 1 5 "${api1}" "${addr5}" "outgoing" "true" &
 
 log "Waiting for nodes to finish handling close channels calls"
 wait
-
-# Also add confirmation time
-log "Waiting 30 seconds for cool-off period"
-sleep 30
-
-# verify channel has been closed
-close_channel 1 5 "${api1}" "${addr5}" "outgoing" "true"
-
 test_get_all_channels() {
   local node_api=${1}
 
@@ -670,7 +711,7 @@ test_get_all_channels() {
   echo "Get all channels successfull"
 }
 
-test_get_all_channels ${api1}
+test_get_all_channels "${api1}"
 
 # NOTE: strategy testing will require separate setup so commented out for now until moved
 # test_strategy_setting() {

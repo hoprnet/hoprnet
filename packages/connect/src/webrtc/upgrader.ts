@@ -9,7 +9,7 @@ import { AbortError } from 'abortable-iterator'
 
 // No types for wrtc
 // @ts-ignore
-import * as wrtc from 'wrtc'
+import wrtc from 'wrtc'
 
 const DEBUG_PREFIX = `hopr-connect:webrtc`
 

@@ -1,19 +1,30 @@
 {
   "openapi": "3.0.3",
-  "servers": [{ "url": "/api/v2" }],
+  "servers": [
+    {
+      "url": "/api/v2"
+    }
+  ],
   "info": {
     "description": "This Rest API enables developers to interact with a hoprd node programatically.",
     "version": "2.0.0",
     "title": "HOPRd Rest API v2",
-    "contact": { "email": "tech@hoprnet.org" },
-    "license": { "name": "GPL-3.0", "url": "https://github.com/hoprnet/hoprnet/blob/master/LICENSE" }
+    "contact": {
+      "email": "tech@hoprnet.org"
+    },
+    "license": {
+      "name": "GPL-3.0",
+      "url": "https://github.com/hoprnet/hoprnet/blob/master/LICENSE"
+    }
   },
   "paths": {
     "/tickets/statistics": {
       "parameters": [],
       "get": {
         "description": "Get statistics regarding all your tickets. Node gets a ticket everytime it relays data packet in channel.",
-        "tags": ["Tickets"],
+        "tags": [
+          "Tickets"
+        ],
         "operationId": "ticketsGetStatistics",
         "responses": {
           "200": {
@@ -35,7 +46,10 @@
                       "type": "string",
                       "description": "Total value of all unredeemed tickets in Hopr tokens."
                     },
-                    "redeemed": { "type": "number", "description": "Number of tickets already redeemed on this node." },
+                    "redeemed": {
+                      "type": "number",
+                      "description": "Number of tickets already redeemed on this node."
+                    },
                     "redeemedValue": {
                       "type": "string",
                       "description": "Total value of all redeemed tickets in Hopr tokens."
@@ -72,11 +86,20 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
+                    "status": {
+                      "type": "string",
+                      "example": "UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Full error message."
+                    }
                   }
                 },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+                "example": {
+                  "status": "UNKNOWN_FAILURE",
+                  "error": "Full error message."
+                }
               }
             }
           }
@@ -87,10 +110,14 @@
       "parameters": [],
       "post": {
         "description": "Redeems all tickets from all the channels and exchanges them for Hopr tokens. Every ticket have a chance to be winning one, rewarding you with Hopr tokens.",
-        "tags": ["Tickets"],
+        "tags": [
+          "Tickets"
+        ],
         "operationId": "ticketsRedeemTickets",
         "responses": {
-          "204": { "description": "Tickets redeemed succesfully." },
+          "204": {
+            "description": "Tickets redeemed succesfully."
+          },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -98,11 +125,20 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
+                    "status": {
+                      "type": "string",
+                      "example": "UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Full error message."
+                    }
                   }
                 },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+                "example": {
+                  "status": "UNKNOWN_FAILURE",
+                  "error": "Full error message."
+                }
               }
             }
           }
@@ -113,13 +149,22 @@
       "parameters": [],
       "get": {
         "description": "Get all tickets earned by relaying data packets by your node from every channel.",
-        "tags": ["Tickets"],
+        "tags": [
+          "Tickets"
+        ],
         "operationId": "ticketsGetTickets",
         "responses": {
           "200": {
             "description": "Tickets fetched successfully.",
             "content": {
-              "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Ticket" } } }
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Ticket"
+                  }
+                }
+              }
             }
           },
           "422": {
@@ -129,11 +174,20 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
+                    "status": {
+                      "type": "string",
+                      "example": "UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Full error message."
+                    }
                   }
                 },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+                "example": {
+                  "status": "UNKNOWN_FAILURE",
+                  "error": "Full error message."
+                }
               }
             }
           }
@@ -144,12 +198,20 @@
       "parameters": [],
       "get": {
         "description": "Get all of the node's settings.",
-        "tags": ["Settings"],
+        "tags": [
+          "Settings"
+        ],
         "operationId": "settingsGetSettings",
         "responses": {
           "200": {
             "description": "Settings fetched succesfully.",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Settings" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            }
           },
           "422": {
             "description": "Unknown failure.",
@@ -158,11 +220,20 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
+                    "status": {
+                      "type": "string",
+                      "example": "UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Full error message."
+                    }
                   }
                 },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+                "example": {
+                  "status": "UNKNOWN_FAILURE",
+                  "error": "Full error message."
+                }
               }
             }
           }
@@ -173,14 +244,20 @@
       "parameters": [],
       "get": {
         "description": "Get release version of the running node.",
-        "tags": ["Node"],
+        "tags": [
+          "Node"
+        ],
         "operationId": "nodeGetVersion",
         "responses": {
           "200": {
             "description": "Returns the release version of the running node.",
             "content": {
               "application/json": {
-                "schema": { "type": "string", "description": "Node version.", "example": "1.83.5" }
+                "schema": {
+                  "type": "string",
+                  "description": "Node version.",
+                  "example": "1.83.5"
+                }
               }
             }
           },
@@ -191,11 +268,20 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
+                    "status": {
+                      "type": "string",
+                      "example": "UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Full error message."
+                    }
                   }
                 },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+                "example": {
+                  "status": "UNKNOWN_FAILURE",
+                  "error": "Full error message."
+                }
               }
             }
           }
@@ -206,11 +292,15 @@
       "parameters": [],
       "get": {
         "description": "This is a websocket endpoint which streams legacy hopr-admin data excluding messages. Authentication (if enabled) is done via either passing an `apiToken` parameter in the url or cookie `X-Auth-Token`. Connect to the endpoint by using a WS client. No preview available. Example: `ws://127.0.0.1:3001/api/v2/node/stream/websocket/?apiToken=myApiToken`",
-        "tags": ["Node"],
+        "tags": [
+          "Node"
+        ],
         "operationId": "nodeStreamWebsocket",
         "deprecated": true,
         "responses": {
-          "101": { "description": "Switching protocols" },
+          "101": {
+            "description": "Switching protocols"
+          },
           "206": {
             "description": "Incoming data.",
             "content": {
@@ -221,22 +311,39 @@
                     "type": {
                       "type": "string",
                       "description": "Type of data",
-                      "example": ["log", "fatal-error", "status", "connected"]
+                      "example": [
+                        "log",
+                        "fatal-error",
+                        "status",
+                        "connected"
+                      ]
                     },
                     "timestamp": {
                       "type": "number",
                       "description": "Timestamp in miliseconds",
                       "example": 1644587213977
                     },
-                    "content": { "type": "string", "description": "The text content", "example": "Opening channel..." }
+                    "content": {
+                      "type": "string",
+                      "description": "The text content",
+                      "example": "Opening channel..."
+                    }
                   }
                 },
-                "example": { "type": "log", "timestamp": 1644587213977, "content": "Opening channel..." }
+                "example": {
+                  "type": "log",
+                  "timestamp": 1644587213977,
+                  "content": "Opening channel..."
+                }
               }
             }
           },
-          "401": { "description": "Unauthorized" },
-          "404": { "description": "Not found" }
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
         }
       }
     },
@@ -244,14 +351,18 @@
       "parameters": [],
       "post": {
         "description": "Pings another node to check its availability.",
-        "tags": ["Node"],
+        "tags": [
+          "Node"
+        ],
         "operationId": "nodePing",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["peerId"],
+                "required": [
+                  "peerId"
+                ],
                 "properties": {
                   "peerId": {
                     "format": "peerId",
@@ -259,7 +370,9 @@
                     "description": "PeerId associated to the other node that we want to ping."
                   }
                 },
-                "example": { "peerId": "16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12" }
+                "example": {
+                  "peerId": "16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12"
+                }
               }
             }
           }
@@ -286,8 +399,12 @@
             "description": "Invalid peerId.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/RequestStatus" },
-                "example": { "status": "INVALID_PEERID" }
+                "schema": {
+                  "$ref": "#/components/schemas/RequestStatus"
+                },
+                "example": {
+                  "status": "INVALID_PEERID"
+                }
               }
             }
           },
@@ -295,8 +412,12 @@
             "description": "Timout, node with specified PeerId didn't respond in time.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/RequestStatus" },
-                "example": { "status": "TIMEOUT" }
+                "schema": {
+                  "$ref": "#/components/schemas/RequestStatus"
+                },
+                "example": {
+                  "status": "TIMEOUT"
+                }
               }
             }
           }
@@ -307,14 +428,19 @@
       "parameters": [],
       "get": {
         "description": "Lists information for `connected peers` and `announced peers`.\nConnected peers are nodes which are connected to the node while announced peers are nodes which have announced to the network.\nOptionally, you can pass `quality` parameter which would filter out peers with lower quality to the one specified.",
-        "tags": ["Node"],
+        "tags": [
+          "Node"
+        ],
         "operationId": "nodeGetPeers",
         "parameters": [
           {
             "in": "query",
             "name": "quality",
             "description": "When quality is passed, the response will only include peers with higher or equal quality to the one specified.",
-            "schema": { "type": "number", "example": "0.5" }
+            "schema": {
+              "type": "number",
+              "example": "0.5"
+            }
           }
         ],
         "responses": {
@@ -330,12 +456,20 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "peerId": { "$ref": "#/components/schemas/HoprAddress" },
-                          "multiAddr": { "$ref": "#/components/schemas/MultiAddress" },
+                          "peerId": {
+                            "$ref": "#/components/schemas/HoprAddress"
+                          },
+                          "multiAddr": {
+                            "$ref": "#/components/schemas/MultiAddress"
+                          },
                           "heartbeats": {
                             "type": "object",
                             "properties": {
-                              "sent": { "type": "number", "description": "Heartbeats sent to the node", "example": 10 },
+                              "sent": {
+                                "type": "number",
+                                "description": "Heartbeats sent to the node",
+                                "example": 10
+                              },
                               "success": {
                                 "type": "number",
                                 "description": "Successful heartbeats sent to the node",
@@ -353,7 +487,9 @@
                             "description": "A float between 0 (completely unreliable) and 1 (completely reliable) estimating the quality of service of a peer's network connection",
                             "example": 0.8
                           },
-                          "backoff": { "type": "number" },
+                          "backoff": {
+                            "type": "number"
+                          },
                           "isNew": {
                             "type": "boolean",
                             "description": "True if the node is new (no heartbeats sent yet)."
@@ -366,12 +502,20 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "peerId": { "$ref": "#/components/schemas/HoprAddress" },
-                          "multiAddr": { "$ref": "#/components/schemas/MultiAddress" },
+                          "peerId": {
+                            "$ref": "#/components/schemas/HoprAddress"
+                          },
+                          "multiAddr": {
+                            "$ref": "#/components/schemas/MultiAddress"
+                          },
                           "heartbeats": {
                             "type": "object",
                             "properties": {
-                              "sent": { "type": "number", "description": "Heartbeats sent to the node", "example": 10 },
+                              "sent": {
+                                "type": "number",
+                                "description": "Heartbeats sent to the node",
+                                "example": 10
+                              },
                               "success": {
                                 "type": "number",
                                 "description": "Successful heartbeats sent to the node",
@@ -389,7 +533,9 @@
                             "description": "A float between 0 (completely unreliable) and 1 (completely reliable) estimating the quality of service of a peer's network connection",
                             "example": 0.8
                           },
-                          "backoff": { "type": "number" },
+                          "backoff": {
+                            "type": "number"
+                          },
                           "isNew": {
                             "type": "boolean",
                             "description": "True if the node is new (no heartbeats sent yet)."
@@ -406,8 +552,12 @@
             "description": "Invalid input. One of the parameters passed is in an incorrect format.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/RequestStatus" },
-                "example": { "status": "INVALID_QUALITY" }
+                "schema": {
+                  "$ref": "#/components/schemas/RequestStatus"
+                },
+                "example": {
+                  "status": "INVALID_QUALITY"
+                }
               }
             }
           },
@@ -418,11 +568,20 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
+                    "status": {
+                      "type": "string",
+                      "example": "UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Full error message."
+                    }
                   }
                 },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+                "example": {
+                  "status": "UNKNOWN_FAILURE",
+                  "error": "Full error message."
+                }
               }
             }
           }
@@ -433,7 +592,9 @@
       "parameters": [],
       "get": {
         "description": "Information about the HOPR Node, including any options it started with. See the schema of the response to get more information on each field.",
-        "tags": ["Node"],
+        "tags": [
+          "Node"
+        ],
         "operationId": "nodeGetInfo",
         "responses": {
           "200": {
@@ -467,7 +628,9 @@
                         "type": "string",
                         "description": "Other nodes IP address that this node is listening to for websocket events."
                       },
-                      "example": ["/ip4/0.0.0.0/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit"]
+                      "example": [
+                        "/ip4/0.0.0.0/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit"
+                      ]
                     },
                     "network": {
                       "type": "string",
@@ -501,11 +664,20 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
+                    "status": {
+                      "type": "string",
+                      "example": "UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Full error message."
+                    }
                   }
                 },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+                "example": {
+                  "status": "UNKNOWN_FAILURE",
+                  "error": "Full error message."
+                }
               }
             }
           }
@@ -516,21 +688,31 @@
       "parameters": [],
       "get": {
         "description": "This is a websocket endpoint which streams incoming messages from other nodes. Data is streamed in a stringified Uint8Array instance. Authentication (if enabled) is done via either passing an `apiToken` parameter in the url or cookie `X-Auth-Token`. Connect to the endpoint by using a WS client. No preview available. Example: `ws://127.0.0.1:3001/api/v2/messages/websocket/?apiToken=myApiToken`",
-        "tags": ["Messages"],
+        "tags": [
+          "Messages"
+        ],
         "operationId": "messagesWebsocket",
         "responses": {
-          "101": { "description": "Switching protocols" },
+          "101": {
+            "description": "Switching protocols"
+          },
           "206": {
             "description": "Incoming data",
             "content": {
               "application/text": {
-                "schema": { "type": "string" },
+                "schema": {
+                  "type": "string"
+                },
                 "example": "104,101,108,108,111,32,119,111,114,108,100"
               }
             }
           },
-          "401": { "description": "Unauthorized" },
-          "404": { "description": "Not found" }
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
         }
       }
     },
@@ -538,15 +720,24 @@
       "parameters": [],
       "post": {
         "description": "Signs a message given using the node’s private key. Prefixes messsage with “HOPR Signed Message: ” before signing.",
-        "tags": ["Messages"],
+        "tags": [
+          "Messages"
+        ],
         "operationId": "messagesSign",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["message"],
-                "properties": { "message": { "description": "The message to be signed.", "type": "string" } }
+                "required": [
+                  "message"
+                ],
+                "properties": {
+                  "message": {
+                    "description": "The message to be signed.",
+                    "type": "string"
+                  }
+                }
               }
             }
           }
@@ -558,7 +749,11 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": { "signature": { "$ref": "#/components/schemas/Signature" } }
+                  "properties": {
+                    "signature": {
+                      "$ref": "#/components/schemas/Signature"
+                    }
+                  }
                 }
               }
             }
@@ -570,11 +765,20 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
+                    "status": {
+                      "type": "string",
+                      "example": "UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Full error message."
+                    }
                   }
                 },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+                "example": {
+                  "status": "UNKNOWN_FAILURE",
+                  "error": "Full error message."
+                }
               }
             }
           }
@@ -585,14 +789,19 @@
       "parameters": [],
       "post": {
         "description": "Send a message to another peer using a given path (list of node addresses that should relay our message through network). If no path is given, HOPR will attempt to find a path.",
-        "tags": ["Messages"],
+        "tags": [
+          "Messages"
+        ],
         "operationId": "messagesSendMessage",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["body", "recipient"],
+                "required": [
+                  "body",
+                  "recipient"
+                ],
                 "properties": {
                   "body": {
                     "description": "The message body which should be sent.",
@@ -623,7 +832,9 @@
           }
         },
         "responses": {
-          "204": { "description": "The message was sent successfully. NOTE: This does not imply successful delivery." },
+          "204": {
+            "description": "The message was sent successfully. NOTE: This does not imply successful delivery."
+          },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -631,11 +842,20 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
+                    "status": {
+                      "type": "string",
+                      "example": "UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Full error message."
+                    }
                   }
                 },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+                "example": {
+                  "status": "UNKNOWN_FAILURE",
+                  "error": "Full error message."
+                }
               }
             }
           }
@@ -646,15 +866,24 @@
       "parameters": [],
       "post": {
         "description": "Signs a message given using the node’s private key. Prefixes messsage with “HOPR Signed Message: ” before signing.",
-        "tags": ["Messages"],
+        "tags": [
+          "Messages"
+        ],
         "operationId": "messageSign",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["message"],
-                "properties": { "message": { "description": "The message to be signed.", "type": "string" } }
+                "required": [
+                  "message"
+                ],
+                "properties": {
+                  "message": {
+                    "description": "The message to be signed.",
+                    "type": "string"
+                  }
+                }
               }
             }
           }
@@ -666,61 +895,9 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": { "signature": { "$ref": "#/components/schemas/Signature" } }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Unknown failure.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
-                  }
-                },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
-              }
-            }
-          }
-        },
-        "deprecated": true
-      }
-    },
-    "/channels/": {
-      "parameters": [],
-      "get": {
-        "description": "Lists all active channels between this node and other nodes on the Hopr network. By default response will contain all incomming and outgoing channels that are either open, waiting to be opened, or waiting to be closed. If you also want to receive past channels that were closed, you can pass `includingClosed` in the request url query.",
-        "tags": ["Channels"],
-        "operationId": "channelsGetChannels",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "includingClosed",
-            "description": "When includingClosed is passed the response will include closed channels which are ommited by default.",
-            "schema": { "type": "string", "example": "false" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Channels fetched succesfully.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "incoming": {
-                      "type": "array",
-                      "items": { "$ref": "#/components/schemas/Channel" },
-                      "description": "Incomming channels are the ones that were opened by a different node and this node acts as relay."
-                    },
-                    "outgoing": {
-                      "type": "array",
-                      "items": { "$ref": "#/components/schemas/Channel" },
-                      "description": "Outgoing channels are the ones that were opened by this node and is using other node as relay."
+                    "signature": {
+                      "$ref": "#/components/schemas/Signature"
                     }
                   }
                 }
@@ -734,26 +911,44 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
+                    "status": {
+                      "type": "string",
+                      "example": "UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Full error message."
+                    }
                   }
                 },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+                "example": {
+                  "status": "UNKNOWN_FAILURE",
+                  "error": "Full error message."
+                }
               }
             }
           }
-        }
-      },
+        },
+        "deprecated": true
+      }
+    },
+    "/channels/": {
+      "parameters": [],
       "post": {
         "description": "Opens a payment channel between this node and the counter party provided. This channel can be used to send messages between two nodes using other nodes on the network to relay the messages. Each message will deduce its cost from the funded amount to pay other nodes for relaying your messages. Opening a channel can take a little bit of time, because it requires some block confirmations on the blockchain.",
-        "tags": ["Channels"],
+        "tags": [
+          "Channels"
+        ],
         "operationId": "channelsOpenChannel",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["peerId", "amount"],
+                "required": [
+                  "peerId",
+                  "amount"
+                ],
                 "properties": {
                   "peerId": {
                     "format": "peerId",
@@ -766,7 +961,10 @@
                     "description": "Amount of HOPR tokens to fund the channel. It will be used to pay for sending messages through channel"
                   }
                 },
-                "example": { "peerId": "16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12", "amount": "1000000" }
+                "example": {
+                  "peerId": "16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12",
+                  "amount": "1000000"
+                }
               }
             }
           }
@@ -798,8 +996,12 @@
             "description": "Problem with inputs.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/RequestStatus" },
-                "example": { "status": "INVALID_AMOUNT | INVALID_ADDRESS" }
+                "schema": {
+                  "$ref": "#/components/schemas/RequestStatus"
+                },
+                "example": {
+                  "status": "INVALID_AMOUNT | INVALID_ADDRESS"
+                }
               }
             }
           },
@@ -817,7 +1019,9 @@
                     }
                   }
                 },
-                "example": { "status": "NOT_ENOUGH_BALANCE" }
+                "example": {
+                  "status": "NOT_ENOUGH_BALANCE"
+                }
               }
             }
           },
@@ -835,7 +1039,9 @@
                     }
                   }
                 },
-                "example": { "status": "CHANNEL_ALREADY_OPEN" }
+                "example": {
+                  "status": "CHANNEL_ALREADY_OPEN"
+                }
               }
             }
           },
@@ -846,33 +1052,64 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
+                    "status": {
+                      "type": "string",
+                      "example": "UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Full error message."
+                    }
                   }
                 },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+                "example": {
+                  "status": "UNKNOWN_FAILURE",
+                  "error": "Full error message."
+                }
               }
             }
           }
         }
-      }
-    },
-    "/aliases/": {
-      "parameters": [],
+      },
       "get": {
-        "description": "Get all aliases you set previously and thier corresponding peer IDs.",
-        "tags": ["Aliases"],
-        "operationId": "aliasesGetAliases",
+        "description": "Lists all active channels between this node and other nodes on the Hopr network. By default response will contain all incomming and outgoing channels that are either open, waiting to be opened, or waiting to be closed. If you also want to receive past channels that were closed, you can pass `includingClosed` in the request url query.",
+        "tags": [
+          "Channels"
+        ],
+        "operationId": "channelsGetChannels",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "includingClosed",
+            "description": "When includingClosed is passed the response will include closed channels which are ommited by default.",
+            "schema": {
+              "type": "string",
+              "example": "false"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Returns List of Aliases and corresponding peerIds.",
+            "description": "Channels fetched succesfully.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "alice": { "$ref": "#/components/schemas/HoprAddress" },
-                    "bob": { "$ref": "#/components/schemas/HoprAddress" }
+                    "incoming": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Channel"
+                      },
+                      "description": "Incomming channels are the ones that were opened by a different node and this node acts as relay."
+                    },
+                    "outgoing": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Channel"
+                      },
+                      "description": "Outgoing channels are the ones that were opened by this node and is using other node as relay."
+                    }
                   }
                 }
               }
@@ -885,47 +1122,50 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
+                    "status": {
+                      "type": "string",
+                      "example": "UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Full error message."
+                    }
                   }
                 },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+                "example": {
+                  "status": "UNKNOWN_FAILURE",
+                  "error": "Full error message."
+                }
               }
             }
           }
         }
-      },
-      "post": {
-        "description": "Instead of using HOPR address, we can assign HOPR address to a specific name called alias. Give an address a more memorable alias and use it instead of Hopr address. Aliases are kept locally and are not saved or shared on the network.",
-        "tags": ["Aliases"],
-        "operationId": "aliasesSetAlias",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["peerId", "alias"],
-                "properties": {
-                  "peerId": {
-                    "format": "peerId",
-                    "type": "string",
-                    "description": "PeerId that we want to set alias to."
-                  },
-                  "alias": { "type": "string", "description": "Alias that we want to attach to peerId." }
-                },
-                "example": { "peerId": "16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12", "alias": "Alice" }
-              }
-            }
-          }
-        },
+      }
+    },
+    "/aliases/": {
+      "parameters": [],
+      "get": {
+        "description": "Get all aliases you set previously and thier corresponding peer IDs.",
+        "tags": [
+          "Aliases"
+        ],
+        "operationId": "aliasesGetAliases",
         "responses": {
-          "201": { "description": "Alias set succesfully" },
-          "400": {
-            "description": "Invalid peerId. The format or length of the peerId is incorrect.",
+          "200": {
+            "description": "Returns List of Aliases and corresponding peerIds.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/RequestStatus" },
-                "example": { "status": "INVALID_PEERID" }
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "alice": {
+                      "$ref": "#/components/schemas/HoprAddress"
+                    },
+                    "bob": {
+                      "$ref": "#/components/schemas/HoprAddress"
+                    }
+                  }
+                }
               }
             }
           },
@@ -936,11 +1176,97 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
+                    "status": {
+                      "type": "string",
+                      "example": "UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Full error message."
+                    }
                   }
                 },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+                "example": {
+                  "status": "UNKNOWN_FAILURE",
+                  "error": "Full error message."
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Instead of using HOPR address, we can assign HOPR address to a specific name called alias. Give an address a more memorable alias and use it instead of Hopr address. Aliases are kept locally and are not saved or shared on the network.",
+        "tags": [
+          "Aliases"
+        ],
+        "operationId": "aliasesSetAlias",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "peerId",
+                  "alias"
+                ],
+                "properties": {
+                  "peerId": {
+                    "format": "peerId",
+                    "type": "string",
+                    "description": "PeerId that we want to set alias to."
+                  },
+                  "alias": {
+                    "type": "string",
+                    "description": "Alias that we want to attach to peerId."
+                  }
+                },
+                "example": {
+                  "peerId": "16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12",
+                  "alias": "Alice"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Alias set succesfully"
+          },
+          "400": {
+            "description": "Invalid peerId. The format or length of the peerId is incorrect.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestStatus"
+                },
+                "example": {
+                  "status": "INVALID_PEERID"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unknown failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Full error message."
+                    }
+                  }
+                },
+                "example": {
+                  "status": "UNKNOWN_FAILURE",
+                  "error": "Full error message."
+                }
               }
             }
           }
@@ -951,23 +1277,33 @@
       "parameters": [],
       "post": {
         "description": "Withdraw funds from this node to your ethereum wallet address. You can choose whitch currency you want to withdraw, NATIVE or HOPR.",
-        "tags": ["Account"],
+        "tags": [
+          "Account"
+        ],
         "operationId": "accountWithdraw",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["currency", "amount", "recipient"],
+                "required": [
+                  "currency",
+                  "amount",
+                  "recipient"
+                ],
                 "properties": {
-                  "currency": { "$ref": "#/components/schemas/Currency" },
+                  "currency": {
+                    "$ref": "#/components/schemas/Currency"
+                  },
                   "amount": {
                     "type": "string",
                     "format": "amount",
                     "description": "Amount to withdraw in the currency's smallest unit.",
                     "example": "1337"
                   },
-                  "recipient": { "$ref": "#/components/schemas/NativeAddress" }
+                  "recipient": {
+                    "$ref": "#/components/schemas/NativeAddress"
+                  }
                 }
               }
             }
@@ -995,8 +1331,12 @@
             "description": "Incorrect data in request body. Make sure to provide valid currency ('NATIVE' | 'HOPR') or amount.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/RequestStatus" },
-                "example": { "status": "INVALID_CURRENCY | INVALID_AMOUNT" }
+                "schema": {
+                  "$ref": "#/components/schemas/RequestStatus"
+                },
+                "example": {
+                  "status": "INVALID_CURRENCY | INVALID_AMOUNT"
+                }
               }
             }
           },
@@ -1007,11 +1347,19 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "NOT_ENOUGH_BALANCE | UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "NOT_ENOUGH_BALANCE" }
+                    "status": {
+                      "type": "string",
+                      "example": "NOT_ENOUGH_BALANCE | UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "NOT_ENOUGH_BALANCE"
+                    }
                   }
                 },
-                "example": { "status": "NOT_ENOUGH_BALANCE" }
+                "example": {
+                  "status": "NOT_ENOUGH_BALANCE"
+                }
               }
             }
           }
@@ -1022,7 +1370,9 @@
       "parameters": [],
       "get": {
         "description": "Get node's HOPR and native balances. HOPR tokens from this balance is used to fund payment channels between this node and other nodes on the network. NATIVE balance is used to pay for the gas fees for the blockchain network.",
-        "tags": ["Account"],
+        "tags": [
+          "Account"
+        ],
         "operationId": "accountGetBalances",
         "responses": {
           "200": {
@@ -1032,8 +1382,12 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "native": { "$ref": "#/components/schemas/NativeBalance" },
-                    "hopr": { "$ref": "#/components/schemas/HoprBalance" }
+                    "native": {
+                      "$ref": "#/components/schemas/NativeBalance"
+                    },
+                    "hopr": {
+                      "$ref": "#/components/schemas/HoprBalance"
+                    }
                   }
                 }
               }
@@ -1046,11 +1400,20 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
+                    "status": {
+                      "type": "string",
+                      "example": "UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Full error message."
+                    }
                   }
                 },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+                "example": {
+                  "status": "UNKNOWN_FAILURE",
+                  "error": "Full error message."
+                }
               }
             }
           }
@@ -1061,7 +1424,9 @@
       "parameters": [],
       "get": {
         "description": "Get node's HOPR and native addresses. HOPR address is also called PeerId and can be used by other node owner to interact with this node.",
-        "tags": ["Account"],
+        "tags": [
+          "Account"
+        ],
         "operationId": "accountGetAddresses",
         "responses": {
           "200": {
@@ -1072,13 +1437,31 @@
                   "type": "object",
                   "properties": {
                     "nativeAddress": {
-                      "allOf": [{ "$ref": "#/components/schemas/NativeAddress" }, { "deprecated": true }]
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/NativeAddress"
+                        },
+                        {
+                          "deprecated": true
+                        }
+                      ]
                     },
                     "hoprAddress": {
-                      "allOf": [{ "$ref": "#/components/schemas/HoprAddress" }, { "deprecated": true }]
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/HoprAddress"
+                        },
+                        {
+                          "deprecated": true
+                        }
+                      ]
                     },
-                    "native": { "$ref": "#/components/schemas/NativeAddress" },
-                    "hopr": { "$ref": "#/components/schemas/HoprAddress" }
+                    "native": {
+                      "$ref": "#/components/schemas/NativeAddress"
+                    },
+                    "hopr": {
+                      "$ref": "#/components/schemas/HoprAddress"
+                    }
                   }
                 }
               }
@@ -1091,11 +1474,20 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
+                    "status": {
+                      "type": "string",
+                      "example": "UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Full error message."
+                    }
                   }
                 },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+                "example": {
+                  "status": "UNKNOWN_FAILURE",
+                  "error": "Full error message."
+                }
               }
             }
           }
@@ -1106,7 +1498,9 @@
       "parameters": [],
       "get": {
         "description": "Get node's HOPR and native addresses. HOPR address is also called PeerId and can be used by other node owner to interact with this node.",
-        "tags": ["Account"],
+        "tags": [
+          "Account"
+        ],
         "operationId": "accountGetAddress",
         "responses": {
           "200": {
@@ -1117,13 +1511,31 @@
                   "type": "object",
                   "properties": {
                     "nativeAddress": {
-                      "allOf": [{ "$ref": "#/components/schemas/NativeAddress" }, { "deprecated": true }]
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/NativeAddress"
+                        },
+                        {
+                          "deprecated": true
+                        }
+                      ]
                     },
                     "hoprAddress": {
-                      "allOf": [{ "$ref": "#/components/schemas/HoprAddress" }, { "deprecated": true }]
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/HoprAddress"
+                        },
+                        {
+                          "deprecated": true
+                        }
+                      ]
                     },
-                    "native": { "$ref": "#/components/schemas/NativeAddress" },
-                    "hopr": { "$ref": "#/components/schemas/HoprAddress" }
+                    "native": {
+                      "$ref": "#/components/schemas/NativeAddress"
+                    },
+                    "hopr": {
+                      "$ref": "#/components/schemas/HoprAddress"
+                    }
                   }
                 }
               }
@@ -1136,11 +1548,20 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
+                    "status": {
+                      "type": "string",
+                      "example": "UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Full error message."
+                    }
                   }
                 },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+                "example": {
+                  "status": "UNKNOWN_FAILURE",
+                  "error": "Full error message."
+                }
               }
             }
           }
@@ -1152,7 +1573,9 @@
       "parameters": [],
       "put": {
         "description": "Change this node's setting value. Check Settings schema to learn more about each setting and the type of value it expects.",
-        "tags": ["Settings"],
+        "tags": [
+          "Settings"
+        ],
         "operationId": "settingsSetSetting",
         "parameters": [
           {
@@ -1172,21 +1595,33 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["settingValue"],
-                "properties": { "settingValue": {} },
-                "example": { "settingValue": true }
+                "required": [
+                  "settingValue"
+                ],
+                "properties": {
+                  "settingValue": {}
+                },
+                "example": {
+                  "settingValue": true
+                }
               }
             }
           }
         },
         "responses": {
-          "204": { "description": "Setting set succesfully" },
+          "204": {
+            "description": "Setting set succesfully"
+          },
           "400": {
             "description": "Invalid input. Either setting with that name doesn't exist or the value is incorrect.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/RequestStatus" },
-                "example": { "status": "INVALID_SETTING | INVALID_SETTING_VALUE" }
+                "schema": {
+                  "$ref": "#/components/schemas/RequestStatus"
+                },
+                "example": {
+                  "status": "INVALID_SETTING | INVALID_SETTING_VALUE"
+                }
               }
             }
           },
@@ -1197,11 +1632,20 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
+                    "status": {
+                      "type": "string",
+                      "example": "UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Full error message."
+                    }
                   }
                 },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+                "example": {
+                  "status": "UNKNOWN_FAILURE",
+                  "error": "Full error message."
+                }
               }
             }
           }
@@ -1212,7 +1656,9 @@
       "parameters": [],
       "post": {
         "description": "Redeems your tickets for this channel. Redeeming will change your tickets into Hopr tokens if they are winning ones. You can check how much tickets given channel has by calling /channels/{peerid}/tickets endpoint. Do this before channel is closed as neglected tickets are no longer valid for redeeming.",
-        "tags": ["Channels"],
+        "tags": [
+          "Channels"
+        ],
         "operationId": "channelsRedeemTickets",
         "parameters": [
           {
@@ -1229,13 +1675,19 @@
           }
         ],
         "responses": {
-          "204": { "description": "Tickets redeemed succesfully." },
+          "204": {
+            "description": "Tickets redeemed succesfully."
+          },
           "400": {
             "description": "Invalid peerId.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/RequestStatus" },
-                "example": { "status": "INVALID_PEERID" }
+                "schema": {
+                  "$ref": "#/components/schemas/RequestStatus"
+                },
+                "example": {
+                  "status": "INVALID_PEERID"
+                }
               }
             }
           },
@@ -1243,8 +1695,12 @@
             "description": "Tickets were not found for that channel. That means that no messages were sent inside this channel yet.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/RequestStatus" },
-                "example": { "status": "TICKETS_NOT_FOUND" }
+                "schema": {
+                  "$ref": "#/components/schemas/RequestStatus"
+                },
+                "example": {
+                  "status": "TICKETS_NOT_FOUND"
+                }
               }
             }
           },
@@ -1255,11 +1711,20 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
+                    "status": {
+                      "type": "string",
+                      "example": "UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Full error message."
+                    }
                   }
                 },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+                "example": {
+                  "status": "UNKNOWN_FAILURE",
+                  "error": "Full error message."
+                }
               }
             }
           }
@@ -1270,7 +1735,9 @@
       "parameters": [],
       "get": {
         "description": "Get tickets earned by relaying data packets by your node for the particular channel.",
-        "tags": ["Channels"],
+        "tags": [
+          "Channels"
+        ],
         "operationId": "channelsGetTickets",
         "parameters": [
           {
@@ -1290,15 +1757,26 @@
           "200": {
             "description": "Tickets fetched successfully.",
             "content": {
-              "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Ticket" } } }
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Ticket"
+                  }
+                }
+              }
             }
           },
           "400": {
             "description": "Invalid peerId.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/RequestStatus" },
-                "example": { "status": "INVALID_PEERID" }
+                "schema": {
+                  "$ref": "#/components/schemas/RequestStatus"
+                },
+                "example": {
+                  "status": "INVALID_PEERID"
+                }
               }
             }
           },
@@ -1306,8 +1784,12 @@
             "description": "Tickets were not found for that channel. That means that no messages were sent inside this channel yet.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/RequestStatus" },
-                "example": { "status": "TICKETS_NOT_FOUND" }
+                "schema": {
+                  "$ref": "#/components/schemas/RequestStatus"
+                },
+                "example": {
+                  "status": "TICKETS_NOT_FOUND"
+                }
               }
             }
           },
@@ -1318,22 +1800,33 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
+                    "status": {
+                      "type": "string",
+                      "example": "UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Full error message."
+                    }
                   }
                 },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+                "example": {
+                  "status": "UNKNOWN_FAILURE",
+                  "error": "Full error message."
+                }
               }
             }
           }
         }
       }
     },
-    "/channels/{peerid}/{direction}": {
+    "/channels/{peerid}/{direction}/": {
       "parameters": [],
       "delete": {
-        "description": "Close a opened channel between this node and other node. Once you’ve initiated channel closure, you have to wait for a specified closure time, it will show you a closure initiation message with cool-off time you need to wait.\n  Then you will need to send the same command again to finalize closure. This is a cool down period to give the other party in the channel sufficient time to redeem their tickets.",
-        "tags": ["Channels"],
+        "description": "Close a opened channel between this node and other node. Once you've initiated channel closure, you have to wait for a specified closure time, it will show you a closure initiation message with cool-off time you need to wait.\n  Then you will need to send the same command again to finalize closure. This is a cool down period to give the other party in the channel sufficient time to redeem their tickets.",
+        "tags": [
+          "Channels"
+        ],
         "operationId": "channelsCloseChannel",
         "parameters": [
           {
@@ -1352,7 +1845,13 @@
             "name": "direction",
             "description": "Specify which channel should be fetched, incoming or outgoing.",
             "required": true,
-            "schema": { "type": "string", "enum": ["incoming", "outgoing"] }
+            "schema": {
+              "type": "string",
+              "enum": [
+                "incoming",
+                "outgoing"
+              ]
+            }
           }
         ],
         "responses": {
@@ -1382,8 +1881,12 @@
             "description": "Invalid peerId.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/RequestStatus" },
-                "example": { "status": "INVALID_PEERID" }
+                "schema": {
+                  "$ref": "#/components/schemas/RequestStatus"
+                },
+                "example": {
+                  "status": "INVALID_PEERID"
+                }
               }
             }
           },
@@ -1394,11 +1897,20 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
+                    "status": {
+                      "type": "string",
+                      "example": "UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Full error message."
+                    }
                   }
                 },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+                "example": {
+                  "status": "UNKNOWN_FAILURE",
+                  "error": "Full error message."
+                }
               }
             }
           }
@@ -1406,7 +1918,9 @@
       },
       "get": {
         "description": "Returns information about the channel between this node and provided peerId.",
-        "tags": ["Channels"],
+        "tags": [
+          "Channels"
+        ],
         "operationId": "channelsGetChannel",
         "parameters": [
           {
@@ -1414,27 +1928,47 @@
             "name": "peerid",
             "description": "Counterparty peerId assigned to the channel you want to fetch.",
             "required": true,
-            "schema": { "$ref": "#/components/schemas/HoprAddress" }
+            "schema": {
+              "$ref": "#/components/schemas/HoprAddress"
+            }
           },
           {
             "in": "path",
             "name": "direction",
             "description": "Specify which channel should be fetched, incoming or outgoing.",
             "required": true,
-            "schema": { "type": "string", "enum": ["incoming", "outgoing"] }
+            "schema": {
+              "type": "string",
+              "enum": [
+                "incoming",
+                "outgoing"
+              ]
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "Channel fetched succesfully.",
-            "content": { "application/json": { "schema": { "items": { "$ref": "#/components/schemas/Channel" } } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Channel"
+                  }
+                }
+              }
+            }
           },
           "400": {
             "description": "Invalid peerId.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/RequestStatus" },
-                "example": { "status": "INVALID_PEERID" }
+                "schema": {
+                  "$ref": "#/components/schemas/RequestStatus"
+                },
+                "example": {
+                  "status": "INVALID_PEERID"
+                }
               }
             }
           },
@@ -1442,8 +1976,12 @@
             "description": "Channel with that peerId was not found. You can list all channels using /channels/ endpoint.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/RequestStatus" },
-                "example": { "status": "CHANNEL_NOT_FOUND" }
+                "schema": {
+                  "$ref": "#/components/schemas/RequestStatus"
+                },
+                "example": {
+                  "status": "CHANNEL_NOT_FOUND"
+                }
               }
             }
           },
@@ -1454,11 +1992,20 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
+                    "status": {
+                      "type": "string",
+                      "example": "UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Full error message."
+                    }
                   }
                 },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+                "example": {
+                  "status": "UNKNOWN_FAILURE",
+                  "error": "Full error message."
+                }
               }
             }
           }
@@ -1467,41 +2014,11 @@
     },
     "/aliases/{alias}": {
       "parameters": [],
-      "delete": {
-        "description": "Unassign an alias from a PeerId. You can always assign back alias to that PeerId using /aliases endpoint.",
-        "tags": ["Aliases"],
-        "operationId": "aliasesRemoveAlias",
-        "parameters": [
-          {
-            "name": "alias",
-            "in": "path",
-            "description": "Alias that we want to remove.",
-            "required": true,
-            "schema": { "type": "string", "example": "Alice" }
-          }
-        ],
-        "responses": {
-          "204": { "description": "Alias removed succesfully." },
-          "422": {
-            "description": "Unknown failure.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
-                  }
-                },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
-              }
-            }
-          }
-        }
-      },
       "get": {
         "description": "Get the PeerId (Hopr address) that have this alias assigned to it.",
-        "tags": ["Aliases"],
+        "tags": [
+          "Aliases"
+        ],
         "operationId": "aliasesGetAlias",
         "parameters": [
           {
@@ -1509,7 +2026,10 @@
             "in": "path",
             "description": "Alias that we previously assigned to some PeerId.",
             "required": true,
-            "schema": { "type": "string", "example": "Alice" }
+            "schema": {
+              "type": "string",
+              "example": "Alice"
+            }
           }
         ],
         "responses": {
@@ -1519,7 +2039,11 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": { "peerId": { "$ref": "#/components/schemas/HoprAddress" } }
+                  "properties": {
+                    "peerId": {
+                      "$ref": "#/components/schemas/HoprAddress"
+                    }
+                  }
                 }
               }
             }
@@ -1528,8 +2052,12 @@
             "description": "This alias was not assigned to any PeerId before. You can get the list of all PeerId's and thier corresponding aliases using /aliases endpoint.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/RequestStatus" },
-                "example": { "status": "PEERID_NOT_FOUND" }
+                "schema": {
+                  "$ref": "#/components/schemas/RequestStatus"
+                },
+                "example": {
+                  "status": "PEERID_NOT_FOUND"
+                }
               }
             }
           },
@@ -1540,11 +2068,68 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
+                    "status": {
+                      "type": "string",
+                      "example": "UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Full error message."
+                    }
                   }
                 },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+                "example": {
+                  "status": "UNKNOWN_FAILURE",
+                  "error": "Full error message."
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "description": "Unassign an alias from a PeerId. You can always assign back alias to that PeerId using /aliases endpoint.",
+        "tags": [
+          "Aliases"
+        ],
+        "operationId": "aliasesRemoveAlias",
+        "parameters": [
+          {
+            "name": "alias",
+            "in": "path",
+            "description": "Alias that we want to remove.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "Alice"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Alias removed succesfully."
+          },
+          "422": {
+            "description": "Unknown failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "UNKNOWN_FAILURE"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Full error message."
+                    }
+                  }
+                },
+                "example": {
+                  "status": "UNKNOWN_FAILURE",
+                  "error": "Full error message."
+                }
               }
             }
           }
@@ -1552,16 +2137,35 @@
       }
     }
   },
-  "security": [{ "keyScheme": ["write"] }, { "passwordScheme": ["write"] }],
-  "externalDocs": { "description": "Find out more about HOPR and HOPRd.", "url": "http://docs.hoprnet.org" },
+  "security": [
+    {
+      "keyScheme": [
+        "write"
+      ]
+    },
+    {
+      "passwordScheme": [
+        "write"
+      ]
+    }
+  ],
+  "externalDocs": {
+    "description": "Find out more about HOPR and HOPRd.",
+    "url": "http://docs.hoprnet.org"
+  },
   "components": {
     "schemas": {
       "RequestStatus": {
         "type": "object",
         "properties": {
-          "status": { "type": "string", "description": "Status declaring success/failure of the request." }
+          "status": {
+            "type": "string",
+            "description": "Status declaring success/failure of the request."
+          }
         },
-        "example": { "status": "success" }
+        "example": {
+          "status": "success"
+        }
       },
       "Signature": {
         "type": "string",
@@ -1580,7 +2184,10 @@
       },
       "Currency": {
         "type": "string",
-        "enum": ["NATIVE", "HOPR"],
+        "enum": [
+          "NATIVE",
+          "HOPR"
+        ],
         "description": "Supported currencies, NATIVE used for the interacting with blockchain or HOPR used to fund channels.",
         "example": "NATIVE"
       },
@@ -1611,7 +2218,10 @@
         "properties": {
           "type": {
             "type": "string",
-            "enum": ["incoming", "outgoing"],
+            "enum": [
+              "incoming",
+              "outgoing"
+            ],
             "description": "Channel can be either incomming or outgoing. Incomming means that other node can send messages using this node as relay. Outgoing means that this node can use other node to send message as realy.",
             "example": "incoming"
           },
@@ -1620,20 +2230,31 @@
             "description": "Channel ID that can be used in other calls, not to confuse with transaction hash.",
             "example": "0x04e50b7ddce9770f58cebe51f33b472c92d1c40384759f5a0b1025220bf15ec5"
           },
-          "peerId": { "$ref": "#/components/schemas/HoprAddress" },
+          "peerId": {
+            "$ref": "#/components/schemas/HoprAddress"
+          },
           "status": {
             "type": "string",
-            "enum": ["WaitingForCommitment", "Open", "PendingToClose", "Closed"],
+            "enum": [
+              "WaitingForCommitment",
+              "Open",
+              "PendingToClose",
+              "Closed"
+            ],
             "description": "Status of the channel can be: WaitingForCommitment, Open, PendingToClose, or Closed.",
             "example": "Open"
           },
-          "balance": { "$ref": "#/components/schemas/HoprBalance" }
+          "balance": {
+            "$ref": "#/components/schemas/HoprBalance"
+          }
         }
       },
       "Ticket": {
         "type": "object",
         "properties": {
-          "counterparty": { "$ref": "#/components/schemas/HoprAddress" },
+          "counterparty": {
+            "$ref": "#/components/schemas/HoprAddress"
+          },
           "challenge": {
             "type": "string",
             "description": "The ticket's challenge which needs to be solved before being able to claim the embedded incentive."
@@ -1646,7 +2267,10 @@
             "type": "string",
             "description": "Each ticket is labeled by an ongoing serial number named ticket index i and its current value is stored in the smart contract."
           },
-          "amount": { "type": "string", "description": "The ticket's value in HOPR." },
+          "amount": {
+            "type": "string",
+            "description": "The ticket's value in HOPR."
+          },
           "winProb": {
             "type": "string",
             "description": "The ticket's winning probability normalized with the common base of Ethereum which is 2^256-1."
@@ -1655,7 +2279,9 @@
             "type": "string",
             "description": "Payment channels might run through multiple open and close sequences, this epoch tracks the sequence."
           },
-          "signature": { "$ref": "#/components/schemas/Signature" }
+          "signature": {
+            "$ref": "#/components/schemas/Signature"
+          }
         }
       },
       "Settings": {
@@ -1669,7 +2295,10 @@
           },
           "strategy": {
             "type": "string",
-            "enum": ["passive", "promiscuous"],
+            "enum": [
+              "passive",
+              "promiscuous"
+            ],
             "example": "passive",
             "description": "By default, hoprd runs in **passive** mode, this means that your node will not attempt to open or close any channels automatically. When you set your strategy to **promiscuous** mode, your node will attempt to open channels to a _randomly_ selected group of nodes which you have a healthy connection to. At the same time, your node will also attempt to close channels that are running low on balance or are unhealthy."
           }
@@ -1691,12 +2320,26 @@
     }
   },
   "tags": [
-    { "name": "Account" },
-    { "name": "Aliases" },
-    { "name": "Channels" },
-    { "name": "Messages" },
-    { "name": "Node" },
-    { "name": "Settings" },
-    { "name": "Tickets" }
+    {
+      "name": "Account"
+    },
+    {
+      "name": "Aliases"
+    },
+    {
+      "name": "Channels"
+    },
+    {
+      "name": "Messages"
+    },
+    {
+      "name": "Node"
+    },
+    {
+      "name": "Settings"
+    },
+    {
+      "name": "Tickets"
+    }
   ]
 }

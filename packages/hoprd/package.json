@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.89.0-next.28",
+  "version": "1.89.0-next.42",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -26,11 +26,11 @@
     "build:wasm": "make -C crates all && make -C crates install",
     "test:wasm": "make -C crates test",
     "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo ./build ./rest-api-v2-full-spec.json",
-    "build": "yarn clean && yarn build:wasm && npx tsc -p . && yarn buildAdmin && chmod u+x lib/*.js",
+    "build": "yarn clean && yarn build:wasm && tsc -p . && yarn buildAdmin && chmod u+x lib/*.js",
     "buildAdmin": "HOPRD_GIT_COMMIT=$(git rev-parse --short HEAD) next build hopr-admin",
     "test": "yarn test:wasm && NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace --exit . test",
     "prebuild": "next telemetry disable",
-    "start": "node --experimental-wasm-modules lib/main.cjs --admin --init --api",
+    "start": "node --experimental-wasm-modules lib/main.cjs --admin --init --rest",
     "dev": "NODE_ENV=development yarn start --environment hardhat-localhost --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses --testPreferLocalAddresses --testNoAuthentication",
     "devAdmin": "next dev hopr-admin",
     "docs:generate": "typedoc",
@@ -50,7 +50,7 @@
     "dids": "2.4.3",
     "ethers": "^5.6.1",
     "express": "4.17.3",
-    "express-openapi": "https://github.com/hoprnet/open-api/raw/robertkiel/built-esm-support/packages/express-openapi/express-openapi-11.0.4.tgz",
+    "express-openapi": "12.0.1",
     "jazzicon": "1.5.0",
     "js-cookie": "3.0.1",
     "key-did-provider-ed25519": "1.1.0",
@@ -69,7 +69,7 @@
     "trace-unhandled": "2.0.1",
     "ws": "8.3.0",
     "yamljs": "0.3.0",
-    "yargs": "17.4.0"
+    "yargs": "17.5.1"
   },
   "devDependencies": {
     "@types/chai": "^4",
@@ -88,10 +88,7 @@
     "typedoc-plugin-markdown": "3.11.14"
   },
   "mocha": {
-    "spec": [
-      "lib/**/*.spec.js",
-      "hopr-admin/**/*.spec.ts"
-    ]
+    "spec": "lib/**/*.spec.js"
   },
   "publishConfig": {
     "access": "public"

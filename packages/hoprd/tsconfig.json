@@ -1,6 +1,9 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    // Make sure that all kinds of errors are handled since
+    // package is a leaf in the dependency graph
+    "useUnknownInCatchVariables": true,
     "outDir": "./lib",
     "rootDir": "./src"
   },

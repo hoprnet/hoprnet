@@ -113,7 +113,7 @@ export class PublicKey {
 
   public serializeUncompressed() {
     if (this.isCompressed) {
-      // Expensive EC-operation, only do if necessary
+      // Expensive EC-operation, only do if really necessary
       this.arr = secp256k1.publicKeyConvert(this.arr, false)
     }
 

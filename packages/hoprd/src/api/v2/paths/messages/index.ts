@@ -1,20 +1,11 @@
 import type { Operation } from 'express-openapi'
 import PeerId from 'peer-id'
-import { encode } from 'rlp'
 import { PublicKey } from '@hoprnet/hopr-utils'
 import { STATUS_CODES } from '../../utils.js'
 
-/**
- * Adds the current timestamp to the message in order to measure the latency.
- * @param msg the message
- */
-export function encodeMessage(msg: string): Uint8Array {
-  return encode([msg, Date.now()])
-}
-
-export const POST: Operation = [
+const POST: Operation = [
   async (req, res, _next) => {
-    const message = encodeMessage(req.body.body)
+    const message = req.body.body
     const recipient: PeerId = PeerId.createFromB58String(req.body.recipient)
 
     // only set path if given, otherwise a path will be chosen by hopr core
@@ -25,9 +16,11 @@ export const POST: Operation = [
 
     try {
       await req.context.node.sendMessage(message, recipient, path)
-      res.status(204).send()
+      return res.status(204).send()
     } catch (err) {
-      res.status(422).json({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+      return res
+        .status(422)
+        .json({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 ]
@@ -94,3 +87,5 @@ POST.apiDoc = {
     }
   }
 }
+
+export default { POST }

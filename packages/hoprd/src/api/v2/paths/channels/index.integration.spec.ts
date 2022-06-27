@@ -2,15 +2,25 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
-import { createTestApiInstance, ALICE_PEER_ID, INVALID_PEER_ID } from '../../fixtures.js'
+import { createTestApiInstance, ALICE_PEER_ID, ALICE_NATIVE_ADDR, INVALID_PEER_ID } from '../../fixtures.js'
 import { Balance, ChannelEntry, NativeBalance } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { STATUS_CODES } from '../../utils.js'
 
 let node = sinon.fake() as any
 node.getId = sinon.fake.returns(ALICE_PEER_ID)
+node.getEthereumAddress = sinon.fake.returns(ALICE_NATIVE_ADDR)
+node.getNativeBalance = sinon.fake.returns(new NativeBalance(new BN(10)))
+node.getBalance = sinon.fake.returns(new Balance(new BN(1)))
 
 const CHANNEL_ID = ChannelEntry.createMock().getId()
+
+node.openChannel = sinon.fake.returns(
+  Promise.resolve({
+    channelId: CHANNEL_ID,
+    receipt: 'testReceipt'
+  })
+)
 
 describe('GET /channels', function () {
   const testChannel = ChannelEntry.createMock()
@@ -42,15 +52,6 @@ describe('GET /channels', function () {
     expect(res.body.outgoing.length).to.be.equal(0)
   })
 })
-
-node.getNativeBalance = sinon.fake.returns(new NativeBalance(new BN(10)))
-node.getBalance = sinon.fake.returns(new Balance(new BN(1)))
-node.openChannel = sinon.fake.returns(
-  Promise.resolve({
-    channelId: CHANNEL_ID,
-    receipt: 'testReceipt'
-  })
-)
 
 describe('POST /channels', () => {
   let service: any

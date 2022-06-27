@@ -225,25 +225,94 @@ get_hopr_address() {
 }
 
 # $1 = endpoint
-# $1 = api token
+# $2 = api token
+validate_hopr_address() {
+  local hopr_address
+  local endpoint="${1}"
+  local api_token="${2}"
+
+  hopr_address="$(get_hopr_address "${api_token}@${endpoint}")"
+  if [[ -z "${hopr_address}" ]]; then
+    log "-- could not derive hopr address from endpoint ${endpoint}"
+    exit 1
+  fi
+
+  local valid="$(node -e "(import('@hoprnet/hopr-utils')).then(pId => console.log(pId.hasB58String('${hopr_address}')))")"
+
+  if ! [[ $valid == "true" ]]; then
+    log "Node returns an invalid hopr address: ${hopr_address} derived from endpoint ${endpoint}"
+    exit 1
+  fi
+
+  echo "valid hopr address: ${hopr_address}"
+}
+
+# $1 = endpoint
+# $2 = api token
 validate_native_address() {
-  local native_address is_valid_native_address
+  local native_address
   local endpoint="${1}"
   local api_token="${2}"
 
   native_address="$(get_native_address "${api_token}@${endpoint}")"
-  if [ -z "${native_address}" ]; then
+  if [[ -z "${native_address}" ]]; then
     log "-- could not derive native address from endpoint ${endpoint}"
     exit 1
   fi
 
-  is_valid_native_address="$(curl --silent https://api.hoprnet.org/api/validate/$native_address/get\?text=true)"
-  if [ "${is_valid_native_address}" == "false" ]; then
-    log "--⛔️ Node returns an invalidddress: ${native_address} derived from endpoint ${endpoint}"
+  if ! [[ -n $(echo "${native_address}" | sed -nE "/0x[0-9a-fA-F]{40}/p") ]]; then
+    log "Node returns an invalid native address: ${native_address} derived from endpoint ${endpoint}"
     exit 1
   fi
 
-  echo "${native_address}"
+  echo "valid native address: ${native_address}"
+}
+
+# $1 = endpoint
+get_authenticated_curl_cmd() {
+  # the following checks must handle endpoints like:
+  #   - myendpoint.com
+  #   - myendpoint.com:3001
+  #   - apitoken@myendpoint.com
+  #   - apitoken@myendpoint.com:3001
+  #   - http(s)://myendpoint.com
+  #   - http(s)://myendpoint.com:3001
+  #   - http(s)://apitoken@myendpoint.com
+  #   - http(s)://apitoken@myendpoint.com:3001
+
+  # trim whitespaces which are not allowed anywhere in the url
+  local full_endpoint="${1// /}"
+
+  # set default protocol if none was found
+  local protocol="http://"
+  # extract protocol prefix incl. separator ://
+  if [[ "${full_endpoint}" =~ "://" ]]; then
+    protocol="$(echo ${full_endpoint} | sed -e's,^\(.*://\).*,\1,g')"
+  fi
+
+  # remove protocol from endpoint
+  local endpoint_wo_protocol="${full_endpoint#$protocol}"
+
+  # extract host:port/url portion of endpoint
+  local host_w_port="${endpoint_wo_protocol#*@}"
+
+  # extract auth portion of endpoint
+  local api_token="${endpoint_wo_protocol%@*}"
+
+  # re-create endpoint with correct protocol
+  local endpoint="${protocol}${host_w_port}"
+
+  # set up base curl command
+  local cmd="curl --silent --max-time 5 ${endpoint}"
+
+  # add auth info if token was found previously
+  if [ -n "${api_token}" ]; then
+    local api_token_encoded="$(encode_api_token $api_token)"
+    cmd+=" --header \"Authorization: Basic ${api_token_encoded}\""
+  fi
+
+  # return full command
+  echo "${cmd}"
 }
 
 # $1 = endpoint
