@@ -4,6 +4,7 @@
 import { PeerId } from '@libp2p/interface-peer-id'
 import type { Libp2p } from 'libp2p'
 import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
+import type { ConnectionManager } from '@libp2p/interface-connection-manager'
 import { Multiaddr, protocols } from '@multiformats/multiaddr'
 
 import { timeout, abortableTimeout, type TimeoutOpts } from '../async/index.js'
@@ -57,8 +58,11 @@ export type DialResponse =
 type ReducedPeerStore = {
   addressBook: Pick<Libp2p['peerStore']['addressBook'], 'get' | 'add'>
 }
-type ReducedConnectionManager = Pick<Libp2p['connectionManager'], 'getAll' | 'onDisconnect'>
-type ReducedDHT = { contentRouting: Pick<Libp2p['contentRouting'], 'routers' | 'findProviders'> }
+type ReducedConnectionManager = Pick<ConnectionManager, 'getConnections'>
+type ReducedDHT = {
+  dht: { [Symbol.toStringTag]: string }
+  contentRouting: Pick<Libp2p['contentRouting'], 'findProviders'>
+}
 type ReducedLibp2p = ReducedDHT & { peerStore: ReducedPeerStore } & {
   connectionManager: ReducedConnectionManager
 } & Pick<Libp2p, 'dial'>
@@ -75,7 +79,7 @@ async function printPeerStoreAddresses(msg: string, destination: PeerId, peerSto
 const PROTOCOL_SELECT_TIMEOUT = 10e3
 
 export async function tryExistingConnections(
-  libp2p: Pick<ReducedLibp2p, 'connectionManager'>,
+  libp2p: { connectionManager: Pick<ConnectionManager, 'getConnections'> },
   destination: PeerId,
   protocol: string
 ): Promise<
@@ -84,13 +88,13 @@ export async function tryExistingConnections(
       conn: Connection
     })
 > {
-  const existingConnections = libp2p.connectionManager.getAll(destination)
+  const existingConnections = libp2p.connectionManager.getConnections(destination)
 
   if (existingConnections == undefined || existingConnections.length == 0) {
     return
   }
 
-  let stream: ProtocolStream | undefined
+  let stream: ProtocolStream['stream'] | undefined
   let conn: Connection | undefined
 
   const deadConnections: Connection[] = []
@@ -116,11 +120,14 @@ export async function tryExistingConnections(
   }
 
   for (const deadConnection of deadConnections) {
-    libp2p.connectionManager.onDisconnect(deadConnection)
+    // @fixme does that work?
+    try {
+      await deadConnection.close()
+    } catch {}
+  }
 
-    if (stream != undefined && conn != undefined) {
-      return { conn, stream, protocol }
-    }
+  if (stream != undefined && conn != undefined) {
+    return { conn, stream, protocol }
   }
 }
 
@@ -151,7 +158,8 @@ async function establishNewConnection(
 
   let conn: Connection
   try {
-    conn = await libp2p.dial(destination, { signal: opts.signal })
+    // libp2p type clash
+    conn = await libp2p.dial(destination as any, { signal: opts.signal })
   } catch (err) {
     logError(`Error while establishing connection to ${destination.toString()}.`)
     if (err?.message) {
@@ -207,16 +215,14 @@ type Relayers = {
  * @param _opts timeout options
  */
 async function queryDHT(libp2p: ReducedDHT, destination: PeerId, _opts: Required<TimeoutOpts>): Promise<PeerId[]> {
-  const relayers: Relayers[] = []
+  const relayers: PeerId[] = []
 
   const key = await createRelayerKey(destination)
   log(`fetching relay keys for node ${destination.toString()} from DHT.`, key)
 
   try {
-    for await (const relayer of libp2p.contentRouting.findProviders(key, {
-      timeout: DEFAULT_DHT_QUERY_TIMEOUT
-    })) {
-      relayers.push(relayer)
+    for await (const relayer of libp2p.contentRouting.findProviders(key)) {
+      relayers.push(relayer.id)
     }
   } catch (err) {
     logError(`Error while querying the DHT for ${destination.toString()}.`)
@@ -226,12 +232,12 @@ async function queryDHT(libp2p: ReducedDHT, destination: PeerId, _opts: Required
   }
 
   if (relayers.length > 0) {
-    log(`found ${relayers.map((relayer) => relayer.id.toString()).join(' ,')} for node ${destination.toString()}.`)
+    log(`found ${relayers.map((relayer) => relayer.toString()).join(' ,')} for node ${destination.toString()}.`)
   } else {
     log(`could not find any relayer for ${destination.toString()}`)
   }
 
-  return relayers.map((relayer) => relayer.id)
+  return relayers
 }
 
 const CODE_P2P = protocols('p2p').code
@@ -280,7 +286,7 @@ async function doDial(
   }
 
   // Check if DHT is available
-  if (libp2p.contentRouting.routers.length == 0) {
+  if (libp2p.dht[Symbol.toStringTag] !== '@libp2p/dummy-dht') {
     // Stop if there is no DHT available
     await printPeerStoreAddresses(
       `Could not establish a connection to ${destination.toString()} and libp2p was started without a DHT. Giving up`,
@@ -328,7 +334,7 @@ async function doDial(
 
   for (const circuitAddress of circuitsNotTriedYet) {
     // Share new knowledge about peer with Libp2p's peerStore
-    await libp2p.peerStore.addressBook.add(destination, [circuitAddress])
+    await libp2p.peerStore.addressBook.add(destination, [circuitAddress as any])
 
     log(`Trying to reach ${destination.toString()} via circuit ${circuitAddress}...`)
 

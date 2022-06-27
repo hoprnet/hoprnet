@@ -1,5 +1,3 @@
-// import { randomBytes } from 'crypto'
-
 import { createLibp2p, type Libp2p } from 'libp2p'
 import { TCP } from '@libp2p/tcp'
 import { Mplex } from '@libp2p/mplex'
@@ -11,7 +9,6 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 
 import { createRelayerKey } from './relayCode.js'
 import { privKeyToPeerId } from './privKeyToPeerId.js'
-import assert from 'assert'
 
 const peerA = privKeyToPeerId('0x06243fcfd7d7ba9364c9903b95cb8cfb3a3e6e95a80c96656598bda6942ae1c2')
 const peerB = privKeyToPeerId('0x0e5574d6fcb05bc06542daeaa231639d26753f366b02fdc072944e728cbd4647')
@@ -28,7 +25,7 @@ async function getNode(id: PeerId): Promise<Libp2p> {
       listen: [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${id.toString()}`).toString()]
     },
     peerId: id,
-    transports: [new TCP() as any],
+    transports: [new TCP()],
     streamMuxers: [new Mplex()],
     connectionEncryption: [new Noise()],
     dht: new KadDHT({ clientMode: false, protocolPrefix: '/hopr' }),

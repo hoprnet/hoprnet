@@ -1,8 +1,10 @@
-import { NOISE } from '@chainsafe/libp2p-noise'
+import { Noise } from '@chainsafe/libp2p-noise'
 import { Mplex } from '@libp2p/mplex'
 import { createLibp2p, type Libp2p } from 'libp2p'
-import type { Address } from 'libp2p/src/peer-store/address-book.js'
+import type { Address, PeerStore } from '@libp2p/interface-peer-store'
 import type { Connection } from '@libp2p/interface-connection'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import type { ConnectionManager } from '@libp2p/interface-connection-manager'
 import { dial as dialHelper, DialStatus } from './dialHelper.js'
 import { privKeyToPeerId } from './privKeyToPeerId.js'
 import { TCP } from '@libp2p/tcp'
@@ -12,7 +14,6 @@ import { Multiaddr } from '@multiformats/multiaddr'
 import { pipe } from 'it-pipe'
 import { u8aEquals, stringToU8a } from '../u8a/index.js'
 import { createRelayerKey } from './relayCode.js'
-import type { PeerId } from '@libp2p/interface-peer-id'
 
 const TEST_PROTOCOL = '/test'
 const TEST_MESSAGE = new TextEncoder().encode('test msg')
@@ -21,47 +22,39 @@ const Alice = privKeyToPeerId(stringToU8a('0xcf0b158c5f9d83dabf81a43391cce6cced6
 const Bob = privKeyToPeerId(stringToU8a('0x801f499e287fa0e5ac546a86d7f1e3ca766249f62759e6a1f2c90de6090cc4c0'))
 const Chris = privKeyToPeerId(stringToU8a('0x1bbb9a915ddd6e19d0f533da6c0fbe8820541a370110728f647829cd2c91bc79'))
 
-async function getNode(id: PeerId, withDHT = false, maDestination?: Multiaddr): Promise<Libp2p> {
+async function getNode(id: PeerId, withDht = false, maDestination?: Multiaddr): Promise<Libp2p> {
   const node = await createLibp2p({
     addresses: {
       listen: [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${id.toString()}`).toString()]
     },
     peerId: id,
-    modules: {
-      transport: [TCP],
-      streamMuxer: [Mplex],
-      connEncryption: [NOISE],
-      dht: withDHT ? KadDHT : undefined
-    },
+    transports: [new TCP()],
+    streamMuxers: [new Mplex()],
+    connectionEncryption: [new Noise()],
+    dht: withDht ? new KadDHT({ protocolPrefix: '/hopr', clientMode: false }) : undefined,
     metrics: {
       enabled: false
     },
-    config: {
-      dht: {
-        enabled: withDHT
-      },
-      nat: {
-        enabled: false
-      },
-      relay: {
-        enabled: false
-      },
-      peerDiscovery: {
-        autoDial: false
-      }
+    nat: {
+      enabled: false
     },
-    dialer: {
+    relay: {
+      enabled: false
+    },
+    connectionManager: {
+      autoDial: false,
       // Use custom sorting to prevent from problems with libp2p
       // and HOPR's relay addresses
-      addressSorter: (addrs) => addrs
+      addressSorter: () => 0
     }
   })
 
   const dial = node.dial.bind(node)
 
-  node.dial = async (_peer: PeerId | Multiaddr, options: any) => {
+  // libp2p type clash
+  node.dial = (async (_peer: PeerId | Multiaddr, options: any) => {
     return dial(maDestination, options)
-  }
+  }) as any
 
   node.handle(TEST_PROTOCOL, async ({ stream }) => {
     await pipe(stream.source, stream.sink)
@@ -72,15 +65,17 @@ async function getNode(id: PeerId, withDHT = false, maDestination?: Multiaddr): 
   return node
 }
 
-function getPeerStore() {
+function getPeerStore(): PeerStore {
   const peerStore = new Map<PeerId, Set<Address>>()
 
   return {
     addressBook: {
+      // @ts-ignore
       add: async (peerId: PeerId, multiaddrs: Multiaddr[]): Promise<void> => {
         const addresses = peerStore.get(peerId) ?? new Set<Address>()
         for (const address of multiaddrs) {
-          addresses.add({ multiaddr: address, isCertified: true })
+          // libp2p type clash
+          addresses.add({ multiaddr: address as any, isCertified: true })
         }
         peerStore.set(peerId, addresses)
       },
@@ -97,18 +92,15 @@ function getPeerStore() {
   }
 }
 
-function getConnectionManager() {
+function getConnectionManager(): ConnectionManager {
   const connections = new Map<string, Connection[]>()
-  const getAll = (peer: PeerId) => {
+  const getConnections = (peer: PeerId) => {
     return connections.get(peer.toString()) ?? []
   }
 
-  const onDisconnect = (_conn: Connection) => {}
-
   return {
-    getAll,
-    onDisconnect
-  }
+    getConnections
+  } as ConnectionManager
 }
 
 describe('test dialHelper', function () {
@@ -127,7 +119,7 @@ describe('test dialHelper', function () {
     const peerA = await getNode(Alice)
     const peerB = await getNode(Bob)
 
-    await peerA.peerStore.addressBook.add(peerB.peerId, peerB.multiaddrs)
+    await peerA.peerStore.addressBook.add(peerB.peerId, peerB.getMultiaddrs())
 
     const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)
 
@@ -162,13 +154,14 @@ describe('test dialHelper', function () {
     const peerC = await getNode(Chris, true)
 
     // Secretly tell peerA the address of peerC
-    const peerA = await getNode(Alice, true, peerC.multiaddrs[0])
+    // libp2p type clash
+    const peerA = await getNode(Alice, true, peerC.getMultiaddrs()[0] as any)
 
-    await peerB.peerStore.addressBook.add(peerA.peerId, peerA.multiaddrs)
-    await peerA.peerStore.addressBook.add(peerB.peerId, peerB.multiaddrs)
+    await peerB.peerStore.addressBook.add(peerA.peerId, peerA.getMultiaddrs())
+    await peerA.peerStore.addressBook.add(peerB.peerId, peerB.getMultiaddrs())
 
-    await peerB.peerStore.addressBook.add(peerC.peerId, peerC.multiaddrs)
-    await peerC.peerStore.addressBook.add(peerB.peerId, peerB.multiaddrs)
+    await peerB.peerStore.addressBook.add(peerC.peerId, peerC.getMultiaddrs())
+    await peerC.peerStore.addressBook.add(peerB.peerId, peerB.getMultiaddrs())
 
     await peerA.start()
     await peerB.start()
@@ -200,9 +193,10 @@ describe('test dialHelper', function () {
 
   it('DHT does not find any new addresses', async function () {
     const peerA = {
+      dht: {
+        [Symbol.toStringTag]: 'some DHT that is not @libp2p/dummy-dht'
+      },
       contentRouting: {
-        // Non-empty array
-        routers: [undefined],
         // Returning an empty iterator
         findProviders: () => (async function* () {})()
       },
@@ -221,9 +215,10 @@ describe('test dialHelper', function () {
 
   it('DHT throws an error', async function () {
     const peerA = {
+      dht: {
+        [Symbol.toStringTag]: 'some DHT that is not @libp2p/dummy-dht'
+      },
       contentRouting: {
-        // Non-empty array
-        routers: [undefined],
         // Returning an empty iterator
         findProviders: () =>
           (async function* () {
