@@ -15,7 +15,7 @@ test: $(JS_FILES)
 $(JS_FILES):
 	mkdir -p $(@D)
 	npx wasm-pack build --target=nodejs `pwd`/$(@D)/..
-	cp $@ $(subst .js,.cjs,$@)
+	mv $@ $(subst .js,.cjs,$@)
 
 install:
 ifneq ($(PACKAGES),)

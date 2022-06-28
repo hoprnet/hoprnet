@@ -36,6 +36,9 @@ mkShell {
     vagrant
     shellcheck
 
+    # devops tooling
+    google-cloud-sdk
+
     # custom pkg groups
     macosPkgs
     linuxPkgs

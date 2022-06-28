@@ -90,12 +90,14 @@ export async function getPeers(
       connected,
       announced: Array.from(announced.values())
     }
-  } catch (error) {
-    throw new Error(STATUS_CODES.UNKNOWN_FAILURE + ' ' + error.message)
+  } catch (err) {
+    // Makes sure this doesn't throw
+    const errString = `${STATUS_CODES.UNKNOWN_FAILURE} ${err instanceof Error ? err.message : 'Unknown error'}`
+    throw new Error(errString)
   }
 }
 
-export const GET: Operation = [
+const GET: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
     const quality = parseFloat(String(req.query.quality ?? 0))
@@ -103,13 +105,15 @@ export const GET: Operation = [
     try {
       const info = await getPeers(node, quality)
       return res.status(200).send(info)
-    } catch (error) {
-      if (error.message.includes(STATUS_CODES.INVALID_QUALITY)) {
+    } catch (err) {
+      const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
+
+      if (errString.includes(STATUS_CODES.INVALID_QUALITY)) {
         return res
           .status(400)
           .send({ status: STATUS_CODES.INVALID_QUALITY, error: 'Quality must be a range from 0 to 1' })
       } else {
-        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
+        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: errString })
       }
     }
   }
@@ -228,3 +232,5 @@ GET.apiDoc = {
     }
   }
 }
+
+export default { GET }

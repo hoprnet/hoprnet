@@ -33,7 +33,7 @@ export class OpenChannel extends AbstractCommand {
     try {
       counterparty = checkPeerIdInput(counterpartyStr, getState())
     } catch (err) {
-      return log(styleValue(err.message, 'failure'))
+      return log(styleValue(err instanceof Error ? err.message : 'Unknown error', 'failure'))
     }
 
     const amountToFund = new BN(moveDecimalPoint(amountToFundStr, Balance.DECIMALS))
@@ -50,7 +50,7 @@ export class OpenChannel extends AbstractCommand {
       const { channelId } = await this.node.openChannel(counterparty, amountToFund)
       return log(`${chalk.green(`Successfully opened channel`)} ${styleValue(channelId.toHex(), 'hash')}`)
     } catch (err) {
-      return log(styleValue(err.message, 'failure'))
+      return log(styleValue(err instanceof Error ? err.message : 'Unknown error', 'failure'))
     }
   }
 }

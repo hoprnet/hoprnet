@@ -6,15 +6,17 @@ export const getSettings = (state: State) => {
   return state.settings
 }
 
-export const GET: Operation = [
+const GET: Operation = [
   async (req, res, _next) => {
     const { stateOps } = req.context
 
     try {
       const settings = getSettings(stateOps.getState())
       return res.status(200).send(settings)
-    } catch (error) {
-      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
+    } catch (err) {
+      return res
+        .status(422)
+        .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 ]
@@ -51,3 +53,5 @@ GET.apiDoc = {
     }
   }
 }
+
+export default { GET }

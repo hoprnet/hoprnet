@@ -27,7 +27,7 @@ export default class Addresses extends AbstractCommand {
     try {
       peerId = checkPeerIdInput(query, getState())
     } catch (err) {
-      return log(styleValue(err.message, 'failure'))
+      return log(styleValue(err instanceof Error ? err.message : 'Unknown error', 'failure'))
     }
     const announcedAddresses = await this.node.getAddressesAnnouncedToDHT(peerId)
     const announcedAddressesStr = announcedAddresses.map((a) => `\n- ${a.toString()}`)

@@ -5,8 +5,9 @@ import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 import { setTimeout } from 'timers/promises'
 
-import { loadJson, NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
-import Hopr, {
+import { loadJson, NativeBalance, SUGGESTED_NATIVE_BALANCE, get_package_version } from '@hoprnet/hopr-utils'
+import {
+  default as Hopr,
   type HoprOptions,
   type NetworkHealthIndicator,
   createHoprNode,
@@ -31,8 +32,6 @@ import { register as registerUnhandled } from 'trace-unhandled'
 
 import { setLogger } from 'trace-unhandled'
 
-import * as wasm from '../lib/hoprd_misc.cjs'
-
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
 export type DefaultEnvironment = {
@@ -50,10 +49,11 @@ function defaultEnvironment(): string {
 }
 
 // Use environment-specific default data path
-const defaultDataPath = path.join(
-  path.dirname(new URL('../package.json', import.meta.url).pathname),
-  defaultEnvironment()
-)
+const defaultDataPath = path.join(process.cwd(), 'hoprd-db', defaultEnvironment())
+
+// reading the version manually to ensure the path is read correctly
+const packageFile = path.normalize(new URL('../package.json', import.meta.url).pathname)
+const version = get_package_version(packageFile)
 
 const yargsInstance = yargs(hideBin(process.argv))
 
@@ -62,6 +62,7 @@ const argv = yargsInstance
   .epilogue(
     'All CLI options can be configured through environment variables as well. CLI parameters have precedence over environment variables.'
   )
+  .version(version)
   .option('environment', {
     string: true,
     describe: 'Environment id which the node shall run on (HOPRD_ENVIRONMENT)',
@@ -377,7 +378,7 @@ async function main() {
       // also send it tagged as message for apps to use
       logs.logMessage(decoded.toString())
     } catch (err) {
-      logs.log('Could not decode message', err)
+      logs.log('Could not decode message', err instanceof Error ? err.message : 'Unknown error')
       logs.log(msg.toString())
     }
   }
@@ -414,8 +415,7 @@ async function main() {
   }
 
   try {
-    let packageFile = path.normalize(new URL('../package.json', import.meta.url).pathname)
-    logs.log(`This is hoprd version ${wasm.get_package_version(packageFile)}`)
+    logs.log(`This is hoprd version ${version}`)
 
     // 1. Find or create an identity
     const peerId = await getIdentity({

@@ -1,7 +1,7 @@
 import type { Operation } from 'express-openapi'
 import { WS_DEFAULT_RESPONSES, generateWsApiDescription } from '../../utils.js'
 
-export const GET: Operation = [
+const GET: Operation = [
   async (_, res, _next) => {
     return res.status(404).end('Not found.')
   }
@@ -30,3 +30,5 @@ GET.apiDoc = {
     }
   }
 }
+
+export default { GET }

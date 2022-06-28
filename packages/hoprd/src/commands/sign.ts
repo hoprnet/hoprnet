@@ -26,7 +26,7 @@ export default class Sign extends AbstractCommand {
       const signature = await this.node.signMessage(new TextEncoder().encode(query))
       return log(`Signed message: ${u8aToHex(signature)}`)
     } catch (err) {
-      return log(styleValue(err.message, 'failure'))
+      return log(styleValue(err instanceof Error ? err.message : 'Unknown error', 'failure'))
     }
   }
 }

@@ -75,7 +75,7 @@ export default class Withdraw extends AbstractCommand {
         )}, receipt ${styleValue(receipt, 'hash')}.`
       )
     } catch (err) {
-      log(styleValue(err.message, 'failure'))
+      log(styleValue(err instanceof Error ? err.message : 'Unknown error', 'failure'))
     }
   }
 }

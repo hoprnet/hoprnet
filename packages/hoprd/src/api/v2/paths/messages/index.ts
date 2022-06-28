@@ -4,7 +4,7 @@ import { PublicKey } from '@hoprnet/hopr-utils'
 import { encodeMessage } from '../../../../commands/utils/index.js'
 import { STATUS_CODES } from '../../utils.js'
 
-export const POST: Operation = [
+const POST: Operation = [
   async (req, res, _next) => {
     const message = encodeMessage(req.body.body)
     const recipient = peerIdFromString(req.body.recipient)
@@ -17,9 +17,11 @@ export const POST: Operation = [
 
     try {
       await req.context.node.sendMessage(message, recipient, path)
-      res.status(204).send()
+      return res.status(204).send()
     } catch (err) {
-      res.status(422).json({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+      return res
+        .status(422)
+        .json({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 ]
@@ -86,3 +88,5 @@ POST.apiDoc = {
     }
   }
 }
+
+export default { POST }

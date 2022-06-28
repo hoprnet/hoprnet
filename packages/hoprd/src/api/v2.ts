@@ -17,6 +17,7 @@ import type { WebSocketServer } from 'ws'
 import type Hopr from '@hoprnet/hopr-core'
 import { SettingKey, StateOps } from '../types.js'
 import type { LogStream } from './../logs.js'
+import BN from 'bn.js'
 
 const debugLog = debug('hoprd:api:v2')
 
@@ -38,10 +39,16 @@ export async function setupRestApi(
 
   // assign internal objects to each requests so they can be accessed within
   // handlers
-  service.use(urlPath, (req, _res, next) => {
-    req.context = new Context(node, stateOps)
-    next()
-  })
+  service.use(
+    urlPath,
+    function addNodeContext(req, _res, next) {
+      req.context = { node: this.node, stateOps: this.stateOps }
+      next()
+    }
+      // Need to explicitly bind the instances to the function
+      // to make sure the right instances are present
+      .bind({ node, stateOps })
+  )
   // because express-openapi uses relative paths we need to figure out where
   // we are exactly
   const cwd = process.cwd()
@@ -50,6 +57,7 @@ export async function setupRestApi(
   const apiBaseSpecPath = path.join(relPath, 'rest-api-v2-spec.yaml')
   const apiFullSpecPath = path.join(relPath, 'rest-api-v2-full-spec.json')
   const apiPathsPath = path.join(relPath, 'lib/api/v2/paths')
+  const encodedApiToken = encodeURI(options.apiToken)
 
   // useful documentation for the configuration of express-openapi can be found at:
   // https://github.com/kogosoftwarellc/open-api/tree/master/packages/express-openapi
@@ -65,6 +73,7 @@ export async function setupRestApi(
     // since we pass the spec directly we don't need to expose it via HTTP
     exposeApiDocs: false,
     errorMiddleware: function (err, _, res, next) {
+      // @fixme index-0 access does not always work
       if (err.status === 400) {
         const path = String(err.errors[0].path) || ''
         res.status(err.status).send({ status: getStatusCodeForInvalidInputInRequest(path) })
@@ -77,20 +86,27 @@ export async function setupRestApi(
       peerId: (input) => {
         try {
           // this call will throw if the input is no peer id
-          return !!peerIdFromString(input)
-        } catch (_err) {
+          peerIdFromString(input)
+        } catch (err) {
           return false
         }
+        return true
       },
       address: (input) => {
         try {
-          return !!Address.fromString(input)
-        } catch (_err) {
+          Address.fromString(input)
+        } catch (err) {
           return false
         }
+        return true
       },
       amount: (input) => {
-        return !isNaN(Number(input))
+        try {
+          new BN(input)
+        } catch (err) {
+          return false
+        }
+        return true
       },
       settingKey: (input) => {
         return Object.values(SettingKey).includes(input)
@@ -98,11 +114,16 @@ export async function setupRestApi(
     },
     securityHandlers: {
       // TODO: We assume the handlers are always called in order. This isn't a
-      // given and might change in the future. Thus, they should be made order-erindependent.
+      // given and might change in the future. Thus, they should be made order-independent.
       keyScheme: function (req: Request, _scopes, _securityDefinition) {
-        const apiToken = decodeURI(req.get('x-auth-token') || '')
+        // Applying multiple URI encoding is an identity
+        let apiTokenFromUser = encodeURI(req.get('x-auth-token') || '')
 
-        if (!options.testNoAuthentication && options.apiToken !== undefined && apiToken !== options.apiToken) {
+        if (
+          !this.options.testNoAuthentication &&
+          this.options.apiToken !== undefined &&
+          apiTokenFromUser !== encodedApiToken
+        ) {
           // because this is not the last auth check, we just indicate that
           // the authentication failed so the auth chain can continue
           return false
@@ -110,13 +131,17 @@ export async function setupRestApi(
 
         // successfully authenticated, will stop the auth chain and proceed with the request
         return true
-      },
+      }.bind({ options }),
       passwordScheme: function (req: Request, _scopes, _securityDefinition) {
         const authEncoded = (req.get('authorization') || '').replace('Basic ', '')
-        // we only expect a single value here, instead of the usual user:password
-        const [apiToken, ..._rest] = decodeURI(Buffer.from(authEncoded, 'base64').toString('binary')).split(':')
+        // We only expect a single value here, instead of the usual user:password, so we take the user part as token
+        let apiTokenFromUser = encodeURI(Buffer.from(authEncoded, 'base64').toString('binary')).split(':')[0] // The colon ':' does not get encoded by encodeURI
 
-        if (!options.testNoAuthentication && options.apiToken !== undefined && apiToken !== options.apiToken) {
+        if (
+          !this.options.testNoAuthentication &&
+          this.options.apiToken !== undefined &&
+          apiTokenFromUser !== encodedApiToken
+        ) {
           // because this is the last auth check, we must throw the appropriate
           // error to be sent back to the user
           throw {
@@ -128,7 +153,7 @@ export async function setupRestApi(
 
         // successfully authenticated
         return true
-      }
+      }.bind({ options })
     }
   })
 
@@ -244,7 +269,10 @@ export class Context {
 declare global {
   namespace Express {
     interface Request {
-      context: Context
+      context: {
+        node: Hopr
+        stateOps: StateOps
+      }
     }
   }
 }

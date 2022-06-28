@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-utils",
   "description": "HOPR-based utilities to process multiple data structures",
-  "version": "1.89.0-next.28",
+  "version": "1.89.0-next.42",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
@@ -29,6 +29,7 @@
     "@libp2p/crypto": "1.0.0",
     "@libp2p/peer-id": "1.1.10",
     "@multiformats/multiaddr": "10.1.8",
+    "@hoprnet/hopr-real": "workspace:packages/real",
     "abort-controller": "~3.0.0",
     "bignumber.js": "9.0.2",
     "bn.js": "5.2.0",
@@ -43,8 +44,6 @@
     "levelup": "5.1.1",
     "memdown": "6.1.1",
     "multiformats": "9.6.5",
-    "pino": "7.8.0",
-    "pino-logflare": "0.3.12",
     "secp256k1": "4.0.3"
   },
   "devDependencies": {
@@ -59,7 +58,6 @@
     "@libp2p/peer-id-factory": "1.0.15",
     "@libp2p/tcp": "1.0.11",
     "@types/mocha": "9.1.0",
-    "@types/pino": "7.0.4",
     "bl": "5.0.0",
     "chai": "4.3.6",
     "libp2p": "0.37.3",

@@ -2,14 +2,38 @@ import type Hopr from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { peerIdFromString } from '@libp2p/peer-id'
-import { STATUS_CODES } from '../../../utils.js'
-import { ChannelInfo, channelStatusToString, formatIncomingChannel, formatOutgoingChannel } from '../index.js'
+import { STATUS_CODES } from '../../../../utils.js'
+import { ChannelInfo, formatIncomingChannel, formatOutgoingChannel } from '../../index.js'
+import {
+  channelStatusToString,
+  ChannelStatus,
+  defer,
+  generateChannelId,
+  PublicKey,
+  type DeferType
+} from '@hoprnet/hopr-utils'
+
+const closingRequests = new Map<string, DeferType<void>>()
 
 /**
  * Closes a channel with provided peerId.
  * @returns Channel status and receipt.
  */
-export const closeChannel = async (node: Hopr, peerIdStr: string, direction: ChannelInfo['type']) => {
+export async function closeChannel(
+  node: Hopr,
+  peerIdStr: string,
+  direction: ChannelInfo['type']
+): Promise<
+  | {
+      success: false
+      reason: keyof typeof STATUS_CODES
+    }
+  | {
+      success: true
+      channelStatus: ChannelStatus
+      receipt: string
+    }
+> {
   let peerId: PeerId
   try {
     peerId = peerIdFromString(peerIdStr)
@@ -17,30 +41,53 @@ export const closeChannel = async (node: Hopr, peerIdStr: string, direction: Cha
     throw Error(STATUS_CODES.INVALID_PEERID)
   }
 
-  const { status: channelStatus, receipt } = await node.closeChannel(peerId, direction)
+  const channelId = generateChannelId(node.getEthereumAddress(), PublicKey.fromPeerId(peerId).toAddress())
 
-  return {
-    channelStatus,
-    receipt
+  let closingRequest = closingRequests.get(channelId.toHex())
+  if (closingRequest == null) {
+    closingRequest = defer<void>()
+    closingRequests.set(channelId.toHex(), closingRequest)
+  } else {
+    await closingRequest.promise
+  }
+
+  try {
+    const { status: channelStatus, receipt } = await node.closeChannel(peerId, direction)
+    return { success: true, channelStatus, receipt }
+  } catch (err) {
+    const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
+
+    if (errString.match(/Channel is already closed/)) {
+      // @TODO insert receipt
+      return { success: true, receipt: /* @fixme */ '0x', channelStatus: ChannelStatus.Closed }
+    } else {
+      return { success: false, reason: STATUS_CODES.UNKNOWN_FAILURE }
+    }
+  } finally {
+    closingRequests.delete(channelId.toHex())
+    closingRequest.resolve()
   }
 }
 
-export const DELETE: Operation = [
+const DELETE: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
     const { peerid, direction } = req.params
 
-    try {
-      const { receipt, channelStatus } = await closeChannel(node, peerid, direction as any)
-      return res.status(200).send({ receipt, channelStatus: channelStatusToString(channelStatus) })
-    } catch (err) {
-      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+    const closingResult = await closeChannel(node, peerid, direction as any)
+
+    if (closingResult.success == true) {
+      res
+        .status(200)
+        .send({ receipt: closingResult.receipt, channelStatus: channelStatusToString(closingResult.channelStatus) })
+    } else {
+      res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE })
     }
   }
 ]
 
 DELETE.apiDoc = {
-  description: `Close a opened channel between this node and other node. Once you’ve initiated channel closure, you have to wait for a specified closure time, it will show you a closure initiation message with cool-off time you need to wait.
+  description: `Close a opened channel between this node and other node. Once you've initiated channel closure, you have to wait for a specified closure time, it will show you a closure initiation message with cool-off time you need to wait.
   Then you will need to send the same command again to finalize closure. This is a cool down period to give the other party in the channel sufficient time to redeem their tickets.`,
   tags: ['Channels'],
   operationId: 'channelsCloseChannel',
@@ -144,22 +191,30 @@ export const getChannel = async (
   }
 }
 
-export const GET: Operation = [
+const GET: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
     const { peerid, direction } = req.params
+
+    if (!['incoming', 'outgoing'].includes(direction)) {
+      return res
+        .status(404)
+        .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: 'Method not supported. Use "incoming" or "outgoing"' })
+    }
 
     try {
       const channel = await getChannel(node, peerid, direction as any)
       return res.status(200).send(channel)
     } catch (err) {
-      console.log(err)
-      if (err.message === STATUS_CODES.INVALID_PEERID) {
-        return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID })
-      } else if (err.message === STATUS_CODES.CHANNEL_NOT_FOUND) {
-        return res.status(404).send({ status: STATUS_CODES.CHANNEL_NOT_FOUND })
-      } else {
-        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+      const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
+
+      switch (errString) {
+        case STATUS_CODES.INVALID_PEERID:
+          return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID })
+        case STATUS_CODES.CHANNEL_NOT_FOUND:
+          return res.status(404).send({ status: STATUS_CODES.CHANNEL_NOT_FOUND })
+        default:
+          return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: errString })
       }
     }
   }
@@ -246,3 +301,5 @@ GET.apiDoc = {
     }
   }
 }
+
+export default { DELETE, GET }
