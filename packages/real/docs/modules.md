@@ -31,10 +31,6 @@ Wrapper for reading file via WASM
 
 `Uint8Array`
 
-#### Defined in
-
-[src/io.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/real/src/io.ts#L9)
-
 ___
 
 ### write\_file
@@ -53,7 +49,3 @@ Wrapper for reading file via WASM.
 #### Returns
 
 `void`
-
-#### Defined in
-
-[src/io.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/real/src/io.ts#L18)

@@ -44,7 +44,7 @@
 - [Intermediate](interfaces/Intermediate.md)
 - [NetOptions](interfaces/NetOptions.md)
 
-### Type aliases
+### Type Aliases
 
 - [AddressSorter](modules.md#addresssorter)
 - [DeferType](modules.md#defertype)
@@ -157,8 +157,8 @@
 - [isReservedAddress](modules.md#isreservedaddress)
 - [isSecp256k1PeerId](modules.md#issecp256k1peerid)
 - [iterateHash](modules.md#iteratehash)
-- [libp2pSendMessage](modules.md#libp2psendmessage)
-- [libp2pSubscribe](modules.md#libp2psubscribe)
+- [libp2pSendMessage](modules.md#libp2psendmessage-1)
+- [libp2pSubscribe](modules.md#libp2psubscribe-1)
 - [loadJson](modules.md#loadjson)
 - [moveDecimalPoint](modules.md#movedecimalpoint)
 - [nAtATime](modules.md#natatime)
@@ -215,7 +215,7 @@
 
 Renames and re-exports [TimeoutOpts](modules.md#timeoutopts)
 
-## Type aliases
+## Type Aliases
 
 ### AddressSorter
 
@@ -480,9 +480,11 @@ send message. If `includeReply` is set, wait for a response
 
 **`param`** try to receive a reply
 
-**`param`** timeout
+**`param`** [optional] timeout
 
 #### Defined in
+
+[libp2p/index.ts:122](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L122)
 
 [libp2p/index.ts:105](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L105)
 
@@ -506,6 +508,8 @@ and feeds them to the given handler.
 **`param`** try to receive a reply
 
 #### Defined in
+
+[libp2p/index.ts:260](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L260)
 
 [libp2p/index.ts:245](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L245)
 
@@ -952,6 +956,10 @@ ___
 
 • **get\_package\_version**: `any`
 
+#### Defined in
+
+[index.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/index.ts#L19)
+
 ## Functions
 
 ### FIFO
@@ -967,10 +975,6 @@ ___
 #### Returns
 
 [`FIFO`](modules.md#fifo)<`T`\>
-
-#### Defined in
-
-[collection/fifo.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/collection/fifo.ts#L19)
 
 ___
 
@@ -1004,10 +1008,6 @@ it can pass an AbortController and end the call prematurely.
 
 `Promise`<`Result` \| `AbortMsg` \| `TimeoutMsg`\>
 
-#### Defined in
-
-[async/abortableTimeout.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/abortableTimeout.ts#L21)
-
 ___
 
 ### cacheNoArgAsyncFunction
@@ -1037,10 +1037,6 @@ ___
 
 `Promise`<`T`\>
 
-#### Defined in
-
-[async/cache.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/cache.ts#L8)
-
 ___
 
 ### channelStatusToString
@@ -1056,10 +1052,6 @@ ___
 #### Returns
 
 `string`
-
-#### Defined in
-
-[types/channelEntry.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L35)
 
 ___
 
@@ -1085,10 +1077,6 @@ Checks if given address is in one of the given networks
 
 true if address is at least one of the given networks
 
-#### Defined in
-
-[network/addrs.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L72)
-
 ___
 
 ### convertPubKeyFromB58String
@@ -1106,10 +1094,6 @@ Takes a B58String and converts them to a PublicKey
 #### Returns
 
 `PublicKey`
-
-#### Defined in
-
-[libp2p/index.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L43)
 
 ___
 
@@ -1129,10 +1113,6 @@ Takes a peerId and returns its corresponding public key.
 
 `PublicKey`
 
-#### Defined in
-
-[libp2p/index.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L33)
-
 ___
 
 ### createCircuitAddress
@@ -1151,10 +1131,6 @@ Create a multiaddress that is a circuit address using given relay to the given d
 #### Returns
 
 `Multiaddr`
-
-#### Defined in
-
-[network/addrs.ts:290](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L290)
 
 ___
 
@@ -1183,10 +1159,6 @@ Creates a mixnet packet
 
 the packet as u8a
 
-#### Defined in
-
-[crypto/packet/index.ts:64](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/index.ts#L64)
-
 ___
 
 ### createPoRString
@@ -1210,10 +1182,6 @@ challenge that is given to the relayer.
 
 the bitstring that is embedded next to the routing
 information for each relayer
-
-#### Defined in
-
-[crypto/por/index.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L46)
 
 ___
 
@@ -1244,10 +1212,6 @@ the challenge for the first ticket sent to the first relayer
 | `ownKey` | [`HalfKey`](classes/HalfKey.md) |
 | `ticketChallenge` | [`Challenge`](classes/Challenge.md) |
 
-#### Defined in
-
-[crypto/por/index.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L20)
-
 ___
 
 ### createRelayerKey
@@ -1269,10 +1233,6 @@ node.
 `Promise`<`CID`\>
 
 the DHT entry key
-
-#### Defined in
-
-[libp2p/relayCode.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/relayCode.ts#L13)
 
 ___
 
@@ -1303,10 +1263,6 @@ ___
 
 `void`
 
-#### Defined in
-
-[process/debug.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/process/debug.ts#L3)
-
 ___
 
 ### decodePoRBytes
@@ -1328,10 +1284,6 @@ ___
 | `ackChallenge` | [`HalfKeyChallenge`](classes/HalfKeyChallenge.md) |
 | `nextTicketChallenge` | [`Challenge`](classes/Challenge.md) |
 
-#### Defined in
-
-[crypto/por/index.ts:111](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L111)
-
 ___
 
 ### defer
@@ -1347,10 +1299,6 @@ ___
 #### Returns
 
 [`DeferType`](modules.md#defertype)<`T`\>
-
-#### Defined in
-
-[async/defer.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/defer.ts#L8)
 
 ___
 
@@ -1372,10 +1320,6 @@ relayer for transforming and delivering the packet
 
 [`HalfKey`](classes/HalfKey.md)
 
-#### Defined in
-
-[crypto/por/keyDerivation.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/keyDerivation.ts#L31)
-
 ___
 
 ### deriveCommitmentSeed
@@ -1395,10 +1339,6 @@ Derives the initial commitment seed on a newly opened channel.
 
 `Uint8Array`
 
-#### Defined in
-
-[crypto/commitment/keyDerivation.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/commitment/keyDerivation.ts#L12)
-
 ___
 
 ### deserializeKeyPair
@@ -1416,17 +1356,13 @@ Deserializes an encoded key pair
 | :------ | :------ | :------ | :------ |
 | `serialized` | `Uint8Array` | `undefined` | encoded key pair |
 | `password` | `string` | `undefined` | password to use for decryption |
-| `useWeakCrypto` | `boolean` | `false` | use faster but weaker crypto to reconstruct key pair |
+| `useWeakCrypto` | `boolean` | `false` | [optional] use faster but weaker crypto to reconstruct key pair |
 
 #### Returns
 
 `Promise`<`DeserializationResponse`\>
 
 reconstructed key pair
-
-#### Defined in
-
-[crypto/keyPair.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/keyPair.ts#L84)
 
 ___
 
@@ -1451,10 +1387,6 @@ Contains a baseline protection against dialing same addresses twice.
 
 `Promise`<[`DialResponse`](modules.md#dialresponse)\>
 
-#### Defined in
-
-[libp2p/dialHelper.ts:373](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L373)
-
 ___
 
 ### expandVars
@@ -1473,10 +1405,6 @@ ___
 `string`
 
 a string with variables resolved to the actual values
-
-#### Defined in
-
-[utils.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L19)
 
 ___
 
@@ -1506,10 +1434,6 @@ the transformed packet, the public key of the next hop
 and the data next to the routing information. If current
 hop is the final recipient, it returns the plaintext
 
-#### Defined in
-
-[crypto/packet/index.ts:127](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/index.ts#L127)
-
 ___
 
 ### gcd
@@ -1529,10 +1453,6 @@ Computes the greatest common divisor of two integers
 
 `number`
 
-#### Defined in
-
-[math/gcd.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/math/gcd.ts#L6)
-
 ___
 
 ### generateChannelId
@@ -1549,10 +1469,6 @@ ___
 #### Returns
 
 [`Hash`](classes/Hash.md)
-
-#### Defined in
-
-[types/channelEntry.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L16)
 
 ___
 
@@ -1581,10 +1497,6 @@ with the nodes along the path
 | `alpha` | `Uint8Array` |
 | `secrets` | `Uint8Array`[] |
 
-#### Defined in
-
-[crypto/packet/keyShares.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/keyShares.ts#L16)
-
 ___
 
 ### getB58String
@@ -1602,10 +1514,6 @@ Returns the b58String within a given content. Returns empty string if none is fo
 #### Returns
 
 `string`
-
-#### Defined in
-
-[libp2p/index.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L70)
 
 ___
 
@@ -1625,10 +1533,6 @@ ___
 
 `number`
 
-#### Defined in
-
-[crypto/packet/index.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/index.ts#L27)
-
 ___
 
 ### getLocalAddresses
@@ -1645,10 +1549,6 @@ ___
 
 [`Network`](modules.md#network)[]
 
-#### Defined in
-
-[network/addrs.ts:270](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L270)
-
 ___
 
 ### getLocalHosts
@@ -1664,10 +1564,6 @@ ___
 #### Returns
 
 [`Network`](modules.md#network)[]
-
-#### Defined in
-
-[network/addrs.ts:281](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L281)
 
 ___
 
@@ -1687,10 +1583,6 @@ ___
 
 `Uint8Array`
 
-#### Defined in
-
-[network/addrs.ts:195](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L195)
-
 ___
 
 ### getPacketLength
@@ -1709,10 +1601,6 @@ ___
 
 `number`
 
-#### Defined in
-
-[crypto/packet/index.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/index.ts#L38)
-
 ___
 
 ### getPrivateAddresses
@@ -1729,10 +1617,6 @@ ___
 
 [`Network`](modules.md#network)[]
 
-#### Defined in
-
-[network/addrs.ts:267](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L267)
-
 ___
 
 ### getPublicAddresses
@@ -1748,10 +1632,6 @@ ___
 #### Returns
 
 [`Network`](modules.md#network)[]
-
-#### Defined in
-
-[network/addrs.ts:274](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L274)
 
 ___
 
@@ -1771,10 +1651,6 @@ Returns true or false if given string does not contain a b58string
 
 `Boolean`
 
-#### Defined in
-
-[libp2p/index.ts:53](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L53)
-
 ___
 
 ### inSameNetwork
@@ -1793,10 +1669,6 @@ ___
 #### Returns
 
 `boolean`
-
-#### Defined in
-
-[network/addrs.ts:208](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L208)
 
 ___
 
@@ -1819,10 +1691,6 @@ Converts ip address string to Uint8Arrays
 
 Byte representation of the given ip address
 
-#### Defined in
-
-[network/addrs.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L94)
-
 ___
 
 ### isAnyAddress
@@ -1842,10 +1710,6 @@ Checks if given address is any address
 
 `boolean`
 
-#### Defined in
-
-[network/addrs.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L13)
-
 ___
 
 ### isErrorOutOfFunds
@@ -1861,10 +1725,6 @@ ___
 #### Returns
 
 ``"NATIVE"`` \| ``"HOPR"`` \| ``false``
-
-#### Defined in
-
-[ethereum/index.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum/index.ts#L17)
 
 ___
 
@@ -1882,10 +1742,6 @@ ___
 
 `boolean`
 
-#### Defined in
-
-[ethereum/index.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum/index.ts#L11)
-
 ___
 
 ### isErrorOutOfNativeFunds
@@ -1901,10 +1757,6 @@ ___
 #### Returns
 
 `boolean`
-
-#### Defined in
-
-[ethereum/index.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum/index.ts#L6)
 
 ___
 
@@ -1928,10 +1780,6 @@ Compares timestamps to find out if "value" has expired.
 
 true if it's expired
 
-#### Defined in
-
-[time.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/time.ts#L23)
-
 ___
 
 ### isLinkLocaleAddress
@@ -1952,10 +1800,6 @@ Checks if given address is link-locale address
 `boolean`
 
 true if is link-locale address
-
-#### Defined in
-
-[network/addrs.ts:50](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L50)
 
 ___
 
@@ -1978,10 +1822,6 @@ Checks if given address is a loopback address (localhost)
 
 true if localhost
 
-#### Defined in
-
-[network/addrs.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L30)
-
 ___
 
 ### isMultiaddrLocal
@@ -2001,10 +1841,6 @@ Checks if given Multiaddr encodes a private address
 `boolean`
 
 true if address is a private ip address
-
-#### Defined in
-
-[libp2p/addressSorters.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L15)
 
 ___
 
@@ -2027,10 +1863,6 @@ Checks if given address is a private address
 
 true if private address
 
-#### Defined in
-
-[network/addrs.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L40)
-
 ___
 
 ### isReservedAddress
@@ -2052,10 +1884,6 @@ Checks if given address is a reserved address
 
 true if address is a reserved address
 
-#### Defined in
-
-[network/addrs.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L60)
-
 ___
 
 ### isSecp256k1PeerId
@@ -2076,10 +1904,6 @@ Check if PeerId contains a secp256k1 privKey
 
 whether embedded privKey is a secp256k1 key
 
-#### Defined in
-
-[libp2p/index.ts:86](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L86)
-
 ___
 
 ### iterateHash
@@ -2099,10 +1923,6 @@ ___
 #### Returns
 
 `Promise`<{ `hash`: `Uint8Array` ; `intermediates`: [`Intermediate`](interfaces/Intermediate.md)[]  }\>
-
-#### Defined in
-
-[crypto/hashIterator.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/hashIterator.ts#L7)
 
 ___
 
@@ -2125,10 +1945,6 @@ ___
 
 `Promise`<`void` \| `Uint8Array`[]\>
 
-#### Defined in
-
-[libp2p/index.ts:122](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L122)
-
 ___
 
 ### libp2pSubscribe
@@ -2148,10 +1964,6 @@ ___
 #### Returns
 
 `Promise`<`void`\>
-
-#### Defined in
-
-[libp2p/index.ts:260](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L260)
 
 ___
 
@@ -2175,10 +1987,6 @@ loads JSON data from file
 
 object parsed from JSON data
 
-#### Defined in
-
-[utils.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L34)
-
 ___
 
 ### moveDecimalPoint
@@ -2196,10 +2004,6 @@ ___
 
 `string`
 
-#### Defined in
-
-[math/moveDecimalPoint.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/math/moveDecimalPoint.ts#L3)
-
 ___
 
 ### nAtATime
@@ -2211,11 +2015,12 @@ than a given number of workers concurrently.
 
 **`dev`** Iterative implementation of the functionality
 
-**`example`**
+**`example`** ```ts
 import { setTimeout } from 'timers/promises'
 
 const result = await nAtaTime(setTimeout, [[300, 'one'], [200, 'two'], [100, 'three']], 2)
 // => ['two', 'one', 'three']
+```
 
 #### Type parameters
 
@@ -2239,10 +2044,6 @@ const result = await nAtaTime(setTimeout, [[300, 'one'], [200, 'two'], [100, 'th
 
 an array containing the results
 
-#### Defined in
-
-[async/parallel.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/parallel.ts#L37)
-
 ___
 
 ### oneAtATime
@@ -2252,10 +2053,11 @@ ___
 Creates a limiter that takes functions and runs them subsequently
 with no concurrency.
 
-**`example`**
+**`example`** ```ts
 let limiter = oneAtATime()
 limiter(() => Promise.resolve('1'))
 limiter(() => Promise.resolve('2'))
+```
 
 #### Type parameters
 
@@ -2271,14 +2073,6 @@ a limiter that takes additional functions
 
 ▸ (`fn`): `void`
 
-Creates a limiter that takes functions and runs them subsequently
-with no concurrency.
-
-**`example`**
-let limiter = oneAtATime()
-limiter(() => Promise.resolve('1'))
-limiter(() => Promise.resolve('2'))
-
 ##### Parameters
 
 | Name | Type |
@@ -2288,12 +2082,6 @@ limiter(() => Promise.resolve('2'))
 ##### Returns
 
 `void`
-
-a limiter that takes additional functions
-
-#### Defined in
-
-[async/concurrency.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/concurrency.ts#L14)
 
 ___
 
@@ -2306,7 +2094,7 @@ unorders but outputs them ordered using an asynchronous iterator.
 Each element consists of a value and an index upon which
 elements are ordered.
 
-**`example`**
+**`example`** ```ts
 import { ordered, wait } from '@hoprnet/hopr-utils'
 
 const order = ordered<number>()
@@ -2326,6 +2114,7 @@ for await (const item of order.iterator()) {
   result.push(item.value)
 }
 // result == ['first', 'third', 'second']
+```
 
 #### Type parameters
 
@@ -2345,10 +2134,6 @@ an ordered stream
 | `iterator` | () => `AsyncGenerator`<`Item`<`T`\>, `void`, `unknown`\> |
 | `push` | (`newItem`: `Item`<`T`\>) => `void` |
 
-#### Defined in
-
-[async/ordering.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/ordering.ts#L35)
-
 ___
 
 ### parseHosts
@@ -2358,10 +2143,6 @@ ___
 #### Returns
 
 [`Hosts`](modules.md#hosts)
-
-#### Defined in
-
-[network/hosts.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/hosts.ts#L11)
 
 ___
 
@@ -2381,17 +2162,11 @@ Parse JSON while recovering all Buffer elements
 
 `object`
 
-#### Defined in
-
-[parseJSON.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/parseJSON.ts#L5)
-
 ___
 
 ### pickVersion
 
 ▸ **pickVersion**(`full_version`): `string`
-
-Used by our network stack and deployment scripts to determine.
 
 #### Parameters
 
@@ -2402,12 +2177,6 @@ Used by our network stack and deployment scripts to determine.
 #### Returns
 
 `string`
-
-major and minor versions, ex: `1.8.5` -> `1.8.0`
-
-#### Defined in
-
-[libp2p/pickVersion.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/pickVersion.ts#L6)
 
 ___
 
@@ -2435,10 +2204,6 @@ whether the challenge is derivable, if yes, it returns
 the keyShare of the relayer as well as the secret that is used
 to create it and the challenge for the next relayer.
 
-#### Defined in
-
-[crypto/por/index.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L82)
-
 ___
 
 ### prefixLength
@@ -2459,10 +2224,6 @@ Returns the prefix length of a network prefix
 
 the prefix length, e.g. 24
 
-#### Defined in
-
-[network/addrs.ts:143](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L143)
-
 ___
 
 ### privKeyToPeerId
@@ -2482,10 +2243,6 @@ It equips the generated peerId with private key and public key.
 #### Returns
 
 `PeerId`
-
-#### Defined in
-
-[libp2p/privKeyToPeerId.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/privKeyToPeerId.ts#L18)
 
 ___
 
@@ -2509,10 +2266,6 @@ Using `libsecp256k1` directly does not work.
 
 `PeerId`
 
-#### Defined in
-
-[libp2p/pubKeyToPeerId.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/pubKeyToPeerId.ts#L17)
-
 ___
 
 ### randomBigInteger
@@ -2531,10 +2284,6 @@ same as randomInteger, but for BigInts
 #### Returns
 
 `bigint`
-
-#### Defined in
-
-[crypto/randomInteger.ts:181](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomInteger.ts#L181)
 
 ___
 
@@ -2558,10 +2307,6 @@ ___
 
 `T`
 
-#### Defined in
-
-[crypto/randomInteger.ts:194](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomInteger.ts#L194)
-
 ___
 
 ### randomFloat
@@ -2572,10 +2317,6 @@ ___
 
 `number`
 
-#### Defined in
-
-[crypto/randomFloat.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomFloat.ts#L3)
-
 ___
 
 ### randomInteger
@@ -2584,8 +2325,7 @@ ___
 
 Returns a random value between `start` and `end`.
 
-**`example`**
-```
+**`example`** ```
 randomInteger(3) // result in { 0, 1, 2}
 randomInteger(0, 3) // result in { 0, 1, 2 }
 randomInteger(7, 9) // result in { 7, 8 }
@@ -2603,11 +2343,7 @@ The maximum number generated by this function is MAX_RANDOM_INTEGER.
 
 `number`
 
-random number between @param start and @param end
-
-#### Defined in
-
-[crypto/randomInteger.ts:159](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomInteger.ts#L159)
+random number between
 
 ___
 
@@ -2618,9 +2354,7 @@ ___
 Return a random permutation of the given `array`
 by using the (optimized) Fisher-Yates shuffling algorithm.
 
-**`example`**
-
-```javascript
+**`example`** ```javascript
 randomPermutation([1,2,3,4]);
 // first run: [2,4,1,2]
 // second run: [3,1,2,4]
@@ -2643,22 +2377,15 @@ randomPermutation([1,2,3,4]);
 
 `T`[]
 
-#### Defined in
-
-[collection/randomPermutation.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/collection/randomPermutation.ts#L18)
-
 ___
 
 ### randomSubset
 
 ▸ **randomSubset**<`T`\>(`array`, `subsetSize`, `filter?`): `T`[]
 
-Picks @param subsetSize elements at random from @param array .
-The order of the picked elements does not coincide with their
-order in @param array
+Picks
 
-**`notice`** If less than @param subsetSize elements pass the test,
-the result will contain less than @param subsetSize elements.
+**`notice`** If less than
 
 #### Type parameters
 
@@ -2670,20 +2397,15 @@ the result will contain less than @param subsetSize elements.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `array` | `T`[] | the array to pick the elements from |
-| `subsetSize` | `number` | the requested size of the subset |
+| `array` | `T`[] | . The order of the picked elements does not coincide with their order in |
+| `subsetSize` | `number` | elements at random from |
 | `filter?` | (`candidate`: `T`) => `boolean` | called with `(peerInfo)` and should return `true` for every node that should be in the subset |
 
 #### Returns
 
 `T`[]
 
-array with at most @param subsetSize elements
-that pass the test.
-
-#### Defined in
-
-[collection/randomSubset.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/collection/randomSubset.ts#L20)
+array with at most
 
 ___
 
@@ -2706,10 +2428,6 @@ ___
 
 `Promise`<[`Intermediate`](interfaces/Intermediate.md) \| `undefined`\>
 
-#### Defined in
-
-[crypto/hashIterator.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/hashIterator.ts#L55)
-
 ___
 
 ### retimer
@@ -2731,15 +2449,9 @@ Repeatedly apply a function after a timeout
 
 ▸ (): `void`
 
-Repeatedly apply a function after a timeout
-
 ##### Returns
 
 `void`
-
-#### Defined in
-
-[process/retimer.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/process/retimer.ts#L6)
 
 ___
 
@@ -2769,10 +2481,6 @@ A general use backoff that will reject once MAX_DELAY is reached.
 
 `Promise`<`T`\>
 
-#### Defined in
-
-[async/backoff.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/backoff.ts#L18)
-
 ___
 
 ### sampleGroupElement
@@ -2794,9 +2502,7 @@ and the product of exponent and base-point.
 
 [exponent: Uint8Array, groupElement: Uint8Array]
 
-#### Defined in
-
-[crypto/sampleGroupElement.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/sampleGroupElement.ts#L11)
+[ exponent, groupElement]
 
 ___
 
@@ -2816,7 +2522,7 @@ see https://medium.com/@julien.maffre/what-is-an-ethereum-keystore-file-86c8c591
 | :------ | :------ | :------ | :------ |
 | `peerId` | `PeerId` | `undefined` | id to store |
 | `password` | `string` | `undefined` | password used for encryption |
-| `useWeakCrypto` | `boolean` | `false` | weak parameter for fast serialization |
+| `useWeakCrypto` | `boolean` | `false` | [optional] weak parameter for fast serialization |
 | `__iv?` | `string` | `undefined` | - |
 | `__salt?` | `string` | `undefined` | - |
 | `__uuidSalt?` | `string` | `undefined` | - |
@@ -2826,10 +2532,6 @@ see https://medium.com/@julien.maffre/what-is-an-ethereum-keystore-file-86c8c591
 `Promise`<`Uint8Array`\>
 
 Uint8Array representation
-
-#### Defined in
-
-[crypto/keyPair.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/keyPair.ts#L18)
 
 ___
 
@@ -2846,10 +2548,6 @@ ___
 #### Returns
 
 `Uint8Array`
-
-#### Defined in
-
-[u8a/index.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L20)
 
 ___
 
@@ -2874,17 +2572,9 @@ a function that stop the resource logger
 
 ▸ (): `void`
 
-Creates a resource logger and provides a function to stop it.
-
 ##### Returns
 
 `void`
-
-a function that stop the resource logger
-
-#### Defined in
-
-[process/resourceLogger.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/process/resourceLogger.ts#L26)
 
 ___
 
@@ -2895,8 +2585,9 @@ ___
 Converts a **HEX** string to a Uint8Array and optionally adds some padding to match
 the desired size.
 
-**`example`**
+**`example`** ```ts
 stringToU8a('0xDEadBeeF') // Uint8Array [ 222, 173, 190, 239 ]
+```
 
 **`notice`** Throws an error in case a length was provided and the result does not fit.
 
@@ -2910,10 +2601,6 @@ stringToU8a('0xDEadBeeF') // Uint8Array [ 222, 173, 190, 239 ]
 #### Returns
 
 `Uint8Array`
-
-#### Defined in
-
-[u8a/toU8a.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/toU8a.ts#L60)
 
 ___
 
@@ -2942,10 +2629,6 @@ Races a timeout against some work
 
 a Promise that resolves once the timeout is due or the work is done
 
-#### Defined in
-
-[async/timeout.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/timeout.ts#L7)
-
 ___
 
 ### timer
@@ -2962,10 +2645,6 @@ ___
 
 `number`
 
-#### Defined in
-
-[utils.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L6)
-
 ___
 
 ### toNetworkPrefix
@@ -2981,10 +2660,6 @@ ___
 #### Returns
 
 [`Network`](modules.md#network)
-
-#### Defined in
-
-[network/addrs.ts:241](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L241)
 
 ___
 
@@ -3006,10 +2681,6 @@ the desired size.
 
 `Uint8Array`
 
-#### Defined in
-
-[u8a/toU8a.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/toU8a.ts#L7)
-
 ___
 
 ### tryExistingConnections
@@ -3028,10 +2699,6 @@ ___
 
 `Promise`<`void` \| { `conn`: `Connection` ; `protocol`: `string` ; `stream`: `MuxedStream`  }\>
 
-#### Defined in
-
-[libp2p/dialHelper.ts:80](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L80)
-
 ___
 
 ### u8aAdd
@@ -3041,10 +2708,11 @@ ___
 Adds the contents of two arrays together while ignoring the final overflow.
 Computes `a + b % ( 2 ** (8 * a.length) - 1)`
 
-**`example`**
+**`example`** ```ts
 u8aAdd(false, new Uint8Array([1], new Uint8Array([2])) // Uint8Array([3])
 u8aAdd(false, new Uint8Array([1], new Uint8Array([255])) // Uint8Array([0])
 u8aAdd(false, new Uint8Array([0, 1], new Uint8Array([0, 255])) // Uint8Array([1, 0])
+```
 
 #### Parameters
 
@@ -3057,10 +2725,6 @@ u8aAdd(false, new Uint8Array([0, 1], new Uint8Array([0, 255])) // Uint8Array([1,
 #### Returns
 
 `Uint8Array`
-
-#### Defined in
-
-[u8a/u8aAdd.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aAdd.ts#L13)
 
 ___
 
@@ -3081,10 +2745,6 @@ Converts ip address from byte representation to string
 
 `string`
 
-#### Defined in
-
-[network/addrs.ts:176](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L176)
-
 ___
 
 ### u8aAddressToCIDR
@@ -3098,8 +2758,8 @@ returns a CIDR string
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `prefix` | `Uint8Array` | network prefix, e.g. `new Uint8Array([10,0,0,0]) |
-| `subnet` | `Uint8Array` | subnet, e.g. `new Uint8Array([255,255,255,0]) |
+| `prefix` | `Uint8Array` | network prefix, e.g. `new Uint8Array([10,0,0,0]) @param subnet subnet, e.g. `new Uint8Array([255,255,255,0]) |
+| `subnet` | `Uint8Array` | - |
 | `family` | ``"IPv4"`` \| ``"IPv6"`` | IP address family, `IPv4` or `IPv6` |
 
 #### Returns
@@ -3107,10 +2767,6 @@ returns a CIDR string
 `string`
 
 a CIDR string, such as `192.168.1.0/24`
-
-#### Defined in
-
-[network/addrs.ts:166](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L166)
 
 ___
 
@@ -3120,7 +2776,7 @@ ___
 
 Writes to the provided mempage the data on a given list of u8a on a given offset
 
-**`export`**
+**`export`** 
 
 #### Parameters
 
@@ -3132,10 +2788,6 @@ Writes to the provided mempage the data on a given list of u8a on a given offset
 #### Returns
 
 `Uint8Array`
-
-#### Defined in
-
-[u8a/allocate.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/allocate.ts#L14)
 
 ___
 
@@ -3154,10 +2806,6 @@ ___
 
 `number`
 
-#### Defined in
-
-[u8a/u8aCompare.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aCompare.ts#L5)
-
 ___
 
 ### u8aConcat
@@ -3166,7 +2814,7 @@ ___
 
 Concatenates the input arrays into a single `UInt8Array`.
 
-**`example`**
+**`example`** ```ts
 u8aConcat(
   new Uint8Array([1, 1, 1]),
   new Uint8Array([2, 2, 2])
@@ -3176,6 +2824,7 @@ u8aConcat(
   undefined
   new Uint8Array([2, 2, 2])
 ); // Uint8Arrau([1, 1, 1, 2, 2, 2])
+```
 
 #### Parameters
 
@@ -3186,10 +2835,6 @@ u8aConcat(
 #### Returns
 
 `Uint8Array`
-
-#### Defined in
-
-[u8a/concat.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/concat.ts#L15)
 
 ___
 
@@ -3210,10 +2855,6 @@ one different entry is found.
 
 `boolean`
 
-#### Defined in
-
-[u8a/equals.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/equals.ts#L8)
-
 ___
 
 ### u8aSplit
@@ -3230,10 +2871,6 @@ ___
 #### Returns
 
 `Uint8Array`[]
-
-#### Defined in
-
-[u8a/index.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L34)
 
 ___
 
@@ -3256,10 +2893,6 @@ Converts a Uint8Array to a hex string.
 
 `string`
 
-#### Defined in
-
-[u8a/toHex.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/toHex.ts#L8)
-
 ___
 
 ### u8aToNumber
@@ -3275,10 +2908,6 @@ ___
 #### Returns
 
 `number`
-
-#### Defined in
-
-[u8a/u8aToNumber.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aToNumber.ts#L41)
 
 ___
 
@@ -3297,10 +2926,6 @@ Converts a Uint8Array to number.
 #### Returns
 
 `number` \| `bigint`
-
-#### Defined in
-
-[u8a/u8aToNumber.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aToNumber.ts#L5)
 
 ___
 
@@ -3321,10 +2946,6 @@ Apply an XOR on a list of arrays.
 
 `Uint8Array`
 
-#### Defined in
-
-[u8a/xor.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/xor.ts#L7)
-
 ___
 
 ### validateData
@@ -3334,7 +2955,7 @@ ___
 validates JSON data against JSON schema
 prints errors to the console and throws in case of non-conforming
 
-**`throws`**
+**`throws`** 
 
 #### Parameters
 
@@ -3346,10 +2967,6 @@ prints errors to the console and throws in case of non-conforming
 #### Returns
 
 `void`
-
-#### Defined in
-
-[utils.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L46)
 
 ___
 
@@ -3369,10 +2986,6 @@ ___
 
 `boolean`
 
-#### Defined in
-
-[crypto/por/index.ts:127](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L127)
-
 ___
 
 ### validatePoRHint
@@ -3391,10 +3004,6 @@ ___
 
 `boolean`
 
-#### Defined in
-
-[crypto/por/index.ts:138](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L138)
-
 ___
 
 ### validatePoRResponse
@@ -3411,10 +3020,6 @@ ___
 #### Returns
 
 `boolean`
-
-#### Defined in
-
-[crypto/por/index.ts:132](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L132)
 
 ___
 
@@ -3440,10 +3045,6 @@ key, but no other tests had been done for additional keys (e.g. Curve25519)
 
 `Promise`<`boolean`\>
 
-#### Defined in
-
-[libp2p/verifySignatureFromPeerId.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/verifySignatureFromPeerId.ts#L15)
-
 ___
 
 ### wait
@@ -3459,7 +3060,3 @@ ___
 #### Returns
 
 `Promise`<`void`\>
-
-#### Defined in
-
-[async/backoff.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/backoff.ts#L7)

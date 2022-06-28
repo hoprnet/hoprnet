@@ -33,10 +33,6 @@
 | :------ | :------ |
 | `arr` | `Uint8Array` |
 
-#### Defined in
-
-[types/response.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L11)
-
 ## Properties
 
 ### SIZE
@@ -57,10 +53,6 @@
 
 `Uint8Array`
 
-#### Defined in
-
-[types/response.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L37)
-
 ___
 
 ### toChallenge
@@ -70,10 +62,6 @@ ___
 #### Returns
 
 [`Challenge`](Challenge.md)
-
-#### Defined in
-
-[types/response.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L41)
 
 ___
 
@@ -85,10 +73,6 @@ ___
 
 `string`
 
-#### Defined in
-
-[types/response.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L33)
-
 ___
 
 ### createMock
@@ -98,10 +82,6 @@ ___
 #### Returns
 
 [`Response`](Response.md)
-
-#### Defined in
-
-[types/response.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L47)
 
 ___
 
@@ -119,10 +99,6 @@ ___
 
 [`Response`](Response.md)
 
-#### Defined in
-
-[types/response.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L29)
-
 ___
 
 ### fromHalfKeys
@@ -139,7 +115,3 @@ ___
 #### Returns
 
 [`Response`](Response.md)
-
-#### Defined in
-
-[types/response.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L25)

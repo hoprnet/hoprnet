@@ -40,15 +40,15 @@
 | `preImage` | [`Hash`](Hash.md) |
 | `signer` | [`PublicKey`](PublicKey.md) |
 
-#### Defined in
-
-[types/acknowledgedTicket.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L5)
-
 ## Properties
 
 ### preImage
 
 • `Readonly` **preImage**: [`Hash`](Hash.md)
+
+#### Defined in
+
+[types/acknowledgedTicket.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L8)
 
 ___
 
@@ -56,17 +56,29 @@ ___
 
 • `Readonly` **response**: [`Response`](Response.md)
 
+#### Defined in
+
+[types/acknowledgedTicket.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L7)
+
 ___
 
 ### signer
 
 • `Readonly` **signer**: [`PublicKey`](PublicKey.md)
 
+#### Defined in
+
+[types/acknowledgedTicket.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L9)
+
 ___
 
 ### ticket
 
 • `Readonly` **ticket**: [`Ticket`](Ticket.md)
+
+#### Defined in
+
+[types/acknowledgedTicket.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L6)
 
 ## Accessors
 
@@ -78,10 +90,6 @@ ___
 
 `number`
 
-#### Defined in
-
-[types/acknowledgedTicket.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L41)
-
 ## Methods
 
 ### serialize
@@ -91,10 +99,6 @@ ___
 #### Returns
 
 `Uint8Array`
-
-#### Defined in
-
-[types/acknowledgedTicket.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L16)
 
 ___
 
@@ -112,10 +116,6 @@ ___
 
 `boolean`
 
-#### Defined in
-
-[types/acknowledgedTicket.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L25)
-
 ___
 
 ### deserialize
@@ -131,7 +131,3 @@ ___
 #### Returns
 
 [`AcknowledgedTicket`](AcknowledgedTicket.md)
-
-#### Defined in
-
-[types/acknowledgedTicket.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L31)

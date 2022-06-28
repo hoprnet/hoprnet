@@ -12,55 +12,55 @@
 
 ### Properties
 
-- [\_deployedPromise](HoprChannels.md#_deployedpromise)
-- [\_runningEvents](HoprChannels.md#_runningevents)
-- [\_wrappedEmits](HoprChannels.md#_wrappedemits)
-- [address](HoprChannels.md#address)
-- [callStatic](HoprChannels.md#callstatic)
-- [contractName](HoprChannels.md#contractname)
-- [deployTransaction](HoprChannels.md#deploytransaction)
-- [estimateGas](HoprChannels.md#estimategas)
-- [filters](HoprChannels.md#filters)
-- [functions](HoprChannels.md#functions)
-- [interface](HoprChannels.md#interface)
-- [off](HoprChannels.md#off)
-- [on](HoprChannels.md#on)
-- [once](HoprChannels.md#once)
-- [populateTransaction](HoprChannels.md#populatetransaction)
-- [provider](HoprChannels.md#provider)
-- [removeListener](HoprChannels.md#removelistener)
-- [resolvedAddress](HoprChannels.md#resolvedaddress)
-- [signer](HoprChannels.md#signer)
+- [\_deployedPromise](HoprChannels-1.md#_deployedpromise)
+- [\_runningEvents](HoprChannels-1.md#_runningevents)
+- [\_wrappedEmits](HoprChannels-1.md#_wrappedemits)
+- [address](HoprChannels-1.md#address)
+- [callStatic](HoprChannels-1.md#callstatic)
+- [contractName](HoprChannels-1.md#contractname)
+- [deployTransaction](HoprChannels-1.md#deploytransaction)
+- [estimateGas](HoprChannels-1.md#estimategas)
+- [filters](HoprChannels-1.md#filters)
+- [functions](HoprChannels-1.md#functions)
+- [interface](HoprChannels-1.md#interface)
+- [off](HoprChannels-1.md#off)
+- [on](HoprChannels-1.md#on)
+- [once](HoprChannels-1.md#once)
+- [populateTransaction](HoprChannels-1.md#populatetransaction)
+- [provider](HoprChannels-1.md#provider)
+- [removeListener](HoprChannels-1.md#removelistener)
+- [resolvedAddress](HoprChannels-1.md#resolvedaddress)
+- [signer](HoprChannels-1.md#signer)
 
 ### Methods
 
-- [FUND\_CHANNEL\_MULTI\_SIZE](HoprChannels.md#fund_channel_multi_size)
-- [TOKENS\_RECIPIENT\_INTERFACE\_HASH](HoprChannels.md#tokens_recipient_interface_hash)
-- [\_checkRunningEvents](HoprChannels.md#_checkrunningevents)
-- [\_deployed](HoprChannels.md#_deployed)
-- [\_wrapEvent](HoprChannels.md#_wrapevent)
-- [announce](HoprChannels.md#announce)
-- [attach](HoprChannels.md#attach)
-- [bumpChannel](HoprChannels.md#bumpchannel)
-- [canImplementInterfaceForAddress](HoprChannels.md#canimplementinterfaceforaddress)
-- [channels](HoprChannels.md#channels)
-- [connect](HoprChannels.md#connect)
-- [deployed](HoprChannels.md#deployed)
-- [emit](HoprChannels.md#emit)
-- [fallback](HoprChannels.md#fallback)
-- [finalizeChannelClosure](HoprChannels.md#finalizechannelclosure)
-- [fundChannelMulti](HoprChannels.md#fundchannelmulti)
-- [initiateChannelClosure](HoprChannels.md#initiatechannelclosure)
-- [listenerCount](HoprChannels.md#listenercount)
-- [listeners](HoprChannels.md#listeners)
-- [multicall](HoprChannels.md#multicall)
-- [publicKeys](HoprChannels.md#publickeys)
-- [queryFilter](HoprChannels.md#queryfilter)
-- [redeemTicket](HoprChannels.md#redeemticket)
-- [removeAllListeners](HoprChannels.md#removealllisteners)
-- [secsClosure](HoprChannels.md#secsclosure)
-- [token](HoprChannels.md#token)
-- [tokensReceived](HoprChannels.md#tokensreceived)
+- [FUND\_CHANNEL\_MULTI\_SIZE](HoprChannels-1.md#fund_channel_multi_size)
+- [TOKENS\_RECIPIENT\_INTERFACE\_HASH](HoprChannels-1.md#tokens_recipient_interface_hash)
+- [\_checkRunningEvents](HoprChannels-1.md#_checkrunningevents)
+- [\_deployed](HoprChannels-1.md#_deployed)
+- [\_wrapEvent](HoprChannels-1.md#_wrapevent)
+- [announce](HoprChannels-1.md#announce)
+- [attach](HoprChannels-1.md#attach)
+- [bumpChannel](HoprChannels-1.md#bumpchannel)
+- [canImplementInterfaceForAddress](HoprChannels-1.md#canimplementinterfaceforaddress)
+- [channels](HoprChannels-1.md#channels)
+- [connect](HoprChannels-1.md#connect)
+- [deployed](HoprChannels-1.md#deployed)
+- [emit](HoprChannels-1.md#emit)
+- [fallback](HoprChannels-1.md#fallback)
+- [finalizeChannelClosure](HoprChannels-1.md#finalizechannelclosure)
+- [fundChannelMulti](HoprChannels-1.md#fundchannelmulti)
+- [initiateChannelClosure](HoprChannels-1.md#initiatechannelclosure)
+- [listenerCount](HoprChannels-1.md#listenercount)
+- [listeners](HoprChannels-1.md#listeners)
+- [multicall](HoprChannels-1.md#multicall)
+- [publicKeys](HoprChannels-1.md#publickeys)
+- [queryFilter](HoprChannels-1.md#queryfilter)
+- [redeemTicket](HoprChannels-1.md#redeemticket)
+- [removeAllListeners](HoprChannels-1.md#removealllisteners)
+- [secsClosure](HoprChannels-1.md#secsclosure)
+- [token](HoprChannels-1.md#token)
+- [tokensReceived](HoprChannels-1.md#tokensreceived)
 
 ## Properties
 
@@ -305,7 +305,7 @@ ___
 
 ### off
 
-• **off**: `OnEvent`<[`HoprChannels`](HoprChannels.md)\>
+• **off**: `OnEvent`<[`HoprChannels`](HoprChannels-1.md)\>
 
 #### Overrides
 
@@ -319,7 +319,7 @@ ___
 
 ### on
 
-• **on**: `OnEvent`<[`HoprChannels`](HoprChannels.md)\>
+• **on**: `OnEvent`<[`HoprChannels`](HoprChannels-1.md)\>
 
 #### Overrides
 
@@ -333,7 +333,7 @@ ___
 
 ### once
 
-• **once**: `OnEvent`<[`HoprChannels`](HoprChannels.md)\>
+• **once**: `OnEvent`<[`HoprChannels`](HoprChannels-1.md)\>
 
 #### Overrides
 
@@ -395,7 +395,7 @@ ___
 
 ### removeListener
 
-• **removeListener**: `OnEvent`<[`HoprChannels`](HoprChannels.md)\>
+• **removeListener**: `OnEvent`<[`HoprChannels`](HoprChannels-1.md)\>
 
 #### Overrides
 
@@ -449,10 +449,6 @@ node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:79
 
 `Promise`<`BigNumber`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprChannels.ts:410
-
 ___
 
 ### TOKENS\_RECIPIENT\_INTERFACE\_HASH
@@ -468,10 +464,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprChannels.ts:412
 
 ___
 
@@ -493,10 +485,6 @@ ___
 
 BaseContract.\_checkRunningEvents
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:119
-
 ___
 
 ### \_deployed
@@ -516,10 +504,6 @@ ___
 #### Inherited from
 
 BaseContract.\_deployed
-
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:112
 
 ___
 
@@ -543,10 +527,6 @@ ___
 
 BaseContract.\_wrapEvent
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:120
-
 ___
 
 ### announce
@@ -565,15 +545,11 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprChannels.ts:414
-
 ___
 
 ### attach
 
-▸ **attach**(`addressOrName`): [`HoprChannels`](HoprChannels.md)
+▸ **attach**(`addressOrName`): [`HoprChannels`](HoprChannels-1.md)
 
 #### Parameters
 
@@ -583,15 +559,11 @@ ___
 
 #### Returns
 
-[`HoprChannels`](HoprChannels.md)
+[`HoprChannels`](HoprChannels-1.md)
 
 #### Overrides
 
 BaseContract.attach
-
-#### Defined in
-
-packages/ethereum/src/types/HoprChannels.ts:294
 
 ___
 
@@ -611,10 +583,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprChannels.ts:420
-
 ___
 
 ### canImplementInterfaceForAddress
@@ -633,10 +601,6 @@ ___
 
 `Promise`<`string`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprChannels.ts:426
-
 ___
 
 ### channels
@@ -654,15 +618,11 @@ ___
 
 `Promise`<[`BigNumber`, `string`, `BigNumber`, `BigNumber`, `number`, `BigNumber`, `number`] & { `balance`: `BigNumber` ; `channelEpoch`: `BigNumber` ; `closureTime`: `number` ; `commitment`: `string` ; `status`: `number` ; `ticketEpoch`: `BigNumber` ; `ticketIndex`: `BigNumber`  }\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprChannels.ts:432
-
 ___
 
 ### connect
 
-▸ **connect**(`signerOrProvider`): [`HoprChannels`](HoprChannels.md)
+▸ **connect**(`signerOrProvider`): [`HoprChannels`](HoprChannels-1.md)
 
 #### Parameters
 
@@ -672,33 +632,25 @@ ___
 
 #### Returns
 
-[`HoprChannels`](HoprChannels.md)
+[`HoprChannels`](HoprChannels-1.md)
 
 #### Overrides
 
 BaseContract.connect
 
-#### Defined in
-
-packages/ethereum/src/types/HoprChannels.ts:293
-
 ___
 
 ### deployed
 
-▸ **deployed**(): `Promise`<[`HoprChannels`](HoprChannels.md)\>
+▸ **deployed**(): `Promise`<[`HoprChannels`](HoprChannels-1.md)\>
 
 #### Returns
 
-`Promise`<[`HoprChannels`](HoprChannels.md)\>
+`Promise`<[`HoprChannels`](HoprChannels-1.md)\>
 
 #### Overrides
 
 BaseContract.deployed
-
-#### Defined in
-
-packages/ethereum/src/types/HoprChannels.ts:295
 
 ___
 
@@ -721,10 +673,6 @@ ___
 
 BaseContract.emit
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:125
-
 ___
 
 ### fallback
@@ -745,10 +693,6 @@ ___
 
 BaseContract.fallback
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:113
-
 ___
 
 ### finalizeChannelClosure
@@ -765,10 +709,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprChannels.ts:447
 
 ___
 
@@ -790,10 +730,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprChannels.ts:452
-
 ___
 
 ### initiateChannelClosure
@@ -810,10 +746,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprChannels.ts:460
 
 ___
 
@@ -834,10 +766,6 @@ ___
 #### Inherited from
 
 BaseContract.listenerCount
-
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:126
 
 ___
 
@@ -865,10 +793,6 @@ ___
 
 BaseContract.listeners
 
-#### Defined in
-
-packages/ethereum/src/types/HoprChannels.ts:305
-
 ▸ **listeners**(`eventName?`): `Listener`[]
 
 #### Parameters
@@ -884,10 +808,6 @@ packages/ethereum/src/types/HoprChannels.ts:305
 #### Overrides
 
 BaseContract.listeners
-
-#### Defined in
-
-packages/ethereum/src/types/HoprChannels.ts:308
 
 ___
 
@@ -906,10 +826,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprChannels.ts:465
-
 ___
 
 ### publicKeys
@@ -926,10 +842,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprChannels.ts:470
 
 ___
 
@@ -959,10 +871,6 @@ ___
 
 BaseContract.queryFilter
 
-#### Defined in
-
-packages/ethereum/src/types/HoprChannels.ts:299
-
 ___
 
 ### redeemTicket
@@ -987,15 +895,11 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprChannels.ts:472
-
 ___
 
 ### removeAllListeners
 
-▸ **removeAllListeners**<`TEvent`\>(`eventFilter`): [`HoprChannels`](HoprChannels.md)
+▸ **removeAllListeners**<`TEvent`\>(`eventFilter`): [`HoprChannels`](HoprChannels-1.md)
 
 #### Type parameters
 
@@ -1011,17 +915,13 @@ ___
 
 #### Returns
 
-[`HoprChannels`](HoprChannels.md)
+[`HoprChannels`](HoprChannels-1.md)
 
 #### Overrides
 
 BaseContract.removeAllListeners
 
-#### Defined in
-
-packages/ethereum/src/types/HoprChannels.ts:309
-
-▸ **removeAllListeners**(`eventName?`): [`HoprChannels`](HoprChannels.md)
+▸ **removeAllListeners**(`eventName?`): [`HoprChannels`](HoprChannels-1.md)
 
 #### Parameters
 
@@ -1031,15 +931,11 @@ packages/ethereum/src/types/HoprChannels.ts:309
 
 #### Returns
 
-[`HoprChannels`](HoprChannels.md)
+[`HoprChannels`](HoprChannels-1.md)
 
 #### Overrides
 
 BaseContract.removeAllListeners
-
-#### Defined in
-
-packages/ethereum/src/types/HoprChannels.ts:312
 
 ___
 
@@ -1057,10 +953,6 @@ ___
 
 `Promise`<`number`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprChannels.ts:484
-
 ___
 
 ### token
@@ -1076,10 +968,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprChannels.ts:486
 
 ___
 
@@ -1102,7 +990,3 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprChannels.ts:488

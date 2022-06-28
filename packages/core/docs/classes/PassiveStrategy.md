@@ -2,6 +2,14 @@
 
 # Class: PassiveStrategy
 
+Staked nodes will likely want to automate opening and closing of channels. By
+implementing the following interface, they can decide how to allocate their
+stake to best attract traffic with a useful channel graph.
+
+Implementors should bear in mind:
+- Churn is expensive
+- Path finding will prefer high stakes, and high availability of nodes.
+
 ## Hierarchy
 
 - [`SaneDefaults`](SaneDefaults.md)
@@ -97,10 +105,6 @@ ___
 
 [SaneDefaults](SaneDefaults.md).[onChannelWillClose](SaneDefaults.md#onchannelwillclose)
 
-#### Defined in
-
-[packages/core/src/channel-strategy.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L65)
-
 ___
 
 ### onWinningTicket
@@ -126,10 +130,6 @@ ___
 
 [SaneDefaults](SaneDefaults.md).[onWinningTicket](SaneDefaults.md#onwinningticket)
 
-#### Defined in
-
-[packages/core/src/channel-strategy.ts:59](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L59)
-
 ___
 
 ### shouldCommitToChannel
@@ -154,10 +154,6 @@ ___
 
 [SaneDefaults](SaneDefaults.md).[shouldCommitToChannel](SaneDefaults.md#shouldcommittochannel)
 
-#### Defined in
-
-[packages/core/src/channel-strategy.ts:78](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L78)
-
 ___
 
 ### tick
@@ -179,7 +175,3 @@ ___
 #### Implementation of
 
 [ChannelStrategyInterface](../interfaces/ChannelStrategyInterface.md).[tick](../interfaces/ChannelStrategyInterface.md#tick)
-
-#### Defined in
-
-[packages/core/src/channel-strategy.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L90)

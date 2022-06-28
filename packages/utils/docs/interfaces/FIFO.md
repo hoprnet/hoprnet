@@ -40,10 +40,6 @@
 
 `T`
 
-#### Defined in
-
-[collection/fifo.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/collection/fifo.ts#L7)
-
 ___
 
 ### peek
@@ -53,10 +49,6 @@ ___
 #### Returns
 
 `T`
-
-#### Defined in
-
-[collection/fifo.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/collection/fifo.ts#L10)
 
 ___
 
@@ -73,10 +65,6 @@ ___
 #### Returns
 
 `number`
-
-#### Defined in
-
-[collection/fifo.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/collection/fifo.ts#L12)
 
 ___
 
@@ -95,10 +83,6 @@ ___
 
 `boolean`
 
-#### Defined in
-
-[collection/fifo.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/collection/fifo.ts#L11)
-
 ___
 
 ### shift
@@ -108,10 +92,6 @@ ___
 #### Returns
 
 `T`
-
-#### Defined in
-
-[collection/fifo.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/collection/fifo.ts#L9)
 
 ___
 
@@ -123,10 +103,6 @@ ___
 
 `number`
 
-#### Defined in
-
-[collection/fifo.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/collection/fifo.ts#L8)
-
 ___
 
 ### toArray
@@ -136,7 +112,3 @@ ___
 #### Returns
 
 `T`[]
-
-#### Defined in
-
-[collection/fifo.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/collection/fifo.ts#L13)

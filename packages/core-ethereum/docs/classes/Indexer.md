@@ -87,10 +87,6 @@ Also keeps track of the latest block number.
 
 (EventEmitter as new () &#x3D;\&gt; IndexerEventEmitter).constructor
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L73)
-
 ## Properties
 
 ### blockProcessingLock
@@ -250,10 +246,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).addListener
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L70)
-
 ▸ **addListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -270,10 +262,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).addListener
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L71)
 
 ▸ **addListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
@@ -292,10 +280,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).addListener
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L72)
-
 ▸ **addListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -312,10 +296,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).addListener
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L73)
 
 ▸ **addListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
@@ -334,10 +314,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).addListener
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L74)
-
 ▸ **addListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -354,10 +330,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).addListener
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:75](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L75)
 
 ▸ **addListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
@@ -376,10 +348,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).addListener
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:76](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L76)
-
 ▸ **addListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -397,10 +365,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).addListener
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:77](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L77)
-
 ▸ **addListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -417,10 +381,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).addListener
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:81](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L81)
 
 ___
 
@@ -442,10 +402,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).emit
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:83](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L83)
-
 ▸ **emit**(`event`, `block`): `boolean`
 
 #### Parameters
@@ -462,10 +418,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).emit
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L84)
 
 ▸ **emit**(`event`, `block`): `boolean`
 
@@ -484,10 +436,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).emit
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:85](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L85)
-
 ▸ **emit**(`event`, `status`): `boolean`
 
 #### Parameters
@@ -504,10 +452,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).emit
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:86](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L86)
 
 ▸ **emit**(`event`, `peerData`): `boolean`
 
@@ -528,10 +472,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).emit
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:87](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L87)
-
 ▸ **emit**(`event`, `channel`): `boolean`
 
 #### Parameters
@@ -549,10 +489,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).emit
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:88](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L88)
-
 ▸ **emit**(`event`, `txHash`): `boolean`
 
 #### Parameters
@@ -569,10 +505,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).emit
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:89](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L89)
 
 ▸ **emit**(`event`, `account`, `hoprNode`, `eligibility`): `boolean`
 
@@ -593,10 +525,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).emit
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L90)
-
 ▸ **emit**(`event`, `isEnabled`): `boolean`
 
 #### Parameters
@@ -614,10 +542,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).emit
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:96](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L96)
-
 ___
 
 ### getAccount
@@ -634,10 +558,6 @@ ___
 
 `Promise`<`AccountEntry`\>
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:867](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L867)
-
 ___
 
 ### getAddressesAnnouncedOnChain
@@ -647,10 +567,6 @@ ___
 #### Returns
 
 `Promise`<`Multiaddr`[]\>
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:879](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L879)
 
 ___
 
@@ -675,10 +591,6 @@ channel events
 
 all relevant events in the specified block range
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:217](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L217)
-
 ___
 
 ### getOpenChannelsFrom
@@ -700,10 +612,6 @@ NOTE: channels with status 'PENDING_TO_CLOSE' are not included
 
 peer's open channels
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:922](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L922)
-
 ___
 
 ### getPublicKeyOf
@@ -720,10 +628,6 @@ ___
 
 `Promise`<`PublicKey`\>
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:871](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L871)
-
 ___
 
 ### getPublicNodes
@@ -733,10 +637,6 @@ ___
 #### Returns
 
 `Promise`<{ `id`: `PeerId` ; `multiaddrs`: `Multiaddr`[]  }[]\>
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:883](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L883)
 
 ___
 
@@ -753,10 +653,6 @@ NOTE: channels with status 'PENDING_TO_CLOSE' are not included
 
 an open channel
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:905](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L905)
-
 ___
 
 ### indexEvent
@@ -772,10 +668,6 @@ ___
 #### Returns
 
 `void`
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:862](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L862)
 
 ___
 
@@ -796,10 +688,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).listeners
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:170](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L170)
 
 ___
 
@@ -822,10 +710,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).off
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:160](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L160)
-
 ▸ **off**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -842,10 +726,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).off
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:161](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L161)
 
 ▸ **off**(`event`, `listener`): [`Indexer`](Indexer.md)
 
@@ -864,10 +744,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).off
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:162](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L162)
-
 ▸ **off**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -884,10 +760,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).off
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:163](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L163)
 
 ▸ **off**(`event`, `listener`): [`Indexer`](Indexer.md)
 
@@ -906,10 +778,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).off
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:164](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L164)
-
 ▸ **off**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -926,10 +794,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).off
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:165](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L165)
 
 ▸ **off**(`event`, `listener`): [`Indexer`](Indexer.md)
 
@@ -948,10 +812,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).off
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:166](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L166)
-
 ▸ **off**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -969,10 +829,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).off
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:167](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L167)
-
 ▸ **off**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -989,10 +845,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).off
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:168](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L168)
 
 ___
 
@@ -1015,10 +867,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).on
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L98)
-
 ▸ **on**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -1035,10 +883,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).on
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:99](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L99)
 
 ▸ **on**(`event`, `listener`): [`Indexer`](Indexer.md)
 
@@ -1057,10 +901,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).on
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:100](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L100)
-
 ▸ **on**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -1077,10 +917,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).on
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:101](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L101)
 
 ▸ **on**(`event`, `listener`): [`Indexer`](Indexer.md)
 
@@ -1099,10 +935,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).on
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:102](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L102)
-
 ▸ **on**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -1119,10 +951,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).on
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:103](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L103)
 
 ▸ **on**(`event`, `listener`): [`Indexer`](Indexer.md)
 
@@ -1141,10 +969,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).on
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:104](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L104)
-
 ▸ **on**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -1162,10 +986,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).on
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:105](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L105)
-
 ▸ **on**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -1182,10 +1002,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).on
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:106](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L106)
 
 ___
 
@@ -1205,10 +1021,6 @@ ___
 
 `Promise`<`void`\>
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:709](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L709)
-
 ___
 
 ### onChannelClosed
@@ -1224,10 +1036,6 @@ ___
 #### Returns
 
 `Promise`<`void`\>
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:806](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L806)
 
 ___
 
@@ -1246,10 +1054,6 @@ ___
 
 `Promise`<`void`\>
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:738](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L738)
-
 ___
 
 ### onDeregistered
@@ -1266,10 +1070,6 @@ ___
 #### Returns
 
 `Promise`<`void`\>
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:839](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L839)
 
 ___
 
@@ -1288,10 +1088,6 @@ ___
 
 `Promise`<`void`\>
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:811](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L811)
-
 ___
 
 ### onEnabledNetworkRegistry
@@ -1309,10 +1105,6 @@ ___
 
 `Promise`<`void`\>
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:843](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L843)
-
 ___
 
 ### onNewBlock
@@ -1329,17 +1121,13 @@ confirmed blocks.
 | Name | Type | Default value | Description |
 | :------ | :------ | :------ | :------ |
 | `blockNumber` | `number` | `undefined` | latest on-chain block number |
-| `fetchEvents` | `boolean` | `false` | if true, query provider for events in block |
+| `fetchEvents` | `boolean` | `false` | [optional] if true, query provider for events in block |
 | `fetchNativeTxs` | `boolean` | `false` | - |
 | `blocking` | `boolean` | `false` | - |
 
 #### Returns
 
 `Promise`<`void`\>
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:423](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L423)
 
 ___
 
@@ -1361,10 +1149,6 @@ Adds new events to the queue of unprocessed events
 
 `void`
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:535](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L535)
-
 ___
 
 ### onProviderError
@@ -1384,10 +1168,6 @@ Will restart the indexer if needed.
 
 `Promise`<`void`\>
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:379](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L379)
-
 ___
 
 ### onRegistered
@@ -1404,10 +1184,6 @@ ___
 #### Returns
 
 `Promise`<`void`\>
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:825](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L825)
 
 ___
 
@@ -1426,10 +1202,6 @@ ___
 
 `Promise`<`void`\>
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:774](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L774)
-
 ___
 
 ### onTransfer
@@ -1446,10 +1218,6 @@ ___
 #### Returns
 
 `Promise`<`void`\>
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:851](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L851)
 
 ___
 
@@ -1472,10 +1240,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).once
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:108](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L108)
-
 ▸ **once**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -1492,10 +1256,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).once
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:109](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L109)
 
 ▸ **once**(`event`, `listener`): [`Indexer`](Indexer.md)
 
@@ -1514,10 +1274,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).once
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:110](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L110)
-
 ▸ **once**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -1534,10 +1290,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).once
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:111](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L111)
 
 ▸ **once**(`event`, `listener`): [`Indexer`](Indexer.md)
 
@@ -1556,10 +1308,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).once
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:112](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L112)
-
 ▸ **once**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -1576,10 +1324,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).once
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:113](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L113)
 
 ▸ **once**(`event`, `listener`): [`Indexer`](Indexer.md)
 
@@ -1598,10 +1342,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).once
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:114](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L114)
-
 ▸ **once**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -1619,10 +1359,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).once
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:115](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L115)
-
 ▸ **once**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -1639,10 +1375,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).once
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:116](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L116)
 
 ___
 
@@ -1665,10 +1397,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).prependListener
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:118](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L118)
-
 ▸ **prependListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -1685,10 +1413,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).prependListener
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L119)
 
 ▸ **prependListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
@@ -1707,10 +1431,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).prependListener
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:120](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L120)
-
 ▸ **prependListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -1727,10 +1447,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).prependListener
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:121](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L121)
 
 ▸ **prependListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
@@ -1749,10 +1465,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).prependListener
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:122](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L122)
-
 ▸ **prependListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -1769,10 +1481,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).prependListener
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:123](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L123)
 
 ▸ **prependListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
@@ -1791,10 +1499,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).prependListener
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:124](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L124)
-
 ▸ **prependListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -1812,10 +1516,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).prependListener
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:125](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L125)
-
 ▸ **prependListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -1832,10 +1532,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).prependListener
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:129](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L129)
 
 ___
 
@@ -1858,10 +1554,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).prependOnceListener
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:131](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L131)
-
 ▸ **prependOnceListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -1878,10 +1570,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).prependOnceListener
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:132](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L132)
 
 ▸ **prependOnceListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
@@ -1900,10 +1588,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).prependOnceListener
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:133](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L133)
-
 ▸ **prependOnceListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -1920,10 +1604,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).prependOnceListener
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:134](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L134)
 
 ▸ **prependOnceListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
@@ -1942,10 +1622,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).prependOnceListener
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:135](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L135)
-
 ▸ **prependOnceListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -1962,10 +1638,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).prependOnceListener
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:136](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L136)
 
 ▸ **prependOnceListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
@@ -1984,10 +1656,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).prependOnceListener
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:137](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L137)
-
 ▸ **prependOnceListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -2005,10 +1673,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).prependOnceListener
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:138](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L138)
-
 ▸ **prependOnceListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -2025,10 +1689,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).prependOnceListener
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:142](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L142)
 
 ___
 
@@ -2054,10 +1714,6 @@ TODO: optimize DB and fetch requests
 
 past events and last queried block
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:331](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L331)
-
 ___
 
 ### processUnconfirmedEvents
@@ -2078,10 +1734,6 @@ confirmed block (latestBlock - confirmationTime)
 #### Returns
 
 `Promise`<`void`\>
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:592](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L592)
 
 ___
 
@@ -2104,10 +1756,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).removeListener
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:147](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L147)
-
 ▸ **removeListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -2124,10 +1772,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).removeListener
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:148](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L148)
 
 ▸ **removeListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
@@ -2146,10 +1790,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).removeListener
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:149](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L149)
-
 ▸ **removeListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -2166,10 +1806,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).removeListener
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:150](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L150)
 
 ▸ **removeListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
@@ -2188,10 +1824,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).removeListener
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:151](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L151)
-
 ▸ **removeListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -2208,10 +1840,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).removeListener
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:152](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L152)
 
 ▸ **removeListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
@@ -2230,10 +1858,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).removeListener
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:153](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L153)
-
 ▸ **removeListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
 #### Parameters
@@ -2250,10 +1874,6 @@ ___
 #### Inherited from
 
 (EventEmitter as new () =\> IndexerEventEmitter).removeListener
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:154](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L154)
 
 ▸ **removeListener**(`event`, `listener`): [`Indexer`](Indexer.md)
 
@@ -2272,10 +1892,6 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).removeListener
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/types.ts:158](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/types.ts#L158)
-
 ___
 
 ### resolvePendingTransaction
@@ -2293,10 +1909,6 @@ ___
 
 `DeferType`<`string`\>
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:928](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L928)
-
 ___
 
 ### restart
@@ -2311,10 +1923,6 @@ Restarts the indexer
 
 a promise that resolves once the indexer
 has been restarted
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:189](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L189)
 
 ___
 
@@ -2362,10 +1970,6 @@ Starts indexing.
 
 `Promise`<`void`\>
 
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:87](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L87)
-
 ___
 
 ### stop
@@ -2377,7 +1981,3 @@ Stops indexing.
 #### Returns
 
 `Promise`<`void`\>
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:167](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L167)

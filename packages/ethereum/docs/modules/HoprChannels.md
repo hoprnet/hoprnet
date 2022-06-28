@@ -4,12 +4,12 @@
 
 ## Table of contents
 
-### Type aliases
+### Type Aliases
 
 - [ChannelStruct](HoprChannels.md#channelstruct)
 - [ChannelStructOutput](HoprChannels.md#channelstructoutput)
 
-## Type aliases
+## Type Aliases
 
 ### ChannelStruct
 
