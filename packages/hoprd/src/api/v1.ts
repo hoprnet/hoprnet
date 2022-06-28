@@ -25,7 +25,7 @@ export function setupRestApi(
 
   router.get('/version', (_, res) => res.send(node.getVersion()))
   router.get('/address/eth', (_, res) => res.send(node.getEthereumAddress().toHex()))
-  router.get('/address/hopr', (_, res) => res.send(node.getId().toB58String()))
+  router.get('/address/hopr', (_, res) => res.send(node.getId().toString()))
 
   const cmds = new Commands(node, stateOps)
   router.post('/command', async (req, res) => {

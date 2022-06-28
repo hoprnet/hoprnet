@@ -1,6 +1,6 @@
 import { PeerId } from '@libp2p/interface-peer-id'
 import { Multiaddr } from '@multiformats/multiaddr'
-import PeerStore from 'libp2p/src/peer-store/index.js'
+import { PeerStore } from '@libp2p/peer-store'
 import AddressManager from 'libp2p/src/address-manager/index.js'
 import { MemoryDatastore } from 'datastore-core/memory'
 
@@ -36,7 +36,7 @@ function createLibp2pMock(peerId: PeerId): Libp2p {
     return Promise.resolve()
   }
   libp2p.connectionManager = {} as unknown as Libp2p['connectionManager']
-  libp2p.connectionManager.on = (event: string) => {
+  libp2p.connectionManager.addEventListener = (event: string) => {
     libp2pLogger(`Connection manager event handler called with event "${event}"`)
     return libp2p.connectionManager
   }
@@ -48,24 +48,6 @@ function createLibp2pMock(peerId: PeerId): Libp2p {
   })
 
   libp2p.upgrader = {} as any
-
-  // Add DHT environments
-  libp2p._dht = {}
-  libp2p._dht._wan = {}
-  libp2p._dht._wan._network = {}
-  libp2p._dht._wan._topologyListener = {}
-  libp2p._dht._lan = {}
-  libp2p._dht._lan._network = {}
-  libp2p._dht._lan._topologyListener = {}
-
-  libp2p._dht._wan._network._protocol =
-    libp2p._dht._wan._topologyListener._protocol =
-    libp2p._dht._wan._protocol =
-      '/ipfs/kad/1.0.0'
-  libp2p._dht._lan._network._protocol =
-    libp2p._dht._lan._topologyListener._protocol =
-    libp2p._dht._lan._protocol =
-      '/ipfs/lan/kad/1.0.0'
 
   return libp2p
 }

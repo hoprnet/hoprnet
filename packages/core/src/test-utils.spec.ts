@@ -5,7 +5,7 @@ import type NetworkPeers from './network/network-peers.js'
 import { MAX_BACKOFF } from './network/network-peers.js'
 
 export function getAddress(node: Libp2p): Multiaddr {
-  let addr = node.multiaddrs[0]
+  let addr = node.getMultiaddrs()[0]
   if (!addr.getPeerId()) {
     addr = addr.encapsulate('/p2p/' + node.peerId.toString())
   }
@@ -15,7 +15,8 @@ export function getAddress(node: Libp2p): Multiaddr {
 export function fakePeerId(i: number | string): PeerId {
   return {
     id: i as unknown as Uint8Array,
-    equals: (x: PeerId) => (x.id as unknown as number) == i,
+    // Custom PeerId implementation
+    equals: (x: PeerId) => (x as any).id == i,
     toString: () => i
   } as any
 }

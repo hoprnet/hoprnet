@@ -1,13 +1,13 @@
 import { setImmediate } from 'timers/promises'
 import EventEmitter from 'events'
 
-import all from 'it-all'
 import { protocols, Multiaddr } from '@multiformats/multiaddr'
 import chalk from 'chalk'
 
 import type BN from 'bn.js'
-import type { Libp2p, Connection } from 'libp2p'
-import type { Peer } from 'libp2p/src/peer-store/types.js'
+import type { Libp2p } from 'libp2p'
+import type { Connection } from '@libp2p/interface-connection'
+import type { Peer } from '@libp2p/interface-peer-store'
 import type { PeerId } from '@libp2p/interface-peer-id'
 
 import { compareAddressesLocalMode, compareAddressesPublicMode, type HoprConnectConfig } from '@hoprnet/hopr-connect'
@@ -30,7 +30,6 @@ import {
   isSecp256k1PeerId,
   ChannelStatus,
   MIN_NATIVE_BALANCE,
-  u8aConcat,
   isMultiaddrLocal,
   retryWithBackoff,
   durations,
@@ -65,6 +64,7 @@ import { PacketForwardInteraction } from './interactions/packet/forward.js'
 import { Packet } from './messages/index.js'
 import type { ResolvedEnvironment } from './environment.js'
 import { createLibp2pInstance } from './main.js'
+import { supportedKeys } from '@libp2p/crypto/keys'
 
 const DEBUG_PREFIX = `hopr-core`
 const log = debug(DEBUG_PREFIX)
@@ -157,7 +157,7 @@ class Hopr extends EventEmitter {
   private networkPeers: NetworkPeers
   private heartbeat: Heartbeat
   private forward: PacketForwardInteraction
-  private libp2p: LibP2P
+  private libp2p: Libp2p
   private pubKey: PublicKey
   private knownPublicNodesCache = new Set()
 
@@ -182,7 +182,7 @@ class Hopr extends EventEmitter {
   ) {
     super()
 
-    if (!id.privKey || !isSecp256k1PeerId(id)) {
+    if (!id.privateKey || !isSecp256k1PeerId(id)) {
       throw new Error('Hopr Node must be initialized with an id with a secp256k1 private key')
     }
     this.environment = options.environment
@@ -268,7 +268,7 @@ class Hopr extends EventEmitter {
       libp2pSendMessage(this.libp2p, dest, protocol, msg, includeReply, opts)) as SendMessage
 
     // Attach network health measurement functionality
-    const peers: Peer[] = await all(this.libp2p.peerStore.getPeers())
+    const peers: Peer[] = await this.libp2p.peerStore.all()
     this.networkPeers = new NetworkPeers(
       peers.map((p) => p.id),
       [this.id],
@@ -316,7 +316,7 @@ class Hopr extends EventEmitter {
       this.options
     )
 
-    this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
+    this.libp2p.connectionManager.addEventListener('peer:connect', (conn: Connection) => {
       this.networkPeers.register(conn.remotePeer, 'libp2p peer connect')
     })
 
@@ -386,9 +386,9 @@ class Hopr extends EventEmitter {
     log('# STARTED NODE')
     log('ID', this.getId().toString())
     log('Protocol version', VERSION)
-    if (this.libp2p.multiaddrs !== undefined) {
+    if (this.libp2p.getMultiaddrs() !== undefined) {
       log(`Available under the following addresses:`)
-      for (const ma of this.libp2p.multiaddrs) {
+      for (const ma of this.libp2p.getMultiaddrs()) {
         log(` - ${ma.toString()}`)
       }
     } else {
@@ -475,7 +475,7 @@ class Hopr extends EventEmitter {
 
     try {
       const pubKey = convertPubKeyFromPeerId(peer.id)
-      await this.libp2p.peerStore.keyBook.set(peer.id, pubKey)
+      await this.libp2p.peerStore.keyBook.set(peer.id, pubKey.bytes)
 
       if (dialables.length > 0) {
         this.publicNodesEmitter.emit('addPublicNode', { id: peer.id, multiaddrs: dialables })
@@ -652,7 +652,7 @@ class Hopr extends EventEmitter {
     let addrs: Multiaddr[]
 
     if (peer.equals(this.getId())) {
-      addrs = this.libp2p.multiaddrs
+      addrs = this.libp2p.getMultiaddrs()
     } else {
       addrs = await this.getObservedAddresses(peer)
 
@@ -679,7 +679,8 @@ class Hopr extends EventEmitter {
    * List the addresses on which the node is listening
    */
   public getListeningAddresses(): Multiaddr[] {
-    return this.libp2p.addressManager.getListenAddrs()
+    // @TODO
+    return this.libp2p.getPeers.getListenAddrs()
   }
 
   /**
@@ -837,7 +838,7 @@ class Hopr extends EventEmitter {
    * @param peer PeerId of the peer from whom we want to disconnect
    */
   private async closeConnectionsTo(peer: PeerId): Promise<void> {
-    const connections = this.libp2p.connectionManager.getAll(peer)
+    const connections = this.libp2p.connectionManager.getConnections(peer)
 
     for (const conn of connections) {
       try {
@@ -1186,11 +1187,14 @@ class Hopr extends EventEmitter {
     return await this.connector.getPublicKeyOf(addr)
   }
 
+  // @TODO remove this
   // NB: The prefix "HOPR Signed Message: " is added as a security precaution.
   // Without it, the node could be convinced to sign a message like an Ethereum
   // transaction draining it's connected wallet funds, since they share the key.
   public async signMessage(message: Uint8Array) {
-    return await this.id.privKey.sign(u8aConcat(new TextEncoder().encode('HOPR Signed Message: '), message))
+    return await new supportedKeys.secp256k1.Secp256k1PrivateKey(this.id.privateKey).sign(
+      Uint8Array.from([...new TextEncoder().encode('HOPR Signed Message: '), ...message])
+    )
   }
 
   public getEthereumAddress(): Address {

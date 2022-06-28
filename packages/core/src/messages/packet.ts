@@ -27,6 +27,7 @@ import BN from 'bn.js'
 import { Acknowledgement } from './acknowledgement.js'
 import chalk from 'chalk'
 import { debug } from '@hoprnet/hopr-utils'
+import { keysPBM } from '@libp2p/crypto/keys'
 
 export const INTERMEDIATE_HOPS = 3 // 3 relayers and 1 destination
 
@@ -99,7 +100,7 @@ export async function createTicket(
     amount,
     UINT256.fromInverseProbability(winProb),
     channel.channelEpoch,
-    privKey.privKey.marshal()
+    keysPBM.PrivateKey.decode(privKey.privateKey).Data
   )
   await db.markPending(ticket)
 
@@ -124,7 +125,7 @@ export function createZeroHopTicket(dest: PublicKey, challenge: Challenge, privK
     new Balance(new BN(0)),
     UINT256.DUMMY_INVERSE_PROBABILITY,
     UINT256.fromString('0'),
-    privKey.privKey.marshal()
+    keysPBM.PrivateKey.decode(privKey.privateKey).Data
   )
 }
 
@@ -327,7 +328,7 @@ export class Packet {
   }
 
   static deserialize(preArray: Uint8Array, privKey: PeerId, pubKeySender: PeerId): Packet {
-    if (privKey.privKey == null) {
+    if (!privKey.privateKey) {
       throw Error(`Invalid arguments`)
     }
 

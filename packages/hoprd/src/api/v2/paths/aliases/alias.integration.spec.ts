@@ -22,7 +22,7 @@ describe('GET /aliases/{alias}', () => {
 
   it('should successfuly get alias', async () => {
     await request(service).post('/api/v2/aliases').send({
-      peerId: ALICE_PEER_ID.toB58String(),
+      peerId: ALICE_PEER_ID.toString(),
       alias: ALIAS
     })
 
@@ -30,7 +30,7 @@ describe('GET /aliases/{alias}', () => {
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({
-      peerId: ALICE_PEER_ID.toB58String()
+      peerId: ALICE_PEER_ID.toString()
     })
   })
   it('should return 404 on invalid peerId', async () => {
@@ -55,7 +55,7 @@ describe('DELETE /aliases/{alias}', () => {
 
   it('should remove alias successfuly', async () => {
     await request(service).post('/api/v2/aliases').send({
-      peerId: ALICE_PEER_ID.toB58String(),
+      peerId: ALICE_PEER_ID.toString(),
       alias: ALIAS
     })
 
@@ -67,7 +67,7 @@ describe('DELETE /aliases/{alias}', () => {
   })
   it("should return 204 even if the alias doesn't exist", async () => {
     await request(service).post('/api/v2/aliases').send({
-      peerId: ALICE_PEER_ID.toB58String(),
+      peerId: ALICE_PEER_ID.toString(),
       alias: 'nonExistingAlias'
     })
 

@@ -19,7 +19,7 @@ describe('hopr core (instance)', async function () {
     const connectorMock = createConnectorMock(peerId)
     const node = new Hopr(peerId, dbMock, connectorMock, sampleOptions as HoprOptions)
 
-    log('Node created with Id', node.getId().toB58String())
+    log('Node created with Id', node.getId().toString())
     assert(node instanceof Hopr)
 
     log('Starting node')

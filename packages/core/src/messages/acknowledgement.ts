@@ -5,6 +5,7 @@ import secp256k1 from 'secp256k1'
 import { SECRET_LENGTH, HASH_ALGORITHM } from './constants.js'
 import { createHash } from 'crypto'
 import type { PeerId } from '@libp2p/interface-peer-id'
+import { keysPBM, unmarshalPublicKey } from '@libp2p/crypto/keys'
 
 export class Acknowledgement {
   private constructor(
@@ -20,7 +21,10 @@ export class Acknowledgement {
   static create(challenge: AcknowledgementChallenge, ackKey: HalfKey, privKey: PeerId): Acknowledgement {
     const toSign = Uint8Array.from([...challenge.serialize(), ...ackKey.serialize()])
 
-    const signature = secp256k1.ecdsaSign(createHash(HASH_ALGORITHM).update(toSign).digest(), privKey.privKey.marshal())
+    const signature = secp256k1.ecdsaSign(
+      createHash(HASH_ALGORITHM).update(toSign).digest(),
+      keysPBM.PrivateKey.decode(privKey.privateKey).Data
+    )
 
     return new Acknowledgement(signature.signature, challenge.serialize(), ackKey)
   }
@@ -45,7 +49,9 @@ export class Acknowledgement {
 
     const challengeToVerify = createHash(HASH_ALGORITHM).update(new HalfKey(ackKey).toChallenge().serialize()).digest()
 
-    if (!secp256k1.ecdsaVerify(challengeSignature, challengeToVerify, ownPubKey.pubKey.marshal())) {
+    if (
+      !secp256k1.ecdsaVerify(challengeSignature, challengeToVerify, unmarshalPublicKey(ownPubKey.publicKey).marshal())
+    ) {
       throw Error(`Challenge signature verification failed.`)
     }
 
@@ -53,7 +59,7 @@ export class Acknowledgement {
       .update(Uint8Array.from([...challengeSignature, ...ackKey]))
       .digest()
 
-    if (!secp256k1.ecdsaVerify(ackSignature, ackToVerify, senderPubKey.pubKey.marshal())) {
+    if (!secp256k1.ecdsaVerify(ackSignature, ackToVerify, unmarshalPublicKey(senderPubKey.publicKey).marshal())) {
       throw Error(`Acknowledgement signature verification failed.`)
     }
 

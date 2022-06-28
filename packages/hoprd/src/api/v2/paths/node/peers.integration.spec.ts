@@ -21,7 +21,7 @@ const ALICE_ENTRY = {
   quality: 1
 }
 const ALICE_PEER_INFO = {
-  peerId: ALICE_PEER_ID.toB58String(),
+  peerId: ALICE_PEER_ID.toString(),
   multiAddr: ALICE_MULTI_ADDR.toString(),
   heartbeats: {
     sent: ALICE_ENTRY.heartbeatsSent,
@@ -42,7 +42,7 @@ const BOB_ENTRY = {
   quality: 0.2
 }
 const BOB_PEER_INFO = {
-  peerId: BOB_PEER_ID.toB58String(),
+  peerId: BOB_PEER_ID.toString(),
   multiAddr: BOB_MULTI_ADDR.toString(),
   heartbeats: {
     sent: BOB_ENTRY.heartbeatsSent,
@@ -63,7 +63,7 @@ const CHARLIE_ENTRY = {
   quality: 0.8
 }
 const CHARLIE_PEER_INFO = {
-  peerId: CHARLIE_PEER_ID.toB58String(),
+  peerId: CHARLIE_PEER_ID.toString(),
   heartbeats: {
     sent: CHARLIE_ENTRY.heartbeatsSent,
     success: CHARLIE_ENTRY.heartbeatsSuccess
@@ -79,9 +79,9 @@ node.getConnectedPeers = sinon.fake.returns([ALICE_PEER_ID, BOB_PEER_ID, CHARLIE
 node.getAddressesAnnouncedOnChain = sinon.fake.resolves([ALICE_MULTI_ADDR, BOB_MULTI_ADDR])
 node.getConnectionInfo = sinon.stub()
 // we must use `sinon.match.has` as passing the plain PeerId in `withArgs` fails to work
-node.getConnectionInfo.withArgs(sinon.match.has('_idB58String', ALICE_PEER_ID.toB58String())).returns(ALICE_ENTRY)
-node.getConnectionInfo.withArgs(sinon.match.has('_idB58String', BOB_PEER_ID.toB58String())).returns(BOB_ENTRY)
-node.getConnectionInfo.withArgs(sinon.match.has('_idB58String', CHARLIE_PEER_ID.toB58String())).returns(CHARLIE_ENTRY)
+node.getConnectionInfo.withArgs(sinon.match.has('_idB58String', ALICE_PEER_ID.toString())).returns(ALICE_ENTRY)
+node.getConnectionInfo.withArgs(sinon.match.has('_idB58String', BOB_PEER_ID.toString())).returns(BOB_ENTRY)
+node.getConnectionInfo.withArgs(sinon.match.has('_idB58String', CHARLIE_PEER_ID.toString())).returns(CHARLIE_ENTRY)
 
 describe('GET /node/peers', function () {
   let service: any

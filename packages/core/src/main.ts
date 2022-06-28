@@ -8,8 +8,9 @@ import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
 import { Mplex } from '@libp2p/mplex'
 import { KadDHT } from '@libp2p/kad-dht'
-import { NOISE } from '@chainsafe/libp2p-noise'
+import { Noise } from '@chainsafe/libp2p-noise'
 import type { PeerId } from '@libp2p/interface-peer-id'
+import { keysPBM } from '@libp2p/crypto/keys'
 import Hopr, { type HoprOptions } from './index.js'
 import { getAddrs } from './identity.js'
 import HoprConnect, {
@@ -67,13 +68,12 @@ export async function createLibp2pInstance(
   const libp2p = await createLibp2p({
     peerId,
     addresses: { listen: getAddrs(peerId, options).map((x) => x.toString()) },
+    // @ts-ignore
+    transports: [new HoprConnect()],
+    streamMuxers: [new Mplex()],
+    connectionEncryption: [new Noise()],
+    dht: new KadDHT({ protocolPrefix: `/hopr/${options.environment.id}` }),
     // libp2p modules
-    modules: {
-      transport: [HoprConnect as any],
-      streamMuxer: [Mplex],
-      connEncryption: [NOISE as any],
-      dht: KadDHT
-    },
     // Configure peerstore to be persisted using LevelDB, also requires config
     // persistence to be set.
     datastore,
@@ -147,24 +147,6 @@ export async function createLibp2pInstance(
     }
   })
 
-  // Isolate DHTs
-  const DHT_WAN_PREFIX = libp2p._dht._wan._protocol
-  const DHT_LAN_PREFIX = libp2p._dht._lan._protocol
-
-  if (DHT_WAN_PREFIX !== '/ipfs/kad/1.0.0' || DHT_LAN_PREFIX !== '/ipfs/lan/kad/1.0.0') {
-    throw Error(`Libp2p DHT implementation has changed. Cannot set DHT environments`)
-  }
-
-  const HOPR_DHT_WAN_PROTOCOL = `/hopr/${options.environment.id}/kad/1.0.0`
-  libp2p._dht._wan._protocol = HOPR_DHT_WAN_PROTOCOL
-  libp2p._dht._wan._network._protocol = HOPR_DHT_WAN_PROTOCOL
-  libp2p._dht._wan._topologyListener._protocol = HOPR_DHT_WAN_PROTOCOL
-
-  const HOPR_DHT_LAN_PROTOCOL = `/hopr/${options.environment.id}/lan/kad/1.0.0`
-  libp2p._dht._lan._protocol = HOPR_DHT_LAN_PROTOCOL
-  libp2p._dht._lan._network._protocol = HOPR_DHT_LAN_PROTOCOL
-  libp2p._dht._lan._topologyListener._protocol = HOPR_DHT_LAN_PROTOCOL
-
   return libp2p
 }
 
@@ -180,7 +162,7 @@ export async function createHoprNode(
   options: HoprOptions,
   automaticChainCreation = true
 ): Promise<Hopr> {
-  const db = new HoprDB(PublicKey.fromPrivKey(peerId.privKey.marshal()))
+  const db = new HoprDB(PublicKey.fromPeerId(peerId))
 
   try {
     const dbPath = path.join(options.dataPath, 'db')
@@ -194,7 +176,7 @@ export async function createHoprNode(
   const chain = new HoprCoreEthereum(
     db,
     PublicKey.fromPeerId(peerId),
-    peerId.privKey.marshal(),
+    keysPBM.PrivateKey.decode(peerId.privateKey as Uint8Array).Data,
     {
       chainId: options.environment.network.chain_id,
       environment: options.environment.id,
