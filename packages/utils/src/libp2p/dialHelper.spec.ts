@@ -4,7 +4,7 @@ import { createLibp2p, type Libp2p } from 'libp2p'
 import { TCP } from '@libp2p/tcp'
 import { KadDHT } from '@libp2p/kad-dht'
 import { Multiaddr } from '@multiformats/multiaddr'
-import type { Address, PeerStore } from '@libp2p/interface-peer-store'
+import type { Address, AddressBook, PeerStore } from '@libp2p/interface-peer-store'
 import type { Connection } from '@libp2p/interface-connection'
 import { isPeerId, type PeerId } from '@libp2p/interface-peer-id'
 import type { ConnectionManager } from '@libp2p/interface-connection-manager'
@@ -75,7 +75,6 @@ function getPeerStore(): PeerStore {
 
   return {
     addressBook: {
-      // @ts-ignore libp2p type clash
       add: async (peerId: PeerId, multiaddrs: Multiaddr[]): Promise<void> => {
         const addresses = peerStore.get(peerId) ?? new Set<Address>()
         for (const address of multiaddrs) {
@@ -93,8 +92,8 @@ function getPeerStore(): PeerStore {
         }
         return result
       }
-    }
-  }
+    } as AddressBook
+  } as PeerStore
 }
 
 function getConnectionManager(): ConnectionManager {
