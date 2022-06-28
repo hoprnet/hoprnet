@@ -69,9 +69,11 @@ WORKDIR /hardhat
 COPY --from=build /app/packages/ethereum .
 COPY --from=build /app/packages/core/protocol-config.json /core/
 
+# pre-compile as much as we can to reduce startup time
 RUN rm package.json \
  && mv package.hardhat.json package.json \
- && yarn
+ && yarn \
+ && yarn run compile
 
 COPY --from=build /app/scripts scripts
 

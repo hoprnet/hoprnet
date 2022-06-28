@@ -98,7 +98,7 @@ build_and_tag_images() {
 
     if [ -z "${image_name}" ] || [ "${image_name}" = "hardhat" ] || [ "${image_name}" = "pluto-complete" ]; then
     log "Building Docker image hopr-hardhat-local"
-    docker build -q -t hopr-hardhat-local \
+    docker build -t hopr-hardhat-local \
       -f Dockerfile.hardhat . &
     fi
 

@@ -6,7 +6,7 @@ FROM ${HOPRD_IMAGE} as hoprd
 
 FROM ${HARDHAT_IMAGE} as runtime
 
-RUN apk add --no-cache bash libc6-compat lsof
+RUN apk add --no-cache bash libc6-compat lsof curl jq
 
 # symlink required to get WRTC to work
 RUN ln -s /lib/libc.musl-x86_64.so.1 /lib/ld-linux-x86-64.so.2
@@ -51,4 +51,4 @@ ENV HOPRD_API_TOKEN=${HOPRD_API_TOKEN:-%th1s-IS-a-S3CR3T-ap1-PUSHING-b1ts-TO-you
 
 #
 #ENTRYPOINT ["supervisord", "-c", "/etc/supervisord.conf"]
-ENTRYPOINT /hardhat/scripts/setup-local-cluster.sh -t "${HOPRD_API_TOKEN}" -i /hardhat/scripts/topologies/full_interconnected_cluster.sh --hardhat-command "yarn run network" --hoprd-command "yarn hoprd" --hardhat-basedir "/hardhat"
+ENTRYPOINT /hardhat/scripts/setup-local-cluster.sh -p -t "${HOPRD_API_TOKEN}" -i /hardhat/scripts/topologies/full_interconnected_cluster.sh --hoprd-command "yarn hoprd" --hardhat-basedir "/hardhat"
