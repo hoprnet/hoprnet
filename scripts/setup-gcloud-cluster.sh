@@ -127,6 +127,7 @@ gcloud_create_or_update_managed_instance_group  \
 
 
 # Maps "staking account address" => "private key"
+# TODO: Supply the private keys from GH secrets
 declare -A staking_addr_dict=(
   [0x6c150A63941c6d58a2f2687a23d5a8E0DbdE181C]=""
   [0x0Fd4C32CC8C6237132284c1600ed94D06AC478C6]=""
@@ -140,10 +141,6 @@ for staking_addr in "${!staking_addr_dict[@]}" ; do
     --privatekey "${staking_addr_dict[staking_addr]}"
 done
 
-declare -A ip_addrs
-declare -A hopr_addrs
-declare -A used_staking_addrs
-
 # Get names of all instances in this cluster
 declare instance_names
 instance_names=$(gcloud_get_managed_instance_group_instances_names "${cluster_id}")
@@ -152,6 +149,12 @@ declare instance_names_arr=( ${instance_names} )
 # Prepare sorted staking account addresses so we ensure a stable order of assignment
 declare staking_addresses_arr=( "${!staking_addr_dict[@]}" ) # staking accounts addresses only
 readarray -t staking_addresses_arr < <(for addr in "${!staking_addr_dict[@]}"; do echo "$addr"; done | sort)
+
+# These arrays will hold IP addresses, peer IDs and staking addresses
+# for instance VMs in the encounter order of `instance_names` array
+declare -a ip_addrs
+declare -a hopr_addrs
+declare -a used_staking_addrs
 
 # Iterate through all VM instances
 for instance_idx in "${!instance_names_arr[@]}" ; do
@@ -186,13 +189,12 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
     staking_addr=$(echo "${info_tag}" | sed -E 's/.*nr_staking_addr=([a-zA-Z0-9]+).*/\1/g')
   fi
 
-  # Also use the staking account address here?
-  ip_addrs+=( [$instance_name]="${node_ip}" )
+  ip_addrs+=( "${node_ip}" )
 
-  # Do not include the "unstaked" node during registration
+  # Do not include the "unstaked" node (= skipped during registration for NR)
   if [[ "${staking_addr}" != "unstaked" ]]; then
-    hopr_addrs+=( [$instance_name]="${peer_id}" )
-    used_staking_addrs+=( [$instance_name]="${staking_addr}" )
+    hopr_addrs+=( "${peer_id}" )
+    used_staking_addrs+=( "${staking_addr}" )
   fi
 
   # Fund the node as well
