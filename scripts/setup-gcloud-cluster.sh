@@ -129,18 +129,22 @@ gcloud_create_or_update_managed_instance_group  \
 # TODO: Populate this from GH Secrets
 declare -A staking_acc_dict=() # Maps "staking account address/name" => "private key"
 
-# TODO: Call this always?
-# yarn hardhat stake --network hardhat --amount 1000000000000000000000 --privatekey "${staking_priv_key[staking_acc_name]}"
+# This can be called always, because the "stake" task is idempotent given the same arguments
+for staking_account in "${!staking_acc_dict[@]}" ; do
+  yarn hardhat stake --network hardhat --amount 1000000000000000000000 \
+    --privatekey "${staking_acc_dict[staking_account]}"
+done
 
 declare -A ip_addrs
 declare -A hopr_addrs
-declare -A native_addrs
+declare -A used_staking_addrs
 
+# Get names of all instances in this cluster
 declare instance_names
 instance_names=$(gcloud_get_managed_instance_group_instances_names "${cluster_id}")
 declare instance_names_arr=( ${instance_names} )
 
-# Iterate through all instances in this cluster
+# Iterate through all instances
 declare staking_acc_names_arr=( "${!staking_acc_dict[@]}" ) # staking accounts addresses/names only
 declare count_staking_accs=${#staking_acc_names_arr[@]}
 declare current_staking_index=0
@@ -170,8 +174,8 @@ for instance_name in "${instance_names_arr[@]}" ; do
 
   # Also use the staking account address here?
   ip_addrs+=( [$instance_name]="${node_ip}" )
-  native_addrs+=( [$instance_name]="${wallet_addr}" )
   hopr_addrs+=( [$instance_name]="${peer_id}" )
+  used_staking_addrs+=( [$instance_name]="${staking_acc}" )
 
   # Staking accounts are assigned round-robin
   current_staking_index=$(( (current_staking_index + 1) % count_staking_accs ))
@@ -185,10 +189,11 @@ done
 # Register all nodes in cluster
 declare cifs="$IFS"
 IFS=','
+# If same order of parameters is given, the "register" task is idempotent
 yarn workspace @hoprnet/hopr-ethereum hardhat register \
    --network hardhat \
    --task add \
-   --native-addresses "${native_addrs[*]}" \
+   --native-addresses "${used_staking_addrs[*]}" \
    --peer-ids "${hopr_addrs[*]}"
 IFS="${cifs}"
 
