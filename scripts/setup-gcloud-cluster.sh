@@ -158,11 +158,11 @@ instance_names=$(gcloud_get_managed_instance_group_instances_names "${cluster_id
 declare instance_names_arr=( ${instance_names} )
 
 # Prepare sorted staking account addresses so we ensure a stable order of assignment
-declare staking_addresses_arr=( "${!staking_addrs_dict[@]}" ) # staking accounts addresses only
-readarray -t staking_addresses_arr < <(for addr in "${!staking_addrs_dict[@]}"; do echo "$addr"; done | sort -r)
+declare staking_addresses_arr=( "${!staking_addrs_dict[@]}" )
+readarray -t staking_addresses_arr < <(for addr in "${!staking_addrs_dict[@]}"; do echo "$addr"; done | sort)
 
 # These arrays will hold IP addresses, peer IDs and staking addresses
-# for instance VMs in the encounter order of `instance_names` array
+# for instance VMs in the encounter order of the `instance_names` array
 declare -a ip_addrs
 declare -a hopr_addrs
 declare -a used_staking_addrs
@@ -178,9 +178,10 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
   # which contains all handy information about the HOPR instance running in the VM.
   # These currently include: node wallet address, node peer ID, associated staking account
   # These information are constant during the lifetime of the VM and
-  # do not change during redeployment.
+  # do not change during re-deployment.
   info_tag=$(gcloud_get_node_info_tag "${instance_name}")
 
+  # Values contained in the INFO tag
   declare wallet_addr
   declare peer_id
   declare staking_addr
@@ -232,9 +233,9 @@ yarn workspace @hoprnet/hopr-ethereum hardhat register \
    --peer-ids "${hopr_addrs[*]}"
 unset IFS
 
-
+# Finally wait for the public nodes to come up, for NAT nodes this isn't possible
+# because the P2P port is not exposed.
 if [[ "${docker_image}" != *-nat:* ]]; then
-  # Finally wait for the public nodes to come up
   for ip in "${ip_addrs[@]}"; do
     wait_for_port "9091" "${ip}"
   done
