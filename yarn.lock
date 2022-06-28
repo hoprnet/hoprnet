@@ -3486,6 +3486,7 @@ __metadata:
     sinon: 12.0.1
     typedoc: 0.22.13
     typedoc-plugin-markdown: 3.11.14
+    typescript: 4.7.4
   languageName: unknown
   linkType: soft
 
@@ -3527,6 +3528,7 @@ __metadata:
     sinon: 12.0.1
     typedoc: 0.22.13
     typedoc-plugin-markdown: 3.11.14
+    typescript: 4.7.4
   languageName: unknown
   linkType: soft
 
@@ -3550,6 +3552,7 @@ __metadata:
     nyc: 15.1.0
     typedoc: 0.22.13
     typedoc-plugin-markdown: 3.11.14
+    typescript: 4.7.4
     yargs: 17.5.1
   bin:
     hopr-cover-traffic-daemon: lib/main.cjs
@@ -3588,6 +3591,7 @@ __metadata:
     typechain: 7.0.1
     typedoc: 0.22.13
     typedoc-plugin-markdown: 3.11.14
+    typescript: 4.7.4
   languageName: unknown
   linkType: soft
 
@@ -3598,6 +3602,7 @@ __metadata:
     mocha: 9.2.2
     typedoc: 0.22.13
     typedoc-plugin-markdown: 3.11.14
+    typescript: 4.7.4
   languageName: unknown
   linkType: soft
 
