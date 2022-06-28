@@ -1,5 +1,6 @@
 import type { Stream } from '../types.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
+import { unmarshalPublicKey } from '@libp2p/crypto/keys'
 
 import { nAtATime, u8aCompare } from '@hoprnet/hopr-utils'
 import { RelayContext } from './context.js'
@@ -179,7 +180,10 @@ class RelayState {
    * @returns the identifier
    */
   static getId(a: PeerId, b: PeerId): string {
-    const cmpResult = u8aCompare(a.pubKey.marshal(), b.pubKey.marshal())
+    const cmpResult = u8aCompare(
+      unmarshalPublicKey(a.publicKey as Uint8Array).marshal(),
+      unmarshalPublicKey(b.publicKey as Uint8Array).marshal()
+    )
 
     switch (cmpResult) {
       case 1:

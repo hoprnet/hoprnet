@@ -46,7 +46,9 @@ type ReducedPeerStore = {
 type ReducedDHT = { contentRouting: Pick<Libp2p['contentRouting'], 'provide'> }
 type ReducedDialer = { dialer: Pick<Libp2p['dialer'], '_pendingDials'> }
 type ReducedUpgrader = { upgrader: Pick<Upgrader, 'upgradeInbound' | 'upgradeOutbound'> }
-type ReducedConnectionManager = { connectionManager: Pick<Libp2p['connectionManager'], 'getAll' | 'onDisconnect'> }
+type ReducedConnectionManager = {
+  connectionManager: Pick<Libp2p['connectionManager'], 'getConnections'>
+}
 type ReducedLibp2p = ReducedPeerStore &
   ReducedDialer &
   ReducedConnectionManager &
@@ -143,7 +145,7 @@ class Relay {
 
     log(`Currently tracked connections to relays: `)
     this.connectedToRelays.forEach((relayPeerId) => {
-      const countConns = this.libp2p.connectionManager.getAll(peerIdFromString(relayPeerId)).length
+      const countConns = this.libp2p.connectionManager.getConnections(peerIdFromString(relayPeerId)).length
       log(`- ${relayPeerId}: ${countConns} connection${countConns == 1 ? '' : 's'}`)
     })
   }
@@ -406,12 +408,14 @@ class Relay {
     // @TODO remove this (1/2 done)
     this.libp2p.dialer._pendingDials?.get(counterparty.toString())?.destroy()
 
-    const existingConnections = this.libp2p.connectionManager.getAll(counterparty)
+    const existingConnections = this.libp2p.connectionManager.getConnections(counterparty)
     for (const existingConnection of existingConnections) {
       if (existingConnection.id === newConn.id) {
         continue
       }
-      this.libp2p.connectionManager.onDisconnect(existingConnection)
+      try {
+        await existingConnection.close()
+      } catch {}
     }
   }
 

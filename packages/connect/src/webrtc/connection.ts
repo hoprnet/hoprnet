@@ -1,4 +1,4 @@
-import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types.js'
+import type { MultiaddrConnection } from '@libp2p/interface-connection'
 import type { Instance as SimplePeer } from 'simple-peer'
 import { durations, u8aToHex, defer, type DeferType } from '@hoprnet/hopr-utils'
 

@@ -3420,6 +3420,7 @@ __metadata:
   dependencies:
     "@chainsafe/libp2p-noise": 7.0.0
     "@hoprnet/hopr-utils": "workspace:packages/utils"
+    "@libp2p/crypto": 1.0.0
     "@libp2p/interface-address-manager": ^1.0.1
     "@libp2p/interface-connection": 1.0.1
     "@libp2p/interface-peer-discovery": 1.0.0

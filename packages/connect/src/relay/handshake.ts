@@ -3,6 +3,7 @@ import { toU8aStream } from '../utils/index.js'
 import { handshake } from 'it-handshake'
 import type { Handshake } from 'it-handshake'
 import type { PeerId } from '@libp2p/interface-peer-id'
+import { unmarshalPublicKey } from '@libp2p/crypto/keys'
 
 import chalk from 'chalk'
 import { pubKeyToPeerId } from '@hoprnet/hopr-utils'
@@ -103,7 +104,7 @@ class RelayHandshake {
    * @returns a relayed connection to `destination`
    */
   async initiate(relay: PeerId, destination: PeerId): Promise<Response> {
-    this.shaker.write(destination.pubKey.marshal())
+    this.shaker.write(unmarshalPublicKey(destination.publicKey as Uint8Array).marshal())
 
     let chunk: StreamType | undefined
     try {
@@ -250,7 +251,7 @@ class RelayHandshake {
       sink: toDestinationStruct.stream.sink as any
     })
 
-    destinationShaker.write(source.pubKey.marshal())
+    destinationShaker.write(unmarshalPublicKey(source.publicKey as Uint8Array).marshal())
 
     let destinationChunk: StreamType | undefined
 

@@ -23,8 +23,8 @@ class FakeConnectionManager {
     this._started = true
   }
 
-  public getAll(peer: PeerId): Connection[] {
-    return this.connections.get(peer.toString()) ?? []
+  public getConnections(peer: PeerId | undefined): Connection[] {
+    return peer ? this.connections.get(peer.toString()) ?? [] : [...this.connections.values()][0]
   }
 
   public onDisconnect(_conn: Connection): void {}

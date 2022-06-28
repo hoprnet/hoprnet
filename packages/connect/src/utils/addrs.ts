@@ -1,5 +1,6 @@
 import type { Multiaddr } from '@multiformats/multiaddr'
 import { CODE_IP4, CODE_IP6, CODE_P2P, CODE_CIRCUIT, CODE_TCP } from '../constants.js'
+// @ts-ignore untyped library
 import { hasher } from 'multiformats/basics'
 import { u8aEquals, u8aToNumber, u8aCompare } from '@hoprnet/hopr-utils'
 import Debug from 'debug'

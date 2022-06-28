@@ -1,8 +1,7 @@
 import type { Stream, StreamType } from '../types.js'
 import type { AddressInfo, Server as TCPServer } from 'net'
 import type { Socket as UDPSocket } from 'dgram'
-import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types.js'
-import type Connection from 'libp2p-interfaces/src/connection/connection.js'
+import type { Connection, MultiaddrConnection } from '@libp2p/interface-connection'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { peerIdFromBytes } from '@libp2p/peer-id'
 

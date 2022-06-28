@@ -4,7 +4,6 @@
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Libp2p } from 'libp2p'
 import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
-import type { ConnectionManager } from '@libp2p/interface-connection-manager'
 import { type Multiaddr, protocols } from '@multiformats/multiaddr'
 
 import { timeout, abortableTimeout, type TimeoutOpts } from '../async/index.js'
@@ -58,7 +57,7 @@ export type DialResponse =
 type ReducedPeerStore = {
   addressBook: Pick<Libp2p['peerStore']['addressBook'], 'get' | 'add'>
 }
-type ReducedConnectionManager = Pick<ConnectionManager, 'getConnections'>
+type ReducedConnectionManager = Pick<Libp2p['connectionManager'], 'getConnections'>
 type ReducedDHT = {
   dht: { [Symbol.toStringTag]: string }
   contentRouting: Pick<Libp2p['contentRouting'], 'findProviders'>
@@ -79,7 +78,7 @@ async function printPeerStoreAddresses(msg: string, destination: PeerId, peerSto
 const PROTOCOL_SELECT_TIMEOUT = 10e3
 
 export async function tryExistingConnections(
-  libp2p: { connectionManager: Pick<ConnectionManager, 'getConnections'> },
+  libp2p: { connectionManager: Pick<Libp2p['connectionManager'], 'getConnections'> },
   destination: PeerId,
   protocol: string
 ): Promise<

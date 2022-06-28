@@ -80,7 +80,7 @@ export const RELAY_CHANGED_EVENT = 'relay:changed'
 export const ENTRY_NODES_MAX_PARALLEL_DIALS = 14
 
 type ReducedLibp2p = {
-  connectionManager: Pick<Libp2p['connectionManager'], '_started' | 'getAll' | 'onDisconnect'>
+  connectionManager: Pick<Libp2p['connectionManager'], 'getConnections'>
 }
 
 export class EntryNodes extends EventEmitter {

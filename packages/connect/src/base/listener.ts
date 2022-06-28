@@ -115,7 +115,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       // hopr-connect does not enable IPv6 connections right now, therefore we can set `listeningAddrs` statically
       // to `/ip4/0.0.0.0/tcp/0`, meaning listening on IPv4 using a canonical port
       // TODO check IPv6
-      this.filter.setAddrs(this.getAddrs(), [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${this.peerId.toB58String()}`)])
+      this.filter.setAddrs(this.getAddrs(), [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${this.peerId.toString()}`)])
 
       const usedRelays = this.entry.getUsedRelayAddresses()
 
@@ -482,7 +482,7 @@ class Listener extends EventEmitter implements InterfaceListener {
         // Make sure that Multiaddr contains a PeerId
         const maWithPeerId = maConn.remoteAddr
           .decapsulateCode(CODE_P2P)
-          .encapsulate(`/p2p/${conn.remotePeer.toB58String()}`)
+          .encapsulate(`/p2p/${conn.remotePeer.toString()}`)
 
         ;(maConn.conn as TCPSocket).on('close', () => {
           if (maConn!.closed) {

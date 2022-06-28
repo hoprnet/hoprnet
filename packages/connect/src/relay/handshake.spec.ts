@@ -4,8 +4,8 @@ import { duplexPair } from 'it-pair/duplex'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import assert from 'assert'
 import type { Stream, StreamType } from '../types.js'
-import type Connection from 'libp2p-interfaces/src/connection/connection.js'
-import type { MuxedStream } from 'libp2p/src/upgrader.js'
+import type { Connection } from '@libp2p/interface-connection'
+import { unmarshalPublicKey } from '@libp2p/crypto/keys'
 
 const initiator = privKeyToPeerId('0x695a1ad048d12a1a82f827a38815ab33aa4464194fa0bdb99f78d9c66ec21505')
 const relay = privKeyToPeerId('0xf0b8e814c3594d0c552d72fb3dfda7f0d9063458a7792369e7c044eda10f3b52')
@@ -50,12 +50,12 @@ describe('test relay handshake', function () {
             })() as AsyncIterable<Uint8Array>,
             sink: async function (source: Stream['source']) {
               for await (const msg of source) {
-                if (u8aEquals(msg.slice(), initiator.pubKey.marshal())) {
+                if (u8aEquals(msg.slice(), unmarshalPublicKey(initiator.publicKey as Uint8Array).marshal())) {
                   initiatorReceived.resolve()
                 }
               }
             }
-          } as MuxedStream,
+          },
           conn: {
             close: async () => {}
           } as Connection,
@@ -75,7 +75,7 @@ describe('test relay handshake', function () {
 
     const relayHandshake = new RelayHandshake({
       source: (async function* () {
-        yield destination.pubKey.marshal()
+        yield unmarshalPublicKey(destination.publicKey as Uint8Array).marshal()
       })(),
       sink: async (source: Stream['source']) => {
         for await (const msg of source) {
@@ -92,7 +92,7 @@ describe('test relay handshake', function () {
       initiator,
       async () => {
         return {
-          stream: destinationToRelay as MuxedStream,
+          stream: destinationToRelay,
           conn: {
             close: async () => {}
           } as Connection,
@@ -120,7 +120,7 @@ describe('test relay handshake', function () {
       initiator,
       async () => {
         return {
-          stream: destinationToRelay as MuxedStream,
+          stream: destinationToRelay,
           conn: {
             close: async () => {}
           } as Connection,
