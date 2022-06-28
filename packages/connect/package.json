@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@hoprnet/hopr-utils": "workspace:packages/utils",
-    "@libp2p/peer-id": "1.1.10",
+    "@libp2p/peer-id": "1.1.13",
     "@multiformats/multiaddr": "10.2.1",
     "abortable-iterator": "4.0.2",
     "bl": "5.0.0",
