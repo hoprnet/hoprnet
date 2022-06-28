@@ -131,12 +131,11 @@ gcloud_create_or_update_managed_instance_group  \
 
 # NOTE: the addresses are sorted alphabetically here, to see the actual order the keys will
 # have after sorting. As usual, dictionaries do not keep the insertion order of the keys.
-# TODO: Supply the private keys from GH secrets on the LHS
 declare -A staking_addr_dict=(
-  [0x0Fd4C32CC8C6237132284c1600ed94D06AC478C6]=""
-  [0x6c150A63941c6d58a2f2687a23d5a8E0DbdE181C]=""
-  [0xBA28EE6743d008ed6794D023B10D212bc4Eb7e75]=""
-  [0xf84Ba32dd2f2EC2F355fB63F3fC3e048900aE3b2]=""
+  [0x0Fd4C32CC8C6237132284c1600ed94D06AC478C6]="${STAKING_ACCOUNT_0FD4}"
+  [0x6c150A63941c6d58a2f2687a23d5a8E0DbdE181C]="${STAKING_ACCOUNT_6C15}"
+  [0xBA28EE6743d008ed6794D023B10D212bc4Eb7e75]="${STAKING_ACCOUNT_BA28}"
+  [0xf84Ba32dd2f2EC2F355fB63F3fC3e048900aE3b2]="${STAKING_ACCOUNT_F84B}"
 )
 # NAT nodes will use staking addresses starting from this offset (after keys are sorted)
 readonly nat_node_staking_offset=2
