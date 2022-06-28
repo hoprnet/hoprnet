@@ -125,25 +125,31 @@ gcloud_create_or_update_managed_instance_group  \
   ${cluster_size} \
   "${instance_template_name}"
 
-
-# Maps "staking account address" => "private key"
-# This needs to be supplied differently in future to accommodate with bigger GCP cluster sizes.
+# This maps "staking account address" => "private key"
+declare -A staking_addrs_dict
 
 # NOTE: the addresses are sorted alphabetically here, to see the actual order the keys will
 # have after sorting. As usual, dictionaries do not keep the insertion order of the keys.
-declare -A staking_addr_dict=(
-  [0x0Fd4C32CC8C6237132284c1600ed94D06AC478C6]="${STAKING_ACCOUNT_0FD4}"
-  [0x6c150A63941c6d58a2f2687a23d5a8E0DbdE181C]="${STAKING_ACCOUNT_6C15}"
-  [0xBA28EE6743d008ed6794D023B10D212bc4Eb7e75]="${STAKING_ACCOUNT_BA28}"
-  [0xf84Ba32dd2f2EC2F355fB63F3fC3e048900aE3b2]="${STAKING_ACCOUNT_F84B}"
-)
-# NAT nodes will use staking addresses starting from this offset (after keys are sorted)
-readonly nat_node_staking_offset=2
+
+# May be supplied differently in future to accommodate with bigger GCP cluster sizes.
+if [[  "${docker_image}" != *-nat:* ]]; then
+  # Staking addresses for public nodes
+  staking_addrs_dict=(
+    [0xBA28EE6743d008ed6794D023B10D212bc4Eb7e75]="${STAKING_ACCOUNT_BA28}"
+    [0xf84Ba32dd2f2EC2F355fB63F3fC3e048900aE3b2]="${STAKING_ACCOUNT_F84B}"
+  )
+else
+  # Staking addresses for NAT nodes
+  staking_addrs_dict=(
+    [0x0Fd4C32CC8C6237132284c1600ed94D06AC478C6]="${STAKING_ACCOUNT_0FD4}"
+    [0x6c150A63941c6d58a2f2687a23d5a8E0DbdE181C]="${STAKING_ACCOUNT_6C15}"
+  )
+fi
 
 # This can be called always, because the "stake" task is idempotent given the same arguments
-for staking_addr in "${!staking_addr_dict[@]}" ; do
+for staking_addr in "${!staking_addrs_dict[@]}" ; do
   yarn hardhat stake --network hardhat --amount 1000000000000000000000 \
-    --privatekey "${staking_addr_dict[staking_addr]}"
+    --privatekey "${staking_addrs_dict[staking_addr]}"
 done
 
 # Get names of all instances in this cluster
@@ -152,8 +158,8 @@ instance_names=$(gcloud_get_managed_instance_group_instances_names "${cluster_id
 declare instance_names_arr=( ${instance_names} )
 
 # Prepare sorted staking account addresses so we ensure a stable order of assignment
-declare staking_addresses_arr=( "${!staking_addr_dict[@]}" ) # staking accounts addresses only
-readarray -t staking_addresses_arr < <(for addr in "${!staking_addr_dict[@]}"; do echo "$addr"; done | sort)
+declare staking_addresses_arr=( "${!staking_addrs_dict[@]}" ) # staking accounts addresses only
+readarray -t staking_addresses_arr < <(for addr in "${!staking_addrs_dict[@]}"; do echo "$addr"; done | sort -r)
 
 # These arrays will hold IP addresses, peer IDs and staking addresses
 # for instance VMs in the encounter order of `instance_names` array
@@ -183,16 +189,12 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
     wallet_addr=$(get_native_address "${api_token}@${node_ip}:3001")
     peer_id=$(get_hopr_address "${api_token}@${node_ip}:3001")
 
-    # Leave the first public node unstaked
+    # NOTE: We leave only the first public node unstaked
     if [[ ${instance_idx} -eq 0 && "${docker_image}" != *-nat:* ]]; then
       staking_addr="unstaked"
     else
-      # Offset the staking address array for NAT nodes
-      offset=0
-      [[ "${docker_image}" = *-nat:* ]] && offset=${nat_node_staking_offset}
-
       # Staking accounts are assigned round-robin
-      staking_addr_idx=$(( (instance_idx + offset) % ${#staking_addresses_arr[@]} ))
+      staking_addr_idx=$(( (instance_idx ) % ${#staking_addresses_arr[@]} ))
       staking_addr="${staking_addresses_arr[staking_addr_idx]}"
     fi
 
@@ -208,7 +210,7 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
 
   ip_addrs+=( "${node_ip}" )
 
-  # Do not include the "unstaked" node (= skipped during registration for NR)
+  # Do not include the unstaked nodes (= skipped during registration for NR)
   if [[ "${staking_addr}" != "unstaked" ]]; then
     hopr_addrs+=( "${peer_id}" )
     used_staking_addrs+=( "${staking_addr}" )
