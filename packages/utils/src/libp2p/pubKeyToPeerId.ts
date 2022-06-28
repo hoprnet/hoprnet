@@ -24,7 +24,7 @@ export function pubKeyToPeerId(pubKey: Uint8Array | string): PeerId {
       if (!matched) {
         throw Error(`Invalid input argument. Either key length or key characters were incorrect.`)
       }
-      pubKey = stringToU8a(pubKey, COMPRESSED_PUBLIC_KEY_LENGTH)
+      internalPubKey = stringToU8a(pubKey, COMPRESSED_PUBLIC_KEY_LENGTH)
       break
     case 'object':
       if (pubKey.length != COMPRESSED_PUBLIC_KEY_LENGTH) {
@@ -38,7 +38,7 @@ export function pubKeyToPeerId(pubKey: Uint8Array | string): PeerId {
       throw Error(`Invalid input arguments`)
   }
 
-  const secp256k1PubKey = new keys.supportedKeys.secp256k1.Secp256k1PublicKey(pubKey)
+  const secp256k1PubKey = new keys.supportedKeys.secp256k1.Secp256k1PublicKey(internalPubKey)
 
   return peerIdFromPeerId({
     type: 'secp256k1',

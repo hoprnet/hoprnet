@@ -4,7 +4,6 @@
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { PublicKey } from '@libp2p/interface-keys'
 import type { Libp2p } from 'libp2p'
-
 import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
 
 import { keys } from '@libp2p/crypto'

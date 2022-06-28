@@ -68,6 +68,6 @@
     "typedoc-plugin-markdown": "3.11.14"
   },
   "mocha": {
-    "spec": "lib/**/*.spec.js"
+    "spec": "lib/libp2p/dialHelper.spec.js"
   }
 }

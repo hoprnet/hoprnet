@@ -203,11 +203,6 @@ async function establishNewConnection(
   }
 }
 
-type Relayers = {
-  id: PeerId
-  multiaddrs: Multiaddr[]
-}
-
 /**
  * Performs a DHT query and handles possible errors
  * @param libp2p Libp2p instance

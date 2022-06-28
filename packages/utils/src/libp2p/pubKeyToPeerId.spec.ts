@@ -3,7 +3,6 @@ import { createFromPubKey } from '@libp2p/peer-id-factory'
 import { peerIdFromKeys, peerIdFromString } from '@libp2p/peer-id'
 import { keys } from '@libp2p/crypto'
 import assert from 'assert'
-import { u8aToHex } from '../u8a/toHex.js'
 
 const peerIdPubKey = Uint8Array.from([
   2, 104, 233, 189, 80, 129, 44, 179, 234, 88, 101, 46, 60, 61, 48, 87, 12, 238, 242, 64, 28, 86, 221, 89, 184, 117,
