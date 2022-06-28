@@ -126,13 +126,18 @@ gcloud_create_or_update_managed_instance_group  \
   "${instance_template_name}"
 
 
-# TODO: Populate this from GH Secrets
-declare -A staking_acc_dict=() # Maps "staking account address/name" => "private key"
+# Maps "staking account address" => "private key"
+declare -A staking_addr_dict=(
+  [0x6c150A63941c6d58a2f2687a23d5a8E0DbdE181C]=""
+  [0x0Fd4C32CC8C6237132284c1600ed94D06AC478C6]=""
+  [0xBA28EE6743d008ed6794D023B10D212bc4Eb7e75]=""
+  [0xf84Ba32dd2f2EC2F355fB63F3fC3e048900aE3b2]=""
+)
 
 # This can be called always, because the "stake" task is idempotent given the same arguments
-for staking_account in "${!staking_acc_dict[@]}" ; do
+for staking_addr in "${!staking_addr_dict[@]}" ; do
   yarn hardhat stake --network hardhat --amount 1000000000000000000000 \
-    --privatekey "${staking_acc_dict[staking_account]}"
+    --privatekey "${staking_addr_dict[staking_addr]}"
 done
 
 declare -A ip_addrs
@@ -144,41 +149,51 @@ declare instance_names
 instance_names=$(gcloud_get_managed_instance_group_instances_names "${cluster_id}")
 declare instance_names_arr=( ${instance_names} )
 
-# Iterate through all instances
-declare staking_acc_names_arr=( "${!staking_acc_dict[@]}" ) # staking accounts addresses/names only
-declare count_staking_accs=${#staking_acc_names_arr[@]}
-declare current_staking_index=0
-for instance_name in "${instance_names_arr[@]}" ; do
+# Prepare sorted staking account addresses so we ensure a stable order of assignment
+declare staking_addresses_arr=( "${!staking_addr_dict[@]}" ) # staking accounts addresses only
+readarray -t staking_addresses_arr < <(for addr in "${!staking_addr_dict[@]}"; do echo "$addr"; done | sort)
 
-  declare info_tag=$(gcloud_get_node_info_tag "${instance_name}")
-  declare node_ip=$(gcloud_get_ip "${instance_name}")
+# Iterate through all VM instances
+for instance_idx in "${!instance_names_arr[@]}" ; do
+  instance_name="${instance_names_arr[instance_idx]}"
+  info_tag=$(gcloud_get_node_info_tag "${instance_name}")
+  node_ip=$(gcloud_get_ip "${instance_name}")
 
   declare wallet_addr
   declare peer_id
-  declare staking_acc
+  declare staking_addr
   if [[ -z "${info_tag}" ]]; then
     # If the instance does not have the INFO tag yet, we need to retrieve all info
     wallet_addr=$(get_native_address "${api_token}@${node_ip}:3001")
     peer_id=$(get_hopr_address "${api_token}@${node_ip}:3001")
-    staking_acc="${staking_acc_names_arr[current_staking_index]}"
+
+    # Leave the first public node unstaked
+    if [[ ${instance_idx} -eq 0 && "${docker_image}" != *-nat:* ]]; then
+      staking_addr="unstaked"
+    else
+      # Staking accounts are assigned round-robin
+      staking_addr_idx=$(( instance_idx % ${#staking_addresses_arr[@]} ))
+      staking_addr="${staking_addresses_arr[staking_addr_idx]}"
+    fi
 
     # Save the info tag
-    info_tag="info:native_addr=${wallet_addr};peer_id=${peer_id};nr_staking_account=${staking_acc}"
+    info_tag="info:native_addr=${wallet_addr};peer_id=${peer_id};nr_staking_addr=${staking_addr}"
     gcloud_add_instance_tags "${instance_name}" "${info_tag}"
   else
     # Retrieve all information from the INFO tag
     wallet_addr=$(echo "${info_tag}" | sed -E 's/.*native_addr=([Xxa-f0-9A-F]+).*/\1/g')
     peer_id=$(echo "${info_tag}" | sed -E 's/.*peer_id=([a-zA-Z0-9]+).*/\1/g')
-    staking_acc=$(echo "${info_tag}" | sed -E 's/.*nr_staking_account=([a-zA-Z0-9]+).*/\1/g')
+    staking_addr=$(echo "${info_tag}" | sed -E 's/.*nr_staking_addr=([a-zA-Z0-9]+).*/\1/g')
   fi
 
   # Also use the staking account address here?
   ip_addrs+=( [$instance_name]="${node_ip}" )
-  hopr_addrs+=( [$instance_name]="${peer_id}" )
-  used_staking_addrs+=( [$instance_name]="${staking_acc}" )
 
-  # Staking accounts are assigned round-robin
-  current_staking_index=$(( (current_staking_index + 1) % count_staking_accs ))
+  # Do not include the "unstaked" node during registration
+  if [[ "${staking_addr}" != "unstaked" ]]; then
+    hopr_addrs+=( [$instance_name]="${peer_id}" )
+    used_staking_addrs+=( [$instance_name]="${staking_addr}" )
+  fi
 
   # Fund the node as well
   wait_until_node_is_ready "${node_ip}"
@@ -187,7 +202,6 @@ for instance_name in "${instance_names_arr[@]}" ; do
 done
 
 # Register all nodes in cluster
-declare cifs="$IFS"
 IFS=','
 # If same order of parameters is given, the "register" task is idempotent
 yarn workspace @hoprnet/hopr-ethereum hardhat register \
@@ -195,7 +209,7 @@ yarn workspace @hoprnet/hopr-ethereum hardhat register \
    --task add \
    --native-addresses "${used_staking_addrs[*]}" \
    --peer-ids "${hopr_addrs[*]}"
-IFS="${cifs}"
+unset IFS
 
 
 if [[ "${docker_image}" != *-nat:* ]]; then
