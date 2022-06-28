@@ -6,7 +6,7 @@ import { KadDHT } from '@libp2p/kad-dht'
 import { Multiaddr } from '@multiformats/multiaddr'
 import type { Address, PeerStore } from '@libp2p/interface-peer-store'
 import type { Connection } from '@libp2p/interface-connection'
-import type { PeerId } from '@libp2p/interface-peer-id'
+import { isPeerId, type PeerId } from '@libp2p/interface-peer-id'
 import type { ConnectionManager } from '@libp2p/interface-connection-manager'
 
 import assert from 'assert'
@@ -54,7 +54,10 @@ async function getNode(id: PeerId, withDht = false, maDestination?: Multiaddr): 
   const dial = node.dial.bind(node)
 
   // libp2p type clash
-  node.dial = (async (_peer: PeerId | Multiaddr, options: any) => {
+  node.dial = (async (peer: PeerId | Multiaddr, options: any) => {
+    if (isPeerId(peer)) {
+      return dial(peer, options)
+    }
     return dial(maDestination, options)
   }) as any
 
@@ -111,6 +114,7 @@ describe('test dialHelper', function () {
 
     const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)
 
+    console.log(result)
     assert(result.status === DialStatus.NO_DHT)
 
     // Shutdown node
@@ -122,15 +126,18 @@ describe('test dialHelper', function () {
     const peerB = await getNode(Bob)
 
     await peerA.peerStore.addressBook.add(peerB.peerId, peerB.getMultiaddrs())
+    console.log(peerB.getMultiaddrs())
 
     const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)
 
+    console.log(result)
     assert(result.status === DialStatus.SUCCESS)
 
     // @fixme
-    pipe(TEST_MESSAGE, result.resp.stream.sink as any)
+    pipe([TEST_MESSAGE], result.resp.stream.sink)
 
     for await (const msg of result.resp.stream.source) {
+      console.log(msg, TEST_MESSAGE)
       assert(u8aEquals(msg.slice(), TEST_MESSAGE))
     }
 
@@ -183,8 +190,7 @@ describe('test dialHelper', function () {
 
     assert(result.status === DialStatus.SUCCESS, `Dial must be successful`)
 
-    // @fixme
-    pipe(TEST_MESSAGE, result.resp.stream.sink as any)
+    pipe([TEST_MESSAGE], result.resp.stream.sink)
 
     for await (const msg of result.resp.stream.source) {
       assert(u8aEquals(msg.slice(), TEST_MESSAGE))

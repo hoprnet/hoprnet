@@ -139,7 +139,7 @@ export async function tryExistingConnections(
  * @param opts timeout options
  */
 async function establishNewConnection(
-  libp2p: Pick<ReducedLibp2p, 'dial'>,
+  libp2p: Pick<Libp2p, 'dial'>,
   destination: PeerId | Multiaddr,
   protocol: string,
   opts: TimeoutOpts
@@ -281,7 +281,7 @@ async function doDial(
   }
 
   // Check if DHT is available
-  if (libp2p.dht[Symbol.toStringTag] !== '@libp2p/dummy-dht') {
+  if (libp2p.dht[Symbol.toStringTag] === /* catchall package of libp2p */ '@libp2p/dummy-dht') {
     // Stop if there is no DHT available
     await printPeerStoreAddresses(
       `Could not establish a connection to ${destination.toString()} and libp2p was started without a DHT. Giving up`,

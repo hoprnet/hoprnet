@@ -29,7 +29,7 @@
     "@hoprnet/hopr-real": "workspace:packages/real",
     "@libp2p/crypto": "1.0.0",
     "@libp2p/peer-id": "1.1.10",
-    "@multiformats/multiaddr": "10.1.8",
+    "@multiformats/multiaddr": "10.2.1",
     "abort-controller": "~3.0.0",
     "bignumber.js": "9.0.2",
     "bn.js": "5.2.0",
@@ -68,6 +68,6 @@
     "typedoc-plugin-markdown": "3.11.14"
   },
   "mocha": {
-    "spec": "lib/libp2p/dialHelper.spec.js"
+    "spec": "lib/**/*.spec.js"
   }
 }
