@@ -2,7 +2,7 @@ import assert from 'assert'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Connection } from '@libp2p/interface-connection'
 import { peerIdFromString } from '@libp2p/peer-id'
-import { createSecp256k1PeerId } from '@libp2p/peer-id-factory'
+import { createSecp256k1PeerId, createEd25519PeerId } from '@libp2p/peer-id-factory'
 import BL from 'bl'
 import { Multiaddr } from '@multiformats/multiaddr'
 
@@ -23,13 +23,13 @@ describe(`test convertPubKeyFromPeerId`, function () {
   it(`should equal to a newly created pubkey from PeerId`, async function () {
     const id = await createSecp256k1PeerId()
     const pubKey = convertPubKeyFromPeerId(id)
-    assert(id.pubKey.toString() === pubKey.toString())
+    assert(u8aEquals(id.publicKey, pubKey.bytes))
   })
   it(`should equal to pubkey from a PeerId CID`, async function () {
     const testIdB58String = '16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg'
     const pubKey = convertPubKeyFromB58String(testIdB58String)
     const id = peerIdFromString(testIdB58String)
-    assert(id.pubKey.toString() === pubKey.toString())
+    assert(u8aEquals(id.publicKey, pubKey.bytes))
   })
 })
 
@@ -56,7 +56,7 @@ describe(`test hasB58String`, function () {
   })
 })
 
-describe(`test hasB58String`, function () {
+describe(`test getB58String`, function () {
   it(`should return a string value`, function () {
     const response = getB58String('test')
     assert(typeof response === 'string')
@@ -295,7 +295,7 @@ describe('test libp2p utils', function () {
 
     assert(isSecp256k1PeerId(pId) == true, 'peerId must have a secp256k1 keypair')
 
-    const pIdDifferentKey = await createSecp256k1PeerId()
+    const pIdDifferentKey = await createEd25519PeerId()
 
     assert(isSecp256k1PeerId(pIdDifferentKey) == false, 'peerId does not have a secp256k1 keypair')
   })

@@ -25,6 +25,8 @@ export function isMultiaddrLocal(multiaddr: Multiaddr): boolean {
     case CODE_IP6:
       ipFamily = 'IPv6'
       break
+    default:
+      throw Error(`invalid input arguments`)
   }
 
   return isLocalhost(tuples[0][1], ipFamily) || isPrivateAddress(tuples[0][1], ipFamily)

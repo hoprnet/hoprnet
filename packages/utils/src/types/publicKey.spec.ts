@@ -18,8 +18,6 @@ const compressedInvalidPubKey = '0x041464586aeaea0eb5736884ca1bf42d165fc8e2243b1
 const b58String = '16Uiu2HAkvoGszJh3KCuxxZPsNjcCN5X1PHbnhAyGzvSyub88b679'
 const address = '0x115Bc5B501CdD8D1fA5098D3c9Be8dd5954CA371'
 
-const pubKeyString = `<PubKey:${b58String}>`
-
 describe('test PublicKey primitive', function () {
   it('from private key', function () {
     const pKey = PublicKey.fromPrivKey(stringToU8a(privateKey))
@@ -142,7 +140,7 @@ describe('test PublicKey primitive', function () {
     const pKeyFromUncompressed = PublicKey.fromString(uncompressedPubKey)
     const pKeyFromCompressed = PublicKey.fromString(compressedPubKey)
 
-    assert(pKeyFromCompressed.toString() === pubKeyString)
-    assert(pKeyFromUncompressed.toString() === pubKeyString)
+    assert(pKeyFromCompressed.toString() === b58String)
+    assert(pKeyFromUncompressed.toString() === b58String)
   })
 })

@@ -3,6 +3,7 @@ import { peerIdFromPeerId } from '@libp2p/peer-id'
 import { keys } from '@libp2p/crypto'
 
 import { stringToU8a } from '../u8a/index.js'
+// @ts-ignore untyped dependency
 import { identity } from 'multiformats/hashes/identity'
 
 import secp256k1 from 'secp256k1'

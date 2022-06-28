@@ -161,8 +161,8 @@ export class ChannelEntry {
     return (
       // prettier-ignore
       `ChannelEntry   (${chalk.green(this.getId().toHex())}):\n` +
-      `  source:       ${chalk.yellow(this.source.toAddress())} (${this.source.toB58String()})\n` +
-      `  destination:  ${chalk.yellow(this.destination.toAddress())} (${this.destination.toB58String()})\n` +
+      `  source:       ${chalk.yellow(this.source.toAddress())} (${this.source.toString()})\n` +
+      `  destination:  ${chalk.yellow(this.destination.toAddress())} (${this.destination.toString()})\n` +
       `  balance:      ${this.balance.toFormattedString()}\n` +
       `  commitment:   ${this.commitment.toHex()}\n` +
       `  ticketEpoch:  ${this.ticketEpoch.toBN().toString(10)}\n` +

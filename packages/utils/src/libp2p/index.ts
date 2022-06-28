@@ -2,11 +2,13 @@
  * Add a more usable API on top of LibP2P
  */
 import type { PeerId } from '@libp2p/interface-peer-id'
-import { peerIdFromString } from '@libp2p/peer-id'
-import { keys, PublicKey } from 'libp2p-crypto'
-import multihashes from 'multihashes'
-import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
+import type { PublicKey } from '@libp2p/interface-keys'
 import type { Libp2p } from 'libp2p'
+
+import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
+
+import { keys } from '@libp2p/crypto'
+import { peerIdFromString } from '@libp2p/peer-id'
 
 import { debug } from '../process/index.js'
 import { pipe } from 'it-pipe'
@@ -24,7 +26,7 @@ export * from './verifySignatureFromPeerId.js'
  * Regular expresion used to match b58Strings
  *
  */
-export const b58StringRegex = /16Uiu2HA[A-Za-z0-9]{1,45}/i
+export const b58StringRegex = /16Uiu2HA[A-Za-z0-9]{45}/i
 
 /**
  * Takes a peerId and returns its corresponding public key.
@@ -32,14 +34,14 @@ export const b58StringRegex = /16Uiu2HA[A-Za-z0-9]{1,45}/i
  * @param peerId the PeerId used to generate a public key
  */
 export function convertPubKeyFromPeerId(peerId: PeerId): PublicKey {
-  return keys.unmarshalPublicKey(multihashes.decode(peerId.toBytes()).digest)
+  return keys.unmarshalPublicKey(peerId.publicKey)
 }
 
 /**
  *
  * Takes a B58String and converts them to a PublicKey
  *
- * @param string the B58String used to represent the PeerId
+ * @param b58string the B58String used to represent the PeerId
  */
 export function convertPubKeyFromB58String(b58string: string): PublicKey {
   return convertPubKeyFromPeerId(peerIdFromString(b58string))
@@ -49,7 +51,7 @@ export function convertPubKeyFromB58String(b58string: string): PublicKey {
  *
  * Returns true or false if given string does not contain a b58string
  *
- * @param string arbitrary content with maybe a b58string
+ * @param content arbitrary content with maybe a b58string
  */
 export function hasB58String(content: string): Boolean {
   const hasMatcheableContent = content.match(b58StringRegex)
@@ -66,13 +68,13 @@ export function hasB58String(content: string): Boolean {
  *
  * Returns the b58String within a given content. Returns empty string if none is found.
  *
- * @param string arbitrary content with maybe a b58string
+ * @param content arbitrary content with maybe a b58string
  */
 export function getB58String(content: string): string {
   const hasMatcheableContent = content.match(b58StringRegex)
   if (hasMatcheableContent) {
     const [maybeB58String] = hasMatcheableContent
-    const b58String = maybeB58String.substr(0, 53)
+    const b58String = maybeB58String.substring(0, 53)
     return b58String
   } else {
     return ''
@@ -201,7 +203,7 @@ function generateHandler(
             }
           },
           // @fixme correct type
-          props.stream as any
+          props.stream
         )
       } catch (err) {
         // Mostly used to capture send errors

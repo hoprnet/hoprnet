@@ -1,17 +1,19 @@
 import { Noise } from '@chainsafe/libp2p-noise'
 import { Mplex } from '@libp2p/mplex'
 import { createLibp2p, type Libp2p } from 'libp2p'
+import { TCP } from '@libp2p/tcp'
+import { KadDHT } from '@libp2p/kad-dht'
+import { Multiaddr } from '@multiformats/multiaddr'
 import type { Address, PeerStore } from '@libp2p/interface-peer-store'
 import type { Connection } from '@libp2p/interface-connection'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { ConnectionManager } from '@libp2p/interface-connection-manager'
+
+import assert from 'assert'
+import { pipe } from 'it-pipe'
+
 import { dial as dialHelper, DialStatus } from './dialHelper.js'
 import { privKeyToPeerId } from './privKeyToPeerId.js'
-import { TCP } from '@libp2p/tcp'
-import { KadDHT } from '@libp2p/kad-dht'
-import assert from 'assert'
-import { Multiaddr } from '@multiformats/multiaddr'
-import { pipe } from 'it-pipe'
 import { u8aEquals, stringToU8a } from '../u8a/index.js'
 import { createRelayerKey } from './relayCode.js'
 
@@ -70,7 +72,7 @@ function getPeerStore(): PeerStore {
 
   return {
     addressBook: {
-      // @ts-ignore
+      // @ts-ignore libp2p type clash
       add: async (peerId: PeerId, multiaddrs: Multiaddr[]): Promise<void> => {
         const addresses = peerStore.get(peerId) ?? new Set<Address>()
         for (const address of multiaddrs) {
@@ -172,7 +174,8 @@ describe('test dialHelper', function () {
 
     await new Promise((resolve) => setTimeout(resolve, 200))
 
-    await peerB.contentRouting.provide(await createRelayerKey(Chris))
+    // libp2p type clash
+    await peerB.contentRouting.provide(createRelayerKey(Chris) as any)
 
     await new Promise((resolve) => setTimeout(resolve, 200))
 
@@ -201,7 +204,7 @@ describe('test dialHelper', function () {
         findProviders: () => (async function* () {})()
       },
       connectionManager: getConnectionManager(),
-      dial: () => Promise.resolve<Connection>(undefined),
+      dial: () => Promise.resolve<Connection>(undefined as any),
       peerStore: getPeerStore()
     }
 
@@ -225,7 +228,7 @@ describe('test dialHelper', function () {
             throw Error(`boom`)
           })()
       },
-      dial: () => Promise.resolve<Connection>(undefined),
+      dial: () => Promise.resolve<Connection>(undefined as any),
       connectionManager: getConnectionManager(),
       peerStore: getPeerStore()
     }

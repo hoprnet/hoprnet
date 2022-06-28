@@ -1,11 +1,11 @@
 /*
  * Add a more usable API on top of LibP2P
  */
-import { PeerId } from '@libp2p/interface-peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Libp2p } from 'libp2p'
 import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
 import type { ConnectionManager } from '@libp2p/interface-connection-manager'
-import { Multiaddr, protocols } from '@multiformats/multiaddr'
+import { type Multiaddr, protocols } from '@multiformats/multiaddr'
 
 import { timeout, abortableTimeout, type TimeoutOpts } from '../async/index.js'
 
@@ -156,7 +156,7 @@ async function establishNewConnection(
 
   log(`Trying to establish connection to ${destination.toString()}`)
 
-  let conn: Connection
+  let conn: Connection | undefined
   try {
     // libp2p type clash
     conn = await libp2p.dial(destination as any, { signal: opts.signal })
@@ -175,7 +175,7 @@ async function establishNewConnection(
 
   log(`Connection ${destination.toString()} established !`)
 
-  const stream = (await timeout(10000, () => conn.newStream(protocol)))?.stream
+  const stream = (await timeout(10000, () => (conn as Connection).newStream(protocol)))?.stream
 
   opts.signal?.removeEventListener('abort', onAbort)
 
@@ -212,16 +212,16 @@ type Relayers = {
  * Performs a DHT query and handles possible errors
  * @param libp2p Libp2p instance
  * @param destination which peer to look for
- * @param _opts timeout options
  */
-async function queryDHT(libp2p: ReducedDHT, destination: PeerId, _opts: Required<TimeoutOpts>): Promise<PeerId[]> {
+async function queryDHT(libp2p: ReducedDHT, destination: PeerId): Promise<PeerId[]> {
   const relayers: PeerId[] = []
 
-  const key = await createRelayerKey(destination)
+  const key = createRelayerKey(destination)
   log(`fetching relay keys for node ${destination.toString()} from DHT.`, key)
 
   try {
-    for await (const relayer of libp2p.contentRouting.findProviders(key)) {
+    // libp2p type clash
+    for await (const relayer of libp2p.contentRouting.findProviders(key as any)) {
       relayers.push(relayer.id)
     }
   } catch (err) {
@@ -298,10 +298,7 @@ async function doDial(
 
   // Try to get some fresh addresses from the DHT
   log(`Could not reach ${destination.toString()} using known addresses, querying DHT for more addresses...`)
-  const dhtResult = await queryDHT(libp2p, destination, {
-    ...opts,
-    signal: undefined
-  })
+  const dhtResult = await queryDHT(libp2p, destination)
 
   if (dhtResult.length == 0) {
     await printPeerStoreAddresses(
@@ -323,9 +320,11 @@ async function doDial(
       .map((address) => address.toString())
   )
 
-  let relayStruct: ProtocolStream & {
-    conn: Connection
-  }
+  let relayStruct:
+    | (ProtocolStream & {
+        conn: Connection
+      })
+    | undefined
 
   // Filter out the circuit addresses that were tried using the previous attempt
   const circuitsNotTriedYet = dhtResult
