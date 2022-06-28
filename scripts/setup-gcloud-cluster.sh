@@ -54,6 +54,10 @@ usage() {
 
 # verify and set parameters
 : ${FAUCET_SECRET_API_KEY?"Missing environment variable FAUCET_SECRET_API_KEY"}
+: ${STAKING_ACCOUNT_BA28?"Missing environment variable STAKING_ACCOUNT_BA28"}
+: ${STAKING_ACCOUNT_F84B?"Missing environment variable STAKING_ACCOUNT_F84B"}
+: ${STAKING_ACCOUNT_0FD4?"Missing environment variable STAKING_ACCOUNT_0FD4"}
+: ${STAKING_ACCOUNT_6C15?"Missing environment variable STAKING_ACCOUNT_6C15"}
 
 declare environment="${1?"missing parameter <environment>"}"
 declare init_script=${2:-}
