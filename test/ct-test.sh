@@ -20,15 +20,6 @@ declare ct_node1_log="${1}"
 declare healthcheck_host="${2}"
 declare healthcheck_port="${3}"
 
-# disable register
-log "Disabling register"
-HOPR_ENVIRONMENT_ID=hardhat-localhost \
-TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-yarn workspace @hoprnet/hopr-ethereum hardhat register \
-  --network hardhat \
-  --task disable
-log "Register disabled"
-
 log "Running Cover Traffic test"
 
 log "Check CT daemon health"

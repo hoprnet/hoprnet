@@ -47,6 +47,7 @@ declare api5="${5}"
 declare api6="${6}"
 declare api7="${7}"
 declare api8="${8}"
+
 declare api_token=${HOPRD_API_TOKEN}
 declare additional_nodes_addrs="${ADDITIONAL_NODE_ADDRS:-}"
 declare additional_nodes_peerids="${ADDITIONAL_NODE_PEERIDS:-}"
