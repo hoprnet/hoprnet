@@ -556,10 +556,6 @@ node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:79
 
 `Promise`<`BigNumber`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:592
-
 ___
 
 ### BOOST\_CAP
@@ -575,10 +571,6 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:594
 
 ___
 
@@ -596,10 +588,6 @@ ___
 
 `Promise`<`BigNumber`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:596
-
 ___
 
 ### LOCK\_TOKEN
@@ -615,10 +603,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:598
 
 ___
 
@@ -636,10 +620,6 @@ ___
 
 `Promise`<`string`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:600
-
 ___
 
 ### PROGRAM\_END
@@ -655,10 +635,6 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:602
 
 ___
 
@@ -676,10 +652,6 @@ ___
 
 `Promise`<`BigNumber`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:604
-
 ___
 
 ### REWARD\_TOKEN
@@ -695,10 +667,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:606
 
 ___
 
@@ -720,10 +688,6 @@ ___
 
 BaseContract.\_checkRunningEvents
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:119
-
 ___
 
 ### \_deployed
@@ -743,10 +707,6 @@ ___
 #### Inherited from
 
 BaseContract.\_deployed
-
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:112
 
 ___
 
@@ -770,10 +730,6 @@ ___
 
 BaseContract.\_wrapEvent
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:120
-
 ___
 
 ### accounts
@@ -790,10 +746,6 @@ ___
 #### Returns
 
 `Promise`<[`BigNumber`, `BigNumber`, `BigNumber`, `BigNumber`] & { `actualLockedTokenAmount`: `BigNumber` ; `claimedRewards`: `BigNumber` ; `cumulatedRewards`: `BigNumber` ; `lastSyncTimestamp`: `BigNumber`  }\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:608
 
 ___
 
@@ -815,10 +767,6 @@ ___
 
 BaseContract.attach
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:393
-
 ___
 
 ### availableReward
@@ -834,10 +782,6 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:620
 
 ___
 
@@ -855,10 +799,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:622
 
 ___
 
@@ -880,10 +820,6 @@ ___
 
 BaseContract.connect
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:392
-
 ___
 
 ### deployed
@@ -897,10 +833,6 @@ ___
 #### Overrides
 
 BaseContract.deployed
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:394
 
 ___
 
@@ -923,10 +855,6 @@ ___
 
 BaseContract.emit
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:125
-
 ___
 
 ### fallback
@@ -947,10 +875,6 @@ ___
 
 BaseContract.fallback
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:113
-
 ___
 
 ### getCumulatedRewardsIncrement
@@ -968,10 +892,6 @@ ___
 
 `Promise`<`BigNumber`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:627
-
 ___
 
 ### isBlockedNft
@@ -988,10 +908,6 @@ ___
 #### Returns
 
 `Promise`<`boolean`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:632
 
 ___
 
@@ -1012,10 +928,6 @@ ___
 
 `Promise`<`boolean`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:634
-
 ___
 
 ### isNftTypeAndRankRedeemed2
@@ -1034,10 +946,6 @@ ___
 #### Returns
 
 `Promise`<`boolean`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:641
 
 ___
 
@@ -1058,10 +966,6 @@ ___
 
 `Promise`<`boolean`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:648
-
 ___
 
 ### isNftTypeAndRankRedeemed4
@@ -1080,10 +984,6 @@ ___
 #### Returns
 
 `Promise`<`boolean`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:655
 
 ___
 
@@ -1104,10 +1004,6 @@ ___
 #### Inherited from
 
 BaseContract.listenerCount
-
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:126
 
 ___
 
@@ -1135,10 +1031,6 @@ ___
 
 BaseContract.listeners
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:404
-
 ▸ **listeners**(`eventName?`): `Listener`[]
 
 #### Parameters
@@ -1154,10 +1046,6 @@ packages/ethereum/src/types/HoprStakeSeason4.ts:404
 #### Overrides
 
 BaseContract.listeners
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:407
 
 ___
 
@@ -1179,10 +1067,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:662
-
 ___
 
 ### onTokenTransfer
@@ -1202,10 +1086,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:670
-
 ___
 
 ### owner
@@ -1221,10 +1101,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:677
 
 ___
 
@@ -1243,10 +1119,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:679
-
 ___
 
 ### ownerUnblockNftType
@@ -1263,10 +1135,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:684
 
 ___
 
@@ -1296,10 +1164,6 @@ ___
 
 BaseContract.queryFilter
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:398
-
 ___
 
 ### reclaimErc20Tokens
@@ -1316,10 +1180,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:689
 
 ___
 
@@ -1339,10 +1199,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:694
-
 ___
 
 ### redeemedFactor
@@ -1361,10 +1217,6 @@ ___
 
 `Promise`<`BigNumber`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:700
-
 ___
 
 ### redeemedFactorIndex
@@ -1381,10 +1233,6 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:706
 
 ___
 
@@ -1404,10 +1252,6 @@ ___
 
 `Promise`<`BigNumber`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:711
-
 ___
 
 ### redeemedNftIndex
@@ -1424,10 +1268,6 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:717
 
 ___
 
@@ -1455,10 +1295,6 @@ ___
 
 BaseContract.removeAllListeners
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:408
-
 ▸ **removeAllListeners**(`eventName?`): [`HoprStakeSeason4`](HoprStakeSeason4.md)
 
 #### Parameters
@@ -1475,10 +1311,6 @@ packages/ethereum/src/types/HoprStakeSeason4.ts:408
 
 BaseContract.removeAllListeners
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:411
-
 ___
 
 ### renounceOwnership
@@ -1494,10 +1326,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:719
 
 ___
 
@@ -1516,10 +1344,6 @@ ___
 
 `Promise`<`BigNumber`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:723
-
 ___
 
 ### sync
@@ -1536,10 +1360,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:728
 
 ___
 
@@ -1563,10 +1383,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:733
-
 ___
 
 ### totalLocked
@@ -1582,10 +1398,6 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:743
 
 ___
 
@@ -1604,10 +1416,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:745
-
 ___
 
 ### unlock
@@ -1623,10 +1431,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:750
 
 ___
 
@@ -1644,7 +1448,3 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:754

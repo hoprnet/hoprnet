@@ -39,10 +39,6 @@
 | :------ | :------ |
 | `arr` | `Uint8Array` |
 
-#### Defined in
-
-[types/halfKeyChallenge.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L12)
-
 ## Accessors
 
 ### SIZE
@@ -53,10 +49,6 @@
 
 `number`
 
-#### Defined in
-
-[types/halfKeyChallenge.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L55)
-
 ## Methods
 
 ### clone
@@ -66,10 +58,6 @@
 #### Returns
 
 [`HalfKeyChallenge`](HalfKeyChallenge.md)
-
-#### Defined in
-
-[types/halfKeyChallenge.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L71)
 
 ___
 
@@ -87,10 +75,6 @@ ___
 
 `boolean`
 
-#### Defined in
-
-[types/halfKeyChallenge.ts:75](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L75)
-
 ___
 
 ### serialize
@@ -100,10 +84,6 @@ ___
 #### Returns
 
 `Uint8Array`
-
-#### Defined in
-
-[types/halfKeyChallenge.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L63)
 
 ___
 
@@ -115,10 +95,6 @@ ___
 
 [`Address`](Address.md)
 
-#### Defined in
-
-[types/halfKeyChallenge.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L38)
-
 ___
 
 ### toHex
@@ -128,10 +104,6 @@ ___
 #### Returns
 
 `string`
-
-#### Defined in
-
-[types/halfKeyChallenge.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L67)
 
 ___
 
@@ -143,10 +115,6 @@ ___
 
 `PeerId`
 
-#### Defined in
-
-[types/halfKeyChallenge.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L47)
-
 ___
 
 ### toUncompressedCurvePoint
@@ -156,10 +124,6 @@ ___
 #### Returns
 
 `string`
-
-#### Defined in
-
-[types/halfKeyChallenge.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L42)
 
 ___
 
@@ -177,10 +141,6 @@ ___
 
 [`HalfKeyChallenge`](HalfKeyChallenge.md)
 
-#### Defined in
-
-[types/halfKeyChallenge.ts:59](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L59)
-
 ___
 
 ### fromExponent
@@ -196,10 +156,6 @@ ___
 #### Returns
 
 [`HalfKeyChallenge`](HalfKeyChallenge.md)
-
-#### Defined in
-
-[types/halfKeyChallenge.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L18)
 
 ___
 
@@ -217,10 +173,6 @@ ___
 
 [`HalfKeyChallenge`](HalfKeyChallenge.md)
 
-#### Defined in
-
-[types/halfKeyChallenge.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L34)
-
 ___
 
 ### fromString
@@ -237,10 +189,6 @@ ___
 
 [`HalfKeyChallenge`](HalfKeyChallenge.md)
 
-#### Defined in
-
-[types/halfKeyChallenge.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L51)
-
 ___
 
 ### fromUncompressedUncompressedCurvePoint
@@ -256,7 +204,3 @@ ___
 #### Returns
 
 [`HalfKeyChallenge`](HalfKeyChallenge.md)
-
-#### Defined in
-
-[types/halfKeyChallenge.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L26)

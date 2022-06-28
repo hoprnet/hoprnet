@@ -4,11 +4,11 @@
 
 ## Table of contents
 
-### Type aliases
+### Type Aliases
 
 - [DefaultEnvironment](modules.md#defaultenvironment)
 
-## Type aliases
+## Type Aliases
 
 ### DefaultEnvironment
 

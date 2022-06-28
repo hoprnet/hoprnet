@@ -411,10 +411,6 @@ node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:79
 
 BaseContract.\_checkRunningEvents
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:119
-
 ___
 
 ### \_deployed
@@ -434,10 +430,6 @@ ___
 #### Inherited from
 
 BaseContract.\_deployed
-
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:112
 
 ___
 
@@ -461,10 +453,6 @@ ___
 
 BaseContract.\_wrapEvent
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:120
-
 ___
 
 ### allowance
@@ -483,10 +471,6 @@ ___
 
 `Promise`<`BigNumber`\>
 
-#### Defined in
-
-packages/ethereum/src/types/ERC677.ts:244
-
 ___
 
 ### approve
@@ -504,10 +488,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/ERC677.ts:202
 
 ___
 
@@ -529,10 +509,6 @@ ___
 
 BaseContract.attach
 
-#### Defined in
-
-packages/ethereum/src/types/ERC677.ts:128
-
 ___
 
 ### balanceOf
@@ -549,10 +525,6 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/src/types/ERC677.ts:230
 
 ___
 
@@ -574,10 +546,6 @@ ___
 
 BaseContract.connect
 
-#### Defined in
-
-packages/ethereum/src/types/ERC677.ts:127
-
 ___
 
 ### decreaseAllowance
@@ -596,10 +564,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/ERC677.ts:232
-
 ___
 
 ### deployed
@@ -613,10 +577,6 @@ ___
 #### Overrides
 
 BaseContract.deployed
-
-#### Defined in
-
-packages/ethereum/src/types/ERC677.ts:129
 
 ___
 
@@ -639,10 +599,6 @@ ___
 
 BaseContract.emit
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:125
-
 ___
 
 ### fallback
@@ -663,10 +619,6 @@ ___
 
 BaseContract.fallback
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:113
-
 ___
 
 ### increaseAllowance
@@ -684,10 +636,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/ERC677.ts:217
 
 ___
 
@@ -708,10 +656,6 @@ ___
 #### Inherited from
 
 BaseContract.listenerCount
-
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:126
 
 ___
 
@@ -739,10 +683,6 @@ ___
 
 BaseContract.listeners
 
-#### Defined in
-
-packages/ethereum/src/types/ERC677.ts:139
-
 ▸ **listeners**(`eventName?`): `Listener`[]
 
 #### Parameters
@@ -758,10 +698,6 @@ packages/ethereum/src/types/ERC677.ts:139
 #### Overrides
 
 BaseContract.listeners
-
-#### Defined in
-
-packages/ethereum/src/types/ERC677.ts:142
 
 ___
 
@@ -791,10 +727,6 @@ ___
 
 BaseContract.queryFilter
 
-#### Defined in
-
-packages/ethereum/src/types/ERC677.ts:133
-
 ___
 
 ### removeAllListeners
@@ -821,10 +753,6 @@ ___
 
 BaseContract.removeAllListeners
 
-#### Defined in
-
-packages/ethereum/src/types/ERC677.ts:143
-
 ▸ **removeAllListeners**(`eventName?`): [`xHoprToken`](xHoprToken.md)
 
 #### Parameters
@@ -841,10 +769,6 @@ packages/ethereum/src/types/ERC677.ts:143
 
 BaseContract.removeAllListeners
 
-#### Defined in
-
-packages/ethereum/src/types/ERC677.ts:146
-
 ___
 
 ### totalSupply
@@ -860,10 +784,6 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/src/types/ERC677.ts:208
 
 ___
 
@@ -882,10 +802,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/ERC677.ts:238
 
 ___
 
@@ -906,10 +822,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/ERC677.ts:223
-
 ___
 
 ### transferFrom
@@ -928,7 +840,3 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/ERC677.ts:210
