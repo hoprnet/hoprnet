@@ -136,7 +136,7 @@ function getFakeLibp2p(
       }
     },
     connectionManager: {
-      getAll: () => {
+      getConnections: () => {
         return []
       }
     }
