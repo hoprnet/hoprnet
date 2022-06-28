@@ -127,13 +127,19 @@ gcloud_create_or_update_managed_instance_group  \
 
 
 # Maps "staking account address" => "private key"
-# TODO: Supply the private keys from GH secrets
+# This needs to be supplied differently in future to accommodate with bigger GCP cluster sizes.
+
+# NOTE: the addresses are sorted alphabetically here, to see the actual order the keys will
+# have after sorting. As usual, dictionaries do not keep the insertion order of the keys.
+# TODO: Supply the private keys from GH secrets on the LHS
 declare -A staking_addr_dict=(
-  [0x6c150A63941c6d58a2f2687a23d5a8E0DbdE181C]=""
   [0x0Fd4C32CC8C6237132284c1600ed94D06AC478C6]=""
+  [0x6c150A63941c6d58a2f2687a23d5a8E0DbdE181C]=""
   [0xBA28EE6743d008ed6794D023B10D212bc4Eb7e75]=""
   [0xf84Ba32dd2f2EC2F355fB63F3fC3e048900aE3b2]=""
 )
+# NAT nodes will use staking addresses starting from this offset (after keys are sorted)
+readonly nat_node_staking_offset=2
 
 # This can be called always, because the "stake" task is idempotent given the same arguments
 for staking_addr in "${!staking_addr_dict[@]}" ; do
@@ -157,10 +163,18 @@ declare -a hopr_addrs
 declare -a used_staking_addrs
 
 # Iterate through all VM instances
+# The loop should be parallelized in future to accommodate better with larger clusters
 for instance_idx in "${!instance_names_arr[@]}" ; do
+  # Firstly, retrieve the IP address of this VM instance
   instance_name="${instance_names_arr[instance_idx]}"
-  info_tag=$(gcloud_get_node_info_tag "${instance_name}")
   node_ip=$(gcloud_get_ip "${instance_name}")
+
+  # All VM instances in the deployed cluster will get a special INFO tag
+  # which contains all handy information about the HOPR instance running in the VM.
+  # These currently include: node wallet address, node peer ID, associated staking account
+  # These information are constant during the lifetime of the VM and
+  # do not change during redeployment.
+  info_tag=$(gcloud_get_node_info_tag "${instance_name}")
 
   declare wallet_addr
   declare peer_id
@@ -174,8 +188,12 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
     if [[ ${instance_idx} -eq 0 && "${docker_image}" != *-nat:* ]]; then
       staking_addr="unstaked"
     else
+      # Offset the staking address array for NAT nodes
+      offset=0
+      [[ "${docker_image}" = *-nat:* ]] && offset=${nat_node_staking_offset}
+
       # Staking accounts are assigned round-robin
-      staking_addr_idx=$(( instance_idx % ${#staking_addresses_arr[@]} ))
+      staking_addr_idx=$(( (instance_idx + offset) % ${#staking_addresses_arr[@]} ))
       staking_addr="${staking_addresses_arr[staking_addr_idx]}"
     fi
 
