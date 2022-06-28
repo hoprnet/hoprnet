@@ -1,8 +1,11 @@
 import type { Libp2p } from 'libp2p'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Connection, ProtocolStream, MultiaddrConnection } from '@libp2p/interface-connection'
-import { type Multiaddr } from '@multiformats/multiaddr'
-import type { Address } from 'libp2p/src/peer-store/address-book.js'
+import type { Multiaddr } from '@multiformats/multiaddr'
+import type { Address } from '@libp2p/interface-peer-store'
+import type { Upgrader } from '@libp2p/interface-transport'
+import { peerIdFromString } from '@libp2p/peer-id'
+
 import type HoprConnect from '../index.js'
 
 import type { Stream, HoprConnectOptions, HoprConnectDialOptions, HoprConnectTestingOptions } from '../types.js'
@@ -18,7 +21,6 @@ import { RelayState } from './state.js'
 import { createRelayerKey, randomInteger, retimer, tryExistingConnections } from '@hoprnet/hopr-utils'
 
 import { attemptClose } from '../utils/index.js'
-import { Upgrader } from '@libp2p/interface-transport'
 
 const DEBUG_PREFIX = 'hopr-connect:relay'
 const DEFAULT_MAX_RELAYED_CONNECTIONS = 10
@@ -141,7 +143,7 @@ class Relay {
 
     log(`Currently tracked connections to relays: `)
     this.connectedToRelays.forEach((relayPeerId) => {
-      const countConns = this.libp2p.connectionManager.getAll(PeerId.createFromB58String(relayPeerId)).length
+      const countConns = this.libp2p.connectionManager.getAll(peerIdFromString(relayPeerId)).length
       log(`- ${relayPeerId}: ${countConns} connection${countConns == 1 ? '' : 's'}`)
     })
   }
