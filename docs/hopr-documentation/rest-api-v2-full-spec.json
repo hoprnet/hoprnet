@@ -1,21 +1,12 @@
 {
   "openapi": "3.0.3",
-  "servers": [
-    {
-      "url": "/api/v2"
-    }
-  ],
+  "servers": [{ "url": "/api/v2" }],
   "info": {
     "description": "This Rest API enables developers to interact with a hoprd node programatically.",
     "version": "2.0.0",
     "title": "HOPRd Rest API v2",
-    "contact": {
-      "email": "tech@hoprnet.org"
-    },
-    "license": {
-      "name": "GPL-3.0",
-      "url": "https://github.com/hoprnet/hoprnet/blob/master/LICENSE"
-    }
+    "contact": { "email": "tech@hoprnet.org" },
+    "license": { "name": "GPL-3.0", "url": "https://github.com/hoprnet/hoprnet/blob/master/LICENSE" }
   },
   "paths": {
     "/tickets/statistics": {
@@ -44,10 +35,7 @@
                       "type": "string",
                       "description": "Total value of all unredeemed tickets in Hopr tokens."
                     },
-                    "redeemed": {
-                      "type": "number",
-                      "description": "Number of tickets already redeemed on this node."
-                    },
+                    "redeemed": { "type": "number", "description": "Number of tickets already redeemed on this node." },
                     "redeemedValue": {
                       "type": "string",
                       "description": "Total value of all redeemed tickets in Hopr tokens."
@@ -84,20 +72,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Full error message."
-                    }
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
                   }
                 },
-                "example": {
-                  "status": "UNKNOWN_FAILURE",
-                  "error": "Full error message."
-                }
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
               }
             }
           }
@@ -111,9 +90,7 @@
         "tags": ["Tickets"],
         "operationId": "ticketsRedeemTickets",
         "responses": {
-          "204": {
-            "description": "Tickets redeemed succesfully."
-          },
+          "204": { "description": "Tickets redeemed succesfully." },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -121,20 +98,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Full error message."
-                    }
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
                   }
                 },
-                "example": {
-                  "status": "UNKNOWN_FAILURE",
-                  "error": "Full error message."
-                }
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
               }
             }
           }
@@ -151,14 +119,7 @@
           "200": {
             "description": "Tickets fetched successfully.",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Ticket"
-                  }
-                }
-              }
+              "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Ticket" } } }
             }
           },
           "422": {
@@ -168,20 +129,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Full error message."
-                    }
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
                   }
                 },
-                "example": {
-                  "status": "UNKNOWN_FAILURE",
-                  "error": "Full error message."
-                }
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
               }
             }
           }
@@ -197,13 +149,7 @@
         "responses": {
           "200": {
             "description": "Settings fetched succesfully.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Settings"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Settings" } } }
           },
           "422": {
             "description": "Unknown failure.",
@@ -212,20 +158,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Full error message."
-                    }
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
                   }
                 },
-                "example": {
-                  "status": "UNKNOWN_FAILURE",
-                  "error": "Full error message."
-                }
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
               }
             }
           }
@@ -243,11 +180,7 @@
             "description": "Returns the release version of the running node.",
             "content": {
               "application/json": {
-                "schema": {
-                  "type": "string",
-                  "description": "Node version.",
-                  "example": "1.83.5"
-                }
+                "schema": { "type": "string", "description": "Node version.", "example": "1.83.5" }
               }
             }
           },
@@ -258,20 +191,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Full error message."
-                    }
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
                   }
                 },
-                "example": {
-                  "status": "UNKNOWN_FAILURE",
-                  "error": "Full error message."
-                }
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
               }
             }
           }
@@ -286,9 +210,7 @@
         "operationId": "nodeStreamWebsocket",
         "deprecated": true,
         "responses": {
-          "101": {
-            "description": "Switching protocols"
-          },
+          "101": { "description": "Switching protocols" },
           "206": {
             "description": "Incoming data.",
             "content": {
@@ -306,27 +228,15 @@
                       "description": "Timestamp in miliseconds",
                       "example": 1644587213977
                     },
-                    "content": {
-                      "type": "string",
-                      "description": "The text content",
-                      "example": "Opening channel..."
-                    }
+                    "content": { "type": "string", "description": "The text content", "example": "Opening channel..." }
                   }
                 },
-                "example": {
-                  "type": "log",
-                  "timestamp": 1644587213977,
-                  "content": "Opening channel..."
-                }
+                "example": { "type": "log", "timestamp": 1644587213977, "content": "Opening channel..." }
               }
             }
           },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "404": {
-            "description": "Not found"
-          }
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Not found" }
         }
       }
     },
@@ -349,9 +259,7 @@
                     "description": "PeerId associated to the other node that we want to ping."
                   }
                 },
-                "example": {
-                  "peerId": "16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12"
-                }
+                "example": { "peerId": "16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12" }
               }
             }
           }
@@ -378,12 +286,8 @@
             "description": "Invalid peerId.",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RequestStatus"
-                },
-                "example": {
-                  "status": "INVALID_PEERID"
-                }
+                "schema": { "$ref": "#/components/schemas/RequestStatus" },
+                "example": { "status": "INVALID_PEERID" }
               }
             }
           },
@@ -391,12 +295,8 @@
             "description": "Timout, node with specified PeerId didn't respond in time.",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RequestStatus"
-                },
-                "example": {
-                  "status": "TIMEOUT"
-                }
+                "schema": { "$ref": "#/components/schemas/RequestStatus" },
+                "example": { "status": "TIMEOUT" }
               }
             }
           }
@@ -414,10 +314,7 @@
             "in": "query",
             "name": "quality",
             "description": "When quality is passed, the response will only include peers with higher or equal quality to the one specified.",
-            "schema": {
-              "type": "number",
-              "example": "0.5"
-            }
+            "schema": { "type": "number", "example": "0.5" }
           }
         ],
         "responses": {
@@ -433,20 +330,12 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "peerId": {
-                            "$ref": "#/components/schemas/HoprAddress"
-                          },
-                          "multiAddr": {
-                            "$ref": "#/components/schemas/MultiAddress"
-                          },
+                          "peerId": { "$ref": "#/components/schemas/HoprAddress" },
+                          "multiAddr": { "$ref": "#/components/schemas/MultiAddress" },
                           "heartbeats": {
                             "type": "object",
                             "properties": {
-                              "sent": {
-                                "type": "number",
-                                "description": "Heartbeats sent to the node",
-                                "example": 10
-                              },
+                              "sent": { "type": "number", "description": "Heartbeats sent to the node", "example": 10 },
                               "success": {
                                 "type": "number",
                                 "description": "Successful heartbeats sent to the node",
@@ -464,9 +353,7 @@
                             "description": "A float between 0 (completely unreliable) and 1 (completely reliable) estimating the quality of service of a peer's network connection",
                             "example": 0.8
                           },
-                          "backoff": {
-                            "type": "number"
-                          },
+                          "backoff": { "type": "number" },
                           "isNew": {
                             "type": "boolean",
                             "description": "True if the node is new (no heartbeats sent yet)."
@@ -479,20 +366,12 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "peerId": {
-                            "$ref": "#/components/schemas/HoprAddress"
-                          },
-                          "multiAddr": {
-                            "$ref": "#/components/schemas/MultiAddress"
-                          },
+                          "peerId": { "$ref": "#/components/schemas/HoprAddress" },
+                          "multiAddr": { "$ref": "#/components/schemas/MultiAddress" },
                           "heartbeats": {
                             "type": "object",
                             "properties": {
-                              "sent": {
-                                "type": "number",
-                                "description": "Heartbeats sent to the node",
-                                "example": 10
-                              },
+                              "sent": { "type": "number", "description": "Heartbeats sent to the node", "example": 10 },
                               "success": {
                                 "type": "number",
                                 "description": "Successful heartbeats sent to the node",
@@ -510,9 +389,7 @@
                             "description": "A float between 0 (completely unreliable) and 1 (completely reliable) estimating the quality of service of a peer's network connection",
                             "example": 0.8
                           },
-                          "backoff": {
-                            "type": "number"
-                          },
+                          "backoff": { "type": "number" },
                           "isNew": {
                             "type": "boolean",
                             "description": "True if the node is new (no heartbeats sent yet)."
@@ -529,12 +406,8 @@
             "description": "Invalid input. One of the parameters passed is in an incorrect format.",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RequestStatus"
-                },
-                "example": {
-                  "status": "INVALID_QUALITY"
-                }
+                "schema": { "$ref": "#/components/schemas/RequestStatus" },
+                "example": { "status": "INVALID_QUALITY" }
               }
             }
           },
@@ -545,20 +418,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Full error message."
-                    }
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
                   }
                 },
-                "example": {
-                  "status": "UNKNOWN_FAILURE",
-                  "error": "Full error message."
-                }
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
               }
             }
           }
@@ -637,20 +501,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Full error message."
-                    }
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
                   }
                 },
-                "example": {
-                  "status": "UNKNOWN_FAILURE",
-                  "error": "Full error message."
-                }
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
               }
             }
           }
@@ -664,26 +519,18 @@
         "tags": ["Messages"],
         "operationId": "messagesWebsocket",
         "responses": {
-          "101": {
-            "description": "Switching protocols"
-          },
+          "101": { "description": "Switching protocols" },
           "206": {
             "description": "Incoming data",
             "content": {
               "application/text": {
-                "schema": {
-                  "type": "string"
-                },
+                "schema": { "type": "string" },
                 "example": "104,101,108,108,111,32,119,111,114,108,100"
               }
             }
           },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "404": {
-            "description": "Not found"
-          }
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Not found" }
         }
       }
     },
@@ -699,12 +546,7 @@
               "schema": {
                 "type": "object",
                 "required": ["message"],
-                "properties": {
-                  "message": {
-                    "description": "The message to be signed.",
-                    "type": "string"
-                  }
-                }
+                "properties": { "message": { "description": "The message to be signed.", "type": "string" } }
               }
             }
           }
@@ -716,11 +558,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": {
-                    "signature": {
-                      "$ref": "#/components/schemas/Signature"
-                    }
-                  }
+                  "properties": { "signature": { "$ref": "#/components/schemas/Signature" } }
                 }
               }
             }
@@ -732,20 +570,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Full error message."
-                    }
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
                   }
                 },
-                "example": {
-                  "status": "UNKNOWN_FAILURE",
-                  "error": "Full error message."
-                }
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
               }
             }
           }
@@ -794,9 +623,7 @@
           }
         },
         "responses": {
-          "204": {
-            "description": "The message was sent successfully. NOTE: This does not imply successful delivery."
-          },
+          "204": { "description": "The message was sent successfully. NOTE: This does not imply successful delivery." },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -804,20 +631,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Full error message."
-                    }
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
                   }
                 },
-                "example": {
-                  "status": "UNKNOWN_FAILURE",
-                  "error": "Full error message."
-                }
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
               }
             }
           }
@@ -836,12 +654,7 @@
               "schema": {
                 "type": "object",
                 "required": ["message"],
-                "properties": {
-                  "message": {
-                    "description": "The message to be signed.",
-                    "type": "string"
-                  }
-                }
+                "properties": { "message": { "description": "The message to be signed.", "type": "string" } }
               }
             }
           }
@@ -853,11 +666,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": {
-                    "signature": {
-                      "$ref": "#/components/schemas/Signature"
-                    }
-                  }
+                  "properties": { "signature": { "$ref": "#/components/schemas/Signature" } }
                 }
               }
             }
@@ -869,20 +678,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Full error message."
-                    }
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
                   }
                 },
-                "example": {
-                  "status": "UNKNOWN_FAILURE",
-                  "error": "Full error message."
-                }
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
               }
             }
           }
@@ -914,10 +714,7 @@
                     "description": "Amount of HOPR tokens to fund the channel. It will be used to pay for sending messages through channel"
                   }
                 },
-                "example": {
-                  "peerId": "16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12",
-                  "amount": "1000000"
-                }
+                "example": { "peerId": "16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12", "amount": "1000000" }
               }
             }
           }
@@ -949,12 +746,8 @@
             "description": "Problem with inputs.",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RequestStatus"
-                },
-                "example": {
-                  "status": "INVALID_AMOUNT | INVALID_ADDRESS"
-                }
+                "schema": { "$ref": "#/components/schemas/RequestStatus" },
+                "example": { "status": "INVALID_AMOUNT | INVALID_ADDRESS" }
               }
             }
           },
@@ -972,9 +765,7 @@
                     }
                   }
                 },
-                "example": {
-                  "status": "NOT_ENOUGH_BALANCE"
-                }
+                "example": { "status": "NOT_ENOUGH_BALANCE" }
               }
             }
           },
@@ -992,9 +783,7 @@
                     }
                   }
                 },
-                "example": {
-                  "status": "CHANNEL_ALREADY_OPEN"
-                }
+                "example": { "status": "CHANNEL_ALREADY_OPEN" }
               }
             }
           },
@@ -1005,20 +794,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Full error message."
-                    }
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
                   }
                 },
-                "example": {
-                  "status": "UNKNOWN_FAILURE",
-                  "error": "Full error message."
-                }
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
               }
             }
           }
@@ -1033,10 +813,7 @@
             "in": "query",
             "name": "includingClosed",
             "description": "When includingClosed is passed the response will include closed channels which are ommited by default.",
-            "schema": {
-              "type": "string",
-              "example": "false"
-            }
+            "schema": { "type": "string", "example": "false" }
           }
         ],
         "responses": {
@@ -1049,16 +826,12 @@
                   "properties": {
                     "incoming": {
                       "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Channel"
-                      },
+                      "items": { "$ref": "#/components/schemas/Channel" },
                       "description": "Incomming channels are the ones that were opened by a different node and this node acts as relay."
                     },
                     "outgoing": {
                       "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Channel"
-                      },
+                      "items": { "$ref": "#/components/schemas/Channel" },
                       "description": "Outgoing channels are the ones that were opened by this node and is using other node as relay."
                     }
                   }
@@ -1073,20 +846,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Full error message."
-                    }
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
                   }
                 },
-                "example": {
-                  "status": "UNKNOWN_FAILURE",
-                  "error": "Full error message."
-                }
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
               }
             }
           }
@@ -1107,12 +871,8 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "alice": {
-                      "$ref": "#/components/schemas/HoprAddress"
-                    },
-                    "bob": {
-                      "$ref": "#/components/schemas/HoprAddress"
-                    }
+                    "alice": { "$ref": "#/components/schemas/HoprAddress" },
+                    "bob": { "$ref": "#/components/schemas/HoprAddress" }
                   }
                 }
               }
@@ -1125,20 +885,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Full error message."
-                    }
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
                   }
                 },
-                "example": {
-                  "status": "UNKNOWN_FAILURE",
-                  "error": "Full error message."
-                }
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
               }
             }
           }
@@ -1160,33 +911,21 @@
                     "type": "string",
                     "description": "PeerId that we want to set alias to."
                   },
-                  "alias": {
-                    "type": "string",
-                    "description": "Alias that we want to attach to peerId."
-                  }
+                  "alias": { "type": "string", "description": "Alias that we want to attach to peerId." }
                 },
-                "example": {
-                  "peerId": "16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12",
-                  "alias": "Alice"
-                }
+                "example": { "peerId": "16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12", "alias": "Alice" }
               }
             }
           }
         },
         "responses": {
-          "201": {
-            "description": "Alias set succesfully"
-          },
+          "201": { "description": "Alias set succesfully" },
           "400": {
             "description": "Invalid peerId. The format or length of the peerId is incorrect.",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RequestStatus"
-                },
-                "example": {
-                  "status": "INVALID_PEERID"
-                }
+                "schema": { "$ref": "#/components/schemas/RequestStatus" },
+                "example": { "status": "INVALID_PEERID" }
               }
             }
           },
@@ -1197,20 +936,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Full error message."
-                    }
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
                   }
                 },
-                "example": {
-                  "status": "UNKNOWN_FAILURE",
-                  "error": "Full error message."
-                }
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
               }
             }
           }
@@ -1230,18 +960,14 @@
                 "type": "object",
                 "required": ["currency", "amount", "recipient"],
                 "properties": {
-                  "currency": {
-                    "$ref": "#/components/schemas/Currency"
-                  },
+                  "currency": { "$ref": "#/components/schemas/Currency" },
                   "amount": {
                     "type": "string",
                     "format": "amount",
                     "description": "Amount to withdraw in the currency's smallest unit.",
                     "example": "1337"
                   },
-                  "recipient": {
-                    "$ref": "#/components/schemas/NativeAddress"
-                  }
+                  "recipient": { "$ref": "#/components/schemas/NativeAddress" }
                 }
               }
             }
@@ -1269,12 +995,8 @@
             "description": "Incorrect data in request body. Make sure to provide valid currency ('NATIVE' | 'HOPR') or amount.",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RequestStatus"
-                },
-                "example": {
-                  "status": "INVALID_CURRENCY | INVALID_AMOUNT"
-                }
+                "schema": { "$ref": "#/components/schemas/RequestStatus" },
+                "example": { "status": "INVALID_CURRENCY | INVALID_AMOUNT" }
               }
             }
           },
@@ -1285,19 +1007,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "NOT_ENOUGH_BALANCE | UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "NOT_ENOUGH_BALANCE"
-                    }
+                    "status": { "type": "string", "example": "NOT_ENOUGH_BALANCE | UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "NOT_ENOUGH_BALANCE" }
                   }
                 },
-                "example": {
-                  "status": "NOT_ENOUGH_BALANCE"
-                }
+                "example": { "status": "NOT_ENOUGH_BALANCE" }
               }
             }
           }
@@ -1318,12 +1032,8 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "native": {
-                      "$ref": "#/components/schemas/NativeBalance"
-                    },
-                    "hopr": {
-                      "$ref": "#/components/schemas/HoprBalance"
-                    }
+                    "native": { "$ref": "#/components/schemas/NativeBalance" },
+                    "hopr": { "$ref": "#/components/schemas/HoprBalance" }
                   }
                 }
               }
@@ -1336,20 +1046,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Full error message."
-                    }
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
                   }
                 },
-                "example": {
-                  "status": "UNKNOWN_FAILURE",
-                  "error": "Full error message."
-                }
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
               }
             }
           }
@@ -1371,31 +1072,13 @@
                   "type": "object",
                   "properties": {
                     "nativeAddress": {
-                      "allOf": [
-                        {
-                          "$ref": "#/components/schemas/NativeAddress"
-                        },
-                        {
-                          "deprecated": true
-                        }
-                      ]
+                      "allOf": [{ "$ref": "#/components/schemas/NativeAddress" }, { "deprecated": true }]
                     },
                     "hoprAddress": {
-                      "allOf": [
-                        {
-                          "$ref": "#/components/schemas/HoprAddress"
-                        },
-                        {
-                          "deprecated": true
-                        }
-                      ]
+                      "allOf": [{ "$ref": "#/components/schemas/HoprAddress" }, { "deprecated": true }]
                     },
-                    "native": {
-                      "$ref": "#/components/schemas/NativeAddress"
-                    },
-                    "hopr": {
-                      "$ref": "#/components/schemas/HoprAddress"
-                    }
+                    "native": { "$ref": "#/components/schemas/NativeAddress" },
+                    "hopr": { "$ref": "#/components/schemas/HoprAddress" }
                   }
                 }
               }
@@ -1408,20 +1091,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Full error message."
-                    }
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
                   }
                 },
-                "example": {
-                  "status": "UNKNOWN_FAILURE",
-                  "error": "Full error message."
-                }
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
               }
             }
           }
@@ -1443,31 +1117,13 @@
                   "type": "object",
                   "properties": {
                     "nativeAddress": {
-                      "allOf": [
-                        {
-                          "$ref": "#/components/schemas/NativeAddress"
-                        },
-                        {
-                          "deprecated": true
-                        }
-                      ]
+                      "allOf": [{ "$ref": "#/components/schemas/NativeAddress" }, { "deprecated": true }]
                     },
                     "hoprAddress": {
-                      "allOf": [
-                        {
-                          "$ref": "#/components/schemas/HoprAddress"
-                        },
-                        {
-                          "deprecated": true
-                        }
-                      ]
+                      "allOf": [{ "$ref": "#/components/schemas/HoprAddress" }, { "deprecated": true }]
                     },
-                    "native": {
-                      "$ref": "#/components/schemas/NativeAddress"
-                    },
-                    "hopr": {
-                      "$ref": "#/components/schemas/HoprAddress"
-                    }
+                    "native": { "$ref": "#/components/schemas/NativeAddress" },
+                    "hopr": { "$ref": "#/components/schemas/HoprAddress" }
                   }
                 }
               }
@@ -1480,20 +1136,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Full error message."
-                    }
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
                   }
                 },
-                "example": {
-                  "status": "UNKNOWN_FAILURE",
-                  "error": "Full error message."
-                }
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
               }
             }
           }
@@ -1526,30 +1173,20 @@
               "schema": {
                 "type": "object",
                 "required": ["settingValue"],
-                "properties": {
-                  "settingValue": {}
-                },
-                "example": {
-                  "settingValue": true
-                }
+                "properties": { "settingValue": {} },
+                "example": { "settingValue": true }
               }
             }
           }
         },
         "responses": {
-          "204": {
-            "description": "Setting set succesfully"
-          },
+          "204": { "description": "Setting set succesfully" },
           "400": {
             "description": "Invalid input. Either setting with that name doesn't exist or the value is incorrect.",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RequestStatus"
-                },
-                "example": {
-                  "status": "INVALID_SETTING | INVALID_SETTING_VALUE"
-                }
+                "schema": { "$ref": "#/components/schemas/RequestStatus" },
+                "example": { "status": "INVALID_SETTING | INVALID_SETTING_VALUE" }
               }
             }
           },
@@ -1560,20 +1197,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Full error message."
-                    }
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
                   }
                 },
-                "example": {
-                  "status": "UNKNOWN_FAILURE",
-                  "error": "Full error message."
-                }
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
               }
             }
           }
@@ -1601,19 +1229,13 @@
           }
         ],
         "responses": {
-          "204": {
-            "description": "Tickets redeemed succesfully."
-          },
+          "204": { "description": "Tickets redeemed succesfully." },
           "400": {
             "description": "Invalid peerId.",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RequestStatus"
-                },
-                "example": {
-                  "status": "INVALID_PEERID"
-                }
+                "schema": { "$ref": "#/components/schemas/RequestStatus" },
+                "example": { "status": "INVALID_PEERID" }
               }
             }
           },
@@ -1621,12 +1243,8 @@
             "description": "Tickets were not found for that channel. That means that no messages were sent inside this channel yet.",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RequestStatus"
-                },
-                "example": {
-                  "status": "TICKETS_NOT_FOUND"
-                }
+                "schema": { "$ref": "#/components/schemas/RequestStatus" },
+                "example": { "status": "TICKETS_NOT_FOUND" }
               }
             }
           },
@@ -1637,20 +1255,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Full error message."
-                    }
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
                   }
                 },
-                "example": {
-                  "status": "UNKNOWN_FAILURE",
-                  "error": "Full error message."
-                }
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
               }
             }
           }
@@ -1681,26 +1290,15 @@
           "200": {
             "description": "Tickets fetched successfully.",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Ticket"
-                  }
-                }
-              }
+              "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Ticket" } } }
             }
           },
           "400": {
             "description": "Invalid peerId.",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RequestStatus"
-                },
-                "example": {
-                  "status": "INVALID_PEERID"
-                }
+                "schema": { "$ref": "#/components/schemas/RequestStatus" },
+                "example": { "status": "INVALID_PEERID" }
               }
             }
           },
@@ -1708,12 +1306,8 @@
             "description": "Tickets were not found for that channel. That means that no messages were sent inside this channel yet.",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RequestStatus"
-                },
-                "example": {
-                  "status": "TICKETS_NOT_FOUND"
-                }
+                "schema": { "$ref": "#/components/schemas/RequestStatus" },
+                "example": { "status": "TICKETS_NOT_FOUND" }
               }
             }
           },
@@ -1724,20 +1318,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Full error message."
-                    }
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
                   }
                 },
-                "example": {
-                  "status": "UNKNOWN_FAILURE",
-                  "error": "Full error message."
-                }
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
               }
             }
           }
@@ -1767,10 +1352,7 @@
             "name": "direction",
             "description": "Specify which channel should be fetched, incoming or outgoing.",
             "required": true,
-            "schema": {
-              "type": "string",
-              "enum": ["incoming", "outgoing"]
-            }
+            "schema": { "type": "string", "enum": ["incoming", "outgoing"] }
           }
         ],
         "responses": {
@@ -1800,12 +1382,8 @@
             "description": "Invalid peerId.",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RequestStatus"
-                },
-                "example": {
-                  "status": "INVALID_PEERID"
-                }
+                "schema": { "$ref": "#/components/schemas/RequestStatus" },
+                "example": { "status": "INVALID_PEERID" }
               }
             }
           },
@@ -1816,20 +1394,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Full error message."
-                    }
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
                   }
                 },
-                "example": {
-                  "status": "UNKNOWN_FAILURE",
-                  "error": "Full error message."
-                }
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
               }
             }
           }
@@ -1845,44 +1414,27 @@
             "name": "peerid",
             "description": "Counterparty peerId assigned to the channel you want to fetch.",
             "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/HoprAddress"
-            }
+            "schema": { "$ref": "#/components/schemas/HoprAddress" }
           },
           {
             "in": "path",
             "name": "direction",
             "description": "Specify which channel should be fetched, incoming or outgoing.",
             "required": true,
-            "schema": {
-              "type": "string",
-              "enum": ["incoming", "outgoing"]
-            }
+            "schema": { "type": "string", "enum": ["incoming", "outgoing"] }
           }
         ],
         "responses": {
           "200": {
             "description": "Channel fetched succesfully.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/Channel"
-                  }
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "items": { "$ref": "#/components/schemas/Channel" } } } }
           },
           "400": {
             "description": "Invalid peerId.",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RequestStatus"
-                },
-                "example": {
-                  "status": "INVALID_PEERID"
-                }
+                "schema": { "$ref": "#/components/schemas/RequestStatus" },
+                "example": { "status": "INVALID_PEERID" }
               }
             }
           },
@@ -1890,12 +1442,8 @@
             "description": "Channel with that peerId was not found. You can list all channels using /channels/ endpoint.",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RequestStatus"
-                },
-                "example": {
-                  "status": "CHANNEL_NOT_FOUND"
-                }
+                "schema": { "$ref": "#/components/schemas/RequestStatus" },
+                "example": { "status": "CHANNEL_NOT_FOUND" }
               }
             }
           },
@@ -1906,20 +1454,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Full error message."
-                    }
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
                   }
                 },
-                "example": {
-                  "status": "UNKNOWN_FAILURE",
-                  "error": "Full error message."
-                }
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
               }
             }
           }
@@ -1938,10 +1477,7 @@
             "in": "path",
             "description": "Alias that we previously assigned to some PeerId.",
             "required": true,
-            "schema": {
-              "type": "string",
-              "example": "Alice"
-            }
+            "schema": { "type": "string", "example": "Alice" }
           }
         ],
         "responses": {
@@ -1951,11 +1487,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": {
-                    "peerId": {
-                      "$ref": "#/components/schemas/HoprAddress"
-                    }
-                  }
+                  "properties": { "peerId": { "$ref": "#/components/schemas/HoprAddress" } }
                 }
               }
             }
@@ -1964,12 +1496,8 @@
             "description": "This alias was not assigned to any PeerId before. You can get the list of all PeerId's and thier corresponding aliases using /aliases endpoint.",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RequestStatus"
-                },
-                "example": {
-                  "status": "PEERID_NOT_FOUND"
-                }
+                "schema": { "$ref": "#/components/schemas/RequestStatus" },
+                "example": { "status": "PEERID_NOT_FOUND" }
               }
             }
           },
@@ -1980,20 +1508,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Full error message."
-                    }
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
                   }
                 },
-                "example": {
-                  "status": "UNKNOWN_FAILURE",
-                  "error": "Full error message."
-                }
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
               }
             }
           }
@@ -2009,16 +1528,11 @@
             "in": "path",
             "description": "Alias that we want to remove.",
             "required": true,
-            "schema": {
-              "type": "string",
-              "example": "Alice"
-            }
+            "schema": { "type": "string", "example": "Alice" }
           }
         ],
         "responses": {
-          "204": {
-            "description": "Alias removed succesfully."
-          },
+          "204": { "description": "Alias removed succesfully." },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -2026,20 +1540,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "UNKNOWN_FAILURE"
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Full error message."
-                    }
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
                   }
                 },
-                "example": {
-                  "status": "UNKNOWN_FAILURE",
-                  "error": "Full error message."
-                }
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
               }
             }
           }
@@ -2047,31 +1552,16 @@
       }
     }
   },
-  "security": [
-    {
-      "keyScheme": ["write"]
-    },
-    {
-      "passwordScheme": ["write"]
-    }
-  ],
-  "externalDocs": {
-    "description": "Find out more about HOPR and HOPRd.",
-    "url": "http://docs.hoprnet.org"
-  },
+  "security": [{ "keyScheme": ["write"] }, { "passwordScheme": ["write"] }],
+  "externalDocs": { "description": "Find out more about HOPR and HOPRd.", "url": "http://docs.hoprnet.org" },
   "components": {
     "schemas": {
       "RequestStatus": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "string",
-            "description": "Status declaring success/failure of the request."
-          }
+          "status": { "type": "string", "description": "Status declaring success/failure of the request." }
         },
-        "example": {
-          "status": "success"
-        }
+        "example": { "status": "success" }
       },
       "Signature": {
         "type": "string",
@@ -2130,26 +1620,20 @@
             "description": "Channel ID that can be used in other calls, not to confuse with transaction hash.",
             "example": "0x04e50b7ddce9770f58cebe51f33b472c92d1c40384759f5a0b1025220bf15ec5"
           },
-          "peerId": {
-            "$ref": "#/components/schemas/HoprAddress"
-          },
+          "peerId": { "$ref": "#/components/schemas/HoprAddress" },
           "status": {
             "type": "string",
             "enum": ["WaitingForCommitment", "Open", "PendingToClose", "Closed"],
             "description": "Status of the channel can be: WaitingForCommitment, Open, PendingToClose, or Closed.",
             "example": "Open"
           },
-          "balance": {
-            "$ref": "#/components/schemas/HoprBalance"
-          }
+          "balance": { "$ref": "#/components/schemas/HoprBalance" }
         }
       },
       "Ticket": {
         "type": "object",
         "properties": {
-          "counterparty": {
-            "$ref": "#/components/schemas/HoprAddress"
-          },
+          "counterparty": { "$ref": "#/components/schemas/HoprAddress" },
           "challenge": {
             "type": "string",
             "description": "The ticket's challenge which needs to be solved before being able to claim the embedded incentive."
@@ -2162,10 +1646,7 @@
             "type": "string",
             "description": "Each ticket is labeled by an ongoing serial number named ticket index i and its current value is stored in the smart contract."
           },
-          "amount": {
-            "type": "string",
-            "description": "The ticket's value in HOPR."
-          },
+          "amount": { "type": "string", "description": "The ticket's value in HOPR." },
           "winProb": {
             "type": "string",
             "description": "The ticket's winning probability normalized with the common base of Ethereum which is 2^256-1."
@@ -2174,9 +1655,7 @@
             "type": "string",
             "description": "Payment channels might run through multiple open and close sequences, this epoch tracks the sequence."
           },
-          "signature": {
-            "$ref": "#/components/schemas/Signature"
-          }
+          "signature": { "$ref": "#/components/schemas/Signature" }
         }
       },
       "Settings": {
@@ -2212,26 +1691,12 @@
     }
   },
   "tags": [
-    {
-      "name": "Account"
-    },
-    {
-      "name": "Aliases"
-    },
-    {
-      "name": "Channels"
-    },
-    {
-      "name": "Messages"
-    },
-    {
-      "name": "Node"
-    },
-    {
-      "name": "Settings"
-    },
-    {
-      "name": "Tickets"
-    }
+    { "name": "Account" },
+    { "name": "Aliases" },
+    { "name": "Channels" },
+    { "name": "Messages" },
+    { "name": "Node" },
+    { "name": "Settings" },
+    { "name": "Tickets" }
   ]
 }
