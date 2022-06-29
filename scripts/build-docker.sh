@@ -82,35 +82,35 @@ build_and_tag_images() {
     fi
 
     if [ -z "${image_name}" ] || [ "${image_name}" = "cover-traffic-daemon" ]; then
-    log "Building Docker image hopr-cover-traffic-daemon-local"
-    docker build -q -t hopr-cover-traffic-daemon-local \
-      --build-arg=PACKAGE_VERSION="${package_version}" \
-      packages/cover-traffic-daemon &
+      log "Building Docker image hopr-cover-traffic-daemon-local"
+      docker build -q -t hopr-cover-traffic-daemon-local \
+        --build-arg=PACKAGE_VERSION="${package_version}" \
+        packages/cover-traffic-daemon &
     fi
 
     if [ -z "${image_name}" ] || [ "${image_name}" = "hoprd-nat" ]; then
-    log "Building Docker image hoprd-nat-local"
-    docker build -q -t hoprd-nat-local \
-      --build-arg=PACKAGE_VERSION="${package_version}" \
-      --build-arg=HOPRD_RELEASE="${image_version}" \
-      scripts/nat &
+      log "Building Docker image hoprd-nat-local"
+      docker build -q -t hoprd-nat-local \
+        --build-arg=PACKAGE_VERSION="${package_version}" \
+        --build-arg=HOPRD_RELEASE="${image_version}" \
+        scripts/nat &
     fi
 
     if [ -z "${image_name}" ] || [ "${image_name}" = "hardhat" ] || [ "${image_name}" = "pluto-complete" ]; then
-    log "Building Docker image hopr-hardhat-local"
-    docker build -t hopr-hardhat-local \
-      -f Dockerfile.hardhat . &
+      log "Building Docker image hopr-hardhat-local"
+      docker build -q -t hopr-hardhat-local \
+        -f Dockerfile.hardhat . &
     fi
 
     log "Waiting for Docker builds (part 1) to finish"
     wait
 
     if [ -z "${image_name}" ] || [ "${image_name}" = "pluto" ] || [ "${image_name}" = "pluto-complete" ]; then
-    log "Building Docker image hopr-pluto-local"
-    docker build -q -t hopr-pluto-local \
-      --build-arg=HARDHAT_IMAGE="hopr-hardhat-local" \
-      --build-arg=HOPRD_IMAGE="hoprd-local" \
-      scripts/pluto &
+      log "Building Docker image hopr-pluto-local"
+      docker build -q -t hopr-pluto-local \
+        --build-arg=HARDHAT_IMAGE="hopr-hardhat-local" \
+        --build-arg=HOPRD_IMAGE="hoprd-local" \
+        scripts/pluto &
     fi
 
     log "Waiting for Docker builds (part 2) to finish"
