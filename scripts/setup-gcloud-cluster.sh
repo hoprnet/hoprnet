@@ -54,6 +54,10 @@ usage() {
 
 # verify and set parameters
 : ${FAUCET_SECRET_API_KEY?"Missing environment variable FAUCET_SECRET_API_KEY"}
+: ${STAKING_ACCOUNT_BA28?"Missing environment variable STAKING_ACCOUNT_BA28"}
+: ${STAKING_ACCOUNT_F84B?"Missing environment variable STAKING_ACCOUNT_F84B"}
+: ${STAKING_ACCOUNT_0FD4?"Missing environment variable STAKING_ACCOUNT_0FD4"}
+: ${STAKING_ACCOUNT_6C15?"Missing environment variable STAKING_ACCOUNT_6C15"}
 
 declare environment="${1?"missing parameter <environment>"}"
 declare init_script=${2:-}
@@ -125,26 +129,118 @@ gcloud_create_or_update_managed_instance_group  \
   ${cluster_size} \
   "${instance_template_name}"
 
-# get IPs of newly started VMs which run hoprd
-declare node_ips
-node_ips=$(gcloud_get_managed_instance_group_instances_ips "${cluster_id}")
-declare node_ips_arr=( ${node_ips} )
+# This maps "staking account address" => "private key"
+declare -A staking_addrs_dict
 
-#  --- Fund nodes --- {{{
-declare eth_address
-for ip in ${node_ips}; do
-  wait_until_node_is_ready "${ip}"
-  eth_address=$(get_native_address "${api_token}@${ip}:3001")
-  fund_if_empty "${eth_address}" "${environment}"
+# NOTE: the addresses are sorted alphabetically here, to see the actual order the keys will
+# have after sorting. As usual, dictionaries do not keep the insertion order of the keys.
+
+# May be supplied differently in future to accommodate with bigger GCP cluster sizes.
+if [[  "${docker_image}" != *-nat:* ]]; then
+  # Staking addresses for public nodes
+  staking_addrs_dict=(
+    [0xBA28EE6743d008ed6794D023B10D212bc4Eb7e75]="${STAKING_ACCOUNT_BA28}"
+    [0xf84Ba32dd2f2EC2F355fB63F3fC3e048900aE3b2]="${STAKING_ACCOUNT_F84B}"
+  )
+else
+  # Staking addresses for NAT nodes
+  staking_addrs_dict=(
+    [0x0Fd4C32CC8C6237132284c1600ed94D06AC478C6]="${STAKING_ACCOUNT_0FD4}"
+    [0x6c150A63941c6d58a2f2687a23d5a8E0DbdE181C]="${STAKING_ACCOUNT_6C15}"
+  )
+fi
+
+# This can be called always, because the "stake" task is idempotent given the same arguments
+for staking_addr in "${!staking_addrs_dict[@]}" ; do
+  yarn hardhat stake --network hardhat --amount 1000000000000000000000 \
+    --privatekey "${staking_addrs_dict[staking_addr]}"
 done
 
-# To test Network registry, the cluster_size is greater or equal to 2 and staker_addresses are provided as parameters
-# TODO: call stake API so that the first staker_addresses[0] stake in the current program
-# TODO: call register API and register staker_addresses with node peer ids
+# Get names of all instances in this cluster
+declare instance_names
+instance_names=$(gcloud_get_managed_instance_group_instances_names "${cluster_id}")
+declare instance_names_arr=( ${instance_names} )
 
-# We cannot poll for NAT nodes, because they do not expose 9091 to the outside world
+# Prepare sorted staking account addresses so we ensure a stable order of assignment
+declare staking_addresses_arr=( "${!staking_addrs_dict[@]}" )
+readarray -t staking_addresses_arr < <(for addr in "${!staking_addrs_dict[@]}"; do echo "$addr"; done | sort)
+
+# These arrays will hold IP addresses, peer IDs and staking addresses
+# for instance VMs in the encounter order of the `instance_names` array
+declare -a ip_addrs
+declare -a hopr_addrs
+declare -a used_staking_addrs
+
+# Iterate through all VM instances
+# The loop should be parallelized in future to accommodate better with larger clusters
+for instance_idx in "${!instance_names_arr[@]}" ; do
+  # Firstly, retrieve the IP address of this VM instance
+  instance_name="${instance_names_arr[instance_idx]}"
+  node_ip=$(gcloud_get_ip "${instance_name}")
+
+  # All VM instances in the deployed cluster will get a special INFO tag
+  # which contains all handy information about the HOPR instance running in the VM.
+  # These currently include: node wallet address, node peer ID, associated staking account
+  # These information are constant during the lifetime of the VM and
+  # do not change during re-deployment.
+  info_tag=$(gcloud_get_node_info_tag "${instance_name}")
+
+  # Values contained in the INFO tag
+  declare wallet_addr
+  declare peer_id
+  declare staking_addr
+  if [[ -z "${info_tag}" ]]; then
+    # If the instance does not have the INFO tag yet, we need to retrieve all info
+    wallet_addr=$(get_native_address "${api_token}@${node_ip}:3001")
+    peer_id=$(get_hopr_address "${api_token}@${node_ip}:3001")
+
+    # NOTE: We leave only the first public node unstaked
+    if [[ ${instance_idx} -eq 0 && "${docker_image}" != *-nat:* ]]; then
+      staking_addr="unstaked"
+    else
+      # Staking accounts are assigned round-robin
+      staking_addr_idx=$(( (instance_idx ) % ${#staking_addresses_arr[@]} ))
+      staking_addr="${staking_addresses_arr[staking_addr_idx]}"
+    fi
+
+    # Save the info tag
+    info_tag="info:native_addr=${wallet_addr};peer_id=${peer_id};nr_staking_addr=${staking_addr}"
+    gcloud_add_instance_tags "${instance_name}" "${info_tag}"
+  else
+    # Retrieve all information from the INFO tag
+    wallet_addr=$(echo "${info_tag}" | sed -E 's/.*native_addr=(0[xX]{1}[a-f0-9A-F]{40}).*/\1/g')
+    peer_id=$(echo "${info_tag}" | sed -E 's/.*peer_id=([a-zA-Z0-9]+).*/\1/g')
+    staking_addr=$(echo "${info_tag}" | sed -E 's/.*nr_staking_addr=([a-zA-Z0-9]+).*/\1/g')
+  fi
+
+  ip_addrs+=( "${node_ip}" )
+
+  # Do not include the unstaked nodes (= skipped during registration for NR)
+  if [[ "${staking_addr}" != "unstaked" ]]; then
+    hopr_addrs+=( "${peer_id}" )
+    used_staking_addrs+=( "${staking_addr}" )
+  fi
+
+  # Fund the node as well
+  wait_until_node_is_ready "${node_ip}"
+  fund_if_empty "${wallet_addr}" "${environment}"
+
+done
+
+# Register all nodes in cluster
+IFS=','
+# If same order of parameters is given, the "register" task is idempotent
+yarn workspace @hoprnet/hopr-ethereum hardhat register \
+   --network hardhat \
+   --task add \
+   --native-addresses "${used_staking_addrs[*]}" \
+   --peer-ids "${hopr_addrs[*]}"
+unset IFS
+
+# Finally wait for the public nodes to come up, for NAT nodes this isn't possible
+# because the P2P port is not exposed.
 if [[ "${docker_image}" != *-nat:* ]]; then
-  for ip in ${node_ips}; do
+  for ip in "${ip_addrs[@]}"; do
     wait_for_port "9091" "${ip}"
   done
 fi
@@ -154,7 +250,7 @@ fi
 if [ -n "${init_script}" ] && [ -x "${init_script}" ]; then
   HOPRD_API_TOKEN="${api_token}" \
     "${init_script}" \
-    ${node_ips_arr[@]/%/:3001}
+    ${ip_addrs[@]/%/:3001}
 fi
 # }}}
 

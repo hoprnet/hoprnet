@@ -371,10 +371,62 @@ gcloud_get_managed_instance_group_instances_ips() {
   fi
 
   gcloud compute instance-groups list-instances "${name}" \
-    ${gcloud_region} --uri | \
+    ${gcloud_region} --sort-by=instance --uri | \
     xargs -P `${nproc_cmd}` -I '{}' gcloud compute instances describe '{}' \
       --flatten 'networkInterfaces[].accessConfigs[]' \
       --format 'csv[no-heading](networkInterfaces.accessConfigs.natIP)'
+}
+
+# $1=group name
+gcloud_get_managed_instance_group_instances_names() {
+  local name="${1}"
+
+  gcloud compute instance-groups list-instances "${name}" ${gcloud_region} --sort-by=instance \
+    --format=json | jq '.[1].instance' | tr -d '"'
+}
+
+# $1=instance name
+gcloud_get_instance_tags() {
+  local name="${1}"
+
+  gcloud compute instances describe "${name}" --format=json | jq ".tags.items[]" | tr -d '"'
+}
+
+# $1=instance name
+# $2=comma separated list of tags to add
+gcloud_add_instance_tags() {
+  local name="${1}"
+  local tags="${2}"
+
+  gcloud compute instances add-tags "${name}" --tags="${tags}"
+}
+
+# $1 = instance name
+gcloud_get_node_info_tag() {
+  local instance_name="${1}"
+
+  local current_tag_set=$(gcloud_get_instance_tags "${instance_name}")
+  local current_tag_set_arr=( "${current_tag_set}" )
+
+  # Find the tag containing the "info:" prefix
+  local info_tag=""
+  for tag in ${current_tag_set_arr}; do
+    if [[ ${tag} =~ info:.+ ]]; then
+         info_tag="${tag#info:}"
+         break
+    fi
+  done
+
+  echo "${info_tag}"
+}
+
+# $1=instance name
+# $2=comma separated list of tags to remove
+gcloud_remove_instance_tags() {
+  local name="${1}"
+  local tags="${2}"
+
+  gcloud compute instances remove-tags "${name}" --tags="${tags}"
 }
 
 gcloud_get_unused_static_ip_addresses() {
