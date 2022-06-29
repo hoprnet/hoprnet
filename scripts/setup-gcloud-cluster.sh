@@ -208,7 +208,7 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
     gcloud_add_instance_tags "${instance_name}" "${info_tag}"
   else
     # Retrieve all information from the INFO tag
-    wallet_addr=$(echo "${info_tag}" | sed -E 's/.*native_addr=([Xxa-f0-9A-F]+).*/\1/g')
+    wallet_addr=$(echo "${info_tag}" | sed -E 's/.*native_addr=(0[xX]{1}[a-f0-9A-F]{40}).*/\1/g')
     peer_id=$(echo "${info_tag}" | sed -E 's/.*peer_id=([a-zA-Z0-9]+).*/\1/g')
     staking_addr=$(echo "${info_tag}" | sed -E 's/.*nr_staking_addr=([a-zA-Z0-9]+).*/\1/g')
   fi
