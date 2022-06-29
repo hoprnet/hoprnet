@@ -250,7 +250,7 @@ fi
 if [ -n "${init_script}" ] && [ -x "${init_script}" ]; then
   HOPRD_API_TOKEN="${api_token}" \
     "${init_script}" \
-    ${node_ips_arr[@]/%/:3001}
+    ${ip_addrs[@]/%/:3001}
 fi
 # }}}
 
