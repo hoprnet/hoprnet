@@ -17,14 +17,20 @@ source "${mydir}/utils.sh"
 declare api_token="^^LOCAL-testing-123^^"
 declare myne_chat_url="http://app.myne.chat"
 declare init_script=""
+declare hoprd_command="node packages/hoprd/lib/main.cjs"
+declare hardhat_basedir="."
+declare node_env="development"
 
 usage() {
   msg
-  msg "Usage: $0 [-h|--help] [-t|--api-token <api_token>] [-m|--myne-chat-url <myne_chat_url>] [-i|--init-script <init_script>]"
+  msg "Usage: $0 [-h|--help] [-t|--api-token <api_token>] [-m|--myne-chat-url <myne_chat_url>] [-i|--init-script <init_script>] [--hoprd-command <hoprd_command>] [--hardhat-basedir <hardhat_basedir>] [-p|--production]"
   msg
   msg "<api_token> is set to '${api_token}' by default"
   msg "<myne_chat_url> is set to '${myne_chat_url}' by default"
   msg "<init_script> is empty by default, expected to be path to a script which is called with all node API endpoints as parameters"
+  msg "<hoprd_command> is used to start hoprd, default is '${hoprd_command}'"
+  msg "<hardhat_basedir> is entered before hardhat is started, default is '${hardhat_basedir}'"
+  msg "-p sets NODE_ENV to 'production'"
 }
 
 while (( "$#" )); do
@@ -33,6 +39,10 @@ while (( "$#" )); do
       # return early with help info when requested
       usage
       exit 0
+      ;;
+    -p|--production)
+      node_env="production"
+      shift
       ;;
     -t|--api-token)
       api_token="${2}"
@@ -46,6 +56,16 @@ while (( "$#" )); do
       ;;
     -i|--init-script)
       init_script="${2}"
+      shift
+      shift
+      ;;
+    --hoprd-command)
+      hoprd_command="${2}"
+      shift
+      shift
+      ;;
+    --hardhat-basedir)
+      hardhat_basedir="${2}"
       shift
       shift
       ;;
@@ -103,7 +123,8 @@ function cleanup {
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
 
-  rm ${env_file}
+  log "Removing cluster env file"
+  rm -f ${env_file}
 
   exit $EXIT_CODE
 }
@@ -140,13 +161,13 @@ function setup_node() {
   # in parallel
   env \
     DEBUG="hopr*" \
-    NODE_ENV=development \
+    NODE_ENV="${node_env}" \
     HOPRD_HEARTBEAT_INTERVAL=2500 \
     HOPRD_HEARTBEAT_THRESHOLD=2500 \
     HOPRD_HEARTBEAT_VARIANCE=1000 \
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
     HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
-    node packages/hoprd/lib/main.cjs \
+    ${hoprd_command} \
       --admin \
       --adminHost "127.0.0.1" \
       --adminPort ${admin_port} \
@@ -214,26 +235,27 @@ ensure_port_is_free 19095
 # --- Cleanup old contract deployments {{{
 log "Removing artifacts from old contract deployments"
 rm -Rfv \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
+  "${hardhat_basedir}/deployments/hardhat-localhost/*" \
+  "${hardhat_basedir}/deployments/hardhat-localhost2"
 # }}}
 
 # --- Running Mock Blockchain --- {{{
 log "Running hardhat local node"
-HOPR_ENVIRONMENT_ID="hardhat-localhost" yarn workspace @hoprnet/hopr-ethereum hardhat node \
-  --network hardhat --show-stack-traces > \
-  "${hardhat_rpc_log}" 2>&1 &
+cd "${hardhat_basedir}" && \
+  yarn run:network \
+    --network hardhat --show-stack-traces > \
+    "${hardhat_rpc_log}" 2>&1 &
 
 wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
 log "Hardhat node started (127.0.0.1:8545)"
 
 # need to mirror contract data because of hardhat-deploy node only writing to localhost
 cp -R \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost/localhost" \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost/hardhat"
+  "${hardhat_basedir}/deployments/hardhat-localhost/localhost" \
+  "${hardhat_basedir}/deployments/hardhat-localhost/hardhat"
 cp -R \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
+  "${hardhat_basedir}/deployments/hardhat-localhost" \
+  "${hardhat_basedir}/deployments/hardhat-localhost2"
 # }}}
 
 #  --- Run nodes --- {{{
@@ -255,12 +277,8 @@ wait_for_regex ${node5_log} "unfunded"
 log "Funding nodes"
 
 #  --- Fund nodes --- {{{
-HOPR_ENVIRONMENT_ID=hardhat-localhost yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
-  --identity-prefix "${node_prefix}" \
-  --identity-directory "${tmp}" \
-  --use-local-identities \
-  --network hardhat \
-  --password "${password}"
+cd "${hardhat_basedir}" && \
+  yarn run:faucet:all
 # }}}
 
 log "Waiting for nodes startup"
@@ -380,4 +398,5 @@ else
 fi
 
 log "Terminating this script will clean up the running local cluster"
+trap - SIGINT SIGTERM ERR
 wait
