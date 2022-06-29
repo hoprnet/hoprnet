@@ -12,7 +12,7 @@ const DEBUG_PREFIX = 'hopr-connect:relay:state'
 const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
 const error = debug(DEBUG_PREFIX.concat(':error'))
 
-type State = {
+type RelayConnections = {
   [id: string]: RelayContext
 }
 
@@ -20,7 +20,7 @@ type State = {
  * Encapsulates open relayed connections
  */
 class RelayState {
-  private relayedConnections: Map<string, State>
+  private relayedConnections: Map<string, RelayConnections>
 
   constructor() {
     this.relayedConnections = new Map()
@@ -57,7 +57,7 @@ class RelayState {
       return false
     }
 
-    const context = this.relayedConnections.get(id) as State
+    const context = this.relayedConnections.get(id) as RelayConnections
 
     let latency: number
     try {
@@ -90,7 +90,7 @@ class RelayState {
       throw Error(`Relayed connection does not exist`)
     }
 
-    const context = this.relayedConnections.get(id) as State
+    const context = this.relayedConnections.get(id) as RelayConnections
 
     context[source.toString()].update(toSource)
   }
@@ -129,7 +129,7 @@ class RelayState {
     let sourcePromise = toSourceContext.sink(toDestinationContext.source)
     let destinationPromise = toDestinationContext.sink(toSourceContext.source)
 
-    let relayedConnection: State = {
+    let relayedConnection: RelayConnections = {
       [source.toString()]: toSourceContext,
       [destination.toString()]: toDestinationContext
     }

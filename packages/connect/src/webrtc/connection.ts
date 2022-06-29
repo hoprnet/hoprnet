@@ -56,7 +56,6 @@ class WebRTCConnection implements MultiaddrConnection {
 
   public destroyed: boolean
   public remoteAddr: MultiaddrConnection['remoteAddr']
-  public localAddr: MultiaddrConnection['localAddr']
 
   // @ts-ignore
   public sink: StreamSink
@@ -85,7 +84,6 @@ class WebRTCConnection implements MultiaddrConnection {
     this._sourceMigrated = false
     this._sinkMigrated = false
 
-    this.localAddr = this.conn.localAddr
     this.remoteAddr = this.conn.remoteAddr
 
     this.timeline = {

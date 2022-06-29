@@ -1,14 +1,24 @@
 import NatAPI from 'nat-api'
+import type { Startable } from '@libp2p/interfaces/startable'
 
-export class UpnpManager {
+export class UpnpManager implements Startable {
   protected client: NatAPI
+  private _isStarted: boolean
+
   constructor() {
+    this._isStarted = false
     this.client = new NatAPI()
 
     // Reduce default timeout
     //@ts-ignore
     this.client._upnpClient.timeout = 700
   }
+
+  public isStarted(): boolean {
+    return this._isStarted
+  }
+
+  public start(): void {}
 
   /**
    * Tries to get the external IP using UPnP.
@@ -60,7 +70,9 @@ export class UpnpManager {
    * Frees all allocated ports and cleans all opened sockets
    * @returns a promise that resolves once done
    */
-  stop(): Promise<void> {
-    return new Promise((resolve) => this.client.destroy(resolve))
+  async stop(): Promise<void> {
+    await new Promise<void>((resolve) => this.client.destroy(resolve))
+
+    this._isStarted = false
   }
 }

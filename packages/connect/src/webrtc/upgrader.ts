@@ -5,6 +5,8 @@ import { Multiaddr } from '@multiformats/multiaddr'
 import type { PeerStoreType, HoprConnectOptions } from '../types.js'
 import { CODE_IP4, CODE_TCP, CODE_UDP } from '../constants.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
+import type { Startable } from '@libp2p/interfaces/startable'
+
 import { AbortError } from 'abortable-iterator'
 
 // No types for wrtc
@@ -62,21 +64,32 @@ function publicNodesToRTCServers(peerData: PeerStoreType[]): RTCIceServer[] {
 /**
  * Encapsulate configuration used to create WebRTC instances
  */
-class WebRTCUpgrader {
+class WebRTCUpgrader implements Startable {
   public rtcConfig?: RTCConfiguration
   private publicNodes: PeerStoreType[]
+
+  private _isStarted: boolean
 
   private _onNewPublicNode: WebRTCUpgrader['onNewPublicNode'] | undefined
   private _onOfflineNode: WebRTCUpgrader['onOfflineNode'] | undefined
 
   constructor(private options: HoprConnectOptions) {
+    this._isStarted = false
     this.publicNodes = []
+  }
+
+  public isStarted(): boolean {
+    return this._isStarted
   }
 
   /**
    * Attach event listeners to handle newly discovered public nodes and offline public nodes
    */
   public start(): void {
+    if (this._isStarted) {
+      return
+    }
+
     this._onNewPublicNode = this.onNewPublicNode.bind(this)
     this._onOfflineNode = this.onOfflineNode.bind(this)
 
@@ -86,12 +99,18 @@ class WebRTCUpgrader {
       this.options.publicNodes.on('addPublicNode', this._onNewPublicNode)
       this.options.publicNodes.on('removePublicNode', this._onOfflineNode)
     }
+
+    this._isStarted = true
   }
 
   /**
    * Unassign event listeners
    */
   public stop(): void {
+    if (!this._isStarted) {
+      throw Error(`Could not stop module because it is not yet started.`)
+    }
+
     if (
       this.options.publicNodes != undefined &&
       this._onNewPublicNode != undefined &&
@@ -100,6 +119,8 @@ class WebRTCUpgrader {
       this.options.publicNodes.removeListener('addPublicNode', this._onNewPublicNode)
       this.options.publicNodes.removeListener('removePublicNode', this._onOfflineNode)
     }
+
+    this._isStarted = false
   }
 
   /**

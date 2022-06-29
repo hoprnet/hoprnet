@@ -1,14 +1,14 @@
 import type { HoprConnectOptions, PeerStoreType } from '../types.js'
 import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
 import type { PeerId } from '@libp2p/interface-peer-id'
+import type { Initializable, Components } from '@libp2p/interfaces/components'
+import type { Startable } from '@libp2p/interfaces/startable'
 import type { Multiaddr } from '@multiformats/multiaddr'
 import type HoprConnect from '../index.js'
 import { peerIdFromBytes } from '@libp2p/peer-id'
-import { Libp2p } from 'libp2p'
 
 import { EventEmitter } from 'events'
 import Debug from 'debug'
-import { setTimeout as setTimeoutPromise } from 'timers/promises'
 
 import {
   CODE_IP4,
@@ -79,33 +79,38 @@ export const RELAY_CHANGED_EVENT = 'relay:changed'
 
 export const ENTRY_NODES_MAX_PARALLEL_DIALS = 14
 
-type ReducedLibp2p = {
-  connectionManager: Pick<Libp2p['connectionManager'], 'getConnections'>
-}
-
-export class EntryNodes extends EventEmitter {
+export class EntryNodes extends EventEmitter implements Initializable, Startable {
   protected availableEntryNodes: EntryNodeData[]
   protected uncheckedEntryNodes: PeerStoreType[]
   private stopDHTRenewal: (() => void) | undefined
 
   protected usedRelays: UsedRelay[]
 
+  private _isStarted: boolean
+
+  private components: Components | undefined
+
   private _onNewRelay: ((peer: PeerStoreType) => void) | undefined
   private _onRemoveRelay: ((peer: PeerId) => void) | undefined
   private _connectToRelay: EntryNodes['connectToRelay'] | undefined
   public _onEntryNodeDisconnect: EntryNodes['onEntryDisconnect'] | undefined
 
-  constructor(
-    private peerId: PeerId,
-    private libp2p: ReducedLibp2p,
-    private dialDirectly: HoprConnect['dialDirectly'],
-    private options: HoprConnectOptions
-  ) {
+  public init(components: Components) {
+    this.components = components
+  }
+
+  constructor(private dialDirectly: HoprConnect['dialDirectly'], private options: HoprConnectOptions) {
     super()
+
+    this._isStarted = false
     this.availableEntryNodes = []
     this.uncheckedEntryNodes = options.initialNodes ?? []
 
     this.usedRelays = []
+  }
+
+  public isStarted() {
+    return this._isStarted
   }
 
   /**
@@ -136,12 +141,17 @@ export class EntryNodes extends EventEmitter {
     }
 
     this.startDHTRenewInterval()
+    this._isStarted = true
   }
 
   /**
    * Removes event listeners
    */
   public stop() {
+    if (!this._isStarted) {
+      throw Error(`Could not stop module because it is not yet started.`)
+    }
+
     if (this.options.publicNodes != undefined && this._onNewRelay != undefined && this._onRemoveRelay != undefined) {
       this.options.publicNodes.removeListener('addPublicNode', this._onNewRelay)
 
@@ -149,6 +159,7 @@ export class EntryNodes extends EventEmitter {
     }
 
     this.stopDHTRenewal?.()
+    this._isStarted = false
   }
 
   private onEntryDisconnect(ma: Multiaddr) {
@@ -256,7 +267,7 @@ export class EntryNodes extends EventEmitter {
    * @param peer PeerInfo of node that is added as a relay opportunity
    */
   protected async onNewRelay(peer: PeerStoreType): Promise<void> {
-    if (peer.id.equals(this.peerId)) {
+    if (peer.id.equals((this.components as Components).getPeerId())) {
       return
     }
     if (peer.multiaddrs == undefined || peer.multiaddrs.length == 0) {
@@ -322,7 +333,7 @@ export class EntryNodes extends EventEmitter {
     const nodesToCheck: PeerStoreType[] = []
 
     for (const uncheckedNode of this.uncheckedEntryNodes) {
-      if (uncheckedNode.id.equals(this.peerId)) {
+      if (uncheckedNode.id.equals((this.components as Components).getPeerId())) {
         continue
       }
 
@@ -368,12 +379,6 @@ export class EntryNodes extends EventEmitter {
    * Called at startup and once an entry node is considered offline.
    */
   async updatePublicNodes(): Promise<void> {
-    while (!this.libp2p.connectionManager._started) {
-      // Make sure that libp2p is started
-      log(`Waiting for start of connection manager ...`)
-      await setTimeoutPromise(250)
-    }
-
     log(`Updating list of used relay nodes ...`)
     const nodesToCheck = this.filterUncheckedNodes()
 
@@ -422,7 +427,7 @@ export class EntryNodes extends EventEmitter {
         .map((entry: EntryNodeData) => {
           return {
             relayDirectAddress: entry.multiaddrs[0],
-            ourCircuitAddress: createCircuitAddress(entry.id, this.peerId)
+            ourCircuitAddress: createCircuitAddress(entry.id, (this.components as Components).getPeerId())
           }
         })
     } else {
@@ -522,7 +527,11 @@ export class EntryNodes extends EventEmitter {
   ): Promise<{ entry: EntryNodeData; conn?: Connection }> {
     const start = Date.now()
 
-    let conn = await tryExistingConnections(this.libp2p, id, CAN_RELAY_PROTCOL(this.options.environment))
+    let conn = await tryExistingConnections(
+      this.components as Components,
+      id,
+      CAN_RELAY_PROTCOL(this.options.environment)
+    )
 
     if (!conn) {
       conn = await this.establishNewConnection(

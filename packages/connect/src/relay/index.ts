@@ -1,9 +1,11 @@
-import type { Libp2p } from 'libp2p'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Connection, ProtocolStream, MultiaddrConnection } from '@libp2p/interface-connection'
 import type { Multiaddr } from '@multiformats/multiaddr'
 import type { Address } from '@libp2p/interface-peer-store'
-import type { Upgrader } from '@libp2p/interface-transport'
+import type { IncomingStreamData } from '@libp2p/interfaces/registrar'
+import type { Initializable, Components } from '@libp2p/interfaces/components'
+import type { Startable } from '@libp2p/interfaces/startable'
+
 import { peerIdFromString } from '@libp2p/peer-id'
 
 import type HoprConnect from '../index.js'
@@ -11,9 +13,9 @@ import type HoprConnect from '../index.js'
 import type { Stream, HoprConnectOptions, HoprConnectDialOptions, HoprConnectTestingOptions } from '../types.js'
 
 import debug from 'debug'
-
-import { WebRTCUpgrader, WebRTCConnection } from '../webrtc/index.js'
 import chalk from 'chalk'
+
+import { WebRTCConnection } from '../webrtc/index.js'
 import { RELAY_PROTCOL, DELIVERY_PROTOCOL, CODE_P2P, OK, CAN_RELAY_PROTCOL } from '../constants.js'
 import { RelayConnection } from './connection.js'
 import { RelayHandshake, RelayHandshakeMessage } from './handshake.js'
@@ -21,6 +23,7 @@ import { RelayState } from './state.js'
 import { createRelayerKey, randomInteger, retimer, tryExistingConnections } from '@hoprnet/hopr-utils'
 
 import { attemptClose } from '../utils/index.js'
+import { ConnectComponents, ConnectInitializable } from '../components.js'
 
 const DEBUG_PREFIX = 'hopr-connect:relay'
 const DEFAULT_MAX_RELAYED_CONNECTIONS = 10
@@ -33,37 +36,14 @@ type ConnResult = ProtocolStream & {
   conn: Connection
 }
 
-// Specify which libp2p methods this class uses
-// such that Typescript fails to build if anything changes
-type ReducedAddressBook = {
-  get: (peerId: PeerId) => ReturnType<Libp2p['peerStore']['addressBook']['get']>
-}
-type ReducedPeerStore = {
-  peerStore: {
-    addressBook: ReducedAddressBook
-  }
-}
-type ReducedDHT = { contentRouting: Pick<Libp2p['contentRouting'], 'provide'> }
-type ReducedDialer = { dialer: Pick<Libp2p['dialer'], '_pendingDials'> }
-type ReducedUpgrader = { upgrader: Pick<Upgrader, 'upgradeInbound' | 'upgradeOutbound'> }
-type ReducedConnectionManager = {
-  connectionManager: Pick<Libp2p['connectionManager'], 'getConnections'>
-}
-type ReducedLibp2p = ReducedPeerStore &
-  ReducedDialer &
-  ReducedConnectionManager &
-  ReducedUpgrader & {
-    peerId: PeerId
-    handle: Libp2p['handle']
-  } & ReducedDHT
-
 /**
  * API interface for relayed connections
  */
-class Relay {
+class Relay implements Initializable, ConnectInitializable, Startable {
   private relayState: RelayState
-  private webRTCUpgrader: WebRTCUpgrader
   private usedRelays: PeerId[]
+
+  private _isStarted: boolean
 
   private _onReconnect: Relay['onReconnect'] | undefined
   private _onDelivery: Relay['onDelivery'] | undefined
@@ -74,19 +54,29 @@ class Relay {
   private stopKeepAlive: (() => void) | undefined
   private connectedToRelays: Set<string>
 
+  private components: Components | undefined
+  private connectComponents: ConnectComponents | undefined
+
+  public init(components: Components) {
+    this.components = components
+  }
+
+  public initConnect(connectComponents: ConnectComponents) {
+    this.connectComponents = connectComponents
+  }
+
   constructor(
-    public libp2p: ReducedLibp2p,
     private dialDirectly: HoprConnect['dialDirectly'],
     private filter: HoprConnect['filter'],
     private options: HoprConnectOptions,
     private testingOptions: HoprConnectTestingOptions
   ) {
+    this._isStarted = false
+
     log(`relay testing options`, testingOptions)
     this.relayState = new RelayState()
 
     this.options.maxRelayedConnections ??= DEFAULT_MAX_RELAYED_CONNECTIONS
-
-    this.webRTCUpgrader = new WebRTCUpgrader(this.options)
 
     // Stores all relays that we announce to other nodes
     // to make sure we don't close these connections
@@ -96,12 +86,22 @@ class Relay {
     this.connectedToRelays = new Set()
   }
 
+  public isStarted(): boolean {
+    return this._isStarted
+  }
+
+  public start(): void {}
+
   /**
    * Assigns the event listeners to the constructed object.
    * @dev Must not happen in the constructor because `this` is not ready
    *      at that point in time
    */
-  async start(): Promise<void> {
+  async afterStart(): Promise<void> {
+    if (!this.components) {
+      throw Error(`Module has to be initialized first`)
+    }
+
     this._onReconnect = this.onReconnect.bind(this)
     this._onRelay = this.onRelay.bind(this)
     this._onDelivery = this.onDelivery.bind(this)
@@ -109,11 +109,10 @@ class Relay {
 
     this._dialNodeDirectly = this.dialNodeDirectly.bind(this)
 
-    await this.libp2p.handle(DELIVERY_PROTOCOL(this.options.environment), this._onDelivery)
-    await this.libp2p.handle(RELAY_PROTCOL(this.options.environment), this._onRelay)
-    await this.libp2p.handle(CAN_RELAY_PROTCOL(this.options.environment), this._onCanRelay)
-
-    this.webRTCUpgrader.start()
+    // Requires registrar to be started first
+    await this.components.getRegistrar().handle(DELIVERY_PROTOCOL(this.options.environment), this._onDelivery)
+    await this.components.getRegistrar().handle(RELAY_PROTCOL(this.options.environment), this._onRelay)
+    await this.components.getRegistrar().handle(CAN_RELAY_PROTCOL(this.options.environment), this._onCanRelay)
 
     // Periodic function that prints relay connections (and will also do pings in future)
     const periodicKeepAlive = async function (this: Relay) {
@@ -129,9 +128,25 @@ class Relay {
       // TODO: Make these values configurable
       () => randomInteger(10000, 10000 + 3000)
     )
+
+    this._isStarted = true
   }
 
-  setUsedRelays(peers: PeerId[]) {
+  /**
+   * Unassigns event listeners
+   */
+  public stop(): void {
+    if (!this._isStarted) {
+      throw Error(`Could not stop module because it is not yet started.`)
+    }
+
+    this.stopKeepAlive?.()
+    this.connectedToRelays.clear()
+
+    this._isStarted = false
+  }
+
+  public setUsedRelays(peers: PeerId[]) {
     log(`set used relays`, peers)
     this.usedRelays = peers
   }
@@ -145,18 +160,11 @@ class Relay {
 
     log(`Currently tracked connections to relays: `)
     this.connectedToRelays.forEach((relayPeerId) => {
-      const countConns = this.libp2p.connectionManager.getConnections(peerIdFromString(relayPeerId)).length
+      const countConns = (this.components as Components)
+        .getConnectionManager()
+        .getConnections(peerIdFromString(relayPeerId)).length
       log(`- ${relayPeerId}: ${countConns} connection${countConns == 1 ? '' : 's'}`)
     })
-  }
-
-  /**
-   * Unassigns event listeners
-   */
-  stop(): void {
-    this.stopKeepAlive?.()
-    this.connectedToRelays.clear()
-    this.webRTCUpgrader.stop()
   }
 
   /**
@@ -220,23 +228,25 @@ class Relay {
     if (!!this.testingOptions.__noWebRTCUpgrade) {
       return new RelayConnection({
         stream,
-        self: this.libp2p.peerId,
+        self: (this.components as Components).getPeerId(),
         relay,
         counterparty: destination,
         onReconnect: this._onReconnect
       }) as MultiaddrConnection
     } else {
-      let channel = this.webRTCUpgrader.upgradeOutbound()
+      let channel = (this.connectComponents as ConnectComponents).getWebRTCUpgrader().upgradeOutbound()
 
       let newConn = new RelayConnection({
         stream,
-        self: this.libp2p.peerId,
+        self: (this.components as Components).getPeerId(),
         relay,
         counterparty: destination,
         onReconnect: this._onReconnect,
         webRTC: {
           channel,
-          upgradeInbound: this.webRTCUpgrader.upgradeInbound.bind(this.webRTCUpgrader)
+          upgradeInbound: (this.connectComponents as ConnectComponents)
+            .getWebRTCUpgrader()
+            .upgradeInbound.bind((this.connectComponents as ConnectComponents).getWebRTCUpgrader())
         }
       })
 
@@ -251,23 +261,25 @@ class Relay {
     if (!!this.testingOptions.__noWebRTCUpgrade) {
       return new RelayConnection({
         stream,
-        self: this.libp2p.peerId,
+        self: (this.components as Components).getPeerId(),
         relay,
         counterparty: initiator,
         onReconnect: this._onReconnect
       })
     } else {
-      let channel = this.webRTCUpgrader.upgradeInbound()
+      let channel = (this.connectComponents as ConnectComponents).getWebRTCUpgrader().upgradeOutbound()
 
       let newConn = new RelayConnection({
         stream,
-        self: this.libp2p.peerId,
+        self: (this.components as Components).getPeerId(),
         relay,
         counterparty: initiator,
         onReconnect: this._onReconnect,
         webRTC: {
           channel,
-          upgradeInbound: this.webRTCUpgrader.upgradeInbound.bind(this.webRTCUpgrader)
+          upgradeInbound: (this.connectComponents as ConnectComponents)
+            .getWebRTCUpgrader()
+            .upgradeInbound.bind((this.connectComponents as ConnectComponents).getWebRTCUpgrader())
         }
       })
 
@@ -277,7 +289,7 @@ class Relay {
     }
   }
 
-  private async onCanRelay(conn: HandlerProps) {
+  private async onCanRelay(conn: IncomingStreamData) {
     // Only called if protocol is supported which
     // means that environments match
     try {
@@ -291,7 +303,7 @@ class Relay {
             try {
               const key = createRelayerKey(conn.connection.remotePeer)
 
-              await this.libp2p.contentRouting.provide(key)
+              await (this.components as Components).getContentRouting().provide(key)
 
               log(`announced in the DHT as relayer for node ${conn.connection.remotePeer.toString()}`, key)
             } catch (err) {
@@ -307,7 +319,7 @@ class Relay {
     }
   }
 
-  private async onRelay(conn: HandlerProps) {
+  private async onRelay(conn: IncomingStreamData) {
     if (conn.connection == undefined || conn.connection.remotePeer == undefined) {
       verbose(`Received incomplete connection object`)
       return
@@ -340,7 +352,7 @@ class Relay {
    * Handles incoming relay requests.
    * @param conn incoming connection
    */
-  private async onDelivery(conn: HandlerProps): Promise<void> {
+  private async onDelivery(conn: IncomingStreamData): Promise<void> {
     if (conn.stream == undefined || conn.connection == undefined) {
       error(
         `Dropping stream because ${conn.connection == undefined ? 'cannot determine relay address ' : ''}${
@@ -368,7 +380,7 @@ class Relay {
 
     try {
       // Will call internal libp2p event handler, so no further action required
-      await this.libp2p.upgrader.upgradeInbound(newConn as MultiaddrConnection)
+      await (this.components as Components).getUpgrader().upgradeInbound(newConn)
     } catch (err) {
       error(`Could not upgrade relayed connection. Error was: ${err}`)
       return
@@ -392,9 +404,9 @@ class Relay {
 
     try {
       if (!!this.testingOptions.__noWebRTCUpgrade) {
-        newConn = await this.libp2p.upgrader.upgradeInbound(newStream as MultiaddrConnection)
+        newConn = await (this.components as Components).getUpgrader().upgradeInbound(newStream as MultiaddrConnection)
       } else {
-        newConn = await this.libp2p.upgrader.upgradeInbound(
+        newConn = await (this.components as Components).getUpgrader().upgradeInbound(
           new WebRTCConnection(newStream, newStream.webRTC!.channel, {
             __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade
           }) as MultiaddrConnection
@@ -406,9 +418,13 @@ class Relay {
     }
 
     // @TODO remove this (1/2 done)
-    this.libp2p.dialer._pendingDials?.get(counterparty.toString())?.destroy()
+    ;(this.components as Components)
+      .getConnectionManager()
+      // @ts-ignore not part of exposed interface (yet)
+      .dialer._pendingDials?.get(counterparty.toString())
+      ?.destroy()
 
-    const existingConnections = this.libp2p.connectionManager.getConnections(counterparty)
+    const existingConnections = (this.components as Components).getConnectionManager().getConnections(counterparty)
     for (const existingConnection of existingConnections) {
       if (existingConnection.id === newConn.id) {
         continue
@@ -431,7 +447,7 @@ class Relay {
     protocol: string,
     opts?: HoprConnectDialOptions
   ): Promise<ConnResult | void> {
-    let connResult = await tryExistingConnections(this.libp2p, destination, protocol)
+    let connResult = await tryExistingConnections(this.components as Components, destination, protocol)
 
     // Only establish a new connection if we don't have any.
     // Don't establish a new direct connection to the recipient when using
@@ -458,7 +474,7 @@ class Relay {
   ): Promise<ConnResult | undefined> {
     const usableAddresses: Multiaddr[] = []
 
-    const knownAddresses: Address[] = await this.libp2p.peerStore.addressBook.get(destination)
+    const knownAddresses: Address[] = await (this.components as Components).getPeerStore().addressBook.get(destination)
     for (const knownAddress of knownAddresses) {
       // Check that the address:
       // - matches the format (PeerStore might include addresses of other transport modules)

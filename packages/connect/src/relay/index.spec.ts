@@ -1,5 +1,5 @@
 import type { StreamType } from '../types.js'
-import type { HandlerProps } from 'libp2p'
+import type { StreamHandler } from '@libp2p/interfaces/registrar'
 import type { Connection } from '@libp2p/interface-connection'
 import type { Address } from '@libp2p/interface-peer-store'
 
@@ -27,7 +27,7 @@ function getPeerProtocol(peer: PeerId, protocol: string) {
 }
 
 function getPeer(peerId: PeerId, network: EventEmitter) {
-  async function handle(protocol: string, handler: (conn: HandlerProps) => void) {
+  async function handle(protocol: string, handler: (conn: StreamHandler) => void) {
     network.on(getPeerProtocol(peerId, protocol), handler)
   }
 

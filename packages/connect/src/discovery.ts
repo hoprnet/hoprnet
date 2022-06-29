@@ -1,9 +1,11 @@
-import { type PeerDiscovery, symbol } from '@libp2p/interface-peer-discovery'
-import { EventEmitter } from 'events'
+import { type PeerDiscovery, type PeerDiscoveryEvents, symbol } from '@libp2p/interface-peer-discovery'
+import type { PeerInfo } from '@libp2p/interface-peer-info'
+import { EventEmitter, CustomEvent } from '@libp2p/interfaces/events'
 import type { Multiaddr } from '@multiformats/multiaddr'
 import type { PeerId } from '@libp2p/interface-peer-id'
 
-class Discovery extends EventEmitter implements PeerDiscovery {
+// @ts-ignore libp2p interfaces type clash
+class Discovery extends EventEmitter<PeerDiscoveryEvents> implements PeerDiscovery {
   private _running: boolean
 
   get [symbol](): true {
@@ -41,7 +43,7 @@ class Discovery extends EventEmitter implements PeerDiscovery {
       return
     }
 
-    this.emit('peer', { id, multiaddrs })
+    this.dispatchEvent(new CustomEvent<PeerInfo>('peer', { detail: { id, multiaddrs, protocols: [] } }))
   }
 }
 
