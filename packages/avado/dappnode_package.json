@@ -5,25 +5,13 @@
   "avatar": "/ipfs/QmX8oTreTovBjr3QmV4UT5nfNbjYxJJJy3dswYVgcYattE",
   "type": "service",
   "autoupdate": true,
-  "image": {
-    "volumes": [
-      "db:/app/hoprd-db"
-    ],
-    "environment": [
-      "DEBUG=hopr*"
-    ],
-    "ports": [
-      "3000:3000/tcp",
-      "3001:3001/tcp",
-      "8080:8080/tcp",
-      "9091:9091/tcp",
-      "9091:9091/udp"
-    ],
-    "restart": "always"
-  },
   "author": "HOPR",
   "license": "GPL-3.0",
   "dependencies": {},
+  "image": {
+    "restart": "always",
+    "network_mode": "host"
+  },
   "links": {
     "OnboardingWizard": "http://hopr.my.ava.do:3000/",
     "homepage": "https://hoprnet.org",

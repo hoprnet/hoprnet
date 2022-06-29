@@ -58,6 +58,12 @@ if [[ -z $(grep -E "${default_development_environment}" "./build/Dockerfile") ]]
   exit 1
 fi
 
+# Copy sections between *_JSON_EXPORT of docker-compose.yaml to dappnode_package.json
+sed -n '/BEGIN_JSON_EXPORT/,/END_JSON_EXPORT/{//!p}' docker-compose.yml \
+  | sed -E 's/]/],/ ; s/"([^,])/"\1/ ; s/#([{}])/\1/' \
+  | jq -s '.[0].image += .[1] | .[0]' dappnode_package.json /dev/stdin \
+  > ./docker-compose.yml.tmp && mv ./docker-compose.yml.tmp ./docker-compose.yml
+
 # Write AVADO docker build version
 sed -e "s/image:[ ]'hopr\.avado\.dnp\.dappnode\.eth:[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}/image: 'hopr.avado.dnp.dappnode.eth:${AVADO_VERSION}/" ./docker-compose.yml \
   > ./docker-compose.yml.tmp && mv ./docker-compose.yml.tmp ./docker-compose.yml
@@ -66,15 +72,14 @@ sed -e "s/image:[ ]'hopr\.avado\.dnp\.dappnode\.eth:[0-9]\{1,\}\.[0-9]\{1,\}\.[0
 sed -e "s/\"version\":[ ]\"[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\"/\"version\": \"${AVADO_VERSION}\"/" ./dappnode_package.json \
   > ./dappnode_package.json.tmp && mv ./dappnode_package.json.tmp ./dappnode_package.json
 
-
-# Overwrite default environmnet in Dockerfile with the one currently used
+# Overwrite default environment in Dockerfile with the one currently used
 sed -e "s/master-goerli/${environment_id}/" ./build/Dockerfile > ./build/Dockerfile.tmp && mv ./build/Dockerfile.tmp ./build/Dockerfile 
 
 # AVADO SDK does not do proper releases, therefore using GitHub + git commit hashes
 declare AVADO_SDK_COMMIT="7b035be"
 
 # Must be installed globally due to bad directory calls
-npm install -g git+https://github.com/AvadoDServer/AVADOSDK.git#${AVADO_SDK_COMMIT}
+sudo npm install -g git+https://github.com/AvadoDServer/AVADOSDK.git#${AVADO_SDK_COMMIT}
 
 # Must run as sudo due to underlying call to docker-compose
 sudo avadosdk build --provider http://80.208.229.228:5001
