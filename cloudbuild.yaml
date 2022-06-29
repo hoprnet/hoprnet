@@ -40,14 +40,6 @@ steps:
       - --cache-ttl=96h
     timeout: 600s
     waitFor: ['-']
-  - name: 'gcr.io/kaniko-project/executor:latest'
-    id: buildHardhat
-    args:
-      - --destination=gcr.io/${PROJECT_ID}/hopr-hardhat:${_IMAGE_VERSION}
-      - --cache=true
-      - --cache-ttl=96h
-    timeout: 2400s
-    waitFor: ['-']
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: testImages
     script: |
@@ -72,9 +64,9 @@ steps:
       - --destination=gcr.io/${PROJECT_ID}/hopr-pluto:${_IMAGE_VERSION}
       - --cache=true
       - --cache-ttl=96h
-      - --build-arg=HARDHAT_VERSION=${_IMAGE_VERSION}
-      - --build-arg=HOPRD_RELEASE=${_IMAGE_VERSION}
-    timeout: 2400s
+      - --build-arg=HARDHAT_IMAGE=gcr.io/${PROJECT_ID}/hopr-hardhat:${_IMAGE_VERSION}
+      - --build-arg=HOPRD_IMAGE=gcr.io/${PROJECT_ID}/hoprd:${_IMAGE_VERSION}
+    timeout: 1200s
     waitFor: ['-']
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: tagImages
