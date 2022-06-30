@@ -81,7 +81,7 @@ sed -e "s/master-goerli/${environment_id}/" ./build/Dockerfile > ./build/Dockerf
 declare AVADO_SDK_COMMIT="7b035be"
 
 # Must be installed globally due to bad directory calls
-sudo npm install -g git+https://github.com/AvadoDServer/AVADOSDK.git#${AVADO_SDK_COMMIT}
+npm install -g git+https://github.com/AvadoDServer/AVADOSDK.git#${AVADO_SDK_COMMIT}
 
 # Must run as sudo due to underlying call to docker-compose
 sudo avadosdk build --provider http://80.208.229.228:5001
