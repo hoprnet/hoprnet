@@ -8,7 +8,9 @@ RUN apt-get update && \
     apt-get install -y \
     git \
     python3 \
-    build-essential
+    build-essential \
+  && rm -rf /var/lib/apt/lists/* \
+  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
 
 # enable to pass the version to Docker using either --build-arg or an
 # environment variable

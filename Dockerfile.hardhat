@@ -14,7 +14,9 @@ RUN apt-get update \
      openssl \
      pkg-config \
      python3 \
-     wget
+     wget \
+  && rm -rf /var/lib/apt/lists/* \
+  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
 
 # taken from
 # https://github.com/rust-lang/docker-rust/blob/186e4d580b5581861907c015d6b58919c809e375/1.61.0/bullseye/Dockerfile
@@ -67,11 +69,15 @@ WORKDIR /hardhat
 COPY --from=build /app/packages/ethereum .
 COPY --from=build /app/packages/core/protocol-config.json /core/
 
+# pre-compile as much as we can to reduce startup time
 RUN rm package.json \
  && mv package.hardhat.json package.json \
- && yarn
+ && yarn \
+ && yarn run compile
 
-EXPOSE 8454
+COPY --from=build /app/scripts scripts
+
+EXPOSE 8545
 
 ENV NODE_OPTIONS=--max_old_space_size=1024
 
