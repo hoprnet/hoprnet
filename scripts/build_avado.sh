@@ -64,9 +64,9 @@ sed -e "s/image:[ ]'hopr\.avado\.dnp\.dappnode\.eth:[0-9]\{1,\}\.[0-9]\{1,\}\.[0
 
 # Copy sections between *_JSON_EXPORT of docker-compose.yaml to dappnode_package.json
 # and also set dappnode version
-sed -n '/BEGIN_JSON_EXPORT/,/END_JSON_EXPORT/{//!p}' docker-compose.yml \
+sed -n '/BEGIN_JSON_EXPORT/,/END_JSON_EXPORT/{//!p}' ./docker-compose.yml \
   | sed -E 's/]/],/ ; s/"([^,])/"\1/ ; s/#([{}])/\1/' \
-  | jq -s ".[0].image += .[1] | .[0] | .version = \"${AVADO_VERSION}\"" dappnode_package.json /dev/stdin \
+  | jq -s ".[0].image += .[1] | .[0] | .version = \"${AVADO_VERSION}\"" ./dappnode_package.json /dev/stdin \
   > ./dappnode_package.json.tmp && mv ./dappnode_package.json.tmp ./dappnode_package.json
 
 # Overwrite default environment in Dockerfile with the one currently used
