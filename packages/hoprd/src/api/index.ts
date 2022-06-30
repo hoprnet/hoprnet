@@ -5,7 +5,7 @@ import express from 'express'
 import http from 'http'
 import { debug } from '@hoprnet/hopr-utils'
 import * as apiV2 from './v2.js'
-import ws from 'ws'
+import { WebSocketServer } from 'ws'
 
 const debugLog = debug('hoprd:api')
 
@@ -24,7 +24,7 @@ export default function setupAPI(
   const server = http.createServer(service)
 
   apiV2.setupRestApi(service, '/api/v2', node, stateOps, options)
-  apiV2.setupWsApi(server, new ws.Server({ noServer: true }), node, logs, options)
+  apiV2.setupWsApi(server, new WebSocketServer({ noServer: true }), node, logs, options)
 
   return function listen() {
     server
