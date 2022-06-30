@@ -67,7 +67,6 @@ steps:
       - --build-arg=HARDHAT_IMAGE=gcr.io/${PROJECT_ID}/hopr-hardhat:${_IMAGE_VERSION}
       - --build-arg=HOPRD_IMAGE=gcr.io/${PROJECT_ID}/hoprd:${_IMAGE_VERSION}
     timeout: 1200s
-    waitFor: ['-']
     waitFor:
       - buildHoprd
       - buildHardhat
