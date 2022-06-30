@@ -1,9 +1,10 @@
-import { createLibp2p, type Libp2p, type HandlerProps } from 'libp2p'
+import { createLibp2p, type Libp2p } from 'libp2p'
+import type { IncomingStreamData } from '@libp2p/interfaces/registrar'
 import { durations } from '@hoprnet/hopr-utils'
 import fs from 'fs'
 import { setTimeout } from 'timers/promises'
 
-import { NOISE } from '@chainsafe/libp2p-noise'
+import { Noise } from '@chainsafe/libp2p-noise'
 import { Mplex } from '@libp2p/mplex'
 
 import HoprConnect, { type HoprConnectConfig } from '@hoprnet/hopr-connect'
@@ -85,26 +86,22 @@ async function startNode(
     addresses: {
       listen: [`/ip4/0.0.0.0/tcp/${port}/p2p/${peerId.toString()}`]
     },
-    modules: {
-      transport: [HoprConnect as any],
-      streamMuxer: [Mplex],
-      connEncryption: [NOISE]
+    transports: [
+      // @ts-ignore libp2p interfaces type clash
+      new HoprConnect(options)
+    ],
+    streamMuxers: [new Mplex()],
+    connectionEncryption: [new Noise()],
+    connectionManager: {
+      autoDial: true
     },
-    config: {
-      transport: {
-        HoprConnect: options
-      },
-      peerDiscovery: {
-        autoDial: false
-      },
-      relay: {
-        // Conflicts with HoprConnect's own mechanism
-        enabled: false
-      },
-      nat: {
-        // Conflicts with HoprConnect's own mechanism
-        enabled: false
-      }
+    relay: {
+      // Conflicts with HoprConnect's own mechanism
+      enabled: false
+    },
+    nat: {
+      // Conflicts with HoprConnect's own mechanism
+      enabled: false
     }
   })
 
@@ -115,7 +112,7 @@ async function startNode(
     return identityFromPeerId(connection.remotePeer)
   }
 
-  node.handle(TEST_PROTOCOL, async (conn: HandlerProps) => {
+  node.handle(TEST_PROTOCOL, async (conn: IncomingStreamData) => {
     pipe(
       conn.stream.source as any,
       createEchoReplier(await identityNameForConnection(conn.connection), pipeFileStream),

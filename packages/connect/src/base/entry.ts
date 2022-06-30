@@ -7,6 +7,7 @@ import type { Multiaddr } from '@multiformats/multiaddr'
 import type HoprConnect from '../index.js'
 import { peerIdFromBytes } from '@libp2p/peer-id'
 
+import errCode from 'err-code'
 import { EventEmitter } from 'events'
 import Debug from 'debug'
 
@@ -97,6 +98,14 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
   public init(components: Components) {
     this.components = components
+  }
+
+  public getComponents(): Components {
+    if (this.components == null) {
+      throw errCode(new Error('components not set'), 'ERR_SERVICE_MISSING')
+    }
+
+    return this.components
   }
 
   constructor(private dialDirectly: HoprConnect['dialDirectly'], private options: HoprConnectOptions) {
@@ -267,7 +276,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    * @param peer PeerInfo of node that is added as a relay opportunity
    */
   protected async onNewRelay(peer: PeerStoreType): Promise<void> {
-    if (peer.id.equals((this.components as Components).getPeerId())) {
+    if (peer.id.equals(this.getComponents().getPeerId())) {
       return
     }
     if (peer.multiaddrs == undefined || peer.multiaddrs.length == 0) {
@@ -333,7 +342,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     const nodesToCheck: PeerStoreType[] = []
 
     for (const uncheckedNode of this.uncheckedEntryNodes) {
-      if (uncheckedNode.id.equals((this.components as Components).getPeerId())) {
+      if (uncheckedNode.id.equals(this.getComponents().getPeerId())) {
         continue
       }
 
@@ -427,7 +436,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
         .map((entry: EntryNodeData) => {
           return {
             relayDirectAddress: entry.multiaddrs[0],
-            ourCircuitAddress: createCircuitAddress(entry.id, (this.components as Components).getPeerId())
+            ourCircuitAddress: createCircuitAddress(entry.id, this.getComponents().getPeerId())
           }
         })
     } else {
@@ -527,11 +536,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
   ): Promise<{ entry: EntryNodeData; conn?: Connection }> {
     const start = Date.now()
 
-    let conn = await tryExistingConnections(
-      this.components as Components,
-      id,
-      CAN_RELAY_PROTCOL(this.options.environment)
-    )
+    let conn = await tryExistingConnections(this.getComponents(), id, CAN_RELAY_PROTCOL(this.options.environment))
 
     if (!conn) {
       conn = await this.establishNewConnection(

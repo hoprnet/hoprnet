@@ -9,7 +9,7 @@ import type { Libp2p } from 'libp2p'
 import type { Connection } from '@libp2p/interface-connection'
 import type { Peer } from '@libp2p/interface-peer-store'
 import type { PeerId } from '@libp2p/interface-peer-id'
-
+import type { Components } from '@libp2p/interfaces/components'
 import { compareAddressesLocalMode, compareAddressesPublicMode, type HoprConnectConfig } from '@hoprnet/hopr-connect'
 
 import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants.js'
@@ -316,8 +316,8 @@ class Hopr extends EventEmitter {
       this.options
     )
 
-    this.libp2p.connectionManager.addEventListener('peer:connect', (conn: Connection) => {
-      this.networkPeers.register(conn.remotePeer, 'libp2p peer connect')
+    this.libp2p.connectionManager.addEventListener('peer:connect', (event: CustomEvent<Connection>) => {
+      this.networkPeers.register(event.detail.remotePeer, 'libp2p peer connect')
     })
 
     const protocolMsg = `/hopr/${this.environment.id}/msg`
@@ -622,17 +622,24 @@ class Hopr extends EventEmitter {
   /**
    * Shuts down the node and saves keys and peerBook in the database
    */
+  // @TODO make modules Startable
   public async stop(): Promise<void> {
+    if (this.status == 'DESTROYED') {
+      throw Error(`alreayd destroyed. Cannot destroy twice`)
+    }
     this.status = 'DESTROYED'
     verbose('Stopping checking timeout')
     this.stopPeriodicCheck?.()
     verbose('Stopping heartbeat & indexer')
-    await Promise.all([this.heartbeat.stop(), this.connector.stop()])
-    verbose('Stopping database & libp2p')
-    await Promise.all([
-      this.db?.close().then(() => log(`Database closed.`)),
-      this.libp2p.stop().then(() => log(`Libp2p closed.`))
-    ])
+    await this.heartbeat.stop()
+    verbose(`Stopping connector`)
+    await this.connector.stop()
+    verbose('Stopping database')
+    await this.db?.close()
+    log(`Database closed.`)
+    verbose('Stopping libp2p')
+    await this.libp2p.stop()
+    log(`Libp2p closed.`)
 
     // Give the operating system some extra time to close the sockets
     await new Promise((resolve) => setTimeout(resolve, 100))
@@ -646,9 +653,9 @@ class Hopr extends EventEmitter {
    * List of addresses that is announced to other nodes
    * @dev returned list can change at runtime
    * @param peer peer to query for, default self
-   * @param timeout [optional] custom timeout for DHT query
+   * @param _timeout [optional] custom timeout for DHT query
    */
-  public async getAddressesAnnouncedToDHT(peer: PeerId = this.getId(), timeout = 5e3): Promise<Multiaddr[]> {
+  public async getAddressesAnnouncedToDHT(peer: PeerId = this.getId(), _timeout = 5e3): Promise<Multiaddr[]> {
     let addrs: Multiaddr[]
 
     if (peer.equals(this.getId())) {
@@ -657,9 +664,8 @@ class Hopr extends EventEmitter {
       addrs = await this.getObservedAddresses(peer)
 
       try {
-        for await (const relayer of this.libp2p.contentRouting.findProviders(createRelayerKey(peer), {
-          timeout
-        })) {
+        // @TODO add abort controller
+        for await (const relayer of this.libp2p.contentRouting.findProviders(createRelayerKey(peer))) {
           const relayAddress = createCircuitAddress(relayer.id, peer)
           if (addrs.findIndex((ma) => ma.equals(relayAddress)) < 0) {
             addrs.push(relayAddress)
@@ -679,8 +685,9 @@ class Hopr extends EventEmitter {
    * List the addresses on which the node is listening
    */
   public getListeningAddresses(): Multiaddr[] {
-    // @TODO
-    return this.libp2p.getPeers.getListenAddrs()
+    // @TODO find a better way to do this
+    // @ts-ignore undocumented method
+    return (this.libp2p.components as Components).getAddressManager().getListenAddrs()
   }
 
   /**
@@ -695,7 +702,7 @@ class Hopr extends EventEmitter {
   /**
    * @param msg message to send
    * @param destination PeerId of the destination
-   * @param intermediateNodes optional set path manually
+   * @param intermediatePath optional set path manually
    */
   public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PublicKey[]): Promise<void> {
     const promises: Promise<void>[] = []

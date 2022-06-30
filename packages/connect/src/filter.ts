@@ -16,6 +16,7 @@ import {
 } from '@hoprnet/hopr-utils'
 import { AddressType, parseAddress, type DirectAddress, type CircuitAddress } from './utils/index.js'
 
+import errCode from 'err-code'
 import Debug from 'debug'
 import type { HoprConnectOptions } from './types.js'
 
@@ -37,6 +38,14 @@ export class Filter implements Initializable {
 
   public init(components: Components): void {
     this.components = components
+  }
+
+  public getComponents(): Components {
+    if (this.components == null) {
+      throw errCode(new Error('components not set'), 'ERR_SERVICE_MISSING')
+    }
+
+    return this.components
   }
 
   /**
@@ -110,7 +119,7 @@ export class Filter implements Initializable {
       case AddressType.IPv6:
         if (
           parsed.address.node != undefined &&
-          !u8aEquals(parsed.address.node, (this.components as Components).getPeerId().publicKey)
+          !u8aEquals(parsed.address.node, this.getComponents().getPeerId().publicKey)
         ) {
           log(`Cannot listen to multiaddrs with other peerId than our own. Given addr: ${ma.toString()}`)
           return false
@@ -151,12 +160,12 @@ export class Filter implements Initializable {
    * @returns
    */
   private filterCircuitDial(address: CircuitAddress, ma: Multiaddr): boolean {
-    if (u8aEquals(address.node, (this.components as Components).getPeerId().publicKey)) {
+    if (u8aEquals(address.node, this.getComponents().getPeerId().publicKey)) {
       log(`Prevented self-dial using circuit addr. Used addr: ${ma.toString()}`)
       return false
     }
 
-    if (u8aEquals(address.relayer, (this.components as Components).getPeerId().publicKey)) {
+    if (u8aEquals(address.relayer, this.getComponents().getPeerId().publicKey)) {
       log(`Prevented dial using self as relay node. Used addr: ${ma.toString()}`)
       return false
     }
@@ -171,7 +180,7 @@ export class Filter implements Initializable {
    * @returns
    */
   private filterDirectDial(address: DirectAddress, ma: Multiaddr): boolean {
-    if (address.node != undefined && u8aEquals(address.node, (this.components as Components).getPeerId().publicKey)) {
+    if (address.node != undefined && u8aEquals(address.node, this.getComponents().getPeerId().publicKey)) {
       log(`Prevented self-dial. Used addr: ${ma.toString()}`)
       return false
     }

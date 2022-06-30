@@ -12,6 +12,7 @@ import type HoprConnect from '../index.js'
 
 import type { Stream, HoprConnectOptions, HoprConnectDialOptions, HoprConnectTestingOptions } from '../types.js'
 
+import errCode from 'err-code'
 import debug from 'debug'
 import chalk from 'chalk'
 
@@ -61,8 +62,24 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     this.components = components
   }
 
+  public getComponents(): Components {
+    if (this.components == null) {
+      throw errCode(new Error('components not set'), 'ERR_SERVICE_MISSING')
+    }
+
+    return this.components
+  }
+
   public initConnect(connectComponents: ConnectComponents) {
     this.connectComponents = connectComponents
+  }
+
+  public getConnectComponents(): ConnectComponents {
+    if (this.connectComponents == null) {
+      throw errCode(new Error('connectComponents not set'), 'ERR_SERVICE_MISSING')
+    }
+
+    return this.connectComponents
   }
 
   constructor(
@@ -160,7 +177,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
     log(`Currently tracked connections to relays: `)
     this.connectedToRelays.forEach((relayPeerId) => {
-      const countConns = (this.components as Components)
+      const countConns = this.getComponents()
         .getConnectionManager()
         .getConnections(peerIdFromString(relayPeerId)).length
       log(`- ${relayPeerId}: ${countConns} connection${countConns == 1 ? '' : 's'}`)
@@ -228,25 +245,25 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     if (!!this.testingOptions.__noWebRTCUpgrade) {
       return new RelayConnection({
         stream,
-        self: (this.components as Components).getPeerId(),
+        self: this.getComponents().getPeerId(),
         relay,
         counterparty: destination,
         onReconnect: this._onReconnect
       }) as MultiaddrConnection
     } else {
-      let channel = (this.connectComponents as ConnectComponents).getWebRTCUpgrader().upgradeOutbound()
+      let channel = this.getConnectComponents().getWebRTCUpgrader().upgradeOutbound()
 
       let newConn = new RelayConnection({
         stream,
-        self: (this.components as Components).getPeerId(),
+        self: this.getComponents().getPeerId(),
         relay,
         counterparty: destination,
         onReconnect: this._onReconnect,
         webRTC: {
           channel,
-          upgradeInbound: (this.connectComponents as ConnectComponents)
+          upgradeInbound: this.getConnectComponents()
             .getWebRTCUpgrader()
-            .upgradeInbound.bind((this.connectComponents as ConnectComponents).getWebRTCUpgrader())
+            .upgradeInbound.bind(this.getConnectComponents().getWebRTCUpgrader())
         }
       })
 
@@ -261,25 +278,25 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     if (!!this.testingOptions.__noWebRTCUpgrade) {
       return new RelayConnection({
         stream,
-        self: (this.components as Components).getPeerId(),
+        self: this.getComponents().getPeerId(),
         relay,
         counterparty: initiator,
         onReconnect: this._onReconnect
       })
     } else {
-      let channel = (this.connectComponents as ConnectComponents).getWebRTCUpgrader().upgradeOutbound()
+      let channel = this.getConnectComponents().getWebRTCUpgrader().upgradeOutbound()
 
       let newConn = new RelayConnection({
         stream,
-        self: (this.components as Components).getPeerId(),
+        self: this.getComponents().getPeerId(),
         relay,
         counterparty: initiator,
         onReconnect: this._onReconnect,
         webRTC: {
           channel,
-          upgradeInbound: (this.connectComponents as ConnectComponents)
+          upgradeInbound: this.getConnectComponents()
             .getWebRTCUpgrader()
-            .upgradeInbound.bind((this.connectComponents as ConnectComponents).getWebRTCUpgrader())
+            .upgradeInbound.bind(this.getConnectComponents().getWebRTCUpgrader())
         }
       })
 
@@ -303,7 +320,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
             try {
               const key = createRelayerKey(conn.connection.remotePeer)
 
-              await (this.components as Components).getContentRouting().provide(key)
+              await this.getComponents().getContentRouting().provide(key)
 
               log(`announced in the DHT as relayer for node ${conn.connection.remotePeer.toString()}`, key)
             } catch (err) {
@@ -380,7 +397,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
     try {
       // Will call internal libp2p event handler, so no further action required
-      await (this.components as Components).getUpgrader().upgradeInbound(newConn)
+      await this.getComponents().getUpgrader().upgradeInbound(newConn)
     } catch (err) {
       error(`Could not upgrade relayed connection. Error was: ${err}`)
       return
@@ -404,13 +421,15 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
     try {
       if (!!this.testingOptions.__noWebRTCUpgrade) {
-        newConn = await (this.components as Components).getUpgrader().upgradeInbound(newStream as MultiaddrConnection)
+        newConn = await this.getComponents().getUpgrader().upgradeInbound(newStream)
       } else {
-        newConn = await (this.components as Components).getUpgrader().upgradeInbound(
-          new WebRTCConnection(newStream, newStream.webRTC!.channel, {
-            __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade
-          }) as MultiaddrConnection
-        )
+        newConn = await this.getComponents()
+          .getUpgrader()
+          .upgradeInbound(
+            new WebRTCConnection(newStream, newStream.webRTC!.channel, {
+              __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade
+            }) as MultiaddrConnection
+          )
       }
     } catch (err) {
       error(err)
@@ -418,13 +437,13 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     }
 
     // @TODO remove this (1/2 done)
-    ;(this.components as Components)
+    this.getComponents()
       .getConnectionManager()
       // @ts-ignore not part of exposed interface (yet)
       .dialer._pendingDials?.get(counterparty.toString())
       ?.destroy()
 
-    const existingConnections = (this.components as Components).getConnectionManager().getConnections(counterparty)
+    const existingConnections = this.getComponents().getConnectionManager().getConnections(counterparty)
     for (const existingConnection of existingConnections) {
       if (existingConnection.id === newConn.id) {
         continue
@@ -447,7 +466,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     protocol: string,
     opts?: HoprConnectDialOptions
   ): Promise<ConnResult | void> {
-    let connResult = await tryExistingConnections(this.components as Components, destination, protocol)
+    let connResult = await tryExistingConnections(this.getComponents(), destination, protocol)
 
     // Only establish a new connection if we don't have any.
     // Don't establish a new direct connection to the recipient when using
@@ -474,7 +493,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
   ): Promise<ConnResult | undefined> {
     const usableAddresses: Multiaddr[] = []
 
-    const knownAddresses: Address[] = await (this.components as Components).getPeerStore().addressBook.get(destination)
+    const knownAddresses: Address[] = await this.getComponents().getPeerStore().addressBook.get(destination)
     for (const knownAddress of knownAddresses) {
       // Check that the address:
       // - matches the format (PeerStore might include addresses of other transport modules)

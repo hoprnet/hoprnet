@@ -71,6 +71,18 @@ export class ConnectComponents implements Startable, Initializable {
     return this._isStarted
   }
 
+  async beforeStart(): Promise<void> {
+    const promises: (Promise<void> | void)[] = []
+
+    for (const module of Object.values(this)) {
+      if (isStartable(module)) {
+        promises.push(module.beforeStart?.())
+      }
+    }
+
+    await Promise.all(promises)
+  }
+
   async start(): Promise<void> {
     const promises: (Promise<void> | void)[] = []
 
@@ -85,6 +97,30 @@ export class ConnectComponents implements Startable, Initializable {
     this._isStarted = true
   }
 
+  async afterStart(): Promise<void> {
+    const promises: (Promise<void> | void)[] = []
+
+    for (const module of Object.values(this)) {
+      if (isStartable(module)) {
+        promises.push(module.afterStart?.())
+      }
+    }
+
+    await Promise.all(promises)
+  }
+
+  async beforeStop(): Promise<void> {
+    const promises: (Promise<void> | void)[] = []
+
+    for (const module of Object.values(this)) {
+      if (isStartable(module)) {
+        promises.push(module.beforeStop?.())
+      }
+    }
+
+    await Promise.all(promises)
+  }
+
   async stop(): Promise<void> {
     const promises: (Promise<void> | void)[] = []
 
@@ -97,6 +133,18 @@ export class ConnectComponents implements Startable, Initializable {
     await Promise.all(promises)
 
     this._isStarted = false
+  }
+
+  async afterStop(): Promise<void> {
+    const promises: (Promise<void> | void)[] = []
+
+    for (const module of Object.values(this)) {
+      if (isStartable(module)) {
+        promises.push(module.afterStop?.())
+      }
+    }
+
+    await Promise.all(promises)
   }
 
   setAddressFilter(addressFilter: Filter) {

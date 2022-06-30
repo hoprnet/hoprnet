@@ -2,8 +2,9 @@ import type { Multiaddr } from '@multiformats/multiaddr'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Initializable, Components } from '@libp2p/interfaces/components'
 import type { Startable } from '@libp2p/interfaces/startable'
-import type { Connection } from '@libp2p/interface-connection'
+import type { Connection, MultiaddrConnection } from '@libp2p/interface-connection'
 
+import errCode from 'err-code'
 import Debug from 'debug'
 import { CODE_DNS4, CODE_DNS6, CODE_IP4, CODE_IP6, CODE_P2P } from './constants.js'
 
@@ -98,48 +99,66 @@ class HoprConnect implements Transport, Initializable, Startable {
     this.connectComponents.init(components)
   }
 
+  public getComponents(): Components {
+    if (this.components == null) {
+      throw errCode(new Error('components not set'), 'ERR_SERVICE_MISSING')
+    }
+
+    return this.components
+  }
+
+  public getConnectComponents(): ConnectComponents {
+    if (this.connectComponents == null) {
+      throw errCode(new Error('connectComponents not set'), 'ERR_SERVICE_MISSING')
+    }
+
+    return this.connectComponents
+  }
+
   public isStarted(): boolean {
     return true
+  }
+
+  // Simulated NAT:
+  // If we don't allow direct connections (being a NATed node), then a connection
+  // can happen if outgoing, i.e. by establishing a connection to someone else
+  // we populate the address mapping of the router.
+  // Or, if we get contacted by a relay to which we already have an *outgoing*
+  // connection that gets reused.
+  // @TODO
+  private setupSimulatedNAT(): void {
+    // Simulated NAT using connection gater
+    const denyInboundConnection = this.getComponents().getConnectionGater().denyInboundConnection
+    this.getComponents().getConnectionGater().denyInboundConnection = async (maConn: MultiaddrConnection) => {
+      log(`New connection:`)
+      log(`remoteAddr: ${maConn.remoteAddr.toString()}`)
+      // log(`remotePeer ${maConn.remotePeer.toB58String()}`)
+      // log(`localAddr: ${conn.localAddr?.toString()}`)
+      // log(`remotePeer ${conn.localPeer.toB58String()}`)
+      if (await denyInboundConnection(maConn)) {
+        log(`closing due to simulated NAT`)
+        return true
+      } else if (maConn.remoteAddr.toString().startsWith(`/p2p/`)) {
+        return false
+      }
+      log(`closing due to simulated NAT`)
+      return true
+    }
+    // @TODO only allow connections to entry nodes
+    // this.getComponents().getConnectionGater().denyDialMultiaddr
   }
 
   public async start(): Promise<void> {
     if (!!this.testingOptions.__noDirectConnections) {
       verbose(`DEBUG mode: always using relayed or WebRTC connections.`)
 
-      const onConnection = this._libp2p.upgrader.onConnection
-
-      // Simulated NAT:
-      // If we don't allow direct connections (being a NATed node), then a connection
-      // can happen if outgoing, i.e. by establishing a connection to someone else
-      // we populate the address mapping of the router.
-      // Or, if we get contacted by a relay to which we already have an *outgoing*
-      // connection that gets reused.
-      // @TODO
-      this.components.getConnectionGater().onConnection = (conn) => {
-        log(`New connection:`)
-        log(`remoteAddr: ${conn.remoteAddr.toString()}`)
-        log(`remotePeer ${conn.remotePeer.toB58String()}`)
-        log(`localAddr: ${conn.localAddr?.toString()}`)
-        log(`remotePeer ${conn.localPeer.toB58String()}`)
-
-        if (conn.remoteAddr.toString().startsWith(`/p2p/`)) {
-          onConnection(conn)
-          return
-        }
-
-        if (conn.stat.direction === 'outbound') {
-          onConnection(conn)
-          return
-        }
-
-        log(`closing due to NAT`)
-
-        // Close the NATed connection as there is no need to keep
-        // unused connections open.
-        conn.close()
-      }
+      this.setupSimulatedNAT()
     }
-    await (this.connectComponents as ConnectComponents).start()
+    await this.getConnectComponents().start()
+  }
+
+  public async afterStart() {
+    await this.getConnectComponents().afterStart()
   }
 
   public async stop(): Promise<void> {
@@ -160,7 +179,7 @@ class HoprConnect implements Transport, Initializable, Startable {
     // Other addresses are not supported.
     const destination = peerIdFromBytes((maTuples[2][1] as Uint8Array).slice(1))
 
-    if (destination.equals((this.components as Components).getPeerId())) {
+    if (destination.equals(this.getComponents().getPeerId())) {
       throw new Error(`Cannot dial ourself`)
     }
 
@@ -191,17 +210,18 @@ class HoprConnect implements Transport, Initializable, Startable {
    * Creates a TCP listener. The provided `handler` function will be called
    * anytime a new incoming Connection has been successfully upgraded via
    * `upgrader.upgradeInbound`.
-   * @param _handler
+   * @param opts
    * @returns A TCP listener
    */
+  // @ts-ignore libp2p type clash
   public createListener(opts: CreateListenerOptions): Listener {
     return new Listener(
       this.onClose.bind(this),
       this.onListening.bind(this),
       this.options,
       this.testingOptions,
-      this.components as Components,
-      this.connectComponents as ConnectComponents
+      this.getComponents(),
+      this.getConnectComponents()
     )
   }
 
@@ -215,7 +235,7 @@ class HoprConnect implements Transport, Initializable, Startable {
    */
   public filter(multiaddrs: Multiaddr[]): Multiaddr[] {
     return (Array.isArray(multiaddrs) ? multiaddrs : [multiaddrs]).filter(
-      (this.connectComponents as ConnectComponents).getAddressFilter().filter.bind(this.addressFilter)
+      this.getConnectComponents().getAddressFilter().filter.bind(this.getConnectComponents().getAddressFilter())
     )
   }
 
@@ -228,7 +248,7 @@ class HoprConnect implements Transport, Initializable, Startable {
   private async dialWithRelay(relay: PeerId, destination: PeerId, options: DialOptions): Promise<Connection> {
     log(`Attempting to dial ${chalk.yellow(`/p2p/${relay.toString()}/p2p-circuit/p2p/${destination.toString()}`)}`)
 
-    let maConn = await this.relay.connect(relay, destination, options)
+    let maConn = await this.getConnectComponents().getRelay().connect(relay, destination, options)
 
     if (maConn == undefined) {
       throw Error(`Could not establish relayed connection.`)
@@ -257,7 +277,7 @@ class HoprConnect implements Transport, Initializable, Startable {
   public async dialDirectly(ma: Multiaddr, options: DialOptions): Promise<Connection> {
     log(`Attempting to dial ${chalk.yellow(ma.toString())}`)
 
-    const maConn = await TCPConnection.create(ma, (this.components as Components).getPeerId(), options)
+    const maConn = await TCPConnection.create(ma, this.getComponents().getPeerId(), options)
 
     verbose(
       `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshake.`

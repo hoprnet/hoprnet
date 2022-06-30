@@ -70,6 +70,8 @@ export type HoprConnectOptions = {
 }
 
 export type HoprConnectTestingOptions = {
+  // @TODO implement this
+  __useLocalAddresses?: boolean
   // Simulated NAT: only connect directly to relays
   __noDirectConnections?: boolean
   // Simulated NAT: ignore WebRTC upgrade
