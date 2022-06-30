@@ -1,19 +1,16 @@
-{
-  "name": "hopr.avado.dnp.dappnode.eth",
-  "version": "0.100.0",
-  "description": "HOPR is an open incentivized mixnet which enables privacy-preserving point-to-point data exchange. HOPR is similar to Tor but actually private, decentralized and economically sustainable.",
-  "avatar": "/ipfs/QmX8oTreTovBjr3QmV4UT5nfNbjYxJJJy3dswYVgcYattE",
-  "type": "service",
-  "autoupdate": true,
-  "author": "HOPR",
-  "license": "GPL-3.0",
-  "dependencies": {},
-  "image": {
-    "restart": "always",
-    "network_mode": "host",
+version: '3.4'
+services:
+  hopr.avado.dnp.dappnode.eth:
+    build: ./build
+    image: 'hopr.avado.dnp.dappnode.eth:0.100.0'
+    network_mode: host
+    # Lines between *_JSON_EXPORT are intentionally also a valid JSON
+    # DO NOT REMOVE
+    # BEGIN_JSON_EXPORT
+    #{
     "volumes": [
       "db:/app/hoprd-db"
-    ],
+    ]
     "environment": [
       "DEBUG=hopr*",
       "HOPRD_ENVIRONMENT=master-goerli",
@@ -34,7 +31,7 @@
       "HOPRD_DATA=/app/hoprd-db/data-master-goerli",
       "HOPRD_INIT=true",
       "HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS=false"
-    ],
+    ]
     "ports": [
       "3000:3000/tcp",
       "3001:3001/tcp",
@@ -42,17 +39,8 @@
       "9091:9091/tcp",
       "9091:9091/udp"
     ]
-  },
-  "links": {
-    "OnboardingWizard": "http://hopr.my.ava.do:3000/",
-    "homepage": "https://hoprnet.org",
-    "Admin interface": "http://hopr.my.ava.do:3000",
-    "Rest API V2": "http://hopr.my.ava.do:3001/api/v2/_swagger/"
-  },
-  "ui": {
-    "OnboardingWizard": {
-      "url": "http://hopr.my.ava.do",
-      "external": true
-    }
-  }
-}
+    "restart": "always"
+    #}
+    # END_JSON_EXPORT
+volumes:
+  db: {}

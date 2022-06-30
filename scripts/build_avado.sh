@@ -58,18 +58,15 @@ if [[ -z $(grep -E "${default_development_environment}" "./build/Dockerfile") ]]
   exit 1
 fi
 
-# Copy sections between *_JSON_EXPORT of docker-compose.yaml to dappnode_package.json
-sed -n '/BEGIN_JSON_EXPORT/,/END_JSON_EXPORT/{//!p}' docker-compose.yml \
-  | sed -E 's/]/],/ ; s/"([^,])/"\1/ ; s/#([{}])/\1/' \
-  | jq -s '.[0].image += .[1] | .[0]' dappnode_package.json /dev/stdin \
-  > ./docker-compose.yml.tmp && mv ./docker-compose.yml.tmp ./docker-compose.yml
-
 # Write AVADO docker build version
 sed -e "s/image:[ ]'hopr\.avado\.dnp\.dappnode\.eth:[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}/image: 'hopr.avado.dnp.dappnode.eth:${AVADO_VERSION}/" ./docker-compose.yml \
   > ./docker-compose.yml.tmp && mv ./docker-compose.yml.tmp ./docker-compose.yml
 
-# Write dappnode version
-sed -e "s/\"version\":[ ]\"[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\"/\"version\": \"${AVADO_VERSION}\"/" ./dappnode_package.json \
+# Copy sections between *_JSON_EXPORT of docker-compose.yaml to dappnode_package.json
+# and also set dappnode version
+sed -n '/BEGIN_JSON_EXPORT/,/END_JSON_EXPORT/{//!p}' docker-compose.yml \
+  | sed -E 's/]/],/ ; s/"([^,])/"\1/ ; s/#([{}])/\1/' \
+  | jq -s ".[0].image += .[1] | .[0] | .version = \"${AVADO_VERSION}\"" dappnode_package.json /dev/stdin \
   > ./dappnode_package.json.tmp && mv ./dappnode_package.json.tmp ./dappnode_package.json
 
 # Overwrite default environment in Dockerfile with the one currently used
