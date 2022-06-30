@@ -9,7 +9,6 @@
   "license": "GPL-3.0",
   "dependencies": {},
   "image": {
-    "restart": "always",
     "network_mode": "host"
   },
   "links": {
