@@ -13,6 +13,7 @@
 - Reenable e2e tests and enhance REST API ([#3836](https://github.com/hoprnet/hoprnet/pull/3836))
 - Fix decoding error when API token contains certain characters
 - Add Docker image running hardhat using the Hopr environment and smart contracts (useful for testing and development)
+- Make environment variables for `hoprd` accessible in Avado package configuration ([#3885](https://github.com/hoprnet/hoprnet/pull/3885))
 
 <a name="1.89"></a>
 
