@@ -8,38 +8,31 @@ services:
     # DO NOT REMOVE
     # BEGIN_JSON_EXPORT
     #{
-    "volumes": [
-      "db:/app/hoprd-db"
-    ]
-    "environment": [
-      "DEBUG=hopr*",
-      "HOPRD_ENVIRONMENT=master-goerli",
-      "HOPRD_HOST=0.0.0.0:9091",
-      "HOPRD_ANNOUNCE=false",
-      "HOPRD_ADMIN=true",
-      "HOPRD_ADMIN_HOST=0.0.0.0",
-      "HOPRD_ADMIN_PORT=3000",
-      "HOPRD_API=true",
-      "HOPRD_API_HOST=0.0.0.0",
-      "HOPRD_API_PORT=3001",
-      "HOPRD_HEALTH_CHECK=true",
-      "HOPRD_HEALTH_CHECK_HOST=0.0.0.0",
-      "HOPRD_HEALTH_CHECK_PORT=8080",
-      "HOPRD_PASSWORD=open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0",
-      "HOPRD_API_TOKEN=!5qxc9Lp1BE7IFQ-nrtttU",
-      "HOPRD_IDENTITY=/app/hoprd-db/.hopr-identity",
-      "HOPRD_DATA=/app/hoprd-db/data-master-goerli",
-      "HOPRD_INIT=true",
-      "HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS=false"
-    ]
-    "ports": [
-      "3000:3000/tcp",
-      "3001:3001/tcp",
-      "8080:8080/tcp",
-      "9091:9091/tcp",
-      "9091:9091/udp"
-    ]
-    "restart": "always"
+    'volumes': ['db:/app/hoprd-db']
+    'environment':
+      [
+        'DEBUG=hopr*',
+        'HOPRD_ENVIRONMENT=master-goerli',
+        'HOPRD_HOST=0.0.0.0:9091',
+        'HOPRD_ANNOUNCE=false',
+        'HOPRD_ADMIN=true',
+        'HOPRD_ADMIN_HOST=0.0.0.0',
+        'HOPRD_ADMIN_PORT=3000',
+        'HOPRD_API=true',
+        'HOPRD_API_HOST=0.0.0.0',
+        'HOPRD_API_PORT=3001',
+        'HOPRD_HEALTH_CHECK=true',
+        'HOPRD_HEALTH_CHECK_HOST=0.0.0.0',
+        'HOPRD_HEALTH_CHECK_PORT=8080',
+        'HOPRD_PASSWORD=open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0',
+        'HOPRD_API_TOKEN=!5qxc9Lp1BE7IFQ-nrtttU',
+        'HOPRD_IDENTITY=/app/hoprd-db/.hopr-identity',
+        'HOPRD_DATA=/app/hoprd-db/data-master-goerli',
+        'HOPRD_INIT=true',
+        'HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS=false'
+      ]
+    'ports': ['3000:3000/tcp', '3001:3001/tcp', '8080:8080/tcp', '9091:9091/tcp', '9091:9091/udp']
+    'restart': 'always'
     #}
     # END_JSON_EXPORT
 volumes:
