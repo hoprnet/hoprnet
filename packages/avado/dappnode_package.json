@@ -8,9 +8,7 @@
   "author": "HOPR",
   "license": "GPL-3.0",
   "dependencies": {},
-  "image": {
-    "network_mode": "host"
-  },
+  "image": {},
   "links": {
     "OnboardingWizard": "http://hopr.my.ava.do:3000/",
     "homepage": "https://hoprnet.org",
