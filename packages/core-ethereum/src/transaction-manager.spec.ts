@@ -2,12 +2,15 @@ import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import TransactionManager, { Transaction, TransactionPayload } from './transaction-manager.js'
 
-const TX: [string, Omit<Transaction, 'createdAt'>] = ['0', { 
-  nonce: 0, 
-  maxPriority: BigNumber.from('2000000000'),
-  maxFeePerGas: BigNumber.from(10e9),
-  gasLimit: BigNumber.from(400e3)
-}]
+const TX: [string, Omit<Transaction, 'createdAt'>] = [
+  '0',
+  {
+    nonce: 0,
+    maxPriority: BigNumber.from('2000000000'),
+    maxFeePerGas: BigNumber.from(10e9),
+    gasLimit: BigNumber.from(400e3)
+  }
+]
 const PAYLOAD: TransactionPayload = { to: '0x0', data: '0x123', value: BigNumber.from('1') }
 
 describe('transaction-manager', function () {
@@ -99,7 +102,15 @@ describe('transaction-manager', function () {
 
     // generate mock txs
     for (let i = 0; i < 7; i++) {
-      txs.push([String(i), { nonce: i, maxPriority: BigNumber.from('1'), maxFeePerGas: BigNumber.from(10), gasLimit: BigNumber.from(400e3)}])
+      txs.push([
+        String(i),
+        {
+          nonce: i,
+          maxPriority: BigNumber.from('1'),
+          maxFeePerGas: BigNumber.from(10),
+          gasLimit: BigNumber.from(400e3)
+        }
+      ])
     }
 
     // add them to confirmed

@@ -324,7 +324,8 @@ export async function createChainWrapper(
     const initiatedHash = utils.keccak256(signedTx)
     const addedToQueue = transactions.addToQueuing(
       initiatedHash,
-      { nonce: populatedTx.nonce, 
+      {
+        nonce: populatedTx.nonce,
         maxPriority: BigNumber.from(populatedTx.maxPriorityFeePerGas),
         maxFeePerGas: BigNumber.from(populatedTx.maxFeePerGas),
         gasLimit: BigNumber.from(populatedTx.gasLimit)

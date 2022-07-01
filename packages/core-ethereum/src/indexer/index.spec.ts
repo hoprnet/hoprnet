@@ -730,9 +730,9 @@ describe('test indexer', function () {
       id: fixtures.PARTY_A
     })
 
-    let trySendTransaction: boolean = false;
+    let trySendTransaction: boolean = false
     chain.sendTransaction = async () => {
-      trySendTransaction = true;
+      trySendTransaction = true
       return {
         code: SendTransactionStatus.SUCCESS,
         tx: {
@@ -740,8 +740,8 @@ describe('test indexer', function () {
           confirmations: 0,
           nonce: 3,
           gasLimit: BigNumber.from('1000'),
-          data: "0x",
-          value: BigNumber.from('0'),
+          data: '0x',
+          value: BigNumber.from('0')
         }
       }
     }

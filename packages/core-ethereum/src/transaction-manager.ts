@@ -129,9 +129,9 @@ class TranscationManager {
 
     log('Adding queuing transaction %s %i', hash, transaction.nonce)
     this.payloads.set(hash, transactionPayload)
-    this.queuing.set(hash, { 
-      nonce: transaction.nonce, 
-      createdAt: 0, 
+    this.queuing.set(hash, {
+      nonce: transaction.nonce,
+      createdAt: 0,
       maxPriority: transaction.maxPriority,
       maxFeePerGas: transaction.maxFeePerGas,
       gasLimit: transaction.gasLimit

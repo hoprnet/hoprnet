@@ -524,20 +524,22 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     // resend queuing transactions, when there are transactions (in queue) that haven't been accepted by the RPC
     // and resend transactions if the current balance is sufficient.
 
-    const allQueuingTxs = this.chain.getAllQueuingTransactionRequests();
+    const allQueuingTxs = this.chain.getAllQueuingTransactionRequests()
     if (allQueuingTxs.length > 0) {
-      const minimumBalanceForQueuingTxs = allQueuingTxs.reduce((acc, queuingTx) => 
-        // to get the minimum balance required to resend a queuing transaction,
-        // use the gasLimit (that shouldn't change, unless the contract state is different)
-        // multiplies the maxFeePerGas of the queuing transaction
-        acc.add(new BN(queuingTx.gasLimit.toString()).mul(new BN(queuingTx.maxFeePerGas.toString())))
-      , new BN(0))
+      const minimumBalanceForQueuingTxs = allQueuingTxs.reduce(
+        (acc, queuingTx) =>
+          // to get the minimum balance required to resend a queuing transaction,
+          // use the gasLimit (that shouldn't change, unless the contract state is different)
+          // multiplies the maxFeePerGas of the queuing transaction
+          acc.add(new BN(queuingTx.gasLimit.toString()).mul(new BN(queuingTx.maxFeePerGas.toString()))),
+        new BN(0)
+      )
       const currentBalance = await this.chain.getNativeBalance(this.address)
       if (
         // compare the current balance with the minimum balance required at the time of transaction being queued.
         // NB: Both gasLimit and maxFeePerGas requirement may be different due to "drastic" changes in contract state and network condition
-        currentBalance.toBN().gte(minimumBalanceForQueuingTxs) 
-      )  {
+        currentBalance.toBN().gte(minimumBalanceForQueuingTxs)
+      ) {
         try {
           await Promise.all(
             allQueuingTxs.map((request) => {
