@@ -125,7 +125,7 @@ const main: DeployFunction = async function ({
 
     try {
       await hoprBoost.batchMint(
-        [CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1], CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[3]],
+        [CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1], CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[3], ...Array(10).fill(DEV_BANK_ADDRESS)],
         DEV_NFT_TYPE,
         DEV_NFT_TYPE,
         DEV_NFT_BOOST,
@@ -134,7 +134,7 @@ const main: DeployFunction = async function ({
           gasLimit: 4e6
         }
       )
-      console.log(`... minting ${DEV_NFT_TYPE} NFTs to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1] and [3]`)
+      console.log(`... minting ${DEV_NFT_TYPE} NFTs to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1], [3] and 10 for dev bank`)
     } catch (error) {
       console.error(
         `Cannot mint ${DEV_NFT_TYPE} NFTs to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1] and CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[3] due to ${error}`

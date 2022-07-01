@@ -13,6 +13,10 @@ export type RegisterOpts =
       peerIds: string
     }
   | {
+      task: 'remove'
+      nativeAddresses: string
+    }
+  | {
       task: 'disable' | 'enable'
     }
 
@@ -85,11 +89,24 @@ async function main(
         process.exit(1)
       }
 
-      // in staging account, special DEV nfts are minted; in non-stagin environment, add addresses directly to proxy
+      // in staging account, register by owner; in non-stagin environment, add addresses directly to proxy
       if (!network.tags.staging) {
         await (await (hoprProxy as HoprDummyProxyForNetworkRegistry).ownerBatchAddAccounts(nativeAddresses)).wait()
       }
       await (await hoprNetworkRegistry.ownerRegister(nativeAddresses, peerIds)).wait()
+    } else if (opts.task === 'remove') {
+      const nativeAddresses = opts.nativeAddresses.split(',')
+      // ensure all native addresses are valid
+      if (nativeAddresses.some((a) => !utils.isAddress(a))) {
+        console.error(`Given address list '${nativeAddresses.join(',')}' contains an invalid address.`)
+        process.exit(1)
+      }
+
+      // in staging account, deregister; in non-stagin environment, remove addresses directly from proxy
+      if (!network.tags.staging) {
+        await (await (hoprProxy as HoprDummyProxyForNetworkRegistry).ownerBatchRemoveAccounts(nativeAddresses)).wait()
+      }
+      await (await hoprNetworkRegistry.ownerDeregister(nativeAddresses)).wait()
     } else if (opts.task === 'enable' && !isEnabled) {
       await (await hoprNetworkRegistry.enableRegistry()).wait()
     } else if (opts.task === 'disable' && isEnabled) {

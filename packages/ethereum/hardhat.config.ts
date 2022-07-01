@@ -21,6 +21,7 @@ import '@typechain/hardhat'
 import faucet, { type FaucetCLIOPts } from './tasks/faucet'
 import parallelTest, { type ParallelTestCLIOpts } from './tasks/parallelTest'
 import register, { type RegisterOpts } from './tasks/register'
+import selfRegister, { type SelfRegisterOpts } from './tasks/selfRegister'
 import getAccounts from './tasks/getAccounts'
 
 import { expandVars } from '@hoprnet/hopr-utils'
@@ -194,6 +195,15 @@ task<RegisterOpts>(
   .addParam<RegisterOpts['task']>('task', 'The task to run', undefined, types.string)
   .addOptionalParam<string>('nativeAddresses', 'A list of native addresses', undefined, types.string)
   .addOptionalParam<string>('peerIds', 'A list of peerIds', undefined, types.string)
+
+task<SelfRegisterOpts>(
+  'register:self',
+  "Used by our E2E tests to interact with 'HoprNetworkRegistry' and 'HoprDummyProxyForNetworkRegistry'.",
+  selfRegister
+)
+  .addParam<SelfRegisterOpts['task']>('task', 'The task to run', undefined, types.string)
+  .addOptionalParam<string>('peerId', 'HOPR peer ID to be registered', undefined, types.string)
+  .addOptionalParam<string>('privatekey', 'Private key of the signer', undefined, types.string)
 
 task<StakeOpts>('stake', 'Used by CI tests to stake tokens to the running staking program.', stake)
   .addParam<string>(
