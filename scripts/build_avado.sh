@@ -58,10 +58,25 @@ if [[ -z $(grep -E "${default_development_environment}" "./build/Dockerfile") ]]
   exit 1
 fi
 
+function cleanup {
+  local EC=$?
+  trap - SIGINT SIGTERM ERR EXIT
+  set +Eeuo pipefail
+
+  # Undo changes restoring backups
+  mv ./docker-compose.bak ./docker-compose.yml
+  mv ./dappnode_package.bak ./dappnode_package.json
+  mv ./build/Dockerfile.bak ./build/Dockerfile
+
+  exit $EC
+}
+
 # Create backups
 cp ./docker-compose.yml ./docker-compose.bak
 cp ./dappnode_package.json ./dappnode_package.bak
 cp ./build/Dockerfile ./build/Dockerfile.bak
+
+trap cleanup SIGINT SIGTERM ERR EXIT
 
 # Write AVADO docker build version
 sed -e "s/image:[ ]'hopr\.avado\.dnp\.dappnode\.eth:[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}/image: 'hopr.avado.dnp.dappnode.eth:${AVADO_VERSION}/" ./docker-compose.yml \
@@ -88,7 +103,3 @@ sudo avadosdk build --provider http://80.208.229.228:5001
 
 # http://go.ava.do/install/<IPFS HASH>
 
-# Undo changes restoring backups
-mv ./docker-compose.bak ./docker-compose.yml
-mv ./dappnode_package.bak ./dappnode_package.json
-mv ./build/Dockerfile.bak ./build/Dockerfile
