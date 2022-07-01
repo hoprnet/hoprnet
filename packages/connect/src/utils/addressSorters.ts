@@ -1,6 +1,6 @@
 import type { Multiaddr } from 'multiaddr'
 
-import { CODE_IP4, CODE_IP6, CODE_P2P } from '../constants'
+import { CODE_IP4, CODE_IP6, CODE_P2P } from '../constants.js'
 import {
   inSameNetwork,
   isLinkLocaleAddress,

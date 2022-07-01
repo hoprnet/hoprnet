@@ -31,10 +31,6 @@
 | `key` | `Uint8Array` |
 | `iv` | `Uint8Array` |
 
-#### Defined in
-
-[crypto/prg.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L20)
-
 ## Properties
 
 ### iv
@@ -72,10 +68,6 @@ ___
 
 `Uint8Array`
 
-#### Defined in
-
-[crypto/prg.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L35)
-
 ___
 
 ### createPRG
@@ -91,7 +83,3 @@ ___
 #### Returns
 
 [`PRG`](PRG.md)
-
-#### Defined in
-
-[crypto/prg.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L25)

@@ -1,4 +1,4 @@
-import { timeout } from './timeout'
+import { timeout } from './timeout.js'
 import assert from 'assert'
 
 describe('testing timeoutAfter', () => {

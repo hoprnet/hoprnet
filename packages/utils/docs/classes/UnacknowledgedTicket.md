@@ -38,15 +38,15 @@
 | `ownKey` | [`HalfKey`](HalfKey.md) |
 | `signer` | [`PublicKey`](PublicKey.md) |
 
-#### Defined in
-
-[types/unacknowledgedTicket.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L5)
-
 ## Properties
 
 ### ownKey
 
 • `Readonly` **ownKey**: [`HalfKey`](HalfKey.md)
+
+#### Defined in
+
+[types/unacknowledgedTicket.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L5)
 
 ___
 
@@ -54,11 +54,19 @@ ___
 
 • `Readonly` **signer**: [`PublicKey`](PublicKey.md)
 
+#### Defined in
+
+[types/unacknowledgedTicket.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L5)
+
 ___
 
 ### ticket
 
 • `Readonly` **ticket**: [`Ticket`](Ticket.md)
+
+#### Defined in
+
+[types/unacknowledgedTicket.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L5)
 
 ## Methods
 
@@ -69,10 +77,6 @@ ___
 #### Returns
 
 [`HalfKeyChallenge`](HalfKeyChallenge.md)
-
-#### Defined in
-
-[types/unacknowledgedTicket.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L41)
 
 ___
 
@@ -90,10 +94,6 @@ ___
 
 [`Response`](Response.md)
 
-#### Defined in
-
-[types/unacknowledgedTicket.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L37)
-
 ___
 
 ### serialize
@@ -103,10 +103,6 @@ ___
 #### Returns
 
 `Uint8Array`
-
-#### Defined in
-
-[types/unacknowledgedTicket.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L21)
 
 ___
 
@@ -124,10 +120,6 @@ ___
 
 `boolean`
 
-#### Defined in
-
-[types/unacknowledgedTicket.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L29)
-
 ___
 
 ### verifySignature
@@ -138,10 +130,6 @@ ___
 
 `boolean`
 
-#### Defined in
-
-[types/unacknowledgedTicket.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L33)
-
 ___
 
 ### SIZE
@@ -151,10 +139,6 @@ ___
 #### Returns
 
 `number`
-
-#### Defined in
-
-[types/unacknowledgedTicket.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L45)
 
 ___
 
@@ -171,7 +155,3 @@ ___
 #### Returns
 
 [`UnacknowledgedTicket`](UnacknowledgedTicket.md)
-
-#### Defined in
-
-[types/unacknowledgedTicket.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L11)

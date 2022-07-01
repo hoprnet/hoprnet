@@ -4,7 +4,7 @@ import type { Signer } from 'ethers'
 // Read https://eips.ethereum.org/EIPS/eip-1820 for more information as to how the ERC1820 registry is deployed to
 // ensure its address is the same on all chains.
 const main = async function (hre: HardhatRuntimeEnvironment, signer?: Signer) {
-  const { ethers, getNamedAccounts } = hre
+  const { ethers, getNamedAccounts, environment } = hre
   const deployer = signer || (await getNamedAccounts().then((o) => ethers.getSigner(o.deployer)))
 
   // check if it already exists
@@ -15,13 +15,23 @@ const main = async function (hre: HardhatRuntimeEnvironment, signer?: Signer) {
 
   // 0.08 ether is needed to deploy the registry, and those funds need to be transferred to the account that will deploy
   // the contract.
-  await deployer.sendTransaction({
+  const fundDeployerTx = await deployer.sendTransaction({
     to: ERC1820_DEPLOYER,
     value: ethers.utils.parseEther('0.08')
   })
 
+  // don't wait when using local hardhat because its using auto-mine
+  if (!environment.match('hardhat')) {
+    await fundDeployerTx.wait(2)
+  }
+
   // deploy
-  await ethers.provider.sendTransaction(ERC1820_REGISTRY_DEPLOY_TX)
+  const deployTx = await ethers.provider.sendTransaction(ERC1820_REGISTRY_DEPLOY_TX)
+
+  // don't wait when using local hardhat because its using auto-mine
+  if (!environment.match('hardhat')) {
+    await deployTx.wait(2)
+  }
 
   console.log(`"ERC1820Registry" deployed at ${ERC1820_REGISTRY_ADDRESS}`)
 }

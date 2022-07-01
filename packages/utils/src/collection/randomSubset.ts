@@ -1,5 +1,5 @@
-import { randomPermutation } from './randomPermutation'
-import { randomInteger } from '../crypto/randomInteger'
+import { randomPermutation } from './randomPermutation.js'
+import { randomInteger } from '../crypto/randomInteger.js'
 
 /**
  * Picks @param subsetSize elements at random from @param array .

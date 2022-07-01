@@ -1,4 +1,4 @@
-import { getAddrs } from './addrs'
+import { getAddrs } from './addrs.js'
 import assert from 'assert'
 
 describe('addrs', function () {

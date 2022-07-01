@@ -1,11 +1,11 @@
 import assert from 'assert'
-import { bumpCommitment, ChannelCommitmentInfo, findCommitmentPreImage, initializeCommitment } from './commitment'
+import { bumpCommitment, ChannelCommitmentInfo, findCommitmentPreImage, initializeCommitment } from './commitment.js'
 import sinon from 'sinon'
 import { Hash, HoprDB, privKeyToPeerId, stringToU8a, UINT256 } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 
 describe('commitment', function () {
-  let fakeSet, fakeGet, fakeDB
+  let fakeSet: any, fakeGet: any, fakeDB: any
   let fakeKey: PeerId
   let fakeCommInfo: ChannelCommitmentInfo
   beforeEach(async function () {
@@ -22,7 +22,7 @@ describe('commitment', function () {
   })
 
   it('should publish a hashed secret', async function () {
-    this.timeout(3000)
+    this.timeout(5e3)
 
     await initializeCommitment(fakeDB, fakeKey, fakeCommInfo, fakeGet, fakeSet)
     let c1 = await findCommitmentPreImage(fakeDB, fakeCommInfo.channelId)

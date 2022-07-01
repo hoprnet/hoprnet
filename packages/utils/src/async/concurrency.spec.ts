@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { oneAtATime } from './concurrency'
+import { oneAtATime } from './concurrency.js'
 
 describe('concurrency', function () {
   it('one at a time', async function () {

@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import { BigNumber } from 'ethers'
-import TransactionManager, { Transaction, TransactionPayload } from './transaction-manager'
+import TransactionManager, { Transaction, TransactionPayload } from './transaction-manager.js'
 
 const TX: [string, Omit<Transaction, 'createdAt'>] = ['0', { nonce: 0, maxPrority: BigNumber.from('2000000000') }]
 const PAYLOAD: TransactionPayload = { to: '0x0', data: '0x123', value: BigNumber.from('1') }

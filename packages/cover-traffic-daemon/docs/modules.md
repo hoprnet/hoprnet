@@ -4,7 +4,7 @@
 
 ## Table of contents
 
-### Type aliases
+### Type Aliases
 
 - [DefaultEnvironment](modules.md#defaultenvironment)
 
@@ -12,7 +12,7 @@
 
 - [main](modules.md#main)
 
-## Type aliases
+## Type Aliases
 
 ### DefaultEnvironment
 
@@ -26,7 +26,7 @@
 
 #### Defined in
 
-[index.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/cover-traffic-daemon/src/index.ts#L27)
+[index.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/cover-traffic-daemon/src/index.ts#L43)
 
 ## Functions
 
@@ -44,7 +44,3 @@
 #### Returns
 
 `Promise`<`void`\>
-
-#### Defined in
-
-[index.ts:126](https://github.com/hoprnet/hoprnet/blob/master/packages/cover-traffic-daemon/src/index.ts#L126)

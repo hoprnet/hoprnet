@@ -4,18 +4,18 @@
 
 ## Table of contents
 
-### Enumeration members
+### Enumeration Members
 
 - [Closed](ChannelStatus.md#closed)
 - [Open](ChannelStatus.md#open)
 - [PendingToClose](ChannelStatus.md#pendingtoclose)
 - [WaitingForCommitment](ChannelStatus.md#waitingforcommitment)
 
-## Enumeration members
+## Enumeration Members
 
 ### Closed
 
-• **Closed** = `0`
+• **Closed**
 
 #### Defined in
 
@@ -25,7 +25,7 @@ ___
 
 ### Open
 
-• **Open** = `2`
+• **Open**
 
 #### Defined in
 
@@ -35,7 +35,7 @@ ___
 
 ### PendingToClose
 
-• **PendingToClose** = `3`
+• **PendingToClose**
 
 #### Defined in
 
@@ -45,7 +45,7 @@ ___
 
 ### WaitingForCommitment
 
-• **WaitingForCommitment** = `1`
+• **WaitingForCommitment**
 
 #### Defined in
 

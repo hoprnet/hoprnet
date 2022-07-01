@@ -1,7 +1,7 @@
 import { Multiaddr } from 'multiaddr'
 import assert from 'assert'
 
-import { isMultiaddrLocal } from './addressSorters'
+import { isMultiaddrLocal } from './addressSorters.js'
 
 describe(`test isMultiaddrLocal`, function () {
   it(`should detect local multiaddrs`, function () {

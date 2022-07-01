@@ -1,9 +1,9 @@
 import { Multiaddr, protocols } from 'multiaddr'
 import PeerId from 'peer-id'
-import { u8aSplit, serializeToU8a, MULTI_ADDR_MAX_LENGTH, toU8a, u8aToNumber } from '..'
+import { u8aSplit, serializeToU8a, MULTI_ADDR_MAX_LENGTH, toU8a, u8aToNumber } from '../index.js'
 import BN from 'bn.js'
-import { PublicKey } from './publicKey'
-import type { Address } from './primitives'
+import { PublicKey } from './publicKey.js'
+import type { Address } from './primitives.js'
 
 const LENGTH_PREFIX_LENGTH = 4
 const BLOCK_NUMBER_LENGTH = 4

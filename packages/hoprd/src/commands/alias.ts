@@ -51,8 +51,8 @@ export class Alias extends AbstractCommand {
       setState(state)
 
       return log(`Set alias '${styleValue(name, 'highlight')}' to '${styleValue(peerId.toB58String(), 'peerId')}'.`)
-    } catch (error) {
-      return log(styleValue(error.message, 'failure'))
+    } catch (err) {
+      return log(styleValue(err instanceof Error ? err.message : 'Unknown error', 'failure'))
     }
   }
 }

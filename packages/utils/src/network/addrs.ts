@@ -1,5 +1,5 @@
-import { stringToU8a, u8aToHex } from '..'
-import { PRIVATE_NETWORKS, LINK_LOCAL_NETWORKS, LOOPBACK_ADDRS, RESERVED_ADDRS, type Network } from './constants'
+import { stringToU8a, u8aToHex } from '../index.js'
+import { PRIVATE_NETWORKS, LINK_LOCAL_NETWORKS, LOOPBACK_ADDRS, RESERVED_ADDRS, type Network } from './constants.js'
 
 import { networkInterfaces, type NetworkInterfaceInfo } from 'os'
 import PeerId from 'peer-id'

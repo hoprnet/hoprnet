@@ -1,6 +1,6 @@
 import assert from 'assert'
 
-import { FIFO } from './fifo'
+import { FIFO } from './fifo.js'
 
 describe('test fifo', function () {
   it('entry insertion and extraction', function () {

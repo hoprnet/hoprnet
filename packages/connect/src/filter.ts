@@ -1,5 +1,5 @@
 import type { Multiaddr } from 'multiaddr'
-import type { ValidAddress } from './utils'
+import type { ValidAddress } from './utils/index.js'
 import type PeerId from 'peer-id'
 
 import {
@@ -14,10 +14,10 @@ import {
   u8aAddressToCIDR,
   type Network
 } from '@hoprnet/hopr-utils'
-import { AddressType, parseAddress, type DirectAddress, type CircuitAddress } from './utils'
+import { AddressType, parseAddress, type DirectAddress, type CircuitAddress } from './utils/index.js'
 
 import Debug from 'debug'
-import { HoprConnectOptions } from './types'
+import { HoprConnectOptions } from './types.js'
 
 const log = Debug('hopr-connect:filter')
 

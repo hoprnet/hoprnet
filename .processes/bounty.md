@@ -66,6 +66,7 @@ In order to ensure that external contributions pass our CI tests, the bounty cre
 1. Create a branch prefixed by `bounty/<name>` and push it.
 2. Bounty hunter may create PRs that merge into that branch.
 3. When work is complete, PR is merged into the branch, ensuring tests pass.
+4. If the bounty is a Dune Analytics query or dashboard, ensure that the full code of all queries got submitted via PR and the query/Dashboard got forked by the `hoprnet` Dune account.
 
 ## Prizes and rewards
 

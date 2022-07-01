@@ -29,7 +29,7 @@ export const getAliases = (state: Readonly<State>): { [alias: string]: string } 
   }, {})
 }
 
-export const GET: Operation = [
+const GET: Operation = [
   async (req, res, _next) => {
     const { stateOps } = req.context
 
@@ -37,7 +37,9 @@ export const GET: Operation = [
       const aliases = getAliases(stateOps.getState())
       return res.status(200).send(aliases)
     } catch (err) {
-      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+      return res
+        .status(422)
+        .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 ]
@@ -83,7 +85,7 @@ GET.apiDoc = {
   }
 }
 
-export const POST: Operation = [
+const POST: Operation = [
   async (req, res, _next) => {
     const { stateOps } = req.context
     const { peerId, alias } = req.body
@@ -92,7 +94,9 @@ export const POST: Operation = [
       setAlias(stateOps, alias, peerId)
       return res.status(201).send()
     } catch (err) {
-      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+      return res
+        .status(422)
+        .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 ]
@@ -154,3 +158,5 @@ POST.apiDoc = {
     }
   }
 }
+
+export default { GET, POST }

@@ -10,13 +10,21 @@
 
 ### Interfaces
 
-- [HoprChannels](interfaces/HoprChannels.md)
+- [HoprBoost](interfaces/HoprBoost.md)
+- [HoprChannels](interfaces/HoprChannels-1.md)
+- [HoprDistributor](interfaces/HoprDistributor.md)
 - [HoprNetworkRegistry](interfaces/HoprNetworkRegistry.md)
+- [HoprStake](interfaces/HoprStake.md)
+- [HoprStake2](interfaces/HoprStake2.md)
+- [HoprStakeSeason3](interfaces/HoprStakeSeason3.md)
+- [HoprStakeSeason4](interfaces/HoprStakeSeason4.md)
 - [HoprToken](interfaces/HoprToken.md)
+- [HoprWhitehat](interfaces/HoprWhitehat.md)
 - [TypedEvent](interfaces/TypedEvent.md)
 - [TypedEventFilter](interfaces/TypedEventFilter.md)
+- [xHoprToken](interfaces/xHoprToken.md)
 
-### Type aliases
+### Type Aliases
 
 - [ContractData](modules.md#contractdata)
 - [ContractNames](modules.md#contractnames)
@@ -29,7 +37,7 @@
 
 - [getContractData](modules.md#getcontractdata)
 
-## Type aliases
+## Type Aliases
 
 ### ContractData
 
@@ -46,7 +54,7 @@
 
 #### Defined in
 
-[packages/ethereum/src/index.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L19)
+[packages/ethereum/src/index.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L32)
 
 ___
 
@@ -56,7 +64,7 @@ ___
 
 #### Defined in
 
-[packages/ethereum/src/index.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L7)
+[packages/ethereum/src/index.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L20)
 
 ___
 
@@ -120,7 +128,3 @@ ___
 #### Returns
 
 [`ContractData`](modules.md#contractdata)
-
-#### Defined in
-
-[packages/ethereum/src/index.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L26)

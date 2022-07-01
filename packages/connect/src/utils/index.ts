@@ -1,18 +1,18 @@
-import type { Stream, StreamType } from '../types'
+import type { Stream, StreamType } from '../types.js'
 import type { AddressInfo, Server as TCPServer } from 'net'
 import type { Socket as UDPSocket } from 'dgram'
-import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
-import type Connection from 'libp2p-interfaces/src/connection/connection'
+import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types.js'
+import type Connection from 'libp2p-interfaces/src/connection/connection.js'
 import PeerId from 'peer-id'
 
 import { isAnyAddress } from '@hoprnet/hopr-utils'
 
 import { Multiaddr } from 'multiaddr'
-import { CODE_CIRCUIT, CODE_P2P } from '../constants'
+import { CODE_CIRCUIT, CODE_P2P } from '../constants.js'
 
-export * from './addrs'
-export * from './addressSorters'
-export { encodeWithLengthPrefix, decodeWithLengthPrefix } from './lengthPrefix'
+export * from './addrs.js'
+export * from './addressSorters.js'
+export { encodeWithLengthPrefix, decodeWithLengthPrefix } from './lengthPrefix.js'
 
 function isAsyncStream<T>(iterator: AsyncIterable<T> | Iterable<T>): iterator is AsyncIterable<T> {
   if ((iterator as AsyncIterable<T>)[Symbol.asyncIterator]) {

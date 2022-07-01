@@ -1,4 +1,4 @@
-import type { HoprOptions } from '.'
+import type { HoprOptions } from './index.js'
 import PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'
 

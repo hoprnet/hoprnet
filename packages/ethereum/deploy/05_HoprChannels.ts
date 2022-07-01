@@ -1,19 +1,28 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
 import type { DeploymentTypes } from '../src/constants'
-import { durations, u8aToHex, pickVersion } from '@hoprnet/hopr-utils'
+
+const shortDuration = 15 * 1e3 // 15 seconds in ms
+const longDuration = 5 * 60 * 1e3 // 5 minutes in ms
+
+// inlined from @hoprnet/hopr-utils to remove dependency on whole package
+const pickVersion = (full_version: string): string => {
+  const split = full_version.split('.')
+  return split[0] + '.' + split[1] + '.0'
+}
 
 const closures: {
   [key in DeploymentTypes]: number
 } = {
-  testing: durations.seconds(15),
-  development: durations.seconds(15),
-  staging: durations.minutes(5),
-  production: durations.minutes(5)
+  testing: shortDuration,
+  development: shortDuration,
+  staging: longDuration,
+  production: longDuration
 }
 
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const { ethers, deployments, getNamedAccounts, network } = hre
+  const { ethers, deployments, getNamedAccounts, network, environment } = hre
+
   const deployer = await getNamedAccounts().then((o) => ethers.getSigner(o.deployer))
   const hoprToken = await deployments.get('HoprToken')
 
@@ -27,11 +36,19 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const deploymentType = Object.keys(network.tags).find((tag) => closures[tag])
   const closure = Math.floor((closures[deploymentType] ?? closures.testing) / 1e3)
 
+  const deployOptions = {
+    log: true
+  }
+  // don't wait when using local hardhat because its using auto-mine
+  if (!environment.match('hardhat')) {
+    deployOptions['waitConfirmations'] = 2
+  }
+
   const result = await deployments.deterministic('HoprChannels', {
     from: deployer.address,
     args: [hoprToken.address, closure],
-    salt: u8aToHex(new TextEncoder().encode(salt)),
-    log: true
+    salt: ethers.utils.formatBytes32String(salt),
+    ...deployOptions
   })
 
   await result.deploy()

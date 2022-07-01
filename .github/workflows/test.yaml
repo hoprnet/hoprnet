@@ -17,23 +17,38 @@ jobs:
       matrix:
         node-version: [16]
         os: ['ubuntu-latest']
+        rust: ['stable']
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: restore cargo cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
           registry-url: https://registry.npmjs.org/
           cache: yarn
 
       - name: Install dependencies
-        run: yarn
+        run: make -j deps
 
       - name: Build
-        run: yarn build
+        run: make -j build
 
       - name: Test
-        run: yarn test
+        run: make -j test
         env:
           HOPR_ENVIRONMENT_ID: hardhat-localhost

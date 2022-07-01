@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "1.89.0-next.17",
+  "version": "1.89.0-next.51",
   "description": "On-chain logic for hoprnet.org",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "license": "GPL-3.0",
@@ -8,8 +8,11 @@
   "main": "./lib/index.js",
   "type": "commonjs",
   "scripts": {
-    "clean": "rimraf ./lib ./src/types ./tsconfig.tsbuildinfo ./tsconfig.hardhat.tsbuildinfo ./tsconfig.spec.tsbuildinfo ./hardhat ./deployments/default/localhost ./deployments/hardhat-localhost",
-    "build": "yarn clean && yarn build:sol:types && yarn build:tsc",
+    "clean:wasm": "make -C crates clean",
+    "build:wasm": "make -C crates all && make -C crates install",
+    "test:wasm": "make -C crates test",
+    "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo ./tsconfig.hardhat.tsbuildinfo ./hardhat ./deployments/default/localhost ./deployments/hardhat-localhost ./deployments/hardhat",
+    "build": "yarn clean && yarn build:wasm && yarn build:sol:types && yarn build:tsc",
     "build:tsc": "tsc -p .",
     "build:sol": "TS_NODE_PROJECT=./tsconfig.hardhat.json hardhat compile",
     "build:sol:types": "echo \"Generating smart contract typings\" && TS_NODE_PROJECT=./tsconfig.hardhat.json hardhat typechain",
@@ -18,7 +21,7 @@
     "faucet": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost hardhat faucet --use-local-identities --identity-directory /tmp --identity-prefix local --password local",
     "accounts": "TS_NODE_PROJECT=./tsconfig.hardhat.json hardhat accounts",
     "network": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost hardhat node",
-    "test": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost HOPR_HARDHAT_TAG=testing hardhat test:in-group",
+    "test": "yarn test:wasm && TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost HOPR_HARDHAT_TAG=testing hardhat test:in-group",
     "coverage": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost HOPR_HARDHAT_TAG=testing hardhat coverage",
     "deploy:local": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost hardhat deploy --network hardhat --write true",
     "deploy:goerli": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=master-goerli hardhat deploy --network goerli --write true",
@@ -56,15 +59,14 @@
     "hardhat-deploy": "^0.11.5",
     "hardhat-gas-reporter": "1.0.8",
     "multiaddr": "10.0.1",
-    "rimraf": "3.0.2",
     "solidity-coverage": "0.7.18",
     "ts-generator": "0.1.1",
     "typechain": "7.0.1",
-    "typedoc": "0.22.13",
-    "typedoc-plugin-markdown": "3.11.14"
+    "typedoc": "0.23.2",
+    "typedoc-plugin-markdown": "3.13.1",
+    "typescript": "4.7.4"
   },
   "engines": {
     "node": "16"
-  },
-  "stableVersion": "1.76.0-next.31"
+  }
 }

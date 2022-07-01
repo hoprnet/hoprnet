@@ -1,6 +1,9 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    // Make sure that all kinds of errors are handled since
+    // package is a leaf in the dependency graph
+    "useUnknownInCatchVariables": true,
     "outDir": "./lib",
     "rootDir": "./src"
   },
@@ -12,5 +15,5 @@
     // when building docs for releases we can fix the revision on the cmdline
     "gitRevision": "master"
   },
-  "references": [{ "path": "../utils" }, { "path": "../core" }]
+  "references": [{ "path": "../utils" }, { "path": "../core" }, { "path": "../real" }]
 }

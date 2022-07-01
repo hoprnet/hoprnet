@@ -1,3 +1,3 @@
-export * from './acknowledgement'
-export * from './acknowledgementChallenge'
-export * from './packet'
+export * from './acknowledgement.js'
+export * from './acknowledgementChallenge.js'
+export * from './packet.js'

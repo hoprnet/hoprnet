@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Set up Git repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
@@ -30,8 +30,7 @@ jobs:
           texlive-bibtex-extra latexmk
 
       - name: Compile LaTeX document
-        run: |
-          make -C docs/yellowpaper/
+        run: make -j build-yellowpaper
 
       - name: Commit & Push changes
         run: ./scripts/commit-and-push-all-changes.sh

@@ -24,7 +24,7 @@ export default class RedeemTickets extends AbstractCommand {
       await this.node.redeemAllTickets()
       log(`Redeemed all tickets. Run 'tickets' for details`)
     } catch (err) {
-      return log(styleValue(err.message, 'failure'))
+      return log(styleValue(err instanceof Error ? err.message : 'Unknown error', 'failure'))
     }
   }
 }

@@ -1,8 +1,8 @@
 import type LibP2P from 'libp2p'
 import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
-import type NetworkPeers from './network/network-peers'
-import { MAX_BACKOFF } from './network/network-peers'
+import type NetworkPeers from './network/network-peers.js'
+import { MAX_BACKOFF } from './network/network-peers.js'
 
 export function getAddress(node: LibP2P): Multiaddr {
   let addr = node.multiaddrs[0]

@@ -11,6 +11,8 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="e2e-npm-test"
+
+source "${mydir}/testnet.sh"
 source "${mydir}/utils.sh"
 
 usage() {
@@ -176,6 +178,9 @@ function setup_node() {
   install_npm_packages
   cd "${npm_install_dir}"
 
+  # Remove previous logs to make sure the regex does not match
+  rm -f "${log}"
+
   DEBUG="hopr*" npx hoprd \
     --admin \
     --adminHost "127.0.0.1" \
@@ -226,6 +231,7 @@ function install_npm_packages() {
       # Install modules according to their dependencies
       # @dev only works when cleaning node_modules afterwards,
       #      otherwise NPM might use outdated packages
+      npm install ${tmp}/hopr-real-package.tgz
       npm install ${tmp}/hopr-utils-package.tgz
       npm install ${tmp}/hopr-connect-package.tgz
       npm install ${tmp}/hopr-ethereum-package.tgz
@@ -330,6 +336,7 @@ if [ -z "${npm_package_version}" ]; then
   create_npm_package "hopr-connect"
   create_npm_package "hopr-core"
   create_npm_package "hopr-utils"
+  create_npm_package "hopr-real"
   create_npm_package "hopr-ethereum"
   create_npm_package "hopr-core-ethereum"
   # set default environment
@@ -339,13 +346,7 @@ fi
 # }}}
 
 # --- Running Mock Blockchain --- {{{
-log "Running hardhat local node"
-HOPR_ENVIRONMENT_ID="hardhat-localhost" \
-TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-yarn workspace @hoprnet/hopr-ethereum hardhat node \
-  --network hardhat \
-  --show-stack-traces > \
-  "${hardhat_rpc_log}" 2>&1 &
+start_local_hardhat "${hardhat_rpc_log}"
 
 wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
 log "Hardhat node started (127.0.0.1:8545)"
@@ -377,14 +378,7 @@ wait_for_regex ${node8_log} "please fund this node"
 # }}}
 
 #  --- Fund nodes --- {{{
-HOPR_ENVIRONMENT_ID=hardhat-localhost \
-TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
-  --identity-prefix "${node_prefix}" \
-  --identity-directory "${tmp}" \
-  --use-local-identities \
-  --network hardhat \
-  --password "${password}"
+fund_nodes "${node_prefix}" "${tmp}" "${password}"
 # }}}
 
 #  --- Wait for ports to be bound --- {{{

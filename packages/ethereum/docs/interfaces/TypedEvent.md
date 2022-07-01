@@ -244,10 +244,6 @@ node_modules/ethers/node_modules/@ethersproject/contracts/node_modules/@etherspr
 
 Event.decode
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:49
-
 ___
 
 ### getBlock
@@ -261,10 +257,6 @@ ___
 #### Inherited from
 
 Event.getBlock
-
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:51
 
 ___
 
@@ -280,10 +272,6 @@ ___
 
 Event.getTransaction
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:52
-
 ___
 
 ### getTransactionReceipt
@@ -298,10 +286,6 @@ ___
 
 Event.getTransactionReceipt
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:53
-
 ___
 
 ### removeListener
@@ -315,7 +299,3 @@ ___
 #### Inherited from
 
 Event.removeListener
-
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:50

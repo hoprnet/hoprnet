@@ -6,33 +6,33 @@ import {
   type Server as TCPServer
 } from 'net'
 import { createSocket, type RemoteInfo, type Socket as UDPSocket } from 'dgram'
-import type Connection from 'libp2p-interfaces/dist/src/connection/connection'
+import type Connection from 'libp2p-interfaces/dist/src/connection/connection.js'
 
 import { once, EventEmitter } from 'events'
-import type { PeerStoreType, HoprConnectOptions, HoprConnectTestingOptions } from '../types'
+import type { PeerStoreType, HoprConnectOptions, HoprConnectTestingOptions } from '../types.js'
 import Debug from 'debug'
 import { networkInterfaces, type NetworkInterfaceInfo } from 'os'
 
-import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP } from '../constants'
+import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP } from '../constants.js'
 import type {
   MultiaddrConnection,
   Upgrader,
   Listener as InterfaceListener
-} from 'libp2p-interfaces/src/transport/types'
+} from 'libp2p-interfaces/src/transport/types.js'
 
 import PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'
 
-import { handleStunRequest, getExternalIp } from './stun'
-import { getAddrs } from './addrs'
+import { handleStunRequest, getExternalIp } from './stun.js'
+import { getAddrs } from './addrs.js'
 import { isAnyAddress, u8aEquals, defer } from '@hoprnet/hopr-utils'
-import { TCPConnection } from './tcp'
-import { EntryNodes, RELAY_CHANGED_EVENT } from './entry'
-import { bindToPort, attemptClose, nodeToMultiaddr } from '../utils'
-import type HoprConnect from '..'
-import { UpnpManager } from './upnp'
-import type { Filter } from '../filter'
-import type { Relay } from '../relay'
+import { TCPConnection } from './tcp.js'
+import { EntryNodes, RELAY_CHANGED_EVENT } from './entry.js'
+import { bindToPort, attemptClose, nodeToMultiaddr } from '../utils/index.js'
+import type HoprConnect from '../index.js'
+import { UpnpManager } from './upnp.js'
+import type { Filter } from '../filter.js'
+import type { Relay } from '../relay/index.js'
 import type Libp2p from 'libp2p'
 
 const log = Debug('hopr-connect:listener')
@@ -465,7 +465,7 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     let conn: Connection
     try {
-      conn = await this.upgradeInbound(maConn)
+      conn = await this.upgradeInbound(maConn as MultiaddrConnection)
     } catch (err: any) {
       if (err.code === 'ERR_ENCRYPTION_FAILED') {
         error(`inbound connection failed because encryption failed. Maybe connected to the wrong node?`)
@@ -474,7 +474,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       }
 
       if (maConn != undefined) {
-        return attemptClose(maConn, error)
+        return attemptClose(maConn as MultiaddrConnection, error)
       }
 
       return
@@ -499,7 +499,7 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     log('inbound connection %s upgraded', maConn.remoteAddr)
 
-    this.trackConn(maConn)
+    this.trackConn(maConn as MultiaddrConnection)
   }
 
   /**

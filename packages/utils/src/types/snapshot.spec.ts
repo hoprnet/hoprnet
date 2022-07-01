@@ -1,6 +1,6 @@
 import assert from 'assert'
 import BN from 'bn.js'
-import { Snapshot } from './snapshot'
+import { Snapshot } from './snapshot.js'
 
 describe('Snapshot', function () {
   it('should be empty', function () {

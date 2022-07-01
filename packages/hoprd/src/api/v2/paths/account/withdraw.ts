@@ -34,7 +34,7 @@ export const withdraw = async (node: Hopr, currency: 'native' | 'hopr', recipien
   return txHash
 }
 
-export const POST: Operation = [
+const POST: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
     const { currency, amount, recipient } = req.body
@@ -43,11 +43,13 @@ export const POST: Operation = [
       const txHash = await withdraw(node, currency, recipient, amount)
       return res.status(200).send({ receipt: txHash })
     } catch (err) {
+      const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
+
       return res.status(422).send({
-        status: err.message.includes(STATUS_CODES.NOT_ENOUGH_BALANCE)
+        status: errString.includes(STATUS_CODES.NOT_ENOUGH_BALANCE)
           ? STATUS_CODES.NOT_ENOUGH_BALANCE
           : STATUS_CODES.UNKNOWN_FAILURE,
-        error: err.message
+        error: errString
       })
     }
   }
@@ -138,3 +140,5 @@ POST.apiDoc = {
     }
   }
 }
+
+export default { POST }

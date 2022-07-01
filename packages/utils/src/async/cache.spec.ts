@@ -1,6 +1,6 @@
 import assert from 'assert'
 import sinon from 'sinon'
-import { cacheNoArgAsyncFunction } from '.'
+import { cacheNoArgAsyncFunction } from './index.js'
 
 describe('cache', function () {
   let clock: sinon.SinonFakeTimers

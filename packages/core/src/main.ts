@@ -1,24 +1,24 @@
 import path from 'path'
 import { mkdir } from 'fs/promises'
 
-import { default as LibP2P, type Connection } from 'libp2p'
+import { default as LibP2P } from 'libp2p'
 import { LevelDatastore } from 'datastore-level'
 import { type AddressSorter, HoprDB, PublicKey, debug } from '@hoprnet/hopr-utils'
-import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+import { default as HoprCoreEthereum } from '@hoprnet/hopr-core-ethereum'
 
 import Mplex from 'libp2p-mplex'
 import KadDHT from 'libp2p-kad-dht'
 import { NOISE } from '@chainsafe/libp2p-noise'
 import type PeerId from 'peer-id'
-import Hopr, { type HoprOptions } from '.'
-import { getAddrs } from './identity'
+import Hopr, { type HoprOptions } from './index.js'
+import { getAddrs } from './identity.js'
 import HoprConnect, {
   compareAddressesLocalMode,
   type HoprConnectConfig,
   type PublicNodesEmitter
 } from '@hoprnet/hopr-connect'
 import type { Multiaddr } from 'multiaddr'
-import type AccessControl from './network/access-control'
+import type AccessControl from './network/access-control.js'
 
 const log = debug(`hopr-core:create-hopr`)
 
@@ -136,6 +136,14 @@ export async function createLibp2pInstance(
       maxParallelDials: options.announce ? 250 : 50,
       // default timeout of 30s appears to be too long
       dialTimeout: 10e3
+    },
+    connectionGater: {
+      denyDialPeer: async (peer: PeerId) => {
+        return !(await reviewConnection(peer, 'libp2p peer connect'))
+      },
+      denyInboundEncryptedConnection: async (peer: PeerId) => {
+        return !(await reviewConnection(peer, 'libp2p peer connect'))
+      }
     }
   })
 
@@ -156,22 +164,6 @@ export async function createLibp2pInstance(
   libp2p._dht._lan._protocol = HOPR_DHT_LAN_PROTOCOL
   libp2p._dht._lan._network._protocol = HOPR_DHT_LAN_PROTOCOL
   libp2p._dht._lan._topologyListener._protocol = HOPR_DHT_LAN_PROTOCOL
-
-  const onConnectionOriginal = libp2p.upgrader.onConnection
-  // check if connection is allowed
-  libp2p.upgrader.onConnection = async (conn: Connection) => {
-    const allowed = await reviewConnection(conn.remotePeer, 'libp2p peer connect')
-    if (allowed) {
-      // continue connection
-      onConnectionOriginal(conn)
-    } else {
-      try {
-        await conn.close()
-      } catch (err: any) {
-        log(`Error while closing connection to non-registered node`, err)
-      }
-    }
-  }
 
   return libp2p
 }
@@ -217,6 +209,5 @@ export async function createHoprNode(
   // Initialize connection to the blockchain
   await chain.initializeChainWrapper()
 
-  const node = new Hopr(peerId, db, chain, options)
-  return node
+  return new Hopr(peerId, db, chain, options)
 }

@@ -23,12 +23,24 @@ jobs:
       matrix:
         node-version: [16]
         os: ['ubuntu-latest', 'macos-latest']
+        rust: ['stable']
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+
+      - name: restore cargo cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
           registry-url: https://registry.npmjs.org/
@@ -36,8 +48,8 @@ jobs:
 
       - name: Build
         run: |
-          yarn
-          yarn build
+          make -j deps
+          make -j build
 
       - name: Install websocat
         run: ./scripts/install-websocat.sh

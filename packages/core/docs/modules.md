@@ -15,14 +15,17 @@
 - [SaneDefaults](classes/SaneDefaults.md)
 - [default](classes/default.md)
 
-### Type aliases
+### Interfaces
 
-- [ChannelsToClose](modules.md#channelstoclose)
-- [ChannelsToOpen](modules.md#channelstoopen)
+- [ChannelStrategyInterface](interfaces/ChannelStrategyInterface.md)
+
+### Type Aliases
+
 - [HoprOptions](modules.md#hoproptions)
 - [NodeStatus](modules.md#nodestatus)
 - [ResolvedEnvironment](modules.md#resolvedenvironment)
 - [SendMessage](modules.md#sendmessage)
+- [StrategyTickResult](modules.md#strategytickresult)
 - [Subscribe](modules.md#subscribe)
 
 ### Variables
@@ -54,27 +57,7 @@
 - [resolveEnvironment](modules.md#resolveenvironment)
 - [supportedEnvironments](modules.md#supportedenvironments)
 
-## Type aliases
-
-### ChannelsToClose
-
-Ƭ **ChannelsToClose**: `PublicKey`
-
-#### Defined in
-
-[packages/core/src/channel-strategy.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L17)
-
-___
-
-### ChannelsToOpen
-
-Ƭ **ChannelsToOpen**: [`PublicKey`, `BN`]
-
-#### Defined in
-
-[packages/core/src/channel-strategy.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L16)
-
-___
+## Type Aliases
 
 ### HoprOptions
 
@@ -101,7 +84,7 @@ ___
 | `networkQualityThreshold?` | `number` |
 | `onChainConfirmations?` | `number` |
 | `password?` | `string` |
-| `strategy?` | `ChannelStrategy` |
+| `strategy?` | [`ChannelStrategyInterface`](interfaces/ChannelStrategyInterface.md) |
 | `testing?` | { `announceLocalAddresses?`: `boolean` ; `noDirectConnections?`: `boolean` ; `noUPNP?`: `boolean` ; `noWebRTCUpgrade?`: `boolean` ; `preferLocalAddresses?`: `boolean`  } |
 | `testing.announceLocalAddresses?` | `boolean` |
 | `testing.noDirectConnections?` | `boolean` |
@@ -111,7 +94,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:85](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L85)
+[packages/core/src/index.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L84)
 
 ___
 
@@ -121,7 +104,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:129](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L129)
+[packages/core/src/index.ts:128](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L128)
 
 ___
 
@@ -146,7 +129,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/environment.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L34)
+[packages/core/src/environment.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L39)
 
 ___
 
@@ -156,7 +139,24 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:144](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L144)
+[packages/core/src/index.ts:143](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L143)
+
+___
+
+### StrategyTickResult
+
+Ƭ **StrategyTickResult**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `toClose` | { `destination`: `PublicKey`  }[] |
+| `toOpen` | { `destination`: `PublicKey` ; `stake`: `BN`  }[] |
+
+#### Defined in
+
+[packages/core/src/channel-strategy.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L16)
 
 ___
 
@@ -166,7 +166,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:131](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L131)
+[packages/core/src/index.ts:130](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L130)
 
 ## Variables
 
@@ -176,7 +176,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L27)
+[packages/core/src/constants.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L29)
 
 ___
 
@@ -186,7 +186,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L26)
+[packages/core/src/constants.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L28)
 
 ___
 
@@ -206,7 +206,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L6)
+[packages/core/src/constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L8)
 
 ___
 
@@ -216,7 +216,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L13)
+[packages/core/src/constants.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L15)
 
 ___
 
@@ -226,7 +226,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L15)
+[packages/core/src/constants.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L17)
 
 ___
 
@@ -236,7 +236,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L14)
+[packages/core/src/constants.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L16)
 
 ___
 
@@ -246,7 +246,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L12)
+[packages/core/src/constants.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L14)
 
 ___
 
@@ -256,7 +256,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L19)
+[packages/core/src/constants.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L21)
 
 ___
 
@@ -266,7 +266,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L24)
+[packages/core/src/constants.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L26)
 
 ___
 
@@ -276,7 +276,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L23)
+[packages/core/src/constants.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L25)
 
 ___
 
@@ -286,7 +286,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L17)
+[packages/core/src/constants.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L19)
 
 ___
 
@@ -296,7 +296,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L21)
+[packages/core/src/constants.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L23)
 
 ___
 
@@ -306,7 +306,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L22)
+[packages/core/src/constants.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L24)
 
 ___
 
@@ -316,7 +316,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L5)
+[packages/core/src/constants.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L7)
 
 ___
 
@@ -326,7 +326,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L20)
+[packages/core/src/constants.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L22)
 
 ___
 
@@ -336,7 +336,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L8)
+[packages/core/src/constants.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L10)
 
 ___
 
@@ -366,10 +366,6 @@ ___
 
 `Promise`<[`default`](classes/default.md)\>
 
-#### Defined in
-
-[packages/core/src/main.ts:186](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L186)
-
 ___
 
 ### createLibp2pMock
@@ -385,10 +381,6 @@ ___
 #### Returns
 
 `LibP2P`
-
-#### Defined in
-
-[packages/core/src/libp2p.mock.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/libp2p.mock.ts#L11)
 
 ___
 
@@ -418,10 +410,6 @@ Depth first search through potential paths based on weight
 path as Array<PeerId> (including start, but not including
 destination
 
-#### Defined in
-
-[packages/core/src/path/index.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/path/index.ts#L38)
-
 ___
 
 ### resolveEnvironment
@@ -439,10 +427,6 @@ ___
 
 [`ResolvedEnvironment`](modules.md#resolvedenvironment)
 
-#### Defined in
-
-[packages/core/src/environment.ts:53](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L53)
-
 ___
 
 ### supportedEnvironments
@@ -452,7 +436,3 @@ ___
 #### Returns
 
 `Environment`[]
-
-#### Defined in
-
-[packages/core/src/environment.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L47)

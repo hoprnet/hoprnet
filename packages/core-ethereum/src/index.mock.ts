@@ -1,5 +1,5 @@
 import { AccountEntry, debug, NativeBalance, PublicKey } from '@hoprnet/hopr-utils'
-import type HoprCoreEthereum from '.'
+import type HoprCoreEthereum from './index.js'
 import BN from 'bn.js'
 import PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'

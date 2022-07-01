@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "1.89.0-next.17",
+  "version": "1.89.0-next.51",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -13,14 +13,17 @@
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "engines": {
-    "node": "16"
+    "node": ">=16.15"
   },
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
-    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
+    "clean:wasm": "make -C crates clean",
+    "build:wasm": "make -C crates all && make -C crates install",
+    "test:wasm": "make -C crates test",
+    "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo",
     "coverage": "nyc --reporter=html mocha",
-    "build": "yarn clean && tsc -p .",
-    "test": "NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
+    "build": "yarn clean && yarn build:wasm && tsc -p .",
+    "test": "yarn test:wasm && NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },
@@ -36,7 +39,7 @@
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "abort-controller": "3.0.0",
     "bn.js": "5.2.0",
-    "chalk": "4.1.2",
+    "chalk": "5.0.1",
     "datastore-level": "^8.0.0",
     "debug": "4.3.4",
     "heap-js": "2.1.6",
@@ -60,25 +63,15 @@
     "memdown": "6.1.1",
     "mocha": "9.2.2",
     "nyc": "15.1.0",
-    "rimraf": "3.0.2",
     "sinon": "12.0.1",
-    "typedoc": "0.22.13",
-    "typedoc-plugin-markdown": "3.11.14"
+    "typedoc": "0.23.2",
+    "typedoc-plugin-markdown": "3.13.1",
+    "typescript": "4.7.4"
   },
   "mocha": {
-    "extension": [
-      "ts"
-    ],
-    "spec": [
-      "src/**/*.spec.ts",
-      "test/*.spec.ts"
-    ],
-    "require": [
-      "ts-node/register"
-    ]
+    "spec": "lib/**/*.spec.js"
   },
   "publishConfig": {
     "access": "public"
-  },
-  "stableVersion": "1.76.0-next.31"
+  }
 }
