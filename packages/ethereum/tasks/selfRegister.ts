@@ -1,6 +1,6 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import { Signer, Wallet } from 'ethers'
-import type {HoprNetworkRegistry} from '../src/types'
+import type { HoprNetworkRegistry } from '../src/types'
 
 export type SelfRegisterOpts =
   | {
