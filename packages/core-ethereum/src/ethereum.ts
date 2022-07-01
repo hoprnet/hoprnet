@@ -34,7 +34,7 @@ const abiCoder = new utils.AbiCoder()
 export type Receipt = string
 export type ChainWrapper = Awaited<ReturnType<typeof createChainWrapper>>
 
-enum SendTransactionStatus {
+export enum SendTransactionStatus {
   SUCCESS = 'SUCCESS',
   DUPLICATE = 'DUPLICATE'
 }
@@ -324,7 +324,11 @@ export async function createChainWrapper(
     const initiatedHash = utils.keccak256(signedTx)
     const addedToQueue = transactions.addToQueuing(
       initiatedHash,
-      { nonce: populatedTx.nonce, maxPrority: BigNumber.from(populatedTx.maxPriorityFeePerGas) },
+      { nonce: populatedTx.nonce, 
+        maxPriority: BigNumber.from(populatedTx.maxPriorityFeePerGas),
+        maxFeePerGas: BigNumber.from(populatedTx.maxFeePerGas),
+        gasLimit: BigNumber.from(populatedTx.gasLimit)
+      },
       essentialTxPayload
     )
 

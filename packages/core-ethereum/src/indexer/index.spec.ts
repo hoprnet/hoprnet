@@ -6,6 +6,7 @@ import { expectAccountsToBeEqual, expectChannelsToBeEqual, PARTY_A, PARTY_B, PAR
 import * as fixtures from './fixtures.js'
 import { type Event, IndexerStatus } from './types.js'
 import { useFixtures } from './index.mock.js'
+import { SendTransactionStatus } from '../ethereum.js'
 
 describe('test indexer', function () {
   it('should start indexer', async function () {
@@ -720,5 +721,39 @@ describe('test indexer', function () {
     newBlock()
     await processed.promise
     assert((await db.isNetworkRegistryEnabled()) === false)
+  })
+
+  it('should resend queuing transactions when more native tokens are received', async function () {
+    const { chain, indexer, newBlock } = await useFixtures({
+      latestBlockNumber: 3,
+      pastHoprRegistryEvents: [fixtures.REGISTER_ENABLED, fixtures.REGISTER_DISABLED],
+      id: fixtures.PARTY_A
+    })
+
+    let trySendTransaction: boolean = false;
+    chain.sendTransaction = async () => {
+      trySendTransaction = true;
+      return {
+        code: SendTransactionStatus.SUCCESS,
+        tx: {
+          hash: '0x123',
+          confirmations: 0,
+          nonce: 3,
+          gasLimit: BigNumber.from('1000'),
+          data: "0x",
+          value: BigNumber.from('0'),
+        }
+      }
+    }
+
+    const processed = defer<void>()
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber == 3) processed.resolve()
+    })
+    await indexer.start(chain, 0)
+
+    newBlock()
+    await processed.promise
+    assert(trySendTransaction)
   })
 })

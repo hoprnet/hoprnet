@@ -12,7 +12,7 @@
 - Allow configuration via environment variables instead of CLI parameters for all supported options
 - Fix decoding error when API token contains certain characters
 - Add Docker image running hardhat using the Hopr environment and smart contracts (useful for testing and development)
-- Automatically resend queuing transactions when provider is reset
+- Automatically resend queuing transactions when provider is reset or a node receives sufficient native tokens
 
 <a name="1.89"></a>
 
