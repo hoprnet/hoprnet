@@ -67,7 +67,9 @@ steps:
       - --build-arg=HARDHAT_IMAGE=gcr.io/${PROJECT_ID}/hopr-hardhat:${_IMAGE_VERSION}
       - --build-arg=HOPRD_IMAGE=gcr.io/${PROJECT_ID}/hoprd:${_IMAGE_VERSION}
     timeout: 1200s
-    waitFor: ['-']
+    waitFor:
+      - buildHoprd
+      - buildHardhat
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: tagImages
     script: |
@@ -90,6 +92,7 @@ steps:
     timeout: 600s
     waitFor:
       - testImages
+      - buildPluto
 options:
   logStreamingOption: STREAM_ON
   substitutionOption: MUST_MATCH

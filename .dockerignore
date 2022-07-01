@@ -32,7 +32,6 @@ logs.txt
 **/*.tsbuildinfo
 
 .dockerignore
-Dockerfile
 .git
 .gitignore
 
