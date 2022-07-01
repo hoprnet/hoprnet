@@ -11,6 +11,8 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="e2e-npm-test"
+
+source "${mydir}/testnet.sh"
 source "${mydir}/utils.sh"
 
 usage() {
@@ -177,7 +179,7 @@ function setup_node() {
   cd "${npm_install_dir}"
 
   # Remove previous logs to make sure the regex does not match
-  rm -Rf "${log}"
+  rm -f "${log}"
 
   DEBUG="hopr*" npx hoprd \
     --admin \
@@ -344,13 +346,7 @@ fi
 # }}}
 
 # --- Running Mock Blockchain --- {{{
-log "Running hardhat local node"
-HOPR_ENVIRONMENT_ID="hardhat-localhost" \
-TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-yarn workspace @hoprnet/hopr-ethereum hardhat node \
-  --network hardhat \
-  --show-stack-traces > \
-  "${hardhat_rpc_log}" 2>&1 &
+start_local_hardhat "${hardhat_rpc_log}"
 
 wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
 log "Hardhat node started (127.0.0.1:8545)"
@@ -382,14 +378,7 @@ wait_for_regex ${node8_log} "please fund this node"
 # }}}
 
 #  --- Fund nodes --- {{{
-HOPR_ENVIRONMENT_ID=hardhat-localhost \
-TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
-  --identity-prefix "${node_prefix}" \
-  --identity-directory "${tmp}" \
-  --use-local-identities \
-  --network hardhat \
-  --password "${password}"
+fund_nodes "${node_prefix}" "${tmp}" "${password}"
 # }}}
 
 #  --- Wait for ports to be bound --- {{{

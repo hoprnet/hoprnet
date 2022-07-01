@@ -11,6 +11,8 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="e2e-source-test"
+
+source "${mydir}/testnet.sh"
 source "${mydir}/utils.sh"
 
 usage() {
@@ -176,7 +178,7 @@ function setup_node() {
   log "Additional args: \"${additional_args}\""
 
   # Remove previous logs to make sure the regex does not match
-  rm -Rf "${log}"
+  rm -f "${log}"
 
   # Set NODE_ENV=development to rebuild hopr-admin next files
   # at runtime. Necessary to start multiple instances of hoprd
@@ -225,6 +227,9 @@ function setup_ct_node() {
   local dir=${4}
   local additional_args=${5:-""}
 
+  # Remove previous logs to make sure the regex does not match
+  rm -f "${log}"
+
   log "Run CT node -> ${log}"
 
   if [[ "${additional_args}" != *"--environment "* ]]; then
@@ -233,7 +238,7 @@ function setup_ct_node() {
   log "Additional args: \"${additional_args}\""
 
   # Remove previous logs to make sure the regex does not match
-  rm -Rf "${log}"
+  rm -f "${log}"
 
   HOPR_CTD_HEARTBEAT_INTERVAL=2500 \
   HOPR_CTD_HEARTBEAT_THRESHOLD=2500 \
@@ -321,13 +326,7 @@ rm -Rf \
 # }}}
 
 # --- Running Mock Blockchain --- {{{
-log "Running hardhat local node"
-HOPR_ENVIRONMENT_ID="hardhat-localhost" \
-TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-yarn workspace @hoprnet/hopr-ethereum hardhat node \
-  --network hardhat \
-  --show-stack-traces > \
-  "${hardhat_rpc_log}" 2>&1 &
+start_local_hardhat "${hardhat_rpc_log}"
 
 wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
 log "Hardhat node started (127.0.0.1:8545)"
@@ -374,15 +373,7 @@ wait_for_regex ${node8_log} "please fund this node"
 
 log "Funding nodes"
 #  --- Fund nodes --- {{{
-HOPR_ENVIRONMENT_ID=hardhat-localhost \
-TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
-  --identity-prefix "${node_prefix}" \
-  --identity-directory "${tmp}" \
-  --use-local-identities \
-  --network hardhat \
-  --address "${ct_node1_address}" \
-  --password "${password}"
+fund_nodes "${node_prefix}" "${tmp}" "${password}" "${ct_node1_address}"
 # }}}
 
 log "Waiting for port binding"

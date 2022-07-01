@@ -34,7 +34,7 @@ export const ping = async ({ node, peerId }: { node: Hopr; peerId: string }) => 
   throw Error(STATUS_CODES.TIMEOUT)
 }
 
-export const POST: Operation = [
+const POST: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
     const { peerId } = req.body
@@ -42,11 +42,13 @@ export const POST: Operation = [
     try {
       const pingRes = await ping({ peerId, node })
       return res.status(200).send(pingRes)
-    } catch (error) {
-      if (STATUS_CODES[error.message]) {
-        return res.status(422).send({ status: STATUS_CODES[error.message] })
+    } catch (err) {
+      const errString = err instanceof Error ? err.message : 'Unknown error'
+
+      if (STATUS_CODES[errString]) {
+        return res.status(422).send({ status: STATUS_CODES[errString] })
       } else {
-        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
+        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: errString })
       }
     }
   }
@@ -118,3 +120,5 @@ POST.apiDoc = {
     }
   }
 }
+
+export default { POST }

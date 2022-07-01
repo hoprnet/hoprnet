@@ -4,7 +4,7 @@
 
 ## Table of contents
 
-### Enumeration members
+### Enumeration Members
 
 - [ABORTED](DialStatus.md#aborted)
 - [DHT\_ERROR](DialStatus.md#dht_error)
@@ -13,11 +13,11 @@
 - [SUCCESS](DialStatus.md#success)
 - [TIMEOUT](DialStatus.md#timeout)
 
-## Enumeration members
+## Enumeration Members
 
 ### ABORTED
 
-• **ABORTED** = `"E_ABORTED"`
+• **ABORTED**
 
 #### Defined in
 
@@ -27,7 +27,7 @@ ___
 
 ### DHT\_ERROR
 
-• **DHT\_ERROR** = `"E_DHT_QUERY"`
+• **DHT\_ERROR**
 
 #### Defined in
 
@@ -37,7 +37,7 @@ ___
 
 ### DIAL\_ERROR
 
-• **DIAL\_ERROR** = `"E_DIAL"`
+• **DIAL\_ERROR**
 
 #### Defined in
 
@@ -47,7 +47,7 @@ ___
 
 ### NO\_DHT
 
-• **NO\_DHT** = `"E_NO_DHT"`
+• **NO\_DHT**
 
 #### Defined in
 
@@ -57,7 +57,7 @@ ___
 
 ### SUCCESS
 
-• **SUCCESS** = `"SUCCESS"`
+• **SUCCESS**
 
 #### Defined in
 
@@ -67,7 +67,7 @@ ___
 
 ### TIMEOUT
 
-• **TIMEOUT** = `"E_TIMEOUT"`
+• **TIMEOUT**
 
 #### Defined in
 

@@ -7,7 +7,7 @@ based on the different node types we can ping.
 
 ## Table of contents
 
-### Enumeration members
+### Enumeration Members
 
 - [GREEN](NetworkHealthIndicator.md#green)
 - [ORANGE](NetworkHealthIndicator.md#orange)
@@ -15,11 +15,11 @@ based on the different node types we can ping.
 - [UNKNOWN](NetworkHealthIndicator.md#unknown)
 - [YELLOW](NetworkHealthIndicator.md#yellow)
 
-## Enumeration members
+## Enumeration Members
 
 ### GREEN
 
-• **GREEN** = `"Green"`
+• **GREEN**
 
 #### Defined in
 
@@ -29,7 +29,7 @@ ___
 
 ### ORANGE
 
-• **ORANGE** = `"Orange"`
+• **ORANGE**
 
 #### Defined in
 
@@ -39,7 +39,7 @@ ___
 
 ### RED
 
-• **RED** = `"Red"`
+• **RED**
 
 #### Defined in
 
@@ -49,7 +49,7 @@ ___
 
 ### UNKNOWN
 
-• **UNKNOWN** = `"Unknown"`
+• **UNKNOWN**
 
 #### Defined in
 
@@ -59,7 +59,7 @@ ___
 
 ### YELLOW
 
-• **YELLOW** = `"Yellow"`
+• **YELLOW**
 
 #### Defined in
 

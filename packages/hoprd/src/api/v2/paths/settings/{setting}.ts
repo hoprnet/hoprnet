@@ -40,7 +40,7 @@ export const setSetting = (node: Hopr, stateOps: StateOps, key: keyof State['set
   stateOps.setState(state)
 }
 
-export const PUT: Operation = [
+const PUT: Operation = [
   async (req, res, _next) => {
     const { stateOps, node } = req.context
     const { setting } = req.params
@@ -49,14 +49,16 @@ export const PUT: Operation = [
     try {
       setSetting(node, stateOps, setting as SettingKey, settingValue)
       return res.status(204).send()
-    } catch (error) {
+    } catch (err) {
+      const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
+
       // Can't validate setting value on express validation level bacause the type of settingValue depends on settingKey.
       // CustomFormats validation check in express-openapi doesn't have access to rest of the request body so we can't check setting key,
       // that's why we leave validation of the setting value to the logic function and not route code.
-      if (error.message.includes(STATUS_CODES.INVALID_SETTING_VALUE)) {
+      if (errString.includes(STATUS_CODES.INVALID_SETTING_VALUE)) {
         return res.status(400).send({ status: STATUS_CODES.INVALID_SETTING_VALUE })
       } else {
-        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
+        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: errString })
       }
     }
   }
@@ -127,3 +129,5 @@ PUT.apiDoc = {
     }
   }
 }
+
+export default { PUT }

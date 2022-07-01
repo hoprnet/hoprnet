@@ -34,10 +34,6 @@
 | :------ | :------ |
 | `arr` | `Uint8Array` |
 
-#### Defined in
-
-[types/primitives.ts:66](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L66)
-
 ## Properties
 
 ### SIZE
@@ -58,10 +54,6 @@
 
 [`Hash`](Hash.md)
 
-#### Defined in
-
-[types/primitives.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L98)
-
 ___
 
 ### eq
@@ -78,10 +70,6 @@ ___
 
 `boolean`
 
-#### Defined in
-
-[types/primitives.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L90)
-
 ___
 
 ### hash
@@ -91,10 +79,6 @@ ___
 #### Returns
 
 [`Hash`](Hash.md)
-
-#### Defined in
-
-[types/primitives.ts:102](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L102)
 
 ___
 
@@ -106,10 +90,6 @@ ___
 
 `Uint8Array`
 
-#### Defined in
-
-[types/primitives.ts:86](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L86)
-
 ___
 
 ### toHex
@@ -119,10 +99,6 @@ ___
 #### Returns
 
 `string`
-
-#### Defined in
-
-[types/primitives.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L94)
 
 ___
 
@@ -140,10 +116,6 @@ ___
 
 [`Hash`](Hash.md)
 
-#### Defined in
-
-[types/primitives.ts:78](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L78)
-
 ___
 
 ### deserialize
@@ -159,7 +131,3 @@ ___
 #### Returns
 
 [`Hash`](Hash.md)
-
-#### Defined in
-
-[types/primitives.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L82)

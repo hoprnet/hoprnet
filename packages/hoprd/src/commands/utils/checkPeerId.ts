@@ -17,7 +17,7 @@ export function checkPeerIdInput(peerIdString: string, state?: State): PeerId {
 
     return PeerId.createFromB58String(peerIdString)
   } catch (err) {
-    throw Error(`Invalid peerId. ${err.message}`)
+    throw Error(`Invalid peerId. ${err instanceof Error ? err.message : 'Unknown error'}`)
   }
 }
 

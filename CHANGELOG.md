@@ -10,9 +10,12 @@
 - Marge hopr-stake contracs into monorepo and relevant deploy scripts
 - Add additional CLI parameters `--heartbeatThreshold`, `--networkQualityThreshold` and `--onChainConfirmations`
 - Allow configuration via environment variables instead of CLI parameters for all supported options
+- Reenable e2e tests and enhance REST API ([#3836](https://github.com/hoprnet/hoprnet/pull/3836))
 - Fix decoding error when API token contains certain characters
-- Add Docker image running hardhat using the Hopr environment and smart contracts (useful for testing and development)
 - Automatically resend queuing transactions when provider is reset or a node receives sufficient native tokens
+- Make environment variables for `hoprd` accessible in Avado package configuration ([#3885](https://github.com/hoprnet/hoprnet/pull/3885))
+- Add Docker image (hopr-hardhat) running hardhat using the Hopr environment and smart contracts (useful for testing and development)
+- Add Docker image (hopr-pluto) running a full hoprd test cluster for local dApp testing
 
 <a name="1.89"></a>
 

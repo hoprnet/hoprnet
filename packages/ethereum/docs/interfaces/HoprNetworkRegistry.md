@@ -463,10 +463,6 @@ node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:79
 
 BaseContract.\_checkRunningEvents
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:119
-
 ___
 
 ### \_deployed
@@ -486,10 +482,6 @@ ___
 #### Inherited from
 
 BaseContract.\_deployed
-
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:112
 
 ___
 
@@ -513,10 +505,6 @@ ___
 
 BaseContract.\_wrapEvent
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:120
-
 ___
 
 ### accountToNodePeerId
@@ -533,10 +521,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:343
 
 ___
 
@@ -558,10 +542,6 @@ ___
 
 BaseContract.attach
 
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:244
-
 ___
 
 ### connect
@@ -582,10 +562,6 @@ ___
 
 BaseContract.connect
 
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:243
-
 ___
 
 ### deployed
@@ -599,10 +575,6 @@ ___
 #### Overrides
 
 BaseContract.deployed
-
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:245
 
 ___
 
@@ -619,10 +591,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:345
 
 ___
 
@@ -645,10 +613,6 @@ ___
 
 BaseContract.emit
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:125
-
 ___
 
 ### enableRegistry
@@ -665,10 +629,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:349
-
 ___
 
 ### enabled
@@ -684,10 +644,6 @@ ___
 #### Returns
 
 `Promise`<`boolean`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:353
 
 ___
 
@@ -709,10 +665,6 @@ ___
 
 BaseContract.fallback
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:113
-
 ___
 
 ### isAccountRegisteredAndEligible
@@ -730,10 +682,6 @@ ___
 
 `Promise`<`boolean`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:355
-
 ___
 
 ### isNodeRegisteredAndEligible
@@ -750,10 +698,6 @@ ___
 #### Returns
 
 `Promise`<`boolean`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:360
 
 ___
 
@@ -774,10 +718,6 @@ ___
 #### Inherited from
 
 BaseContract.listenerCount
-
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:126
 
 ___
 
@@ -805,10 +745,6 @@ ___
 
 BaseContract.listeners
 
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:255
-
 ▸ **listeners**(`eventName?`): `Listener`[]
 
 #### Parameters
@@ -824,10 +760,6 @@ packages/ethereum/src/types/HoprNetworkRegistry.ts:255
 #### Overrides
 
 BaseContract.listeners
-
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:258
 
 ___
 
@@ -846,10 +778,6 @@ ___
 
 `Promise`<`string`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:365
-
 ___
 
 ### owner
@@ -865,10 +793,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:367
 
 ___
 
@@ -887,10 +811,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:369
-
 ___
 
 ### ownerRegister
@@ -908,10 +828,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:374
 
 ___
 
@@ -941,10 +857,6 @@ ___
 
 BaseContract.queryFilter
 
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:249
-
 ___
 
 ### removeAllListeners
@@ -971,10 +883,6 @@ ___
 
 BaseContract.removeAllListeners
 
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:259
-
 ▸ **removeAllListeners**(`eventName?`): [`HoprNetworkRegistry`](HoprNetworkRegistry.md)
 
 #### Parameters
@@ -990,10 +898,6 @@ packages/ethereum/src/types/HoprNetworkRegistry.ts:259
 #### Overrides
 
 BaseContract.removeAllListeners
-
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:262
 
 ___
 
@@ -1011,10 +915,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:380
-
 ___
 
 ### requirementImplementation
@@ -1031,10 +931,6 @@ ___
 
 `Promise`<`string`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:384
-
 ___
 
 ### selfDeregister
@@ -1050,10 +946,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:386
 
 ___
 
@@ -1072,10 +964,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:390
-
 ___
 
 ### sync
@@ -1092,10 +980,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:395
 
 ___
 
@@ -1114,10 +998,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:400
-
 ___
 
 ### updateRequirementImplementation
@@ -1134,7 +1014,3 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:405

@@ -19,19 +19,23 @@ export const getInfo = async ({ node }: { node: Hopr }) => {
       channelClosurePeriod: Math.ceil(channelClosureSecs / 60)
     }
   } catch (error) {
-    throw new Error(STATUS_CODES.UNKNOWN_FAILURE + error.message)
+    // Make sure this doesn't throw
+    const errString = error instanceof Error ? error.message : 'Unknown error'
+    throw new Error(errString)
   }
 }
 
-export const GET: Operation = [
+const GET: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
 
     try {
       const info = await getInfo({ node })
       return res.status(200).send(info)
-    } catch (error) {
-      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
+    } catch (err) {
+      return res
+        .status(422)
+        .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 ]
@@ -120,3 +124,5 @@ GET.apiDoc = {
     }
   }
 }
+
+export default { GET }
