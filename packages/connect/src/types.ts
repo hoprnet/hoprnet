@@ -85,13 +85,3 @@ export type HoprConnectTestingOptions = {
   // Disable UPNP support
   __noUPNP?: boolean
 }
-
-export type HoprConnectListeningOptions = undefined
-
-export type HoprConnectDialOptions = {
-  // Used to cancel dial attempts after a timeout
-  signal?: AbortSignal
-  // Called when closing socket with the Multiaddr that
-  // was used to establish the connection
-  onDisconnect?: (ma: Multiaddr) => void
-}

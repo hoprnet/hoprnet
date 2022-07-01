@@ -301,7 +301,8 @@ describe('test webrtc connection', function () {
       } as RelayConnection,
       webRTCInstance,
       {
-        signal: abort.signal
+        signal: abort.signal,
+        upgrader: undefined as any
       }
     )
 

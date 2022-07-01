@@ -8,15 +8,9 @@ import type { RelayConnection } from '../relay/connection.js'
 import { randomBytes } from 'crypto'
 import { toU8aStream, encodeWithLengthPrefix, decodeWithLengthPrefix, eagerIterator } from '../utils/index.js'
 import { abortableSource } from 'abortable-iterator'
-import type {
-  StreamSink,
-  StreamResult,
-  StreamType,
-  StreamSource,
-  StreamSourceAsync,
-  HoprConnectDialOptions
-} from '../types.js'
+import type { StreamSink, StreamResult, StreamType, StreamSource, StreamSourceAsync } from '../types.js'
 import assert from 'assert'
+import type { DialOptions } from '@libp2p/interface-transport'
 
 const DEBUG_PREFIX = `hopr-connect`
 
@@ -70,7 +64,7 @@ class WebRTCConnection implements MultiaddrConnection {
   constructor(
     private relayConn: RelayConnection,
     private channel: SimplePeer,
-    private options?: HoprConnectDialOptions & { __noWebRTCUpgrade?: boolean }
+    private options?: DialOptions & { __noWebRTCUpgrade?: boolean }
   ) {
     this.conn = relayConn
 

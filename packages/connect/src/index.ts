@@ -17,13 +17,7 @@ import { TCPConnection, Listener } from './base/index.js'
 // @ts-ignore
 import pkg from '../package.json' assert { type: 'json' }
 
-import type {
-  PublicNodesEmitter,
-  HoprConnectListeningOptions,
-  HoprConnectDialOptions,
-  HoprConnectOptions,
-  HoprConnectTestingOptions
-} from './types.js'
+import type { PublicNodesEmitter, HoprConnectOptions, HoprConnectTestingOptions } from './types.js'
 
 import { Relay } from './relay/index.js'
 import { Filter } from './filter.js'
@@ -198,14 +192,6 @@ class HoprConnect implements Transport, Initializable, Startable {
     }
   }
 
-  private onClose(): void {
-    this.relay.stop()
-  }
-
-  private onListening(): void {
-    this.relay.start()
-  }
-
   /**
    * Creates a TCP listener. The provided `handler` function will be called
    * anytime a new incoming Connection has been successfully upgraded via
@@ -215,14 +201,7 @@ class HoprConnect implements Transport, Initializable, Startable {
    */
   // @ts-ignore libp2p type clash
   public createListener(opts: CreateListenerOptions): Listener {
-    return new Listener(
-      this.onClose.bind(this),
-      this.onListening.bind(this),
-      this.options,
-      this.testingOptions,
-      this.getComponents(),
-      this.getConnectComponents()
-    )
+    return new Listener(this.options, this.testingOptions, this.getComponents(), this.getConnectComponents())
   }
 
   /**
@@ -274,7 +253,10 @@ class HoprConnect implements Transport, Initializable, Startable {
    * @param ma destination
    * @param options optional dial options
    */
-  public async dialDirectly(ma: Multiaddr, options: DialOptions): Promise<Connection> {
+  public async dialDirectly(
+    ma: Multiaddr,
+    options: DialOptions & { onDisconnect?: (ma: Multiaddr) => void }
+  ): Promise<Connection> {
     log(`Attempting to dial ${chalk.yellow(ma.toString())}`)
 
     const maConn = await TCPConnection.create(ma, this.getComponents().getPeerId(), options)
@@ -317,7 +299,7 @@ class HoprConnect implements Transport, Initializable, Startable {
   }
 }
 
-export type { PublicNodesEmitter, HoprConnectConfig, HoprConnectDialOptions, HoprConnectListeningOptions }
+export type { PublicNodesEmitter, HoprConnectConfig }
 export { compareAddressesLocalMode, compareAddressesPublicMode } from './utils/index.js'
 
-export default HoprConnect
+export { HoprConnect }

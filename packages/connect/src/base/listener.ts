@@ -63,19 +63,12 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
   }
 
   /**
-   * @param onClose called once listener is closed
-   * @param onListening called once listener is listening
-   * @param dialDirectly utility to establish a direct connection
-   * @param upgradeInbound forward inbound connections to libp2p
-   * @param peerId own id
    * @param options connection Options, e.g. AbortSignal
    * @param testingOptions turn on / off modules for testing
-   * @param filter allow Listener to populate address filter
-   * @param relay allow Listener to populate list of utilized relays
+   * @param components Libp2p instance components
+   * @param connectComponents HoprConnect components
    */
   constructor(
-    private onClose: () => void,
-    private onListening: () => void,
     private options: HoprConnectOptions,
     private testingOptions: HoprConnectTestingOptions,
     private components: Components,
@@ -351,7 +344,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     // Need to be called before _emitListening
     // because _emitListening() sets an attribute in
     // the relay object
-    this.onListening()
+    this.connectComponents.getRelay().start()
 
     this._emitListening()
 
@@ -383,7 +376,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     await Promise.all([this.closeUDP(), this.closeTCP()])
 
     this.state = ListenerState.CLOSED
-    this.onClose()
+    this.connectComponents.getRelay().stop()
     this.dispatchEvent(new CustomEvent('close'))
   }
 

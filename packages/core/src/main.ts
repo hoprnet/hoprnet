@@ -11,7 +11,7 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { keysPBM } from '@libp2p/crypto/keys'
 import type { AddressSorter, Address } from '@libp2p/interfaces/peer-store'
 
-import HoprConnect, { compareAddressesLocalMode, type PublicNodesEmitter } from '@hoprnet/hopr-connect'
+import { HoprConnect, compareAddressesLocalMode, type PublicNodesEmitter } from '@hoprnet/hopr-connect'
 import { HoprDB, PublicKey, debug } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
@@ -135,10 +135,7 @@ export async function createLibp2pInstance(
     identify: {
       protocolPrefix
     },
-    datastore,
-    config: {
-      protocolPrefix: `hopr/${options.environment.id}`
-    }
+    datastore
   })
 
   return libp2p

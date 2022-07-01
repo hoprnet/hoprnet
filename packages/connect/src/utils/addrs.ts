@@ -1,7 +1,10 @@
 import type { Multiaddr } from '@multiformats/multiaddr'
 import { CODE_IP4, CODE_IP6, CODE_P2P, CODE_CIRCUIT, CODE_TCP } from '../constants.js'
 // @ts-ignore untyped library
-import { hasher } from 'multiformats/basics'
+import { decode, Digest } from 'multiformats/hashes/digest'
+// @ts-ignore untyped library
+import { identity } from 'multiformats/hashes/identity'
+
 import { u8aEquals, u8aToNumber, u8aCompare } from '@hoprnet/hopr-utils'
 import Debug from 'debug'
 
@@ -44,17 +47,17 @@ const log = Debug('hopr-connect:addr')
  * Checks and parses a given Multihash
  * @param mh Multihash to check
  */
-function parseMultihash(mh: Uint8Array): { valid: false } | { valid: true; result: ReturnType<typeof decode> } {
-  hasher()
-  let decoded: ReturnType<typeof decode>
+function parseMultihash(mh: Uint8Array): { valid: false } | { valid: true; result: Digest } {
+  let decoded: Digest
   try {
     decoded = decode(mh)
   } catch (err) {
+    console.log(err)
     log(`address is not a valid Multihash`, err)
     return { valid: false }
   }
 
-  if (decoded.name !== MULTIHASH_TYPE || decoded.length != MULTIHASH_LENGTH) {
+  if (decoded.code != identity.code || decoded.size != MULTIHASH_LENGTH) {
     log(`address length is not ${MULTIHASH_LENGTH} bytes long or type is not ${MULTIHASH_TYPE}`)
     return { valid: false }
   }

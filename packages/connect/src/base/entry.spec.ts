@@ -1,34 +1,18 @@
 import { EntryNodes, ENTRY_NODES_MAX_PARALLEL_DIALS, RELAY_CHANGED_EVENT } from './entry.js'
-import type { PeerId } from '@libp2p/interface-peer-id'
-import assert from 'assert'
 import { createPeerId, getPeerStoreEntry } from './utils.spec.js'
+import { MAX_RELAYS_PER_NODE, OK } from '../constants.js'
+import type { PeerStoreType, PublicNodesEmitter } from '../types.js'
+
+import assert from 'assert'
 import { once, EventEmitter } from 'events'
+
+import type { PeerId } from '@libp2p/interface-peer-id'
+import type { DialOptions } from '@libp2p/interface-transport'
 import { Multiaddr } from '@multiformats/multiaddr'
 import type { Connection } from '@libp2p/interface-connection'
-
-import { MAX_RELAYS_PER_NODE, OK } from '../constants.js'
-import type { HoprConnectDialOptions, PeerStoreType, PublicNodesEmitter } from '../types.js'
-// import { defer } from '@hoprnet/hopr-utils'
-
-class FakeConnectionManager {
-  public _started: boolean
-  private connections: Map<string, Connection[]>
-
-  constructor(started = false) {
-    this._started = started
-    this.connections = new Map<string, Connection[]>()
-  }
-
-  public start() {
-    this._started = true
-  }
-
-  public getConnections(peer: PeerId | undefined): Connection[] {
-    return peer ? this.connections.get(peer.toString()) ?? [] : [...this.connections.values()][0]
-  }
-
-  public onDisconnect(_conn: Connection): void {}
-}
+import type { ConnectionManager } from '@libp2p/interface-connection-manager'
+import type { Components } from '@libp2p/interfaces/components'
+import type { AbortOptions } from '@libp2p/interfaces'
 
 /**
  * Decorated EntryNodes class that allows direct access
@@ -56,6 +40,22 @@ class TestingEntryNodes extends EntryNodes {
   }
 }
 
+function createFakeComponents(peerId: PeerId) {
+  const getPeerId = () => peerId
+
+  const getConnectionManager = () =>
+    ({
+      getConnections(_peer: PeerId | undefined, _options?: AbortOptions): Connection[] {
+        return []
+      }
+    } as ConnectionManager as Components['connectionManager'])
+
+  return {
+    getPeerId,
+    getConnectionManager
+  } as Components
+}
+
 function connectEvent(addr: string): string {
   return `connect:${addr}`
 }
@@ -74,12 +74,8 @@ function createFakeNetwork() {
     return emitter
   }
 
-  const connect = (ma: Multiaddr, opts: HoprConnectDialOptions) => {
+  const connect = (ma: Multiaddr, _opts: DialOptions) => {
     const addr = ma.toString()
-
-    if (opts.onDisconnect) {
-      network.once(disconnectEvent(addr), () => opts?.onDisconnect?.(ma))
-    }
 
     if (network.listeners(connectEvent(addr)).length >= 1) {
       network.emit(connectEvent(addr))
@@ -125,14 +121,12 @@ describe('entry node functionality', function () {
   const peerId = createPeerId()
   it('add public nodes', function () {
     const entryNodes = new TestingEntryNodes(
-      peerId,
-      {
-        connectionManager: new FakeConnectionManager(true)
-      },
-      // Make sure that call is indeed asynchronous
+      // Make sure that connect call is indeed asynchronous
       (async () => new Promise((resolve) => setImmediate(resolve))) as any,
       {}
     )
+
+    entryNodes.init(createFakeComponents(peerId))
 
     entryNodes.start()
 
@@ -155,14 +149,7 @@ describe('entry node functionality', function () {
   })
 
   it('remove an offline node', function () {
-    const entryNodes = new TestingEntryNodes(
-      peerId,
-      {
-        connectionManager: new FakeConnectionManager()
-      },
-      (async () => new Promise((resolve) => setImmediate(resolve))) as any,
-      {}
-    )
+    const entryNodes = new TestingEntryNodes((async () => new Promise((resolve) => setImmediate(resolve))) as any, {})
 
     entryNodes.start()
 
@@ -193,16 +180,9 @@ describe('entry node functionality', function () {
 
     const connectPromise = once(relayListener, 'connected')
 
-    const entryNodes = new TestingEntryNodes(
-      peerId,
-      {
-        connectionManager: new FakeConnectionManager(true)
-      },
-      network.connect as any,
-      {
-        initialNodes: [relay]
-      }
-    )
+    const entryNodes = new TestingEntryNodes(network.connect as any, { initialNodes: [relay] })
+
+    entryNodes.init(createFakeComponents(peerId))
 
     entryNodes.start()
 
@@ -246,16 +226,11 @@ describe('entry node functionality', function () {
 
     const additionalOfflineNodes = [getPeerStoreEntry(`/ip4/127.0.0.1/tcp/23`)]
 
-    const entryNodes = new TestingEntryNodes(
-      peerId,
-      {
-        connectionManager: new FakeConnectionManager(true)
-      },
-      network.connect as any,
-      {
-        initialNodes: relayNodes.map((relayNode) => relayNode[1]).concat(additionalOfflineNodes)
-      }
-    )
+    const entryNodes = new TestingEntryNodes(network.connect as any, {
+      initialNodes: relayNodes.map((relayNode) => relayNode[1]).concat(additionalOfflineNodes)
+    })
+
+    entryNodes.init(createFakeComponents(peerId))
 
     entryNodes.start()
 
@@ -290,15 +265,9 @@ describe('entry node functionality', function () {
 
     const newNodeListener = network.listen(newNode.multiaddrs[0].toString())
 
-    const entryNodes = new TestingEntryNodes(
-      peerId,
-      {
-        connectionManager: new FakeConnectionManager(true)
-      },
-      network.connect as any,
-      {}
-    )
+    const entryNodes = new TestingEntryNodes(network.connect as any, {})
 
+    entryNodes.init(createFakeComponents(peerId))
     entryNodes.start()
 
     entryNodes.uncheckedEntryNodes.push(newNode)
@@ -342,15 +311,9 @@ describe('entry node functionality', function () {
 
     const connectPromise = once(relayListener, 'connected')
 
-    const entryNodes = new TestingEntryNodes(
-      peerId,
-      {
-        connectionManager: new FakeConnectionManager(true)
-      },
-      network.connect as any,
-      {}
-    )
+    const entryNodes = new TestingEntryNodes(network.connect as any, {})
 
+    entryNodes.init(createFakeComponents(peerId))
     entryNodes.start()
 
     const fakeNode = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/2`)
@@ -380,15 +343,9 @@ describe('entry node functionality', function () {
 
     const offlineRelay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
 
-    const entryNodes = new TestingEntryNodes(
-      peerId,
-      {
-        connectionManager: new FakeConnectionManager(true)
-      },
-      network.connect as any,
-      {}
-    )
+    const entryNodes = new TestingEntryNodes(network.connect as any, {})
 
+    entryNodes.init(createFakeComponents(peerId))
     entryNodes.start()
 
     entryNodes.uncheckedEntryNodes.push(offlineRelay)
@@ -403,15 +360,9 @@ describe('entry node functionality', function () {
   })
 
   it('do not emit listening event if nothing has changed', async function () {
-    const entryNodes = new TestingEntryNodes(
-      peerId,
-      {
-        connectionManager: new FakeConnectionManager(true)
-      },
-      (async () => {}) as any,
-      {}
-    )
+    const entryNodes = new TestingEntryNodes((async () => {}) as any, {})
 
+    entryNodes.init(createFakeComponents(peerId))
     entryNodes.start()
 
     const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
@@ -446,17 +397,11 @@ describe('entry node functionality', function () {
     const relayListener = network.listen(relay.multiaddrs[0].toString())
 
     const publicNodes = new EventEmitter() as PublicNodesEmitter
-    const entryNodes = new TestingEntryNodes(
-      peerId,
-      {
-        connectionManager: new FakeConnectionManager(true)
-      },
-      network.connect as any,
-      {
-        publicNodes
-      }
-    )
+    const entryNodes = new TestingEntryNodes(network.connect as any, {
+      publicNodes
+    })
 
+    entryNodes.init(createFakeComponents(peerId))
     entryNodes.start()
 
     publicNodes.emit('addPublicNode', relay)
@@ -491,18 +436,12 @@ describe('entry node functionality', function () {
 
     const CUSTOM_DHT_RENEWAL_TIMEOUT = 100 // very short timeout
 
-    const entryNodes = new TestingEntryNodes(
-      peerId,
-      {
-        connectionManager: new FakeConnectionManager(true)
-      },
-      network.connect as any,
-      {
-        dhtRenewalTimeout: CUSTOM_DHT_RENEWAL_TIMEOUT,
-        publicNodes
-      }
-    )
+    const entryNodes = new TestingEntryNodes(network.connect as any, {
+      dhtRenewalTimeout: CUSTOM_DHT_RENEWAL_TIMEOUT,
+      publicNodes
+    })
 
+    entryNodes.init(createFakeComponents(peerId))
     entryNodes.start()
 
     publicNodes.emit('addPublicNode', relay)
@@ -519,14 +458,12 @@ describe('entry node functionality', function () {
 
   it('do not contact nodes we are already connected to', async function () {
     const entryNodes = new TestingEntryNodes(
-      peerId,
-      {
-        connectionManager: new FakeConnectionManager(true)
-      },
       // Make sure that call is indeed asynchronous
       (async () => new Promise((resolve) => setImmediate(resolve))) as any,
       {}
     )
+
+    entryNodes.init(createFakeComponents(peerId))
 
     const ma = new Multiaddr('/ip4/8.8.8.8/tcp/9091')
 

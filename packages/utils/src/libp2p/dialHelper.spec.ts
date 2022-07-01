@@ -103,17 +103,22 @@ function getConnectionManager(): ConnectionManager {
   }
 
   return {
+    dialer: {
+      dial() {
+        return Promise.resolve()
+      }
+    },
     getConnections
-  } as ConnectionManager
+  } as any // dialer is not part of interface
 }
 
 describe('test dialHelper', function () {
   it('call non-existing', async function () {
     const peerA = await getNode(Alice)
 
-    const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)
+    // components not part of interface
+    const result = await dialHelper((peerA as any).components, Bob, TEST_PROTOCOL)
 
-    console.log(result)
     assert(result.status === DialStatus.NO_DHT)
 
     // Shutdown node
@@ -125,18 +130,15 @@ describe('test dialHelper', function () {
     const peerB = await getNode(Bob)
 
     await peerA.peerStore.addressBook.add(peerB.peerId, peerB.getMultiaddrs())
-    console.log(peerB.getMultiaddrs())
 
-    const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)
+    // components not part of interface
+    const result = await dialHelper((peerA as any).components, Bob, TEST_PROTOCOL)
 
-    console.log(result)
     assert(result.status === DialStatus.SUCCESS)
 
-    // @fixme
     pipe([TEST_MESSAGE], result.resp.stream.sink)
 
     for await (const msg of result.resp.stream.source) {
-      console.log(msg, TEST_MESSAGE)
       assert(u8aEquals(msg.slice(), TEST_MESSAGE))
     }
 
@@ -147,7 +149,8 @@ describe('test dialHelper', function () {
   it('call non-existing with DHT', async function () {
     const peerA = await getNode(Alice, true)
 
-    const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)
+    // components not part of interface
+    const result = await dialHelper((peerA as any).components, Bob, TEST_PROTOCOL)
 
     assert(result.status === DialStatus.DHT_ERROR, `Must return dht error`)
 
@@ -185,7 +188,8 @@ describe('test dialHelper', function () {
 
     await new Promise((resolve) => setTimeout(resolve, 200))
 
-    let result = await dialHelper(peerA, Chris, TEST_PROTOCOL)
+    // components not part of interface
+    let result = await dialHelper((peerA as any).components, Chris, TEST_PROTOCOL)
 
     assert(result.status === DialStatus.SUCCESS, `Dial must be successful`)
 
@@ -200,21 +204,24 @@ describe('test dialHelper', function () {
   })
 
   it('DHT does not find any new addresses', async function () {
-    const peerA = {
-      dht: {
-        [Symbol.toStringTag]: 'some DHT that is not @libp2p/dummy-dht'
+    const peerAComponents = {
+      getDHT() {
+        return {
+          [Symbol.toStringTag]: 'some DHT that is not @libp2p/dummy-dht'
+        }
       },
-      contentRouting: {
-        // Returning an empty iterator
-        findProviders: () => (async function* () {})()
+      getContentRouting() {
+        return {
+          // Returning an empty iterator
+          findProviders: () => (async function* () {})()
+        }
       },
-      connectionManager: getConnectionManager(),
-      dial: () => Promise.resolve<Connection>(undefined as any),
-      peerStore: getPeerStore()
+      getConnectionManager,
+      getPeerStore
     }
 
     // Try to call Bob but does not exist
-    const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)
+    const result = await dialHelper(peerAComponents as any, Bob, TEST_PROTOCOL)
 
     // Must fail with a DHT error because we obviously can't find
     // Bob's relay address in the DHT
@@ -222,23 +229,26 @@ describe('test dialHelper', function () {
   })
 
   it('DHT throws an error', async function () {
-    const peerA = {
-      dht: {
-        [Symbol.toStringTag]: 'some DHT that is not @libp2p/dummy-dht'
+    const peerAComponents = {
+      getDHT() {
+        return {
+          [Symbol.toStringTag]: 'some DHT that is not @libp2p/dummy-dht'
+        }
       },
-      contentRouting: {
-        // Returning an empty iterator
-        findProviders: () =>
-          (async function* () {
-            throw Error(`boom`)
-          })()
+      getContentRouting() {
+        return {
+          // Returning an empty iterator
+          findProviders: () =>
+            (async function* () {
+              throw Error(`boom`)
+            })()
+        }
       },
-      dial: () => Promise.resolve<Connection>(undefined as any),
-      connectionManager: getConnectionManager(),
-      peerStore: getPeerStore()
+      getConnectionManager,
+      getPeerStore
     }
 
-    const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)
+    const result = await dialHelper(peerAComponents as any, Bob, TEST_PROTOCOL)
 
     assert(result.status === DialStatus.DHT_ERROR)
   })

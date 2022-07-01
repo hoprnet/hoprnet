@@ -119,7 +119,7 @@ export async function tryExistingConnections(
 
 /**
  * Performs a dial attempt and handles possible errors.
- * @param libp2p Libp2p instance
+ * @param components Libp2p components
  * @param destination which peer to dial
  * @param protocol which protocol to use
  * @param opts timeout options
@@ -246,6 +246,7 @@ async function doDial(
 ): Promise<DialResponse> {
   // First let's try already existing connections
   let struct = await tryExistingConnections(components, destination, protocol)
+
   if (struct) {
     log(`Successfully reached ${destination.toString()} via existing connection !`)
     return { status: DialStatus.SUCCESS, resp: struct }
@@ -268,8 +269,15 @@ async function doDial(
     log(`No currently known addresses for peer ${destination.toString()}`)
   }
 
+  let noDht = false
+  try {
+    components.getDHT()
+  } catch {
+    noDht = true
+  }
+
   // Check if DHT is available
-  if (components.getDHT()[Symbol.toStringTag] === /* catchall package of libp2p */ '@libp2p/dummy-dht') {
+  if (noDht || components.getDHT()[Symbol.toStringTag] === /* catchall package of libp2p */ '@libp2p/dummy-dht') {
     // Stop if there is no DHT available
     await printPeerStoreAddresses(
       `Could not establish a connection to ${destination.toString()} and libp2p was started without a DHT. Giving up`,

@@ -464,10 +464,6 @@ class Hopr extends EventEmitter {
       return
     }
 
-    // Total hack
-    // function cannot throw because it has a catch all
-    await this.addPeerToDHT(peer.id)
-
     const dialables = peer.multiaddrs.filter((ma: Multiaddr) => {
       const tuples = ma.tuples()
       return tuples.length > 1 && tuples[0][0] != protocols('p2p').code
@@ -488,28 +484,6 @@ class Hopr extends EventEmitter {
       this.heartbeat.recalculateNetworkHealth()
     } catch (err) {
       log(`Failed to update peer-store with new peer ${peer.id.toString()} info`, err)
-    }
-  }
-
-  /**
-   * Total hack.
-   * Libp2p seems to miss a channel that passes discovered peers
-   * to the DHT routing table.
-   * @param peer peer to add to DHT routing table
-   */
-  private async addPeerToDHT(peer: PeerId): Promise<void> {
-    try {
-      await this.libp2p._dht._wan._routingTable.add(peer)
-      await this.libp2p._dht._lan._routingTable.add(peer)
-
-      await this.libp2p._dht._wan._routingTableRefresh.start()
-      await this.libp2p._dht._lan._routingTableRefresh.start()
-
-      await this.libp2p._dht._wan.refreshRoutingTable()
-      await this.libp2p._dht._lan.refreshRoutingTable()
-    } catch (err) {
-      // Catch and log all DHT errors, entirely unclear how to handle them
-      log(`Failed while populating the DHT routing table`, err)
     }
   }
 
@@ -1311,6 +1285,6 @@ export {
   type ChannelStrategyInterface
 }
 export { resolveEnvironment, supportedEnvironments, type ResolvedEnvironment } from './environment.js'
-export { createLibp2pMock } from './libp2p.mock.js'
+// export { createLibp2pMock } from './libp2p.mock.js'
 export { sampleOptions } from './index.mock.js'
 export { CONFIRMATIONS } from '@hoprnet/hopr-core-ethereum'

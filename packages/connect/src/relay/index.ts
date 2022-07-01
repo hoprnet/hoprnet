@@ -5,12 +5,13 @@ import type { Address } from '@libp2p/interface-peer-store'
 import type { IncomingStreamData } from '@libp2p/interfaces/registrar'
 import type { Initializable, Components } from '@libp2p/interfaces/components'
 import type { Startable } from '@libp2p/interfaces/startable'
+import type { DialOptions } from '@libp2p/interface-transport'
 
 import { peerIdFromString } from '@libp2p/peer-id'
 
-import type HoprConnect from '../index.js'
+import type { HoprConnect } from '../index.js'
 
-import type { Stream, HoprConnectOptions, HoprConnectDialOptions, HoprConnectTestingOptions } from '../types.js'
+import type { Stream, HoprConnectOptions, HoprConnectTestingOptions } from '../types.js'
 
 import errCode from 'err-code'
 import debug from 'debug'
@@ -194,10 +195,11 @@ class Relay implements Initializable, ConnectInitializable, Startable {
   public async connect(
     relay: PeerId,
     destination: PeerId,
-    options?: HoprConnectDialOptions
+    options?: DialOptions
   ): Promise<MultiaddrConnection | undefined> {
     const baseConnection = await this.dialNodeDirectly(relay, RELAY_PROTCOL(this.options.environment), {
-      signal: options?.signal
+      signal: options?.signal,
+      upgrader: undefined as any
     }).catch(error)
 
     if (baseConnection == undefined) {
@@ -236,12 +238,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     return conn
   }
 
-  private upgradeOutbound(
-    relay: PeerId,
-    destination: PeerId,
-    stream: Stream,
-    opts?: HoprConnectDialOptions
-  ): MultiaddrConnection {
+  private upgradeOutbound(relay: PeerId, destination: PeerId, stream: Stream, opts?: DialOptions): MultiaddrConnection {
     if (!!this.testingOptions.__noWebRTCUpgrade) {
       return new RelayConnection({
         stream,
@@ -269,6 +266,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
       return new WebRTCConnection(newConn, channel, {
         __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade,
+        upgrader: undefined as any,
         ...opts
       }) as MultiaddrConnection
     }
@@ -301,7 +299,8 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       })
 
       return new WebRTCConnection(newConn, channel, {
-        __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade
+        __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade,
+        upgrader: undefined as any
       })
     }
   }
@@ -427,7 +426,8 @@ class Relay implements Initializable, ConnectInitializable, Startable {
           .getUpgrader()
           .upgradeInbound(
             new WebRTCConnection(newStream, newStream.webRTC!.channel, {
-              __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade
+              __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade,
+              upgrader: undefined as any
             }) as MultiaddrConnection
           )
       }
@@ -464,7 +464,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
   private async dialNodeDirectly(
     destination: PeerId,
     protocol: string,
-    opts?: HoprConnectDialOptions
+    opts?: DialOptions
   ): Promise<ConnResult | void> {
     let connResult = await tryExistingConnections(this.getComponents(), destination, protocol)
 
@@ -489,7 +489,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
   private async establishDirectConnection(
     destination: PeerId,
     protocol: string,
-    opts?: HoprConnectDialOptions
+    opts?: DialOptions
   ): Promise<ConnResult | undefined> {
     const usableAddresses: Multiaddr[] = []
 
@@ -512,7 +512,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
     for (const usable of usableAddresses) {
       try {
-        conn = await this.dialDirectly(usable, opts)
+        conn = await this.dialDirectly(usable, opts as any)
       } catch (err) {
         await attemptClose(conn, error)
         continue

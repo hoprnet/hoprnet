@@ -158,7 +158,8 @@ describe('test TCP connection', function () {
       new Multiaddr(`/ip4/127.0.0.1/tcp/${(server.address() as AddressInfo).port}`),
       peerId,
       {
-        signal: abort.signal
+        signal: abort.signal,
+        upgrader: undefined as any
       }
     )
 

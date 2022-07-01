@@ -94,50 +94,61 @@ function getFakeLibp2p(
     | undefined
 ) {
   return {
-    dial(destination: PeerId, ..._opts: any[]): Promise<Connection> {
-      return Promise.resolve<Connection>({
-        newStream: (protocol: string) =>
-          Promise.resolve({
-            stream: {
-              sink: async (source: AsyncIterable<Uint8Array>) => {
-                for await (const msg of source) {
-                  if (messages?.msgToReceive && u8aEquals(Uint8Array.from(msg.slice()), messages.msgToReceive)) {
-                    state?.msgReceived?.resolve()
-                  } else {
-                    state?.msgReceived?.reject()
-                  }
+    components: {
+      getConnectionManager() {
+        return {
+          getConnections: () => {
+            return []
+          },
+          dialer: {
+            dial(destination: PeerId, ..._opts: any[]): Promise<Connection> {
+              return Promise.resolve<Connection>({
+                newStream: (protocol: string) =>
+                  Promise.resolve({
+                    stream: {
+                      sink: async (source: AsyncIterable<Uint8Array>) => {
+                        for await (const msg of source) {
+                          if (
+                            messages?.msgToReceive &&
+                            u8aEquals(Uint8Array.from(msg.slice()), messages.msgToReceive)
+                          ) {
+                            state?.msgReceived?.resolve()
+                          } else {
+                            state?.msgReceived?.reject()
+                          }
 
-                  await new Promise((resolve) => setTimeout(resolve, 50))
-                  state?.waitUntilSend?.resolve()
-                }
-              },
-              source: (async function* () {
-                state?.waitUntilSend && (await state.waitUntilSend.promise)
+                          await new Promise((resolve) => setTimeout(resolve, 50))
+                          state?.waitUntilSend?.resolve()
+                        }
+                      },
+                      source: (async function* () {
+                        state?.waitUntilSend && (await state.waitUntilSend.promise)
 
-                if (messages.msgToReplyWith) {
-                  yield new BL(Buffer.from(messages.msgToReplyWith))
-                }
-              })()
-            } as any,
-            protocol
-          }),
-        remotePeer: destination
-      } as Connection)
-    },
-    peerStore: {
-      addressBook: {
-        get(_peer: PeerId) {
-          return [
-            {
-              multiaddr: new Multiaddr(`/ip4/1.2.3.4/`)
+                        if (messages.msgToReplyWith) {
+                          yield new BL(Buffer.from(messages.msgToReplyWith))
+                        }
+                      })()
+                    } as any,
+                    protocol
+                  }),
+                remotePeer: destination
+              } as Connection)
             }
-          ]
+          }
         }
-      }
-    },
-    connectionManager: {
-      getConnections: () => {
-        return []
+      },
+      getPeerStore() {
+        return {
+          addressBook: {
+            get(_peer: PeerId) {
+              return [
+                {
+                  multiaddr: new Multiaddr(`/ip4/1.2.3.4/`)
+                }
+              ]
+            }
+          }
+        }
       }
     }
   }

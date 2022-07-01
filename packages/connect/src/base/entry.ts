@@ -4,7 +4,7 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Initializable, Components } from '@libp2p/interfaces/components'
 import type { Startable } from '@libp2p/interfaces/startable'
 import type { Multiaddr } from '@multiformats/multiaddr'
-import type HoprConnect from '../index.js'
+import type { HoprConnect } from '../index.js'
 import { peerIdFromBytes } from '@libp2p/peer-id'
 
 import errCode from 'err-code'
@@ -490,7 +490,11 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
     let conn: Connection | undefined
     try {
-      conn = await this.dialDirectly(destinationAddress, { signal: abort.signal, onDisconnect })
+      conn = await this.dialDirectly(destinationAddress, {
+        signal: abort.signal,
+        upgrader: undefined as any,
+        onDisconnect
+      })
     } catch (err: any) {
       error(`error while contacting entry node ${destination.toString()}.`, err.message)
       await attemptClose(conn, error)
@@ -538,7 +542,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
     let conn = await tryExistingConnections(this.getComponents(), id, CAN_RELAY_PROTCOL(this.options.environment))
 
-    if (!conn) {
+    if (conn == null) {
       conn = await this.establishNewConnection(
         id,
         relay,
@@ -547,7 +551,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       )
     }
 
-    if (conn == undefined) {
+    if (conn == null) {
       return {
         entry: {
           id,
