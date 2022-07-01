@@ -3444,6 +3444,7 @@ __metadata:
     chai-spies: 1.0.0
     chalk: 5.0.1
     debug: 4.3.4
+    err-code: 3.0.1
     heap-js: 2.1.6
     it-handshake: 4.0.0
     it-pair: 2.0.2
@@ -3467,6 +3468,7 @@ __metadata:
   dependencies:
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
+    "@libp2p/crypto": 1.0.0
     "@libp2p/interface-peer-id": 1.0.2
     "@libp2p/peer-id": 1.1.13
     "@multiformats/multiaddr": 10.2.1
@@ -3501,6 +3503,7 @@ __metadata:
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum"
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
+    "@libp2p/crypto": 1.0.0
     "@libp2p/interface-peer-id": 1.0.2
     "@libp2p/kad-dht": 1.0.16
     "@libp2p/mplex": 1.2.1
@@ -3518,6 +3521,7 @@ __metadata:
     chalk: 5.0.1
     datastore-level: ^8.0.0
     debug: 4.3.4
+    err-code: 3.0.1
     heap-js: 2.1.6
     leveldown: 6.1.1
     levelup: 5.1.1
@@ -11610,17 +11614,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"err-code@npm:3.0.1, err-code@npm:^3.0.0, err-code@npm:^3.0.1":
+  version: 3.0.1
+  resolution: "err-code@npm:3.0.1"
+  checksum: aede1f1d5ebe6d6b30b5e3175e3cc13e67de2e2e1ad99ce4917e957d7b59e8451ed10ee37dbc6493521920a47082c479b9097e5c39438d4aff4cc84438568a5a
+  languageName: node
+  linkType: hard
+
 "err-code@npm:^2.0.2":
   version: 2.0.3
   resolution: "err-code@npm:2.0.3"
   checksum: 8b7b1be20d2de12d2255c0bc2ca638b7af5171142693299416e6a9339bd7d88fc8d7707d913d78e0993176005405a236b066b45666b27b797252c771156ace54
-  languageName: node
-  linkType: hard
-
-"err-code@npm:^3.0.0, err-code@npm:^3.0.1":
-  version: 3.0.1
-  resolution: "err-code@npm:3.0.1"
-  checksum: aede1f1d5ebe6d6b30b5e3175e3cc13e67de2e2e1ad99ce4917e957d7b59e8451ed10ee37dbc6493521920a47082c479b9097e5c39438d4aff4cc84438568a5a
   languageName: node
   linkType: hard
 
