@@ -155,7 +155,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
    */
   public stop(): void {
     if (!this._isStarted) {
-      throw Error(`Could not stop module because it is not yet started.`)
+      return
     }
 
     this.stopKeepAlive?.()

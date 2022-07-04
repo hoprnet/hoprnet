@@ -156,7 +156,7 @@ class HoprConnect implements Transport, Initializable, Startable {
   }
 
   public async stop(): Promise<void> {
-    return Promise.resolve()
+    await this.getConnectComponents().stop()
   }
 
   /**

@@ -158,7 +158,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    */
   public stop() {
     if (!this._isStarted) {
-      throw Error(`Could not stop module because it is not yet started.`)
+      return
     }
 
     if (this.options.publicNodes != undefined && this._onNewRelay != undefined && this._onRemoveRelay != undefined) {

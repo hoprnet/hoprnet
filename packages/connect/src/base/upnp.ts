@@ -71,6 +71,10 @@ export class UpnpManager implements Startable {
    * @returns a promise that resolves once done
    */
   async stop(): Promise<void> {
+    if (!this._isStarted) {
+      return
+    }
+
     await new Promise<void>((resolve) => this.client.destroy(resolve))
 
     this._isStarted = false
