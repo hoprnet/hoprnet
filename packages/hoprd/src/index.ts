@@ -18,7 +18,7 @@ const argv = yargs
   })
   .option('provider', {
     describe: 'A provider url for the Network you specified',
-    default: 'wss://rpc.xdaichain.com/wss'
+    default: 'wss://rpc.gnosischain.com/wss'
   })
   .option('host', {
     describe: 'The network host to run the HOPR node on.',
