@@ -30,6 +30,7 @@ const txRequest = {
   data: '0x0',
   value: 0,
   nonce: 0,
+  gasLimit: BigNumber.from(400e3),
   maxPriorityFeePerGas: utils.parseUnits('1', 'gwei'),
   maxFeePerGas: utils.parseUnits('1', 'gwei')
 }

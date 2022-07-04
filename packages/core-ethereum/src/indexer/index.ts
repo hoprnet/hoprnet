@@ -38,7 +38,7 @@ import {
   IndexerStatus
 } from './types.js'
 import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils.js'
-import { Contract, errors } from 'ethers'
+import { BigNumber, Contract, errors } from 'ethers'
 import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants.js'
 import type { TypedEvent, TypedEventFilter } from '@hoprnet/hopr-ethereum'
 
@@ -392,18 +392,23 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         )
       ) {
         log(chalk.blue('code error falls here', this.chain.getAllQueuingTransactionRequests().length))
-        if (this.chain.getAllQueuingTransactionRequests().length > 0) {
-          await retryWithBackoff(
-            () =>
-              Promise.allSettled([
-                ...this.chain
-                  .getAllQueuingTransactionRequests()
-                  .map((request) => this.chain.sendTransaction(request as string)),
-                this.restart()
-              ]),
-            backoffOption
-          )
-        }
+        // allow the indexer to restart even there is no transaction in queue
+        await retryWithBackoff(
+          () =>
+            Promise.allSettled([
+              ...this.chain.getAllQueuingTransactionRequests().map((request) => {
+                // convert TransactionRequest to signed transaction and send out
+                return this.chain.sendTransaction(
+                  true,
+                  { to: request.to, value: request.value as BigNumber, data: request.data as string },
+                  // the transaction is resolved without the specific tag for its action, but rather as a result of provider retry
+                  (txHash: string) => this.resolvePendingTransaction(`on-provider-error-${txHash}`, txHash)
+                )
+              }),
+              this.restart()
+            ]),
+          backoffOption
+        )
       } else {
         await retryWithBackoff(() => this.restart(), backoffOption)
       }
@@ -515,6 +520,42 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     }
 
     await this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot, blocking)
+
+    // resend queuing transactions, when there are transactions (in queue) that haven't been accepted by the RPC
+    // and resend transactions if the current balance is sufficient.
+
+    const allQueuingTxs = this.chain.getAllQueuingTransactionRequests()
+    if (allQueuingTxs.length > 0) {
+      const minimumBalanceForQueuingTxs = allQueuingTxs.reduce(
+        (acc, queuingTx) =>
+          // to get the minimum balance required to resend a queuing transaction,
+          // use the gasLimit (that shouldn't change, unless the contract state is different)
+          // multiplies the maxFeePerGas of the queuing transaction
+          acc.add(new BN(queuingTx.gasLimit.toString()).mul(new BN(queuingTx.maxFeePerGas.toString()))),
+        new BN(0)
+      )
+      const currentBalance = await this.chain.getNativeBalance(this.address)
+      if (
+        // compare the current balance with the minimum balance required at the time of transaction being queued.
+        // NB: Both gasLimit and maxFeePerGas requirement may be different due to "drastic" changes in contract state and network condition
+        currentBalance.toBN().gte(minimumBalanceForQueuingTxs)
+      ) {
+        try {
+          await Promise.all(
+            allQueuingTxs.map((request) => {
+              // convert TransactionRequest to signed transaction and send out
+              return this.chain.sendTransaction(
+                true,
+                { to: request.to, value: request.value as BigNumber, data: request.data as string },
+                (txHash: string) => this.resolvePendingTransaction(`on-new-block-${txHash}`, txHash)
+              )
+            })
+          )
+        } catch (err) {
+          log(`error: failed to send queuing transaction on new block`, err)
+        }
+      }
+    }
 
     try {
       await this.db.updateLatestBlockNumber(new BN(blockNumber))
