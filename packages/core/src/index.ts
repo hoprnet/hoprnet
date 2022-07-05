@@ -65,6 +65,7 @@ import { Packet } from './messages/index.js'
 import type { ResolvedEnvironment } from './environment.js'
 import { createLibp2pInstance } from './main.js'
 import { supportedKeys } from '@libp2p/crypto/keys'
+import type { EventEmitter as Libp2pEmitter } from '@libp2p/interfaces/events'
 
 const DEBUG_PREFIX = `hopr-core`
 const log = debug(DEBUG_PREFIX)
@@ -127,6 +128,13 @@ export type HoprOptions = {
     // external IP
     // default: false
     noUPNP?: boolean
+    // Use mocked libp2p instance instead of real one
+    useMockedLibp2p?: boolean
+    // When using mocked libp2p instance, use existing mocked
+    // DHT to simulate decentralized networks
+    mockedDHT?: Map<string, string[]>
+    // When using mocked libp2p instances
+    mockedNetwork?: Libp2pEmitter<any>
   }
 }
 
@@ -176,8 +184,11 @@ class Hopr extends EventEmitter {
    *
    * @constructor
    *
+   * @param id PeerId to use, determines node address
+   * @param db used to persist protocol state
+   * @param connector an instance of the blockchain wrapper
    * @param options
-   * @param provider
+   * @param publicNodesEmitter used to pass information about newly announced nodes to transport module
    */
   public constructor(
     private id: PeerId,
@@ -1295,5 +1306,5 @@ export {
   type ChannelStrategyInterface
 }
 export { resolveEnvironment, supportedEnvironments, type ResolvedEnvironment } from './environment.js'
-// export { createLibp2pMock } from './libp2p.mock.js'
+export { sampleOptions } from './index.mock.js'
 export { CONFIRMATIONS } from '@hoprnet/hopr-core-ethereum'
