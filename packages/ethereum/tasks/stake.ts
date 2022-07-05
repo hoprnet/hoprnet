@@ -61,13 +61,11 @@ async function main(
           devNFTIndex = index
         }
       } catch (error) {
-        // // reaching the end of nft index array storage: panic code 0x32 (Array accessed at an out-of-bounds or negative index
-        // if (`${error}`.match(/0x32/g) || `${error}`.match(/cannot estimate gas/g)) {
-        //   loopCompleted = true
-        // } else {
+        // reaching the end of nft index array storage: panic code 0x32 (Array accessed at an out-of-bounds or negative index
+        if (!(`${error}`.match(/0x32/g) || `${error}`.match(/cannot estimate gas/g))) {
           console.error(`Error in checking HoprBoost types. ${error}`)
-        // }
-        process.exit(1)
+        }
+        loopCompleted = true
       }
       index++
     }
@@ -75,8 +73,7 @@ async function main(
     if (!devNFTIndex) {
       console.error(`Cannot find Dev NFT index when staking.`)
       process.exit(1)
-    } else 
-    
+    } 
 
     if (hasStaked) {
       // Caller has staked Dev NFT, no need to repeat the process.
