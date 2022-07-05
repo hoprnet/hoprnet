@@ -119,6 +119,7 @@ ___
 | `boost_contract_address` | `string` |
 | `channel_contract_deploy_block` | `number` |
 | `channels_contract_address` | `string` |
+| `environment_type` | `EnvironmentType` |
 | `id` | `string` |
 | `network` | `NetworkOptions` |
 | `network_registry_contract_address` | `string` |
@@ -129,7 +130,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/environment.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L39)
+[packages/core/src/environment.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L46)
 
 ___
 
