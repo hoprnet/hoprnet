@@ -3504,7 +3504,9 @@ __metadata:
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@libp2p/crypto": 1.0.0
+    "@libp2p/interface-content-routing": 1.0.2
     "@libp2p/interface-peer-id": 1.0.2
+    "@libp2p/interface-registrar": 1.1.0
     "@libp2p/kad-dht": 1.0.16
     "@libp2p/mplex": 1.2.1
     "@libp2p/peer-id": 1.1.13
@@ -3889,6 +3891,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@libp2p/interface-content-routing@npm:1.0.2":
+  version: 1.0.2
+  resolution: "@libp2p/interface-content-routing@npm:1.0.2"
+  dependencies:
+    "@libp2p/interface-peer-info": ^1.0.0
+    "@libp2p/interfaces": ^3.0.0
+    multiformats: ^9.6.3
+  checksum: 205ad6165dcf2a8fc1b4d416eca94c667d43acddb40ade756dea77511631e996b66850579e28e421e1929145a053b8d96b0ce9978c252540c2a39b30f50085b6
+  languageName: node
+  linkType: hard
+
 "@libp2p/interface-keys@npm:1.0.3, @libp2p/interface-keys@npm:^1.0.2":
   version: 1.0.3
   resolution: "@libp2p/interface-keys@npm:1.0.3"
@@ -3944,6 +3957,16 @@ __metadata:
   dependencies:
     "@libp2p/interface-peer-id": ^1.0.0
   checksum: 909f4842ff4e25fbd8bdd93c954595c4e1acc1a4791e503a023545f7f9a70c75feebcd69a9edd3f1994a13aa2698a63d2b718dee1c82e6d78677a4ce7cdc1c85
+  languageName: node
+  linkType: hard
+
+"@libp2p/interface-registrar@npm:1.1.0":
+  version: 1.1.0
+  resolution: "@libp2p/interface-registrar@npm:1.1.0"
+  dependencies:
+    "@libp2p/interface-connection": ^1.0.0
+    "@libp2p/interface-peer-id": ^1.0.0
+  checksum: 5353328d32f85519dfa0636d7542ad5e57fe4624020c827682fa79c14b9eb6dbea9c2c27b3caa44292fa45e9a98cde50907006a9a31896787db88eeb713fe9cc
   languageName: node
   linkType: hard
 
@@ -7327,9 +7350,9 @@ __metadata:
   linkType: hard
 
 "async@npm:^3.2.0":
-  version: 3.2.3
-  resolution: "async@npm:3.2.3"
-  checksum: c4bee57ab2249af3dc83ca3ef9acfa8e822c0d5e5aa41bae3eaf7f673648343cd64ecd7d26091ffd357f3f044428b17b5f00098494b6cf8b6b3e9681f0636ca1
+  version: 3.2.4
+  resolution: "async@npm:3.2.4"
+  checksum: 43d07459a4e1d09b84a20772414aa684ff4de085cbcaec6eea3c7a8f8150e8c62aa6cd4e699fe8ee93c3a5b324e777d34642531875a0817a35697522c1b02e89
   languageName: node
   linkType: hard
 
