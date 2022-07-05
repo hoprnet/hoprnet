@@ -11,6 +11,7 @@ import {
   CHARLIE_PEER_ID
 } from '../../fixtures.js'
 import { STATUS_CODES } from '../../utils.js'
+import type { PeerId } from '@libp2p/interface-peer-id'
 
 const ALICE_ENTRY = {
   id: ALICE_PEER_ID,
@@ -77,13 +78,18 @@ const CHARLIE_PEER_INFO = {
 let node = sinon.fake() as any
 node.getConnectedPeers = sinon.fake.returns([ALICE_PEER_ID, BOB_PEER_ID, CHARLIE_PEER_ID])
 node.getAddressesAnnouncedOnChain = sinon.fake.resolves([ALICE_MULTI_ADDR, BOB_MULTI_ADDR])
-node.getConnectionInfo = sinon.stub()
-// we must use `sinon.match.has` as passing the plain PeerId in `withArgs` fails to work
-node.getConnectionInfo.withArgs(sinon.match.has('_idB58String', ALICE_PEER_ID.toString())).returns(ALICE_ENTRY)
-node.getConnectionInfo.withArgs(sinon.match.has('_idB58String', BOB_PEER_ID.toString())).returns(BOB_ENTRY)
-node.getConnectionInfo.withArgs(sinon.match.has('_idB58String', CHARLIE_PEER_ID.toString())).returns(CHARLIE_ENTRY)
+node.getConnectionInfo = (peer: PeerId) => {
+  switch (peer.toString()) {
+    case ALICE_PEER_ID.toString():
+      return ALICE_ENTRY
+    case BOB_PEER_ID.toString():
+      return BOB_ENTRY
+    case CHARLIE_PEER_ID.toString():
+      return CHARLIE_ENTRY
+  }
+}
 
-describe('GET /node/peers', function () {
+describe.only('GET /node/peers', function () {
   let service: any
   before(async function () {
     const loaded = await createTestApiInstance(node)
