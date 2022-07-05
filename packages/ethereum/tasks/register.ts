@@ -111,7 +111,7 @@ async function main(
       throw Error(`Task "${opts.task}" not available.`)
     }
   } catch (error) {
-    console.error('Failed to add account with error:', error)
+    console.error('Failed to interact with network registry with error:', error)
     process.exit(1)
   }
 }
