@@ -15,6 +15,7 @@ export const getHoprStakeContractName = (latestBlockTimestamp: number): string =
 }
 
 export const DEV_NFT_BOOST = 0
+export const DEV_NFT_TYPE = 'Dev'
 
 export const CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES = [
   '0x6c150A63941c6d58a2f2687a23d5a8E0DbdE181C', // nat_with_stake

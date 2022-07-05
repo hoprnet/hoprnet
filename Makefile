@@ -93,6 +93,7 @@ endif
 	HOPR_ENVIRONMENT_ID="$(environment)" \
 		yarn workspace @hoprnet/hopr-ethereum run hardhat stake \
 		--network goerli \
+		--type xhopr \
 		--amount 1000000000000000000000 \
 		--privatekey "$(privkey)"
 
