@@ -86,13 +86,13 @@ async function main(
     // check if the signer has Dev NFT
     const boostNFTBalance = await hoprBoost.balanceOf(signerAddress);
     let nftFound = false
-    let nftFindingIndex = 0
-    let ownedNFTTokenId = 0
+    let nftFindingIndex = ethers.constants.Zero
+    let ownedNFTTokenId = ethers.constants.Zero
 
-    while (nftFindingIndex < boostNFTBalance && !nftFound) {
-      ownedNFTTokenId = await hoprBoost.tokenOfOwnerByIndex(nftFindingIndex)
+    while (nftFindingIndex.lt(boostNFTBalance) && !nftFound) {
+      ownedNFTTokenId = await hoprBoost.tokenOfOwnerByIndex(signerAddress, nftFindingIndex)
       const ownedNFTType = await hoprBoost.typeIndexOf(ownedNFTTokenId)
-      if (ownedNFTType === devNFTIndex) {
+      if (ownedNFTType.eq(devNFTIndex)) {
         nftFound = true
       }
     }
