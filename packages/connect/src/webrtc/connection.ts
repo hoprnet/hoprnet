@@ -139,7 +139,7 @@ class WebRTCConnection implements MultiaddrConnection {
     sinkCreator.catch((err) => this.error('sink error thrown before sink attach', err.message))
     this.verbose(`!!! sinkFunction`)
 
-    setTimeout(this.onWebRTCError.bind(this), WEBRTC_UPGRADE_TIMEOUT)
+    setTimeout(this.onWebRTCError.bind(this), WEBRTC_UPGRADE_TIMEOUT).unref()
   }
 
   /**

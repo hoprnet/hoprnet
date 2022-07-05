@@ -58,6 +58,8 @@
   },
   "devDependencies": {
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum",
+    "@libp2p/interface-content-routing": "1.0.2",
+    "@libp2p/interface-registrar": "1.1.0",
     "@libp2p/tcp": "1.0.11",
     "@types/chai-as-promised": "7.1.5",
     "@types/mocha": "9.1.0",

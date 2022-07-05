@@ -3456,6 +3456,7 @@ __metadata:
     nat-api: 0.3.1
     simple-peer: 9.11.1
     stream-to-it: 0.2.4
+    typescript: 4.7.4
     webrtc-stun: 3.0.0
     wrtc: 0.4.7
     yargs: 17.5.1
@@ -3655,6 +3656,7 @@ __metadata:
     sinon: 12.0.1
     typedoc: 0.22.13
     typedoc-plugin-markdown: 3.11.14
+    typescript: 4.7.4
   languageName: unknown
   linkType: soft
 
