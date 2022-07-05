@@ -2,10 +2,9 @@ import { HardhatRuntimeEnvironment } from 'hardhat/types'
 import { DeployFunction } from 'hardhat-deploy/types'
 import type { HoprBoost, ERC677Mock } from '../src/types'
 import { utils } from 'ethers'
-import { CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES, DEV_NFT_BOOST, MIN_STAKE } from '../utils/constants'
+import { CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES, DEV_NFT_BOOST, DEV_NFT_TYPE, MIN_STAKE } from '../utils/constants'
 import type { HoprStakingProxyForNetworkRegistry } from '../src/types'
 
-const DEV_NFT_TYPE = 'Dev'
 const NUM_DEV_NFT = 3
 const DUMMY_NFT_TYPE = 'Dummy'
 const DUMMY_NFT_BOOST = 10
@@ -32,7 +31,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // get max blocked nft type index
   const blockNftTypeMax = blockedNftTypes.reduce((a, b) => Math.max(a, b))
   // get nft types created in the HoprBoost contract
-  let devNftIndex = null
+  let devNftIndex: number | null = null
   let loopCompleted = false
   let index = 0
   // loop through the array storage and record the length and dev nft index, if any
