@@ -54,7 +54,9 @@
       "xhopr_contract_address": "0x552aBf0EBCd6B6162519132A831C181f87e46874",
       "boost_contract_address": "0x20d7182F9f16E0eda619bBe1Fe8732169B90fab5",
       "network_registry_proxy_contract_address": "0x29f0f5d69Eae4B1A16Ffa82DD3f8EAe965F2Ba6F",
-      "tags": ["development"]
+      "tags": [
+        "development"
+      ]
     },
     "tuttlingen": {
       "environment_type": "production",
@@ -127,7 +129,6 @@
       "hardhat_deploy_gas_price": "2 gwei",
       "max_fee_per_gas": "1 gwei",
       "max_priority_fee_per_gas": "2 gwei",
-      "gas_limit": "auto",
       "default_provider": "http://127.0.0.1:8545/",
       "native_token_name": "ETH",
       "hopr_token_name": "wxHOPR"
@@ -139,7 +140,6 @@
       "hardhat_deploy_gas_price": "2 gwei",
       "max_fee_per_gas": "10 gwei",
       "max_priority_fee_per_gas": "2 gwei",
-      "gas_limit": 400000,
       "default_provider": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
       "native_token_name": "xDAI",
       "hopr_token_name": "wxHOPR"
@@ -151,7 +151,6 @@
       "hardhat_deploy_gas_price": "1 gwei",
       "max_fee_per_gas": "10 gwei",
       "max_priority_fee_per_gas": "2 gwei",
-      "gas_limit": 400000,
       "default_provider": "https://provider-proxy.hoprnet.workers.dev/eth_goerli",
       "etherscan_api_url": "http://api-goerli.etherscan.io/api",
       "native_token_name": "gETH",

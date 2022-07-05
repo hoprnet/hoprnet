@@ -23,15 +23,11 @@ async function main(
 ): Promise<void> {
   const hoprNetworkRegistryAddress = (await deployments.get('HoprNetworkRegistry')).address
 
-  // we use a custom ethers provider here instead of the ethers object from the
-  // hre which is managed by hardhat-ethers, because that one seems to
-  // run its own in-memory hardhat instance, which is undesirable
-  const provider = new ethers.providers.JsonRpcProvider()
   let signer: Signer
   if (!opts.privatekey) {
-    signer = provider.getSigner()
+    signer = ethers.provider.getSigner()
   } else {
-    signer = new Wallet(opts.privatekey, provider)
+    signer = new Wallet(opts.privatekey, ethers.provider)
   }
   const signerAddress = await signer.getAddress()
 

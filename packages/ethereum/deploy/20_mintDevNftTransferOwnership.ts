@@ -1,6 +1,6 @@
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
 import { DeployFunction } from 'hardhat-deploy/types'
-import type { HoprBoost, HoprToken } from '../src/types'
+import type { HoprBoost, ERC677Mock } from '../src/types'
 import { utils } from 'ethers'
 import { CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES, DEV_NFT_BOOST, MIN_STAKE } from '../utils/constants'
 import type { HoprStakingProxyForNetworkRegistry } from '../src/types'
@@ -118,26 +118,16 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
     try {
       // mint minimum stake to addresses that will stake and are binded to nodes in NR
-      const tokenContract = await deployments.get('HoprToken')
-      const hoprToken = (await ethers.getContractFactory('HoprToken')).attach(tokenContract.address) as HoprToken
+      const tokenContract = await deployments.get('xHoprMock')
+      const hoprToken = (await ethers.getContractFactory('ERC677Mock')).attach(tokenContract.address) as ERC677Mock
 
-      const mintTx1 = await hoprToken.mint(
-        CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0],
-        MIN_STAKE,
-        ethers.constants.HashZero,
-        ethers.constants.HashZero
-      )
+      const mintTx1 = await hoprToken.batchMintInternal([CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0]], MIN_STAKE)
       // don't wait when using local hardhat because its using auto-mine
       if (!environment.match('hardhat')) {
         await ethers.provider.waitForTransaction(mintTx1.hash, 2)
       }
 
-      const mintTx2 = await hoprToken.mint(
-        CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[2],
-        MIN_STAKE,
-        ethers.constants.HashZero,
-        ethers.constants.HashZero
-      )
+      const mintTx2 = await hoprToken.batchMintInternal([CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[2]], MIN_STAKE)
       // don't wait when using local hardhat because its using auto-mine
       if (!environment.match('hardhat')) {
         await ethers.provider.waitForTransaction(mintTx2.hash, 2)

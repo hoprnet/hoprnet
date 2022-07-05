@@ -155,9 +155,13 @@ else
 fi
 
 # This can be called always, because the "stake" task is idempotent given the same arguments
+declare staking_index=0
 for staking_addr in "${!staking_addrs_dict[@]}" ; do
   fund_if_empty "${staking_addr}" "${environment}"
+  # we only stake funds
+  #if [ staking_index ]
   make -C "${mydir}/.." stake-funds privkey="${staking_addrs_dict[${staking_addr}]}" environment="${environment}"
+  #staking_index+=1
 done
 
 # Get names of all instances in this cluster

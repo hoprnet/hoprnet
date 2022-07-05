@@ -11,7 +11,7 @@ export type StakeOpts = {
  */
 async function main(
   opts: StakeOpts,
-  { ethers, deployments, environment, network }: HardhatRuntimeEnvironment,
+  { ethers, deployments, environment }: HardhatRuntimeEnvironment,
   _runSuper: RunSuperFunction<any>
 ) {
   if (environment == undefined) {
@@ -22,16 +22,11 @@ async function main(
   const tokenContract = await deployments.get('xHoprMock')
   const stakingContract = await deployments.get('HoprStake')
 
-  // we use a custom ethers provider here instead of the ethers object from the
-  // hre which is managed by hardhat-ethers, because that one seems to
-  // run its own in-memory hardhat instance, which is undesirable
-  const provider = new ethers.providers.JsonRpcProvider(network.config.url)
-
   let signer: Signer
   if (!opts.privatekey) {
-    signer = provider.getSigner()
+    signer = ethers.provider.getSigner()
   } else {
-    signer = new Wallet(opts.privatekey, provider)
+    signer = new Wallet(opts.privatekey, ethers.provider)
   }
   const signerAddress = await signer.getAddress()
 
@@ -42,26 +37,27 @@ async function main(
     .connect(signer)
     .attach(stakingContract.address)
 
-  const balanceNativeToken = await provider.getBalance(signerAddress)
-  let balanceHoprToken: number
+  const balanceNativeToken = await ethers.provider.getBalance(signerAddress)
+  let balanceHoprToken
   try {
     balanceHoprToken = await hoprToken.balanceOf(signerAddress)
   } catch (_) {
-    balanceHoprToken = 0
+    balanceHoprToken = ethers.constants.Zero
   }
   console.log(`Account ${signerAddress} has ${balanceHoprToken} HOPR tokens`)
   console.log(`Account ${signerAddress} has ${balanceNativeToken} native tokens`)
 
-  if (balanceNativeToken <= 0) {
+  if (balanceNativeToken.lte(0)) {
     console.log(`Account ${signerAddress} does not have enough native tokens to proceed`)
     process.exit(1)
   }
 
-  let stakedAmount: number = 0
+  let stakedAmount
   try {
-    stakedAmount = (await hoprStake.stakedHoprTokens(signerAddress)).toString()
+    stakedAmount = await hoprStake.stakedHoprTokens(signerAddress)
     console.log(`Account ${signerAddress} has staked ${stakedAmount}.`)
   } catch (_) {
+    stakedAmount = ethers.constants.Zero
     console.log(`Account ${signerAddress} has not staked anything yet`)
   }
 

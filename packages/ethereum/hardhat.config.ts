@@ -86,8 +86,7 @@ function networkToHardhatNetwork(name: String, input: NetworkOptions): NetworkUs
     live: input.live,
     tags: input.tags,
     // used by hardhat-deploy
-    saveDeployments: true,
-    gas: input.gas_limit || 'auto'
+    saveDeployments: true
   }
 
   if (name !== 'hardhat') {
