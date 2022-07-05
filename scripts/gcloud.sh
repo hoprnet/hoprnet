@@ -49,10 +49,13 @@ wait_until_node_is_ready() {
 }
 
 # Get external IP for running node or die
-# $1 - VM name
+# $1 - VM instance uri
 gcloud_get_ip() {
-  local vm_name="${1}"
-  gcloud compute instances list | grep "${vm_name}" | awk '{ print $5 }'
+  local instance_uri="${1}"
+
+  gcloud compute instances describe ${instance_uri} \
+    --flatten 'networkInterfaces[].accessConfigs[]' \
+    --format 'csv[no-heading](networkInterfaces.accessConfigs.natIP)'
 }
 
 # $1=VM name
@@ -328,9 +331,7 @@ gcloud_create_or_update_managed_instance_group() {
   log "reserve all external addresses of the instance group ${name} instances"
   for instance_uri in $(gcloud compute instance-groups list-instances "${name}" ${gcloud_region} --uri); do
     local instance_name=$(gcloud compute instances describe ${instance_uri} --format 'csv[no-heading](name)')
-    local instance_ip=$(gcloud compute instances describe ${instance_uri} \
-      --flatten 'networkInterfaces[].accessConfigs[]' \
-      --format 'csv[no-heading](networkInterfaces.accessConfigs.natIP)')
+    local instance_ip=$(gcloud_get_ip ${instance_uri})
 
     gcloud_reserve_static_ip_address "${instance_name}" "${instance_ip}"
   done
@@ -343,9 +344,7 @@ gcloud_delete_managed_instance_group() {
   log "un-reserve all external addresses of the instance group ${name} instances"
   for instance_uri in $(gcloud compute instance-groups list-instances "${name}" ${gcloud_region} --uri); do
     local instance_name=$(gcloud compute instances describe ${instance_uri} --format 'csv[no-heading](name)')
-    local isntance_ip=$(gcloud compute instances describe ${instance_uri} \
-      --flatten 'networkInterfaces[].accessConfigs[]' \
-      --format 'csv[no-heading](networkInterfaces.accessConfigs.natIP)')
+    local instance_ip=$(gcloud_get_ip ${instance_uri})
 
     gcloud_delete_static_ip_address "${instance_name}"
   done
@@ -372,9 +371,7 @@ gcloud_get_managed_instance_group_instances_ips() {
 
   gcloud compute instance-groups list-instances "${name}" \
     ${gcloud_region} --sort-by=instance --uri | \
-    xargs -P `${nproc_cmd}` -I '{}' gcloud compute instances describe '{}' \
-      --flatten 'networkInterfaces[].accessConfigs[]' \
-      --format 'csv[no-heading](networkInterfaces.accessConfigs.natIP)'
+    xargs -P `${nproc_cmd}` -I '{}' gcloud_get_ip '{}'
 }
 
 # $1=group name

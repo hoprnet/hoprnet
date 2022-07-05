@@ -158,10 +158,13 @@ fi
 declare staking_index=0
 for staking_addr in "${!staking_addrs_dict[@]}" ; do
   fund_if_empty "${staking_addr}" "${environment}"
-  # we only stake funds
-  #if [ staking_index ]
-  make -C "${mydir}/.." stake-funds privkey="${staking_addrs_dict[${staking_addr}]}" environment="${environment}"
-  #staking_index+=1
+  # we alternate between staking funds or NFT
+  if [ "$((staking_index%2))" = "0" ]; then
+    make -C "${mydir}/.." stake-funds privkey="${staking_addrs_dict[${staking_addr}]}" environment="${environment}"
+  else
+    make -C "${mydir}/.." stake-devnft privkey="${staking_addrs_dict[${staking_addr}]}" environment="${environment}"
+  fi
+  ((++staking_index))
 done
 
 # Get names of all instances in this cluster
@@ -198,6 +201,7 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
   declare wallet_addr
   declare peer_id
   declare staking_addr
+
   if [[ -z "${info_tag}" ]]; then
     # If the instance does not have the INFO tag yet, we need to retrieve all info
     wallet_addr=$(get_native_address "${api_token}@${node_ip}:3001")

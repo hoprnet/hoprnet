@@ -97,6 +97,21 @@ endif
 		--amount 1000000000000000000000 \
 		--privatekey "$(privkey)"
 
+.PHONY: stake-devnft
+stake-devnft: ## stake Dev NFTs (idempotent operation)
+ifeq ($(privkey),)
+	echo "parameter <privkey> missing" >&2 && exit 1
+endif
+ifeq ($(environment),)
+	echo "parameter <environment> missing" >&2 && exit 1
+endif
+	@TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+		yarn workspace @hoprnet/hopr-ethereum run hardhat stake \
+		--network goerli \
+		--type devnft \
+		--privatekey "$(privkey)"
+
 .PHONY: help
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'

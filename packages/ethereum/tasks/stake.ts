@@ -68,23 +68,33 @@ async function stakeDevNft(hre: HardhatRuntimeEnvironment, signer, hoprStake) {
   // check if the signer has staked Dev NFT
   const signerAddress = await signer.getAddress()
   const hasStaked = await hoprStake.isNftTypeAndRankRedeemed4(DEV_NFT_TYPE, DEV_NFT_BOOST, signerAddress)
+
+  if (hasStaked) {
+    // Caller has staked Dev NFT, no need to repeat the process.
+    console.log(`Address ${signerAddress} has staked Dev NFT. No need to stake more.`)
+    return
+  }
+
   // get Dev NFT index
   let devNFTIndex: number | null = null
-  let loopCompleted = false
-  let index = 0
+  let index = 1
   // loop through the array storage and record the length and dev nft index, if any
-  while (!loopCompleted) {
+  while (true) {
     try {
-      const createdNftTypes = await hoprBoost.typeAt(index + 1) // array of types are 1-based
+      console.error(`Check DevNFT type at index = ${index}`)
+      const createdNftTypes = await hoprBoost.typeAt(index) // array of types are 1-based
       if (createdNftTypes === DEV_NFT_TYPE) {
+        console.error(`Found usable DevNFT type at index = ${index}`)
         devNFTIndex = index
+        break
       }
     } catch (error) {
-        // reaching the end of nft index array storage: panic code 0x32 (Array accessed at an out-of-bounds or negative index
-        if (!(`${error}`.match(/0x32/g) || `${error}`.match(/cannot estimate gas/g))) {
-          console.error(`Error in checking HoprBoost types. ${error}`)
-        }
-        loopCompleted = true
+      // reaching the end of nft index array storage: panic code 0x32 (Array accessed at an out-of-bounds or negative index
+      if (!(`${error}`.match(/0x32/g) || `${error}`.match(/cannot estimate gas/g))) {
+        console.error(`Error in checking HoprBoost types. ${error}`)
+      }
+      console.error(`Completed DevNFT check loop without result`)
+      break
     }
     index++
   }
@@ -92,11 +102,6 @@ async function stakeDevNft(hre: HardhatRuntimeEnvironment, signer, hoprStake) {
   if (!devNFTIndex) {
     console.error(`Cannot find Dev NFT index when staking.`)
     process.exit(1)
-  }
-
-  if (hasStaked) {
-    // Caller has staked Dev NFT, no need to repeat the process.
-    console.log(`Address ${signerAddress} has staked Dev NFT. No need to stake more.`)
   }
 
   // check if the signer has Dev NFT
@@ -109,6 +114,7 @@ async function stakeDevNft(hre: HardhatRuntimeEnvironment, signer, hoprStake) {
     ownedNFTTokenId = await hoprBoost.tokenOfOwnerByIndex(signerAddress, nftFindingIndex)
     const ownedNFTType = await hoprBoost.typeIndexOf(ownedNFTTokenId)
     if (ownedNFTType.eq(devNFTIndex)) {
+      console.log(`Found usable DevNFT at index ${nftFindingIndex}`)
       nftFound = true
     }
   }
