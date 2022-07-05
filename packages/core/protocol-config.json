@@ -127,6 +127,7 @@
       "hardhat_deploy_gas_price": "2 gwei",
       "max_fee_per_gas": "1 gwei",
       "max_priority_fee_per_gas": "2 gwei",
+      "gas_limit": "auto",
       "default_provider": "http://127.0.0.1:8545/",
       "native_token_name": "ETH",
       "hopr_token_name": "wxHOPR"
@@ -138,6 +139,7 @@
       "hardhat_deploy_gas_price": "2 gwei",
       "max_fee_per_gas": "10 gwei",
       "max_priority_fee_per_gas": "2 gwei",
+      "gas_limit": 400000,
       "default_provider": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
       "native_token_name": "xDAI",
       "hopr_token_name": "wxHOPR"
@@ -149,6 +151,7 @@
       "hardhat_deploy_gas_price": "1 gwei",
       "max_fee_per_gas": "10 gwei",
       "max_priority_fee_per_gas": "2 gwei",
+      "gas_limit": 400000,
       "default_provider": "https://provider-proxy.hoprnet.workers.dev/eth_goerli",
       "etherscan_api_url": "http://api-goerli.etherscan.io/api",
       "native_token_name": "gETH",

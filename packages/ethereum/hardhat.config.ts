@@ -54,6 +54,7 @@ type NetworkOptions = {
   etherscan_api_url?: string // a valid HTTP url pointing at a RPC endpoint
   max_fee_per_gas: string // The absolute maximum you are willing to pay per unit of gas to get your transaction included in a block, e.g. '10 gwei'
   max_priority_fee_per_gas: string // Tips paid directly to miners, e.g. '2 gwei'
+  gas_limit: number
   native_token_name: string
   hopr_token_name: string
   tags: string[]
@@ -85,7 +86,8 @@ function networkToHardhatNetwork(name: String, input: NetworkOptions): NetworkUs
     live: input.live,
     tags: input.tags,
     // used by hardhat-deploy
-    saveDeployments: true
+    saveDeployments: true,
+    gas: input.gas_limit || 'auto'
   }
 
   if (name !== 'hardhat') {

@@ -4,6 +4,7 @@
 # should be extended to use its own instance of hardhat too.
 
 # prevent sourcing of this script, only allow execution
+# shellcheck disable=SC2091
 $(return >/dev/null 2>&1)
 test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
 
@@ -14,8 +15,11 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare -x HOPR_LOG_ID="setup-gcloud-cluster"
+# shellcheck disable=SC1091
 source "${mydir}/utils.sh"
+# shellcheck disable=SC1091
 source "${mydir}/gcloud.sh"
+# shellcheck disable=SC1091
 source "${mydir}/testnet.sh"
 
 usage() {
@@ -53,11 +57,11 @@ usage() {
 { [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
 
 # verify and set parameters
-: ${FAUCET_SECRET_API_KEY?"Missing environment variable FAUCET_SECRET_API_KEY"}
-: ${STAKING_ACCOUNT_BA28?"Missing environment variable STAKING_ACCOUNT_BA28"}
-: ${STAKING_ACCOUNT_F84B?"Missing environment variable STAKING_ACCOUNT_F84B"}
-: ${STAKING_ACCOUNT_0FD4?"Missing environment variable STAKING_ACCOUNT_0FD4"}
-: ${STAKING_ACCOUNT_6C15?"Missing environment variable STAKING_ACCOUNT_6C15"}
+: "${FAUCET_SECRET_API_KEY?"Missing environment variable FAUCET_SECRET_API_KEY"}"
+: "${STAKING_ACCOUNT_BA28?"Missing environment variable STAKING_ACCOUNT_BA28"}"
+: "${STAKING_ACCOUNT_F84B?"Missing environment variable STAKING_ACCOUNT_F84B"}"
+: "${STAKING_ACCOUNT_0FD4?"Missing environment variable STAKING_ACCOUNT_0FD4"}"
+: "${STAKING_ACCOUNT_6C15?"Missing environment variable STAKING_ACCOUNT_6C15"}"
 
 declare environment="${1?"missing parameter <environment>"}"
 declare init_script=${2:-}
@@ -126,7 +130,7 @@ gcloud_create_instance_template_if_not_exists \
 # start nodes
 gcloud_create_or_update_managed_instance_group  \
   "${cluster_id}" \
-  ${cluster_size} \
+  "${cluster_size}" \
   "${instance_template_name}"
 
 # This maps "staking account address" => "private key"
@@ -152,14 +156,15 @@ fi
 
 # This can be called always, because the "stake" task is idempotent given the same arguments
 for staking_addr in "${!staking_addrs_dict[@]}" ; do
-  yarn hardhat stake --network hardhat --amount 1000000000000000000000 \
-    --privatekey "${staking_addrs_dict[staking_addr]}"
+  fund_if_empty "${staking_addr}" "${environment}"
+  make -C "${mydir}/.." stake-funds privkey="${staking_addrs_dict[${staking_addr}]}" environment="${environment}"
 done
 
 # Get names of all instances in this cluster
 declare instance_names
-instance_names=$(gcloud_get_managed_instance_group_instances_names "${cluster_id}")
-declare instance_names_arr=( ${instance_names} )
+instance_names="$(gcloud_get_managed_instance_group_instances_names "${cluster_id}")"
+declare -a instance_names_arr
+IFS=" " read -r -a instance_names_arr <<< "${instance_names}"
 
 # Prepare sorted staking account addresses so we ensure a stable order of assignment
 declare staking_addresses_arr=( "${!staking_addrs_dict[@]}" )
@@ -224,7 +229,6 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
   # Fund the node as well
   wait_until_node_is_ready "${node_ip}"
   fund_if_empty "${wallet_addr}" "${environment}"
-
 done
 
 # Register all nodes in cluster
@@ -248,6 +252,7 @@ fi
 
 # --- Call init script--- {{{
 if [ -n "${init_script}" ] && [ -x "${init_script}" ]; then
+  # shellcheck disable=SC2068
   HOPRD_API_TOKEN="${api_token}" \
     "${init_script}" \
     ${ip_addrs[@]/%/:3001}

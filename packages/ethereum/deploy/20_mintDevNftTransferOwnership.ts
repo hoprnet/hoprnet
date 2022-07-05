@@ -110,24 +110,39 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const registryProxy = (await ethers.getContractFactory('HoprStakingProxyForNetworkRegistry')).attach(
       registryProxyDeployment.address
     ) as HoprStakingProxyForNetworkRegistry
-    await registryProxy.ownerBatchAddNftTypeAndRank([devNftIndex], [DEV_NFT_BOOST])
+    const ownerNftTx = await registryProxy.ownerBatchAddNftTypeAndRank([devNftIndex], [DEV_NFT_BOOST])
+    // don't wait when using local hardhat because its using auto-mine
+    if (!environment.match('hardhat')) {
+      await ethers.provider.waitForTransaction(ownerNftTx.hash, 2)
+    }
 
     try {
       // mint minimum stake to addresses that will stake and are binded to nodes in NR
       const tokenContract = await deployments.get('HoprToken')
       const hoprToken = (await ethers.getContractFactory('HoprToken')).attach(tokenContract.address) as HoprToken
-      await hoprToken.mint(
+
+      const mintTx1 = await hoprToken.mint(
         CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0],
         MIN_STAKE,
         ethers.constants.HashZero,
         ethers.constants.HashZero
       )
-      await hoprToken.mint(
+      // don't wait when using local hardhat because its using auto-mine
+      if (!environment.match('hardhat')) {
+        await ethers.provider.waitForTransaction(mintTx1.hash, 2)
+      }
+
+      const mintTx2 = await hoprToken.mint(
         CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[2],
         MIN_STAKE,
         ethers.constants.HashZero,
         ethers.constants.HashZero
       )
+      // don't wait when using local hardhat because its using auto-mine
+      if (!environment.match('hardhat')) {
+        await ethers.provider.waitForTransaction(mintTx2.hash, 2)
+      }
+
       console.log(`... minting ${MIN_STAKE} txHOPR to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0] and [2]`)
     } catch (error) {
       console.error(
@@ -136,7 +151,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     }
 
     try {
-      await hoprBoost.batchMint(
+      const mintNftTx = await hoprBoost.batchMint(
         [
           CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1],
           CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[3],
@@ -150,6 +165,11 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
           gasLimit: 4e6
         }
       )
+      // don't wait when using local hardhat because its using auto-mine
+      if (!environment.match('hardhat')) {
+        await ethers.provider.waitForTransaction(mintNftTx.hash, 2)
+      }
+
       console.log(
         `... minting ${DEV_NFT_TYPE} NFTs to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1], [3] and 10 for dev bank`
       )

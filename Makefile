@@ -55,10 +55,10 @@ build-docs-api: build
 
 .PHONY: test
 test: ## run unit tests for all packages, or a single package if package= is set
-ifdef package
-	yarn workspace @hoprnet/${package} run test
-else
+ifeq ($(package),)
 	yarn workspaces foreach -pv run test
+else
+	yarn workspace @hoprnet/${package} run test
 endif
 
 .PHONY: lint-check
@@ -80,6 +80,21 @@ endif
 .PHONY: docker-build-gcb
 docker-build-gcb: ## build Docker images on Google Cloud Build
 	./scripts/build-docker.sh --no-tags --force
+
+.PHONY: stake-funds
+stake-funds: ## stake funds (idempotent operation)
+ifeq ($(privkey),)
+	echo "parameter <privkey> missing" >&2 && exit 1
+endif
+ifeq ($(environment),)
+	echo "parameter <environment> missing" >&2 && exit 1
+endif
+	@TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+		yarn workspace @hoprnet/hopr-ethereum run hardhat stake \
+		--network goerli \
+		--amount 1000000000000000000000 \
+		--privatekey "$(privkey)"
 
 .PHONY: help
 help:
