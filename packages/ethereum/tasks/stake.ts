@@ -74,7 +74,7 @@ async function main(
     if (!devNFTIndex) {
       console.error(`Cannot find Dev NFT index when staking.`)
       process.exit(1)
-    } 
+    }
 
     if (hasStaked) {
       // Caller has staked Dev NFT, no need to repeat the process.
