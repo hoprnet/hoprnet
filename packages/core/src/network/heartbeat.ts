@@ -219,7 +219,7 @@ export default class Heartbeat {
       if (!finished) {
         abort.abort()
       }
-    }, this.config.heartbeatRunTimeout)
+    }, this.config.heartbeatRunTimeout).unref()
 
     // Create an object that describes which work has to be done
     // by the workers, i.e. the pingNode code

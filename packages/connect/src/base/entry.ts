@@ -486,7 +486,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       if (!done) {
         abort.abort()
       }
-    }, timeout)
+    }, timeout).unref()
 
     let conn: Connection | undefined
     try {
