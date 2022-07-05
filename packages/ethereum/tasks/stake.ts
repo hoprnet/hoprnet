@@ -2,15 +2,16 @@ import { Signer, Wallet } from 'ethers'
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import { DEV_NFT_BOOST, DEV_NFT_TYPE } from '../utils/constants'
 
-export type StakeOpts = 
+export type StakeOpts =
   | {
-    type: 'devnft'
-    privatekey: string // private key of the caller
-  } | {
-    type: 'xhopr' 
-    amount: string // target amount in wei
-    privatekey: string // private key of the caller
-  }
+      type: 'devnft'
+      privatekey: string // private key of the caller
+    }
+  | {
+      type: 'xhopr'
+      amount: string // target amount in wei
+      privatekey: string // private key of the caller
+    }
 
 /**
  * Let caller to stake HOPR tokens in the current staking program
@@ -50,7 +51,7 @@ async function main(
     // check if the signer has staked Dev NFT
     const hasStaked = await hoprStake.isNftTypeAndRankRedeemed4(DEV_NFT_TYPE, DEV_NFT_BOOST, signerAddress)
     // get Dev NFT index
-    let devNFTIndex: number | null = null;
+    let devNFTIndex: number | null = null
     let loopCompleted = false
     let index = 0
     // loop through the array storage and record the length and dev nft index, if any
@@ -65,26 +66,23 @@ async function main(
         // if (`${error}`.match(/0x32/g) || `${error}`.match(/cannot estimate gas/g)) {
         //   loopCompleted = true
         // } else {
-          console.error(`Error in checking HoprBoost types. ${error}`)
+        console.error(`Error in checking HoprBoost types. ${error}`)
         // }
         process.exit(1)
       }
       index++
     }
-    
+
     if (!devNFTIndex) {
       console.error(`Cannot find Dev NFT index when staking.`)
       process.exit(1)
-    } else 
-    
-
-    if (hasStaked) {
+    } else if (hasStaked) {
       // Caller has staked Dev NFT, no need to repeat the process.
       console.log(`Address ${signerAddress} has staked Dev NFT. No need to stake more.`)
     }
 
     // check if the signer has Dev NFT
-    const boostNFTBalance = await hoprBoost.balanceOf(signerAddress);
+    const boostNFTBalance = await hoprBoost.balanceOf(signerAddress)
     let nftFound = false
     let nftFindingIndex = ethers.constants.Zero
     let ownedNFTTokenId = ethers.constants.Zero
@@ -104,7 +102,13 @@ async function main(
     }
 
     // now the caller has Dev NFT and no Dev NFT has been staked. Now proceed with staking
-    await(await hoprBoost['safeTransferFrom(address,address,uint256)'](signerAddress, stakingContract.address, ownedNFTTokenId)).wait()
+    await (
+      await hoprBoost['safeTransferFrom(address,address,uint256)'](
+        signerAddress,
+        stakingContract.address,
+        ownedNFTTokenId
+      )
+    ).wait()
     console.log(`Address ${signerAddress} succeeded in staking Dev NFT.`)
   } else if (opts.type === 'xhopr' && opts.amount) {
     // must provide amount when token type is 'xhopr'
