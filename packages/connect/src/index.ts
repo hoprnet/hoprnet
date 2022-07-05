@@ -142,6 +142,10 @@ class HoprConnect implements Transport, Initializable, Startable {
     // this.getComponents().getConnectionGater().denyDialMultiaddr
   }
 
+  public async beforeStart() {
+    await this.getConnectComponents().beforeStart()
+  }
+
   public async start(): Promise<void> {
     if (!!this.testingOptions.__noDirectConnections) {
       verbose(`DEBUG mode: always using relayed or WebRTC connections.`)

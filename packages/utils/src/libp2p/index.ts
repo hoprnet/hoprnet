@@ -3,7 +3,7 @@
  */
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { PublicKey } from '@libp2p/interface-keys'
-import type { Libp2p } from 'libp2p'
+import type { Components } from '@libp2p/interfaces/components'
 import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
 
 import { keys } from '@libp2p/crypto'
@@ -103,7 +103,7 @@ const logError = debug(`hopr-core:libp2p:error`)
  */
 
 export type libp2pSendMessage = ((
-  libp2p: Libp2p,
+  components: Components,
   destination: PeerId,
   protocol: string,
   message: Uint8Array,
@@ -111,7 +111,7 @@ export type libp2pSendMessage = ((
   opts?: DialOpts
 ) => Promise<void>) &
   ((
-    libp2p: Libp2p,
+    components: Components,
     destination: PeerId,
     protocol: string,
     message: Uint8Array,
@@ -120,7 +120,7 @@ export type libp2pSendMessage = ((
   ) => Promise<Uint8Array[]>)
 
 export async function libp2pSendMessage(
-  libp2p: Libp2p,
+  components: Components,
   destination: PeerId,
   protocol: string,
   message: Uint8Array,
@@ -128,7 +128,7 @@ export async function libp2pSendMessage(
   opts?: DialOpts
 ): Promise<void | Uint8Array[]> {
   // Components is not part of interface
-  const r = await dial((libp2p as any).components, destination, protocol, opts)
+  const r = await dial(components, destination, protocol, opts)
 
   if (r.status !== 'SUCCESS') {
     logError(r)
@@ -244,14 +244,14 @@ function generateHandler(
  */
 
 export type libp2pSubscribe = ((
-  libp2p: Libp2p,
+  components: Components,
   protocol: string,
   handler: LibP2PHandlerFunction<Promise<void> | void>,
   errHandler: ErrHandler,
   includeReply: false
 ) => void) &
   ((
-    libp2p: Libp2p,
+    components: Components,
     protocol: string,
     handler: LibP2PHandlerFunction<Promise<Uint8Array>>,
     errHandler: ErrHandler,
@@ -259,11 +259,11 @@ export type libp2pSubscribe = ((
   ) => void)
 
 export async function libp2pSubscribe(
-  libp2p: Libp2p,
+  components: Components,
   protocol: string,
   handler: LibP2PHandlerFunction<Promise<void | Uint8Array> | void>,
   errHandler: ErrHandler,
   includeReply = false
 ): Promise<void> {
-  await libp2p.handle([protocol], generateHandler(handler, errHandler, includeReply))
+  await components.getRegistrar().handle([protocol], generateHandler(handler, errHandler, includeReply))
 }
