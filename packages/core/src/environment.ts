@@ -18,9 +18,12 @@ export type NetworkOptions = {
   tags: string[]
 }
 
+export type EnvironmentType = 'production' | 'staging' | 'development'
+
 export type Environment = {
   id: string
   network_id: string // must match one of the Network.id
+  environment_type: EnvironmentType
   channel_contract_deploy_block: number // >= 0
   token_contract_address: string // an Ethereum address
   channels_contract_address: string // an Ethereum address
@@ -32,13 +35,18 @@ export type Environment = {
 }
 
 export type ProtocolConfig = {
-  environments: Environment[]
-  networks: NetworkOptions[]
+  environments: {
+    [key: string]: Environment
+  }
+  networks: {
+    [key: string]: NetworkOptions
+  }
 }
 
 export type ResolvedEnvironment = {
   id: string
   network: NetworkOptions
+  environment_type: EnvironmentType
   channel_contract_deploy_block: number
   token_contract_address: string // an Ethereum address
   channels_contract_address: string // an Ethereum address
@@ -66,6 +74,7 @@ export function resolveEnvironment(environment_id: string, customProvider?: stri
     return {
       id: environment_id,
       network,
+      environment_type: environment.environment_type,
       channel_contract_deploy_block: environment.channel_contract_deploy_block,
       token_contract_address: environment.token_contract_address,
       channels_contract_address: environment.channels_contract_address,

@@ -1,6 +1,10 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import { utils } from 'ethers'
-import type { HoprNetworkRegistry, HoprDummyProxyForNetworkRegistry } from '../src/types'
+import type {
+  HoprNetworkRegistry,
+  HoprDummyProxyForNetworkRegistry,
+  HoprStakingProxyForNetworkRegistry
+} from '../src/types'
 
 export type RegisterOpts =
   | {
@@ -9,11 +13,16 @@ export type RegisterOpts =
       peerIds: string
     }
   | {
+      task: 'remove'
+      nativeAddresses: string
+    }
+  | {
       task: 'disable' | 'enable'
     }
 
 /**
  * Used by our E2E tests to interact with 'HoprNetworkRegistry' and 'HoprDummyProxyForNetworkRegistry'.
+ * Can also be used by the CI to automate registery for cloud cluster nodes
  */
 async function main(
   opts: RegisterOpts,
@@ -25,15 +34,17 @@ async function main(
     process.exit(1)
   }
 
-  if (network.name !== 'hardhat') {
-    console.error('Register only works in a hardhat network.')
+  if (network.name !== 'hardhat' || !network.tags.staging) {
+    console.error('Register only works in a hardhat or staging network.')
     process.exit(1)
   }
 
-  let hoprDummyProxyAddress: string
+  let hoprProxyAddress: string
   let hoprNetworkRegistryAddress: string
   try {
-    hoprDummyProxyAddress = (await deployments.get('HoprNetworkRegistryProxy')).address
+    hoprProxyAddress = !network.tags.staging
+      ? (await deployments.get('HoprNetworkRegistryProxy')).address
+      : (await deployments.get('HoprNetworkRegistryProxy')).address
     hoprNetworkRegistryAddress = (await deployments.get('HoprNetworkRegistry')).address
   } catch {
     console.error(
@@ -48,9 +59,13 @@ async function main(
   const provider = new ethers.providers.JsonRpcProvider()
   const signer = provider.getSigner()
 
-  const hoprDummyProxy = (await ethers.getContractFactory('HoprDummyProxyForNetworkRegistry'))
-    .connect(signer)
-    .attach(hoprDummyProxyAddress) as HoprDummyProxyForNetworkRegistry
+  const hoprProxy = !network.tags.staging
+    ? ((await ethers.getContractFactory('HoprDummyProxyForNetworkRegistry'))
+        .connect(signer)
+        .attach(hoprProxyAddress) as HoprDummyProxyForNetworkRegistry)
+    : ((await ethers.getContractFactory('HoprStakingProxyForNetworkRegistry'))
+        .connect(signer)
+        .attach(hoprProxyAddress) as HoprStakingProxyForNetworkRegistry)
 
   const hoprNetworkRegistry = (await ethers.getContractFactory('HoprNetworkRegistry'))
     .connect(signer)
@@ -74,8 +89,24 @@ async function main(
         process.exit(1)
       }
 
-      await (await hoprDummyProxy.ownerBatchAddAccounts(nativeAddresses)).wait()
+      // in staging account, register by owner; in non-stagin environment, add addresses directly to proxy
+      if (!network.tags.staging) {
+        await (await (hoprProxy as HoprDummyProxyForNetworkRegistry).ownerBatchAddAccounts(nativeAddresses)).wait()
+      }
       await (await hoprNetworkRegistry.ownerRegister(nativeAddresses, peerIds)).wait()
+    } else if (opts.task === 'remove') {
+      const nativeAddresses = opts.nativeAddresses.split(',')
+      // ensure all native addresses are valid
+      if (nativeAddresses.some((a) => !utils.isAddress(a))) {
+        console.error(`Given address list '${nativeAddresses.join(',')}' contains an invalid address.`)
+        process.exit(1)
+      }
+
+      // in staging account, deregister; in non-stagin environment, remove addresses directly from proxy
+      if (!network.tags.staging) {
+        await (await (hoprProxy as HoprDummyProxyForNetworkRegistry).ownerBatchRemoveAccounts(nativeAddresses)).wait()
+      }
+      await (await hoprNetworkRegistry.ownerDeregister(nativeAddresses)).wait()
     } else if (opts.task === 'enable' && !isEnabled) {
       await (await hoprNetworkRegistry.enableRegistry()).wait()
     } else if (opts.task === 'disable' && isEnabled) {

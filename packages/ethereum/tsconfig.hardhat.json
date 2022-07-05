@@ -5,6 +5,6 @@
     "noEmit": true,
     "rootDir": "."
   },
-  "include": ["type-extension.ts", "hardhat.config.ts", "tasks", "test", "deploy", "src"],
+  "include": ["type-extension.ts", "hardhat.config.ts", "tasks", "test", "deploy", "src", "utils"],
   "references": [{ "path": "../utils" }]
 }
