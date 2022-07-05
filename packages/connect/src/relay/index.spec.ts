@@ -37,7 +37,6 @@ function createFakeComponents(peerId: PeerId, network: EventEmitter): Components
     getRegistrar() {
       return {
         handle(protocol: string, handler: (conn: StreamHandler) => void) {
-          console.log(`handle called`)
           network.on(getPeerProtocol(peerId, protocol), handler)
         }
       } as Components['registrar']
@@ -85,7 +84,6 @@ function getPeer(peerId: PeerId, network: EventEmitter) {
   async function dialDirectly(ma: Multiaddr): Promise<Connection> {
     const peerId = peerIdFromString(ma.getPeerId() as string)
 
-    console.log(`dialing directly`)
     return {
       remotePeer: peerId,
       newStream: async (protocol: string) => {

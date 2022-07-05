@@ -40,7 +40,7 @@ export async function createLibp2pInstance(
   reviewConnection: AccessControl['reviewConnection']
 ): Promise<Libp2p> {
   let libp2p: Libp2p
-  if (options.testing.useMockedLibp2p) {
+  if (options.testing?.useMockedLibp2p) {
     // Used for quick integration testing
     libp2p = createLibp2pMock(peerId, {
       network: options.testing.mockedNetwork,
