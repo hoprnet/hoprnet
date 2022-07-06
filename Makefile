@@ -82,35 +82,57 @@ docker-build-gcb: ## build Docker images on Google Cloud Build
 	./scripts/build-docker.sh --no-tags --force
 
 .PHONY: stake-funds
+stake-funds: ensure-environment-is-set
 stake-funds: ## stake funds (idempotent operation)
 ifeq ($(privkey),)
 	echo "parameter <privkey> missing" >&2 && exit 1
 endif
-ifeq ($(environment),)
-	echo "parameter <environment> missing" >&2 && exit 1
-endif
 	@TS_NODE_PROJECT=./tsconfig.hardhat.json \
 	HOPR_ENVIRONMENT_ID="$(environment)" \
 		yarn workspace @hoprnet/hopr-ethereum run hardhat stake \
-		--network goerli \
+		--network $(network) \
 		--type xhopr \
 		--amount 1000000000000000000000 \
 		--privatekey "$(privkey)"
 
 .PHONY: stake-devnft
+stake-devnft: ensure-environment-is-set
 stake-devnft: ## stake Dev NFTs (idempotent operation)
 ifeq ($(privkey),)
 	echo "parameter <privkey> missing" >&2 && exit 1
 endif
-ifeq ($(environment),)
-	echo "parameter <environment> missing" >&2 && exit 1
-endif
 	@TS_NODE_PROJECT=./tsconfig.hardhat.json \
 	HOPR_ENVIRONMENT_ID="$(environment)" \
 		yarn workspace @hoprnet/hopr-ethereum run hardhat stake \
-		--network goerli \
+		--network $(network) \
 		--type devnft \
 		--privatekey "$(privkey)"
+
+register-nodes: ensure-environment-is-set
+register-nodes: ## register given nodes in network registry contract
+ifeq ($(native_addresses),)
+	echo "parameter <native_addresses> missing" >&2 && exit 1
+endif
+ifeq ($(peer_ids),)
+	echo "parameter <peer_ids> missing" >&2 && exit 1
+endif
+	@TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
+   --network $(network) \
+   --task add \
+   --native-addresses "$(native_addresses)" \
+   --peer-ids "$(peer_ids)"
+
+ensure-environment-is-set:
+ifeq ($(environment),)
+	echo "parameter <environment> missing" >&2 && exit 1
+else
+network != jq '.environments."$(environment)".network_id // empty' packages/core/protocol-config.json
+ifeq ($(network),)
+	echo "could not read environment info from protocol-config.json" >&2 && exit 1
+endif
+endif
 
 .PHONY: help
 help:

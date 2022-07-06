@@ -374,64 +374,51 @@ gcloud_get_managed_instance_group_instances_ips() {
     xargs -P `${nproc_cmd}` -I '{}' gcloud_get_ip '{}'
 }
 
+# returns a JSON list of strings
 # $1=group name
 gcloud_get_managed_instance_group_instances_names() {
   local name="${1}"
 
   gcloud compute instance-groups list-instances "${name}" ${gcloud_region} --sort-by=instance \
-    --format=json | jq '.[1].instance' | tr -d '"'
+    --format=json | jq 'map(.instance)'
+}
+
+# returns a JSON list of key/value paris
+# $1=instance name
+gcloud_get_instance_metadata() {
+  local name="${1}"
+
+  gcloud compute instances describe "${name}" --format=json | jq ".metadata.items"
 }
 
 # $1=instance name
-gcloud_get_instance_tags() {
+# $2=comma separated list of metadata to add
+gcloud_add_instance_metadata() {
   local name="${1}"
+  local metadata="${2}"
 
-  gcloud compute instances describe "${name}" --format=json | jq ".tags.items[]" | tr -d '"'
-}
-
-# $1=instance name
-# $2=comma separated list of tags to add
-gcloud_add_instance_tags() {
-  local name="${1}"
-  local tags="${2}"
-
-  gcloud compute instances add-tags "${name}" --tags="${tags}"
+  gcloud compute instances add-metadata "${name}" --metadata="${metadata}"
 }
 
 # $1 = instance name
-gcloud_get_node_info_tag() {
+gcloud_get_node_info_metadata() {
   local instance_name="${1}"
 
-  local current_tag_set=$(gcloud_get_instance_tags "${instance_name}")
-  local current_tag_set_arr=( "${current_tag_set}" )
-
-  # Find the tag containing the "info:" prefix
-  local info_tag=""
-  for tag in ${current_tag_set_arr}; do
-    if [[ ${tag} =~ info:.+ ]]; then
-         info_tag="${tag#info:}"
-         break
-    fi
-  done
-
-  echo "${info_tag}"
+  # filter by prefix hoprd_ and return results as object
+  gcloud_get_instance_metadata "${instance_name}" | jq 'map(select(.key | startswith("hopr_"))) | from_entries'
 }
 
 # $1=instance name
-# $2=comma separated list of tags to remove
-gcloud_remove_instance_tags() {
+# $2=comma separated list of metadata keys to remove
+gcloud_remove_instance_metadata() {
   local name="${1}"
-  local tags="${2}"
+  local keys="${2}"
 
-  gcloud compute instances remove-tags "${name}" --tags="${tags}"
+  gcloud compute instances remove-metadata "${name}" --keys="${keys}"
 }
 
 gcloud_get_unused_static_ip_addresses() {
-  local json
-
-  json=$(gcloud compute addresses list --filter='status != IN_USE' --format=json ${gcloud_region})
-
-  echo "${json}"
+  gcloud compute addresses list --filter='status != IN_USE' --format=json ${gcloud_region}
 }
 
 # $1=address name
