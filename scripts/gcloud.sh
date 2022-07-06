@@ -404,8 +404,8 @@ gcloud_add_instance_metadata() {
 gcloud_get_node_info_metadata() {
   local instance_name="${1}"
 
-  # filter by prefix hoprd_ and return results as object
-  gcloud_get_instance_metadata "${instance_name}" | jq 'map(select(.key | startswith("hopr_"))) | from_entries'
+  # filter by prefix hopr- and return results as object
+  gcloud_get_instance_metadata "${instance_name}" | jq 'map(select(.key | startswith("hopr-"))) | from_entries'
 }
 
 # $1=instance name

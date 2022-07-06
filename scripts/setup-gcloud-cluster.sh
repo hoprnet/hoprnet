@@ -51,6 +51,7 @@ usage() {
   msg "HOPRD_PASSWORD\t\t\tused as password for all nodes, defaults to a random value"
   msg "HOPRD_SHOW_PRESTART_INFO\tset to 'true' to print used parameter values before starting"
   msg "HOPRD_PERFORM_CLEANUP\t\tset to 'true' to perform the cleanup process for the given cluster id"
+  msg "HOPRD_RESET_METADATA\t\tset to 'true' to trigger metadata reset on instances"
   msg
 }
 
@@ -76,6 +77,7 @@ declare api_token="${HOPRD_API_TOKEN:-Token${RANDOM}^${RANDOM}^${RANDOM}Token}"
 declare password="${HOPRD_PASSWORD:-pw${RANDOM}${RANDOM}${RANDOM}pw}"
 declare perform_cleanup="${HOPRD_PERFORM_CLEANUP:-false}"
 declare show_prestartinfo="${HOPRD_SHOW_PRESTART_INFO:-false}"
+declare reset_metadata="${HOPRD_RESET_METADATA:-false}"
 
 # Append environment as Docker image version, if not specified
 [[ "${docker_image}" != *:* ]] && docker_image="${docker_image}:${environment}"
@@ -191,6 +193,10 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
   instance_name="${instance_names_arr[instance_idx]}"
   node_ip=$(gcloud_get_ip "${instance_name}")
 
+  if [[ "${reset_metadata}" = "true" ]]; then
+    gcloud_remove_instance_metadata "${instance_name}" "hopr_peer-id,hopr_wallet-addr,hopr_staking-addr"
+  fi
+
   # All VM instances in the deployed cluster will get a special metadata entries
   # which contain all information about the HOPR instance running in the VM.
   # These currently include:
@@ -199,13 +205,14 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
   # - associated staking account
   # This information is constant during the lifetime of the VM and
   # does not change during re-deployment once set.
-  declare instance_metadata="$(gcloud_get_node_info_metadata "${instance_name}")"
+  declare instance_metadata
+  instance_metadata="$(gcloud_get_node_info_metadata "${instance_name}")"
 
   # known metadata keys
   declare wallet_addr peer_id staking_addr
-  wallet_addr="$(echo "${instance_metadata}" | jq -r '.hopr_wallet_addr // empty')"
-  peer_id="$(echo "${instance_metadata}" | jq -r '.hopr_peer_id // empty')"
-  staking_addr="$(echo "${instance_metadata}" | jq -r '.hopr_staking_addr // empty')"
+  wallet_addr="$(echo "${instance_metadata}" | jq -r '.hopr-wallet-addr // empty')"
+  peer_id="$(echo "${instance_metadata}" | jq -r '.hopr-peer-id // empty')"
+  staking_addr="$(echo "${instance_metadata}" | jq -r '.hopr-staking-addr // empty')"
 
   # data from the node's API for verification or initialization
   declare api_wallet_addr api_peer_id
@@ -225,7 +232,7 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
     fi
 
     # Save the metadata
-    declare new_metadata="hopr_wallet_addr=${api_wallet_addr},hopr_peer_id=${api_peer_id},hopr_staking_addr=${staking_addr}"
+    declare new_metadata="hopr-wallet-addr=${api_wallet_addr},hopr-peer-id=${api_peer_id},hopr-staking-addr=${staking_addr}"
     gcloud_add_instance_metadata "${instance_name}" "${new_metadata}"
   else
     # cross-check data, and log discrepancies, we keep going though and leave
