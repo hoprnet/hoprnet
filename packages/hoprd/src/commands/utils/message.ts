@@ -1,4 +1,4 @@
-import { encode, decode } from 'rlp'
+import RLP from 'rlp'
 import { u8aToHex } from '@hoprnet/hopr-utils'
 import { styleValue } from './index.js'
 
@@ -7,7 +7,7 @@ import { styleValue } from './index.js'
  * @param msg the message
  */
 export function encodeMessage(msg: string): Uint8Array {
-  return encode([msg, Date.now()])
+  return RLP.encode([msg, Date.now()])
 }
 
 /**
@@ -21,7 +21,7 @@ export function decodeMessage(encoded: Uint8Array): {
 } {
   let msg: Buffer, time: Buffer
   try {
-    ;[msg, time] = decode(encoded) as [Buffer, Buffer]
+    ;[msg, time] = RLP.decode(encoded) as [Buffer, Buffer]
 
     return {
       latency: Date.now() - parseInt(time.toString('hex'), 16),

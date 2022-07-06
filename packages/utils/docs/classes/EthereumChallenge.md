@@ -31,10 +31,6 @@
 | :------ | :------ |
 | `arr` | `Uint8Array` |
 
-#### Defined in
-
-[types/ethereumChallenge.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ethereumChallenge.ts#L4)
-
 ## Properties
 
 ### SIZE
@@ -61,10 +57,6 @@
 
 `boolean`
 
-#### Defined in
-
-[types/ethereumChallenge.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ethereumChallenge.ts#L26)
-
 ___
 
 ### serialize
@@ -75,10 +67,6 @@ ___
 
 `Uint8Array`
 
-#### Defined in
-
-[types/ethereumChallenge.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ethereumChallenge.ts#L18)
-
 ___
 
 ### toHex
@@ -88,10 +76,6 @@ ___
 #### Returns
 
 `string`
-
-#### Defined in
-
-[types/ethereumChallenge.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ethereumChallenge.ts#L22)
 
 ___
 
@@ -108,7 +92,3 @@ ___
 #### Returns
 
 [`EthereumChallenge`](EthereumChallenge.md)
-
-#### Defined in
-
-[types/ethereumChallenge.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ethereumChallenge.ts#L14)

@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-utils",
   "description": "HOPR-based utilities to process multiple data structures",
-  "version": "1.89.0-next.42",
+  "version": "1.89.0-next.54",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
@@ -57,15 +57,15 @@
     "@libp2p/mplex": "1.2.1",
     "@libp2p/peer-id-factory": "1.0.15",
     "@libp2p/tcp": "1.0.11",
-    "@types/mocha": "9.1.0",
+    "@types/mocha": "9.1.1",
     "bl": "5.0.0",
     "chai": "4.3.6",
     "libp2p": "0.37.3",
     "mocha": "9.2.2",
     "rewiremock": "3.14.3",
     "sinon": "12.0.1",
-    "typedoc": "0.22.13",
-    "typedoc-plugin-markdown": "3.11.14",
+    "typedoc": "0.23.2",
+    "typedoc-plugin-markdown": "3.13.1",
     "typescript": "4.7.4"
   },
   "mocha": {

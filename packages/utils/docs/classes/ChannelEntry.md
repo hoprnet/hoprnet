@@ -55,15 +55,15 @@
 | `channelEpoch` | [`UINT256`](UINT256.md) |
 | `closureTime` | [`UINT256`](UINT256.md) |
 
-#### Defined in
-
-[types/channelEntry.ts:75](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L75)
-
 ## Properties
 
 ### balance
 
 • `Readonly` **balance**: [`Balance`](Balance.md)
+
+#### Defined in
+
+[types/channelEntry.ts:78](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L78)
 
 ___
 
@@ -71,11 +71,19 @@ ___
 
 • `Readonly` **channelEpoch**: [`UINT256`](UINT256.md)
 
+#### Defined in
+
+[types/channelEntry.ts:83](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L83)
+
 ___
 
 ### closureTime
 
 • `Readonly` **closureTime**: [`UINT256`](UINT256.md)
+
+#### Defined in
+
+[types/channelEntry.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L84)
 
 ___
 
@@ -83,11 +91,19 @@ ___
 
 • `Readonly` **commitment**: [`Hash`](Hash.md)
 
+#### Defined in
+
+[types/channelEntry.ts:79](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L79)
+
 ___
 
 ### destination
 
 • `Readonly` **destination**: [`PublicKey`](PublicKey.md)
+
+#### Defined in
+
+[types/channelEntry.ts:77](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L77)
 
 ___
 
@@ -95,11 +111,19 @@ ___
 
 • `Readonly` **source**: [`PublicKey`](PublicKey.md)
 
+#### Defined in
+
+[types/channelEntry.ts:76](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L76)
+
 ___
 
 ### status
 
 • `Readonly` **status**: [`ChannelStatus`](../enums/ChannelStatus.md)
+
+#### Defined in
+
+[types/channelEntry.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L82)
 
 ___
 
@@ -107,11 +131,19 @@ ___
 
 • `Readonly` **ticketEpoch**: [`UINT256`](UINT256.md)
 
+#### Defined in
+
+[types/channelEntry.ts:80](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L80)
+
 ___
 
 ### ticketIndex
 
 • `Readonly` **ticketIndex**: [`UINT256`](UINT256.md)
+
+#### Defined in
+
+[types/channelEntry.ts:81](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L81)
 
 ## Accessors
 
@@ -123,10 +155,6 @@ ___
 
 `number`
 
-#### Defined in
-
-[types/channelEntry.ts:87](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L87)
-
 ## Methods
 
 ### closureTimePassed
@@ -137,10 +165,6 @@ ___
 
 `boolean`
 
-#### Defined in
-
-[types/channelEntry.ts:185](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L185)
-
 ___
 
 ### getId
@@ -150,10 +174,6 @@ ___
 #### Returns
 
 [`Hash`](Hash.md)
-
-#### Defined in
-
-[types/channelEntry.ts:176](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L176)
 
 ___
 
@@ -171,10 +191,6 @@ closure time of this channel is unknown.
 
 `BN`
 
-#### Defined in
-
-[types/channelEntry.ts:197](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L197)
-
 ___
 
 ### serialize
@@ -184,10 +200,6 @@ ___
 #### Returns
 
 `Uint8Array`
-
-#### Defined in
-
-[types/channelEntry.ts:146](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L146)
 
 ___
 
@@ -199,10 +211,6 @@ ___
 
 `string`
 
-#### Defined in
-
-[types/channelEntry.ts:160](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L160)
-
 ___
 
 ### createMock
@@ -212,10 +220,6 @@ ___
 #### Returns
 
 [`ChannelEntry`](ChannelEntry.md)
-
-#### Defined in
-
-[types/channelEntry.ts:208](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L208)
 
 ___
 
@@ -233,10 +237,6 @@ ___
 
 [`ChannelEntry`](ChannelEntry.md)
 
-#### Defined in
-
-[types/channelEntry.ts:101](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L101)
-
 ___
 
 ### fromSCEvent
@@ -253,7 +253,3 @@ ___
 #### Returns
 
 `Promise`<[`ChannelEntry`](ChannelEntry.md)\>
-
-#### Defined in
-
-[types/channelEntry.ts:127](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L127)

@@ -14,6 +14,12 @@
 - Fix decoding error when API token contains certain characters
 - Add Docker image running hardhat using the Hopr environment and smart contracts (useful for testing and development)
 - Bump `libp2p@0.37` ([#3879](https://github.com/hoprnet/hoprnet/pull/3879))
+- Automatically resend queuing transactions when provider is reset or a node receives sufficient native tokens
+- Make environment variables for `hoprd` accessible in Avado package configuration ([#3885](https://github.com/hoprnet/hoprnet/pull/3885))
+- Add Docker image (hopr-hardhat) running hardhat using the Hopr environment and smart contracts (useful for testing and development)
+- Add Docker image (hopr-pluto) running a full hoprd test cluster for local dApp testing
+- Add script that allow self register and self deregister on the Network Registry contract
+- Add documentations around network registry
 
 <a name="1.89"></a>
 

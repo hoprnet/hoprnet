@@ -33,6 +33,8 @@ export type IndexerEvents =
   | `withdraw-hopr-${string}`
   | `withdraw-native-${string}`
   | `channel-updated-${string}`
+  | `on-provider-error-${string}`
+  | `on-new-block-${string}`
 
 type BlockEventName = 'block'
 type BlockProcessedEventName = 'block-processed'

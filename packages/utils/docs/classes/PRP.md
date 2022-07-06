@@ -38,10 +38,6 @@
 | `iv` | `Uint8Array` |
 | `key` | `Uint8Array` |
 
-#### Defined in
-
-[crypto/prp.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L32)
-
 ## Properties
 
 ### iv1
@@ -138,10 +134,6 @@ ___
 
 `Uint8Array`
 
-#### Defined in
-
-[crypto/prp.ts:79](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L79)
-
 ___
 
 ### permutate
@@ -158,10 +150,6 @@ ___
 
 `Uint8Array`
 
-#### Defined in
-
-[crypto/prp.ts:64](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L64)
-
 ___
 
 ### createPRP
@@ -177,7 +165,3 @@ ___
 #### Returns
 
 [`PRP`](PRP.md)
-
-#### Defined in
-
-[crypto/prp.ts:44](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L44)

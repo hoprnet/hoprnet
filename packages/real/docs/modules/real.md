@@ -19,7 +19,3 @@ Dummy function to test WASM.
 #### Returns
 
 `string`
-
-#### Defined in
-
-lib/real_base.d.ts:7

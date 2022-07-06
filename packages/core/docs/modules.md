@@ -19,7 +19,7 @@
 
 - [ChannelStrategyInterface](interfaces/ChannelStrategyInterface.md)
 
-### Type aliases
+### Type Aliases
 
 - [HoprOptions](modules.md#hoproptions)
 - [NodeStatus](modules.md#nodestatus)
@@ -57,7 +57,7 @@
 - [resolveEnvironment](modules.md#resolveenvironment)
 - [supportedEnvironments](modules.md#supportedenvironments)
 
-## Type aliases
+## Type Aliases
 
 ### HoprOptions
 
@@ -119,6 +119,7 @@ ___
 | `boost_contract_address` | `string` |
 | `channel_contract_deploy_block` | `number` |
 | `channels_contract_address` | `string` |
+| `environment_type` | `EnvironmentType` |
 | `id` | `string` |
 | `network` | `NetworkOptions` |
 | `network_registry_contract_address` | `string` |
@@ -129,7 +130,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/environment.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L39)
+[packages/core/src/environment.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L46)
 
 ___
 
@@ -366,10 +367,6 @@ ___
 
 `Promise`<[`default`](classes/default.md)\>
 
-#### Defined in
-
-[packages/core/src/main.ts:178](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L178)
-
 ___
 
 ### createLibp2pMock
@@ -385,10 +382,6 @@ ___
 #### Returns
 
 `LibP2P`
-
-#### Defined in
-
-[packages/core/src/libp2p.mock.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/libp2p.mock.ts#L11)
 
 ___
 
@@ -418,10 +411,6 @@ Depth first search through potential paths based on weight
 path as Array<PeerId> (including start, but not including
 destination
 
-#### Defined in
-
-[packages/core/src/path/index.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/path/index.ts#L38)
-
 ___
 
 ### resolveEnvironment
@@ -439,10 +428,6 @@ ___
 
 [`ResolvedEnvironment`](modules.md#resolvedenvironment)
 
-#### Defined in
-
-[packages/core/src/environment.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L60)
-
 ___
 
 ### supportedEnvironments
@@ -452,7 +437,3 @@ ___
 #### Returns
 
 `Environment`[]
-
-#### Defined in
-
-[packages/core/src/environment.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L52)

@@ -1,7 +1,7 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
+import { MIN_STAKE } from '../utils/constants'
 
 const PROTOCOL_CONFIG = require('../../core/protocol-config.json')
-const MIN_STAKE = 0
 const DUMMY_PROXY = 'HoprDummyProxyForNetworkRegistry'
 const STAKING_PROXY = 'HoprStakingProxyForNetworkRegistry'
 

@@ -9,9 +9,10 @@
   "type": "commonjs",
   "scripts": {
     "fund": "TS_NODE_PROJECT=./tsconfig.hardhat.json hardhat fund",
-    "faucet": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost hardhat faucet --use-local-identities --identity-directory /tmp --identity-prefix local --password local",
+    "compile": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost hardhat compile",
+    "run:faucet:all": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost hardhat faucet --use-local-identities --identity-directory /tmp --identity-prefix local --password local",
     "accounts": "TS_NODE_PROJECT=./tsconfig.hardhat.json hardhat accounts",
-    "network": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost hardhat node",
+    "run:network": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost hardhat node",
     "deploy:local": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost HOPR_HARDHAT_TAG=testing hardhat deploy --network hardhat --write true"
   },
   "dependencies": {
@@ -19,6 +20,7 @@
     "@openzeppelin/contracts-v3-0-1": "npm:@openzeppelin/contracts@3.4.2"
   },
   "devDependencies": {
+    "@hoprnet/hopr-utils": "1",
     "@nomiclabs/hardhat-ethers": "2.0.5",
     "@nomiclabs/hardhat-solhint": "2.0.0",
     "@nomiclabs/hardhat-waffle": "2.0.2",
@@ -33,8 +35,7 @@
     "solidity-coverage": "0.7.18",
     "ts-node": "10.8.0",
     "typechain": "7.0.1",
-    "typescript": "4.7.4",
-    "@hoprnet/hopr-utils": "1"
+    "typescript": "4.7.4"
   },
   "engines": {
     "node": "16"

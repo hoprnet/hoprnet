@@ -21,6 +21,7 @@ import '@typechain/hardhat'
 import faucet, { type FaucetCLIOPts } from './tasks/faucet'
 import parallelTest, { type ParallelTestCLIOpts } from './tasks/parallelTest'
 import register, { type RegisterOpts } from './tasks/register'
+import selfRegister, { type SelfRegisterOpts } from './tasks/selfRegister'
 import disableAutoMine from './tasks/disableAutoMine'
 import getAccounts from './tasks/getAccounts'
 
@@ -63,6 +64,8 @@ import { writeFileSync, realpathSync } from 'fs'
 import { TASK_TEST_SETUP_TEST_ENVIRONMENT } from 'hardhat/builtin-tasks/task-names'
 import { HARDHAT_NETWORK_NAME } from 'hardhat/plugins'
 import { TASK_DEPLOY_RUN_DEPLOY } from 'hardhat-deploy'
+import stake, { StakeOpts } from './tasks/stake'
+import { MIN_STAKE } from './utils/constants'
 
 const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, HOPR_ENVIRONMENT_ID, HOPR_HARDHAT_TAG } = process.env
 
@@ -128,7 +131,11 @@ for (const [networkId, network] of Object.entries<NetworkOptions>(PROTOCOL_CONFI
     PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID] &&
     PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID].network_id === networkId
   ) {
-    network['tags'] = PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID].tags
+    network['tags'] = [
+      // always insert 'environment_type' as a tag so we know this info during smart contract deployment
+      PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID].environment_type,
+      ...PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID].tags
+    ]
   }
   // environment could be undefined at this point
   const hardhatNetwork = networkToHardhatNetwork(networkId, network)
@@ -222,6 +229,24 @@ task<RegisterOpts>(
   .addParam<RegisterOpts['task']>('task', 'The task to run', undefined, types.string)
   .addOptionalParam<string>('nativeAddresses', 'A list of native addresses', undefined, types.string)
   .addOptionalParam<string>('peerIds', 'A list of peerIds', undefined, types.string)
+
+task<SelfRegisterOpts>(
+  'register:self',
+  "Used by our E2E tests to interact with 'HoprNetworkRegistry' and 'HoprDummyProxyForNetworkRegistry'.",
+  selfRegister
+)
+  .addParam<SelfRegisterOpts['task']>('task', 'The task to run', undefined, types.string)
+  .addOptionalParam<string>('peerId', 'HOPR peer ID to be registered', undefined, types.string)
+  .addOptionalParam<string>('privatekey', 'Private key of the signer', undefined, types.string)
+
+task<StakeOpts>('stake', 'Used by CI tests to stake tokens to the running staking program.', stake)
+  .addParam<string>(
+    'amount',
+    'target txHOPR token amount (in wei) that will be staked',
+    MIN_STAKE.toString(),
+    types.string
+  )
+  .addOptionalParam<string>('privatekey', 'Private key of the signer', undefined, types.string)
 
 function getSortedFiles(dependenciesGraph) {
   const tsort = require('tsort')

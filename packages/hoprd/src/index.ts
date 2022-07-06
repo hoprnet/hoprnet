@@ -1,5 +1,5 @@
 import { passwordStrength } from 'check-password-strength'
-import { decode } from 'rlp'
+import RLP from 'rlp'
 import path from 'path'
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
@@ -371,7 +371,7 @@ async function main() {
   function logMessageToNode(msg: Uint8Array) {
     logs.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
     try {
-      let [decoded, time] = decode(msg) as [Buffer, Buffer]
+      let [decoded, time] = RLP.decode(msg) as [Buffer, Buffer]
       logs.log(`Message: ${decoded.toString()}`)
       logs.log(`Latency: ${Date.now() - parseInt(time.toString('hex'), 16)}ms`)
 

@@ -68,6 +68,7 @@ const sidebars = {
       items: [
         'developers/starting-local-cluster',
         'developers/connecting-node',
+        'developers/network-registry',
         'developers/tutorial-hello-world',
         'developers/demo-boomerang-chat',
         'developers/demo-rps-game',

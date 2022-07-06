@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.89.0-next.42",
+  "version": "1.89.0-next.54",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -59,10 +59,10 @@
     "prop-types": "15.7.2",
     "react": "17.0.2",
     "react-dom": "17.0.2",
-    "rlp": "2.2.7",
+    "rlp": "3.0.0",
     "run-queue": "2.0.1",
     "semver": "7.3.7",
-    "strip-ansi": "6.0.1",
+    "strip-ansi": "7.0.1",
     "swagger-ui-express": "4.3.0",
     "tiny-hashes": "1.0.1",
     "trace-unhandled": "2.0.1",
@@ -73,7 +73,7 @@
   "devDependencies": {
     "@types/chai": "^4",
     "@types/cors": "2.8.12",
-    "@types/mocha": "9.1.0",
+    "@types/mocha": "9.1.1",
     "@types/supertest": "^2.0.11",
     "@types/yargs": "17.0.10",
     "chai": "^4.3.6",
@@ -81,8 +81,8 @@
     "mocha": "9.2.2",
     "sinon": "12.0.1",
     "supertest": "^6.2.2",
-    "typedoc": "0.22.13",
-    "typedoc-plugin-markdown": "3.11.14",
+    "typedoc": "0.23.2",
+    "typedoc-plugin-markdown": "3.13.1",
     "typescript": "4.7.4"
   },
   "mocha": {

@@ -11,7 +11,7 @@
 ### Interfaces
 
 - [HoprBoost](interfaces/HoprBoost.md)
-- [HoprChannels](interfaces/HoprChannels.md)
+- [HoprChannels](interfaces/HoprChannels-1.md)
 - [HoprDistributor](interfaces/HoprDistributor.md)
 - [HoprNetworkRegistry](interfaces/HoprNetworkRegistry.md)
 - [HoprStake](interfaces/HoprStake.md)
@@ -24,7 +24,7 @@
 - [TypedEventFilter](interfaces/TypedEventFilter.md)
 - [xHoprToken](interfaces/xHoprToken.md)
 
-### Type aliases
+### Type Aliases
 
 - [ContractData](modules.md#contractdata)
 - [ContractNames](modules.md#contractnames)
@@ -37,7 +37,7 @@
 
 - [getContractData](modules.md#getcontractdata)
 
-## Type aliases
+## Type Aliases
 
 ### ContractData
 
@@ -128,7 +128,3 @@ ___
 #### Returns
 
 [`ContractData`](modules.md#contractdata)
-
-#### Defined in
-
-[packages/ethereum/src/index.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L39)

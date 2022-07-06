@@ -489,10 +489,6 @@ node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:79
 
 BaseContract.\_checkRunningEvents
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:119
-
 ___
 
 ### \_deployed
@@ -512,10 +508,6 @@ ___
 #### Inherited from
 
 BaseContract.\_deployed
-
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:112
 
 ___
 
@@ -539,10 +531,6 @@ ___
 
 BaseContract.\_wrapEvent
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:120
-
 ___
 
 ### activate
@@ -558,10 +546,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:388
 
 ___
 
@@ -583,10 +567,6 @@ ___
 
 BaseContract.attach
 
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:262
-
 ___
 
 ### canImplementInterfaceForAddress
@@ -604,10 +584,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:392
 
 ___
 
@@ -629,10 +605,6 @@ ___
 
 BaseContract.connect
 
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:261
-
 ___
 
 ### currentCaller
@@ -648,10 +620,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:398
 
 ___
 
@@ -669,10 +637,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:400
-
 ___
 
 ### deployed
@@ -686,10 +650,6 @@ ___
 #### Overrides
 
 BaseContract.deployed
-
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:263
 
 ___
 
@@ -712,10 +672,6 @@ ___
 
 BaseContract.emit
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:125
-
 ___
 
 ### fallback
@@ -736,10 +692,6 @@ ___
 
 BaseContract.fallback
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:113
-
 ___
 
 ### gimmeToken
@@ -755,10 +707,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:404
 
 ___
 
@@ -777,10 +725,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:408
-
 ___
 
 ### isActive
@@ -796,10 +740,6 @@ ___
 #### Returns
 
 `Promise`<`boolean`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:413
 
 ___
 
@@ -820,10 +760,6 @@ ___
 #### Inherited from
 
 BaseContract.listenerCount
-
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:126
 
 ___
 
@@ -851,10 +787,6 @@ ___
 
 BaseContract.listeners
 
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:273
-
 ▸ **listeners**(`eventName?`): `Listener`[]
 
 #### Parameters
@@ -870,10 +802,6 @@ packages/ethereum/src/types/HoprWhitehat.ts:273
 #### Overrides
 
 BaseContract.listeners
-
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:276
 
 ___
 
@@ -891,10 +819,6 @@ ___
 
 `Promise`<`string`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:415
-
 ___
 
 ### myHoprStake
@@ -910,10 +834,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:417
 
 ___
 
@@ -935,10 +855,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:419
-
 ___
 
 ### onTokenTransfer
@@ -958,10 +874,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:427
-
 ___
 
 ### owner
@@ -977,10 +889,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:434
 
 ___
 
@@ -1000,10 +908,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:436
-
 ___
 
 ### ownerRescueBoosterNftInBatch
@@ -1020,10 +924,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:442
 
 ___
 
@@ -1053,10 +953,6 @@ ___
 
 BaseContract.queryFilter
 
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:267
-
 ___
 
 ### reclaimErc20Tokens
@@ -1073,10 +969,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:447
 
 ___
 
@@ -1095,10 +987,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:452
 
 ___
 
@@ -1126,10 +1014,6 @@ ___
 
 BaseContract.removeAllListeners
 
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:277
-
 ▸ **removeAllListeners**(`eventName?`): [`HoprWhitehat`](HoprWhitehat.md)
 
 #### Parameters
@@ -1145,10 +1029,6 @@ packages/ethereum/src/types/HoprWhitehat.ts:277
 #### Overrides
 
 BaseContract.removeAllListeners
-
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:280
 
 ___
 
@@ -1166,10 +1046,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:458
-
 ___
 
 ### rescuedXHoprAmount
@@ -1185,10 +1061,6 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:462
 
 ___
 
@@ -1212,10 +1084,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:464
-
 ___
 
 ### transferBackOwnership
@@ -1232,10 +1100,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:474
 
 ___
 
@@ -1254,10 +1118,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:479
-
 ___
 
 ### wxHopr
@@ -1274,10 +1134,6 @@ ___
 
 `Promise`<`string`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:484
-
 ___
 
 ### xHopr
@@ -1293,7 +1149,3 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:486
