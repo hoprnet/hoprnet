@@ -3381,7 +3381,7 @@ __metadata:
     "@types/chai": 4.3.0
     "@types/chai-spies": 1.0.3
     "@types/debug": 4.1.7
-    "@types/mocha": 9.1.0
+    "@types/mocha": 9.1.1
     "@types/node": 16.11.26
     "@types/simple-peer": 9.11.4
     "@types/yargs": 17.0.10
@@ -3391,7 +3391,7 @@ __metadata:
     chai-spies: 1.0.0
     chalk: 5.0.1
     debug: 4.3.4
-    heap-js: 2.1.6
+    heap-js: 2.2.0
     it-handshake: 4.0.0
     it-pair: 2.0.2
     it-pipe: 2.0.3
@@ -3419,7 +3419,7 @@ __metadata:
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@sinonjs/referee": 9.1.1
-    "@types/mocha": 9.1.0
+    "@types/mocha": 9.1.1
     "@types/yargs": 17.0.10
     async-mutex: 0.3.2
     bn.js: 5.2.0
@@ -3428,7 +3428,7 @@ __metadata:
     chalk: 5.0.1
     debug: 4.3.4
     ethers: 5.5.4
-    heap-js: 2.1.6
+    heap-js: 2.2.0
     mocha: 9.2.2
     multiaddr: 10.0.1
     nyc: 15.1.0
@@ -3452,7 +3452,7 @@ __metadata:
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@types/chai-as-promised": 7.1.5
-    "@types/mocha": 9.1.0
+    "@types/mocha": 9.1.1
     "@types/yargs": 17.0.10
     abort-controller: 3.0.0
     bn.js: 5.2.0
@@ -3461,7 +3461,7 @@ __metadata:
     chalk: 5.0.1
     datastore-level: ^8.0.0
     debug: 4.3.4
-    heap-js: 2.1.6
+    heap-js: 2.2.0
     leveldown: 6.1.1
     levelup: 5.1.1
     libp2p: 0.36.2
@@ -3488,7 +3488,7 @@ __metadata:
     "@hoprnet/hopr-core": "workspace:packages/core"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@types/express": 4
-    "@types/mocha": 9.1.0
+    "@types/mocha": 9.1.1
     "@types/yargs": 17.0.10
     bignumber.js: 9.0.2
     bn.js: 5.2.0
@@ -3559,7 +3559,7 @@ __metadata:
   dependencies:
     "@chainsafe/libp2p-noise": 5.0.3
     "@hoprnet/hopr-real": "workspace:packages/real"
-    "@types/mocha": 9.1.0
+    "@types/mocha": 9.1.1
     abort-controller: ~3.0.0
     bignumber.js: 9.0.2
     bl: 5.0.0
@@ -3603,7 +3603,7 @@ __metadata:
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@types/chai": ^4
     "@types/cors": 2.8.12
-    "@types/mocha": 9.1.0
+    "@types/mocha": 9.1.1
     "@types/supertest": ^2.0.11
     "@types/yargs": 17.0.10
     bn.js: 5.2.0
@@ -3628,11 +3628,11 @@ __metadata:
     prop-types: 15.7.2
     react: 17.0.2
     react-dom: 17.0.2
-    rlp: 2.2.7
+    rlp: 3.0.0
     run-queue: 2.0.1
     semver: 7.3.7
     sinon: 12.0.1
-    strip-ansi: 6.0.1
+    strip-ansi: 7.0.1
     supertest: ^6.2.2
     swagger-ui-express: 4.3.0
     tiny-hashes: 1.0.1
@@ -5407,14 +5407,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/mocha@npm:9.1.0":
-  version: 9.1.0
-  resolution: "@types/mocha@npm:9.1.0"
-  checksum: 21e1000dafcfe387c6812be41c44a47b48c27a74d5a70c3d5ef1bb5c88eadadfc74dba06e93f160e7248c8a57b3977b590f82504c801c9927816ecd4668023c0
-  languageName: node
-  linkType: hard
-
-"@types/mocha@npm:^9.1.1":
+"@types/mocha@npm:9.1.1, @types/mocha@npm:^9.1.1":
   version: 9.1.1
   resolution: "@types/mocha@npm:9.1.1"
   checksum: 516077c0acd9806dc78317f88aaac0df5aaf0bdc2f63dfdadeabdf0b0137953b6ca65472e6ff7c30bc93ce4e0ae76eae70e8d46764b9a8eae4877a928b6ef49a
@@ -14215,10 +14208,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"heap-js@npm:2.1.6":
-  version: 2.1.6
-  resolution: "heap-js@npm:2.1.6"
-  checksum: cb712678bc441b5e9d5b825b1c8db170e1bc5757144ce10687d427ec53ac7ae0d8b9c9d4c18b7554949d7aad2ab8d6c71316355839bc1b7b498eaae088db5d94
+"heap-js@npm:2.2.0":
+  version: 2.2.0
+  resolution: "heap-js@npm:2.2.0"
+  checksum: be89ec49ceac0c55a1cdbbe47b8fad76b43d98468b72e7fb3302f048a796ca8c8e683d59ffe564cc0b5ad31b68770a31bf2f315e3739bd7165ea34d7562a4b6b
   languageName: node
   linkType: hard
 
@@ -22806,7 +22799,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"rlp@npm:2.2.7, rlp@npm:^2.0.0, rlp@npm:^2.2.1, rlp@npm:^2.2.2, rlp@npm:^2.2.3, rlp@npm:^2.2.4":
+"rlp@npm:3.0.0":
+  version: 3.0.0
+  resolution: "rlp@npm:3.0.0"
+  bin:
+    rlp: bin/rlp
+  checksum: d1d8003b2be0b25083d842571c0cdc3f2ed4f8b6cc2edf46239e240ba7f73b57ca419cea544394c38bd6b0125e728945af5b167370385d9462e04559b2332e69
+  languageName: node
+  linkType: hard
+
+"rlp@npm:^2.0.0, rlp@npm:^2.2.1, rlp@npm:^2.2.2, rlp@npm:^2.2.3, rlp@npm:^2.2.4":
   version: 2.2.7
   resolution: "rlp@npm:2.2.7"
   dependencies:
@@ -24431,12 +24433,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"strip-ansi@npm:6.0.1, strip-ansi@npm:^6.0.0, strip-ansi@npm:^6.0.1":
-  version: 6.0.1
-  resolution: "strip-ansi@npm:6.0.1"
+"strip-ansi@npm:7.0.1, strip-ansi@npm:^7.0.1":
+  version: 7.0.1
+  resolution: "strip-ansi@npm:7.0.1"
   dependencies:
-    ansi-regex: ^5.0.1
-  checksum: f3cd25890aef3ba6e1a74e20896c21a46f482e93df4a06567cebf2b57edabb15133f1f94e57434e0a958d61186087b1008e89c94875d019910a213181a14fc8c
+    ansi-regex: ^6.0.1
+  checksum: 257f78fa433520e7f9897722731d78599cb3fce29ff26a20a5e12ba4957463b50a01136f37c43707f4951817a75e90820174853d6ccc240997adc5df8f966039
   languageName: node
   linkType: hard
 
@@ -24467,12 +24469,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"strip-ansi@npm:^7.0.1":
-  version: 7.0.1
-  resolution: "strip-ansi@npm:7.0.1"
+"strip-ansi@npm:^6.0.0, strip-ansi@npm:^6.0.1":
+  version: 6.0.1
+  resolution: "strip-ansi@npm:6.0.1"
   dependencies:
-    ansi-regex: ^6.0.1
-  checksum: 257f78fa433520e7f9897722731d78599cb3fce29ff26a20a5e12ba4957463b50a01136f37c43707f4951817a75e90820174853d6ccc240997adc5df8f966039
+    ansi-regex: ^5.0.1
+  checksum: f3cd25890aef3ba6e1a74e20896c21a46f482e93df4a06567cebf2b57edabb15133f1f94e57434e0a958d61186087b1008e89c94875d019910a213181a14fc8c
   languageName: node
   linkType: hard
 
