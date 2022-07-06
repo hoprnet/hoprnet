@@ -25,7 +25,7 @@ import { RelayState } from './state.js'
 import { createRelayerKey, randomInteger, retimer, tryExistingConnections } from '@hoprnet/hopr-utils'
 
 import { attemptClose } from '../utils/index.js'
-import { ConnectComponents, ConnectInitializable } from '../components.js'
+import { type ConnectComponents, ConnectInitializable } from '../components.js'
 
 const DEBUG_PREFIX = 'hopr-connect:relay'
 const DEFAULT_MAX_RELAYED_CONNECTIONS = 10
@@ -211,7 +211,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       return
     }
 
-    const shaker = new RelayHandshake(baseConnection.stream as Stream, this.options)
+    const shaker = new RelayHandshake(baseConnection.stream, this.options)
 
     const handshakeResult = await shaker.initiate(relay, destination)
 
@@ -239,69 +239,46 @@ class Relay implements Initializable, ConnectInitializable, Startable {
   }
 
   private upgradeOutbound(relay: PeerId, destination: PeerId, stream: Stream, opts?: DialOptions): MultiaddrConnection {
-    if (!!this.testingOptions.__noWebRTCUpgrade) {
-      return new RelayConnection({
-        stream,
-        self: this.getComponents().getPeerId(),
-        relay,
-        counterparty: destination,
-        onReconnect: this._onReconnect
-      }) as MultiaddrConnection
-    } else {
-      let channel = this.getConnectComponents().getWebRTCUpgrader().upgradeOutbound()
+    const conn = new RelayConnection(
+      stream,
+      this.getComponents().getPeerId(),
+      relay,
+      destination,
+      'outbound',
+      this.getConnectComponents(),
+      this.testingOptions,
+      this._onReconnect as Relay['onReconnect']
+    )
 
-      let newConn = new RelayConnection({
-        stream,
-        self: this.getComponents().getPeerId(),
-        relay,
-        counterparty: destination,
-        onReconnect: this._onReconnect,
-        webRTC: {
-          channel,
-          upgradeInbound: this.getConnectComponents()
-            .getWebRTCUpgrader()
-            .upgradeInbound.bind(this.getConnectComponents().getWebRTCUpgrader())
-        }
-      })
-
-      return new WebRTCConnection(newConn, channel, {
+    if (!this.testingOptions.__noWebRTCUpgrade) {
+      return new WebRTCConnection(conn, {
         __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade,
         upgrader: undefined as any,
         ...opts
-      }) as MultiaddrConnection
+      })
+    } else {
+      return conn
     }
   }
 
   private upgradeInbound(initiator: PeerId, relay: PeerId, stream: Stream) {
-    if (!!this.testingOptions.__noWebRTCUpgrade) {
-      return new RelayConnection({
-        stream,
-        self: this.getComponents().getPeerId(),
-        relay,
-        counterparty: initiator,
-        onReconnect: this._onReconnect
-      })
-    } else {
-      let channel = this.getConnectComponents().getWebRTCUpgrader().upgradeOutbound()
+    const conn = new RelayConnection(
+      stream,
+      this.getComponents().getPeerId(),
+      relay,
+      initiator,
+      'inbound',
+      this.getConnectComponents(),
+      this.testingOptions,
+      this._onReconnect as Relay['onReconnect']
+    )
 
-      let newConn = new RelayConnection({
-        stream,
-        self: this.getComponents().getPeerId(),
-        relay,
-        counterparty: initiator,
-        onReconnect: this._onReconnect,
-        webRTC: {
-          channel,
-          upgradeInbound: this.getConnectComponents()
-            .getWebRTCUpgrader()
-            .upgradeInbound.bind(this.getConnectComponents().getWebRTCUpgrader())
-        }
-      })
-
-      return new WebRTCConnection(newConn, channel, {
-        __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade,
+    if (!this.testingOptions.__noWebRTCUpgrade) {
+      return new WebRTCConnection(conn, this.testingOptions, {
         upgrader: undefined as any
       })
+    } else {
+      return conn
     }
   }
 
@@ -341,7 +318,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       return
     }
 
-    const shaker = new RelayHandshake(conn.stream as Stream, this.options)
+    const shaker = new RelayHandshake(conn.stream, this.options)
 
     log(`handling relay request from ${conn.connection.remotePeer.toString()}`)
     log(`relayed connection count: ${this.relayState.relayedConnectionCount()}`)
@@ -378,9 +355,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       return
     }
 
-    const handShakeResult = await new RelayHandshake(conn.stream as Stream, this.options).handle(
-      conn.connection.remotePeer
-    )
+    const handShakeResult = await new RelayHandshake(conn.stream, this.options).handle(conn.connection.remotePeer)
 
     if (!handShakeResult.success) {
       return
@@ -408,10 +383,10 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
   /**
    * Called once reconnect happens
-   * @param newStream new relayed connection
+   * @param relayConn new relayed connection
    * @param counterparty counterparty of the relayed connection
    */
-  private async onReconnect(newStream: RelayConnection, counterparty: PeerId): Promise<void> {
+  private async onReconnect(relayConn: RelayConnection, counterparty: PeerId): Promise<void> {
     log(`####### inside reconnect #######`)
 
     let newConn: Connection
@@ -419,17 +394,16 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     log(`Handling reconnection to ${counterparty.toString()}`)
 
     try {
-      if (!!this.testingOptions.__noWebRTCUpgrade) {
-        newConn = await this.getComponents().getUpgrader().upgradeInbound(newStream)
-      } else {
+      if (!this.testingOptions.__noWebRTCUpgrade) {
         newConn = await this.getComponents()
           .getUpgrader()
           .upgradeInbound(
-            new WebRTCConnection(newStream, newStream.webRTC!.channel, {
-              __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade,
+            new WebRTCConnection(relayConn, this.testingOptions, {
               upgrader: undefined as any
-            }) as MultiaddrConnection
+            })
           )
+      } else {
+        newConn = await this.getComponents().getUpgrader().upgradeInbound(relayConn)
       }
     } catch (err) {
       error(err)
@@ -520,7 +494,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
       if (conn != undefined) {
         try {
-          stream = (await conn.newStream([protocol]))?.stream as ProtocolStream['stream']
+          stream = (await conn.newStream([protocol]))?.stream
         } catch (err) {
           await attemptClose(conn, error)
           continue

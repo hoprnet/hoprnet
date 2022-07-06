@@ -1,4 +1,4 @@
-import type { StreamType } from '../types.js'
+import type { HoprConnectTestingOptions, StreamType } from '../types.js'
 import type { StreamHandler } from '@libp2p/interfaces/registrar'
 import type { Connection } from '@libp2p/interface-connection'
 import type { Address } from '@libp2p/interface-peer-store'
@@ -15,7 +15,8 @@ import assert from 'assert'
 
 import { Relay } from './index.js'
 import { privKeyToPeerId, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
-import { RelayConnection } from './connection.js'
+import type { RelayConnection } from './connection.js'
+import type { ConnectComponents } from '../components.js'
 
 const initiator = privKeyToPeerId(stringToU8a('0xa889bad3e2a31cceff4faccdd374af67db485ac0e05e7e654530aff0da5199f7'))
 const relay = privKeyToPeerId(stringToU8a('0xcd1fb76053833d9bb5b3ff243b2d17b96dc5ad7cc09b33c4cf77ba83c297443f'))
@@ -80,7 +81,7 @@ function createFakeComponents(peerId: PeerId, network: EventEmitter): Components
   } as Components
 }
 
-function getPeer(peerId: PeerId, network: EventEmitter) {
+function getPeer(peerId: PeerId, network: EventEmitter, testingOptions?: HoprConnectTestingOptions) {
   async function dialDirectly(ma: Multiaddr): Promise<Connection> {
     const peerId = peerIdFromString(ma.getPeerId() as string)
 
@@ -115,10 +116,23 @@ function getPeer(peerId: PeerId, network: EventEmitter) {
     dialDirectly,
     (multiaddrs: Multiaddr[]) => multiaddrs,
     { environment: `testingEnvironment` },
-    { __noWebRTCUpgrade: true }
+    testingOptions ?? { __noWebRTCUpgrade: true }
   )
 
   relay.init(createFakeComponents(peerId, network))
+  relay.initConnect({
+    getWebRTCUpgrader() {
+      const webRTCInstance = new EventEmitter()
+      return {
+        upgradeOutbound() {
+          return webRTCInstance
+        },
+        upgradeInbound() {
+          return webRTCInstance
+        }
+      }
+    }
+  } as ConnectComponents)
 
   relay.start()
   relay.afterStart()
@@ -137,7 +151,6 @@ describe('test relay', function () {
     for (let i = 0; i < 5; i++) {
       const conn = await Alice.connect(Bob.getComponents().getPeerId(), Charly.getComponents().getPeerId())
 
-      console.log('after connect')
       assert(conn != undefined, `Should be able to connect`)
       const shaker = handshake(conn as any)
 
