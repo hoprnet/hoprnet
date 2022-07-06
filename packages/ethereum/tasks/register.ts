@@ -34,7 +34,7 @@ async function main(
     process.exit(1)
   }
 
-  if (network.name !== 'hardhat' || !network.tags.staging) {
+  if (network.name !== 'hardhat' && !network.tags.staging) {
     console.error('Register only works in a hardhat or staging network.')
     process.exit(1)
   }
