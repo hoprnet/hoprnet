@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-set -x
 
 # TODO: this script currently uses goerli as the RPC provider. However, it
 # should be extended to use its own instance of hardhat too.
