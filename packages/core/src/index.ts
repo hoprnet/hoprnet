@@ -254,7 +254,7 @@ class Hopr extends EventEmitter {
     // Fetch previous announcements from database
     const initialNodes = await this.connector.waitForPublicNodes()
 
-    // // Add all initial public nodes to public nodes cache
+    // Add all initial public nodes to public nodes cache
     initialNodes.forEach((initialNode) => this.knownPublicNodesCache.add(initialNode.id.toString()))
 
     // Fetch all nodes that will announces themselves during startup
@@ -266,7 +266,7 @@ class Hopr extends EventEmitter {
     const libp2p = (await createLibp2pInstance(
       this.id,
       this.options,
-      [], //initialNodes,
+      initialNodes,
       this.publicNodesEmitter,
       async (peerId: PeerId, origin: string): Promise<boolean> => {
         return accessControl.reviewConnection(peerId, origin)
@@ -416,7 +416,7 @@ class Hopr extends EventEmitter {
       log(`No multiaddrs has been registered.`)
     }
     await this.maybeLogProfilingToGCloud()
-    // this.heartbeat.recalculateNetworkHealth()
+    this.heartbeat.recalculateNetworkHealth()
   }
 
   private async maybeLogProfilingToGCloud() {
@@ -682,7 +682,7 @@ class Hopr extends EventEmitter {
   public getListeningAddresses(): Multiaddr[] {
     // @TODO find a better way to do this
     // @ts-ignore undocumented method
-    return (this.libp2pComponents.components as Components).getAddressManager().getListenAddrs()
+    return this.libp2pComponents.getAddressManager().getListenAddrs()
   }
 
   /**

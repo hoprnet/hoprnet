@@ -1,11 +1,10 @@
 import assert from 'assert'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import type { Connection } from '@libp2p/interface-connection'
+import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
 import type { Components } from '@libp2p/interfaces/components'
-import type { StreamHandler } from '@libp2p/interface-registrar'
+import type { StreamHandler, IncomingStreamData } from '@libp2p/interface-registrar'
 import { peerIdFromString } from '@libp2p/peer-id'
 import { createSecp256k1PeerId, createEd25519PeerId } from '@libp2p/peer-id-factory'
-import BL from 'bl'
 import { Multiaddr } from '@multiformats/multiaddr'
 
 import { defer, type DeferType } from '../async/index.js'
@@ -94,11 +93,11 @@ function getFakeLibp2p(
         msgToReplyWith?: Uint8Array
       }
     | undefined
-) {
+): Components {
   return {
     getConnectionManager() {
       return {
-        getConnections: (_peer: PeerId) => {
+        getConnections(_peer: PeerId): Connection[] {
           return []
         },
         dialer: {
@@ -119,36 +118,37 @@ function getFakeLibp2p(
                         state?.waitUntilSend?.resolve()
                       }
                     },
-                    source: (async function* () {
+                    source: (async function* (): AsyncIterable<Uint8Array> {
                       state?.waitUntilSend && (await state.waitUntilSend.promise)
 
                       if (messages.msgToReplyWith) {
-                        yield new BL(Buffer.from(messages.msgToReplyWith))
+                        yield messages.msgToReplyWith
                       }
                     })()
-                  } as any,
+                  } as ProtocolStream['stream'],
                   protocol
                 }),
               remotePeer: destination
             } as Connection)
           }
         }
-      } as any
+      } as Components['connectionManager']
     },
     getPeerStore() {
       return {
         addressBook: {
-          get(_peer: PeerId) {
+          async get(_peer: PeerId) {
             return [
               {
-                multiaddr: new Multiaddr(`/ip4/1.2.3.4/`)
+                multiaddr: new Multiaddr(`/ip4/1.2.3.4/`),
+                isCertified: true
               }
             ]
           }
         }
-      } as any
+      } as Components['peerStore']
     }
-  }
+  } as Components
 }
 
 describe(`test libp2pSendMessage`, function () {
@@ -167,7 +167,7 @@ describe(`test libp2pSendMessage`, function () {
       }
     )
 
-    await libp2pSendMessage(libp2pComponents as Components, destination, 'demo protocol', msgToReceive, false, {
+    await libp2pSendMessage(libp2pComponents, destination, 'demo protocol', msgToReceive, false, {
       timeout: 5000
     })
 
@@ -199,7 +199,7 @@ describe(`test libp2pSendMessage with response`, function () {
 
     const results = await Promise.all([
       msgReceived.promise,
-      libp2pSendMessage(libp2pComponents as Components, destination, 'demo protocol', msgToReceive, true, {
+      libp2pSendMessage(libp2pComponents, destination, 'demo protocol', msgToReceive, true, {
         timeout: 5000
       })
     ])
@@ -234,10 +234,10 @@ describe(`test libp2pSubscribe`, async function () {
           async handle(protocols: string | string[], handlerFunction: StreamHandler) {
             handlerFunction({
               stream: {
-                source: (async function* () {
-                  yield new BL(msgToReceive as any)
+                source: (async function* (): AsyncIterable<Uint8Array> {
+                  yield msgToReceive
                 })(),
-                sink: (async (source: AsyncIterable<Uint8Array>) => {
+                sink: async (source: AsyncIterable<Uint8Array>) => {
                   const msgs = []
                   for await (const msg of source) {
                     msgs.push(msg)
@@ -247,15 +247,15 @@ describe(`test libp2pSubscribe`, async function () {
                   } else {
                     msgReplied.reject()
                   }
-                }) as any
-              } as any,
+                }
+              },
               connection: {
                 remotePeer
-              } as any,
+              } as Connection,
               protocol: protocols[0]
-            })
+            } as IncomingStreamData)
           }
-        } as any
+        } as Components['registrar']
       }
     } as Components
 
@@ -286,22 +286,22 @@ describe(`test libp2pSubscribe`, async function () {
           async handle(protocols: string[], handlerFunction: (args: LibP2PHandlerArgs) => Promise<void>) {
             handlerFunction({
               stream: {
-                source: (async function* () {
-                  yield new BL(msgToReceive as any)
+                source: (async function* (): AsyncIterable<Uint8Array> {
+                  yield msgToReceive
                 })(),
                 sink: (() => {}) as any
-              } as any,
+              } as ProtocolStream['stream'],
               connection: {
                 remotePeer
               } as any,
               protocol: protocols[0]
             })
           }
-        } as any
+        } as Components['registrar']
       }
     } as Components
 
-    libp2pSubscribe(libp2pComponents as any, 'demo protocol', fakeOnMessage, () => {}, false)
+    libp2pSubscribe(libp2pComponents, 'demo protocol', fakeOnMessage, () => {}, false)
 
     await msgReceived.promise
   })

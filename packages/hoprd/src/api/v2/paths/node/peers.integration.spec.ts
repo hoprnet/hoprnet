@@ -89,7 +89,7 @@ node.getConnectionInfo = (peer: PeerId) => {
   }
 }
 
-describe.only('GET /node/peers', function () {
+describe('GET /node/peers', function () {
   let service: any
   before(async function () {
     const loaded = await createTestApiInstance(node)
