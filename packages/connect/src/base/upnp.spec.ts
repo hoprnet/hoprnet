@@ -12,7 +12,6 @@ describe('test upnp', function () {
       return
     }
 
-    console.log(`started`)
     upnp.beforeStart()
     upnp.start()
   })
