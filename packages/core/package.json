@@ -42,7 +42,7 @@
     "chalk": "5.0.1",
     "datastore-level": "^8.0.0",
     "debug": "4.3.4",
-    "heap-js": "2.1.6",
+    "heap-js": "2.2.0",
     "leveldown": "6.1.1",
     "levelup": "5.1.1",
     "libp2p": "0.36.2",
@@ -55,7 +55,7 @@
   "devDependencies": {
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum",
     "@types/chai-as-promised": "7.1.5",
-    "@types/mocha": "9.1.0",
+    "@types/mocha": "9.1.1",
     "@types/yargs": "17.0.10",
     "chai": "4.3.6",
     "chai-as-promised": "7.1.1",
