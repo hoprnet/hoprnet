@@ -13,6 +13,7 @@
 - Reenable e2e tests and enhance REST API ([#3836](https://github.com/hoprnet/hoprnet/pull/3836))
 - Fix decoding error when API token contains certain characters
 - Add Docker image running hardhat using the Hopr environment and smart contracts (useful for testing and development)
+- Bump `libp2p@0.37` ([#3879](https://github.com/hoprnet/hoprnet/pull/3879))
 
 <a name="1.89"></a>
 
