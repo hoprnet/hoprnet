@@ -26,25 +26,31 @@ Relevant smart contracts are listed below, per environment:
 A node can be registered by its runner if the runner is eligible. There are two ways to become an eligible account:
 
 - A node runner's Ethereum account is staking in the HOPR stake program for a minimum stake of 1000 xHOPR token
-- A node runner's Ethereum account holds a "HOPR Boost NFT" of type `Dev`
+- A node runner's Ethereum account is staking a "HOPR Boost NFT" of type `Dev`
 
-#### Stake in staging environment
+#### Stake xHOPR tokens in staging environment
 
 To stake xHOPR tokens, you can interact directly with the staking contract of the environment your HOPR node is running on. For production network, there is even a web application for such a purpose.
 
 For the <mark>staging environment</mark>, please call the following function where the `privatekey` is the private key of the node runner's account. This call can only succeed if the caller (i.e. the `privatekey` or the node runner) has enough xHOPR (on goerli staging environment).
 
 ```
-yarn workspace @hoprnet/hopr-ethereum hardhat stake --network goerli --amount 1000000000000000000000 --privatekey 0x6789...
+yarn workspace @hoprnet/hopr-ethereum hardhat stake --network goerli --type xhopr --amount 1000000000000000000000 --privatekey 0x6789...
 ```
 
 If there's not enough xHOPR token, please use "Dev Bank" account to transfer some to the node runner's account.
 
-#### Mint Dev NFT in staging environment
+#### Stake Dev NFT in staging environment
 
 <mark>When not in production</mark>, CI/CD will mint "Dev" NFTs to `CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1]` and `CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[3]` on deployment.
 
 There are 10 "Dev" NFTs being minted to the "Dev Bank" account per deployment, where you can transfer some tokens from.
+
+For the <mark>staging environment</mark>, please call the following function where the `privatekey` is the private key of the node runner's account. This call can only succeed if the caller (i.e. the `privatekey` or the node runner) has "Dev" NFT (on goerli staging environment).
+
+```
+yarn workspace @hoprnet/hopr-ethereum hardhat stake --network goerli --type devnft --privatekey 0x6789...
+```
 
 ### Register the peer ID
 
