@@ -193,7 +193,7 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
   node_ip=$(gcloud_get_ip "${instance_name}")
 
   if [[ "${reset_metadata}" = "true" ]]; then
-    gcloud_remove_instance_metadata "${instance_name}" "hopr_peer-id,hopr_wallet-addr,hopr_staking-addr"
+    gcloud_remove_instance_metadata "${instance_name}" "hopr-peer-id,hopr-wallet-addr,hopr-staking-addr"
   fi
 
   # All VM instances in the deployed cluster will get a special metadata entries
@@ -209,9 +209,9 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
 
   # known metadata keys
   declare wallet_addr peer_id staking_addr
-  wallet_addr="$(echo "${instance_metadata}" | jq -r '.hopr-wallet-addr // empty')"
-  peer_id="$(echo "${instance_metadata}" | jq -r '.hopr-peer-id // empty')"
-  staking_addr="$(echo "${instance_metadata}" | jq -r '.hopr-staking-addr // empty')"
+  wallet_addr="$(echo "${instance_metadata}" | jq -r '."hopr-wallet-addr" // empty')"
+  peer_id="$(echo "${instance_metadata}" | jq -r '."hopr-peer-id" // empty')"
+  staking_addr="$(echo "${instance_metadata}" | jq -r '."hopr-staking-addr" // empty')"
 
   # data from the node's API for verification or initialization
   declare api_wallet_addr api_peer_id
