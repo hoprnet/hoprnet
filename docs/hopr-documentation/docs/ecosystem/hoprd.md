@@ -1,5 +1,5 @@
 ---
-id: ecosystem-hoprd
+id: hoprd
 title: Using wxHOPR in HOPRd
 ---
 
@@ -9,5 +9,5 @@ The first thing to understand is that HOPR nodes currently run on wrapped xHOPR 
 
 Learn how to run and fund a HOPRd node in the following guides:
 
-1. [Installing a HOPR node](https://docs.hoprnet.org/v1.86/node/start-here)
-2. [Running a HOPR node](https://docs.hoprnet.org/v1.86/node/guide-using-a-hoprd-node)
+1. [Installing a HOPR node](https://docs.hoprnet.org/node/start-here)
+2. [Running a HOPR node](https://docs.hoprnet.org/node/guide-using-a-hoprd-node)
