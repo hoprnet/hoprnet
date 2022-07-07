@@ -77,9 +77,9 @@ faucet_to_address() {
   local secret="${FAUCET_SECRET_API_KEY}"
 
   curl --silent --request POST \
-  "$API_ENDPOINT/api/faucet/$environment/$address/$token?text=true" \
-  --header 'Content-Type: application/json' \
-  --data-raw "{\"secret\": \"$secret\"}"
+    "$API_ENDPOINT/api/faucet/$environment/$address/$token?text=true" \
+    --header 'Content-Type: application/json' \
+    --data-raw "{\"secret\": \"$secret\"}"
 }
 
 # $1=account (hex)
@@ -111,6 +111,7 @@ fund_if_empty() {
   local address_native_balance address_hopr_balance
   log "Checking balance of the address to fund: ${address}"
   address_native_balance=$(wallet_balance "${environment}" "${address}" "native")
+
   log "Checking balance of the address to fund: ${address}"
   address_hopr_balance=$(wallet_balance "${environment}" "${address}" "hopr")
 
