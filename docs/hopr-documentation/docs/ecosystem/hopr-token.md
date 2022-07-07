@@ -1,5 +1,5 @@
 ---
-id: ecosystem-hopr-token
+id: hopr-token
 title: HOPR Token
 ---
 
@@ -12,4 +12,4 @@ The HOPR token has three main uses:
 3. Users can stake their HOPR tokens, allowing them to earn more HOPR tokens.
 4. Finally, the HOPR token gives users voting power in the HOPR Association DAO.
 
-You can buy HOPR tokens using this [guide](https://docs.hoprnet.org/v1.86/staking/how-to-get-hopr).
+You can buy HOPR tokens using this [guide](https://docs.hoprnet.org/staking/how-to-get-hopr).

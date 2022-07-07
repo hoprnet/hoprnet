@@ -1,5 +1,5 @@
 ---
-id: ecosystem-introduction
+id: introduction
 title: Introduction
 ---
 

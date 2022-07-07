@@ -1,5 +1,5 @@
 ---
-id: ecosystem-staking
+id: staking
 title: Staking xHOPR tokens
 ---
 
@@ -9,4 +9,4 @@ Stake `xHOPR` tokens on Gnosis Chain to earn rewards. There’s a base rate of 1
 
 Rewards are paid every block, and can be claimed as soon as you earn them. But your stake is locked until the staking season ends. Claimed rewards can be unwrapped and restaked for cumulative yields, but these restaked rewards will also be locked.
 
-Find how to stake in this [guide](https://docs.hoprnet.org/v1.86/staking/how-to-stake#how-to-stake).
+Find how to stake in this [guide](https://docs.hoprnet.org/staking/how-to-stake#how-to-stake).

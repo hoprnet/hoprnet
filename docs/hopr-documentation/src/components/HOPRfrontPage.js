@@ -54,7 +54,7 @@ const FeatureList = [
     title: 'Ecosystem',
     Svg: <img class="svg_icon" src={'/img/front_icons/hopr-ecosystem.svg'} />,
     description: <>Everything you need to know about HOPR's ecosystem.</>,
-    docName: 'ecosystem/intro'
+    docName: 'ecosystem/introduction'
   },
   {
     title: 'FAQ',
