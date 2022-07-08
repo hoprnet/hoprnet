@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -x
 
 # API used for funding the calls, source code in https://github.com/hoprnet/api
 declare API_ENDPOINT="https://api.hoprnet.org"
@@ -121,13 +122,29 @@ fund_if_empty() {
   if [ "${address_native_balance}" = '0.0' ]; then
     # @TODO: Provide retry by checking balance again.
     log "${address} has no native balance. Funding native tokens..."
-    faucet_to_address "${environment}" "${address}" "native"
+    local tx_hash tx_error tx_res
+    tx_res="$(faucet_to_address "${environment}" "${address}" "native")"
+    tx_error="$(echo "${tx_res}" | jq -r '.err // empty')"
+    tx_hash="$(echo "${tx_res}" | jq -r '.hash // empty')"
+    if [ -n "${tx_error}" ]; then
+      log "Funding native tokens failed with error: ${tx_error}"
+    exit 1
+    fi
+    log "Funded native tokens, see tx hash ${tx_hash}"
   fi
 
   if [ "${address_hopr_balance}" = '0.0' ]; then
     # @TODO: Provide retry by checking balance again.
     log "${address} has no HOPR tokens. Funding HOPR tokens..."
-    faucet_to_address "${environment}" "${address}" "hopr"
+    local tx_hash tx_error tx_res
+    tx_res="$(faucet_to_address "${environment}" "${address}" "hopr")"
+    tx_error="$(echo "${tx_res}" | jq -r '.err // empty')"
+    tx_hash="$(echo "${tx_res}" | jq -r '.hash // empty')"
+    if [ -n "${tx_error}" ]; then
+      log "Funding HOPR tokens failed with error: ${tx_error}"
+    exit 1
+    fi
+    log "Funded HOPR tokens, see tx hash ${tx_hash}"
   fi
 }
 
