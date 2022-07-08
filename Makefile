@@ -116,7 +116,7 @@ endif
 ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
-	@TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
 	HOPR_ENVIRONMENT_ID="$(environment)" \
 	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
    --network $(network) \
