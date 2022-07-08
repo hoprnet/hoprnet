@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-set -x
 
 # API used for funding the calls, source code in https://github.com/hoprnet/api
 declare API_ENDPOINT="https://api.hoprnet.org"
