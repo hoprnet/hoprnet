@@ -1,5 +1,5 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
-import { utils } from 'ethers'
+import { Signer, utils } from 'ethers'
 import type {
   HoprNetworkRegistry,
   HoprDummyProxyForNetworkRegistry,
@@ -53,7 +53,18 @@ async function main(
     process.exit(1)
   }
 
-  const signer = ethers.provider.getSigner()
+  let provider
+  let signer: Signer
+  if (environment == 'hardhat-localhost') {
+    // we use a custom ethers provider here instead of the ethers object from the
+    // hre which is managed by hardhat-ethers, because that one seems to
+    // run its own in-memory hardhat instance, which is undesirable
+    provider = new ethers.providers.JsonRpcProvider()
+    signer = provider.getSigner()
+  } else {
+    provider = ethers.provider
+    signer = ethers.provider.getSigner()
+  }
 
   const hoprProxy = !network.tags.staging
     ? ((await ethers.getContractFactory('HoprDummyProxyForNetworkRegistry'))

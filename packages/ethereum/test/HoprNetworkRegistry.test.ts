@@ -79,6 +79,10 @@ describe('HoprNetworkRegistry', () => {
     beforeEach(async () => {
       ;({ owner, participants, participantAddresses, hoprNetworkRegistry } = await useFixtures())
     })
+    it('is enabled globally', async () => {
+      expect(await hoprNetworkRegistry.enabled()).to.be
+      .true
+    })
     it('owner to update the registry', async () => {
       // const {deployer, owner, participants, ownerAddress, participantAddresses, stakeV2Fake, hoprNetworkRegistry } = await useFixtures()
       await expect(hoprNetworkRegistry.connect(owner).updateRequirementImplementation(constants.AddressZero))
