@@ -143,12 +143,22 @@ async function main(opts: StakeOpts, hre: HardhatRuntimeEnvironment, _runSuper: 
     process.exit(1)
   }
 
+  let provider
+  if (environment == 'hardhat-localhost') {
+    // we use a custom ethers provider here instead of the ethers object from the
+    // hre which is managed by hardhat-ethers, because that one seems to
+    // run its own in-memory hardhat instance, which is undesirable
+    provider = new ethers.providers.JsonRpcProvider()
+  } else {
+    provider = ethers.provider
+  }
+
   // get the provider and signer
   let signer: Signer
   if (!opts.privatekey) {
-    signer = ethers.provider.getSigner()
+    signer = provider.getSigner()
   } else {
-    signer = new Wallet(opts.privatekey, ethers.provider)
+    signer = new Wallet(opts.privatekey, provider)
   }
   const signerAddress = await signer.getAddress()
   console.log('Signer Address', signerAddress)
