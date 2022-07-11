@@ -148,6 +148,7 @@ describe('relay swtich context', function () {
     const UPDATE_ATTEMPTS = 5
 
     for (let i = 0; i < UPDATE_ATTEMPTS; i++) {
+      console.log(`iteration`, i)
       const [relayToNodeAfterUpdate, nodeToRelayAfterUpdate] = duplexPair<StreamType>()
 
       ctx.update(nodeToRelayAfterUpdate)
@@ -198,14 +199,16 @@ describe('relay switch context - falsy streams', function () {
       })()
     )
 
+    // start stream
     const sourcePromise = (relayToNode.source as AsyncIterable<StreamType>)[Symbol.asyncIterator]().next()
 
     await assert.rejects(sinkPromise, Error(errorInSource))
 
+    // make sure that stream ends
     await sourcePromise
   })
 
-  it('falsy sink', async function () {
+  it('falsy sink + recovery', async function () {
     const nodeToRelay = pair<StreamType>()
 
     const falsySinkError = 'falsy sink error'
@@ -215,14 +218,137 @@ describe('relay switch context - falsy streams', function () {
       sink: () => Promise.reject(Error(falsySinkError))
     })
 
-    await assert.rejects(
-      ctx.sink(
-        (async function* () {
-          yield new Uint8Array()
-        })()
-      ),
-      Error(falsySinkError)
+    const relayShaker = handshake(ctx)
+
+    const messageBeforeError = Uint8Array.from([
+      RelayPrefix.PAYLOAD,
+      ...new TextEncoder().encode(`message before error`)
+    ])
+    // should not throw
+    relayShaker.write(messageBeforeError)
+
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    const [relayEnd, nodeEnd] = duplexPair<Uint8Array>()
+
+    const shakerAfterError = handshake(nodeEnd)
+
+    ctx.update(relayEnd)
+
+    const newStreamMessage = Uint8Array.from([RelayPrefix.PAYLOAD, ...new TextEncoder().encode(`new stream message`)])
+    shakerAfterError.write(newStreamMessage)
+
+    assert(
+      u8aEquals(
+        await relayShaker.read(),
+        Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.RESTART)
+      )
     )
+
+    assert(u8aEquals(await relayShaker.read(), newStreamMessage))
+
+    const newStreamMessageReply = Uint8Array.from([
+      RelayPrefix.PAYLOAD,
+      ...new TextEncoder().encode(`new stream message reply`)
+    ])
+
+    relayShaker.write(newStreamMessageReply)
+
+    assert(u8aEquals(await shakerAfterError.read(), messageBeforeError))
+    assert(u8aEquals(await shakerAfterError.read(), newStreamMessageReply))
+  })
+
+  it('falsy sink & source + recovery', async function () {
+    const falsySinkError = 'falsy sink error'
+
+    const ctx = new RelayContext({
+      source: undefined as any,
+      sink: () => Promise.reject(Error(falsySinkError))
+    })
+
+    const relayShaker = handshake(ctx)
+
+    const messageBeforeError = Uint8Array.from([
+      RelayPrefix.PAYLOAD,
+      ...new TextEncoder().encode(`message before error`)
+    ])
+    // should not throw
+    relayShaker.write(messageBeforeError)
+
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    const [relayEnd, nodeEnd] = duplexPair<Uint8Array>()
+
+    const shakerAfterError = handshake(nodeEnd)
+
+    ctx.update(relayEnd)
+
+    const newStreamMessage = Uint8Array.from([RelayPrefix.PAYLOAD, ...new TextEncoder().encode(`new stream message`)])
+    shakerAfterError.write(newStreamMessage)
+
+    assert(
+      u8aEquals(
+        await relayShaker.read(),
+        Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.RESTART)
+      )
+    )
+
+    assert(u8aEquals(await relayShaker.read(), newStreamMessage))
+
+    const newStreamMessageReply = Uint8Array.from([
+      RelayPrefix.PAYLOAD,
+      ...new TextEncoder().encode(`new stream message reply`)
+    ])
+
+    relayShaker.write(newStreamMessageReply)
+
+    assert(u8aEquals(await shakerAfterError.read(), messageBeforeError))
+    assert(u8aEquals(await shakerAfterError.read(), newStreamMessageReply))
+  })
+
+  it('falsy source + recovery', async function () {
+    const nodeToRelay = pair<StreamType>()
+
+    const ctx = new RelayContext({
+      source: undefined as any,
+      sink: nodeToRelay.sink
+    })
+
+    const relayShaker = handshake(ctx)
+
+    const messageBeforeError = Uint8Array.from([
+      RelayPrefix.PAYLOAD,
+      ...new TextEncoder().encode(`message before error`)
+    ])
+    // should not throw
+    relayShaker.write(messageBeforeError)
+
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    const [relayEnd, nodeEnd] = duplexPair<Uint8Array>()
+
+    const shakerAfterError = handshake(nodeEnd)
+
+    ctx.update(relayEnd)
+
+    const newStreamMessage = Uint8Array.from([RelayPrefix.PAYLOAD, ...new TextEncoder().encode(`new stream message`)])
+    shakerAfterError.write(newStreamMessage)
+
+    assert(
+      u8aEquals(
+        await relayShaker.read(),
+        Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.RESTART)
+      )
+    )
+
+    assert(u8aEquals(await relayShaker.read(), newStreamMessage))
+
+    const newStreamMessageReply = Uint8Array.from([
+      RelayPrefix.PAYLOAD,
+      ...new TextEncoder().encode(`new stream message reply`)
+    ])
+
+    relayShaker.write(newStreamMessageReply)
+
+    assert(u8aEquals(await shakerAfterError.read(), messageBeforeError))
+    assert(u8aEquals(await shakerAfterError.read(), newStreamMessageReply))
   })
 
   it('falsy sink before attaching source', async function () {

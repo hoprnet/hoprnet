@@ -73,12 +73,12 @@ export function statusMessagesCompare(a: Uint8Array, b: Uint8Array): -1 | 0 | 1 
 }
 
 enum ConnectionEventTypes {
-  CLOSE = 'close',
-  SINK_SOURCE_ATTACHED = 'sinkSourceAttached',
-  STATUS_MESSAGE = 'statusMessage',
-  PAYLOAD = 'payload',
-  SINK_SWITCH = 'sinkSwitch',
-  SOURCE_SWITCH = 'sourceSwitch'
+  CLOSE,
+  SINK_SOURCE_ATTACHED,
+  STATUS_MESSAGE,
+  PAYLOAD,
+  SINK_SWITCH,
+  SOURCE_SWITCH
 }
 
 type CloseEvent = {
@@ -216,8 +216,6 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     // to make sure we can attach an error handler to it
     this.sinkCreator = this._stream.sink(this.sinkFunction())
 
-    console.log(`sinkCreator`, this.sinkCreator)
-
     // catch errors that occur before attaching a sink source stream
     this.sinkCreator.catch((err) => this.error('sink error thrown before sink attach', err.message))
 
@@ -345,7 +343,9 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       type: ConnectionEventTypes.SINK_SWITCH
     })
     this._sourceSwitched = true
-    this._sourceSwitchPromise.resolve()
+    this._sourceSwitchPromise.resolve({
+      type: ConnectionEventTypes.SOURCE_SWITCH
+    })
 
     // FIXME: The type between iterator/async-iterator cannot be matched in
     // this case easily.
@@ -480,6 +480,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
           toYield = Uint8Array.from([RelayPrefix.PAYLOAD, ...result.value.value.slice()])
           break
+        default:
+          throw Error(`Invalid result. Received ${result}`)
       }
 
       if (toYield != undefined) {
@@ -608,6 +610,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
                     nextPayload()
                     break
+                  default:
+                    throw Error(`Invalid suffix. Received ${u8aToHex(SUFFIX)}`)
                 }
                 break
               case RelayPrefix.STATUS_MESSAGE:
@@ -653,8 +657,12 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
                 toYield = SUFFIX
                 nextPayload()
                 break
+              default:
+                throw Error(`Invalid prefix. Received ${u8aToHex(PREFIX)}`)
             }
             break
+          default:
+            throw Error(`Invalid result. Received ${result}`)
         }
 
         this.flow(`here`, toYield)

@@ -143,10 +143,13 @@ class RelayState {
     this.relayedConnections.set(RelayState.getId(source, destination), relayedConnection)
 
     try {
-      await Promise.all([sourcePromise, destinationPromise])
+      Promise.all([sourcePromise, destinationPromise]).catch((err) => {
+        this.relayedConnections.delete(RelayState.getId(source, destination))
+        error(`Could not create new relay connection`, err)
+      })
     } catch (err) {
       this.relayedConnections.delete(RelayState.getId(source, destination))
-      throw err
+      error(`Could not create new relay connection`, err)
     }
   }
 
@@ -185,11 +188,12 @@ class RelayState {
       unmarshalPublicKey(b.publicKey as Uint8Array).marshal()
     )
 
+    // human-readable ID
     switch (cmpResult) {
       case 1:
-        return `${a.toString()}${b.toString()}`
+        return `${a.toString()}-${b.toString()}`
       case -1:
-        return `${b.toString()}${a.toString()}`
+        return `${b.toString()}-${a.toString()}`
       default:
         throw Error(`Invalid compare result. Loopbacks are not allowed.`)
     }
