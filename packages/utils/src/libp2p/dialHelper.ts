@@ -202,12 +202,26 @@ async function queryDHT(components: Components, destination: PeerId): Promise<Pe
   const key = createRelayerKey(destination)
   log(`fetching relay keys for node ${destination.toString()} from DHT.`, key)
 
+  const abort = new AbortController()
+
+  let done = false
+
+  setTimeout(() => {
+    if (done) {
+      return
+    }
+    done = true
+
+    abort.abort()
+  }, DEFAULT_DHT_QUERY_TIMEOUT).unref()
   try {
     // libp2p type clash
-    for await (const relayer of components.getContentRouting().findProviders(key as any)) {
+    for await (const relayer of components.getContentRouting().findProviders(key as any, { signal: abort.signal })) {
       relayers.push(relayer.id)
     }
+    done = true
   } catch (err) {
+    done = true
     error(`Error while querying the DHT for ${destination.toString()}.`)
     if (err?.message) {
       error(`DHT error: ${err.message}`)
@@ -232,7 +246,7 @@ const CODE_P2P = protocols('p2p').code
  * 2. Check the DHT (if available) for additional addresses
  * 3. Try new addresses
  *
- * @param libp2p Libp2p instance
+ * @param components components of libp2p instance
  * @param destination which peer to connect to
  * @param protocol which protocol to use
  * @param opts timeout options
