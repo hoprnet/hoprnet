@@ -30,8 +30,15 @@ fi
 
 declare environment_id="${2:-"$(${mydir}/get-default-environment.sh)"}"
 
-if [ -z ${environment_id} ]; then
+if [ -z "${environment_id}" ]; then
   msg "Could not determine default environment"
+  exit 1
+fi
+
+# Retrieve the provider URL for the given environment ID from protocol-config.json
+provider_url=$(jq -r ".environments.\"${environment_id}\".network_id as \$envid | .networks[\$envid].default_provider // \"\"" "${mydir}/../packages/core/protocol-config.json")
+if [ -z "${provider_url}" ]; then
+  msg "Environment ${environment_id} has invalid network_id"
   exit 1
 fi
 
@@ -89,8 +96,9 @@ sed -n '/BEGIN_JSON_EXPORT/,/END_JSON_EXPORT/{//!p}' ./docker-compose.yml \
   | jq -s ".[0].image += .[1] | .[0] | .version = \"${AVADO_VERSION}\"" ./dappnode_package.json /dev/stdin \
   > ./dappnode_package.json.tmp && mv ./dappnode_package.json.tmp ./dappnode_package.json
 
-# Overwrite default environment in Dockerfile with the one currently used
-sed -e "s/master-goerli/${environment_id}/" ./build/Dockerfile > ./build/Dockerfile.tmp && mv ./build/Dockerfile.tmp ./build/Dockerfile 
+# Overwrite default environment & provider in Dockerfile with the one currently used
+sed -e "s/${default_development_environment}/${environment_id}/ ; s/HOPRD_PROVIDER=.+/HOPRD_PROVIDER=${provider_url}" ./build/Dockerfile \
+  > ./build/Dockerfile.tmp && mv ./build/Dockerfile.tmp ./build/Dockerfile
 
 # AVADO SDK does not do proper releases, therefore using GitHub + git commit hashes
 declare AVADO_SDK_COMMIT="7b035be"

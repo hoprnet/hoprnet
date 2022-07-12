@@ -29,7 +29,8 @@ services:
         'HOPRD_IDENTITY=/app/hoprd-db/.hopr-identity',
         'HOPRD_DATA=/app/hoprd-db/data-master-goerli',
         'HOPRD_INIT=true',
-        'HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS=false'
+        'HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS=false',
+        'HOPRD_PROVIDER=https://provider-proxy.hoprnet.workers.dev/eth_goerli',
       ]
     'ports': ['3000:3000/tcp', '3001:3001/tcp', '8080:8080/tcp', '9091:9091/tcp', '9091:9091/udp']
     'restart': 'always'
