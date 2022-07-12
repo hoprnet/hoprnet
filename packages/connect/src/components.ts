@@ -1,3 +1,4 @@
+// Use errCode library to add metadata to errors and align with libp2p transport interface
 import errCode from 'err-code'
 
 import type { WebRTCUpgrader } from './webrtc/upgrader.js'

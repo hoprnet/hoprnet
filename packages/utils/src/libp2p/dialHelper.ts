@@ -15,7 +15,7 @@ import { createCircuitAddress } from '../network/index.js'
 const DEBUG_PREFIX = `hopr-core:libp2p`
 
 const log = debug(DEBUG_PREFIX)
-const logError = debug(DEBUG_PREFIX.concat(`:error`))
+const error = debug(DEBUG_PREFIX.concat(`:error`))
 
 const DEFAULT_DHT_QUERY_TIMEOUT = 20000
 
@@ -54,11 +54,11 @@ export type DialResponse =
     }
 
 async function printPeerStoreAddresses(msg: string, destination: PeerId, components: Components): Promise<void> {
-  logError(msg)
-  logError(`Known addresses:`)
+  error(msg)
+  error(`Known addresses:`)
 
   for (const address of await components.getPeerStore().addressBook.get(destination)) {
-    logError(address.multiaddr.toString())
+    error(address.multiaddr.toString())
   }
 }
 
@@ -109,7 +109,9 @@ export async function tryExistingConnections(
     // @fixme does that work?
     try {
       await deadConnection.close()
-    } catch {}
+    } catch (err) {
+      error(`Error while closing dead connection`, err)
+    }
   }
 
   if (stream != undefined && conn != undefined) {
@@ -149,9 +151,9 @@ async function establishNewConnection(
     // @ts-ignore Dialer is not yet part of interface
     conn = await components.getConnectionManager().dialer.dial(destination, opts)
   } catch (err) {
-    logError(`Error while establishing connection to ${destination.toString()}.`)
+    error(`Error while establishing connection to ${destination.toString()}.`)
     if (err?.message) {
-      logError(`Dial error:`, err)
+      error(`Dial error:`, err)
     }
   }
 
@@ -171,11 +173,9 @@ async function establishNewConnection(
   if (stream != null && aborted) {
     log(`ending obsolete write stream after ${Date.now() - start} ms`)
     try {
-      stream
-        .sink((async function* () {})())
-        .catch((err: any) => logError(`Error while ending obsolete write stream`, err))
+      stream.sink((async function* () {})()).catch((err: any) => error(`Error while ending obsolete write stream`, err))
     } catch (err) {
-      logError(`Error while ending obsolete write stream`, err)
+      error(`Error while ending obsolete write stream`, err)
     }
     return
   }
@@ -208,9 +208,9 @@ async function queryDHT(components: Components, destination: PeerId): Promise<Pe
       relayers.push(relayer.id)
     }
   } catch (err) {
-    logError(`Error while querying the DHT for ${destination.toString()}.`)
+    error(`Error while querying the DHT for ${destination.toString()}.`)
     if (err?.message) {
-      logError(`DHT error: ${err.message}`)
+      error(`DHT error: ${err.message}`)
     }
   }
 
@@ -273,6 +273,7 @@ async function doDial(
   try {
     components.getDHT()
   } catch {
+    // If there's no DHT set, libp2p-components.getDHT() throws an error
     noDht = true
   }
 
@@ -347,7 +348,7 @@ async function doDial(
  * Performs a dial strategy using libp2p.dialProtocol and libp2p.findPeer
  * to establish a connection.
  * Contains a baseline protection against dialing same addresses twice.
- * @param libp2p a libp2p instance
+ * @param components components of a libp2p instance
  * @param destination PeerId of the destination
  * @param protocol protocols to use
  * @param opts
