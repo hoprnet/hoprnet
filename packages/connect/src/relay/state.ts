@@ -83,16 +83,19 @@ class RelayState {
    * @param destination other party of the relayed connection
    * @param toSource new stream to source
    */
-  updateExisting(source: PeerId, destination: PeerId, toSource: Stream): void {
+  updateExisting(source: PeerId, destination: PeerId, toSource: Stream): boolean {
     const id = RelayState.getId(source, destination)
 
-    if (!this.relayedConnections.has(id)) {
-      throw Error(`Relayed connection does not exist`)
+    const context = this.relayedConnections.get(id)
+
+    if (context == null) {
+      verbose(`Relayed connection ${id} does not exist`)
+      return false
     }
 
-    const context = this.relayedConnections.get(id) as RelayConnections
-
     context[source.toString()].update(toSource)
+
+    return true
   }
 
   /**

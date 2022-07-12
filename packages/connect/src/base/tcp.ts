@@ -15,7 +15,7 @@ import type { MultiaddrConnection } from '@libp2p/interface-connection'
 import type { Multiaddr } from '@multiformats/multiaddr'
 import toIterable from 'stream-to-it'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import type { Stream, StreamSink, StreamSource, StreamSourceAsync, StreamType } from '../types.js'
+import type { Stream, StreamSink, StreamSource, StreamSourceAsync } from '../types.js'
 import type { DialOptions } from '@libp2p/interface-transport'
 
 /**
@@ -28,8 +28,6 @@ class TCPConnection implements MultiaddrConnection {
   public sink: StreamSink
   public source: StreamSourceAsync
   public closed: boolean
-
-  private _stream: Stream
 
   private _signal?: AbortSignal
 
@@ -55,14 +53,8 @@ class TCPConnection implements MultiaddrConnection {
 
     this._signal = options?.signal
 
-    this._stream = toIterable.duplex<StreamType>(this.conn)
-
+    this.source = this.createSource(this.conn) as AsyncIterable<Uint8Array>
     this.sink = this._sink.bind(this)
-
-    this.source =
-      this._signal != undefined
-        ? abortableSource(this._stream.source, this._signal)
-        : (this._stream.source as AsyncIterable<StreamType>)
   }
 
   public close(): Promise<void> {
@@ -117,10 +109,29 @@ class TCPConnection implements MultiaddrConnection {
     })
   }
 
+  private createSource(socket: net.Socket): AsyncIterable<Uint8Array> {
+    const iterableSource = toU8aStream(toIterable.source<Uint8Array>(socket)) as AsyncIterable<Uint8Array>
+
+    if (this._signal != undefined) {
+      return abortableSource(iterableSource, this._signal)
+    } else {
+      return iterableSource
+    }
+  }
+
   private async _sink(source: StreamSource): Promise<void> {
     const u8aStream = toU8aStream(source)
+
+    let iterableSink: Stream['sink']
     try {
-      await this._stream.sink(
+      iterableSink = toIterable.sink<Uint8Array>(this.conn)
+    } catch (err) {
+      error(`TCP sink error`, err)
+      return
+    }
+
+    try {
+      await iterableSink(
         this._signal != undefined ? (abortableSource(u8aStream, this._signal) as StreamSource) : u8aStream
       )
     } catch (err: any) {
