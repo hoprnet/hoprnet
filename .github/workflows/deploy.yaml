@@ -313,6 +313,7 @@ jobs:
         run: |
           ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd" 3
         env:
+          DEPLOYER_WALLET_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
           HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
           FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
@@ -395,6 +396,7 @@ jobs:
         run: |
           ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd-nat" 2 "-nat"
         env:
+          DEPLOYER_WALLET_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
           HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
           FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
