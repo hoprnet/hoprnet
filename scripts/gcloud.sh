@@ -39,13 +39,15 @@ alias gssh="gcloud compute ssh --force-key-file-overwrite --ssh-key-expire-after
 # $1=ip
 # $2=optional: healthcheck port, defaults to 8080
 wait_until_node_is_ready() {
-  local ip=${1}
-  local port=${2:-8080}
+  local ip="${1}"
+  local port="${2:-8080}"
   local cmd="curl --silent --max-time 5 ${ip}:${port}/healthcheck/v1/version"
+  local vsn
 
   # try every 10 seconds for 5 minutes
-  log "waiting for VM with IP $1 to have HOPR node up and running"
-  try_cmd "${cmd}" 30 10
+  log "waiting for VM with IP ${ip} to have HOPRd node up and running"
+  vsn="$(try_cmd "${cmd}" 30 10)"
+  log "VM with IP ${ip} is running HOPRd v${vsn}"
 }
 
 # Get external IP for running node or die
