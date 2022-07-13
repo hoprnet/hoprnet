@@ -28,9 +28,7 @@ import { AdminServer } from './admin.js'
 import { Commands } from './commands/index.js'
 import { LogStream } from './logs.js'
 import { getIdentity } from './identity.js'
-import { register as registerUnhandled } from 'trace-unhandled'
-
-import { setLogger } from 'trace-unhandled'
+import { register as registerUnhandled, setLogger } from 'trace-unhandled'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
@@ -54,6 +52,7 @@ const defaultDataPath = path.join(process.cwd(), 'hoprd-db', defaultEnvironment(
 // reading the version manually to ensure the path is read correctly
 const packageFile = path.normalize(new URL('../package.json', import.meta.url).pathname)
 const version = get_package_version(packageFile)
+const on_avado = (process.env.AVADO ?? 'false').toLowerCase() === 'true'
 
 const yargsInstance = yargs(hideBin(process.argv))
 
@@ -416,6 +415,8 @@ async function main() {
 
   try {
     logs.log(`This is hoprd version ${version}`)
+    if (on_avado)
+      logs.log('This node appears to be running on an AVADO')
 
     // 1. Find or create an identity
     const peerId = await getIdentity({
