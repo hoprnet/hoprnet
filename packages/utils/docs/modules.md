@@ -193,7 +193,6 @@
 - [u8aAdd](modules.md#u8aadd)
 - [u8aAddrToString](modules.md#u8aaddrtostring)
 - [u8aAddressToCIDR](modules.md#u8aaddresstocidr)
-- [u8aAllocate](modules.md#u8aallocate)
 - [u8aCompare](modules.md#u8acompare)
 - [u8aConcat](modules.md#u8aconcat)
 - [u8aEquals](modules.md#u8aequals)
@@ -237,7 +236,7 @@ Renames and re-exports [TimeoutOpts](modules.md#timeoutopts)
 
 #### Defined in
 
-[libp2p/addressSorters.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L33)
+[libp2p/addressSorters.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L35)
 
 ___
 
@@ -267,11 +266,11 @@ ___
 
 ### DialResponse
 
-Ƭ **DialResponse**: { `resp`: { `conn`: `Connection` ; `protocol`: `string` ; `stream`: `MuxedStream`  } ; `status`: [`SUCCESS`](enums/DialStatus.md#success)  } \| { `status`: [`TIMEOUT`](enums/DialStatus.md#timeout)  } \| { `status`: [`ABORTED`](enums/DialStatus.md#aborted)  } \| { `dhtContacted`: `boolean` ; `status`: [`DIAL_ERROR`](enums/DialStatus.md#dial_error)  } \| { `query`: `string` ; `status`: [`DHT_ERROR`](enums/DialStatus.md#dht_error)  } \| { `status`: [`NO_DHT`](enums/DialStatus.md#no_dht)  }
+Ƭ **DialResponse**: { `resp`: `ProtocolStream` & { `conn`: `Connection`  } ; `status`: [`SUCCESS`](enums/DialStatus.md#success)  } \| { `status`: [`TIMEOUT`](enums/DialStatus.md#timeout)  } \| { `status`: [`ABORTED`](enums/DialStatus.md#aborted)  } \| { `dhtContacted`: `boolean` ; `status`: [`DIAL_ERROR`](enums/DialStatus.md#dial_error)  } \| { `query`: `string` ; `status`: [`DHT_ERROR`](enums/DialStatus.md#dht_error)  } \| { `status`: [`NO_DHT`](enums/DialStatus.md#no_dht)  }
 
 #### Defined in
 
-[libp2p/dialHelper.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L32)
+[libp2p/dialHelper.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L31)
 
 ___
 
@@ -302,11 +301,11 @@ ___
 | :------ | :------ |
 | `connection` | `Connection` |
 | `protocol` | `string` |
-| `stream` | `MuxedStream` |
+| `stream` | `ProtocolStream`[``"stream"``] |
 
 #### Defined in
 
-[libp2p/index.ts:167](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L167)
+[libp2p/index.ts:168](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L168)
 
 ___
 
@@ -337,7 +336,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:168](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L168)
+[libp2p/index.ts:169](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L169)
 
 ___
 
@@ -426,7 +425,7 @@ ___
 
 #### Defined in
 
-[u8a/index.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L18)
+[u8a/index.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L17)
 
 ___
 
@@ -465,7 +464,7 @@ ___
 
 ### libp2pSendMessage
 
-Ƭ **libp2pSendMessage**: (`libp2p`: `LibP2P`, `destination`: `PeerId`, `protocol`: `string`, `message`: `Uint8Array`, `includeReply`: ``false``, `opts?`: [`TimeoutOpts`](modules.md#timeoutopts)) => `Promise`<`void`\> & (`libp2p`: `LibP2P`, `destination`: `PeerId`, `protocol`: `string`, `message`: `Uint8Array`, `includeReply`: ``true``, `opts?`: [`TimeoutOpts`](modules.md#timeoutopts)) => `Promise`<`Uint8Array`[]\>
+Ƭ **libp2pSendMessage**: (`components`: `Components`, `destination`: `PeerId`, `protocol`: `string`, `message`: `Uint8Array`, `includeReply`: ``false``, `opts?`: [`TimeoutOpts`](modules.md#timeoutopts)) => `Promise`<`void`\> & (`components`: `Components`, `destination`: `PeerId`, `protocol`: `string`, `message`: `Uint8Array`, `includeReply`: ``true``, `opts?`: [`TimeoutOpts`](modules.md#timeoutopts)) => `Promise`<`Uint8Array`[]\>
 
 Asks libp2p to establish a connection to another node and
 send message. If `includeReply` is set, wait for a response
@@ -492,7 +491,7 @@ ___
 
 ### libp2pSubscribe
 
-Ƭ **libp2pSubscribe**: (`libp2p`: `LibP2P`, `protocol`: `string`, `handler`: [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`Promise`<`void`\> \| `void`\>, `errHandler`: `ErrHandler`, `includeReply`: ``false``) => `void` & (`libp2p`: `LibP2P`, `protocol`: `string`, `handler`: [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`Promise`<`Uint8Array`\>\>, `errHandler`: `ErrHandler`, `includeReply`: ``true``) => `void`
+Ƭ **libp2pSubscribe**: (`components`: `Components`, `protocol`: `string`, `handler`: [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`Promise`<`void`\> \| `void`\>, `errHandler`: `ErrHandler`, `includeReply`: ``false``) => `void` & (`components`: `Components`, `protocol`: `string`, `handler`: [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`Promise`<`Uint8Array`\>\>, `errHandler`: `ErrHandler`, `includeReply`: ``true``) => `void`
 
 Generates a handler that pulls messages out of a stream
 and feeds them to the given handler.
@@ -509,9 +508,9 @@ and feeds them to the given handler.
 
 #### Defined in
 
-[libp2p/index.ts:260](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L260)
+[libp2p/index.ts:261](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L261)
 
-[libp2p/index.ts:245](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L245)
+[libp2p/index.ts:246](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L246)
 
 ## Variables
 
@@ -919,7 +918,7 @@ Regular expresion used to match b58Strings
 
 #### Defined in
 
-[libp2p/index.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L26)
+[libp2p/index.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L28)
 
 ___
 
@@ -1087,9 +1086,9 @@ Takes a B58String and converts them to a PublicKey
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `b58string` | `string` |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `b58string` | `string` | the B58String used to represent the PeerId |
 
 #### Returns
 
@@ -1216,7 +1215,7 @@ ___
 
 ### createRelayerKey
 
-▸ **createRelayerKey**(`destination`): `Promise`<`CID`\>
+▸ **createRelayerKey**(`destination`): `CID`
 
 Creates a DHT entry to give relays the opportunity to signal
 other nodes in the network that they act as a relay for the given
@@ -1230,7 +1229,7 @@ node.
 
 #### Returns
 
-`Promise`<`CID`\>
+`CID`
 
 the DHT entry key
 
@@ -1368,7 +1367,7 @@ ___
 
 ### dial
 
-▸ **dial**(`libp2p`, `destination`, `protocol`, `opts?`): `Promise`<[`DialResponse`](modules.md#dialresponse)\>
+▸ **dial**(`components`, `destination`, `protocol`, `opts?`): `Promise`<[`DialResponse`](modules.md#dialresponse)\>
 
 Performs a dial strategy using libp2p.dialProtocol and libp2p.findPeer
 to establish a connection.
@@ -1378,7 +1377,7 @@ Contains a baseline protection against dialing same addresses twice.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `libp2p` | `ReducedLibp2p` | a libp2p instance |
+| `components` | `Components` | components of a libp2p instance |
 | `destination` | `PeerId` | PeerId of the destination |
 | `protocol` | `string` | protocols to use |
 | `opts?` | [`TimeoutOpts`](modules.md#timeoutopts) |  |
@@ -1507,9 +1506,9 @@ Returns the b58String within a given content. Returns empty string if none is fo
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `content` | `string` |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `content` | `string` | arbitrary content with maybe a b58string |
 
 #### Returns
 
@@ -1643,9 +1642,9 @@ Returns true or false if given string does not contain a b58string
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `content` | `string` |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `content` | `string` | arbitrary content with maybe a b58string |
 
 #### Returns
 
@@ -1928,13 +1927,13 @@ ___
 
 ### libp2pSendMessage
 
-▸ **libp2pSendMessage**(`libp2p`, `destination`, `protocol`, `message`, `includeReply`, `opts?`): `Promise`<`void` \| `Uint8Array`[]\>
+▸ **libp2pSendMessage**(`components`, `destination`, `protocol`, `message`, `includeReply`, `opts?`): `Promise`<`void` \| `Uint8Array`[]\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `libp2p` | `Libp2p` |
+| `components` | `Components` |
 | `destination` | `PeerId` |
 | `protocol` | `string` |
 | `message` | `Uint8Array` |
@@ -1949,13 +1948,13 @@ ___
 
 ### libp2pSubscribe
 
-▸ **libp2pSubscribe**(`libp2p`, `protocol`, `handler`, `errHandler`, `includeReply?`): `Promise`<`void`\>
+▸ **libp2pSubscribe**(`components`, `protocol`, `handler`, `errHandler`, `includeReply?`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type | Default value |
 | :------ | :------ | :------ |
-| `libp2p` | `Libp2p` | `undefined` |
+| `components` | `Components` | `undefined` |
 | `protocol` | `string` | `undefined` |
 | `handler` | [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`void` \| `Promise`<`void` \| `Uint8Array`\>\> | `undefined` |
 | `errHandler` | `ErrHandler` | `undefined` |
@@ -2168,6 +2167,8 @@ ___
 
 ▸ **pickVersion**(`full_version`): `string`
 
+Used by our network stack and deployment scripts to determine.
+
 #### Parameters
 
 | Name | Type |
@@ -2177,6 +2178,8 @@ ___
 #### Returns
 
 `string`
+
+major and minor versions, ex: `1.8.5` -> `1.8.0`
 
 ___
 
@@ -2685,19 +2688,19 @@ ___
 
 ### tryExistingConnections
 
-▸ **tryExistingConnections**(`libp2p`, `destination`, `protocol`): `Promise`<`void` \| { `conn`: `Connection` ; `protocol`: `string` ; `stream`: `MuxedStream`  }\>
+▸ **tryExistingConnections**(`components`, `destination`, `protocol`): `Promise`<`void` \| `ProtocolStream` & { `conn`: `Connection`  }\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `libp2p` | `Pick`<`ReducedLibp2p`, ``"connectionManager"``\> |
+| `components` | `Components` |
 | `destination` | `PeerId` |
 | `protocol` | `string` |
 
 #### Returns
 
-`Promise`<`void` \| { `conn`: `Connection` ; `protocol`: `string` ; `stream`: `MuxedStream`  }\>
+`Promise`<`void` \| `ProtocolStream` & { `conn`: `Connection`  }\>
 
 ___
 
@@ -2767,27 +2770,6 @@ returns a CIDR string
 `string`
 
 a CIDR string, such as `192.168.1.0/24`
-
-___
-
-### u8aAllocate
-
-▸ **u8aAllocate**(`{`, ...`list`): `Uint8Array`
-
-Writes to the provided mempage the data on a given list of u8a on a given offset
-
-**`export`** 
-
-#### Parameters
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `{` | `MemoryPage` | page: ArrayBuffer, offset: number } |
-| `...list` | `Uint8Array`[] |  |
-
-#### Returns
-
-`Uint8Array`
 
 ___
 
