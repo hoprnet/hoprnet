@@ -1,5 +1,5 @@
-import type { Multiaddr } from 'multiaddr'
-import type PeerId from 'peer-id'
+import type { Multiaddr } from '@multiformats/multiaddr'
+import type { PeerId } from '@libp2p/interface-peer-id'
 
 type Suffix = 'PublicNode'
 type AddEventName = `add${Suffix}`
@@ -70,6 +70,8 @@ export type HoprConnectOptions = {
 }
 
 export type HoprConnectTestingOptions = {
+  // @TODO implement this
+  __useLocalAddresses?: boolean
   // Simulated NAT: only connect directly to relays
   __noDirectConnections?: boolean
   // Simulated NAT: ignore WebRTC upgrade
@@ -82,14 +84,4 @@ export type HoprConnectTestingOptions = {
   __runningLocally?: boolean
   // Disable UPNP support
   __noUPNP?: boolean
-}
-
-export type HoprConnectListeningOptions = undefined
-
-export type HoprConnectDialOptions = {
-  // Used to cancel dial attempts after a timeout
-  signal?: AbortSignal
-  // Called when closing socket with the Multiaddr that
-  // was used to establish the connection
-  onDisconnect?: (ma: Multiaddr) => void
 }

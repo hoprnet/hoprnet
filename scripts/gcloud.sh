@@ -371,9 +371,10 @@ gcloud_get_managed_instance_group_instances_ips() {
     nproc_cmd="echo 1"
   fi
 
+  export -f gcloud_get_ip
   gcloud compute instance-groups list-instances "${name}" \
     ${gcloud_region} --sort-by=instance --uri | \
-    xargs -P `${nproc_cmd}` -I '{}' gcloud_get_ip '{}'
+    xargs -P `${nproc_cmd}` -I '{}' bash -c "gcloud_get_ip '{}'"
 }
 
 # returns a JSON list of strings

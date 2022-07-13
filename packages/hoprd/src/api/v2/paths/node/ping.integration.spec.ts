@@ -21,7 +21,7 @@ describe('POST /node/ping', () => {
   it('should ping successfuly', async () => {
     node.ping = sinon.fake.returns({ latency: 10 })
 
-    const res = await request(service).post(`/api/v2/node/ping`).send({ peerId: ALICE_PEER_ID.toB58String() })
+    const res = await request(service).post(`/api/v2/node/ping`).send({ peerId: ALICE_PEER_ID.toString() })
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({ latency: 10 })
@@ -39,7 +39,7 @@ describe('POST /node/ping', () => {
   it('should return proper error on ping fail', async () => {
     node.ping = sinon.fake.throws('')
 
-    const res = await request(service).post(`/api/v2/node/ping`).send({ peerId: ALICE_PEER_ID.toB58String() })
+    const res = await request(service).post(`/api/v2/node/ping`).send({ peerId: ALICE_PEER_ID.toString() })
     expect(res.status).to.equal(422)
     expect(res).to.satisfyApiSpec
     expect(res.body.status).to.equal(STATUS_CODES.UNKNOWN_FAILURE)

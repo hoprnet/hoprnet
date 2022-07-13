@@ -1,4 +1,4 @@
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import type { StateOps } from '../types.js'
 import { AbstractCommand } from './abstractCommand.js'
 import { checkPeerIdInput, getPaddingLength, styleValue } from './utils/index.js'
@@ -36,7 +36,7 @@ export class Alias extends AbstractCommand {
       return log(
         names
           .map((name, index) => {
-            return name.padEnd(paddingLength) + styleValue(peerIds[index].toB58String(), 'peerId')
+            return name.padEnd(paddingLength) + styleValue(peerIds[index].toString(), 'peerId')
           })
           .join('\n')
       )
@@ -50,7 +50,7 @@ export class Alias extends AbstractCommand {
       state.aliases.set(name, peerId)
       setState(state)
 
-      return log(`Set alias '${styleValue(name, 'highlight')}' to '${styleValue(peerId.toB58String(), 'peerId')}'.`)
+      return log(`Set alias '${styleValue(name, 'highlight')}' to '${styleValue(peerId.toString(), 'peerId')}'.`)
     } catch (err) {
       return log(styleValue(err instanceof Error ? err.message : 'Unknown error', 'failure'))
     }

@@ -28,7 +28,7 @@ import { PersistedState } from './state.js'
 import { CoverTrafficStrategy } from './strategy.js'
 import setupHealthcheck from './healthcheck.js'
 
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import type { PeerData, State } from './state.js'
 
@@ -185,7 +185,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   }
 
   const peerUpdate = (peer: PeerData) => {
-    log('adding peer', peer.id.toB58String())
+    log('adding peer', peer.id.toString())
     data.setNode(peer)
   }
 

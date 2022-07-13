@@ -3,7 +3,7 @@ import http from 'http'
 
 import { debug } from '@hoprnet/hopr-utils'
 
-import { type default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 
 const log = debug('hopr:cover-traffic')
 

@@ -1,6 +1,6 @@
 import assert from 'assert'
 import BN from 'bn.js'
-import PeerId from 'peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import { utils } from 'ethers'
 import { UnreleasedTokens } from './utils.js'
 
@@ -60,7 +60,7 @@ unreleasedTokenInputs.forEach(function (input, index) {
         let validHoprId = false
         let errMsg = ''
         try {
-          PeerId.createFromB58String(hoprId)
+          peerIdFromString(hoprId)
           validHoprId = true
         } catch (err) {
           errMsg = err

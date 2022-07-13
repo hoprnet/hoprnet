@@ -1,4 +1,4 @@
-import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types.js'
+import type { MultiaddrConnection } from '@libp2p/interface-connection'
 import type { Instance as SimplePeer } from 'simple-peer'
 import { durations, u8aToHex, defer, type DeferType } from '@hoprnet/hopr-utils'
 
@@ -14,9 +14,10 @@ import type {
   StreamType,
   StreamSource,
   StreamSourceAsync,
-  HoprConnectDialOptions
+  HoprConnectTestingOptions
 } from '../types.js'
 import assert from 'assert'
+import type { DialOptions } from '@libp2p/interface-transport'
 
 const DEBUG_PREFIX = `hopr-connect`
 
@@ -56,7 +57,6 @@ class WebRTCConnection implements MultiaddrConnection {
 
   public destroyed: boolean
   public remoteAddr: MultiaddrConnection['remoteAddr']
-  public localAddr: MultiaddrConnection['localAddr']
 
   // @ts-ignore
   public sink: StreamSink
@@ -70,8 +70,8 @@ class WebRTCConnection implements MultiaddrConnection {
 
   constructor(
     private relayConn: RelayConnection,
-    private channel: SimplePeer,
-    private options?: HoprConnectDialOptions & { __noWebRTCUpgrade?: boolean }
+    private testingOptions: HoprConnectTestingOptions,
+    private options?: DialOptions
   ) {
     this.conn = relayConn
 
@@ -85,7 +85,6 @@ class WebRTCConnection implements MultiaddrConnection {
     this._sourceMigrated = false
     this._sinkMigrated = false
 
-    this.localAddr = this.conn.localAddr
     this.remoteAddr = this.conn.remoteAddr
 
     this.timeline = {
@@ -95,12 +94,12 @@ class WebRTCConnection implements MultiaddrConnection {
     // Give each WebRTC connection instance a unique identifier
     this._id = u8aToHex(randomBytes(4), false)
 
-    this.channel.on(
+    this.relayConn.getWebRTCInstance().on(
       'error',
       // not supposed to produce any errors
       this.onWebRTCError.bind(this)
     )
-    this.channel.once(
+    this.relayConn.getWebRTCInstance().once(
       'connect',
       // not supposed to produce any errors
       this.onWebRTCConnect.bind(this)
@@ -108,7 +107,7 @@ class WebRTCConnection implements MultiaddrConnection {
 
     // Attach a listener to WebRTC to cleanup state
     // and remove stale connection from internal libp2p state
-    this.channel.on('iceStateChange', (iceConnectionState: string, iceGatheringState: string) => {
+    this.relayConn.getWebRTCInstance().on('iceStateChange', (iceConnectionState: string, iceGatheringState: string) => {
       if (iceConnectionState === 'disconnected' && iceGatheringState === 'complete') {
         this.destroyed = true
         this.timeline.close = this.timeline.close ?? Date.now()
@@ -147,7 +146,7 @@ class WebRTCConnection implements MultiaddrConnection {
     sinkCreator.catch((err) => this.error('sink error thrown before sink attach', err.message))
     this.verbose(`!!! sinkFunction`)
 
-    setTimeout(this.onWebRTCError.bind(this), WEBRTC_UPGRADE_TIMEOUT)
+    setTimeout(this.onWebRTCError.bind(this), WEBRTC_UPGRADE_TIMEOUT).unref()
   }
 
   /**
@@ -193,7 +192,7 @@ class WebRTCConnection implements MultiaddrConnection {
     this._webRTCAvailable = false
     this._switchPromise.resolve()
 
-    setImmediate(this.channel.destroy.bind(this.channel))
+    setImmediate(this.relayConn.getWebRTCInstance().destroy.bind(this.relayConn.getWebRTCInstance()))
   }
 
   /**
@@ -207,7 +206,7 @@ class WebRTCConnection implements MultiaddrConnection {
 
     this._webRTCHandshakeFinished = true
 
-    if (this.options?.__noWebRTCUpgrade) {
+    if (this.testingOptions.__noWebRTCUpgrade) {
       this._webRTCAvailable = false
     } else {
       this._webRTCAvailable = true
@@ -352,10 +351,10 @@ class WebRTCConnection implements MultiaddrConnection {
       this._sinkMigrated = true
       if (this._sourceMigrated) {
         // Update state object once source *and* sink are migrated
-        this.conn = this.channel
+        this.conn = this.relayConn.getWebRTCInstance()
       }
 
-      await toIterable.sink(this.channel)(
+      await toIterable.sink(this.relayConn.getWebRTCInstance())(
         async function* (this: WebRTCConnection): StreamSource {
           let result: SinkType
 
@@ -379,7 +378,7 @@ class WebRTCConnection implements MultiaddrConnection {
 
             const received = result as StreamResult
 
-            if (received.done || this.destroyed || this.channel.destroyed) {
+            if (received.done || this.destroyed || this.relayConn.getWebRTCInstance().destroyed) {
               yield encodeWithLengthPrefix(Uint8Array.of(MigrationStatus.DONE))
               break
             }
@@ -387,7 +386,11 @@ class WebRTCConnection implements MultiaddrConnection {
             assert(source != undefined)
             sourcePromise = source.next()
 
-            this.log(`sinking ${received.value.slice().length} bytes into webrtc[${(this.channel as any)._id}]`)
+            this.log(
+              `sinking ${received.value.slice().length} bytes into webrtc[${
+                (this.relayConn.getWebRTCInstance() as any)._id
+              }]`
+            )
 
             yield encodeWithLengthPrefix(Uint8Array.from([MigrationStatus.NOT_DONE, ...received.value.slice()]))
           }
@@ -440,13 +443,13 @@ class WebRTCConnection implements MultiaddrConnection {
 
       if (this._sinkMigrated) {
         // Update state object once sink *and* source are migrated
-        this.conn = this.channel
+        this.conn = this.relayConn.getWebRTCInstance()
       }
 
       this.log(`webRTC source handover done. Using direct connection to peer ${this.remoteAddr.getPeerId()}`)
 
       let done = false
-      for await (const msg of this.channel) {
+      for await (const msg of this.relayConn.getWebRTCInstance()) {
         const decoded = decodeWithLengthPrefix(msg.slice())
 
         for (const decodedMsg of decoded) {
@@ -490,7 +493,7 @@ class WebRTCConnection implements MultiaddrConnection {
     this.destroyed = true
 
     try {
-      this.channel.destroy()
+      this.relayConn.getWebRTCInstance().destroy()
     } catch (e) {
       this.error(`Error while destroying WebRTC instance to ${this.remoteAddr}: ${e}`)
     }

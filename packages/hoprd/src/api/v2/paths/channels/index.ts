@@ -6,12 +6,13 @@ import {
   defer,
   generateChannelId,
   PublicKey,
+  channelStatusToString,
   type DeferType
 } from '@hoprnet/hopr-utils'
-import PeerId from 'peer-id'
+import { PeerId } from '@libp2p/interface-peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import BN from 'bn.js'
 import { STATUS_CODES } from '../../utils.js'
-import { channelStatusToString } from '@hoprnet/hopr-utils'
 
 export interface ChannelInfo {
   type: 'outgoing' | 'incoming'
@@ -25,7 +26,7 @@ export const formatOutgoingChannel = (channel: ChannelEntry): ChannelInfo => {
   return {
     type: 'outgoing',
     channelId: channel.getId().toHex(),
-    peerId: channel.source.toPeerId().toB58String(),
+    peerId: channel.source.toPeerId().toString(),
     status: channelStatusToString(channel.status),
     balance: channel.balance.toBN().toString()
   }
@@ -35,7 +36,7 @@ export const formatIncomingChannel = (channel: ChannelEntry): ChannelInfo => {
   return {
     type: 'incoming',
     channelId: channel.getId().toHex(),
-    peerId: channel.destination.toPeerId().toB58String(),
+    peerId: channel.destination.toPeerId().toString(),
     status: channelStatusToString(channel.status),
     balance: channel.balance.toBN().toString()
   }
@@ -154,7 +155,7 @@ async function validateOpenChannelParameters(
 > {
   let counterparty: PeerId
   try {
-    counterparty = PeerId.createFromB58String(counterpartyStr)
+    counterparty = peerIdFromString(counterpartyStr)
   } catch (err) {
     return {
       valid: false,

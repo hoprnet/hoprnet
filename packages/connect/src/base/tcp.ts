@@ -10,19 +10,13 @@ const verbose = Debug('hopr-connect:verbose:tcp')
 // Timeout to wait for socket close before destroying it
 export const SOCKET_CLOSE_TIMEOUT = 1000
 
-import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types.js'
+import type { MultiaddrConnection } from '@libp2p/interface-connection'
 
-import type { Multiaddr } from 'multiaddr'
+import type { Multiaddr } from '@multiformats/multiaddr'
 import toIterable from 'stream-to-it'
-import type PeerId from 'peer-id'
-import type {
-  Stream,
-  StreamSink,
-  StreamSource,
-  StreamSourceAsync,
-  StreamType,
-  HoprConnectDialOptions
-} from '../types.js'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import type { Stream, StreamSink, StreamSource, StreamSourceAsync, StreamType } from '../types.js'
+import type { DialOptions } from '@libp2p/interface-transport'
 
 /**
  * Class to encapsulate TCP sockets
@@ -44,7 +38,7 @@ class TCPConnection implements MultiaddrConnection {
     close?: number
   }
 
-  constructor(public remoteAddr: Multiaddr, self: PeerId, public conn: Socket, options?: HoprConnectDialOptions) {
+  constructor(public remoteAddr: Multiaddr, self: PeerId, public conn: Socket, options?: DialOptions) {
     this.localAddr = nodeToMultiaddr(this.conn.address() as AddressInfo, self)
 
     this.closed = false
@@ -146,7 +140,7 @@ class TCPConnection implements MultiaddrConnection {
    * @param options
    * @returns Resolves a TCP Socket
    */
-  public static create(ma: Multiaddr, self: PeerId, options?: HoprConnectDialOptions): Promise<TCPConnection> {
+  public static create(ma: Multiaddr, self: PeerId, options?: DialOptions): Promise<TCPConnection> {
     return new Promise<TCPConnection>((resolve, reject) => {
       const start = Date.now()
       const cOpts = ma.toOptions()

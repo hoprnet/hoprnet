@@ -1,5 +1,5 @@
-import type { default as Hopr } from '@hoprnet/hopr-core'
-import type PeerId from 'peer-id'
+import type Hopr from '@hoprnet/hopr-core'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import chalk from 'chalk'
 import BN from 'bn.js'
 import { moveDecimalPoint, Balance } from '@hoprnet/hopr-utils'
@@ -55,7 +55,7 @@ export default class FundChannel extends AbstractCommand {
 
     try {
       await this.node.fundChannel(peerId, myFund, counterpartyFund)
-      return log(`${chalk.green(`Successfully funded channel`)} to ${peerId.toB58String()}`)
+      return log(`${chalk.green(`Successfully funded channel`)} to ${peerId.toString()}`)
     } catch (err) {
       return log(styleValue(err instanceof Error ? err.message : 'Unknown error', 'failure'))
     }

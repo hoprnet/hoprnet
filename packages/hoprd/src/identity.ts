@@ -1,4 +1,4 @@
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import { privKeyToPeerId, stringToU8a, serializeKeyPair, deserializeKeyPair } from '@hoprnet/hopr-utils'
 import { randomBytes } from 'crypto'
 import { writeFile, readFile } from 'fs/promises'

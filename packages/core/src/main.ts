@@ -1,24 +1,24 @@
 import path from 'path'
 import { mkdir } from 'fs/promises'
 
-import { default as LibP2P } from 'libp2p'
+import { type Libp2p, createLibp2p } from 'libp2p'
 import { LevelDatastore } from 'datastore-level'
-import { type AddressSorter, HoprDB, PublicKey, debug } from '@hoprnet/hopr-utils'
-import { default as HoprCoreEthereum } from '@hoprnet/hopr-core-ethereum'
+import type { Multiaddr } from '@multiformats/multiaddr'
+import { Mplex } from '@libp2p/mplex'
+import { KadDHT } from '@libp2p/kad-dht'
+import { Noise } from '@chainsafe/libp2p-noise'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { keysPBM } from '@libp2p/crypto/keys'
+import type { AddressSorter, Address } from '@libp2p/interfaces/peer-store'
 
-import Mplex from 'libp2p-mplex'
-import KadDHT from 'libp2p-kad-dht'
-import { NOISE } from '@chainsafe/libp2p-noise'
-import type PeerId from 'peer-id'
+import { HoprConnect, compareAddressesLocalMode, type PublicNodesEmitter } from '@hoprnet/hopr-connect'
+import { HoprDB, PublicKey, debug } from '@hoprnet/hopr-utils'
+import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+
 import Hopr, { type HoprOptions } from './index.js'
 import { getAddrs } from './identity.js'
-import HoprConnect, {
-  compareAddressesLocalMode,
-  type HoprConnectConfig,
-  type PublicNodesEmitter
-} from '@hoprnet/hopr-connect'
-import type { Multiaddr } from 'multiaddr'
 import type AccessControl from './network/access-control.js'
+import { createLibp2pMock } from './libp2p.mock.js'
 
 const log = debug(`hopr-core:create-hopr`)
 
@@ -38,52 +38,46 @@ export async function createLibp2pInstance(
   initialNodes: { id: PeerId; multiaddrs: Multiaddr[] }[],
   publicNodes: PublicNodesEmitter,
   reviewConnection: AccessControl['reviewConnection']
-): Promise<LibP2P> {
-  let addressSorter: AddressSorter
-
-  if (options.testing?.preferLocalAddresses) {
-    addressSorter = (addrs) => {
-      let a = new Array(...addrs) // Create copy to prevent sorting the original array
-      return a.sort((aa, ba) => compareAddressesLocalMode(aa.multiaddr, ba.multiaddr))
-    }
-    log('Preferring local addresses')
+): Promise<Libp2p> {
+  let libp2p: Libp2p
+  if (options.testing?.useMockedLibp2p) {
+    // Used for quick integration testing
+    libp2p = createLibp2pMock(peerId, {
+      network: options.testing.mockedNetwork,
+      dht: options.testing.mockedDHT
+    })
   } else {
-    // Overwrite address sorter with identity function since
-    // libp2p's own address sorter function is unable to handle
-    // p2p addresses, e.g. /p2p/<RELAY>/p2p-circuit/p2p/<DESTINATION>
-    addressSorter = (addr) => addr
-    log('Addresses are sorted by default')
-  }
+    let addressSorter: AddressSorter
 
-  // Store the peerstore on-disk under the main data path. Ensure store is
-  // opened before passing it to libp2p.
-  const datastorePath = path.join(options.dataPath, 'peerstore')
-  await mkdir(datastorePath, { recursive: true })
-  const datastore = new LevelDatastore(datastorePath, { createIfMissing: true })
-  await datastore.open()
+    if (options.testing?.preferLocalAddresses) {
+      addressSorter = (a: Address, b: Address) => compareAddressesLocalMode(a.multiaddr, b.multiaddr)
+      log('Preferring local addresses')
+    } else {
+      // Overwrite address sorter with identity function since
+      // libp2p's own address sorter function is unable to handle
+      // p2p addresses, e.g. /p2p/<RELAY>/p2p-circuit/p2p/<DESTINATION>
+      addressSorter = (_addr) => 0
+      log('Addresses are sorted by default')
+    }
 
-  log(`using peerstore at ${datastorePath}`)
+    // Store the peerstore on-disk under the main data path. Ensure store is
+    // opened before passing it to libp2p.
+    const datastorePath = path.join(options.dataPath, 'peerstore')
+    await mkdir(datastorePath, { recursive: true })
+    const datastore = new LevelDatastore(datastorePath, { createIfMissing: true })
+    await datastore.open()
 
-  const libp2p = await LibP2P.create({
-    peerId,
-    addresses: { listen: getAddrs(peerId, options).map((x) => x.toString()) },
-    // libp2p modules
-    modules: {
-      transport: [HoprConnect as any],
-      streamMuxer: [Mplex],
-      connEncryption: [NOISE as any],
-      dht: KadDHT
-    },
-    // Configure peerstore to be persisted using LevelDB, also requires config
-    // persistence to be set.
-    datastore,
-    peerStore: {
-      persistence: true
-    },
-    config: {
-      protocolPrefix: `hopr/${options.environment.id}`,
-      transport: {
-        HoprConnect: {
+    log(`using peerstore at ${datastorePath}`)
+
+    // Make libp2p aware of environments
+    const protocolPrefix = `/hopr/${options.environment.id}`
+
+    libp2p = await createLibp2p({
+      peerId,
+      addresses: { listen: getAddrs(peerId, options).map((x: Multiaddr) => x.toString()) },
+      transports: [
+        // @ts-ignore libp2p interface type clash
+        new HoprConnect({
           config: {
             initialNodes,
             publicNodes,
@@ -108,13 +102,31 @@ export async function createLibp2pInstance(
             // Prevent usage of UPNP to determine external IP address
             __noUPNP: options.testing?.noUPNP
           }
-        } as HoprConnectConfig
+        })
+      ],
+      streamMuxers: [new Mplex()],
+      connectionEncryption: [new Noise()],
+      dht: new KadDHT({ protocolPrefix }),
+      connectionManager: {
+        autoDial: true,
+        // Use custom sorting to prevent from problems with libp2p
+        // and HOPR's relay addresses
+        addressSorter,
+        // Don't try to dial a peer using multiple addresses in parallel
+        maxDialsPerPeer: 1,
+        // If we are a public node, assume that our system is able to handle
+        // more connections
+        maxParallelDials: options.announce ? 250 : 50,
+        // default timeout of 30s appears to be too long
+        dialTimeout: 10e3
       },
-      dht: {
-        enabled: true,
-        // Feed DHT with all previously announced nodes
-        // @ts-ignore
-        bootstrapPeers: initialNodes
+      connectionGater: {
+        denyDialPeer: async (peer: PeerId) => {
+          return !(await reviewConnection(peer, 'libp2p peer connect'))
+        },
+        denyInboundEncryptedConnection: async (peer: PeerId) => {
+          return !(await reviewConnection(peer, 'libp2p peer connect'))
+        }
       },
       relay: {
         // Conflicts with HoprConnect's own mechanism
@@ -123,47 +135,19 @@ export async function createLibp2pInstance(
       nat: {
         // Conflicts with HoprConnect's own mechanism
         enabled: false
-      }
-    },
-    dialer: {
-      // Use custom sorting to prevent from problems with libp2p
-      // and HOPR's relay addresses
-      addressSorter,
-      // Don't try to dial a peer using multiple addresses in parallel
-      maxDialsPerPeer: 1,
-      // If we are a public node, assume that our system is able to handle
-      // more connections
-      maxParallelDials: options.announce ? 250 : 50,
-      // default timeout of 30s appears to be too long
-      dialTimeout: 10e3
-    },
-    connectionGater: {
-      denyDialPeer: async (peer: PeerId) => {
-        return !(await reviewConnection(peer, 'libp2p peer connect'))
       },
-      denyInboundEncryptedConnection: async (peer: PeerId) => {
-        return !(await reviewConnection(peer, 'libp2p peer connect'))
-      }
-    }
-  })
-
-  // Isolate DHTs
-  const DHT_WAN_PREFIX = libp2p._dht._wan._protocol
-  const DHT_LAN_PREFIX = libp2p._dht._lan._protocol
-
-  if (DHT_WAN_PREFIX !== '/ipfs/kad/1.0.0' || DHT_LAN_PREFIX !== '/ipfs/lan/kad/1.0.0') {
-    throw Error(`Libp2p DHT implementation has changed. Cannot set DHT environments`)
+      ping: {
+        protocolPrefix
+      },
+      fetch: {
+        protocolPrefix
+      },
+      identify: {
+        protocolPrefix
+      },
+      datastore
+    })
   }
-
-  const HOPR_DHT_WAN_PROTOCOL = `/hopr/${options.environment.id}/kad/1.0.0`
-  libp2p._dht._wan._protocol = HOPR_DHT_WAN_PROTOCOL
-  libp2p._dht._wan._network._protocol = HOPR_DHT_WAN_PROTOCOL
-  libp2p._dht._wan._topologyListener._protocol = HOPR_DHT_WAN_PROTOCOL
-
-  const HOPR_DHT_LAN_PROTOCOL = `/hopr/${options.environment.id}/lan/kad/1.0.0`
-  libp2p._dht._lan._protocol = HOPR_DHT_LAN_PROTOCOL
-  libp2p._dht._lan._network._protocol = HOPR_DHT_LAN_PROTOCOL
-  libp2p._dht._lan._topologyListener._protocol = HOPR_DHT_LAN_PROTOCOL
 
   return libp2p
 }
@@ -180,7 +164,7 @@ export async function createHoprNode(
   options: HoprOptions,
   automaticChainCreation = true
 ): Promise<Hopr> {
-  const db = new HoprDB(PublicKey.fromPrivKey(peerId.privKey.marshal()))
+  const db = new HoprDB(PublicKey.fromPeerId(peerId))
 
   try {
     const dbPath = path.join(options.dataPath, 'db')
@@ -194,7 +178,7 @@ export async function createHoprNode(
   const chain = new HoprCoreEthereum(
     db,
     PublicKey.fromPeerId(peerId),
-    peerId.privKey.marshal(),
+    keysPBM.PrivateKey.decode(peerId.privateKey as Uint8Array).Data,
     {
       chainId: options.environment.network.chain_id,
       environment: options.environment.id,

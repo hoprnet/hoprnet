@@ -1,5 +1,5 @@
-import type { default as Hopr } from '@hoprnet/hopr-core'
-import type PeerId from 'peer-id'
+import type Hopr from '@hoprnet/hopr-core'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import { moveDecimalPoint, Balance } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import chalk from 'chalk'

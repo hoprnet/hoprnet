@@ -55,7 +55,7 @@ describe('cover traffic state', async function () {
   it('should set a new node', async function () {
     mockPersistedState.setNode(mockPeerData)
     const state = mockPersistedState.get()
-    expect(state.nodes[mockPeerData.id.toB58String()]).to.deep.equal({
+    expect(state.nodes[mockPeerData.id.toString()]).to.deep.equal({
       id: mockPeerData.id,
       multiaddrs: mockPeerData.multiaddrs,
       pub: mockPublicKey

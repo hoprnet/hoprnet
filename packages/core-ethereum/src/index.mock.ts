@@ -1,8 +1,8 @@
 import { AccountEntry, debug, NativeBalance, PublicKey } from '@hoprnet/hopr-utils'
 import type HoprCoreEthereum from './index.js'
 import BN from 'bn.js'
-import PeerId from 'peer-id'
-import { Multiaddr } from 'multiaddr'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { Multiaddr } from '@multiformats/multiaddr'
 
 const connectorLogger = debug(`hopr:mocks:connector`)
 function createConnectorMock(peer: PeerId): HoprCoreEthereum {
@@ -28,7 +28,7 @@ function createConnectorMock(peer: PeerId): HoprCoreEthereum {
       return Promise.resolve(
         new AccountEntry(
           PublicKey.fromPeerId(peer),
-          new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${peer.toB58String()}`),
+          new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${peer.toString()}`),
           new BN('1')
         )
       )

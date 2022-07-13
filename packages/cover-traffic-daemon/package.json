@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-cover-traffic-daemon",
   "description": "Generate chaffing traffic",
-  "version": "1.89.0-next.61",
+  "version": "1.89.0-next.65",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
@@ -33,11 +33,12 @@
   "dependencies": {
     "@hoprnet/hopr-core": "workspace:packages/core",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
+    "@libp2p/interface-peer-id": "1.0.2",
+    "@libp2p/peer-id": "1.1.13",
+    "@multiformats/multiaddr": "10.2.1",
     "bignumber.js": "9.0.2",
     "bn.js": "5.2.0",
     "express": "4.17.3",
-    "multiaddr": "^10.0.1",
-    "peer-id": "^0.16.0",
     "yargs": "17.5.1"
   },
   "devDependencies": {

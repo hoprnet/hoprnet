@@ -1,5 +1,6 @@
-import { Stream } from '../types.js'
-import type PeerId from 'peer-id'
+import type { Stream } from '../types.js'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { unmarshalPublicKey } from '@libp2p/crypto/keys'
 
 import { nAtATime, u8aCompare } from '@hoprnet/hopr-utils'
 import { RelayContext } from './context.js'
@@ -11,7 +12,7 @@ const DEBUG_PREFIX = 'hopr-connect:relay:state'
 const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
 const error = debug(DEBUG_PREFIX.concat(':error'))
 
-type State = {
+type RelayConnections = {
   [id: string]: RelayContext
 }
 
@@ -19,7 +20,7 @@ type State = {
  * Encapsulates open relayed connections
  */
 class RelayState {
-  private relayedConnections: Map<string, State>
+  private relayedConnections: Map<string, RelayConnections>
 
   constructor() {
     this.relayedConnections = new Map()
@@ -52,26 +53,26 @@ class RelayState {
   async isActive(source: PeerId, destination: PeerId, timeout?: number): Promise<boolean> {
     const id = RelayState.getId(source, destination)
     if (!this.relayedConnections.has(id)) {
-      verbose(`Connection from ${source.toB58String()} to ${destination.toB58String()} does not exist.`)
+      verbose(`Connection from ${source.toString()} to ${destination.toString()} does not exist.`)
       return false
     }
 
-    const context = this.relayedConnections.get(id) as State
+    const context = this.relayedConnections.get(id) as RelayConnections
 
     let latency: number
     try {
-      latency = await context[destination.toB58String()].ping(timeout)
+      latency = await context[destination.toString()].ping(timeout)
     } catch (err) {
       error(err)
       return false
     }
 
     if (latency >= 0) {
-      verbose(`Connection from ${source.toB58String()} to ${destination.toB58String()} is active.`)
+      verbose(`Connection from ${source.toString()} to ${destination.toString()} is active.`)
       return true
     }
 
-    error(`Connection from ${source.toB58String()} to ${destination.toB58String()} is NOT active.`)
+    error(`Connection from ${source.toString()} to ${destination.toString()} is NOT active.`)
     return false
   }
 
@@ -89,9 +90,9 @@ class RelayState {
       throw Error(`Relayed connection does not exist`)
     }
 
-    const context = this.relayedConnections.get(id) as State
+    const context = this.relayedConnections.get(id) as RelayConnections
 
-    context[source.toB58String()].update(toSource)
+    context[source.toString()].update(toSource)
   }
 
   /**
@@ -128,9 +129,9 @@ class RelayState {
     let sourcePromise = toSourceContext.sink(toDestinationContext.source)
     let destinationPromise = toDestinationContext.sink(toSourceContext.source)
 
-    let relayedConnection: State = {
-      [source.toB58String()]: toSourceContext,
-      [destination.toB58String()]: toDestinationContext
+    let relayedConnection: RelayConnections = {
+      [source.toString()]: toSourceContext,
+      [destination.toString()]: toDestinationContext
     }
 
     toSourceContext.once('close', this.cleanListener(source, destination))
@@ -162,9 +163,9 @@ class RelayState {
       let found = this.relayedConnections.get(id)
 
       if (found) {
-        delete found[source.toB58String()]
+        delete found[source.toString()]
 
-        if (!found.hasOwnProperty(destination.toB58String())) {
+        if (!found.hasOwnProperty(destination.toString())) {
           this.relayedConnections.delete(id)
         }
       }
@@ -179,13 +180,16 @@ class RelayState {
    * @returns the identifier
    */
   static getId(a: PeerId, b: PeerId): string {
-    const cmpResult = u8aCompare(a.pubKey.marshal(), b.pubKey.marshal())
+    const cmpResult = u8aCompare(
+      unmarshalPublicKey(a.publicKey as Uint8Array).marshal(),
+      unmarshalPublicKey(b.publicKey as Uint8Array).marshal()
+    )
 
     switch (cmpResult) {
       case 1:
-        return `${a.toB58String()}${b.toB58String()}`
+        return `${a.toString()}${b.toString()}`
       case -1:
-        return `${b.toB58String()}${a.toB58String()}`
+        return `${b.toString()}${a.toString()}`
       default:
         throw Error(`Invalid compare result. Loopbacks are not allowed.`)
     }

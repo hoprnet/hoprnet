@@ -1,5 +1,5 @@
-import type { default as Hopr } from '@hoprnet/hopr-core'
-import type PeerId from 'peer-id'
+import type Hopr from '@hoprnet/hopr-core'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import type { StateOps, State } from '../types.js'
 import { PublicKey } from '@hoprnet/hopr-utils'
 import { checkPeerIdInput, encodeMessage, styleValue } from './utils/index.js'
@@ -23,7 +23,7 @@ export class SendMessage extends AbstractCommand {
   }
 
   private insertMyAddress(message: string): string {
-    const myAddress = this.node.getId().toB58String()
+    const myAddress = this.node.getId().toString()
     return `${myAddress}:${message}`
   }
 
@@ -91,7 +91,7 @@ export class SendMessage extends AbstractCommand {
       return
     }
 
-    console.log(`Sending message to ${styleValue(destination.toB58String(), 'peerId')} ...`)
+    console.log(`Sending message to ${styleValue(destination.toString(), 'peerId')} ...`)
     log(await this.sendMessage(state, destination, message))
   }
 }

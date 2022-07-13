@@ -1,5 +1,5 @@
 import { type HeartbeatPingResult } from './heartbeat.js'
-import PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import { randomSubset, debug } from '@hoprnet/hopr-utils'
 
 const log = debug('hopr-core:network-peers')
@@ -49,7 +49,7 @@ class NetworkPeers {
   // @returns a float between 0 (completely unreliable) and 1 (completely
   // reliable) estimating the quality of service of a peer's network connection
   public qualityOf(peerId: PeerId): number {
-    const entry = this.entries.get(peerId.toB58String())
+    const entry = this.entries.get(peerId.toString())
     if (entry && entry.heartbeatsSent > 0) {
       /*
       return entry.heartbeatsSuccess / entry.heartbeatsSent
@@ -64,7 +64,7 @@ class NetworkPeers {
    * @returns various information about the connection, throws error if peerId doesn't exist
    */
   public getConnectionInfo(peerId: PeerId): Entry {
-    const id = peerId.toB58String()
+    const id = peerId.toString()
     const entry = this.entries.get(id)
     if (entry) return entry
     throw Error(`Entry for ${id} does not exist`)
@@ -82,7 +82,7 @@ class NetworkPeers {
   }
 
   public updateRecord(pingResult: HeartbeatPingResult): void {
-    const id = pingResult.destination.toB58String()
+    const id = pingResult.destination.toString()
     const previousEntry = this.entries.get(id)
     if (!previousEntry) return
 
@@ -141,10 +141,10 @@ class NetworkPeers {
   }
 
   public register(peerId: PeerId, origin: string) {
-    const id = peerId.toB58String()
+    const id = peerId.toString()
     const now = Date.now()
     const hasEntry = this.entries.has(id)
-    const isExcluded = !hasEntry && this.excludedPeers.some((p) => p.equals(peerId))
+    const isExcluded = !hasEntry && this.excludedPeers.some((excluded: PeerId) => excluded.equals(peerId))
     const isDenied = !hasEntry && this.deniedEntries.has(id)
 
     log('registering peer', id, { hasEntry, isExcluded, isDenied })
@@ -182,7 +182,7 @@ class NetworkPeers {
   }
 
   public has(peerId: PeerId): boolean {
-    return this.entries.has(peerId.toB58String())
+    return this.entries.has(peerId.toString())
   }
 
   public length(): number {
@@ -217,7 +217,7 @@ class NetworkPeers {
         continue
       }
 
-      const entry = this.entries.get(peer.toB58String())
+      const entry = this.entries.get(peer.toString())
 
       const quality = this.qualityOf(peer)
       if (quality.toFixed(1) === '1.0') {
@@ -228,7 +228,7 @@ class NetworkPeers {
 
       const success =
         entry.heartbeatsSent > 0 ? ((entry.heartbeatsSuccess / entry.heartbeatsSent) * 100).toFixed() + '%' : '<new>'
-      out += `- id: ${entry.id.toB58String()}, `
+      out += `- id: ${entry.id.toString()}, `
       out += `quality: ${this.qualityOf(entry.id).toFixed(2)}, `
       out += `backoff: ${entry.backoff.toFixed()} (${success} of ${entry.heartbeatsSent}), `
       out += `origin: ${entry.origin}`
@@ -267,13 +267,13 @@ class NetworkPeers {
   }
 
   public addPeerToDenied(peerId: PeerId, origin: string): void {
-    const peerIdStr = peerId.toB58String()
+    const peerIdStr = peerId.toString()
     log('adding peer to denied', peerIdStr)
     this.deniedEntries.set(peerIdStr, { id: peerId, origin })
   }
 
   public removePeerFromDenied(peerId: PeerId): void {
-    const peerIdStr = peerId.toB58String()
+    const peerIdStr = peerId.toString()
     const existed = this.deniedEntries.delete(peerIdStr)
 
     if (existed) {

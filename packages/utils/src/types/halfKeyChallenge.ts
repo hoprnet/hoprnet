@@ -1,4 +1,5 @@
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { unmarshalPublicKey } from '@libp2p/crypto/keys'
 
 import secp256k1 from 'secp256k1'
 import { Address, Hash } from './index.js'
@@ -32,7 +33,7 @@ export class HalfKeyChallenge {
   }
 
   static fromPeerId(peerId: PeerId) {
-    return new HalfKeyChallenge(peerId.pubKey.marshal())
+    return new HalfKeyChallenge(unmarshalPublicKey(peerId.publicKey).marshal())
   }
 
   toAddress(): Address {

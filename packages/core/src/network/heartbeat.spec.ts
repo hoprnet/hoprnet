@@ -3,7 +3,7 @@ import NetworkPeers from './network-peers.js'
 import { assert } from 'chai'
 import { type LibP2PHandlerFunction, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { EventEmitter, once } from 'events'
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import { NETWORK_QUALITY_THRESHOLD } from '../constants.js'
 
 class TestingHeartbeat extends Heartbeat {
@@ -47,7 +47,7 @@ const SHORT_TIMEOUTS: Partial<HeartbeatConfig> = {
  * @returns an event string that includes destination and protocol
  */
 function reqEventName(self: PeerId, protocol: string): string {
-  return `req:${self.toB58String()}:${protocol}`
+  return `req:${self.toString()}:${protocol}`
 }
 
 /**
@@ -58,7 +58,7 @@ function reqEventName(self: PeerId, protocol: string): string {
  * @returns an event string that includes sender, receiver and the protocol
  */
 function resEventName(self: PeerId, dest: PeerId, protocol: string): string {
-  return `res:${self.toB58String()}:${dest.toB58String()}:${protocol}`
+  return `res:${self.toString()}:${dest.toString()}:${protocol}`
 }
 /**
  * Creates an event-based fake network
@@ -81,7 +81,7 @@ function createFakeNetwork() {
       network.emit(resEventName(self, from, protocol), self, response)
     })
 
-    subscribedPeers.set(self.toB58String(), reqEventName(self, protocol))
+    subscribedPeers.set(self.toString(), reqEventName(self, protocol))
   }
 
   // mocks libp2p.dialProtocol
@@ -101,8 +101,8 @@ function createFakeNetwork() {
 
   // mocks libp2p.stop
   const unsubscribe = (peer: PeerId) => {
-    if (subscribedPeers.has(peer.toB58String())) {
-      const protocol = subscribedPeers.get(peer.toB58String())
+    if (subscribedPeers.has(peer.toString())) {
+      const protocol = subscribedPeers.get(peer.toString())
 
       network.removeAllListeners(protocol)
     }
@@ -132,7 +132,7 @@ async function getPeer(
     }) as any,
     () => Promise.resolve(true),
     netStatEvents,
-    (peerId) => peerId.toB58String() !== Charly.toB58String(),
+    (peerId) => !peerId.equals(Charly),
     TESTING_ENVIRONMENT,
     {
       ...SHORT_TIMEOUTS,
