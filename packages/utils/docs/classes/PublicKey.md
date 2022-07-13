@@ -24,7 +24,6 @@
 - [serializeCompressed](PublicKey.md#serializecompressed)
 - [serializeUncompressed](PublicKey.md#serializeuncompressed)
 - [toAddress](PublicKey.md#toaddress)
-- [toB58String](PublicKey.md#tob58string)
 - [toCompressedPubKeyHex](PublicKey.md#tocompressedpubkeyhex)
 - [toPeerId](PublicKey.md#topeerid)
 - [toString](PublicKey.md#tostring)
@@ -59,7 +58,7 @@
 
 #### Defined in
 
-[types/publicKey.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L9)
+[types/publicKey.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L16)
 
 ## Accessors
 
@@ -136,16 +135,6 @@ ___
 #### Returns
 
 [`Address`](Address.md)
-
-___
-
-### toB58String
-
-▸ **toB58String**(): `string`
-
-#### Returns
-
-`string`
 
 ___
 

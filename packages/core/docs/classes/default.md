@@ -21,10 +21,11 @@
 - [heartbeat](default.md#heartbeat)
 - [indexer](default.md#indexer)
 - [knownPublicNodesCache](default.md#knownpublicnodescache)
-- [libp2p](default.md#libp2p)
+- [libp2pComponents](default.md#libp2pcomponents)
 - [networkPeers](default.md#networkpeers)
 - [pubKey](default.md#pubkey)
 - [status](default.md#status)
+- [stopLibp2p](default.md#stoplibp2p)
 - [stopPeriodicCheck](default.md#stopperiodiccheck)
 - [strategy](default.md#strategy)
 - [captureRejectionSymbol](default.md#capturerejectionsymbol)
@@ -35,7 +36,6 @@
 ### Methods
 
 - [addListener](default.md#addlistener)
-- [addPeerToDHT](default.md#addpeertodht)
 - [announce](default.md#announce)
 - [closeChannel](default.md#closechannel)
 - [closeConnectionsTo](default.md#closeconnectionsto)
@@ -114,13 +114,13 @@ Create an uninitialized Hopr Node
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `id` | `PeerId` |
-| `db` | `HoprDB` |
-| `connector` | `default` |
-| `options` | [`HoprOptions`](../modules.md#hoproptions) |
-| `publicNodesEmitter` | `PublicNodesEmitter` |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `id` | `PeerId` | PeerId to use, determines node address |
+| `db` | `HoprDB` | used to persist protocol state |
+| `connector` | `default` | an instance of the blockchain wrapper |
+| `options` | [`HoprOptions`](../modules.md#hoproptions) |  |
+| `publicNodesEmitter` | `PublicNodesEmitter` | used to pass information about newly announced nodes to transport module |
 
 #### Overrides
 
@@ -134,7 +134,7 @@ EventEmitter.constructor
 
 #### Defined in
 
-[packages/core/src/index.ts:164](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L164)
+[packages/core/src/index.ts:178](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L178)
 
 ___
 
@@ -144,7 +144,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:159](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L159)
+[packages/core/src/index.ts:172](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L172)
 
 ___
 
@@ -154,7 +154,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:158](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L158)
+[packages/core/src/index.ts:171](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L171)
 
 ___
 
@@ -164,7 +164,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:166](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L166)
+[packages/core/src/index.ts:180](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L180)
 
 ___
 
@@ -174,17 +174,17 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:162](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L162)
+[packages/core/src/index.ts:176](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L176)
 
 ___
 
-### libp2p
+### libp2pComponents
 
-• `Private` **libp2p**: `Libp2p`
+• `Private` **libp2pComponents**: `Components`
 
 #### Defined in
 
-[packages/core/src/index.ts:160](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L160)
+[packages/core/src/index.ts:173](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L173)
 
 ___
 
@@ -194,7 +194,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:157](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L157)
+[packages/core/src/index.ts:170](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L170)
 
 ___
 
@@ -204,7 +204,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:161](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L161)
+[packages/core/src/index.ts:175](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L175)
 
 ___
 
@@ -214,7 +214,29 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:153](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L153)
+[packages/core/src/index.ts:166](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L166)
+
+___
+
+### stopLibp2p
+
+• `Private` **stopLibp2p**: () => `void` \| `Promise`<`void`\>
+
+#### Type declaration
+
+▸ (): `void` \| `Promise`<`void`\>
+
+This method will be invoked to stop the component.
+
+It should not assume any other components are running when it is called.
+
+##### Returns
+
+`void` \| `Promise`<`void`\>
+
+#### Defined in
+
+[packages/core/src/index.ts:174](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L174)
 
 ___
 
@@ -232,7 +254,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:155](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L155)
+[packages/core/src/index.ts:168](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L168)
 
 ___
 
@@ -242,7 +264,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:156](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L156)
+[packages/core/src/index.ts:169](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L169)
 
 ___
 
@@ -334,26 +356,6 @@ Alias for `emitter.on(eventName, listener)`.
 #### Inherited from
 
 EventEmitter.addListener
-
-___
-
-### addPeerToDHT
-
-▸ `Private` **addPeerToDHT**(`peer`): `Promise`<`void`\>
-
-Total hack.
-Libp2p seems to miss a channel that passes discovered peers
-to the DHT routing table.
-
-#### Parameters
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `peer` | `PeerId` | peer to add to DHT routing table |
-
-#### Returns
-
-`Promise`<`void`\>
 
 ___
 
@@ -576,7 +578,7 @@ ___
 
 ### getAddressesAnnouncedToDHT
 
-▸ **getAddressesAnnouncedToDHT**(`peer?`, `timeout?`): `Promise`<`Multiaddr`[]\>
+▸ **getAddressesAnnouncedToDHT**(`peer?`, `_timeout?`): `Promise`<`Multiaddr`[]\>
 
 List of addresses that is announced to other nodes
 
@@ -587,7 +589,7 @@ List of addresses that is announced to other nodes
 | Name | Type | Default value | Description |
 | :------ | :------ | :------ | :------ |
 | `peer` | `PeerId` | `undefined` | peer to query for, default self |
-| `timeout` | `number` | `5e3` | [optional] custom timeout for DHT query |
+| `_timeout` | `number` | `5e3` | [optional] custom timeout for DHT query |
 
 #### Returns
 
@@ -1470,7 +1472,7 @@ ___
 | :------ | :------ | :------ |
 | `msg` | `Uint8Array` | message to send |
 | `destination` | `PeerId` | PeerId of the destination |
-| `intermediatePath?` | `PublicKey`[] | - |
+| `intermediatePath?` | `PublicKey`[] | optional set path manually |
 
 #### Returns
 
@@ -1559,7 +1561,7 @@ ___
 
 ### start
 
-▸ **start**(): `Promise`<`void`\>
+▸ **start**(`__testingLibp2p?`): `Promise`<`void`\>
 
 Start node
 
@@ -1580,6 +1582,12 @@ If the node is not funded, it will throw.
 - Announce address, pubkey, and multiaddr on chain.
 
 - Start heartbeat, automatic strategies, etc..
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `__testingLibp2p?` | `Libp2p` | use simulated libp2p instance for testing |
 
 #### Returns
 
