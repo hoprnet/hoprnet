@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "1.89.0-next.63",
+  "version": "1.89.0-next.65",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -39,6 +39,7 @@
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "@libp2p/crypto": "1.0.0",
     "@libp2p/interface-peer-id": "1.0.2",
+    "@libp2p/interfaces": "2.0.4",
     "@libp2p/kad-dht": "1.0.16",
     "@libp2p/mplex": "1.2.1",
     "@libp2p/peer-id": "1.1.13",

@@ -3427,6 +3427,7 @@ __metadata:
     "@libp2p/interface-peer-id": 1.0.2
     "@libp2p/interface-peer-store": 1.0.0
     "@libp2p/interface-transport": 1.0.0
+    "@libp2p/interfaces": 2.0.4
     "@libp2p/mplex": 1.2.1
     "@libp2p/peer-id": 1.1.13
     "@multiformats/multiaddr": 10.2.1
@@ -3509,6 +3510,7 @@ __metadata:
     "@libp2p/interface-content-routing": 1.0.2
     "@libp2p/interface-peer-id": 1.0.2
     "@libp2p/interface-registrar": 1.1.0
+    "@libp2p/interfaces": 2.0.4
     "@libp2p/kad-dht": 1.0.16
     "@libp2p/mplex": 1.2.1
     "@libp2p/peer-id": 1.1.13
@@ -3985,7 +3987,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@libp2p/interfaces@npm:^2.0.0, @libp2p/interfaces@npm:^2.0.1, @libp2p/interfaces@npm:^2.0.2":
+"@libp2p/interfaces@npm:2.0.4, @libp2p/interfaces@npm:^2.0.0, @libp2p/interfaces@npm:^2.0.1, @libp2p/interfaces@npm:^2.0.2":
   version: 2.0.4
   resolution: "@libp2p/interfaces@npm:2.0.4"
   dependencies:
