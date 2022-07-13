@@ -34,7 +34,7 @@ async function main(
     process.exit(1)
   }
 
-  if (network.name !== 'hardhat' || !network.tags.staging) {
+  if (network.name !== 'hardhat' && !network.tags.staging) {
     console.error('Register only works in a hardhat or staging network.')
     process.exit(1)
   }
@@ -53,10 +53,16 @@ async function main(
     process.exit(1)
   }
 
-  // we use a custom ethers provider here instead of the ethers object from the
-  // hre which is managed by hardhat-ethers, because that one seems to
-  // run its own in-memory hardhat instance, which is undesirable
-  const provider = new ethers.providers.JsonRpcProvider()
+  let provider
+  if (environment == 'hardhat-localhost') {
+    // we use a custom ethers provider here instead of the ethers object from the
+    // hre which is managed by hardhat-ethers, because that one seems to
+    // run its own in-memory hardhat instance, which is undesirable
+    provider = new ethers.providers.JsonRpcProvider()
+  } else {
+    provider = ethers.provider
+  }
+
   const signer = provider.getSigner()
 
   const hoprProxy = !network.tags.staging
@@ -115,7 +121,7 @@ async function main(
       throw Error(`Task "${opts.task}" not available.`)
     }
   } catch (error) {
-    console.error('Failed to add account with error:', error)
+    console.error('Failed to interact with network registry with error:', error)
     process.exit(1)
   }
 }

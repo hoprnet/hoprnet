@@ -4,6 +4,7 @@
 # should be extended to use its own instance of hardhat too.
 
 # prevent sourcing of this script, only allow execution
+# shellcheck disable=SC2091
 $(return >/dev/null 2>&1)
 test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
 
@@ -14,8 +15,11 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare -x HOPR_LOG_ID="setup-gcloud-cluster"
+# shellcheck disable=SC1091
 source "${mydir}/utils.sh"
+# shellcheck disable=SC1091
 source "${mydir}/gcloud.sh"
+# shellcheck disable=SC1091
 source "${mydir}/testnet.sh"
 
 usage() {
@@ -46,18 +50,19 @@ usage() {
   msg "HOPRD_PASSWORD\t\t\tused as password for all nodes, defaults to a random value"
   msg "HOPRD_SHOW_PRESTART_INFO\tset to 'true' to print used parameter values before starting"
   msg "HOPRD_PERFORM_CLEANUP\t\tset to 'true' to perform the cleanup process for the given cluster id"
+  msg "HOPRD_RESET_METADATA\t\tset to 'true' to trigger metadata reset on instances"
   msg
 }
 
 # return early with help info when requested
-{ [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
+{ [[ "${1:-}" = "-h" ]] || [[ "${1:-}" = "--help" ]]; } && { usage; exit 0; }
 
 # verify and set parameters
-: ${FAUCET_SECRET_API_KEY?"Missing environment variable FAUCET_SECRET_API_KEY"}
-: ${STAKING_ACCOUNT_BA28?"Missing environment variable STAKING_ACCOUNT_BA28"}
-: ${STAKING_ACCOUNT_F84B?"Missing environment variable STAKING_ACCOUNT_F84B"}
-: ${STAKING_ACCOUNT_0FD4?"Missing environment variable STAKING_ACCOUNT_0FD4"}
-: ${STAKING_ACCOUNT_6C15?"Missing environment variable STAKING_ACCOUNT_6C15"}
+: "${FAUCET_SECRET_API_KEY?"Missing environment variable FAUCET_SECRET_API_KEY"}"
+: "${STAKING_ACCOUNT_BA28?"Missing environment variable STAKING_ACCOUNT_BA28"}"
+: "${STAKING_ACCOUNT_F84B?"Missing environment variable STAKING_ACCOUNT_F84B"}"
+: "${STAKING_ACCOUNT_0FD4?"Missing environment variable STAKING_ACCOUNT_0FD4"}"
+: "${STAKING_ACCOUNT_6C15?"Missing environment variable STAKING_ACCOUNT_6C15"}"
 
 declare environment="${1?"missing parameter <environment>"}"
 declare init_script=${2:-}
@@ -71,6 +76,7 @@ declare api_token="${HOPRD_API_TOKEN:-Token${RANDOM}^${RANDOM}^${RANDOM}Token}"
 declare password="${HOPRD_PASSWORD:-pw${RANDOM}${RANDOM}${RANDOM}pw}"
 declare perform_cleanup="${HOPRD_PERFORM_CLEANUP:-false}"
 declare show_prestartinfo="${HOPRD_SHOW_PRESTART_INFO:-false}"
+declare reset_metadata="${HOPRD_RESET_METADATA:-false}"
 
 # Append environment as Docker image version, if not specified
 [[ "${docker_image}" != *:* ]] && docker_image="${docker_image}:${environment}"
@@ -81,7 +87,7 @@ function cleanup {
   trap - SIGINT SIGTERM ERR EXIT
   set +Eeuo pipefail
 
-  if [ ${EXIT_CODE} -ne 0 ] || [ "${perform_cleanup}" = "true" ] || [ "${perform_cleanup}" = "1" ]; then
+  if [[ ${EXIT_CODE} -ne 0 ]] || [[ "${perform_cleanup}" = "true" ]] || [[ "${perform_cleanup}" = "1" ]]; then
     # Cleaning up everything upon failure
     gcloud_delete_managed_instance_group "${cluster_id}"
     gcloud_delete_instance_template "${instance_template_name}"
@@ -90,7 +96,7 @@ function cleanup {
   exit $EXIT_CODE
 }
 
-if [ "${perform_cleanup}" = "1" ] || [ "${perform_cleanup}" = "true" ]; then
+if [[ "${perform_cleanup}" = "1" ]] || [[ "${perform_cleanup}" = "true" ]]; then
   cleanup
 
   # exit right away
@@ -98,7 +104,7 @@ if [ "${perform_cleanup}" = "1" ] || [ "${perform_cleanup}" = "true" ]; then
 fi
 
 # --- Log test info {{{
-if [ "${show_prestartinfo}" = "1" ] || [ "${show_prestartinfo}" = "true" ]; then
+if [[ "${show_prestartinfo}" = "1" ]] || [[ "${show_prestartinfo}" = "true" ]]; then
   log "Pre-Start Info"
   log "\tdocker_image: ${docker_image}"
   log "\tcluster_id: ${cluster_id}"
@@ -126,7 +132,7 @@ gcloud_create_instance_template_if_not_exists \
 # start nodes
 gcloud_create_or_update_managed_instance_group  \
   "${cluster_id}" \
-  ${cluster_size} \
+  "${cluster_size}" \
   "${instance_template_name}"
 
 # This maps "staking account address" => "private key"
@@ -151,15 +157,23 @@ else
 fi
 
 # This can be called always, because the "stake" task is idempotent given the same arguments
+declare staking_index=0
 for staking_addr in "${!staking_addrs_dict[@]}" ; do
-  yarn hardhat stake --network hardhat --amount 1000000000000000000000 \
-    --privatekey "${staking_addrs_dict[staking_addr]}"
+  fund_if_empty "${staking_addr}" "${environment}"
+  # we alternate between staking funds or NFT
+  if [[ "$((staking_index%2))" = "0" ]]; then
+    make -C "${mydir}/.." stake-funds privkey="${staking_addrs_dict[${staking_addr}]}" environment="${environment}"
+  else
+    make -C "${mydir}/.." stake-devnft privkey="${staking_addrs_dict[${staking_addr}]}" environment="${environment}"
+  fi
+  ((++staking_index))
 done
 
 # Get names of all instances in this cluster
 declare instance_names
-instance_names=$(gcloud_get_managed_instance_group_instances_names "${cluster_id}")
-declare instance_names_arr=( ${instance_names} )
+instance_names="$(gcloud_get_managed_instance_group_instances_names "${cluster_id}")"
+declare -a instance_names_arr
+IFS="," read -r -a instance_names_arr <<< "$(echo "${instance_names}" | jq -r '@csv' | tr -d '"')"
 
 # Prepare sorted staking account addresses so we ensure a stable order of assignment
 declare staking_addresses_arr=( "${!staking_addrs_dict[@]}" )
@@ -178,21 +192,34 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
   instance_name="${instance_names_arr[instance_idx]}"
   node_ip=$(gcloud_get_ip "${instance_name}")
 
-  # All VM instances in the deployed cluster will get a special INFO tag
-  # which contains all handy information about the HOPR instance running in the VM.
-  # These currently include: node wallet address, node peer ID, associated staking account
-  # These information are constant during the lifetime of the VM and
-  # do not change during re-deployment.
-  info_tag=$(gcloud_get_node_info_tag "${instance_name}")
+  if [[ "${reset_metadata}" = "true" ]]; then
+    gcloud_remove_instance_metadata "${instance_name}" "hopr-peer-id,hopr-wallet-addr,hopr-staking-addr"
+  fi
 
-  # Values contained in the INFO tag
-  declare wallet_addr
-  declare peer_id
-  declare staking_addr
-  if [[ -z "${info_tag}" ]]; then
-    # If the instance does not have the INFO tag yet, we need to retrieve all info
-    wallet_addr=$(get_native_address "${api_token}@${node_ip}:3001")
-    peer_id=$(get_hopr_address "${api_token}@${node_ip}:3001")
+  # All VM instances in the deployed cluster will get a special metadata entries
+  # which contain all information about the HOPR instance running in the VM.
+  # These currently include:
+  # - node wallet address
+  # - node peer ID
+  # - associated staking account
+  # This information is constant during the lifetime of the VM and
+  # does not change during re-deployment once set.
+  declare instance_metadata
+  instance_metadata="$(gcloud_get_node_info_metadata "${instance_name}")"
+
+  # known metadata keys
+  declare wallet_addr peer_id staking_addr
+  wallet_addr="$(echo "${instance_metadata}" | jq -r '."hopr-wallet-addr" // empty')"
+  peer_id="$(echo "${instance_metadata}" | jq -r '."hopr-peer-id" // empty')"
+  staking_addr="$(echo "${instance_metadata}" | jq -r '."hopr-staking-addr" // empty')"
+
+  # data from the node's API for verification or initialization
+  declare api_wallet_addr api_peer_id
+  api_wallet_addr="$(get_native_address "${api_token}@${node_ip}:3001")"
+  api_peer_id="$(get_hopr_address "${api_token}@${node_ip}:3001")"
+
+  if [[ -z "${staking_addr}" ]]; then
+    # If the instance does not have metadata yet, we set it once
 
     # NOTE: We leave only the first public node unstaked
     if [[ ${instance_idx} -eq 0 && "${docker_image}" != *-nat:* ]]; then
@@ -203,38 +230,40 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
       staking_addr="${staking_addresses_arr[staking_addr_idx]}"
     fi
 
-    # Save the info tag
-    info_tag="info:native_addr=${wallet_addr};peer_id=${peer_id};nr_staking_addr=${staking_addr}"
-    gcloud_add_instance_tags "${instance_name}" "${info_tag}"
+    # Save the metadata
+    declare new_metadata="hopr-wallet-addr=${api_wallet_addr},hopr-peer-id=${api_peer_id},hopr-staking-addr=${staking_addr}"
+    gcloud_add_instance_metadata "${instance_name}" "${new_metadata}"
   else
-    # Retrieve all information from the INFO tag
-    wallet_addr=$(echo "${info_tag}" | sed -E 's/.*native_addr=(0[xX]{1}[a-f0-9A-F]{40}).*/\1/g')
-    peer_id=$(echo "${info_tag}" | sed -E 's/.*peer_id=([a-zA-Z0-9]+).*/\1/g')
-    staking_addr=$(echo "${info_tag}" | sed -E 's/.*nr_staking_addr=([a-zA-Z0-9]+).*/\1/g')
+    # cross-check data, and log discrepancies, we keep going though and leave
+    # the reconciliation for another process to do
+    if [[ "${api_wallet_addr}" != "${wallet_addr}" ]]; then
+      log "ERROR: instance ${instance_name} has changed wallet addr from original ${wallet_addr} to ${api_wallet_addr}"
+    fi
+    if [[ "${api_peer_id}" != "${peer_id}" ]]; then
+      log "ERROR: instance ${instance_name} has changed peer id from original ${peer_id} to ${api_peer_id}"
+    fi
   fi
 
   ip_addrs+=( "${node_ip}" )
 
   # Do not include the unstaked nodes (= skipped during registration for NR)
   if [[ "${staking_addr}" != "unstaked" ]]; then
-    hopr_addrs+=( "${peer_id}" )
+    hopr_addrs+=( "${api_peer_id}" )
     used_staking_addrs+=( "${staking_addr}" )
   fi
 
   # Fund the node as well
   wait_until_node_is_ready "${node_ip}"
-  fund_if_empty "${wallet_addr}" "${environment}"
-
+  fund_if_empty "${api_wallet_addr}" "${environment}"
 done
 
 # Register all nodes in cluster
 IFS=','
 # If same order of parameters is given, the "register" task is idempotent
-yarn workspace @hoprnet/hopr-ethereum hardhat register \
-   --network hardhat \
-   --task add \
-   --native-addresses "${used_staking_addrs[*]}" \
-   --peer-ids "${hopr_addrs[*]}"
+make -C "${mydir}/.." register-nodes \
+  environment="${environment}" \
+  native_addresses="${used_staking_addrs[*]}" \
+  peer_ids="${hopr_addrs[*]}"
 unset IFS
 
 # Finally wait for the public nodes to come up, for NAT nodes this isn't possible
@@ -247,7 +276,8 @@ fi
 # }}}
 
 # --- Call init script--- {{{
-if [ -n "${init_script}" ] && [ -x "${init_script}" ]; then
+if [[ -n "${init_script}" ]] && [[ -x "${init_script}" ]]; then
+  # shellcheck disable=SC2068
   HOPRD_API_TOKEN="${api_token}" \
     "${init_script}" \
     ${ip_addrs[@]/%/:3001}

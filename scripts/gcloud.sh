@@ -39,20 +39,25 @@ alias gssh="gcloud compute ssh --force-key-file-overwrite --ssh-key-expire-after
 # $1=ip
 # $2=optional: healthcheck port, defaults to 8080
 wait_until_node_is_ready() {
-  local ip=${1}
-  local port=${2:-8080}
+  local ip="${1}"
+  local port="${2:-8080}"
   local cmd="curl --silent --max-time 5 ${ip}:${port}/healthcheck/v1/version"
+  local vsn
 
   # try every 10 seconds for 5 minutes
-  log "waiting for VM with IP $1 to have HOPR node up and running"
-  try_cmd "${cmd}" 30 10
+  log "waiting for VM with IP ${ip} to have HOPRd node up and running"
+  vsn="$(try_cmd "${cmd}" 30 10)"
+  log "VM with IP ${ip} is running HOPRd v${vsn}"
 }
 
 # Get external IP for running node or die
-# $1 - VM name
+# $1 - VM instance uri
 gcloud_get_ip() {
-  local vm_name="${1}"
-  gcloud compute instances list | grep "${vm_name}" | awk '{ print $5 }'
+  local instance_uri="${1}"
+
+  gcloud compute instances describe ${instance_uri} \
+    --flatten 'networkInterfaces[].accessConfigs[]' \
+    --format 'csv[no-heading](networkInterfaces.accessConfigs.natIP)'
 }
 
 # $1=VM name
@@ -328,9 +333,7 @@ gcloud_create_or_update_managed_instance_group() {
   log "reserve all external addresses of the instance group ${name} instances"
   for instance_uri in $(gcloud compute instance-groups list-instances "${name}" ${gcloud_region} --uri); do
     local instance_name=$(gcloud compute instances describe ${instance_uri} --format 'csv[no-heading](name)')
-    local instance_ip=$(gcloud compute instances describe ${instance_uri} \
-      --flatten 'networkInterfaces[].accessConfigs[]' \
-      --format 'csv[no-heading](networkInterfaces.accessConfigs.natIP)')
+    local instance_ip=$(gcloud_get_ip ${instance_uri})
 
     gcloud_reserve_static_ip_address "${instance_name}" "${instance_ip}"
   done
@@ -343,9 +346,7 @@ gcloud_delete_managed_instance_group() {
   log "un-reserve all external addresses of the instance group ${name} instances"
   for instance_uri in $(gcloud compute instance-groups list-instances "${name}" ${gcloud_region} --uri); do
     local instance_name=$(gcloud compute instances describe ${instance_uri} --format 'csv[no-heading](name)')
-    local isntance_ip=$(gcloud compute instances describe ${instance_uri} \
-      --flatten 'networkInterfaces[].accessConfigs[]' \
-      --format 'csv[no-heading](networkInterfaces.accessConfigs.natIP)')
+    local instance_ip=$(gcloud_get_ip ${instance_uri})
 
     gcloud_delete_static_ip_address "${instance_name}"
   done
@@ -370,71 +371,57 @@ gcloud_get_managed_instance_group_instances_ips() {
     nproc_cmd="echo 1"
   fi
 
+  export -f gcloud_get_ip
   gcloud compute instance-groups list-instances "${name}" \
     ${gcloud_region} --sort-by=instance --uri | \
-    xargs -P `${nproc_cmd}` -I '{}' gcloud compute instances describe '{}' \
-      --flatten 'networkInterfaces[].accessConfigs[]' \
-      --format 'csv[no-heading](networkInterfaces.accessConfigs.natIP)'
+    xargs -P `${nproc_cmd}` -I '{}' bash -c "gcloud_get_ip '{}'"
 }
 
+# returns a JSON list of strings
 # $1=group name
 gcloud_get_managed_instance_group_instances_names() {
   local name="${1}"
 
   gcloud compute instance-groups list-instances "${name}" ${gcloud_region} --sort-by=instance \
-    --format=json | jq '.[1].instance' | tr -d '"'
+    --format=json | jq 'map(.instance)'
+}
+
+# returns a JSON list of key/value paris
+# $1=instance name
+gcloud_get_instance_metadata() {
+  local name="${1}"
+
+  gcloud compute instances describe "${name}" --format=json | jq ".metadata.items"
 }
 
 # $1=instance name
-gcloud_get_instance_tags() {
+# $2=comma separated list of metadata to add
+gcloud_add_instance_metadata() {
   local name="${1}"
+  local metadata="${2}"
 
-  gcloud compute instances describe "${name}" --format=json | jq ".tags.items[]" | tr -d '"'
-}
-
-# $1=instance name
-# $2=comma separated list of tags to add
-gcloud_add_instance_tags() {
-  local name="${1}"
-  local tags="${2}"
-
-  gcloud compute instances add-tags "${name}" --tags="${tags}"
+  gcloud compute instances add-metadata "${name}" --metadata="${metadata}"
 }
 
 # $1 = instance name
-gcloud_get_node_info_tag() {
+gcloud_get_node_info_metadata() {
   local instance_name="${1}"
 
-  local current_tag_set=$(gcloud_get_instance_tags "${instance_name}")
-  local current_tag_set_arr=( "${current_tag_set}" )
-
-  # Find the tag containing the "info:" prefix
-  local info_tag=""
-  for tag in ${current_tag_set_arr}; do
-    if [[ ${tag} =~ info:.+ ]]; then
-         info_tag="${tag#info:}"
-         break
-    fi
-  done
-
-  echo "${info_tag}"
+  # filter by prefix hopr- and return results as object
+  gcloud_get_instance_metadata "${instance_name}" | jq 'map(select(.key | startswith("hopr-"))) | from_entries'
 }
 
 # $1=instance name
-# $2=comma separated list of tags to remove
-gcloud_remove_instance_tags() {
+# $2=comma separated list of metadata keys to remove
+gcloud_remove_instance_metadata() {
   local name="${1}"
-  local tags="${2}"
+  local keys="${2}"
 
-  gcloud compute instances remove-tags "${name}" --tags="${tags}"
+  gcloud compute instances remove-metadata "${name}" --keys="${keys}"
 }
 
 gcloud_get_unused_static_ip_addresses() {
-  local json
-
-  json=$(gcloud compute addresses list --filter='status != IN_USE' --format=json ${gcloud_region})
-
-  echo "${json}"
+  gcloud compute addresses list --filter='status != IN_USE' --format=json ${gcloud_region}
 }
 
 # $1=address name

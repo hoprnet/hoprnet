@@ -193,6 +193,7 @@ class WebRTCConnection implements MultiaddrConnection {
   /**
    * Log verbose messages and add identity tag to distinguish multiple instances
    */
+  // @ts-ignore
   private verbose(..._: any[]) {
     _verbose(`WRTC [${this._id}]`, ...arguments)
   }

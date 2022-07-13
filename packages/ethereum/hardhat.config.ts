@@ -240,7 +240,8 @@ task<SelfRegisterOpts>(
   .addOptionalParam<string>('privatekey', 'Private key of the signer', undefined, types.string)
 
 task<StakeOpts>('stake', 'Used by CI tests to stake tokens to the running staking program.', stake)
-  .addParam<string>(
+  .addParam<StakeOpts['type']>('type', 'Token type to stake', undefined, types.string)
+  .addOptionalParam<string>(
     'amount',
     'target txHOPR token amount (in wei) that will be staked',
     MIN_STAKE.toString(),

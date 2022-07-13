@@ -104,28 +104,27 @@ redeem_tickets() {
 # to disable auto-mining at runtime
 disable_hardhat_auto_mining() {
   log "Disabling hardhat automining"
-  HOPR_ENVIRONMENT_ID=hardhat-localhost \
-  TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
-  yarn workspace @hoprnet/hopr-ethereum hardhat disable-automine \
-    --network hardhat
+  env \
+    HOPR_ENVIRONMENT_ID=hardhat-localhost \
+    TS_NODE_PROJECT="./tsconfig.hardhat.json" \
+    yarn workspace @hoprnet/hopr-ethereum hardhat disable-automine \
+      --network hardhat
 }
 
 # $1 native addresses ("Ethereum addresses"), comma-separated list
 # $2 peerIds, comma-separated list
 register_nodes() {
-  HOPR_ENVIRONMENT_ID=hardhat-localhost \
-  TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
-  yarn workspace @hoprnet/hopr-ethereum hardhat register \
-    --network hardhat \
-    --task add \
-    --native-addresses "${1}" \
-    --peer-ids "${2}"
+  make -C "${mydir}/.. register-nodes" \
+    environment=hardhat-localhost \
+    native_addresses="${1}" \
+    peer_ids="${2}"
 }
 
 enable_network_registry() {
   log "Enabling register"
-  HOPR_ENVIRONMENT_ID=hardhat-localhost \
-    TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
+  env \
+    HOPR_ENVIRONMENT_ID=hardhat-localhost \
+    TS_NODE_PROJECT="./tsconfig.hardhat.json" \
     yarn workspace @hoprnet/hopr-ethereum hardhat register \
       --network hardhat \
       --task enable

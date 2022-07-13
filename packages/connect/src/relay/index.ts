@@ -424,7 +424,9 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       }
       try {
         await existingConnection.close()
-      } catch {}
+      } catch (err) {
+        error(`Error while closing dead connection`, err)
+      }
     }
   }
 
