@@ -414,7 +414,7 @@ async function main() {
   }
 
   try {
-    logs.log(`This is hoprd version ${version}`)
+    logs.log(`This is HOPRd version ${version}`)
     if (on_avado) logs.log('This node appears to be running on an AVADO')
 
     // 1. Find or create an identity

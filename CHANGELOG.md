@@ -18,6 +18,7 @@
 - Add Docker image (hopr-pluto) running a full hoprd test cluster for local dApp testing
 - Add script that allow self register and self deregister on the Network Registry contract
 - Add documentations around network registry
+- Added possibility to specify custom RPC provider in Avado
 
 <a name="1.89"></a>
 

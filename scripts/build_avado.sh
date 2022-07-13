@@ -85,8 +85,9 @@ cp ./build/Dockerfile ./build/Dockerfile.bak
 
 trap cleanup SIGINT SIGTERM ERR EXIT
 
-# Write AVADO docker build version
-sed -e "s/image:[ ]'hopr\.avado\.dnp\.dappnode\.eth:[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}/image: 'hopr.avado.dnp.dappnode.eth:${AVADO_VERSION}/" ./docker-compose.yml \
+# Write AVADO docker build version & used provider
+sed -e "s/image:[ ]'hopr\.avado\.dnp\.dappnode\.eth:[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}/image: 'hopr.avado.dnp.dappnode.eth:${AVADO_VERSION}/ ;\
+ s/HOPRD_ENVIRONMENT=.+/HOPRD_ENVIRONMENT=${environment_id}/ ; s|HOPRD_PROVIDER=.+|HOPRD_PROVIDER=${provider_url}|" ./docker-compose.yml \
   > ./docker-compose.yml.tmp && mv ./docker-compose.yml.tmp ./docker-compose.yml
 
 # Copy sections between *_JSON_EXPORT of docker-compose.yaml to dappnode_package.json
@@ -96,8 +97,8 @@ sed -n '/BEGIN_JSON_EXPORT/,/END_JSON_EXPORT/{//!p}' ./docker-compose.yml \
   | jq -s ".[0].image += .[1] | .[0] | .version = \"${AVADO_VERSION}\"" ./dappnode_package.json /dev/stdin \
   > ./dappnode_package.json.tmp && mv ./dappnode_package.json.tmp ./dappnode_package.json
 
-# Overwrite default environment & provider in Dockerfile with the one currently used
-sed -e "s/${default_development_environment}/${environment_id}/ ; s/HOPRD_PROVIDER=.+/HOPRD_PROVIDER=${provider_url}" ./build/Dockerfile \
+# Overwrite default environment in Dockerfile with the one currently used
+sed -e "s/${default_development_environment}/${environment_id}/" ./build/Dockerfile \
   > ./build/Dockerfile.tmp && mv ./build/Dockerfile.tmp ./build/Dockerfile
 
 # AVADO SDK does not do proper releases, therefore using GitHub + git commit hashes
