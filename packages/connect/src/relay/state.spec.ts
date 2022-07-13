@@ -22,13 +22,11 @@ function getPingResponder() {
     function reply(source: AsyncIterable<Uint8Array>) {
       return (async function* (): AsyncIterable<Uint8Array> {
         for await (const msg of source) {
-          console.log(`pingResponder`, msg)
           const [PREFIX, SUFFIX] = [msg.slice(0, 1), msg.slice(1)]
 
           switch (PREFIX[0]) {
             case RelayPrefix.STATUS_MESSAGE:
               if (SUFFIX[0] == StatusMessages.PING) {
-                console.log(`received ping`)
                 yield Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PONG)
               } else {
                 yield msg
@@ -44,8 +42,6 @@ function getPingResponder() {
             default:
               yield msg
           }
-
-          console.log(`yielded`)
         }
       })()
     },

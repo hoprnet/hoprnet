@@ -148,7 +148,6 @@ describe('relay swtich context', function () {
     const UPDATE_ATTEMPTS = 5
 
     for (let i = 0; i < UPDATE_ATTEMPTS; i++) {
-      console.log(`iteration`, i)
       const [relayToNodeAfterUpdate, nodeToRelayAfterUpdate] = duplexPair<StreamType>()
 
       ctx.update(nodeToRelayAfterUpdate)

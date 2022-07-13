@@ -192,7 +192,6 @@ class RelayContext extends EventEmitter {
    * @param newStream the new stream to use
    */
   public update(newStream: Stream) {
-    console.log(`############## updating`)
     this._streamSourceSwitchPromise.resolve({
       type: ConnectionEventTypes.STREAM_SOURCE_SWITCH,
       value: newStream.source as StreamSourceAsync
@@ -281,7 +280,6 @@ class RelayContext extends EventEmitter {
         // 1. Handle Stream switches
         // 2. Handle payload / status messages
         const result = await Promise.race(promises)
-        console.log(`incoming`, result)
 
         let toYield: Uint8Array | undefined
 
@@ -430,7 +428,6 @@ class RelayContext extends EventEmitter {
     let iteration = 0
 
     async function* drain(this: RelayContext, internalIteration: number, endPromise: DeferType<SinkEndedEvent>) {
-      console.log(`drain called`, internalIteration)
       const nextMessage = () => {
         assert(currentSource != undefined)
         sourcePromise = currentSource.next().then((res) => ({
@@ -467,13 +464,10 @@ class RelayContext extends EventEmitter {
         this.flow(`FLOW: relay_outgoing: awaiting promises`)
         const result = await Promise.race(promises)
 
-        console.log(`iteration`, iteration, `internalIterarion`, internalIteration)
         if (iteration != internalIteration) {
           leave = true
           break
         }
-
-        console.log(`outgoing`, result, internalIteration)
 
         let toYield: Uint8Array | undefined
 
@@ -542,7 +536,6 @@ class RelayContext extends EventEmitter {
     }
 
     while (true) {
-      console.log(`sink iteration`)
       const endPromise = defer<SinkEndedEvent>()
       try {
         await currentSink(drain.call(this, iteration, endPromise))
@@ -555,8 +548,6 @@ class RelayContext extends EventEmitter {
 
       const result = await Promise.race([endPromise.promise, this._streamSinkSwitchPromise.promise])
 
-      console.log(`sink result`, result)
-
       switch (result.type) {
         case ConnectionEventTypes.STREAM_ENDED:
           // Wait for next sink
@@ -565,7 +556,6 @@ class RelayContext extends EventEmitter {
             this.error(`Sink threw error`, result.err)
             currentSink = (await this._streamSinkSwitchPromise.promise).value
             iteration++
-            console.log(`after error`, currentSink)
           } else {
             currentSink = (await this._streamSinkSwitchPromise.promise).value
             iteration++
