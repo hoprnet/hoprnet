@@ -1,71 +1,113 @@
 #!/usr/bin/env -S yarn --silent ts-node
+// Early beta - to be tested soon
 // Used to get a node's spoken protocols and to test connectivity
 // Example usage: `./scripts/get-supported-protocols-from-peer.ts --addr /ip4/34.65.6.139/tcp/9091/p2p/16Uiu2HAm5Ym8minpwct7aZ9dYYnpbjfsfr8wa6o7GbRFcmXLcmFW`
 
-import { pipe } from 'it-pipe'
 import chalk from 'chalk'
 import yargs from 'yargs/yargs'
+import debug from 'debug'
 
-import { Multiaddr } from 'multiaddr'
-import type PeerId from 'peer-id'
-import { NOISE } from '@chainsafe/libp2p-noise'
-import Upgrader from 'libp2p/src/upgrader.js'
-import Mplex from 'libp2p-mplex'
-const Multistream = require('multistream-select')
+import { Multiaddr } from '@multiformats/multiaddr'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { Noise } from '@chainsafe/libp2p-noise'
+import type { StreamMuxerFactory } from '@libp2p/interfaces/stream-muxer'
+import { Mplex } from '@libp2p/mplex'
+import { createLibp2p, type Libp2p as Libp2pType } from 'libp2p'
+import type { Components } from '@libp2p/interfaces/components'
+import { EventEmitter } from 'events'
+import { Dialer } from '@libp2p/multistream-select'
+import type { MultiaddrConnection } from '@libp2p/interface-connection'
+import { pipe } from 'it-pipe'
+import { Duplex } from 'it-stream-types'
 
-const { HoprConnect } = require('@hoprnet/hopr-connect')
-import { privKeyToPeerId, stringToU8a } from '@hoprnet/hopr-utils'
+import { HoprConnect } from '@hoprnet/hopr-connect'
+import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 
-const id = '0x964e55c734330e9393a32aef61e6b75f3b526fb64df0ac55a6076045918657e1'
+const log = debug('hopr:ls-protocols')
 
-// @ts-ignore
-class ReducedUpgrader extends Upgrader {
-  /**
-   * Overwriting a convenience method in libp2p's Upgrader class to get the spoken
-   * protocols before using the connection
-   *
-   * @override
-   * @param {object} options
-   * @param {MultiaddrConnection} options.maConn - The transport layer connection
-   * @param {MuxedStream | MultiaddrConnection} options.upgradedConn - A duplex connection returned from multiplexer and/or crypto selection
-   * @param {MuxerFactory} [options.Muxer] - The muxer to be used for muxing
-   * @param {PeerId} options.remotePeer - The peer the connection is with
-   */
+interface Libp2p extends Libp2pType {
+  components: Components
+}
+
+interface MyCreateConnection {
+  // to speak Multistream-`ls` protocol
+  dialer: Dialer
+  // to close connection
+  maConn: MultiaddrConnection
+  // to identify remotePeer
+  remotePeer: PeerId
+}
+
+/**
+ * Creates a libp2p instance with a similar configuration as used
+ * in `core` but without any `hopr`-specific functionalities
+ */
+async function getLibp2pInstance(): Promise<Libp2p> {
+  const peerId = privKeyToPeerId('0x964e55c734330e9393a32aef61e6b75f3b526fb64df0ac55a6076045918657e1')
+
+  const libp2p = (await createLibp2p({
+    peerId,
+    addresses: { listen: [`/ip4/127.0.0.1/tcp/0/${peerId.toString()}`] },
+    transports: [
+      // @ts-ignore libp2p interface type clash
+      new HoprConnect({
+        config: {
+          publicNodes: new EventEmitter(),
+          allowLocalConnections: true,
+          allowPrivateConnections: true,
+          // Amount of nodes for which we are willing to act as a relay
+          maxRelayedConnections: 50_000
+        }
+      })
+    ],
+    streamMuxers: [new Mplex()],
+    connectionEncryption: [new Noise()],
+    connectionManager: {
+      autoDial: true,
+      // Use custom sorting to prevent from problems with libp2p
+      // and HOPR's relay addresses
+      addressSorter: () => 0,
+      // Don't try to dial a peer using multiple addresses in parallel
+      maxDialsPerPeer: 1,
+      // If we are a public node, assume that our system is able to handle
+      // more connections
+      maxParallelDials: 50,
+      // default timeout of 30s appears to be too long
+      dialTimeout: 10e3
+    },
+    relay: {
+      // Conflicts with HoprConnect's own mechanism
+      enabled: false
+    },
+    nat: {
+      // Conflicts with HoprConnect's own mechanism
+      enabled: false
+    }
+  })) as Libp2p
+
+  await libp2p.start()
+
+  // Total hack
   // @ts-ignore
-  private _createConnection({ maConn, upgradedConn, Muxer, remotePeer }): {
-    getProtocols: () => Promise<string[]>
-    remotePeer: PeerId
-    close: () => Promise<void>
-  } {
-    let muxer = new Muxer()
+  Object.assign(libp2p.components.upgrader, {
+    _createConnection: (opts: {
+      cryptoProtocol: string
+      direction: 'inbound' | 'outbound'
+      maConn: MultiaddrConnection
+      upgradedConn: Duplex<Uint8Array>
+      remotePeer: PeerId
+      muxerFactory?: StreamMuxerFactory
+    }): MyCreateConnection => {
+      const muxer = opts.muxerFactory.createStreamMuxer(libp2p.components)
 
-    let getProtocols = async () => {
-      // log('%s: starting new stream on %s', direction, protocols)
-      const muxedStream = muxer.newStream()
-      const mss = new Multistream.Dialer(muxedStream)
+      // Pipe all data through the muxer
+      pipe(opts.upgradedConn, muxer, opts.upgradedConn).catch(log)
 
-      return await mss.ls()
+      return { dialer: new Dialer(muxer.newStream()), maConn: opts.maConn, remotePeer: opts.remotePeer }
     }
+  })
 
-    // Pipe all data through the muxer
-    pipe(upgradedConn, muxer, upgradedConn) //.catch(log.error)
-
-    maConn.timeline.upgraded = Date.now()
-
-    const close = async () => {
-      await maConn.close()
-      // Ensure remaining streams are aborted
-      if (muxer) {
-        muxer.streams.map((stream) => stream.abort())
-      }
-    }
-
-    return {
-      getProtocols,
-      close,
-      remotePeer
-    }
-  }
+  return libp2p
 }
 
 async function main() {
@@ -85,45 +127,24 @@ async function main() {
     return
   }
 
-  const self = privKeyToPeerId(stringToU8a(id, 32))
+  const libp2p = await getLibp2pInstance()
 
-  // @ts-ignore
-  const upgrader = new ReducedUpgrader({
-    localPeer: self
-  })
+  // @ts-ignore non-public api
+  const conn = (await libp2p.components.getConnectionManager().dialer.dial(ma)) as MyCreateConnection
 
-  // As used by other HOPR nodes
-  upgrader.cryptos.set(NOISE.protocol, NOISE)
-  upgrader.muxers.set(Mplex.multicodec, Mplex)
-
-  // Use minimal configuration for hopr-connect
-  const Transport = new HoprConnect({
-    upgrader,
-    libp2p: {
-      peerId: self,
-      handle: () => {}
-    }
-  })
-
-  let _conn: ReturnType<ReducedUpgrader['_createConnection']>
-
-  // Try to dial node and fail if there was an error
-  try {
-    _conn = await Transport.dial(ma)
-  } catch (err) {
-    console.log(err)
-    return
-  }
-
-  const protocols = await _conn.getProtocols()
+  const protocols = await conn.dialer.ls()
 
   console.log(
-    `Node identified as ${chalk.blue(_conn.remotePeer.toB58String())}, supported protocol${
+    `Node identified as ${chalk.blue(conn.remotePeer.toString())}, supported protocol${
       protocols.length == 1 ? '' : 's'
     }:\n  ${protocols.map((str) => chalk.green(str)).join('\n  ')}`
   )
 
-  await _conn.close()
+  try {
+    conn.maConn.close()
+  } catch (err) {
+    log(`Error while closing connection`, err)
+  }
 }
 
 main()

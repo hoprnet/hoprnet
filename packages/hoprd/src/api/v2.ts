@@ -7,14 +7,14 @@ import swaggerUi from 'swagger-ui-express'
 import bodyParser from 'body-parser'
 import { initialize } from 'express-openapi'
 import type { default as OpenAPIFramework } from 'openapi-framework'
-import PeerId from 'peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import { debug, Address } from '@hoprnet/hopr-utils'
 import { authenticateWsConnection, getStatusCodeForInvalidInputInRequest, removeQueryParams } from './utils.js'
 
 import type { Server } from 'http'
 import type { Application, Request } from 'express'
 import type { WebSocketServer } from 'ws'
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import { SettingKey, StateOps } from '../types.js'
 import type { LogStream } from './../logs.js'
 import BN from 'bn.js'
@@ -86,7 +86,7 @@ export async function setupRestApi(
       peerId: (input) => {
         try {
           // this call will throw if the input is no peer id
-          PeerId.createFromB58String(input)
+          peerIdFromString(input)
         } catch (err) {
           return false
         }

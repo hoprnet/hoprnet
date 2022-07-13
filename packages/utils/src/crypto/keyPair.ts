@@ -1,4 +1,5 @@
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { keysPBM } from '@libp2p/crypto/keys'
 import debug from 'debug'
 import { privKeyToPeerId } from '../index.js'
 import { Wallet } from '@ethersproject/wallet'
@@ -23,7 +24,7 @@ export async function serializeKeyPair(
   __salt?: string,
   __uuidSalt?: string
 ): Promise<Uint8Array> {
-  const w = new Wallet(peerId.privKey.marshal() as Buffer)
+  const w = new Wallet(keysPBM.PrivateKey.decode(peerId.privateKey).Data)
 
   let serialized: string
   if (useWeakCrypto) {

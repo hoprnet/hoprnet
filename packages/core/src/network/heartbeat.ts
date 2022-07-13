@@ -2,7 +2,7 @@ import { setImmediate } from 'timers/promises'
 
 import type NetworkPeers from './network-peers.js'
 import type AccessControl from './access-control.js'
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import { randomInteger, u8aEquals, debug, retimer, nAtATime, u8aToHex } from '@hoprnet/hopr-utils'
 import { HEARTBEAT_TIMEOUT } from '../constants.js'
 import { createHash, randomBytes } from 'crypto'
@@ -109,7 +109,7 @@ export default class Heartbeat {
     // Recalculate network health when incoming heartbeat has been received
     this.recalculateNetworkHealth()
 
-    log(`received heartbeat from ${remotePeer.toB58String()}`)
+    log(`received heartbeat from ${remotePeer.toString()}`)
     return Promise.resolve(Heartbeat.calculatePingResponse(msg))
   }
 
@@ -120,7 +120,7 @@ export default class Heartbeat {
    * @returns a Promise of a pingResult object with property `lastSeen < 0` if there were a timeout
    */
   public async pingNode(destination: PeerId, signal?: AbortSignal): Promise<HeartbeatPingResult> {
-    log(`ping ${destination.toB58String()} (timeout ${this.config.heartbeatDialTimeout})`)
+    log(`ping ${destination.toString()} (timeout ${this.config.heartbeatDialTimeout})`)
 
     const origin = this.networkPeers.has(destination)
       ? this.networkPeers.getConnectionInfo(destination).origin
@@ -137,7 +137,7 @@ export default class Heartbeat {
         signal
       })
     } catch (err) {
-      log(`Connection to ${destination.toB58String()} failed: ${err?.message}`)
+      log(`Connection to ${destination.toString()} failed: ${err?.message}`)
       return {
         destination,
         lastSeen: -1
@@ -219,7 +219,7 @@ export default class Heartbeat {
       if (!finished) {
         abort.abort()
       }
-    }, this.config.heartbeatRunTimeout)
+    }, this.config.heartbeatRunTimeout).unref()
 
     // Create an object that describes which work has to be done
     // by the workers, i.e. the pingNode code

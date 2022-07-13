@@ -12,12 +12,19 @@
 - Allow configuration via environment variables instead of CLI parameters for all supported options
 - Reenable e2e tests and enhance REST API ([#3836](https://github.com/hoprnet/hoprnet/pull/3836))
 - Fix decoding error when API token contains certain characters
+- Bump `libp2p@0.37` ([#3879](https://github.com/hoprnet/hoprnet/pull/3879))
+- Reimplement simulated NAT using libp2p's connection gater API ([#3879](https://github.com/hoprnet/hoprnet/pull/3879))
+- Refactor module injection system of `connect` module to align with `libp2p@0.37` ([#3879](https://github.com/hoprnet/hoprnet/pull/3879))
 - Automatically resend queuing transactions when provider is reset or a node receives sufficient native tokens
 - Make environment variables for `hoprd` accessible in Avado package configuration ([#3885](https://github.com/hoprnet/hoprnet/pull/3885))
 - Add Docker image (hopr-hardhat) running hardhat using the Hopr environment and smart contracts (useful for testing and development)
 - Add Docker image (hopr-pluto) running a full hoprd test cluster for local dApp testing
 - Add script that allow self register and self deregister on the Network Registry contract
 - Add documentations around network registry
+
+# Breaking changes
+
+Bump `libp2p@0.37` which came with many bugfixes, plenty of internal API changes and different module injection system and made lots of workarounds obsolete.
 
 <a name="1.89"></a>
 

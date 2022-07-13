@@ -1,13 +1,15 @@
 import type { HoprConnectOptions, PeerStoreType } from '../types.js'
-import type Connection from 'libp2p-interfaces/src/connection/connection.js'
-import PeerId from 'peer-id'
-import type { Multiaddr } from 'multiaddr'
-import type HoprConnect from '../index.js'
-import { type default as Libp2p, MuxedStream } from 'libp2p'
+import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import type { Initializable, Components } from '@libp2p/interfaces/components'
+import type { Startable } from '@libp2p/interfaces/startable'
+import type { Multiaddr } from '@multiformats/multiaddr'
+import type { HoprConnect } from '../index.js'
+import { peerIdFromBytes } from '@libp2p/peer-id'
 
+import errCode from 'err-code'
 import { EventEmitter } from 'events'
 import Debug from 'debug'
-import { setTimeout as setTimeoutPromise } from 'timers/promises'
 
 import {
   CODE_IP4,
@@ -53,10 +55,8 @@ type ConnectionResult = {
   conn?: Connection
 }
 
-type ConnResult = {
+type ConnResult = ProtocolStream & {
   conn: Connection
-  stream: MuxedStream
-  protocol: string
 }
 
 function latencyCompare(a: ConnectionResult, b: ConnectionResult) {
@@ -80,33 +80,46 @@ export const RELAY_CHANGED_EVENT = 'relay:changed'
 
 export const ENTRY_NODES_MAX_PARALLEL_DIALS = 14
 
-type ReducedLibp2p = {
-  connectionManager: Pick<Libp2p['connectionManager'], '_started' | 'getAll' | 'onDisconnect'>
-}
-
-export class EntryNodes extends EventEmitter {
+export class EntryNodes extends EventEmitter implements Initializable, Startable {
   protected availableEntryNodes: EntryNodeData[]
   protected uncheckedEntryNodes: PeerStoreType[]
   private stopDHTRenewal: (() => void) | undefined
 
   protected usedRelays: UsedRelay[]
 
+  private _isStarted: boolean
+
+  private components: Components | undefined
+
   private _onNewRelay: ((peer: PeerStoreType) => void) | undefined
   private _onRemoveRelay: ((peer: PeerId) => void) | undefined
   private _connectToRelay: EntryNodes['connectToRelay'] | undefined
   public _onEntryNodeDisconnect: EntryNodes['onEntryDisconnect'] | undefined
 
-  constructor(
-    private peerId: PeerId,
-    private libp2p: ReducedLibp2p,
-    private dialDirectly: HoprConnect['dialDirectly'],
-    private options: HoprConnectOptions
-  ) {
+  public init(components: Components) {
+    this.components = components
+  }
+
+  public getComponents(): Components {
+    if (this.components == null) {
+      throw errCode(new Error('components not set'), 'ERR_SERVICE_MISSING')
+    }
+
+    return this.components
+  }
+
+  constructor(private dialDirectly: HoprConnect['dialDirectly'], private options: HoprConnectOptions) {
     super()
+
+    this._isStarted = false
     this.availableEntryNodes = []
     this.uncheckedEntryNodes = options.initialNodes ?? []
 
     this.usedRelays = []
+  }
+
+  public isStarted() {
+    return this._isStarted
   }
 
   /**
@@ -121,13 +134,13 @@ export class EntryNodes extends EventEmitter {
       const limiter = oneAtATime()
       this._onNewRelay = (peer: PeerStoreType) => {
         limiter(async () => {
-          log(`peer online`, peer.id.toB58String())
+          log(`peer online`, peer.id.toString())
           await this.onNewRelay(peer)
         })
       }
       this._onRemoveRelay = (peer: PeerId) => {
         limiter(async () => {
-          log(`peer offline`, peer.toB58String())
+          log(`peer offline`, peer.toString())
           await this.onRemoveRelay(peer)
         })
       }
@@ -137,12 +150,17 @@ export class EntryNodes extends EventEmitter {
     }
 
     this.startDHTRenewInterval()
+    this._isStarted = true
   }
 
   /**
    * Removes event listeners
    */
   public stop() {
+    if (!this._isStarted) {
+      return
+    }
+
     if (this.options.publicNodes != undefined && this._onNewRelay != undefined && this._onRemoveRelay != undefined) {
       this.options.publicNodes.removeListener('addPublicNode', this._onNewRelay)
 
@@ -150,13 +168,14 @@ export class EntryNodes extends EventEmitter {
     }
 
     this.stopDHTRenewal?.()
+    this._isStarted = false
   }
 
   private onEntryDisconnect(ma: Multiaddr) {
     const tuples = ma.tuples() as [code: number, addr: Uint8Array][]
-    const peer = PeerId.createFromBytes(tuples[2][1].slice(1))
+    const peer = peerIdFromBytes(tuples[2][1].slice(1))
 
-    log(`Disconnected from entry node ${peer.toB58String()}`)
+    log(`Disconnected from entry node ${peer.toString()}`)
 
     for (const usedRelay of this.usedRelays) {
       const relayTuples = usedRelay.relayDirectAddress.tuples()
@@ -169,7 +188,7 @@ export class EntryNodes extends EventEmitter {
             attempt++
             const result = await this.connectToRelay(peer, usedRelay.relayDirectAddress, ENTRY_NODE_CONTACT_TIMEOUT)
             log(
-              `Reconnect attempt ${attempt} to entry node ${peer.toB58String()} was ${
+              `Reconnect attempt ${attempt} to entry node ${peer.toString()} was ${
                 result.entry.latency >= 0 ? 'successful' : 'not successful'
               }`
             )
@@ -192,7 +211,7 @@ export class EntryNodes extends EventEmitter {
           } else {
             // Keep the entry node on the list, to avoid losing information about ALL of them
             //this.onRemoveRelay(peer)
-            error(`Re-connection to relay ${peer.toB58String()} failed.`)
+            error(`Re-connection to relay ${peer.toString()} failed.`)
           }
         })
 
@@ -209,9 +228,7 @@ export class EntryNodes extends EventEmitter {
         const relayEntry = this.availableEntryNodes.find((entry: EntryNodeData) => entry.id.equals(relay))
 
         if (relayEntry == undefined) {
-          log(
-            `Relay ${relay.toB58String()} has been removed from list of available entry nodes. Not renewing this entry`
-          )
+          log(`Relay ${relay.toString()} has been removed from list of available entry nodes. Not renewing this entry`)
           continue
         }
 
@@ -259,17 +276,17 @@ export class EntryNodes extends EventEmitter {
    * @param peer PeerInfo of node that is added as a relay opportunity
    */
   protected async onNewRelay(peer: PeerStoreType): Promise<void> {
-    if (peer.id.equals(this.peerId)) {
+    if (peer.id.equals(this.getComponents().getPeerId())) {
       return
     }
     if (peer.multiaddrs == undefined || peer.multiaddrs.length == 0) {
-      log(`Received entry node ${peer.id.toB58String()} without any multiaddr`)
+      log(`Received entry node ${peer.id.toString()} without any multiaddr`)
       return
     }
 
     for (const uncheckedNode of this.uncheckedEntryNodes) {
       if (uncheckedNode.id.equals(peer.id)) {
-        log(`Received duplicate entry node ${peer.id.toB58String()}`)
+        log(`Received duplicate entry node ${peer.id.toString()}`)
         // TODO add difference to previous multiaddrs
         return
       }
@@ -321,17 +338,17 @@ export class EntryNodes extends EventEmitter {
    * @returns a filtered list of entry nodes
    */
   private filterUncheckedNodes(): PeerStoreType[] {
-    const knownNodes = new Set<string>(this.availableEntryNodes.map((entry: EntryNodeData) => entry.id.toB58String()))
+    const knownNodes = new Set<string>(this.availableEntryNodes.map((entry: EntryNodeData) => entry.id.toString()))
     const nodesToCheck: PeerStoreType[] = []
 
     for (const uncheckedNode of this.uncheckedEntryNodes) {
-      if (uncheckedNode.id.equals(this.peerId)) {
+      if (uncheckedNode.id.equals(this.getComponents().getPeerId())) {
         continue
       }
 
       const usableAddresses: Multiaddr[] = uncheckedNode.multiaddrs.filter(isUsableRelay)
 
-      if (knownNodes.has(uncheckedNode.id.toB58String())) {
+      if (knownNodes.has(uncheckedNode.id.toString())) {
         const index = this.availableEntryNodes.findIndex((entry) => entry.id.equals(uncheckedNode.id))
 
         if (index < 0) {
@@ -371,12 +388,6 @@ export class EntryNodes extends EventEmitter {
    * Called at startup and once an entry node is considered offline.
    */
   async updatePublicNodes(): Promise<void> {
-    while (!this.libp2p.connectionManager._started) {
-      // Make sure that libp2p is started
-      log(`Waiting for start of connection manager ...`)
-      await setTimeoutPromise(250)
-    }
-
     log(`Updating list of used relay nodes ...`)
     const nodesToCheck = this.filterUncheckedNodes()
 
@@ -404,7 +415,7 @@ export class EntryNodes extends EventEmitter {
 
     const positiveOnes = results.findIndex((result: ConnectionResult) => result.entry.latency >= 0)
 
-    const previous = new Set<string>(this.getUsedRelayPeerIds().map((p: PeerId) => p.toB58String()))
+    const previous = new Set<string>(this.getUsedRelayPeerIds().map((p: PeerId) => p.toString()))
 
     if (positiveOnes >= 0) {
       // Close all unnecessary connections
@@ -425,7 +436,7 @@ export class EntryNodes extends EventEmitter {
         .map((entry: EntryNodeData) => {
           return {
             relayDirectAddress: entry.multiaddrs[0],
-            ourCircuitAddress: createCircuitAddress(entry.id, this.peerId)
+            ourCircuitAddress: createCircuitAddress(entry.id, this.getComponents().getPeerId())
           }
         })
     } else {
@@ -444,7 +455,7 @@ export class EntryNodes extends EventEmitter {
       isDifferent = true
     } else {
       for (const usedRelayPeerIds of this.getUsedRelayPeerIds()) {
-        if (!previous.has(usedRelayPeerIds.toB58String())) {
+        if (!previous.has(usedRelayPeerIds.toString())) {
           isDifferent = true
           break
         }
@@ -475,13 +486,17 @@ export class EntryNodes extends EventEmitter {
       if (!done) {
         abort.abort()
       }
-    }, timeout)
+    }, timeout).unref()
 
     let conn: Connection | undefined
     try {
-      conn = await this.dialDirectly(destinationAddress, { signal: abort.signal, onDisconnect })
+      conn = await this.dialDirectly(destinationAddress, {
+        signal: abort.signal,
+        upgrader: undefined as any,
+        onDisconnect
+      })
     } catch (err: any) {
-      error(`error while contacting entry node ${destination.toB58String()}.`, err.message)
+      error(`error while contacting entry node ${destination.toString()}.`, err.message)
       await attemptClose(conn, error)
     }
 
@@ -494,7 +509,7 @@ export class EntryNodes extends EventEmitter {
 
     const protocol = CAN_RELAY_PROTCOL(this.options.environment)
 
-    let stream: MuxedStream | undefined
+    let stream: ProtocolStream['stream'] | undefined
     try {
       stream = (await conn.newStream([protocol]))?.stream
     } catch (err) {
@@ -525,9 +540,9 @@ export class EntryNodes extends EventEmitter {
   ): Promise<{ entry: EntryNodeData; conn?: Connection }> {
     const start = Date.now()
 
-    let conn = await tryExistingConnections(this.libp2p, id, CAN_RELAY_PROTCOL(this.options.environment))
+    let conn = await tryExistingConnections(this.getComponents(), id, CAN_RELAY_PROTCOL(this.options.environment))
 
-    if (!conn) {
+    if (conn == null) {
       conn = await this.establishNewConnection(
         id,
         relay,
@@ -536,7 +551,7 @@ export class EntryNodes extends EventEmitter {
       )
     }
 
-    if (conn == undefined) {
+    if (conn == null) {
       return {
         entry: {
           id,
@@ -550,8 +565,8 @@ export class EntryNodes extends EventEmitter {
 
     // calls the iterator, thereby starts the stream and
     // consumes the first messages, afterwards closes the stream
-    for await (const msg of conn.stream.source) {
-      verbose(`can relay received ${new TextDecoder().decode(msg.slice())} from ${id.toB58String()}`)
+    for await (const msg of conn.stream.source as AsyncIterable<Uint8Array>) {
+      verbose(`can relay received ${new TextDecoder().decode(msg.slice())} from ${id.toString()}`)
       if (u8aEquals(msg.slice(), OK)) {
         done = true
       }

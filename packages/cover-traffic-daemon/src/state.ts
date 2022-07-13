@@ -1,7 +1,8 @@
 import BN from 'bn.js'
 import { PublicKey, ChannelEntry, ChannelStatus, randomFloat } from '@hoprnet/hopr-utils'
-import PeerId from 'peer-id'
-import type { Multiaddr } from 'multiaddr'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
+import type { Multiaddr } from '@multiformats/multiaddr'
 import { findChannel, importance } from './utils.js'
 import fs from 'fs'
 
@@ -61,7 +62,7 @@ export function serializeState(state: State): string {
     nodes: Object.values(state.nodes).map((node: PeerData) => ({
       // Using hex representation since deserializing Base58 encoded
       // strings is complex
-      id: node.id.toHexString(),
+      id: node.id.toString(),
       multiaddrs: node.multiaddrs.map((ma: Multiaddr) => ma.toString())
     })),
     channels: Object.values(state.channels).map((c: ChannelData) => ({
@@ -84,8 +85,8 @@ export function deserializeState(serialized: string): State {
     nodes: parsed.nodes.reduce((acc, node) => {
       // Using hex representation since deserializing Base58 encoded
       // strings is complex
-      const id = PeerId.createFromHexString(node.id)
-      acc[id.toB58String()] = { id, pub: PublicKey.fromPeerId(id), multiaddrs: [] }
+      const id = peerIdFromString(node.id)
+      acc[id.toString()] = { id, pub: PublicKey.fromPeerId(id), multiaddrs: [] }
       return acc
     }, {}),
     channels: parsed.channels.reduce((acc, c) => {
@@ -187,7 +188,7 @@ export class PersistedState {
    */
   setNode(peer: PeerData): void {
     const state = this.get()
-    state.nodes[peer.id.toB58String()] = {
+    state.nodes[peer.id.toString()] = {
       id: peer.id,
       multiaddrs: peer.multiaddrs,
       pub: PublicKey.fromPeerId(peer.id)
@@ -357,7 +358,7 @@ export class PersistedState {
    * @returns number of failed messages. If none, returns zero.
    */
   messageFails(dest: PublicKey): number {
-    return this.get().messageFails[dest.toB58String()] || 0
+    return this.get().messageFails[dest.toString()] || 0
   }
 
   /**
@@ -366,8 +367,8 @@ export class PersistedState {
    */
   incrementMessageFails(dest: PublicKey): void {
     const state = this.get()
-    const prev = state.messageFails[dest.toB58String()] || 0
-    state.messageFails[dest.toB58String()] = prev + 1
+    const prev = state.messageFails[dest.toString()] || 0
+    state.messageFails[dest.toString()] = prev + 1
     this.set(state)
   }
 
@@ -377,7 +378,7 @@ export class PersistedState {
    */
   resetMessageFails(dest: PublicKey): void {
     const state = this.get()
-    state.messageFails[dest.toB58String()] = 0
+    state.messageFails[dest.toString()] = 0
     this.set(state)
   }
 }

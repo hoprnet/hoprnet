@@ -1,12 +1,9 @@
 import assert from 'assert'
-import LibP2P from 'libp2p'
-import { default as Hopr, type HoprOptions } from '@hoprnet/hopr-core'
-import { debug, PublicKey, wait, dbMock, privKeyToPeerId } from '@hoprnet/hopr-utils'
-import sinon from 'sinon'
+import Hopr, { type HoprOptions } from '@hoprnet/hopr-core'
+import { debug, PublicKey, wait, HoprDB, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { PersistedState } from './state.js'
 import { CoverTrafficStrategy } from './strategy.js'
-import { sampleData } from './state.mock.js'
-import { sampleOptions, createLibp2pMock } from '@hoprnet/hopr-core'
+import { sampleOptions } from '@hoprnet/hopr-core'
 import { createConnectorMock } from '@hoprnet/hopr-core-ethereum'
 
 const namespace = 'hopr:test:cover-traffic'
@@ -18,22 +15,22 @@ const mockPeerId = privKeyToPeerId(privateKey)
 describe('cover-traffic daemon', async function () {
   let node: Hopr, data: PersistedState
 
-  beforeEach(function () {
-    function stubLibp2p() {
-      sinon.stub(LibP2P, 'create').callsFake(() => {
-        log('libp2p stub started')
-        return Promise.resolve(createLibp2pMock(mockPeerId))
-      })
-    }
-    data = sampleData
-    stubLibp2p()
+  beforeEach(async function () {
     const connectorMock = createConnectorMock(mockPeerId)
     log('Mocked chain', connectorMock)
-    node = new Hopr(mockPeerId, dbMock, connectorMock, sampleOptions as HoprOptions)
+    node = new Hopr(mockPeerId, HoprDB.createMock(), connectorMock, {
+      ...sampleOptions,
+      testing: {
+        // Do not use real libp2p instance to keep setup simple
+        useMockedLibp2p: true
+      }
+    } as HoprOptions)
+
+    await node.start()
   })
 
-  afterEach(function () {
-    sinon.restore()
+  afterEach(async function () {
+    await node.stop()
   })
 
   it('should run and stop properly', async function () {
@@ -43,9 +40,6 @@ describe('cover-traffic daemon', async function () {
     log('completed stubbed hopr node, starting cover-traffic strategy')
     node.setChannelStrategy(new CoverTrafficStrategy(PublicKey.fromPeerId(mockPeerId), node, data))
     log('completed strategy, waiting for 200 ms w/o crashing')
-    await wait(200)
-    log('Starting node stop process')
-    await node.stop()
-    log('Stopped node succesfully')
+    await wait(1000)
   })
 })

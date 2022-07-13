@@ -1,6 +1,6 @@
 // import assert from 'assert'
 // import { Listener } from './listener'
-// import { Multiaddr } from 'multiaddr'
+// import { Multiaddr } from '@multiformats/multiaddr'
 // import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
 // import type Connection from 'libp2p-interfaces/src/connection/connection'
 // import dgram, { type Socket } from 'dgram'

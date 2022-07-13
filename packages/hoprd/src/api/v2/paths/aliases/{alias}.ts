@@ -20,7 +20,7 @@ export const removeAlias = (stateOps: StateOps, alias: string): State => {
 export const getAlias = (state: Readonly<State>, alias: string): string => {
   const peerId = state.aliases.get(alias)
   if (!peerId) throw Error(STATUS_CODES.PEERID_NOT_FOUND)
-  return peerId.toB58String()
+  return peerId.toString()
 }
 
 const GET: Operation = [

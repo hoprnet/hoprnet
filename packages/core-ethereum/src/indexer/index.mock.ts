@@ -19,7 +19,7 @@ import type { ChainWrapper } from '../ethereum.js'
 import type { Event, TokenEvent, RegistryEvent } from './types.js'
 import * as fixtures from './fixtures.js'
 import { ACCOUNT_A, PARTY_A, PARTY_A_MULTIADDR, PARTY_B } from '../fixtures.js'
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 import BN from 'bn.js'
 
 //@TODO: Refactor this logger and mock outside of indexer
@@ -261,7 +261,7 @@ const createChainMock = (
       return Promise.resolve(
         new AccountEntry(
           fixtures.PARTY_A,
-          new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${fixtures.PARTY_A.toB58String()}`),
+          new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${fixtures.PARTY_A.toString()}`),
           new BN('1')
         )
       )

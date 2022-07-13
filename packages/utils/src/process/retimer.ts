@@ -8,9 +8,9 @@ export function retimer(fn: () => void, newTimeout: () => number): () => void {
 
   const again = () => {
     fn()
-    timeout = setTimeout(again, newTimeout())
+    timeout = setTimeout(again, newTimeout()).unref()
   }
-  timeout = setTimeout(again, newTimeout())
+  timeout = setTimeout(again, newTimeout()).unref()
 
   return () => clearTimeout(timeout)
 }

@@ -5,15 +5,11 @@ import { randomBytes } from 'crypto'
 import { deriveAckKeyShare, HalfKey } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 
-import PeerId from 'peer-id'
+import { createSecp256k1PeerId } from '@libp2p/peer-id-factory'
 
-describe('acknowledement message', function () {
+describe('acknowledement message', async function () {
+  let [self, counterparty] = [await createSecp256k1PeerId(), await createSecp256k1PeerId()]
   it('create, serialize and deserialize', async function () {
-    const AMOUNT = 2
-    const [self, counterparty] = await Promise.all(
-      Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
-    )
-
     const ackKey = new HalfKey(Uint8Array.from(randomBytes(SECRET_LENGTH)))
 
     const challenge = AcknowledgementChallenge.create(ackKey.toChallenge(), self)
@@ -28,11 +24,6 @@ describe('acknowledement message', function () {
   })
 
   it('create, serialize and deserialize - false positives', async function () {
-    const AMOUNT = 2
-    const [self, counterparty] = await Promise.all(
-      Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
-    )
-
     const key = randomBytes(SECRET_LENGTH)
 
     assert.throws(() =>

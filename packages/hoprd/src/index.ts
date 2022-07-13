@@ -461,7 +461,7 @@ async function main() {
         setupHealthcheck(node, logs, argv.healthCheckHost, argv.healthCheckPort)
       }
 
-      logs.log(`Node address: ${node.getId().toB58String()}`)
+      logs.log(`Node address: ${node.getId().toString()}`)
 
       const ethAddr = node.getEthereumAddress().toHex()
       const fundsReq = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()

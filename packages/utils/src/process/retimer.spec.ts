@@ -2,6 +2,8 @@ import { retimer } from './retimer.js'
 import assert from 'assert'
 import { setTimeout } from 'timers/promises'
 
+const TWO_HOURS = 2 * 60 * 60 * 1000
+
 describe('test retimer', function () {
   it('return a timeout', async function () {
     const INITIAL_TIMEOUT = 100
@@ -31,5 +33,14 @@ describe('test retimer', function () {
     stopRetimer()
 
     assert(i > 500, `function must be efficient`)
+  })
+
+  it('does not block Node.js process termination', function () {
+    retimer(
+      () => {
+        assert.fail(`Timeout prevented termination of Node.js for more than 2 hours.`)
+      },
+      () => TWO_HOURS
+    )
   })
 })

@@ -1,4 +1,4 @@
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 
 const Alice = privKeyToPeerId('0xd12c951563ee7e322562b7ce7a31c37cc6c10d9b86f834ed30f7c4ab42ae8de0')
@@ -31,7 +31,7 @@ export function peerIdForIdentity(identityName: string): PeerId {
 export async function identityFromPeerId(peerIdToCheck: PeerId): Promise<string> {
   for (const identityName of ['alice', 'bob', 'charly', 'dave', 'ed']) {
     const peerId = peerIdForIdentity(identityName)
-    if (peerId.toB58String() === peerIdToCheck.toB58String()) {
+    if (peerId.toString() === peerIdToCheck.toString()) {
       return identityName
     }
   }

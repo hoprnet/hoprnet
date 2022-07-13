@@ -1,18 +1,27 @@
-import { Multiaddr } from 'multiaddr'
-import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types.js'
-import type { Stream, StreamSink, StreamSource, StreamSourceAsync, StreamResult, StreamType } from '../types.js'
+import { Multiaddr } from '@multiformats/multiaddr'
+import type { MultiaddrConnection } from '@libp2p/interface-connection'
+import type {
+  Stream,
+  StreamSink,
+  StreamSource,
+  StreamSourceAsync,
+  StreamResult,
+  StreamType,
+  HoprConnectTestingOptions
+} from '../types.js'
 import { randomBytes } from 'crypto'
 import { RelayPrefix, ConnectionStatusMessages, StatusMessages } from '../constants.js'
 import { u8aEquals, u8aToHex, defer, createCircuitAddress, type DeferType } from '@hoprnet/hopr-utils'
 import HeapPkg, { type Heap as HeapType } from 'heap-js'
 
-import type { Instance as SimplePeer } from 'simple-peer'
-import type PeerId from 'peer-id'
+import type SimplePeer from 'simple-peer'
+import type { PeerId } from '@libp2p/interface-peer-id'
 
 import Debug from 'debug'
 import { EventEmitter } from 'events'
 import { toU8aStream, eagerIterator } from '../utils/index.js'
 import assert from 'assert'
+import type { ConnectComponents } from '../components.js'
 
 const { Heap } = HeapPkg
 
@@ -22,11 +31,6 @@ const _log = Debug(DEBUG_PREFIX)
 const _verbose = Debug(`${DEBUG_PREFIX}:verbose`)
 const _flow = Debug(`flow:${DEBUG_PREFIX}`)
 const _error = Debug(`${DEBUG_PREFIX}:error`)
-
-type WebRTC = {
-  channel: SimplePeer
-  upgradeInbound: () => SimplePeer
-}
 
 export function statusMessagesCompare(a: Uint8Array, b: Uint8Array): -1 | 0 | 1 {
   switch (a[0] as RelayPrefix) {
@@ -72,7 +76,6 @@ export function statusMessagesCompare(a: Uint8Array, b: Uint8Array): -1 | 0 | 1 
  * Encapsulates the client-side state management of a relayed connection
  */
 class RelayConnection extends EventEmitter implements MultiaddrConnection {
-  private _stream: Stream
   private _sourceIterator: AsyncIterator<StreamType>
   private _sinkSourceAttached: boolean
   private _sinkSourceSwitched: boolean
@@ -94,11 +97,9 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   private _statusMessagePromise: DeferType<void>
   private _closePromise: DeferType<void>
 
-  private _onReconnect: ((newStream: RelayConnection, counterparty: PeerId) => Promise<void>) | undefined
-
   public destroyed: boolean
 
-  public webRTC?: WebRTC
+  public channel?: SimplePeer.Instance
 
   public localAddr: Multiaddr
   public remoteAddr: Multiaddr
@@ -107,21 +108,22 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
   public source: StreamSourceAsync
 
-  // @ts-ignore
   public sink: StreamSink
 
   public conn: Stream
 
   public timeline: MultiaddrConnection['timeline']
 
-  constructor(opts: {
-    stream: Stream
-    self: PeerId
-    relay: PeerId
-    counterparty: PeerId
-    onReconnect?: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>
-    webRTC?: WebRTC
-  }) {
+  constructor(
+    private _stream: Stream,
+    self: PeerId,
+    relay: PeerId,
+    counterparty: PeerId,
+    direction: 'inbound' | 'outbound',
+    private connectComponents: ConnectComponents,
+    private testingOptions: HoprConnectTestingOptions,
+    private _onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>
+  ) {
     super()
 
     this.timeline = {
@@ -132,20 +134,14 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
     this.destroyed = false
 
-    this._stream = opts.stream
+    this.conn = _stream
 
-    this.conn = opts.stream
-
-    this._onReconnect = opts.onReconnect
-
-    this._counterparty = opts.counterparty
+    this._counterparty = counterparty
 
     this._id = u8aToHex(randomBytes(4), false)
 
-    this.localAddr = createCircuitAddress(opts.relay, opts.self)
-    this.remoteAddr = createCircuitAddress(opts.relay, opts.counterparty)
-
-    this.webRTC = opts.webRTC
+    this.localAddr = createCircuitAddress(relay, self)
+    this.remoteAddr = createCircuitAddress(relay, counterparty)
 
     this._iteration = 0
 
@@ -161,12 +157,20 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     this._sinkSwitchPromise = defer<void>()
     this._sourceSwitchPromise = defer<void>()
 
+    if (!this.testingOptions.__noWebRTCUpgrade) {
+      switch (direction) {
+        case 'inbound':
+          this.channel = this.connectComponents.getWebRTCUpgrader().upgradeInbound()
+          break
+        case 'outbound':
+          this.channel = this.connectComponents.getWebRTCUpgrader().upgradeOutbound()
+          break
+      }
+    }
+
     this._sourceIterator = (this._stream.source as AsyncIterable<StreamType>)[Symbol.asyncIterator]()
 
-    // FIXME: The type between iterator/async-iterator cannot be matched in
-    // this case easily.
-    // @ts-ignore
-    this.source = this.createSource()
+    this.source = this.createSource() as AsyncIterable<StreamType>
 
     // Auto-start sink stream and declare variable in advance
     // to make sure we can attach an error handler to it
@@ -266,16 +270,27 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     _flow(`RC [${this._id}]`, ...arguments)
   }
 
+  public getWebRTCInstance(): SimplePeer.Instance {
+    if (this.channel == null) {
+      throw Error(`WebRTC instance not set`)
+    }
+
+    return this.channel
+  }
+
   /**
    * Creates a new connection and initiates a handover to the
    * new connection end
    * @returns a new connection end
    */
   public switch(): RelayConnection {
-    if (this.webRTC != undefined) {
+    if (this.channel != undefined) {
       try {
-        this.webRTC.channel.destroy()
-      } catch {}
+        this.channel.destroy()
+      } catch (err) {
+        this.error(`Error while destroying WebRTC instance`, err)
+      }
+      this.channel = this.connectComponents.getWebRTCUpgrader().upgradeInbound()
     }
 
     this._migrationDone = defer<void>()
@@ -284,10 +299,6 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     this._sinkSwitchPromise.resolve()
     this._sourceSwitched = true
     this._sourceSwitchPromise.resolve()
-
-    if (this.webRTC != undefined) {
-      this.webRTC.channel = this.webRTC.upgradeInbound()
-    }
 
     // FIXME: The type between iterator/async-iterator cannot be matched in
     // this case easily.
@@ -461,7 +472,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
         streamPromise = this._sourceIterator.next()
       }
 
-      if (this.webRTC != undefined) {
+      if (!this.testingOptions.__noWebRTCUpgrade) {
         this.attachWebRTCListeners(drainIteration)
       }
 
@@ -552,7 +563,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
             // values are set, even if _onReconnect throws
             let switchedConnection = this.switch()
 
-            this._onReconnect?.(switchedConnection, this._counterparty)
+            this._onReconnect(switchedConnection, this._counterparty)
 
             continue
           }
@@ -570,16 +581,20 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
           next()
           continue
         } else if (PREFIX[0] == RelayPrefix.WEBRTC_SIGNALLING) {
-          let decoded: Object | undefined
+          let decoded: SimplePeer.SignalData | undefined
           try {
-            decoded = JSON.parse(new TextDecoder().decode(SUFFIX))
+            decoded = JSON.parse(new TextDecoder().decode(SUFFIX)) as SimplePeer.SignalData
           } catch {
             this.error(`Error while trying to decode JSON-encoded WebRTC message`)
           }
 
-          if (decoded != undefined && this.webRTC != undefined && !this.webRTC.channel.connected) {
+          if (
+            decoded != undefined &&
+            !this.testingOptions.__noWebRTCUpgrade &&
+            !(this.channel as SimplePeer.Instance).connected
+          ) {
             try {
-              this.webRTC?.channel.signal(decoded as any)
+              ;(this.channel as SimplePeer.Instance).signal(decoded)
             } catch (err) {
               this.error(`WebRTC error:`, err)
             }
@@ -604,12 +619,11 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
    * @param drainIteration index of current iteration
    */
   private attachWebRTCListeners(drainIteration: number) {
-    let currentChannel: SimplePeer
-    let onSignalListener: (data: Object) => void
+    let currentChannel: SimplePeer.Instance
 
-    const onSignal = (data: Object) => {
+    const onSignal = ((data: Object) => {
       if (this._iteration != drainIteration) {
-        currentChannel.removeListener('signal', onSignalListener)
+        currentChannel.removeListener('signal', onSignal)
 
         return
       }
@@ -617,10 +631,9 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       this.queueStatusMessage(
         Uint8Array.from([RelayPrefix.WEBRTC_SIGNALLING, ...new TextEncoder().encode(JSON.stringify(data))])
       )
-    }
+    }).bind(this)
     // Store bound listener instance
-    onSignalListener = onSignal.bind(this)
-    currentChannel = this.webRTC?.channel.on('signal', onSignalListener) as SimplePeer
+    currentChannel = (this.channel as SimplePeer.Instance).on('signal', onSignal)
   }
 
   /**

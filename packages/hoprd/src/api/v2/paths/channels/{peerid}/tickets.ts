@@ -1,11 +1,11 @@
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
-import PeerId from 'peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import { STATUS_CODES } from '../../../utils.js'
 import { formatTicket } from '../../tickets/index.js'
 
 export const getTickets = async (node: Hopr, peerId: string) => {
-  const tickets = await node.getTickets(PeerId.createFromB58String(peerId))
+  const tickets = await node.getTickets(peerIdFromString(peerId))
   return tickets.map(formatTicket)
 }
 

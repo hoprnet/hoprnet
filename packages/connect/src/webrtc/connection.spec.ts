@@ -4,7 +4,7 @@ import type { RelayConnection } from '../relay/connection.js'
 
 import { handshake } from 'it-handshake'
 import { pair } from 'it-pair'
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 
 import { WebRTCConnection, MigrationStatus } from './connection.js'
 import { encodeWithLengthPrefix } from '../utils/index.js'
@@ -32,9 +32,10 @@ describe('test webrtc connection', function () {
       {
         source: BobAlice.source,
         sink: AliceBob.sink,
-        sendUpgraded: () => {}
+        sendUpgraded: () => {},
+        getWebRTCInstance: () => fakedWebRTCInstance
       } as RelayConnection,
-      fakedWebRTCInstance
+      {}
     )
 
     const AliceShaker = handshake(conn)
@@ -76,9 +77,10 @@ describe('test webrtc connection', function () {
         sink: AliceBob.sink,
         sendUpgraded: () => {
           upgradeCalls++
-        }
+        },
+        getWebRTCInstance: () => webRTCInstance
       } as RelayConnection,
-      webRTCInstance
+      {}
     )
 
     const BobShaker = handshake({
@@ -103,9 +105,10 @@ describe('test webrtc connection', function () {
       {
         source: BobAlice.source,
         sink: AliceBob.sink,
-        sendUpgraded: () => {}
+        sendUpgraded: () => {},
+        getWebRTCInstance: () => webRTCInstance
       } as RelayConnection,
-      webRTCInstance
+      {}
     )
 
     const BobShaker = handshake({
@@ -131,9 +134,10 @@ describe('test webrtc connection', function () {
     const conn = new WebRTCConnection(
       {
         source: BobAlice.source,
-        sink: AliceBob.sink
+        sink: AliceBob.sink,
+        getWebRTCInstance: () => webRTCInstance
       } as RelayConnection,
-      webRTCInstance
+      {}
     )
 
     const AliceShaker = handshake(conn)
@@ -170,9 +174,10 @@ describe('test webrtc connection', function () {
       {
         source: BobAlice.source,
         sink: AliceBob.sink,
-        sendUpgraded: () => {}
+        sendUpgraded: () => {},
+        getWebRTCInstance: () => webRTCInstance
       } as RelayConnection,
-      webRTCInstance
+      {}
     )
 
     const AliceShaker = handshake(conn)
@@ -232,10 +237,11 @@ describe('test webrtc connection', function () {
       {
         source: BobAlice.source,
         sink: AliceBob.sink,
-        remoteAddr: new Multiaddr(`/p2p/${Bob.toB58String()}`),
-        sendUpgraded: () => {}
+        remoteAddr: new Multiaddr(`/p2p/${Bob.toString()}`),
+        sendUpgraded: () => {},
+        getWebRTCInstance: () => webRTCInstance
       } as RelayConnection,
-      webRTCInstance
+      {}
     )
 
     const AliceShaker = handshake(conn)
@@ -297,11 +303,13 @@ describe('test webrtc connection', function () {
     const conn = new WebRTCConnection(
       {
         source: BobAlice.source,
-        sink: AliceBob.sink
+        sink: AliceBob.sink,
+        getWebRTCInstance: () => webRTCInstance
       } as RelayConnection,
-      webRTCInstance,
+      {},
       {
-        signal: abort.signal
+        signal: abort.signal,
+        upgrader: undefined as any
       }
     )
 
@@ -335,9 +343,10 @@ describe('webrtc connection - stream error propagation', function () {
       {
         source: BobAlice.source,
         sink: (_source: AsyncIterable<Uint8Array>) => waitForSinkAttach.promise,
-        sendUpgraded: () => {}
+        sendUpgraded: () => {},
+        getWebRTCInstance: () => fakedWebRTCInstance
       } as RelayConnection,
-      fakedWebRTCInstance
+      {}
     )
 
     await assert.rejects(
@@ -371,9 +380,10 @@ describe('webrtc connection - stream error propagation', function () {
           waitForError.resolve()
           return Promise.reject(Error(falsySinkError))
         },
-        sendUpgraded: () => {}
+        sendUpgraded: () => {},
+        getWebRTCInstance: () => fakedWebRTCInstance
       } as RelayConnection,
-      fakedWebRTCInstance
+      {}
     )
 
     await waitForError.promise
@@ -395,9 +405,10 @@ describe('webrtc connection - stream error propagation', function () {
       {
         source: BobAlice.source,
         sink: AliceBob.sink,
-        sendUpgraded: () => {}
+        sendUpgraded: () => {},
+        getWebRTCInstance: () => fakedWebRTCInstance
       } as RelayConnection,
-      fakedWebRTCInstance
+      {}
     )
 
     await assert.rejects(
@@ -426,9 +437,10 @@ describe('webrtc connection - stream error propagation', function () {
           throw Error(errorInSource)
         })() as AsyncIterable<Uint8Array>,
         sink: AliceBob.sink,
-        sendUpgraded: () => {}
+        sendUpgraded: () => {},
+        getWebRTCInstance: () => fakedWebRTCInstance
       } as RelayConnection,
-      fakedWebRTCInstance
+      {}
     )
 
     await assert.rejects(

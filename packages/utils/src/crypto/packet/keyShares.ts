@@ -3,7 +3,8 @@ import { SECP256K1_CONSTANTS } from '../constants.js'
 import { sampleGroupElement } from '../sampleGroupElement.js'
 import secp256k1 from 'secp256k1'
 
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { unmarshalPublicKey, keysPBM } from '@libp2p/crypto/keys'
 import hkdf from 'futoin-hkdf'
 
 /**
@@ -33,8 +34,8 @@ export function generateKeyShares(path: PeerId[]): { alpha: Uint8Array; secrets:
 
     for (const [k, peerId] of path.entries()) {
       // Compute the shared group element and extract keying material as a shared secret
-      const s_k = secp256k1.publicKeyTweakMul(peerId.pubKey.marshal(), coeff_prev, true)
-      secrets.push(keyExtract(s_k, peerId.pubKey.marshal()))
+      const s_k = secp256k1.publicKeyTweakMul(unmarshalPublicKey(peerId.publicKey).marshal(), coeff_prev, true)
+      secrets.push(keyExtract(s_k, unmarshalPublicKey(peerId.publicKey).marshal()))
 
       // If this was the last shared secret, no need to compute anymore
       if (k == path.length - 1) {
@@ -74,16 +75,16 @@ export function generateKeyShares(path: PeerId[]): { alpha: Uint8Array; secrets:
  * @return Next public key (compressed EC point) and derived secret
  */
 export function forwardTransform(alpha: Uint8Array, peerId: PeerId): { alpha: Uint8Array; secret: Uint8Array } {
-  if (!secp256k1.publicKeyVerify(alpha) || peerId.privKey == null || peerId.pubKey == null) {
+  if (!secp256k1.publicKeyVerify(alpha) || peerId.privateKey == null || peerId.publicKey == null) {
     throw Error(`Invalid arguments`)
   }
 
-  const s_k = secp256k1.publicKeyTweakMul(alpha, peerId.privKey.marshal(), true)
+  const s_k = secp256k1.publicKeyTweakMul(alpha, keysPBM.PrivateKey.decode(peerId.privateKey).Data, true)
   const b_k = fullKdf(s_k, alpha)
 
   return {
     alpha: secp256k1.publicKeyTweakMul(alpha, b_k, true), // advance alpha by the blinding factor
-    secret: keyExtract(s_k, peerId.pubKey.marshal()) // extract keying material from the group element
+    secret: keyExtract(s_k, unmarshalPublicKey(peerId.publicKey).marshal()) // extract keying material from the group element
   }
 }
 

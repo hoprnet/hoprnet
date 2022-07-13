@@ -419,7 +419,6 @@ log "Verifying node6 log output"
 grep -E "HOPR Balance: +20000 txHOPR" "${node6_log}"
 # Node balance must be a little bit smaller than 10 xDAI due to the announce transaction
 grep -E "ETH Balance: +[789]\.[[:digit:]]?.+ xDAI" "${node6_log}"
-grep -E "Running on: hardhat" "${node6_log}"
 log "Output of node6 correct"
 # }}}
 

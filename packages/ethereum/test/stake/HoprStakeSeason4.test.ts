@@ -218,7 +218,7 @@ describe('HoprStakeSeason4', function () {
         })
       })
       describe('redeemed token but wrong info', function () {
-        it('should be false, when getting redeemed token with isNftTypeAndRankRedeemed1, differnt rank', async function () {
+        it('should be false, when getting redeemed token with isNftTypeAndRankRedeemed1, different rank', async function () {
           const isNftTypeAndRankRedeemed1 = await stakeContract
             .connect(deployer)
             .isNftTypeAndRankRedeemed1(BADGES[0].type, 'diamond', participantAddresses[0])
@@ -244,7 +244,7 @@ describe('HoprStakeSeason4', function () {
             .isNftTypeAndRankRedeemed2(2, BADGES[0].rank, participantAddresses[0])
           expect(isNftTypeAndRankRedeemed2).to.equal(false)
         })
-        it('should be false, when getting redeemed token with isNftTypeAndRankRedeemed3, differnt factor', async function () {
+        it('should be false, when getting redeemed token with isNftTypeAndRankRedeemed3, different factor', async function () {
           // type index starts from 1
           const isNftTypeAndRankRedeemed3 = await stakeContract
             .connect(deployer)

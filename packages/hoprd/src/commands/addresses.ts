@@ -1,6 +1,6 @@
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from './abstractCommand.js'
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import { checkPeerIdInput, styleValue } from './utils/index.js'
 import type { StateOps } from '../types.js'
 

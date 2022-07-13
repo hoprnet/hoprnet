@@ -2,7 +2,7 @@ import { createServer, type Socket, type AddressInfo } from 'net'
 
 import { SOCKET_CLOSE_TIMEOUT, TCPConnection } from './tcp.js'
 import { once } from 'events'
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 import { u8aEquals, defer } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import type { EventEmitter } from 'events'
@@ -158,7 +158,8 @@ describe('test TCP connection', function () {
       new Multiaddr(`/ip4/127.0.0.1/tcp/${(server.address() as AddressInfo).port}`),
       peerId,
       {
-        signal: abort.signal
+        signal: abort.signal,
+        upgrader: undefined as any
       }
     )
 
