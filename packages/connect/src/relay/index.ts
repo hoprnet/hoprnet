@@ -241,7 +241,6 @@ class Relay implements Initializable, ConnectInitializable, Startable {
   private upgradeOutbound(relay: PeerId, destination: PeerId, stream: Stream, opts?: DialOptions): MultiaddrConnection {
     const conn = new RelayConnection(
       stream,
-      this.getComponents().getPeerId(),
       relay,
       destination,
       'outbound',
@@ -264,7 +263,6 @@ class Relay implements Initializable, ConnectInitializable, Startable {
   private upgradeInbound(initiator: PeerId, relay: PeerId, stream: Stream) {
     const conn = new RelayConnection(
       stream,
-      this.getComponents().getPeerId(),
       relay,
       initiator,
       'inbound',

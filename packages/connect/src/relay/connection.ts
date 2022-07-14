@@ -1,4 +1,3 @@
-import { Multiaddr } from '@multiformats/multiaddr'
 import type { MultiaddrConnection } from '@libp2p/interface-connection'
 import type {
   Stream,
@@ -32,6 +31,7 @@ const _verbose = Debug(`${DEBUG_PREFIX}:verbose`)
 const _flow = Debug(`flow:${DEBUG_PREFIX}`)
 const _error = Debug(`${DEBUG_PREFIX}:error`)
 
+// Sort status messsages according to importance
 export function statusMessagesCompare(a: Uint8Array, b: Uint8Array): -1 | 0 | 1 {
   switch (a[0] as RelayPrefix) {
     case RelayPrefix.CONNECTION_STATUS:
@@ -118,7 +118,31 @@ type SinkEvent = CloseEvent | SinkSourceAttachedEvent | StatusMessageEvent | Pay
 type SourceEvent = CloseEvent | SourceSwitchEvent | PayloadEvent
 
 /**
- * Encapsulates the client-side state management of a relayed connection
+ * Encapsulates the client-side stream state management of a relayed connection
+ *
+ *          ┌───────────┐       ┌─────────┐
+ *  Stream  │Connection ├─────┐►│Stream   │
+ * ────────►│           │     │ └─────────┘
+ *          │           ├──┐  │
+ *          └───────────┘  │  │ ┌─────────┐
+ *                         │  └►│WebRTC   │
+ *                         │    └─────────┘
+ *                         │
+ *                         │     after reconnect
+ *                         │    ┌─────────┐
+ *                         └──┐►│Stream'  │
+ *                            │ └─────────┘
+ *                            │
+ *                            │ ┌─────────┐
+ *                            └►│WebRTC'  │
+ *                              └─────────┘
+ *
+ * Listens to protocol messages and multiplexes WebRTC signalling
+ * into WebRTC instance.
+ *
+ * Once there was a reconnect at the relay, create a new WebRTC
+ * instance and a *new* connection endpoint which get passed to
+ * libp2p as *new* stream
  */
 class RelayConnection extends EventEmitter implements MultiaddrConnection {
   private _sourceIterator: AsyncIterator<StreamType>
@@ -141,15 +165,16 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
   public destroyed: boolean
 
+  // Current WebRTC instance
   public channel?: SimplePeer.Instance
 
-  public localAddr: Multiaddr
-  public remoteAddr: Multiaddr
+  public remoteAddr: MultiaddrConnection['remoteAddr']
 
   private _counterparty: PeerId
 
   private sinkCreator: Promise<void>
 
+  // Current connection endpoint to be used by libp2p
   public sink: StreamSink
   public source: StreamSourceAsync
 
@@ -159,7 +184,6 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
   constructor(
     private _stream: Stream,
-    self: PeerId,
     relay: PeerId,
     counterparty: PeerId,
     direction: 'inbound' | 'outbound',
@@ -169,10 +193,13 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   ) {
     super()
 
+    // Set *close* property to notify libp2p that
+    // stream was closed
     this.timeline = {
       open: Date.now()
     }
 
+    // Internal status message buffer
     this.statusMessages = new Heap(statusMessagesCompare)
 
     this.destroyed = false
@@ -181,13 +208,15 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
     this._counterparty = counterparty
 
+    // Create a unique id to distinguish multiple instances
     this._id = u8aToHex(randomBytes(4), false)
 
-    this.localAddr = createCircuitAddress(relay, self)
     this.remoteAddr = createCircuitAddress(relay, counterparty)
 
+    // After reconnect, deprecate old stream
     this._iteration = 0
 
+    // Set to true during stream migration
     this._sourceSwitched = false
 
     this._closePromise = defer<CloseEvent>()
@@ -197,6 +226,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     this._sinkSwitchPromise = defer<SinkSwitchEvent>()
     this._sourceSwitchPromise = defer<SourceSwitchEvent>()
 
+    // For testing fallback relayed connection, disable WebRTC upgrade attempts
     if (!this.testingOptions.__noWebRTCUpgrade) {
       switch (direction) {
         case 'inbound':
@@ -220,7 +250,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     this.sinkCreator.catch((err) => this.error('sink error thrown before sink attach', err.message))
 
     // Stream sink gets passed as function handle, so we
-    // need to explicitly assign an environment
+    // need to explicitly bind it to an environment
     this.sink = this._sink.bind(this)
   }
 
@@ -362,6 +392,9 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     this._closePromise.resolve({
       type: ConnectionEventTypes.CLOSE
     })
+    // Sets the magic *close* property that makes libp2p forget
+    // about the connection.
+    // @dev this is done implicitly by using meta programming
     this.timeline.close = Date.now()
   }
 
@@ -371,8 +404,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
    * Once a source is attached, forward the messages from the source to the relay.
    */
   private async *sinkFunction(): StreamSource {
-    let currentSource: AsyncIterator<StreamType> | undefined
-    let streamPromise: Promise<StreamResult> | undefined
+    let currentSourceIterator: AsyncIterator<StreamType> | undefined
+    let nextMessagePromise: Promise<StreamResult> | undefined
 
     this.flow(`sinkFunction called`)
     let leave = false
@@ -384,8 +417,9 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       promises.push(this._closePromise.promise)
       promises.push(this._sinkSwitchPromise.promise)
 
-      // Wait for source being attached to sink
-      if (currentSource == undefined) {
+      // Wait for source being attached to sink,
+      // before that happens, there will be only status messages
+      if (currentSourceIterator == undefined) {
         promises.push(this._sinkSourceAttachedPromise.promise)
       }
 
@@ -393,11 +427,12 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       promises.push(this._statusMessagePromise.promise)
 
       // Wait for payload messages
-      if (currentSource != undefined) {
-        streamPromise = streamPromise ?? currentSource.next()
+      if (currentSourceIterator != undefined) {
+        // Advances the iterator if not yet happened
+        nextMessagePromise = nextMessagePromise ?? currentSourceIterator.next()
 
         promises.push(
-          streamPromise.then((res: StreamResult) => ({
+          nextMessagePromise.then((res: StreamResult) => ({
             type: ConnectionEventTypes.PAYLOAD,
             value: res
           }))
@@ -408,7 +443,9 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
       const result = await Promise.race(promises)
 
+      // Something happened, let's find out what
       switch (result.type) {
+        // Destroy called, so notify relay first and then tear down rest
         case ConnectionEventTypes.CLOSE:
           this.flow(`FLOW: stream is closed, break`)
           if (this._destroyedPromise != undefined) {
@@ -421,6 +458,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
           leave = true
           break
+        // Reconnect happened, cleanup state and reset mutexes
         case ConnectionEventTypes.SINK_SWITCH:
           this._sinkSwitchPromise = defer<SinkSwitchEvent>()
 
@@ -430,22 +468,25 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
             ignore: true
           })
           this._sinkSourceAttachedPromise = defer<SinkSourceAttachedEvent>()
-          currentSource = undefined
-          streamPromise = undefined
+          currentSourceIterator = undefined
+          nextMessagePromise = undefined
           this._migrationDone?.resolve()
           this.flow(`FLOW: stream switched, continue`)
           break
+        // A sink stream got attached, either after initialization
+        // or after a reconnect
         case ConnectionEventTypes.SINK_SOURCE_ATTACHED:
           if (result.ignore) {
             break
           }
 
-          // Start iterator
-          currentSource = result.value[Symbol.asyncIterator]()
+          // Start the iterator
+          currentSourceIterator = result.value[Symbol.asyncIterator]()
 
-          streamPromise = undefined
+          nextMessagePromise = undefined
           this.flow(`FLOW: source attached, forwarding`)
           break
+        // There is a status message to be sent
         case ConnectionEventTypes.STATUS_MESSAGE:
           const statusMsg = this.unqueueStatusMessage()
 
@@ -462,20 +503,24 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
           toYield = statusMsg
 
           break
+        // There is a payload message that we need to forward
         case ConnectionEventTypes.PAYLOAD:
           if (result.value == undefined) {
             throw Error(`Received must not be undefined`)
           }
 
+          // No more messages to send by libp2p, so end stream
           if (result.value.done) {
-            currentSource = undefined
-            streamPromise = undefined
+            currentSourceIterator = undefined
+            nextMessagePromise = undefined
             this.flow(`FLOW: received.done == true, break`)
             leave = true
             break
           }
-          assert(currentSource != undefined)
-          streamPromise = currentSource.next()
+          assert(currentSourceIterator != undefined)
+
+          // Advance iterator
+          nextMessagePromise = currentSourceIterator.next()
           this.flow(`FLOW: loop end`)
 
           toYield = Uint8Array.from([RelayPrefix.PAYLOAD, ...result.value.value.slice()])
@@ -492,7 +537,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   }
 
   /**
-   * Returns incoming payload messages and handles status and control messages.
+   * Creates an async iterable that resolves to incoming messages.
+   * Streams ends once there is a reconnect.
    * @returns an async iterator yielding incoming payload messages
    */
   private createSource() {
@@ -504,17 +550,23 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
       let streamPromise = this._sourceIterator.next()
 
-      const nextPayload = () => {
+      const advanceIterator = () => {
         streamPromise = this._sourceIterator.next()
       }
 
       if (!this.testingOptions.__noWebRTCUpgrade) {
+        // We're now ready to fetch WebRTC signalling messages
         this.attachWebRTCListeners(drainIteration)
       }
 
       let leave = false
 
-      while (!leave && this._iteration == drainIteration) {
+      while (
+        !leave &&
+        // Each reconnect increases `this._iteration` and thereby
+        // deprecates previous streams and ends them
+        this._iteration == drainIteration
+      ) {
         this.flow(`FLOW: incoming: new loop iteration`)
         const promises: Promise<SourceEvent>[] = []
 
@@ -545,16 +597,23 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
         let toYield: Uint8Array | undefined
 
         switch (result.type) {
+          // Stream got destroyed, so end it
           case ConnectionEventTypes.CLOSE:
             this.flow(`FLOW: stream closed`)
             leave = true
             // leave loop
             break
+          // A reconnect happened a source got attached
+          // in next iteration, attach new source
           case ConnectionEventTypes.SOURCE_SWITCH:
             migrationDone.resolve()
             this.flow(`FLOW: migration done`)
             break
+          // We received a payload message, if it is a
+          // status message, interprete it, otherwise
+          // forward it to libp2p
           case ConnectionEventTypes.PAYLOAD:
+            // Stream ended, so we're done here
             if (result.value.done) {
               // @TODO how to proceed ???
               this.flow(`FLOW: received done`)
@@ -563,24 +622,28 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
               break
             }
 
+            // Anything can happen
             if (result.value.value.length == 0) {
               this.verbose(`Ignoring empty message`)
-              nextPayload()
+              advanceIterator()
               break
             }
 
             const [PREFIX, SUFFIX] = [result.value.value.slice(0, 1), result.value.value.slice(1)]
 
+            // Anything can happen
             if (SUFFIX.length == 0) {
-              nextPayload()
+              advanceIterator()
               this.verbose(`Ignoring empty payload`)
               break
             }
 
             // Handle relay sub-protocol
             switch (PREFIX[0]) {
+              // Something on the connection happened
               case RelayPrefix.CONNECTION_STATUS:
                 switch (SUFFIX[0]) {
+                  // Relay asks us to stop stream
                   case ConnectionStatusMessages.STOP:
                     this.log(`STOP received. Ending stream ...`)
                     this.destroyed = true
@@ -588,6 +651,12 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
                     this.setClosed()
                     leave = true
                     break
+                  // A reconnect at the other of the relay happened,
+                  // so create a new connection endpoint (stream) and
+                  // pass it to libp2p
+                  // Also create a new WebRTC instance because old one
+                  // cannot be used anymore since other party might have
+                  // migrated to different port or IP
                   case ConnectionStatusMessages.RESTART:
                     this.log(`RESTART received. Ending stream ...`)
                     this.emit(`restart`)
@@ -595,6 +664,9 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
                     // First switch, then call _onReconnect to make sure
                     // values are set, even if _onReconnect throws
                     let switchedConnection = this.switch()
+                    // We must not await this promise because it resolves once
+                    // TLS-alike handshake is done and thus creates a deadlock
+                    // since the await blocks this stream
                     this._onReconnect(switchedConnection, this._counterparty)
 
                     await migrationDone.promise
@@ -603,12 +675,14 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
                     this._sourceSwitchPromise = defer<SourceSwitchEvent>()
                     this._sourceSwitched = false
 
-                    nextPayload()
+                    advanceIterator()
                     break
                   default:
                     throw Error(`Invalid suffix. Received ${u8aToHex(SUFFIX)}`)
                 }
                 break
+              // We received a status message. Usually used to send PING / PONG
+              // messages to detect if connection works
               case RelayPrefix.STATUS_MESSAGE:
                 this.flow(`Received status message`)
                 switch (SUFFIX[0]) {
@@ -617,7 +691,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
                     this.queueStatusMessage(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PONG))
                     break
                   case StatusMessages.PONG:
-                    // noop
+                    // noop, left for future usage
                     break
                   default:
                     this.error(
@@ -625,8 +699,10 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
                     )
                     break
                 }
-                nextPayload()
+                advanceIterator()
                 break
+              // Upgrade to direct WebRTC is ongoing, forward ICE signalling
+              // messages to WebRTC instance
               case RelayPrefix.WEBRTC_SIGNALLING:
                 let decoded: SimplePeer.SignalData | undefined
                 try {
@@ -646,11 +722,12 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
                     this.error(`WebRTC error:`, err)
                   }
                 }
-                nextPayload()
+                advanceIterator()
                 break
+              // Forward message to libp2p
               case RelayPrefix.PAYLOAD:
                 toYield = SUFFIX
-                nextPayload()
+                advanceIterator()
                 break
               default:
                 throw Error(`Invalid prefix. Received ${u8aToHex(PREFIX)}`)
@@ -666,12 +743,15 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       }
     }.call(this, this._iteration)
 
+    // We need to eagerly drain the iterator to make sure it fetches
+    // status messages and WebRTC signallign messages - even before
+    // libp2p decides to drain the stream
     return eagerIterator(iterator)
   }
 
   /**
    * Attaches a listener to the WebRTC 'signal' events
-   * and removes it once class iteration increases
+   * and removes it once there is a reconnect
    * @param drainIteration index of current iteration
    */
   private attachWebRTCListeners(drainIteration: number) {
