@@ -353,6 +353,7 @@ class RelayContext extends EventEmitter {
 
             switch (PREFIX[0]) {
               case RelayPrefix.STATUS_MESSAGE:
+                this.flow(`FLOW: relay_incoming: got PING or PONG, continue`)
                 switch (SUFFIX[0]) {
                   case StatusMessages.PING:
                     this.verbose(`PING received`)
@@ -411,14 +412,6 @@ class RelayContext extends EventEmitter {
                   default:
                     throw Error(`Invalid connection status prefix. Received ${u8aToHex(SUFFIX.slice(0, 1))}`)
                 }
-                break
-              // Forward status messages such as PING / PONG
-              case RelayPrefix.STATUS_MESSAGE:
-                this.flow(`FLOW: relay_incoming: got PING or PONG, continue`)
-
-                // Unclear
-                toYield = result.value.value
-                advanceIterator()
                 break
               // Forward any WebRTC signalling
               case RelayPrefix.WEBRTC_SIGNALLING:
