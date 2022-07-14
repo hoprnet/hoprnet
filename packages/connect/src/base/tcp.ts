@@ -125,23 +125,23 @@ class TCPConnection implements MultiaddrConnection {
     let iterableSink: Stream['sink']
     try {
       iterableSink = toIterable.sink<Uint8Array>(this.conn)
+
+      try {
+        await iterableSink(
+          this._signal != undefined ? (abortableSource(u8aStream, this._signal) as StreamSource) : u8aStream
+        )
+      } catch (err: any) {
+        // If aborted we can safely ignore
+        if (err.code !== 'ABORT_ERR' && err.type !== 'aborted') {
+          // If the source errored the socket will already have been destroyed by
+          // toIterable.duplex(). If the socket errored it will already be
+          // destroyed. There's nothing to do here except log the error & return.
+          error(`unexpected error in TCP sink function`, err)
+        }
+      }
     } catch (err) {
       error(`TCP sink error`, err)
       return
-    }
-
-    try {
-      await iterableSink(
-        this._signal != undefined ? (abortableSource(u8aStream, this._signal) as StreamSource) : u8aStream
-      )
-    } catch (err: any) {
-      // If aborted we can safely ignore
-      if (err.code !== 'ABORT_ERR' && err.type !== 'aborted') {
-        // If the source errored the socket will already have been destroyed by
-        // toIterable.duplex(). If the socket errored it will already be
-        // destroyed. There's nothing to do here except log the error & return.
-        error(`unexpected error in TCP sink function`, err)
-      }
     }
   }
 

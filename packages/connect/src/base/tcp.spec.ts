@@ -1,4 +1,5 @@
 import { createServer, type Socket, type AddressInfo } from 'net'
+import { setTimeout } from 'timers/promises'
 
 import { SOCKET_CLOSE_TIMEOUT, TCPConnection } from './tcp.js'
 import { once } from 'events'
@@ -174,7 +175,7 @@ describe('test TCP connection', function () {
   })
 })
 
-describe('test TCP connection - socket errors', function () {
+describe.only('test TCP connection - socket errors', function () {
   it('throw on write attempts', async function () {
     const socket = new Writable()
 
@@ -208,11 +209,13 @@ describe('test TCP connection - socket errors', function () {
 
     await conn.sink(
       (async function* (): AsyncIterable<Uint8Array> {
+        // propagation delay
+        await setTimeout(200)
         yield new Uint8Array()
       })()
     )
 
     // Propagation delay to let errors happen
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await setTimeout(500)
   })
 })
