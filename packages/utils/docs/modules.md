@@ -256,7 +256,7 @@ ___
 | :------ | :------ |
 | `promise` | `Promise`<`T`\> |
 | `reject` | (`reason?`: `any`) => `void` |
-| `resolve` | (`value?`: `T` \| `PromiseLike`<`T`\>) => `void` |
+| `resolve` | (`value`: `T` \| `PromiseLike`<`T`\>) => `void` |
 
 #### Defined in
 
