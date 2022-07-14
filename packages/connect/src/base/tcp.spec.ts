@@ -1,13 +1,17 @@
 import { createServer, type Socket, type AddressInfo } from 'net'
+import { setTimeout } from 'timers/promises'
 
 import { SOCKET_CLOSE_TIMEOUT, TCPConnection } from './tcp.js'
 import { once } from 'events'
 import { Multiaddr } from '@multiformats/multiaddr'
-import { u8aEquals, defer } from '@hoprnet/hopr-utils'
+import { u8aEquals, defer, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import type { EventEmitter } from 'events'
 
-import { waitUntilListening, stopNode, createPeerId } from './utils.spec.js'
+import { waitUntilListening, stopNode } from './utils.spec.js'
+import { Writable } from 'stream'
+
+const peerId = privKeyToPeerId('0xe89695ba0c247b14fc552367d9f92f598b4308782e2ce09396fcd0f1bafcc397')
 
 describe('test TCP connection', function () {
   it('should test TCPConnection against Node.js APIs', async function () {
@@ -15,8 +19,6 @@ describe('test TCP connection', function () {
 
     const testMessage = new TextEncoder().encode('test')
     const testMessageReply = new TextEncoder().encode('reply')
-
-    const peerId = createPeerId()
 
     const server = createServer((socket: Socket) => {
       socket.on('data', (data: Uint8Array) => {
@@ -76,7 +78,6 @@ describe('test TCP connection', function () {
 
     await waitUntilListening(server, undefined)
 
-    const peerId = createPeerId()
     const conn = await TCPConnection.create(
       new Multiaddr(`/ip4/127.0.0.1/tcp/${(server.address() as AddressInfo).port}`),
       peerId
@@ -120,7 +121,6 @@ describe('test TCP connection', function () {
 
   it('tcp socket timeout and error cases', async function () {
     const INVALID_PORT = 54221
-    const peerId = createPeerId()
 
     await assert.rejects(
       async () => {
@@ -138,8 +138,6 @@ describe('test TCP connection', function () {
 
     const testMessage = new TextEncoder().encode('test')
     const testMessageReply = new TextEncoder().encode('reply')
-
-    const peerId = createPeerId()
 
     const server = createServer((socket: Socket) => {
       socket.on('data', (data: Uint8Array) => {
@@ -174,5 +172,50 @@ describe('test TCP connection', function () {
     )
 
     await stopNode(server)
+  })
+})
+
+describe.only('test TCP connection - socket errors', function () {
+  it('throw on write attempts', async function () {
+    const socket = new Writable()
+
+    // Overwrite methods to simulate socket errors
+    Object.assign(socket, {
+      write: () => {
+        throw Error(`boom`)
+      },
+      [Symbol.asyncIterator]: () => {
+        return {
+          next() {
+            return Promise.resolve({ value: new Uint8Array(), done: false })
+          },
+          return() {
+            // This will be reached if the consumer called 'break' or 'return' early in the loop.
+            return { done: true }
+          }
+        }
+      },
+      remoteAddress: '127.0.0.1',
+      remotePort: 9091,
+      remoteFamily: 'IPv4',
+      address: () => ({
+        address: '127.0.0.1',
+        port: 9092,
+        family: 'IPv4'
+      })
+    })
+
+    const conn = TCPConnection.fromSocket(socket as Socket, peerId)
+
+    await conn.sink(
+      (async function* (): AsyncIterable<Uint8Array> {
+        // propagation delay
+        await setTimeout(200)
+        yield new Uint8Array()
+      })()
+    )
+
+    // Propagation delay to let errors happen
+    await setTimeout(500)
   })
 })

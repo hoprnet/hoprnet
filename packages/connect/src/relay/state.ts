@@ -83,16 +83,19 @@ class RelayState {
    * @param destination other party of the relayed connection
    * @param toSource new stream to source
    */
-  updateExisting(source: PeerId, destination: PeerId, toSource: Stream): void {
+  updateExisting(source: PeerId, destination: PeerId, toSource: Stream): boolean {
     const id = RelayState.getId(source, destination)
 
-    if (!this.relayedConnections.has(id)) {
-      throw Error(`Relayed connection does not exist`)
+    const context = this.relayedConnections.get(id)
+
+    if (context == null) {
+      verbose(`Relayed connection between ${source.toString()} and ${destination.toString()} does not exist`)
+      return false
     }
 
-    const context = this.relayedConnections.get(id) as RelayConnections
-
     context[source.toString()].update(toSource)
+
+    return true
   }
 
   /**
@@ -143,10 +146,13 @@ class RelayState {
     this.relayedConnections.set(RelayState.getId(source, destination), relayedConnection)
 
     try {
-      await Promise.all([sourcePromise, destinationPromise])
+      Promise.all([sourcePromise, destinationPromise]).catch((err) => {
+        this.relayedConnections.delete(RelayState.getId(source, destination))
+        error(`Could not create new relay connection between ${source.toString()} and ${destination.toString()}`, err)
+      })
     } catch (err) {
       this.relayedConnections.delete(RelayState.getId(source, destination))
-      throw err
+      error(`Could not create new relay connection between ${source.toString()} and ${destination.toString()}`, err)
     }
   }
 
@@ -185,11 +191,12 @@ class RelayState {
       unmarshalPublicKey(b.publicKey as Uint8Array).marshal()
     )
 
+    // human-readable ID
     switch (cmpResult) {
       case 1:
-        return `${a.toString()}${b.toString()}`
+        return `${a.toString()}-${b.toString()}`
       case -1:
-        return `${b.toString()}${a.toString()}`
+        return `${b.toString()}-${a.toString()}`
       default:
         throw Error(`Invalid compare result. Loopbacks are not allowed.`)
     }

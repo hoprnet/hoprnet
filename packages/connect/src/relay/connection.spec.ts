@@ -28,7 +28,6 @@ describe('test status message sorting', function () {
 })
 
 describe('relay connection', function () {
-  const Alice: PeerId = createPeerId()
   const Relay: PeerId = createPeerId()
   const Bob: PeerId = createPeerId()
 
@@ -37,7 +36,6 @@ describe('relay connection', function () {
 
     new RelayConnection(
       AliceRelay,
-      Alice,
       Relay,
       Bob,
       'outbound',
@@ -62,7 +60,6 @@ describe('relay connection', function () {
 
     const alice = new RelayConnection(
       AliceRelay,
-      Alice,
       Relay,
       Bob,
       'outbound',
@@ -104,7 +101,6 @@ describe('relay connection', function () {
 
     const alice = new RelayConnection(
       AliceRelay,
-      Alice,
       Relay,
       Bob,
       'outbound',
@@ -142,7 +138,6 @@ describe('relay connection', function () {
 
     const alice = new RelayConnection(
       AliceRelay,
-      Alice,
       Relay,
       Bob,
       'outbound',
@@ -189,7 +184,6 @@ describe('relay connection', function () {
 
     const alice = new RelayConnection(
       AliceRelay,
-      Alice,
       Relay,
       Bob,
       'outbound',
@@ -248,7 +242,6 @@ describe('relay connection', function () {
 
     const alice = new RelayConnection(
       AliceRelay,
-      Alice,
       Relay,
       Bob,
       'outbound',
@@ -328,7 +321,6 @@ describe('relay connection', function () {
 
     new RelayConnection(
       AliceRelay,
-      Alice,
       Relay,
       Bob,
       'outbound',
@@ -395,7 +387,6 @@ describe('relay connection', function () {
 
     const alice = new RelayConnection(
       AliceRelay,
-      Alice,
       Relay,
       Bob,
       'outbound',
@@ -485,7 +476,6 @@ describe('relay connection', function () {
 })
 
 describe('relay connection - stream error propagation', function () {
-  const Alice: PeerId = createPeerId()
   const Relay: PeerId = createPeerId()
   const Bob: PeerId = createPeerId()
 
@@ -496,7 +486,6 @@ describe('relay connection - stream error propagation', function () {
 
     const alice = new RelayConnection(
       RelayAlice,
-      Alice,
       Relay,
       Bob,
       'outbound',
@@ -531,7 +520,6 @@ describe('relay connection - stream error propagation', function () {
         sink: () => Promise.reject(Error(errorInSinkFunction)),
         source: RelayAlice.source
       },
-      Alice,
       Relay,
       Bob,
       'outbound',
@@ -564,7 +552,6 @@ describe('relay connection - stream error propagation', function () {
           throw Error(errorInSource)
         })()
       },
-      Alice,
       Relay,
       Bob,
       'outbound',

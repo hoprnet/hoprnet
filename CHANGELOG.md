@@ -21,6 +21,7 @@
 - Add Docker image (hopr-pluto) running a full hoprd test cluster for local dApp testing
 - Add script that allow self register and self deregister on the Network Registry contract
 - Add documentations around network registry
+- Refactor and simplify stream handover functionality to be more robust ([#3898](https://github.com/hoprnet/hoprnet/pull/3898))
 - Added possibility to specify custom RPC provider in Avado
 
 # Breaking changes

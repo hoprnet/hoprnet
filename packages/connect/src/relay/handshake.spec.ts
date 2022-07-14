@@ -29,7 +29,7 @@ describe('test relay handshake', function () {
   it('check initiating sequence', async function () {
     const [relayToInitiator, initiatorToRelay] = duplexPair<StreamType>()
 
-    const initiatorReceived = defer()
+    const initiatorReceived = defer<void>()
 
     const initiatorHandshake = new RelayHandshake(relayToInitiator)
     const relayHandshake = new RelayHandshake(initiatorToRelay)
@@ -71,7 +71,7 @@ describe('test relay handshake', function () {
   it('check forwarding sequence', async function () {
     const [destinationToRelay, relayToDestination] = duplexPair<StreamType>()
 
-    const okReceived = defer()
+    const okReceived = defer<void>()
 
     const relayHandshake = new RelayHandshake({
       source: (async function* () {

@@ -216,16 +216,18 @@ class RelayHandshake {
     const relayedConnectionExists = state.exists(source, destination)
 
     if (relayedConnectionExists) {
-      // Relay could exist but connection is dead
+      // Relayed connection could exist but connection is dead
       const connectionIsActive = await state.isActive(source, destination)
 
       if (connectionIsActive) {
         this.shaker.write(Uint8Array.of(RelayHandshakeMessage.OK))
         this.shaker.rest()
 
-        state.updateExisting(source, destination, this.shaker.stream)
-
-        return
+        // Relayed connection could have been closed meanwhile
+        if (state.updateExisting(source, destination, this.shaker.stream)) {
+          // Updated connection, so everything done
+          return
+        }
       }
     }
 
@@ -282,22 +284,16 @@ class RelayHandshake {
         this.shaker.rest()
         destinationShaker.rest()
 
-        try {
-          // NOTE: This returns only when the relay connection is terminated
-          await state.createNew(
-            source,
-            destination,
-            this.shaker.stream,
-            destinationShaker.stream,
-            this.options.relayFreeTimeout
-          )
-        } catch (err) {
-          error(`Cannot establish relayed connection between ${destination.toString()} and ${source.toString()}`, err)
-          // @TODO find a way how to forward the error to source and destination
-          return
-        }
+        state.createNew(
+          source,
+          destination,
+          this.shaker.stream,
+          destinationShaker.stream,
+          this.options.relayFreeTimeout
+        )
         break
       default:
+        log(`Counterparty replied with ${destinationAnswer} but expected ${RelayHandshakeMessage.OK}`)
         this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY))
         this.shaker.rest()
 

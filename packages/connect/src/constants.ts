@@ -56,18 +56,6 @@ export enum RelayPrefix {
   WEBRTC_SIGNALLING
 }
 
-export function isValidPrefix(prefix: RelayPrefix): boolean {
-  switch (prefix) {
-    case RelayPrefix.PAYLOAD:
-    case RelayPrefix.STATUS_MESSAGE:
-    case RelayPrefix.CONNECTION_STATUS:
-    case RelayPrefix.WEBRTC_SIGNALLING:
-      return true
-    default:
-      return false
-  }
-}
-
 export const MAX_RELAYS_PER_NODE = 5
 
 /**
