@@ -240,7 +240,7 @@ We attempt to provide instructions on how to migrate your tokens between release
 ## Develop
 
 HOPR contains modules written in Rust, therefore a Rust toolchain is needed to successfully build the artifacts.
-To install Rust toolchain (at least version 1.60) please follow instructions at [https://www.rust-lang.org/tools/install](https://www.rust-lang.org/tools/install).
+To install Rust toolchain (at least version 1.60) please follow instructions at [https://www.rust-lang.org/tools/install](https://www.rust-lang.org/tools/install) first.
 
 ```sh
 make -j deps build
