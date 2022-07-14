@@ -504,7 +504,6 @@ class RelayContext extends EventEmitter {
         const result = await Promise.race(promises)
 
         if (iteration != internalIteration) {
-          leave = true
           break
         }
 
