@@ -4,6 +4,7 @@ all: help
 
 .PHONY: deps
 deps: ## install dependencies
+	corepack enable
 	yarn
 	command -v rustup && rustup update || echo "No rustup installed, ignoring"
 
