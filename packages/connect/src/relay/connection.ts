@@ -499,11 +499,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     // migration mutex
     let migrationDone = defer<void>()
 
-    const iterator = async function* (this: RelayConnection) {
-      // deep-clone number
-      // @TOOD make sure that the compiler does not notice
-      const drainIteration = parseInt(this._iteration.toString())
-
+    const iterator = async function* (this: RelayConnection, drainIteration: number) {
       let result: SourceEvent
 
       let streamPromise = this._sourceIterator.next()
@@ -543,7 +539,6 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
         // End stream once new instance is used
         if (this._iteration != drainIteration) {
           // leave loop
-          leave = true
           break
         }
 
@@ -665,13 +660,11 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
             throw Error(`Invalid result. Received ${result}`)
         }
 
-        this.flow(`here`, toYield)
         if (toYield != undefined) {
-          this.flow(`yielding`)
           yield toYield
         }
       }
-    }.call(this)
+    }.call(this, this._iteration)
 
     return eagerIterator(iterator)
   }

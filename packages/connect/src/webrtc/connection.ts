@@ -317,19 +317,19 @@ class WebRTCConnection implements MultiaddrConnection {
                 // 1. Handle stream handover
                 // 2. Handle stream messages
                 this.flow(`FLOW: webrtc sink: awaiting promises`)
-                const result = await Promise.race(promises)
+                const relayConnResult = await Promise.race(promises)
 
                 let toYield: Uint8Array | undefined
 
-                switch (result.type) {
+                switch (relayConnResult.type) {
                   case ConnectionEventTypes.SINK_SOURCE_ATTACHED:
                     this.flow(`FLOW: webrtc sink: source attached, continue`)
-                    source = result.value[Symbol.asyncIterator]()
+                    source = relayConnResult.value[Symbol.asyncIterator]()
                     break
                   case ConnectionEventTypes.WEBRTC_INIT_FINISHED:
                     this.flow(`FLOW: webrtc sink: webrtc finished, handle`)
                     webRTCFinished = true
-                    switch (result.value) {
+                    switch (relayConnResult.value) {
                       case WebRTCResult.AVAILABLE:
                         reasonToLeave = { type: ConnectionEventTypes.MIGRATED }
                         leave = true
@@ -340,21 +340,21 @@ class WebRTCConnection implements MultiaddrConnection {
                         // WebRTC upgrade finished but no connection possible
                         break
                       default:
-                        throw Error(`Invalid WebRTC result. Received ${JSON.stringify(result)}`)
+                        throw Error(`Invalid WebRTC result. Received ${JSON.stringify(relayConnResult)}`)
                     }
                     break
                   case ConnectionEventTypes.PAYLOAD:
-                    if (result.value.done) {
+                    if (relayConnResult.value.done) {
                       this.flow(`FLOW: webrtc sink: received.done, break`)
                       reasonToLeave = { type: ConnectionEventTypes.STREAM_ENDED }
                       leave = true
                       break
                     }
-                    toYield = Uint8Array.from([MigrationStatus.NOT_DONE, ...result.value.value])
+                    toYield = Uint8Array.from([MigrationStatus.NOT_DONE, ...relayConnResult.value.value])
                     nextMessage()
                     break
                   default:
-                    throw Error(`Invalid result ${JSON.stringify(result)}`)
+                    throw Error(`Invalid result ${JSON.stringify(relayConnResult)}`)
                 }
 
                 if (toYield != undefined) {
@@ -388,7 +388,7 @@ class WebRTCConnection implements MultiaddrConnection {
         }
         await toIterable.sink(this.relayConn.getWebRTCInstance())(
           async function* (this: WebRTCConnection): StreamSource {
-            let result: PayloadEvent | SinkSourceAttachedEvent
+            let webRTCresult: PayloadEvent | SinkSourceAttachedEvent
             let toYield: Uint8Array | undefined
             let leave = false
 
@@ -396,20 +396,20 @@ class WebRTCConnection implements MultiaddrConnection {
               // If no source attached, wait until there is one,
               // otherwise wait for messages
               if (source == undefined) {
-                result = await this._sinkSourceAttachedPromise.promise
+                webRTCresult = await this._sinkSourceAttachedPromise.promise
               } else {
                 if (sourcePromise == undefined) {
                   nextMessage()
                 }
-                result = await (sourcePromise as Promise<PayloadEvent>)
+                webRTCresult = await (sourcePromise as Promise<PayloadEvent>)
               }
 
-              switch (result.type) {
+              switch (webRTCresult.type) {
                 case ConnectionEventTypes.SINK_SOURCE_ATTACHED:
-                  source = result.value[Symbol.asyncIterator]()
+                  source = webRTCresult.value[Symbol.asyncIterator]()
                   break
                 case ConnectionEventTypes.PAYLOAD:
-                  const received = result.value
+                  const received = webRTCresult.value
 
                   if (received.done || this.destroyed || this.relayConn.getWebRTCInstance().destroyed) {
                     leave = true

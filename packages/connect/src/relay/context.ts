@@ -427,7 +427,11 @@ class RelayContext extends EventEmitter {
 
     let iteration = 0
 
-    async function* drain(this: RelayContext, internalIteration: number, endPromise: DeferType<SinkEndedEvent>) {
+    async function* drain(
+      this: RelayContext,
+      internalIteration: number,
+      endPromise: DeferType<SinkEndedEvent | EndedEvent>
+    ) {
       const nextMessage = () => {
         assert(currentSource != undefined)
         sourcePromise = currentSource.next().then((res) => ({
@@ -436,6 +440,8 @@ class RelayContext extends EventEmitter {
         }))
       }
 
+      let reasonToLeave: ConnectionEventTypes.STREAM_ENDED | ConnectionEventTypes.ENDED =
+        ConnectionEventTypes.STREAM_ENDED
       let leave = false
       this.flow(`FLOW: relay_outgoing: loop started`)
 
@@ -511,6 +517,7 @@ class RelayContext extends EventEmitter {
               this.flow(`FLOW: relay_outgoing: STOP, break`)
               toYield = result.value.value
               leave = true
+              reasonToLeave = ConnectionEventTypes.ENDED
               break
             }
 
@@ -530,13 +537,16 @@ class RelayContext extends EventEmitter {
       }
 
       endPromise.resolve({
-        type: ConnectionEventTypes.STREAM_ENDED
+        type: reasonToLeave
       })
       this.flow(`FLOW: relay_outgoing: loop ended`, internalIteration)
     }
 
-    while (true) {
-      const endPromise = defer<SinkEndedEvent>()
+    // Set to true once STOP signal received
+    let leaveSinkLoop = false
+
+    while (!leaveSinkLoop) {
+      const endPromise = defer<SinkEndedEvent | EndedEvent>()
       try {
         await currentSink(drain.call(this, iteration, endPromise))
       } catch (err) {
@@ -561,6 +571,10 @@ class RelayContext extends EventEmitter {
             iteration++
           }
           // sink call might return earlier, so wait for new stream
+          break
+        case ConnectionEventTypes.ENDED:
+          // Beta, needs more testing
+          leaveSinkLoop = true
           break
         case ConnectionEventTypes.STREAM_SINK_SWITCH:
           iteration++

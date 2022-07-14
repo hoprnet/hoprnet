@@ -89,7 +89,7 @@ class RelayState {
     const context = this.relayedConnections.get(id)
 
     if (context == null) {
-      verbose(`Relayed connection ${id} does not exist`)
+      verbose(`Relayed connection between ${source.toString()} and ${destination.toString()} does not exist`)
       return false
     }
 
@@ -148,11 +148,11 @@ class RelayState {
     try {
       Promise.all([sourcePromise, destinationPromise]).catch((err) => {
         this.relayedConnections.delete(RelayState.getId(source, destination))
-        error(`Could not create new relay connection`, err)
+        error(`Could not create new relay connection between ${source.toString()} and ${destination.toString()}`, err)
       })
     } catch (err) {
       this.relayedConnections.delete(RelayState.getId(source, destination))
-      error(`Could not create new relay connection`, err)
+      error(`Could not create new relay connection between ${source.toString()} and ${destination.toString()}`, err)
     }
   }
 
