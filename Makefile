@@ -109,7 +109,7 @@ endif
 		--privatekey "$(privkey)"
 
 register-nodes: ensure-environment-is-set
-register-nodes: ## register given nodes in network registry contract
+register-nodes: ## owner register given nodes in network registry contract
 ifeq ($(native_addresses),)
 	echo "parameter <native_addresses> missing" >&2 && exit 1
 endif
@@ -123,6 +123,21 @@ endif
    --task add \
    --native-addresses "$(native_addresses)" \
    --peer-ids "$(peer_ids)"
+
+self-register-node: ensure-environment-is-set
+self-register-node: ## staker register a node in network registry contract
+ifeq ($(native_addresses),)
+	echo "parameter <native_addresses> missing" >&2 && exit 1
+endif
+ifeq ($(peer_ids),)
+	echo "parameter <peer_ids> missing" >&2 && exit 1
+endif
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat register:self \
+   --network $(network) \
+   --task add \
+   --peer-id "$(peer_id)"
 
 ensure-environment-is-set:
 ifeq ($(environment),)
