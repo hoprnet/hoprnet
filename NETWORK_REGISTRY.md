@@ -120,5 +120,5 @@ yarn workspace @hoprnet/hopr-ethereum hardhat register --network goerli --task e
 3. Request a Dev NFT from "DevBank" with `make request-dev-nft environment=master-goerli network=goerli privkey=<private key of "DevBank"> recipient <"account">`.
 4. Stake NFT `make stake-devnft environment=master-goerli network=goerli privkey=<private key of “account”>` It detects if the “account” needs to stake Dev NFT and stake
 5. Start your Hopr node and copy node’s “Peer ID”
-6. Register "Peer ID" with `make self-register-node environment=master-goerli network=goerli privkey=<private key of “account”> peer-id <peer id>`.
+6. Register "Peer ID" with `make self-register-node environment=master-goerli network=goerli privkey=<private key of “account”> peer-id <peer id>`. If the "account" has registered with a different "Peer ID", a deregister needs to be done with `make self-deregister-node environment=master-goerli network=goerli privkey=<private key of “account”>`
 7. Fund the HOPR node as usual
