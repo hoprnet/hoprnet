@@ -492,7 +492,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     try {
       conn = await this.dialDirectly(destinationAddress, {
         signal: abort.signal,
-        upgrader: undefined as any,
+        // libp2p interface type clash
+        upgrader: this.getComponents().getUpgrader() as any,
         onDisconnect
       })
     } catch (err: any) {

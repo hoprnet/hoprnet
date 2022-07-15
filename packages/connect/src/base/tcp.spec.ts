@@ -175,7 +175,7 @@ describe('test TCP connection', function () {
   })
 })
 
-describe.only('test TCP connection - socket errors', function () {
+describe('test TCP connection - socket errors', function () {
   it('throw on write attempts', async function () {
     const socket = new Writable()
 

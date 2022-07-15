@@ -199,7 +199,8 @@ class Relay implements Initializable, ConnectInitializable, Startable {
   ): Promise<MultiaddrConnection | undefined> {
     const baseConnection = await this.dialNodeDirectly(relay, RELAY_PROTCOL(this.options.environment), {
       signal: options?.signal,
-      upgrader: undefined as any
+      // libp2p interface type clash
+      upgrader: this.getComponents().getUpgrader() as any
     }).catch(error)
 
     if (baseConnection == undefined) {
@@ -252,7 +253,8 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     if (!this.testingOptions.__noWebRTCUpgrade) {
       return new WebRTCConnection(conn, {
         __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade,
-        upgrader: undefined as any,
+        // libp2p interface type clash
+        upgrader: this.getComponents().getUpgrader() as any,
         ...opts
       })
     } else {
@@ -273,7 +275,8 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
     if (!this.testingOptions.__noWebRTCUpgrade) {
       return new WebRTCConnection(conn, this.testingOptions, {
-        upgrader: undefined as any
+        // libp2p interface type clash
+        upgrader: this.getComponents().getUpgrader() as any
       })
     } else {
       return conn
@@ -397,7 +400,8 @@ class Relay implements Initializable, ConnectInitializable, Startable {
           .getUpgrader()
           .upgradeInbound(
             new WebRTCConnection(relayConn, this.testingOptions, {
-              upgrader: undefined as any
+              // libp2p interface type clash
+              upgrader: this.getComponents().getUpgrader() as any
             })
           )
       } else {

@@ -267,7 +267,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       type: ConnectionEventTypes.SINK_SOURCE_ATTACHED,
       value: async function* (this: RelayConnection) {
         try {
-          yield* toU8aStream(source)
+          yield* toU8aStream(source) as StreamSourceAsync
           deferred.resolve()
         } catch (err: any) {
           this.queueStatusMessage(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP))

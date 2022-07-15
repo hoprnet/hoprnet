@@ -10,7 +10,6 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import type { DialOptions } from '@libp2p/interface-transport'
 import { Multiaddr } from '@multiformats/multiaddr'
 import type { Connection } from '@libp2p/interface-connection'
-import type { ConnectionManager } from '@libp2p/interface-connection-manager'
 import type { Components } from '@libp2p/interfaces/components'
 import type { AbortOptions } from '@libp2p/interfaces'
 
@@ -48,11 +47,18 @@ function createFakeComponents(peerId: PeerId) {
       getConnections(_peer: PeerId | undefined, _options?: AbortOptions): Connection[] {
         return []
       }
-    } as ConnectionManager as Components['connectionManager'])
+    } as Components['connectionManager'])
+
+  const getUpgrader = () =>
+    ({
+      upgradeInbound: (x: any) => x,
+      upgradeOutbound: (x: any) => x
+    } as Components['upgrader'])
 
   return {
     getPeerId,
-    getConnectionManager
+    getConnectionManager,
+    getUpgrader
   } as Components
 }
 
