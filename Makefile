@@ -126,11 +126,8 @@ endif
 
 self-register-node: ensure-environment-is-set
 self-register-node: ## staker register a node in network registry contract
-ifeq ($(native_addresses),)
-	echo "parameter <native_addresses> missing" >&2 && exit 1
-endif
-ifeq ($(peer_ids),)
-	echo "parameter <peer_ids> missing" >&2 && exit 1
+ifeq ($(peer_id),)
+	echo "parameter <peer_id> missing" >&2 && exit 1
 endif
 	TS_NODE_PROJECT=./tsconfig.hardhat.json \
 	HOPR_ENVIRONMENT_ID="$(environment)" \
