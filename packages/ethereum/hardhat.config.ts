@@ -22,6 +22,7 @@ import faucet, { type FaucetCLIOPts } from './tasks/faucet'
 import parallelTest, { type ParallelTestCLIOpts } from './tasks/parallelTest'
 import register, { type RegisterOpts } from './tasks/register'
 import selfRegister, { type SelfRegisterOpts } from './tasks/selfRegister'
+import requestDevNft, { type RequestDevNftOpts } from './tasks/requestDevNft'
 import disableAutoMine from './tasks/disableAutoMine'
 import getAccounts from './tasks/getAccounts'
 
@@ -238,6 +239,10 @@ task<SelfRegisterOpts>(
   .addParam<SelfRegisterOpts['task']>('task', 'The task to run', undefined, types.string)
   .addOptionalParam<string>('peerId', 'HOPR peer ID to be registered', undefined, types.string)
   .addOptionalParam<string>('privatekey', 'Private key of the signer', undefined, types.string)
+
+task<RequestDevNftOpts>('request-dev-nft', 'Request Dev NFT for a staker', requestDevNft)
+  .addParam<string>('recipient', 'Address of the NFT recipient', undefined, types.string)
+  .addParam<string>('privatekey', 'Private key of the current owner of NFTs', undefined, types.string)
 
 task<StakeOpts>('stake', 'Used by CI tests to stake tokens to the running staking program.', stake)
   .addParam<StakeOpts['type']>('type', 'Token type to stake', undefined, types.string)
