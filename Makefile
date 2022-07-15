@@ -81,6 +81,22 @@ endif
 docker-build-gcb: ## build Docker images on Google Cloud Build
 	./scripts/build-docker.sh --no-tags --force
 
+.PHONY: request-dev-nft
+request-dev-nft: ensure-environment-is-set
+request-dev-nft: ## Request one HoprBoost Dev NFT for the recipient given it has none and hasn't staked Dev NFT
+ifeq ($(recipient),)
+	echo "parameter <recipient> missing" >&2 && exit 1
+endif
+ifeq ($(privkey),)
+	echo "parameter <privkey> missing" >&2 && exit 1
+endif
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat request-dev-nft \
+   --network $(network) \
+   --recipient $(recipient) \
+   --privatekey "$(privkey)"
+
 .PHONY: stake-funds
 stake-funds: ensure-environment-is-set
 stake-funds: ## stake funds (idempotent operation)
