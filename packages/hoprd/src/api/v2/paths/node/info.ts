@@ -100,7 +100,8 @@ GET.apiDoc = {
               connectivityStatus: {
                 type: 'string',
                 example: 'GREEN',
-                description: 'Indicates how good is the connectivity of this node to the HOPR network: either RED, ORANGE, YELLOW or GREEN'
+                description:
+                  'Indicates how good is the connectivity of this node to the HOPR network: either RED, ORANGE, YELLOW or GREEN'
               },
               channelClosurePeriod: {
                 type: 'number',

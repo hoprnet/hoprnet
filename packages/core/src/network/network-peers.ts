@@ -273,8 +273,7 @@ class NetworkPeers {
     if (this.deniedEntries.has(peerIdStr)) {
       log('adding peer to denied', peerIdStr)
       this.deniedEntries.set(peerIdStr, { id: peerId, origin })
-    }
-    else {
+    } else {
       verbose('peer is still denied', peerIdStr)
     }
   }
