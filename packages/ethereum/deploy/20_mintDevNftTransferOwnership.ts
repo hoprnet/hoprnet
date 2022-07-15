@@ -110,7 +110,10 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       registryProxyDeployment.address
     ) as HoprStakingProxyForNetworkRegistry
     const ownerAddDevNftTypeTx = await registryProxy.ownerBatchAddNftTypeAndRank([devNftIndex], [DEV_NFT_BOOST])
-    const ownerAddSpecialNftTypeTx = await registryProxy.ownerBatchAddSpecialNftTypeAndRank([devNftIndex], [DEV_NFT_BOOST])
+    const ownerAddSpecialNftTypeTx = await registryProxy.ownerBatchAddSpecialNftTypeAndRank(
+      [devNftIndex],
+      [DEV_NFT_BOOST]
+    )
 
     // don't wait when using local hardhat because its using auto-mine
     if (!environment.match('hardhat')) {
