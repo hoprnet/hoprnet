@@ -113,7 +113,7 @@ or
 yarn workspace @hoprnet/hopr-ethereum hardhat register --network goerli --task enable
 ```
 
-## Internal NR testing - obtain a dev not and register your node on NR
+## Internal NR testing - obtain a dev NFT and register your node on NR
 
 1. Create a MetaMask wallet (note as “account”)
 2. Send 1 Goerli ETH from “DevBank” to the “account”
@@ -123,10 +123,7 @@ yarn workspace @hoprnet/hopr-ethereum hardhat register --network goerli --task e
    - `to`: the “account“ address
    - `tokenId`: the token Id that you just picked in step 3
 5. Click on “write” to sign and send the transaction. Now you should have a Dev NFT in your wallet.
-6. Go to [HoprBoost NFT contract on Goerli](https://goerli.etherscan.io/address/0xd7eca0e90cd85b08875e7d10d4d25b274c6cc549#writeContract) AGAIN and click on “Connect to web3” to connect with the "account"!! Go to “9. SafeTransferFrom” and fill in with the following:
-   - `from`: the “account“ address
-   - `to`: `0x0d4Ec37e692BcD36FE7dDcB37a14358d7F44d72C`
-   - `tokenId`: the token Id that you picked in step 3 and received in step 5
-7. Click on “write” to sign and send the transaction. Now you just staked your Dev NFT to the staking contract.
-8. Start your Hopr node and copy node’s “Peer ID”
-9. Run `HOPR_ENVIRONMENT_ID=master-goerli yarn workspace @hoprnet/hopr-ethereum hardhat register:self --network goerli --task add --peerId <peerid> --privatekey 0x6789...` Here the privatekey is the private key of the “account”
+6. Stake NFT `make stake-devnft environment=master-goerli network=goerli privkey=<private key of “account”>` It detects if the “account” needs to stake Dev NFT and stake
+7. Start your Hopr node and copy node’s “Peer ID”
+8. Register "Peer ID" with `make self-register-node environment=master-goerli network=goerli privkey=<private key of “account”> peer-id <peer id>`
+9. Fund the HOPR node as usual
