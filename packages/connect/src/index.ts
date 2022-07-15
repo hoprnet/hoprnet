@@ -47,8 +47,8 @@ class HoprConnect implements Transport, Initializable, Startable {
   private options: HoprConnectOptions
   private testingOptions: HoprConnectTestingOptions
 
-  private components: Components | undefined
-  private connectComponents: ConnectComponents | undefined
+  components: Components | undefined
+  connectComponents: ConnectComponents | undefined
 
   constructor(opts: HoprConnectConfig) {
     this.options = opts.config ?? {}
@@ -240,7 +240,7 @@ class HoprConnect implements Transport, Initializable, Startable {
     let conn: Connection
 
     try {
-      conn = await this.getComponents().getUpgrader().upgradeOutbound(maConn)
+      conn = await options.upgrader.upgradeOutbound(maConn)
       log(`Successfully established relayed connection to ${destination.toString()}`)
     } catch (err) {
       error(err)
@@ -269,7 +269,7 @@ class HoprConnect implements Transport, Initializable, Startable {
       `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshake.`
     )
 
-    const conn = await this.getComponents().getUpgrader().upgradeOutbound(maConn)
+    const conn = await options.upgrader.upgradeOutbound(maConn)
 
     // Assign various connection properties once we're sure that public keys match,
     // i.e. dialed node == desired destination
