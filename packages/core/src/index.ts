@@ -647,6 +647,9 @@ class Hopr extends EventEmitter {
     await new Promise((resolve) => setTimeout(resolve, 100))
   }
 
+  /**
+   * Gets the peer ID of this HOPR node.
+   */
   public getId(): PeerId {
     return this.id
   }

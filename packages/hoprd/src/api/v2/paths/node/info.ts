@@ -16,6 +16,7 @@ export const getInfo = async ({ node }: { node: Hopr }) => {
       network: network,
       hoprToken: hoprTokenAddress,
       hoprChannels: hoprChannelsAddress,
+      isEligible: node.isAllowedAccessToNetwork(node.getId()),
       connectivityStatus: node.getConnectivityHealth().toString(),
       channelClosurePeriod: Math.ceil(channelClosureSecs / 60)
     }
@@ -101,6 +102,11 @@ GET.apiDoc = {
                 type: 'string',
                 example: 'GREEN',
                 description: 'Indicates how good is the connectivity of this node to the HOPR network: either RED, ORANGE, YELLOW or GREEN'
+              },
+              isEligible: {
+                type: 'boolean',
+                example: 'true',
+                description: 'Determines whether the staking account associated with this node is eligible for accessing the HOPR network. Always true if network registry is disabled.'
               },
               channelClosurePeriod: {
                 type: 'number',
