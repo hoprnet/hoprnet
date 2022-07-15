@@ -107,7 +107,8 @@ GET.apiDoc = {
               isEligible: {
                 type: 'boolean',
                 example: 'true',
-                description: 'Determines whether the staking account associated with this node is eligible for accessing the HOPR network. Always true if network registry is disabled.'
+                description:
+                  'Determines whether the staking account associated with this node is eligible for accessing the HOPR network. Always true if network registry is disabled.'
               },
               channelClosurePeriod: {
                 type: 'number',
