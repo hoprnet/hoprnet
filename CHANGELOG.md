@@ -23,6 +23,7 @@
 - Add documentations around network registry
 - Refactor and simplify stream handover functionality to be more robust ([#3898](https://github.com/hoprnet/hoprnet/pull/3898))
 - Added possibility to specify custom RPC provider in Avado
+- Add connectivity health indicator & NR eligibility status of the node to the `info` command ([#3921](https://github.com/hoprnet/hoprnet/pull/3921))
 
 # Breaking changes
 
