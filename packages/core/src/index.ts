@@ -15,7 +15,7 @@ import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constan
 
 import AccessControl from './network/access-control.js'
 import NetworkPeers, { Entry } from './network/network-peers.js'
-import Heartbeat, { type HeartbeatPingResult, type NetworkHealthIndicator } from './network/heartbeat.js'
+import Heartbeat, { type HeartbeatPingResult, NetworkHealthIndicator } from './network/heartbeat.js'
 
 import { findPath } from './path/index.js'
 
@@ -1295,7 +1295,7 @@ export {
   SaneDefaults,
   findPath,
   type StrategyTickResult,
-  type NetworkHealthIndicator,
+  NetworkHealthIndicator,
   type ChannelStrategyInterface
 }
 export { resolveEnvironment, supportedEnvironments, type ResolvedEnvironment } from './environment.js'
