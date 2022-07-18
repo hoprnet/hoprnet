@@ -7,7 +7,8 @@ import { STATUS_CODES } from '../../utils.js'
  */
 export const getInfo = async ({ node }: { node: Hopr }) => {
   try {
-    const { network, hoprTokenAddress, hoprChannelsAddress, channelClosureSecs } = node.smartContractInfo()
+    const { network, hoprTokenAddress, hoprChannelsAddress, channelClosureSecs, hoprNetworkRegistryAddress } =
+      node.smartContractInfo()
 
     return {
       environment: node.environment.id,
@@ -16,7 +17,8 @@ export const getInfo = async ({ node }: { node: Hopr }) => {
       network: network,
       hoprToken: hoprTokenAddress,
       hoprChannels: hoprChannelsAddress,
-      isEligible: node.isAllowedAccessToNetwork(node.getId()),
+      hoprNetworkRegistry: hoprNetworkRegistryAddress,
+      isEligible: await node.isAllowedAccessToNetwork(node.getId()),
       connectivityStatus: node.getConnectivityHealth().toString(),
       channelClosurePeriod: Math.ceil(channelClosureSecs / 60)
     }
@@ -98,6 +100,12 @@ GET.apiDoc = {
                 description:
                   'Contract address of the HoprChannels smart contract on ethereum network. This smart contract is used to open payment channels between nodes on blockchain.'
               },
+              hoprNetworkRegistryAddress: {
+                type: 'string',
+                example: '0xBEE1F5d64b562715E749771408d06D57EE0892A7',
+                description:
+                  'Contract address of the contract that allows to control the number of nodes in the network'
+              },
               connectivityStatus: {
                 type: 'string',
                 example: 'GREEN',
@@ -106,7 +114,7 @@ GET.apiDoc = {
               },
               isEligible: {
                 type: 'boolean',
-                example: 'true',
+                example: true,
                 description:
                   'Determines whether the staking account associated with this node is eligible for accessing the HOPR network. Always true if network registry is disabled.'
               },
