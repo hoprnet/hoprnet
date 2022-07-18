@@ -315,7 +315,13 @@ function addUnhandledPromiseRejectionHandler() {
       const msgString = reason.toString()
 
       // Only silence very specific errors
-      if (msgString.match(/write ECONNRESET/) || msgString.match(/write EPIPE/)) {
+      if (
+        // HOPR uses the `stream-to-it` library to convert streams from Node.js sockets
+        // to async iterables. This library has shown to have issues with runtime errors,
+        // mainly ECONNRESET and EPIPE
+        msgString.match(/write ECONNRESET/) ||
+        msgString.match(/write EPIPE/)
+      ) {
         console.error('Unhandled promise rejection silenced')
         return
       }
