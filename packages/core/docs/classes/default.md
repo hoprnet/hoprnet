@@ -55,6 +55,7 @@
 - [getChannelsTo](default.md#getchannelsto)
 - [getConnectedPeers](default.md#getconnectedpeers)
 - [getConnectionInfo](default.md#getconnectioninfo)
+- [getConnectivityHealth](default.md#getconnectivityhealth)
 - [getEthereumAddress](default.md#getethereumaddress)
 - [getId](default.md#getid)
 - [getIntermediateNodes](default.md#getintermediatenodes)
@@ -720,6 +721,18 @@ various information about the connection
 
 ___
 
+### getConnectivityHealth
+
+▸ **getConnectivityHealth**(): [`NetworkHealthIndicator`](../enums/NetworkHealthIndicator.md)
+
+Recalculates and retrieves the current connectivity health indicator.
+
+#### Returns
+
+[`NetworkHealthIndicator`](../enums/NetworkHealthIndicator.md)
+
+___
+
 ### getEthereumAddress
 
 ▸ **getEthereumAddress**(): `Address`
@@ -733,6 +746,8 @@ ___
 ### getId
 
 ▸ **getId**(): `PeerId`
+
+Gets the peer ID of this HOPR node.
 
 #### Returns
 
