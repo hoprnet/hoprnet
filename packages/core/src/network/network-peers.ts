@@ -2,7 +2,9 @@ import { type HeartbeatPingResult } from './heartbeat.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { randomSubset, debug } from '@hoprnet/hopr-utils'
 
-const log = debug('hopr-core:network-peers')
+const DEBUG_PREFIX = 'hopr-core:network-peers'
+const log = debug(DEBUG_PREFIX)
+const verbose = debug(DEBUG_PREFIX.concat(`:verbose`))
 
 export type Entry = {
   id: PeerId
@@ -268,8 +270,12 @@ class NetworkPeers {
 
   public addPeerToDenied(peerId: PeerId, origin: string): void {
     const peerIdStr = peerId.toString()
-    log('adding peer to denied', peerIdStr)
-    this.deniedEntries.set(peerIdStr, { id: peerId, origin })
+    if (this.deniedEntries.has(peerIdStr)) {
+      log('adding peer to denied', peerIdStr)
+      this.deniedEntries.set(peerIdStr, { id: peerId, origin })
+    } else {
+      verbose('peer is still denied', peerIdStr)
+    }
   }
 
   public removePeerFromDenied(peerId: PeerId): void {

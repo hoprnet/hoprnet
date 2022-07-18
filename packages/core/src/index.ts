@@ -614,6 +614,13 @@ class Hopr extends EventEmitter {
   }
 
   /**
+   * Recalculates and retrieves the current connectivity health indicator.
+   */
+  public getConnectivityHealth() {
+    return this.heartbeat.recalculateNetworkHealth()
+  }
+
+  /**
    * Shuts down the node and saves keys and peerBook in the database
    */
   // @TODO make modules Startable
@@ -639,6 +646,9 @@ class Hopr extends EventEmitter {
     await new Promise((resolve) => setTimeout(resolve, 100))
   }
 
+  /**
+   * Gets the peer ID of this HOPR node.
+   */
   public getId(): PeerId {
     return this.id
   }

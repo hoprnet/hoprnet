@@ -16,6 +16,8 @@ export const getInfo = async ({ node }: { node: Hopr }) => {
       network: network,
       hoprToken: hoprTokenAddress,
       hoprChannels: hoprChannelsAddress,
+      isEligible: node.isAllowedAccessToNetwork(node.getId()),
+      connectivityStatus: node.getConnectivityHealth().toString(),
       channelClosurePeriod: Math.ceil(channelClosureSecs / 60)
     }
   } catch (error) {
@@ -95,6 +97,18 @@ GET.apiDoc = {
                 example: '0x2a54194c8fe0e3CdeAa39c49B95495aA3b44Db63',
                 description:
                   'Contract address of the HoprChannels smart contract on ethereum network. This smart contract is used to open payment channels between nodes on blockchain.'
+              },
+              connectivityStatus: {
+                type: 'string',
+                example: 'GREEN',
+                description:
+                  'Indicates how good is the connectivity of this node to the HOPR network: either RED, ORANGE, YELLOW or GREEN'
+              },
+              isEligible: {
+                type: 'boolean',
+                example: 'true',
+                description:
+                  'Determines whether the staking account associated with this node is eligible for accessing the HOPR network. Always true if network registry is disabled.'
               },
               channelClosurePeriod: {
                 type: 'number',

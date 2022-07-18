@@ -38,6 +38,8 @@ describe('GET /node/info', () => {
       network: 'a',
       hoprToken: 'b',
       hoprChannels: 'c',
+      isEligible: 'true',
+      connectivityStatus: 'green',
       channelClosurePeriod: 1
     })
   })
