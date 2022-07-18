@@ -82,6 +82,22 @@ endif
 docker-build-gcb: ## build Docker images on Google Cloud Build
 	./scripts/build-docker.sh --no-tags --force
 
+.PHONY: request-dev-nft
+request-dev-nft: ensure-environment-is-set
+request-dev-nft: ## Request one HoprBoost Dev NFT for the recipient given it has none and hasn't staked Dev NFT
+ifeq ($(recipient),)
+	echo "parameter <recipient> missing" >&2 && exit 1
+endif
+ifeq ($(privkey),)
+	echo "parameter <privkey> missing" >&2 && exit 1
+endif
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat request-dev-nft \
+   --network $(network) \
+   --recipient $(recipient) \
+   --privatekey "$(privkey)"
+
 .PHONY: stake-funds
 stake-funds: ensure-environment-is-set
 stake-funds: ## stake funds (idempotent operation)
@@ -110,7 +126,7 @@ endif
 		--privatekey "$(privkey)"
 
 register-nodes: ensure-environment-is-set
-register-nodes: ## register given nodes in network registry contract
+register-nodes: ## owner register given nodes in network registry contract
 ifeq ($(native_addresses),)
 	echo "parameter <native_addresses> missing" >&2 && exit 1
 endif
@@ -124,6 +140,28 @@ endif
    --task add \
    --native-addresses "$(native_addresses)" \
    --peer-ids "$(peer_ids)"
+
+.PHONY: self-register-node
+self-register-node: ensure-environment-is-set
+self-register-node: ## staker register a node in network registry contract
+ifeq ($(peer_id),)
+	echo "parameter <peer_id> missing" >&2 && exit 1
+endif
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat register:self \
+   --network $(network) \
+   --task add \
+   --peer-id "$(peer_id)"
+
+.PHONY: self-deregister-node
+self-deregister-node: ensure-environment-is-set
+self-deregister-node: ## staker deregister a node in network registry contract
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat register:self \
+   --network $(network) \
+   --task remove
 
 ensure-environment-is-set:
 ifeq ($(environment),)
