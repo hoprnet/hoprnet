@@ -25,7 +25,6 @@ import { AcknowledgementChallenge } from './acknowledgementChallenge.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import BN from 'bn.js'
 import { Acknowledgement } from './acknowledgement.js'
-import chalk from 'chalk'
 import { debug } from '@hoprnet/hopr-utils'
 import { keysPBM } from '@libp2p/crypto/keys'
 
@@ -400,9 +399,9 @@ export class Packet {
     const unacknowledged = new UnacknowledgedTicket(this.ticket, this.ownKey, this.previousHop)
 
     log(
-      `Storing unacknowledged ticket. Expecting to receive a preImage for ${chalk.green(
-        this.ackChallenge.toHex()
-      )} from ${chalk.blue(pubKeyToPeerId(this.nextHop).toString())}`
+      `Storing unacknowledged ticket. Expecting to receive a preImage for ${this.ackChallenge.toHex()} from ${pubKeyToPeerId(
+        this.nextHop
+      ).toString()}`
     )
 
     await db.storePendingAcknowledgement(this.ackChallenge, false, unacknowledged)

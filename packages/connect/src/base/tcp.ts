@@ -102,8 +102,12 @@ class TCPConnection implements MultiaddrConnection {
       })
 
       try {
-        this.conn.end()
+        this.conn.end(() => {
+          this.timeline.close ??= Date.now()
+          done = true
+        })
       } catch (err) {
+        // Anything can happen
         this.conn.destroy()
       }
     })

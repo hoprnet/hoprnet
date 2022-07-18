@@ -1,8 +1,7 @@
 import { setImmediate } from 'timers/promises'
-import EventEmitter from 'events'
+import EventEmitter, { once } from 'events'
 
 import { protocols, Multiaddr } from '@multiformats/multiaddr'
-import chalk from 'chalk'
 
 import type BN from 'bn.js'
 import type { Libp2p as Libp2pType } from 'libp2p'
@@ -700,10 +699,12 @@ class Hopr extends EventEmitter {
    * @param intermediatePath optional set path manually
    */
   public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PublicKey[]): Promise<void> {
-    const promises: Promise<void>[] = []
-
     if (this.status != 'RUNNING') {
       throw new Error('Cannot send message until the node is running')
+    }
+
+    if (msg.length > PACKET_SIZE) {
+      throw Error(`Message does not fit into one packet. Please split message into chunks of ${PACKET_SIZE} bytes`)
     }
 
     if (intermediatePath != undefined) {
@@ -726,57 +727,39 @@ class Hopr extends EventEmitter {
           throw Error(`Channel ${channel.getId().toHex()} is not open`)
         }
       }
+    } else {
+      intermediatePath = await this.getIntermediateNodes(PublicKey.fromPeerId(destination))
+
+      if (intermediatePath == null || !intermediatePath.length) {
+        throw Error(`bad path`)
+      }
     }
 
-    for (let n = 0; n < msg.length / PACKET_SIZE; n++) {
-      promises.push(
-        new Promise<void>(async (resolve, reject) => {
-          if (intermediatePath == undefined) {
-            try {
-              intermediatePath = await this.getIntermediateNodes(PublicKey.fromPeerId(destination))
-            } catch (e) {
-              reject(e)
-              return
-            }
-            if (!intermediatePath || !intermediatePath.length) {
-              reject(new Error('bad path'))
-            }
-          }
+    const path: PublicKey[] = [].concat(intermediatePath, [PublicKey.fromPeerId(destination)])
 
-          const path: PublicKey[] = [].concat(intermediatePath, [PublicKey.fromPeerId(destination)])
-          let packet: Packet
-          try {
-            packet = await Packet.create(
-              msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
-              path.map((x) => x.toPeerId()),
-              this.getId(),
-              this.db
-            )
-          } catch (err) {
-            return reject(err)
-          }
-
-          await packet.storePendingAcknowledgement(this.db)
-
-          this.once('message-acknowledged:' + packet.ackChallenge.toHex(), () => {
-            resolve()
-          })
-
-          try {
-            await this.forward.interact(path[0].toPeerId(), packet)
-          } catch (err) {
-            return reject(err)
-          }
-        })
+    let packet: Packet
+    try {
+      packet = await Packet.create(
+        msg,
+        path.map((x) => x.toPeerId()),
+        this.getId(),
+        this.db
       )
+    } catch (err) {
+      throw Error(`Error while creating packet ${JSON.stringify(err)}`)
     }
+
+    await packet.storePendingAcknowledgement(this.db)
+
+    const acknowledged: Promise<void> = once(this, 'message-acknowledged:' + packet.ackChallenge.toHex()) as any
 
     try {
-      await Promise.all(promises)
+      await this.forward.interact(path[0].toPeerId(), packet)
     } catch (err) {
-      log(`Could not send message. Error was: ${chalk.red(err.message)}`)
-      throw err
+      throw Error(`Error while trying to send final packet ${JSON.stringify(err)}`)
     }
+
+    return acknowledged
   }
 
   /**
