@@ -319,6 +319,7 @@ function addUnhandledPromiseRejectionHandler() {
         // HOPR uses the `stream-to-it` library to convert streams from Node.js sockets
         // to async iterables. This library has shown to have issues with runtime errors,
         // mainly ECONNRESET and EPIPE
+        msgString.match(/read ECONNRESET/) ||
         msgString.match(/write ECONNRESET/) ||
         msgString.match(/write EPIPE/)
       ) {
