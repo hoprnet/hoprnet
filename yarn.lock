@@ -3524,7 +3524,6 @@ __metadata:
     bn.js: 5.2.0
     chai: 4.3.6
     chai-as-promised: 7.1.1
-    chalk: 5.0.1
     datastore-level: ^8.0.0
     debug: 4.3.4
     err-code: 3.0.1
