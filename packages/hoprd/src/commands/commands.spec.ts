@@ -2,6 +2,7 @@ import type { State, StateOps } from '../types.js'
 import * as mod from './index.js'
 import assert from 'assert'
 import sinon from 'sinon'
+import { NetworkHealthIndicator } from '@hoprnet/hopr-core'
 
 const assertMatch = async (cmds: mod.Commands, command: string, pattern: RegExp) => {
   let response = ''
@@ -134,6 +135,9 @@ describe('Commands', () => {
   it('info', async () => {
     let mockNode: any = sinon.fake()
     mockNode.getAddressesAnnouncedToDHT = async () => []
+    mockNode.getId = () => '16Uiu2HAkyXRaL7fKu4qcjaKuo4WXizrpK63Ltd6kG2tH6oSV58AW'
+    mockNode.isAllowedAccessToNetwork = () => true
+    mockNode.getConnectivityHealth = () => NetworkHealthIndicator.GREEN
     mockNode.getListeningAddresses = () => []
     mockNode.smartContractInfo = () => ({
       channelClosureSecs: 300
