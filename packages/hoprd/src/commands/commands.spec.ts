@@ -136,7 +136,7 @@ describe('Commands', () => {
     let mockNode: any = sinon.fake()
     mockNode.getAddressesAnnouncedToDHT = async () => []
     mockNode.getId = () => '16Uiu2HAkyXRaL7fKu4qcjaKuo4WXizrpK63Ltd6kG2tH6oSV58AW'
-    mockNode.isAllowedAccessToNetwork = () => true
+    mockNode.isAllowedAccessToNetwork = () => Promise.resolve(true)
     mockNode.getConnectivityHealth = () => NetworkHealthIndicator.GREEN
     mockNode.getListeningAddresses = () => []
     mockNode.smartContractInfo = () => ({
