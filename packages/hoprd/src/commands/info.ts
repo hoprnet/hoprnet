@@ -28,6 +28,8 @@ export class Info extends AbstractCommand {
         `HOPR Token: ${smartContractInfo.hoprTokenAddress}`,
         `HOPR Channels: ${smartContractInfo.hoprChannelsAddress}`,
         `HOPR NetworkRegistry: ${smartContractInfo.hoprNetworkRegistryAddress}`,
+        `Eligibility: ${await this.node.isAllowedAccessToNetwork(this.node.getId())}`,
+        `Connectivity Indicator: ${this.node.getConnectivityHealth().toString()}`,
         `Channel closure period: ${channelClosureMins} minutes`
       ].join('\n')
     )
