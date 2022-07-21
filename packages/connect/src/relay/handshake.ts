@@ -13,6 +13,7 @@ import type { Relay } from './index.js'
 
 import debug from 'debug'
 import { DELIVERY_PROTOCOL } from '../constants.js'
+import { Components } from '@libp2p/interfaces/components'
 
 export enum RelayHandshakeMessage {
   OK,
@@ -166,6 +167,7 @@ class RelayHandshake {
     source: PeerId,
     getStreamToCounterparty: InstanceType<typeof Relay>['dialNodeDirectly'],
     state: Pick<RelayState, 'exists' | 'isActive' | 'updateExisting' | 'createNew'>,
+    upgrader: Components['upgrader'],
     __relayFreeTimeout?: number
   ): Promise<void> {
     log(`handling relay request`)
@@ -233,7 +235,9 @@ class RelayHandshake {
 
     let toDestinationStruct: Awaited<ReturnType<typeof getStreamToCounterparty>>
     try {
-      toDestinationStruct = await getStreamToCounterparty(destination, DELIVERY_PROTOCOL(this.options.environment))
+      toDestinationStruct = await getStreamToCounterparty(destination, DELIVERY_PROTOCOL(this.options.environment), {
+        upgrader
+      })
     } catch (err) {
       error(err)
     }
