@@ -62,7 +62,11 @@ describe('test relay handshake', function () {
           protocol: 'test'
         }
       },
-      getRelayState()
+      getRelayState(),
+      {
+        // We don't need the upgrader for this purpose
+        upgrader: undefined as any
+      }
     )
 
     await initiatorReceived.promise
@@ -99,7 +103,11 @@ describe('test relay handshake', function () {
           protocol: 'test'
         }
       },
-      getRelayState()
+      getRelayState(),
+      {
+        // We don't need the upgrader for this purpose
+        upgrader: undefined as any
+      }
     )
 
     await Promise.all([handshakePromise, destinationHandshake])
@@ -127,7 +135,11 @@ describe('test relay handshake', function () {
           protocol: 'test'
         }
       },
-      getRelayState(true)
+      getRelayState(true),
+      {
+        // We don't need the upgrader for this purpose
+        upgrader: undefined as any
+      }
     )
 
     const [initiatorResult, destinationResult] = await Promise.all([

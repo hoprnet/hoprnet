@@ -245,7 +245,7 @@ function decodeIncomingSTUNResponses(addrs: Request[], socket: Socket, ms: numbe
         } selected STUN servers replied.`
       )
       done()
-    }, ms)
+    }, ms).unref()
 
     // Receiving a Buffer, not a Uint8Array
     listener = (msg: Buffer) => {

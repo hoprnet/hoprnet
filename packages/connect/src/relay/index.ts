@@ -334,7 +334,8 @@ class Relay implements Initializable, ConnectInitializable, Startable {
         shaker.negotiate(
           conn.connection.remotePeer,
           this._dialNodeDirectly as Relay['dialNodeDirectly'],
-          this.relayState
+          this.relayState,
+          this.getComponents().getUpgrader()
         )
       }
     } catch (e) {
@@ -439,11 +440,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
    * @param opts
    * @returns a stream to the given peer
    */
-  private async dialNodeDirectly(
-    destination: PeerId,
-    protocol: string,
-    opts?: DialOptions
-  ): Promise<ConnResult | void> {
+  private async dialNodeDirectly(destination: PeerId, protocol: string, opts: DialOptions): Promise<ConnResult | void> {
     let connResult = await tryExistingConnections(this.getComponents(), destination, protocol)
 
     // Only establish a new connection if we don't have any.
@@ -467,7 +464,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
   private async establishDirectConnection(
     destination: PeerId,
     protocol: string,
-    opts?: DialOptions
+    opts: DialOptions
   ): Promise<ConnResult | undefined> {
     const usableAddresses: Multiaddr[] = []
 
@@ -490,7 +487,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
     for (const usable of usableAddresses) {
       try {
-        conn = await this.dialDirectly(usable, opts as any)
+        conn = await this.dialDirectly(usable, opts)
       } catch (err) {
         await attemptClose(conn, error)
         continue

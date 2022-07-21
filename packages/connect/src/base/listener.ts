@@ -219,8 +219,8 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     const tcpTimeout = setTimeout(() => {
       abort.abort()
       waitForIncomingTcpPacket.reject()
-    }, TIMEOUT)
-    const udpTimeout = setTimeout(waitForIncomingUdpPacket.reject.bind(waitForIncomingUdpPacket), TIMEOUT)
+    }, TIMEOUT).unref()
+    const udpTimeout = setTimeout(waitForIncomingUdpPacket.reject.bind(waitForIncomingUdpPacket), TIMEOUT).unref()
 
     const checkTcpMessage = (socket: TCPSocket) => {
       socket.on('data', (data: Buffer) => {
