@@ -34,7 +34,7 @@ describe('GET /node/info', () => {
     chai.use(chaiResponseValidator.default(loaded.api.apiDoc))
   })
 
-  it.only('should get info', async () => {
+  it('should get info', async () => {
     node.environment = { id: 'hardhat-localhost' } as ResolvedEnvironment
     node.smartContractInfo = sinon.fake.returns({
       network: 'a',

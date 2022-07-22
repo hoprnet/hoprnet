@@ -357,20 +357,20 @@ async function main() {
       strategy: 'passive'
     }
   }
-  function setState(newState: State): void {
+  const setState = (newState: State): void => {
     state = newState
   }
-  function getState(): State {
+  const getState = (): State => {
     return state
   }
 
-  function networkHealthChanged(oldState: NetworkHealthIndicator, newState: NetworkHealthIndicator) {
+  const networkHealthChanged = (oldState: NetworkHealthIndicator, newState: NetworkHealthIndicator): void => {
     // Log the network health indicator state change (goes over the WS as well)
     logs.log(`Network health indicator changed: ${oldState} -> ${newState}`)
     logs.log(`NETWORK HEALTH: ${newState}`)
   }
 
-  function logMessageToNode(msg: Uint8Array) {
+  const logMessageToNode = (msg: Uint8Array): void => {
     logs.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
     try {
       let [decoded, time] = RLP.decode(msg) as [Buffer, Buffer]
