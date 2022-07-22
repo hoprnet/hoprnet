@@ -109,7 +109,7 @@
 
 #### Defined in
 
-[db/db.ts:141](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L141)
+[db/db.ts:140](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L140)
 
 ## Methods
 
