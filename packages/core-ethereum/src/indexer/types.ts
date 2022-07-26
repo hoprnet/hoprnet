@@ -1,6 +1,6 @@
 import type { HoprToken, HoprChannels, HoprNetworkRegistry, TypedEventFilter } from '@hoprnet/hopr-ethereum'
-import type PeerId from 'peer-id'
-import type { Multiaddr } from 'multiaddr'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import type { Multiaddr } from '@multiformats/multiaddr'
 import type { Address, ChannelEntry, PublicKey } from '@hoprnet/hopr-utils'
 
 /**

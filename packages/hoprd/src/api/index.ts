@@ -5,7 +5,7 @@ import { debug } from '@hoprnet/hopr-utils'
 import * as apiV1 from './v1.js'
 import * as apiV2 from './v2.js'
 
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import type { AdminServer } from '../admin.js'
 import type { LogStream } from '../logs.js'
 import type { StateOps } from '../types.js'

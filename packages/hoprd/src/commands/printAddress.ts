@@ -1,4 +1,4 @@
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from './abstractCommand.js'
 import { styleValue } from './utils/index.js'
 import { PublicKey } from '@hoprnet/hopr-utils'
@@ -23,7 +23,7 @@ export default class PrintAddress extends AbstractCommand {
    */
   public async execute(log, query: string): Promise<void> {
     const hoprPrefix = 'HOPR Address:'
-    const hoprAddress = this.node.getId().toB58String()
+    const hoprAddress = this.node.getId().toString()
 
     if (query.trim() === 'hopr') {
       return log(hoprAddress)

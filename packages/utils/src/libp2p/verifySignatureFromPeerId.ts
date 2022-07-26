@@ -1,5 +1,6 @@
-import { utils } from 'ethers'
-import PeerId from 'peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
+import { keys } from '@libp2p/crypto'
+import { stringToU8a } from '../u8a/index.js'
 
 /**
  * Verifies a given signature comes from a specific PeerId, based on the
@@ -13,6 +14,10 @@ import PeerId from 'peer-id'
  * @param signature the generated signature created by the PeerId
  */
 export async function verifySignatureFromPeerId(peerId: string, message: string, signature: string): Promise<boolean> {
-  const pId = PeerId.createFromB58String(peerId)
-  return await pId.pubKey.verify(new TextEncoder().encode(message), utils.arrayify(signature))
+  const pId = peerIdFromString(peerId)
+
+  return new keys.supportedKeys.secp256k1.Secp256k1PublicKey(pId.publicKey).verify(
+    new TextEncoder().encode(message),
+    stringToU8a(signature)
+  )
 }

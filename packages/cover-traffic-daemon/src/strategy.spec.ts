@@ -2,7 +2,7 @@ import sinon from 'sinon'
 import { State, type PersistedState } from './state.js'
 import { log, mockChannelEntry, TestingPersistedState } from './state.mock.js'
 import { expect } from 'chai'
-import { default as Hopr, type ChannelStrategyInterface } from '@hoprnet/hopr-core'
+import Hopr, { type ChannelStrategyInterface } from '@hoprnet/hopr-core'
 import { CoverTrafficStrategy } from './strategy.js'
 
 describe('cover traffic strategy', async function () {

@@ -1,7 +1,7 @@
 import { Balance, ChannelEntry, ChannelStatus, debug, Hash, PublicKey, stringToU8a, UINT256 } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import PeerId from 'peer-id'
-import { Multiaddr } from 'multiaddr'
+import { peerIdFromString } from '@libp2p/peer-id'
+import { Multiaddr } from '@multiformats/multiaddr'
 import { OpenChannels, PeerData, PersistedState, State, deserializeState, serializeState } from './state.js'
 
 export const log = debug('hopr:cover-traffic:mock')
@@ -61,7 +61,7 @@ export const mockChannelEntry = new ChannelEntry(
   new UINT256(new BN('0'))
 )
 
-const mockPeerId = PeerId.createFromB58String('16Uiu2HAm6fJyjpFFbFtNx2aqRakVCjodRUoagu6Pu4w1LAKL9uLy')
+const mockPeerId = peerIdFromString('16Uiu2HAm6fJyjpFFbFtNx2aqRakVCjodRUoagu6Pu4w1LAKL9uLy')
 export const mockPublicKey = PublicKey.fromPeerId(mockPeerId)
 
 export const mockPeerData: PeerData = {

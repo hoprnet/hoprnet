@@ -1,5 +1,4 @@
-import type { LevelUp } from 'levelup'
-import levelup from 'levelup'
+import levelup, { type LevelUp } from 'levelup'
 import leveldown from 'leveldown'
 import MemDown from 'memdown'
 import { stat, mkdir, rm } from 'fs/promises'
@@ -151,30 +150,31 @@ export class HoprDB {
       await rm(dbPath, { recursive: true, force: true })
       await mkdir(dbPath, { recursive: true })
       setEnvironment = true
-    }
+    } else {
+      let exists = false
 
-    let exists = false
+      try {
+        exists = !(await stat(dbPath)).isDirectory()
+      } catch (err: any) {
+        if (err.code === 'ENOENT') {
+          exists = false
+        } else {
+          // Unexpected error, therefore throw it
+          throw err
+        }
+      }
 
-    try {
-      exists = !(await stat(dbPath)).isDirectory()
-    } catch (err: any) {
-      if (err.code === 'ENOENT') {
-        exists = false
-      } else {
-        // Unexpected error, therefore throw it
-        throw err
+      if (!exists) {
+        log('db directory does not exist, creating?:', initialize)
+        if (initialize) {
+          await mkdir(dbPath, { recursive: true })
+          setEnvironment = true
+        } else {
+          throw new Error('Database does not exist: ' + dbPath)
+        }
       }
     }
 
-    if (!exists) {
-      log('db directory does not exist, creating?:', initialize)
-      if (initialize) {
-        await mkdir(dbPath, { recursive: true })
-        setEnvironment = true
-      } else {
-        throw new Error('Database does not exist: ' + dbPath)
-      }
-    }
     // CommonJS / ESM issue
     // @ts-ignore
     this.db = levelup(leveldown(dbPath))

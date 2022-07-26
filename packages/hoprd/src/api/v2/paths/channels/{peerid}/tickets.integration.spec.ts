@@ -20,13 +20,13 @@ describe('GET /channels/{peerId}/tickets', () => {
   })
 
   it('should get tickets successfully', async () => {
-    const res = await request(service).get(`/api/v2/channels/${ALICE_PEER_ID.toB58String()}/tickets`)
+    const res = await request(service).get(`/api/v2/channels/${ALICE_PEER_ID.toString()}/tickets`)
     expect(res).to.satisfyApiSpec
   })
 
   it('should fail when no tickets to get', async () => {
     node.getTickets = sinon.fake.returns([])
-    const res = await request(service).get(`/api/v2/channels/${ALICE_PEER_ID.toB58String()}/tickets`)
+    const res = await request(service).get(`/api/v2/channels/${ALICE_PEER_ID.toString()}/tickets`)
     expect(res.status).to.equal(404)
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({ status: STATUS_CODES.TICKETS_NOT_FOUND })
@@ -44,7 +44,7 @@ describe('GET /channels/{peerId}/tickets', () => {
   it('should fail when node call fails', async () => {
     node.getTickets = sinon.fake.throws('')
 
-    const res = await request(service).get(`/api/v2/channels/${ALICE_PEER_ID.toB58String()}/tickets`)
+    const res = await request(service).get(`/api/v2/channels/${ALICE_PEER_ID.toString()}/tickets`)
     expect(res.status).to.equal(422)
     expect(res).to.satisfyApiSpec
   })

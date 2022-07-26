@@ -1,8 +1,6 @@
 /**
  * Checks if the contents of the given Uint8Arrays are equal. Returns once at least
  * one different entry is found.
- * @param a first array
- * @param b second array
  * @param arrays additional arrays
  */
 export function u8aEquals(...arrays: (Uint8Array | undefined)[]) {
@@ -25,11 +23,12 @@ export function u8aEquals(...arrays: (Uint8Array | undefined)[]) {
 
   if (firstLength == 0) {
     for (let i = 1; i < aLength; i++) {
-      if (arrays[i] == undefined) {
+      const array = arrays[i]
+      if (array == undefined) {
         return false
       }
 
-      if (arrays[i].length != 0) {
+      if (array.length != 0) {
         return false
       }
     }
@@ -41,21 +40,22 @@ export function u8aEquals(...arrays: (Uint8Array | undefined)[]) {
   let canUse16 = arrays[0].byteOffset % 2 == 0
 
   for (let i = 1; i < aLength; i++) {
-    if (arrays[i] == undefined) {
+    const array = arrays[i]
+    if (array == undefined) {
       return false
     }
-    if (firstLength != arrays[i].length) {
+    if (firstLength != array.length) {
       return false
     }
 
-    canUse64 = canUse64 && arrays[i].byteOffset % 8 == 0
-    canUse32 = canUse32 && arrays[i].byteOffset % 4 == 0
-    canUse16 = canUse16 && arrays[i].byteOffset % 2 == 0
+    canUse64 = canUse64 && array.byteOffset % 8 == 0
+    canUse32 = canUse32 && array.byteOffset % 4 == 0
+    canUse16 = canUse16 && array.byteOffset % 2 == 0
   }
 
   const views: DataView[] = Array.from(
     { length: aLength },
-    (_, i: number) => new DataView(arrays[i].buffer, arrays[i].byteOffset, firstLength)
+    (_, i: number) => new DataView((arrays[i] as Uint8Array).buffer, (arrays[i] as Uint8Array).byteOffset, firstLength)
   )
 
   let index = 0

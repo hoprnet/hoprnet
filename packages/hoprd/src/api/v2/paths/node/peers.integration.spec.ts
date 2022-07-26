@@ -11,6 +11,7 @@ import {
   CHARLIE_PEER_ID
 } from '../../fixtures.js'
 import { STATUS_CODES } from '../../utils.js'
+import type { PeerId } from '@libp2p/interface-peer-id'
 
 const ALICE_ENTRY = {
   id: ALICE_PEER_ID,
@@ -21,7 +22,7 @@ const ALICE_ENTRY = {
   quality: 1
 }
 const ALICE_PEER_INFO = {
-  peerId: ALICE_PEER_ID.toB58String(),
+  peerId: ALICE_PEER_ID.toString(),
   multiAddr: ALICE_MULTI_ADDR.toString(),
   heartbeats: {
     sent: ALICE_ENTRY.heartbeatsSent,
@@ -42,7 +43,7 @@ const BOB_ENTRY = {
   quality: 0.2
 }
 const BOB_PEER_INFO = {
-  peerId: BOB_PEER_ID.toB58String(),
+  peerId: BOB_PEER_ID.toString(),
   multiAddr: BOB_MULTI_ADDR.toString(),
   heartbeats: {
     sent: BOB_ENTRY.heartbeatsSent,
@@ -63,7 +64,7 @@ const CHARLIE_ENTRY = {
   quality: 0.8
 }
 const CHARLIE_PEER_INFO = {
-  peerId: CHARLIE_PEER_ID.toB58String(),
+  peerId: CHARLIE_PEER_ID.toString(),
   heartbeats: {
     sent: CHARLIE_ENTRY.heartbeatsSent,
     success: CHARLIE_ENTRY.heartbeatsSuccess
@@ -77,11 +78,16 @@ const CHARLIE_PEER_INFO = {
 let node = sinon.fake() as any
 node.getConnectedPeers = sinon.fake.returns([ALICE_PEER_ID, BOB_PEER_ID, CHARLIE_PEER_ID])
 node.getAddressesAnnouncedOnChain = sinon.fake.resolves([ALICE_MULTI_ADDR, BOB_MULTI_ADDR])
-node.getConnectionInfo = sinon.stub()
-// we must use `sinon.match.has` as passing the plain PeerId in `withArgs` fails to work
-node.getConnectionInfo.withArgs(sinon.match.has('_idB58String', ALICE_PEER_ID.toB58String())).returns(ALICE_ENTRY)
-node.getConnectionInfo.withArgs(sinon.match.has('_idB58String', BOB_PEER_ID.toB58String())).returns(BOB_ENTRY)
-node.getConnectionInfo.withArgs(sinon.match.has('_idB58String', CHARLIE_PEER_ID.toB58String())).returns(CHARLIE_ENTRY)
+node.getConnectionInfo = (peer: PeerId) => {
+  switch (peer.toString()) {
+    case ALICE_PEER_ID.toString():
+      return ALICE_ENTRY
+    case BOB_PEER_ID.toString():
+      return BOB_ENTRY
+    case CHARLIE_PEER_ID.toString():
+      return CHARLIE_ENTRY
+  }
+}
 
 describe('GET /node/peers', function () {
   let service: any

@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "1.89.0-next.59",
+  "version": "1.89.0-next.77",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -29,6 +29,10 @@
   "dependencies": {
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
+    "@libp2p/crypto": "1.0.0",
+    "@libp2p/interface-peer-id": "1.0.2",
+    "@libp2p/peer-id": "1.1.13",
+    "@multiformats/multiaddr": "10.2.1",
     "@sinonjs/referee": "9.1.1",
     "async-mutex": "0.3.2",
     "bn.js": "5.2.0",
@@ -37,7 +41,6 @@
     "ethers": "5.5.4",
     "heap-js": "2.2.0",
     "multiaddr": "10.0.1",
-    "peer-id": "0.16.0",
     "secp256k1": "4.0.3"
   },
   "devDependencies": {

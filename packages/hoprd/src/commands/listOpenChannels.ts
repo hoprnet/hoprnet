@@ -1,4 +1,4 @@
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from './abstractCommand.js'
 import { styleValue } from './utils/index.js'
 import { PublicKey, ChannelStatus, channelStatusToString } from '@hoprnet/hopr-utils'
@@ -35,7 +35,7 @@ export default class ListOpenChannels extends AbstractCommand {
       for (const channel of channelsFrom) {
         const out =
           `Outgoing Channel:       ${styleValue(channel.getId().toHex(), 'hash')}\n` +
-          `To:                     ${styleValue(channel.destination.toPeerId().toB58String(), 'peerId')}\n` +
+          `To:                     ${styleValue(channel.destination.toPeerId().toString(), 'peerId')}\n` +
           `Status:                 ${styleValue(channelStatusToString(channel.status), 'highlight')}\n` +
           `Balance:                ${styleValue(channel.balance.toFormattedString(), 'number')}`
         log(out)
@@ -51,7 +51,7 @@ export default class ListOpenChannels extends AbstractCommand {
       for (const channel of channelsTo) {
         const out =
           `Incoming Channel:       ${styleValue(channel.getId().toHex(), 'hash')}\n` +
-          `From:                   ${styleValue(channel.source.toPeerId().toB58String(), 'peerId')}\n` +
+          `From:                   ${styleValue(channel.source.toPeerId().toString(), 'peerId')}\n` +
           `Status:                 ${styleValue(channelStatusToString(channel.status), 'highlight')}\n` +
           `Balance:                ${styleValue(channel.balance.toFormattedString(), 'number')}\n`
         log(out)

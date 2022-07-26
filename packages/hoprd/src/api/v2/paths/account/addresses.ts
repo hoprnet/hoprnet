@@ -1,5 +1,5 @@
 import type { Operation } from 'express-openapi'
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import { STATUS_CODES } from '../../utils.js'
 
 /**
@@ -12,7 +12,7 @@ export const getAddresses = (
   hopr: string
 } => {
   const native = node.getEthereumAddress().toHex()
-  const hopr = node.getId().toB58String()
+  const hopr = node.getId().toString()
 
   return {
     native,

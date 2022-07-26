@@ -63,7 +63,7 @@ describe('POST /channels', () => {
 
   it('should open channel', async () => {
     const res = await request(service).post('/api/v2/channels').send({
-      peerId: ALICE_PEER_ID.toB58String(),
+      peerId: ALICE_PEER_ID.toString(),
       amount: '1'
     })
     expect(res.status).to.equal(201)
@@ -88,7 +88,7 @@ describe('POST /channels', () => {
 
   it('should fail on invalid amountToFund', async () => {
     const res = await request(service).post('/api/v2/channels').send({
-      peerId: ALICE_PEER_ID.toB58String(),
+      peerId: ALICE_PEER_ID.toString(),
       amount: 'abc'
     })
     expect(res.status).to.equal(400)
@@ -100,7 +100,7 @@ describe('POST /channels', () => {
 
   it('should fail when out of balance', async () => {
     const res = await request(service).post('/api/v2/channels').send({
-      peerId: ALICE_PEER_ID.toB58String(),
+      peerId: ALICE_PEER_ID.toString(),
       amount: '10000000'
     })
     expect(res.status).to.equal(403)
@@ -114,7 +114,7 @@ describe('POST /channels', () => {
     node.openChannel = sinon.fake.throws('Channel is already opened')
 
     const res = await request(service).post('/api/v2/channels').send({
-      peerId: ALICE_PEER_ID.toB58String(),
+      peerId: ALICE_PEER_ID.toString(),
       amount: '1'
     })
     expect(res.status).to.equal(409)

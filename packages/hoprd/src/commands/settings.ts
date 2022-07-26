@@ -1,4 +1,4 @@
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import type { State, StateOps } from '../types.js'
 import { getPaddingLength, styleValue } from './utils/index.js'
 import { AbstractCommand } from './abstractCommand.js'

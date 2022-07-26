@@ -1,5 +1,5 @@
 import { Wallet } from 'ethers'
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 import { PublicKey, Hash, stringToU8a } from '@hoprnet/hopr-utils'
 
 export const ACCOUNT_A = new Wallet('0x18a664889e28a432495758f0522b53b2f04a35f810b78c6ea01db305141bcba2')

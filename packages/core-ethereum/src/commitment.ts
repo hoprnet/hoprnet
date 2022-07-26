@@ -6,7 +6,8 @@
 // syncing back and forth with those that have been persisted on chain.
 import { debug, Hash, HoprDB, iterateHash, recoverIteratedHash, toU8a, u8aConcat, UINT256 } from '@hoprnet/hopr-utils'
 import { deriveCommitmentSeed } from '@hoprnet/hopr-utils'
-import PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { keysPBM } from '@libp2p/crypto/keys'
 
 const log = debug('hopr-core-ethereum:commitment')
 
@@ -80,7 +81,7 @@ export class ChannelCommitmentInfo {
    * @param peerId Local node ID.
    */
   public createInitialCommitmentSeed(peerId: PeerId): Uint8Array {
-    if (peerId.privKey == null) {
+    if (peerId.privateKey == null) {
       throw Error('Invalid peerId')
     }
 
@@ -95,7 +96,7 @@ export class ChannelCommitmentInfo {
       new TextEncoder().encode(this.contractAddress)
     )
 
-    return deriveCommitmentSeed(peerId.privKey.marshal(), channelSeedInfo)
+    return deriveCommitmentSeed(keysPBM.PrivateKey.decode(peerId.privateKey).Data, channelSeedInfo)
   }
 }
 

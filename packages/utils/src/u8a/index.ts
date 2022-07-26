@@ -1,6 +1,5 @@
 export * from './constants.js'
 
-export * from './allocate.js'
 export * from './concat.js'
 
 export * from './xor.js'

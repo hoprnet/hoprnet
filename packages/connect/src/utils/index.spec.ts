@@ -1,4 +1,4 @@
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 import assert from 'assert'
 
 import { privKeyToPeerId } from '@hoprnet/hopr-utils'
@@ -10,19 +10,19 @@ const RELAY = privKeyToPeerId('0x152c95bd36e6ada51309558756d5f901853d45ab94336a0
 describe(`test util functions`, function () {
   it('relay extraction from relay address', function () {
     const extracted = relayFromRelayAddress(
-      new Multiaddr(`/p2p/${RELAY.toB58String()}/p2p-circuit/p2p/${SELF.toB58String()}`)
+      new Multiaddr(`/p2p/${RELAY.toString()}/p2p-circuit/p2p/${SELF.toString()}`)
     )
 
     assert(extracted.equals(RELAY))
 
     // Incorrect size
-    assert.throws(() => relayFromRelayAddress(new Multiaddr(`/p2p/${SELF.toB58String()}`)))
+    assert.throws(() => relayFromRelayAddress(new Multiaddr(`/p2p/${SELF.toString()}`)))
 
     // Incorrect protocol
     assert.throws(() => relayFromRelayAddress(new Multiaddr(`/ip4/127.0.0.1`)))
 
     // Incorrect size and missing protocol
-    assert.throws(() => relayFromRelayAddress(new Multiaddr(`/p2p/${SELF.toB58String()}/p2p/${SELF.toB58String()}`)))
+    assert.throws(() => relayFromRelayAddress(new Multiaddr(`/p2p/${SELF.toString()}/p2p/${SELF.toString()}`)))
   })
 
   it('Node.js AddressInfo to Multiaddr', function () {
@@ -39,7 +39,7 @@ describe(`test util functions`, function () {
         )
       ],
       [
-        new Multiaddr(`/ip4/127.0.0.1/tcp/12345/p2p/${SELF.toB58String()}`),
+        new Multiaddr(`/ip4/127.0.0.1/tcp/12345/p2p/${SELF.toString()}`),
         nodeToMultiaddr(
           {
             address: '127.0.0.1',
@@ -84,7 +84,7 @@ describe(`test util functions`, function () {
         )
       ],
       [
-        new Multiaddr(`/ip6/::1/tcp/12345/p2p/${SELF.toB58String()}`),
+        new Multiaddr(`/ip6/::1/tcp/12345/p2p/${SELF.toString()}`),
         nodeToMultiaddr(
           {
             address: '::1',

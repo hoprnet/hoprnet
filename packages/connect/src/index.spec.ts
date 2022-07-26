@@ -1,18 +1,19 @@
 // import assert from 'assert'
 // import libp2p from 'libp2p'
 
-// const Mplex = require('libp2p-mplex')
+// import { Mplex } from '@libp2p/mplex'
 // // @ts-ignore
-// import KadDHT = require('libp2p-kad-dht')
+// import KadDHT = require('@libp2p/kad-dht')
 // // @ts-ignore
 // import SECIO = require('libp2p-secio')
 
-// import PeerId from 'peer-id'
+// import { createSecp256k1PeerId } from '@libp2p/peer-id-factory'
+// import PeerId from '@libp2p/interface-peer-id'
 
 // import { Connection, Handler } from 'libp2p'
 
 // import TCP from '.'
-// import Multiaddr from 'multiaddr'
+// import Multiaddr from '@multiformats/multiaddr'
 // import pipe from 'it-pipe'
 
 // import { u8aEquals } from '@hoprnet/hopr-utils'

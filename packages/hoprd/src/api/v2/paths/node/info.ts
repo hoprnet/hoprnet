@@ -1,4 +1,4 @@
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
 
@@ -7,7 +7,8 @@ import { STATUS_CODES } from '../../utils.js'
  */
 export const getInfo = async ({ node }: { node: Hopr }) => {
   try {
-    const { network, hoprTokenAddress, hoprChannelsAddress, channelClosureSecs } = node.smartContractInfo()
+    const { network, hoprTokenAddress, hoprChannelsAddress, channelClosureSecs, hoprNetworkRegistryAddress } =
+      node.smartContractInfo()
 
     return {
       environment: node.environment.id,
@@ -16,6 +17,9 @@ export const getInfo = async ({ node }: { node: Hopr }) => {
       network: network,
       hoprToken: hoprTokenAddress,
       hoprChannels: hoprChannelsAddress,
+      hoprNetworkRegistry: hoprNetworkRegistryAddress,
+      isEligible: await node.isAllowedAccessToNetwork(node.getId()),
+      connectivityStatus: node.getConnectivityHealth().toString(),
       channelClosurePeriod: Math.ceil(channelClosureSecs / 60)
     }
   } catch (error) {
@@ -95,6 +99,24 @@ GET.apiDoc = {
                 example: '0x2a54194c8fe0e3CdeAa39c49B95495aA3b44Db63',
                 description:
                   'Contract address of the HoprChannels smart contract on ethereum network. This smart contract is used to open payment channels between nodes on blockchain.'
+              },
+              hoprNetworkRegistryAddress: {
+                type: 'string',
+                example: '0xBEE1F5d64b562715E749771408d06D57EE0892A7',
+                description:
+                  'Contract address of the contract that allows to control the number of nodes in the network'
+              },
+              connectivityStatus: {
+                type: 'string',
+                example: 'GREEN',
+                description:
+                  'Indicates how good is the connectivity of this node to the HOPR network: either RED, ORANGE, YELLOW or GREEN'
+              },
+              isEligible: {
+                type: 'boolean',
+                example: true,
+                description:
+                  'Determines whether the staking account associated with this node is eligible for accessing the HOPR network. Always true if network registry is disabled.'
               },
               channelClosurePeriod: {
                 type: 'number',

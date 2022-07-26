@@ -28,9 +28,7 @@ import { AdminServer } from './admin.js'
 import { Commands } from './commands/index.js'
 import { LogStream } from './logs.js'
 import { getIdentity } from './identity.js'
-import { register as registerUnhandled } from 'trace-unhandled'
-
-import { setLogger } from 'trace-unhandled'
+import { register as registerUnhandled, setLogger } from 'trace-unhandled'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
@@ -54,6 +52,7 @@ const defaultDataPath = path.join(process.cwd(), 'hoprd-db', defaultEnvironment(
 // reading the version manually to ensure the path is read correctly
 const packageFile = path.normalize(new URL('../package.json', import.meta.url).pathname)
 const version = get_package_version(packageFile)
+const on_avado = (process.env.AVADO ?? 'false').toLowerCase() === 'true'
 
 const yargsInstance = yargs(hideBin(process.argv))
 
@@ -317,9 +316,12 @@ function addUnhandledPromiseRejectionHandler() {
 
       // Only silence very specific errors
       if (
+        // HOPR uses the `stream-to-it` library to convert streams from Node.js sockets
+        // to async iterables. This library has shown to have issues with runtime errors,
+        // mainly ECONNRESET and EPIPE
         msgString.match(/read ECONNRESET/) ||
         msgString.match(/write ECONNRESET/) ||
-        msgString.match(/The operation was aborted/)
+        msgString.match(/write EPIPE/)
       ) {
         console.error('Unhandled promise rejection silenced')
         return
@@ -355,20 +357,20 @@ async function main() {
       strategy: 'passive'
     }
   }
-  function setState(newState: State): void {
+  const setState = (newState: State): void => {
     state = newState
   }
-  function getState(): State {
+  const getState = (): State => {
     return state
   }
 
-  function networkHealthChanged(oldState: NetworkHealthIndicator, newState: NetworkHealthIndicator) {
+  const networkHealthChanged = (oldState: NetworkHealthIndicator, newState: NetworkHealthIndicator): void => {
     // Log the network health indicator state change (goes over the WS as well)
     logs.log(`Network health indicator changed: ${oldState} -> ${newState}`)
     logs.log(`NETWORK HEALTH: ${newState}`)
   }
 
-  function logMessageToNode(msg: Uint8Array) {
+  const logMessageToNode = (msg: Uint8Array): void => {
     logs.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
     try {
       let [decoded, time] = RLP.decode(msg) as [Buffer, Buffer]
@@ -415,7 +417,8 @@ async function main() {
   }
 
   try {
-    logs.log(`This is hoprd version ${version}`)
+    logs.log(`This is HOPRd version ${version}`)
+    if (on_avado) logs.log('This node appears to be running on an AVADO')
 
     // 1. Find or create an identity
     const peerId = await getIdentity({
@@ -461,7 +464,7 @@ async function main() {
         setupHealthcheck(node, logs, argv.healthCheckHost, argv.healthCheckPort)
       }
 
-      logs.log(`Node address: ${node.getId().toB58String()}`)
+      logs.log(`Node address: ${node.getId().toString()}`)
 
       const ethAddr = node.getEthereumAddress().toHex()
       const fundsReq = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()

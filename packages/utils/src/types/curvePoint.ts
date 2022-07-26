@@ -1,5 +1,6 @@
 import secp256k1 from 'secp256k1'
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { unmarshalPublicKey } from '@libp2p/crypto/keys'
 
 import { u8aToHex, u8aEquals, stringToU8a } from '../u8a/index.js'
 import { SECP256K1_CONSTANTS } from '../crypto/index.js'
@@ -31,7 +32,7 @@ export class CurvePoint {
   }
 
   static fromPeerId(peerId: PeerId) {
-    return new CurvePoint(peerId.pubKey.marshal())
+    return new CurvePoint(unmarshalPublicKey(peerId.publicKey).marshal())
   }
 
   toAddress(): Address {

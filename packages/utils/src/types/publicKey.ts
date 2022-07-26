@@ -1,8 +1,15 @@
 import secp256k1 from 'secp256k1'
 import { u8aToHex, u8aEquals, stringToU8a } from '../u8a/index.js'
-import PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import { pubKeyToPeerId } from '../libp2p/index.js'
 import { Address, Hash } from './primitives.js'
+import { unmarshalPublicKey } from '@libp2p/crypto/keys'
+
+const SIZE_PUBKEY_UNCOMPRESSED = 65
+const SIZE_PUBKEY_UNCOMPRESSED_WITHOUT_PREFIX = 64
+const SIZE_PUBKEY_COMPRESSED = 33
+const SIZE_PRIVKEY = 32
 
 export class PublicKey {
   // Cache expensive computation result
@@ -15,7 +22,7 @@ export class PublicKey {
   }
 
   static fromPrivKey(privKey: Uint8Array): PublicKey {
-    if (privKey.length !== 32) {
+    if (privKey.length != SIZE_PRIVKEY) {
       throw new Error('Incorrect size Uint8Array for private key')
     }
 
@@ -24,14 +31,14 @@ export class PublicKey {
 
   static deserialize(arr: Uint8Array) {
     switch (arr.length) {
-      case 65:
+      case SIZE_PUBKEY_UNCOMPRESSED:
         if (arr[0] != 4) {
           throw Error(`Invalid uncompressed public key`)
         }
         return new PublicKey(arr)
-      case 64:
+      case SIZE_PUBKEY_UNCOMPRESSED_WITHOUT_PREFIX:
         return new PublicKey(Uint8Array.from([4, ...arr]))
-      case 33:
+      case SIZE_PUBKEY_COMPRESSED:
         if (![2, 3].includes(arr[0])) {
           throw Error(`Invalid compressed public key`)
         }
@@ -42,11 +49,14 @@ export class PublicKey {
   }
 
   static fromPeerId(peerId: PeerId): PublicKey {
-    return PublicKey.deserialize(peerId.pubKey.marshal())
+    if (peerId.type !== 'secp256k1') {
+      throw Error(`PublicKey class only supports secp256k1 public keys`)
+    }
+    return PublicKey.deserialize(unmarshalPublicKey(peerId.publicKey).marshal())
   }
 
   static fromPeerIdString(peerIdString: string) {
-    return PublicKey.fromPeerId(PeerId.createFromB58String(peerIdString))
+    return PublicKey.fromPeerId(peerIdFromString(peerIdString))
   }
 
   static fromSignature(hash: Uint8Array, signature: Uint8Array, v: number): PublicKey {
@@ -65,11 +75,11 @@ export class PublicKey {
   }
 
   static get SIZE_COMPRESSED(): number {
-    return 33
+    return SIZE_PUBKEY_COMPRESSED
   }
 
   static get SIZE_UNCOMPRESSED(): number {
-    return 65
+    return SIZE_PUBKEY_UNCOMPRESSED
   }
 
   public get isCompressed(): boolean {
@@ -121,11 +131,7 @@ export class PublicKey {
   }
 
   toString(): string {
-    return `<PubKey:${this.toB58String()}>`
-  }
-
-  toB58String(): string {
-    return this.toPeerId().toB58String()
+    return this.toPeerId().toString()
   }
 
   eq(b: PublicKey) {

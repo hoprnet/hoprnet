@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "1.89.0-next.59",
+  "version": "1.89.0-next.77",
   "description": "On-chain logic for hoprnet.org",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "license": "GPL-3.0",
@@ -41,6 +41,7 @@
     "@defi-wonderland/smock": "^2.0.7",
     "@ethersproject/wallet": "5.5.0",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
+    "@multiformats/multiaddr": "10.2.1",
     "@nomiclabs/hardhat-ethers": "2.0.5",
     "@nomiclabs/hardhat-etherscan": "3.0.1",
     "@nomiclabs/hardhat-solhint": "2.0.0",
@@ -58,7 +59,6 @@
     "hardhat": "2.8.4",
     "hardhat-deploy": "^0.11.5",
     "hardhat-gas-reporter": "1.0.8",
-    "multiaddr": "10.0.1",
     "solidity-coverage": "0.7.18",
     "ts-generator": "0.1.1",
     "typechain": "7.0.1",

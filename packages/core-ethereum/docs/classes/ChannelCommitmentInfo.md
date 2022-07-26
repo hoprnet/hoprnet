@@ -45,7 +45,7 @@ used to generate the initial channel commitment.
 
 #### Defined in
 
-[packages/core-ethereum/src/commitment.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L70)
+[packages/core-ethereum/src/commitment.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L71)
 
 ___
 
@@ -55,7 +55,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/commitment.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L73)
+[packages/core-ethereum/src/commitment.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L74)
 
 ___
 
@@ -65,7 +65,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/commitment.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L72)
+[packages/core-ethereum/src/commitment.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L73)
 
 ___
 
@@ -75,7 +75,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/commitment.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L71)
+[packages/core-ethereum/src/commitment.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L72)
 
 ## Methods
 

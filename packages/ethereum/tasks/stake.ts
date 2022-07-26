@@ -117,6 +117,7 @@ async function stakeDevNft(hre: HardhatRuntimeEnvironment, signer, hoprStake) {
       console.log(`Found usable DevNFT at index ${nftFindingIndex}`)
       nftFound = true
     }
+    nftFindingIndex = nftFindingIndex.add(ethers.constants.One)
   }
 
   if (!nftFound) {

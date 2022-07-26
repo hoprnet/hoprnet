@@ -9,7 +9,7 @@ export function toU8a(arg: number, length?: number): Uint8Array {
     throw Error('Not implemented')
   }
 
-  if (length < 4 && arg > 1 << (length * 8)) {
+  if (length && length < 4 && arg > 1 << (length * 8)) {
     throw Error(`Argument <${arg}> does not fit into desired length <${length}>.`)
   }
 
@@ -39,7 +39,7 @@ export function toU8a(arg: number, length?: number): Uint8Array {
     return buf.slice(3)
   } else if (length <= 4) {
     return buf.slice(4 - length)
-  } else if (length > 4) {
+  } else {
     let result = new Uint8Array(length)
 
     result.set(buf, length - 4)
