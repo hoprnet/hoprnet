@@ -147,12 +147,16 @@ self-register-node: ## staker register a node in network registry contract
 ifeq ($(peer_id),)
 	echo "parameter <peer_id> missing" >&2 && exit 1
 endif
+ifeq ($(privkey),)
+	echo "parameter <privkey> missing" >&2 && exit 1
+endif
 	TS_NODE_PROJECT=./tsconfig.hardhat.json \
 	HOPR_ENVIRONMENT_ID="$(environment)" \
 	  yarn workspace @hoprnet/hopr-ethereum run hardhat register:self \
    --network $(network) \
    --task add \
-   --peer-id "$(peer_id)"
+   --peer-id "$(peer_id)" \
+   --privatekey "$(privkey)"
 
 .PHONY: self-deregister-node
 self-deregister-node: ensure-environment-is-set
