@@ -37,9 +37,9 @@
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
       "xhopr_contract_address": "0xe8aD2ac347dA7549Aaca8F5B1c5Bf979d85bC78F",
       "boost_contract_address": "0xd7ECa0E90cD85b08875E7d10d4D25B274C6CC549",
-      "stake_contract_address": "0x0d4Ec37e692BcD36FE7dDcB37a14358d7F44d72C",
-      "network_registry_proxy_contract_address": "0xcE1869b26A2514A99B40CA9519d619Fe754464F2",
-      "network_registry_contract_address": "0x4A4fc524a2fea63B47e2Aacf31b4D218d87878e9",
+      "stake_contract_address": "0xDe893b35A9A2201F5362a6E196735fDcE148381b",
+      "network_registry_proxy_contract_address": "0x0a0e8936a616a5DFcd86F3A4c6dd5a036cb12b57",
+      "network_registry_contract_address": "0xEf258Dea5D502833776eaC8BB01A039dd3246955",
       "tags": []
     },
     "debug-goerli": {
