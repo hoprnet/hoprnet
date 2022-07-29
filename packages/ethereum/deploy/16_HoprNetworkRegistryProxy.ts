@@ -12,7 +12,7 @@ const main = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await getNamedAccounts()
 
   const stakeAddress =
-    network.tags.testing || network.tags.development
+    network.tags.testing || network.tags.development || network.tags.staging
       ? (await deployments.get('HoprStake')).address
       : environmentConfig['stake_contract_address']
 
