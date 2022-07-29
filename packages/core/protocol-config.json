@@ -36,10 +36,10 @@
       "channels_contract_address": "0x3Bad568f50e5436fb1757C8B3582fEDdA686583C",
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
       "xhopr_contract_address": "0xe8aD2ac347dA7549Aaca8F5B1c5Bf979d85bC78F",
-      "boost_contract_address": "0xd7ECa0E90cD85b08875E7d10d4D25B274C6CC549",
-      "stake_contract_address": "0xDe893b35A9A2201F5362a6E196735fDcE148381b",
-      "network_registry_proxy_contract_address": "0x0a0e8936a616a5DFcd86F3A4c6dd5a036cb12b57",
-      "network_registry_contract_address": "0xEf258Dea5D502833776eaC8BB01A039dd3246955",
+      "boost_contract_address": "0x2B3Dc48E74da0176f761d0aA864e81A8170df24f",
+      "stake_contract_address": "0xAc677660cb7F525F6e74c0560924fB6D16EF2681",
+      "network_registry_proxy_contract_address": "0x2dBf1d5b4012291C0EFaec26c4DAb105B059D898",
+      "network_registry_contract_address": "0x5df074701a46e34f83cF0Bc18874BB83c34A5BD3",
       "tags": []
     },
     "debug-goerli": {
