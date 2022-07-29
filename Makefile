@@ -88,7 +88,7 @@ request-dev-nft: ## Request one HoprBoost Dev NFT for the recipient given it has
 ifeq ($(recipient),)
 	echo "parameter <recipient> missing" >&2 && exit 1
 endif
-ifeq($(origin PRIVATE_KEY),undefined)
+ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
 	TS_NODE_PROJECT=./tsconfig.hardhat.json \
@@ -101,7 +101,7 @@ endif
 .PHONY: stake-funds
 stake-funds: ensure-environment-is-set
 stake-funds: ## stake funds (idempotent operation)
-ifeq($(origin PRIVATE_KEY),undefined)
+ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
 	@TS_NODE_PROJECT=./tsconfig.hardhat.json \
@@ -115,7 +115,7 @@ endif
 .PHONY: stake-devnft
 stake-devnft: ensure-environment-is-set
 stake-devnft: ## stake Dev NFTs (idempotent operation)
-ifeq($(origin PRIVATE_KEY),undefined)
+ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
 	@TS_NODE_PROJECT=./tsconfig.hardhat.json \
@@ -147,7 +147,7 @@ self-register-node: ## staker register a node in network registry contract
 ifeq ($(peer_id),)
 	echo "parameter <peer_id> missing" >&2 && exit 1
 endif
-ifeq($(origin PRIVATE_KEY),undefined)
+ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
 	TS_NODE_PROJECT=./tsconfig.hardhat.json \
