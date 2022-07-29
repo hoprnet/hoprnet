@@ -122,3 +122,10 @@ yarn workspace @hoprnet/hopr-ethereum hardhat register --network goerli --task e
 5. Start your Hopr node and copy node’s “Peer ID”
 6. Register "Peer ID" with `make self-register-node environment=master-goerli network=goerli privkey=<private key of “account”> peer-id <peer id>`. If the "account" has registered with a different "Peer ID", a deregister needs to be done with `make self-deregister-node environment=master-goerli network=goerli privkey=<private key of “account”>`
 7. Fund the HOPR node as usual
+
+Or
+
+1. Create a MetaMask wallet (note as “account”)
+2. Fund 1 Goerli ETH (from “DevBank” or from the faucet) to the “account”
+3. Start your local HOPR node
+4. Run `HOPRD_API_TOKEN=<hoprd_api_token> ACCOUNT_PRIVKEY=<account_private_key> DEV_BANK_PRIVKEY==<dev_bank_private_key> ./scripts/register-node.sh 0x35A3e15A2E2C297686A4fac5999647312fdDfa3f <hopr_api>`. Provide `<hopr_api>` when it's different from `localhost:3001`
