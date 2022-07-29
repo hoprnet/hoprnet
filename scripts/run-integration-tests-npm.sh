@@ -398,6 +398,7 @@ wait_for_regex ${node7_log} "please fund this node"
 wait_for_regex ${node8_log} "please fund this node"
 # }}}
 
+log "Funding nodes"
 #  --- Fund nodes --- {{{
 fund_nodes "${node_prefix}" "${tmp}" "${password}"
 # }}}
@@ -436,7 +437,7 @@ HOPRD_API_TOKEN="${api_token}" ${mydir}/../test/integration-test.sh \
 # -- Verify node6 has executed the commands {{{
 log "Verifying node6 log output"
 grep -E "HOPR Balance: +20000 txHOPR" "${node6_log}"
-grep -E "ETH Balance: +10 xDAI" "${node6_log}"
-grep -E "Running on: hardhat" "${node6_log}"
+# Node balance must be a little bit smaller than 10 xDAI due to the announce transaction
+grep -E "ETH Balance: +[789]\.[[:digit:]]?.+ xDAI" "${node6_log}"
 log "Output of node6 correct"
 # }}}
