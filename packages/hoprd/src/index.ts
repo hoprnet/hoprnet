@@ -321,7 +321,9 @@ function addUnhandledPromiseRejectionHandler() {
         // mainly ECONNRESET and EPIPE
         msgString.match(/read ECONNRESET/) ||
         msgString.match(/write ECONNRESET/) ||
-        msgString.match(/write EPIPE/)
+        msgString.match(/write EPIPE/) ||
+        // Requires changes in libp2p, tbd in upstream PRs to libp2p
+        msgString.match(/The operation was aborted/)
       ) {
         console.error('Unhandled promise rejection silenced')
         return
