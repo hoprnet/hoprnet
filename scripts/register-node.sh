@@ -62,4 +62,4 @@ make self-register-node \
     environment=master-goerli \
     network=goerli \
     privkey="${account_privkey}" \
-    peer-id=${peer_id}"
+    peer_id=${peer_id}"
