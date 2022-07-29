@@ -40,7 +40,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       const createdNftTypes = await hoprBoost.typeAt(index + 1, { gasLimit: 400e3 }) // array of types are 1-based
       console.log(`createdNftTypes ${createdNftTypes}`)
       if (createdNftTypes === DEV_NFT_TYPE) {
-        devNftIndex = index
+        devNftIndex = index + 1
       }
     } catch (error) {
       // reaching the end of nft index array storage: panic code 0x32 (Array accessed at an out-of-bounds or negative index
@@ -67,7 +67,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   if (isDeployerMinter) {
     // current deployer is minter
     console.log('Deployer is a minter. Mint necessary HoprBoost NFTs')
-
+    console.log(`index ${index} blockNftTypeMax ${blockNftTypeMax} devNftIndex ${devNftIndex}`)
     // mint all the dummy NFTs (especially those are blocked in the constructor). Mint some dev NFTs
     while (index <= blockNftTypeMax || index <= devNftIndex) {
       console.log(`Minting type of index ${index}`)
