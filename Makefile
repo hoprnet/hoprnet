@@ -88,21 +88,21 @@ request-dev-nft: ## Request one HoprBoost Dev NFT for the recipient given it has
 ifeq ($(recipient),)
 	echo "parameter <recipient> missing" >&2 && exit 1
 endif
-ifeq ($(privkey),)
-	echo "parameter <privkey> missing" >&2 && exit 1
+ifeq ($(origin PRIVATE_KEY),undefined)
+	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
 	TS_NODE_PROJECT=./tsconfig.hardhat.json \
 	HOPR_ENVIRONMENT_ID="$(environment)" \
 	  yarn workspace @hoprnet/hopr-ethereum run hardhat request-dev-nft \
    --network $(network) \
    --recipient $(recipient) \
-   --privatekey "$(privkey)"
+   --privatekey "$(PRIVATE_KEY)"
 
 .PHONY: stake-funds
 stake-funds: ensure-environment-is-set
 stake-funds: ## stake funds (idempotent operation)
-ifeq ($(privkey),)
-	echo "parameter <privkey> missing" >&2 && exit 1
+ifeq ($(origin PRIVATE_KEY),undefined)
+	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
 	@TS_NODE_PROJECT=./tsconfig.hardhat.json \
 	HOPR_ENVIRONMENT_ID="$(environment)" \
@@ -110,20 +110,20 @@ endif
 		--network $(network) \
 		--type xhopr \
 		--amount 1000000000000000000000 \
-		--privatekey "$(privkey)"
+		--privatekey "$(PRIVATE_KEY)"
 
 .PHONY: stake-devnft
 stake-devnft: ensure-environment-is-set
 stake-devnft: ## stake Dev NFTs (idempotent operation)
-ifeq ($(privkey),)
-	echo "parameter <privkey> missing" >&2 && exit 1
+ifeq ($(origin PRIVATE_KEY),undefined)
+	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
 	@TS_NODE_PROJECT=./tsconfig.hardhat.json \
 	HOPR_ENVIRONMENT_ID="$(environment)" \
 		yarn workspace @hoprnet/hopr-ethereum run hardhat stake \
 		--network $(network) \
 		--type devnft \
-		--privatekey "$(privkey)"
+		--privatekey "$(PRIVATE_KEY)"
 
 register-nodes: ensure-environment-is-set
 register-nodes: ## owner register given nodes in network registry contract
@@ -147,12 +147,16 @@ self-register-node: ## staker register a node in network registry contract
 ifeq ($(peer_id),)
 	echo "parameter <peer_id> missing" >&2 && exit 1
 endif
+ifeq ($(origin PRIVATE_KEY),undefined)
+	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
+endif
 	TS_NODE_PROJECT=./tsconfig.hardhat.json \
 	HOPR_ENVIRONMENT_ID="$(environment)" \
 	  yarn workspace @hoprnet/hopr-ethereum run hardhat register:self \
    --network $(network) \
    --task add \
-   --peer-id "$(peer_id)"
+   --peer-id "$(peer_id)" \
+   --privatekey "$(PRIVATE_KEY)"
 
 .PHONY: self-deregister-node
 self-deregister-node: ensure-environment-is-set
