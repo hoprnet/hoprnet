@@ -129,3 +129,29 @@ Or
 2. Fund 1 Goerli ETH (from “DevBank” or from the faucet) to the “account”
 3. Start your local HOPR node
 4. Run `HOPRD_API_TOKEN=<hoprd_api_token> ACCOUNT_PRIVKEY=<account_private_key> DEV_BANK_PRIVKEY==<dev_bank_private_key> ./scripts/register-node.sh 0x35A3e15A2E2C297686A4fac5999647312fdDfa3f <hopr_api>`. Provide `<hopr_api>` when it's different from `localhost:3001`
+
+Or
+
+1. Create a MetaMask wallet (note as “account”)
+2. Fund 1 Goerli ETH (from “DevBank” or from the faucet) to the “account”
+3. Start your local HOPR node
+4. Save private keys (`ACCOUNT_PRIVKEY` and `DEV_BANK_PRIVKEY`) into `.env` file
+
+```
+ACCOUNT_PRIVKEY=<account_private_key>
+DEV_BANK_PRIVKEY=<dev_bank_private_key>
+```
+
+and
+
+```
+source .env
+```
+
+4. Run
+
+```
+make register-node endpoint=<hoprd_endpoint> account=<staking_account> environment=master-goerli network=goerli
+```
+
+provide `<hoprd_endpoint>` when it's different from `localhost:3001`
