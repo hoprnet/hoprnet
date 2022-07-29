@@ -21,7 +21,7 @@ const closures: {
 }
 
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const { ethers, deployments, getNamedAccounts, network, environment } = hre
+  const { ethers, deployments, getNamedAccounts, network, environment, maxFeePerGas, maxPriorityFeePerGas } = hre
 
   const deployer = await getNamedAccounts().then((o) => ethers.getSigner(o.deployer))
   const hoprToken = await deployments.get('HoprToken')
@@ -48,6 +48,8 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     from: deployer.address,
     args: [hoprToken.address, closure],
     salt: ethers.utils.formatBytes32String(salt),
+    maxFeePerGas,
+    maxPriorityFeePerGas,
     ...deployOptions
   })
 

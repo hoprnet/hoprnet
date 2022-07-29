@@ -1,8 +1,9 @@
+import type { DeployFunction } from 'hardhat-deploy/types'
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { HoprNetworkRegistry } from '../src/types'
 
-const main = async function (hre: HardhatRuntimeEnvironment) {
-  const { ethers, deployments, getNamedAccounts, network, environment } = hre
+const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+  const { ethers, deployments, getNamedAccounts, network, environment, maxFeePerGas, maxPriorityFeePerGas } = hre
   const { deployer } = await getNamedAccounts()
 
   // Local development environment uses HoprDummyProxyForNetworkRegistry. All the other network uses HoprStakingProxyForNetworkRegistry
@@ -19,6 +20,8 @@ const main = async function (hre: HardhatRuntimeEnvironment) {
   const networkRegistryContract = await deployments.deploy('HoprNetworkRegistry', {
     from: deployer,
     args: [registryProxy.address, deployer],
+    maxFeePerGas,
+    maxPriorityFeePerGas,
     ...deployOptions
   })
   console.log(`"HoprNetworkRegistry" deployed at ${networkRegistryContract.address}`)

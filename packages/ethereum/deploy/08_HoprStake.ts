@@ -1,11 +1,11 @@
-import { HardhatRuntimeEnvironment } from 'hardhat/types'
-import { DeployFunction } from 'hardhat-deploy/types'
+import type { HardhatRuntimeEnvironment } from 'hardhat/types'
+import type { DeployFunction } from 'hardhat-deploy/types'
 import { getHoprStakeContractName } from '../utils/constants'
 
 const PROTOCOL_CONFIG = require('../../core/protocol-config.json')
 
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const { ethers, deployments, getNamedAccounts, network, environment } = hre
+  const { ethers, deployments, getNamedAccounts, network, environment, maxFeePerGas, maxPriorityFeePerGas } = hre
   const { deploy } = deployments
   const { deployer, admin } = await getNamedAccounts()
   const environmentConfig = PROTOCOL_CONFIG.environments[environment]
@@ -35,6 +35,8 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     contract: stakeContractName,
     from: deployer,
     args: [HoprBoost.address, admin, xHOPR.address, wxHOPR.address],
+    maxFeePerGas,
+    maxPriorityFeePerGas,
     ...deployOptions
   })
 }

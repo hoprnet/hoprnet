@@ -4,7 +4,7 @@ import type { DeployFunction } from 'hardhat-deploy/types'
 const XHOPR_ADDRESS = '0xD057604A14982FE8D88c5fC25Aac3267eA142a08'
 
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const { ethers, deployments, getNamedAccounts, environment } = hre
+  const { ethers, deployments, getNamedAccounts, environment, maxFeePerGas, maxPriorityFeePerGas } = hre
   const deployer = await getNamedAccounts().then((o) => ethers.getSigner(o.deployer))
   const hoprToken = await deployments.get('HoprToken')
 
@@ -19,6 +19,8 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   await deployments.deploy('HoprWrapper', {
     from: deployer.address,
     args: [XHOPR_ADDRESS, hoprToken.address],
+    maxFeePerGas,
+    maxPriorityFeePerGas,
     ...deployOptions
   })
 }
