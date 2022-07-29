@@ -19,7 +19,7 @@
     "rest-api-v2-spec.yaml"
   ],
   "engines": {
-    "node": "16"
+    "node": "16.15"
   },
   "scripts": {
     "clean:wasm": "make -C crates clean",
