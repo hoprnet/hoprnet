@@ -162,9 +162,9 @@ for staking_addr in "${!staking_addrs_dict[@]}" ; do
   fund_if_empty "${staking_addr}" "${environment}"
   # we alternate between staking funds or NFT
   if [[ "$((staking_index%2))" = "0" ]]; then
-    make -C "${mydir}/.." stake-funds privkey="${staking_addrs_dict[${staking_addr}]}" environment="${environment}"
+    PRIVATE_KEY="${staking_addrs_dict[${staking_addr}]}" make -C "${mydir}/.." stake-funds environment="${environment}"
   else
-    make -C "${mydir}/.." stake-devnft privkey="${staking_addrs_dict[${staking_addr}]}" environment="${environment}"
+    PRIVATE_KEY="${staking_addrs_dict[${staking_addr}]}" make -C "${mydir}/.." stake-devnft environment="${environment}"
   fi
   ((++staking_index))
 done
