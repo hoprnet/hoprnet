@@ -1,4 +1,4 @@
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 
 import { MAC_LENGTH, END_PREFIX_LENGTH, PAYLOAD_SIZE } from './constants.js'
 import { SECP256K1_CONSTANTS } from '../constants.js'
@@ -131,7 +131,7 @@ export function forwardTransform(
   additionalDataLastHopLength: number,
   maxHops: number
 ): LastNodeOutput | RelayNodeOutput {
-  if (privKey.privKey == null) {
+  if (privKey.privateKey == null) {
     throw Error(`Invalid arguments`)
   }
 

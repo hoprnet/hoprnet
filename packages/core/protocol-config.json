@@ -2,6 +2,7 @@
   "environments": {
     "hardhat-localhost": {
       "network_id": "hardhat",
+      "environment_type": "development",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "${HARDHAT_TOKEN_CONTACT_ADDRESS}",
       "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}",
@@ -11,10 +12,11 @@
       "stake_contract_address": "${HARDHAT_STAKE_CONTACT_ADDRESS}",
       "network_registry_proxy_contract_address": "${HARDHAT_REGISTRY_PROXY_CONTACT_ADDRESS}",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "tags": ["development"]
+      "tags": []
     },
     "hardhat-localhost2": {
       "network_id": "hardhat",
+      "environment_type": "development",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "${HARDHAT_TOKEN_CONTACT_ADDRESS}",
       "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}",
@@ -24,84 +26,97 @@
       "stake_contract_address": "${HARDHAT_STAKE_CONTACT_ADDRESS}",
       "network_registry_proxy_contract_address": "${HARDHAT_REGISTRY_PROXY_CONTACT_ADDRESS}",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "tags": ["development"]
+      "tags": []
     },
     "master-goerli": {
       "network_id": "goerli",
+      "environment_type": "staging",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xa3C8f4044b30Fb3071F5b3b02913DE524F1041dc",
-      "channels_contract_address": "0xcE1A97E3293c58C4A9D32dF7c0C0771D92d24922",
+      "channels_contract_address": "0x3Bad568f50e5436fb1757C8B3582fEDdA686583C",
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
       "xhopr_contract_address": "0xe8aD2ac347dA7549Aaca8F5B1c5Bf979d85bC78F",
-      "boost_contract_address": "0xd7ECa0E90cD85b08875E7d10d4D25B274C6CC549",
-      "stake_contract_address": "0x0d4Ec37e692BcD36FE7dDcB37a14358d7F44d72C",
-      "network_registry_proxy_contract_address": "0x3ee6e1eaE59C44EC30bc5e8FEeE587f95C9F2626",
-      "network_registry_contract_address": "0x3e5AA27125C90686444b2d093BFe9b843E82D2F5",
-      "tags": ["development"]
+      "boost_contract_address": "0x2B3Dc48E74da0176f761d0aA864e81A8170df24f",
+      "stake_contract_address": "0xAc677660cb7F525F6e74c0560924fB6D16EF2681",
+      "network_registry_proxy_contract_address": "0x2dBf1d5b4012291C0EFaec26c4DAb105B059D898",
+      "network_registry_contract_address": "0x5df074701a46e34f83cF0Bc18874BB83c34A5BD3",
+      "tags": []
     },
     "debug-goerli": {
       "network_id": "goerli",
+      "environment_type": "staging",
       "channel_contract_deploy_block": 0,
-      "token_contract_address": "0xC3Ff0A2C4F404D6a9B31a7ABc2a41E616bd4F34C",
-      "channels_contract_address": "0x3F766C4f0414CDA4A7B699Cf8927CA82a521ADd4",
+      "token_contract_address": "0xa3C8f4044b30Fb3071F5b3b02913DE524F1041dc",
+      "channels_contract_address": "0xc33Cb28986e929c04A2e8A5f1F641489e6f6d5CE",
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
-      "stake_contract_address": "0x208Bd0F5Bd13357Ba077dd4888a76D40d947F9f4",
-      "network_registry_contract_address": "0x69C201Df0b4c54f600d49Dde1953F46b89EBa23B",
+      "stake_contract_address": "0xbEFEdcB0cAD48f0F9f858CF0A328dD1389e18A84",
+      "network_registry_contract_address": "0x57e74767075471B1B87C7d34968a5c91a6B6FEB4",
       "xhopr_contract_address": "0x552aBf0EBCd6B6162519132A831C181f87e46874",
       "boost_contract_address": "0x20d7182F9f16E0eda619bBe1Fe8732169B90fab5",
-      "network_registry_proxy_contract_address": "0x913bF9D5bd22eD468b628c1212EAF3a06C8fF3b6",
+      "network_registry_proxy_contract_address": "0x29f0f5d69Eae4B1A16Ffa82DD3f8EAe965F2Ba6F",
       "tags": ["development"]
     },
     "tuttlingen": {
+      "environment_type": "production",
       "network_id": "xdai",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
       "channels_contract_address": "0xd2229d5d54bE8ABC9A2b2d5cFdEd22B48FB8ce2c",
       "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "tags": ["production"]
+      "tags": []
     },
     "prague": {
       "network_id": "xdai",
+      "environment_type": "production",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
       "channels_contract_address": "0x4f98F01cb02083eb5457CA0DDC6B37073ec5388a",
       "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "tags": ["production"]
+      "tags": []
     },
     "budapest": {
       "network_id": "xdai",
+      "environment_type": "production",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
       "channels_contract_address": "0xEee8AB66b7169b3f9024676165fB1D2a25E472c5",
       "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "tags": ["production"]
+      "tags": []
     },
     "athens": {
       "network_id": "xdai",
+      "environment_type": "production",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
       "channels_contract_address": "0xD2F008718EEdD7aF7E9a466F5D68bb77D03B8F7A",
-      "tags": ["production"]
+      "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
+      "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "tags": []
     },
     "lisbon": {
       "network_id": "xdai",
+      "environment_type": "production",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0x978D91ddFdb0c6eaCC22A258fE498957a79c5F4C",
       "channels_contract_address": "0x1753C9eE656c54f443ce2Fe7248076f9bA4eC100",
-      "tags": ["production"]
+      "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
+      "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "tags": []
     },
     "ouagadougou": {
       "network_id": "xdai",
+      "environment_type": "production",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0x978D91ddFdb0c6eaCC22A258fE498957a79c5F4C",
       "channels_contract_address": "0x0BB1Ff7A9b3f2c87267626630aa0195cAE3ed5E3",
       "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
       "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
       "stake_contract_address": "0xae933331ef0bE122f9499512d3ed4Fa3896DCf20",
-      "tags": ["production"]
+      "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "tags": []
     }
   },
   "networks": {

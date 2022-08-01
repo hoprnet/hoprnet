@@ -95,7 +95,7 @@ Also keeps track of the latest block number.
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:68](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L68)
+[packages/core-ethereum/src/indexer/index.ts:69](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L69)
 
 ___
 
@@ -126,7 +126,7 @@ ___
 | `getTransactionsInBlock` | (`blockNumber`: `number`) => `Promise`<`string`[]\> |
 | `initiateChannelClosure` | (`counterparty`: `Address`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
 | `redeemTicket` | (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
-| `sendTransaction` | (`signedTransaction`: `string` \| `Promise`<`string`\>) => `Promise`<`TransactionResponse`\> |
+| `sendTransaction` | (`checkDuplicate`: `Boolean`, `essentialTxPayload`: `TransactionPayload`, `handleTxListener`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`SendTransactionReturn`\> |
 | `setCommitment` | (`counterparty`: `Address`, `commitment`: `Hash`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
 | `subscribeBlock` | (`cb`: (`blockNumber`: `number`) => `void` \| `Promise`<`void`\>) => () => `void` |
 | `subscribeError` | (`cb`: (`err`: `any`) => `void` \| `Promise`<`void`\>) => () => `void` |
@@ -137,7 +137,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:64](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L64)
+[packages/core-ethereum/src/indexer/index.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L65)
 
 ___
 
@@ -147,7 +147,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L65)
+[packages/core-ethereum/src/indexer/index.ts:66](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L66)
 
 ___
 
@@ -157,7 +157,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:66](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L66)
+[packages/core-ethereum/src/indexer/index.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L67)
 
 ___
 
@@ -167,7 +167,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:59](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L59)
+[packages/core-ethereum/src/indexer/index.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L60)
 
 ___
 
@@ -177,7 +177,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:58](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L58)
+[packages/core-ethereum/src/indexer/index.ts:59](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L59)
 
 ___
 
@@ -187,7 +187,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:62](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L62)
+[packages/core-ethereum/src/indexer/index.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L63)
 
 ___
 
@@ -205,7 +205,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L71)
+[packages/core-ethereum/src/indexer/index.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L72)
 
 ___
 
@@ -223,7 +223,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L70)
+[packages/core-ethereum/src/indexer/index.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L71)
 
 ## Methods
 
@@ -1956,7 +1956,7 @@ Starts indexing.
 | `chain.getTransactionsInBlock` | (`blockNumber`: `number`) => `Promise`<`string`[]\> |
 | `chain.initiateChannelClosure` | (`counterparty`: `Address`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
 | `chain.redeemTicket` | (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
-| `chain.sendTransaction` | (`signedTransaction`: `string` \| `Promise`<`string`\>) => `Promise`<`TransactionResponse`\> |
+| `chain.sendTransaction` | (`checkDuplicate`: `Boolean`, `essentialTxPayload`: `TransactionPayload`, `handleTxListener`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`SendTransactionReturn`\> |
 | `chain.setCommitment` | (`counterparty`: `Address`, `commitment`: `Hash`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
 | `chain.subscribeBlock` | (`cb`: (`blockNumber`: `number`) => `void` \| `Promise`<`void`\>) => () => `void` |
 | `chain.subscribeError` | (`cb`: (`err`: `any`) => `void` \| `Promise`<`void`\>) => () => `void` |

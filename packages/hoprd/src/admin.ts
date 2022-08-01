@@ -1,4 +1,4 @@
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import http from 'http'
 import fs from 'fs'
 import path from 'path'
@@ -141,8 +141,8 @@ export function showDisclaimer(logs: LogStream) {
 }
 
 export async function startConnectionReports(node: Hopr, logs: LogStream) {
-  logs.logConnectedPeers(node.getConnectedPeers().map((p) => p.toB58String()))
+  logs.logConnectedPeers(node.getConnectedPeers().map((p) => p.toString()))
   setInterval(() => {
-    logs.logConnectedPeers(node.getConnectedPeers().map((p) => p.toB58String()))
+    logs.logConnectedPeers(node.getConnectedPeers().map((p) => p.toString()))
   }, 60 * 1000)
 }

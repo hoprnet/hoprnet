@@ -2,7 +2,8 @@ import type { HoprConnectOptions, Stream, StreamType } from '../types.js'
 import { toU8aStream } from '../utils/index.js'
 import { handshake } from 'it-handshake'
 import type { Handshake } from 'it-handshake'
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { unmarshalPublicKey } from '@libp2p/crypto/keys'
 
 import chalk from 'chalk'
 import { pubKeyToPeerId } from '@hoprnet/hopr-utils'
@@ -12,6 +13,7 @@ import type { Relay } from './index.js'
 
 import debug from 'debug'
 import { DELIVERY_PROTOCOL } from '../constants.js'
+import { Components } from '@libp2p/interfaces/components'
 
 export enum RelayHandshakeMessage {
   OK,
@@ -103,13 +105,13 @@ class RelayHandshake {
    * @returns a relayed connection to `destination`
    */
   async initiate(relay: PeerId, destination: PeerId): Promise<Response> {
-    this.shaker.write(destination.pubKey.marshal())
+    this.shaker.write(unmarshalPublicKey(destination.publicKey as Uint8Array).marshal())
 
     let chunk: StreamType | undefined
     try {
       chunk = await this.shaker.read()
     } catch (err: any) {
-      error(`Error while reading answer from ${chalk.green(relay.toB58String())}.`, err.message)
+      error(`Error while reading answer from ${chalk.green(relay.toString())}.`, err.message)
     }
 
     if (chunk == null || chunk.length == 0) {
@@ -130,8 +132,8 @@ class RelayHandshake {
       case RelayHandshakeMessage.OK:
         log(
           `Successfully established outbound relayed connection with ${chalk.green(
-            destination.toB58String()
-          )} over relay ${chalk.green(relay.toB58String())}`
+            destination.toString()
+          )} over relay ${chalk.green(relay.toString())}`
         )
         return {
           success: true,
@@ -139,8 +141,8 @@ class RelayHandshake {
         }
       default:
         error(
-          `Could not establish relayed connection to ${chalk.green(destination.toB58String())} over relay ${chalk.green(
-            relay.toB58String()
+          `Could not establish relayed connection to ${chalk.green(destination.toString())} over relay ${chalk.green(
+            relay.toString()
           )}. Answer was: <${chalk.yellow(handshakeMessageToString(answer))}>`
         )
 
@@ -165,6 +167,7 @@ class RelayHandshake {
     source: PeerId,
     getStreamToCounterparty: InstanceType<typeof Relay>['dialNodeDirectly'],
     state: Pick<RelayState, 'exists' | 'isActive' | 'updateExisting' | 'createNew'>,
+    upgrader: Components['upgrader'],
     __relayFreeTimeout?: number
   ): Promise<void> {
     log(`handling relay request`)
@@ -203,10 +206,10 @@ class RelayHandshake {
       return
     }
 
-    log(`counterparty identified as ${destination.toB58String()}`)
+    log(`counterparty identified as ${destination.toString()}`)
 
     if (source.equals(destination)) {
-      error(`Peer ${source.toB58String()} is trying to loopback to itself. Dropping connection.`)
+      error(`Peer ${source.toString()} is trying to loopback to itself. Dropping connection.`)
       this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_LOOPBACKS_ARE_NOT_ALLOWED))
       this.shaker.rest()
       return
@@ -215,22 +218,26 @@ class RelayHandshake {
     const relayedConnectionExists = state.exists(source, destination)
 
     if (relayedConnectionExists) {
-      // Relay could exist but connection is dead
+      // Relayed connection could exist but connection is dead
       const connectionIsActive = await state.isActive(source, destination)
 
       if (connectionIsActive) {
         this.shaker.write(Uint8Array.of(RelayHandshakeMessage.OK))
         this.shaker.rest()
 
-        state.updateExisting(source, destination, this.shaker.stream)
-
-        return
+        // Relayed connection could have been closed meanwhile
+        if (state.updateExisting(source, destination, this.shaker.stream)) {
+          // Updated connection, so everything done
+          return
+        }
       }
     }
 
     let toDestinationStruct: Awaited<ReturnType<typeof getStreamToCounterparty>>
     try {
-      toDestinationStruct = await getStreamToCounterparty(destination, DELIVERY_PROTOCOL(this.options.environment))
+      toDestinationStruct = await getStreamToCounterparty(destination, DELIVERY_PROTOCOL(this.options.environment), {
+        upgrader
+      })
     } catch (err) {
       error(err)
     }
@@ -238,7 +245,7 @@ class RelayHandshake {
     // Anything can happen while attempting to connect
     if (toDestinationStruct == null) {
       error(
-        `Failed to create circuit from ${source.toB58String()} to ${destination.toB58String()} because destination is not reachable`
+        `Failed to create circuit from ${source.toString()} to ${destination.toString()} because destination is not reachable`
       )
       this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY))
       this.shaker.rest()
@@ -250,7 +257,7 @@ class RelayHandshake {
       sink: toDestinationStruct.stream.sink as any
     })
 
-    destinationShaker.write(source.pubKey.marshal())
+    destinationShaker.write(unmarshalPublicKey(source.publicKey as Uint8Array).marshal())
 
     let destinationChunk: StreamType | undefined
 
@@ -268,7 +275,7 @@ class RelayHandshake {
       try {
         await toDestinationStruct.conn.close()
       } catch (err) {
-        error(`Error while closing connection to destination ${destination.toB58String()}.`, err)
+        error(`Error while closing connection to destination ${destination.toString()}.`, err)
       }
       return
     }
@@ -281,25 +288,16 @@ class RelayHandshake {
         this.shaker.rest()
         destinationShaker.rest()
 
-        try {
-          // NOTE: This returns only when the relay connection is terminated
-          await state.createNew(
-            source,
-            destination,
-            this.shaker.stream,
-            destinationShaker.stream,
-            this.options.relayFreeTimeout
-          )
-        } catch (err) {
-          error(
-            `Cannot establish relayed connection between ${destination.toB58String()} and ${source.toB58String()}`,
-            err
-          )
-          // @TODO find a way how to forward the error to source and destination
-          return
-        }
+        state.createNew(
+          source,
+          destination,
+          this.shaker.stream,
+          destinationShaker.stream,
+          this.options.relayFreeTimeout
+        )
         break
       default:
+        log(`Counterparty replied with ${destinationAnswer} but expected ${RelayHandshakeMessage.OK}`)
         this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY))
         this.shaker.rest()
 
@@ -353,8 +351,8 @@ class RelayHandshake {
 
     log(
       `Successfully established inbound relayed connection from initiator ${chalk.green(
-        initiator.toB58String()
-      )} over relay ${chalk.green(source.toB58String())}.`
+        initiator.toString()
+      )} over relay ${chalk.green(source.toString())}.`
     )
 
     this.shaker.write(Uint8Array.of(RelayHandshakeMessage.OK))

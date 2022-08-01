@@ -52,7 +52,6 @@
 ### Functions
 
 - [createHoprNode](modules.md#createhoprnode)
-- [createLibp2pMock](modules.md#createlibp2pmock)
 - [findPath](modules.md#findpath)
 - [resolveEnvironment](modules.md#resolveenvironment)
 - [supportedEnvironments](modules.md#supportedenvironments)
@@ -85,16 +84,19 @@
 | `onChainConfirmations?` | `number` |
 | `password?` | `string` |
 | `strategy?` | [`ChannelStrategyInterface`](interfaces/ChannelStrategyInterface.md) |
-| `testing?` | { `announceLocalAddresses?`: `boolean` ; `noDirectConnections?`: `boolean` ; `noUPNP?`: `boolean` ; `noWebRTCUpgrade?`: `boolean` ; `preferLocalAddresses?`: `boolean`  } |
+| `testing?` | { `announceLocalAddresses?`: `boolean` ; `mockedDHT?`: `Map`<`string`, `string`[]\> ; `mockedNetwork?`: `Libp2pEmitter`<`any`\> ; `noDirectConnections?`: `boolean` ; `noUPNP?`: `boolean` ; `noWebRTCUpgrade?`: `boolean` ; `preferLocalAddresses?`: `boolean` ; `useMockedLibp2p?`: `boolean`  } |
 | `testing.announceLocalAddresses?` | `boolean` |
+| `testing.mockedDHT?` | `Map`<`string`, `string`[]\> |
+| `testing.mockedNetwork?` | `Libp2pEmitter`<`any`\> |
 | `testing.noDirectConnections?` | `boolean` |
 | `testing.noUPNP?` | `boolean` |
 | `testing.noWebRTCUpgrade?` | `boolean` |
 | `testing.preferLocalAddresses?` | `boolean` |
+| `testing.useMockedLibp2p?` | `boolean` |
 
 #### Defined in
 
-[packages/core/src/index.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L84)
+[packages/core/src/index.ts:89](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L89)
 
 ___
 
@@ -104,7 +106,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:128](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L128)
+[packages/core/src/index.ts:140](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L140)
 
 ___
 
@@ -119,6 +121,7 @@ ___
 | `boost_contract_address` | `string` |
 | `channel_contract_deploy_block` | `number` |
 | `channels_contract_address` | `string` |
+| `environment_type` | `EnvironmentType` |
 | `id` | `string` |
 | `network` | `NetworkOptions` |
 | `network_registry_contract_address` | `string` |
@@ -129,7 +132,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/environment.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L39)
+[packages/core/src/environment.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L46)
 
 ___
 
@@ -139,7 +142,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:143](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L143)
+[packages/core/src/index.ts:155](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L155)
 
 ___
 
@@ -166,7 +169,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:130](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L130)
+[packages/core/src/index.ts:142](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L142)
 
 ## Variables
 
@@ -365,22 +368,6 @@ ___
 #### Returns
 
 `Promise`<[`default`](classes/default.md)\>
-
-___
-
-### createLibp2pMock
-
-▸ **createLibp2pMock**(`peerId`): `LibP2P`
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `peerId` | `PeerId` |
-
-#### Returns
-
-`LibP2P`
 
 ___
 

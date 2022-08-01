@@ -24,11 +24,6 @@ const sidebars = {
       label: 'About HOPR',
       items: ['about-hopr']
     },
-    /* {
-      type: 'doc',
-      id: 'intro',
-      label: 'Welcome to HOPR',
-    },*/
     {
       type: 'category',
       label: 'Installing a hoprd node',
@@ -68,6 +63,7 @@ const sidebars = {
       items: [
         'developers/starting-local-cluster',
         'developers/connecting-node',
+        'developers/network-registry',
         'developers/tutorial-hello-world',
         'developers/demo-boomerang-chat',
         'developers/demo-rps-game',
@@ -82,11 +78,12 @@ const sidebars = {
       label: 'dApps',
       items: ['dapps/myne-chat']
     },
-    /*{
-        type: 'doc',
-  id: 'staking',
-        label: 'Staking',
-    },*/
+    {
+      type: 'category',
+      label: 'Ecosystem',
+      link: { type: 'doc', id: 'ecosystem/introduction' },
+      items: ['ecosystem/hopr-token', 'ecosystem/gnosis-hopr-tokens', 'ecosystem/staking', 'ecosystem/hoprd']
+    },
     {
       type: 'doc',
       id: 'faq',

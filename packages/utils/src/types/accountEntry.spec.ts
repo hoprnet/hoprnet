@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 import { AccountEntry } from './accountEntry.js'
 import BN from 'bn.js'
 import { PublicKey } from './publicKey.js'

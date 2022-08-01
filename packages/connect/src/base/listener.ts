@@ -1,3 +1,8 @@
+import type { Connection } from '@libp2p/interface-connection'
+import type { Listener as InterfaceListener, ListenerEvents } from '@libp2p/interface-transport'
+import { EventEmitter, CustomEvent } from '@libp2p/interfaces/events'
+
+import { networkInterfaces, type NetworkInterfaceInfo } from 'os'
 import {
   createServer,
   createConnection,
@@ -6,34 +11,24 @@ import {
   type Server as TCPServer
 } from 'net'
 import { createSocket, type RemoteInfo, type Socket as UDPSocket } from 'dgram'
-import type Connection from 'libp2p-interfaces/dist/src/connection/connection.js'
+import { once } from 'events'
 
-import { once, EventEmitter } from 'events'
-import type { PeerStoreType, HoprConnectOptions, HoprConnectTestingOptions } from '../types.js'
 import Debug from 'debug'
-import { networkInterfaces, type NetworkInterfaceInfo } from 'os'
+import { peerIdFromBytes } from '@libp2p/peer-id'
+import { Multiaddr } from '@multiformats/multiaddr'
+
+import { isAnyAddress, u8aEquals, defer } from '@hoprnet/hopr-utils'
 
 import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP } from '../constants.js'
-import type {
-  MultiaddrConnection,
-  Upgrader,
-  Listener as InterfaceListener
-} from 'libp2p-interfaces/src/transport/types.js'
-
-import PeerId from 'peer-id'
-import { Multiaddr } from 'multiaddr'
-
+import type { PeerStoreType, HoprConnectOptions, HoprConnectTestingOptions } from '../types.js'
 import { handleStunRequest, getExternalIp } from './stun.js'
 import { getAddrs } from './addrs.js'
-import { isAnyAddress, u8aEquals, defer } from '@hoprnet/hopr-utils'
 import { TCPConnection } from './tcp.js'
-import { EntryNodes, RELAY_CHANGED_EVENT } from './entry.js'
+import { RELAY_CHANGED_EVENT } from './entry.js'
 import { bindToPort, attemptClose, nodeToMultiaddr } from '../utils/index.js'
-import type HoprConnect from '../index.js'
-import { UpnpManager } from './upnp.js'
-import type { Filter } from '../filter.js'
-import type { Relay } from '../relay/index.js'
-import type Libp2p from 'libp2p'
+
+import type { Components } from '@libp2p/interfaces/components'
+import type { ConnectComponents } from '../components.js'
 
 const log = Debug('hopr-connect:listener')
 const error = Debug('hopr-connect:listener:error')
@@ -42,7 +37,7 @@ const verbose = Debug('hopr-connect:verbose:listener')
 // @TODO to be adjusted
 const SOCKET_CLOSE_TIMEOUT = 500
 
-enum State {
+enum ListenerState {
   UNINITIALIZED,
   LISTENING,
   CLOSING,
@@ -51,14 +46,13 @@ enum State {
 
 type Address = { port: number; address: string }
 
-class Listener extends EventEmitter implements InterfaceListener {
-  protected __connections: MultiaddrConnection[]
+// @ts-ignore libp2p interfaces type clash
+class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener {
+  protected __connections: Connection[]
   protected tcpSocket: TCPServer
   private udpSocket: UDPSocket
-  private upnpManager: UpnpManager
 
-  private state: State
-  private entry: EntryNodes
+  private state: ListenerState
   private _emitListening: () => void
 
   private listeningAddr?: Multiaddr
@@ -69,28 +63,16 @@ class Listener extends EventEmitter implements InterfaceListener {
   }
 
   /**
-   * @param onClose called once listener is closed
-   * @param onListening called once listener is listening
-   * @param dialDirectly utility to establish a direct connection
-   * @param upgradeInbound forward inbound connections to libp2p
-   * @param peerId own id
    * @param options connection Options, e.g. AbortSignal
    * @param testingOptions turn on / off modules for testing
-   * @param filter allow Listener to populate address filter
-   * @param relay allow Listener to populate list of utilized relays
-   * @param libp2p libp2p instance for various purposes
+   * @param components Libp2p instance components
+   * @param connectComponents HoprConnect components
    */
   constructor(
-    private onClose: () => void,
-    private onListening: () => void,
-    dialDirectly: HoprConnect['dialDirectly'],
-    private upgradeInbound: Upgrader['upgradeInbound'],
-    private peerId: PeerId,
     private options: HoprConnectOptions,
     private testingOptions: HoprConnectTestingOptions,
-    private filter: Filter,
-    private relay: Relay,
-    libp2p: Libp2p
+    private components: Components,
+    private connectComponents: ConnectComponents
   ) {
     super()
 
@@ -107,7 +89,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       reuseAddr: true
     })
 
-    this.state = State.UNINITIALIZED
+    this.state = ListenerState.UNINITIALIZED
 
     this.addrs = {
       interface: [],
@@ -118,44 +100,45 @@ class Listener extends EventEmitter implements InterfaceListener {
       // hopr-connect does not enable IPv6 connections right now, therefore we can set `listeningAddrs` statically
       // to `/ip4/0.0.0.0/tcp/0`, meaning listening on IPv4 using a canonical port
       // TODO check IPv6
-      this.filter.setAddrs(this.getAddrs(), [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${this.peerId.toB58String()}`)])
+      this.connectComponents
+        .getAddressFilter()
+        .setAddrs(this.getAddrs(), [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${this.components.getPeerId().toString()}`)])
 
-      const usedRelays = this.entry.getUsedRelayAddresses()
+      const usedRelays = this.connectComponents.getEntryNodes().getUsedRelayAddresses()
 
       if (usedRelays && usedRelays.length > 0) {
-        const relayPeerIds = this.entry.getUsedRelayAddresses().map((ma: Multiaddr) => {
-          const tuples = ma.tuples()
+        const relayPeerIds = this.connectComponents
+          .getEntryNodes()
+          .getUsedRelayAddresses()
+          .map((ma: Multiaddr) => {
+            const tuples = ma.tuples()
 
-          return PeerId.createFromBytes((tuples[0][1] as Uint8Array).slice(1))
-        })
+            return peerIdFromBytes((tuples[0][1] as Uint8Array).slice(1))
+          })
 
-        this.relay.setUsedRelays(relayPeerIds)
+        this.connectComponents.getRelay().setUsedRelays(relayPeerIds)
       }
 
-      this.emit('listening')
+      this.dispatchEvent(new CustomEvent('listening'))
     }.bind(this)
-
-    this.entry = new EntryNodes(this.peerId, libp2p, dialDirectly, this.options)
-
-    this.upnpManager = new UpnpManager()
   }
 
   attachSocketHandlers() {
     this.udpSocket.once('close', () => {
-      if (![State.CLOSING, State.CLOSED].includes(this.state)) {
+      if (![ListenerState.CLOSING, ListenerState.CLOSED].includes(this.state)) {
         console.trace(`UDP socket was closed earlier than expected. Please report this!`)
       }
     })
 
     this.tcpSocket.once('close', () => {
-      if (![State.CLOSING, State.CLOSED].includes(this.state)) {
+      if (![ListenerState.CLOSING, ListenerState.CLOSED].includes(this.state)) {
         console.trace(`TCP socket was closed earlier than expected. Please report this!`)
       }
     })
 
     // Forward socket errors
-    this.tcpSocket.on('error', (err) => this.emit('error', err))
-    this.udpSocket.on('error', (err) => this.emit('error', err))
+    this.tcpSocket.on('error', (err) => this.dispatchEvent(new CustomEvent<Error>('error', { detail: err })))
+    this.udpSocket.on('error', (err) => this.dispatchEvent(new CustomEvent<Error>('error', { detail: err })))
 
     this.tcpSocket.on('connection', async (socket: TCPSocket) => {
       try {
@@ -186,7 +169,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       throw Error(`Can only bind to TCP sockets`)
     }
 
-    if (this.peerId.toB58String() !== ma.getPeerId()) {
+    if (this.components.getPeerId().toString() !== ma.getPeerId()) {
       let tmpListeningAddr = ma.decapsulateCode(CODE_P2P)
 
       if (!tmpListeningAddr.isThinWaistAddress()) {
@@ -194,8 +177,8 @@ class Listener extends EventEmitter implements InterfaceListener {
       }
 
       // Replace wrong PeerId in given listeningAddr with own PeerId
-      log(`replacing peerId in ${ma.toString()} by our peerId which is ${this.peerId.toB58String()}`)
-      this.listeningAddr = tmpListeningAddr.encapsulate(`/p2p/${this.peerId.toB58String()}`)
+      log(`replacing peerId in ${ma.toString()} by our peerId which is ${this.components.getPeerId().toString()}`)
+      this.listeningAddr = tmpListeningAddr.encapsulate(`/p2p/${this.components.getPeerId().toString()}`)
     } else {
       this.listeningAddr = ma
     }
@@ -236,8 +219,8 @@ class Listener extends EventEmitter implements InterfaceListener {
     const tcpTimeout = setTimeout(() => {
       abort.abort()
       waitForIncomingTcpPacket.reject()
-    }, TIMEOUT)
-    const udpTimeout = setTimeout(waitForIncomingUdpPacket.reject.bind(waitForIncomingUdpPacket), TIMEOUT)
+    }, TIMEOUT).unref()
+    const udpTimeout = setTimeout(waitForIncomingUdpPacket.reject.bind(waitForIncomingUdpPacket), TIMEOUT).unref()
 
     const checkTcpMessage = (socket: TCPSocket) => {
       socket.on('data', (data: Buffer) => {
@@ -314,7 +297,7 @@ class Listener extends EventEmitter implements InterfaceListener {
    * @param ma address to listen to
    */
   async listen(ma: Multiaddr): Promise<void> {
-    if (this.state == State.CLOSED) {
+    if (this.state == ListenerState.CLOSED) {
       throw Error(`Cannot listen after 'close()' has been called`)
     }
 
@@ -347,13 +330,13 @@ class Listener extends EventEmitter implements InterfaceListener {
             port: natSituation.externalPort,
             family: 'IPv4'
           },
-          this.peerId
+          this.components.getPeerId()
         )
       ]
     }
 
     this.addrs.interface = internalInterfaces.map((internalInterface) =>
-      nodeToMultiaddr(internalInterface, this.peerId)
+      nodeToMultiaddr(internalInterface, this.components.getPeerId())
     )
 
     this.attachSocketHandlers()
@@ -361,22 +344,22 @@ class Listener extends EventEmitter implements InterfaceListener {
     // Need to be called before _emitListening
     // because _emitListening() sets an attribute in
     // the relay object
-    this.onListening()
+    this.connectComponents.getRelay().start()
 
     this._emitListening()
 
     // Only add relay nodes if node is not directly reachable or running locally
     if (this.testingOptions.__runningLocally || natSituation.bidirectionalNAT || !natSituation.isExposed) {
-      this.entry.on(RELAY_CHANGED_EVENT, this._emitListening)
+      this.connectComponents.getEntryNodes().on(RELAY_CHANGED_EVENT, this._emitListening)
 
       // Finish startup
-      this.entry.start()
+      this.connectComponents.getEntryNodes().start()
 
       // Initiate update but don't await its result
-      this.entry.updatePublicNodes()
+      this.connectComponents.getEntryNodes().updatePublicNodes()
     }
 
-    this.state = State.LISTENING
+    this.state = ListenerState.LISTENING
   }
 
   /**
@@ -384,22 +367,17 @@ class Listener extends EventEmitter implements InterfaceListener {
    * @dev ignores prematurely closed TCP sockets
    */
   async close(): Promise<void> {
-    this.state = State.CLOSING
+    this.state = ListenerState.CLOSING
 
     // Remove listeners
-    this.entry.stop()
-    this.entry.off(RELAY_CHANGED_EVENT, this._emitListening)
+    this.connectComponents.getEntryNodes().stop()
+    this.connectComponents.getEntryNodes().off(RELAY_CHANGED_EVENT, this._emitListening)
 
-    await Promise.all([
-      // Unmap all mapped UPNP ports and release socket
-      this.upnpManager.stop(),
-      this.closeUDP(),
-      this.closeTCP()
-    ])
+    await Promise.all([this.closeUDP(), this.closeTCP()])
 
-    this.state = State.CLOSED
-    this.onClose()
-    this.emit('close')
+    this.state = ListenerState.CLOSED
+    this.connectComponents.getRelay().stop()
+    this.dispatchEvent(new CustomEvent('close'))
   }
 
   /**
@@ -409,20 +387,24 @@ class Listener extends EventEmitter implements InterfaceListener {
    * @returns list of addresses under which the node is available
    */
   getAddrs(): Multiaddr[] {
-    return [...this.addrs.external, ...this.entry.getUsedRelayAddresses(), ...this.addrs.interface]
+    return [
+      ...this.addrs.external,
+      ...this.connectComponents.getEntryNodes().getUsedRelayAddresses(),
+      ...this.addrs.interface
+    ]
   }
 
   /**
    * Tracks connections to close them once necessary.
    * @param maConn connection to track
    */
-  private trackConn(maConn: MultiaddrConnection) {
+  private trackConn(maConn: Connection) {
     this.__connections.push(maConn)
     verbose(`currently tracking ${this.__connections.length} connections ++`)
 
-    const untrackConn = () => {
+    return () => {
       verbose(`currently tracking ${this.__connections.length} connections --`)
-      let index = this.__connections.findIndex((c: MultiaddrConnection) => c === maConn)
+      let index = this.__connections.findIndex((c: Connection) => c === maConn)
 
       if (index < 0) {
         // connection not found
@@ -433,11 +415,9 @@ class Listener extends EventEmitter implements InterfaceListener {
       if ([index + 1, 1].includes(this.__connections.length)) {
         this.__connections.pop()
       } else {
-        this.__connections[index] = this.__connections.pop() as MultiaddrConnection
+        this.__connections[index] = this.__connections.pop() as Connection
       }
     }
-
-    ;(maConn.conn as EventEmitter).once('close', untrackConn)
   }
 
   /**
@@ -451,7 +431,7 @@ class Listener extends EventEmitter implements InterfaceListener {
     let maConn: TCPConnection | undefined
 
     try {
-      maConn = TCPConnection.fromSocket(socket, this.peerId)
+      maConn = TCPConnection.fromSocket(socket, this.components.getPeerId())
     } catch (err: any) {
       error(`inbound connection failed. ${err.message}`)
     }
@@ -465,7 +445,7 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     let conn: Connection
     try {
-      conn = await this.upgradeInbound(maConn as MultiaddrConnection)
+      conn = await this.components.getUpgrader().upgradeInbound(maConn)
     } catch (err: any) {
       if (err.code === 'ERR_ENCRYPTION_FAILED') {
         error(`inbound connection failed because encryption failed. Maybe connected to the wrong node?`)
@@ -474,32 +454,32 @@ class Listener extends EventEmitter implements InterfaceListener {
       }
 
       if (maConn != undefined) {
-        return attemptClose(maConn as MultiaddrConnection, error)
+        return attemptClose(maConn, error)
       }
 
       return
     }
 
-    for (const peer of this.entry.getUsedRelayPeerIds()) {
+    for (const peer of this.connectComponents.getEntryNodes().getUsedRelayPeerIds()) {
       if (peer.equals(conn.remotePeer)) {
         // Make sure that Multiaddr contains a PeerId
         const maWithPeerId = maConn.remoteAddr
           .decapsulateCode(CODE_P2P)
-          .encapsulate(`/p2p/${conn.remotePeer.toB58String()}`)
+          .encapsulate(`/p2p/${conn.remotePeer.toString()}`)
 
         ;(maConn.conn as TCPSocket).on('close', () => {
           if (maConn!.closed) {
             return
           }
 
-          this.entry._onEntryNodeDisconnect!(maWithPeerId)
+          this.connectComponents.getEntryNodes()._onEntryNodeDisconnect!(maWithPeerId)
         })
       }
     }
 
     log('inbound connection %s upgraded', maConn.remoteAddr)
 
-    this.trackConn(maConn as MultiaddrConnection)
+    socket.once('close', this.trackConn(conn))
   }
 
   /**
@@ -531,7 +511,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       return
     }
 
-    await Promise.all(this.__connections.map((conn: MultiaddrConnection) => attemptClose(conn, error)))
+    await Promise.all(this.__connections.map((conn: Connection) => attemptClose(conn, error)))
 
     const promise = once(this.tcpSocket, 'close')
 
@@ -585,13 +565,15 @@ class Listener extends EventEmitter implements InterfaceListener {
         isExposed: true
       }
     }
-    let externalAddress = this.testingOptions.__noUPNP ? undefined : await this.upnpManager.externalIp()
+    let externalAddress = this.testingOptions.__noUPNP
+      ? undefined
+      : await this.connectComponents.getUpnpManager().externalIp()
     let externalPort: number | undefined
 
     let isExposedHost: Awaited<ReturnType<Listener['isExposedHost']>> | undefined
     if (externalAddress != undefined) {
       // UPnP is supported, let's try to open the port
-      await this.upnpManager.map(ownPort)
+      await this.connectComponents.getUpnpManager().map(ownPort)
 
       // Don't trust the router blindly ...
       isExposedHost = await this.isExposedHost(externalAddress, ownPort)
@@ -672,15 +654,15 @@ class Listener extends EventEmitter implements InterfaceListener {
   private getUsableStunServers(ownHost: string, ownPort: number): Multiaddr[] {
     const filtered = []
 
-    let usableNodes: PeerStoreType[] = this.entry.getAvailabeEntryNodes()
+    let usableNodes: PeerStoreType[] = this.connectComponents.getEntryNodes().getAvailabeEntryNodes()
 
     if (usableNodes.length == 0) {
       // Use unchecked nodes at startup
-      usableNodes = this.entry.getUncheckedEntryNodes()
+      usableNodes = this.connectComponents.getEntryNodes().getUncheckedEntryNodes()
     }
 
     for (const usableNode of usableNodes) {
-      if (usableNode.id.equals(this.peerId)) {
+      if (usableNode.id.equals(this.components.getPeerId())) {
         // Exclude self
         continue
       }

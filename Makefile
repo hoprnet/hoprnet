@@ -4,6 +4,7 @@ all: help
 
 .PHONY: deps
 deps: ## install dependencies
+	corepack enable
 	yarn
 	command -v rustup && rustup update || echo "No rustup installed, ignoring"
 
@@ -55,10 +56,10 @@ build-docs-api: build
 
 .PHONY: test
 test: ## run unit tests for all packages, or a single package if package= is set
-ifdef package
-	yarn workspace @hoprnet/${package} run test
-else
+ifeq ($(package),)
 	yarn workspaces foreach -pv run test
+else
+	yarn workspace @hoprnet/${package} run test
 endif
 
 .PHONY: lint-check
@@ -80,6 +81,101 @@ endif
 .PHONY: docker-build-gcb
 docker-build-gcb: ## build Docker images on Google Cloud Build
 	./scripts/build-docker.sh --no-tags --force
+
+.PHONY: request-dev-nft
+request-dev-nft: ensure-environment-is-set
+request-dev-nft: ## Request one HoprBoost Dev NFT for the recipient given it has none and hasn't staked Dev NFT
+ifeq ($(recipient),)
+	echo "parameter <recipient> missing" >&2 && exit 1
+endif
+ifeq ($(origin PRIVATE_KEY),undefined)
+	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
+endif
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat request-dev-nft \
+   --network $(network) \
+   --recipient $(recipient) \
+   --privatekey "$(PRIVATE_KEY)"
+
+.PHONY: stake-funds
+stake-funds: ensure-environment-is-set
+stake-funds: ## stake funds (idempotent operation)
+ifeq ($(origin PRIVATE_KEY),undefined)
+	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
+endif
+	@TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+		yarn workspace @hoprnet/hopr-ethereum run hardhat stake \
+		--network $(network) \
+		--type xhopr \
+		--amount 1000000000000000000000 \
+		--privatekey "$(PRIVATE_KEY)"
+
+.PHONY: stake-devnft
+stake-devnft: ensure-environment-is-set
+stake-devnft: ## stake Dev NFTs (idempotent operation)
+ifeq ($(origin PRIVATE_KEY),undefined)
+	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
+endif
+	@TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+		yarn workspace @hoprnet/hopr-ethereum run hardhat stake \
+		--network $(network) \
+		--type devnft \
+		--privatekey "$(PRIVATE_KEY)"
+
+register-nodes: ensure-environment-is-set
+register-nodes: ## owner register given nodes in network registry contract
+ifeq ($(native_addresses),)
+	echo "parameter <native_addresses> missing" >&2 && exit 1
+endif
+ifeq ($(peer_ids),)
+	echo "parameter <peer_ids> missing" >&2 && exit 1
+endif
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
+   --network $(network) \
+   --task add \
+   --native-addresses "$(native_addresses)" \
+   --peer-ids "$(peer_ids)"
+
+.PHONY: self-register-node
+self-register-node: ensure-environment-is-set
+self-register-node: ## staker register a node in network registry contract
+ifeq ($(peer_id),)
+	echo "parameter <peer_id> missing" >&2 && exit 1
+endif
+ifeq ($(origin PRIVATE_KEY),undefined)
+	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
+endif
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat register:self \
+   --network $(network) \
+   --task add \
+   --peer-id "$(peer_id)" \
+   --privatekey "$(PRIVATE_KEY)"
+
+.PHONY: self-deregister-node
+self-deregister-node: ensure-environment-is-set
+self-deregister-node: ## staker deregister a node in network registry contract
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat register:self \
+   --network $(network) \
+   --task remove
+
+ensure-environment-is-set:
+ifeq ($(environment),)
+	echo "parameter <environment> missing" >&2 && exit 1
+else
+network != jq '.environments."$(environment)".network_id // empty' packages/core/protocol-config.json
+ifeq ($(network),)
+	echo "could not read environment info from protocol-config.json" >&2 && exit 1
+endif
+endif
 
 .PHONY: help
 help:

@@ -1,7 +1,7 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
+import { MIN_STAKE } from '../utils/constants'
 
 const PROTOCOL_CONFIG = require('../../core/protocol-config.json')
-const MIN_STAKE = 0
 const DUMMY_PROXY = 'HoprDummyProxyForNetworkRegistry'
 const STAKING_PROXY = 'HoprStakingProxyForNetworkRegistry'
 
@@ -12,7 +12,7 @@ const main = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await getNamedAccounts()
 
   const stakeAddress =
-    network.tags.testing || network.tags.development
+    network.tags.testing || network.tags.development || network.tags.staging
       ? (await deployments.get('HoprStake')).address
       : environmentConfig['stake_contract_address']
 

@@ -1,4 +1,4 @@
-import { type default as HoprCoreEthereum, type ChannelEntry } from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum, { type ChannelEntry } from '@hoprnet/hopr-core-ethereum'
 import {
   type AcknowledgedTicket,
   PublicKey,
@@ -58,7 +58,7 @@ export interface ChannelStrategyInterface {
 export abstract class SaneDefaults {
   async onWinningTicket(ackTicket: AcknowledgedTicket, chain: HoprCoreEthereum) {
     const counterparty = ackTicket.signer
-    log(`auto redeeming tickets in channel to ${counterparty.toPeerId().toB58String()}`)
+    log(`auto redeeming tickets in channel to ${counterparty.toPeerId().toString()}`)
     await chain.redeemTicketsInChannelByCounterparty(counterparty)
   }
 
@@ -66,7 +66,7 @@ export abstract class SaneDefaults {
     const counterparty = channel.source
     const selfPubKey = chain.getPublicKey()
     if (!counterparty.eq(selfPubKey)) {
-      log(`auto redeeming tickets in channel to ${counterparty.toPeerId().toB58String()}`)
+      log(`auto redeeming tickets in channel to ${counterparty.toPeerId().toString()}`)
       try {
         await chain.redeemTicketsInChannel(channel)
       } catch (err) {

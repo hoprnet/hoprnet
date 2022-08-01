@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.89.0-next.45",
+  "version": "1.89.0-next.81",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -19,7 +19,7 @@
     "rest-api-v2-spec.yaml"
   ],
   "engines": {
-    "node": "16"
+    "node": "16.15"
   },
   "scripts": {
     "clean:wasm": "make -C crates clean",
@@ -40,6 +40,8 @@
     "@hoprnet/hopr-core": "workspace:packages/core",
     "@hoprnet/hopr-real": "workspace:packages/real",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
+    "@libp2p/interface-peer-id": "1.0.2",
+    "@libp2p/peer-id": "1.1.13",
     "bn.js": "5.2.0",
     "body-parser": "1.19.2",
     "chalk": "5.0.1",
@@ -56,14 +58,13 @@
     "key-did-provider-ed25519": "1.1.0",
     "key-did-resolver": "1.4.4",
     "next": "12.1.0",
-    "peer-id": "0.16.0",
     "prop-types": "15.7.2",
     "react": "17.0.2",
     "react-dom": "17.0.2",
-    "rlp": "2.2.7",
+    "rlp": "3.0.0",
     "run-queue": "2.0.1",
     "semver": "7.3.7",
-    "strip-ansi": "6.0.1",
+    "strip-ansi": "7.0.1",
     "swagger-ui-express": "4.3.0",
     "tiny-hashes": "1.0.1",
     "trace-unhandled": "2.0.1",
@@ -75,7 +76,7 @@
     "@types/chai": "^4",
     "@types/cors": "2.8.12",
     "@types/js-cookie": "^3.0.1",
-    "@types/mocha": "9.1.0",
+    "@types/mocha": "9.1.1",
     "@types/react": "^17.0.2",
     "@types/supertest": "^2.0.11",
     "@types/yargs": "17.0.10",

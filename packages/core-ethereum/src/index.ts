@@ -1,6 +1,6 @@
 import { setImmediate } from 'timers/promises'
-import type { Multiaddr } from 'multiaddr'
-import type PeerId from 'peer-id'
+import type { Multiaddr } from '@multiformats/multiaddr'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import { ChainWrapper, createChainWrapper, Receipt } from './ethereum.js'
 import chalk from 'chalk'
 import {
@@ -362,7 +362,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       }
     }
 
-    log(`redemption of tickets from ${channel.source.toB58String()} is complete`)
+    log(`redemption of tickets from ${channel.source.toString()} is complete`)
     // delete operation before returning
     delete this.ticketRedemtionInChannelOperations[channelId]
   }

@@ -1,11 +1,11 @@
 import { RelayHandshake, RelayHandshakeMessage } from './handshake.js'
 import { u8aEquals, defer, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { duplexPair } from 'it-pair/duplex'
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import assert from 'assert'
 import type { Stream, StreamType } from '../types.js'
-import type Connection from 'libp2p-interfaces/src/connection/connection.js'
-import type { MuxedStream } from 'libp2p/src/upgrader.js'
+import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
+import { unmarshalPublicKey } from '@libp2p/crypto/keys'
 
 const initiator = privKeyToPeerId('0x695a1ad048d12a1a82f827a38815ab33aa4464194fa0bdb99f78d9c66ec21505')
 const relay = privKeyToPeerId('0xf0b8e814c3594d0c552d72fb3dfda7f0d9063458a7792369e7c044eda10f3b52')
@@ -29,7 +29,7 @@ describe('test relay handshake', function () {
   it('check initiating sequence', async function () {
     const [relayToInitiator, initiatorToRelay] = duplexPair<StreamType>()
 
-    const initiatorReceived = defer()
+    const initiatorReceived = defer<void>()
 
     const initiatorHandshake = new RelayHandshake(relayToInitiator)
     const relayHandshake = new RelayHandshake(initiatorToRelay)
@@ -50,19 +50,23 @@ describe('test relay handshake', function () {
             })() as AsyncIterable<Uint8Array>,
             sink: async function (source: Stream['source']) {
               for await (const msg of source) {
-                if (u8aEquals(msg.slice(), initiator.pubKey.marshal())) {
+                if (u8aEquals(msg.slice(), unmarshalPublicKey(initiator.publicKey as Uint8Array).marshal())) {
                   initiatorReceived.resolve()
                 }
               }
             }
-          } as MuxedStream,
+          } as ProtocolStream['stream'],
           conn: {
             close: async () => {}
           } as Connection,
           protocol: 'test'
         }
       },
-      getRelayState()
+      getRelayState(),
+      {
+        // We don't need the upgrader for this purpose
+        upgrader: undefined as any
+      }
     )
 
     await initiatorReceived.promise
@@ -71,11 +75,11 @@ describe('test relay handshake', function () {
   it('check forwarding sequence', async function () {
     const [destinationToRelay, relayToDestination] = duplexPair<StreamType>()
 
-    const okReceived = defer()
+    const okReceived = defer<void>()
 
     const relayHandshake = new RelayHandshake({
       source: (async function* () {
-        yield destination.pubKey.marshal()
+        yield unmarshalPublicKey(destination.publicKey as Uint8Array).marshal()
       })(),
       sink: async (source: Stream['source']) => {
         for await (const msg of source) {
@@ -92,14 +96,18 @@ describe('test relay handshake', function () {
       initiator,
       async () => {
         return {
-          stream: destinationToRelay as MuxedStream,
+          stream: destinationToRelay as ProtocolStream['stream'],
           conn: {
             close: async () => {}
           } as Connection,
           protocol: 'test'
         }
       },
-      getRelayState()
+      getRelayState(),
+      {
+        // We don't need the upgrader for this purpose
+        upgrader: undefined as any
+      }
     )
 
     await Promise.all([handshakePromise, destinationHandshake])
@@ -120,14 +128,18 @@ describe('test relay handshake', function () {
       initiator,
       async () => {
         return {
-          stream: destinationToRelay as MuxedStream,
+          stream: destinationToRelay as ProtocolStream['stream'],
           conn: {
             close: async () => {}
           } as Connection,
           protocol: 'test'
         }
       },
-      getRelayState(true)
+      getRelayState(true),
+      {
+        // We don't need the upgrader for this purpose
+        upgrader: undefined as any
+      }
     )
 
     const [initiatorResult, destinationResult] = await Promise.all([

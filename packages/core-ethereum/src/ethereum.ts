@@ -1,5 +1,5 @@
 import { setImmediate as setImmediatePromise } from 'timers/promises'
-import type { Multiaddr } from 'multiaddr'
+import type { Multiaddr } from '@multiformats/multiaddr'
 import {
   providers,
   utils,
@@ -34,7 +34,7 @@ const abiCoder = new utils.AbiCoder()
 export type Receipt = string
 export type ChainWrapper = Awaited<ReturnType<typeof createChainWrapper>>
 
-enum SendTransactionStatus {
+export enum SendTransactionStatus {
   SUCCESS = 'SUCCESS',
   DUPLICATE = 'DUPLICATE'
 }
@@ -212,14 +212,52 @@ export async function createChainWrapper(
     })
   }
 
-  const populateTransaction = async <T extends BaseContract>(
-    contract: T | string,
+  /**
+   * Build an essential transaction payload from contract parameters
+   * @param value amount of native token to send
+   * @param contract destination to send funds to or contract to execute the requested method
+   * @param method contract method
+   * @param rest contract method arguments
+   * @returns TransactionPayload
+   */
+  const buildEssentialTxPayload = <T extends BaseContract>(
     value: BigNumber | string | number,
-    nonce: number,
+    contract: T | string,
     method: keyof T['functions'],
-    rest: Parameters<T['functions'][keyof T['functions']]>
-  ) => {
+    ...rest: Parameters<T['functions'][keyof T['functions']]>
+  ): TransactionPayload => {
+    if (rest.length > 0 && typeof contract === 'string') {
+      throw Error(`sendTransaction: passing arguments to non-contract instances is not implemented`)
+    }
+
+    const essentialTxPayload: TransactionPayload = {
+      to: typeof contract === 'string' ? contract : contract.address,
+      data:
+        rest.length > 0 && typeof contract !== 'string'
+          ? contract.interface.encodeFunctionData(method as string, rest)
+          : '',
+      value: BigNumber.from(value ?? 0)
+    }
+    log('essentialTxPayload %o', essentialTxPayload)
+    return essentialTxPayload
+  }
+
+  /**
+   * Update nonce-tracker and transaction-manager, broadcast the transaction on chain, and listen
+   * to the response until reaching block confirmation.
+   * Transaction is built on essential transaction payload
+   * @param checkDuplicate If the flag is true (default), check if an unconfirmed (pending/mined) transaction with the same payload has been sent
+   * @param handleTxListener build listener to transaction hash
+   * @returns Promise of a ContractTransaction
+   */
+  const sendTransaction = async (
+    checkDuplicate: Boolean,
+    essentialTxPayload: TransactionPayload,
+    handleTxListener: (tx: string) => DeferType<string>
+  ): Promise<SendTransactionReturn> => {
     const gasLimit = 400e3
+    const nonceLock = await nonceTracker.getNonceLock(address)
+    const nonce = nonceLock.nextNonce
 
     let feeData: providers.FeeData
 
@@ -235,74 +273,28 @@ export async function createChainWrapper(
       }
     }
 
+    log('Sending transaction %o', {
+      gasLimit,
+      maxFeePerGas: feeData.maxFeePerGas,
+      maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
+      nonce
+    })
+
+    // breakdown steps in ethersjs
+    // https://github.com/ethers-io/ethers.js/blob/master/packages/abstract-signer/src.ts/index.ts#L122
+    // 1. omit this._checkProvider("sendTransaction");
+    // 2. populate transaction, from essential tx payload
     const populatedTx: UnsignedTransaction = {
-      to: typeof contract === 'string' ? contract : contract.address,
-      value,
+      to: essentialTxPayload.to,
+      value: essentialTxPayload.value,
       type: 2,
       nonce,
       gasLimit,
       maxFeePerGas: feeData.maxFeePerGas,
       maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
       chainId: providerChainId,
-      data:
-        rest.length > 0 && typeof contract !== 'string'
-          ? contract.interface.encodeFunctionData(method as string, rest)
-          : ''
+      data: essentialTxPayload.data
     }
-
-    const essentialTxPayload: TransactionPayload = {
-      to: populatedTx.to,
-      data: populatedTx.data as string,
-      value: BigNumber.from(value)
-    }
-
-    return { populatedTx, essentialTxPayload }
-  }
-
-  /**
-   * Update nonce-tracker and transaction-manager, broadcast the transaction on chain, and listen
-   * to the response until reaching block confirmation.
-   * @param checkDuplicate If the flag is true (default), check if an unconfirmed (pending/mined) transaction with the same payload has been sent
-   * @param value amount of native token to send
-   * @param contract destination to send funds to or contract to execute the requested method
-   * @param method contract method
-   * @param rest contract method arguments
-   * @returns Promise of a ContractTransaction
-   */
-  const sendTransaction = async <T extends BaseContract>(
-    checkDuplicate: Boolean,
-    value: BigNumber | string | number,
-    contract: T | string,
-    method: keyof T['functions'],
-    handleTxListener: (tx: string) => DeferType<string>,
-    ...rest: Parameters<T['functions'][keyof T['functions']]>
-  ): Promise<SendTransactionReturn> => {
-    if (rest.length > 0 && typeof contract === 'string') {
-      throw Error(`sendTransaction: passing arguments to non-contract instances is not implemented`)
-    }
-
-    const nonceLock = await nonceTracker.getNonceLock(address)
-
-    const { populatedTx, essentialTxPayload } = await populateTransaction(
-      contract,
-      value,
-      nonceLock.nextNonce,
-      method,
-      rest
-    )
-
-    log('Sending transaction %o', {
-      gasLimit: populatedTx.gasLimit,
-      maxFeePerGas: populatedTx.maxFeePerGas,
-      maxPriorityFeePerGas: populatedTx.maxPriorityFeePerGas,
-      nonce: populatedTx.nonce
-    })
-    log('essentialTxPayload %o', essentialTxPayload)
-
-    // breakdown steps in ethersjs
-    // https://github.com/ethers-io/ethers.js/blob/master/packages/abstract-signer/src.ts/index.ts#L122
-    // 1. omit this._checkProvider("sendTransaction");
-    // 2. populate transaction
 
     if (checkDuplicate) {
       const [isDuplicate, hash] = transactions.existInMinedOrPendingWithHigherFee(
@@ -332,7 +324,12 @@ export async function createChainWrapper(
     const initiatedHash = utils.keccak256(signedTx)
     const addedToQueue = transactions.addToQueuing(
       initiatedHash,
-      { nonce: populatedTx.nonce, maxPrority: BigNumber.from(populatedTx.maxPriorityFeePerGas) },
+      {
+        nonce: populatedTx.nonce,
+        maxPriority: BigNumber.from(populatedTx.maxPriorityFeePerGas),
+        maxFeePerGas: BigNumber.from(populatedTx.maxFeePerGas),
+        gasLimit: BigNumber.from(populatedTx.gasLimit)
+      },
       essentialTxPayload
     )
 
@@ -414,15 +411,14 @@ export async function createChainWrapper(
     let sendResult: SendTransactionReturn
     let error: unknown
     try {
-      sendResult = await sendTransaction(
-        checkDuplicate,
+      const confirmationEssentialTxPayload = buildEssentialTxPayload(
         0,
         channels,
         'announce',
-        txHandler,
         publicKey.toUncompressedPubKeyHex(),
         multiaddr.bytes
       )
+      sendResult = await sendTransaction(checkDuplicate, confirmationEssentialTxPayload, txHandler)
     } catch (err) {
       error = err
     }
@@ -453,14 +449,17 @@ export async function createChainWrapper(
   ): Promise<string> => {
     log('Withdrawing %s %s tokens', amount, currency)
     let sendResult: SendTransactionReturn
+    let withdrawEssentialTxPayload: TransactionPayload
     let error: unknown
     try {
       switch (currency) {
         case 'NATIVE':
-          sendResult = await sendTransaction(checkDuplicate, amount, recipient, undefined, txHandler)
+          withdrawEssentialTxPayload = buildEssentialTxPayload(amount, recipient, undefined)
+          sendResult = await sendTransaction(checkDuplicate, withdrawEssentialTxPayload, txHandler)
           break
         case 'HOPR':
-          sendResult = await sendTransaction(checkDuplicate, 0, token, 'transfer', txHandler, recipient, amount)
+          withdrawEssentialTxPayload = buildEssentialTxPayload(0, token, 'transfer', recipient, amount)
+          sendResult = await sendTransaction(checkDuplicate, withdrawEssentialTxPayload, txHandler)
           break
       }
     } catch (err) {
@@ -504,12 +503,10 @@ export async function createChainWrapper(
     let sendResult: SendTransactionReturn
     let error: unknown
     try {
-      await sendTransaction(
-        checkDuplicate,
+      const fundChannelEssentialTxPayload = buildEssentialTxPayload(
         0,
         token,
         'send',
-        txHandler,
         channels.address,
         totalFund.toString(),
         abiCoder.encode(
@@ -517,6 +514,7 @@ export async function createChainWrapper(
           [partyA.toHex(), partyB.toHex(), fundsA.toBN().toString(), fundsB.toBN().toString()]
         )
       )
+      sendResult = await sendTransaction(checkDuplicate, fundChannelEssentialTxPayload, txHandler)
     } catch (err) {
       error = err
     }
@@ -546,14 +544,13 @@ export async function createChainWrapper(
     let error: unknown
 
     try {
-      sendResult = await sendTransaction(
-        checkDuplicate,
+      const initiateChannelClosureEssentialTxPayload = buildEssentialTxPayload(
         0,
         channels,
         'initiateChannelClosure',
-        txHandler,
         counterparty.toHex()
       )
+      sendResult = await sendTransaction(checkDuplicate, initiateChannelClosureEssentialTxPayload, txHandler)
     } catch (err) {
       error
     }
@@ -586,14 +583,13 @@ export async function createChainWrapper(
     let error: unknown
 
     try {
-      sendResult = await sendTransaction(
-        checkDuplicate,
+      const finalizeChannelClosureEssentialTxPayload = buildEssentialTxPayload(
         0,
         channels,
         'finalizeChannelClosure',
-        txHandler,
         counterparty.toHex()
       )
+      sendResult = await sendTransaction(checkDuplicate, finalizeChannelClosureEssentialTxPayload, txHandler)
     } catch (err) {
       error = err
     }
@@ -626,12 +622,10 @@ export async function createChainWrapper(
     let sendResult: SendTransactionReturn
     let error: unknown
     try {
-      sendResult = await sendTransaction(
-        checkDuplicate,
+      const redeemTicketEssentialTxPayload = buildEssentialTxPayload(
         0,
         channels,
         'redeemTicket',
-        txHandler,
         counterparty.toHex(),
         ackTicket.preImage.toHex(),
         ackTicket.ticket.epoch.toHex(),
@@ -641,6 +635,7 @@ export async function createChainWrapper(
         ackTicket.ticket.winProb.toBN().toString(),
         ackTicket.ticket.signature.toHex()
       )
+      sendResult = await sendTransaction(checkDuplicate, redeemTicketEssentialTxPayload, txHandler)
     } catch (err) {
       error = err
     }
@@ -672,15 +667,14 @@ export async function createChainWrapper(
     let error: unknown
 
     try {
-      sendResult = await sendTransaction(
-        checkDuplicate,
+      const setCommitmentEssentialTxPayload = buildEssentialTxPayload(
         0,
         channels,
         'bumpChannel',
-        txHandler,
         counterparty.toHex(),
         commitment.toHex()
       )
+      sendResult = await sendTransaction(checkDuplicate, setCommitmentEssentialTxPayload, txHandler)
     } catch (err) {
       error = err
     }
@@ -813,7 +807,7 @@ export async function createChainWrapper(
     redeemTicket,
     getGenesisBlock: () => genesisBlock,
     setCommitment,
-    sendTransaction: provider.sendTransaction.bind(provider) as typeof provider['sendTransaction'],
+    sendTransaction, //: provider.sendTransaction.bind(provider) as typeof provider['sendTransaction'],
     waitUntilReady: async () => await provider.ready,
     getLatestBlockNumber, // TODO: use indexer when it's done syncing
     subscribeBlock,

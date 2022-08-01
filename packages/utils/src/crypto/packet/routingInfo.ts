@@ -7,7 +7,8 @@ import { PRG } from '../prg.js'
 import { generateFiller } from './filler.js'
 import { createMAC } from './mac.js'
 import secp256k1 from 'secp256k1'
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { unmarshalPublicKey } from '@libp2p/crypto/keys'
 
 /**
  * Creates the routing information of the mixnet packet
@@ -79,7 +80,7 @@ export function createRoutingInfo(
       extendedHeader.copyWithin(routingInfoLength, 0, headerLength)
 
       // Add pubkey of next downstream node
-      extendedHeader.set(path[invIndex + 1].pubKey.marshal())
+      extendedHeader.set(unmarshalPublicKey(path[invIndex + 1].publicKey).marshal())
 
       extendedHeader.set(mac, SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH)
 

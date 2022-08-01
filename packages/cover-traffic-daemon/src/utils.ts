@@ -91,7 +91,7 @@ export function totalChannelBalanceFor(p: PublicKey, state: State): BN {
 export function stakeFor(p: PublicKey, state: State): BN {
   let linkedAccounts: UnreleasedTokens['link'][string] = null
 
-  const b58String = p.toB58String()
+  const b58String = p.toString()
   for (const id in unreleasedTokens.link) {
     // Base58 encoding is case-sensitive
     if (id === b58String) {
@@ -223,16 +223,16 @@ export const sendCTMessage = async (
     // build the complete path
     path.unshift(startNode) // Path doesn't normally include this
 
-    log(`SEND ${path.map((pub) => pub.toB58String()).join(',')}`)
+    log(`SEND ${path.map((pub) => pub.toString()).join(',')}`)
   } catch (e) {
     return false
   }
   try {
     await sendMessage(message, path)
-    log(`success sending ${path.map((pub) => pub.toB58String()).join(',')} message ${message}`)
+    log(`success sending ${path.map((pub) => pub.toString()).join(',')} message ${message}`)
     return true
   } catch (e) {
-    log(`error ${e} sending to ${startNode.toB58String()}`)
+    log(`error ${e} sending to ${startNode.toString()}`)
     return false
   }
 }

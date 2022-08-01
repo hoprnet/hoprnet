@@ -1,5 +1,5 @@
 import { type StrategyTickResult, SaneDefaults, type ChannelStrategyInterface } from '@hoprnet/hopr-core'
-import { type default as Hopr } from '@hoprnet/hopr-core'
+import Hopr from '@hoprnet/hopr-core'
 import type BN from 'bn.js'
 import { type PublicKey, type ChannelEntry, ChannelStatus } from '@hoprnet/hopr-utils'
 import type { PersistedState, State } from './state.js'
@@ -68,21 +68,21 @@ export class CoverTrafficStrategy extends SaneDefaults implements ChannelStrateg
 
       // Cover traffic channels with quality below this threshold will be closed
       if (quality < CT_NETWORK_QUALITY_THRESHOLD) {
-        log(`closing channel ${channel.destination.toB58String()} with quality < ${CT_NETWORK_QUALITY_THRESHOLD}`)
+        log(`closing channel ${channel.destination.toString()} with quality < ${CT_NETWORK_QUALITY_THRESHOLD}`)
         tickResult.toClose.push({
           destination: channel.destination
         })
       }
       // If the HOPR token balance of the current CT node is no larger than the `MINIMUM_STAKE_BEFORE_CLOSURE`, close all the non-closed channels.
       if (channel.balance.toBN().lt(MINIMUM_STAKE_BEFORE_CLOSURE)) {
-        log(`closing channel with balance too low ${channel.destination.toB58String()}`)
+        log(`closing channel with balance too low ${channel.destination.toString()}`)
         tickResult.toClose.push({
           destination: channel.destination
         })
       }
       // Close the cover-traffic channel when the number of failed messages meets the threshold. Reset the failed message counter.
       if (this.data.messageFails(channel.destination) > MESSAGE_FAIL_THRESHOLD) {
-        log(`closing channel with too many message fails: ${channel.destination.toB58String()}`)
+        log(`closing channel with too many message fails: ${channel.destination.toString()}`)
         this.data.resetMessageFails(channel.destination)
         tickResult.toClose.push({
           destination: channel.destination
@@ -120,9 +120,7 @@ export class CoverTrafficStrategy extends SaneDefaults implements ChannelStrateg
     this.data.setCTChannels(ctChannels)
     log(
       'channels',
-      ctChannels
-        .map((c: CtChannel) => `${c.destination.toB58String()} - ${c.latestQualityOf}, ${c.openFrom}`)
-        .join('; ')
+      ctChannels.map((c: CtChannel) => `${c.destination.toString()} - ${c.latestQualityOf}, ${c.openFrom}`).join('; ')
     )
 
     // Network must have at least some channels to create a full cover-traffic loop.
@@ -144,7 +142,7 @@ export class CoverTrafficStrategy extends SaneDefaults implements ChannelStrateg
 
           if (!success) {
             log(
-              `failed to send to ${openChannel.destination.toB58String()} fails: ${this.data.messageFails(
+              `failed to send to ${openChannel.destination.toString()} fails: ${this.data.messageFails(
                 openChannel.destination
               )}`
             )
@@ -155,18 +153,18 @@ export class CoverTrafficStrategy extends SaneDefaults implements ChannelStrateg
         } else if (channel && channel.status == ChannelStatus.WaitingForCommitment) {
           if (Date.now() - openChannel.openFrom >= CT_CHANNEL_STALL_TIMEOUT) {
             // handle waiting for commitment stalls
-            log('channel is stalled in WAITING_FOR_COMMITMENT, closing', openChannel.destination.toB58String())
+            log('channel is stalled in WAITING_FOR_COMMITMENT, closing', openChannel.destination.toString())
             tickResult.toClose.push({
               destination: openChannel.destination
             })
           } else {
-            log('channel is WAITING_FOR_COMMITMENT, waiting', openChannel.destination.toB58String())
+            log('channel is WAITING_FOR_COMMITMENT, waiting', openChannel.destination.toString())
           }
         } else {
           log(
             `Unknown error with open CT channels. Channel is ${
               channel.status
-            }; openChannel is to ${openChannel.destination.toB58String()} since ${openChannel.openFrom} with quality ${
+            }; openChannel is to ${openChannel.destination.toString()} since ${openChannel.openFrom} with quality ${
               openChannel.latestQualityOf
             }`
           )
@@ -204,7 +202,7 @@ export class CoverTrafficStrategy extends SaneDefaults implements ChannelStrateg
         continue
       }
 
-      log(`opening ${choice.toB58String()}`)
+      log(`opening ${choice.toString()}`)
       currentChannelNum++
       tickResult.toOpen.push({
         destination: choice,
@@ -214,9 +212,9 @@ export class CoverTrafficStrategy extends SaneDefaults implements ChannelStrateg
 
     log(
       `strategy tick: ${Date.now()} balance:${balance.toString()} open:${tickResult.toOpen
-        .map((p: StrategyTickResult['toOpen'][number]) => p.destination.toPeerId().toB58String())
+        .map((p: StrategyTickResult['toOpen'][number]) => p.destination.toPeerId().toString())
         .join(',')} close: ${tickResult.toClose
-        .map((p: StrategyTickResult['toClose'][number]) => p.destination.toPeerId().toB58String())
+        .map((p: StrategyTickResult['toClose'][number]) => p.destination.toPeerId().toString())
         .join(',')}`.replace('\n', ', ')
     )
     return tickResult

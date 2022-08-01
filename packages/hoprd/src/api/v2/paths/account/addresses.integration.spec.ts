@@ -29,9 +29,9 @@ describe('GET /account/addresses', () => {
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({
       native: ALICE_ETH_ADDRESS.toString(),
-      hopr: ALICE_PEER_ID.toB58String(),
+      hopr: ALICE_PEER_ID.toString(),
       nativeAddress: ALICE_ETH_ADDRESS.toString(),
-      hoprAddress: ALICE_PEER_ID.toB58String()
+      hoprAddress: ALICE_PEER_ID.toString()
     })
   })
 })

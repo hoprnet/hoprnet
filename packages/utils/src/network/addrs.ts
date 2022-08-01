@@ -1,9 +1,9 @@
-import { stringToU8a, u8aToHex } from '../index.js'
+import { stringToU8a, u8aToHex } from '../u8a/index.js'
 import { PRIVATE_NETWORKS, LINK_LOCAL_NETWORKS, LOOPBACK_ADDRS, RESERVED_ADDRS, type Network } from './constants.js'
 
 import { networkInterfaces, type NetworkInterfaceInfo } from 'os'
-import PeerId from 'peer-id'
-import { Multiaddr } from 'multiaddr'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { Multiaddr } from '@multiformats/multiaddr'
 
 /**
  * Checks if given address is any address
@@ -288,5 +288,5 @@ export function getLocalHosts(_iface?: string): Network[] {
  * @param destination Destination peer ID
  */
 export function createCircuitAddress(relay: PeerId, destination: PeerId) {
-  return new Multiaddr(`/p2p/${relay.toB58String()}/p2p-circuit/p2p/${destination.toB58String()}`)
+  return new Multiaddr(`/p2p/${relay.toString()}/p2p-circuit/p2p/${destination.toString()}`)
 }

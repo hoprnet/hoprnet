@@ -50,16 +50,12 @@ const FeatureList = [
     description: <>Documentations and guides of dApps built on HOPR.</>,
     docName: 'dapps/myne-chat'
   },
-  /*{
+  {
     title: 'Ecosystem',
-    Svg: <img class="svg_icon" src={'/img/front_icons/hopr-ecosystem.svg'}/>,
-    description: (
-      <>
-        Broader stuff built on top of HOPR.
-      </>
-    ),
-        docName: ('#'),
-  },*/
+    Svg: <img class="svg_icon" src={'/img/front_icons/hopr-ecosystem.svg'} />,
+    description: <>Everything you need to know about HOPR's ecosystem.</>,
+    docName: 'ecosystem/introduction'
+  },
   {
     title: 'FAQ',
     Svg: <img class="svg_icon" src={'/img/front_icons/hopr-faqs.svg'} />,

@@ -16,7 +16,7 @@ const pathFrom = (c: ChannelPath): Path => c.path.map((ce) => ce.destination) //
 const filterCycles = (c: ChannelEntry, p: ChannelPath): boolean => !pathFrom(p).find((x) => x.eq(c.destination))
 const debugPath = (p: ChannelPath) =>
   pathFrom(p)
-    .map((x) => x.toB58String())
+    .map((x) => x.toString())
     .join(',')
 
 // Weight a node based on stake, and a random component.
@@ -43,7 +43,7 @@ export async function findPath(
   getOpenChannelsFromPeer: (p: PublicKey) => Promise<ChannelEntry[]>,
   weight = defaultWeight
 ): Promise<Path> {
-  log('find path from', start.toB58String(), 'to ', destination.toB58String(), 'length', hops)
+  log('find path from', start.toString(), 'to ', destination.toString(), 'length', hops)
 
   // Weight the path with the sum of its' edges weight
   const pathWeight = async (a: ChannelEntry[]): Promise<BN> => (await Promise.all(a.map(weight))).reduce(sum, new BN(0))

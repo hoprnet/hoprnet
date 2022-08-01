@@ -1,4 +1,4 @@
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 
 export enum SettingKey {
   STRATEGY = 'strategy',
