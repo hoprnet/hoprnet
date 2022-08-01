@@ -374,11 +374,11 @@ async function main() {
     logs.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
     try {
       let decodedMsg = decodeMessage(msg)
-      logs.log(`Message: ${decodedMsg.msg.toString()}`)
+      logs.log(`Message: ${decodedMsg.msg}`)
       logs.log(`Latency: ${decodedMsg.latency} ms`)
 
       // also send it tagged as message for apps to use
-      logs.logMessage(decodedMsg.msg.toString())
+      logs.logMessage(decodedMsg.msg)
     } catch (err) {
       logs.log('Could not decode message', err instanceof Error ? err.message : 'Unknown error')
       logs.log(msg.toString())
