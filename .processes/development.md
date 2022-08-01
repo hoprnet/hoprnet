@@ -339,7 +339,8 @@ Since PRs should link to an issue, it's not necessary to label PRs. However, som
    merged. Use common sense to decide when you should do which one.
 
 5. If a PR is deprioritised and has remained unmerged, the original author is responsible
-   for frequenlty merging master into it so it does not diverge or closing the PR.
+   for frequenlty merging master into it so it does not diverge, if PR is no longer relevant
+   it must be closed.
 
 #### Releases
 
