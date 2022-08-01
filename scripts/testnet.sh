@@ -191,21 +191,23 @@ start_local_hardhat() {
 # $1 prefix, e.g. "e2e-source"
 # $2 identity file directory, e.g. "/tmp"
 # $3 password, e.g. "dummy e2e password"
-# $4 additional address, e.g CT node address
+# $4 optional: additional address, e.g CT node address
 fund_nodes() {
+  local node_prefix="${1}"
+  local tmp_dir="${2}"
+  local password="${3}"
   local addr_arg=""
-  [[ -n "$4" ]] && addr_arg="--address $4"
-
+  [[ -n "${4:-}" ]] && addr_arg="--address ${4}"
 
   HOPR_ENVIRONMENT_ID=hardhat-localhost \
-    TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
+  TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
     yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
       --identity-prefix "${node_prefix}" \
       --identity-directory "${tmp}" \
       --use-local-identities \
       --network hardhat \
       --password "${password}" \
-      $addr_arg
+      ${addr_arg}
 }
 
 
