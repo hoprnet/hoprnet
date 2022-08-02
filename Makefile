@@ -199,6 +199,21 @@ endif
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-devnft
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_id=$(shell ./scripts/get-hopr-address.sh "$(endpoint)")
 
+.PHONY: register-node-with-stake
+# node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'
+register-node: ensure-environment-is-set
+ifeq ($(endpoint),)
+	echo "parameter <endpoint> is default to localhost:3001" >&2
+endif
+ifeq ($(account),)
+	echo "parameter <account> missing" >&2 && exit 1
+endif
+ifeq ($(origin ACCOUNT_PRIVKEY),undefined)
+	echo "<ACCOUNT_PRIVKEY> environment variable missing" >&2 && exit 1
+endif
+	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-funds
+	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_id=$(shell ./scripts/get-hopr-address.sh "$(endpoint)")
+
 ensure-environment-is-set:
 ifeq ($(environment),)
 	echo "parameter <environment> missing" >&2 && exit 1
