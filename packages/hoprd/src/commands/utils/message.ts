@@ -19,13 +19,13 @@ export function decodeMessage(encoded: Uint8Array): {
   latency: number
   msg: string
 } {
-  let msg: Buffer, time: Buffer
+  let msg: Uint8Array, time: Uint8Array
   try {
-    ;[msg, time] = RLP.decode(encoded) as [Buffer, Buffer]
+    ;[msg, time] = RLP.decode(encoded) as [Uint8Array, Uint8Array]
 
     return {
-      latency: Date.now() - parseInt(time.toString('hex'), 16),
-      msg: msg.toString()
+      latency: Date.now() - Buffer.from(time).readUintBE(0, time.length),
+      msg: new TextDecoder().decode(msg)
     }
   } catch (err) {
     styleValue(

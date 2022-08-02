@@ -13,7 +13,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const HoprBoost = await deployments.get('HoprBoost')
   // xHOPR can be a contract automatically deployed by the bridge (on xDAI/Gnosis chain)
   const xHOPR =
-    network.tags.testing || network.tags.development
+    network.tags.testing || network.tags.development || network.tags.staging
       ? await deployments.get('xHoprMock')
       : environmentConfig['minted_token_receiver_address']
   const wxHOPR = await deployments.get('HoprToken')
@@ -41,6 +41,6 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 main.tags = ['HoprStake']
 main.dependencies = ['preDeploy', 'HoprBoost', 'HoprToken']
-main.skip = async (env: HardhatRuntimeEnvironment) => !!env.network.tags.production || !!env.network.tags.staging
+main.skip = async (env: HardhatRuntimeEnvironment) => !!env.network.tags.production
 
 export default main

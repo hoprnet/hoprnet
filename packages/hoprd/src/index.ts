@@ -1,5 +1,4 @@
 import { passwordStrength } from 'check-password-strength'
-import RLP from 'rlp'
 import path from 'path'
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
@@ -29,6 +28,7 @@ import { Commands } from './commands/index.js'
 import { LogStream } from './logs.js'
 import { getIdentity } from './identity.js'
 import { register as registerUnhandled, setLogger } from 'trace-unhandled'
+import { decodeMessage } from './commands/utils/index.js'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
@@ -373,12 +373,12 @@ async function main() {
   const logMessageToNode = (msg: Uint8Array): void => {
     logs.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
     try {
-      let [decoded, time] = RLP.decode(msg) as [Buffer, Buffer]
-      logs.log(`Message: ${decoded.toString()}`)
-      logs.log(`Latency: ${Date.now() - parseInt(time.toString('hex'), 16)}ms`)
+      let decodedMsg = decodeMessage(msg)
+      logs.log(`Message: ${decodedMsg.msg}`)
+      logs.log(`Latency: ${decodedMsg.latency} ms`)
 
       // also send it tagged as message for apps to use
-      logs.logMessage(decoded.toString())
+      logs.logMessage(decodedMsg.msg)
     } catch (err) {
       logs.log('Could not decode message', err instanceof Error ? err.message : 'Unknown error')
       logs.log(msg.toString())
