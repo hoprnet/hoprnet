@@ -35,7 +35,7 @@ To stake xHOPR tokens, you can interact directly with the staking contract of th
 For the <mark>staging environment</mark>, please call the following function where the `PRIVATE_KEY` is the private key of the node runner's account. This call can only succeed if the caller (i.e. the `PRIVATE_KEY` or the node runner) has enough xHOPR (on goerli staging environment).
 
 ```
-PRIVATE_KEY<private key of "account"> make stake-funds environment=master-goerli network=goerli
+PRIVATE_KEY=<private key of "account"> make stake-funds environment=master-goerli network=goerli
 ```
 
 If there's not enough xHOPR token, please use "Dev Bank" account to transfer some to the node runner's account.
@@ -119,8 +119,8 @@ yarn workspace @hoprnet/hopr-ethereum hardhat register --network goerli --task e
 4. Save private keys (`ACCOUNT_PRIVKEY` and `DEV_BANK_PRIVKEY`) into `.env` file
 
 ```
-ACCOUNT_PRIVKEY=<account_private_key>
-DEV_BANK_PRIVKEY=<dev_bank_private_key>
+export ACCOUNT_PRIVKEY=<account_private_key>
+export DEV_BANK_PRIVKEY=<dev_bank_private_key>
 ```
 
 and
