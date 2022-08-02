@@ -139,4 +139,24 @@ provide `<hoprd_endpoint>` when it's different from `localhost:3001`
 
 ### Option 2: stake tokens and register your node on NR
 
-TBD
+1. Create a MetaMask wallet (note as “account”)
+2. Fund 1 Goerli ETH (from “DevBank” or from the faucet) to the “account”
+3. Fund 1000 txHOPR from “DevBank” to the “account”
+4. Start your local HOPR node
+5. Save private keys (`ACCOUNT_PRIVKEY`) into `.env` file
+
+```
+ACCOUNT_PRIVKEY=<account_private_key>
+```
+
+and
+
+```
+source .env
+```
+
+4. Run
+
+```
+make register-node-with-stake environment=master-goerli network=goerli
+```
