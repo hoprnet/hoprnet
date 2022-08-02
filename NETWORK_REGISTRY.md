@@ -32,10 +32,10 @@ A node can be registered by its runner if the runner is eligible. There are two 
 
 To stake xHOPR tokens, you can interact directly with the staking contract of the environment your HOPR node is running on. For production network, there is even a web application for such a purpose.
 
-For the <mark>staging environment</mark>, please call the following function where the `privatekey` is the private key of the node runner's account. This call can only succeed if the caller (i.e. the `privatekey` or the node runner) has enough xHOPR (on goerli staging environment).
+For the <mark>staging environment</mark>, please call the following function where the `PRIVATE_KEY` is the private key of the node runner's account. This call can only succeed if the caller (i.e. the `PRIVATE_KEY` or the node runner) has enough xHOPR (on goerli staging environment).
 
 ```
-make stake-funds environment=master-goerli network=goerli privkey=<private key of “account”>
+PRIVATE_KEY<private key of "account"> make stake-funds environment=master-goerli network=goerli
 ```
 
 If there's not enough xHOPR token, please use "Dev Bank" account to transfer some to the node runner's account.
@@ -46,30 +46,30 @@ If there's not enough xHOPR token, please use "Dev Bank" account to transfer som
 
 There are 10 "Dev" NFTs being minted to the "Dev Bank" account per deployment, where you can transfer some tokens from.
 
-For the <mark>staging environment</mark>, please call the following function where the `privatekey` is the private key of the node runner's account. This call can only succeed if the caller (i.e. the `privatekey` or the node runner) has "Dev" NFT (on goerli staging environment).
+For the <mark>staging environment</mark>, please call the following function where the `PRIVATE_KEY` is the private key of the node runner's account. This call can only succeed if the caller (i.e. the `PRIVATE_KEY` or the node runner) has "Dev" NFT (on goerli staging environment).
 
 ```
-make stake-devnft environment=master-goerli network=goerli privkey=<private key of “account”>
+PRIVATE_KEY<private key of "account"> make stake-devnft environment=master-goerli network=goerli
 ```
 
 ### Register the peer ID
 
 An eligible node runner can call `selfRegister(string hoprPeerId)` method from `HoprNetworkRegistry` smart contract to register its HOPR node. Note that only one node per account is allowed for registration. If a node has been registered by the caller, the caller must deregister the old peerId before registering a new one.
 
-For the <mark>staging environment</mark>, please call the following function where the `privatekey` is the private key of the node runner's account. This call can only succeed if the caller (i.e. the `privatekey` or the node runner) is eligible (having enough stake or a "Dev" NFT).
+For the <mark>staging environment</mark>, please call the following function where the `PRIVATE_KEY` is the private key of the node runner's account. This call can only succeed if the caller (i.e. the `PRIVATE_KEY` of the node runner) is eligible (having enough stake or a "Dev" NFT).
 
 ```
-make self-register-node environment=master-goerli network=goerli privkey=<private key of “account”> peer-id <peer id>
+PRIVATE_KEY=<private key of “account”> make self-register-node environment=master-goerli network=goerli peer-id=<peer id>
 ```
 
 ## Deregister a node
 
 A node runner can call `selfDeregister()` method from `HoprNetworkRegistry` smart contract to de-register an old HOPR node.
 
-For the <mark>staging environment</mark>, please call the following function where the `privatekey` is the private key of the node runner's account.
+For the <mark>staging environment</mark>, please call the following function where the `PRIVATE_KEY` is the private key of the node runner's account.
 
 ```
-yarn workspace @hoprnet/hopr-ethereum hardhat register:self --network goerli --task remove --privatekey 0x6789...
+PRIVATE_KEY=<private key of “account”> make self-deregister-node environment=master-goerli network=goerli
 ```
 
 ## Register a node by the Network Registry contract owner
@@ -82,20 +82,16 @@ Owner can register any account for any node. The eligibility of an account is no
 
 Owner can call `ownerRegister(address[] accounts, string[] hoprPeerIds)` method from `HoprNetworkRegistry` smart contract to register a list of HOPR nodes for a list of accounts respectively. Note that this registration can overwrite existing entries.
 
-For the <mark>staging environment</mark>, please call the following function where the `privatekey` is the private key of the owner.
-
 ```
-yarn workspace @hoprnet/hopr-ethereum hardhat register --network goerli --task add --nativeAddresses <address1,address2,address3,address4> --peerIds <peerid1,peerid2,peerid3,peerid4>
+make register-nodes environment=master-goerli network=goerli --native-addresses=<address1,address2,address3,address4> --peer-ids=<peerid1,peerid2,peerid3,peerid4>
 ```
 
 ## Deregister a node
 
 Owner can call `ownerDeregister(address[] accounts)` method from `HoprNetworkRegistry` smart contract to de-register for a list of accounts.
 
-For the <mark>staging environment</mark>, please call the following function where the `privatekey` is the private key of the owner.
-
 ```
-yarn workspace @hoprnet/hopr-ethereum hardhat register --network goerli --task remove --nativeAddresses <address1,address2,address3,address4>
+make deregister-nodes environment=master-goerli network=goerli --native-addresses=<address1,address2,address3,address4>
 ```
 
 ## Enable and disable globally
@@ -113,24 +109,9 @@ or
 yarn workspace @hoprnet/hopr-ethereum hardhat register --network goerli --task enable
 ```
 
-## Internal NR testing - obtain a dev NFT and register your node on NR
+## Internal NR testing
 
-1. Create a MetaMask wallet (note as “account”)
-2. Send 1 Goerli ETH from “DevBank” to the “account”
-3. Request a Dev NFT from "DevBank" with `make request-dev-nft environment=master-goerli network=goerli privkey=<private key of "DevBank"> recipient=<"account">`.
-4. Stake NFT `make stake-devnft environment=master-goerli network=goerli privkey=<private key of “account”>` It detects if the “account” needs to stake Dev NFT and stake
-5. Start your Hopr node and copy node’s “Peer ID”
-6. Register "Peer ID" with `make self-register-node environment=master-goerli network=goerli privkey=<private key of “account”> peer-id <peer id>`. If the "account" has registered with a different "Peer ID", a deregister needs to be done with `make self-deregister-node environment=master-goerli network=goerli privkey=<private key of “account”>`
-7. Fund the HOPR node as usual
-
-Or
-
-1. Create a MetaMask wallet (note as “account”)
-2. Fund 1 Goerli ETH (from “DevBank” or from the faucet) to the “account”
-3. Start your local HOPR node
-4. Run `HOPRD_API_TOKEN=<hoprd_api_token> ACCOUNT_PRIVKEY=<account_private_key> DEV_BANK_PRIVKEY==<dev_bank_private_key> ./scripts/register-node.sh 0x35A3e15A2E2C297686A4fac5999647312fdDfa3f <hopr_api>`. Provide `<hopr_api>` when it's different from `localhost:3001`
-
-Or
+### Option 1: obtain a dev NFT and register your node on NR
 
 1. Create a MetaMask wallet (note as “account”)
 2. Fund 1 Goerli ETH (from “DevBank” or from the faucet) to the “account”
@@ -155,3 +136,7 @@ make register-node endpoint=<hoprd_endpoint> account=<staking_account> environme
 ```
 
 provide `<hoprd_endpoint>` when it's different from `localhost:3001`
+
+### Option 2: stake tokens and register your node on NR
+
+TBD
