@@ -170,6 +170,9 @@ self-deregister-node: ## staker deregister a node in network registry contract
 .PHONY: register-node
 # node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'
 register-node: ensure-environment-is-set
+ifeq ($(endpoint),)
+	echo "parameter <endpoint> is default to localhost:3001" >&2
+endif
 ifeq ($(account),)
 	echo "parameter <account> missing" >&2 && exit 1
 endif
@@ -179,9 +182,9 @@ endif
 ifeq ($(origin DEV_BANK_PRIVKEY),undefined)
 	echo "<DEV_BANK_PRIVKEY> environment variable missing" >&2 && exit 1
 endif
-	make self-register-node privkey=${ACCOUNT_PRIVKEY} peer_id=$(shell ./scripts/get-hopr-address.sh "$(or $(endpoint), localhost:3001)")
-	make request-dev-nft privkey=${DEV_BANK_PRIVKEY} recipient=${account}
-	make stake-devnft privkey=${ACCOUNT_PRIVKEY}
+	PRIVATE_KEY=${DEV_BANK_PRIVKEY} make request-dev-nft recipient=${account}
+	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-devnft
+	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_id=$(shell ./scripts/get-hopr-address.sh "$(endpoint)")
 
 ensure-environment-is-set:
 ifeq ($(environment),)
