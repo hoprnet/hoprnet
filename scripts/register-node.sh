@@ -45,21 +45,18 @@ declare dev_bank_privkey="${DEV_BANK_PRIVKEY:-}"
 declare peer_id="$(get_hopr_address "${api_token}@${node_api}")"
 
 # Request a Dev NFT from DevBank
-make request-dev-nft \
+PRIVATE_KEY="${dev_bank_privkey}" make request-dev-nft \
     environment=master-goerli \
     network=goerli \
-    privkey="${dev_bank_privkey}" \
     recipient="${account}"
 
 # Stake NFT
-make stake-devnft \
+PRIVATE_KEY="${account_privkey}" make stake-devnft \
     environment=master-goerli \ 
-    network=goerli \ 
-    privkey="${account_privkey}"
+    network=goerli
 
 # Register "Peer ID" on Network Registry
-make self-register-node \
+PRIVATE_KEY="${account_privkey}" make self-register-node \
     environment=master-goerli \
     network=goerli \
-    privkey="${account_privkey}" \
     peer_id=${peer_id}"
