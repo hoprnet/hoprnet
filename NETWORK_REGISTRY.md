@@ -83,7 +83,7 @@ Owner can register any account for any node. The eligibility of an account is no
 Owner can call `ownerRegister(address[] accounts, string[] hoprPeerIds)` method from `HoprNetworkRegistry` smart contract to register a list of HOPR nodes for a list of accounts respectively. Note that this registration can overwrite existing entries.
 
 ```
-make register-nodes environment=master-goerli network=goerli --native-addresses=<address1,address2,address3,address4> --peer-ids=<peerid1,peerid2,peerid3,peerid4> 
+make register-nodes environment=master-goerli network=goerli --native-addresses=<address1,address2,address3,address4> --peer-ids=<peerid1,peerid2,peerid3,peerid4>
 ```
 
 ## Deregister a node
@@ -109,7 +109,7 @@ or
 yarn workspace @hoprnet/hopr-ethereum hardhat register --network goerli --task enable
 ```
 
-## Internal NR testing 
+## Internal NR testing
 
 ### Option 1: obtain a dev NFT and register your node on NR
 
