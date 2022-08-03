@@ -9,7 +9,7 @@ export const SYMBOL = 'HOPR Boost'
 export const BASIC_START = 1627387200 // July 27 2021 14:00 CET.
 export const PROGRAM_END = 1642424400 // Jan 17 2022 14:00 CET.
 
-export const baseURI = 'hoprboost.eth.link/'
+export const baseURI = 'hoprboost.eth.limo/'
 export const BADGES = [
   {
     type: 'HODLr',
