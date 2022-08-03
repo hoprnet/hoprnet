@@ -1,7 +1,7 @@
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
-import { DeployFunction } from 'hardhat-deploy/types'
+import type { DeployFunction } from 'hardhat-deploy/types'
 import type { HoprBoost, ERC677Mock } from '../src/types'
-import { utils } from 'ethers'
+import { type ContractTransaction, utils } from 'ethers'
 import { CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES, DEV_NFT_BOOST, DEV_NFT_TYPE, MIN_STAKE } from '../utils/constants'
 import type { HoprStakingProxyForNetworkRegistry } from '../src/types'
 
@@ -71,7 +71,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     // mint all the dummy NFTs (especially those are blocked in the constructor). Mint some dev NFTs
     while (index <= blockNftTypeMax || index <= devNftIndex) {
       console.log(`Minting type of index ${index}`)
-      let mintTx
+      let mintTx: ContractTransaction
       if (index === devNftIndex) {
         mintTx = await hoprBoost.batchMint(
           new Array(NUM_DEV_NFT).fill(admin),

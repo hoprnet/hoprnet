@@ -1,11 +1,11 @@
-import { HardhatRuntimeEnvironment } from 'hardhat/types'
-import { DeployFunction } from 'hardhat-deploy/types'
+import type { HardhatRuntimeEnvironment } from 'hardhat/types'
+import type { DeployFunction } from 'hardhat-deploy/types'
 import type { ERC677Mock } from '../src/types'
 
 const MINTED_AMOUNT = '5000000'
 
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const { ethers, deployments, getNamedAccounts, environment } = hre
+  const { ethers, deployments, getNamedAccounts, environment, maxFeePerGas, maxPriorityFeePerGas } = hre
   const { admin } = await getNamedAccounts()
   const deployer = await getNamedAccounts().then((o) => ethers.getSigner(o.deployer))
 
@@ -21,6 +21,8 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const xHoprContract = await deployments.deploy('xHoprMock', {
     contract: 'ERC677Mock',
     from: deployer.address,
+    maxFeePerGas,
+    maxPriorityFeePerGas,
     ...deployOptions
   })
   console.log(`xHoprMock deployed at ${xHoprContract.address}`)
