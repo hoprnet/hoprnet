@@ -345,7 +345,7 @@ jobs:
         rust: ['stable']
 
     runs-on: ${{ matrix.os }}
-    needs: [  deploy_public_instances ] # Public nodes need to be deployed first
+    needs: [deploy_public_instances] # Public nodes need to be deployed first
     steps:
       - uses: actions/checkout@v3
         with:
