@@ -195,7 +195,7 @@ Once the release testing has concluded, or if any signifant amount of patches we
    2. Revert any chain specific changes.
    3. Revert changes made to Avado configuration files as part of the initial release creation.
 3. merge the `merge-back-release-${RELEASE_NAME}` PR back to `master` (ask someone to review first)
-4. Ideally, we would merge-back frequently enough to minimise conflicts whenever we want to merge a hotfix back to master.
+4. Release must be merged-back every week (Friday) to minimise conflicts whenever we want to merge a hotfix back to master.
 
 ### Actions
 
