@@ -57,7 +57,7 @@
     "js-cookie": "3.0.1",
     "key-did-provider-ed25519": "1.1.0",
     "key-did-resolver": "1.4.4",
-    "next": "12.1.0",
+    "next": "12.2.3",
     "prop-types": "15.7.2",
     "react": "17.0.2",
     "react-dom": "17.0.2",
