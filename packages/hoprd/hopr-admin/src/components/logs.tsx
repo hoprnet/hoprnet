@@ -1,4 +1,4 @@
-import type { Log } from '../utils'
+import type { Log } from '../utils/index'
 import React, { useEffect, useState, useRef } from 'react'
 import styles from '../../styles/log.module.css'
 import dynamic from 'next/dynamic'
@@ -50,7 +50,7 @@ export function LogLine({ log }: { log: Log }) {
   )
 }
 
-export function Logs(props: { status: string; messages: Log[] }) {
+export default function Logs(props: { status: string; messages: Log[] }) {
   let container = useRef(null)
 
   useEffect(() => {

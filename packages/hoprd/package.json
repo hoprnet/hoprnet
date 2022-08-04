@@ -26,7 +26,7 @@
     "build:wasm": "make -C crates all && make -C crates install",
     "test:wasm": "make -C crates test",
     "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo ./build ./rest-api-v2-full-spec.json",
-    "build": "yarn clean && yarn build:wasm && tsc -p . && chmod u+x lib/*.js",
+    "build": "yarn clean && yarn build:wasm && tsc -p . && yarn buildAdmin && chmod u+x lib/*.js",
     "buildAdmin": "HOPRD_GIT_COMMIT=$(git rev-parse --short HEAD) next build hopr-admin",
     "test": "yarn test:wasm && NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace --exit . test",
     "prebuild": "next telemetry disable",

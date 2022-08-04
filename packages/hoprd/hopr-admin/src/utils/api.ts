@@ -1,3 +1,8 @@
+/**
+ * Simple abstraction for API v2 calls.
+ * TODO: replace with SDK
+ */
+
 import { type ApiPath } from '.'
 
 export type ExpandedJsonResponse<R = any> = Promise<
