@@ -37,9 +37,11 @@ export default class Settings extends Command {
     if (use === 'view') {
       const response = await this.api.getSettings()
       if (!response.ok) return log(this.invalidResponse('get settings'))
-      return log(toPaddedString(Object.entries(response.json()).map<[string, string]>(([k, v]) => [k, String(v)])))
+      return log(
+        toPaddedString(Object.entries(await response.json()).map<[string, string]>(([k, v]) => [k, String(v)]))
+      )
     } else {
-      const response = await this.api.setSetting(key, value)
+      const response = await this.api.setSetting(key, key === 'includeRecipient' ? Boolean(value) : value)
       if (!response.ok) return log(`set setting "${key}" to "${value}"`)
       return log('Settings updated.')
     }

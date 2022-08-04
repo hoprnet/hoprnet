@@ -62,7 +62,6 @@ const useAppState = () => {
    * Takes into account all WS connections.
    */
   const status = useMemo<'DISCONNECTED' | 'CONNECTED'>(() => {
-    console.log('USE MEMO', streamWS.state.status, messagesWS.state.status)
     if (streamWS.state.status === 'CONNECTED' && messagesWS.state.status === 'CONNECTED') return 'CONNECTED'
     return 'DISCONNECTED'
   }, [streamWS.state.status, messagesWS.state.status])

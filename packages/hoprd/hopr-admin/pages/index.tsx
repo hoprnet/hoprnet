@@ -151,7 +151,7 @@ export default function Home() {
         </span>
       </h1>
 
-      <Logs messages={logs} connecting={app.status !== 'CONNECTED'} />
+      <Logs messages={logs} status={app.status} />
 
       <div className="send">
         <input

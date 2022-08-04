@@ -447,6 +447,7 @@ async function main() {
         logs,
         { getState, setState },
         {
+          ...argv,
           apiHost: argv.apiHost,
           apiPort: argv.apiPort,
           apiToken

@@ -50,19 +50,20 @@ export function LogLine({ log }: { log: Log }) {
   )
 }
 
-export function Logs(props: { connecting: boolean; messages: Log[] }) {
+export function Logs(props: { status: string; messages: Log[] }) {
   let container = useRef(null)
 
   useEffect(() => {
     container.current.scrollIntoView({ block: 'end', behaviour: 'smooth' })
   })
 
-  let cls = styles.logs + ' ' + (props.connecting ? styles.connecting : '')
+  const isDisconnected = props.status === 'DISCONNECTED'
+  let cls = styles.logs + ' ' + (isDisconnected ? styles.connecting : '')
 
   return (
     <div className={cls}>
       <div ref={container}>
-        {props.connecting && <span>Attempting to connect, please ensure correct settings are set!</span>}
+        {isDisconnected && <span>Attempting to connect, please ensure correct settings are set!</span>}
         {props.messages.map((log) => (
           <LogLine log={log} key={log.id} />
         ))}

@@ -116,6 +116,9 @@ export async function setupRestApi(
       // TODO: We assume the handlers are always called in order. This isn't a
       // given and might change in the future. Thus, they should be made order-independent.
       keyScheme: function (req: Request, _scopes, _securityDefinition) {
+        // skip checks if authentication is disabled
+        if (this.options.testNoAuthentication) return true
+
         // Applying multiple URI encoding is an identity
         let apiTokenFromUser = encodeURI(req.get('x-auth-token') || '')
 

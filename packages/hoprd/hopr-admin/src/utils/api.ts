@@ -173,7 +173,7 @@ export default class API {
   }> {
     return this.getReq('/api/v2/settings')
   }
-  public async setSetting(key: string, value: string): ExpandedJsonResponse {
+  public async setSetting(key: string, value: string | boolean): ExpandedJsonResponse {
     return this.putReq(`/api/v2/settings/${key}`, { key: key, value: value })
   }
 }
