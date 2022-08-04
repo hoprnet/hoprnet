@@ -1,6 +1,7 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
-import PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import { STATUS_CODES } from '../../utils.js'
 
 export const getPeerInfo = async (node: Hopr, peerId: PeerId) => {
@@ -19,7 +20,7 @@ export const GET: Operation = [
     const { peerid } = req.params
 
     try {
-      const info = await getPeerInfo(node, PeerId.createFromB58String(peerid))
+      const info = await getPeerInfo(node, peerIdFromString(peerid))
       return res.status(200).send(info)
     } catch (err) {
       return res

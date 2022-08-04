@@ -2,16 +2,12 @@ import type { Operation } from 'express-openapi'
 import { peerIdFromString } from '@libp2p/peer-id'
 import { PublicKey } from '@hoprnet/hopr-utils'
 import { STATUS_CODES } from '../../utils.js'
+import { encodeMessage } from '../../../utils.js'
 
 const POST: Operation = [
   async (req, res, _next) => {
-<<<<<<< HEAD
-    const message = req.body.body
-    const recipient: PeerId = PeerId.createFromB58String(req.body.recipient)
-=======
     const message = encodeMessage(req.body.body)
     const recipient = peerIdFromString(req.body.recipient)
->>>>>>> master
 
     // only set path if given, otherwise a path will be chosen by hopr core
     let path: PublicKey[]

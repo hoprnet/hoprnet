@@ -1,6 +1,6 @@
 import type API from '../utils/api'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import { Command } from '../utils/command'
-import PeerId from 'peer-id'
 
 export default class Ping extends Command {
   constructor(api: API, extra: { getCachedAliases: () => Record<string, string> }) {
@@ -27,7 +27,7 @@ export default class Ping extends Command {
       return log(error)
     }
 
-    const peerIdStr = peerId.toB58String()
+    const peerIdStr = peerId.toString()
     const pingRes = await this.api.ping(peerIdStr)
     if (!pingRes.ok) return log(`ping "${peerIdStr}"`)
     const ping = await pingRes.json()

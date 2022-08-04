@@ -1,4 +1,4 @@
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import type API from '../utils/api'
 import BN from 'bn.js'
 import { utils as ethersUtils } from 'ethers'
@@ -39,7 +39,7 @@ export default class OpenChannel extends Command {
     if (error) return log(error)
 
     const amountToFund = new BN(String(ethersUtils.parseEther(String(amount))))
-    const counterpartyStr = counterparty.toB58String()
+    const counterpartyStr = counterparty.toString()
 
     const balancesRes = await this.api.getBalances()
     if (!balancesRes) {

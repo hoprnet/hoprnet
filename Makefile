@@ -141,6 +141,18 @@ endif
    --native-addresses "$(native_addresses)" \
    --peer-ids "$(peer_ids)"
 
+deregister-nodes: ensure-environment-is-set
+deregister-nodes: ## owner de-register given nodes in network registry contract
+ifeq ($(native_addresses),)
+	echo "parameter <native_addresses> missing" >&2 && exit 1
+endif
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
+   --network $(network) \
+   --task remove \
+   --native-addresses "$(native_addresses)"
+
 .PHONY: self-register-node
 self-register-node: ensure-environment-is-set
 self-register-node: ## staker register a node in network registry contract
@@ -165,7 +177,42 @@ self-deregister-node: ## staker deregister a node in network registry contract
 	HOPR_ENVIRONMENT_ID="$(environment)" \
 	  yarn workspace @hoprnet/hopr-ethereum run hardhat register:self \
    --network $(network) \
-   --task remove
+   --task remove \
+   --privatekey "$(PRIVATE_KEY)"
+
+.PHONY: register-node
+# node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'
+register-node: ensure-environment-is-set
+ifeq ($(endpoint),)
+	echo "parameter <endpoint> is default to localhost:3001" >&2
+endif
+ifeq ($(account),)
+	echo "parameter <account> missing" >&2 && exit 1
+endif
+ifeq ($(origin ACCOUNT_PRIVKEY),undefined)
+	echo "<ACCOUNT_PRIVKEY> environment variable missing" >&2 && exit 1
+endif
+ifeq ($(origin DEV_BANK_PRIVKEY),undefined)
+	echo "<DEV_BANK_PRIVKEY> environment variable missing" >&2 && exit 1
+endif
+	PRIVATE_KEY=${DEV_BANK_PRIVKEY} make request-dev-nft recipient=${account}
+	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-devnft
+	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_id=$(shell ./scripts/get-hopr-address.sh "$(endpoint)")
+
+.PHONY: register-node-with-stake
+# node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'
+register-node-with-stake: ensure-environment-is-set
+ifeq ($(endpoint),)
+	echo "parameter <endpoint> is default to localhost:3001" >&2
+endif
+ifeq ($(account),)
+	echo "parameter <account> missing" >&2 && exit 1
+endif
+ifeq ($(origin ACCOUNT_PRIVKEY),undefined)
+	echo "<ACCOUNT_PRIVKEY> environment variable missing" >&2 && exit 1
+endif
+	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-funds
+	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_id=$(shell ./scripts/get-hopr-address.sh "$(endpoint)")
 
 ensure-environment-is-set:
 ifeq ($(environment),)

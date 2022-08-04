@@ -78,10 +78,6 @@
             "chain_id": {
               "type": "integer"
             },
-            "hardhat_deploy_gas_price": {
-              "type": "string",
-              "description": "Gas price as either a number string '11' or a value which should be converted like '1 gwei'. Used in hardhat-deploy plugin."
-            },
             "max_fee_per_gas": {
               "type": "string",
               "description": "Max fee per gas as either a number '11' or a value which should be converted like '1 gwei'."
@@ -108,7 +104,6 @@
             "chain_id",
             "default_provider",
             "description",
-            "hardhat_deploy_gas_price",
             "max_fee_per_gas",
             "max_priority_fee_per_gas",
             "hopr_token_name",

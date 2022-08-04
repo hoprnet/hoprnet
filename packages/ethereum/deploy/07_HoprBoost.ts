@@ -1,8 +1,8 @@
-import { HardhatRuntimeEnvironment } from 'hardhat/types'
-import { DeployFunction } from 'hardhat-deploy/types'
+import type { HardhatRuntimeEnvironment } from 'hardhat/types'
+import type { DeployFunction } from 'hardhat-deploy/types'
 
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const { ethers, deployments, getNamedAccounts, environment } = hre
+  const { ethers, deployments, getNamedAccounts, environment, maxFeePerGas, maxPriorityFeePerGas } = hre
   const deployer = await getNamedAccounts().then((o) => ethers.getSigner(o.deployer))
 
   const deployOptions = {
@@ -16,6 +16,8 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   await deployments.deploy('HoprBoost', {
     from: deployer.address,
     args: [deployer.address, ''],
+    maxFeePerGas,
+    maxPriorityFeePerGas,
     ...deployOptions
   })
 }

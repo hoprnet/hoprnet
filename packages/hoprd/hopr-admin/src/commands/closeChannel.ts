@@ -1,4 +1,4 @@
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import type API from '../utils/api'
 import { Command } from '../utils/command'
 
@@ -30,7 +30,7 @@ export default class CloseChannel extends Command {
     let channelClosurePeriod: any = '?'
 
     const [closeChannelRes, infoRes] = await Promise.all([
-      this.api.closeChannel(counterparty.toB58String()),
+      this.api.closeChannel(counterparty.toString()),
       this.api.getInfo()
     ])
 

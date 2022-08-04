@@ -1,6 +1,6 @@
 import type API from './api'
 import assert from 'assert'
-import PeerId from 'peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import { type CmdParameter, Command } from './command'
 
 const createCommandMock = (...args: ConstructorParameters<typeof Command>) => {
@@ -40,7 +40,7 @@ const EXTRA_MOCK = {
   getCachedAliases: () => ({} as Record<any, any>)
 }
 
-const HOPR_ADDRESS_MOCK = PeerId.createFromB58String('16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12')
+const HOPR_ADDRESS_MOCK = peerIdFromString('16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12')
 
 describe('test Command class', function () {
   it('should initialize command', function () {
@@ -100,17 +100,17 @@ describe('test Command class', function () {
 
     // @ts-ignore
     const noQueryResult = cmd.assertUsage('')
-    assert(noQueryResult[0].startsWith('No query provided'))
+    assert(noQueryResult[0] && noQueryResult[0].startsWith('No query provided'))
     assert.equal(noQueryResult[1], 'primary')
 
     // @ts-ignore
     const invalidArgResult = cmd.assertUsage('not-a-address extra-arg')
-    assert(invalidArgResult[0].startsWith('Invalid arguments'))
+    assert(invalidArgResult[0] && invalidArgResult[0].startsWith('Invalid arguments'))
     assert.equal(invalidArgResult[1], 'primary')
 
     // @ts-ignore
     const incorrectParamResult = cmd.assertUsage('not-a-address')
-    assert(incorrectParamResult[0].startsWith('Incorrect parameter'))
+    assert(incorrectParamResult[0] && incorrectParamResult[0].startsWith('Incorrect parameter'))
     assert.equal(incorrectParamResult[1], 'primary')
   })
 })

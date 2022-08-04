@@ -46,6 +46,8 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       Math.floor(startTimes[deploymentType] ?? startTimes.testing / 1e3),
       maxMintAmounts[deploymentType] ?? maxMintAmounts.testing
     ],
+    maxFeePerGas: hre.maxFeePerGas,
+    maxPriorityFeePerGas: hre.maxPriorityFeePerGas,
     ...deployOptions
   })
 }

@@ -139,6 +139,7 @@ async function main(
     hoprTokenAddress = contract.address
   } catch (error) {
     console.error('HoprToken contract has not been deployed. Deploy the contract and run again.')
+    console.log(error)
     process.exit(1)
   }
 

@@ -5,7 +5,7 @@ import type { HoprToken } from '../src/types'
 const PROTOCOL_CONFIG = require('../../core/protocol-config.json')
 
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const { ethers, deployments, getNamedAccounts, network, environment } = hre
+  const { ethers, deployments, getNamedAccounts, network, environment, maxFeePerGas, maxPriorityFeePerGas } = hre
   const environmentConfig = PROTOCOL_CONFIG.environments[environment]
   const mintedTokenReceiver = environmentConfig['minted_token_receiver_address']
 
@@ -22,6 +22,8 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const tokenContract = await deployments.deploy('HoprToken', {
     from: deployer.address,
+    maxFeePerGas,
+    maxPriorityFeePerGas,
     ...deployOptions
   })
 

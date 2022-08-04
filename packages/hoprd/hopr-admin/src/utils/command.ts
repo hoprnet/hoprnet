@@ -1,5 +1,6 @@
 import type API from './api'
-import PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import { utils as ethersUtils } from 'ethers'
 import { toPaddedString } from '.'
 
@@ -145,7 +146,7 @@ export const CMD_PARAMS: Record<CmdTypes, CmdArg<any, any, any>> = {
     'A HOPR address (PeerId)',
     (v) => {
       try {
-        return [true, PeerId.createFromB58String(v)]
+        return [true, peerIdFromString(v)]
       } catch {
         return [false, v]
       }
@@ -165,13 +166,13 @@ export const CMD_PARAMS: Record<CmdTypes, CmdArg<any, any, any>> = {
 
       // try PeerId
       try {
-        peerId = PeerId.createFromB58String(peerIdStrOrAlias)
+        peerId = peerIdFromString(peerIdStrOrAlias)
       } catch {}
 
       // try aliases
       if (!peerId && aliases) {
         try {
-          peerId = PeerId.createFromB58String(aliases[peerIdStrOrAlias])
+          peerId = peerIdFromString(aliases[peerIdStrOrAlias])
         } catch {}
       }
 

@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { authenticateWsConnection, removeQueryParams } from './utils.js'
+import { authenticateWsConnection, removeQueryParams, encodeMessage, decodeMessage } from './utils.js'
 
 // mocks
 const VALID_API_TOKEN = 'VALID_API_TOKEN_123_^^'
@@ -14,7 +14,7 @@ const REQ_COOKIES = {
   }
 }
 
-describe('Test authenticateWsConnection', function () {
+describe('test authenticateWsConnection', function () {
   it('should throw on empty API token', function () {
     assert.throws(() => authenticateWsConnection(REQ_PARAM, ''), /Cannot authenticate empty apiToken/)
   })
@@ -54,7 +54,7 @@ describe('Test authenticateWsConnection', function () {
   })
 })
 
-describe('Test removeQueryParams', function () {
+describe('test removeQueryParams', function () {
   it('should strip away parameters', function () {
     assert.equal(
       removeQueryParams('/api/v2/messages/websocket?apiToken=^^LOCAL-testing-123^^'),
@@ -72,5 +72,18 @@ describe('Test removeQueryParams', function () {
   it('should strip away single slash', function () {
     assert.equal(removeQueryParams('/?apiToken=^^LOCAL-testing-123^^'), '')
     assert.equal(removeQueryParams('/'), '')
+  })
+})
+
+describe('test message encoding & decoding', () => {
+  it('check if message can be encoded and then decoded', async () => {
+    let msg = 'some test message!'
+    let encodedMsg = encodeMessage(msg)
+
+    await new Promise((r) => setTimeout(r, 500))
+
+    let decodedMsg = decodeMessage(encodedMsg)
+    assert.deepEqual(decodedMsg.msg, msg)
+    assert(decodedMsg.latency >= 500)
   })
 })

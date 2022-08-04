@@ -1,5 +1,5 @@
 import type API from '../utils/api'
-import PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import { toPaddedString } from '../utils'
 import { Command } from '../utils/command'
 
@@ -47,10 +47,10 @@ export default class Alias extends Command {
       return log(toPaddedString(entries.map<[string, string]>(([name, peerId]) => [name, `-> ${peerId}`])))
     } else {
       // sets aliases
-      const response = await this.api.setAlias(peerId.toB58String(), name)
+      const response = await this.api.setAlias(peerId.toString(), name)
 
       if (response.status == 201) {
-        return log(`Set alias '${name}' to '${peerId.toB58String()}'.`)
+        return log(`Set alias '${name}' to '${peerId.toString()}'.`)
       } else {
         return log(this.invalidResponse('set alias'))
       }

@@ -1,4 +1,4 @@
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import type API from '../utils/api'
 import { Command } from '../utils/command'
 
@@ -26,7 +26,7 @@ export default class PeerInfo extends Command {
     const [error, , peerId] = this.assertUsage(query) as [string | undefined, string, PeerId]
     if (error) return log(error)
 
-    const peerIdStr = peerId.toB58String()
+    const peerIdStr = peerId.toString()
     const peerInfoRes = await this.api.getPeerInfo(peerIdStr)
     if (!peerInfoRes.ok) return log(this.invalidResponse("get peer's information"))
     const { announced, observed } = await peerInfoRes.json()
