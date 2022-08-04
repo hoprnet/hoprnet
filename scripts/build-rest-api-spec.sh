@@ -67,10 +67,10 @@ log "Hardhat node started (127.0.0.1:8545)"
 
 # need to mirror contract data because of hardhat-deploy node only writing to localhost {{{
 cp -R \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost/localhost/" \
+  "${mydir}/../packages/ethereum/deployments/hardhat-localhost/localhost" \
   "${mydir}/../packages/ethereum/deployments/hardhat-localhost/hardhat"
 cp -R \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost/" \
+  "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
   "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
 # }}}
 

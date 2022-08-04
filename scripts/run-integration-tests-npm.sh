@@ -266,16 +266,16 @@ function install_npm_packages() {
     # need to mirror contract data because of hardhat-deploy node only writing to localhost
     log "Copying deployment information to npm directory (${npm_install_dir})"
     cp -R \
-      "${mydir}/../packages/ethereum/deployments/hardhat-localhost/localhost/.[^.]*" \
+      "${mydir}/../packages/ethereum/deployments/hardhat-localhost/localhost" \
       "${mydir}/../packages/ethereum/deployments/hardhat-localhost/hardhat"
     cp -R \
-      "${mydir}/../packages/ethereum/deployments/hardhat-localhost/.[^.]*" \
+      "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
       "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
     cp -R \
-      "${mydir}/../packages/ethereum/deployments/hardhat-localhost/.[^.]*" \
+      "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
       "${npm_install_dir}/node_modules/@hoprnet/hopr-ethereum/deployments/hardhat-localhost"
     cp -R \
-      "${mydir}/../packages/ethereum/deployments/hardhat-localhost/.[^.]*" \
+      "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
       "${npm_install_dir}/node_modules/@hoprnet/hopr-ethereum/deployments/hardhat-localhost2"
   fi
 }

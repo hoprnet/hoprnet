@@ -251,10 +251,10 @@ log "Hardhat node started (127.0.0.1:8545)"
 
 # need to mirror contract data because of hardhat-deploy node only writing to localhost
 cp -R \
-  "${hardhat_basedir}/deployments/hardhat-localhost/localhost/.[^.]*" \
+  "${hardhat_basedir}/deployments/hardhat-localhost/localhost" \
   "${hardhat_basedir}/deployments/hardhat-localhost/hardhat"
 cp -R \
-  "${hardhat_basedir}/deployments/hardhat-localhost/.[^.]*" \
+  "${hardhat_basedir}/deployments/hardhat-localhost" \
   "${hardhat_basedir}/deployments/hardhat-localhost2"
 # }}}
 

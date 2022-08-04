@@ -27,7 +27,7 @@ done
 
 echo "HardHat provider started up!"
 # Copies all the deployment files including the .chainId file
-cp -R packages/ethereum/deployments/hardhat-localhost/localhost/.[^.]* packages/ethereum/deployments/hardhat-localhost/hardhat
+cp -R packages/ethereum/deployments/hardhat-localhost/localhost/. packages/ethereum/deployments/hardhat-localhost/hardhat
 
 if [ "$(curl -s -o /dev/null -w ''%{http_code}'' $provider_ip:8546)" != "200" ]; then
 	# Mirror localhost:8545 -> outboud 8546
