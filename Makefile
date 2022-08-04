@@ -54,6 +54,15 @@ build-docs-api: ## build Rest API docs
 build-docs-api: build
 	./scripts/build-rest-api-spec.sh
 
+.PHONY: clean
+clean: # Cleanup build directories (lib,build, ...etc.)
+	yarn clean
+
+.PHONY: reset
+reset: # Performs cleanup & also deletes all "node_modules" directories
+reset: clean
+	yarn reset
+
 .PHONY: test
 test: ## run unit tests for all packages, or a single package if package= is set
 ifeq ($(package),)
