@@ -126,7 +126,7 @@ The procedure for both options are very similar, which only some differences in 
 4. Save private keys (`ACCOUNT_PRIVKEY` and `DEV_BANK_PRIVKEY`) into `.env` file
 
 ```
-export ACCOUNT_PRIVKEY=<account_private_key
+export ACCOUNT_PRIVKEY=<account_private_key>
 export DEV_BANK_PRIVKEY=<dev_bank_private_key>
 ```
 

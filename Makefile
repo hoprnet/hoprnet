@@ -84,7 +84,7 @@ docker-build-gcb: ## build Docker images on Google Cloud Build
 
 .PHONY: request-funds
 request-funds: ensure-environment-is-set
-request-funds: ## Request one HoprBoost Dev NFT for the recipient given it has none and hasn't staked Dev NFT
+request-funds: ## Request 1000 xHOPR tokens for the recipient
 ifeq ($(recipient),)
 	echo "parameter <recipient> missing" >&2 && exit 1
 endif
