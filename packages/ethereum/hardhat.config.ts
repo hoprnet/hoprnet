@@ -22,7 +22,7 @@ import faucet, { type FaucetCLIOPts } from './tasks/faucet'
 import parallelTest, { type ParallelTestCLIOpts } from './tasks/parallelTest'
 import register, { type RegisterOpts } from './tasks/register'
 import selfRegister, { type SelfRegisterOpts } from './tasks/selfRegister'
-import requestDevNft, { type RequestDevNftOpts } from './tasks/requestDevNft'
+import requestTestTokens, { type RequestTestTokensOpts } from './tasks/requestTestTokens'
 import disableAutoMine from './tasks/disableAutoMine'
 import getAccounts from './tasks/getAccounts'
 import type { NetworkOptions } from './types'
@@ -246,7 +246,18 @@ task<SelfRegisterOpts>(
   .addOptionalParam<string>('peerId', 'HOPR peer ID to be registered', undefined, types.string)
   .addOptionalParam<string>('privatekey', 'Private key of the signer', undefined, types.string)
 
-task<RequestDevNftOpts>('request-dev-nft', 'Request Dev NFT for a staker', requestDevNft)
+task<RequestTestTokensOpts>(
+  'request-test-tokens',
+  'Request test tokens ("Dev NFT" or "txHOPR") for a staker',
+  requestTestTokens
+)
+  .addParam<RequestTestTokensOpts['type']>('type', 'Token type to request', undefined, types.string)
+  .addOptionalParam<string>(
+    'amount',
+    'target txHOPR token amount (in wei) to request for',
+    MIN_STAKE.toString(),
+    types.string
+  )
   .addParam<string>('recipient', 'Address of the NFT recipient', undefined, types.string)
   .addParam<string>('privatekey', 'Private key of the current owner of NFTs', undefined, types.string)
 
