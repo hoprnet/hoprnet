@@ -92,7 +92,7 @@ function getPeerStore(): PeerStore {
         }
         return result
       }
-    } as AddressBook
+    } as unknown as AddressBook
   } as PeerStore
 }
 
