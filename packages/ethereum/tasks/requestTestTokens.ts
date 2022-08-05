@@ -44,7 +44,12 @@ async function requestXhopr(hre: HardhatRuntimeEnvironment, signer: Signer, amou
   }
 }
 
-async function requestDevNft(hre: HardhatRuntimeEnvironment, signer: Signer, hoprStake: Contract, recipientAddress: string) {
+async function requestDevNft(
+  hre: HardhatRuntimeEnvironment,
+  signer: Signer,
+  hoprStake: Contract,
+  recipientAddress: string
+) {
   const { ethers, deployments } = hre
   const signerAddress = await signer.getAddress()
 

@@ -246,7 +246,11 @@ task<SelfRegisterOpts>(
   .addOptionalParam<string>('peerId', 'HOPR peer ID to be registered', undefined, types.string)
   .addOptionalParam<string>('privatekey', 'Private key of the signer', undefined, types.string)
 
-task<RequestTestTokensOpts>('request-test-tokens', 'Request test tokens ("Dev NFT" or "txHOPR") for a staker', requestTestTokens)
+task<RequestTestTokensOpts>(
+  'request-test-tokens',
+  'Request test tokens ("Dev NFT" or "txHOPR") for a staker',
+  requestTestTokens
+)
   .addParam<RequestTestTokensOpts['type']>('type', 'Token type to request', undefined, types.string)
   .addOptionalParam<string>(
     'amount',
