@@ -82,9 +82,9 @@ endif
 docker-build-gcb: ## build Docker images on Google Cloud Build
 	./scripts/build-docker.sh --no-tags --force
 
-.PHONY: request-dev-nft
-request-dev-nft: ensure-environment-is-set
-request-dev-nft: ## Request one HoprBoost Dev NFT for the recipient given it has none and hasn't staked Dev NFT
+.PHONY: request-funds
+request-funds: ensure-environment-is-set
+request-funds: ## Request one HoprBoost Dev NFT for the recipient given it has none and hasn't staked Dev NFT
 ifeq ($(recipient),)
 	echo "parameter <recipient> missing" >&2 && exit 1
 endif
@@ -93,8 +93,27 @@ ifeq ($(origin PRIVATE_KEY),undefined)
 endif
 	TS_NODE_PROJECT=./tsconfig.hardhat.json \
 	HOPR_ENVIRONMENT_ID="$(environment)" \
-	  yarn workspace @hoprnet/hopr-ethereum run hardhat request-dev-nft \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat request-test-tokens \
    --network $(network) \
+   --type xhopr \
+   --amount 1000000000000000000000 \
+   --recipient $(recipient) \
+   --privatekey "$(PRIVATE_KEY)"
+   
+.PHONY: request-devnft
+request-devnft: ensure-environment-is-set
+request-devnft: ## Request one HoprBoost Dev NFT for the recipient given it has none and hasn't staked Dev NFT
+ifeq ($(recipient),)
+	echo "parameter <recipient> missing" >&2 && exit 1
+endif
+ifeq ($(origin PRIVATE_KEY),undefined)
+	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
+endif
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat request-test-tokens \
+   --network $(network) \
+   --type devnft \
    --recipient $(recipient) \
    --privatekey "$(PRIVATE_KEY)"
 
@@ -195,7 +214,7 @@ endif
 ifeq ($(origin DEV_BANK_PRIVKEY),undefined)
 	echo "<DEV_BANK_PRIVKEY> environment variable missing" >&2 && exit 1
 endif
-	PRIVATE_KEY=${DEV_BANK_PRIVKEY} make request-dev-nft recipient=${account}
+	PRIVATE_KEY=${DEV_BANK_PRIVKEY} make request-devnft recipient=${account}
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-devnft
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_id=$(shell ./scripts/get-hopr-address.sh "$(endpoint)")
 
