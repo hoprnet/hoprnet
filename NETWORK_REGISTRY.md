@@ -132,7 +132,7 @@ source .env
 4. Run
 
 ```
-make register-node endpoint=<hoprd_endpoint> account=<staking_account> environment=master-goerli network=goerli
+make register-node-with-nft endpoint=<hoprd_endpoint> account=<staking_account> environment=master-goerli network=goerli
 ```
 
 provide `<hoprd_endpoint>` when it's different from `localhost:3001`
@@ -141,12 +141,12 @@ provide `<hoprd_endpoint>` when it's different from `localhost:3001`
 
 1. Create a MetaMask wallet (note as “account”)
 2. Fund 1 Goerli ETH (from “DevBank” or from the faucet) to the “account”
-3. Fund 1000 txHOPR from “DevBank” to the “account”
-4. Start your local HOPR node
-5. Save private keys (`ACCOUNT_PRIVKEY`) into `.env` file
+3. Start your local HOPR node
+4. Save private keys (`ACCOUNT_PRIVKEY` and `DEV_BANK_PRIVKEY`) into `.env` file
 
 ```
-ACCOUNT_PRIVKEY=<account_private_key>
+export ACCOUNT_PRIVKEY=<account_private_key>
+export DEV_BANK_PRIVKEY=<dev_bank_private_key>
 ```
 
 and
@@ -158,5 +158,5 @@ source .env
 4. Run
 
 ```
-make register-node-with-stake environment=master-goerli network=goerli
+make register-node-with-stake endpoint=<hoprd_endpoint> account=<staking_account> environment=master-goerli network=goerli
 ```
