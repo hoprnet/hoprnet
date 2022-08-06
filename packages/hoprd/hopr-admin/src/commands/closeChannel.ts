@@ -18,7 +18,7 @@ export default class CloseChannel extends Command {
   }
 
   public description() {
-    return 'Close an open channel'
+    return 'Close an an outgoing channel'
   }
 
   async execute(log: (msg: string) => void, query: string): Promise<void> {
@@ -30,12 +30,12 @@ export default class CloseChannel extends Command {
     let channelClosurePeriod: any = '?'
 
     const [closeChannelRes, infoRes] = await Promise.all([
-      this.api.closeChannel(counterparty.toString()),
+      this.api.closeChannel(counterparty.toString(), 'outgoing'),
       this.api.getInfo()
     ])
 
     if (!closeChannelRes.ok) {
-      return log('close channel')
+      log(`Channel to "${counterparty}" closed.`)
     }
     if (infoRes.ok) {
       channelClosurePeriod = (await infoRes.json()).channelClosurePeriod

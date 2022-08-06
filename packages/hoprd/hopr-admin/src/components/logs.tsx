@@ -20,11 +20,12 @@ export function AbbreviatedId({ id }: { id: string }) {
 
 const PEERID_REGEXP = /(\b\w{53})\b/g // NB: Cannot be global variable, has state!
 
-const getAbbreviatedIds = (text: string, regex: RegExp): [string, any][] => {
-  const textArray: string[] = text.split(regex)
+const getAbbreviatedIds = (log: Log, regex: RegExp): [string, any][] => {
+  const textArray: string[] = log.msg.split(regex)
+  let peerIdsFound = 0
   return textArray.map<[string, any | undefined]>((str) => {
     if (regex.test(str)) {
-      return [str, <AbbreviatedId id={str} key={str} />]
+      return [str, <AbbreviatedId id={str} key={`${log.id}-${++peerIdsFound}`} />]
     } else {
       return [str, undefined]
     }
@@ -32,12 +33,12 @@ const getAbbreviatedIds = (text: string, regex: RegExp): [string, any][] => {
 }
 
 export function LogLine({ log }: { log: Log }) {
-  const lines = getAbbreviatedIds(log.msg, PEERID_REGEXP)
+  const lines = getAbbreviatedIds(log, PEERID_REGEXP)
   const ids = lines.filter(([, elem]) => !!elem).map(([str]) => str)
   const output = lines.map(([str, elem]) => elem || str)
 
   return (
-    <div key={log.ts} className={styles.logline}>
+    <div key={log.id} className={styles.logline}>
       <time>{new Date(log.ts).toISOString().slice(11)}</time>
       <pre>{output}</pre>
       <div className={styles.loglineicons}>
@@ -56,8 +57,6 @@ export default function Logs(props: { isConnected: boolean; messages: Log[] }) {
   useEffect(() => {
     container.current.scrollIntoView({ block: 'end', behaviour: 'smooth' })
   })
-
-  console.log('isConnected', props.isConnected)
 
   return (
     <div className={`${styles.logs} ${!props.isConnected ? styles.connecting : ''}`}>

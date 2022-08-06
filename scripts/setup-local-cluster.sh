@@ -306,12 +306,16 @@ log "All nodes came up online"
 
 declare endpoints="localhost:13301 localhost:13302 localhost:13303 localhost:13304 localhost:13305"
 
+log "Calling init script ${init_script}"
+HOPRD_API_TOKEN="${api_token}" \
+  "${mydir}/${init_script}" ${endpoints}
+
 # --- Call init script--- {{{
-if [ -n "${init_script}" ] && [ -x "${init_script}" ]; then
-  log "Calling init script ${init_script}"
-  HOPRD_API_TOKEN="${api_token}" \
-    "${init_script}" ${endpoints}
-fi
+# if [ -n "${init_script}" ] && [ -x "${init_script}" ]; then
+#   log "Calling init script ${init_script}"
+#   HOPRD_API_TOKEN="${api_token}" \
+#     "${init_script}" ${endpoints}
+# fi
 # }}}
 
 # --- Get peer ids for reporting --- {{{
@@ -329,35 +333,35 @@ log "\t\tRest API:\thttp://localhost:13301/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19501/?apiEndpoint=http://localhost:13301&apiToken=${api_token}"
 log "\t\tHealthcheck:\thttp://localhost:18081/"
 log "\t\tWebSocket:\tws://localhost:19501/"
-log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13301&wsEndpoint=ws://localhost:19501&securityToken=${api_token}"
+log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:13301&apiToken=${api_token}"
 log "\tnode2"
 log "\t\tPeer Id:\t${peers[1]}"
 log "\t\tRest API:\thttp://localhost:13302/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19502/?apiEndpoint=http://localhost:19502&apiToken=${api_token}"
 log "\t\tHealthcheck:\thttp://localhost:18082/"
 log "\t\tWebSocket:\tws://localhost:19502/"
-log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13302&wsEndpoint=ws://localhost:19502&securityToken=${api_token}"
+log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:13302&apiToken=${api_token}"
 log "\tnode3"
 log "\t\tPeer Id:\t${peers[2]}"
 log "\t\tRest API:\thttp://localhost:13303/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19503/?apiEndpoint=http://localhost:13303&apiToken=${api_token}"
 log "\t\tHealthcheck:\thttp://localhost:18083/"
 log "\t\tWebSocket:\tws://localhost:19503/"
-log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13303&wsEndpoint=ws://localhost:19503&securityToken=${api_token}"
+log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:13303&apiToken=${api_token}"
 log "\tnode4"
 log "\t\tPeer Id:\t${peers[3]}"
 log "\t\tRest API:\thttp://localhost:13304/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19504/?apiEndpoint=http://localhost:13304&apiToken=${api_token}"
 log "\t\tHealthcheck:\thttp://localhost:18084/"
 log "\t\tWebSocket:\tws://localhost:19504/"
-log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13304&wsEndpoint=ws://localhost:19504&securityToken=${api_token}"
+log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:13304&apiToken=${api_token}"
 log "\tnode5"
 log "\t\tPeer Id:\t${peers[4]}"
 log "\t\tRest API:\thttp://localhost:13305/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19505/?apiEndpoint=http://localhost:13305&apiToken=${api_token}"
 log "\t\tHealthcheck:\thttp://localhost:18085/"
 log "\t\tWebSocket:\tws://localhost:19505/"
-log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13305&wsEndpoint=ws://localhost:19505&securityToken=${api_token}"
+log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:13305&apiToken=${api_token}"
 
 cat <<EOF > ${env_file}
 #!/usr/bin/env bash

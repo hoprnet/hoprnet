@@ -107,7 +107,7 @@ export default function Home() {
     index: number
   }>({
     history: [],
-    index: 0
+    index: 0 // index 0 stands for no selection in history
   })
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setInput(event.target.value)
@@ -117,9 +117,9 @@ export default function Home() {
       event.stopPropagation()
       cmds.execute((msg: string) => addLog(createLog(msg)), input)
       setHistory((prevHistory) => {
+        if (!input) return prevHistory
         const history = prevHistory.history.slice(0)
         history.unshift(input)
-        console.log(history)
 
         return {
           history: history.slice(0, 50),
@@ -128,32 +128,37 @@ export default function Home() {
       })
       setInput('')
     } else if (event.key === 'ArrowDown') {
-      const index = history.index === 0 ? history.index : --history.index
-      const input = history[index]
-      console.log(input)
+      if (history.index > 0) {
+        const newIndex = --history.index
 
-      setHistory((prevHistory) => {
-        return {
-          ...prevHistory,
-          index
+        if (newIndex === 0) {
+          setInput('')
+        } else {
+          setInput(history.history[history.index])
         }
-      })
-      setInput(input)
+
+        setHistory((prevHistory) => {
+          return {
+            ...prevHistory,
+            index: newIndex
+          }
+        })
+      }
     } else if (event.key === 'ArrowUp') {
-      const index = history.index === history.history.length - 1 ? history.index : ++history.index
-      const input = history[index]
-      console.log(input)
+      if (history.index < history.history.length) {
+        const newIndex = ++history.index
+        const input = history.history[history.index - 1]
 
-      setHistory((prevHistory) => {
-        return {
-          ...prevHistory,
-          index
-        }
-      })
-      setInput(input)
+        setInput(input)
+        setHistory((prevHistory) => {
+          return {
+            ...prevHistory,
+            index: newIndex
+          }
+        })
+      }
     }
   }
-  console.log('index', history)
 
   // attach event listener for new streams events
   const handleStreamEvent = (event: MessageEvent<any>) => {

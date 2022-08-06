@@ -9,7 +9,7 @@ export default class Withdraw extends Command {
         default: [
           [
             ['number', 'amount to withdraw', false],
-            ['hoprOrNative', 'withdraw HOPR or NATIVE', false],
+            ['hoprOrNative', 'withdraw "hopr" or "native"', false],
             ['nativeAddress', 'recipient', false]
           ],
           'withdraw'
@@ -43,7 +43,7 @@ export default class Withdraw extends Command {
 
     const amountWei = ethersUtils.parseEther(String(amount))
     const response = await this.api.withdraw(amountWei.toString(), currency, recipient)
-    if (!response.ok) return log('withdraw')
+    if (!response.ok) return log(this.invalidResponse('withdraw'))
 
     const receipt = response.json().then((res) => res.receipt)
     return log(`Withdrawing ${amount} ${currency} to ${recipient}, receipt ${receipt}.`)

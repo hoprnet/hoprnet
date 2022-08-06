@@ -8,7 +8,8 @@ export default class Channels extends Command {
     super(
       {
         default: [[], 'shows open channels'],
-        showAll: [[['boolean', 'show closed', true]], 'show all channels']
+        incoming: [[['constant', 'show incoming only', false]], 'show incoming channels'],
+        outgoing: [[['constant', 'show outgoing only', false]], 'show outgoing channels']
       },
       api,
       cache
@@ -40,35 +41,43 @@ export default class Channels extends Command {
    * Lists all channels that we have with other nodes. Triggered from the CLI.
    */
   async execute(log: (msg: string) => void, query: string): Promise<void> {
-    const [error, , showAll] = this.assertUsage(query) as [string | undefined, string, boolean]
+    const [error, , param] = this.assertUsage(query) as [string | undefined, string, boolean | string]
     if (error) return log(error)
+
+    const showAll = param === true
+    const showIncoming = param === 'incoming'
+    const showOutgoing = param === 'outgoing'
 
     log('fetching channels...')
     const channelsRes = await this.api.getChannels()
     if (!channelsRes.ok) return log(this.invalidResponse('get channels'))
     const channels = await channelsRes.json()
 
-    const incomingChannels = channels.incoming.filter((channel) => {
-      if (showAll) return true
-      return channel.status !== 'Closed'
-    })
-    if (incomingChannels.length == 0) {
-      log(`\nNo channels opened to you.`)
-    } else {
-      for (const channel of incomingChannels) {
-        log(this.getChannelLog(channel))
+    if (!showOutgoing) {
+      const incomingChannels = channels.incoming.filter((channel) => {
+        if (showAll) return true
+        return channel.status !== 'Closed'
+      })
+      if (incomingChannels.length == 0) {
+        log(`\nNo channels opened to you.`)
+      } else {
+        for (const channel of incomingChannels) {
+          log(this.getChannelLog(channel))
+        }
       }
     }
 
-    const channelsOutgoing = channels.outgoing.filter((channel) => {
-      if (showAll) return true
-      return channel.status !== 'Closed'
-    })
-    if (channelsOutgoing.length == 0) {
-      log(`\nNo channels opened by you.`)
-    } else {
-      for (const channel of channelsOutgoing) {
-        log(this.getChannelLog(channel))
+    if (!showIncoming) {
+      const channelsOutgoing = channels.outgoing.filter((channel) => {
+        if (showAll) return true
+        return channel.status !== 'Closed'
+      })
+      if (channelsOutgoing.length == 0) {
+        log(`\nNo channels opened by you.`)
+      } else {
+        for (const channel of channelsOutgoing) {
+          log(this.getChannelLog(channel))
+        }
       }
     }
   }

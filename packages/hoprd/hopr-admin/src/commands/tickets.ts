@@ -1,6 +1,7 @@
 import type API from '../utils/api'
 import { toPaddedString } from '../utils'
 import { Command, type CacheFunctions } from '../utils/command'
+import { utils } from 'ethers'
 
 export default class Tickets extends Command {
   constructor(api: API, cache: CacheFunctions) {
@@ -32,14 +33,14 @@ export default class Tickets extends Command {
           ['Tickets:', ''],
           ['- Pending:', stats.pending],
           ['- Unredeemed:', stats.unredeemed],
-          ['- Unredeemed Value:', `${stats.unredeemedValue} xHOPR`],
+          ['- Unredeemed Value:', `${utils.formatEther(stats.unredeemedValue)} xHOPR`],
           ['- Redeemed:', stats.redeemed],
-          ['- Redeemed Value:', `${stats.redeemedValue} xHOPR`],
+          ['- Redeemed Value:', `${utils.formatEther(stats.redeemedValue)} xHOPR`],
           ['- Losing Tickets:', stats.losingTickets],
           ['- Win Proportion:', stats.winProportion * 100],
           ['- Neglected:', stats.neglected],
           ['- Rejected:', stats.rejected],
-          ['- Rejected Value:', `${stats.rejectedValue} xHOPR`]
+          ['- Rejected Value:', `${utils.formatEther(stats.rejectedValue)} xHOPR`]
         ])
       )
     }

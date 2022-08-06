@@ -86,11 +86,14 @@ export default class API {
   }> {
     return this.getReq('/api/v2/channels')
   }
-  public async closeChannel(peerId: string): ExpandedJsonResponse<{
+  public async closeChannel(
+    peerId: string,
+    direction: 'incoming' | 'outgoing'
+  ): ExpandedJsonResponse<{
     receipt: string
     channelStatus: string
   }> {
-    return this.delReq(`/api/v2/channels/${peerId}`)
+    return this.delReq(`/api/v2/channels/${peerId}/${direction}`)
   }
   public async openChannel(peerId: string, amount: string): ExpandedJsonResponse {
     return this.postReq('/api/v2/channels', { peerId, amount })
@@ -160,7 +163,7 @@ export default class API {
     return this.getReq('/api/v2/settings')
   }
   public async setSetting(key: string, value: string | boolean): ExpandedJsonResponse {
-    return this.putReq(`/api/v2/settings/${key}`, { key: key, value: value })
+    return this.putReq(`/api/v2/settings/${key}`, { settingValue: value })
   }
 }
 

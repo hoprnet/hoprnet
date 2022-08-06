@@ -26,7 +26,7 @@ export default class Peers extends Command {
     if (announced.length === 0 && connected.length === 0) {
       return log('No peers found.')
     } else {
-      return log(toPaddedString([...announced, ...connected]))
+      return log(toPaddedString(connected))
     }
   }
 }

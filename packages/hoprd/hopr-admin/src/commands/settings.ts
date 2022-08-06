@@ -42,7 +42,7 @@ export default class Settings extends Command {
       )
     } else {
       const response = await this.api.setSetting(key, key === 'includeRecipient' ? Boolean(value) : value)
-      if (!response.ok) return log(`set setting "${key}" to "${value}"`)
+      if (!response.ok) return log(this.invalidResponse(`set setting "${key}" to "${value}"`))
       return log('Settings updated.')
     }
   }
