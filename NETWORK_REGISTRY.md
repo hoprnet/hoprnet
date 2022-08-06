@@ -111,7 +111,14 @@ yarn workspace @hoprnet/hopr-ethereum hardhat register --network goerli --task e
 
 ## Internal NR testing
 
-### Option 1: obtain a dev NFT and register your node on NR
+To register an eligible node in the NR, there are two options:
+
+- obtain a dev NFT and register your node on NR
+- stake tokens and register your node on NR
+
+The procedure for both options are very similar, which only some differences in the last step.
+
+### Procedure
 
 1. Create a MetaMask wallet (note as “account”)
 2. Fund 1 Goerli ETH (from “DevBank” or from the faucet) to the “account”
@@ -129,34 +136,16 @@ and
 source .env
 ```
 
-4. Run
+5. Run either command. In both cases, provide `<hoprd_endpoint>` when it's different from `localhost:3001`
 
-```
-make register-node endpoint=<hoprd_endpoint> account=<staking_account> environment=master-goerli network=goerli
-```
+- Option 1: obtain a dev NFT and register your node on NR
 
-provide `<hoprd_endpoint>` when it's different from `localhost:3001`
+  ```
+  make register-node-with-nft endpoint=<hoprd_endpoint> account=<staking_account> environment=master-goerli network=goerli
+  ```
 
-### Option 2: stake tokens and register your node on NR
+- Option 2: stake tokens and register your node on NR
 
-1. Create a MetaMask wallet (note as “account”)
-2. Fund 1 Goerli ETH (from “DevBank” or from the faucet) to the “account”
-3. Fund 1000 txHOPR from “DevBank” to the “account”
-4. Start your local HOPR node
-5. Save private keys (`ACCOUNT_PRIVKEY`) into `.env` file
-
-```
-ACCOUNT_PRIVKEY=<account_private_key>
-```
-
-and
-
-```
-source .env
-```
-
-4. Run
-
-```
-make register-node-with-stake environment=master-goerli network=goerli
-```
+  ```
+  make register-node-with-stake endpoint=<hoprd_endpoint> account=<staking_account> environment=master-goerli network=goerli
+  ```

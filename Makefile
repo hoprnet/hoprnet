@@ -54,6 +54,15 @@ build-docs-api: ## build Rest API docs
 build-docs-api: build
 	./scripts/build-rest-api-spec.sh
 
+.PHONY: clean
+clean: # Cleanup build directories (lib,build, ...etc.)
+	yarn clean
+
+.PHONY: reset
+reset: # Performs cleanup & also deletes all "node_modules" directories
+reset: clean
+	yarn reset
+
 .PHONY: test
 test: ## run unit tests for all packages, or a single package if package= is set
 ifeq ($(package),)
@@ -82,9 +91,9 @@ endif
 docker-build-gcb: ## build Docker images on Google Cloud Build
 	./scripts/build-docker.sh --no-tags --force
 
-.PHONY: request-dev-nft
-request-dev-nft: ensure-environment-is-set
-request-dev-nft: ## Request one HoprBoost Dev NFT for the recipient given it has none and hasn't staked Dev NFT
+.PHONY: request-funds
+request-funds: ensure-environment-is-set
+request-funds: ## Request 1000 xHOPR tokens for the recipient
 ifeq ($(recipient),)
 	echo "parameter <recipient> missing" >&2 && exit 1
 endif
@@ -93,8 +102,27 @@ ifeq ($(origin PRIVATE_KEY),undefined)
 endif
 	TS_NODE_PROJECT=./tsconfig.hardhat.json \
 	HOPR_ENVIRONMENT_ID="$(environment)" \
-	  yarn workspace @hoprnet/hopr-ethereum run hardhat request-dev-nft \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat request-test-tokens \
    --network $(network) \
+   --type xhopr \
+   --amount 1000000000000000000000 \
+   --recipient $(recipient) \
+   --privatekey "$(PRIVATE_KEY)"
+   
+.PHONY: request-devnft
+request-devnft: ensure-environment-is-set
+request-devnft: ## Request one HoprBoost Dev NFT for the recipient given it has none and hasn't staked Dev NFT
+ifeq ($(recipient),)
+	echo "parameter <recipient> missing" >&2 && exit 1
+endif
+ifeq ($(origin PRIVATE_KEY),undefined)
+	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
+endif
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat request-test-tokens \
+   --network $(network) \
+   --type devnft \
    --recipient $(recipient) \
    --privatekey "$(PRIVATE_KEY)"
 
@@ -180,9 +208,9 @@ self-deregister-node: ## staker deregister a node in network registry contract
    --task remove \
    --privatekey "$(PRIVATE_KEY)"
 
-.PHONY: register-node
+.PHONY: register-node-with-nft
 # node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'
-register-node: ensure-environment-is-set
+register-node-with-nft: ensure-environment-is-set
 ifeq ($(endpoint),)
 	echo "parameter <endpoint> is default to localhost:3001" >&2
 endif
@@ -195,7 +223,7 @@ endif
 ifeq ($(origin DEV_BANK_PRIVKEY),undefined)
 	echo "<DEV_BANK_PRIVKEY> environment variable missing" >&2 && exit 1
 endif
-	PRIVATE_KEY=${DEV_BANK_PRIVKEY} make request-dev-nft recipient=${account}
+	PRIVATE_KEY=${DEV_BANK_PRIVKEY} make request-devnft recipient=${account}
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-devnft
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_id=$(shell ./scripts/get-hopr-address.sh "$(endpoint)")
 
@@ -211,6 +239,10 @@ endif
 ifeq ($(origin ACCOUNT_PRIVKEY),undefined)
 	echo "<ACCOUNT_PRIVKEY> environment variable missing" >&2 && exit 1
 endif
+ifeq ($(origin DEV_BANK_PRIVKEY),undefined)
+	echo "<DEV_BANK_PRIVKEY> environment variable missing" >&2 && exit 1
+endif
+	PRIVATE_KEY=${DEV_BANK_PRIVKEY} make request-funds recipient=${account}
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-funds
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_id=$(shell ./scripts/get-hopr-address.sh "$(endpoint)")
 

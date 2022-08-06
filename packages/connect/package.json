@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-connect",
-  "version": "1.89.0-next.84",
+  "version": "1.89.0-next.86",
   "description": "A libp2p-complaint transport module that handles NAT traversal by using WebRTC",
   "repository": "https://github.com/hoprnet/hopr-connect.git",
   "homepage": "https://github.com/hoprnet/hopr-connect",
@@ -34,7 +34,7 @@
     "@libp2p/interface-transport": "1.0.0",
     "@libp2p/interfaces": "2.0.4",
     "@libp2p/peer-id": "1.1.13",
-    "@multiformats/multiaddr": "10.2.1",
+    "@multiformats/multiaddr": "10.3.3",
     "abortable-iterator": "4.0.2",
     "bl": "5.0.0",
     "chalk": "5.0.1",

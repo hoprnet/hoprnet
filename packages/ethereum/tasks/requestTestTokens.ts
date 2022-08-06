@@ -1,52 +1,57 @@
-import { Signer, Wallet } from 'ethers'
+import { type Signer, type Contract, Wallet } from 'ethers'
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import { DEV_NFT_BOOST, DEV_NFT_TYPE } from '../utils/constants'
 
-export type RequestDevNftOpts = {
+export type RequestTestTokensOpts = {
+  type: 'devnft' | 'xhopr'
+  amount?: string // target amount in wei
   recipient: string // address of the recipient
   privatekey: string // private key of the Boost NFT owner
 }
 
-/**
- * As a prerequisite for staking, the staker must request Dev NFT. Staker is the recipient. privatekey should
- * be the private key of an account that owns some Dev NFTs
- */
-async function main(opts: RequestDevNftOpts, hre: HardhatRuntimeEnvironment, _runSuper: RunSuperFunction<any>) {
-  const { ethers, deployments, environment } = hre
-  // get envirionment
-  if (environment == undefined) {
-    console.error(`HOPR_ENVIRONMENT_ID is not set. Run with "HOPR_ENVIRONMENT_ID=<environment> ..."`)
+async function requestXhopr(hre: HardhatRuntimeEnvironment, signer: Signer, amount: string, recipientAddress: string) {
+  const { ethers, deployments } = hre
+  // must provide amount when token type is 'xhopr'
+  const tokenContract = await deployments.get('xHoprMock')
+  const hoprToken = (await ethers.getContractFactory('ERC677Mock')).connect(signer).attach(tokenContract.address)
+
+  const signerAddress = await signer.getAddress()
+  const balanceNativeToken = await ethers.provider.getBalance(signerAddress)
+  let balanceHoprToken
+  try {
+    balanceHoprToken = await hoprToken.balanceOf(signerAddress)
+  } catch (_) {
+    balanceHoprToken = ethers.constants.Zero
+  }
+  console.log(`DevBank account ${signerAddress} has ${balanceHoprToken} HOPR tokens`)
+  console.log(`DevBank account ${signerAddress} has ${balanceNativeToken} native tokens`)
+
+  if (balanceNativeToken.lte(0)) {
+    console.log(`DevBank account ${signerAddress} does not have enough native tokens to proceed`)
     process.exit(1)
   }
 
-  let provider
-  if (environment == 'hardhat-localhost') {
-    // we use a custom ethers provider here instead of the ethers object from the
-    // hre which is managed by hardhat-ethers, because that one seems to
-    // run its own in-memory hardhat instance, which is undesirable
-    provider = new ethers.providers.JsonRpcProvider()
-  } else {
-    provider = ethers.provider
+  if (ethers.BigNumber.from(amount).gt(ethers.BigNumber.from(balanceHoprToken))) {
+    console.log(`DevBank account ${signerAddress} does not have enough HOPR tokens to fulfill the request`)
+    process.exit(1)
   }
 
-  // get the provider and signer
-  let signer: Signer
-  if (!opts.privatekey) {
-    signer = provider.getSigner()
-  } else {
-    signer = new Wallet(opts.privatekey, provider)
+  try {
+    await (await hoprToken.transferAndCall(recipientAddress, amount, ethers.constants.HashZero)).wait()
+    console.log(`DevBank account ${signerAddress} transferred ${amount} HOPR tokens successfully`)
+  } catch (error) {
+    console.error(`Requesting HOPR tokens failed due to ${error}`)
   }
+}
+
+async function requestDevNft(
+  hre: HardhatRuntimeEnvironment,
+  signer: Signer,
+  hoprStake: Contract,
+  recipientAddress: string
+) {
+  const { ethers, deployments } = hre
   const signerAddress = await signer.getAddress()
-  console.log('Signer Address', signerAddress)
-
-  const recipientAddress = opts.recipient
-  console.log('Recipient Address', recipientAddress)
-
-  // get staking contract
-  const stakingContract = await deployments.get('HoprStake')
-  const hoprStake = (await ethers.getContractFactory('HoprStakeSeason3'))
-    .connect(signer)
-    .attach(stakingContract.address)
 
   // check if dev nft exists
   const nftContract = await deployments.get('HoprBoost')
@@ -139,6 +144,62 @@ async function main(opts: RequestDevNftOpts, hre: HardhatRuntimeEnvironment, _ru
     await hoprBoost['safeTransferFrom(address,address,uint256)'](signerAddress, recipientAddress, signerOwnedNFTTokenId)
   ).wait()
   console.log(`Address ${recipientAddress} succeeded in receiving Dev NFT from ${signerAddress}.`)
+}
+
+/**
+ * As a prerequisite for staking, the staker must request Dev NFT. Staker is the recipient. privatekey should
+ * be the private key of an account that owns some Dev NFTs
+ */
+async function main(opts: RequestTestTokensOpts, hre: HardhatRuntimeEnvironment, _runSuper: RunSuperFunction<any>) {
+  const { ethers, deployments, environment } = hre
+  // get envirionment
+  if (environment == undefined) {
+    console.error(`HOPR_ENVIRONMENT_ID is not set. Run with "HOPR_ENVIRONMENT_ID=<environment> ..."`)
+    process.exit(1)
+  }
+
+  let provider
+  if (environment == 'hardhat-localhost') {
+    // we use a custom ethers provider here instead of the ethers object from the
+    // hre which is managed by hardhat-ethers, because that one seems to
+    // run its own in-memory hardhat instance, which is undesirable
+    provider = new ethers.providers.JsonRpcProvider()
+  } else {
+    provider = ethers.provider
+  }
+
+  // get the provider and signer
+  let signer: Signer
+  if (!opts.privatekey) {
+    signer = provider.getSigner()
+  } else {
+    signer = new Wallet(opts.privatekey, provider)
+  }
+  const signerAddress = await signer.getAddress()
+  console.log('Signer Address', signerAddress)
+
+  const recipientAddress = opts.recipient
+  console.log('Recipient Address', recipientAddress)
+
+  // get staking contract
+  const stakingContract = await deployments.get('HoprStake')
+  const hoprStake = (await ethers.getContractFactory('HoprStakeSeason3'))
+    .connect(signer)
+    .attach(stakingContract.address)
+
+  if (opts.type === 'devnft') {
+    await requestDevNft(hre, signer, hoprStake, recipientAddress)
+  } else if (opts.type === 'xhopr') {
+    if (opts.amount) {
+      await requestXhopr(hre, signer, opts.amount, recipientAddress)
+    } else {
+      console.error('Missing argument --amount when requesting xHOPR tokens')
+      process.exit(1)
+    }
+  } else {
+    console.error(`Unsupported requesting type ${opts.type}`)
+    process.exit(1)
+  }
 }
 
 export default main

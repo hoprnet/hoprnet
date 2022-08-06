@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "1.89.0-next.84",
+  "version": "1.89.0-next.86",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -44,7 +44,7 @@
     "@libp2p/mplex": "1.2.1",
     "@libp2p/peer-id": "1.1.13",
     "@libp2p/peer-id-factory": "1.0.15",
-    "@multiformats/multiaddr": "10.2.1",
+    "@multiformats/multiaddr": "10.3.3",
     "abort-controller": "3.0.0",
     "bn.js": "5.2.0",
     "datastore-level": "^8.0.0",

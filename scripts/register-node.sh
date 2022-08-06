@@ -45,7 +45,7 @@ declare dev_bank_privkey="${DEV_BANK_PRIVKEY:-}"
 declare peer_id="$(get_hopr_address "${api_token}@${node_api}")"
 
 # Request a Dev NFT from DevBank
-PRIVATE_KEY="${dev_bank_privkey}" make request-dev-nft \
+PRIVATE_KEY="${dev_bank_privkey}" make request-devnft \
     environment=master-goerli \
     network=goerli \
     recipient="${account}"

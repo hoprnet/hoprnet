@@ -11,7 +11,7 @@ declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 source "${mydir}/utils.sh"
 
-: ${endpoint:?"No <endpoint> is set, use default value localhost:3001"}
+: ${1:?"No <endpoint> is set, use default value localhost:3001"}
 
 # $1 = optional: endpoint, defaults to http://localhost:3001
 declare endpoint="${1:-localhost:3001}"
