@@ -287,8 +287,8 @@ Since PRs should link to an issue, it's not necessary to label PRs. However, som
 
 ### Rules
 
-- All PR‘s **have to be approved** by at least two members.
-- Respect our CI pipeline. If you break it, you fix it.
+- All PR‘s **have to be approved** by at least one member.
+- If CI pipeline breaks, you must open an issue for it and attempt to fix it.
 - All PR‘s must pass all status checks/tests before merging.
 - Releases can be merged back to `master`, but not always necessary.
 - When in conflict, chat and engage with the team.
@@ -337,6 +337,10 @@ Since PRs should link to an issue, it's not necessary to label PRs. However, som
 4. After a different team member reviews the code and indicates approval, the PR
    can be merged. If the history is messy, the PR can be squashed, otherwise, it is
    merged. Use common sense to decide when you should do which one.
+
+5. If a PR is deprioritised and has remained unmerged, the original author is responsible
+   for frequenlty merging master into it so it does not diverge, if PR is no longer relevant
+   it must be closed.
 
 #### Releases
 
