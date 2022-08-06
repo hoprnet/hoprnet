@@ -1,14 +1,14 @@
 import type API from '../utils/api'
-import { Command } from '../utils/command'
+import { Command, type CacheFunctions } from '../utils/command'
 
 export default class Sign extends Command {
-  constructor(api: API, extra: { getCachedAliases: () => Record<string, string> }) {
+  constructor(api: API, cache: CacheFunctions) {
     super(
       {
         default: [[['string', 'message', false]], '']
       },
       api,
-      extra
+      cache
     )
   }
 

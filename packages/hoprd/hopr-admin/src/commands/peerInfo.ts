@@ -1,15 +1,15 @@
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type API from '../utils/api'
-import { Command } from '../utils/command'
+import { Command, type CacheFunctions } from '../utils/command'
 
 export default class PeerInfo extends Command {
-  constructor(api: API, extra: { getCachedAliases: () => Record<string, string> }) {
+  constructor(api: API, cache: CacheFunctions) {
     super(
       {
         default: [[['hoprAddressOrAlias', 'peer', false]], 'gets information about peer']
       },
       api,
-      extra,
+      cache,
       true
     )
   }

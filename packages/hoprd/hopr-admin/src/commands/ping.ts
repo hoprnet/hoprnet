@@ -1,15 +1,15 @@
 import type API from '../utils/api'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import { Command } from '../utils/command'
+import { Command, type CacheFunctions } from '../utils/command'
 
 export default class Ping extends Command {
-  constructor(api: API, extra: { getCachedAliases: () => Record<string, string> }) {
+  constructor(api: API, cache: CacheFunctions) {
     super(
       {
         default: [[['hoprAddressOrAlias', "node's hopr address or alias", false]], '']
       },
       api,
-      extra
+      cache
     )
   }
 

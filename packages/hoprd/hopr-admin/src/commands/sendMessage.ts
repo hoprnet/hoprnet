@@ -1,8 +1,8 @@
 import type API from '../utils/api'
-import { Command, CMD_PARAMS } from '../utils/command'
+import { Command, CMD_PARAMS, type CacheFunctions } from '../utils/command'
 
 export default class SendMessage extends Command {
-  constructor(api: API, extra: { getCachedAliases: () => Record<string, string> }) {
+  constructor(api: API, cache: CacheFunctions) {
     super(
       {
         default: [
@@ -21,7 +21,7 @@ export default class SendMessage extends Command {
         ]
       },
       api,
-      extra
+      cache
     )
   }
 
@@ -39,7 +39,7 @@ export default class SendMessage extends Command {
     const peerIdStrings = pathStr.split(',').filter(Boolean)
 
     const validatePeerIdOrAlias = CMD_PARAMS.hoprAddressOrAlias[1]
-    const aliases = this.extra.getCachedAliases()
+    const aliases = this.cache.getCachedAliases()
 
     const path: string[] = []
     for (const pIdString of peerIdStrings) {

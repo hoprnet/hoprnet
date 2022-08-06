@@ -1,9 +1,9 @@
 import type API from '../utils/api'
-import { Command } from '../utils/command'
+import { Command, type CacheFunctions } from '../utils/command'
 
 export default class Version extends Command {
-  constructor(api: API, extra: { getCachedAliases: () => Record<string, string> }) {
-    super({}, api, extra)
+  constructor(api: API, cache: CacheFunctions) {
+    super({}, api, cache)
   }
 
   public name() {

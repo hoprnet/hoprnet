@@ -1,9 +1,9 @@
 import type API from '../utils/api'
 import { utils as ethersUtils } from 'ethers'
-import { Command } from '../utils/command'
+import { Command, type CacheFunctions } from '../utils/command'
 
 export default class Withdraw extends Command {
-  constructor(api: API, extra: { getCachedAliases: () => Record<string, string> }) {
+  constructor(api: API, cache: CacheFunctions) {
     super(
       {
         default: [
@@ -16,7 +16,7 @@ export default class Withdraw extends Command {
         ]
       },
       api,
-      extra
+      cache
     )
   }
 

@@ -1,15 +1,15 @@
 import type API from '../utils/api'
 import { toPaddedString } from '../utils'
-import { Command } from '../utils/command'
+import { Command, type CacheFunctions } from '../utils/command'
 
 export default class Tickets extends Command {
-  constructor(api: API, extra: { getCachedAliases: () => Record<string, string> }) {
+  constructor(api: API, cache: CacheFunctions) {
     super(
       {
         default: [[], 'shows all tickets']
       },
       api,
-      extra
+      cache
     )
   }
 

@@ -6,16 +6,16 @@ import Ping from './ping'
 type PingResponse = Awaited<ReturnType<API['ping']>>
 
 const createAddressesCommand = (
-  pingResponse?: PingResponse | undefined,
+  pingResponse: PingResponse,
   getCachedAliasesResponse?: Record<any, any> | undefined
 ) => {
   const api = sinon.fake() as unknown as API
   api.ping = () => Promise.resolve(pingResponse)
-  const extra = {
+  const cache = {
     getCachedAliases: () => getCachedAliasesResponse || ({} as Record<any, any>)
   }
 
-  return new Ping(api, extra)
+  return new Ping(api, cache as any)
 }
 
 describe('test Ping command', function () {

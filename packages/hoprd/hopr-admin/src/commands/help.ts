@@ -1,16 +1,16 @@
 import type API from '../utils/api'
 import { toPaddedString } from '../utils'
-import { Command } from '../utils/command'
+import { Command, type CacheFunctions } from '../utils/command'
 
 export default class Help extends Command {
-  constructor(api: API, extra: { getCachedAliases: () => Record<string, string> }, private commands: Command[]) {
+  constructor(api: API, cache: CacheFunctions, private commands: Command[]) {
     super(
       {
         default: [[], 'displays help'],
         showAll: [[['boolean', 'show hidden commands', true]], 'includes hidden commands']
       },
       api,
-      extra
+      cache
     )
   }
 

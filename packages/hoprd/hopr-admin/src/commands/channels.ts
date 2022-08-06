@@ -1,17 +1,17 @@
 import type API from '../utils/api'
 import { toPaddedString } from '../utils'
-import { Command } from '../utils/command'
+import { Command, type CacheFunctions } from '../utils/command'
 import { utils as ethersUtils } from 'ethers'
 
 export default class Channels extends Command {
-  constructor(api: API, extra: { getCachedAliases: () => Record<string, string> }) {
+  constructor(api: API, cache: CacheFunctions) {
     super(
       {
         default: [[], 'shows open channels'],
         showAll: [[['boolean', 'show closed', true]], 'show all channels']
       },
       api,
-      extra
+      cache
     )
   }
 

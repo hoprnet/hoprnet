@@ -1,10 +1,10 @@
 import type API from '../utils/api'
 import { toPaddedString } from '../utils'
-import { Command } from '../utils/command'
+import { Command, type CacheFunctions } from '../utils/command'
 
 export default class Peers extends Command {
-  constructor(api: API, extra: { getCachedAliases: () => Record<string, string> }) {
-    super({}, api, extra)
+  constructor(api: API, cache: CacheFunctions) {
+    super({}, api, cache)
   }
 
   public name() {

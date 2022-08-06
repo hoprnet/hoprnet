@@ -6,16 +6,16 @@ import Addresses from './addresses'
 type GetAddressesResponse = Awaited<ReturnType<API['getAddresses']>>
 
 const createAddressesCommand = (
-  getAddressesResponse?: GetAddressesResponse | undefined,
+  getAddressesResponse: GetAddressesResponse,
   getCachedAliasesResponse?: Record<any, any> | undefined
 ) => {
   const api = sinon.fake() as unknown as API
   api.getAddresses = () => Promise.resolve(getAddressesResponse)
-  const extra = {
+  const cache = {
     getCachedAliases: () => getCachedAliasesResponse || ({} as Record<any, any>)
   }
 
-  return new Addresses(api, extra)
+  return new Addresses(api, cache as any)
 }
 
 describe('test Addresses command', function () {
