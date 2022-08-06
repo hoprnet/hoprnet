@@ -50,28 +50,6 @@ wait_for_port "${insecure_admin_port}" "${host}"
 
 declare http_status_code
 
-# TEST API v1
-log "REST API v1 should reject authentication with invalid token"
-http_status_code=$(curl -H "X-Auth-Token: ${bad_token}" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${api_port}/api/v1/command")
-if [ ${http_status_code} -ne 403 ]; then
-  log "⛔️ Expected 403 http status code, got ${http_status_code}"
-  exit 1
-fi
-
-log "REST API v1 should reject authentication without token"
-http_status_code=$(curl --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${api_port}/api/v1/command")
-if [ ${http_status_code} -ne 403 ]; then
-  log "⛔️ Expected 403 http status code, got ${http_status_code}"
-  exit 1
-fi
-
-log "REST API v1 should accept authentication with valid token"
-http_status_code=$(curl -H "X-Auth-Token: ${api_token}" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 "${host}:${api_port}/api/v1/version")
-if [ ${http_status_code} -ne 200 ]; then
-  log "⛔️ Expected 200 http status code, got ${http_status_code}"
-  exit 1
-fi
-
 # TEST API v2
 log "REST API v2 should reject authentication with invalid token"
 http_status_code=$(curl -H "X-Auth-Token: ${bad_token}" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 "${host}:${api_port}/api/v2/node/version")
