@@ -93,65 +93,6 @@ if [ ${http_status_code} -ne 200 ]; then
   exit 1
 fi
 
-# TEST WS v1
-log "Admin websocket should reject data without token"
-ws_response=$(echo "_test" | websocat ws://${host}:${admin_port}/)
-msg_type=$(echo "${ws_response}" | jq .type --raw-output )
-
-if [ "${msg_type}" != "auth-failed" ]; then
-  log "⛔️ Didn't fail ws authentication"
-  log "Expected response: '{ type: 'auth-failed' } "
-  log "Actual response:"
-  log "${ws_response}"
-  log "Msg type:"
-  log ${msg_type}
-  exit 1
-fi
-
-log "Admin websocket should reject data with invalid token"
-ws_response=$(echo "_test" | websocat ws://${host}:${admin_port}/ --header "Cookie:X-Auth-Token=${bad_token}")
-msg_type=$(echo "${ws_response}" | jq .type --raw-output )
-
-if [ "${msg_type}" != "auth-failed" ]; then
-  log "⛔️ Didn't fail ws authentication"
-  log "Expected response: '{ type: 'auth-failed' } "
-  log "Actual response:"
-  log "${ws_response}"
-  log "Msg type:"
-  log ${msg_type}
-  exit 1
-fi
-
-log "Admin websocket should execute _test data with correct token"
-ws_response=$(echo "_test" | websocat ws://${host}:${admin_port}/ -0 --header "Cookie:X-Auth-Token=${api_token}")
-if [[ "${ws_response}" != *"ws client connected [ authentication ENABLED ]"* ]]; then
-  log "⛔️ Didn't succeed ws authentication"
-  log "Expected response should contain: 'ws client connected [ authentication ENABLED ]' "
-  log "Actual response:"
-  log "${ws_response}"
-  exit 1
-fi
-
-log "No-auth Admin websocket should auth with no token"
-ws_response=$(echo "_test" | websocat ws://${host}:${insecure_admin_port}/ -0)
-if [[ "${ws_response}" != *"ws client connected [ authentication DISABLED ]"* ]]; then
-  log "⛔️ Didn't succeed ws authentication"
-  log "Expected response should contain: 'ws client connected [ authentication DISABLED ]' "
-  log "Actual response:"
-  log "${ws_response}"
-  exit 1
-fi
-
-log "No-auth Admin websocket should auth with bad token"
-ws_response=$(echo "_test" | websocat ws://${host}:${insecure_admin_port}/ -0 --header "Cookie:${bad_token}")
-if [[ "${ws_response}" != *"ws client connected [ authentication DISABLED ]"* ]]; then
-  log "⛔️ Didn't succeed ws authentication"
-  log "Expected response should contain: 'ws client connected [ authentication DISABLED ]' "
-  log "Actual response:"
-  log "${ws_response}"
-  exit 1
-fi
-
 # TEST WS v2
 # we are expecting some pipes to fail here
 set +Eeo pipefail
