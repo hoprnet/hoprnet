@@ -4,11 +4,11 @@
 */
 import { useEffect, useRef, useState } from 'react'
 import { debounce } from 'lodash'
-import { type Settings, type ApiPath, isSSR } from '../utils'
+import { type Configuration, type ApiPath, isSSR } from '../utils'
 
 export type ConnectionStatus = 'CONNECTED' | 'DISCONNECTED'
 
-const useWebsocket = (settings: Settings, apiPath: ApiPath) => {
+const useWebsocket = (config: Configuration, apiPath: ApiPath) => {
   // update timestamp when you want to reconnect to the websocket
   const [reconnectTmsp, setReconnectTmsp] = useState<number>()
   const [state, setState] = useState<{
@@ -60,10 +60,10 @@ const useWebsocket = (settings: Settings, apiPath: ApiPath) => {
     }
 
     // need to set the token in the query parameters, to enable websocket authentication
-    const wsUrl = new URL(apiPath, settings.apiEndpoint)
+    const wsUrl = new URL(apiPath, config.apiEndpoint)
     wsUrl.protocol = wsUrl.protocol === 'https' ? 'wss' : 'ws'
-    if (settings.apiToken) {
-      wsUrl.search = `?apiToken=${settings.apiToken}`
+    if (config.apiToken) {
+      wsUrl.search = `?apiToken=${config.apiToken}`
     }
     console.info('WS Connecting..')
     socketRef.current = new WebSocket(wsUrl)
@@ -83,7 +83,7 @@ const useWebsocket = (settings: Settings, apiPath: ApiPath) => {
       socketRef.current.removeEventListener('close', handleCloseEvent)
       socketRef.current.removeEventListener('error', handleErrorEvent)
     }
-  }, [settings.apiEndpoint, settings.apiToken, reconnectTmsp])
+  }, [config.apiEndpoint, config.apiToken, reconnectTmsp])
 
   return {
     state,

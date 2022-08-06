@@ -4,7 +4,8 @@
  * @returns padded string.
  */
 export const toPaddedString = (items: [string, string][]): string => {
-  const length = getPaddingLength(items.map((item) => item[0]))
+  // add 2 spaces after max pad length
+  const length = getPaddingLength(items.map((item) => item[0])) + 2
 
   return items
     .map(([valA, valB]) => {
@@ -18,7 +19,7 @@ export const toPaddedString = (items: [string, string][]): string => {
  * @returns the max length a string can be after adding padding
  */
 export const getPaddingLength = (items: string[]): number => {
-  return Math.max(...items.map((str) => str.length)) + 2
+  return Math.max(...items.map((str) => str.length))
 }
 
 /**
@@ -28,9 +29,9 @@ export const isSSR: boolean = typeof window === 'undefined'
 
 /**
  * Inspects the url to find valid settings.
- * @returns settings found in url query
+ * @returns config found in url query
  */
-export const getUrlParams = (loc: Location): Partial<Settings> => {
+export const getUrlParams = (loc: Location): Partial<Configuration> => {
   const params = new URLSearchParams(loc.search)
   return {
     apiEndpoint: params.get('apiEndpoint') || undefined,
@@ -41,9 +42,9 @@ export const getUrlParams = (loc: Location): Partial<Settings> => {
 export const API_TOKEN_COOKIE = 'X-Auth-Token'
 
 /**
- * Connectivity settings
+ * Connectivity configuration
  */
-export type Settings = {
+export type Configuration = {
   apiEndpoint: string
   apiToken?: string
 }

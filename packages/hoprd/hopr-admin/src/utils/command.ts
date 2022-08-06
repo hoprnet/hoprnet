@@ -1,8 +1,14 @@
 import type API from './api'
+import type { Aliases } from './api'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { peerIdFromString } from '@libp2p/peer-id'
 import { utils as ethersUtils } from 'ethers'
 import { toPaddedString } from '.'
+
+export type CacheFunctions = {
+  getCachedAliases: () => Aliases
+  updateAliasCache: (fn: (prevAliases: Aliases) => Aliases) => void
+}
 
 /**
  * An abstract command.
@@ -16,9 +22,7 @@ export abstract class Command {
   constructor(
     private uses: { [use: string]: [params: CmdParameter[], description: string] } = {},
     protected api: API,
-    protected extra: {
-      getCachedAliases: () => Record<string, string>
-    },
+    protected cache: CacheFunctions,
     public readonly hidden = false
   ) {}
 
@@ -50,8 +54,9 @@ export abstract class Command {
 
       if (params.length > 0) {
         for (const [type, name, optional] of params) {
-          const [paramDesc] = CMD_PARAMS[type]
-          use.push(`<${name} [${optional ? '?' : ''}${type} (${paramDesc})]>`)
+          // const [paramDesc] = CMD_PARAMS[type]
+          // use.push(`<${name} [${optional ? '?' : ''}${type} (${paramDesc})]>`)
+          use.push(`<${name} [${optional ? '?' : ''}${type}]>`)
         }
       } else {
         use.push('<none>')
@@ -85,7 +90,7 @@ export abstract class Command {
    */
   protected assertUsage(query: string): [error: string | undefined, use: string, ...parsedParams: any] {
     let result: ReturnType<typeof this.assertUsage> | undefined
-    const aliases = this.extra.getCachedAliases()
+    const aliases = this.cache.getCachedAliases()
 
     for (const [use, [params]] of Object.entries(this.uses)) {
       result = undefined
@@ -139,6 +144,7 @@ type CmdTypes =
   | 'number'
   | 'string'
   | 'boolean'
+  | 'constant'
 type CmdArg<I, O, R> = [description: string, validation: (v: I, ops: O) => [valid: boolean, value: R]]
 
 export const CMD_PARAMS: Record<CmdTypes, CmdArg<any, any, any>> = {
@@ -202,6 +208,12 @@ export const CMD_PARAMS: Record<CmdTypes, CmdArg<any, any, any>> = {
     'A boolean',
     (v) => {
       return [v === 'true' || v === 'false', Boolean(v)]
+    }
+  ],
+  constant: [
+    'A constant value',
+    (v) => {
+      return [true, v]
     }
   ]
 }

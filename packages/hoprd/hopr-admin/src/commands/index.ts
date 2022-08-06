@@ -1,4 +1,4 @@
-import type { Command } from '../utils/command'
+import type { Command, CacheFunctions } from '../utils/command'
 import API from '../utils/api'
 // commands
 import Alias from './alias'
@@ -23,30 +23,28 @@ import Help from './help'
 export default class Commands {
   private commandMap: Map<string, Command> = new Map()
 
-  constructor(private api: API, getCachedAliases: () => Record<string, string>) {
-    const extra = { getCachedAliases }
-
+  constructor(private api: API, private cache: CacheFunctions) {
     const commands: Command[] = [
-      new Alias(this.api, extra),
-      new Addresses(this.api, extra),
-      new Balances(this.api, extra),
-      new Sign(this.api, extra),
-      new Peers(this.api, extra),
-      new Ping(this.api, extra),
-      new Channels(this.api, extra),
-      new OpenChannel(this.api, extra),
-      new CloseChannel(this.api, extra),
-      new SendMessage(this.api, extra),
-      new Tickets(this.api, extra),
-      new RedeemTickets(this.api, extra),
-      new Withdraw(this.api, extra),
-      new Settings(this.api, extra),
-      new PeerInfo(this.api, extra),
-      new Info(this.api, extra),
-      new Version(this.api, extra)
+      new Alias(this.api, this.cache),
+      new Addresses(this.api, this.cache),
+      new Balances(this.api, this.cache),
+      new Sign(this.api, this.cache),
+      new Peers(this.api, this.cache),
+      new Ping(this.api, this.cache),
+      new Channels(this.api, this.cache),
+      new OpenChannel(this.api, this.cache),
+      new CloseChannel(this.api, this.cache),
+      new SendMessage(this.api, this.cache),
+      new Tickets(this.api, this.cache),
+      new RedeemTickets(this.api, this.cache),
+      new Withdraw(this.api, this.cache),
+      new Settings(this.api, this.cache),
+      new PeerInfo(this.api, this.cache),
+      new Info(this.api, this.cache),
+      new Version(this.api, this.cache)
     ]
 
-    commands.push(new Help(this.api, extra, commands))
+    commands.push(new Help(this.api, this.cache, commands))
 
     for (const command of commands) {
       if (this.commandMap.has(command.name())) {
@@ -71,6 +69,11 @@ export default class Commands {
     let cmd = this.commandMap.get(cmdName)
 
     if (cmd) {
+      // user is requesting usage
+      if (query === 'help') {
+        return log(cmd.usage())
+      }
+
       try {
         return await cmd.execute(log, query)
       } catch (error: any) {

@@ -2,11 +2,12 @@
   A react hook.
   Manages the dApps state.
 */
+import type { Aliases } from '../utils/api'
 import { useState, useMemo } from 'react'
 import cookies from 'js-cookie'
 import useAPI from './useAPI'
 import useWS from './useWS'
-import { type Settings, isSSR, getUrlParams, API_TOKEN_COOKIE } from '../utils'
+import { type Configuration, isSSR, getUrlParams, API_TOKEN_COOKIE } from '../utils'
 
 const useAppState = () => {
   // search for parameters from url
@@ -15,10 +16,10 @@ const useAppState = () => {
   const apiTokenFromCookies = cookies.get(API_TOKEN_COOKIE)
 
   const [state, setState] = useState<{
-    settings: Settings
-    aliases: Record<string, string>
+    config: Configuration
+    aliases: Aliases
   }>({
-    settings: {
+    config: {
       apiEndpoint: urlParams.apiEndpoint || 'http://localhost:3001/',
       apiToken: urlParams.apiToken || apiTokenFromCookies || undefined
     },
@@ -26,21 +27,19 @@ const useAppState = () => {
   })
 
   // initialize API
-  const api = useAPI(state.settings)
+  const api = useAPI(state.config)
 
   // initialize websocket connections
-  const streamWS = useWS(state.settings, '/api/v2/node/stream/websocket')
-  const messagesWS = useWS(state.settings, '/api/v2/messages/websocket')
+  const streamWS = useWS(state.config, '/api/v2/node/stream/websocket')
+  const messagesWS = useWS(state.config, '/api/v2/messages/websocket')
 
   /**
-   * Updates the app's settings.
+   * Updates the app's connectivity config.
    * Changes are propagated to all hooks.
    */
-  const updateSettings = (newSettings: Partial<Settings>) => {
+  const updateConfig = (update: (prevConfig: Configuration) => Configuration) => {
     setState((state) => {
-      for (const [k, v] of Object.entries(newSettings)) {
-        state.settings[k] = v
-      }
+      state.config = update(state.config)
       return state
     })
   }
@@ -48,11 +47,9 @@ const useAppState = () => {
   /**
    * Updates the app's aliases.
    */
-  const updateAliases = (newAliases: Record<string, string>) => {
+  const updateAliases = (update: (prevAliases: Aliases) => Aliases) => {
     setState((state) => {
-      for (const [k, v] of Object.entries(newAliases)) {
-        state.aliases[k] = v
-      }
+      state.aliases = update(state.aliases)
       return state
     })
   }
@@ -71,7 +68,7 @@ const useAppState = () => {
     api,
     streamWS,
     messagesWS,
-    updateSettings,
+    updateConfig,
     updateAliases,
     status
   }

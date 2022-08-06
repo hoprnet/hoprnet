@@ -5,22 +5,6 @@
 
 import { type ApiPath } from '.'
 
-export type ExpandedJsonResponse<R = any> = Promise<
-  {
-    json: () => Promise<R>
-  } & Response
->
-
-export type ExpandedTextResponse = Promise<Response>
-
-export type Channel = {
-  type: string
-  channelId: string
-  peerId: string
-  status: string
-  balance: string
-}
-
 /**
  * Wrapper around fetch that allows you to call various HOPRd API endpoints.
  */
@@ -77,25 +61,22 @@ export default class API {
   public async withdraw(amount: string, currency: string, recipient: string): ExpandedJsonResponse {
     return this.postReq('/api/v2/account/withdraw', { amount, currency, recipient })
   }
-  public async getBalances(): ExpandedJsonResponse<{
-    hopr: string
-    native: string
-  }> {
+  public async getBalances(): ExpandedJsonResponse<Balances> {
     return this.getReq('/api/v2/account/balances')
   }
-  public async getAddresses(): ExpandedJsonResponse<{
-    hopr: string
-    native: string
-  }> {
+  public async getAddresses(): ExpandedJsonResponse<Addresses> {
     return this.getReq('/api/v2/account/addresses')
   }
 
   // aliases API
-  public async getAliases(): ExpandedJsonResponse<Record<string, string>> {
+  public async getAliases(): ExpandedJsonResponse<Aliases> {
     return this.getReq('/api/v2/aliases')
   }
   public async setAlias(peerId: string, alias: string): ExpandedJsonResponse {
     return this.postReq('/api/v2/aliases', { peerId, alias })
+  }
+  public async removeAlias(alias: string): ExpandedJsonResponse {
+    return this.delReq(`/api/v2/aliases/${alias}`)
   }
 
   // channels API
@@ -181,4 +162,34 @@ export default class API {
   public async setSetting(key: string, value: string | boolean): ExpandedJsonResponse {
     return this.putReq(`/api/v2/settings/${key}`, { key: key, value: value })
   }
+}
+
+// some types
+
+export type ExpandedJsonResponse<R = any> = Promise<
+  {
+    json: () => Promise<R>
+  } & Response
+>
+
+export type ExpandedTextResponse = Promise<Response>
+
+export type Channel = {
+  type: string
+  channelId: string
+  peerId: string
+  status: string
+  balance: string
+}
+
+export type Aliases = Record<string, string>
+
+export type Balances = {
+  hopr: string
+  native: string
+}
+
+export type Addresses = {
+  hopr: string
+  native: string
 }

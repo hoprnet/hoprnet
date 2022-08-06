@@ -28,14 +28,14 @@
   cursor: pointer;
 }
 
-.settings {
+.configuration {
   display: flex;
   justify-content: space-around;
   align-items: center;
   flex-direction: column;
 }
 
-.settings div {
+.configuration div {
   display: flex;
   justify-content: space-around;
   align-items: center;

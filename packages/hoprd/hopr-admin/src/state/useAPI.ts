@@ -3,15 +3,15 @@
   Keeps the configuration of the API updated.
 */
 import { useRef, useEffect } from 'react'
-import { type Settings } from '../utils'
+import { type Configuration } from '../utils'
 import API from '../utils/api'
 
-const useAPI = (settings: Settings) => {
-  const apiRef = useRef<API>(new API(settings.apiEndpoint, settings.apiToken))
+const useAPI = (config: Configuration) => {
+  const apiRef = useRef<API>(new API(config.apiEndpoint, config.apiToken))
 
   useEffect(() => {
-    apiRef.current.updateConfig(settings.apiEndpoint, settings.apiToken)
-  }, [settings.apiEndpoint, settings.apiToken])
+    apiRef.current.updateConfig(config.apiEndpoint, config.apiToken)
+  }, [config.apiEndpoint, config.apiToken])
 
   return {
     apiRef

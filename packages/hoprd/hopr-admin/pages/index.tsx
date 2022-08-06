@@ -6,7 +6,7 @@ import Logs from '../src/components/logs'
 import styles from '../styles/Home.module.css'
 import Commands from '../src/commands'
 import useAppState from '../src/state'
-import { type Log, type Settings, createLog } from '../src/utils'
+import { type Log, type Configuration, createLog } from '../src/utils'
 import { readStreamEvent } from '../src/utils/stream'
 
 // TODO: fix type in refactor
@@ -17,24 +17,34 @@ export default function Home() {
   // initialize app state
   const app = useAppState()
   // initialize commands
-  const cmds = new Commands(app.api.apiRef.current, () => app.state.aliases)
+  const cmds = new Commands(app.api.apiRef.current, {
+    getCachedAliases() {
+      return app.state.aliases
+    },
+    updateAliasCache(fn) {
+      return app.updateAliases(fn)
+    }
+  })
 
-  // update aliases every 5 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const api = app.api.apiRef.current
-      if (api && app.status === 'CONNECTED') {
-        try {
-          api
-            .getAliases()
-            .then((res) => res.json())
-            .then(app.updateAliases)
-        } catch (error) {
-          console.error(error)
-        }
+  const updateAliases = async () => {
+    const api = app.api.apiRef.current
+    if (api && app.status === 'CONNECTED') {
+      try {
+        api
+          .getAliases()
+          .then((res) => res.json())
+          .then((aliases) => app.updateAliases(() => aliases))
+      } catch (error) {
+        console.error(error)
       }
-    }, 5e3)
+    }
+  }
 
+  // update aliases once and every 5 seconds
+  useEffect(() => {
+    updateAliases()
+
+    const interval = setInterval(updateAliases, 5e3)
     return () => clearInterval(interval)
   }, [app.api.apiRef.current, app.status])
 
@@ -73,22 +83,32 @@ export default function Home() {
     }
   }, [showConnectedPanel])
 
-  // toggles settings panel
-  const [showSettingsPanel, setShowSettingsPanel] = useState(false)
-  const [draftSettings, setDraftSettings] = useState<Settings>(app.state.settings)
-  const HandleSettingUpdate = (k: keyof Settings) => (event: React.ChangeEvent<HTMLInputElement>) => {
-    setDraftSettings({
-      ...draftSettings,
+  // toggles config panel
+  const [showConfigPanel, setShowConfigPanel] = useState(false)
+  const [draftConfig, setDraftConfig] = useState<Configuration>(app.state.config)
+  const HandleConfigUpdate = (k: keyof Configuration) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    setDraftConfig({
+      ...draftConfig,
       [k]: event.target.value
     })
   }
-  const handleDraftSettingsSave = () => {
-    app.updateSettings(draftSettings)
-    setShowSettingsPanel(false)
+  const handleDraftConfigSave = () => {
+    app.updateConfig((prevConfig) => ({
+      ...prevConfig,
+      ...draftConfig
+    }))
+    setShowConfigPanel(false)
   }
 
   // handle user inputs
   const [input, setInput] = useState<string>('')
+  const [history, setHistory] = useState<{
+    history: string[]
+    index: number
+  }>({
+    history: [],
+    index: 0
+  })
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setInput(event.target.value)
   }
@@ -96,9 +116,44 @@ export default function Home() {
     if (event.key === 'Enter') {
       event.stopPropagation()
       cmds.execute((msg: string) => addLog(createLog(msg)), input)
+      setHistory((prevHistory) => {
+        const history = prevHistory.history.slice(0)
+        history.unshift(input)
+        console.log(history)
+
+        return {
+          history: history.slice(0, 50),
+          index: 0
+        }
+      })
       setInput('')
+    } else if (event.key === 'ArrowDown') {
+      const index = history.index === 0 ? history.index : --history.index
+      const input = history[index]
+      console.log(input)
+
+      setHistory((prevHistory) => {
+        return {
+          ...prevHistory,
+          index
+        }
+      })
+      setInput(input)
+    } else if (event.key === 'ArrowUp') {
+      const index = history.index === history.history.length - 1 ? history.index : ++history.index
+      const input = history[index]
+      console.log(input)
+
+      setHistory((prevHistory) => {
+        return {
+          ...prevHistory,
+          index
+        }
+      })
+      setInput(input)
     }
   }
+  console.log('index', history)
 
   // attach event listener for new streams events
   const handleStreamEvent = (event: MessageEvent<any>) => {
@@ -146,12 +201,12 @@ export default function Home() {
       <Logo onClick={() => setShowConnectedPanel(!showConnectedPanel)} />
       <h1>
         HOPR Logs - {GIT_HASH ? GIT_HASH : '*'}{' '}
-        <span className={styles.cogwheelIcon} onClick={() => setShowSettingsPanel(!showSettingsPanel)}>
+        <span className={styles.cogwheelIcon} onClick={() => setShowConfigPanel(!showConfigPanel)}>
           ⚙️
         </span>
       </h1>
 
-      <Logs messages={logs} status={app.status} />
+      <Logs messages={logs} isConnected={app.status === 'CONNECTED'} />
 
       <div className="send">
         <input
@@ -180,19 +235,19 @@ export default function Home() {
         </div>
       )}
 
-      {/* display settings panel */}
-      {showSettingsPanel && (
+      {/* display config panel */}
+      {showConfigPanel && (
         <div className={styles.popup}>
-          <h2>Settings</h2>
-          <div className={styles.settings}>
+          <h2>Configuration</h2>
+          <div className={styles.configuration}>
             <div>
-              API endpoint: <input value={draftSettings.apiEndpoint} onChange={HandleSettingUpdate('apiEndpoint')} />
+              API endpoint: <input value={draftConfig.apiEndpoint} onChange={HandleConfigUpdate('apiEndpoint')} />
             </div>
             <div>
-              API token: <input value={draftSettings.apiToken || ''} onChange={HandleSettingUpdate('apiToken')} />
+              API token: <input value={draftConfig.apiToken || ''} onChange={HandleConfigUpdate('apiToken')} />
             </div>
             <div>
-              <button onClick={handleDraftSettingsSave}>Save</button>
+              <button onClick={handleDraftConfigSave}>Save</button>
             </div>
           </div>
         </div>

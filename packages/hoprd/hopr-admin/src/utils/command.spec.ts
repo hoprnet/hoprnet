@@ -1,7 +1,8 @@
 import type API from './api'
+import type { Aliases } from './api'
 import assert from 'assert'
 import { peerIdFromString } from '@libp2p/peer-id'
-import { type CmdParameter, Command } from './command'
+import { type CmdParameter, Command, type CacheFunctions } from './command'
 
 const createCommandMock = (...args: ConstructorParameters<typeof Command>) => {
   return new (class CommandMock extends Command {
@@ -36,15 +37,16 @@ const SECONDARY_USE: [CmdParameter[], string] = [
 ]
 const API_MOCK = {} as API
 
-const EXTRA_MOCK = {
-  getCachedAliases: () => ({} as Record<any, any>)
+const CACHE_MOCK: CacheFunctions = {
+  getCachedAliases: () => ({} as Aliases),
+  updateAliasCache: (fn: any) => {}
 }
 
 const HOPR_ADDRESS_MOCK = peerIdFromString('16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12')
 
 describe('test Command class', function () {
   it('should initialize command', function () {
-    assert.doesNotThrow(() => createCommandMock({}, API_MOCK, EXTRA_MOCK))
+    assert.doesNotThrow(() => createCommandMock({}, API_MOCK, CACHE_MOCK))
   })
 
   it('should generate usage', function () {
@@ -53,7 +55,7 @@ describe('test Command class', function () {
         primary: PRIMARY_USE
       },
       API_MOCK,
-      EXTRA_MOCK
+      CACHE_MOCK
     )
     const usage = cmd.usage()
 
@@ -72,7 +74,7 @@ describe('test Command class', function () {
         secondary: SECONDARY_USE
       },
       API_MOCK,
-      EXTRA_MOCK
+      CACHE_MOCK
     )
 
     // @ts-ignore
@@ -95,7 +97,7 @@ describe('test Command class', function () {
         primary: PRIMARY_USE
       },
       API_MOCK,
-      EXTRA_MOCK
+      CACHE_MOCK
     )
 
     // @ts-ignore
