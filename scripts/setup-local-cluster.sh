@@ -18,7 +18,7 @@ declare api_token="^^LOCAL-testing-123^^"
 declare myne_chat_url="http://app.myne.chat"
 declare init_script=""
 declare hoprd_command="node packages/hoprd/lib/main.cjs"
-declare hardhat_basedir="."
+declare hardhat_basedir="packages/ethereum"
 declare node_env="development"
 
 usage() {
@@ -278,7 +278,7 @@ log "Funding nodes"
 
 #  --- Fund nodes --- {{{
 cd "${hardhat_basedir}" && \
-  yarn run:faucet:all
+  yarn faucet
 # }}}
 
 log "Waiting for nodes startup"
