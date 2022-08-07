@@ -484,6 +484,26 @@ async function main() {
         adminServer.registerUnfundedNode(node, cmds)
       }
 
+      if (argv.showConfiguration) {
+        const config = node.getPublicHoprOptions()
+        const { hoprTokenAddress, hoprChannelsAddress, channelClosureSecs, hoprNetworkRegistryAddress } =
+          node.smartContractInfo()
+        const channelClosureMins = Math.ceil(channelClosureSecs / 60) // convert to minutes
+
+        console.log(
+          [
+            `Environment: ${config.environment}`,
+            `Network: ${config.network}`,
+            `HOPR Token: ${hoprTokenAddress}`,
+            `HOPR Channels: ${hoprChannelsAddress}`,
+            `HOPR NetworkRegistry: ${hoprNetworkRegistryAddress}`,
+            `Eligibility: ${await node.isAllowedAccessToNetwork(node.getId())}`,
+            `Channel closure period: ${channelClosureMins} minutes`
+          ].join('\n')
+        )
+        process.exit(0)
+      }
+
       // 2.5 Await funding of wallet.
       await node.waitForFunds()
       logs.log('Node has been funded, starting...')
