@@ -21,6 +21,7 @@ import Withdraw from './withdraw.js'
 import { Alias } from './alias.js'
 import { Info } from './info.js'
 import Addresses from './addresses.js'
+import { ShowConfiguration } from './showConfiguration.js'
 
 export class Commands {
   readonly commands: AbstractCommand[]
@@ -32,6 +33,7 @@ export class Commands {
       new Alias(node),
       new CloseChannel(node),
       new Info(node),
+      new ShowConfiguration(node),
       new ListConnectedPeers(node),
       new ListCommands(() => this.commands),
       new ListOpenChannels(node),

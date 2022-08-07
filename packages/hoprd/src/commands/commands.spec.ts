@@ -145,4 +145,21 @@ describe('Commands', () => {
     let cmds = new mod.Commands(mockNode, stateOps)
     await assertMatch(cmds, 'info', /Channel closure period: 5 minutes/)
   })
+  it('showConfiguration', async () => {
+    let mockNode: any = sinon.fake()
+    mockNode.getId = () => '16Uiu2HAkyXRaL7fKu4qcjaKuo4WXizrpK63Ltd6kG2tH6oSV58AW'
+    mockNode.isAllowedAccessToNetwork = () => Promise.resolve(true)
+    mockNode.getPublicHoprOptions = () => ({
+      environment: 'hardhat-localhost',
+      network: 'a'
+    })
+    mockNode.smartContractInfo = () => ({
+      network: 'a',
+      hoprTokenAddress: 'b',
+      hoprChannelsAddress: 'c',
+      channelClosureSecs: 60
+    })
+    let cmds = new mod.Commands(mockNode, stateOps)
+    await assertMatch(cmds, 'showConfiguration', /Network: a/)
+  })
 })
