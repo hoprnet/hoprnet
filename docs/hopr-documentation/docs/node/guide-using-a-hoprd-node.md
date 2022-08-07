@@ -285,94 +285,7 @@ Tickets:
 
 This will show Tickets statistics on a Bob's node. On the previous step we sent a message through a Bob's node, this means we used his node to relay data packets. For this Bob got 1 ticket reward for relaying data. It will be automatically auto redeemed and Bob will receive 0.01 HOPR token.
 
-### 10. Fund Alice node
-
-Let's open payment channel with Alice node. But this time we will use command `fund`, this will fund a payment channel with specified node.
-
-We can fund payment channel from our side, this way we will be able to use Alice as a HOP node to send messages.
-
-:::info
-
-We added alias for Bob and Alice. We can use Alice name instead of HOPR address.
-
-:::
-
-```
-fund Alice 2 0
-```
-
-At the end of command you can see **2** and **0**
-
-**2** - First digit means, we funded payment channel on our side with 2 HOPR tokens.
-
-**0** - Second digit means, we didn't funded payment channel on Alice node side.
-
-Output will look similar to this:
-
-```
-Funding channel...
-Successfully funded channel to FskLs
-```
-
-Let's check the payment channels on your node. See the [7th step](guide-using-a-hoprd-node#7-check-opened-channels-list).
-
-From the channels list you will see opened **outgoing** payment channel with Alice with balance of 2 HOPR tokens.
-
-Output will look similar to this:
-
-```
-Outgoing Channel:       0xdc657b66661f2fafdafb6c81da80e928af149ac80a12291564c9195d4d7f52d9
-To:                     FskLs
-Status:                 Open
-Balance:                2 wxHOPR
-```
-
-Now let's fund payment channel with Alice, this time we will fund Alice side.
-
-```
-fund Alice 0 3
-```
-
-At the end of command you can see **0** and **3**
-
-**0** - First digit means, we didn't funded payment channel on our side, because we did it previously.
-
-**3** - Second digit means, we funded payment channel on Alice node side, this way Alice will be able to use our node as a HOP node to send messages.
-
-Output will look similar to this:
-
-```
-Funding channel...
-Successfully funded channel to FskLs
-```
-
-No check again the payment channels on your node. See the [7th step](guide-using-a-hoprd-node#7-check-opened-channels-list).
-
-From the channels list you will see opened **incoming** payment channel from Alice with a balance of 3 HOPR tokens.
-
-Output will look similar to this:
-
-```
-Outgoing Channel:       0xdc657b66661f2fafdafb6c81da80e928af149ac80a12291564c9195d4d7f52d9
-To:                     FskLs
-Status:                 Open
-Balance:                2 wxHOPR
-
-Incoming Channel:       0x80181642b23f69f94298f4240e2cbff85fd0410c2d80262417c728a84c87c0d2
-From:                   FskLs
-Status:                 Open
-Balance:                3 wxHOPR
-```
-
-From the output above you can see that we have now incoming and outgoing payment channel with Alice. This means we can use Alice node as a HOP node and Alice can use our node as a HOP node.
-
-:::tip
-
-You can fund payment channel on both sides at the same time. This was an example on how we could fund different sides of the payment channel.
-
-:::
-
-### 11. Send 2-HOP message through Bob's and Alice nodes to yourself
+### 10. Send 2-HOP message through Bob's and Alice nodes to yourself
 
 :::info
 
@@ -402,7 +315,7 @@ Latency: 845ms
 
 This means, you used Bob's and Alice nodes to send message to yourself. Technically this means data packets was relayed through Bob's and Alice nodes. What we see here a bit different it's a latency, it received message with a greater latency, because data packets relayed through the two nodes instead of one.
 
-### 12. Close payment channel with Bob
+### 11. Close payment channel with Bob
 
 ```
 close 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV
