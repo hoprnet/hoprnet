@@ -252,6 +252,11 @@ const argv = yargsInstance
     describe: 'Number of confirmations required for on-chain transactions [env: HOPRD_ON_CHAIN_CONFIRMATIONS]',
     default: CONFIRMATIONS
   })
+  .option('showConfiguration', {
+    boolean: true,
+    describe: 'List the configuration of the HOPR node',
+    default: false
+  })
 
   .wrap(Math.min(120, yargsInstance.terminalWidth()))
   .parseSync()
@@ -473,16 +478,21 @@ async function main() {
 
       logs.log(`Node is not started, please fund this node ${ethAddr} with at least ${fundsReq}`)
 
+      cmds = new Commands(node, { setState, getState })
+
+      if (adminServer) {
+        adminServer.registerUnfundedNode(node, cmds)
+      }
+
       // 2.5 Await funding of wallet.
       await node.waitForFunds()
       logs.log('Node has been funded, starting...')
 
       // 3. Start the node.
       await node.start()
-      cmds = new Commands(node, { setState, getState })
 
       if (adminServer) {
-        adminServer.registerNode(node, cmds)
+        adminServer.registerFundedNode(node, cmds)
       }
 
       logs.logStatus('READY')

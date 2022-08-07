@@ -81,7 +81,15 @@ export class AdminServer {
     this.logs.log('Admin server listening on port ' + this.port)
   }
 
-  registerNode(node: Hopr, cmds: any, settings?: any) {
+  registerUnfundedNode(node: Hopr, cmds: any, settings?: any) {
+    this.node = node
+    this.cmds = cmds
+    if (settings) {
+      this.cmds.stateOps.setState(settings)
+    }
+  }
+
+  registerFundedNode(node: Hopr, cmds: any, settings?: any) {
     this.node = node
     this.cmds = cmds
     if (settings) {
