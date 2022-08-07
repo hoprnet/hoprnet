@@ -7,7 +7,7 @@ export default class Help extends Command {
     super(
       {
         default: [[], 'displays help'],
-        showAll: [[['boolean', 'show hidden commands', true]], 'includes hidden commands']
+        showAll: [[['constant', "show hidden commands using 'all'", true]], 'shows hidden commands']
       },
       api,
       cache
@@ -23,18 +23,20 @@ export default class Help extends Command {
   }
 
   public async execute(log: (msg: string) => void, query: string): Promise<void> {
-    const [error, showHidden] = this.assertUsage(query)
+    const [error, , param = false] = this.assertUsage(query)
     if (error) return log(error)
 
-    log(
-      toPaddedString(
-        this.commands
-          .filter((cmd) => {
-            if (showHidden) return true
-            return !cmd.hidden
-          })
-          .map<[string, string]>((cmd) => [cmd.name(), cmd.description()])
-      )
-    )
+    const showAll = param === 'all'
+
+    const arr = this.commands
+      .filter((cmd) => {
+        if (showAll) return true
+        return !cmd.hidden
+      })
+      .map<[string, string]>((cmd) => [cmd.name(), cmd.description()])
+
+    if (!showAll) arr.push(['', "* Display hidden commands by running 'help all'"])
+
+    return log(toPaddedString(arr))
   }
 }

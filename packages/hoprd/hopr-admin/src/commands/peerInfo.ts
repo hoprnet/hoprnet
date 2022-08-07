@@ -15,11 +15,11 @@ export default class PeerInfo extends Command {
   }
 
   public name() {
-    return 'addresses'
+    return 'peerinfo'
   }
 
   public description() {
-    return 'Get information of a peer'
+    return '*For devs* Get information of a peer'
   }
 
   public async execute(log: (msg: string) => void, query: string): Promise<void> {
