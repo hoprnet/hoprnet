@@ -96,24 +96,18 @@ const argv = yargsInstance
   })
   .option('api', {
     boolean: true,
-    describe:
-      'Expose the Rest (V1, V2) and Websocket (V2) API on localhost:3001, requires --apiToken. "--rest" is deprecated [env: HOPRD_API]',
-    default: false,
-    alias: 'rest'
+    describe: 'Expose the API on localhost:3001. [env: HOPRD_API]',
+    default: false
   })
   .option('apiHost', {
     string: true,
-    describe:
-      'Set host IP to which the Rest and Websocket API server will bind. "--restHost" is deprecated [env: HOPRD_API_HOST]',
-    default: 'localhost',
-    alias: 'restHost'
+    describe: 'Set host IP to which the API server will bind. [env: HOPRD_API_HOST]',
+    default: 'localhost'
   })
   .option('apiPort', {
     number: true,
-    describe:
-      'Set host port to which the Rest and Websocket API server will bind. "--restPort" is deprecated [env: HOPRD_API_PORT]',
-    default: 3001,
-    alias: 'restPort'
+    describe: 'Set host port to which the API server will bind. [env: HOPRD_API_PORT]',
+    default: 3001
   })
   .option('healthCheck', {
     boolean: true,
