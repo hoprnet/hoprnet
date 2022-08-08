@@ -49,8 +49,8 @@ EXPOSE 19503
 EXPOSE 19504
 EXPOSE 19505
 
-# set deafult token, but keep it configurable for users
+# set default token, but keep it configurable for users
 ARG HOPRD_API_TOKEN
 ENV HOPRD_API_TOKEN=${HOPRD_API_TOKEN:-%th1s-IS-a-S3CR3T-ap1-PUSHING-b1ts-TO-you%}
 
-ENTRYPOINT /hardhat/scripts/setup-local-cluster.sh -p -t "${HOPRD_API_TOKEN}" -i /hardhat/scripts/topologies/full_interconnected_cluster.sh --hoprd-command "yarn hoprd" --hardhat-basedir "/hardhat"
+ENTRYPOINT /hardhat/scripts/setup-local-cluster.sh -p -t "${HOPRD_API_TOKEN}" -i /hardhat/scripts/topologies/full_interconnected_cluster.sh --hoprd-command "yarn hoprd" --hardhat-basedir "/hardhat" -l "0.0.0.0"
