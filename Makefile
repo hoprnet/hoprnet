@@ -1,6 +1,13 @@
+WORKSPACES_WITH_RUST_MODULES := $(wildcard $(addsuffix /crates, $(wildcard ./packages/*)))
+
 .POSIX:
 
 all: help
+
+.PHONY: $(WORKSPACES_WITH_RUST_MODULES) ## build all WASM modules
+$(WORKSPACES_WITH_RUST_MODULES):
+	$(MAKE) -C $@ all 
+	$(MAKE) -C $@ install
 
 .PHONY: deps
 deps: ## install dependencies
@@ -18,8 +25,6 @@ build-hopr-admin: ## build hopr admin React frontend
 
 .PHONY: build-solidity-types
 build-solidity-types: ## generate Solidity typings
-build-solidity-types: build-cargo
-	npx tsc -p packages/utils/tsconfig.json
 	yarn workspace @hoprnet/hopr-ethereum run build:sol:types
 
 .PHONY: build-yarn
@@ -30,7 +35,7 @@ build-yarn: build-solidity-types build-cargo
 .PHONY: build-cargo
 build-cargo: ## build cargo packages
 	cargo build --release --target wasm32-unknown-unknown
-	yarn workspaces foreach --exclude hoprnet --exclude hopr-docs run build:wasm
+	$(MAKE) $(WORKSPACES_WITH_RUST_MODULES)
 
 .PHONY: build-yellowpaper
 build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
