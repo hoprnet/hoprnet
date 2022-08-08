@@ -82,6 +82,7 @@ describe('Commands', () => {
 
   it('settings', async () => {
     let mockNode: any = sinon.fake()
+    mockNode.status = 'RUNNING'
     mockNode.getChannelStrategy = (): string => ''
     let cmds = new mod.Commands(mockNode, stateOps)
     await assertMatch(cmds, 'settings', /includeRecipient/)
@@ -89,6 +90,7 @@ describe('Commands', () => {
 
   it('settings includeRecipient', async () => {
     let mockNode: any = sinon.fake()
+    mockNode.status = 'RUNNING'
     let cmds = new mod.Commands(mockNode, stateOps)
     await assertMatch(cmds, 'settings includeRecipient', /false/)
   })
@@ -136,6 +138,7 @@ describe('Commands', () => {
     let mockNode: any = sinon.fake()
     mockNode.getAddressesAnnouncedToDHT = async () => []
     mockNode.getId = () => '16Uiu2HAkyXRaL7fKu4qcjaKuo4WXizrpK63Ltd6kG2tH6oSV58AW'
+    mockNode.status = 'RUNNING'
     mockNode.isAllowedAccessToNetwork = () => Promise.resolve(true)
     mockNode.getConnectivityHealth = () => NetworkHealthIndicator.GREEN
     mockNode.getListeningAddresses = () => []

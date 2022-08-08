@@ -80,6 +80,9 @@ export default class Settings extends AbstractCommand {
   }
 
   public async execute(log, query: string, { getState, setState }: StateOps): Promise<void> {
+    if (this.node.status != 'RUNNING') {
+      return log(`Node is not started`)
+    }
     const state = getState()
 
     if (!query) {

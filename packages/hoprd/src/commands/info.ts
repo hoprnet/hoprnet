@@ -16,6 +16,9 @@ export class Info extends AbstractCommand {
   }
 
   public async execute(log): Promise<void> {
+    if (this.node.status != 'RUNNING') {
+      return log(`Node is not started`)
+    }
     const smartContractInfo = this.node.smartContractInfo()
     const channelClosureMins = Math.ceil(smartContractInfo.channelClosureSecs / 60) // convert to minutes
 
