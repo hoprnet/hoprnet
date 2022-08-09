@@ -46,9 +46,12 @@ jobs:
           registry-url: https://registry.npmjs.org/
           cache: yarn
 
-      - name: Build
+      - name: Install dependencies
         run: |
           make -j deps
+
+      - name: Build
+        run: |
           make -j build
 
       - name: Install websocat
