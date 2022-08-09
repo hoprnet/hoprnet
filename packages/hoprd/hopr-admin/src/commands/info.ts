@@ -31,9 +31,13 @@ export default class Info extends Command {
         ['Announcing to other nodes as', nodeInfo.announcedAddress.join('\n')],
         ['Listening on', nodeInfo.listeningAddress.join('\n')],
         ['Running on', nodeInfo.network],
-        ['HOPR Token', nodeInfo.hoprToken],
-        ['HOPR Channels', nodeInfo.hoprChannels],
-        ['Channel closure period', `${nodeInfo.channelClosurePeriod} minutes`]
+        ['Using HOPR environment', nodeInfo.environment],
+        ['Channel closure period', `${nodeInfo.channelClosurePeriod} minutes`],
+        ['HOPR Token Contract Address', nodeInfo.hoprToken],
+        ['HOPR Channels Contract Addresss', nodeInfo.hoprChannels],
+        ['HOPR NetworkRegistry Contract Address', nodeInfo.hoprNetworkRegistry],
+        ['NetworkRegistry Eligibility', nodeInfo.isEligible],
+        ['Connectivity Status', nodeInfo.connectivityStatus]
       ])
     )
   }
