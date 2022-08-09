@@ -72,7 +72,7 @@ On each code change, the following steps are repeatable.
 On host machine, you can build HOPR, e.g. using standard:
 
 ```shell
-make -j deps build
+make -j deps && make -j build
 ```
 
 Once HOPR is built, public and NAT nodes can be restarted using the following command for the changes to take effect:
