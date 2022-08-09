@@ -9,6 +9,9 @@ $(WORKSPACES_WITH_RUST_MODULES):
 	$(MAKE) -C $@ all 
 	$(MAKE) -C $@ install
 
+.PHONY: rust-modules
+rust-modules: $(WORKSPACES_WITH_RUST_MODULES)
+
 .PHONY: deps
 deps: ## install dependencies
 	corepack enable
@@ -35,7 +38,7 @@ build-yarn: build-solidity-types build-cargo
 .PHONY: build-cargo
 build-cargo: ## build cargo packages
 	cargo build --release --target wasm32-unknown-unknown
-	$(MAKE) $(WORKSPACES_WITH_RUST_MODULES)
+	$(MAKE) rust-modules
 
 .PHONY: build-yellowpaper
 build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
