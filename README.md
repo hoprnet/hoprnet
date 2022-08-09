@@ -56,29 +56,7 @@ The following instructions show how the latest community release may be
 installed. The instructions should be adapted if you want to use the latest
 development release or any other older release.
 
-### Install via NPM
-
-Please make sure you are running a compatible version of Node.js.
-
-```sh
-node --version
-# v16.15.0
-```
-
-To always use the right version of Node.js, we recommend to install [Fast Node.js Manager (fnm)](https://github.com/Schniz/fnm) and run `fnm use`.
-
-```sh
-fnm use
-# Using Node v16.15.0
-```
-
-Using the [hoprd npm package][6]:
-
-```sh
-mkdir MY_NEW_HOPR_TEST_FOLDER
-cd MY_NEW_HOPR_TEST_FOLDER
-npm install @hoprnet/hoprd@1.88
-```
+The preferred way of installation should be via Docker.
 
 ### Install via Docker
 
@@ -105,7 +83,31 @@ alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:
 HOPRD_DATA_DIR=${HOME}/.hoprd-better-db-folder eval hoprd
 ```
 
-Also all ports are mapped to your local host, assuming you stick to the default port numbers.
+Also all ports are mapped to your localhost, assuming you stick to the default port numbers.
+
+### Install via NPM
+
+Please make sure you are running a compatible version of Node.js.
+
+```sh
+node --version
+# v16.15.0
+```
+
+To always use the right version of Node.js, we recommend to install [Fast Node.js Manager (fnm)](https://github.com/Schniz/fnm) and run `fnm use`.
+
+```sh
+fnm use
+# Using Node v16.15.0
+```
+
+Using the [hoprd npm package][6]:
+
+```sh
+mkdir MY_NEW_HOPR_TEST_FOLDER
+cd MY_NEW_HOPR_TEST_FOLDER
+npm install @hoprnet/hoprd@1.88
+```
 
 ### Install via [Nix package manager][1]
 
@@ -189,12 +191,12 @@ Here is a short break-down of each argument.
 
 ```sh
 hoprd
-  --admin   	                         # enable the node's admin UI, available at localhost:3000
-  --init 				 # initialize the database and identity if not present
-  --announce 				 # announce the node to other nodes in the network and act as relay if publicly reachable
-  --identity .hopr-identity              # store your node identity information in your test folder
-  --password switzerland   		 # set the encryption password for your identity
-  --apiToken <MY_TOKEN> # specify password for accessing admin panel and REST API (REQUIRED)
+  --admin   	              # enable the node's admin UI, available at localhost:3000
+  --init 				      # initialize the database and identity if not present
+  --announce 				  # announce the node to other nodes in the network and act as relay if publicly reachable
+  --identity .hopr-identity   # store your node identity information in your test folder
+  --password switzerland   	  # set the encryption password for your identity
+  --apiToken <MY_TOKEN>       # specify password for accessing admin panel and REST API (REQUIRED)
 ```
 
 ### Using Docker
@@ -202,7 +204,7 @@ hoprd
 The following command assumes you've setup an alias like described in [Install via Docker](#install-via-docker).
 
 ```sh
-hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --admin --adminHost 0.0.0.0 --apiToken <MY_TOKEN> --environment jungfrau
+hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --admin --adminHost 0.0.0.0 --apiToken <MY_TOKEN> --environment ouagadougou
 ```
 
 Here is a short break-down of each argument.
@@ -210,17 +212,24 @@ Here is a short break-down of each argument.
 ```sh
 hoprd
   --identity /app/hoprd-db/.hopr-identity      # store your node identity information in the persisted database folder
-  --password switzerland   		 # set the encryption password for your identity
-  --init 				 # initialize the database and identity if not present
-  --announce 				 # announce the node to other nodes in the network and act as relay if publicly reachable
-  --host "0.0.0.0:9091"   		 # set IP and port of the P2P API to the container's external IP so it can be reached on your host
-  --admin   	                         # enable the node's admin UI
-  --adminHost 0.0.0.0                    # set IP of the Rest API to the container's external IP so it can be reached on your host
-  --apiToken <MY_TOKEN> # specify password for accessing admin panel and REST API(REQUIRED)
-  --environment jungfrau # an environment is defined as a chain plus a number of deployed smart contract addresses to use on that chain
-                         # each release has a default environment id set, but the user can override this value
-                         # nodes from different environments are **not able** to communicate
+  --password switzerland   	# set the encryption password for your identity
+  --init 				    # initialize the database and identity if not present
+  --announce 				# announce the node to other nodes in the network and act as relay if publicly reachable
+  --host "0.0.0.0:9091"   	# set IP and port of the P2P API to the container's external IP so it can be reached on your host
+  --admin   	            # enable the node's admin UI
+  --adminHost 0.0.0.0       # set IP of the Rest API to the container's external IP so it can be reached on your host
+  --apiToken <MY_TOKEN>     # specify password for accessing admin panel and REST API(REQUIRED)
+  --environment ouagadougou # an environment is defined as a chain plus a number of deployed smart contract addresses to use on that chain
+                            # each release has a default environment id set, but the user can override this value
+                            # nodes from different environments are **not able** to communicate
 ```
+
+## Testnet accessibility
+
+Currently, to be able to participate in a public testnet or public staging environment running in Google Cloud (e.g. `master-goerli`), you need to satisfy certain criteria to be eligible to join.
+See ([Network Registry](NETWORK_REGISTRY.md)) for details.
+
+These criteria however, are not required when you develop using your local nodes or a locally running cluster (see next sections).
 
 ## Migrating between releases
 
