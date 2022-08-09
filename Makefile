@@ -6,7 +6,7 @@ all: help
 
 .PHONY: $(WORKSPACES_WITH_RUST_MODULES) ## build all WASM modules
 $(WORKSPACES_WITH_RUST_MODULES):
-	$(MAKE) -C $@ all 
+	$(MAKE) -C $@ all
 	$(MAKE) -C $@ install
 
 .PHONY: rust-modules
@@ -38,7 +38,7 @@ build-yarn: build-solidity-types build-cargo
 .PHONY: build-cargo
 build-cargo: ## build cargo packages
 	cargo build --release --target wasm32-unknown-unknown
-	$(MAKE) rust-modules
+	$(MAKE) -j 1 rust-modules
 
 .PHONY: build-yellowpaper
 build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
