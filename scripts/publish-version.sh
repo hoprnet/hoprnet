@@ -67,7 +67,7 @@ git pull origin "${branch}" --rebase --tags
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
 # ensure the build is up-to-date
-make -C -j "${mydir}/.." deps && make -C -j "${mydir}/.." build
+make -j -C "${mydir}/.." deps && make -j -C "${mydir}/.." build
 
 declare current_version
 current_version="$("${mydir}/get-package-version.sh")"
