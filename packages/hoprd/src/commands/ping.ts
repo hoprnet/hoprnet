@@ -41,13 +41,14 @@ export default class Ping extends AbstractCommand {
       error = err
     }
 
+    if (error && error.message) {
+      return log(`${out}Could not ping node. Error was: ${styleValue(error.message, 'failure')}`)
+    }
+
     if (pingResult.latency >= 0) {
       return log(`${out}Pong received in: ${styleValue(pingResult.latency)} ms ${pingResult?.info ?? ''}`)
     }
 
-    if (error && error.message) {
-      return log(`${out}Could not ping node. Error was: ${styleValue(error.message, 'failure')}`)
-    }
-    return log(`${out}Could not ping node. Timeout.`)
+    return log(`${out}Could not ping node. Timeout or unknown error.`)
   }
 }

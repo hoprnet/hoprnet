@@ -25,6 +25,7 @@
 - Added possibility to specify custom RPC provider in Avado
 - Add connectivity health indicator & NR eligibility status of the node to the `info` command ([#3921](https://github.com/hoprnet/hoprnet/pull/3921))
 - Fix message encoding/decoding in HOPRd ([#3943](https://github.com/hoprnet/hoprnet/pull/3943))
+- Properly display the reason of `ping` failure
 
 # Breaking changes
 

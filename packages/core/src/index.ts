@@ -780,13 +780,8 @@ class Hopr extends EventEmitter {
   public async ping(destination: PeerId): Promise<{ info?: string; latency: number }> {
     let start = Date.now()
 
-    let pingResult: HeartbeatPingResult
-    try {
-      pingResult = await this.heartbeat.pingNode(destination)
-    } catch (err) {
-      log(`Could not ping ${destination.toString()}.`, err)
-      return { latency: -1, info: 'error' }
-    }
+    // Propagate any errors thrown upwards
+    let pingResult = await this.heartbeat.pingNode(destination)
 
     if (pingResult.lastSeen >= 0) {
       if (this.networkPeers.has(destination)) {
