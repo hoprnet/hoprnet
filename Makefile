@@ -6,11 +6,7 @@ all: help
 
 .PHONY: $(WORKSPACES_WITH_RUST_MODULES) ## build all WASM modules
 $(WORKSPACES_WITH_RUST_MODULES):
-	$(MAKE) -C $@ all
-	$(MAKE) -C $@ install
-
-.PHONY: rust-modules
-rust-modules: $(WORKSPACES_WITH_RUST_MODULES)
+	$(MAKE) -j 1 -C $@ all install
 
 .PHONY: deps
 deps: ## install dependencies
@@ -36,9 +32,9 @@ build-yarn: build-solidity-types build-cargo
 	npx tsc --build tsconfig.build.json
 
 .PHONY: build-cargo
-build-cargo: ## build cargo packages
+build-cargo: ## build cargo packages and create boilerplate JS code
 	cargo build --release --target wasm32-unknown-unknown
-	$(MAKE) -j 1 rust-modules
+	$(MAKE) -j 1 $(WORKSPACES_WITH_RUST_MODULES)
 
 .PHONY: build-yellowpaper
 build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
