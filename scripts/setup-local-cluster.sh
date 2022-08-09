@@ -18,7 +18,7 @@ declare api_token="^^LOCAL-testing-123^^"
 declare myne_chat_url="http://app.myne.chat"
 declare init_script=""
 declare hoprd_command="node packages/hoprd/lib/main.cjs"
-declare hardhat_basedir="."
+declare hardhat_basedir="packages/ethereum"
 declare listen_host="127.0.0.1"
 declare node_env="development"
 
@@ -87,15 +87,15 @@ while (( "$#" )); do
 done
 
 # find usable tmp dir
-declare tmp="$(find_tmp_dir)"
+declare tmp_dir="$(find_tmp_dir)"
 
 declare node_prefix="local"
 
-declare node1_dir="${tmp}/${node_prefix}-1"
-declare node2_dir="${tmp}/${node_prefix}-2"
-declare node3_dir="${tmp}/${node_prefix}-3"
-declare node4_dir="${tmp}/${node_prefix}-4"
-declare node5_dir="${tmp}/${node_prefix}-5"
+declare node1_dir="${tmp_dir}/${node_prefix}-1"
+declare node2_dir="${tmp_dir}/${node_prefix}-2"
+declare node3_dir="${tmp_dir}/${node_prefix}-3"
+declare node4_dir="${tmp_dir}/${node_prefix}-4"
+declare node5_dir="${tmp_dir}/${node_prefix}-5"
 
 declare node1_log="${node1_dir}.log"
 declare node2_log="${node2_dir}.log"
@@ -111,8 +111,8 @@ declare node5_id="${node5_dir}.id"
 
 declare password="local"
 
-declare hardhat_rpc_log="${tmp}/hopr-local-hardhat-rpc.log"
-declare env_file="${tmp}/local-cluster.env"
+declare hardhat_rpc_log="${tmp_dir}/hopr-local-hardhat-rpc.log"
+declare env_file="${tmp_dir}/local-cluster.env"
 
 function cleanup {
   local EXIT_CODE=$?
@@ -289,7 +289,7 @@ log "Funding nodes"
 
 #  --- Fund nodes --- {{{
 cd "${hardhat_basedir}" && \
-  yarn faucet
+  yarn faucet --identity-directory "${tmp_dir}"
 # }}}
 
 log "Waiting for nodes startup"
@@ -317,16 +317,12 @@ log "All nodes came up online"
 
 declare endpoints="localhost:13301 localhost:13302 localhost:13303 localhost:13304 localhost:13305"
 
-log "Calling init script ${init_script}"
-HOPRD_API_TOKEN="${api_token}" \
-  "${mydir}/${init_script}" ${endpoints}
-
 # --- Call init script--- {{{
-# if [ -n "${init_script}" ] && [ -x "${init_script}" ]; then
-#   log "Calling init script ${init_script}"
-#   HOPRD_API_TOKEN="${api_token}" \
-#     "${init_script}" ${endpoints}
-# fi
+if [ -n "${init_script}" ] && [ -x "${init_script}" ]; then
+  log "Calling init script ${init_script}"
+  HOPRD_API_TOKEN="${api_token}" \
+    "${init_script}" ${endpoints}
+fi
 # }}}
 
 # --- Get peer ids for reporting --- {{{

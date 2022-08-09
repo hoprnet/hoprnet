@@ -10,7 +10,8 @@ $(WORKSPACES_WITH_RUST_MODULES):
 
 .PHONY: deps
 deps: ## install dependencies
-	corepack enable
+	# only use corepack on non-nix systems
+	[ -n "${NIX_PATH}" ] || corepack enable
 	yarn
 	command -v rustup && rustup update || echo "No rustup installed, ignoring"
 
