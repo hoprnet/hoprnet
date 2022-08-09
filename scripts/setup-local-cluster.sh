@@ -18,18 +18,20 @@ declare api_token="^^LOCAL-testing-123^^"
 declare myne_chat_url="http://app.myne.chat"
 declare init_script=""
 declare hoprd_command="node packages/hoprd/lib/main.cjs"
-declare hardhat_basedir="packages/ethereum"
+declare hardhat_basedir="."
+declare listen_host="127.0.0.1"
 declare node_env="development"
 
 usage() {
   msg
-  msg "Usage: $0 [-h|--help] [-t|--api-token <api_token>] [-m|--myne-chat-url <myne_chat_url>] [-i|--init-script <init_script>] [--hoprd-command <hoprd_command>] [--hardhat-basedir <hardhat_basedir>] [-p|--production]"
+  msg "Usage: $0 [-h|--help] [-t|--api-token <api_token>] [-m|--myne-chat-url <myne_chat_url>] [-i|--init-script <init_script>] [--hoprd-command <hoprd_command>] [--hardhat-basedir <hardhat_basedir>] [--listen-host|-l <list_host>] [-p|--production]"
   msg
   msg "<api_token> is set to '${api_token}' by default"
   msg "<myne_chat_url> is set to '${myne_chat_url}' by default"
   msg "<init_script> is empty by default, expected to be path to a script which is called with all node API endpoints as parameters"
   msg "<hoprd_command> is used to start hoprd, default is '${hoprd_command}'"
   msg "<hardhat_basedir> is entered before hardhat is started, default is '${hardhat_basedir}'"
+  msg "<listen_host> is listened on by all hoprd instances, default is '${listen_host}'"
   msg "-p sets NODE_ENV to 'production'"
 }
 
@@ -56,6 +58,11 @@ while (( "$#" )); do
       ;;
     -i|--init-script)
       init_script="${2}"
+      shift
+      shift
+      ;;
+    -l|--listen-host)
+      listen_host="${2}"
       shift
       shift
       ;;
@@ -134,10 +141,12 @@ trap cleanup SIGINT SIGTERM ERR EXIT
 # $1 = rest port
 # $2 = node port
 # $3 = admin port
-# $4 = node data directory
-# $5 = node log file
-# $6 = node id file
-# $7 = OPTIONAL: additional args to hoprd
+# $4 = healthcheck port
+# $5 = node data directory
+# $6 = node log file
+# $7 = node id file
+# $8 = host to listen on
+# $9 = OPTIONAL: additional args to hoprd
 function setup_node() {
   local api_port=${1}
   local node_port=${2}
@@ -146,7 +155,8 @@ function setup_node() {
   local dir=${5}
   local log=${6}
   local id=${7}
-  local additional_args=${8:-""}
+  local host=${8}
+  local additional_args=${9:-""}
 
   log "Run node ${id} on rest port ${api_port} -> ${log}"
 
@@ -169,16 +179,17 @@ function setup_node() {
     HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
     ${hoprd_command} \
       --admin \
-      --adminHost "127.0.0.1" \
+      --adminHost "${host}" \
       --adminPort ${admin_port} \
       --announce \
       --api-token "${api_token}" \
       --data="${dir}" \
-      --host="127.0.0.1:${node_port}" \
+      --host="${host}:${node_port}" \
       --identity="${id}" \
       --init \
       --password="${password}" \
       --api \
+      --apiHost "${host}" \
       --apiPort "${api_port}" \
       --testAnnounceLocalAddresses \
       --testPreferLocalAddresses \
@@ -186,7 +197,7 @@ function setup_node() {
       --allowLocalNodeConnections \
       --allowPrivateNodeConnections \
       --healthCheck \
-      --healthCheckHost "0.0.0.0" \
+      --healthCheckHost "${host}" \
       --healthCheckPort "${healthcheck_port}" \
       ${additional_args} \
       > "${log}" 2>&1 &
@@ -259,11 +270,11 @@ cp -R \
 # }}}
 
 #  --- Run nodes --- {{{
-setup_node 13301 19091 19501 18081 "${node1_dir}" "${node1_log}" "${node1_id}"
-setup_node 13302 19092 19502 18082 "${node2_dir}" "${node2_log}" "${node2_id}"
-setup_node 13303 19093 19503 18083 "${node3_dir}" "${node3_log}" "${node3_id}"
-setup_node 13304 19094 19504 18084 "${node4_dir}" "${node4_log}" "${node4_id}"
-setup_node 13305 19095 19505 18085 "${node5_dir}" "${node5_log}" "${node5_id}"
+setup_node 13301 19091 19501 18081 "${node1_dir}" "${node1_log}" "${node1_id}" "${listen_host}"
+setup_node 13302 19092 19502 18082 "${node2_dir}" "${node2_log}" "${node2_id}" "${listen_host}"
+setup_node 13303 19093 19503 18083 "${node3_dir}" "${node3_log}" "${node3_id}" "${listen_host}"
+setup_node 13304 19094 19504 18084 "${node4_dir}" "${node4_log}" "${node4_id}" "${listen_host}"
+setup_node 13305 19095 19505 18085 "${node5_dir}" "${node5_log}" "${node5_id}" "${listen_host}"
 # }}}
 
 log "Waiting for nodes bootstrap"
