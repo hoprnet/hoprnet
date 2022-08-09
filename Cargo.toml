@@ -5,3 +5,7 @@ members = [
     "packages/hoprd/crates/hoprd-misc",
     "packages/utils/crates/utils-misc"
 ]
+
+[profile.release]
+# Tell `rustc` to optimize for small code size.
+opt-level = "s"
