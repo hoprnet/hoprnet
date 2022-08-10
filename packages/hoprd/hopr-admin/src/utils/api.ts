@@ -120,13 +120,16 @@ export default class API {
 
   // node API
   public async getInfo(): ExpandedJsonResponse<{
-    channelClosurePeriod: number
     announcedAddress: string[]
-    listeningAddress: string[]
+    channelClosurePeriod: number
+    connectivityStatus: string
     environment: string
-    network: string
-    hoprToken: string
     hoprChannels: string
+    hoprNetworkRegistry: string
+    hoprToken: string
+    isEligible: boolean
+    listeningAddress: string[]
+    network: string
   }> {
     return this.getReq('/api/v2/node/info')
   }
