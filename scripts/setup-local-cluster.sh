@@ -18,7 +18,7 @@ declare api_token="^^LOCAL-testing-123^^"
 declare myne_chat_url="http://app.myne.chat"
 declare init_script=""
 declare hoprd_command="node packages/hoprd/lib/main.cjs"
-declare hardhat_basedir="."
+declare hardhat_basedir="packages/ethereum"
 declare listen_host="127.0.0.1"
 declare node_env="development"
 
@@ -87,15 +87,15 @@ while (( "$#" )); do
 done
 
 # find usable tmp dir
-declare tmp="$(find_tmp_dir)"
+declare tmp_dir="$(find_tmp_dir)"
 
 declare node_prefix="local"
 
-declare node1_dir="${tmp}/${node_prefix}-1"
-declare node2_dir="${tmp}/${node_prefix}-2"
-declare node3_dir="${tmp}/${node_prefix}-3"
-declare node4_dir="${tmp}/${node_prefix}-4"
-declare node5_dir="${tmp}/${node_prefix}-5"
+declare node1_dir="${tmp_dir}/${node_prefix}-1"
+declare node2_dir="${tmp_dir}/${node_prefix}-2"
+declare node3_dir="${tmp_dir}/${node_prefix}-3"
+declare node4_dir="${tmp_dir}/${node_prefix}-4"
+declare node5_dir="${tmp_dir}/${node_prefix}-5"
 
 declare node1_log="${node1_dir}.log"
 declare node2_log="${node2_dir}.log"
@@ -111,8 +111,8 @@ declare node5_id="${node5_dir}.id"
 
 declare password="local"
 
-declare hardhat_rpc_log="${tmp}/hopr-local-hardhat-rpc.log"
-declare env_file="${tmp}/local-cluster.env"
+declare hardhat_rpc_log="${tmp_dir}/hopr-local-hardhat-rpc.log"
+declare env_file="${tmp_dir}/local-cluster.env"
 
 function cleanup {
   local EXIT_CODE=$?
@@ -148,7 +148,7 @@ trap cleanup SIGINT SIGTERM ERR EXIT
 # $8 = host to listen on
 # $9 = OPTIONAL: additional args to hoprd
 function setup_node() {
-  local rest_port=${1}
+  local api_port=${1}
   local node_port=${2}
   local admin_port=${3}
   local healthcheck_port=${4}
@@ -158,7 +158,7 @@ function setup_node() {
   local host=${8}
   local additional_args=${9:-""}
 
-  log "Run node ${id} on rest port ${rest_port} -> ${log}"
+  log "Run node ${id} on rest port ${api_port} -> ${log}"
 
   if [[ "${additional_args}" != *"--environment "* ]]; then
     additional_args="--environment hardhat-localhost ${additional_args}"
@@ -188,9 +188,9 @@ function setup_node() {
       --identity="${id}" \
       --init \
       --password="${password}" \
-      --rest \
-      --restHost "${host}" \
-      --restPort "${rest_port}" \
+      --api \
+      --apiHost "${host}" \
+      --apiPort "${api_port}" \
       --testAnnounceLocalAddresses \
       --testPreferLocalAddresses \
       --testUseWeakCrypto \
@@ -289,7 +289,7 @@ log "Funding nodes"
 
 #  --- Fund nodes --- {{{
 cd "${hardhat_basedir}" && \
-  yarn run:faucet:all
+  yarn faucet --identity-directory "${tmp_dir}"
 # }}}
 
 log "Waiting for nodes startup"
@@ -337,38 +337,38 @@ log "Node port info"
 log "\tnode1"
 log "\t\tPeer Id:\t${peers[0]}"
 log "\t\tRest API:\thttp://localhost:13301/api/v2/_swagger"
-log "\t\tAdmin UI:\thttp://localhost:19501/"
+log "\t\tAdmin UI:\thttp://localhost:19501/?apiEndpoint=http://localhost:13301&apiToken=${api_token}"
 log "\t\tHealthcheck:\thttp://localhost:18081/"
 log "\t\tWebSocket:\tws://localhost:19501/"
-log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13301&wsEndpoint=ws://localhost:19501&securityToken=${api_token}"
+log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:13301&apiToken=${api_token}"
 log "\tnode2"
 log "\t\tPeer Id:\t${peers[1]}"
 log "\t\tRest API:\thttp://localhost:13302/api/v2/_swagger"
-log "\t\tAdmin UI:\thttp://localhost:19502/"
+log "\t\tAdmin UI:\thttp://localhost:19502/?apiEndpoint=http://localhost:13302&apiToken=${api_token}"
 log "\t\tHealthcheck:\thttp://localhost:18082/"
 log "\t\tWebSocket:\tws://localhost:19502/"
-log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13302&wsEndpoint=ws://localhost:19502&securityToken=${api_token}"
+log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:13302&apiToken=${api_token}"
 log "\tnode3"
 log "\t\tPeer Id:\t${peers[2]}"
 log "\t\tRest API:\thttp://localhost:13303/api/v2/_swagger"
-log "\t\tAdmin UI:\thttp://localhost:19503/"
+log "\t\tAdmin UI:\thttp://localhost:19503/?apiEndpoint=http://localhost:13303&apiToken=${api_token}"
 log "\t\tHealthcheck:\thttp://localhost:18083/"
 log "\t\tWebSocket:\tws://localhost:19503/"
-log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13303&wsEndpoint=ws://localhost:19503&securityToken=${api_token}"
+log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:13303&apiToken=${api_token}"
 log "\tnode4"
 log "\t\tPeer Id:\t${peers[3]}"
 log "\t\tRest API:\thttp://localhost:13304/api/v2/_swagger"
-log "\t\tAdmin UI:\thttp://localhost:19504/"
+log "\t\tAdmin UI:\thttp://localhost:19504/?apiEndpoint=http://localhost:13304&apiToken=${api_token}"
 log "\t\tHealthcheck:\thttp://localhost:18084/"
 log "\t\tWebSocket:\tws://localhost:19504/"
-log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13304&wsEndpoint=ws://localhost:19504&securityToken=${api_token}"
+log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:13304&apiToken=${api_token}"
 log "\tnode5"
 log "\t\tPeer Id:\t${peers[4]}"
 log "\t\tRest API:\thttp://localhost:13305/api/v2/_swagger"
-log "\t\tAdmin UI:\thttp://localhost:19505/"
+log "\t\tAdmin UI:\thttp://localhost:19505/?apiEndpoint=http://localhost:13305&apiToken=${api_token}"
 log "\t\tHealthcheck:\thttp://localhost:18085/"
 log "\t\tWebSocket:\tws://localhost:19505/"
-log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13305&wsEndpoint=ws://localhost:19505&securityToken=${api_token}"
+log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:13305&apiToken=${api_token}"
 
 cat <<EOF > ${env_file}
 #!/usr/bin/env bash

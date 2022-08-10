@@ -207,7 +207,7 @@ const DEFAULT_IDENTITY_DIRECTORY = '/tmp'
 const DEFAULT_FUND_AMOUNT = '1'
 
 task<FaucetCLIOPts>('faucet', 'Faucets a local development HOPR node account with ETH and HOPR tokens', faucet)
-  .addOptionalParam<string>('address', 'HoprToken address', undefined, types.string)
+  .addOptionalParam<string>('address', 'destination address which should receive funds', undefined, types.string)
   .addOptionalParam<string>('amount', 'Amount of HOPR to fund', DEFAULT_FUND_AMOUNT, types.string)
   .addFlag('useLocalIdentities', `Fund all identities stored in identity directory`)
   .addOptionalParam<string>(

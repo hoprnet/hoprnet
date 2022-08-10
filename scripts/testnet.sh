@@ -147,13 +147,6 @@ fund_if_empty() {
   fi
 }
 
-# $1=IP
-# $2=Hopr command
-# $3=optional: port
-run_command(){
-  curl -L --silent -X POST --data "${2}" "${1}:${3:-3001}/api/v1/command"
-}
-
 # $1=vm name
 # Run a VM with a hardhat instance
 start_chain_provider(){
