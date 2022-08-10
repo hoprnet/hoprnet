@@ -344,7 +344,7 @@ log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:13301&apiTok
 log "\tnode2"
 log "\t\tPeer Id:\t${peers[1]}"
 log "\t\tRest API:\thttp://localhost:13302/api/v2/_swagger"
-log "\t\tAdmin UI:\thttp://localhost:19502/?apiEndpoint=http://localhost:19502&apiToken=${api_token}"
+log "\t\tAdmin UI:\thttp://localhost:19502/?apiEndpoint=http://localhost:13302&apiToken=${api_token}"
 log "\t\tHealthcheck:\thttp://localhost:18082/"
 log "\t\tWebSocket:\tws://localhost:19502/"
 log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:13302&apiToken=${api_token}"
