@@ -5,7 +5,6 @@ import path from 'path'
 import { parse } from 'url'
 import { default as next } from 'next'
 import type { Server as HttpServer } from 'http'
-import stripAnsi from 'strip-ansi'
 import type { LogStream } from './logs.js'
 import { NODE_ENV } from './env.js'
 import {
@@ -16,7 +15,6 @@ import {
   debug,
   startResourceUsageLogger
 } from '@hoprnet/hopr-utils'
-import { Commands } from './commands/index.js'
 import type { WebSocket } from 'ws'
 
 let debugLog = debug('hoprd:admin')
@@ -24,11 +22,13 @@ let debugLog = debug('hoprd:admin')
 const MIN_BALANCE = new Balance(SUGGESTED_BALANCE).toFormattedString()
 const MIN_NATIVE_BALANCE = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()
 
+/**
+ * Server that hosts hopr-admin website
+ */
 export class AdminServer {
   private app: ReturnType<typeof next>
   public server: HttpServer | undefined
   private node: Hopr | undefined
-  private cmds: Commands
 
   constructor(private logs: LogStream, private host: string, private port: number) {}
 
@@ -81,12 +81,8 @@ export class AdminServer {
     this.logs.log('Admin server listening on port ' + this.port)
   }
 
-  registerNode(node: Hopr, cmds: any, settings?: any) {
+  registerNode(node: Hopr) {
     this.node = node
-    this.cmds = cmds
-    if (settings) {
-      this.cmds.stateOps.setState(settings)
-    }
 
     this.node.on('hopr:channel:opened', (channel) => {
       this.logs.log(`Opened channel to ${channel[0].toB58String()}`)
@@ -119,24 +115,12 @@ export class AdminServer {
     startResourceUsageLogger(debugLog)
 
     process.env.NODE_ENV == 'production' && showDisclaimer(this.logs)
-
-    this.cmds.execute(() => {}, `alias ${node.getId().toString()} me`)
   }
 
   public onConnection(socket: WebSocket) {
     socket.on('message', (message: string) => {
       debugLog('Message from client', message)
       this.logs.logFullLine(`admin > ${message}`)
-
-      if (this.cmds) {
-        this.cmds.execute((resp: string) => {
-          if (resp) {
-            // Strings may have ansi stuff in it, get rid of it:
-            resp = stripAnsi(resp)
-            this.logs.logFullLine(resp)
-          }
-        }, message.toString())
-      }
     })
 
     socket.on('error', (err: string) => {

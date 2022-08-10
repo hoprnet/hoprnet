@@ -116,6 +116,9 @@ export async function setupRestApi(
       // TODO: We assume the handlers are always called in order. This isn't a
       // given and might change in the future. Thus, they should be made order-independent.
       keyScheme: function (req: Request, _scopes, _securityDefinition) {
+        // skip checks if authentication is disabled
+        if (this.options.testNoAuthentication) return true
+
         // Applying multiple URI encoding is an identity
         let apiTokenFromUser = encodeURI(req.get('x-auth-token') || '')
 
@@ -133,6 +136,9 @@ export async function setupRestApi(
         return true
       }.bind({ options }),
       passwordScheme: function (req: Request, _scopes, _securityDefinition) {
+        // skip checks if authentication is disabled
+        if (options.testNoAuthentication) return true
+
         const authEncoded = (req.get('authorization') || '').replace('Basic ', '')
         // We only expect a single value here, instead of the usual user:password, so we take the user part as token
         let apiTokenFromUser = encodeURI(Buffer.from(authEncoded, 'base64').toString('binary')).split(':')[0] // The colon ':' does not get encoded by encodeURI
