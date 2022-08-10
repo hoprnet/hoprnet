@@ -28,8 +28,8 @@ export default class Info extends Command {
 
     return log(
       toPaddedString([
-        ['Announcing to other nodes as', nodeInfo.announcedAddress.join('\n')],
-        ['Listening on', nodeInfo.listeningAddress.join('\n')],
+        ['Announcing to other nodes as', nodeInfo.announcedAddress.join('  ')],
+        ['Listening on', nodeInfo.listeningAddress.join('  ')],
         ['Running on', nodeInfo.network],
         ['Using HOPR environment', nodeInfo.environment],
         ['Channel closure period', `${nodeInfo.channelClosurePeriod} minutes`],

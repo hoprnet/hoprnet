@@ -127,7 +127,7 @@ export default class API {
     hoprChannels: string
     hoprNetworkRegistry: string
     hoprToken: string
-    isEligible: boolean
+    isEligible: string
     listeningAddress: string[]
     network: string
   }> {
