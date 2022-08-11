@@ -170,12 +170,10 @@ This means, you have successfully pinged the node and the latency was only 84 ms
 
 Sending a direct message means it is free of charge, because it is not mixed and private.
 
-Between comma sign (**,**) and HOPR address can't be any space.
-
 :::
 
 ```
-send ,16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV Hello Bob!
+send 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV Hello Bob!
 ```
 
 Output will look similar to this:
