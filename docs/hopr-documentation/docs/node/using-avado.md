@@ -30,3 +30,12 @@ After you installed the HOPR package, please go to `My DApps` section and click 
 If the HOPR client will ask you to enter the **security token**, enter this fixed phrase: `!5qxc9Lp1BE7IFQ-nrtttU`
 
 The installation process has been finished! Now you can proceed to [Guide using a hoprd node](guide-using-a-hoprd-node).
+
+## Additional HOPR configuration on Avado
+
+HOPR node running on Avado can be configured to use custom RPC provider. If you're running an ETH node client on your Avado,
+you can use it's RPC endpoint URL and paste it into `HOPRD_PROVIDER` environment variable on the configuration page.
+
+Updating the value will restart your HOPR node on Avado, and point it to your ETH client. 
+
+**WARNING:** HOPR is currently using Gnosis chain (formerly xdai). If your ETH client is setup with a different chain, HOPR node will not work! 
