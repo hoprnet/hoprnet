@@ -4,6 +4,11 @@
 
 ## 1.90
 
+---
+
+<a name="1.89"></a>
+## [1.89](https://github.com/hoprnet/hoprnet/compare/release/ouagadougou...hoprnet:release/paleochora)
+
 ### Changes
 
 - Reduce eth_getBlockByNumber calls when indexing and sending transactions ([#3814](https://github.com/hoprnet/hoprnet/pull/3814))
@@ -39,10 +44,6 @@
 
 Bump `libp2p@0.37` which came with many bugfixes, plenty of internal API changes and different module injection system and made lots of workarounds obsolete.
 
-<a name="1.89"></a>
-
-## [1.89](https://github.com/hoprnet/hoprnet/compare/release/ouagadougou...hoprnet:master)
-
 - Use npm-shrinkwrap to publish correct lockfiles
 - Add `--provider` flag for setting a custom blockchain RPC provider
 - Improvements in our API v2 unit tests ([#3643](https://github.com/hoprnet/hoprnet/pull/3643))
@@ -53,8 +54,6 @@ Bump `libp2p@0.37` which came with many bugfixes, plenty of internal API changes
 - Optimize build pipeline and migrate to Makefile ([#3851](https://github.com/hoprnet/hoprnet/pull/3851))
 - When sending an Ethereum transaction, also release nonce lock if transaction is considered a duplicate ([#3856](https://github.com/hoprnet/hoprnet/pull/3856))
 - Within E2E tests, disable hardhat autmining after deployment is done ([#3851](https://github.com/hoprnet/hoprnet/pull/3857))
-
-### Breaking changes
 
 - Migration to ECMAscript module standard (ESM), drop support for CommonJS ([#3825](https://github.com/hoprnet/hoprnet/pull/3825))
 
