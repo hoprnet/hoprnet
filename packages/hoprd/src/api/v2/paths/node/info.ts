@@ -5,7 +5,7 @@ import { STATUS_CODES } from '../../utils.js'
 /**
  * @returns Information about the HOPR Node, including any options it started with.
  */
-export const getInfo = async ({ node }: { node: Hopr }) => {
+export const getInfo = async (node: Hopr) => {
   try {
     const { network, hoprTokenAddress, hoprChannelsAddress, channelClosureSecs, hoprNetworkRegistryAddress } =
       node.smartContractInfo()
@@ -34,7 +34,7 @@ const GET: Operation = [
     const { node } = req.context
 
     try {
-      const info = await getInfo({ node })
+      const info = await getInfo(node)
       return res.status(200).send(info)
     } catch (err) {
       return res

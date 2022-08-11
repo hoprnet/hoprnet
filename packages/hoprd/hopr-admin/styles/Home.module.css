@@ -1,4 +1,4 @@
-.connectedPeers {
+.popup {
   background-color: #000050;
   border: 1rem solid #0000b4;
   position: fixed;
@@ -10,7 +10,7 @@
   overflow-y: scroll;
 }
 
-.connectedPeers h2 {
+.popup h2 {
   text-align: center;
 }
 
@@ -22,4 +22,23 @@
 .peerIcon {
   display: block;
   padding: 0.1rem;
+}
+
+.cogwheelIcon:hover {
+  cursor: pointer;
+}
+
+.configuration {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  flex-direction: column;
+}
+
+.configuration div {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  flex-direction: column;
+  padding-bottom: 10px;
 }

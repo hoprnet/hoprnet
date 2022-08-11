@@ -117,32 +117,6 @@ Once you’ve initiated channel closure, you have to wait for a specified closur
 
 Then you will need to send the same command again to finalize closure. This is a cool down period to give the other party in the channel sufficient time to redeem their tickets.
 
-## fund
-
-By funding it is also opens a payment channel to the specified node. With funding command you can fund both sides of payment channel. Make sure you have sufficient native tokens to pay the gas fees.
-
-```
-fund [HOPR address] [HOPR node amount] [HOPR counterparty node amount]
-```
-
-**HOPR address** - open payment channel with specified node. Address starts with **16Uiu2HA...**.
-
-**HOPR node amount** - funding payment channel on current HOPR node side.
-
-**HOPR counterparty node amount** - funding payment channel on the counterparty node side.
-
-Example:
-
-```
-open 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV 0.1 0
-```
-
-:::info
-
-You can choose which payment channel side to fund for the specific node.
-
-:::
-
 ## help
 
 Type help to display all the commands with brief explanation.
@@ -239,14 +213,6 @@ Pong received in: 87 ms
 ```
 
 You should receive a pong and a latency report. This can be used to assess the health of the target node and your own node.
-
-## quit
-
-Type quit to terminate your node.
-
-```
-quit
-```
 
 ## redeemTickets
 

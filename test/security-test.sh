@@ -50,28 +50,6 @@ wait_for_port "${insecure_admin_port}" "${host}"
 
 declare http_status_code
 
-# TEST API v1
-log "REST API v1 should reject authentication with invalid token"
-http_status_code=$(curl -H "X-Auth-Token: ${bad_token}" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${api_port}/api/v1/command")
-if [ ${http_status_code} -ne 403 ]; then
-  log "⛔️ Expected 403 http status code, got ${http_status_code}"
-  exit 1
-fi
-
-log "REST API v1 should reject authentication without token"
-http_status_code=$(curl --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${api_port}/api/v1/command")
-if [ ${http_status_code} -ne 403 ]; then
-  log "⛔️ Expected 403 http status code, got ${http_status_code}"
-  exit 1
-fi
-
-log "REST API v1 should accept authentication with valid token"
-http_status_code=$(curl -H "X-Auth-Token: ${api_token}" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 "${host}:${api_port}/api/v1/version")
-if [ ${http_status_code} -ne 200 ]; then
-  log "⛔️ Expected 200 http status code, got ${http_status_code}"
-  exit 1
-fi
-
 # TEST API v2
 log "REST API v2 should reject authentication with invalid token"
 http_status_code=$(curl -H "X-Auth-Token: ${bad_token}" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 "${host}:${api_port}/api/v2/node/version")
@@ -112,65 +90,6 @@ log "REST API v2 should accept authentication with valid basic auth credentials"
 http_status_code=$(curl --basic --user "${api_token}:" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 "${host}:${api_port}/api/v2/node/version")
 if [ ${http_status_code} -ne 200 ]; then
   log "⛔️ Expected 200 http status code, got ${http_status_code}"
-  exit 1
-fi
-
-# TEST WS v1
-log "Admin websocket should reject data without token"
-ws_response=$(echo "_test" | websocat ws://${host}:${admin_port}/)
-msg_type=$(echo "${ws_response}" | jq .type --raw-output )
-
-if [ "${msg_type}" != "auth-failed" ]; then
-  log "⛔️ Didn't fail ws authentication"
-  log "Expected response: '{ type: 'auth-failed' } "
-  log "Actual response:"
-  log "${ws_response}"
-  log "Msg type:"
-  log ${msg_type}
-  exit 1
-fi
-
-log "Admin websocket should reject data with invalid token"
-ws_response=$(echo "_test" | websocat ws://${host}:${admin_port}/ --header "Cookie:X-Auth-Token=${bad_token}")
-msg_type=$(echo "${ws_response}" | jq .type --raw-output )
-
-if [ "${msg_type}" != "auth-failed" ]; then
-  log "⛔️ Didn't fail ws authentication"
-  log "Expected response: '{ type: 'auth-failed' } "
-  log "Actual response:"
-  log "${ws_response}"
-  log "Msg type:"
-  log ${msg_type}
-  exit 1
-fi
-
-log "Admin websocket should execute _test data with correct token"
-ws_response=$(echo "_test" | websocat ws://${host}:${admin_port}/ -0 --header "Cookie:X-Auth-Token=${api_token}")
-if [[ "${ws_response}" != *"ws client connected [ authentication ENABLED ]"* ]]; then
-  log "⛔️ Didn't succeed ws authentication"
-  log "Expected response should contain: 'ws client connected [ authentication ENABLED ]' "
-  log "Actual response:"
-  log "${ws_response}"
-  exit 1
-fi
-
-log "No-auth Admin websocket should auth with no token"
-ws_response=$(echo "_test" | websocat ws://${host}:${insecure_admin_port}/ -0)
-if [[ "${ws_response}" != *"ws client connected [ authentication DISABLED ]"* ]]; then
-  log "⛔️ Didn't succeed ws authentication"
-  log "Expected response should contain: 'ws client connected [ authentication DISABLED ]' "
-  log "Actual response:"
-  log "${ws_response}"
-  exit 1
-fi
-
-log "No-auth Admin websocket should auth with bad token"
-ws_response=$(echo "_test" | websocat ws://${host}:${insecure_admin_port}/ -0 --header "Cookie:${bad_token}")
-if [[ "${ws_response}" != *"ws client connected [ authentication DISABLED ]"* ]]; then
-  log "⛔️ Didn't succeed ws authentication"
-  log "Expected response should contain: 'ws client connected [ authentication DISABLED ]' "
-  log "Actual response:"
-  log "${ws_response}"
   exit 1
 fi
 

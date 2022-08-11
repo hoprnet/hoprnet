@@ -24,11 +24,12 @@ import type { State } from './types.js'
 import setupAPI from './api/index.js'
 import setupHealthcheck from './healthcheck.js'
 import { AdminServer } from './admin.js'
-import { Commands } from './commands/index.js'
 import { LogStream } from './logs.js'
 import { getIdentity } from './identity.js'
 import { register as registerUnhandled, setLogger } from 'trace-unhandled'
-import { decodeMessage } from './commands/utils/index.js'
+import { decodeMessage } from './api/utils.js'
+
+import runCommand, { isSupported as isSupportedCommand } from './run.js'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
@@ -95,24 +96,18 @@ const argv = yargsInstance
   })
   .option('api', {
     boolean: true,
-    describe:
-      'Expose the Rest (V1, V2) and Websocket (V2) API on localhost:3001, requires --apiToken. "--rest" is deprecated [env: HOPRD_API]',
-    default: false,
-    alias: 'rest'
+    describe: 'Expose the API on localhost:3001. [env: HOPRD_API]',
+    default: false
   })
   .option('apiHost', {
     string: true,
-    describe:
-      'Set host IP to which the Rest and Websocket API server will bind. "--restHost" is deprecated [env: HOPRD_API_HOST]',
-    default: 'localhost',
-    alias: 'restHost'
+    describe: 'Set host IP to which the API server will bind. [env: HOPRD_API_HOST]',
+    default: 'localhost'
   })
   .option('apiPort', {
     number: true,
-    describe:
-      'Set host port to which the Rest and Websocket API server will bind. "--restPort" is deprecated [env: HOPRD_API_PORT]',
-    default: 3001,
-    alias: 'restPort'
+    describe: 'Set host port to which the API server will bind. [env: HOPRD_API_PORT]',
+    default: 3001
   })
   .option('healthCheck', {
     boolean: true,
@@ -348,10 +343,6 @@ async function main() {
   let node: Hopr
   let logs = new LogStream()
   let adminServer: AdminServer = undefined
-  let cmds: Commands
-  // As the daemon aims to maintain for the time being
-  // both APIv1 and APIv2 (hopr-admin / myne-chat), we need
-  // to ensure that daemon's state can be used by both APIs.
   let state: State = {
     aliases: new Map(),
     settings: {
@@ -387,9 +378,9 @@ async function main() {
     }
   }
 
-  if (!argv.testNoAuthentication && (argv.api || argv.admin)) {
+  if (!argv.testNoAuthentication && argv.api) {
     if (argv.apiToken == null) {
-      throw Error(`Must provide --apiToken when --api, --rest or --admin is specified`)
+      throw Error(`Must provide --apiToken when --api is specified`)
     }
     const { contains: hasSymbolTypes, length }: { contains: string[]; length: number } = passwordStrength(argv.apiToken)
     for (const requiredSymbolType of ['uppercase', 'lowercase', 'symbol', 'number']) {
@@ -445,22 +436,19 @@ async function main() {
     node.once('hopr:monitoring:start', async () => {
       // 3. start all monitoring services, and continue with the rest of the setup.
 
-      if (argv.api || argv.admin) {
-        /*
-          When `--api` is used, we turn on Rest API v1, v2 and WS API v2.
-          When `--admin` is used, we turn on WS API v1 only.
-        */
-        setupAPI(
-          node,
-          logs,
-          { getState, setState },
-          {
-            ...argv,
-            apiToken
-          },
-          adminServer // api V1: required by hopr-admin
-        )
-      }
+      const startApiListen = setupAPI(
+        node,
+        logs,
+        { getState, setState },
+        {
+          ...argv,
+          apiHost: argv.apiHost,
+          apiPort: argv.apiPort,
+          apiToken
+        }
+      )
+      // start API server only if API flag is true
+      if (argv.api) startApiListen()
 
       if (argv.healthCheck) {
         setupHealthcheck(node, logs, argv.healthCheckHost, argv.healthCheckPort)
@@ -479,35 +467,38 @@ async function main() {
 
       // 3. Start the node.
       await node.start()
-      cmds = new Commands(node, { setState, getState })
 
       if (adminServer) {
-        adminServer.registerNode(node, cmds)
+        adminServer.registerNode(node)
       }
+
+      // alias self
+      state.aliases.set('me', node.getId())
 
       logs.logStatus('READY')
       logs.log('Node has started!')
 
+      // Run a single command and then exit.
       if (argv.run && argv.run !== '') {
-        // Run a single command and then exit.
         // We support multiple semicolon separated commands
-        let toRun = argv.run.split(';').map((c: string) =>
+        const toRun: string[] = argv.run.split(';').map((cmd: string) =>
           // Remove obsolete ' and "
-          c.replace(/"/g, '')
+          cmd.replace(/"/g, '')
         )
 
-        for (let c of toRun) {
-          console.error('$', c)
-          if (c === 'daemonize') {
-            return
+        for (let cmd of toRun) {
+          console.error('$', cmd)
+          if (!isSupportedCommand(cmd)) {
+            throw new Error(`Unsupported command: "${cmd}"`)
           }
 
-          await cmds.execute((msg) => {
-            logs.log(msg)
-          }, c)
+          const [shouldExit, output] = await runCommand(node, cmd as any)
+          if (shouldExit) return
+          else logs.log(JSON.stringify(output, null, 2))
         }
+
         // Wait for actions to take place
-        await setTimeout(1e3)
+        setTimeout(1e3)
         await node.stop()
         return
       }
