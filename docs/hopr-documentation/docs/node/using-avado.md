@@ -36,6 +36,6 @@ The installation process has been finished! Now you can proceed to [Guide using 
 HOPR node running on Avado can be configured to use custom RPC provider. If you're running an ETH node client on your Avado,
 you can use it's RPC endpoint URL and paste it into `HOPRD_PROVIDER` environment variable on the configuration page.
 
-Updating the value will restart your HOPR node on Avado, and point it to your ETH client. 
+Updating the value will restart your HOPR node on Avado, and point it to your ETH client.
 
-**WARNING:** HOPR is currently using Gnosis chain (formerly xdai). If your ETH client is setup with a different chain, HOPR node will not work! 
+**WARNING:** HOPR is currently using Gnosis chain (formerly xdai). If your ETH client is setup with a different chain, HOPR node will not work!
