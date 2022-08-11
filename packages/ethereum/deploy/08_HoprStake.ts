@@ -2,20 +2,14 @@ import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
 import { getHoprStakeContractName } from '../utils/constants'
 
-const PROTOCOL_CONFIG = require('../../core/protocol-config.json')
-
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const { ethers, deployments, getNamedAccounts, network, environment, maxFeePerGas, maxPriorityFeePerGas } = hre
+  const { ethers, deployments, getNamedAccounts, environment, maxFeePerGas, maxPriorityFeePerGas } = hre
   const { deploy } = deployments
   const { deployer, admin } = await getNamedAccounts()
-  const environmentConfig = PROTOCOL_CONFIG.environments[environment]
 
   const HoprBoost = await deployments.get('HoprBoost')
   // xHOPR can be a contract automatically deployed by the bridge (on xDAI/Gnosis chain)
-  const xHOPR =
-    network.tags.testing || network.tags.development || network.tags.staging
-      ? await deployments.get('xHoprMock')
-      : environmentConfig['minted_token_receiver_address']
+  const xHOPR = await deployments.get('xHoprMock')
   const wxHOPR = await deployments.get('HoprToken')
 
   // check the lastest block timestamp
