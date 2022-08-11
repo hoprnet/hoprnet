@@ -22,12 +22,13 @@
 - [Table of Contents](#table-of-contents)
 - [Getting Started](#getting-started)
 - [Install](#install)
-  - [Install via NPM](#install-via-npm)
   - [Install via Docker](#install-via-docker)
+  - [Install via NPM](#install-via-npm)
   - [Install via Nix package manager](#install-via-nix-package-manager)
 - [Using](#using)
-  - [Using NPM](#using-npm)
   - [Using Docker](#using-docker)
+  - [Using NPM](#using-npm)
+- [Testnet accessibility](#testnet-accessibility)
 - [Migrating between releases](#migrating-between-releases)
 - [Develop](#develop)
 - [Test](#test)
@@ -227,9 +228,9 @@ hoprd
 ## Testnet accessibility
 
 Currently, to be able to participate in a public testnet or public staging environment running in Google Cloud (e.g. `master-goerli`), you need to satisfy certain criteria to be eligible to join.
-See ([Network Registry](NETWORK_REGISTRY.md)) for details.
+See [Network Registry](NETWORK_REGISTRY.md) for details.
 
-These criteria however, are not required when you develop using your local nodes or a locally running cluster (see next sections).
+These criteria however, are not required when you develop using your local nodes or a locally running cluster (see [Develop section below](#develop)).
 
 ## Migrating between releases
 
