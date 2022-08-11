@@ -110,7 +110,7 @@ POST.apiDoc = {
       }
     },
     '422': {
-      description: `Timout, node with specified PeerId didn't respond in time.`,
+      description: `An error occured (see error details) or timeout - node with specified PeerId didn't respond in time.`,
       content: {
         'application/json': {
           schema: {
