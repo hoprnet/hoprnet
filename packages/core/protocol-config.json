@@ -117,6 +117,18 @@
       "stake_contract_address": "0xae933331ef0bE122f9499512d3ed4Fa3896DCf20",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
       "tags": []
+    },
+    "paleochora": {
+      "network_id": "xdai",
+      "environment_type": "production",
+      "channel_contract_deploy_block": 0,
+      "token_contract_address": "",
+      "channels_contract_address": "",
+      "xhopr_contract_address": "",
+      "boost_contract_address": "",
+      "stake_contract_address": "",
+      "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "tags": []
     }
   },
   "networks": {
