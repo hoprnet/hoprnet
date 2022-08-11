@@ -178,27 +178,6 @@ All CLI options can be configured through environment variables as well. CLI par
 
 As you might have noticed running the node without any command-line argument might not work depending on the installation method used. Here are examples to run a node with some safe configurations set.
 
-### Using NPM
-
-The following command assumes you've setup a local installation like described in [Install via NPM](#install-via-npm).
-
-```sh
-cd MY_NEW_HOPR_TEST_FOLDER
-DEBUG=hopr* npx hoprd --admin --init --announce --identity .hopr-identity --password switzerland --apiToken <MY_TOKEN>
-```
-
-Here is a short break-down of each argument.
-
-```sh
-hoprd
-  --admin   	              # enable the node's admin UI, available at localhost:3000
-  --init 				      # initialize the database and identity if not present
-  --announce 				  # announce the node to other nodes in the network and act as relay if publicly reachable
-  --identity .hopr-identity   # store your node identity information in your test folder
-  --password switzerland   	  # set the encryption password for your identity
-  --apiToken <MY_TOKEN>       # specify password for accessing admin panel and REST API (REQUIRED)
-```
-
 ### Using Docker
 
 The following command assumes you've setup an alias like described in [Install via Docker](#install-via-docker).
@@ -222,6 +201,27 @@ hoprd
   --environment ouagadougou # an environment is defined as a chain plus a number of deployed smart contract addresses to use on that chain
                             # each release has a default environment id set, but the user can override this value
                             # nodes from different environments are **not able** to communicate
+```
+
+### Using NPM
+
+The following command assumes you've setup a local installation like described in [Install via NPM](#install-via-npm).
+
+```sh
+cd MY_NEW_HOPR_TEST_FOLDER
+DEBUG=hopr* npx hoprd --admin --init --announce --identity .hopr-identity --password switzerland --apiToken <MY_TOKEN>
+```
+
+Here is a short break-down of each argument.
+
+```sh
+hoprd
+  --admin   	              # enable the node's admin UI, available at localhost:3000
+  --init 				      # initialize the database and identity if not present
+  --announce 				  # announce the node to other nodes in the network and act as relay if publicly reachable
+  --identity .hopr-identity   # store your node identity information in your test folder
+  --password switzerland   	  # set the encryption password for your identity
+  --apiToken <MY_TOKEN>       # specify password for accessing admin panel and REST API (REQUIRED)
 ```
 
 ## Testnet accessibility
