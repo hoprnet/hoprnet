@@ -9,7 +9,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const HoprBoost = await deployments.get('HoprBoost')
   // xHOPR can be a contract automatically deployed by the bridge (on xDAI/Gnosis chain)
-  const xHOPR = await deployments.get('xHoprMock')
+  const xHOPR = await deployments.get('xHoprToken')
   const wxHOPR = await deployments.get('HoprToken')
 
   // check the lastest block timestamp
