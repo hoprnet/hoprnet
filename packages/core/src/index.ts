@@ -15,7 +15,7 @@ import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constan
 
 import AccessControl from './network/access-control.js'
 import NetworkPeers, { Entry } from './network/network-peers.js'
-import Heartbeat, { type HeartbeatPingResult, NetworkHealthIndicator } from './network/heartbeat.js'
+import Heartbeat, { NetworkHealthIndicator } from './network/heartbeat.js'
 
 import { findPath } from './path/index.js'
 
@@ -780,13 +780,8 @@ class Hopr extends EventEmitter {
   public async ping(destination: PeerId): Promise<{ info?: string; latency: number }> {
     let start = Date.now()
 
-    let pingResult: HeartbeatPingResult
-    try {
-      pingResult = await this.heartbeat.pingNode(destination)
-    } catch (err) {
-      log(`Could not ping ${destination.toString()}.`, err)
-      return { latency: -1, info: 'error' }
-    }
+    // Propagate any errors thrown upwards
+    let pingResult = await this.heartbeat.pingNode(destination)
 
     if (pingResult.lastSeen >= 0) {
       if (this.networkPeers.has(destination)) {
