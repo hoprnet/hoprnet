@@ -173,13 +173,18 @@ export const CMD_PARAMS: Record<CmdTypes, CmdArg<any, any, any>> = {
       // try PeerId
       try {
         peerId = peerIdFromString(peerIdStrOrAlias)
-      } catch {}
+      } catch {
+        console.log(`Could not create peer id from '${peerIdStrOrAlias}'`)
+      }
 
       // try aliases
       if (!peerId && aliases) {
+        const alias = aliases[peerIdStrOrAlias]
         try {
-          peerId = peerIdFromString(aliases[peerIdStrOrAlias])
-        } catch {}
+          peerId = peerIdFromString(alias)
+        } catch {
+          console.log(`Could not create peer id from alias '${alias}' for '${peerIdStrOrAlias}'`)
+        }
       }
 
       if (peerId) return [true, peerId]
@@ -187,9 +192,9 @@ export const CMD_PARAMS: Record<CmdTypes, CmdArg<any, any, any>> = {
     }
   ] as CmdArg<string, { aliases: Record<string, string> }, PeerId>,
   hoprOrNative: [
-    "'hopr' or 'native'",
+    "'HOPR' or 'NATIVE'",
     (v) => {
-      return [v === 'hopr' || v === 'native', v]
+      return [v === 'HOPR' || v === 'NATIVE', v]
     }
   ],
   number: [

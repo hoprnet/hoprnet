@@ -4,6 +4,9 @@ import EventEmitter, { once } from 'events'
 import { protocols, Multiaddr } from '@multiformats/multiaddr'
 
 import type BN from 'bn.js'
+import { keysPBM } from '@libp2p/crypto/keys'
+import { createHash } from 'crypto'
+import secp256k1 from 'secp256k1'
 import type { Libp2p as Libp2pType } from 'libp2p'
 import type { Connection } from '@libp2p/interface-connection'
 import type { Peer } from '@libp2p/interface-peer-store'
@@ -63,7 +66,6 @@ import { PacketForwardInteraction } from './interactions/packet/forward.js'
 import { Packet } from './messages/index.js'
 import type { ResolvedEnvironment } from './environment.js'
 import { createLibp2pInstance } from './main.js'
-import { supportedKeys } from '@libp2p/crypto/keys'
 import type { EventEmitter as Libp2pEmitter } from '@libp2p/interfaces/events'
 
 const DEBUG_PREFIX = `hopr-core`
@@ -1186,10 +1188,15 @@ class Hopr extends EventEmitter {
   // NB: The prefix "HOPR Signed Message: " is added as a security precaution.
   // Without it, the node could be convinced to sign a message like an Ethereum
   // transaction draining it's connected wallet funds, since they share the key.
-  public async signMessage(message: Uint8Array) {
-    return await new supportedKeys.secp256k1.Secp256k1PrivateKey(this.id.privateKey).sign(
-      Uint8Array.from([...new TextEncoder().encode('HOPR Signed Message: '), ...message])
+  public signMessage(message: Uint8Array): Uint8Array {
+    const taggedMessage = Uint8Array.from([...new TextEncoder().encode('HOPR Signed Message: '), ...message])
+
+    const signature = secp256k1.ecdsaSign(
+      createHash('sha256').update(taggedMessage).digest(),
+      keysPBM.PrivateKey.decode(this.id.privateKey).Data
     )
+
+    return signature.signature
   }
 
   public getEthereumAddress(): Address {
