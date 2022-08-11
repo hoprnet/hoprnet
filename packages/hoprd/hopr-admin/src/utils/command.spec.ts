@@ -78,13 +78,13 @@ describe('test Command class', function () {
     )
 
     // @ts-ignore
-    const primaryResult = cmd.assertUsage(HOPR_ADDRESS_MOCK.toB58String())
+    const primaryResult = cmd.assertUsage(HOPR_ADDRESS_MOCK.toString())
     assert.equal(primaryResult[0], undefined)
     assert.equal(primaryResult[1], 'primary')
     assert(HOPR_ADDRESS_MOCK.equals(primaryResult[2]))
 
     // @ts-ignore
-    const secondaryResult = cmd.assertUsage(`${HOPR_ADDRESS_MOCK.toB58String()} true`)
+    const secondaryResult = cmd.assertUsage(`${HOPR_ADDRESS_MOCK.toString()} true`)
     assert.equal(secondaryResult[0], undefined)
     assert.equal(secondaryResult[1], 'secondary')
     assert(HOPR_ADDRESS_MOCK.equals(secondaryResult[2]))

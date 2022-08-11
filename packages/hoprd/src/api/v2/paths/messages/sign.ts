@@ -5,7 +5,7 @@ import { STATUS_CODES } from '../../utils.js'
 const POST: Operation = [
   async (req, res, _next) => {
     try {
-      const signature = await req.context.node.signMessage(new TextEncoder().encode(req.body.message))
+      const signature = req.context.node.signMessage(new TextEncoder().encode(req.body.message))
       return res.status(200).send({ signature: u8aToHex(signature) })
     } catch (err) {
       return res

@@ -85,11 +85,11 @@ export class AdminServer {
     this.node = node
 
     this.node.on('hopr:channel:opened', (channel) => {
-      this.logs.log(`Opened channel to ${channel[0].toB58String()}`)
+      this.logs.log(`Opened channel to ${channel[0].toString()}`)
     })
 
     this.node.on('hopr:channel:closed', (peer) => {
-      this.logs.log(`Closed channel to ${peer.toB58String()}`)
+      this.logs.log(`Closed channel to ${peer.toString()}`)
     })
 
     this.node.on('hopr:warning:unfunded', (addr) => {

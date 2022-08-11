@@ -9,7 +9,7 @@ export default class Withdraw extends Command {
         default: [
           [
             ['number', 'amount to withdraw', false],
-            ['hoprOrNative', 'withdraw "hopr" or "native"', false],
+            ['hoprOrNative', 'withdraw "HOPR" or "NATIVE"', false],
             ['nativeAddress', 'recipient', false]
           ],
           'withdraw'

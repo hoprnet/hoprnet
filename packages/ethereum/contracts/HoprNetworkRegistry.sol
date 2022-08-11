@@ -12,7 +12,7 @@ import './IHoprNetworkRegistryRequirement.sol';
  * HOPR node address. If an account wants to change its registerd HOPR node address, it must
  * firstly deregister itself before registering new node.
  *
- * Note that HOPR node address refers to `PeerId.toB58String()`
+ * Note that HOPR node address refers to `PeerId.toString()`
  *
  * This network registry can be globally enabled/disabled by the owner
  *

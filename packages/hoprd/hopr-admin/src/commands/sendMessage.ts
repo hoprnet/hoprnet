@@ -46,7 +46,7 @@ export default class SendMessage extends Command {
       try {
         const [valid, peerId] = validatePeerIdOrAlias(pIdString, { aliases })
         if (!valid) throw Error()
-        path.push(peerId.toB58String())
+        path.push(peerId.toString())
       } catch (err) {
         return [false, `<${pIdString}> is neither a valid alias nor a valid Hopr address string`, undefined]
       }
@@ -57,14 +57,14 @@ export default class SendMessage extends Command {
   }
 
   public async execute(log: (msg: string) => void, query: string): Promise<void> {
-    const [error, use, pathOrRecipeint, message] = this.assertUsage(query) as [string | undefined, string, any, string]
+    const [error, use, pathOrRecipient, message] = this.assertUsage(query) as [string | undefined, string, any, string]
     if (error) return log(error)
 
     let path: string[] | undefined
-    let recipient: string = pathOrRecipeint
+    let recipient: string = pathOrRecipient
 
     if (use === 'manual') {
-      const [valid, error, result] = this.parsePathStr(pathOrRecipeint)
+      const [valid, error, result] = this.parsePathStr(pathOrRecipient)
       if (!valid) return log(`${error}\n${this.usage()}`)
       path = result.intermediateNodes
       recipient = result.recipient
