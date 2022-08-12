@@ -69,13 +69,14 @@ async function main(
   console.log('Signer Address (register task)', signerAddress)
 
   // FIXME: remove production when Dev NFT is ready in production
-  const hoprProxy = network.tags.development || network.tags.production 
-    ? ((await ethers.getContractFactory('HoprDummyProxyForNetworkRegistry'))
-        .connect(signer)
-        .attach(hoprProxyAddress) as HoprDummyProxyForNetworkRegistry)
-    : ((await ethers.getContractFactory('HoprStakingProxyForNetworkRegistry'))
-        .connect(signer)
-        .attach(hoprProxyAddress) as HoprStakingProxyForNetworkRegistry)
+  const hoprProxy =
+    network.tags.development || network.tags.production
+      ? ((await ethers.getContractFactory('HoprDummyProxyForNetworkRegistry'))
+          .connect(signer)
+          .attach(hoprProxyAddress) as HoprDummyProxyForNetworkRegistry)
+      : ((await ethers.getContractFactory('HoprStakingProxyForNetworkRegistry'))
+          .connect(signer)
+          .attach(hoprProxyAddress) as HoprStakingProxyForNetworkRegistry)
 
   const hoprNetworkRegistry = (await ethers.getContractFactory('HoprNetworkRegistry'))
     .connect(signer)
