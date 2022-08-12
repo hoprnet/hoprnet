@@ -34,17 +34,10 @@ async function main(
     process.exit(1)
   }
 
-  if (network.name !== 'hardhat' && !network.tags.staging) {
-    console.error('Register only works in a hardhat or staging network.')
-    process.exit(1)
-  }
-
   let hoprProxyAddress: string
   let hoprNetworkRegistryAddress: string
   try {
-    hoprProxyAddress = !network.tags.staging
-      ? (await deployments.get('HoprNetworkRegistryProxy')).address
-      : (await deployments.get('HoprNetworkRegistryProxy')).address
+    hoprProxyAddress = (await deployments.get('HoprNetworkRegistryProxy')).address
     hoprNetworkRegistryAddress = (await deployments.get('HoprNetworkRegistry')).address
   } catch {
     console.error(
@@ -65,7 +58,7 @@ async function main(
 
   const signer = provider.getSigner()
 
-  const hoprProxy = !network.tags.staging
+  const hoprProxy = network.tags.development
     ? ((await ethers.getContractFactory('HoprDummyProxyForNetworkRegistry'))
         .connect(signer)
         .attach(hoprProxyAddress) as HoprDummyProxyForNetworkRegistry)
@@ -96,7 +89,7 @@ async function main(
       }
 
       // in staging account, register by owner; in non-stagin environment, add addresses directly to proxy
-      if (!network.tags.staging) {
+      if (network.tags.development) {
         await (await (hoprProxy as HoprDummyProxyForNetworkRegistry).ownerBatchAddAccounts(nativeAddresses)).wait()
       }
       await (await hoprNetworkRegistry.ownerRegister(nativeAddresses, peerIds)).wait()
@@ -109,7 +102,7 @@ async function main(
       }
 
       // in staging account, deregister; in non-stagin environment, remove addresses directly from proxy
-      if (!network.tags.staging) {
+      if (network.tags.development) {
         await (await (hoprProxy as HoprDummyProxyForNetworkRegistry).ownerBatchRemoveAccounts(nativeAddresses)).wait()
       }
       await (await hoprNetworkRegistry.ownerDeregister(nativeAddresses)).wait()

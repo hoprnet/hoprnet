@@ -17,20 +17,20 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     deployOptions['waitConfirmations'] = 2
   }
 
-  console.log(`Deploying xHoprMock with account ${deployer.address}`)
-  const xHoprContract = await deployments.deploy('xHoprMock', {
+  console.log(`Deploying xHoprToken (mock) with account ${deployer.address}`)
+  const xHoprContract = await deployments.deploy('xHoprToken', {
     contract: 'ERC677Mock',
     from: deployer.address,
     maxFeePerGas,
     maxPriorityFeePerGas,
     ...deployOptions
   })
-  console.log(`xHoprMock deployed at ${xHoprContract.address}`)
+  console.log(`xHoprToken (mock) deployed at ${xHoprContract.address}`)
 
   const xhoprToken = (await ethers.getContractFactory('ERC677Mock')).attach(xHoprContract.address) as ERC677Mock
 
   const amount = ethers.utils.parseUnits(MINTED_AMOUNT, 'ether')
-  console.log(`Minting ${amount} xHOPR (mock) tokens to account ${admin}`)
+  console.log(`Minting ${amount} xHoprToken (mock) tokens to account ${admin}`)
   const mintTx = await xhoprToken.batchMintInternal([admin], amount)
 
   // don't wait when using local hardhat because its using auto-mine
@@ -39,10 +39,10 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     await ethers.provider.waitForTransaction(mintTx.hash, 2)
   }
 
-  console.log(`Minted ${amount} xHOPR (mock) tokens to account ${admin}`)
+  console.log(`Minted ${amount} xHoprToken (mock) tokens to account ${admin}`)
 }
 
-main.tags = ['xHoprMock']
+main.tags = ['xHoprToken']
 main.dependencies = ['preDeploy', 'HoprChannels']
 main.skip = async (env: HardhatRuntimeEnvironment) => !!env.network.tags.production
 

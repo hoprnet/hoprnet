@@ -11,7 +11,7 @@ export type StakeOpts = {
 async function stakeXhopr(hre: HardhatRuntimeEnvironment, signer, hoprStake, amount) {
   const { ethers, deployments } = hre
   // must provide amount when token type is 'xhopr'
-  const tokenContract = await deployments.get('xHoprMock')
+  const tokenContract = await deployments.get('xHoprToken')
   const hoprToken = (await ethers.getContractFactory('ERC677Mock')).connect(signer).attach(tokenContract.address)
 
   const signerAddress = await signer.getAddress()
