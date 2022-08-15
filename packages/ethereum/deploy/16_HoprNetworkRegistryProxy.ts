@@ -2,24 +2,19 @@ import type { DeployFunction } from 'hardhat-deploy/types'
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import { MIN_STAKE } from '../utils/constants'
 
-const PROTOCOL_CONFIG = require('../../core/protocol-config.json')
-
 const DUMMY_PROXY = 'HoprDummyProxyForNetworkRegistry'
 const STAKING_PROXY = 'HoprStakingProxyForNetworkRegistry'
 
 // Deploy directly a HoprNetworkRegistry contract, using hardcoded staking contract.
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts, network, environment, maxFeePerGas, maxPriorityFeePerGas } = hre
-  const environmentConfig = PROTOCOL_CONFIG.environments[environment]
   const { deployer } = await getNamedAccounts()
 
-  const stakeAddress =
-    network.tags.testing || network.tags.development || network.tags.staging
-      ? (await deployments.get('HoprStake')).address
-      : environmentConfig['stake_contract_address']
+  const stakeAddress = (await deployments.get('HoprStake')).address
 
   // Local development environment uses HoprDummyProxyForNetworkRegistry. All the other network uses HoprStakingProxyForNetworkRegistry
-  const registryProxyName = network.name == 'hardhat' ? DUMMY_PROXY : STAKING_PROXY
+  // FIXME: Before Dev NFTs are minted in production environment, dummy proxy gets deployed in production
+  const registryProxyName = network.name == 'hardhat' || network.tags.production ? DUMMY_PROXY : STAKING_PROXY
 
   const deployOptions = {
     log: true

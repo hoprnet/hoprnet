@@ -213,6 +213,28 @@ self-deregister-node: ## staker deregister a node in network registry contract
    --task remove \
    --privatekey "$(PRIVATE_KEY)"
 
+.PHONY: register-node-when-dummy-proxy
+# Register a node when a dummy proxy is in place of staking proxy
+# node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'
+register-node-when-dummy-proxy: ensure-environment-is-set
+ifeq ($(endpoint),)
+	echo "parameter <endpoint> is default to localhost:3001" >&2
+endif
+ifeq ($(account),)
+	echo "parameter <account> missing" >&2 && exit 1
+endif
+ifeq ($(origin CI_DEPLOYER_PRIVKEY),undefined)
+	echo "<CI_DEPLOYER_PRIVKEY> environment variable missing" >&2 && exit 1
+endif
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
+   --network $(network) \
+   --task add \
+   --native-addresses "$(account)" \
+   --peer-ids "$(shell ./scripts/get-hopr-address.sh "$(endpoint)")" \
+   --privatekey "$(CI_DEPLOYER_PRIVKEY)"
+
 .PHONY: register-node-with-nft
 # node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'
 register-node-with-nft: ensure-environment-is-set

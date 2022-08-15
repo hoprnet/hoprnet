@@ -123,7 +123,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
     try {
       // mint minimum stake to addresses that will stake and are binded to nodes in NR
-      const tokenContract = await deployments.get('xHoprMock')
+      const tokenContract = await deployments.get('xHoprToken')
       const hoprToken = (await ethers.getContractFactory('ERC677Mock')).attach(tokenContract.address) as ERC677Mock
 
       const mintTx1 = await hoprToken.batchMintInternal([CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0]], MIN_STAKE)

@@ -122,13 +122,14 @@
       "network_id": "xdai",
       "environment_type": "production",
       "channel_contract_deploy_block": 0,
-      "token_contract_address": "",
-      "channels_contract_address": "",
-      "xhopr_contract_address": "",
-      "boost_contract_address": "",
-      "stake_contract_address": "",
-      "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "tags": []
+      "token_contract_address": "0x978D91ddFdb0c6eaCC22A258fE498957a79c5F4C",
+      "channels_contract_address": "0xCe7209FD81ED129C2ea8369715c168419e4148Ef",
+      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
+      "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
+      "stake_contract_address": "0x5Bb7e435aDa333A6714e27962e4Bb6aFDE1cECd4",
+      "network_registry_contract_address": "0xf0D4D48866C4F9665212B29A64c14A1f0FEDFD4c",
+      "tags": [],
+      "network_registry_proxy_contract_address": "0x15e068Ef1f76319b1848b1fcB3e49D68724AEE07"
     }
   },
   "networks": {

@@ -5,15 +5,21 @@ import '@openzeppelin/contracts/access/Ownable.sol';
 import '../IHoprNetworkRegistryRequirement.sol';
 
 /**
- * @dev Dummy roxy which return true if an address is registered by the owner
+ * @dev Dummy roxy which return true if an address is registered by the owner, when isAllAllowed is false.
+ * It allows all the accounts when isAllAllowed is set to true. By default isAllAllowed is false.
  */
 contract HoprDummyProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Ownable {
   mapping(address => bool) registeredAccounts;
   event AccountRegistered(address indexed account);
   event AccountDeregistered(address indexed account);
+  bool public isAllAllowed;
+
+  event AllowAllAccountsEligible(bool isAllowed);
 
   constructor(address newOwner) {
     _transferOwnership(newOwner);
+    isAllAllowed = false;
+    emit AllowAllAccountsEligible(false);
   }
 
   /**
@@ -21,7 +27,22 @@ contract HoprDummyProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Ow
    * @param account address of the account that runs a hopr node
    */
   function isRequirementFulfilled(address account) external view returns (bool) {
-    return registeredAccounts[account];
+    if (isAllAllowed) {
+      return true;
+    } else {
+      return registeredAccounts[account];
+    }
+  }
+
+  /**
+   * @dev Update the global toggle that allows all the accounts to be eligible
+   */
+  function updateAllowAll(bool _updatedAllow) external onlyOwner {
+    if (isAllAllowed == _updatedAllow) {
+      return;
+    }
+    isAllAllowed = _updatedAllow;
+    emit AllowAllAccountsEligible(_updatedAllow);
   }
 
   /**
