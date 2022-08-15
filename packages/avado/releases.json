@@ -1977,5 +1977,12 @@
     "uploadedTo": {
       "http://80.208.229.228:5001": "Mon, 15 Aug 2022 11:01:05 GMT"
     }
+  },
+  "1.89.4": {
+    "hash": "/ipfs/QmeHdDomwXntEZ5ubjTaZZyiw7ivh4oBFEHQchV8cbPiry",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Mon, 15 Aug 2022 12:29:53 GMT"
+    }
   }
 }
