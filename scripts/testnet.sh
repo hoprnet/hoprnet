@@ -104,7 +104,7 @@ fund_if_empty() {
 
   faucet_hopr_balance=$(funding_wallet_info "${environment}" "hopr")
   if [[ ! ${faucet_hopr_balance} =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-    log "Failed to retrieve funding wallet native balance: ${faucet_hopr_balance}"
+    log "Failed to retrieve funding wallet token balance: ${faucet_hopr_balance}"
     exit 1
   fi;
 
