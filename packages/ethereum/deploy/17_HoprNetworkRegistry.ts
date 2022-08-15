@@ -32,15 +32,10 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const isEnabled = await networkRegistry.enabled()
 
-  // when in production, network registry should be disabled // FIXME: for the moment, until NR is fully tested in staging
+  // when in production, network registry should be enabled
   // when in staging, network registry should be enabled.
   // for other environment, network registry should be disabled
-  if (network.tags.production) {
-    if (isEnabled) {
-      await networkRegistry.disableRegistry()
-      console.log(`Disabled "HoprNetworkRegistry" in production.`)
-    }
-  } else if (network.tags.staging) {
+  if (network.tags.staging || network.tags.production) {
     if (!isEnabled) {
       await networkRegistry.enableRegistry()
       console.log(`Enabled "HoprNetworkRegistry" in staging.`)
