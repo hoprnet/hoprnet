@@ -24,6 +24,7 @@ The purpose of this process is to document how crypto wallets are created and st
 | `0x93bC372b4cC142dA75a365C5cB45be996347bfeC` | Multisig n2                                   | HOPR Association representative n2 (only Gnosis Safe)                             |
 | `0x50677B7e720102c5126e17f4485149208d3fce71` | Multisig n3                                   | HOPR Association representative n3 (only Gnosis Wallet)                           |
 | `0x850F27C03508e8d75D69Df70e6a58F63f945F1f9` | Gitcoin Operator n1                           | HOPR Gitcoin Operator n1                                                          |
+| `0xC288484eF7f6BaC61BD9A47747428a480e5c326a` | Gitcoin Operator n2                           | HOPR Gitcoin Operator n2                                                          |
 | `0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05` | HOPR Commercial team Gnosis Safe Gnosis Chain | HOPR commercial team Gnosis Safe wallet on Gnosis Chain (aka xDai)                |
 | `0x217a6d29ABbacEAfB36207b4cB25ACc148E1fc65` | HOPR Commercial team Gnosis Safe Mainnet      | HOPR commercial team Gnosis Safe wallet on Mainnet                                |
 | `0x8C9877a1279192448cAbeC9e8C4697b159cF645e` | CI/CD funding                                 | Used in our CI/CD pipelines to fund nodes automatically for testing.              |
