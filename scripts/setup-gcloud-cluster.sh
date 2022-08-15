@@ -156,18 +156,22 @@ else
   )
 fi
 
-# This can be called always, because the "stake" task is idempotent given the same arguments
-declare staking_index=0
-for staking_addr in "${!staking_addrs_dict[@]}" ; do
-  fund_if_empty "${staking_addr}" "${environment}"
-  # we alternate between staking funds or NFT
-  if [[ "$((staking_index%2))" = "0" ]]; then
-    PRIVATE_KEY="${staking_addrs_dict[${staking_addr}]}" make -C "${mydir}/.." stake-funds environment="${environment}"
-  else
-    PRIVATE_KEY="${staking_addrs_dict[${staking_addr}]}" make -C "${mydir}/.." stake-devnft environment="${environment}"
-  fi
-  ((++staking_index))
-done
+# FIXME: Quick hack, in production, due to lack of "Dev NFT", currently it uses Dummy proxy 
+# that only requires proxy owner (CI deployer account) to `register-nodes`
+if [[ "${environment}" != "paleochora" ]]; then
+  # This can be called always, because the "stake" task is idempotent given the same arguments
+  declare staking_index=0
+  for staking_addr in "${!staking_addrs_dict[@]}" ; do
+    fund_if_empty "${staking_addr}" "${environment}"
+    # we alternate between staking funds or NFT
+    if [[ "$((staking_index%2))" = "0" ]]; then
+      PRIVATE_KEY="${staking_addrs_dict[${staking_addr}]}" make -C "${mydir}/.." stake-funds environment="${environment}"
+    else
+      PRIVATE_KEY="${staking_addrs_dict[${staking_addr}]}" make -C "${mydir}/.." stake-devnft environment="${environment}"
+    fi
+    ((++staking_index))
+  done
+fi
 
 # Get names of all instances in this cluster
 declare instance_names

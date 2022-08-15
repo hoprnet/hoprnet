@@ -111,6 +111,8 @@ yarn workspace @hoprnet/hopr-ethereum hardhat register --network goerli --task e
 
 ## Internal NR testing
 
+### Staging
+
 To register an eligible node in the NR, there are two options:
 
 - obtain a dev NFT and register your node on NR
@@ -118,7 +120,7 @@ To register an eligible node in the NR, there are two options:
 
 The procedure for both options are very similar, which only some differences in the last step.
 
-### Procedure
+#### Procedure
 
 1. Create a MetaMask wallet (note as “account”)
 2. Fund 1 Goerli ETH (from “DevBank” or from the faucet) to the “account”
@@ -149,3 +151,28 @@ source .env
   ```
   make register-node-with-stake endpoint=<hoprd_endpoint> account=<staking_account> environment=master-goerli network=goerli
   ```
+
+### Production
+
+Before Dev NFT gets minted in production environment, "Dummy proxy" is used to faciliate the process.
+Deployer wallet in the CI/CD registers node and its peerId when calling `make register-nodes` (followed by more flags and arguments). Developers must follow these steps to register their node in the registry:
+
+1. Create a MetaMask wallet (note as “account”)
+2. Start your local HOPR node
+3. Save private keys (`CI_DEPLOYER_PRIVKEY`) into `.env` file
+
+```
+export CI_DEPLOYER_PRIVKEY=<CI deployer account private key>
+```
+
+and
+
+```
+source .env
+```
+
+4. Run command
+
+```
+make register-node-when-dummy-proxy endpoint=<hoprd_endpoint> account=<staking_account> environment=master-goerli network=goerli
+```
