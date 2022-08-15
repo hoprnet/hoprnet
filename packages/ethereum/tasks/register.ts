@@ -1,5 +1,5 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
-import { utils } from 'ethers'
+import { type Signer, utils, Wallet } from 'ethers'
 import type {
   HoprNetworkRegistry,
   HoprDummyProxyForNetworkRegistry,
@@ -11,13 +11,16 @@ export type RegisterOpts =
       task: 'add'
       nativeAddresses: string
       peerIds: string
+      privatekey: string // private key of the caller
     }
   | {
       task: 'remove'
       nativeAddresses: string
+      privatekey: string // private key of the caller
     }
   | {
       task: 'disable' | 'enable'
+      privatekey: string // private key of the caller
     }
 
 /**
@@ -56,20 +59,32 @@ async function main(
     provider = ethers.provider
   }
 
-  const signer = provider.getSigner()
+  let signer: Signer
+  if (!opts.privatekey) {
+    signer = provider.getSigner()
+  } else {
+    signer = new Wallet(opts.privatekey, provider)
+  }
+  const signerAddress = await signer.getAddress()
+  console.log('Signer Address (register task)', signerAddress)
 
-  const hoprProxy = network.tags.development
-    ? ((await ethers.getContractFactory('HoprDummyProxyForNetworkRegistry'))
-        .connect(signer)
-        .attach(hoprProxyAddress) as HoprDummyProxyForNetworkRegistry)
-    : ((await ethers.getContractFactory('HoprStakingProxyForNetworkRegistry'))
-        .connect(signer)
-        .attach(hoprProxyAddress) as HoprStakingProxyForNetworkRegistry)
+  // FIXME: remove production when Dev NFT is ready in production
+  const hoprProxy =
+    network.tags.development || network.tags.production
+      ? ((await ethers.getContractFactory('HoprDummyProxyForNetworkRegistry'))
+          .connect(signer)
+          .attach(hoprProxyAddress) as HoprDummyProxyForNetworkRegistry)
+      : ((await ethers.getContractFactory('HoprStakingProxyForNetworkRegistry'))
+          .connect(signer)
+          .attach(hoprProxyAddress) as HoprStakingProxyForNetworkRegistry)
 
   const hoprNetworkRegistry = (await ethers.getContractFactory('HoprNetworkRegistry'))
     .connect(signer)
     .attach(hoprNetworkRegistryAddress) as HoprNetworkRegistry
   const isEnabled = await hoprNetworkRegistry.enabled()
+
+  console.log(`HoprProxy Address (register task) ${hoprProxyAddress}`)
+  console.log(`HoprNetworkRegistry Address (register task) ${hoprNetworkRegistryAddress} is ${isEnabled}`)
 
   try {
     if (opts.task === 'add') {
@@ -89,7 +104,7 @@ async function main(
       }
 
       // in staging account, register by owner; in non-stagin environment, add addresses directly to proxy
-      if (network.tags.development) {
+      if (network.tags.development || network.tags.production) {
         await (await (hoprProxy as HoprDummyProxyForNetworkRegistry).ownerBatchAddAccounts(nativeAddresses)).wait()
       }
       await (await hoprNetworkRegistry.ownerRegister(nativeAddresses, peerIds)).wait()
@@ -102,7 +117,7 @@ async function main(
       }
 
       // in staging account, deregister; in non-stagin environment, remove addresses directly from proxy
-      if (network.tags.development) {
+      if (network.tags.development || network.tags.production) {
         await (await (hoprProxy as HoprDummyProxyForNetworkRegistry).ownerBatchRemoveAccounts(nativeAddresses)).wait()
       }
       await (await hoprNetworkRegistry.ownerDeregister(nativeAddresses)).wait()
