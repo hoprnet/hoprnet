@@ -83,6 +83,9 @@ async function main(
     .attach(hoprNetworkRegistryAddress) as HoprNetworkRegistry
   const isEnabled = await hoprNetworkRegistry.enabled()
 
+  console.log(`HoprProxy Address (register task) ${hoprProxyAddress}`)
+  console.log(`HoprNetworkRegistry Address (register task) ${hoprNetworkRegistryAddress} is ${isEnabled}`)
+
   try {
     if (opts.task === 'add') {
       const nativeAddresses = opts.nativeAddresses.split(',')
@@ -101,7 +104,7 @@ async function main(
       }
 
       // in staging account, register by owner; in non-stagin environment, add addresses directly to proxy
-      if (network.tags.development) {
+      if (network.tags.development || network.tags.production) {
         await (await (hoprProxy as HoprDummyProxyForNetworkRegistry).ownerBatchAddAccounts(nativeAddresses)).wait()
       }
       await (await hoprNetworkRegistry.ownerRegister(nativeAddresses, peerIds)).wait()
@@ -114,7 +117,7 @@ async function main(
       }
 
       // in staging account, deregister; in non-stagin environment, remove addresses directly from proxy
-      if (network.tags.development) {
+      if (network.tags.development || network.tags.production) {
         await (await (hoprProxy as HoprDummyProxyForNetworkRegistry).ownerBatchRemoveAccounts(nativeAddresses)).wait()
       }
       await (await hoprNetworkRegistry.ownerDeregister(nativeAddresses)).wait()
