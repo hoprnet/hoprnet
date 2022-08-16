@@ -223,12 +223,13 @@ contract HoprNetworkRegistry is Ownable {
    * @param hoprPeerId hopr node peer id
    */
   function isNodeRegisteredAndEligible(string calldata hoprPeerId) public view returns (bool) {
+    // check if peer id is registered
     address account = nodePeerIdToAccount[hoprPeerId];
     if (account == address(0)) {
       // this address has never been registered
       return false;
     }
-    return requirementImplementation.isRequirementFulfilled(account);
+    return _checkEligibility(account);
   }
 
   /**
@@ -236,7 +237,7 @@ contract HoprNetworkRegistry is Ownable {
    * It also checks if a node peer id is associated with the account.
    * @param account account address that runs hopr node
    */
-  function isAccountEligible(address account) public view returns (bool) {
+  function isAccountRegisteredAndEligible(address account) public view returns (bool) {
     return countRegisterdNodesPerAccount[account] > 0 && _checkEligibility(account);
   }
 

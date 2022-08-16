@@ -68,39 +68,6 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   }
 
   /**
-   * @dev Checks if the provided account has
-   * a) special NFTs, e.g. "Dev NFT"
-   * b) redeemed any NFT of eligibleNftTypeAndRank and staked HOPR tokens above the `threshold`
-   * @param account staker address that has a hopr nodes running
-   */
-  function isRequirementFulfilled(address account) external view returns (bool) {
-    // if the account owns a special NFT, requirement is fulfilled
-    for (uint256 i = 0; i < specialNftTypeAndRank.length; i++) {
-      NftTypeAndRank memory eligible = specialNftTypeAndRank[i];
-      if (STAKE_CONTRACT.isNftTypeAndRankRedeemed3(eligible.nftType, eligible.nftRank, account)) {
-        return true;
-      }
-    }
-
-    // when no special NFT is present, the account needs to 1) reach the minimum stake, 2) own an eligible NFT
-    // for self-claiming accounts, check against the current criteria
-    uint256 amount = STAKE_CONTRACT.stakedHoprTokens(account);
-    if (amount < stakeThreshold) {
-      // threshold does not meet
-      return false;
-    }
-    // check on regular eligible NFTs.
-    for (uint256 i = 0; i < eligibleNftTypeAndRank.length; i++) {
-      NftTypeAndRank memory eligible = eligibleNftTypeAndRank[i];
-      if (STAKE_CONTRACT.isNftTypeAndRankRedeemed3(eligible.nftType, eligible.nftRank, account)) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  /**
    * @dev Returns the maximum allowed registration.
    * a) special NFTs, returns `maxRegistrationsPerSpecialNft`
    * b) if NFT of eligibleNftTypeAndRank are redeemed, floor(`stake`/`threshold`)

@@ -9,14 +9,6 @@ pragma solidity ^0.8.0;
  */
 interface IHoprNetworkRegistryRequirement {
   /**
-   * @dev Check the eligibility of the requesting account. If it's eligible, returns
-   * true. Otherwise, returns false.
-   *
-   * @param account Address on which eligibility is checked
-   */
-  function isRequirementFulfilled(address account) external view returns (bool);
-
-  /**
    * @dev Get the maximum number of nodes' peer ids that an account can register.
    * This check is only performed when registering new nodes, i.e. if the number gets
    * reduced later, it does not affect registered nodes.
