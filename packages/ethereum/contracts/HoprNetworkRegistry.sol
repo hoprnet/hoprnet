@@ -94,46 +94,58 @@ contract HoprNetworkRegistry is Ownable {
    * @notice Transaction will fail, if
    * 1) the peer ID is registered to an address, including the caller.
    * 2) the caller will become ineligible after adding a new node
+   *
    * Performs a minimum validation of node IDs. Full validation should be done off-chain.
-   * Function can only be called when the registry is enabled.
-   * @param hoprPeerId Hopr nodes peer id in bytes. e.g. 16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x1
    * hopr node peer id should always start with '16Uiu2HA' (0x3136556975324841) and be of length 53
+   *
+   * Function can only be called when the registry is enabled.
+   * @param hoprPeerIds Array of hopr nodes id. e.g. [16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x1]
    */
-  function selfRegister(string calldata hoprPeerId) external mustBeEnabled {
-    require(
-      bytes(hoprPeerId).length == 53 && bytes32(bytes(hoprPeerId)[0:8]) == '16Uiu2HA',
-      'HoprNetworkRegistry: HOPR node peer id must be valid'
-    );
-    // get account associated with the given hopr node peer id, if any
-    address registeredAccount = nodePeerIdToAccount[hoprPeerId];
-    // if the hopr node peer id was linked to a different account, revert.
-    // To change a nodes' linked account, it must be deregistered by the previously linked account
-    // first before registering by the new account, to prevent hostile takeover of others' node peer id
-    require(registeredAccount == address(0), 'HoprNetworkRegistry: Cannot link a registered node.');
+  function selfRegister(string[] calldata hoprPeerIds) external mustBeEnabled {
+    for (uint256 i = 0; i < hoprPeerIds.length; i++) {
+      string memory hoprPeerId = hoprPeerIds[i];
+      require(
+        bytes(hoprPeerId).length == 53 && bytes32(bytes(hoprPeerIds[i])[0:8]) == '16Uiu2HA',
+        'HoprNetworkRegistry: HOPR node peer id must be valid'
+      );
+      // get account associated with the given hopr node peer id, if any
+      address registeredAccount = nodePeerIdToAccount[hoprPeerId];
+      // if the hopr node peer id was linked to a different account, revert.
+      // To change a nodes' linked account, it must be deregistered by the previously linked account
+      // first before registering by the new account, to prevent hostile takeover of others' node peer id
+      require(registeredAccount == address(0), 'HoprNetworkRegistry: Cannot link a registered node.');
 
-    // update the counter
-    countRegisterdNodesPerAccount[msg.sender] += 1;
+      // update the counter
+      countRegisterdNodesPerAccount[msg.sender] += 1;
 
-    // check sender eligibility
-    require(_checkEligibility(msg.sender), 'HoprNetworkRegistry: Reaching limit, cannot register more nodes.');
+      // check sender eligibility
+      require(_checkEligibility(msg.sender), 'HoprNetworkRegistry: Reaching limit, cannot register more nodes.');
 
-    nodePeerIdToAccount[hoprPeerId] = msg.sender;
-    emit EligibilityUpdated(msg.sender, true);
+      nodePeerIdToAccount[hoprPeerId] = msg.sender;
+      emit EligibilityUpdated(msg.sender, true);
+    }
   }
 
   /**
    * @dev Allows account to deregister a registered peer ID
    * Function can only be called when the registry is enabled.
-   * @param hoprPeerId Hopr nodes peer id in bytes. e.g. 16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x1
+   *
+   * Performs a minimum validation of node IDs. Full validation should be done off-chain.
+   * hopr node peer id should always start with '16Uiu2HA' (0x3136556975324841) and be of length 53
+   *
+   * @param hoprPeerIds Array of hopr nodes id. e.g. [16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x1]
    */
-  function selfDeregister(string calldata hoprPeerId) external mustBeEnabled {
-    require(
-      nodePeerIdToAccount[hoprPeerId] == msg.sender,
-      'HoprNetworkRegistry: Cannot delete an entry not associated with the caller.'
-    );
-    delete nodePeerIdToAccount[hoprPeerId];
-    countRegisterdNodesPerAccount[msg.sender] -= 1;
-    emit Deregistered(msg.sender, hoprPeerId);
+  function selfDeregister(string[] calldata hoprPeerIds) external mustBeEnabled {
+    for (uint256 i = 0; i < hoprPeerIds.length; i++) {
+      string memory hoprPeerId = hoprPeerIds[i];
+      require(
+        nodePeerIdToAccount[hoprPeerId] == msg.sender,
+        'HoprNetworkRegistry: Cannot delete an entry not associated with the caller.'
+      );
+      delete nodePeerIdToAccount[hoprPeerId];
+      countRegisterdNodesPerAccount[msg.sender] -= 1;
+      emit Deregistered(msg.sender, hoprPeerId);
+    }
   }
 
   /**
