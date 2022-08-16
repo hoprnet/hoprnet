@@ -169,6 +169,12 @@ export async function createHoprNode(
   try {
     const dbPath = path.join(options.dataPath, 'db')
     await db.init(options.createDbIfNotExist, dbPath, options.forceCreateDB, options.environment.id)
+
+    // Dump entire database to a file if given by the env variable
+    const dump_file = process.env.DB_DUMP ?? ''
+    if (dump_file.length > 0)
+      db.dumpDatabase(dump_file)
+
   } catch (err: unknown) {
     log(`failed init db:`, err)
     throw err

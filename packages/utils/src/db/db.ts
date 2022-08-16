@@ -22,6 +22,7 @@ import {
 } from '../types/index.js'
 import BN from 'bn.js'
 import { u8aToNumber, u8aConcat, toU8a } from '../u8a/index.js'
+import fs from 'fs'
 
 const log = debug(`hopr-core:db`)
 
@@ -217,6 +218,29 @@ export class HoprDB {
 
   protected async put(key: Uint8Array, value: Uint8Array): Promise<void> {
     await this.db.put(Buffer.from(this.keyOf(key)), Buffer.from(value))
+  }
+
+  public async dumpDatabase(destFile: string) {
+    let dumpFile = fs.createWriteStream(destFile, { flags: 'a' })
+    this.db.createReadStream({keys: true, keyAsBuffer: true, values: true, valueAsBuffer: false})
+     .on('data', (d) => {
+       let keyString = ''
+       let isHex = false;
+       for (const b of d.key) {
+         if (b >= 32 && b <= 126) {
+           // Print sequences of ascii chars normally
+           keyString += (isHex ? ' ' : '') + String.fromCharCode(b)
+           isHex = false
+         }
+         else {
+           // Print sequences of non-ascii chars as hex
+           keyString += (!isHex ? '0x' : '') + (b as number).toString(16)
+           isHex = true
+         }
+       }
+       dumpFile.write(keyString + ":" + d.value)
+     })
+     dumpFile.close()
   }
 
   private async touch(key: Uint8Array): Promise<void> {
