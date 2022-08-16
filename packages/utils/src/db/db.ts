@@ -237,7 +237,7 @@ export class HoprDB {
         }
       }
       dumpFile.write(keyString + ':' + d.value)
-     })
+    })
   }
 
   private async touch(key: Uint8Array): Promise<void> {
