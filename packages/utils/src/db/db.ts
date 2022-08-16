@@ -221,11 +221,13 @@ export class HoprDB {
   }
 
   public dumpDatabase(destFile: string) {
+    log(`Dumping current database to ${destFile}`)
     let dumpFile = fs.createWriteStream(destFile, { flags: 'a' })
-    this.db.createReadStream({ keys: true, keyAsBuffer: true, values: true, valueAsBuffer: false }).on('data', (d) => {
+    this.db.createReadStream({ keys: true, keyAsBuffer: true, values: true, valueAsBuffer: true }).on('data', (d) => {
+      let key = (d.key as Buffer).subarray(PublicKey.SIZE_COMPRESSED)
       let keyString = ''
       let isHex = false
-      for (const b of d.key) {
+      for (const b of key) {
         if (b >= 32 && b <= 126) {
           // Print sequences of ascii chars normally
           keyString += (isHex ? ' ' : '') + String.fromCharCode(b)
@@ -236,7 +238,7 @@ export class HoprDB {
           isHex = true
         }
       }
-      dumpFile.write(keyString + ':' + d.value)
+      dumpFile.write(keyString + ':' + d.value.toString("hex") + '\n')
     })
   }
 
