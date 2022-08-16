@@ -238,7 +238,7 @@ export class HoprDB {
           isHex = true
         }
       }
-      dumpFile.write(keyString + ':' + d.value.toString("hex") + '\n')
+      dumpFile.write(keyString + ':' + d.value.toString('hex') + '\n')
     })
   }
 
