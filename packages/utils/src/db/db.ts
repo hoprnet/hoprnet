@@ -222,23 +222,21 @@ export class HoprDB {
 
   public dumpDatabase(destFile: string) {
     let dumpFile = fs.createWriteStream(destFile, { flags: 'a' })
-    this.db.createReadStream({keys: true, keyAsBuffer: true, values: true, valueAsBuffer: false})
-     .on('data', (d) => {
-       let keyString = ''
-       let isHex = false;
-       for (const b of d.key) {
-         if (b >= 32 && b <= 126) {
-           // Print sequences of ascii chars normally
-           keyString += (isHex ? ' ' : '') + String.fromCharCode(b)
-           isHex = false
-         }
-         else {
-           // Print sequences of non-ascii chars as hex
-           keyString += (!isHex ? '0x' : '') + (b as number).toString(16)
-           isHex = true
-         }
-       }
-       dumpFile.write(keyString + ":" + d.value)
+    this.db.createReadStream({ keys: true, keyAsBuffer: true, values: true, valueAsBuffer: false }).on('data', (d) => {
+      let keyString = ''
+      let isHex = false
+      for (const b of d.key) {
+        if (b >= 32 && b <= 126) {
+          // Print sequences of ascii chars normally
+          keyString += (isHex ? ' ' : '') + String.fromCharCode(b)
+          isHex = false
+        } else {
+          // Print sequences of non-ascii chars as hex
+          keyString += (!isHex ? '0x' : '') + (b as number).toString(16)
+          isHex = true
+        }
+      }
+      dumpFile.write(keyString + ':' + d.value)
      })
   }
 
