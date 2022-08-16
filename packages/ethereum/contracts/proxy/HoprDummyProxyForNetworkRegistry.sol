@@ -38,7 +38,7 @@ contract HoprDummyProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Ow
 
   /**
    * @dev Checks if the provided account is registered by the owner
-   * @param account address of the account that runs a hopr node
+   * @param _account address of the account that runs a hopr node
    */
   function maxAllowedRegistrations(address _account) external pure returns (uint256) {
     return MAX_REGISTRATION_PER_ACCOUNT;
