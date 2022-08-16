@@ -21,9 +21,13 @@ contract IHoprStake {
 }
 
 /**
- * @dev Proxy for staking (v2/v3) contract, which an "HoprNetworkRegistry requirement" is implemented
- * Only accounts with HoprBoost NFTs that are of the type and rank in the `eligibleNftTypeAndRank` array
- * are considered as eligible, when their stake is also above the `stakeThreshold`
+ * @dev Proxy for staking (v2/v3/v4) contract, which an "HoprNetworkRegistry requirement" is implemented
+ * Two types of accounts are considered eligible:
+ * 1) Accounts with HoprBoost NFTs that are of the type and rank in the `eligibleNftTypeAndRank` array
+ * are considered as eligible, when their stake is also above the `stakeThreshold`. The maximum allowed
+ * registration of these accounts are defined by their stake.
+ * 2) Acounts with HoprBoost NFTs of `specialNftTypeAndRank`. Its maximum allowed registration is set
+ * by the owner.
  */
 contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Ownable {
   struct NftTypeAndRank {
@@ -32,7 +36,10 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   }
 
   IHoprStake public immutable STAKE_CONTRACT; // contract of HoprStake contract
-  uint256 public stakeThreshold; // minimum amount HOPR tokens being staked in the staking contract to be considered eligible
+  // minimum amount HOPR tokens being staked in the staking contract to be considered eligible
+  // for every stakeThreshold, one peer id can be registered.
+  uint256 public stakeThreshold;
+  uint256 public maxRegistrationsPerSpecialNft; // for holders of special NFT, it's the cap of peer ids one address can register.
   NftTypeAndRank[] public eligibleNftTypeAndRank; // list of NFTs whose owner are considered as eligible to the network if the `stakeThreshold` is also met
   NftTypeAndRank[] public specialNftTypeAndRank; // list of NFTs whose owner are considered as eligible to the network without meeting the `stakeThreshold`, e.g. "Dev NFT"
 
@@ -41,7 +48,12 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   event SpecialNftTypeAndRankAdded(uint256 indexed nftType, uint256 indexed nftRank); // emit when a new special type and rank of NFT gets included in the eligibility list
   event SpecialNftTypeAndRankRemoved(uint256 indexed nftType, uint256 indexed nftRank); // emit when a special type and rank of NFT gets removed from the eligibility list
   event ThresholdUpdated(uint256 indexed threshold); // emit when the staking threshold gets updated.
+  event MaxRegistrationsPerSpecialNftUpdated(uint256 indexed maxValue); // emit when the maxRegistrationsPerSpecialNft gets updated.
 
+  /**
+   * @dev Set stake contract address, transfer ownership, and set the maximum registrations per
+   * special NFT to the default value: upperbound of of uint256.
+   */
   constructor(
     address stakeContract,
     address newOwner,
@@ -49,7 +61,9 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   ) {
     STAKE_CONTRACT = IHoprStake(stakeContract);
     stakeThreshold = minStake;
+    maxRegistrationsPerSpecialNft = type(uint256).max;
     emit ThresholdUpdated(stakeThreshold);
+    emit MaxRegistrationsPerSpecialNftUpdated(maxRegistrationsPerSpecialNft);
     _transferOwnership(newOwner);
   }
 
@@ -84,6 +98,39 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
     }
 
     return false;
+  }
+
+  /**
+   * @dev Returns the maximum allowed registration.
+   * a) special NFTs, returns `maxRegistrationsPerSpecialNft`
+   * b) if NFT of eligibleNftTypeAndRank are redeemed, floor(`stake`/`threshold`)
+   * @param account staker address that has a hopr nodes running
+   */
+  function maxAllowedRegistrations(address account) external view returns (uint256) {
+    // if the account owns a special NFT, requirement is fulfilled
+    for (uint256 i = 0; i < specialNftTypeAndRank.length; i++) {
+      NftTypeAndRank memory eligible = specialNftTypeAndRank[i];
+      if (STAKE_CONTRACT.isNftTypeAndRankRedeemed3(eligible.nftType, eligible.nftRank, account)) {
+        return maxRegistrationsPerSpecialNft;
+      }
+    }
+
+    // when no special NFT is present, the account needs to 1) reach the minimum stake, 2) own an eligible NFT
+    // for self-claiming accounts, check against the current criteria
+    uint256 amount = STAKE_CONTRACT.stakedHoprTokens(account);
+    if (amount < stakeThreshold) {
+      // threshold does not meet
+      return 0;
+    }
+    // check on regular eligible NFTs.
+    for (uint256 i = 0; i < eligibleNftTypeAndRank.length; i++) {
+      NftTypeAndRank memory eligible = eligibleNftTypeAndRank[i];
+      if (STAKE_CONTRACT.isNftTypeAndRankRedeemed3(eligible.nftType, eligible.nftRank, account)) {
+        return amount / stakeThreshold;
+      }
+    }
+
+    return 0;
   }
 
   /**
@@ -181,6 +228,19 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
     );
     stakeThreshold = newThreshold;
     emit ThresholdUpdated(stakeThreshold);
+  }
+
+  /**
+   * @dev Owner updates the maximum allowed number of nodes registered per special NFT
+   * @param newMax Maximum number of nodes that are allowed for registration per special NFT
+   */
+  function ownerUpdateMaxRegistrationsPerSpecialNft(uint256 newMax) external onlyOwner {
+    require(
+      maxRegistrationsPerSpecialNft != newMax,
+      'HoprStakingProxyForNetworkRegistry: try to update with the same maxRegistrationsPerSpecialNft'
+    );
+    maxRegistrationsPerSpecialNft = newMax;
+    emit MaxRegistrationsPerSpecialNftUpdated(maxRegistrationsPerSpecialNft);
   }
 
   /**

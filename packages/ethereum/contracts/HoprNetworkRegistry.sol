@@ -8,8 +8,8 @@ import './IHoprNetworkRegistryRequirement.sol';
  * @title HoprNetworkRegistry
  * @dev Smart contract that maintains a list of hopr node address (peer id) that are allowed
  * to enter HOPR network. Each peer id is linked with an Ethereum account. Only Ethereum
- * accounts that are eligible according to `IHoprNetworkRegistryRequirement` can register a
- * HOPR node address. If an account wants to change its registerd HOPR node address, it must
+ * accounts that are eligible according to `IHoprNetworkRegistryRequirement` can register one
+ * or multiple HOPR node address(es). If an account wants to change its registerd HOPR node address, it must
  * firstly deregister itself before registering new node.
  *
  * Note that HOPR node address refers to `PeerId.toString()`

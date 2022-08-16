@@ -7,13 +7,15 @@ import '../IHoprNetworkRegistryRequirement.sol';
 /**
  * @dev Dummy roxy which return true if an address is registered by the owner, when isAllAllowed is false.
  * It allows all the accounts when isAllAllowed is set to true. By default isAllAllowed is false.
+ * Eligible account can register as many nodes as possible, capped at `type(uint256).max`
  */
 contract HoprDummyProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Ownable {
   mapping(address => bool) registeredAccounts;
-  event AccountRegistered(address indexed account);
-  event AccountDeregistered(address indexed account);
+  uint256 public constant MAX_REGISTRATION_PER_ACCOUNT = type(uint256).max;
   bool public isAllAllowed;
 
+  event AccountRegistered(address indexed account);
+  event AccountDeregistered(address indexed account);
   event AllowAllAccountsEligible(bool isAllowed);
 
   constructor(address newOwner) {
@@ -32,6 +34,14 @@ contract HoprDummyProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Ow
     } else {
       return registeredAccounts[account];
     }
+  }
+
+  /**
+   * @dev Checks if the provided account is registered by the owner
+   * @param account address of the account that runs a hopr node
+   */
+  function maxAllowedRegistrations(address _account) external pure returns (uint256) {
+    return MAX_REGISTRATION_PER_ACCOUNT;
   }
 
   /**
