@@ -220,7 +220,7 @@ export class HoprDB {
     await this.db.put(Buffer.from(this.keyOf(key)), Buffer.from(value))
   }
 
-  public async dumpDatabase(destFile: string) {
+  public dumpDatabase(destFile: string) {
     let dumpFile = fs.createWriteStream(destFile, { flags: 'a' })
     this.db.createReadStream({keys: true, keyAsBuffer: true, values: true, valueAsBuffer: false})
      .on('data', (d) => {
@@ -240,7 +240,6 @@ export class HoprDB {
        }
        dumpFile.write(keyString + ":" + d.value)
      })
-     dumpFile.close()
   }
 
   private async touch(key: Uint8Array): Promise<void> {
