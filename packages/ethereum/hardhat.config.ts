@@ -230,21 +230,21 @@ task('disable-automine', 'Used by E2E tests to disable auto-mining once setup is
 
 task<RegisterOpts>(
   'register',
-  "Used by our E2E tests to interact with 'HoprNetworkRegistry' and 'HoprDummyProxyForNetworkRegistry'.",
+  "Used by our E2E tests to interact with 'HoprNetworkRegistry' and 'HoprNetworkRegistryProxy'.",
   register
 )
   .addParam<RegisterOpts['task']>('task', 'The task to run', undefined, types.string)
   .addOptionalParam<string>('nativeAddresses', 'A list of native addresses', undefined, types.string)
-  .addOptionalParam<string>('peerIds', 'A list of peerIds', undefined, types.string)
+  .addOptionalParam<string>('peerIds', 'A list of comma-seperated peerIds', undefined, types.string)
   .addOptionalParam<string>('privatekey', 'Private key of the signer', undefined, types.string)
 
 task<SelfRegisterOpts>(
   'register:self',
-  "Used by our E2E tests to interact with 'HoprNetworkRegistry' and 'HoprDummyProxyForNetworkRegistry'.",
+  "Used by our E2E tests to interact with 'HoprNetworkRegistry' and 'HoprNetworkRegistryProxy'.",
   selfRegister
 )
   .addParam<SelfRegisterOpts['task']>('task', 'The task to run', undefined, types.string)
-  .addOptionalParam<string>('peerId', 'HOPR peer ID to be registered', undefined, types.string)
+  .addOptionalParam<string>('peerIds', 'A list of comma-seperated peerIds', undefined, types.string)
   .addOptionalParam<string>('privatekey', 'Private key of the signer', undefined, types.string)
 
 task<RequestTestTokensOpts>(
