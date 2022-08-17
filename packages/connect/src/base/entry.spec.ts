@@ -34,6 +34,10 @@ class TestingEntryNodes extends EntryNodes {
     return super.onRemoveRelay(peer)
   }
 
+  public updateRecords(...args: Parameters<InstanceType<typeof EntryNodes>['updateRecords']>) {
+    return super.updateRecords(...args)
+  }
+
   public async updatePublicNodes() {
     return super.updatePublicNodes()
   }
@@ -123,20 +127,18 @@ function createFakeNetwork() {
   }
 }
 
-describe('entry node functionality', function () {
+describe.only('entry node functionality', function () {
   const peerId = createPeerId()
   it('add public nodes', function () {
-    const entryNodes = new TestingEntryNodes(
-      // Make sure that connect call is indeed asynchronous
-      (async () => new Promise((resolve) => setImmediate(resolve))) as any,
-      {}
-    )
+    const entryNodes = new TestingEntryNodes(undefined as any, {})
 
     entryNodes.init(createFakeComponents(peerId))
-
     entryNodes.start()
 
     const peerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/0`)
+
+    // Don't contact any nodes
+    entryNodes.usedRelays = Array.from({ length: MAX_RELAYS_PER_NODE }) as any
 
     entryNodes.onNewRelay(peerStoreEntry)
     // Should filter duplicate
@@ -148,14 +150,11 @@ describe('entry node functionality', function () {
     assert(uncheckedNodes[0].id.equals(peerStoreEntry.id), `id must match the generated one`)
     assert(uncheckedNodes[0].multiaddrs.length == peerStoreEntry.multiaddrs.length, `must not contain more multiaddrs`)
 
-    const usedRelays = entryNodes.getUsedRelayAddresses()
-    assert(usedRelays == undefined || usedRelays.length == 0, `must not expose any internal addrs`)
-
     entryNodes.stop()
   })
 
   it('remove an offline node', function () {
-    const entryNodes = new TestingEntryNodes((async () => new Promise((resolve) => setImmediate(resolve))) as any, {})
+    const entryNodes = new TestingEntryNodes(undefined as any, {})
 
     entryNodes.start()
 
@@ -166,13 +165,64 @@ describe('entry node functionality', function () {
       latency: 23
     })
 
+    // Don't contact any nodes
+    entryNodes.usedRelays = Array.from({ length: MAX_RELAYS_PER_NODE }) as any
+
     entryNodes.onRemoveRelay(peerStoreEntry.id)
 
     const availablePublicNodes = entryNodes.getAvailabeEntryNodes()
     assert(availablePublicNodes.length == 0, `must remove node from public nodes`)
 
-    const usedRelays = entryNodes.getUsedRelayAddresses()
-    assert(usedRelays == undefined || usedRelays.length == 0, `must not expose any internal addrs`)
+    entryNodes.stop()
+  })
+
+  it('update existing unchecked nodes', function () {
+    const entryNodes = new TestingEntryNodes(undefined as any, {})
+
+    entryNodes.init(createFakeComponents(peerId))
+    entryNodes.start()
+
+    const newPeer = createPeerId()
+
+    const firstPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/123`, newPeer)
+    const secondPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/456`, newPeer)
+
+    // Don't contact any nodes
+    entryNodes.usedRelays = Array.from({ length: MAX_RELAYS_PER_NODE }) as any
+    entryNodes.onNewRelay(firstPeerStoreEntry)
+    // Should filter duplicate
+    entryNodes.onNewRelay(secondPeerStoreEntry)
+
+    assert(entryNodes.uncheckedEntryNodes.length == 1)
+    assert(entryNodes.uncheckedEntryNodes[0].multiaddrs.length == 2)
+  })
+
+  it.only('update addresses of available public nodes', function () {
+    const entryNodes = new TestingEntryNodes(undefined as any, {})
+
+    entryNodes.init(createFakeComponents(peerId))
+    entryNodes.start()
+
+    const newPeer = createPeerId()
+
+    const firstPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/123`, newPeer)
+    const secondPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/456`, newPeer)
+
+    // Don't contact any nodes
+    entryNodes.usedRelays = Array.from({ length: MAX_RELAYS_PER_NODE }) as any
+
+    entryNodes.availableEntryNodes.push({
+      id: newPeer,
+      multiaddrs: [],
+      latency: 23
+    })
+
+    entryNodes.onNewRelay(firstPeerStoreEntry)
+    entryNodes.onNewRelay(secondPeerStoreEntry)
+
+    assert(entryNodes.uncheckedEntryNodes.length == 0, `Unchecked nodes must contain one entry`)
+    assert(entryNodes.availableEntryNodes.length == 1, `must not contain more multiaddrs`)
+    assert(entryNodes.availableEntryNodes[0].multiaddrs.length)
 
     entryNodes.stop()
   })

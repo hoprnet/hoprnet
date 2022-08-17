@@ -19,7 +19,8 @@ import {
   MAX_RELAYS_PER_NODE,
   CAN_RELAY_PROTCOL,
   OK,
-  DEFAULT_DHT_ENTRY_RENEWAL
+  DEFAULT_DHT_ENTRY_RENEWAL,
+  CODE_P2P
 } from '../constants.js'
 
 import {
@@ -59,8 +60,56 @@ type ConnResult = ProtocolStream & {
   conn: Connection
 }
 
-function latencyCompare(a: ConnectionResult, b: ConnectionResult) {
-  return a.entry.latency - b.entry.latency
+/**
+ * Sort results ascending in latency
+ */
+function latencyCompare(a: EntryNodeData, b: EntryNodeData) {
+  return a.latency - b.latency
+}
+
+function connectionResultToNumber(res: ConnectionResult | undefined | Error) {
+  if (res == undefined) {
+    return 3
+  }
+
+  if (res instanceof Error) {
+    return 2
+  }
+
+  if (res.entry.latency < 0) {
+    return 1
+  }
+
+  return 0
+}
+
+/**
+ * Sort results, such that:
+ *
+ * positive latencies, sorted ascending in latency
+ * negative latencies (timeout)
+ * Error (something went wrong)
+ * undefined (break condition reached, no result)
+ */
+function compareConnectionResults(a: ConnectionResult | undefined | Error, b: ConnectionResult | undefined | Error) {
+  const first = connectionResultToNumber(a)
+  const second = connectionResultToNumber(b)
+
+  switch (first) {
+    case 3:
+    case 2:
+    case 1:
+      return first - second
+    case 0:
+      switch (second) {
+        case 3:
+        case 2:
+        case 1:
+          return first - second
+        case 0:
+          return (a as ConnectionResult).entry.latency - (b as ConnectionResult).entry.latency
+      }
+  }
 }
 
 function isUsableRelay(ma: Multiaddr) {
@@ -81,8 +130,13 @@ export const RELAY_CHANGED_EVENT = 'relay:changed'
 export const ENTRY_NODES_MAX_PARALLEL_DIALS = 14
 
 export class EntryNodes extends EventEmitter implements Initializable, Startable {
+  // Nodes with good availability
   protected availableEntryNodes: EntryNodeData[]
+  // New nodes with unclear availability
   protected uncheckedEntryNodes: PeerStoreType[]
+  // Nodes that have been offline in the past
+  protected offlineEntryNodes: PeerStoreType[]
+
   private stopDHTRenewal: (() => void) | undefined
 
   protected usedRelays: UsedRelay[]
@@ -96,24 +150,13 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
   private _connectToRelay: EntryNodes['connectToRelay'] | undefined
   public _onEntryNodeDisconnect: EntryNodes['onEntryDisconnect'] | undefined
 
-  public init(components: Components) {
-    this.components = components
-  }
-
-  public getComponents(): Components {
-    if (this.components == null) {
-      throw errCode(new Error('components not set'), 'ERR_SERVICE_MISSING')
-    }
-
-    return this.components
-  }
-
   constructor(private dialDirectly: HoprConnect['dialDirectly'], private options: HoprConnectOptions) {
     super()
 
     this._isStarted = false
     this.availableEntryNodes = []
     this.uncheckedEntryNodes = options.initialNodes ?? []
+    this.offlineEntryNodes = []
 
     this.usedRelays = []
   }
@@ -169,6 +212,18 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
     this.stopDHTRenewal?.()
     this._isStarted = false
+  }
+
+  public init(components: Components) {
+    this.components = components
+  }
+
+  public getComponents(): Components {
+    if (this.components == null) {
+      throw errCode(new Error('components not set'), 'ERR_SERVICE_MISSING')
+    }
+
+    return this.components
   }
 
   private onEntryDisconnect(ma: Multiaddr) {
@@ -277,29 +332,59 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    */
   protected async onNewRelay(peer: PeerStoreType): Promise<void> {
     if (peer.id.equals(this.getComponents().getPeerId())) {
-      return
-    }
-    if (peer.multiaddrs == undefined || peer.multiaddrs.length == 0) {
-      log(`Received entry node ${peer.id.toString()} without any multiaddr`)
+      // Cannot use self as entry node
       return
     }
 
-    for (const uncheckedNode of this.uncheckedEntryNodes) {
-      if (uncheckedNode.id.equals(peer.id)) {
-        log(`Received duplicate entry node ${peer.id.toString()}`)
-        // TODO add difference to previous multiaddrs
-        return
+    if (peer.multiaddrs == undefined || peer.multiaddrs.length == 0) {
+      log(`Received entry node ${peer.id.toString()} without any multiaddr`)
+      // Nothing to do
+      return
+    }
+
+    let receivedNewAddrs = false
+
+    let knownPeer = false
+
+    for (const nodeList of [this.uncheckedEntryNodes, this.availableEntryNodes, this.offlineEntryNodes]) {
+      for (const node of nodeList) {
+        if (node.id.equals(peer.id)) {
+          knownPeer = true
+          log(
+            `Received new address${peer.multiaddrs.length == 1 ? '' : 'es'} ${peer.multiaddrs
+              .map((ma) => ma.decapsulateCode(CODE_P2P).toString())
+              .join(', ')} for ${peer.id.toString()}`
+          )
+
+          const existing = new Set(node.multiaddrs.map((ma: Multiaddr) => ma.decapsulateCode(CODE_P2P).toString()))
+          for (const ma of peer.multiaddrs) {
+            if (!existing.has(ma.decapsulateCode(CODE_P2P).toString())) {
+              node.multiaddrs.push(ma.decapsulateCode(CODE_P2P).encapsulate(`/p2p/${peer.id.toString()}`))
+              receivedNewAddrs = true
+              break
+            }
+          }
+          break
+        }
+      }
+
+      // Node list are supposed to be disjoint, so we can stop once found
+      if (knownPeer) {
+        break
       }
     }
 
-    this.uncheckedEntryNodes.push({
-      id: peer.id,
-      multiaddrs: peer.multiaddrs.filter(isUsableRelay)
-    })
+    if (!knownPeer) {
+      this.uncheckedEntryNodes.push({
+        id: peer.id,
+        multiaddrs: peer.multiaddrs.filter(isUsableRelay)
+      })
+      receivedNewAddrs = true
+    }
 
     // Stop adding and checking relay nodes if we already have enough.
     // Once a relay goes offline, the node will try to replace the offline relay.
-    if (this.usedRelays.length < MAX_RELAYS_PER_NODE) {
+    if (receivedNewAddrs && this.usedRelays.length < MAX_RELAYS_PER_NODE) {
       // Rebuild list of relay nodes later
       await this.updatePublicNodes()
     }
@@ -314,6 +399,10 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       if (publicNode.id.equals(peer)) {
         // Remove node without changing order
         this.availableEntryNodes.splice(index, 1)
+        this.offlineEntryNodes.push(publicNode)
+
+        // Assuming that node does not appear more than once
+        break
       }
     }
 
@@ -322,14 +411,40 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       // remove second part of relay address to get relay peerId
       if (relayPeer.equals(peer)) {
         inUse = true
+        break
       }
     }
 
-    // Only rebuild list of relay nodes if we were using the
-    // offline node
+    // Only rebuild list of relay nodes if node is *in use*
     if (inUse) {
       // Rebuild list of relay nodes later
       await this.updatePublicNodes()
+    }
+  }
+
+  /**
+   * Updates existing available entry node with potential new addresses
+   * @param uncheckedNode new unchecked entry
+   */
+  private updateAddrsOfAvailableNodes(uncheckedNode: PeerStoreType): void {
+    const index = this.availableEntryNodes.findIndex((entry) => entry.id.equals(uncheckedNode.id))
+
+    if (index < 0) {
+      // The node is new, so nothing to do here
+      return
+    }
+
+    // If address is not yet known, add it as it could eventually become useful.
+    const existing = new Set(
+      this.availableEntryNodes[index].multiaddrs.map((ma: Multiaddr) => ma.decapsulateCode(CODE_P2P).toString())
+    )
+
+    for (const ma of uncheckedNode.multiaddrs) {
+      if (!existing.has(ma.decapsulateCode(CODE_P2P).toString())) {
+        this.availableEntryNodes[index].multiaddrs.push(
+          ma.decapsulateCode(CODE_P2P).encapsulate(`/p2p/${uncheckedNode.id.toString()}`)
+        )
+      }
     }
   }
 
@@ -343,44 +458,145 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
     for (const uncheckedNode of this.uncheckedEntryNodes) {
       if (uncheckedNode.id.equals(this.getComponents().getPeerId())) {
+        // Cannot use self as entry node
         continue
       }
 
-      const usableAddresses: Multiaddr[] = uncheckedNode.multiaddrs.filter(isUsableRelay)
+      const usableAddresses = uncheckedNode.multiaddrs.filter(isUsableRelay)
 
       if (knownNodes.has(uncheckedNode.id.toString())) {
-        const index = this.availableEntryNodes.findIndex((entry) => entry.id.equals(uncheckedNode.id))
+        this.updateAddrsOfAvailableNodes({
+          id: uncheckedNode.id,
+          multiaddrs: usableAddresses
+        })
 
-        if (index < 0) {
-          continue
-        }
-
-        // Overwrite previous addresses. E.g. a node was restarted
-        // and now announces with a different address
-        this.availableEntryNodes[index].multiaddrs = usableAddresses
-
-        // Nothing to do. Public nodes are added later
+        // Nothing to do. Existing public nodes are added later
         continue
       }
 
-      // Ignore if entry nodes have more than one address
-      const firstUsableAddress = usableAddresses[0]
+      let inUse = false
+      for (const usedRelay of this.usedRelays) {
+        for (const usableAddress of usableAddresses) {
+          if (compareDirectConnectionInfo(usedRelay.relayDirectAddress, usableAddress)) {
+            inUse = true
+            break
+          }
+        }
 
-      // Ignore if we're already connected to the address
-      if (
-        this.usedRelays.some((usedRelay) =>
-          compareDirectConnectionInfo(usedRelay.relayDirectAddress, firstUsableAddress)
-        )
-      )
+        if (inUse) {
+          break
+        }
+      }
+
+      if (inUse) {
+        // Nothing to do
         continue
+      }
 
       nodesToCheck.push({
         id: uncheckedNode.id,
-        multiaddrs: [firstUsableAddress]
+        multiaddrs: usableAddresses.map((ma) =>
+          ma.decapsulateCode(CODE_P2P).encapsulate(`/p2p/${uncheckedNode.id.toString()}`)
+        )
       })
     }
 
     return nodesToCheck
+  }
+
+  /**
+   * Returns arguments to call `connectToRelay`
+   *
+   * 1. unchecked nodes <- recently learned
+   * 2. available nodes <- have been online once
+   * 3. offline nodes <- have been marked offline but could be back
+   *
+   * @returns arguments to probe nodes
+   */
+  private getNodesToContact(): Parameters<EntryNodes['connectToRelay']>[] {
+    const args: Parameters<EntryNodes['connectToRelay']>[] = []
+    const uncheckedNodes = this.filterUncheckedNodes()
+
+    for (const nodeList of [uncheckedNodes, this.availableEntryNodes, this.offlineEntryNodes]) {
+      for (const node of nodeList) {
+        for (const ma of node.multiaddrs) {
+          args.push([node.id, ma, ENTRY_NODE_CONTACT_TIMEOUT])
+        }
+      }
+    }
+
+    return args
+  }
+
+  protected updateRecords(groupedResults: { [index: string]: (EntryNodeData | Error | undefined)[] }) {
+    // @TODO replace this by a more efficient data structure
+    const availableOnes = new Set<string>(this.availableEntryNodes.map((nodeData) => nodeData.id.toString()))
+    const uncheckedOnes = new Set<string>(this.uncheckedEntryNodes.map((nodeData) => nodeData.id.toString()))
+    const offlineOnes = new Set<string>(this.offlineEntryNodes.map((nodeData) => nodeData.id.toString()))
+
+    for (const [id, results] of Object.entries(groupedResults)) {
+      if (results.every((result) => result == undefined)) {
+        // Nothing to do because no additional good or bad knowledge
+        continue
+      }
+
+      if (results.every((result) => result instanceof Error)) {
+        if (availableOnes.has(id)) {
+          for (const [i, available] of this.availableEntryNodes.entries()) {
+            if (available.id.toString() === id) {
+              // move from available to offline
+              this.offlineEntryNodes.push(this.availableEntryNodes.splice(i, 1)[0])
+              break
+            }
+          }
+        } else if (uncheckedOnes.has(id)) {
+          for (const [i, unchecked] of this.uncheckedEntryNodes.entries()) {
+            if (unchecked.id.toString() === id) {
+              // move from unchecked to offline
+              this.offlineEntryNodes.push(this.uncheckedEntryNodes.splice(i, 1)[0])
+              break
+            }
+          }
+        }
+      } else {
+        const positiveLowestLatency = results.reduce((acc, result) => {
+          if (result != undefined && !(result instanceof Error)) {
+            if (result.latency < acc) {
+              return result.latency
+            }
+          }
+          return acc
+        }, Infinity)
+
+        if (positiveLowestLatency < Infinity) {
+          if (offlineOnes.has(id)) {
+            for (const [i, offline] of this.offlineEntryNodes.entries()) {
+              if (offline.id.toString() === id) {
+                // move from offlne to available
+                this.availableEntryNodes.push({
+                  ...this.offlineEntryNodes.splice(i, 1)[0],
+                  latency: positiveLowestLatency
+                })
+                break
+              }
+            }
+          } else if (uncheckedOnes.has(id)) {
+            for (const [i, unchecked] of this.uncheckedEntryNodes.entries()) {
+              if (unchecked.id.toString() === id) {
+                // move from unchecked to available
+                this.availableEntryNodes.push({
+                  ...this.uncheckedEntryNodes.splice(i, 1)[0],
+                  latency: positiveLowestLatency
+                })
+                break
+              }
+            }
+          }
+        }
+      }
+    }
+
+    this.availableEntryNodes.sort(latencyCompare)
   }
 
   /**
@@ -389,46 +605,76 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    */
   async updatePublicNodes(): Promise<void> {
     log(`Updating list of used relay nodes ...`)
-    const nodesToCheck = this.filterUncheckedNodes()
 
-    // Contacting entry nodes includes establishing an entirely new
-    // connection which might take longer than reestablishing an existing connection.
-
-    const toCheck = nodesToCheck.concat(this.availableEntryNodes)
-    const args: Parameters<EntryNodes['connectToRelay']>[] = new Array(toCheck.length)
-
-    for (const [index, nodeToCheck] of toCheck.entries()) {
-      args[index] = [nodeToCheck.id, nodeToCheck.multiaddrs[0], ENTRY_NODE_CONTACT_TIMEOUT]
-    }
+    // Don't add already used ones
+    // identified by peerId
+    const addrsToContact = this.getNodesToContact()
 
     const start = Date.now()
-    const results = (
-      await nAtATime(this._connectToRelay as EntryNodes['connectToRelay'], args, ENTRY_NODES_MAX_PARALLEL_DIALS)
+    const results = await nAtATime(
+      this._connectToRelay as EntryNodes['connectToRelay'],
+      addrsToContact,
+      ENTRY_NODES_MAX_PARALLEL_DIALS,
+      (results: (Awaited<ReturnType<EntryNodes['connectToRelay']>> | Error | undefined)[]) => {
+        let availableNodes = 0
+        for (const result of results) {
+          if (result != undefined && !(result instanceof Error) && result.entry.latency >= 0) {
+            availableNodes++
+            if (availableNodes >= MAX_RELAYS_PER_NODE) {
+              return true
+            }
+          }
+        }
+
+        return false
+      }
     )
-      .filter(
-        // Filter all unsuccessful dials that cause an error
-        (value): value is { entry: EntryNodeData; conn: Connection | undefined } => !(value instanceof Error)
-      )
-      .sort(latencyCompare)
 
-    log(`Checking ${args.length} potential entry nodes done in ${Date.now() - start} ms.`)
+    const groupedResults = results.reduce((acc, result, index) => {
+      const toAdd = result instanceof Error || result == undefined ? result : result.entry
+      const address = addrsToContact[index][0].toString()
+      if (acc[address] == undefined) {
+        acc[address] = [toAdd]
+      } else {
+        acc[address].push(toAdd)
+      }
+      return acc
+    }, {} as { [index: string]: (EntryNodeData | Error | undefined)[] })
 
-    const positiveOnes = results.findIndex((result: ConnectionResult) => result.entry.latency >= 0)
+    this.updateRecords(groupedResults)
+
+    log(
+      `Checking ${results.filter((result) => result != undefined).length} potential entry node addresses done in ${
+        Date.now() - start
+      } ms.`
+    )
+
+    results.sort(compareConnectionResults)
+
+    let successfulOnes = -1
+    for (const [index, result] of results.entries()) {
+      if (result == undefined || result instanceof Error || result.entry.latency < 0) {
+        successfulOnes = index - 1
+        break
+      }
+    }
 
     const previous = new Set<string>(this.getUsedRelayPeerIds().map((p: PeerId) => p.toString()))
 
-    if (positiveOnes >= 0) {
+    if (successfulOnes >= 0) {
       // Close all unnecessary connections
-      await nAtATime(
-        attemptClose,
-        results
-          .slice(positiveOnes + MAX_RELAYS_PER_NODE)
-          .map<[Connection, (arg: any) => void]>((result) => [result.conn as Connection, error]),
-        ENTRY_NODES_MAX_PARALLEL_DIALS
-      )
-
-      // Take all entry nodes that appeared to be online
-      this.availableEntryNodes = results.slice(positiveOnes).map((result) => result.entry)
+      if (successfulOnes > MAX_RELAYS_PER_NODE) {
+        await nAtATime(
+          attemptClose,
+          results
+            .slice(MAX_RELAYS_PER_NODE, successfulOnes)
+            .map<[Connection, (arg: any) => void]>((result) => [
+              (result as ConnectionResult).conn as Connection,
+              error
+            ]),
+          ENTRY_NODES_MAX_PARALLEL_DIALS
+        )
+      }
 
       this.usedRelays = this.availableEntryNodes
         // select only those entry nodes with smallest latencies
@@ -443,11 +689,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       log(`Could not connect to any entry node. Other nodes may not or no longer be able to connect to this node.`)
       // Reset to initial state
       this.usedRelays = []
-      this.availableEntryNodes = []
     }
-
-    // Reset list of unchecked nodes
-    this.uncheckedEntryNodes = []
 
     let isDifferent = false
 
