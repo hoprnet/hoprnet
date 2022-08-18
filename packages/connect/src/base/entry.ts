@@ -158,6 +158,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
   private maxRelaysPerNode: number
   private maxParallelDials: number
   private contactTimeout: number
+  private dhtRenewalTimeout: number
 
   private stopDHTRenewal: (() => void) | undefined
 
@@ -186,6 +187,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     this.maxRelaysPerNode = overwrites?.maxRelaysPerNode ?? MAX_RELAYS_PER_NODE
     this.contactTimeout = overwrites?.contactTimeout ?? ENTRY_NODE_CONTACT_TIMEOUT
     this.maxParallelDials = overwrites?.maxParallelDials ?? ENTRY_NODES_MAX_PARALLEL_DIALS
+    this.dhtRenewalTimeout = options.dhtRenewalTimeout ?? DEFAULT_DHT_ENTRY_RENEWAL
 
     this._isStarted = false
     this.availableEntryNodes = []
@@ -260,6 +262,22 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     return this.components
   }
 
+  private someNode<Return>(
+    id: PeerId,
+    fn: (addrs: EntryNodeData | PeerStoreType, index: number, addrsList: (EntryNodeData | PeerStoreType)[]) => Return
+  ) {
+    for (const nodeList of [this.uncheckedEntryNodes, this.availableEntryNodes, this.offlineEntryNodes]) {
+      for (const [index, node] of nodeList.entries()) {
+        if (node.id.equals(id)) {
+          return fn(node, index, nodeList)
+        }
+      }
+    }
+
+    throw Error(`Node not found`)
+  }
+
+  // @TODO add this call to "global" queue
   private onEntryDisconnect(ma: Multiaddr) {
     const tuples = ma.tuples() as [code: number, addr: Uint8Array][]
     const peer = peerIdFromBytes(tuples[2][1].slice(1))
@@ -269,24 +287,38 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     for (const usedRelay of this.usedRelays) {
       const relayTuples = usedRelay.relayDirectAddress.tuples()
 
+      // Check if peerIds are equal
       if (u8aEquals(tuples[2][1], relayTuples[2][1])) {
         let attempt = 0
 
         retryWithBackoff(
           async () => {
             attempt++
-            const result = await this.connectToRelay(peer, usedRelay.relayDirectAddress, this.contactTimeout)
-            log(
-              `Reconnect attempt ${attempt} to entry node ${peer.toString()} was ${
-                result.entry.latency >= 0 ? 'successful' : 'not successful'
-              }`
+            let addrs: Multiaddr[] = this.someNode(peer, (addrs: EntryNodeData | PeerStoreType) => addrs.multiaddrs)
+
+            const results = await nAtATime(
+              this._connectToRelay as EntryNodes['connectToRelay'],
+              addrs.map<[id: PeerId, relay: Multiaddr, timeout: number]>((addr: Multiaddr) => [
+                peer,
+                addr,
+                this.contactTimeout
+              ]),
+              this.maxParallelDials
             )
 
-            if (result.entry.latency < 0) {
+            if (
+              results.every(
+                (result: ConnectionResult | Error | undefined) =>
+                  result == undefined || result instanceof Error || result.entry.latency < 0
+              )
+            ) {
               // Throw error to signal `retryWithBackoff` that dial attempt
               // was not successful
+              log(`Reconnect attempt ${attempt} to entry node ${peer.toString()} was not successful`)
               throw Error(KNOWN_DISCONNECT_ERROR)
             }
+
+            log(`Reconnect attempt ${attempt} to entry node ${peer.toString()} was successful`)
           },
           {
             minDelay: this.options.entryNodeReconnectBaseTimeout ?? DEFAULT_ENTRY_NODE_RECONNECT_BASE_TIMEOUT,
@@ -294,13 +326,18 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
             delayMultiple: this.options.entryNodeReconnectBackoff ?? DEFAULT_ENTRY_NODE_RECONNECT_BACKOFF
           }
         ).catch((err: any) => {
-          // Forward unexpected errors
           if (err.message !== KNOWN_DISCONNECT_ERROR) {
+            // Forward unexpected errors
             throw err
           } else {
-            // Keep the entry node on the list, to avoid losing information about ALL of them
-            //this.onRemoveRelay(peer)
-            error(`Re-connection to relay ${peer.toString()} failed.`)
+            // Move to offline nodes
+            this.someNode(
+              peer,
+              (_addrs: EntryNodeData | PeerStoreType, index: number, nodeList: (EntryNodeData | PeerStoreType)[]) => {
+                this.offlineEntryNodes.push(nodeList.splice(index, 1)[0])
+              }
+            )
+            error(`Reconnect to relay ${peer.toString()} failed.`)
           }
         })
 
@@ -327,7 +364,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       await nAtATime(this._connectToRelay as EntryNodes['connectToRelay'], work, this.maxParallelDials)
     }.bind(this)
 
-    this.stopDHTRenewal = retimer(renewDHTEntries, () => this.options.dhtRenewalTimeout ?? DEFAULT_DHT_ENTRY_RENEWAL)
+    this.stopDHTRenewal = retimer(renewDHTEntries, () => this.dhtRenewalTimeout)
   }
 
   /**
