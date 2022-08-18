@@ -33,7 +33,6 @@ import {
   retryWithBackoff
 } from '@hoprnet/hopr-utils'
 import { attemptClose, relayFromRelayAddress } from '../utils/index.js'
-import { compareDirectConnectionInfo } from '../utils/index.js'
 
 const DEBUG_PREFIX = 'hopr-connect:entry'
 const log = Debug(DEBUG_PREFIX)
@@ -41,6 +40,7 @@ const error = Debug(DEBUG_PREFIX.concat(':error'))
 const verbose = Debug(DEBUG_PREFIX.concat(':verbose'))
 
 const ENTRY_NODE_CONTACT_TIMEOUT = 5e3
+const ENTRY_NODES_MAX_PARALLEL_DIALS = 14
 
 const DEFAULT_ENTRY_NODE_RECONNECT_BASE_TIMEOUT = 10e3
 const DEFAULT_ENTRY_NODE_RECONNECT_BACKOFF = 2
@@ -120,14 +120,28 @@ function isUsableRelay(ma: Multiaddr) {
   )
 }
 
+function groupConnectionResults(
+  args: [id: PeerId, ma: Multiaddr, timeout: number][],
+  results: (ConnectionResult | Error | undefined)[]
+) {
+  return results.reduce((acc, result, index) => {
+    const toAdd = result instanceof Error || result == undefined ? result : result.entry
+    const address = args[index][0].toString()
+    if (acc[address] == undefined) {
+      acc[address] = [toAdd]
+    } else {
+      acc[address].push(toAdd)
+    }
+    return acc
+  }, {} as { [index: string]: (EntryNodeData | Error | undefined)[] })
+}
+
 type UsedRelay = {
   relayDirectAddress: Multiaddr
   ourCircuitAddress: Multiaddr
 }
 
 export const RELAY_CHANGED_EVENT = 'relay:changed'
-
-export const ENTRY_NODES_MAX_PARALLEL_DIALS = 14
 
 export class EntryNodes extends EventEmitter implements Initializable, Startable {
   // Nodes with good availability
@@ -136,6 +150,10 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
   protected uncheckedEntryNodes: PeerStoreType[]
   // Nodes that have been offline in the past
   protected offlineEntryNodes: PeerStoreType[]
+
+  private maxRelaysPerNode: number
+  private maxParallelDials: number
+  private contactTimeout: number
 
   private stopDHTRenewal: (() => void) | undefined
 
@@ -150,8 +168,20 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
   private _connectToRelay: EntryNodes['connectToRelay'] | undefined
   public _onEntryNodeDisconnect: EntryNodes['onEntryDisconnect'] | undefined
 
-  constructor(private dialDirectly: HoprConnect['dialDirectly'], private options: HoprConnectOptions) {
+  constructor(
+    private dialDirectly: HoprConnect['dialDirectly'],
+    private options: HoprConnectOptions,
+    overwrites?: {
+      maxRelaysPerNode?: number
+      maxParallelDials?: number
+      contactTimeout?: number
+    }
+  ) {
     super()
+
+    this.maxRelaysPerNode = overwrites?.maxRelaysPerNode ?? MAX_RELAYS_PER_NODE
+    this.contactTimeout = overwrites?.contactTimeout ?? ENTRY_NODE_CONTACT_TIMEOUT
+    this.maxParallelDials = overwrites?.maxParallelDials ?? ENTRY_NODES_MAX_PARALLEL_DIALS
 
     this._isStarted = false
     this.availableEntryNodes = []
@@ -241,7 +271,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
         retryWithBackoff(
           async () => {
             attempt++
-            const result = await this.connectToRelay(peer, usedRelay.relayDirectAddress, ENTRY_NODE_CONTACT_TIMEOUT)
+            const result = await this.connectToRelay(peer, usedRelay.relayDirectAddress, this.contactTimeout)
             log(
               `Reconnect attempt ${attempt} to entry node ${peer.toString()} was ${
                 result.entry.latency >= 0 ? 'successful' : 'not successful'
@@ -287,10 +317,10 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
           continue
         }
 
-        work.push([relay, relayEntry.multiaddrs[0], ENTRY_NODE_CONTACT_TIMEOUT])
+        work.push([relay, relayEntry.multiaddrs[0], this.contactTimeout])
       }
 
-      await nAtATime(this._connectToRelay as EntryNodes['connectToRelay'], work, ENTRY_NODES_MAX_PARALLEL_DIALS)
+      await nAtATime(this._connectToRelay as EntryNodes['connectToRelay'], work, this.maxParallelDials)
     }.bind(this)
 
     this.stopDHTRenewal = retimer(renewDHTEntries, () => this.options.dhtRenewalTimeout ?? DEFAULT_DHT_ENTRY_RENEWAL)
@@ -358,6 +388,9 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
           const existing = new Set(node.multiaddrs.map((ma: Multiaddr) => ma.decapsulateCode(CODE_P2P).toString()))
           for (const ma of peer.multiaddrs) {
+            if (!isUsableRelay(ma)) {
+              continue
+            }
             if (!existing.has(ma.decapsulateCode(CODE_P2P).toString())) {
               node.multiaddrs.push(ma.decapsulateCode(CODE_P2P).encapsulate(`/p2p/${peer.id.toString()}`))
               receivedNewAddrs = true
@@ -384,7 +417,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
     // Stop adding and checking relay nodes if we already have enough.
     // Once a relay goes offline, the node will try to replace the offline relay.
-    if (receivedNewAddrs && this.usedRelays.length < MAX_RELAYS_PER_NODE) {
+    if (receivedNewAddrs && this.usedRelays.length < this.maxRelaysPerNode) {
       // Rebuild list of relay nodes later
       await this.updatePublicNodes()
     }
@@ -423,88 +456,6 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
   }
 
   /**
-   * Updates existing available entry node with potential new addresses
-   * @param uncheckedNode new unchecked entry
-   */
-  private updateAddrsOfAvailableNodes(uncheckedNode: PeerStoreType): void {
-    const index = this.availableEntryNodes.findIndex((entry) => entry.id.equals(uncheckedNode.id))
-
-    if (index < 0) {
-      // The node is new, so nothing to do here
-      return
-    }
-
-    // If address is not yet known, add it as it could eventually become useful.
-    const existing = new Set(
-      this.availableEntryNodes[index].multiaddrs.map((ma: Multiaddr) => ma.decapsulateCode(CODE_P2P).toString())
-    )
-
-    for (const ma of uncheckedNode.multiaddrs) {
-      if (!existing.has(ma.decapsulateCode(CODE_P2P).toString())) {
-        this.availableEntryNodes[index].multiaddrs.push(
-          ma.decapsulateCode(CODE_P2P).encapsulate(`/p2p/${uncheckedNode.id.toString()}`)
-        )
-      }
-    }
-  }
-
-  /**
-   * Filters list of unchecked entry nodes before contacting them
-   * @returns a filtered list of entry nodes
-   */
-  private filterUncheckedNodes(): PeerStoreType[] {
-    const knownNodes = new Set<string>(this.availableEntryNodes.map((entry: EntryNodeData) => entry.id.toString()))
-    const nodesToCheck: PeerStoreType[] = []
-
-    for (const uncheckedNode of this.uncheckedEntryNodes) {
-      if (uncheckedNode.id.equals(this.getComponents().getPeerId())) {
-        // Cannot use self as entry node
-        continue
-      }
-
-      const usableAddresses = uncheckedNode.multiaddrs.filter(isUsableRelay)
-
-      if (knownNodes.has(uncheckedNode.id.toString())) {
-        this.updateAddrsOfAvailableNodes({
-          id: uncheckedNode.id,
-          multiaddrs: usableAddresses
-        })
-
-        // Nothing to do. Existing public nodes are added later
-        continue
-      }
-
-      let inUse = false
-      for (const usedRelay of this.usedRelays) {
-        for (const usableAddress of usableAddresses) {
-          if (compareDirectConnectionInfo(usedRelay.relayDirectAddress, usableAddress)) {
-            inUse = true
-            break
-          }
-        }
-
-        if (inUse) {
-          break
-        }
-      }
-
-      if (inUse) {
-        // Nothing to do
-        continue
-      }
-
-      nodesToCheck.push({
-        id: uncheckedNode.id,
-        multiaddrs: usableAddresses.map((ma) =>
-          ma.decapsulateCode(CODE_P2P).encapsulate(`/p2p/${uncheckedNode.id.toString()}`)
-        )
-      })
-    }
-
-    return nodesToCheck
-  }
-
-  /**
    * Returns arguments to call `connectToRelay`
    *
    * 1. unchecked nodes <- recently learned
@@ -515,12 +466,11 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    */
   private getNodesToContact(): Parameters<EntryNodes['connectToRelay']>[] {
     const args: Parameters<EntryNodes['connectToRelay']>[] = []
-    const uncheckedNodes = this.filterUncheckedNodes()
 
-    for (const nodeList of [uncheckedNodes, this.availableEntryNodes, this.offlineEntryNodes]) {
+    for (const nodeList of [this.uncheckedEntryNodes, this.availableEntryNodes, this.offlineEntryNodes]) {
       for (const node of nodeList) {
         for (const ma of node.multiaddrs) {
-          args.push([node.id, ma, ENTRY_NODE_CONTACT_TIMEOUT])
+          args.push([node.id, ma, this.contactTimeout])
         }
       }
     }
@@ -614,13 +564,13 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     const results = await nAtATime(
       this._connectToRelay as EntryNodes['connectToRelay'],
       addrsToContact,
-      ENTRY_NODES_MAX_PARALLEL_DIALS,
+      this.maxParallelDials,
       (results: (Awaited<ReturnType<EntryNodes['connectToRelay']>> | Error | undefined)[]) => {
         let availableNodes = 0
         for (const result of results) {
           if (result != undefined && !(result instanceof Error) && result.entry.latency >= 0) {
             availableNodes++
-            if (availableNodes >= MAX_RELAYS_PER_NODE) {
+            if (availableNodes >= this.maxRelaysPerNode) {
               return true
             }
           }
@@ -630,18 +580,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       }
     )
 
-    const groupedResults = results.reduce((acc, result, index) => {
-      const toAdd = result instanceof Error || result == undefined ? result : result.entry
-      const address = addrsToContact[index][0].toString()
-      if (acc[address] == undefined) {
-        acc[address] = [toAdd]
-      } else {
-        acc[address].push(toAdd)
-      }
-      return acc
-    }, {} as { [index: string]: (EntryNodeData | Error | undefined)[] })
-
-    this.updateRecords(groupedResults)
+    this.updateRecords(groupConnectionResults(addrsToContact, results))
 
     log(
       `Checking ${results.filter((result) => result != undefined).length} potential entry node addresses done in ${
@@ -656,6 +595,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       if (result == undefined || result instanceof Error || result.entry.latency < 0) {
         successfulOnes = index - 1
         break
+      } else {
+        successfulOnes = index
       }
     }
 
@@ -663,22 +604,22 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
     if (successfulOnes >= 0) {
       // Close all unnecessary connections
-      if (successfulOnes > MAX_RELAYS_PER_NODE) {
+      if (successfulOnes > this.maxRelaysPerNode) {
         await nAtATime(
           attemptClose,
           results
-            .slice(MAX_RELAYS_PER_NODE, successfulOnes)
+            .slice(this.maxRelaysPerNode, successfulOnes)
             .map<[Connection, (arg: any) => void]>((result) => [
               (result as ConnectionResult).conn as Connection,
               error
             ]),
-          ENTRY_NODES_MAX_PARALLEL_DIALS
+          this.maxParallelDials
         )
       }
 
       this.usedRelays = this.availableEntryNodes
         // select only those entry nodes with smallest latencies
-        .slice(0, MAX_RELAYS_PER_NODE)
+        .slice(0, this.maxRelaysPerNode)
         .map((entry: EntryNodeData) => {
           return {
             relayDirectAddress: entry.multiaddrs[0],
