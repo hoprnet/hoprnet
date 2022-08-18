@@ -124,16 +124,20 @@ function groupConnectionResults(
   args: [id: PeerId, ma: Multiaddr, timeout: number][],
   results: (ConnectionResult | Error | undefined)[]
 ) {
-  return results.reduce((acc, result, index) => {
+  const grouped: { [index: string]: (EntryNodeData | Error | undefined)[] } = {}
+
+  for (const [index, result] of results.entries()) {
     const toAdd = result instanceof Error || result == undefined ? result : result.entry
     const address = args[index][0].toString()
-    if (acc[address] == undefined) {
-      acc[address] = [toAdd]
+
+    if (grouped[address] == undefined) {
+      grouped[address] = [toAdd]
     } else {
-      acc[address].push(toAdd)
+      grouped[address].push(toAdd)
     }
-    return acc
-  }, {} as { [index: string]: (EntryNodeData | Error | undefined)[] })
+  }
+
+  return grouped
 }
 
 type UsedRelay = {
@@ -490,7 +494,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
         continue
       }
 
-      if (results.every((result) => result instanceof Error)) {
+      if (results.every((result) => result instanceof Error || (result != undefined && result.latency < 0))) {
         if (availableOnes.has(id)) {
           for (const [i, available] of this.availableEntryNodes.entries()) {
             if (available.id.toString() === id) {
@@ -509,37 +513,37 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
           }
         }
       } else {
-        const positiveLowestLatency = results.reduce((acc, result) => {
-          if (result != undefined && !(result instanceof Error)) {
-            if (result.latency < acc) {
-              return result.latency
+        // At least one of the results has been non-negative, now get the lowest one
+        let lowestPositiveLatency = -1
+
+        for (const result of results) {
+          if (result != undefined && !(result instanceof Error) && result.latency >= 0) {
+            if (lowestPositiveLatency == -1 || result.latency < lowestPositiveLatency) {
+              lowestPositiveLatency = result.latency
             }
           }
-          return acc
-        }, Infinity)
+        }
 
-        if (positiveLowestLatency < Infinity) {
-          if (offlineOnes.has(id)) {
-            for (const [i, offline] of this.offlineEntryNodes.entries()) {
-              if (offline.id.toString() === id) {
-                // move from offlne to available
-                this.availableEntryNodes.push({
-                  ...this.offlineEntryNodes.splice(i, 1)[0],
-                  latency: positiveLowestLatency
-                })
-                break
-              }
+        if (offlineOnes.has(id)) {
+          for (const [i, offline] of this.offlineEntryNodes.entries()) {
+            if (offline.id.toString() === id) {
+              // move from offlne to available
+              this.availableEntryNodes.push({
+                ...this.offlineEntryNodes.splice(i, 1)[0],
+                latency: lowestPositiveLatency
+              })
+              break
             }
-          } else if (uncheckedOnes.has(id)) {
-            for (const [i, unchecked] of this.uncheckedEntryNodes.entries()) {
-              if (unchecked.id.toString() === id) {
-                // move from unchecked to available
-                this.availableEntryNodes.push({
-                  ...this.uncheckedEntryNodes.splice(i, 1)[0],
-                  latency: positiveLowestLatency
-                })
-                break
-              }
+          }
+        } else if (uncheckedOnes.has(id)) {
+          for (const [i, unchecked] of this.uncheckedEntryNodes.entries()) {
+            if (unchecked.id.toString() === id) {
+              // move from unchecked to available
+              this.availableEntryNodes.push({
+                ...this.uncheckedEntryNodes.splice(i, 1)[0],
+                latency: lowestPositiveLatency
+              })
+              break
             }
           }
         }
@@ -567,6 +571,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       this.maxParallelDials,
       (results: (Awaited<ReturnType<EntryNodes['connectToRelay']>> | Error | undefined)[]) => {
         let availableNodes = 0
+
         for (const result of results) {
           if (result != undefined && !(result instanceof Error) && result.entry.latency >= 0) {
             availableNodes++
