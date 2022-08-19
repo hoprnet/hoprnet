@@ -223,9 +223,9 @@ export class HoprDB {
   public dumpDatabase(destFile: string) {
     log(`Dumping current database to ${destFile}`)
     let dumpFile = fs.createWriteStream(destFile, { flags: 'a' })
-    this.db.createReadStream({ keys: true, keyAsBuffer: true, values: true, valueAsBuffer: true })
-      .on('data', (d) =>
-      {
+    this.db
+      .createReadStream({ keys: true, keyAsBuffer: true, values: true, valueAsBuffer: true })
+      .on('data', (d) => {
         // Skip the public key prefix in each key
         let key = (d.key as Buffer).subarray(PublicKey.SIZE_COMPRESSED)
         let keyString = ''
@@ -238,7 +238,7 @@ export class HoprDB {
             keyString += (isHex ? ' ' : '') + cc
             isHex = false
             // Once a delimiter is encountered, always print as hex since then
-            sawDelimiter = sawDelimiter || (cc == '-' || cc == ':')
+            sawDelimiter = sawDelimiter || cc == '-' || cc == ':'
           } else {
             // Print sequences of non-ascii chars as hex
             keyString += (!isHex ? '0x' : '') + (b as number).toString(16)
@@ -246,10 +246,10 @@ export class HoprDB {
           }
         }
         dumpFile.write(keyString + ':' + d.value.toString('hex') + '\n')
-    })
-    .on('end',  function () {
+      })
+      .on('end', function () {
         dumpFile.close()
-    })
+      })
   }
 
   private async touch(key: Uint8Array): Promise<void> {
