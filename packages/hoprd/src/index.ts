@@ -306,7 +306,7 @@ function addUnhandledPromiseRejectionHandler() {
 
   // See https://github.com/hoprnet/hoprnet/issues/3755
   process.on('unhandledRejection', (reason: any, _promise: Promise<any>) => {
-    if (reason.message && reason.message.toString) {
+    if (reason && reason.message && reason.message.toString) {
       const msgString = reason.toString()
 
       // Only silence very specific errors
