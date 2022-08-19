@@ -223,22 +223,32 @@ export class HoprDB {
   public dumpDatabase(destFile: string) {
     log(`Dumping current database to ${destFile}`)
     let dumpFile = fs.createWriteStream(destFile, { flags: 'a' })
-    this.db.createReadStream({ keys: true, keyAsBuffer: true, values: true, valueAsBuffer: true }).on('data', (d) => {
-      let key = (d.key as Buffer).subarray(PublicKey.SIZE_COMPRESSED)
-      let keyString = ''
-      let isHex = false
-      for (const b of key) {
-        if (b >= 32 && b <= 126) {
-          // Print sequences of ascii chars normally
-          keyString += (isHex ? ' ' : '') + String.fromCharCode(b)
-          isHex = false
-        } else {
-          // Print sequences of non-ascii chars as hex
-          keyString += (!isHex ? '0x' : '') + (b as number).toString(16)
-          isHex = true
+    this.db.createReadStream({ keys: true, keyAsBuffer: true, values: true, valueAsBuffer: true })
+      .on('data', (d) =>
+      {
+        // Skip the public key prefix in each key
+        let key = (d.key as Buffer).subarray(PublicKey.SIZE_COMPRESSED)
+        let keyString = ''
+        let isHex = false
+        let sawDelimiter = false
+        for (const b of key) {
+          if (!sawDelimiter && b >= 32 && b <= 126) {
+            // Print sequences of ascii chars normally
+            let cc = String.fromCharCode(b)
+            keyString += (isHex ? ' ' : '') + cc
+            isHex = false
+            // Once a delimiter is encountered, always print as hex since then
+            sawDelimiter = sawDelimiter || (cc == '-' || cc == ':')
+          } else {
+            // Print sequences of non-ascii chars as hex
+            keyString += (!isHex ? '0x' : '') + (b as number).toString(16)
+            isHex = true
+          }
         }
-      }
-      dumpFile.write(keyString + ':' + d.value.toString("hex") + '\n')
+        dumpFile.write(keyString + ':' + d.value.toString("hex") + '\n')
+    })
+    .on('end',  function () {
+        dumpFile.close()
     })
   }
 
