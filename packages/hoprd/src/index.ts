@@ -486,20 +486,26 @@ async function main() {
           cmd.replace(/"/g, '')
         )
 
+        let shouldExit = false
+
         for (let cmd of toRun) {
           console.error('$', cmd)
           if (!isSupportedCommand(cmd)) {
             throw new Error(`Unsupported command: "${cmd}"`)
           }
 
-          const [shouldExit, output] = await runCommand(node, cmd as any)
-          if (shouldExit) return
-          else logs.log(JSON.stringify(output, null, 2))
+          const [cmdShouldExit, output] = await runCommand(node, cmd as any)
+          logs.log(JSON.stringify(output, null, 2))
+          shouldExit = cmdShouldExit ? cmdShouldExit : shouldExit
         }
+
+        // only exit if at least on commands set this to true
+        if (!shouldExit) return
 
         // Wait for actions to take place
         setTimeout(1e3)
         await node.stop()
+        process.exit()
         return
       }
     })

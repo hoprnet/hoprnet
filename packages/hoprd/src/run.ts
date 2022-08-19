@@ -16,14 +16,22 @@ export const isSupported = (command: any): boolean => {
  */
 const run = async (node: Hopr, command: typeof COMMANDS[number]): Promise<[shouldExit: boolean, result: string]> => {
   if (command === 'balance') {
-    const output = await getBalances(node)
-    return [true, JSON.stringify(output, null, 2)]
+    const { native, hopr } = await getBalances(node)
+    const output = {
+        native: native.toBN().toString(),
+        hopr: hopr.toBN().toString()
+    }
+    return [true, json_to_string(output)]
   } else if (command === 'info') {
     const output = await getInfo(node)
-    return [true, JSON.stringify(output, null, 2)]
+    return [true, json_to_string(output)]
   } else if (command === 'daemonize') {
     return [false, '']
   }
+}
+
+const json_to_string = (json: any): string => {
+  return JSON.stringify(json).replaceAll(/[}{"]/g, '')
 }
 
 export default run
