@@ -30,7 +30,7 @@ export default class Channels extends Command {
    */
   private getChannelLog(prefix, channel) {
     return toPaddedString([
-      [ prefix + ' Channel:', channel.channelId],
+      [prefix + ' Channel:', channel.channelId],
       ['To:', channel.peerId],
       ['Status:', channel.status],
       ['Balance:', ethersUtils.formatEther(channel.balance)]
