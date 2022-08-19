@@ -39,7 +39,7 @@
       "boost_contract_address": "0x2B3Dc48E74da0176f761d0aA864e81A8170df24f",
       "stake_contract_address": "0xAc677660cb7F525F6e74c0560924fB6D16EF2681",
       "network_registry_proxy_contract_address": "0x2dBf1d5b4012291C0EFaec26c4DAb105B059D898",
-      "network_registry_contract_address": "0x5df074701a46e34f83cF0Bc18874BB83c34A5BD3",
+      "network_registry_contract_address": "0xddD7c666Ee6A951Bc8b920D53237420b2b16bd53",
       "tags": []
     },
     "debug-goerli": {
