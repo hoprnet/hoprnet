@@ -1,4 +1,5 @@
 WORKSPACES_WITH_RUST_MODULES := $(wildcard $(addsuffix /crates, $(wildcard ./packages/*)))
+PEER_ID := $(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")
 
 .POSIX:
 
@@ -220,19 +221,23 @@ register-node-when-dummy-proxy: ensure-environment-is-set
 ifeq ($(endpoint),)
 	echo "parameter <endpoint> is default to localhost:3001" >&2
 endif
+ifeq ($(api_token),)
+	echo "parameter <api_token> missing" >&2 && exit 1
+endif
 ifeq ($(account),)
 	echo "parameter <account> missing" >&2 && exit 1
 endif
 ifeq ($(origin CI_DEPLOYER_PRIVKEY),undefined)
 	echo "<CI_DEPLOYER_PRIVKEY> environment variable missing" >&2 && exit 1
 endif
+	$(GET_PEER_ID)
 	TS_NODE_PROJECT=./tsconfig.hardhat.json \
 	HOPR_ENVIRONMENT_ID="$(environment)" \
 	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
    --network $(network) \
    --task add \
    --native-addresses "$(account)" \
-   --peer-ids "$(shell ./scripts/get-hopr-address.sh "$(endpoint)")" \
+   --peer-ids "${PEER_ID}" \
    --privatekey "$(CI_DEPLOYER_PRIVKEY)"
 
 .PHONY: register-node-with-nft
@@ -241,6 +246,9 @@ register-node-with-nft: ensure-environment-is-set
 ifeq ($(endpoint),)
 	echo "parameter <endpoint> is default to localhost:3001" >&2
 endif
+ifeq ($(api_token),)
+	echo "parameter <api_token> missing" >&2 && exit 1
+endif
 ifeq ($(account),)
 	echo "parameter <account> missing" >&2 && exit 1
 endif
@@ -250,16 +258,14 @@ endif
 ifeq ($(origin DEV_BANK_PRIVKEY),undefined)
 	echo "<DEV_BANK_PRIVKEY> environment variable missing" >&2 && exit 1
 endif
+	$(GET_PEER_ID)
 	PRIVATE_KEY=${DEV_BANK_PRIVKEY} make request-devnft recipient=${account}
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-devnft
-	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_id=$(shell ./scripts/get-hopr-address.sh "$(endpoint)")
+	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_id=${PEER_ID}
 
 .PHONY: register-node-with-stake
 # node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'
-register-node-with-stake: ensure-environment-is-set
-ifeq ($(endpoint),)
-	echo "parameter <endpoint> is default to localhost:3001" >&2
-endif
+register-node-with-stake: ensure-environment-is-set, get-hopr-address-from-script
 ifeq ($(account),)
 	echo "parameter <account> missing" >&2 && exit 1
 endif
@@ -269,9 +275,10 @@ endif
 ifeq ($(origin DEV_BANK_PRIVKEY),undefined)
 	echo "<DEV_BANK_PRIVKEY> environment variable missing" >&2 && exit 1
 endif
+	$(GET_PEER_ID)
 	PRIVATE_KEY=${DEV_BANK_PRIVKEY} make request-funds recipient=${account}
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-funds
-	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_id=$(shell ./scripts/get-hopr-address.sh "$(endpoint)")
+	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_id=${PEER_ID}
 
 ensure-environment-is-set:
 ifeq ($(environment),)
