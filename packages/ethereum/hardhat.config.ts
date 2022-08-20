@@ -196,9 +196,10 @@ const hardhatConfig: HardhatUserConfig = {
     currency: 'USD',
     excludeContracts: ['mocks', 'utils/console.sol']
   },
-  verify: {
-    etherscan: {
-      apiKey: ETHERSCAN_KEY
+  etherscan: {
+    apiKey: {
+      mainnet: ETHERSCAN_KEY,
+      goerli: ETHERSCAN_KEY
     }
   }
 }
