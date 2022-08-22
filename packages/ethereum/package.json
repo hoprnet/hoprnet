@@ -24,7 +24,6 @@
     "coverage": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost HOPR_HARDHAT_TAG=testing hardhat coverage",
     "deploy:local": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost hardhat deploy --network hardhat --write true",
     "deploy:goerli": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=master-goerli hardhat deploy --network goerli --write true",
-    "deploy:paleochora": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=paleochora hardhat deploy --network xdai --write true",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },
@@ -35,8 +34,7 @@
   ],
   "dependencies": {
     "@openzeppelin/contracts": "4.4.2",
-    "@openzeppelin/contracts-v3-0-1": "npm:@openzeppelin/contracts@3.4.2",
-    "node-fetch": "2"
+    "@openzeppelin/contracts-v3-0-1": "npm:@openzeppelin/contracts@3.4.2"
   },
   "devDependencies": {
     "@defi-wonderland/smock": "^2.0.7",
