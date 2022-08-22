@@ -18,8 +18,8 @@ const run = async (node: Hopr, command: typeof COMMANDS[number]): Promise<[shoul
   if (command === 'balance') {
     const { native, hopr } = await getBalances(node)
     const output = {
-        native: native.toBN().toString(),
-        hopr: hopr.toBN().toString()
+      native: native.toBN().toString(),
+      hopr: hopr.toBN().toString()
     }
     return [true, json_to_string(output)]
   } else if (command === 'info') {
