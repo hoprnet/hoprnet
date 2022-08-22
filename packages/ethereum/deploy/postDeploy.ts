@@ -12,7 +12,7 @@ const checkIfContractIsVerified = async (contractName: string, contractAddress: 
   let verificationApiKey;
   if (typeof hre.config.etherscan.apiKey === 'string') {
     verificationApiKey = `&apikey=${hre.config.etherscan.apiKey}`;
-  } else if (Object.keys(hre.config.etherscan.apiKey).some(key => key === hre.network.name)) {
+  } else if (Object.keys(hre.config.etherscan.apiKey).some(key => key === hre.network.name) && hre.config.etherscan.apiKey[hre.network.name] && hre.config.etherscan.apiKey[hre.network.name].length > 0) {
     // if the contract is deployed on mainnet or goerlie, contracts should be verified on etherscan
     // use hardhat-etherscan to verify: https://hardhat.org/hardhat-runner/plugins/nomiclabs-hardhat-etherscan
     verificationApiKey = `&apikey=${hre.config.etherscan.apiKey[hre.network.name]}`;
