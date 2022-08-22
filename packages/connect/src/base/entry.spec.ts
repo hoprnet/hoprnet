@@ -12,7 +12,7 @@ import { Multiaddr } from '@multiformats/multiaddr'
 import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
 import type { Components } from '@libp2p/interfaces/components'
 import type { AbortOptions } from '@libp2p/interfaces'
-import { privKeyToPeerId, defer } from '@hoprnet/hopr-utils'
+import { privKeyToPeerId, defer, createCircuitAddress } from '@hoprnet/hopr-utils'
 
 /**
  * Decorated EntryNodes class that allows direct access
@@ -688,10 +688,16 @@ describe('entry node functionality - dht functionality', function () {
 
     const CUSTOM_DHT_RENEWAL_TIMEOUT = 100 // very short timeout
 
-    const entryNodes = new TestingEntryNodes(network.connect as any, {
-      dhtRenewalTimeout: CUSTOM_DHT_RENEWAL_TIMEOUT,
-      publicNodes
-    })
+    const entryNodes = new TestingEntryNodes(
+      network.connect as any,
+      {
+        dhtRenewalTimeout: CUSTOM_DHT_RENEWAL_TIMEOUT,
+        publicNodes
+      },
+      {
+        minRelaysPerNode: 1
+      }
+    )
 
     entryNodes.init(createFakeComponents(peerId))
     entryNodes.start()
@@ -760,6 +766,7 @@ describe('entry node functionality - automatic reconnect', function () {
     assert(usedRelays.length == 1, `must keep relay address after reconnect`)
 
     relayListener.removeAllListeners()
+    network.stop()
     entryNodes.stop()
   })
 
@@ -811,6 +818,148 @@ describe('entry node functionality - automatic reconnect', function () {
     assert(entryNodes.getUsedRelayAddresses().length == 0, `must not expose any relay addrs`)
 
     relayListener.removeAllListeners()
+    network.stop()
+    entryNodes.stop()
+  })
+})
+
+describe('entry node functionality - min relays per node', function () {
+  it('respect minRelayPerNode on peer offline event', async function () {
+    const network = createFakeNetwork()
+
+    const Alice = privKeyToPeerId('0xa544c6684d500b63f96bb6b4196b90a77e71da74f481578fb6e952422189f2bb')
+    const Bob = privKeyToPeerId('0xbfdd91247bc19340fe6fc5e91358372ae15cc39a377e163167cfee3f48264fa1')
+
+    const firstPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`, Alice)
+    const secondPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/2`, Bob)
+
+    let connectionAttempt = false
+
+    const entryNodes = new TestingEntryNodes(
+      (async (_ma: Multiaddr, _opts: any) => {
+        connectionAttempt = true
+      }) as any,
+      // Should fail after second try
+      {},
+      { maxParallelDials: 5, maxRelaysPerNode: 2, minRelaysPerNode: 0 }
+    )
+
+    entryNodes.init(createFakeComponents(peerId))
+    entryNodes.start()
+
+    entryNodes.availableEntryNodes.push(
+      { ...firstPeerStoreEntry, latency: 23 },
+      { ...secondPeerStoreEntry, latency: 24 }
+    )
+
+    entryNodes.usedRelays.push(
+      {
+        ourCircuitAddress: createCircuitAddress(Alice, peerId),
+        relayDirectAddress: firstPeerStoreEntry.multiaddrs[0]
+      },
+      {
+        ourCircuitAddress: createCircuitAddress(Bob, peerId),
+        relayDirectAddress: secondPeerStoreEntry.multiaddrs[0]
+      }
+    )
+
+    const peerRemovedPromise = once(entryNodes, RELAY_CHANGED_EVENT)
+    entryNodes.onRemoveRelay(Alice)
+
+    await peerRemovedPromise
+
+    if (connectionAttempt) {
+      assert.fail(`Should not contact any node`)
+    }
+
+    assert(entryNodes.usedRelays.length == 1)
+    assert(entryNodes.getUsedRelayPeerIds()[0].equals(Bob))
+
+    assert(entryNodes.availableEntryNodes.length == 1)
+    assert(entryNodes.availableEntryNodes[0].id.equals(Bob))
+
+    entryNodes.stop()
+    network.stop()
+  })
+
+  it('respect minRelayPerNode on entry node disconnect', async function () {
+    const network = createFakeNetwork()
+    const Alice = privKeyToPeerId('0xa544c6684d500b63f96bb6b4196b90a77e71da74f481578fb6e952422189f2bb')
+    const Bob = privKeyToPeerId('0xbfdd91247bc19340fe6fc5e91358372ae15cc39a377e163167cfee3f48264fa1')
+
+    const firstPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`, Alice)
+    const secondPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/2`, Bob)
+
+    const AliceListener = network.listen(firstPeerStoreEntry.multiaddrs[0].toString())
+    const BobListener = network.listen(secondPeerStoreEntry.multiaddrs[0].toString())
+
+    let connectedMoreThanOnce = false
+    const connectionAttempts = new Map<string, number>()
+    // let secondAttempt = defer<void>()
+    const entryNodes = new TestingEntryNodes(
+      (async (ma: Multiaddr, opts: any) => {
+        if (opts.onDisconnect) {
+          network.events.on(disconnectEvent(ma.toString()), opts.onDisconnect)
+        }
+        const connectionAttempt = connectionAttempts.get(ma.getPeerId() as string)
+
+        // Allow 2 reconnect attempt but no additional attempt
+        if (connectionAttempt == undefined) {
+          connectionAttempts.set(ma.getPeerId() as string, 1)
+          return network.connect(ma, opts)
+        } else if (connectionAttempt == 1) {
+          connectionAttempts.set(ma.getPeerId() as string, 2)
+        } else if (connectionAttempt == 2) {
+          connectionAttempts.set(ma.getPeerId() as string, 3)
+        } else {
+          connectedMoreThanOnce = true
+        }
+      }) as any,
+      // Should be successful after second try
+      {
+        entryNodeReconnectBaseTimeout: 2,
+        entryNodeReconnectBackoff: 1000
+      },
+      {
+        maxRelaysPerNode: 2,
+        minRelaysPerNode: 0
+      }
+    )
+
+    entryNodes.init(createFakeComponents(peerId))
+    entryNodes.start()
+
+    entryNodes.availableEntryNodes.push(
+      { ...firstPeerStoreEntry, latency: 23 },
+      { ...secondPeerStoreEntry, latency: 24 }
+    )
+
+    const relayListUpdated = once(entryNodes, RELAY_CHANGED_EVENT)
+
+    await entryNodes.updatePublicNodes()
+
+    // entryNodes.onNewRelay(relay)
+    await relayListUpdated
+
+    const secondRelayListUpdate = once(entryNodes, RELAY_CHANGED_EVENT)
+    // // Should eventually remove relay from list
+    network.close(firstPeerStoreEntry.multiaddrs[0])
+
+    await secondRelayListUpdate
+
+    if (connectedMoreThanOnce) {
+      assert.fail(`Must not connect more than once`)
+    }
+
+    const availablePublicNodes = entryNodes.getAvailabeEntryNodes()
+    assert(availablePublicNodes.length == 1, `must keep entry node after reconnect`)
+    const usedRelays = entryNodes.getUsedRelayAddresses()
+    assert(usedRelays.length == 1, `must keep relay address after reconnect`)
+
+    AliceListener.removeAllListeners()
+    BobListener.removeAllListeners()
+
+    network.stop()
     entryNodes.stop()
   })
 })

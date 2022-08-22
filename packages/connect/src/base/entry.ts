@@ -280,7 +280,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     id: PeerId,
     fn: (addrs: EntryNodeData | PeerStoreType, index: number, addrsList: (EntryNodeData | PeerStoreType)[]) => Return,
     throwIfNotFound: boolean = true
-  ) {
+  ): Return | undefined {
     for (const nodeList of [this.uncheckedEntryNodes, this.availableEntryNodes, this.offlineEntryNodes]) {
       for (const [index, node] of nodeList.entries()) {
         if (node.id.equals(id)) {
@@ -359,10 +359,11 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     const renewDHTEntries = async function (this: EntryNodes) {
       const work: Parameters<EntryNodes['connectToRelay']>[] = []
       for (const relay of this.getUsedRelayPeerIds()) {
-        const relayEntry = this.availableEntryNodes.find((entry: EntryNodeData) => entry.id.equals(relay))
+        const relayEntry = this.someNode(relay, (addrs: PeerStoreType) => addrs.multiaddrs)
 
         if (relayEntry == undefined) {
           log(`Relay ${relay.toString()} has been removed from list of available entry nodes. Not renewing this entry`)
+          // this.updateUsedRelays([[relay.toString(), [undefined]]])
           continue
         }
 
@@ -379,6 +380,11 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       )
 
       this.updateUsedRelays(results)
+
+      if (this.usedRelays.length < this.minRelaysPerNode) {
+        // full rebuild
+        this.updatePublicNodes()
+      }
     }.bind(this)
 
     this.stopDHTRenewal = retimer(renewDHTEntries, () => this.dhtRenewalTimeout)
@@ -499,6 +505,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
         break
       }
     }
+
+    console.log(`here`)
 
     // Only rebuild list of relay nodes if node is *in use*
     if (inUse) {
