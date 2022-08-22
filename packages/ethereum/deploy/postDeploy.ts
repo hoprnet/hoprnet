@@ -2,33 +2,43 @@ import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
 import { join } from 'path'
 import { readdir } from 'fs/promises'
-import { get } from "https"
+import { get } from 'https'
 
 // request blockscout/etherscan if the address is already verified, by requesting the ABI of the said contract address. Only
 // verified contract returns ABI with status '1'
-const checkIfContractIsVerified = async (contractName: string, contractAddress: string, hre: HardhatRuntimeEnvironment) => {
+const checkIfContractIsVerified = async (
+  contractName: string,
+  contractAddress: string,
+  hre: HardhatRuntimeEnvironment
+) => {
   // get verification endpoint
-  const verificationConfig = await hre.run("verify:get-etherscan-endpoint")
-  let verificationApiKey;
+  const verificationConfig = await hre.run('verify:get-etherscan-endpoint')
+  let verificationApiKey
   if (typeof hre.config.etherscan.apiKey === 'string') {
-    verificationApiKey = `&apikey=${hre.config.etherscan.apiKey}`;
-  } else if (Object.keys(hre.config.etherscan.apiKey).some(key => key === hre.network.name) && hre.config.etherscan.apiKey[hre.network.name] && hre.config.etherscan.apiKey[hre.network.name].length > 0) {
+    verificationApiKey = `&apikey=${hre.config.etherscan.apiKey}`
+  } else if (
+    Object.keys(hre.config.etherscan.apiKey).some((key) => key === hre.network.name) &&
+    hre.config.etherscan.apiKey[hre.network.name] &&
+    hre.config.etherscan.apiKey[hre.network.name].length > 0
+  ) {
     // if the contract is deployed on mainnet or goerlie, contracts should be verified on etherscan
     // use hardhat-etherscan to verify: https://hardhat.org/hardhat-runner/plugins/nomiclabs-hardhat-etherscan
-    verificationApiKey = `&apikey=${hre.config.etherscan.apiKey[hre.network.name]}`;
+    verificationApiKey = `&apikey=${hre.config.etherscan.apiKey[hre.network.name]}`
   } else {
     // if the contract is deployed on xdai or sokol, use blockscout to verify
     // https://docs.blockscout.com/for-users/verifying-a-smart-contract
-    verificationApiKey = '';
+    verificationApiKey = ''
   }
   console.log(`Verifying contract ${contractName} at ${contractAddress}`)
 
-  const url = `${verificationConfig.urls.apiURL}?module=contract&action=getabi&address=${contractAddress}${verificationApiKey}`;
+  const url = `${verificationConfig.urls.apiURL}?module=contract&action=getabi&address=${contractAddress}${verificationApiKey}`
 
   return new Promise((resolve, reject) => {
-    const req = get(url, res => {
-      let rawData = '';
-      res.on('data', (chunk) => { rawData += chunk; });    
+    const req = get(url, (res) => {
+      let rawData = ''
+      res.on('data', (chunk) => {
+        rawData += chunk
+      })
       res.on('end', () => {
         resolve(JSON.parse(rawData))
       })
@@ -48,7 +58,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log(`postDeploy with right tag ${hre.network.tags.etherscan}`)
   if (!hre.network.tags.etherscan) {
     console.log(`Should skip verify task`)
-    return;
+    return
   }
 
   const basePath = join(
@@ -89,15 +99,15 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
           listNetworks: true
         })
       } catch (error) {
-        if (error.message.includes("Reason: Already Verified")) {
-          console.log(`  Contract ${contractName} has been already verified!`);
-        } else if (error.message.includes("arguments were provided instead")) {
-          console.error(`  >> Contract ${contractName} misses argument(s)!`);
+        if (error.message.includes('Reason: Already Verified')) {
+          console.log(`  Contract ${contractName} has been already verified!`)
+        } else if (error.message.includes('arguments were provided instead')) {
+          console.error(`  >> Contract ${contractName} misses argument(s)!`)
         } else {
           throw error
         }
       }
-    } else if ((result as any).status === '1')  {
+    } else if ((result as any).status === '1') {
       // When {"status": "1"} skip the verification
       console.log(`  Contract ${contractName} is already verified.`)
     } else {
