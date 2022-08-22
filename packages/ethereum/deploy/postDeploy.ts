@@ -41,29 +41,19 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const contractName = contract.replace('.json', '')
     const contractAddress = data.address
 
-    console.log(`Trying to verify ${contractName} with args ${data.args}`)
-    await hre.run('verify:verify', {
-      address: contractAddress,
-      constructorArgs: data.args,
-      listNetworks: true
-    })
-
-    // const compilerData =
-    //   (await hre.artifacts.getBuildInfo(`contracts/${contractName}.sol:${contractName}`)) ?? data.compilerData
-    // // sometimes not all contracts are deployed, depends on the deployment scripts
-    // if (!compilerData) continue
-    // const slimmed = {
-    //   address: data.address,
-    //   transactionHash: data.transactionHash,
-    //   blockNumber: data.receipt ? data.receipt.blockNumber : data.blockNumber,
-    //   metadata: {
-    //     solcVersion: compilerData.solcVersion,
-    //     input: compilerData.input
-    //   },
-    //   abi: data.abi
-    // }
-
-    // await writeFile(filePath, JSON.stringify(slimmed, null, 2))
+    try {
+      await hre.run('verify:verify', {
+        address: contractAddress,
+        constructorArguments: [...data.args],
+        listNetworks: true
+      })
+    } catch (error) {
+      if (error.message.includes("Reason: Already Verified")) {
+        console.log(`Contract ${contractName} is already verified!`);
+      } else {
+        throw error
+      }
+    }
   }
 }
 
