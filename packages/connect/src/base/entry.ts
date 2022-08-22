@@ -3,9 +3,9 @@ import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Initializable, Components } from '@libp2p/interfaces/components'
 import type { Startable } from '@libp2p/interfaces/startable'
-import type { Multiaddr } from '@multiformats/multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 import type { HoprConnect } from '../index.js'
-import { peerIdFromBytes } from '@libp2p/peer-id'
+import { peerIdFromBytes, peerIdFromString } from '@libp2p/peer-id'
 
 import errCode from 'err-code'
 import { EventEmitter } from 'events'
@@ -17,6 +17,7 @@ import {
   CODE_TCP,
   CODE_UDP,
   MAX_RELAYS_PER_NODE,
+  MIN_RELAYS_PER_NODE,
   CAN_RELAY_PROTCOL,
   OK,
   DEFAULT_DHT_ENTRY_RENEWAL,
@@ -59,6 +60,8 @@ type ConnectionResult = {
 type ConnResult = ProtocolStream & {
   conn: Connection
 }
+
+type Grouped = [id: string, results: (ConnectionResult | Error | undefined)[]]
 
 /**
  * Sort results ascending in latency
@@ -124,20 +127,24 @@ function groupConnectionResults(
   args: [id: PeerId, ma: Multiaddr, timeout: number][],
   results: (ConnectionResult | Error | undefined)[]
 ) {
-  const grouped: { [index: string]: (EntryNodeData | Error | undefined)[] } = {}
+  const grouped: { [index: string]: (ConnectionResult | Error | undefined)[] } = {}
 
   for (const [index, result] of results.entries()) {
-    const toAdd = result instanceof Error || result == undefined ? result : result.entry
     const address = args[index][0].toString()
 
     if (grouped[address] == undefined) {
-      grouped[address] = [toAdd]
+      grouped[address] = [result]
     } else {
-      grouped[address].push(toAdd)
+      grouped[address].push(result)
     }
   }
 
-  return grouped
+  // Sort each list of results and sort the entire list of lists after lowest latency of the first result
+  const result: Grouped[] = Object.entries(grouped)
+    .map<Grouped>((value) => [value[0], value[1].sort(compareConnectionResults)])
+    .sort((a: Grouped, b: Grouped) => compareConnectionResults(a[1][0], b[1][0]))
+
+  return result
 }
 
 type UsedRelay = {
@@ -159,6 +166,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
   private maxParallelDials: number
   private contactTimeout: number
   private dhtRenewalTimeout: number
+  private minRelaysPerNode: number
 
   private stopDHTRenewal: (() => void) | undefined
 
@@ -178,6 +186,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     private options: HoprConnectOptions,
     overwrites?: {
       maxRelaysPerNode?: number
+      minRelaysPerNode?: number
       maxParallelDials?: number
       contactTimeout?: number
     }
@@ -185,9 +194,14 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     super()
 
     this.maxRelaysPerNode = overwrites?.maxRelaysPerNode ?? MAX_RELAYS_PER_NODE
+    this.minRelaysPerNode = overwrites?.minRelaysPerNode ?? MIN_RELAYS_PER_NODE
     this.contactTimeout = overwrites?.contactTimeout ?? ENTRY_NODE_CONTACT_TIMEOUT
     this.maxParallelDials = overwrites?.maxParallelDials ?? ENTRY_NODES_MAX_PARALLEL_DIALS
     this.dhtRenewalTimeout = options.dhtRenewalTimeout ?? DEFAULT_DHT_ENTRY_RENEWAL
+
+    if (this.minRelaysPerNode > this.maxRelaysPerNode) {
+      throw Error(`Invalid configuration. minRelaysPerNode must be smaller or equal to maxRelaysPerNode`)
+    }
 
     this._isStarted = false
     this.availableEntryNodes = []
@@ -264,7 +278,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
   private someNode<Return>(
     id: PeerId,
-    fn: (addrs: EntryNodeData | PeerStoreType, index: number, addrsList: (EntryNodeData | PeerStoreType)[]) => Return
+    fn: (addrs: EntryNodeData | PeerStoreType, index: number, addrsList: (EntryNodeData | PeerStoreType)[]) => Return,
+    throwIfNotFound: boolean = true
   ) {
     for (const nodeList of [this.uncheckedEntryNodes, this.availableEntryNodes, this.offlineEntryNodes]) {
       for (const [index, node] of nodeList.entries()) {
@@ -274,75 +289,68 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       }
     }
 
-    throw Error(`Node not found`)
+    if (throwIfNotFound) {
+      throw Error(`Node not found`)
+    }
   }
 
   // @TODO add this call to "global" queue
-  private onEntryDisconnect(ma: Multiaddr) {
+  private async onEntryDisconnect(ma: Multiaddr) {
     const tuples = ma.tuples() as [code: number, addr: Uint8Array][]
     const peer = peerIdFromBytes(tuples[2][1].slice(1))
 
     log(`Disconnected from entry node ${peer.toString()}`)
 
-    for (const usedRelay of this.usedRelays) {
-      const relayTuples = usedRelay.relayDirectAddress.tuples()
+    const addrToContact = (
+      this.someNode(peer, (addrs: EntryNodeData | PeerStoreType) => addrs.multiaddrs) as Multiaddr[]
+    ).map<[id: PeerId, ma: Multiaddr, timeout: number]>((entry) => [peer, entry, this.contactTimeout])
 
-      // Check if peerIds are equal
-      if (u8aEquals(tuples[2][1], relayTuples[2][1])) {
-        let attempt = 0
+    let attempt = 0
 
-        retryWithBackoff(
-          async () => {
-            attempt++
-            let addrs: Multiaddr[] = this.someNode(peer, (addrs: EntryNodeData | PeerStoreType) => addrs.multiaddrs)
+    try {
+      await retryWithBackoff(
+        async () => {
+          attempt++
+          const results = await nAtATime(
+            this._connectToRelay as EntryNodes['connectToRelay'],
+            addrToContact,
+            this.maxParallelDials
+          )
 
-            const results = await nAtATime(
-              this._connectToRelay as EntryNodes['connectToRelay'],
-              addrs.map<[id: PeerId, relay: Multiaddr, timeout: number]>((addr: Multiaddr) => [
-                peer,
-                addr,
-                this.contactTimeout
-              ]),
-              this.maxParallelDials
+          if (
+            results.every(
+              (result: ConnectionResult | Error | undefined) =>
+                result == undefined || result instanceof Error || result.entry.latency < 0
             )
-
-            if (
-              results.every(
-                (result: ConnectionResult | Error | undefined) =>
-                  result == undefined || result instanceof Error || result.entry.latency < 0
-              )
-            ) {
-              // Throw error to signal `retryWithBackoff` that dial attempt
-              // was not successful
-              log(`Reconnect attempt ${attempt} to entry node ${peer.toString()} was not successful`)
-              throw Error(KNOWN_DISCONNECT_ERROR)
-            }
-
-            log(`Reconnect attempt ${attempt} to entry node ${peer.toString()} was successful`)
-          },
-          {
-            minDelay: this.options.entryNodeReconnectBaseTimeout ?? DEFAULT_ENTRY_NODE_RECONNECT_BASE_TIMEOUT,
-            maxDelay: 10 * (this.options.entryNodeReconnectBaseTimeout ?? DEFAULT_ENTRY_NODE_RECONNECT_BASE_TIMEOUT),
-            delayMultiple: this.options.entryNodeReconnectBackoff ?? DEFAULT_ENTRY_NODE_RECONNECT_BACKOFF
+          ) {
+            // Throw error to signal `retryWithBackoff` that dial attempt
+            // was not successful
+            log(`Reconnect attempt ${attempt} to entry node ${peer.toString()} was not successful`)
+            throw Error(KNOWN_DISCONNECT_ERROR)
           }
-        ).catch((err: any) => {
-          if (err.message !== KNOWN_DISCONNECT_ERROR) {
-            // Forward unexpected errors
-            throw err
-          } else {
-            // Move to offline nodes
-            this.someNode(
-              peer,
-              (_addrs: EntryNodeData | PeerStoreType, index: number, nodeList: (EntryNodeData | PeerStoreType)[]) => {
-                this.offlineEntryNodes.push(nodeList.splice(index, 1)[0])
-              }
-            )
-            error(`Reconnect to relay ${peer.toString()} failed.`)
-          }
-        })
 
-        // Once found, quit loop
-        break
+          log(`Reconnect attempt ${attempt} to entry node ${peer.toString()} was successful`)
+        },
+        {
+          minDelay: this.options.entryNodeReconnectBaseTimeout ?? DEFAULT_ENTRY_NODE_RECONNECT_BASE_TIMEOUT,
+          maxDelay: 10 * (this.options.entryNodeReconnectBaseTimeout ?? DEFAULT_ENTRY_NODE_RECONNECT_BASE_TIMEOUT),
+          delayMultiple: this.options.entryNodeReconnectBackoff ?? DEFAULT_ENTRY_NODE_RECONNECT_BACKOFF
+        }
+      )
+    } catch (err: any) {
+      if (err.message !== KNOWN_DISCONNECT_ERROR) {
+        // Forward unexpected errors
+        throw err
+      } else {
+        // Peer is offline, rebuild list if below threshold
+        if (this.usedRelays.length - 1 < this.minRelaysPerNode) {
+          // Move to offline nodes
+          this.updatePublicNodes()
+        } else {
+          this.updateUsedRelays([[peer.toString(), [undefined]]])
+          this.emit(RELAY_CHANGED_EVENT)
+          error(`Reconnect to relay ${peer.toString()} failed.`)
+        }
       }
     }
   }
@@ -358,10 +366,19 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
           continue
         }
 
-        work.push([relay, relayEntry.multiaddrs[0], this.contactTimeout])
+        const addrsToContact = this.someNode(relay, (addrs) => addrs.multiaddrs, true) as Multiaddr[]
+
+        for (const ma of addrsToContact) {
+          work.push([relay, ma, this.contactTimeout])
+        }
       }
 
-      await nAtATime(this._connectToRelay as EntryNodes['connectToRelay'], work, this.maxParallelDials)
+      const results = groupConnectionResults(
+        work,
+        await nAtATime(this._connectToRelay as EntryNodes['connectToRelay'], work, this.maxParallelDials)
+      )
+
+      this.updateUsedRelays(results)
     }.bind(this)
 
     this.stopDHTRenewal = retimer(renewDHTEntries, () => this.dhtRenewalTimeout)
@@ -379,7 +396,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    * @returns a list of peer IDs of used relays.
    */
   public getUsedRelayPeerIds() {
-    return this.getUsedRelayAddresses().map((ma: Multiaddr) => relayFromRelayAddress(ma))
+    return this.getUsedRelayAddresses().map(relayFromRelayAddress)
   }
 
   /**
@@ -417,37 +434,31 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
     let knownPeer = false
 
-    for (const nodeList of [this.uncheckedEntryNodes, this.availableEntryNodes, this.offlineEntryNodes]) {
-      for (const node of nodeList) {
-        if (node.id.equals(peer.id)) {
-          knownPeer = true
-          log(
-            `Received new address${peer.multiaddrs.length == 1 ? '' : 'es'} ${peer.multiaddrs
-              .map((ma) => ma.decapsulateCode(CODE_P2P).toString())
-              .join(', ')} for ${peer.id.toString()}`
-          )
+    this.someNode(
+      peer.id,
+      (entry) => {
+        knownPeer = true
 
-          const existing = new Set(node.multiaddrs.map((ma: Multiaddr) => ma.decapsulateCode(CODE_P2P).toString()))
-          for (const ma of peer.multiaddrs) {
-            if (!isUsableRelay(ma)) {
-              continue
-            }
-            if (!existing.has(ma.decapsulateCode(CODE_P2P).toString())) {
-              node.multiaddrs.push(ma.decapsulateCode(CODE_P2P).encapsulate(`/p2p/${peer.id.toString()}`))
-              receivedNewAddrs = true
-              break
-            }
+        log(
+          `Received new address${peer.multiaddrs.length == 1 ? '' : 'es'} ${peer.multiaddrs
+            .map((ma) => ma.decapsulateCode(CODE_P2P).toString())
+            .join(', ')} for ${peer.id.toString()}`
+        )
+
+        const existing = new Set(entry.multiaddrs.map((ma: Multiaddr) => ma.decapsulateCode(CODE_P2P).toString()))
+        for (const ma of peer.multiaddrs) {
+          if (!isUsableRelay(ma)) {
+            continue
           }
-          break
+          if (!existing.has(ma.decapsulateCode(CODE_P2P).toString())) {
+            entry.multiaddrs.push(ma.decapsulateCode(CODE_P2P).encapsulate(`/p2p/${peer.id.toString()}`))
+            receivedNewAddrs = true
+            break
+          }
         }
-      }
-
-      // Node list are supposed to be disjoint, so we can stop once found
-      if (knownPeer) {
-        break
-      }
-    }
-
+      },
+      false
+    )
     if (!knownPeer) {
       this.uncheckedEntryNodes.push({
         id: peer.id,
@@ -491,8 +502,13 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
     // Only rebuild list of relay nodes if node is *in use*
     if (inUse) {
-      // Rebuild list of relay nodes later
-      await this.updatePublicNodes()
+      if (this.usedRelays.length - 1 < this.minRelaysPerNode) {
+        // full rebuild because below threshold
+        await this.updatePublicNodes()
+      } else {
+        this.updateUsedRelays([[peer.toString(), [undefined]]])
+        this.emit(RELAY_CHANGED_EVENT)
+      }
     }
   }
 
@@ -519,19 +535,74 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     return args
   }
 
-  protected updateRecords(groupedResults: { [index: string]: (EntryNodeData | Error | undefined)[] }) {
+  private rebuildUsedRelays(groupedResults: Grouped[]) {
+    this.usedRelays = []
+
+    for (const [_id, results] of groupedResults) {
+      if (results[0] == undefined || results[0] instanceof Error) {
+        break
+      }
+
+      if (results[0].entry.latency < 0) {
+        for (const result of results) {
+          if (result == undefined || result instanceof Error) {
+            break
+          }
+          attemptClose((result as ConnectionResult).conn, error)
+        }
+
+        // Don't add entry node
+        break
+      }
+
+      this.usedRelays.push({
+        // @TODO take the address that really got used
+        relayDirectAddress: (results[0] as ConnectionResult).entry.multiaddrs[0],
+        ourCircuitAddress: createCircuitAddress(
+          (results[0] as ConnectionResult).entry.id,
+          this.getComponents().getPeerId()
+        )
+      })
+    }
+  }
+
+  private updateUsedRelays(groupedResults: Grouped[]) {
+    for (const [id, results] of groupedResults) {
+      if (results[0] == undefined || results[0] instanceof Error || results[0].entry.latency < 0) {
+        // Mark offline
+        this.someNode(
+          peerIdFromString(id),
+          (_addrs: EntryNodeData | PeerStoreType, index: number, nodeList: (EntryNodeData | PeerStoreType)[]) => {
+            this.offlineEntryNodes.push(nodeList.splice(index, 1)[0])
+          }
+        )
+
+        for (const [index, relay] of this.usedRelays.entries()) {
+          if (relayFromRelayAddress(relay.ourCircuitAddress)) {
+            this.usedRelays.splice(index, 1)
+            break
+          }
+        }
+
+        // results are sorted, so there is no better result
+        break
+      }
+    }
+  }
+
+  protected updateRecords(groupedResults: Grouped[]) {
     // @TODO replace this by a more efficient data structure
     const availableOnes = new Set<string>(this.availableEntryNodes.map((nodeData) => nodeData.id.toString()))
     const uncheckedOnes = new Set<string>(this.uncheckedEntryNodes.map((nodeData) => nodeData.id.toString()))
     const offlineOnes = new Set<string>(this.offlineEntryNodes.map((nodeData) => nodeData.id.toString()))
 
-    for (const [id, results] of Object.entries(groupedResults)) {
+    for (const [id, results] of groupedResults) {
       if (results.every((result) => result == undefined)) {
         // Nothing to do because no additional good or bad knowledge
         continue
       }
 
-      if (results.every((result) => result instanceof Error || (result != undefined && result.latency < 0))) {
+      if (results.every((result) => result instanceof Error || (result != undefined && result.entry.latency < 0))) {
         if (availableOnes.has(id)) {
           for (const [i, available] of this.availableEntryNodes.entries()) {
             if (available.id.toString() === id) {
@@ -549,44 +620,40 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
             }
           }
         }
-      } else {
-        // At least one of the results has been non-negative, now get the lowest one
-        let lowestPositiveLatency = -1
 
-        for (const result of results) {
-          if (result != undefined && !(result instanceof Error) && result.latency >= 0) {
-            if (lowestPositiveLatency == -1 || result.latency < lowestPositiveLatency) {
-              lowestPositiveLatency = result.latency
-            }
+        // none of the results if usable, so move forward
+        continue
+      }
+
+      // At least one of the results has been non-negative, now get the lowest one
+      let lowestPositiveLatency = (results[0] as ConnectionResult).entry.latency
+
+      if (offlineOnes.has(id)) {
+        for (const [i, offline] of this.offlineEntryNodes.entries()) {
+          if (offline.id.toString() === id) {
+            // move from offlne to available
+            this.availableEntryNodes.push({
+              ...this.offlineEntryNodes.splice(i, 1)[0],
+              latency: lowestPositiveLatency
+            })
+            break
           }
         }
-
-        if (offlineOnes.has(id)) {
-          for (const [i, offline] of this.offlineEntryNodes.entries()) {
-            if (offline.id.toString() === id) {
-              // move from offlne to available
-              this.availableEntryNodes.push({
-                ...this.offlineEntryNodes.splice(i, 1)[0],
-                latency: lowestPositiveLatency
-              })
-              break
-            }
-          }
-        } else if (uncheckedOnes.has(id)) {
-          for (const [i, unchecked] of this.uncheckedEntryNodes.entries()) {
-            if (unchecked.id.toString() === id) {
-              // move from unchecked to available
-              this.availableEntryNodes.push({
-                ...this.uncheckedEntryNodes.splice(i, 1)[0],
-                latency: lowestPositiveLatency
-              })
-              break
-            }
+      } else if (uncheckedOnes.has(id)) {
+        for (const [i, unchecked] of this.uncheckedEntryNodes.entries()) {
+          if (unchecked.id.toString() === id) {
+            // move from unchecked to available
+            this.availableEntryNodes.push({
+              ...this.uncheckedEntryNodes.splice(i, 1)[0],
+              latency: lowestPositiveLatency
+            })
+            break
           }
         }
       }
     }
 
+    // sorts in-place
     this.availableEntryNodes.sort(latencyCompare)
   }
 
@@ -602,27 +669,30 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     const addrsToContact = this.getNodesToContact()
 
     const start = Date.now()
-    const results = await nAtATime(
-      this._connectToRelay as EntryNodes['connectToRelay'],
+    const results = groupConnectionResults(
       addrsToContact,
-      this.maxParallelDials,
-      (results: (Awaited<ReturnType<EntryNodes['connectToRelay']>> | Error | undefined)[]) => {
-        let availableNodes = 0
+      await nAtATime(
+        this._connectToRelay as EntryNodes['connectToRelay'],
+        addrsToContact,
+        this.maxParallelDials,
+        (results: (Awaited<ReturnType<EntryNodes['connectToRelay']>> | Error | undefined)[]) => {
+          let availableNodes = 0
 
-        for (const result of results) {
-          if (result != undefined && !(result instanceof Error) && result.entry.latency >= 0) {
-            availableNodes++
-            if (availableNodes >= this.maxRelaysPerNode) {
-              return true
+          for (const result of results) {
+            if (result != undefined && !(result instanceof Error) && result.entry.latency >= 0) {
+              availableNodes++
+              if (availableNodes >= this.maxRelaysPerNode) {
+                return true
+              }
             }
           }
-        }
 
-        return false
-      }
+          return false
+        }
+      )
     )
 
-    this.updateRecords(groupConnectionResults(addrsToContact, results))
+    this.updateRecords(results)
 
     log(
       `Checking ${results.filter((result) => result != undefined).length} potential entry node addresses done in ${
@@ -630,49 +700,9 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       } ms.`
     )
 
-    results.sort(compareConnectionResults)
-
-    let successfulOnes = -1
-    for (const [index, result] of results.entries()) {
-      if (result == undefined || result instanceof Error || result.entry.latency < 0) {
-        successfulOnes = index - 1
-        break
-      } else {
-        successfulOnes = index
-      }
-    }
-
     const previous = new Set<string>(this.getUsedRelayPeerIds().map((p: PeerId) => p.toString()))
 
-    if (successfulOnes >= 0) {
-      // Close all unnecessary connections
-      if (successfulOnes > this.maxRelaysPerNode) {
-        await nAtATime(
-          attemptClose,
-          results
-            .slice(this.maxRelaysPerNode, successfulOnes)
-            .map<[Connection, (arg: any) => void]>((result) => [
-              (result as ConnectionResult).conn as Connection,
-              error
-            ]),
-          this.maxParallelDials
-        )
-      }
-
-      this.usedRelays = this.availableEntryNodes
-        // select only those entry nodes with smallest latencies
-        .slice(0, this.maxRelaysPerNode)
-        .map((entry: EntryNodeData) => {
-          return {
-            relayDirectAddress: entry.multiaddrs[0],
-            ourCircuitAddress: createCircuitAddress(entry.id, this.getComponents().getPeerId())
-          }
-        })
-    } else {
-      log(`Could not connect to any entry node. Other nodes may not or no longer be able to connect to this node.`)
-      // Reset to initial state
-      this.usedRelays = []
-    }
+    this.rebuildUsedRelays(results)
 
     let isDifferent = false
 
