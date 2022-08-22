@@ -115,6 +115,11 @@ function compareConnectionResults(a: ConnectionResult | undefined | Error, b: Co
   }
 }
 
+/**
+ * Check if given Multiaddr can be used as an entry node
+ * @param ma addr to check
+ * @returns true if given Multiaddr can be used as entry node
+ */
 function isUsableRelay(ma: Multiaddr) {
   const tuples = ma.tuples() as [code: number, addr: Uint8Array][]
 
@@ -123,6 +128,13 @@ function isUsableRelay(ma: Multiaddr) {
   )
 }
 
+/**
+ * Transform dialed addrs + corresponding connection results to more
+ * usable data structure.
+ * @param args addrs used to connect
+ * @param results connection result for each address
+ * @returns
+ */
 function groupConnectionResults(
   args: [id: PeerId, ma: Multiaddr, timeout: number][],
   results: (ConnectionResult | Error | undefined)[]
@@ -152,6 +164,7 @@ type UsedRelay = {
   ourCircuitAddress: Multiaddr
 }
 
+// Emitted whenever list of relays changed
 export const RELAY_CHANGED_EVENT = 'relay:changed'
 
 export class EntryNodes extends EventEmitter implements Initializable, Startable {
@@ -276,9 +289,18 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     return this.components
   }
 
+  /**
+   * Iterates through all sets of known entry nodes to find
+   * given peer. Once found, apply given function `fn` to entry and
+   * return the result of the invocation of `fn`.
+   * @param id node to find
+   * @param fn function to apply on entry
+   * @param throwIfNotFound [default=true] whether to throw if not found
+   * @returns
+   */
   private someNode<Return>(
     id: PeerId,
-    fn: (addrs: EntryNodeData | PeerStoreType, index: number, addrsList: (EntryNodeData | PeerStoreType)[]) => Return,
+    fn: (entry: EntryNodeData | PeerStoreType, index: number, addrsList: (EntryNodeData | PeerStoreType)[]) => Return,
     throwIfNotFound: boolean = true
   ): Return | undefined {
     for (const nodeList of [this.uncheckedEntryNodes, this.availableEntryNodes, this.offlineEntryNodes]) {
@@ -294,6 +316,10 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     }
   }
 
+  /**
+   * Called once connection to an entry node gets closed.
+   * @param ma disconnected Multiaddr
+   */
   // @TODO add this call to "global" queue
   private async onEntryDisconnect(ma: Multiaddr) {
     const tuples = ma.tuples() as [code: number, addr: Uint8Array][]
@@ -355,6 +381,9 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     }
   }
 
+  /**
+   * Start the interval in which the entry in the DHT gets renewed.
+   */
   private startDHTRenewInterval() {
     const renewDHTEntries = async function (this: EntryNodes) {
       const work: Parameters<EntryNodes['connectToRelay']>[] = []
@@ -506,8 +535,6 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       }
     }
 
-    console.log(`here`)
-
     // Only rebuild list of relay nodes if node is *in use*
     if (inUse) {
       if (this.usedRelays.length - 1 < this.minRelaysPerNode) {
@@ -543,6 +570,12 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     return args
   }
 
+  /**
+   * Rebuild the *entire* list of used entry nodes, assuming
+   * that given connect results refer to current availability
+   * of entry nodes.
+   * @param groupedResults results from concurrent connect attempt
+   */
   private rebuildUsedRelays(groupedResults: Grouped[]) {
     this.usedRelays = []
 
@@ -574,6 +607,10 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     }
   }
 
+  /**
+   * Updates specific entries of the list of used entry nodes
+   * @param groupedResults results from concurrent connect attempt
+   */
   private updateUsedRelays(groupedResults: Grouped[]) {
     for (const [id, results] of groupedResults) {
       if (results[0] == undefined || results[0] instanceof Error || results[0].entry.latency < 0) {
@@ -598,6 +635,10 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     }
   }
 
+  /**
+   * Updates knowledge about offline, available and unchecked entry nodes
+   * @param groupedResults results from concurrent connect attempt
+   */
   protected updateRecords(groupedResults: Grouped[]) {
     // @TODO replace this by a more efficient data structure
     const availableOnes = new Set<string>(this.availableEntryNodes.map((nodeData) => nodeData.id.toString()))
@@ -672,8 +713,6 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
   async updatePublicNodes(): Promise<void> {
     log(`Updating list of used relay nodes ...`)
 
-    // Don't add already used ones
-    // identified by peerId
     const addrsToContact = this.getNodesToContact()
 
     const start = Date.now()
@@ -686,6 +725,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
         (results: (Awaited<ReturnType<EntryNodes['connectToRelay']>> | Error | undefined)[]) => {
           let availableNodes = 0
 
+          // @TODO this assumes that there is only address per entry node that leads
+          //       to a usable connection. In some networks, this might not be true.
           for (const result of results) {
             if (result != undefined && !(result instanceof Error) && result.entry.latency >= 0) {
               availableNodes++
@@ -725,6 +766,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       }
     }
 
+    // Only emit events and debug log if something has changed.
+    // This reduces debug log noise.
     if (isDifferent) {
       log(`Current relay addresses:`)
       for (const ma of this.usedRelays) {
@@ -735,6 +778,15 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     }
   }
 
+  /**
+   * Establishes a brand-new connection to the given peer using the given
+   * address.
+   * @param destination peer to connect to
+   * @param destinationAddress address to use for connect attempt
+   * @param timeout when to timeout
+   * @param onDisconnect called once connection gets closed
+   * @returns either a connection result or nothing, if there was an error
+   */
   private async establishNewConnection(
     destination: PeerId,
     destinationAddress: Multiaddr,
