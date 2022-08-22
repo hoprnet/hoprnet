@@ -10,7 +10,13 @@ import {
   type ContractTransaction,
   type BaseContract
 } from 'ethers'
-import { getContractData, type HoprToken, type HoprChannels, type HoprNetworkRegistry, ContractData } from '@hoprnet/hopr-ethereum'
+import {
+  getContractData,
+  type HoprToken,
+  type HoprChannels,
+  type HoprNetworkRegistry,
+  ContractData
+} from '@hoprnet/hopr-ethereum'
 import {
   Address,
   Balance,
@@ -96,21 +102,21 @@ export async function createChainWrapper(
   ) as HoprNetworkRegistry
 
   //getGenesisBlock, taking the earlier deployment block between the channel and network Registery
-  let channelDeployBlockNumber: any;
-  if (Object.keys(hoprChannelsDeployment).some(key => key === "receipt")) {
+  let channelDeployBlockNumber: any
+  if (Object.keys(hoprChannelsDeployment).some((key) => key === 'receipt')) {
     channelDeployBlockNumber = (hoprChannelsDeployment as Deployment).receipt.blockNumber
   } else {
     channelDeployBlockNumber = (hoprChannelsDeployment as ContractData).blockNumber
   }
-  
-  let networkRegistryDeployBlockNumber: any;
-  if (Object.keys(hoprNetworkRegistryDeployment).some(key => key === "receipt")) {
+
+  let networkRegistryDeployBlockNumber: any
+  if (Object.keys(hoprNetworkRegistryDeployment).some((key) => key === 'receipt')) {
     networkRegistryDeployBlockNumber = (hoprNetworkRegistryDeployment as Deployment).receipt.blockNumber
   } else {
     networkRegistryDeployBlockNumber = (hoprNetworkRegistryDeployment as ContractData).blockNumber
   }
-    
-  const genesisBlock = Math.min(parseInt(channelDeployBlockNumber), parseInt(networkRegistryDeployBlockNumber));
+
+  const genesisBlock = Math.min(parseInt(channelDeployBlockNumber), parseInt(networkRegistryDeployBlockNumber))
 
   const channelClosureSecs = await channels.secsClosure()
 
