@@ -269,7 +269,7 @@ result=$(api_ping "${api6}" ${addr1} "TIMEOUT")
 log "-- ${result}"
 
 log "Node 1 should not be able to talk to Node 7 (different environment id)"
-result=$(api_ping "${api1}" ${addr7} "TIMEOUT")
+result=$(api_ping "${api1}" ${addr7} "Connection to node is not allowed")
 log "-- ${result}"
 
 # log "Node 7 should not be able to talk to Node 1 (Node 7 is not in the register)"
@@ -306,18 +306,19 @@ wait
 api_close_channel 1 4 "${api1}" "${addr4}" "outgoing" "true"
 
 for i in `seq 1 10`; do
-  log "Node 1 send 1 hop message to self via node 2" &
+  log "Node 1 send 1 hop message to self via node 2"
   api_send_message "${api1}" "${addr1}" 'hello, world' "${addr2}" &
 
-  log "Node 2 send 1 hop message to self via node 3" &
+  log "Node 2 send 1 hop message to self via node 3"
   api_send_message "${api2}" "${addr2}" 'hello, world' "${addr3}" &
 
-  log "Node 3 send 1 hop message to self via node 4" &
+  log "Node 3 send 1 hop message to self via node 4"
   api_send_message "${api3}" "${addr3}" 'hello, world' "${addr4}" &
 
-  log "Node 4 send 1 hop message to self via node 5" &
-  api_send_message "${api4}" "${addr4}" 'hello, world' "${addr5}"
+  log "Node 4 send 1 hop message to self via node 5"
+  api_send_message "${api4}" "${addr4}" 'hello, world' "${addr5}" &
 done
+wait
 
 log "Node 2 should now have a ticket"
 result=$(api_get_ticket_statistics "${api2}" "\"winProportion\":1")
@@ -336,28 +337,28 @@ result=$(api_get_ticket_statistics "${api5}" "\"winProportion\":1")
 log "-- ${result}"
 
 for i in `seq 1 10`; do
-  log "Node 1 send 1 hop message to node 3 via node 2" &
+  log "Node 1 send 1 hop message to node 3 via node 2"
   api_send_message "${api1}" "${addr3}" 'hello, world' "${addr2}" &
 
-  log "Node 2 send 1 hop message to node 4 via node 3" &
+  log "Node 2 send 1 hop message to node 4 via node 3"
   api_send_message "${api2}" "${addr4}" 'hello, world' "${addr3}" &
 
-  log "Node 3 send 1 hop message to node 5 via node 4" &
+  log "Node 3 send 1 hop message to node 5 via node 4"
   api_send_message "${api3}" "${addr5}" 'hello, world' "${addr4}" &
 
-  log "Node 5 send 1 hop message to node 2 via node 1" &
+  log "Node 5 send 1 hop message to node 2 via node 1"
   api_send_message "${api5}" "${addr2}" 'hello, world' "${addr1}" &
 done
 wait
 
 for i in `seq 1 10`; do
-  log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4" &
+  log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4"
   api_send_message "${api1}" "${addr5}" "hello, world" "${addr2} ${addr3} ${addr4}" &
 done
 wait
 
 for i in `seq 1 10`; do
-  log "Node 1 send message to node 5" &
+  log "Node 1 send message to node 5"
   api_send_message "${api1}" "${addr5}" "hello, world" "" &
 done
 wait
@@ -415,6 +416,7 @@ api_close_channel 1 5 "${api1}" "${addr5}" "outgoing" "true" &
 
 log "Waiting for nodes to finish handling close channels calls"
 wait
+
 test_get_all_channels() {
   local node_api=${1}
 

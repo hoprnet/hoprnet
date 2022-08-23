@@ -2,7 +2,6 @@ import { passwordStrength } from 'check-password-strength'
 import path from 'path'
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
-import { setTimeout } from 'timers/promises'
 
 import { loadJson, NativeBalance, SUGGESTED_NATIVE_BALANCE, get_package_version } from '@hoprnet/hopr-utils'
 import {

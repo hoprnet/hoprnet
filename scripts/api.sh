@@ -97,7 +97,8 @@ api_withdraw() {
 # $1 = node api endpoint
 api_get_balances() {
   local origin=${1}
-  api_call ${1} "/account/balances" "GET" "" "native" 600
+
+  api_call ${origin} "/account/balances" "GET" "" "native" 600
 }
 
 # get addresses is in the utils file
@@ -205,14 +206,14 @@ api_ping() {
   local peer_id="${2}"
   local assertion="${3}"
 
-  api_call ${1} "/node/ping" "POST" "{\"peerId\": \"${peer_id}\"}" ${assertion} 600
+  api_call ${origin} "/node/ping" "POST" "{\"peerId\": \"${peer_id}\"}" "${assertion}" 600
 }
 
 # $1 = node api endpoint
 api_peers() {
   local origin=${1:-localhost:3001}
 
-  api_call ${1} "/node/peers" "GET" "" "" 600
+  api_call ${origin} "/node/peers" "GET" "" "" 600
 }
 
 # $1 = node api endpoint
@@ -221,7 +222,7 @@ api_get_ticket_statistics() {
   local origin=${1:-localhost:3001}
   local assertion="${2}"
 
-  api_call ${1} "/tickets/statistics" "GET" "" ${assertion} 600
+  api_call ${origin} "/tickets/statistics" "GET" "" "${assertion}" 600
 }
 
 # $1 = source api url
@@ -292,7 +293,7 @@ api_validate_node_balance_gt0() {
   local balance eth_balance hopr_balance
   local endpoint=${1:-localhost:3001}
 
-  balance=$(api_get_balances ${1})
+  balance=$(api_get_balances ${endpoint})
   eth_balance=$(echo ${balance} | jq -r ".native")
   hopr_balance=$(echo ${balance} | jq -r ".hopr")
 
