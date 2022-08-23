@@ -270,15 +270,17 @@ api_close_channel() {
 # $2 = destination node id
 # $3 = channel source api endpoint
 # $4 = channel destination peer id
+# $5 = OPTIONAL: amount of tokens to stake (full denomination), default is 100
 api_open_channel() {
   local source_id="${1}"
   local destination_id="${2}"
   local source_api="${3}"
   local destination_peer_id="${4}"
+  local amount="${5:-100000000000000000000}"
   local result
 
   log "Node ${source_id} open channel to Node ${destination_id}"
-  result=$(api_call ${source_api} "/channels" "POST" "{ \"peerId\": \"${destination_peer_id}\", \"amount\": \"100000000000000000000\" }" 'channelId|CHANNEL_ALREADY_OPEN' 600 30)
+  result=$(api_call ${source_api} "/channels" "POST" "{ \"peerId\": \"${destination_peer_id}\", \"amount\": \"${amount}\" }" 'channelId|CHANNEL_ALREADY_OPEN' 600 30)
   log "Node ${source_id} open channel to Node ${destination_id} result -- ${result}"
 }
 

@@ -51,6 +51,7 @@ usage() {
   msg "HOPRD_SHOW_PRESTART_INFO\tset to 'true' to print used parameter values before starting"
   msg "HOPRD_PERFORM_CLEANUP\t\tset to 'true' to perform the cleanup process for the given cluster id"
   msg "HOPRD_RESET_METADATA\t\tset to 'true' to trigger metadata reset on instances"
+  msg "HOPRD_SKIP_UNSTAKED\t\tset to 'true' to stake all nodes and not keep the first unstaked"
   msg
 }
 
@@ -77,6 +78,7 @@ declare password="${HOPRD_PASSWORD:-pw${RANDOM}${RANDOM}${RANDOM}pw}"
 declare perform_cleanup="${HOPRD_PERFORM_CLEANUP:-false}"
 declare show_prestartinfo="${HOPRD_SHOW_PRESTART_INFO:-false}"
 declare reset_metadata="${HOPRD_RESET_METADATA:-false}"
+declare skip_unstaked="${HOPRD_SKIP_UNSTAKED:-false}"
 
 # Append environment as Docker image version, if not specified
 [[ "${docker_image}" != *:* ]] && docker_image="${docker_image}:${environment}"
@@ -196,6 +198,8 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
   instance_name="${instance_names_arr[instance_idx]}"
   node_ip=$(gcloud_get_ip "${instance_name}")
 
+  wait_until_node_is_ready "${node_ip}"
+
   if [[ "${reset_metadata}" = "true" ]]; then
     gcloud_remove_instance_metadata "${instance_name}" "hopr-peer-id,hopr-wallet-addr,hopr-staking-addr"
   fi
@@ -226,7 +230,7 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
     # If the instance does not have metadata yet, we set it once
 
     # NOTE: We leave only the first public node unstaked
-    if [[ ${instance_idx} -eq 0 && "${docker_image}" != *-nat:* ]]; then
+    if [[ ${instance_idx} -eq 0 && "${docker_image}" != *-nat:* && "${skip_unstaked}" != "true" ]]; then
       staking_addr="unstaked"
     else
       # Staking accounts are assigned round-robin
@@ -257,7 +261,6 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
   fi
 
   # Fund the node as well
-  wait_until_node_is_ready "${node_ip}"
   fund_if_empty "${api_wallet_addr}" "${environment}"
 done
 
