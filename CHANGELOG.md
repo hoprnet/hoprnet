@@ -40,7 +40,7 @@
   - uses `typescript`
   - command parsing has been overhauled to support more complex commands
   - improved user experience with more consistent messages
-- Manual path selection should not contain duplicate entries
+- Warn when manual path selection contains duplicate adjacent entries
 
 # Breaking changes
 

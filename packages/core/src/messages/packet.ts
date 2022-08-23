@@ -295,10 +295,6 @@ export class Packet {
   }
 
   static async create(msg: Uint8Array, path: PeerId[], privKey: PeerId, db: HoprDB): Promise<Packet> {
-    if (new Set<PeerId>(path).size != path.length) {
-      throw new Error('Path contains duplicate peer ids')
-    }
-
     const isDirectMessage = path.length == 1
     const { alpha, secrets } = generateKeyShares(path)
     const { ackChallenge, ticketChallenge } = createPoRValuesForSender(secrets[0], secrets[1])
