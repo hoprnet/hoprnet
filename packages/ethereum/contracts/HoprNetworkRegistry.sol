@@ -31,6 +31,8 @@ contract HoprNetworkRegistry is Ownable {
   mapping(string => address) public nodePeerIdToAccount; // mapping the hopr node peer id in bytes to account
   bool public enabled;
 
+  error InvalidPeerId(string peerId);
+
   event EnabledNetworkRegistry(bool indexed isEnabled); // Global toggle of the network registry
   event RequirementUpdated(address indexed requirementImplementation); // Emit when the network registry proxy is updated
   event Registered(address indexed account, string hoprPeerId); // Emit when an account register a node peer id for itself
@@ -102,25 +104,23 @@ contract HoprNetworkRegistry is Ownable {
    * @param hoprPeerIds Array of hopr nodes id. e.g. [16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x1]
    */
   function selfRegister(string[] calldata hoprPeerIds) external mustBeEnabled {
+    // update the counter
+    countRegisterdNodesPerAccount[msg.sender] += hoprPeerIds.length;
+
+    // check sender eligibility
+    require(_checkEligibility(msg.sender), 'HoprNetworkRegistry: Reaching limit, cannot register requested nodes.');
+
     for (uint256 i = 0; i < hoprPeerIds.length; i++) {
       string memory hoprPeerId = hoprPeerIds[i];
-      require(
-        bytes(hoprPeerId).length == 53 && bytes32(bytes(hoprPeerIds[i])[0:8]) == '16Uiu2HA',
-        'HoprNetworkRegistry: HOPR node peer id must be valid'
-      );
+      if (bytes(hoprPeerId).length != 53 && bytes32(bytes(hoprPeerIds[i])[0:8]) != '16Uiu2HA') {
+        revert InvalidPeerId({peerId: hoprPeerId});
+      }
       // get account associated with the given hopr node peer id, if any
       address registeredAccount = nodePeerIdToAccount[hoprPeerId];
       // if the hopr node peer id was linked to a different account, revert.
       // To change a nodes' linked account, it must be deregistered by the previously linked account
       // first before registering by the new account, to prevent hostile takeover of others' node peer id
       require(registeredAccount == address(0), 'HoprNetworkRegistry: Cannot link a registered node.');
-
-      // update the counter
-      countRegisterdNodesPerAccount[msg.sender] += 1;
-
-      // check sender eligibility
-      require(_checkEligibility(msg.sender), 'HoprNetworkRegistry: Reaching limit, cannot register more nodes.');
-
       nodePeerIdToAccount[hoprPeerId] = msg.sender;
       emit EligibilityUpdated(msg.sender, true);
     }
