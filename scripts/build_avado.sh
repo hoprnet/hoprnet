@@ -47,6 +47,8 @@ if [[ "${1}" == "-h" ]] || [[ "${1}" == "--help" ]]; then
   exit 0
 fi
 
+msg "Building Avado for ${environment_id} with default provider ${provider_url}"
+
 declare AVADO_VERSION="${1}"
 
 if ! [[ $AVADO_VERSION =~ [0-9]{1,}\.[0-9]{1,}\.[0-9]{1,}$ ]]; then
@@ -86,8 +88,8 @@ cp ./build/Dockerfile ./build/Dockerfile.bak
 trap cleanup SIGINT SIGTERM ERR EXIT
 
 # Write AVADO docker build version & used provider
-sed -e "s/image:[ ]'hopr\.avado\.dnp\.dappnode\.eth:[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}/image: 'hopr.avado.dnp.dappnode.eth:${AVADO_VERSION}/ ;\
- s/HOPRD_ENVIRONMENT=.+/HOPRD_ENVIRONMENT=${environment_id}/ ; s|HOPRD_PROVIDER=.+|HOPRD_PROVIDER=${provider_url}|" ./docker-compose.yml \
+sed -E "s/image:[ ]'hopr\.avado\.dnp\.dappnode\.eth:[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}/image: 'hopr.avado.dnp.dappnode.eth:${AVADO_VERSION}/ ;\
+ s/(.+HOPRD_ENVIRONMENT=).+'(,?)/\1${environment_id}'\2/ ; s|(.+HOPRD_PROVIDER=).+'(,?)|\1${provider_url}'\2|" ./docker-compose.yml \
   > ./docker-compose.yml.tmp && mv ./docker-compose.yml.tmp ./docker-compose.yml
 
 # Copy sections between *_JSON_EXPORT of docker-compose.yaml to dappnode_package.json
