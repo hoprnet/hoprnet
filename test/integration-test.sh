@@ -18,7 +18,7 @@ source "${mydir}/../scripts/api.sh"
 
 usage() {
   msg
-  msg "Usage: $0 <node_api_1> <node_api_2> <node_api_3> <node_api_4> <node_api_5> <node_api_6> <node_api_7> <node_api_8>"
+  msg "Usage: $0 <node_api_1> <node_api_2> <node_api_3> <node_api_4> <node_api_5> <node_api_6> <node_api_7>"
   msg
   msg "Required environment variables"
   msg "------------------------------"
@@ -37,7 +37,6 @@ test -z "${4:-}" && { msg "Missing 4th parameter"; usage; exit 1; }
 test -z "${5:-}" && { msg "Missing 5th parameter"; usage; exit 1; }
 test -z "${6:-}" && { msg "Missing 6th parameter"; usage; exit 1; }
 test -z "${7:-}" && { msg "Missing 7th parameter"; usage; exit 1; }
-test -z "${8:-}" && { msg "Missing 8th parameter"; usage; exit 1; }
 test -z "${HOPRD_API_TOKEN:-}" && { msg "Missing HOPRD_API_TOKEN"; usage; exit 1; }
 
 declare api1="${1}"
@@ -47,7 +46,6 @@ declare api4="${4}"
 declare api5="${5}"
 declare api6="${6}"
 declare api7="${7}"
-declare api8="${8}"
 
 declare api_token=${HOPRD_API_TOKEN}
 declare additional_nodes_addrs="${ADDITIONAL_NODE_ADDRS:-}"
@@ -132,7 +130,7 @@ enable_network_registry() {
   log "Register enabled"
 }
 
-log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5}, ${api6}, ${api7}, ${api8}"
+log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5}, ${api6}, ${api7}"
 
 # Setup is done, so disable hardhat's auto-mining to correctly mimic
 # real blockchain networks
@@ -143,9 +141,8 @@ validate_native_address "${api2}" "${api_token}" &
 validate_native_address "${api3}" "${api_token}" &
 validate_native_address "${api4}" "${api_token}" &
 validate_native_address "${api5}" "${api_token}" &
-# we don't need node6 because it's short-living
+validate_native_address "${api6}" "${api_token}" &
 validate_native_address "${api7}" "${api_token}" &
-validate_native_address "${api8}" "${api_token}" &
 log "ETH addresses exist"
 
 api_validate_node_balance_gt0 "${api1}"
@@ -153,57 +150,52 @@ api_validate_node_balance_gt0 "${api2}"
 api_validate_node_balance_gt0 "${api3}"
 api_validate_node_balance_gt0 "${api4}"
 api_validate_node_balance_gt0 "${api5}"
-# we don't need node6 because it's short-living
+api_validate_node_balance_gt0 "${api6}"
 api_validate_node_balance_gt0 "${api7}"
-api_validate_node_balance_gt0 "${api8}"
 log "Nodes are funded"
 
-declare addr1 addr2 addr3 addr4 addr5 addr7 addr8 result
+declare addr1 addr2 addr3 addr4 addr5 addr6 addr7 result
 addr1="$(get_hopr_address "${api_token}@${api1}")"
 addr2="$(get_hopr_address "${api_token}@${api2}")"
 addr3="$(get_hopr_address "${api_token}@${api3}")"
 addr4="$(get_hopr_address "${api_token}@${api4}")"
 addr5="$(get_hopr_address "${api_token}@${api5}")"
-# we don't need node6 because it's short-living
+addr6="$(get_hopr_address "${api_token}@${api6}")"
 addr7="$(get_hopr_address "${api_token}@${api7}")"
-addr8="$(get_hopr_address "${api_token}@${api8}")"
 
-declare native_addr1 native_addr2 native_addr3 native_addr4 native_addr5 native_addr7 native_addr8
+declare native_addr1 native_addr2 native_addr3 native_addr4 native_addr5 native_addr6 native_addr7
 native_addr1="$(get_native_address "${api_token}@${api1}")"
 native_addr2="$(get_native_address "${api_token}@${api2}")"
 native_addr3="$(get_native_address "${api_token}@${api3}")"
 native_addr4="$(get_native_address "${api_token}@${api4}")"
 native_addr5="$(get_native_address "${api_token}@${api5}")"
-# we don't need node6 because it's short-living
+native_addr6="$(get_native_address "${api_token}@${api6}")"
 native_addr7="$(get_native_address "${api_token}@${api7}")"
-native_addr8="$(get_native_address "${api_token}@${api8}")"
 
-declare hopr_addr1 hopr_addr2 hopr_addr3 hopr_addr4 hopr_addr5 hopr_addr7 hopr_addr8
+declare hopr_addr1 hopr_addr2 hopr_addr3 hopr_addr4 hopr_addr5 hopr_addr6 hopr_addr7
 hopr_addr1="$(get_hopr_address "${api_token}@${api1}")"
 hopr_addr2="$(get_hopr_address "${api_token}@${api2}")"
 hopr_addr3="$(get_hopr_address "${api_token}@${api3}")"
 hopr_addr4="$(get_hopr_address "${api_token}@${api4}")"
 hopr_addr5="$(get_hopr_address "${api_token}@${api5}")"
-# we don't need node6 because it's short-living
+hopr_addr6="$(get_hopr_address "${api_token}@${api6}")"
 hopr_addr7="$(get_hopr_address "${api_token}@${api7}")"
-hopr_addr8="$(get_hopr_address "${api_token}@${api8}")"
 
 log "hopr addr1: ${addr1} ${native_addr1} ${hopr_addr1}"
 log "hopr addr2: ${addr2} ${native_addr2} ${hopr_addr2}"
 log "hopr addr3: ${addr3} ${native_addr3} ${hopr_addr3}"
 log "hopr addr4: ${addr4} ${native_addr4} ${hopr_addr4}"
 log "hopr addr5: ${addr5} ${native_addr5} ${hopr_addr5}"
-# we don't need node6 because it's short-living
+log "hopr addr6: ${addr6} ${native_addr6} ${hopr_addr6}"
 log "hopr addr7: ${addr7} ${native_addr7} ${hopr_addr7}"
-log "hopr addr8: ${addr8} ${native_addr8} ${hopr_addr8}"
 
 # enable network registry
 enable_network_registry
 
-declare native_addrs_to_register="$native_addr1,$native_addr2,$native_addr3,$native_addr4,$native_addr5,$native_addr7"
-declare native_peerids_to_register="$hopr_addr1,$hopr_addr2,$hopr_addr3,$hopr_addr4,$hopr_addr5,$hopr_addr7"
+declare native_addrs_to_register="$native_addr1,$native_addr2,$native_addr3,$native_addr4,$native_addr5,$native_addr6"
+declare native_peerids_to_register="$hopr_addr1,$hopr_addr2,$hopr_addr3,$hopr_addr4,$hopr_addr5,$hopr_addr6"
 
-# add nodes 1,2,3,4,5,7 plus additional nodes in register, do NOT add node 8
+# add nodes 1,2,3,4,5,6 plus additional nodes in register, do NOT add node 7
 log "Adding nodes to register"
 if ! [ -z $additional_nodes_addrs ] && ! [ -z $additional_nodes_peerids ]; then
   native_addrs_to_register+=",${additional_nodes_addrs}"
@@ -273,19 +265,19 @@ result=$(api_ping "${api2}" ${addr3} "\"latency\":")
 log "-- ${result}"
 
 log "Node 7 should not be able to talk to Node 1 (different environment id)"
-result=$(api_ping "${api7}" ${addr1} "TIMEOUT")
+result=$(api_ping "${api6}" ${addr1} "TIMEOUT")
 log "-- ${result}"
 
 log "Node 1 should not be able to talk to Node 7 (different environment id)"
 result=$(api_ping "${api1}" ${addr7} "TIMEOUT")
 log "-- ${result}"
 
-# log "Node 8 should not be able to talk to Node 1 (Node 8 is not in the register)"
-# result=$(ping "${api8}" ${addr1} "TIMEOUT")
+# log "Node 7 should not be able to talk to Node 1 (Node 7 is not in the register)"
+# result=$(ping "${api7}" ${addr1} "TIMEOUT")
 # log "-- ${result}"
 
-# log "Node 1 should not be able to talk to Node 8 (Node 8 is not in the register)"
-# result=$(ping "${api1}" ${addr8} "TIMEOUT")
+# log "Node 1 should not be able to talk to Node 7 (Node 7 is not in the register)"
+# result=$(ping "${api1}" ${addr7} "TIMEOUT")
 # log "-- ${result}"
 
 log "Node 2 has no unredeemed ticket value"

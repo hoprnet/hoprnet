@@ -29,8 +29,6 @@ import { getIdentity } from './identity.js'
 import { register as registerUnhandled, setLogger } from 'trace-unhandled'
 import { decodeMessage } from './api/utils.js'
 
-import runCommand, { isSupported as isSupportedCommand } from './run.js'
-
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
 export type DefaultEnvironment = {
@@ -147,11 +145,6 @@ const argv = yargsInstance
     string: true,
     describe: 'The path to the identity file [env: HOPRD_IDENTITY]',
     default: DEFAULT_ID_PATH
-  })
-  .option('run', {
-    string: true,
-    describe: 'Run a single hopr command, same syntax as in hopr-admin [env: HOPRD_RUN]',
-    default: ''
   })
   .option('dryRun', {
     boolean: true,
@@ -477,37 +470,6 @@ async function main() {
 
       logs.logStatus('READY')
       logs.log('Node has started!')
-
-      // Run a single command and then exit.
-      if (argv.run && argv.run !== '') {
-        // We support multiple semicolon separated commands
-        const toRun: string[] = argv.run.split(';').map((cmd: string) =>
-          // Remove obsolete ' and "
-          cmd.replace(/"/g, '')
-        )
-
-        let shouldExit = false
-
-        for (let cmd of toRun) {
-          console.error('$', cmd)
-          if (!isSupportedCommand(cmd)) {
-            throw new Error(`Unsupported command: "${cmd}"`)
-          }
-
-          const [cmdShouldExit, output] = await runCommand(node, cmd as any)
-          logs.log(JSON.stringify(output, null, 2))
-          shouldExit = cmdShouldExit ? cmdShouldExit : shouldExit
-        }
-
-        // only exit if at least on commands set this to true
-        if (!shouldExit) return
-
-        // Wait for actions to take place
-        setTimeout(1e3)
-        await node.stop()
-        process.exit()
-        return
-      }
     })
 
     // 2.a - Setup connector listener to bubble up to node. Emit connector creation.
