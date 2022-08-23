@@ -695,7 +695,8 @@ describe('entry node functionality - dht functionality', function () {
         publicNodes
       },
       {
-        minRelaysPerNode: 1
+        minRelaysPerNode: 1,
+        contactTimeout: CUSTOM_DHT_RENEWAL_TIMEOUT / 2
       }
     )
 
