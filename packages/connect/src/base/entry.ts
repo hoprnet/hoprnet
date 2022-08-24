@@ -64,30 +64,37 @@ type ConnResult = ProtocolStream & {
 type Grouped = [id: string, results: (ConnectionResult | Error | undefined)[]]
 
 /**
- * Sort results ascending in latency
+ * Compare function to sort EntryNodeData ascending in latency
  */
 function latencyCompare(a: EntryNodeData, b: EntryNodeData) {
   return a.latency - b.latency
 }
 
-function connectionResultToNumber(res: ConnectionResult | undefined | Error) {
+enum ResultClass {
+  AVAILABLE = 0,
+  TIMEOUT = 1,
+  ERROR = 2,
+  UNCHECKED = 3
+}
+
+function connectionResultToNumber(res: ConnectionResult | undefined | Error): ResultClass {
   if (res == undefined) {
-    return 3
+    return ResultClass.UNCHECKED
   }
 
   if (res instanceof Error) {
-    return 2
+    return ResultClass.ERROR
   }
 
   if (res.entry.latency < 0) {
-    return 1
+    return ResultClass.TIMEOUT
   }
 
-  return 0
+  return ResultClass.AVAILABLE
 }
 
 /**
- * Sort results, such that:
+ * Compare function to sort results, such that:
  *
  * positive latencies, sorted ascending in latency
  * negative latencies (timeout)
@@ -99,19 +106,23 @@ function compareConnectionResults(a: ConnectionResult | undefined | Error, b: Co
   const second = connectionResultToNumber(b)
 
   switch (first) {
-    case 3:
-    case 2:
-    case 1:
+    case ResultClass.UNCHECKED:
+    case ResultClass.ERROR:
+    case ResultClass.TIMEOUT:
       return first - second
-    case 0:
+    case ResultClass.AVAILABLE:
       switch (second) {
-        case 3:
-        case 2:
-        case 1:
+        case ResultClass.UNCHECKED:
+        case ResultClass.ERROR:
+        case ResultClass.TIMEOUT:
           return first - second
-        case 0:
+        case ResultClass.AVAILABLE:
           return (a as ConnectionResult).entry.latency - (b as ConnectionResult).entry.latency
+        default:
+          throw Error(`Invalid result class. Got ${second}`)
       }
+    default:
+      throw Error(`Invalid result class. Got ${first}`)
   }
 }
 
@@ -120,7 +131,7 @@ function compareConnectionResults(a: ConnectionResult | undefined | Error, b: Co
  * @param ma addr to check
  * @returns true if given Multiaddr can be used as entry node
  */
-function isUsableRelay(ma: Multiaddr) {
+function isUsableRelay(ma: Multiaddr): boolean {
   const tuples = ma.tuples() as [code: number, addr: Uint8Array][]
 
   return (
@@ -138,7 +149,7 @@ function isUsableRelay(ma: Multiaddr) {
 function groupConnectionResults(
   args: [id: PeerId, ma: Multiaddr, timeout: number][],
   results: (ConnectionResult | Error | undefined)[]
-) {
+): Grouped[] {
   const grouped: { [index: string]: (ConnectionResult | Error | undefined)[] } = {}
 
   for (const [index, result] of results.entries()) {
@@ -159,7 +170,7 @@ function groupConnectionResults(
   return result
 }
 
-function printGroupedConnectionResults(prefix: string = '', grouped: Grouped[]): string {
+function printGroupedConnectionResults(grouped: Grouped[], prefix: string = ''): string {
   let out = `${prefix}\n`
 
   for (const [id, results] of grouped) {
@@ -183,7 +194,7 @@ function printGroupedConnectionResults(prefix: string = '', grouped: Grouped[]):
   return out
 }
 
-function printListOfUsedRelays(prefix: string = '', relays: UsedRelay[]): string {
+function printListOfUsedRelays(relays: UsedRelay[], prefix: string = ''): string {
   let out = `${prefix}\n`
 
   for (const relay of relays) {
@@ -386,8 +397,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
           log(
             printGroupedConnectionResults(
-              `Connection result to entry nodes at entry node disconnect`,
-              groupConnectionResults(addrToContact, results)
+              groupConnectionResults(addrToContact, results),
+              `Connection result to entry nodes at entry node disconnect`
             )
           )
 
@@ -423,7 +434,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
           log(
             `Number of connected entry nodes (${this.usedRelays.length}) has fallen below threshold of ${this.minRelaysPerNode}, rebuilding list of entry nodes`
           )
-          this.updatePublicNodes()
+          await this.updatePublicNodes()
         } else {
           this.updateUsedRelays([[peer.toString(), [undefined]]])
           // Publish a new DHT entry
@@ -462,7 +473,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
         await nAtATime(this._connectToRelay as EntryNodes['connectToRelay'], work, this.maxParallelDials)
       )
 
-      log(printGroupedConnectionResults(`Connection results to entry nodes at DHT renewal:`, results))
+      log(printGroupedConnectionResults(results, `Connection results to entry nodes at DHT renewal:`))
 
       this.updateUsedRelays(results)
 
@@ -808,7 +819,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       )
     )
 
-    log(printGroupedConnectionResults(`Connection results after contacting entry nodes`, results))
+    log(printGroupedConnectionResults(results, `Connection results after contacting entry nodes`))
 
     this.updateRecords(results)
 
@@ -818,17 +829,17 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       } ms.`
     )
 
-    const previous = new Set<string>(this.getUsedRelayPeerIds().map((p: PeerId) => p.toString()))
+    const previouslyUsedRelays = new Set<string>(this.getUsedRelayPeerIds().map((p: PeerId) => p.toString()))
 
     this.rebuildUsedRelays(results)
 
     let isDifferent = false
 
-    if (this.usedRelays.length != previous.size) {
+    if (this.usedRelays.length != previouslyUsedRelays.size) {
       isDifferent = true
     } else {
-      for (const usedRelayPeerId of this.getUsedRelayPeerIds()) {
-        if (!previous.has(usedRelayPeerId.toString())) {
+      for (const previouslyUsedRelay of this.getUsedRelayPeerIds()) {
+        if (!previouslyUsedRelays.has(previouslyUsedRelay.toString())) {
           isDifferent = true
           break
         }
@@ -838,7 +849,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     // Only emit events and debug log if something has changed.
     // This reduces debug log noise.
     if (isDifferent) {
-      log(printListOfUsedRelays(`Updated list of entry nodes:`, this.usedRelays))
+      log(printListOfUsedRelays(this.usedRelays, `Updated list of entry nodes:`))
 
       this.emit(RELAY_CHANGED_EVENT)
     }
