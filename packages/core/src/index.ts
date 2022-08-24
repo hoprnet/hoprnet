@@ -998,7 +998,7 @@ class Hopr extends EventEmitter {
   /**
    * Open a payment channel
    *
-   * @param counterparty the counter party's peerId
+   * @param counterparty the counterparty's peerId
    * @param amountToFund the amount to fund in HOPR(wei)
    */
   public async openChannel(
@@ -1008,6 +1008,10 @@ class Hopr extends EventEmitter {
     channelId: Hash
     receipt: string
   }> {
+    if (this.id.equals(counterparty)) {
+      throw Error('Cannot open channel to self!')
+    }
+
     const counterpartyPubKey = PublicKey.fromPeerId(counterparty)
     const myAvailableTokens = await this.connector.getBalance(true)
 
