@@ -33,7 +33,7 @@ import TransactionManager, { type TransactionPayload } from './transaction-manag
 import { debug } from '@hoprnet/hopr-utils'
 import { TX_CONFIRMATION_WAIT } from './constants.js'
 import type { Block } from '@ethersproject/abstract-provider'
-import { Deployment } from 'hardhat-deploy/dist/types.js'
+import type { Deployment } from 'hardhat-deploy/dist/types.js'
 
 const log = debug('hopr:core-ethereum:ethereum')
 const abiCoder = new utils.AbiCoder()
