@@ -90,10 +90,23 @@ fund_if_empty() {
 
   local faucet_address
   faucet_address=$(funding_wallet_info "${environment}" "address")
+  if [[ ! ${faucet_address} =~  ^0x[a-fA-F0-9]{40}$ ]]; then
+    log "Failed to retrieve funding wallet address: ${faucet_address}"
+    exit 1
+  fi;
 
   local faucet_native_balance faucet_hopr_balance
   faucet_native_balance=$(funding_wallet_info "${environment}" "native")
+  if [[ ! ${faucet_native_balance} =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+    log "Failed to retrieve funding wallet native balance: ${faucet_native_balance}"
+    exit 1
+  fi;
+
   faucet_hopr_balance=$(funding_wallet_info "${environment}" "hopr")
+  if [[ ! ${faucet_hopr_balance} =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+    log "Failed to retrieve funding wallet token balance: ${faucet_hopr_balance}"
+    exit 1
+  fi;
 
   if [ "${faucet_native_balance}" = '0.0' ]; then
     log "Wallet ${faucet_address} has zero balance and cannot fund node ${address}"
