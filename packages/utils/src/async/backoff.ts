@@ -37,7 +37,7 @@ export function getBackoffRetries(minDelay: number, maxDelay: number, delayMulti
 }
 
 /**
- * Returns the *total* amount of time between calling `retryWithBackoff` and
+ * Returns the *total* amount of time between calling `retryWithBackThenThrow` and
  * once it throws because it ran out of retries.
  *
  * @param minDelay initial delay
@@ -47,6 +47,11 @@ export function getBackoffRetries(minDelay: number, maxDelay: number, delayMulti
  */
 export function getBackoffRetryTimeout(minDelay: number, maxDelay: number, delayMultiple: number) {
   const retries = getBackoffRetries(minDelay, maxDelay, delayMultiple) - 1
+
+  if (retries < 0) {
+    // `retryWithBackThenThrow` throws after first invocation
+    return 0
+  }
 
   if (delayMultiple == 1) {
     throw Error(`boom`)
@@ -65,7 +70,11 @@ export function getBackoffRetryTimeout(minDelay: number, maxDelay: number, delay
 }
 
 /**
- * A general use backoff that will reject once MAX_DELAY is reached.
+ * A general-use exponential backoff that will throw once
+ * iteratively increased timeout reaches MAX_DELAY.
+ *
+ * @dev this function THROWS if retries were not successful
+ *
  * @param fn asynchronous function to run on every tick
  * @param options.minDelay minimum delay, we start with this
  * @param options.maxDelay maximum delay, we reject once we reach this
