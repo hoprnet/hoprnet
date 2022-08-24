@@ -829,17 +829,17 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       } ms.`
     )
 
-    const previous = new Set<string>(this.getUsedRelayPeerIds().map((p: PeerId) => p.toString()))
+    const previouslyUsedRelays = new Set<string>(this.getUsedRelayPeerIds().map((p: PeerId) => p.toString()))
 
     this.rebuildUsedRelays(results)
 
     let isDifferent = false
 
-    if (this.usedRelays.length != previous.size) {
+    if (this.usedRelays.length != previouslyUsedRelays.size) {
       isDifferent = true
     } else {
-      for (const usedRelayPeerId of this.getUsedRelayPeerIds()) {
-        if (!previous.has(usedRelayPeerId.toString())) {
+      for (const previouslyUsedRelay of this.getUsedRelayPeerIds()) {
+        if (!previouslyUsedRelays.has(previouslyUsedRelay.toString())) {
           isDifferent = true
           break
         }
