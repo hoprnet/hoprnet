@@ -29,7 +29,7 @@ import {
   retimer,
   u8aEquals,
   tryExistingConnections,
-  retryWithBackoff
+  retryWithBackoffThenThrow
 } from '@hoprnet/hopr-utils'
 import { attemptClose, relayFromRelayAddress } from '../utils/index.js'
 import { compareDirectConnectionInfo } from '../utils/index.js'
@@ -183,7 +183,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       if (u8aEquals(tuples[2][1], relayTuples[2][1])) {
         let attempt = 0
 
-        retryWithBackoff(
+        retryWithBackoffThenThrow(
           async () => {
             attempt++
             const result = await this.connectToRelay(peer, usedRelay.relayDirectAddress, ENTRY_NODE_CONTACT_TIMEOUT)
