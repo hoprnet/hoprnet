@@ -2007,7 +2007,7 @@ ___
 
 ### nAtATime
 
-▸ **nAtATime**<`ArgType`, `Return`, `Args`\>(`fn`, `args`, `concurrency`): `Promise`<(`Return` \| `Error`)[]\>
+▸ **nAtATime**<`ArgType`, `Return`, `Args`\>(`fn`, `args`, `concurrency`, `done?`): `Promise`<(`Return` \| `Error`)[]\>
 
 Runs the same worker function with multiple arguments but does not run more
 than a given number of workers concurrently.
@@ -2036,6 +2036,7 @@ const result = await nAtaTime(setTimeout, [[300, 'one'], [200, 'two'], [100, 'th
 | `fn` | (...`args`: `Args`) => `Promise`<`Return`\> | worker function |
 | `args` | `Args`[] | arguments passed to worker function |
 | `concurrency` | `number` | number of parallel jobs |
+| `done?` | (`results`: (`Error` \| `Return`)[]) => `boolean` | - |
 
 #### Returns
 
