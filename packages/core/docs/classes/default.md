@@ -1173,7 +1173,7 @@ Open a payment channel
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `counterparty` | `PeerId` | the counter party's peerId |
+| `counterparty` | `PeerId` | the counterparty's peerId |
 | `amountToFund` | `BN` | the amount to fund in HOPR(wei) |
 
 #### Returns
