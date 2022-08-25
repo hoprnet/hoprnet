@@ -38,7 +38,7 @@
   },
   "devDependencies": {
     "@defi-wonderland/smock": "^2.0.7",
-    "@ethersproject/wallet": "5.5.0",
+    "@ethersproject/wallet": "5.7.0",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "@multiformats/multiaddr": "10.3.3",
     "@nomiclabs/hardhat-ethers": "2.0.5",

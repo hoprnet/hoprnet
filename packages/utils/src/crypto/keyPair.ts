@@ -49,15 +49,6 @@ export async function serializeKeyPair(
   // not include the Ethereum address
   delete decoded.address
 
-  // Following the Ethereum specification,
-  // the crypto property in keystore is lowercase
-  Object.assign(decoded, {
-    crypto: decoded.Crypto
-  })
-
-  // Removing property to follow Ethereum standard
-  delete decoded.Crypto
-
   return new TextEncoder().encode(JSON.stringify(decoded))
 }
 
