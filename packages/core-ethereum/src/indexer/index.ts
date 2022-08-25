@@ -17,7 +17,7 @@ import {
   PublicKey,
   Snapshot,
   debug,
-  retryWithBackoff,
+  retryWithBackoffThenThrow,
   Balance,
   ordered,
   u8aToHex,
@@ -48,7 +48,7 @@ const verbose = debug('hopr-core-ethereum:verbose:indexer')
 
 const getSyncPercentage = (start: number, current: number, end: number) =>
   (((current - start) / (end - start)) * 100).toFixed(2)
-const backoffOption: Parameters<typeof retryWithBackoff>[1] = { maxDelay: MAX_TRANSACTION_BACKOFF }
+const backoffOption: Parameters<typeof retryWithBackoffThenThrow>[1] = { maxDelay: MAX_TRANSACTION_BACKOFF }
 
 /**
  * Indexes HoprChannels smart contract and stores to the DB,
@@ -394,7 +394,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       ) {
         log(chalk.blue('code error falls here', this.chain.getAllQueuingTransactionRequests().length))
         // allow the indexer to restart even there is no transaction in queue
-        await retryWithBackoff(
+        await retryWithBackoffThenThrow(
           () =>
             Promise.allSettled([
               ...this.chain.getAllQueuingTransactionRequests().map((request) => {
@@ -411,7 +411,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
           backoffOption
         )
       } else {
-        await retryWithBackoff(() => this.restart(), backoffOption)
+        await retryWithBackoffThenThrow(() => this.restart(), backoffOption)
       }
     } catch (err) {
       log(`error: exception while processing another provider error ${error}`, err)
