@@ -9,7 +9,7 @@ chai.use(smock.matchers)
 
 const hoprAddress = (i: number) => `16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x${i}`
 
-const createFakeRegistryContract = async (participants: string[]) => {
+const createFakeRegistryProxyContract = async (participants: string[]) => {
   const hoprNetworkRegistryRequirementFake = await smock.fake([
     {
       inputs: [
@@ -19,12 +19,12 @@ const createFakeRegistryContract = async (participants: string[]) => {
           type: 'address'
         }
       ],
-      name: 'isRequirementFulfilled',
+      name: 'maxAllowedRegistrations',
       outputs: [
         {
-          internalType: 'bool',
-          name: '',
-          type: 'bool'
+          internalType: 'uint256',
+          name: 'account',
+          type: 'uint256'
         }
       ],
       stateMutability: 'view',
@@ -32,13 +32,18 @@ const createFakeRegistryContract = async (participants: string[]) => {
     }
   ])
 
-  participants.slice(0, 3).forEach((participant) => {
-    // account 0, 1, 2 return true
-    hoprNetworkRegistryRequirementFake.isRequirementFulfilled.whenCalledWith(participant).returns(true)
+  participants.slice(0, 2).forEach((participant) => {
+    // account 0, 1 return max uint256
+    // DEV NFT like
+    hoprNetworkRegistryRequirementFake.maxAllowedRegistrations.whenCalledWith(participant).returns(constants.MaxUint256)
   })
-  participants.slice(3, 6).forEach((participant) => {
-    // account 3, 4, 5 return false
-    hoprNetworkRegistryRequirementFake.isRequirementFulfilled.whenCalledWith(participant).returns(false)
+  participants.slice(2, 4).forEach((participant) => {
+    // account 2, 3 return 1
+    hoprNetworkRegistryRequirementFake.maxAllowedRegistrations.whenCalledWith(participant).returns(1)
+  })
+  participants.slice(4, 6).forEach((participant) => {
+    // account 4, 5 return 0
+    hoprNetworkRegistryRequirementFake.maxAllowedRegistrations.whenCalledWith(participant).returns(0)
   })
   return hoprNetworkRegistryRequirementFake
 }
@@ -51,7 +56,7 @@ const useFixtures = deployments.createFixture(async (_hre) => {
   const participantAddresses = await Promise.all(participants.map((h) => h.getAddress()))
 
   // mock staking contract
-  const registryFake = await createFakeRegistryContract(participantAddresses)
+  const registryFake = await createFakeRegistryProxyContract(participantAddresses)
 
   // deploy network registry
   const hoprNetworkRegistry = (await (
@@ -124,43 +129,52 @@ describe('HoprNetworkRegistry', () => {
       ;({ owner, participants, participantAddresses, registryFake, hoprNetworkRegistry } = await useFixtures())
     })
     it('can self-register when the requirement is fulfilled and emits true', async () => {
-      const participantIndex = 1
+      // account 0 registers hoprAddress[0] and hoprAddress[1]
+      const participantIndex = 0
       await expect(
-        hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister(hoprAddress(participantIndex))
+        hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister([hoprAddress(participantIndex), hoprAddress(participantIndex + 1)])
       )
         .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
         .withArgs(participantAddresses[participantIndex], true)
         .to.emit(hoprNetworkRegistry, 'Registered')
         .withArgs(participantAddresses[participantIndex], hoprAddress(participantIndex))
+        .to.emit(hoprNetworkRegistry, 'Registered')
+        .withArgs(participantAddresses[participantIndex], hoprAddress(participantIndex+1))
     })
-    it('can self-register when the requirement is not fulfilled, but emits nothing', async () => {
-      const participantIndex = 3
-      const tx = await hoprNetworkRegistry
-        .connect(participants[participantIndex])
-        .selfRegister(hoprAddress(participantIndex))
-      expect(tx.value.toString()).to.be.equal('0')
-    })
-    it('fail to register when hopr node address is empty', async () => {
-      await expect(hoprNetworkRegistry.connect(participants[0]).selfRegister('')).to.be.revertedWith(
-        'HoprNetworkRegistry: HOPR node peer id must be valid'
+    it('cannot self-register when trying to register more than the limit', async () => {
+      // account 2 fail to register hoprAddress[2] and hoprAddress[3]
+      const participantIndex = 2
+      await expect(hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister([hoprAddress(participantIndex), hoprAddress(participantIndex + 1)])).to.be.revertedWith(
+        'HoprNetworkRegistry: selfRegister reaches limit, cannot register requested nodes.'
       )
     })
+    it('cannot self-register when the requirement is not fulfilled', async () => {
+      const participantIndex = 4
+      await expect(hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister([hoprAddress(participantIndex)])).to.be.revertedWith(
+        'HoprNetworkRegistry: selfRegister reaches limit, cannot register requested nodes.'
+      )
+    })
+    it('fail to register when hopr node address is empty', async () => {
+      await expect(hoprNetworkRegistry.connect(participants[0]).selfRegister(['']))
+        .to.be.revertedWithCustomError(hoprNetworkRegistry,'InvalidPeerId')
+        .withArgs("")
+    })
     it('fail to register when hopr node address of wrong length', async () => {
-      await expect(hoprNetworkRegistry.connect(participants[0]).selfRegister('16Uiu2HA')).to.be.revertedWith(
+      await expect(hoprNetworkRegistry.connect(participants[0]).selfRegister(['16Uiu2HA'])).to.be.rejectedWith(
         'HoprNetworkRegistry: HOPR node peer id must be valid'
       )
     })
     it('fail to register when hopr node address is of the right length but with wrong prefix', async () => {
       await expect(
-        hoprNetworkRegistry.connect(participants[0]).selfRegister(`0x${hoprAddress(5).slice(2)}`)
-      ).to.be.revertedWith('HoprNetworkRegistry: HOPR node peer id must be valid')
+        hoprNetworkRegistry.connect(participants[0]).selfRegister([`0x${hoprAddress(5).slice(2)}`])
+      ).to.be.rejectedWith('HoprNetworkRegistry: HOPR node peer id must be valid')
     })
     it('fail to when array length does not match', async () => {
       await expect(
         hoprNetworkRegistry
           .connect(owner)
           .ownerRegister([participantAddresses[5], participantAddresses[6]], [hoprAddress(5)])
-      ).to.be.revertedWith('HoprNetworkRegistry: hoprPeerIdes and accounts lengths mismatch')
+      ).to.be.rejectedWith('HoprNetworkRegistry: hoprPeerIdes and accounts lengths mismatch')
     })
     it('can register by the owner', async () => {
       await expect(
@@ -185,12 +199,13 @@ describe('HoprNetworkRegistry', () => {
         .withArgs(participantAddresses[5], false)
     })
   })
+
   describe('Register contract for multiple times by one', () => {
     const participantIndex = 1
     beforeEach(async () => {
       ;({ owner, participants, participantAddresses, registryFake, hoprNetworkRegistry } = await useFixtures())
       // participant successfully registered itself
-      hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister(hoprAddress(participantIndex))
+      hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister([hoprAddress(participantIndex)])
     })
     it('fails to deregister an non-registered account', async () => {
       await expect(hoprNetworkRegistry.connect(participants[participantIndex + 1]).selfDeregister()).to.be.revertedWith(

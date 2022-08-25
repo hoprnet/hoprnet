@@ -108,7 +108,11 @@ contract HoprNetworkRegistry is Ownable {
     countRegisterdNodesPerAccount[msg.sender] += hoprPeerIds.length;
 
     // check sender eligibility
-    require(_checkEligibility(msg.sender), 'HoprNetworkRegistry: Reaching limit, cannot register requested nodes.');
+    require(
+      _checkEligibility(msg.sender),
+      'HoprNetworkRegistry: selfRegister reaches limit, cannot register requested nodes.'
+    );
+    emit EligibilityUpdated(msg.sender, true);
 
     for (uint256 i = 0; i < hoprPeerIds.length; i++) {
       string memory hoprPeerId = hoprPeerIds[i];
@@ -122,7 +126,7 @@ contract HoprNetworkRegistry is Ownable {
       // first before registering by the new account, to prevent hostile takeover of others' node peer id
       require(registeredAccount == address(0), 'HoprNetworkRegistry: Cannot link a registered node.');
       nodePeerIdToAccount[hoprPeerId] = msg.sender;
-      emit EligibilityUpdated(msg.sender, true);
+      emit Registered(msg.sender, hoprPeerId);
     }
   }
 
@@ -136,6 +140,17 @@ contract HoprNetworkRegistry is Ownable {
    * @param hoprPeerIds Array of hopr nodes id. e.g. [16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x1]
    */
   function selfDeregister(string[] calldata hoprPeerIds) external mustBeEnabled {
+    // update the counter
+    countRegisterdNodesPerAccount[msg.sender] -= hoprPeerIds.length;
+
+    // check sender eligibility
+    if (_checkEligibility(msg.sender)) {
+      // account becomes eligible
+      emit EligibilityUpdated(msg.sender, true);
+    } else {
+      emit EligibilityUpdated(msg.sender, false);
+    }
+
     for (uint256 i = 0; i < hoprPeerIds.length; i++) {
       string memory hoprPeerId = hoprPeerIds[i];
       require(
@@ -143,7 +158,6 @@ contract HoprNetworkRegistry is Ownable {
         'HoprNetworkRegistry: Cannot delete an entry not associated with the caller.'
       );
       delete nodePeerIdToAccount[hoprPeerId];
-      countRegisterdNodesPerAccount[msg.sender] -= 1;
       emit Deregistered(msg.sender, hoprPeerId);
     }
   }
