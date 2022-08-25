@@ -352,7 +352,10 @@ export class HoprDB {
   }
 
   public async getPendingAcknowledgement(halfKeyChallenge: HalfKeyChallenge): Promise<PendingAckowledgement> {
-    return await this.getCoerced<PendingAckowledgement>(createPendingAcknowledgement(halfKeyChallenge), deserializePendingAcknowledgement)
+    return await this.getCoerced<PendingAckowledgement>(
+      createPendingAcknowledgement(halfKeyChallenge),
+      deserializePendingAcknowledgement
+    )
   }
 
   public async storePendingAcknowledgement(halfKeyChallenge: HalfKeyChallenge, isMessageSender: true): Promise<void>
@@ -516,7 +519,11 @@ export class HoprDB {
   }
 
   async getCurrentTicketIndex(channelId: Hash): Promise<UINT256 | undefined> {
-    return await this.getCoercedOrDefault<UINT256>(createCurrentTicketIndexKey(channelId), UINT256.deserialize, undefined)
+    return await this.getCoercedOrDefault<UINT256>(
+      createCurrentTicketIndexKey(channelId),
+      UINT256.deserialize,
+      undefined
+    )
   }
 
   setCurrentTicketIndex(channelId: Hash, ticketIndex: UINT256): Promise<void> {
@@ -604,7 +611,11 @@ export class HoprDB {
   }
 
   public async getPendingBalanceTo(counterparty: Address): Promise<Balance> {
-    return await this.getCoercedOrDefault<Balance>(createPendingTicketsCountKey(counterparty), Balance.deserialize, Balance.ZERO)
+    return await this.getCoercedOrDefault<Balance>(
+      createPendingTicketsCountKey(counterparty),
+      Balance.deserialize,
+      Balance.ZERO
+    )
   }
 
   public async getLosingTicketCount(): Promise<number> {
