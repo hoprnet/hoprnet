@@ -2019,5 +2019,12 @@
     "uploadedTo": {
       "http://80.208.229.228:5001": "Thu, 25 Aug 2022 12:12:34 GMT"
     }
+  },
+  "1.89.10": {
+    "hash": "/ipfs/QmPMgRLznC8GrMdKvPgPCQxRpo9RHDvzmt7RcnKNmTLL3p",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Thu, 25 Aug 2022 12:41:09 GMT"
+    }
   }
 }
