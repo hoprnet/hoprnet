@@ -31,7 +31,9 @@ import {
   retimer,
   u8aEquals,
   tryExistingConnections,
-  retryWithBackoff
+  retryWithBackoff,
+  durations,
+  defer
 } from '@hoprnet/hopr-utils'
 import { attemptClose, relayFromRelayAddress } from '../utils/index.js'
 
@@ -170,6 +172,13 @@ function groupConnectionResults(
   return result
 }
 
+/**
+ * Renders connection results to a string
+ *
+ * @param grouped grouped and sorted connection results
+ * @param prefix string to print before listing the results
+ * @returns string to log
+ */
 function printGroupedConnectionResults(grouped: Grouped[], prefix: string = ''): string {
   let out = `${prefix}\n`
 
@@ -194,6 +203,13 @@ function printGroupedConnectionResults(grouped: Grouped[], prefix: string = ''):
   return out
 }
 
+/**
+ * Renders currently used relays to a string
+ *
+ * @param relays used relays
+ * @param prefix string to print before listing the results
+ * @returns
+ */
 function printListOfUsedRelays(relays: UsedRelay[], prefix: string = ''): string {
   let out = `${prefix}\n`
 
@@ -215,6 +231,22 @@ type UsedRelay = {
 // Emitted whenever list of relays changed
 export const RELAY_CHANGED_EVENT = 'relay:changed'
 
+/**\
+ * Manages known entry nodes and provides a list of those
+ * that are currently used as relays.
+ *
+ * ┌───────────────────────┐     ┌─ ┌─────────┐
+ * │ usedRelays            ├─────┤  │unchecked│
+ * │                       │     │  └─────────┘
+ * │<= MAX_RELAYS_PER_NODE │     │
+ * │                       │     │  ┌─────────┐
+ * │>= MIN_RELAYS_PER_NODE │     │  │available│
+ * │                       │     │  └─────────┘
+ * └───────────────────────┘     │
+ *                               │  ┌─────────┐
+ *                               │  │offline  │
+ *                               └─ └─────────┘
+ */
 export class EntryNodes extends EventEmitter implements Initializable, Startable {
   // Nodes with good availability
   protected availableEntryNodes: EntryNodeData[]
@@ -223,13 +255,20 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
   // Nodes that have been offline in the past
   protected offlineEntryNodes: PeerStoreType[]
 
+  // Threshold of entry nodes to connect to
   private maxRelaysPerNode: number
-  private maxParallelDials: number
-  private contactTimeout: number
-  private dhtRenewalTimeout: number
+  // Lower bound once node will try to rebuild list
   private minRelaysPerNode: number
+  // How many calls to do in parallel
+  private maxParallelDials: number
+  // Timeout once node is considered offline
+  private contactTimeout: number
+  // The DHT comes with an auto-clean mechanism that evicts old entries.
+  // To keep the entry, the node needs to renew it
+  private dhtRenewalInterval: number
 
   private stopDHTRenewal: (() => void) | undefined
+  private stopReconnectAttempts: (() => void) | undefined
 
   protected usedRelays: UsedRelay[]
 
@@ -240,7 +279,9 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
   private _onNewRelay: ((peer: PeerStoreType) => void) | undefined
   private _onRemoveRelay: ((peer: PeerId) => void) | undefined
   private _connectToRelay: EntryNodes['connectToRelay'] | undefined
-  public _onEntryNodeDisconnect: EntryNodes['onEntryDisconnect'] | undefined
+  private _onEntryNodeDisconnect: EntryNodes['onEntryDisconnect'] | undefined
+
+  private addToUpdateQueue: ReturnType<typeof oneAtATime>
 
   constructor(
     private dialDirectly: HoprConnect['dialDirectly'],
@@ -258,15 +299,18 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     this.minRelaysPerNode = overwrites?.minRelaysPerNode ?? MIN_RELAYS_PER_NODE
     this.contactTimeout = overwrites?.contactTimeout ?? ENTRY_NODE_CONTACT_TIMEOUT
     this.maxParallelDials = overwrites?.maxParallelDials ?? ENTRY_NODES_MAX_PARALLEL_DIALS
-    this.dhtRenewalTimeout = options.dhtRenewalTimeout ?? DEFAULT_DHT_ENTRY_RENEWAL
+    this.dhtRenewalInterval = options.dhtRenewalTimeout ?? DEFAULT_DHT_ENTRY_RENEWAL
 
     if (this.minRelaysPerNode > this.maxRelaysPerNode) {
       throw Error(`Invalid configuration. minRelaysPerNode must be smaller or equal to maxRelaysPerNode`)
     }
 
-    if (this.contactTimeout >= this.dhtRenewalTimeout) {
+    if (this.contactTimeout >= this.dhtRenewalInterval) {
       throw Error(`Invalid configuration. contactTimeout must be strictly smaller than dhtRenewalTimeout`)
     }
+
+    // FIFO-Queue that manages all connect and reconnect attempts
+    this.addToUpdateQueue = oneAtATime()
 
     this._isStarted = false
     this.availableEntryNodes = []
@@ -289,15 +333,14 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     this._onEntryNodeDisconnect = this.onEntryDisconnect.bind(this)
 
     if (this.options.publicNodes != undefined) {
-      const limiter = oneAtATime()
       this._onNewRelay = (peer: PeerStoreType) => {
-        limiter(async () => {
+        this.addToUpdateQueue(async () => {
           log(`peer online`, peer.id.toString())
           await this.onNewRelay(peer)
         })
       }
       this._onRemoveRelay = (peer: PeerId) => {
-        limiter(async () => {
+        this.addToUpdateQueue(async () => {
           log(`peer offline`, peer.toString())
           await this.onRemoveRelay(peer)
         })
@@ -325,6 +368,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       this.options.publicNodes.removeListener('removePublicNode', this._onRemoveRelay)
     }
 
+    this.stopReconnectAttempts?.()
     this.stopDHTRenewal?.()
     this._isStarted = false
   }
@@ -378,7 +422,10 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     const peer = peerIdFromBytes(tuples[2][1].slice(1))
 
     log(`Disconnected from entry node ${peer.toString()}, trying to reconnect ...`)
+    this.addToUpdateQueue(() => this.reconnectToEntryNode(peer))
+  }
 
+  private async reconnectToEntryNode(peer: PeerId) {
     const addrToContact = (
       this.someNode(peer, (addrs: EntryNodeData | PeerStoreType) => addrs.multiaddrs) as Multiaddr[]
     ).map<[id: PeerId, ma: Multiaddr, timeout: number]>((entry) => [peer, entry, this.contactTimeout])
@@ -444,51 +491,90 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     }
   }
 
+  private async renewDHTEntries() {
+    const work: Parameters<EntryNodes['connectToRelay']>[] = []
+    log(`Renewing DHT entry for selected entry nodes`)
+
+    for (const relay of this.getUsedRelayPeerIds()) {
+      const relayEntry = this.someNode(relay, (addrs: PeerStoreType) => addrs.multiaddrs)
+
+      if (relayEntry == undefined) {
+        log(`Relay ${relay.toString()} has been removed from list of available entry nodes. Not renewing this entry`)
+        // this.updateUsedRelays([[relay.toString(), [undefined]]])
+        continue
+      }
+
+      const addrsToContact = this.someNode(relay, (addrs) => addrs.multiaddrs, true) as Multiaddr[]
+
+      for (const ma of addrsToContact) {
+        work.push([relay, ma, this.contactTimeout])
+      }
+    }
+
+    const results = groupConnectionResults(
+      work,
+      await nAtATime(this._connectToRelay as EntryNodes['connectToRelay'], work, this.maxParallelDials)
+    )
+
+    log(printGroupedConnectionResults(results, `Connection results to entry nodes at DHT renewal:`))
+
+    this.updateUsedRelays(results)
+
+    if (this.usedRelays.length < this.minRelaysPerNode) {
+      log(
+        `Renewing DHT entry has shown that number of connected entry nodes has fallen below threshold of ${this.minRelaysPerNode} nodes, reconnecting to entry nodes`
+      )
+      // full rebuild
+      await this.updatePublicNodes()
+    }
+  }
+
   /**
    * Start the interval in which the entry in the DHT gets renewed.
    */
   private startDHTRenewInterval() {
-    const renewDHTEntries = async function (this: EntryNodes) {
-      const work: Parameters<EntryNodes['connectToRelay']>[] = []
-      log(`Renewing DHT entry for selected entry nodes`)
-
-      for (const relay of this.getUsedRelayPeerIds()) {
-        const relayEntry = this.someNode(relay, (addrs: PeerStoreType) => addrs.multiaddrs)
-
-        if (relayEntry == undefined) {
-          log(`Relay ${relay.toString()} has been removed from list of available entry nodes. Not renewing this entry`)
-          // this.updateUsedRelays([[relay.toString(), [undefined]]])
-          continue
-        }
-
-        const addrsToContact = this.someNode(relay, (addrs) => addrs.multiaddrs, true) as Multiaddr[]
-
-        for (const ma of addrsToContact) {
-          work.push([relay, ma, this.contactTimeout])
-        }
-      }
-
-      const results = groupConnectionResults(
-        work,
-        await nAtATime(this._connectToRelay as EntryNodes['connectToRelay'], work, this.maxParallelDials)
-      )
-
-      log(printGroupedConnectionResults(results, `Connection results to entry nodes at DHT renewal:`))
-
-      this.updateUsedRelays(results)
-
-      if (this.usedRelays.length < this.minRelaysPerNode) {
-        log(
-          `Renewing DHT entry has shown that number of connected entry nodes has fallen below threshold of ${this.minRelaysPerNode} nodes, reconnecting to entry nodes`
-        )
-        // full rebuild
-        this.updatePublicNodes()
-      }
-    }.bind(this)
-
-    this.stopDHTRenewal = retimer(renewDHTEntries, () => this.dhtRenewalTimeout)
+    this.stopDHTRenewal = retimer(
+      () => {
+        const entriesRenewed = defer<void>()
+        this.addToUpdateQueue(async () => {
+          await this.renewDHTEntries()
+          entriesRenewed.resolve()
+        })
+        // Don't do a renew before the previous attempt
+        // has finished
+        return entriesRenewed.promise
+      },
+      () => this.dhtRenewalInterval
+    )
   }
 
+  private startReconnectAttemptInterval() {
+    let initialDelay = durations.minutes(1)
+    this.stopReconnectAttempts = retimer(
+      () => {
+        // if (!isEligible) {
+        //   // No way to connect
+        //   return
+        // }
+
+        const reconnectAttemptFinished = defer<void>()
+        this.addToUpdateQueue(async () => {
+          await this.updatePublicNodes()
+          reconnectAttemptFinished.resolve()
+        })
+        // Don't issue another attempt before previous
+        // one has finished
+        return reconnectAttemptFinished.promise
+      },
+      () => {
+        // if (!isEligible) {
+        //   return durations.minutes(1)
+        // }
+
+        return (initialDelay *= 1.5)
+      }
+    )
+  }
   /**
    * @returns a list of entry nodes that are currently used (as relay circuit addresses with us)
    */
@@ -564,6 +650,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       },
       false
     )
+
     if (!knownPeer) {
       this.uncheckedEntryNodes.push({
         id: peer.id,
@@ -844,6 +931,16 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
           break
         }
       }
+    }
+
+    // If we haven't been able to find an entry to which we can connct,
+    // start an interval to try again until we find some entry nodes to
+    // connect to.
+    // Once we got at least one entry node, stop the interval
+    if (this.stopReconnectAttempts == undefined && (this.usedRelays == undefined || this.usedRelays.length == 0)) {
+      this.startReconnectAttemptInterval()
+    } else {
+      this.stopReconnectAttempts?.()
     }
 
     // Only emit events and debug log if something has changed.
