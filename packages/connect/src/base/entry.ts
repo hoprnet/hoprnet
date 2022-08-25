@@ -279,7 +279,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
   private _onNewRelay: ((peer: PeerStoreType) => void) | undefined
   private _onRemoveRelay: ((peer: PeerId) => void) | undefined
   private _connectToRelay: EntryNodes['connectToRelay'] | undefined
-  private _onEntryNodeDisconnect: EntryNodes['onEntryDisconnect'] | undefined
+  public _onEntryNodeDisconnect: EntryNodes['onEntryDisconnect'] | undefined
 
   private addToUpdateQueue: ReturnType<typeof oneAtATime>
 
@@ -549,13 +549,21 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
   }
 
   private startReconnectAttemptInterval() {
+    let allowed = false
     let initialDelay = durations.minutes(1)
     this.stopReconnectAttempts = retimer(
-      () => {
-        // if (!isEligible) {
-        //   // No way to connect
-        //   return
-        // }
+      async () => {
+        console.log(`allowed`, allowed, this.options.isAllowedToAccessNetwork)
+        if (
+          !allowed &&
+          this.options.isAllowedToAccessNetwork != undefined &&
+          (await this.options.isAllowedToAccessNetwork(this.getComponents().getPeerId()))
+        ) {
+          log(`Node has not been registered and thus not allowed to access network.`)
+          return
+        } else {
+          allowed = true
+        }
 
         const reconnectAttemptFinished = defer<void>()
         this.addToUpdateQueue(async () => {
@@ -564,12 +572,12 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
         })
         // Don't issue another attempt before previous
         // one has finished
-        return reconnectAttemptFinished.promise
+        await reconnectAttemptFinished.promise
       },
       () => {
-        // if (!isEligible) {
-        //   return durations.minutes(1)
-        // }
+        if (!allowed) {
+          return durations.minutes(1)
+        }
 
         return (initialDelay *= 1.5)
       }
@@ -986,8 +994,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
         onDisconnect
       })
     } catch (err: any) {
-      error(`error while contacting entry node ${destination.toString()}.`, err.message)
-      await attemptClose(conn, error)
+      error(`error while contacting entry node ${destination.toString()}.`, err?.message)
+      attemptClose(conn, error)
       return
     }
 
