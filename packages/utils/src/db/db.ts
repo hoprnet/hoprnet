@@ -430,7 +430,11 @@ export class HoprDB {
 
     // only update count if there has been a change
     if (tickets.length > 0) {
-      batch.put(Buffer.from(this.keyOf(NEGLECTED_TICKET_COUNT)), Uint8Array.of(neglectedTicketsCount + tickets.length))
+      batch.put(
+        Buffer.from(this.keyOf(NEGLECTED_TICKET_COUNT)),
+        // store updated number in 4 bytes
+        Buffer.from(toU8a(neglectedTicketsCount + tickets.length, 4))
+      )
     }
 
     await batch.write()
