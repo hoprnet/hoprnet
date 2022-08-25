@@ -57,7 +57,7 @@ funding_wallet_info() {
   local secret="${FAUCET_SECRET_API_KEY}"
 
   curl -L --silent \
-    --header 'x-api-key: ${secret}' \
+    --header "x-api-key: ${secret}" \
     "$API_ENDPOINT/api/faucet/$environment/info?text=$token"
 }
 
@@ -71,7 +71,7 @@ wallet_balance() {
   local secret="${FAUCET_SECRET_API_KEY}"
 
   curl -L --silent \
-    --header 'x-api-key: ${secret}' \
+    --header "x-api-key: ${secret}" \
     "$API_ENDPOINT/api/balance/$environment/$address/$token?text=true"
 }
 
@@ -87,7 +87,7 @@ faucet_to_address() {
   curl -L --silent --request POST \
     "$API_ENDPOINT/api/faucet/$environment/$address/$token" \
     --header 'Content-Type: application/json' \
-    --header 'x-api-key: ${secret}'
+    --header "x-api-key: ${secret}"
 }
 
 # $1=account (hex)
