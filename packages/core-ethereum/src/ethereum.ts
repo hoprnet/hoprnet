@@ -10,7 +10,13 @@ import {
   type ContractTransaction,
   type BaseContract
 } from 'ethers'
-import { getContractData, type HoprToken, type HoprChannels, type HoprNetworkRegistry } from '@hoprnet/hopr-ethereum'
+import {
+  getContractData,
+  type HoprToken,
+  type HoprChannels,
+  type HoprNetworkRegistry,
+  ContractData
+} from '@hoprnet/hopr-ethereum'
 import {
   Address,
   Balance,
@@ -27,6 +33,7 @@ import TransactionManager, { type TransactionPayload } from './transaction-manag
 import { debug } from '@hoprnet/hopr-utils'
 import { TX_CONFIRMATION_WAIT } from './constants.js'
 import type { Block } from '@ethersproject/abstract-provider'
+import type { Deployment } from 'hardhat-deploy/dist/types.js'
 
 const log = debug('hopr:core-ethereum:ethereum')
 const abiCoder = new utils.AbiCoder()
@@ -94,7 +101,25 @@ export async function createChainWrapper(
     provider
   ) as HoprNetworkRegistry
 
-  const genesisBlock = parseInt(hoprChannelsDeployment.blockNumber)
+  //getGenesisBlock, taking the earlier deployment block between the channel and network Registery
+  let channelDeployBlockNumber: any
+  if (Object.keys(hoprChannelsDeployment).some((key) => key === 'receipt')) {
+    // For newly deployed files, where `receipt` exists
+    channelDeployBlockNumber = (hoprChannelsDeployment as Deployment).receipt.blockNumber
+  } else {
+    // For legacy deployment files, it's possible that the deployment file has been overwritten during the `slimDeploy` and thus no `receipt`
+    channelDeployBlockNumber = (hoprChannelsDeployment as ContractData).blockNumber
+  }
+
+  let networkRegistryDeployBlockNumber: any
+  if (Object.keys(hoprNetworkRegistryDeployment).some((key) => key === 'receipt')) {
+    networkRegistryDeployBlockNumber = (hoprNetworkRegistryDeployment as Deployment).receipt.blockNumber
+  } else {
+    networkRegistryDeployBlockNumber = (hoprNetworkRegistryDeployment as ContractData).blockNumber
+  }
+
+  const genesisBlock = Math.min(parseInt(channelDeployBlockNumber), parseInt(networkRegistryDeployBlockNumber))
+
   const channelClosureSecs = await channels.secsClosure()
 
   const transactions = new TransactionManager()

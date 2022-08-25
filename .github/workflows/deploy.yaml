@@ -85,6 +85,7 @@ jobs:
         env:
           DEPLOYER_WALLET_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
           ETHERSCAN_KEY: ${{ secrets.ETHERSCAN }}
+          BLOCKSCOUT_KEY: ${{ secrets.BLOCKSCOUT }}
 
       - name: '[SMART-CONTRACTS] Commit & push changes'
         if: ${{ !env.ACT }}
