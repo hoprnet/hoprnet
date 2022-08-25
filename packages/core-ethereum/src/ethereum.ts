@@ -80,19 +80,19 @@ export async function createChainWrapper(
     'HoprNetworkRegistry'
   )
 
-  const token = new ethers.Contract(hoprTokenDeployment.address, hoprTokenDeployment.abi, provider) as HoprToken
+  const token = new ethers.Contract(hoprTokenDeployment.address, hoprTokenDeployment.abi, provider) as any as HoprToken
 
   const channels = new ethers.Contract(
     hoprChannelsDeployment.address,
     hoprChannelsDeployment.abi,
     provider
-  ) as HoprChannels
+  ) as any as  HoprChannels
 
   const networkRegistry = new ethers.Contract(
     hoprNetworkRegistryDeployment.address,
     hoprNetworkRegistryDeployment.abi,
     provider
-  ) as HoprNetworkRegistry
+  ) as any as HoprNetworkRegistry
 
   const genesisBlock = parseInt(hoprChannelsDeployment.blockNumber)
   const channelClosureSecs = await channels.secsClosure()
@@ -267,6 +267,7 @@ export async function createChainWrapper(
       log('Transaction with nonce %d failed to getFeeData', nonce, error)
       // TODO: find an API for fee data per environment
       feeData = {
+        lastBaseFeePerGas: null,
         maxFeePerGas: defaultMaxFeePerGas,
         maxPriorityFeePerGas: defaultMaxPriorityFeePerGas,
         gasPrice: null

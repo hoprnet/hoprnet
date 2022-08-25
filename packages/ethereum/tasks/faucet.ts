@@ -166,7 +166,7 @@ async function main(
     process.exit(1)
   }
 
-  const hoprToken = (await ethers.getContractFactory('HoprToken')).attach(hoprTokenAddress)
+  const hoprToken = (await ethers.getContractAt('HoprToken', hoprTokenAddress))
 
   // we use a custom ethers provider here instead of the ethers object from the
   // hre which is managed by hardhat-ethers, because that one seems to

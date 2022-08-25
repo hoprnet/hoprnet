@@ -9,6 +9,8 @@ import type {
 } from 'hardhat/types'
 // load env variables
 require('dotenv').config()
+// adds Ethereum-specific capabilities to the Chai assertion library
+import '@nomicfoundation/hardhat-chai-matchers'
 // load hardhat plugins
 import '@nomiclabs/hardhat-ethers'
 import '@nomiclabs/hardhat-solhint'
