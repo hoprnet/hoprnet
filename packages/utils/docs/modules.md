@@ -398,7 +398,7 @@ ___
 
 #### Defined in
 
-[db/db.ts:115](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L115)
+[db/db.ts:116](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L116)
 
 ___
 
@@ -442,7 +442,7 @@ ___
 
 #### Defined in
 
-[db/db.ts:110](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L110)
+[db/db.ts:111](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L111)
 
 ___
 
@@ -458,7 +458,7 @@ ___
 
 #### Defined in
 
-[db/db.ts:106](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L106)
+[db/db.ts:107](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L107)
 
 ___
 

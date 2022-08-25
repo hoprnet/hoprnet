@@ -22,6 +22,7 @@
 - [del](HoprDB.md#del)
 - [delAcknowledgedTicket](HoprDB.md#delacknowledgedticket)
 - [deleteAcknowledgedTicketsFromChannel](HoprDB.md#deleteacknowledgedticketsfromchannel)
+- [dumpDatabase](HoprDB.md#dumpdatabase)
 - [findHoprNodeUsingAccountInNetworkRegistry](HoprDB.md#findhoprnodeusingaccountinnetworkregistry)
 - [get](HoprDB.md#get)
 - [getAccount](HoprDB.md#getaccount)
@@ -109,7 +110,7 @@
 
 #### Defined in
 
-[db/db.ts:140](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L140)
+[db/db.ts:141](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L141)
 
 ## Methods
 
@@ -247,6 +248,22 @@ ___
 #### Returns
 
 `Promise`<`void`\>
+
+___
+
+### dumpDatabase
+
+▸ **dumpDatabase**(`destFile`): `void`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `destFile` | `string` |
+
+#### Returns
+
+`void`
 
 ___
 
