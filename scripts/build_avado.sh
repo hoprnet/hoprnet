@@ -99,6 +99,10 @@ sed -n '/BEGIN_JSON_EXPORT/,/END_JSON_EXPORT/{//!p}' ./docker-compose.yml \
   | jq -s ".[0].image += .[1] | .[0] | .version = \"${AVADO_VERSION}\"" ./dappnode_package.json /dev/stdin \
   > ./dappnode_package.json.tmp && mv ./dappnode_package.json.tmp ./dappnode_package.json
 
+# Replace API token in the json manifest
+declare api_token=$(sed -rn "s/.+HOPRD_API_TOKEN=(.+)',/\1/p" ./docker-compose.yml)
+sed -E "s/%TOKEN%/${api_token}/" ./dappnode_package.json  > ./dappnode_package.json.tmp && mv ./dappnode_package.json.tmp ./dappnode_package.json
+
 # Overwrite default environment in Dockerfile with the one currently used
 sed -e "s/${default_development_environment}/${environment_id}/" ./build/Dockerfile \
   > ./build/Dockerfile.tmp && mv ./build/Dockerfile.tmp ./build/Dockerfile
