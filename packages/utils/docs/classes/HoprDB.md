@@ -110,7 +110,7 @@
 
 #### Defined in
 
-[db/db.ts:141](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L141)
+[db/db.ts:144](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L144)
 
 ## Methods
 
@@ -221,13 +221,13 @@ ___
 
 ▸ **delAcknowledgedTicket**(`ack`): `Promise`<`void`\>
 
-Delete acknowledged ticket in database
+Deletes an acknowledged ticket in database
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `ack` | [`AcknowledgedTicket`](AcknowledgedTicket.md) |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `ack` | [`AcknowledgedTicket`](AcknowledgedTicket.md) | acknowledged ticket |
 
 #### Returns
 
@@ -239,11 +239,14 @@ ___
 
 ▸ **deleteAcknowledgedTicketsFromChannel**(`channel`): `Promise`<`void`\>
 
+Deletes all acknowledged tickets in a channel and updates
+neglected tickets counter.
+
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `channel` | [`ChannelEntry`](ChannelEntry.md) |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `channel` | [`ChannelEntry`](ChannelEntry.md) | in which channel to delete tickets |
 
 #### Returns
 
@@ -881,13 +884,13 @@ ___
 
 ▸ **isNetworkRegistryEnabled**(): `Promise`<`boolean`\>
 
-Hopr Network Registry
+Check ifs Network registry is enabled
 
 #### Returns
 
 `Promise`<`boolean`\>
 
-true if register is enabled
+true if register is enabled or if key is not preset in the dababase
 
 ___
 
