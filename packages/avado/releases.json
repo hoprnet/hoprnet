@@ -2012,5 +2012,12 @@
     "uploadedTo": {
       "http://80.208.229.228:5001": "Wed, 24 Aug 2022 14:10:17 GMT"
     }
+  },
+  "1.89.9": {
+    "hash": "/ipfs/QmeWLYZHg5cuugnBfsNk4FqyMjMmPeWna5oRFsk7idArxa",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Thu, 25 Aug 2022 12:12:34 GMT"
+    }
   }
 }
