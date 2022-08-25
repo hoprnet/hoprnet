@@ -54,6 +54,7 @@ get_rpc() {
 funding_wallet_info() {
   local environment="${1}"
   local token="${2}"
+  local secret="${FAUCET_SECRET_API_KEY}"
 
   curl -L --silent \
     --header 'x-api-key: ${secret}' \
@@ -67,6 +68,7 @@ wallet_balance() {
   local environment="${1}"
   local address="${2}"
   local token="${3}"
+  local secret="${FAUCET_SECRET_API_KEY}"
 
   curl -L --silent \
     --header 'x-api-key: ${secret}' \
