@@ -497,7 +497,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
         onDisconnect
       })
     } catch (err: any) {
-      error(`error while contacting entry node ${destination.toString()}.`, err.message)
+      error(`error while contacting entry node ${destination.toString()}.`, err?.message)
       await attemptClose(conn, error)
     }
 
