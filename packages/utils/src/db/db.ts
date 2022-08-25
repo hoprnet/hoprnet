@@ -46,6 +46,9 @@ const NETWORK_REGISTRY_ADDRESS_PUBLIC_KEY_PREFIX: Uint8Array = encoder.encode('n
 
 const NETWORK_REGISTRY_ENABLED_PREFIX: Uint8Array = encoder.encode('networkRegistry:enabled')
 
+// Max value 2**32 - 1
+const DEFAULT_SERIALIZED_NUMBER_LENGTH = 4
+
 function createChannelKey(channelId: Hash): Uint8Array {
   return Uint8Array.from([...CHANNEL_PREFIX, ...channelId.serialize()])
 }
@@ -170,7 +173,7 @@ export class HoprDB {
           await mkdir(dbPath, { recursive: true })
           setEnvironment = true
         } else {
-          throw new Error('Database does not exist: ' + dbPath)
+          throw new Error(`Database does not exist: ${dbPath}`)
         }
       }
     }
@@ -308,7 +311,8 @@ export class HoprDB {
 
   private async increment(key: Uint8Array): Promise<number> {
     let val = await this.getCoercedOrDefault<number>(key, u8aToNumber, 0)
-    await this.put(key, Uint8Array.of(val + 1))
+    // Always store using 4 bytes, max value 2**32 - 1
+    await this.put(key, toU8a(val + 1, DEFAULT_SERIALIZED_NUMBER_LENGTH))
     return val + 1
   }
 
@@ -417,6 +421,11 @@ export class HoprDB {
     )
   }
 
+  /**
+   * Deletes all acknowledged tickets in a channel and updates
+   * neglected tickets counter.
+   * @param channel in which channel to delete tickets
+   */
   public async deleteAcknowledgedTicketsFromChannel(channel: ChannelEntry): Promise<void> {
     const tickets = await this.getAcknowledgedTickets({ signer: channel.source })
 
@@ -441,8 +450,8 @@ export class HoprDB {
   }
 
   /**
-   * Delete acknowledged ticket in database
-   * @param index Uint8Array
+   * Deletes an acknowledged ticket in database
+   * @param ack acknowledged ticket
    */
   public async delAcknowledgedTicket(ack: AcknowledgedTicket): Promise<void> {
     await this.del(createAcknowledgedTicketKey(ack.ticket.challenge, ack.ticket.channelEpoch))
@@ -461,7 +470,6 @@ export class HoprDB {
 
   /**
    * Get tickets, both unacknowledged and acknowledged
-   * @param node
    * @param filter optionally filter by signer
    * @returns an array of signed tickets
    */
@@ -856,8 +864,8 @@ export class HoprDB {
   }
 
   /**
-   * Hopr Network Registry
-   * @returns true if register is enabled
+   * Check ifs Network registry is enabled
+   * @returns true if register is enabled or if key is not preset in the dababase
    */
   public async isNetworkRegistryEnabled(): Promise<boolean> {
     return this.getCoercedOrDefault<boolean>(NETWORK_REGISTRY_ENABLED_PREFIX, (v) => Boolean(v[0]), true)
