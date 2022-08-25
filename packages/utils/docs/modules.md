@@ -70,6 +70,7 @@
 - [A\_STRICLY\_LESS\_THAN\_B](modules.md#a_stricly_less_than_b)
 - [A\_STRICTLY\_GREATER\_THAN\_B](modules.md#a_strictly_greater_than_b)
 - [CARRIER\_GRADE\_NAT\_NETWORK](modules.md#carrier_grade_nat_network)
+- [DEFAULT\_BACKOFF\_PARAMETERS](modules.md#default_backoff_parameters)
 - [HASH\_LENGTH](modules.md#hash_length)
 - [INVERSE\_TICKET\_WIN\_PROB](modules.md#inverse_ticket_win_prob)
 - [LENGTH\_PREFIX\_LENGTH](modules.md#length_prefix_length)
@@ -135,6 +136,8 @@
 - [generateChannelId](modules.md#generatechannelid)
 - [generateKeyShares](modules.md#generatekeyshares)
 - [getB58String](modules.md#getb58string)
+- [getBackoffRetries](modules.md#getbackoffretries)
+- [getBackoffRetryTimeout](modules.md#getbackoffretrytimeout)
 - [getHeaderLength](modules.md#getheaderlength)
 - [getLocalAddresses](modules.md#getlocaladdresses)
 - [getLocalHosts](modules.md#getlocalhosts)
@@ -179,7 +182,7 @@
 - [randomSubset](modules.md#randomsubset)
 - [recoverIteratedHash](modules.md#recoveriteratedhash)
 - [retimer](modules.md#retimer)
-- [retryWithBackoff](modules.md#retrywithbackoff)
+- [retryWithBackoffThenThrow](modules.md#retrywithbackoffthenthrow)
 - [sampleGroupElement](modules.md#samplegroupelement)
 - [serializeKeyPair](modules.md#serializekeypair)
 - [serializeToU8a](modules.md#serializetou8a)
@@ -561,6 +564,24 @@ ___
 #### Defined in
 
 [network/constants.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L27)
+
+___
+
+### DEFAULT\_BACKOFF\_PARAMETERS
+
+• `Const` **DEFAULT\_BACKOFF\_PARAMETERS**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `delayMultiple` | `number` |
+| `maxDelay` | `number` |
+| `minDelay` | `number` |
+
+#### Defined in
+
+[async/backoff.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/backoff.ts#L9)
 
 ___
 
@@ -1516,6 +1537,47 @@ Returns the b58String within a given content. Returns empty string if none is fo
 
 ___
 
+### getBackoffRetries
+
+▸ **getBackoffRetries**(`minDelay`, `maxDelay`, `delayMultiple`): `number`
+
+Returns the maximal number of retries after which the `retryWithBackoff` throws
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `minDelay` | `number` | initial delay |
+| `maxDelay` | `number` | maximal delay to retry |
+| `delayMultiple` | `number` | factor by which last delay got multiplied |
+
+#### Returns
+
+`number`
+
+___
+
+### getBackoffRetryTimeout
+
+▸ **getBackoffRetryTimeout**(`minDelay`, `maxDelay`, `delayMultiple`): `number`
+
+Returns the *total* amount of time between calling `retryWithBackThenThrow` and
+once it throws because it ran out of retries.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `minDelay` | `number` | initial delay |
+| `maxDelay` | `number` | maximal delay to retry |
+| `delayMultiple` | `number` | factor by which last delay got multiplied |
+
+#### Returns
+
+`number`
+
+___
+
 ### getHeaderLength
 
 ▸ **getHeaderLength**(`maxHops`, `additionalDataRelayerLength`, `additionalDataLastHopLength`): `number`
@@ -2458,11 +2520,14 @@ Repeatedly apply a function after a timeout
 
 ___
 
-### retryWithBackoff
+### retryWithBackoffThenThrow
 
-▸ **retryWithBackoff**<`T`\>(`fn`, `options?`): `Promise`<`T`\>
+▸ **retryWithBackoffThenThrow**<`T`\>(`fn`, `options?`): `Promise`<`T`\>
 
-A general use backoff that will reject once MAX_DELAY is reached.
+A general-use exponential backoff that will throw once
+iteratively increased timeout reaches MAX_DELAY.
+
+**`dev`** this function THROWS if retries were not successful
 
 #### Type parameters
 
@@ -2472,13 +2537,13 @@ A general use backoff that will reject once MAX_DELAY is reached.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `fn` | () => `Promise`<`T`\> | asynchronous function to run on every tick |
-| `options` | `Object` | - |
-| `options.delayMultiple?` | `number` | multiplier to apply to increase running delay |
-| `options.maxDelay?` | `number` | maximum delay, we reject once we reach this |
-| `options.minDelay?` | `number` | minimum delay, we start with this |
+| Name | Type | Default value | Description |
+| :------ | :------ | :------ | :------ |
+| `fn` | () => `Promise`<`T`\> | `undefined` | asynchronous function to run on every tick |
+| `options` | `Object` | `DEFAULT_BACKOFF_PARAMETERS` | - |
+| `options.delayMultiple?` | `number` | `undefined` | multiplier to apply to increase running delay |
+| `options.maxDelay?` | `number` | `undefined` | maximum delay, we reject once we reach this |
+| `options.minDelay?` | `number` | `undefined` | minimum delay, we start with this |
 
 #### Returns
 
