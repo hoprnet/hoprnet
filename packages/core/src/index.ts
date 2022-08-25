@@ -449,7 +449,9 @@ class Hopr extends EventEmitter {
       } catch (err) {
         // @TODO what to do here? E.g. delete channel from db?
         error(
-          `Couldn't set commitment in channel to ${c.destination.toPeerId().toString()} (channelId ${c.getId().toHex()})`
+          `Couldn't set commitment in channel to ${c.destination.toPeerId().toString()} (channelId ${c
+            .getId()
+            .toHex()})`
         )
       }
     }
