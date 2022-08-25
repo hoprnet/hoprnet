@@ -54,7 +54,11 @@ get_rpc() {
 funding_wallet_info() {
   local environment="${1}"
   local token="${2}"
-  curl -L --silent "$API_ENDPOINT/api/faucet/$environment/info?text=$token"
+  local secret="${FAUCET_SECRET_API_KEY}"
+
+  curl -L --silent \
+    --header 'x-api-key: ${secret}' \
+    "$API_ENDPOINT/api/faucet/$environment/info?text=$token"
 }
 
 # $1 = environment
@@ -64,7 +68,11 @@ wallet_balance() {
   local environment="${1}"
   local address="${2}"
   local token="${3}"
-  curl -L --silent "$API_ENDPOINT/api/balance/$environment/$address/$token?text=true"
+  local secret="${FAUCET_SECRET_API_KEY}"
+
+  curl -L --silent \
+    --header 'x-api-key: ${secret}' \
+    "$API_ENDPOINT/api/balance/$environment/$address/$token?text=true"
 }
 
 # $1 = environment
@@ -79,7 +87,7 @@ faucet_to_address() {
   curl -L --silent --request POST \
     "$API_ENDPOINT/api/faucet/$environment/$address/$token" \
     --header 'Content-Type: application/json' \
-    --data-raw "{\"secret\": \"$secret\"}"
+    --header 'x-api-key: ${secret}'
 }
 
 # $1=account (hex)
