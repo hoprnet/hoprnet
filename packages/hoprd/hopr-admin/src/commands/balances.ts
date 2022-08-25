@@ -8,7 +8,7 @@ export default class Balances extends Command {
     super(
       {
         default: [[], 'shows all balances'],
-        onlyOne: [[['hoprOrNative', 'type', false]], 'shows shows one balance']
+        onlyOne: [[['hoprOrNative']], 'shows shows one balance']
       },
       api,
       cache

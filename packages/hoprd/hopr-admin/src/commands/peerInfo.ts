@@ -6,7 +6,7 @@ export default class PeerInfo extends Command {
   constructor(api: API, cache: CacheFunctions) {
     super(
       {
-        default: [[['hoprAddressOrAlias', 'peer', false]], 'gets information about peer']
+        default: [[['hoprAddressOrAlias']], 'gets information about peer']
       },
       api,
       cache,

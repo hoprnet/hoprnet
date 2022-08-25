@@ -5,7 +5,7 @@ export default class Sign extends Command {
   constructor(api: API, cache: CacheFunctions) {
     super(
       {
-        default: [[['string', 'message', false]], '']
+        default: [[['string', 'message']], 'Signs a message']
       },
       api,
       cache

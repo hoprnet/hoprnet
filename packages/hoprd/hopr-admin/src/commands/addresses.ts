@@ -7,7 +7,7 @@ export default class Addresses extends Command {
     super(
       {
         default: [[], 'shows all addresses'],
-        onlyOne: [[['hoprOrNative', 'type', false]], 'shows one address']
+        onlyOne: [[['hoprOrNative']], 'shows one address']
       },
       api,
       cache

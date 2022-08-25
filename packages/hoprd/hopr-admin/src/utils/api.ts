@@ -88,7 +88,7 @@ export default class API {
   }
   public async closeChannel(
     peerId: string,
-    direction: 'incoming' | 'outgoing'
+    direction: ChannelDirection
   ): ExpandedJsonResponse<{
     receipt: string
     channelStatus: string
@@ -199,3 +199,5 @@ export type Addresses = {
   hopr: string
   native: string
 }
+
+export type ChannelDirection = 'incoming' | 'outgoing'

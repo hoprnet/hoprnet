@@ -5,18 +5,9 @@ export default class SendMessage extends Command {
   constructor(api: API, cache: CacheFunctions) {
     super(
       {
-        default: [
-          [
-            ['hoprAddressOrAlias', 'recipient of the message', false],
-            ['string', 'message to send', false]
-          ],
-          'send a message, path is chosen automatically'
-        ],
+        default: [[['hoprAddressOrAlias'], ['string', 'message']], 'send a message, path is chosen automatically'],
         manual: [
-          [
-            ['string', "the path of the message seperated by ',', last one is the receiver", false],
-            ['string', 'message to send', false]
-          ],
+          [['hoprAddressOrAlias'], ['string', "path seperated by ','"], ['string', 'message']],
           'send a message, path is manually specified'
         ]
       },
@@ -38,7 +29,7 @@ export default class SendMessage extends Command {
   ): [valid: boolean, error: string | undefined, path?: { intermediateNodes: string[]; recipient: string }] {
     const peerIdStrings = pathStr.split(',').filter(Boolean)
 
-    const validatePeerIdOrAlias = CMD_PARAMS.hoprAddressOrAlias[1]
+    const validatePeerIdOrAlias = CMD_PARAMS.hoprAddressOrAlias[2]
     const aliases = this.cache.getCachedAliases()
 
     const path: string[] = []
@@ -77,7 +68,13 @@ export default class SendMessage extends Command {
     const settings = await settingsRes.json()
     const addresses = await addressesRes.json()
 
-    log(`Sending message to ${recipient} ..`)
+    if (path && path.length == 0) {
+      log(`Sending message to ${recipient} via ${path.join('->')} ...`)
+    } else if (path && path.length > 0) {
+      log(`Sending direct message to ${recipient} ...`)
+    } else {
+      log(`Sending message to ${recipient} using automatic path finding ...`)
+    }
 
     const payload = settings.includeRecipient ? `${addresses.hopr}:${message}` : message
     const response = await this.api.sendMessage(payload, recipient, path)

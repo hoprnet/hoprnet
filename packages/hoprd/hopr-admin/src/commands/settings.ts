@@ -9,8 +9,8 @@ export default class Settings extends Command {
         view: [[], 'show all settings'],
         update: [
           [
-            ['string', "setting's key", false],
-            ['string', "setting's value", false]
+            ['string', 'key'],
+            ['string', 'value']
           ],
           'update a setting'
         ]

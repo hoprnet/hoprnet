@@ -1,6 +1,6 @@
 import type API from '../utils/api'
 import sinon from 'sinon'
-import { shouldBehaveLikeACommand } from './behaviours.spec'
+// import { shouldBehaveLikeACommand } from './behaviours.spec'
 import Addresses from './addresses'
 
 type GetAddressesResponse = Awaited<ReturnType<API['getAddresses']>>
@@ -30,16 +30,14 @@ describe('test Addresses command', function () {
     ok: false
   } as GetAddressesResponse)
 
-  shouldBehaveLikeACommand(
-    cmdWithApi,
-    cmdWithNoApi,
-    'INVALID',
-    '',
-    [
-      ['', ['HOPR_ADDRESS_MOCK']],
-      ['hopr', ['HOPR_ADDRESS_MOCK']],
-      ['native', ['NATIVE_ADDRESS_MOCK']]
-    ],
-    []
-  )
+  // shouldBehaveLikeACommand(
+  //   cmdWithApi,
+  //   cmdWithNoApi,
+  //   [
+  //     ['', ['HOPR_ADDRESS_MOCK']],
+  //     ['hopr', ['HOPR_ADDRESS_MOCK']],
+  //     ['native', ['NATIVE_ADDRESS_MOCK']]
+  //   ],
+  //   []
+  // )
 })

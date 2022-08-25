@@ -1,5 +1,8 @@
-import assert from 'assert'
+/**
+ * Contains various tests that all commands should pass.
+ */
 import type { Command } from '../utils/command'
+import assert from 'assert'
 
 /**
  * @param cmd command to test
@@ -43,6 +46,14 @@ export function shouldFailExecution(cmd: Command, tests: [query: string, expecte
 
 /**
  * @param cmd command to test
+ * @param query a query to run, must be valid
+ */
+export function shouldFailExecutionOnInvalidQuery(cmd: Command, query: string) {
+  return shouldFailExecution(cmd, [[query, 'Invalid']])
+}
+
+/**
+ * @param cmd command to test
  * @param query an incorrect query to run
  */
 export function shouldFailExecutionOnIncorrectParam(cmd: Command, query: string) {
@@ -55,26 +66,4 @@ export function shouldFailExecutionOnIncorrectParam(cmd: Command, query: string)
  */
 export function shouldFailExecutionOnApiError(cmd: Command, query: string) {
   return shouldFailExecution(cmd, [[query, 'Failed to']])
-}
-
-/**
- * @param cmd command to test with correct API response
- * @param cmdNoApi command to test with incorrect API response
- * @param successTests
- * @param failureTests
- * @param apiErrorQuery
- * @param incorrectParamQuery
- */
-export function shouldBehaveLikeACommand(
-  cmd: Command,
-  cmdNoApi: Command,
-  incorrectParamQuery: string,
-  apiErrorQuery: string,
-  successTests: [query: string, expectedResponses: string[]][],
-  failureTests: [query: string, expectedError: string][]
-) {
-  shouldFailExecutionOnIncorrectParam(cmd, incorrectParamQuery)
-  shouldFailExecutionOnApiError(cmdNoApi, apiErrorQuery)
-  shouldSucceedExecution(cmd, successTests)
-  shouldFailExecution(cmd, failureTests)
 }

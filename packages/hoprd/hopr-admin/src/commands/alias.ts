@@ -8,17 +8,11 @@ export default class Alias extends Command {
     super(
       {
         default: [[], 'show aliases'],
-        setAlias: [
-          [
-            ['hoprAddress', 'PeerId', true],
-            ['string', 'Name', true]
-          ],
-          'set alias'
-        ],
+        setAlias: [[['hoprAddress'], ['string', 'name']], 'set alias'],
         removeAlias: [
           [
-            ['constant', 'remove', false],
-            ['string', 'Name', true]
+            ['constant', 'remove'],
+            ['string', 'name']
           ],
           'remove alias'
         ]

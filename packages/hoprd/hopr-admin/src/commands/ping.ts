@@ -6,7 +6,7 @@ export default class Ping extends Command {
   constructor(api: API, cache: CacheFunctions) {
     super(
       {
-        default: [[['hoprAddressOrAlias', "node's hopr address or alias", false]], '']
+        default: [[['hoprAddressOrAlias']], '']
       },
       api,
       cache

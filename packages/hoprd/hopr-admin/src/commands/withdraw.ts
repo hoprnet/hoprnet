@@ -6,14 +6,7 @@ export default class Withdraw extends Command {
   constructor(api: API, cache: CacheFunctions) {
     super(
       {
-        default: [
-          [
-            ['number', 'amount to withdraw', false],
-            ['hoprOrNative', 'withdraw "HOPR" or "NATIVE"', false],
-            ['nativeAddress', 'recipient', false]
-          ],
-          'withdraw'
-        ]
+        default: [[['number', 'amount'], ['hoprOrNative'], ['nativeAddress']], 'withdraw']
       },
       api,
       cache

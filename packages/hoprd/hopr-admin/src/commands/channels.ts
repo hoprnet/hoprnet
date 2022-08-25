@@ -8,8 +8,8 @@ export default class Channels extends Command {
     super(
       {
         default: [[], 'shows open channels'],
-        incoming: [[['constant', 'show incoming only', false]], 'show incoming channels'],
-        outgoing: [[['constant', 'show outgoing only', false]], 'show outgoing channels']
+        incoming: [[['direction']], 'show incoming channels'],
+        outgoing: [[['direction']], 'show outgoing channels']
       },
       api,
       cache

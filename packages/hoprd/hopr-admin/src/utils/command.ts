@@ -53,10 +53,12 @@ export abstract class Command {
       let use: string[] = ['- usage:']
 
       if (params.length > 0) {
-        for (const [type, name, optional] of params) {
-          // const [paramDesc] = CMD_PARAMS[type]
-          // use.push(`<${name} [${optional ? '?' : ''}${type} (${paramDesc})]>`)
-          use.push(`<${name} [${optional ? '?' : ''}${type}]>`)
+        for (const [type, givenName, optional] of params) {
+          const [defName, defDesc] = CMD_PARAMS[type]
+          const name = givenName || defName // pick given name or default name
+          const desc = defDesc
+
+          use.push(`<${optional ? '?' : ''}${name} (${desc})>`)
         }
       } else {
         use.push('<none>')
@@ -79,8 +81,8 @@ export abstract class Command {
    * @param task what has failed
    * @returns Generic error message when request has failed.
    */
-  protected invalidResponse(task: string): string {
-    return `Failed to ${task}.`
+  protected invalidResponse(task: string, error?: string): string {
+    return `Failed to ${task}${error ? 'with error "' + error : '"'}.`
   }
 
   /**
@@ -114,7 +116,7 @@ export abstract class Command {
       // validate each parameter
       for (let i = 0; i < params.length; i++) {
         const [paramType] = params[i]
-        const [, validate] = CMD_PARAMS[paramType]
+        const [, , validate] = CMD_PARAMS[paramType]
         const queryParam = queryParams[i]
 
         const [valid, parsedValue] = validate(queryParam, { aliases })
@@ -135,21 +137,33 @@ export abstract class Command {
   }
 }
 
-export type CmdParameter = [type: CmdTypes, name: string, optional?: boolean]
-type CmdTypes =
+/**
+ * All possible command types
+ */
+export type CmdTypes =
   | 'hoprAddress'
   | 'nativeAddress'
   | 'hoprAddressOrAlias'
   | 'hoprOrNative'
+  | 'direction'
+  | 'constant'
   | 'number'
   | 'string'
   | 'boolean'
-  | 'constant'
-type CmdArg<I, O, R> = [description: string, validation: (v: I, ops: O) => [valid: boolean, value: R]]
+export type { ChannelDirection } from './api'
+export type HoprOrNative = 'hopr' | 'native'
+
+/**
+ * Used in a Command constructor to specify a command's syntax
+ */
+export type CmdParameter = [type: CmdTypes, name?: string, optional?: boolean]
+
+type CmdArg<I, O, R> = [name: string, description: string, validation: (v: I, ops: O) => [valid: boolean, value: R]]
 
 export const CMD_PARAMS: Record<CmdTypes, CmdArg<any, any, any>> = {
   hoprAddress: [
-    'A HOPR address (PeerId)',
+    'HOPR address',
+    "'16Ui..'",
     (v) => {
       try {
         return [true, peerIdFromString(v)]
@@ -159,13 +173,15 @@ export const CMD_PARAMS: Record<CmdTypes, CmdArg<any, any, any>> = {
     }
   ],
   nativeAddress: [
-    'A native address',
+    'NATIVE address',
+    "'0x..",
     (v) => {
       return [ethersUtils.isAddress(v), v]
     }
   ],
   hoprAddressOrAlias: [
-    'A HOPR address (PeerId) or an alias',
+    'HOPR address or alias',
+    "'16Ui..' or 'alice'",
     (peerIdStrOrAlias, { aliases }) => {
       // is PeerId
       let peerId: PeerId | undefined
@@ -192,33 +208,49 @@ export const CMD_PARAMS: Record<CmdTypes, CmdArg<any, any, any>> = {
     }
   ] as CmdArg<string, { aliases: Record<string, string> }, PeerId>,
   hoprOrNative: [
-    "'HOPR' or 'NATIVE'",
+    'currency',
+    "'hopr' or 'native'",
+    (input) => {
+      if (typeof input !== 'string') return [false, input]
+      const v = input.toLowerCase()
+      return [v === 'hopr' || v === 'native', v]
+    }
+  ],
+  direction: [
+    'direction',
+    "'incoming' or 'outgoing'",
+    (input) => {
+      if (typeof input !== 'string') return [false, input]
+      const v = input.toLowerCase()
+      return [v === 'incoming' || v === 'outgoing', v]
+    }
+  ],
+  constant: [
+    'constant',
+    'A constant value',
     (v) => {
-      return [v === 'HOPR' || v === 'NATIVE', v]
+      return [true, v]
     }
   ],
   number: [
-    'A number',
+    'number',
+    'Any number',
     (v) => {
       return [!isNaN(v), v]
     }
   ],
   string: [
-    'A string',
+    'string',
+    'Any string',
     (v) => {
       return [typeof v === 'string', v]
     }
   ],
   boolean: [
-    'A boolean',
+    'boolean',
+    "Any boolean, 'true' or 'false'",
     (v) => {
       return [v === 'true' || v === 'false', Boolean(v)]
-    }
-  ],
-  constant: [
-    'A constant value',
-    (v) => {
-      return [true, v]
     }
   ]
 }

@@ -8,13 +8,7 @@ export default class OpenChannel extends Command {
   constructor(api: API, cache: CacheFunctions) {
     super(
       {
-        default: [
-          [
-            ['hoprAddressOrAlias', "counterparty's HOPR address", false],
-            ['number', 'Amount of HOPR to fund channel with', false]
-          ],
-          'opens channel'
-        ]
+        default: [[['hoprAddressOrAlias'], ['number', 'Amount of HOPR tokens']], 'opens channel']
       },
       api,
       cache
