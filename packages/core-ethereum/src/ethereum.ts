@@ -104,8 +104,10 @@ export async function createChainWrapper(
   //getGenesisBlock, taking the earlier deployment block between the channel and network Registery
   let channelDeployBlockNumber: any
   if (Object.keys(hoprChannelsDeployment).some((key) => key === 'receipt')) {
+    // For newly deployed files, where `receipt` exists
     channelDeployBlockNumber = (hoprChannelsDeployment as Deployment).receipt.blockNumber
   } else {
+    // For legacy deployment files, it's possible that the deployment file has been overwritten during the `slimDeploy` and thus no `receipt`
     channelDeployBlockNumber = (hoprChannelsDeployment as ContractData).blockNumber
   }
 
