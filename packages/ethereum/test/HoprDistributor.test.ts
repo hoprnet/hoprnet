@@ -1,4 +1,4 @@
-import { expect } from 'chai'
+import chai, { expect } from 'chai'
 import { deployments, ethers } from 'hardhat'
 import { toSolPercent, increaseTime } from './utils'
 import type { HoprToken, HoprDistributor } from '../src/types'
@@ -64,7 +64,7 @@ describe('HoprDistributor', async function () {
 
     it('should fail to update start time', async function () {
       await increaseTime(ethers.provider, minutes(10))
-      await expect(f.distributor.updateStartTime('1')).to.be.rejectedWith('Previous start time must not be reached')
+      await expect(f.distributor.updateStartTime('1')).to.be.revertedWith('Previous start time must not be reached')
     })
   })
 
