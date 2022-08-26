@@ -53,7 +53,8 @@ import stake, { StakeOpts } from './tasks/stake'
 import { MIN_STAKE } from './utils/constants'
 import type { BigNumber } from 'ethers'
 
-const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, HOPR_ENVIRONMENT_ID, HOPR_HARDHAT_TAG } = process.env
+const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, BLOCKSCOUT_KEY, HOPR_ENVIRONMENT_ID, HOPR_HARDHAT_TAG } =
+  process.env
 
 const PROTOCOL_CONFIG = require('../core/protocol-config.json')
 
@@ -196,9 +197,11 @@ const hardhatConfig: HardhatUserConfig = {
     currency: 'USD',
     excludeContracts: ['mocks', 'utils/console.sol']
   },
-  verify: {
-    etherscan: {
-      apiKey: ETHERSCAN_KEY
+  etherscan: {
+    apiKey: {
+      mainnet: ETHERSCAN_KEY,
+      goerli: ETHERSCAN_KEY,
+      xdai: BLOCKSCOUT_KEY
     }
   }
 }

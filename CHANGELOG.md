@@ -40,6 +40,9 @@
   - uses `typescript`
   - command parsing has been overhauled to support more complex commands
   - improved user experience with more consistent messages
+  - Warn when manual path selection contains duplicate adjacent entries
+  - Correctly recognize Avado/Dappnode private subnet ([#4032](https://github.com/hoprnet/hoprnet/pull/4032))
+  - Automate contract verification on Gnosis chain and Goerli testnet.
 
 # Breaking changes
 

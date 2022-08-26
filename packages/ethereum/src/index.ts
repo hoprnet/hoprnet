@@ -1,4 +1,5 @@
 import { join } from 'path'
+import { Deployment } from 'hardhat-deploy/dist/types'
 
 export * from './constants'
 export type {
@@ -36,7 +37,11 @@ export type ContractData = {
   blockNumber: string
 }
 
-export const getContractData = (network: string, environmentId: string, contract: ContractNames): ContractData => {
+export const getContractData = (
+  network: string,
+  environmentId: string,
+  contract: ContractNames
+): Deployment | ContractData => {
   // hack: required for E2E tests to pass
   // when a contract changes we redeploy it, this causes the deployments folder to change
   // unlike normal the release workflow, when running the E2E tests, we build the project

@@ -31,7 +31,7 @@ import {
   retimer,
   u8aEquals,
   tryExistingConnections,
-  retryWithBackoff
+  retryWithBackoffThenThrow
 } from '@hoprnet/hopr-utils'
 import { attemptClose, relayFromRelayAddress } from '../utils/index.js'
 
@@ -386,7 +386,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     let attempt = 0
 
     try {
-      await retryWithBackoff(
+      await retryWithBackoffThenThrow(
         async () => {
           attempt++
           const results = await nAtATime(
@@ -889,7 +889,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
         onDisconnect
       })
     } catch (err: any) {
-      error(`error while contacting entry node ${destination.toString()}.`, err.message)
+      error(`error while contacting entry node ${destination.toString()}.`, err?.message)
       await attemptClose(conn, error)
       return
     }
