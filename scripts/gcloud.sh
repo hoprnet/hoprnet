@@ -235,6 +235,7 @@ gcloud_create_or_update_instance_template() {
       --metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true \
       --maintenance-policy=MIGRATE \
       --tags=hopr-node,web-client,rest-client,portainer,healthcheck \
+      --boot-disk-device-name=boot-disk \
       --boot-disk-size=20GB \
       --boot-disk-type=pd-balanced \
       --image-family=cos-stable \
@@ -252,6 +253,7 @@ gcloud_create_or_update_instance_template() {
       --metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true \
       --maintenance-policy=MIGRATE \
       --tags=hopr-node,web-client,rest-client,portainer,healthcheck \
+      --boot-disk-device-name=boot-disk \
       --boot-disk-size=20GB \
       --boot-disk-type=pd-balanced \
       --image-family=cos-stable \
@@ -308,6 +310,7 @@ gcloud_create_or_update_managed_instance_group() {
       --version=template=${template} \
       --minimal-action=restart \
       --most-disruptive-allowed-action=restart \
+      --replacement-method=recreate \
       ${gcloud_region}
 
     # delete previous template if different
@@ -321,6 +324,7 @@ gcloud_create_or_update_managed_instance_group() {
       --size ${size} \
       --template "${template}" \
       --instance-redistribution-type=NONE \
+      --stateful-disk "device-name=boot-disk,auto-delete=on-permanent-instance-deletion" \
       ${gcloud_region}
   fi
 
