@@ -500,7 +500,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
       if (relayEntry == undefined) {
         log(`Relay ${relay.toString()} has been removed from list of available entry nodes. Not renewing this entry`)
-          // this.updateUsedRelays([[relay.toString(), [undefined]]])
+        // this.updateUsedRelays([[relay.toString(), [undefined]]])
         // this.updateUsedRelays([[relay.toString(), [undefined]]])
         continue
       }
