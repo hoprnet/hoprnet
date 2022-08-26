@@ -556,9 +556,11 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
         if (
           !allowed &&
           this.options.isAllowedToAccessNetwork != undefined &&
-          (await this.options.isAllowedToAccessNetwork(this.getComponents().getPeerId()))
+          !(await this.options.isAllowedToAccessNetwork(this.getComponents().getPeerId()))
         ) {
-          log(`Node has not been registered and thus not allowed to access network.`)
+          log(
+            `Node has not been registered and thus not allowed to access network. Skip trying to connect to entry nodes`
+          )
           return
         } else {
           allowed = true
