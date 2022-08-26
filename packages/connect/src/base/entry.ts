@@ -553,7 +553,6 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     let initialDelay = durations.minutes(1)
     this.stopReconnectAttempts = retimer(
       async () => {
-        console.log(`allowed`, allowed, this.options.isAllowedToAccessNetwork)
         if (
           !allowed &&
           this.options.isAllowedToAccessNetwork != undefined &&
@@ -941,13 +940,15 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       }
     }
 
-    // If we haven't been able to find an entry to which we can connct,
+    // If we haven't been able to find an entry node to which we can connect,
     // start an interval to try again until we find some entry nodes to
-    // connect to.
-    // Once we got at least one entry node, stop the interval
+    // which we can successfully connect to.
     if (this.stopReconnectAttempts == undefined && (this.usedRelays == undefined || this.usedRelays.length == 0)) {
       this.startReconnectAttemptInterval()
-    } else {
+    }
+
+    // Once we got at least one entry node, stop the interval
+    if (this.usedRelays != undefined && this.usedRelays.length > 0) {
       this.stopReconnectAttempts?.()
     }
 
