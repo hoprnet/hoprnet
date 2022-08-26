@@ -54,7 +54,7 @@
 
 #### Defined in
 
-[packages/ethereum/src/index.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L32)
+[packages/ethereum/src/index.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L33)
 
 ___
 
@@ -64,7 +64,7 @@ ___
 
 #### Defined in
 
-[packages/ethereum/src/index.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L20)
+[packages/ethereum/src/index.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L21)
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 ### getContractData
 
-▸ **getContractData**(`network`, `environmentId`, `contract`): [`ContractData`](modules.md#contractdata)
+▸ **getContractData**(`network`, `environmentId`, `contract`): [`ContractData`](modules.md#contractdata) \| `Deployment`
 
 #### Parameters
 
@@ -127,4 +127,4 @@ ___
 
 #### Returns
 
-[`ContractData`](modules.md#contractdata)
+[`ContractData`](modules.md#contractdata) \| `Deployment`

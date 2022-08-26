@@ -40,7 +40,7 @@
       "stake_contract_address": "0xAc677660cb7F525F6e74c0560924fB6D16EF2681",
       "network_registry_proxy_contract_address": "0x2dBf1d5b4012291C0EFaec26c4DAb105B059D898",
       "network_registry_contract_address": "0x5df074701a46e34f83cF0Bc18874BB83c34A5BD3",
-      "tags": []
+      "tags": ["etherscan"]
     },
     "debug-goerli": {
       "network_id": "goerli",
@@ -128,7 +128,7 @@
       "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
       "stake_contract_address": "0x5Bb7e435aDa333A6714e27962e4Bb6aFDE1cECd4",
       "network_registry_contract_address": "0xf0D4D48866C4F9665212B29A64c14A1f0FEDFD4c",
-      "tags": [],
+      "tags": ["etherscan"],
       "network_registry_proxy_contract_address": "0x15e068Ef1f76319b1848b1fcB3e49D68724AEE07"
     }
   },

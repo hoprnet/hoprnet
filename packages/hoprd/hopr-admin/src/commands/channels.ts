@@ -28,9 +28,9 @@ export default class Channels extends Command {
    * Creates the log output for a channel
    * @returns a channel log
    */
-  private getChannelLog(channel) {
+  private getChannelLog(prefix, channel) {
     return toPaddedString([
-      ['Outgoing Channel:', channel.channelId],
+      [prefix + ' Channel:', channel.channelId],
       ['To:', channel.peerId],
       ['Status:', channel.status],
       ['Balance:', ethersUtils.formatEther(channel.balance)]
@@ -62,7 +62,7 @@ export default class Channels extends Command {
         log(`\nNo channels opened to you.`)
       } else {
         for (const channel of incomingChannels) {
-          log(this.getChannelLog(channel))
+          log(this.getChannelLog('Incoming', channel))
         }
       }
     }
@@ -76,7 +76,7 @@ export default class Channels extends Command {
         log(`\nNo channels opened by you.`)
       } else {
         for (const channel of channelsOutgoing) {
-          log(this.getChannelLog(channel))
+          log(this.getChannelLog('Outgoing', channel))
         }
       }
     }

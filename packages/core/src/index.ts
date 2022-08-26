@@ -33,11 +33,16 @@ import {
   ChannelStatus,
   MIN_NATIVE_BALANCE,
   isMultiaddrLocal,
-  retryWithBackoff,
+  retryWithBackoffThenThrow,
   durations,
   isErrorOutOfFunds,
   debug,
   retimer,
+  createRelayerKey,
+  createCircuitAddress,
+  convertPubKeyFromPeerId,
+  getBackoffRetryTimeout,
+  getBackoffRetries,
   type LibP2PHandlerFunction,
   type AcknowledgedTicket,
   type ChannelEntry,
@@ -45,10 +50,7 @@ import {
   type DialOpts,
   type Hash,
   type HalfKeyChallenge,
-  type Ticket,
-  createRelayerKey,
-  createCircuitAddress,
-  convertPubKeyFromPeerId
+  type Ticket
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { type Indexer } from '@hoprnet/hopr-core-ethereum'
 
@@ -442,7 +444,16 @@ class Hopr extends EventEmitter {
   private async onChannelWaitingForCommitment(c: ChannelEntry): Promise<void> {
     if (this.strategy.shouldCommitToChannel(c)) {
       log(`Found channel ${c.getId().toHex()} to us with unset commitment. Setting commitment`)
-      retryWithBackoff(() => this.connector.commitToChannel(c))
+      try {
+        await retryWithBackoffThenThrow(() => this.connector.commitToChannel(c))
+      } catch (err) {
+        // @TODO what to do here? E.g. delete channel from db?
+        error(
+          `Couldn't set commitment in channel to ${c.destination.toPeerId().toString()} (channelId ${c
+            .getId()
+            .toHex()})`
+        )
+      }
     }
   }
 
@@ -733,6 +744,8 @@ class Hopr extends EventEmitter {
           ticketReceiver = intermediatePath[i]
         }
 
+        if (ticketIssuer.eq(ticketReceiver)) log(`WARNING: duplicated adjacent path entries.`)
+
         const channel = await this.db.getChannelX(ticketIssuer, ticketReceiver)
 
         if (channel.status !== ChannelStatus.Open) {
@@ -998,7 +1011,7 @@ class Hopr extends EventEmitter {
   /**
    * Open a payment channel
    *
-   * @param counterparty the counter party's peerId
+   * @param counterparty the counterparty's peerId
    * @param amountToFund the amount to fund in HOPR(wei)
    */
   public async openChannel(
@@ -1008,6 +1021,10 @@ class Hopr extends EventEmitter {
     channelId: Hash
     receipt: string
   }> {
+    if (this.id.equals(counterparty)) {
+      throw Error('Cannot open channel to self!')
+    }
+
     const counterpartyPubKey = PublicKey.fromPeerId(counterparty)
     const myAvailableTokens = await this.connector.getBalance(true)
 
@@ -1247,10 +1264,13 @@ class Hopr extends EventEmitter {
    * MAX_DELAY is reached, this function will reject.
    */
   public async waitForFunds(): Promise<void> {
+    const minDelay = durations.seconds(1)
+    const maxDelay = durations.seconds(200)
+    const delayMultiple = 1.05
     try {
-      return retryWithBackoff(
-        () => {
-          return new Promise<void>(async (resolve, reject) => {
+      await retryWithBackoffThenThrow(
+        () =>
+          new Promise<void>(async (resolve, reject) => {
             try {
               // call connector directly and don't use cache, since this is
               // most likely outdated during node startup
@@ -1265,17 +1285,24 @@ class Hopr extends EventEmitter {
               log('error with native balance call, trying again soon')
               reject()
             }
-          })
-        },
+          }),
         {
-          minDelay: durations.seconds(1),
-          maxDelay: durations.seconds(200),
-          delayMultiple: 1.05
+          minDelay,
+          maxDelay,
+          delayMultiple
         }
       )
     } catch {
-      log(`unfunded for more than 200 seconds, shutting down`)
+      log(
+        `unfunded for more than ${getBackoffRetryTimeout(
+          minDelay,
+          maxDelay,
+          delayMultiple
+        )} seconds and ${getBackoffRetries(minDelay, maxDelay, delayMultiple)} retries, shutting down`
+      )
+      // Close DB etc.
       await this.stop()
+      process.exit(1)
     }
   }
 
