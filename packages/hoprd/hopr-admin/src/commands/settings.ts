@@ -41,7 +41,7 @@ export default class Settings extends Command {
         toPaddedString(Object.entries(await response.json()).map<[string, string]>(([k, v]) => [k, String(v)]))
       )
     } else {
-      const response = await this.api.setSetting(key, key === 'includeRecipient' ? Boolean(value) : value)
+      const response = await this.api.setSetting(key, key === 'includeRecipient' ? value === 'true' : value)
       if (!response.ok) return log(this.failedCommand(`set setting "${key}" to "${value}"`))
       return log('Settings updated.')
     }
