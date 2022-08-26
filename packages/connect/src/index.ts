@@ -26,12 +26,15 @@ import { ConnectComponents } from './components.js'
 import { EntryNodes } from './base/entry.js'
 import { WebRTCUpgrader } from './webrtc/upgrader.js'
 import { UpnpManager } from './base/upnp.js'
+import { timeout } from '@hoprnet/hopr-utils'
 
 const DEBUG_PREFIX = 'hopr-connect'
 const log = Debug(DEBUG_PREFIX)
 const verbose = Debug(DEBUG_PREFIX.concat(':verbose'))
 const warn = Debug(DEBUG_PREFIX.concat(':warn'))
 const error = Debug(DEBUG_PREFIX.concat(':error'))
+
+const DEFAULT_CONNECTION_UPGRADE_TIMEOUT = 2000
 
 type HoprConnectConfig = {
   config?: HoprConnectOptions
@@ -269,7 +272,7 @@ class HoprConnect implements Transport, Initializable, Startable {
       `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshake.`
     )
 
-    const conn = await options.upgrader.upgradeOutbound(maConn)
+    const conn = await timeout(DEFAULT_CONNECTION_UPGRADE_TIMEOUT, () => options.upgrader.upgradeOutbound(maConn))
 
     // Assign various connection properties once we're sure that public keys match,
     // i.e. dialed node == desired destination
