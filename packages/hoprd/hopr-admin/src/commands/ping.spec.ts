@@ -28,7 +28,7 @@ describe('test Ping command', function () {
   } as Response)
 
   behaviours.shouldFailExecutionOnInvalidQuery(cmdWithOkRes, 'x x')
-  behaviours.shouldFailExecutionOnIncorrectParam(cmdWithOkRes, '1')
+  behaviours.shouldFailExecutionOnInvalidParam(cmdWithOkRes, '1')
   behaviours.shouldFailExecutionOnApiError(cmdWithBadRes, PEER_A)
-  behaviours.shouldSucceedExecution(cmdWithOkRes, [[PEER_A, ['Pong received in 100 ms']]])
+  behaviours.shouldSucceedExecution(cmdWithOkRes, [PEER_A, ['Pong received in 100 ms']])
 })

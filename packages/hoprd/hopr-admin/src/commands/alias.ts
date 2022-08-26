@@ -56,7 +56,7 @@ export default class Alias extends Command {
         }))
         return log(`Alias '${name}' was set to '${peerId.toString()}'.`)
       } else {
-        return log(this.invalidResponse(`set alias '${name}'`))
+        return log(this.failedCommand(`set alias '${name}'`))
       }
     } else {
       const response = await this.api.removeAlias(name)
@@ -68,7 +68,7 @@ export default class Alias extends Command {
         })
         return log(`Alias '${name}' was removed.`)
       } else {
-        return log(this.invalidResponse(`remove alias '${name}'`))
+        return log(this.failedCommand(`remove alias '${name}'`))
       }
     }
   }

@@ -32,7 +32,7 @@ export default class Balances extends Command {
     if (error) return log(error)
 
     const balancesRes = await this.api.getBalances()
-    if (!balancesRes.ok) return log(this.invalidResponse('get balances'))
+    if (!balancesRes.ok) return log(this.failedCommand('get balances'))
     const balances = await balancesRes.json()
 
     const hoprPrefix = 'HOPR Balance:'
@@ -42,9 +42,9 @@ export default class Balances extends Command {
 
     if (use === 'onlyOne') {
       if (type === 'hopr') {
-        return log(toPaddedString([[hoprPrefix, hoprBalance]]))
+        return log(hoprBalance)
       } else {
-        return log(toPaddedString([[nativePrefix, nativeBalance]]))
+        return log(nativeBalance)
       }
     } else {
       return log(

@@ -104,12 +104,12 @@ describe('test Command class', function () {
 
     // @ts-ignore
     const invalidArgResult = cmd.assertUsage('not-a-address extra-arg')
-    assert(invalidArgResult[0] && invalidArgResult[0].startsWith('Invalid arguments'))
+    assert(invalidArgResult[0] && invalidArgResult[0].startsWith('Invalid query'))
     assert.equal(invalidArgResult[1], 'primary')
 
     // @ts-ignore
     const incorrectParamResult = cmd.assertUsage('not-a-address')
-    assert(incorrectParamResult[0] && incorrectParamResult[0].startsWith('Incorrect parameter'))
+    assert(incorrectParamResult[0] && incorrectParamResult[0].startsWith('Invalid parameter'))
     assert.equal(incorrectParamResult[1], 'primary')
   })
 })

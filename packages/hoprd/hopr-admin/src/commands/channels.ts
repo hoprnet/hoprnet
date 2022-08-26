@@ -50,7 +50,7 @@ export default class Channels extends Command {
 
     log('fetching channels...')
     const channelsRes = await this.api.getChannels()
-    if (!channelsRes.ok) return log(this.invalidResponse('get channels'))
+    if (!channelsRes.ok) return log(this.failedCommand('get channels'))
     const channels = await channelsRes.json()
 
     if (!showOutgoing) {

@@ -28,7 +28,7 @@ export default class Sign extends Command {
 
     const response = await this.api.signMessage(message)
     if (!response.ok) {
-      return log(this.invalidResponse('sign message'))
+      return log(this.failedCommand('sign message'))
     } else {
       return log(`Signed message: ${(await response.json()).signature}`)
     }

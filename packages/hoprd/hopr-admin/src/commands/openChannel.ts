@@ -37,7 +37,7 @@ export default class OpenChannel extends Command {
 
     const balancesRes = await this.api.getBalances()
     if (!balancesRes) {
-      return log(this.invalidResponse(`failed to get balances so we can open channel with ${counterpartyStr}`))
+      return log(this.failedCommand(`failed to get balances so we can open channel with ${counterpartyStr}`))
     }
     const myAvailableTokens = await balancesRes.json().then((d) => new BN(d.hopr))
 
@@ -50,7 +50,7 @@ export default class OpenChannel extends Command {
     log(`Opening channel to node "${counterpartyStr}"..`)
 
     const response = await this.api.openChannel(counterpartyStr, amountToFund.toString())
-    if (!response.ok) return log(this.invalidResponse(`open a channel to ${counterpartyStr}`))
+    if (!response.ok) return log(this.failedCommand(`open a channel to ${counterpartyStr}`))
 
     const channelId = response.json().then((res) => res.channelId)
     return log(`Successfully opened channel "${channelId}" to node "${counterpartyStr}".`)

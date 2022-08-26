@@ -23,7 +23,7 @@ export default class Info extends Command {
 
   public async execute(log: (msg: string) => void, _query: string): Promise<void> {
     const nodeInfoRes = await this.api.getInfo()
-    if (!nodeInfoRes.ok) return log(this.invalidResponse('get node information'))
+    if (!nodeInfoRes.ok) return log(this.failedCommand('get node information'))
     const nodeInfo = await nodeInfoRes.json()
 
     return log(

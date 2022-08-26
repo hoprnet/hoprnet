@@ -32,7 +32,7 @@ export default class Addresses extends Command {
     if (error) return log(error)
 
     const addressesRes = await this.api.getAddresses()
-    if (!addressesRes.ok) return log(this.invalidResponse('get addresses'))
+    if (!addressesRes.ok) return log(this.failedCommand('get addresses'))
     const addresses = await addressesRes.json()
 
     const hoprPrefix = 'HOPR Address:'

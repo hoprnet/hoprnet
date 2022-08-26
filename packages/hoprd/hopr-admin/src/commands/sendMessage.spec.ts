@@ -63,18 +63,16 @@ describe('test SendMessage command', function () {
   behaviours.shouldFailExecutionOnInvalidQuery(cmdWithOkApiAuto, 'x')
   behaviours.shouldFailExecutionOnApiError(cmdWithBadRes, `${RECIPIENT} hello`)
   behaviours.shouldSucceedExecution(cmdWithOkApiAuto, [
-    [
-      `${RECIPIENT} hello`,
-      [`Sending message to ${RECIPIENT} using automatic path finding ..`, `Message to ${RECIPIENT} sent`]
-    ]
+    `${RECIPIENT} hello`,
+    [`Sending message to ${RECIPIENT} using automatic path finding ..`, `Message to ${RECIPIENT} sent`]
   ])
   behaviours.shouldSucceedExecution(cmdWithOkApiDirect, [
-    [`,${RECIPIENT} hello directly`, [`Sending direct message to ${RECIPIENT} ..`, `Message to ${RECIPIENT} sent`]]
+    `,${RECIPIENT} hello directly`,
+    [`Sending direct message to ${RECIPIENT} ..`, `Message to ${RECIPIENT} sent`]
   ])
   behaviours.shouldSucceedExecution(cmdWithOkApiManual, [
-    [
-      `${HOP_1},${HOP_2},${RECIPIENT} hello manually`,
-      [`Sending message to ${RECIPIENT} via ${HOP_1}->${HOP_2} ..`, `Message to ${RECIPIENT} sent`]
-    ]
+    `${HOP_1},${HOP_2},${RECIPIENT} hello manually`,
+    [`Sending message to ${RECIPIENT} via ${HOP_1}->${HOP_2} ..`, `Message to ${RECIPIENT} sent`]
   ])
+  behaviours.shouldFailExecution(cmdWithBadRes, [`${HOP_1},${HOP_1},${RECIPIENT} hello manually`, 'to construct path'])
 })

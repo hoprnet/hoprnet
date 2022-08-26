@@ -63,16 +63,31 @@ export default class SendMessage extends Command {
 
     const [settingsRes, addressesRes] = await Promise.all([this.api.getSettings(), this.api.getAddresses()])
     if (!settingsRes.ok || !addressesRes.ok) {
-      return log(this.invalidResponse('send message'))
+      return log(this.failedCommand('send message'))
     }
     const settings = await settingsRes.json()
     const addresses = await addressesRes.json()
 
+    // direct message
     if (path && path.length === 0) {
       log(`Sending direct message to ${recipient} ..`)
-    } else if (path && path.length > 0) {
+    }
+    // manual message
+    else if (path && path.length > 0) {
+      // check if path contains an instance of the same adjacent node
+      const fullPath = [addresses.hopr, ...path, recipient]
+      for (let i = 0; i < fullPath.length - 1; ++i) {
+        const from = fullPath[i]
+        const to = fullPath[i + 1]
+        if (from === to) {
+          return log(this.failedCommand('to construct path', 'cannot have the same adjacent nodes'))
+        }
+      }
+
       log(`Sending message to ${recipient} via ${path.join('->')} ..`)
-    } else {
+    }
+    // automatic message
+    else {
       log(`Sending message to ${recipient} using automatic path finding ..`)
     }
 
@@ -80,7 +95,7 @@ export default class SendMessage extends Command {
     const response = await this.api.sendMessage(payload, recipient, path)
 
     if (!response.ok) {
-      return log(this.invalidResponse('send message'))
+      return log(this.failedCommand('send message'))
     } else {
       return log(`Message to ${recipient} sent`)
     }

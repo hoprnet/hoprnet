@@ -71,17 +71,31 @@ export abstract class Command {
   }
 
   /**
+   * @returns When no query is provided.
+   */
+  protected noQuery(): string {
+    return `No query provided.\n${this.usage()}`
+  }
+
+  /**
    * @returns Generic invalid query message.
    */
-  protected invalidUsage(query: string): string {
-    return `Invalid arguments, received "${query}".\n${this.usage()}`
+  protected invalidQuery(query: string): string {
+    return `Invalid query, received "${query}".\n${this.usage()}`
+  }
+
+  /**
+   * @returns Specific paramater was invalid.
+   */
+  protected invalidParameter(param: string, type: string): string {
+    return `Invalid parameter "${param}" of type "${type}".\n${this.usage()}`
   }
 
   /**
    * @param task what has failed
-   * @returns Generic error message when request has failed.
+   * @returns Generic error message when something has failed.
    */
-  protected invalidResponse(task: string, error?: string): string {
+  protected failedCommand(task: string, error?: string): string {
     return `Failed to ${task}${error ? ' with error "' + error + '"' : ''}.`
   }
 
@@ -99,7 +113,7 @@ export abstract class Command {
 
       // invalid when query is not present while parameters are expected
       if (!query && params.length > 0) {
-        result = [`No query provided.\n${this.usage()}`, use]
+        result = [this.noQuery(), use]
         continue
       }
 
@@ -107,7 +121,7 @@ export abstract class Command {
 
       // invalid when query params and expected params are not the same length
       if (queryParams.length !== params.length) {
-        result = [this.invalidUsage(query), use]
+        result = [this.invalidQuery(query), use]
         continue
       }
 
@@ -121,7 +135,7 @@ export abstract class Command {
 
         const [valid, parsedValue] = validate(queryParam, { aliases })
         if (!valid) {
-          result = [`Incorrect parameter "${queryParam}" of type "${paramType}".\n${this.usage()}`, use]
+          result = [this.invalidParameter(queryParam, paramType), use]
           continue
         } else {
           parsedValues.push(parsedValue)
