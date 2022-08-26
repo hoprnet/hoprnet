@@ -63,7 +63,7 @@ describe('test SendMessage command', function () {
   behaviours.shouldFailExecutionOnInvalidQuery(cmdWithOkApiAuto, 'x')
   behaviours.shouldFailExecutionOnApiError(cmdWithBadRes, `${RECIPIENT} hello`)
   behaviours.shouldSucceedExecution(cmdWithOkApiAuto, [
-    `${RECIPIENT} hello`,
+    `${RECIPIENT} hello world 1 2 3`,
     [`Sending message to ${RECIPIENT} using automatic path finding ..`, `Message to ${RECIPIENT} sent`]
   ])
   behaviours.shouldSucceedExecution(cmdWithOkApiDirect, [

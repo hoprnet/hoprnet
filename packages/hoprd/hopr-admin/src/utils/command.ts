@@ -53,12 +53,12 @@ export abstract class Command {
       let use: string[] = ['- usage:']
 
       if (params.length > 0) {
-        for (const [type, givenName, optional] of params) {
+        for (const [type, givenName] of params) {
           const [defName, defDesc] = CMD_PARAMS[type]
           const name = givenName || defName // pick given name or default name
           const desc = defDesc
 
-          use.push(`<${optional ? '?' : ''}${name} (${desc})>`)
+          use.push(`<${name} (${desc})>`)
         }
       } else {
         use.push('<none>')
@@ -117,9 +117,18 @@ export abstract class Command {
         continue
       }
 
-      const queryParams = query.length > 0 ? query.split(' ') : ''
+      let queryParams = query.length > 0 ? query.split(' ') : []
 
-      // invalid when query params and expected params are not the same length
+      // if one of the params is 'everything', we treat the rest
+      // past everything as one string
+      const arbitraryIndex = params.findIndex((p) => p[0] === 'arbitrary')
+      if (arbitraryIndex > 0) {
+        const newParam = queryParams.slice(arbitraryIndex).join(' ')
+        queryParams = queryParams.slice(0, params.length - 1)
+        queryParams.push(newParam)
+      }
+
+      // invalid when query params are less than expected params
       if (queryParams.length !== params.length) {
         result = [this.invalidQuery(query), use]
         continue
@@ -163,6 +172,7 @@ export type CmdTypes =
   | 'constant'
   | 'number'
   | 'string'
+  | 'arbitrary'
   | 'boolean'
 export type { ChannelDirection } from './api'
 export type HoprOrNative = 'hopr' | 'native'
@@ -170,7 +180,7 @@ export type HoprOrNative = 'hopr' | 'native'
 /**
  * Used in a Command constructor to specify a command's syntax
  */
-export type CmdParameter = [type: CmdTypes, name?: string, optional?: boolean]
+export type CmdParameter = [type: CmdTypes, customName?: string]
 
 type CmdArg<I, O, R> = [name: string, description: string, validation: (v: I, ops: O) => [valid: boolean, value: R]]
 
@@ -203,18 +213,14 @@ export const CMD_PARAMS: Record<CmdTypes, CmdArg<any, any, any>> = {
       // try PeerId
       try {
         peerId = peerIdFromString(peerIdStrOrAlias)
-      } catch {
-        console.log(`Could not create peer id from '${peerIdStrOrAlias}'`)
-      }
+      } catch {}
 
       // try aliases
       if (!peerId && aliases) {
         const alias = aliases[peerIdStrOrAlias]
         try {
           peerId = peerIdFromString(alias)
-        } catch {
-          console.log(`Could not create peer id from alias '${alias}' for '${peerIdStrOrAlias}'`)
-        }
+        } catch {}
       }
 
       if (peerId) return [true, peerId]
@@ -255,7 +261,14 @@ export const CMD_PARAMS: Record<CmdTypes, CmdArg<any, any, any>> = {
   ],
   string: [
     'string',
-    'Any string',
+    'Any string with no spaces',
+    (v) => {
+      return [typeof v === 'string', v]
+    }
+  ],
+  arbitrary: [
+    'arbitrary',
+    'An arbitrary string',
     (v) => {
       return [typeof v === 'string', v]
     }
@@ -264,7 +277,7 @@ export const CMD_PARAMS: Record<CmdTypes, CmdArg<any, any, any>> = {
     'boolean',
     "Any boolean, 'true' or 'false'",
     (v) => {
-      return [v === 'true' || v === 'false', Boolean(v)]
+      return [v === 'true' || v === 'false', v === 'true']
     }
   ]
 }

@@ -5,9 +5,9 @@ export default class SendMessage extends Command {
   constructor(api: API, cache: CacheFunctions) {
     super(
       {
-        default: [[['hoprAddressOrAlias'], ['string', 'message']], 'send a message, path is chosen automatically'],
+        default: [[['hoprAddressOrAlias'], ['arbitrary', 'message']], 'send a message, path is chosen automatically'],
         manual: [
-          [['string'], ['string', "path seperated by ','"], ['string', 'message']],
+          [['string'], ['string', "path seperated by ','"], ['arbitrary', 'message']],
           'send a message, path is manually specified'
         ]
       },
@@ -39,7 +39,7 @@ export default class SendMessage extends Command {
         if (!valid) throw Error()
         path.push(peerId.toString())
       } catch (err) {
-        return [false, `<${pIdString}> is neither a valid alias nor a valid Hopr address string`, undefined]
+        return [false, `'${pIdString}' is neither a valid alias nor a valid Hopr address string`, undefined]
       }
     }
 
@@ -80,7 +80,7 @@ export default class SendMessage extends Command {
         const from = fullPath[i]
         const to = fullPath[i + 1]
         if (from === to) {
-          return log(this.failedCommand('to construct path', 'cannot have the same adjacent nodes'))
+          return log(this.failedCommand('construct path', 'cannot have the same adjacent nodes'))
         }
       }
 
