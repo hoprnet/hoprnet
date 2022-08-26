@@ -61,10 +61,7 @@ describe('test Command class', function () {
 
     assert(usage && typeof usage === 'string')
     assert(usage.startsWith('- usage:'))
-    assert.equal(
-      usage,
-      '- usage: <hopr-address-or-alias [hoprAddressOrAlias (A HOPR address (PeerId) or an alias)]>  primary usage'
-    )
+    assert.equal(usage, `- usage: <hopr-address-or-alias ('16Ui..' or 'alice')>  primary usage`)
   })
 
   it('should assert correct usage', function () {

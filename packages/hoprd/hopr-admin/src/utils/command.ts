@@ -82,7 +82,7 @@ export abstract class Command {
    * @returns Generic error message when request has failed.
    */
   protected invalidResponse(task: string, error?: string): string {
-    return `Failed to ${task}${error ? 'with error "' + error : '"'}.`
+    return `Failed to ${task}${error ? ' with error "' + error + '"' : ''}.`
   }
 
   /**

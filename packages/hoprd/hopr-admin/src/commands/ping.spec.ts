@@ -16,7 +16,7 @@ const createCommand = (pingResponse: Response, getCachedAliasesResponse?: Record
   return new Ping(api, cache as any)
 }
 
-describe.only('test Ping command', function () {
+describe('test Ping command', function () {
   const cmdWithOkRes = createCommand({
     ok: true,
     json: async () => ({
@@ -30,5 +30,5 @@ describe.only('test Ping command', function () {
   behaviours.shouldFailExecutionOnInvalidQuery(cmdWithOkRes, 'x x')
   behaviours.shouldFailExecutionOnIncorrectParam(cmdWithOkRes, '1')
   behaviours.shouldFailExecutionOnApiError(cmdWithBadRes, PEER_A)
-  behaviours.shouldSucceedExecution(cmdWithOkRes, [[PEER_A, ['latency']]])
+  behaviours.shouldSucceedExecution(cmdWithOkRes, [[PEER_A, ['Pong received in 100 ms']]])
 })

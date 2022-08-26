@@ -36,19 +36,19 @@ export default class Ping extends Command {
       if (ping.latency >= 0) {
         return log(`Pong received in ${ping.latency} ms`)
       } else {
-        return log(`Could not ping node. Timeout.`)
+        return log(this.invalidResponse('ping node', 'timeout'))
       }
     }
 
     // Handle known errors
     switch (pingRes.status) {
       case 400:
-        return log(`Error: invalid peer ID "${peerIdStr}"`)
+        return log(this.invalidResponse('ping node', `invalid peer ID ${peerIdStr}`))
       case 422:
         const errJson = await (pingRes as Response).json()
-        return log(`Error pinging node. ${JSON.stringify(errJson).replaceAll(/[}{"]/g, '')}`)
+        return log(this.invalidResponse('ping node', JSON.stringify(errJson).replaceAll(/[}{"]/g, '')))
       default:
-        return log(`Unknown error: ${pingRes.body}`)
+        return log(this.invalidResponse('ping node', `unknown: ${String(pingRes.body)}`))
     }
   }
 }

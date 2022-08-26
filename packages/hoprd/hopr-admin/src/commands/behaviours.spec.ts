@@ -37,8 +37,10 @@ export function shouldFailExecution(cmd: Command, tests: [query: string, expecte
   for (const [query, expectedError] of tests) {
     it(`should fail to execute query '${query}'`, function (done) {
       cmd.execute((response) => {
-        assert(response.includes(expectedError), `response '${response}' should include error '${expectedError}`)
-        done()
+        if (response.includes(expectedError)) {
+          assert.ok(`response '${response}' should include error '${expectedError}`)
+          done()
+        }
       }, query)
     })
   }
@@ -46,7 +48,7 @@ export function shouldFailExecution(cmd: Command, tests: [query: string, expecte
 
 /**
  * @param cmd command to test
- * @param query a query to run, must be valid
+ * @param query a query which is invalid
  */
 export function shouldFailExecutionOnInvalidQuery(cmd: Command, query: string) {
   return shouldFailExecution(cmd, [[query, 'Invalid']])
@@ -54,7 +56,7 @@ export function shouldFailExecutionOnInvalidQuery(cmd: Command, query: string) {
 
 /**
  * @param cmd command to test
- * @param query an incorrect query to run
+ * @param query a query which contains an invalid parameter
  */
 export function shouldFailExecutionOnIncorrectParam(cmd: Command, query: string) {
   return shouldFailExecution(cmd, [[query, 'Incorrect']])
@@ -62,7 +64,7 @@ export function shouldFailExecutionOnIncorrectParam(cmd: Command, query: string)
 
 /**
  * @param cmd command to test
- * @param query a query to run, must be valid
+ * @param query a valid query
  */
 export function shouldFailExecutionOnApiError(cmd: Command, query: string) {
   return shouldFailExecution(cmd, [[query, 'Failed to']])

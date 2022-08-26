@@ -7,7 +7,7 @@ export default class SendMessage extends Command {
       {
         default: [[['hoprAddressOrAlias'], ['string', 'message']], 'send a message, path is chosen automatically'],
         manual: [
-          [['hoprAddressOrAlias'], ['string', "path seperated by ','"], ['string', 'message']],
+          [['string'], ['string', "path seperated by ','"], ['string', 'message']],
           'send a message, path is manually specified'
         ]
       },
@@ -68,12 +68,12 @@ export default class SendMessage extends Command {
     const settings = await settingsRes.json()
     const addresses = await addressesRes.json()
 
-    if (path && path.length == 0) {
-      log(`Sending message to ${recipient} via ${path.join('->')} ...`)
+    if (path && path.length === 0) {
+      log(`Sending direct message to ${recipient} ..`)
     } else if (path && path.length > 0) {
-      log(`Sending direct message to ${recipient} ...`)
+      log(`Sending message to ${recipient} via ${path.join('->')} ..`)
     } else {
-      log(`Sending message to ${recipient} using automatic path finding ...`)
+      log(`Sending message to ${recipient} using automatic path finding ..`)
     }
 
     const payload = settings.includeRecipient ? `${addresses.hopr}:${message}` : message
