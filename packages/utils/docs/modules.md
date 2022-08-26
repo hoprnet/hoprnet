@@ -90,6 +90,7 @@
 - [PRIVATE\_KEY\_LENGTH](modules.md#private_key_length)
 - [PRIVATE\_NETWORKS](modules.md#private_networks)
 - [PRIVATE\_V4\_CLASS\_A](modules.md#private_v4_class_a)
+- [PRIVATE\_V4\_CLASS\_AVADO](modules.md#private_v4_class_avado)
 - [PRIVATE\_V4\_CLASS\_B](modules.md#private_v4_class_b)
 - [PRIVATE\_V4\_CLASS\_C](modules.md#private_v4_class_c)
 - [PRP\_IV\_LENGTH](modules.md#prp_iv_length)
@@ -563,7 +564,7 @@ ___
 
 #### Defined in
 
-[network/constants.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L27)
+[network/constants.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L34)
 
 ___
 
@@ -621,7 +622,7 @@ ___
 
 #### Defined in
 
-[network/constants.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L48)
+[network/constants.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L55)
 
 ___
 
@@ -631,7 +632,7 @@ ___
 
 #### Defined in
 
-[network/constants.ts:62](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L62)
+[network/constants.ts:69](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L69)
 
 ___
 
@@ -765,7 +766,7 @@ ___
 
 #### Defined in
 
-[network/constants.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L34)
+[network/constants.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L41)
 
 ___
 
@@ -776,6 +777,16 @@ ___
 #### Defined in
 
 [network/constants.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L9)
+
+___
+
+### PRIVATE\_V4\_CLASS\_AVADO
+
+• `Const` **PRIVATE\_V4\_CLASS\_AVADO**: [`Network`](modules.md#network)
+
+#### Defined in
+
+[network/constants.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L22)
 
 ___
 
@@ -795,7 +806,7 @@ ___
 
 #### Defined in
 
-[network/constants.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L21)
+[network/constants.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L28)
 
 ___
 
@@ -845,7 +856,7 @@ ___
 
 #### Defined in
 
-[network/constants.ts:75](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L75)
+[network/constants.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L82)
 
 ___
 
