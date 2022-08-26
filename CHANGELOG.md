@@ -10,6 +10,12 @@
 
 ## [1.89](https://github.com/hoprnet/hoprnet/compare/release/ouagadougou...hoprnet:release/paleochora)
 
+---
+
+<a name="1.89"></a>
+
+## [1.89](https://github.com/hoprnet/hoprnet/compare/release/ouagadougou...hoprnet:release/paleochora)
+
 ### Changes
 
 - Reduce eth_getBlockByNumber calls when indexing and sending transactions ([#3814](https://github.com/hoprnet/hoprnet/pull/3814))

@@ -56,6 +56,12 @@ export enum RelayPrefix {
   WEBRTC_SIGNALLING
 }
 
+// In order to traverse NATs, nodes needs to maintain
+// a connection to at least one of the entry nodes.
+// To always have a fallback option, nodes connect to multiple
+// entry nodes up to MAX_RELAYS_PER_NODE. If the number of active
+// connections falls below MIN_RELAYS_PER_NODE, the node will
+// actively try to connect to different entry nodes
 export const MAX_RELAYS_PER_NODE = 5
 export const MIN_RELAYS_PER_NODE = 3
 
