@@ -34,7 +34,7 @@ const verbose = Debug(DEBUG_PREFIX.concat(':verbose'))
 const warn = Debug(DEBUG_PREFIX.concat(':warn'))
 const error = Debug(DEBUG_PREFIX.concat(':error'))
 
-const DEFAULT_CONNECTION_UPGRADE_TIMEOUT = 1000
+const DEFAULT_CONNECTION_UPGRADE_TIMEOUT = 2000
 
 type HoprConnectConfig = {
   config?: HoprConnectOptions
