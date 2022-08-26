@@ -3,6 +3,9 @@ import { deployments, ethers } from 'hardhat'
 import { toSolPercent, increaseTime } from './utils'
 import type { HoprToken, HoprDistributor } from '../src/types'
 import deployERC1820Registry from '../deploy/01_ERC1820Registry'
+import { solidity } from 'ethereum-waffle'
+
+chai.use(solidity)
 
 const SCHEDULE_UNSET = 'SCHEDULE_UNSET'
 const SCHEDULE_1_MIN_ALL = 'SCHEDULE_1_MIN_ALL'
@@ -61,7 +64,7 @@ describe('HoprDistributor', async function () {
 
     it('should fail to update start time', async function () {
       await increaseTime(ethers.provider, minutes(10))
-      await expect(f.distributor.updateStartTime('1')).to.be.revertedWith('Previous start time must not be reached')
+      await expect(f.distributor.updateStartTime('1')).to.be.rejectedWith('Previous start time must not be reached')
     })
   })
 
