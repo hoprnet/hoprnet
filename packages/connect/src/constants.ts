@@ -57,6 +57,7 @@ export enum RelayPrefix {
 }
 
 export const MAX_RELAYS_PER_NODE = 5
+export const MIN_RELAYS_PER_NODE = 3
 
 /**
  * @param environment [optional] isolate from nodes running in other environments
