@@ -44,6 +44,8 @@ async function loadIdentity(path: string): Promise<Uint8Array | undefined> {
   return identity
 }
 
+const PRIVATE_KEY_SIZE = 32
+
 /**
  * Persistently store identity on disk
  * @param path file systme path to store identity
@@ -54,7 +56,7 @@ async function storeIdentity(path: string, id: Uint8Array) {
 }
 
 async function createIdentity(idPath: string, password: string, useWeakCrypto = false, privateKey?: Uint8Array) {
-  privateKey = privateKey ?? randomBytes(32)
+  privateKey = privateKey ?? randomBytes(PRIVATE_KEY_SIZE)
   const peerId = privKeyToPeerId(privateKey)
   const serializedKeyPair = await serializeKeyPair(peerId, password, useWeakCrypto)
   await storeIdentity(idPath, serializedKeyPair)

@@ -31,7 +31,7 @@ import {
   retimer,
   u8aEquals,
   tryExistingConnections,
-  retryWithBackoff,
+  retryWithBackoffThenThrow,
   durations,
   defer
 } from '@hoprnet/hopr-utils'
@@ -433,7 +433,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     let attempt = 0
 
     try {
-      await retryWithBackoff(
+      await retryWithBackoffThenThrow(
         async () => {
           attempt++
           const results = await nAtATime(

@@ -1,4 +1,4 @@
-import type { Wallet } from '@ethersproject/wallet'
+import { Wallet } from '@ethersproject/wallet'
 import { deployments, ethers } from 'hardhat'
 import { expect } from 'chai'
 import BN from 'bn.js'
@@ -188,9 +188,11 @@ describe('HoprChannels', async function () {
       const deployer = ethers.provider.getSigner()
 
       const deployerPubKey = await recoverPublicKeyFromSigner(deployer)
-      const accountA = new ethers.Wallet(ACCOUNT_A.privateKey).connect(ethers.provider)
+      // @TODO globally bump ethers.js
+      const accountA = new Wallet(ACCOUNT_A.privateKey).connect(ethers.provider as any)
       const accountAPubKey = PublicKey.fromPrivKeyString(accountA.privateKey)
-      const accountB = new ethers.Wallet(ACCOUNT_B.privateKey).connect(ethers.provider)
+      // @TODO globally bump ethers.js
+      const accountB = new Wallet(ACCOUNT_B.privateKey).connect(ethers.provider as any)
       const accountBPubKey = PublicKey.fromPrivKeyString(accountB.privateKey)
 
       // run migrations

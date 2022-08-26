@@ -58,7 +58,7 @@ export default class OpenChannel extends Command {
     const response = await this.api.openChannel(counterpartyStr, amountToFund.toString())
     if (!response.ok) return log(this.invalidResponse(`open a channel to ${counterpartyStr}`))
 
-    const channelId = response.json().then((res) => res.channelId)
+    const channelId = await response.json().then((res) => res.channelId)
     return log(`Successfully opened channel "${channelId}" to node "${counterpartyStr}".`)
   }
 }
