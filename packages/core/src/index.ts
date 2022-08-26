@@ -273,7 +273,8 @@ class Hopr extends EventEmitter {
       this.publicNodesEmitter,
       async (peerId: PeerId, origin: string): Promise<boolean> => {
         return accessControl.reviewConnection(peerId, origin)
-      }
+      },
+      this.isAllowedAccessToNetwork.bind(this)
     )) as Libp2p
 
     // Needed to stop libp2p instance
