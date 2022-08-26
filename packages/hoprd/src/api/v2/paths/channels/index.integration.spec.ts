@@ -23,9 +23,10 @@ node.openChannel = sinon.fake.returns(
 )
 
 describe('GET /channels', function () {
-  const testChannel = ChannelEntry.createMock()
-  node.getChannelsFrom = sinon.fake.returns(Promise.resolve([testChannel]))
-  node.getChannelsTo = sinon.fake.returns(Promise.resolve([testChannel]))
+  const testChannelFrom = ChannelEntry.createMock()
+  const testChannelTo = ChannelEntry.createMock()
+  node.getChannelsFrom = sinon.fake.returns(Promise.resolve([testChannelFrom]))
+  node.getChannelsTo = sinon.fake.returns(Promise.resolve([testChannelTo]))
 
   let service: any
   before(async function () {
@@ -42,6 +43,8 @@ describe('GET /channels', function () {
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
     expect(res.body.incoming.length).to.be.equal(1)
+    expect(res.body.incoming[0]).to.deep.equal(testChannelTo)
+    expect(res.body.outgoing[0]).to.deep.equal(testChannelFrom)
     expect(res.body.outgoing.length).to.be.equal(1)
   })
   it('should get channels list excluding closed', async function () {
