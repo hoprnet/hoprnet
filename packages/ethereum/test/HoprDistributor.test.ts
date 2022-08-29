@@ -43,7 +43,7 @@ const useFixtures = deployments.createFixture(async (hre, ops: { startTime?: str
   }
 })
 
-describe.only('HoprDistributor', async function () {
+describe('HoprDistributor', async function () {
   describe('start time', function () {
     let f: Awaited<ReturnType<typeof useFixtures>>
 
