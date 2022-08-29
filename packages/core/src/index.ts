@@ -639,15 +639,15 @@ class Hopr extends EventEmitter {
   // @TODO make modules Startable
   public async stop(): Promise<void> {
     if (this.status == 'DESTROYED') {
-      throw Error(`alreayd destroyed. Cannot destroy twice`)
+      throw Error(`Hopr instance already destroyed.`)
     }
     this.status = 'DESTROYED'
     verbose('Stopping checking timeout')
     this.stopPeriodicCheck?.()
     verbose('Stopping heartbeat & indexer')
-    await this.heartbeat.stop()
+    this.heartbeat?.stop()
     verbose(`Stopping connector`)
-    await this.connector.stop()
+    await this.connector?.stop()
     verbose('Stopping database')
     await this.db?.close()
     log(`Database closed.`)
