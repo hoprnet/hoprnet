@@ -29,7 +29,7 @@
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:21
+packages/ethereum/src/types/HoprChannels.ts:26
 
 ___
 
@@ -39,4 +39,4 @@ ___
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:31
+packages/ethereum/src/types/HoprChannels.ts:36

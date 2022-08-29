@@ -53,7 +53,7 @@ Event.address
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/node_modules/@ethersproject/abstract-provider/lib/index.d.ts:59
+node_modules/@ethersproject/abstract-provider/lib/index.d.ts:59
 
 ___
 
@@ -81,7 +81,7 @@ Event.blockHash
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/node_modules/@ethersproject/abstract-provider/lib/index.d.ts:56
+node_modules/@ethersproject/abstract-provider/lib/index.d.ts:56
 
 ___
 
@@ -95,7 +95,7 @@ Event.blockNumber
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/node_modules/@ethersproject/abstract-provider/lib/index.d.ts:55
+node_modules/@ethersproject/abstract-provider/lib/index.d.ts:55
 
 ___
 
@@ -109,7 +109,7 @@ Event.data
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/node_modules/@ethersproject/abstract-provider/lib/index.d.ts:60
+node_modules/@ethersproject/abstract-provider/lib/index.d.ts:60
 
 ___
 
@@ -123,7 +123,7 @@ Event.decodeError
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:48
+node_modules/@ethersproject/contracts/lib/index.d.ts:50
 
 ___
 
@@ -137,7 +137,7 @@ Event.event
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:45
+node_modules/@ethersproject/contracts/lib/index.d.ts:47
 
 ___
 
@@ -151,7 +151,7 @@ Event.eventSignature
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:46
+node_modules/@ethersproject/contracts/lib/index.d.ts:48
 
 ___
 
@@ -165,7 +165,7 @@ Event.logIndex
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/node_modules/@ethersproject/abstract-provider/lib/index.d.ts:63
+node_modules/@ethersproject/abstract-provider/lib/index.d.ts:63
 
 ___
 
@@ -179,7 +179,7 @@ Event.removed
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/node_modules/@ethersproject/abstract-provider/lib/index.d.ts:58
+node_modules/@ethersproject/abstract-provider/lib/index.d.ts:58
 
 ___
 
@@ -193,7 +193,7 @@ Event.topics
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/node_modules/@ethersproject/abstract-provider/lib/index.d.ts:61
+node_modules/@ethersproject/abstract-provider/lib/index.d.ts:61
 
 ___
 
@@ -207,7 +207,7 @@ Event.transactionHash
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/node_modules/@ethersproject/abstract-provider/lib/index.d.ts:62
+node_modules/@ethersproject/abstract-provider/lib/index.d.ts:62
 
 ___
 
@@ -221,7 +221,7 @@ Event.transactionIndex
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/node_modules/@ethersproject/abstract-provider/lib/index.d.ts:57
+node_modules/@ethersproject/abstract-provider/lib/index.d.ts:57
 
 ## Methods
 
