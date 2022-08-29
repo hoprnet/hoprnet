@@ -86,7 +86,7 @@ export async function createChainWrapper(
     hoprChannelsDeployment.address,
     hoprChannelsDeployment.abi,
     provider
-  ) as any as  HoprChannels
+  ) as any as HoprChannels
 
   const networkRegistry = new ethers.Contract(
     hoprNetworkRegistryDeployment.address,
