@@ -262,7 +262,7 @@ endif
 
 .PHONY: register-node-with-stake
 # node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'
-register-node-with-stake: ensure-environment-is-set, get-hopr-address-from-script
+register-node-with-stake: ensure-environment-is-set
 ifeq ($(account),)
 	echo "parameter <account> missing" >&2 && exit 1
 endif
