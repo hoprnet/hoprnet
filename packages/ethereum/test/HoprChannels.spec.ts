@@ -168,7 +168,7 @@ describe('HoprChannels', async function () {
   // recover the public key from the signer passed by ethers
   // could not find a way to get the public key through the API
   const recoverPublicKeyFromSigner = async (
-    deployer: SignerWithAddress 
+    deployer: SignerWithAddress
   ): Promise<ReturnType<typeof PublicKey['fromSignatureString']>> => {
     const tx = await deployer.populateTransaction({
       to: await deployer.getAddress(),
@@ -335,13 +335,17 @@ describe('HoprChannels', async function () {
 
     it('should fail to fund channel 0->A', async function () {
       await expect(
-        channels.connect(accountA as Signer).fundChannelMulti(ethers.constants.AddressZero, ACCOUNT_B.address, '70', '30')
+        channels
+          .connect(accountA as Signer)
+          .fundChannelMulti(ethers.constants.AddressZero, ACCOUNT_B.address, '70', '30')
       ).to.be.revertedWith('source must not be empty')
     })
 
     it('should fail to fund channel A->0', async function () {
       await expect(
-        channels.connect(accountA as Signer).fundChannelMulti(ACCOUNT_A.address, ethers.constants.AddressZero, '70', '30')
+        channels
+          .connect(accountA as Signer)
+          .fundChannelMulti(ACCOUNT_A.address, ethers.constants.AddressZero, '70', '30')
       ).to.be.revertedWith('destination must not be empty')
     })
 
@@ -358,7 +362,9 @@ describe('HoprChannels', async function () {
     it('should multi fund and open channel A->B, no commitment', async function () {
       const { channels, accountA, fundAndApprove, token } = await useFixtures()
       await fundAndApprove(accountA, 100)
-      await expect(channels.connect(accountA as Signer).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30'))
+      await expect(
+        channels.connect(accountA as Signer).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+      )
         .to.emit(channels, 'ChannelUpdated')
         .and.to.emit(channels, 'ChannelFunded')
         .and.not.to.emit(channels, 'ChannelOpened')
@@ -373,7 +379,9 @@ describe('HoprChannels', async function () {
     it('should multi fund and open channel B->A, no commitment', async function () {
       const { channels, accountB, fundAndApprove } = await useFixtures()
       await fundAndApprove(accountB, 100)
-      await expect(channels.connect(accountB as Signer).fundChannelMulti(ACCOUNT_B.address, ACCOUNT_A.address, '30', '70'))
+      await expect(
+        channels.connect(accountB as Signer).fundChannelMulti(ACCOUNT_B.address, ACCOUNT_A.address, '30', '70')
+      )
         .to.emit(channels, 'ChannelUpdated')
         .and.to.emit(channels, 'ChannelFunded')
         .and.not.to.emit(channels, 'ChannelOpened')

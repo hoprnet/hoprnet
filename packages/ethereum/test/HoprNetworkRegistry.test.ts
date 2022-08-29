@@ -3,7 +3,7 @@ import { deployments, ethers } from 'hardhat'
 import { FakeContract, smock } from '@defi-wonderland/smock'
 import { constants, Contract, Signer } from 'ethers'
 import { HoprNetworkRegistry } from '../src/types'
-import { PANIC_CODES } from "@nomicfoundation/hardhat-chai-matchers/panic";
+import { PANIC_CODES } from '@nomicfoundation/hardhat-chai-matchers/panic'
 
 chai.should() // if you like should syntax
 chai.use(smock.matchers)
@@ -133,35 +133,42 @@ describe('HoprNetworkRegistry', () => {
       // account 0 registers hoprAddress[0] and hoprAddress[1]
       const participantIndex = 0
       await expect(
-        hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister([hoprAddress(participantIndex), hoprAddress(participantIndex + 1)])
+        hoprNetworkRegistry
+          .connect(participants[participantIndex])
+          .selfRegister([hoprAddress(participantIndex), hoprAddress(participantIndex + 1)])
       )
         .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
         .withArgs(participantAddresses[participantIndex], true)
         .to.emit(hoprNetworkRegistry, 'Registered')
         .withArgs(participantAddresses[participantIndex], hoprAddress(participantIndex))
         .to.emit(hoprNetworkRegistry, 'Registered')
-        .withArgs(participantAddresses[participantIndex], hoprAddress(participantIndex+1))
+        .withArgs(participantAddresses[participantIndex], hoprAddress(participantIndex + 1))
     })
     it('cannot self-register when trying to register more than the limit', async () => {
       // account 2 fail to register hoprAddress[2] and hoprAddress[3]
       const participantIndex = 2
-      await expect(hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister([hoprAddress(participantIndex), hoprAddress(participantIndex + 1)])).to.be.revertedWith(
-        'HoprNetworkRegistry: selfRegister reaches limit, cannot register requested nodes.'
-      )
+      await expect(
+        hoprNetworkRegistry
+          .connect(participants[participantIndex])
+          .selfRegister([hoprAddress(participantIndex), hoprAddress(participantIndex + 1)])
+      ).to.be.revertedWith('HoprNetworkRegistry: selfRegister reaches limit, cannot register requested nodes.')
     })
     it('cannot self-register when the requirement is not fulfilled', async () => {
       const participantIndex = 4
-      await expect(hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister([hoprAddress(participantIndex)])).to.be.revertedWith(
-        'HoprNetworkRegistry: selfRegister reaches limit, cannot register requested nodes.'
-      )
+      await expect(
+        hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister([hoprAddress(participantIndex)])
+      ).to.be.revertedWith('HoprNetworkRegistry: selfRegister reaches limit, cannot register requested nodes.')
     })
     it('fail to register when hopr node address is empty', async () => {
-      await expect(hoprNetworkRegistry.connect(participants[0]).selfRegister(['']))
-        .to.be.revertedWithCustomError(hoprNetworkRegistry, 'InvalidPeerId')
+      await expect(hoprNetworkRegistry.connect(participants[0]).selfRegister([''])).to.be.revertedWithCustomError(
+        hoprNetworkRegistry,
+        'InvalidPeerId'
+      )
     })
     it('fail to register when hopr node address of wrong length', async () => {
-      await expect(hoprNetworkRegistry.connect(participants[0]).selfRegister(['16Uiu2HA']))
-      .to.be.revertedWithCustomError(hoprNetworkRegistry, 'InvalidPeerId')
+      await expect(
+        hoprNetworkRegistry.connect(participants[0]).selfRegister(['16Uiu2HA'])
+      ).to.be.revertedWithCustomError(hoprNetworkRegistry, 'InvalidPeerId')
     })
     it('fail to register when hopr node address is of the right length but with wrong prefix', async () => {
       await expect(
@@ -187,28 +194,32 @@ describe('HoprNetworkRegistry', () => {
         .withArgs(participantAddresses[6], hoprAddress(6))
     })
     it('can be deregistered by the owner when an address was not registered. Nothing gets emitted', async () => {
-      expect(await hoprNetworkRegistry.countRegisterdNodesPerAccount(participantAddresses[5])).to.equal(0);
-      await hoprNetworkRegistry.connect(owner).ownerDeregister([participantAddresses[5]]);
-      expect(await hoprNetworkRegistry.countRegisterdNodesPerAccount(participantAddresses[5])).to.equal(0);
+      expect(await hoprNetworkRegistry.countRegisterdNodesPerAccount(participantAddresses[5])).to.equal(0)
+      await hoprNetworkRegistry.connect(owner).ownerDeregister([participantAddresses[5]])
+      expect(await hoprNetworkRegistry.countRegisterdNodesPerAccount(participantAddresses[5])).to.equal(0)
     })
     it('can be deregistered by the owner when an address was registered', async () => {
-      await hoprNetworkRegistry.connect(owner).ownerRegister([participantAddresses[5]], [hoprAddress(5)]);
+      await hoprNetworkRegistry.connect(owner).ownerRegister([participantAddresses[5]], [hoprAddress(5)])
       await expect(hoprNetworkRegistry.connect(owner).ownerDeregister([hoprAddress(5)]))
         .to.emit(hoprNetworkRegistry, 'DeregisteredByOwner')
         .withArgs(participantAddresses[5], hoprAddress(5))
-        // .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
-        // .withArgs(participantAddresses[5], false)
+      // .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
+      // .withArgs(participantAddresses[5], false)
     })
   })
   describe('Owner force update eligibility', () => {
     beforeEach(async () => {
       ;({ owner, participants, participantAddresses, registryFake, hoprNetworkRegistry } = await useFixtures())
       // owner register participant 1 and 5 with address 1 and 5
-      await hoprNetworkRegistry.connect(owner).ownerRegister([participantAddresses[1], participantAddresses[5]], [hoprAddress(1), hoprAddress(5)]);
+      await hoprNetworkRegistry
+        .connect(owner)
+        .ownerRegister([participantAddresses[1], participantAddresses[5]], [hoprAddress(1), hoprAddress(5)])
     })
     it('can force update eligibility of an account independantly (true), and sync back to its actual eligibility (false)', async () => {
-      const ineligibleAccountIndex = 5;
-      await expect(hoprNetworkRegistry.connect(owner).ownerForceEligibility([participantAddresses[ineligibleAccountIndex]], [true]))
+      const ineligibleAccountIndex = 5
+      await expect(
+        hoprNetworkRegistry.connect(owner).ownerForceEligibility([participantAddresses[ineligibleAccountIndex]], [true])
+      )
         .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
         .withArgs(participantAddresses[ineligibleAccountIndex], true)
       await expect(hoprNetworkRegistry.connect(owner).sync([hoprAddress(ineligibleAccountIndex)]))
@@ -216,8 +227,10 @@ describe('HoprNetworkRegistry', () => {
         .withArgs(participantAddresses[ineligibleAccountIndex], false)
     })
     it('can force update eligibility of an account independantly (false), and sync back to its actual eligibility (true)', async () => {
-      const eligibleAccountIndex = 1;
-      await expect(hoprNetworkRegistry.connect(owner).ownerForceEligibility([participantAddresses[eligibleAccountIndex]], [false]))
+      const eligibleAccountIndex = 1
+      await expect(
+        hoprNetworkRegistry.connect(owner).ownerForceEligibility([participantAddresses[eligibleAccountIndex]], [false])
+      )
         .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
         .withArgs(participantAddresses[eligibleAccountIndex], false)
       await expect(hoprNetworkRegistry.connect(owner).sync([hoprAddress(eligibleAccountIndex)]))
@@ -225,8 +238,10 @@ describe('HoprNetworkRegistry', () => {
         .withArgs(participantAddresses[eligibleAccountIndex], true)
     })
     it('can force update eligibility of an account independantly (true), and sync back to its actual eligibility (true)', async () => {
-      const eligibleAccountIndex = 1;
-      await expect(hoprNetworkRegistry.connect(owner).ownerForceEligibility([participantAddresses[eligibleAccountIndex]], [true]))
+      const eligibleAccountIndex = 1
+      await expect(
+        hoprNetworkRegistry.connect(owner).ownerForceEligibility([participantAddresses[eligibleAccountIndex]], [true])
+      )
         .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
         .withArgs(participantAddresses[eligibleAccountIndex], true)
       await expect(hoprNetworkRegistry.connect(owner).sync([hoprAddress(eligibleAccountIndex)]))
@@ -234,8 +249,12 @@ describe('HoprNetworkRegistry', () => {
         .withArgs(participantAddresses[eligibleAccountIndex], true)
     })
     it('can force update eligibility of an account independantly (false), and sync back to its actual eligibility (false)', async () => {
-      const ineligibleAccountIndex = 5;
-      await expect(hoprNetworkRegistry.connect(owner).ownerForceEligibility([participantAddresses[ineligibleAccountIndex]], [false]))
+      const ineligibleAccountIndex = 5
+      await expect(
+        hoprNetworkRegistry
+          .connect(owner)
+          .ownerForceEligibility([participantAddresses[ineligibleAccountIndex]], [false])
+      )
         .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
         .withArgs(participantAddresses[ineligibleAccountIndex], false)
       await expect(hoprNetworkRegistry.connect(owner).sync([hoprAddress(ineligibleAccountIndex)]))
@@ -252,18 +271,20 @@ describe('HoprNetworkRegistry', () => {
       hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister([hoprAddress(participantIndex)])
     })
     it('fails to deregister an non-registered account. Panic when the deregister originial account has zero registered node', async () => {
-      await expect(hoprNetworkRegistry.connect(participants[participantIndex + 1]).selfDeregister([hoprAddress(participantIndex)])).to.be.revertedWithPanic(
-        PANIC_CODES.ARITHMETIC_UNDER_OR_OVERFLOW
-      )
+      await expect(
+        hoprNetworkRegistry.connect(participants[participantIndex + 1]).selfDeregister([hoprAddress(participantIndex)])
+      ).to.be.revertedWithPanic(PANIC_CODES.ARITHMETIC_UNDER_OR_OVERFLOW)
     })
     it('fails to deregister an non-registered account', async () => {
       hoprNetworkRegistry.connect(participants[participantIndex + 1]).selfRegister([hoprAddress(participantIndex + 1)])
-      await expect(hoprNetworkRegistry.connect(participants[participantIndex + 1]).selfDeregister([hoprAddress(participantIndex)])).to.be.revertedWith(
-        'HoprNetworkRegistry: Cannot delete an entry not associated with the caller.'
-      )
+      await expect(
+        hoprNetworkRegistry.connect(participants[participantIndex + 1]).selfDeregister([hoprAddress(participantIndex)])
+      ).to.be.revertedWith('HoprNetworkRegistry: Cannot delete an entry not associated with the caller.')
     })
     it('can deregister by itself', async () => {
-      await expect(hoprNetworkRegistry.connect(participants[participantIndex]).selfDeregister([hoprAddress(participantIndex)]))
+      await expect(
+        hoprNetworkRegistry.connect(participants[participantIndex]).selfDeregister([hoprAddress(participantIndex)])
+      )
         .to.emit(hoprNetworkRegistry, 'Deregistered')
         .withArgs(participantAddresses[participantIndex])
         .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
@@ -277,11 +298,11 @@ describe('HoprNetworkRegistry', () => {
     it('can register an additional peer ID', async () => {
       await expect(
         hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister([hoprAddress(participantIndex + 1)])
-      ).to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
-      .withArgs(participantAddresses[participantIndex])
-      .to.emit(hoprNetworkRegistry, 'Registered')
-      .withArgs(participantAddresses[participantIndex], hoprAddress(participantIndex + 1))
-
+      )
+        .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
+        .withArgs(participantAddresses[participantIndex])
+        .to.emit(hoprNetworkRegistry, 'Registered')
+        .withArgs(participantAddresses[participantIndex], hoprAddress(participantIndex + 1))
     })
     it('self-registered account emits true when the requirement is fulfilled, but no longer emits Registered event', async () => {
       await expect(
@@ -295,9 +316,7 @@ describe('HoprNetworkRegistry', () => {
       registryFake.maxAllowedRegistrations.whenCalledWith(participantAddresses[participantIndex]).returns(1)
       await expect(
         hoprNetworkRegistry.connect(participants[participantIndex]).selfRegister([hoprAddress(participantIndex)])
-      ).to.be.revertedWith(
-        'HoprNetworkRegistry: selfRegister reaches limit, cannot register requested nodes.'
-      )
+      ).to.be.revertedWith('HoprNetworkRegistry: selfRegister reaches limit, cannot register requested nodes.')
     })
   })
   describe('Force emit an eligibility update ', () => {
@@ -305,7 +324,10 @@ describe('HoprNetworkRegistry', () => {
       await expect(
         hoprNetworkRegistry
           .connect(owner)
-          .ownerForceEligibility([participantAddresses[0], participantAddresses[2], participantAddresses[4]], [false, true, true])
+          .ownerForceEligibility(
+            [participantAddresses[0], participantAddresses[2], participantAddresses[4]],
+            [false, true, true]
+          )
       )
         .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
         .withArgs(participantAddresses[0], false)
@@ -314,7 +336,6 @@ describe('HoprNetworkRegistry', () => {
         .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
         .withArgs(participantAddresses[4], true)
     })
-    
   })
   describe('Sync with when criteria change', () => {
     const participantIndex = 2
@@ -326,9 +347,7 @@ describe('HoprNetworkRegistry', () => {
     })
     it('owner can sync the criteria, before criteria change', async () => {
       await expect(
-        hoprNetworkRegistry
-          .connect(owner)
-          .sync([hoprAddress(participantIndex), hoprAddress(0), hoprAddress(4)])
+        hoprNetworkRegistry.connect(owner).sync([hoprAddress(participantIndex), hoprAddress(0), hoprAddress(4)])
       )
         .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')
         .withArgs(participantAddresses[participantIndex], true)
@@ -338,9 +357,7 @@ describe('HoprNetworkRegistry', () => {
       registryFake.maxAllowedRegistrations.whenCalledWith(participantAddresses[participantIndex]).returns(0)
 
       await expect(
-        hoprNetworkRegistry
-          .connect(owner)
-          .sync([hoprAddress(participantIndex), hoprAddress(0), hoprAddress(4)])
+        hoprNetworkRegistry.connect(owner).sync([hoprAddress(participantIndex), hoprAddress(0), hoprAddress(4)])
       )
         // only participant[participantIndex] is registered
         .to.emit(hoprNetworkRegistry, 'EligibilityUpdated')

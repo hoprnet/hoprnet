@@ -15,8 +15,8 @@ const LOW_STAKE = 100
 const SPECIAL_NFT_TYPE = 3 // 'Dev'
 const SPECIAL_NFT_RANK_TECH = 0 // 'Tech'
 const SPECIAL_NFT_RANK_COM = 0 // 'Com'
-const MAX_REGISTRATION_TECH = constants.MaxUint256;
-const MAX_REGISTRATION_COM = 1;
+const MAX_REGISTRATION_TECH = constants.MaxUint256
+const MAX_REGISTRATION_COM = 1
 
 /**
  * Allocation of NFTs and staks
@@ -30,8 +30,8 @@ const MAX_REGISTRATION_COM = 1;
  * | Participant_4 |   |   | x |   |      |     | 2000  |
  * | Participant_5 |   | x |   |   |      |     | 0     |
  * | Participant_6 |   |   | x |   |      | x   | 0     |
- * @param participants 
- * @returns 
+ * @param participants
+ * @returns
  */
 
 const createFakeStakeV2Contract = async (participants: string[]) => {
