@@ -93,7 +93,7 @@ BaseContract.\_deployedPromise
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:98
+node_modules/@ethersproject/contracts/lib/index.d.ts:100
 
 ___
 
@@ -111,7 +111,7 @@ BaseContract.\_runningEvents
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:99
+node_modules/@ethersproject/contracts/lib/index.d.ts:101
 
 ___
 
@@ -129,7 +129,7 @@ BaseContract.\_wrappedEmits
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:102
+node_modules/@ethersproject/contracts/lib/index.d.ts:104
 
 ___
 
@@ -143,7 +143,7 @@ BaseContract.address
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:77
+node_modules/@ethersproject/contracts/lib/index.d.ts:79
 
 ___
 
@@ -196,7 +196,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:708
+packages/ethereum/src/types/HoprBoost.ts:713
 
 ___
 
@@ -206,7 +206,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:347
+packages/ethereum/src/types/HoprBoost.ts:352
 
 ___
 
@@ -220,7 +220,7 @@ BaseContract.deployTransaction
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:97
+node_modules/@ethersproject/contracts/lib/index.d.ts:99
 
 ___
 
@@ -273,7 +273,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:951
+packages/ethereum/src/types/HoprBoost.ts:956
 
 ___
 
@@ -306,7 +306,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:872
+packages/ethereum/src/types/HoprBoost.ts:877
 
 ___
 
@@ -359,7 +359,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:373
+packages/ethereum/src/types/HoprBoost.ts:378
 
 ___
 
@@ -373,7 +373,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:352
+packages/ethereum/src/types/HoprBoost.ts:357
 
 ___
 
@@ -387,7 +387,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:368
+packages/ethereum/src/types/HoprBoost.ts:373
 
 ___
 
@@ -401,7 +401,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:369
+packages/ethereum/src/types/HoprBoost.ts:374
 
 ___
 
@@ -415,7 +415,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:370
+packages/ethereum/src/types/HoprBoost.ts:375
 
 ___
 
@@ -468,7 +468,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:1130
+packages/ethereum/src/types/HoprBoost.ts:1135
 
 ___
 
@@ -482,7 +482,7 @@ BaseContract.provider
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:80
+node_modules/@ethersproject/contracts/lib/index.d.ts:82
 
 ___
 
@@ -496,7 +496,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:371
+packages/ethereum/src/types/HoprBoost.ts:376
 
 ___
 
@@ -510,7 +510,7 @@ BaseContract.resolvedAddress
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:96
+node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ___
 
@@ -524,7 +524,7 @@ BaseContract.signer
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:79
+node_modules/@ethersproject/contracts/lib/index.d.ts:81
 
 ## Methods
 
