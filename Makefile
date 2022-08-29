@@ -1,5 +1,4 @@
 WORKSPACES_WITH_RUST_MODULES := $(wildcard $(addsuffix /crates, $(wildcard ./packages/*)))
-PEER_ID := $(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")
 
 .POSIX:
 
@@ -230,14 +229,13 @@ endif
 ifeq ($(origin CI_DEPLOYER_PRIVKEY),undefined)
 	echo "<CI_DEPLOYER_PRIVKEY> environment variable missing" >&2 && exit 1
 endif
-	$(GET_PEER_ID)
 	TS_NODE_PROJECT=./tsconfig.hardhat.json \
 	HOPR_ENVIRONMENT_ID="$(environment)" \
 	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
    --network $(network) \
    --task add \
    --native-addresses "$(account)" \
-   --peer-ids "${PEER_ID}" \
+   --peer-ids "$(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")" \
    --privatekey "$(CI_DEPLOYER_PRIVKEY)"
 
 .PHONY: register-node-with-nft
@@ -258,10 +256,9 @@ endif
 ifeq ($(origin DEV_BANK_PRIVKEY),undefined)
 	echo "<DEV_BANK_PRIVKEY> environment variable missing" >&2 && exit 1
 endif
-	$(GET_PEER_ID)
 	PRIVATE_KEY=${DEV_BANK_PRIVKEY} make request-devnft recipient=${account}
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-devnft
-	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_id=${PEER_ID}
+	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_id=$(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")
 
 .PHONY: register-node-with-stake
 # node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'
@@ -275,10 +272,9 @@ endif
 ifeq ($(origin DEV_BANK_PRIVKEY),undefined)
 	echo "<DEV_BANK_PRIVKEY> environment variable missing" >&2 && exit 1
 endif
-	$(GET_PEER_ID)
 	PRIVATE_KEY=${DEV_BANK_PRIVKEY} make request-funds recipient=${account}
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-funds
-	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_id=${PEER_ID}
+	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_id=$(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")
 
 ensure-environment-is-set:
 ifeq ($(environment),)
