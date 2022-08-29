@@ -44,6 +44,7 @@
     "secp256k1": "4.0.3"
   },
   "devDependencies": {
+    "@types/chai": "4.3.3",
     "@types/mocha": "9.1.1",
     "@types/yargs": "17.0.10",
     "chai": "4.3.6",

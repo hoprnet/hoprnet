@@ -48,7 +48,7 @@
     "@openzeppelin/test-helpers": "^0.5.15",
     "@typechain/ethers-v5": "9.0.0",
     "@typechain/hardhat": "4.0.0",
-    "@types/chai": "^4.3.1",
+    "@types/chai": "4.3.3",
     "@types/mocha": "^9.1.1",
     "bn.js": "5.2.0",
     "chai": "4.3.6",

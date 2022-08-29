@@ -3554,7 +3554,7 @@ __metadata:
     "@libp2p/peer-id": 1.1.13
     "@multiformats/multiaddr": 10.3.3
     "@types/bl": 5.0.2
-    "@types/chai": 4.3.0
+    "@types/chai": 4.3.3
     "@types/chai-spies": 1.0.3
     "@types/debug": 4.1.7
     "@types/mocha": 9.1.1
@@ -3597,6 +3597,7 @@ __metadata:
     "@libp2p/peer-id": 1.1.13
     "@multiformats/multiaddr": 10.3.3
     "@sinonjs/referee": 9.1.1
+    "@types/chai": 4.3.3
     "@types/mocha": 9.1.1
     "@types/yargs": 17.0.10
     async-mutex: 0.3.2
@@ -3639,6 +3640,7 @@ __metadata:
     "@libp2p/peer-id-factory": 1.0.15
     "@libp2p/tcp": 1.0.11
     "@multiformats/multiaddr": 10.3.3
+    "@types/chai": 4.3.3
     "@types/chai-as-promised": 7.1.5
     "@types/mocha": 9.1.1
     "@types/yargs": 17.0.10
@@ -3673,6 +3675,7 @@ __metadata:
     "@libp2p/interface-peer-id": 1.0.2
     "@libp2p/peer-id": 1.1.13
     "@multiformats/multiaddr": 10.3.3
+    "@types/chai": 4.3.3
     "@types/express": 4
     "@types/mocha": 9.1.1
     "@types/yargs": 17.0.10
@@ -3708,7 +3711,7 @@ __metadata:
     "@openzeppelin/test-helpers": ^0.5.15
     "@typechain/ethers-v5": 9.0.0
     "@typechain/hardhat": 4.0.0
-    "@types/chai": ^4.3.1
+    "@types/chai": 4.3.3
     "@types/mocha": ^9.1.1
     bn.js: 5.2.0
     chai: 4.3.6
@@ -3757,6 +3760,7 @@ __metadata:
     "@libp2p/peer-id-factory": 1.0.15
     "@libp2p/tcp": 1.0.11
     "@multiformats/multiaddr": 10.3.3
+    "@types/chai": 4.3.3
     "@types/mocha": 9.1.1
     abort-controller: ~3.0.0
     bignumber.js: 9.0.2
@@ -3794,7 +3798,7 @@ __metadata:
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@libp2p/interface-peer-id": 1.0.2
     "@libp2p/peer-id": 1.1.13
-    "@types/chai": ^4
+    "@types/chai": 4.3.3
     "@types/cors": 2.8.12
     "@types/js-cookie": ^3.0.1
     "@types/mocha": 9.1.1
@@ -3803,7 +3807,7 @@ __metadata:
     "@types/yargs": 17.0.10
     bn.js: 5.2.0
     body-parser: 1.19.2
-    chai: ^4.3.6
+    chai: 4.3.6
     chai-openapi-response-validator: ^0.14.2
     check-password-strength: 2.0.4
     cookie: 0.4.2
@@ -5926,17 +5930,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/chai@npm:*, @types/chai@npm:^4, @types/chai@npm:^4.3.1":
+"@types/chai@npm:*":
   version: 4.3.1
   resolution: "@types/chai@npm:4.3.1"
   checksum: 2ee246b76c469cd620a7a1876a73bc597074361b67d547b4bd96a0c1adb43597ede2d8589ab626192e14349d83cbb646cc11e2c179eeeb43ff11596de94d82c4
   languageName: node
   linkType: hard
 
-"@types/chai@npm:4.3.0":
-  version: 4.3.0
-  resolution: "@types/chai@npm:4.3.0"
-  checksum: 3e393e094263db65df28a0123dc13f342937c1bab6cd173eae913d593c5b9a16b555713a08c34863a1fbf079aa7222b96197c70380a5c130549d6b2f6845a989
+"@types/chai@npm:4.3.3":
+  version: 4.3.3
+  resolution: "@types/chai@npm:4.3.3"
+  checksum: 20cd094753e137cfc35939cae7f0ed78ecda7861e5c94704efab6979b9121a63807e9b631bdcf3a2792d6c6dba44050b13387262f9e63ebb040741c01c345f0a
   languageName: node
   linkType: hard
 
@@ -8571,7 +8575,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"chai@npm:4.3.6, chai@npm:^4.2.0, chai@npm:^4.3.6":
+"chai@npm:4.3.6, chai@npm:^4.2.0":
   version: 4.3.6
   resolution: "chai@npm:4.3.6"
   dependencies:
