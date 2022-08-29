@@ -38,7 +38,7 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
     uint256 nftRank;
   }
 
-  IHoprStake public immutable STAKE_CONTRACT; // contract of HoprStake contract
+  IHoprStake public stakeContract; // contract of HoprStake contract
   // minimum amount HOPR tokens being staked in the staking contract to be considered eligible
   // for every stakeThreshold, one peer id can be registered.
   uint256 public stakeThreshold;
@@ -51,20 +51,21 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   event SpecialNftTypeAndRankAdded(uint256 indexed nftType, uint256 indexed nftRank, uint256 indexed maxRegistration); // emit when a new special type and rank of NFT gets included in the eligibility list
   event SpecialNftTypeAndRankRemoved(uint256 indexed nftType, uint256 indexed nftRank); // emit when a special type and rank of NFT gets removed from the eligibility list
   event ThresholdUpdated(uint256 indexed threshold); // emit when the staking threshold gets updated.
+  event StakeContractUpdated(address indexed stakeContract); // emit when the staking threshold gets updated.
 
   /**
    * @dev Set stake contract address, transfer ownership, and set the maximum registrations per
    * special NFT to the default value: upperbound of of uint256.
    */
   constructor(
-    address stakeContract,
-    address newOwner,
-    uint256 minStake
+    address _stakeContract,
+    address _newOwner,
+    uint256 _minStake
   ) {
-    STAKE_CONTRACT = IHoprStake(stakeContract);
-    stakeThreshold = minStake;
+    _updateStakeContract(_stakeContract);
+    _transferOwnership(_newOwner);
+    stakeThreshold = _minStake;
     emit ThresholdUpdated(stakeThreshold);
-    _transferOwnership(newOwner);
   }
 
   /**
@@ -79,14 +80,14 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
     // if the account owns a special NFT, requirement is fulfilled
     for (uint256 i = 0; i < specialNftTypeAndRank.length; i++) {
       NftTypeAndRank memory eligible = specialNftTypeAndRank[i];
-      if (STAKE_CONTRACT.isNftTypeAndRankRedeemed3(eligible.nftType, eligible.nftRank, account)) {
+      if (stakeContract.isNftTypeAndRankRedeemed3(eligible.nftType, eligible.nftRank, account)) {
         allowedRegistration = allowedRegistration.max(maxRegistrationsPerSpecialNft[i]);
       }
     }
 
     // when no special NFT is present, the account needs to 1) reach the minimum stake, 2) own an eligible NFT
     // for self-claiming accounts, check against the current criteria
-    uint256 amount = STAKE_CONTRACT.stakedHoprTokens(account);
+    uint256 amount = stakeContract.stakedHoprTokens(account);
     if (amount < stakeThreshold) {
       // threshold does not meet
       return allowedRegistration;
@@ -94,7 +95,7 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
     // check on regular eligible NFTs.
     for (uint256 i = 0; i < eligibleNftTypeAndRank.length; i++) {
       NftTypeAndRank memory eligible = eligibleNftTypeAndRank[i];
-      if (STAKE_CONTRACT.isNftTypeAndRankRedeemed3(eligible.nftType, eligible.nftRank, account)) {
+      if (stakeContract.isNftTypeAndRankRedeemed3(eligible.nftType, eligible.nftRank, account)) {
         allowedRegistration = allowedRegistration.max(amount / stakeThreshold);
       }
     }
@@ -206,6 +207,14 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   }
 
   /**
+   * @dev update linked stake contract
+   * @param _stakeContract address of the staking contract from which registration info is obtained.
+   */
+  function updateStakeContract(address _stakeContract) external {
+    _updateStakeContract(_stakeContract);
+  }
+
+  /**
    * @dev adds NFT type and rank to the list of special NFTs.
    * @param nftType Type index of the special HoprBoost NFT
    * @param nftRank HOPR boost numerator, which is associated to the special NFT
@@ -280,5 +289,14 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
         emit NftTypeAndRankRemoved(nftType, nftRank);
       }
     }
+  }
+
+  /**
+   * Update stake contract address
+   * @param _stakeContract address of the staking contract
+   */
+  function _updateStakeContract(address _stakeContract) private {
+    stakeContract = IHoprStake(_stakeContract);
+    emit StakeContractUpdated(_stakeContract);
   }
 }
