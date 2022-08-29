@@ -49,9 +49,17 @@ export default class Channels extends Command {
     const showOutgoing = param === 'outgoing'
 
     log('fetching channels...')
-    const channelsRes = await this.api.getChannels()
-    if (!channelsRes.ok) return log(this.failedCommand('get channels'))
-    const channels = await channelsRes.json()
+    const response = await this.api.getChannels()
+
+    if (!response.ok) {
+      return log(
+        await this.failedApiCall(response, 'fetch channels', {
+          422: (v) => v.error
+        })
+      )
+    }
+
+    const channels = await response.json()
 
     if (!showOutgoing) {
       const incomingChannels = channels.incoming.filter((channel) => {

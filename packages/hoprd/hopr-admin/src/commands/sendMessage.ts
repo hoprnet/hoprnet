@@ -62,9 +62,23 @@ export default class SendMessage extends Command {
     }
 
     const [settingsRes, addressesRes] = await Promise.all([this.api.getSettings(), this.api.getAddresses()])
-    if (!settingsRes.ok || !addressesRes.ok) {
-      return log(this.failedCommand('send message'))
+
+    if (!settingsRes.ok) {
+      return log(
+        await this.failedApiCall(settingsRes, `send message to ${recipient} when fetching latest settings`, {
+          422: (v) => v.error
+        })
+      )
     }
+
+    if (!addressesRes.ok) {
+      return log(
+        await this.failedApiCall(addressesRes, `send message to ${recipient} when fetching addresses`, {
+          422: (v) => v.error
+        })
+      )
+    }
+
     const settings = await settingsRes.json()
     const addresses = await addressesRes.json()
 
@@ -95,7 +109,11 @@ export default class SendMessage extends Command {
     const response = await this.api.sendMessage(payload, recipient, path)
 
     if (!response.ok) {
-      return log(this.failedCommand('send message'))
+      return log(
+        await this.failedApiCall(response, `send message to ${recipient}`, {
+          422: (v) => v.error
+        })
+      )
     } else {
       return log(`Message to ${recipient} sent`)
     }

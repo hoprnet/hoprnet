@@ -28,27 +28,23 @@ export default class Ping extends Command {
     }
 
     const peerIdStr = peerId.toString()
-    const pingRes = await this.api.ping(peerIdStr)
+    const response = await this.api.ping(peerIdStr)
 
-    if (pingRes.ok) {
-      const ping = await pingRes.json()
-
-      if (ping.latency >= 0) {
-        return log(`Pong received in ${ping.latency} ms`)
-      } else {
-        return log(this.failedCommand('ping node', 'timeout'))
-      }
+    if (!response.ok) {
+      return log(
+        await this.failedApiCall(response, 'ping node', {
+          400: `invalid peer ID ${peerIdStr}`,
+          422: ''
+        })
+      )
     }
 
-    // Handle known errors
-    switch (pingRes.status) {
-      case 400:
-        return log(this.failedCommand('ping node', `invalid peer ID ${peerIdStr}`))
-      case 422:
-        const errJson = await (pingRes as Response).json()
-        return log(this.failedCommand('ping node', JSON.stringify(errJson).replaceAll(/[}{"]/g, '')))
-      default:
-        return log(this.failedCommand('ping node', `unknown: ${String(pingRes.body)}`))
+    const ping = await response.json()
+
+    if (ping.latency >= 0) {
+      return log(`Pong received in ${ping.latency} ms`)
+    } else {
+      return log(this.failedCommand('ping node', 'timeout'))
     }
   }
 }

@@ -40,8 +40,26 @@ export default class CloseChannel extends Command {
     ])
 
     if (!closeChannelRes.ok) {
-      log(`Channel to "${counterparty}" closed.`)
+      return log(
+        await this.failedApiCall(closeChannelRes, `close channel with '${counterparty.toString()}'`, {
+          400: `invalid peer ID ${counterparty.toString()}`,
+          422: (v) => v.error
+        })
+      )
     }
+
+    if (!infoRes.ok) {
+      return log(
+        await this.failedApiCall(
+          infoRes,
+          `close channel with '${counterparty.toString()}' when fetching node information`,
+          {
+            422: (v) => v.error
+          }
+        )
+      )
+    }
+
     if (infoRes.ok) {
       channelClosurePeriod = (await infoRes.json()).channelClosurePeriod
     }

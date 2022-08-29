@@ -31,9 +31,17 @@ export default class Balances extends Command {
     const [error, use, type] = this.assertUsage(query) as [string | undefined, string, string]
     if (error) return log(error)
 
-    const balancesRes = await this.api.getBalances()
-    if (!balancesRes.ok) return log(this.failedCommand('get balances'))
-    const balances = await balancesRes.json()
+    const response = await this.api.getBalances()
+
+    if (!response.ok) {
+      return log(
+        await this.failedApiCall(response, 'fetch balances', {
+          422: (v) => v.error
+        })
+      )
+    }
+
+    const balances = await response.json()
 
     const hoprPrefix = 'HOPR Balance:'
     const hoprBalance = ethersUtils.formatEther(balances.hopr)

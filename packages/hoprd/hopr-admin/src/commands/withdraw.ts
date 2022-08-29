@@ -36,7 +36,15 @@ export default class Withdraw extends Command {
 
     const amountWei = ethersUtils.parseEther(String(amount))
     const response = await this.api.withdraw(amountWei.toString(), currency, recipient)
-    if (!response.ok) return log(this.failedCommand('withdraw'))
+
+    if (!response.ok) {
+      return log(
+        await this.failedApiCall(response, 'withdraw', {
+          400: (v) => `one or more invalid inputs ${v.status}`,
+          422: (v) => v.status
+        })
+      )
+    }
 
     const receipt = response.json().then((res) => res.receipt)
     return log(`Withdrawing ${amount} ${currency} to ${recipient}, receipt ${receipt}.`)

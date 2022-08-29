@@ -71,6 +71,7 @@ export abstract class Command {
   }
 
   /**
+   * Generate 'no query provided' message.
    * @returns When no query is provided.
    */
   protected noQuery(): string {
@@ -78,6 +79,7 @@ export abstract class Command {
   }
 
   /**
+   * Generate 'invalid query' message.
    * @returns Generic invalid query message.
    */
   protected invalidQuery(query: string): string {
@@ -85,6 +87,7 @@ export abstract class Command {
   }
 
   /**
+   * Generate 'invalid paramater' message.
    * @returns Specific paramater was invalid.
    */
   protected invalidParameter(param: string, type: string): string {
@@ -92,11 +95,36 @@ export abstract class Command {
   }
 
   /**
-   * @param task what has failed
+   * Generate 'failed command' message.
+   * @param task what action has failed
+   * @param error optional error message
    * @returns Generic error message when something has failed.
    */
   protected failedCommand(task: string, error?: string): string {
     return `Failed to ${task}${error ? ' with error "' + error + '"' : ''}.`
+  }
+
+  /**
+   * Generate 'failed command' message with API
+   * failure context.
+   * @param response API response that failed
+   * @param task what action has failed
+   * @param knownErrors an object containing known errors
+   * @returns Error message when something has failed.
+   */
+  protected async failedApiCall<T extends Response>(
+    response: T,
+    task: string,
+    knownErrors: {
+      [statusCode: number]: string | ((v: any) => string)
+    }
+  ): Promise<string> {
+    const knownError = knownErrors[response.status]
+    if (knownError) {
+      return this.failedCommand(task, typeof knownError === 'string' ? knownError : knownError(await response.json()))
+    } else {
+      return this.failedCommand(task, `unknown error code '${response.status}'`)
+    }
   }
 
   /**
