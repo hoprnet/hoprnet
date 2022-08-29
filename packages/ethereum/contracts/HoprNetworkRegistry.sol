@@ -116,17 +116,22 @@ contract HoprNetworkRegistry is Ownable {
 
     for (uint256 i = 0; i < hoprPeerIds.length; i++) {
       string memory hoprPeerId = hoprPeerIds[i];
-      if (bytes(hoprPeerId).length != 53 && bytes32(bytes(hoprPeerIds[i])[0:8]) != '16Uiu2HA') {
+      if (bytes(hoprPeerId).length != 53 || bytes32(bytes(hoprPeerIds[i])[0:8]) != '16Uiu2HA') {
         revert InvalidPeerId({peerId: hoprPeerId});
       }
       // get account associated with the given hopr node peer id, if any
       address registeredAccount = nodePeerIdToAccount[hoprPeerId];
-      // if the hopr node peer id was linked to a different account, revert.
-      // To change a nodes' linked account, it must be deregistered by the previously linked account
-      // first before registering by the new account, to prevent hostile takeover of others' node peer id
-      require(registeredAccount == address(0), 'HoprNetworkRegistry: Cannot link a registered node.');
-      nodePeerIdToAccount[hoprPeerId] = msg.sender;
-      emit Registered(msg.sender, hoprPeerId);
+      if (registeredAccount == msg.sender) {
+        // when registering the registerd account, skip
+        continue;
+      } else {
+        // if the hopr node peer id was linked to a different account, revert.
+        // To change a nodes' linked account, it must be deregistered by the previously linked account
+        // first before registering by the new account, to prevent hostile takeover of others' node peer id
+        require(registeredAccount == address(0), 'HoprNetworkRegistry: Cannot link a registered node.');
+        nodePeerIdToAccount[hoprPeerId] = msg.sender;
+        emit Registered(msg.sender, hoprPeerId);
+      }
     }
   }
 
@@ -164,14 +169,14 @@ contract HoprNetworkRegistry is Ownable {
 
   /**
    * @dev Owner adds Ethereum addresses and HOPR node ids to the registration.
-   * Function can only be called when the registry is enabled.
+   * Function can be called at any time.
    * Allows owner to register arbitrary HOPR peer ids even if accounts do not fulfill registration requirements.
    * HOPR node peer id validation should be done off-chain.
    * @notice It allows owner to overwrite exisitng entries.
    * @param accounts Array of Ethereum accounts, e.g. [0xf6A8b267f43998B890857f8d1C9AabC68F8556ee]
    * @param hoprPeerIds Array of hopr nodes id. e.g. [16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x1]
    */
-  function ownerRegister(address[] calldata accounts, string[] calldata hoprPeerIds) external onlyOwner mustBeEnabled {
+  function ownerRegister(address[] calldata accounts, string[] calldata hoprPeerIds) external onlyOwner {
     require(hoprPeerIds.length == accounts.length, 'HoprNetworkRegistry: hoprPeerIdes and accounts lengths mismatch');
     for (uint256 i = 0; i < accounts.length; i++) {
       // validate peer the length and prefix of peer Ids. If invalid, skip.
@@ -183,28 +188,42 @@ contract HoprNetworkRegistry is Ownable {
         // update the counter
         countRegisterdNodesPerAccount[account] += 1;
         emit RegisteredByOwner(account, hoprPeerId);
-        emit EligibilityUpdated(account, true);
       }
     }
   }
 
   /**
    * @dev Owner removes previously owner-added Ethereum addresses and HOPR node ids from the registration.
-   * Function can only be called when the registry is enabled.
+   * Function can be called at any time.
    * @notice Owner can even remove self-declared entries.
    * @param hoprPeerIds Array of hopr nodes id. e.g. [16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x1]
    */
-  function ownerDeregister(string[] calldata hoprPeerIds) external onlyOwner mustBeEnabled {
+  function ownerDeregister(string[] calldata hoprPeerIds) external onlyOwner {
     for (uint256 i = 0; i < hoprPeerIds.length; i++) {
       string memory hoprPeerId = hoprPeerIds[i];
       address account = nodePeerIdToAccount[hoprPeerId];
-      delete nodePeerIdToAccount[hoprPeerId];
-      countRegisterdNodesPerAccount[account] -= 1;
-      // Eligibility update should have a logindex strictly smaller
-      // than the deregister event to make sure it always gets processed
-      // before the deregister event
-      emit DeregisteredByOwner(account, hoprPeerId);
-      emit EligibilityUpdated(account, false);
+      if (account != address(0)) {
+        delete nodePeerIdToAccount[hoprPeerId];
+        countRegisterdNodesPerAccount[account] -= 1;
+        // Eligibility update should have a logindex strictly smaller
+        // than the deregister event to make sure it always gets processed
+        // before the deregister event
+        emit DeregisteredByOwner(account, hoprPeerId);
+      }
+    }
+  }
+
+  /**
+   * @dev Force emit eligibility update by the owner.
+   * @notice This does not change the result returned from the proxy, so if `sync` is called on those accounts,
+   * it may return a different result.
+   * @param accounts Array of Ethereum accounts, e.g. [0xf6A8b267f43998B890857f8d1C9AabC68F8556ee]
+   * @param eligibility Array of account eligibility, e.g. [true]
+   */
+  function ownerForceEligibility(address[] calldata accounts, bool[] calldata eligibility) external onlyOwner {
+    require(accounts.length == eligibility.length, 'HoprNetworkRegistry: accounts and eligibility lengths mismatch');
+    for (uint256 i = 0; i < accounts.length; i++) {
+      emit EligibilityUpdated(accounts[i], eligibility[i]);
     }
   }
 
@@ -223,11 +242,11 @@ contract HoprNetworkRegistry is Ownable {
         // if the account does not have any registered address
         continue;
       }
-      if (!_checkEligibility(account)) {
+      if (_checkEligibility(account)) {
+        emit EligibilityUpdated(account, true);
+      } else {
         // if the account is no longer eligible
         emit EligibilityUpdated(account, false);
-      } else {
-        emit EligibilityUpdated(account, true);
       }
     }
   }
@@ -262,7 +281,7 @@ contract HoprNetworkRegistry is Ownable {
    * @param account address to check its eligibility
    */
   function _checkEligibility(address account) private view returns (bool) {
-    uint256 maxAllowedRegistration = requirementImplementation.maxAllowedRegistrations(msg.sender);
+    uint256 maxAllowedRegistration = requirementImplementation.maxAllowedRegistrations(account);
     if (countRegisterdNodesPerAccount[account] <= maxAllowedRegistration) {
       return true;
     } else {
