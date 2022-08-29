@@ -1,7 +1,7 @@
 import chai, { expect } from 'chai'
 import { deployments, ethers } from 'hardhat'
 import { smock } from '@defi-wonderland/smock'
-import { Contract, Signer } from 'ethers'
+import { constants, Contract, Signer } from 'ethers'
 import { HoprStakingProxyForNetworkRegistry } from '../../src/types'
 
 chai.should() // if you like should syntax
@@ -13,7 +13,26 @@ const NFT_RANK = [123, 456]
 const HIGH_STAKE = 2000
 const LOW_STAKE = 100
 const SPECIAL_NFT_TYPE = 3 // 'Dev'
-const SPECIAL_NFT_RANK = 0 // 'Rock'
+const SPECIAL_NFT_RANK_TECH = 0 // 'Tech'
+const SPECIAL_NFT_RANK_COM = 0 // 'Com'
+const MAX_REGISTRATION_TECH = constants.MaxUint256;
+const MAX_REGISTRATION_COM = 1;
+
+/**
+ * Allocation of NFTs and staks
+ * | NFT Type      | 0 | 0 | 1 | 1 | Dev  | Dev | Stake |
+ * |---------------|---|---|---|---|------|-----|-------|
+ * | NFT Rank      | 0 | 1 | 0 | 1 | Tech | Com | --    |
+ * | Participant_0 |   | x |   |   |      |     | 2000  |
+ * | Participant_1 |   |   | x |   |      |     | 2000  |
+ * | Participant_2 |   | x |   |   | x    |     | 0     |
+ * | Participant_3 |   |   | x |   |      |     | 0     |
+ * | Participant_4 |   |   | x |   |      |     | 2000  |
+ * | Participant_5 |   | x |   |   |      |     | 0     |
+ * | Participant_6 |   |   | x |   |      | x   | 0     |
+ * @param participants 
+ * @returns 
+ */
 
 const createFakeStakeV2Contract = async (participants: string[]) => {
   const stakeV2Fake = await smock.fake([
@@ -88,9 +107,13 @@ const createFakeStakeV2Contract = async (participants: string[]) => {
       stakeV2Fake.stakedHoprTokens.whenCalledWith(participant).returns(LOW_STAKE)
     }
   })
-  // participant 2 redeemd a special NFT
+  // participant 2 redeemd a special NFT (TECH)
   stakeV2Fake.isNftTypeAndRankRedeemed3
-    .whenCalledWith(SPECIAL_NFT_TYPE, SPECIAL_NFT_RANK, participants[2])
+    .whenCalledWith(SPECIAL_NFT_TYPE, SPECIAL_NFT_RANK_TECH, participants[2])
+    .returns(true)
+  // participant 6 redeemd a special NFT (COM)
+  stakeV2Fake.isNftTypeAndRankRedeemed3
+    .whenCalledWith(SPECIAL_NFT_TYPE, SPECIAL_NFT_RANK_COM, participants[6])
     .returns(true)
   return stakeV2Fake
 }

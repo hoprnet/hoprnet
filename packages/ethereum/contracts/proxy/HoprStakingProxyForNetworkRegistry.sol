@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import '@openzeppelin/contracts/access/Ownable.sol';
+import '@openzeppelin/contracts/utils/math/Math.sol';
 import '../IHoprNetworkRegistryRequirement.sol';
 
 /**
@@ -30,6 +31,8 @@ contract IHoprStake {
  * by the owner.
  */
 contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Ownable {
+  using Math for uint256;
+
   struct NftTypeAndRank {
     uint256 nftType;
     uint256 nftRank;
@@ -39,16 +42,15 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   // minimum amount HOPR tokens being staked in the staking contract to be considered eligible
   // for every stakeThreshold, one peer id can be registered.
   uint256 public stakeThreshold;
-  uint256 public maxRegistrationsPerSpecialNft; // for holders of special NFT, it's the cap of peer ids one address can register.
   NftTypeAndRank[] public eligibleNftTypeAndRank; // list of NFTs whose owner are considered as eligible to the network if the `stakeThreshold` is also met
+  uint256[] public maxRegistrationsPerSpecialNft; // for holders of special NFT, it's the cap of peer ids one address can register.
   NftTypeAndRank[] public specialNftTypeAndRank; // list of NFTs whose owner are considered as eligible to the network without meeting the `stakeThreshold`, e.g. "Dev NFT"
 
   event NftTypeAndRankAdded(uint256 indexed nftType, uint256 indexed nftRank); // emit when a new NFT type and rank gets included in the eligibility list
   event NftTypeAndRankRemoved(uint256 indexed nftType, uint256 indexed nftRank); // emit when a NFT type and rank gets removed from the eligibility list
-  event SpecialNftTypeAndRankAdded(uint256 indexed nftType, uint256 indexed nftRank); // emit when a new special type and rank of NFT gets included in the eligibility list
+  event SpecialNftTypeAndRankAdded(uint256 indexed nftType, uint256 indexed nftRank, uint256 indexed maxRegistration); // emit when a new special type and rank of NFT gets included in the eligibility list
   event SpecialNftTypeAndRankRemoved(uint256 indexed nftType, uint256 indexed nftRank); // emit when a special type and rank of NFT gets removed from the eligibility list
   event ThresholdUpdated(uint256 indexed threshold); // emit when the staking threshold gets updated.
-  event MaxRegistrationsPerSpecialNftUpdated(uint256 indexed maxValue); // emit when the maxRegistrationsPerSpecialNft gets updated.
 
   /**
    * @dev Set stake contract address, transfer ownership, and set the maximum registrations per
@@ -61,24 +63,24 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   ) {
     STAKE_CONTRACT = IHoprStake(stakeContract);
     stakeThreshold = minStake;
-    maxRegistrationsPerSpecialNft = type(uint256).max;
     emit ThresholdUpdated(stakeThreshold);
-    emit MaxRegistrationsPerSpecialNftUpdated(maxRegistrationsPerSpecialNft);
     _transferOwnership(newOwner);
   }
 
   /**
-   * @dev Returns the maximum allowed registration.
-   * a) special NFTs, returns `maxRegistrationsPerSpecialNft`
-   * b) if NFT of eligibleNftTypeAndRank are redeemed, floor(`stake`/`threshold`)
+   * @dev Returns the maximum allowed registration
+   * a) for each special NFTs staked, consider their `maxRegistrationsPerSpecialNft`
+   * b) if NFT of eligibleNftTypeAndRank are redeemed, consider floor(`stake`/`threshold`)
+   * returns the maximum of the above mentioned categories
    * @param account staker address that has a hopr nodes running
    */
   function maxAllowedRegistrations(address account) external view returns (uint256) {
+    uint256 allowedRegistration;
     // if the account owns a special NFT, requirement is fulfilled
     for (uint256 i = 0; i < specialNftTypeAndRank.length; i++) {
       NftTypeAndRank memory eligible = specialNftTypeAndRank[i];
       if (STAKE_CONTRACT.isNftTypeAndRankRedeemed3(eligible.nftType, eligible.nftRank, account)) {
-        return maxRegistrationsPerSpecialNft;
+        allowedRegistration = allowedRegistration.max(maxRegistrationsPerSpecialNft[i]);
       }
     }
 
@@ -87,34 +89,40 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
     uint256 amount = STAKE_CONTRACT.stakedHoprTokens(account);
     if (amount < stakeThreshold) {
       // threshold does not meet
-      return 0;
+      return allowedRegistration;
     }
     // check on regular eligible NFTs.
     for (uint256 i = 0; i < eligibleNftTypeAndRank.length; i++) {
       NftTypeAndRank memory eligible = eligibleNftTypeAndRank[i];
       if (STAKE_CONTRACT.isNftTypeAndRankRedeemed3(eligible.nftType, eligible.nftRank, account)) {
-        return amount / stakeThreshold;
+        allowedRegistration = allowedRegistration.max(amount / stakeThreshold);
       }
     }
 
-    return 0;
+    return allowedRegistration;
   }
 
   /**
    * @dev Owner adds/updates NFT type and rank to the list of special NFTs in batch.
    * @param nftTypes Array of type indexes of the special HoprBoost NFT
    * @param nftRanks Array of HOPR boost numerator, which is associated to the special NFT
+   * @param maxRegistrations Array of maximum registration per special NFT type
    */
-  function ownerBatchAddSpecialNftTypeAndRank(uint256[] calldata nftTypes, uint256[] calldata nftRanks)
-    external
-    onlyOwner
-  {
+  function ownerBatchAddSpecialNftTypeAndRank(
+    uint256[] calldata nftTypes,
+    uint256[] calldata nftRanks,
+    uint256[] calldata maxRegistrations
+  ) external onlyOwner {
     require(
       nftTypes.length == nftRanks.length,
-      'HoprStakingProxyForNetworkRegistry: ownerBatchAddSpecialNftTypeAndRank lengths mismatch'
+      'HoprStakingProxyForNetworkRegistry: ownerBatchAddSpecialNftTypeAndRank nftTypes and nftRanks lengths mismatch'
+    );
+    require(
+      nftTypes.length == maxRegistrations.length,
+      'HoprStakingProxyForNetworkRegistry: ownerBatchAddSpecialNftTypeAndRank nftTypes and maxRegistrations lengths mismatch'
     );
     for (uint256 index = 0; index < nftTypes.length; index++) {
-      _addSpecialNftTypeAndRank(nftTypes[index], nftRanks[index]);
+      _addSpecialNftTypeAndRank(nftTypes[index], nftRanks[index], maxRegistrations[index]);
     }
   }
 
@@ -198,35 +206,26 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   }
 
   /**
-   * @dev Owner updates the maximum allowed number of nodes registered per special NFT
-   * @param newMax Maximum number of nodes that are allowed for registration per special NFT
-   */
-  function ownerUpdateMaxRegistrationsPerSpecialNft(uint256 newMax) external onlyOwner {
-    require(
-      maxRegistrationsPerSpecialNft != newMax,
-      'HoprStakingProxyForNetworkRegistry: try to update with the same maxRegistrationsPerSpecialNft'
-    );
-    maxRegistrationsPerSpecialNft = newMax;
-    emit MaxRegistrationsPerSpecialNftUpdated(maxRegistrationsPerSpecialNft);
-  }
-
-  /**
    * @dev adds NFT type and rank to the list of special NFTs.
    * @param nftType Type index of the special HoprBoost NFT
    * @param nftRank HOPR boost numerator, which is associated to the special NFT
+   * @param maxRegistration maximum registration of HOPR node per special NFT
    */
-  function _addSpecialNftTypeAndRank(uint256 nftType, uint256 nftRank) private {
+  function _addSpecialNftTypeAndRank(
+    uint256 nftType,
+    uint256 nftRank,
+    uint256 maxRegistration
+  ) private {
     uint256 i = 0;
     for (i; i < specialNftTypeAndRank.length; i++) {
       // walk through all the types
       if (specialNftTypeAndRank[i].nftType == nftType && specialNftTypeAndRank[i].nftRank == nftRank) {
-        // already exist;
-        return;
+        // already exist, overwrite maxRegistration
+        maxRegistrationsPerSpecialNft[i] = maxRegistration;
       }
     }
     specialNftTypeAndRank.push(NftTypeAndRank({nftType: nftType, nftRank: nftRank}));
-    emit SpecialNftTypeAndRankAdded(nftType, nftRank);
-    (nftType, nftRank);
+    emit SpecialNftTypeAndRankAdded(nftType, nftRank, maxRegistration);
   }
 
   /**
@@ -241,6 +240,8 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
         // overwrite with the last element in the array
         specialNftTypeAndRank[i] = specialNftTypeAndRank[specialNftTypeAndRank.length - 1];
         specialNftTypeAndRank.pop();
+        maxRegistrationsPerSpecialNft[i] = maxRegistrationsPerSpecialNft[maxRegistrationsPerSpecialNft.length - 1];
+        maxRegistrationsPerSpecialNft.pop();
         emit SpecialNftTypeAndRankRemoved(nftType, nftRank);
       }
     }
