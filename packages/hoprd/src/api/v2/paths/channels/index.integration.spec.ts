@@ -2,8 +2,14 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
-import { createTestApiInstance, ALICE_PEER_ID, ALICE_NATIVE_ADDR, INVALID_PEER_ID } from '../../fixtures.js'
-import { Balance, ChannelEntry, NativeBalance } from '@hoprnet/hopr-utils'
+import {
+  createTestApiInstance,
+  ALICE_PEER_ID,
+  BOB_PEER_ID,
+  ALICE_NATIVE_ADDR,
+  INVALID_PEER_ID
+} from '../../fixtures.js'
+import { Balance, ChannelEntry, NativeBalance, PublicKey, UINT256, Hash, ChannelStatus } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { STATUS_CODES } from '../../utils.js'
 
@@ -23,8 +29,28 @@ node.openChannel = sinon.fake.returns(
 )
 
 describe('GET /channels', function () {
-  const incoming = ChannelEntry.createMock()
-  const outgoing = ChannelEntry.createMock()
+  const incoming = new ChannelEntry(
+    PublicKey.fromPeerId(ALICE_PEER_ID),
+    PublicKey.fromPeerId(BOB_PEER_ID),
+    new Balance(new BN(1)),
+    Hash.create(),
+    new UINT256(new BN(1)),
+    new UINT256(new BN(1)),
+    ChannelStatus.Closed,
+    new UINT256(new BN(1)),
+    new UINT256(new BN(1))
+  )
+  const outgoing = new ChannelEntry(
+    PublicKey.fromPeerId(BOB_PEER_ID),
+    PublicKey.fromPeerId(ALICE_PEER_ID),
+    new Balance(new BN(1)),
+    Hash.create(),
+    new UINT256(new BN(1)),
+    new UINT256(new BN(1)),
+    ChannelStatus.Closed,
+    new UINT256(new BN(1)),
+    new UINT256(new BN(1))
+  )
   node.getChannelsFrom = sinon.fake.returns(Promise.resolve([outgoing]))
   node.getChannelsTo = sinon.fake.returns(Promise.resolve([incoming]))
 
