@@ -205,6 +205,16 @@ export default class HoprCoreEthereum extends EventEmitter {
     return useCache ? this.cachedGetNativeBalance() : this.uncachedGetNativeBalance()
   }
 
+  public getPublicHoprOptions(): {
+    environment: string
+    network: string
+  } {
+    return {
+      environment: this.options.environment,
+      network: this.options.network
+    }
+  }
+
   public smartContractInfo(): {
     network: string
     hoprTokenAddress: string

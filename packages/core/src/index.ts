@@ -999,6 +999,16 @@ class Hopr extends EventEmitter {
     return await this.connector.getNativeBalance(true)
   }
 
+  public getPublicHoprOptions(): {
+    environment: string
+    network: string
+  } {
+    return {
+      environment: this.options.environment.id,
+      network: this.options.environment.network.id
+    }
+  }
+
   public smartContractInfo(): {
     network: string
     hoprTokenAddress: string
