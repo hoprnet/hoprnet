@@ -1,11 +1,8 @@
-import chai, { expect } from 'chai'
+import { expect } from 'chai'
 import { deployments, ethers } from 'hardhat'
 import { toSolPercent, increaseTime } from './utils'
 import type { HoprToken, HoprDistributor } from '../src/types'
 import deployERC1820Registry from '../deploy/01_ERC1820Registry'
-import { solidity } from 'ethereum-waffle'
-
-chai.use(solidity)
 
 const SCHEDULE_UNSET = 'SCHEDULE_UNSET'
 const SCHEDULE_1_MIN_ALL = 'SCHEDULE_1_MIN_ALL'
@@ -46,7 +43,7 @@ const useFixtures = deployments.createFixture(async (hre, ops: { startTime?: str
   }
 })
 
-describe('HoprDistributor', async function () {
+describe.only('HoprDistributor', async function () {
   describe('start time', function () {
     let f: Awaited<ReturnType<typeof useFixtures>>
 
