@@ -284,7 +284,7 @@ export const CMD_PARAMS: Record<CmdTypes, CmdArg<any, any, any>> = {
     'number',
     'Any number',
     (v) => {
-      return [!isNaN(v), v]
+      return [!isNaN(v) && isFinite(v), v]
     }
   ],
   string: [
