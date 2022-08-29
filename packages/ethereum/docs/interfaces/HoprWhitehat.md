@@ -82,7 +82,7 @@ BaseContract.\_deployedPromise
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:98
+node_modules/@ethersproject/contracts/lib/index.d.ts:100
 
 ___
 
@@ -100,7 +100,7 @@ BaseContract.\_runningEvents
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:99
+node_modules/@ethersproject/contracts/lib/index.d.ts:101
 
 ___
 
@@ -118,7 +118,7 @@ BaseContract.\_wrappedEmits
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:102
+node_modules/@ethersproject/contracts/lib/index.d.ts:104
 
 ___
 
@@ -132,7 +132,7 @@ BaseContract.address
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:77
+node_modules/@ethersproject/contracts/lib/index.d.ts:79
 
 ___
 
@@ -174,7 +174,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/src/types/HoprWhitehat.ts:488
+packages/ethereum/src/types/HoprWhitehat.ts:493
 
 ___
 
@@ -184,7 +184,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/src/types/HoprWhitehat.ts:260
+packages/ethereum/src/types/HoprWhitehat.ts:265
 
 ___
 
@@ -198,7 +198,7 @@ BaseContract.deployTransaction
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:97
+node_modules/@ethersproject/contracts/lib/index.d.ts:99
 
 ___
 
@@ -240,7 +240,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/src/types/HoprWhitehat.ts:641
+packages/ethereum/src/types/HoprWhitehat.ts:646
 
 ___
 
@@ -271,7 +271,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/src/types/HoprWhitehat.ts:579
+packages/ethereum/src/types/HoprWhitehat.ts:584
 
 ___
 
@@ -313,7 +313,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/src/types/HoprWhitehat.ts:286
+packages/ethereum/src/types/HoprWhitehat.ts:291
 
 ___
 
@@ -327,7 +327,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/src/types/HoprWhitehat.ts:265
+packages/ethereum/src/types/HoprWhitehat.ts:270
 
 ___
 
@@ -341,7 +341,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/src/types/HoprWhitehat.ts:281
+packages/ethereum/src/types/HoprWhitehat.ts:286
 
 ___
 
@@ -355,7 +355,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/src/types/HoprWhitehat.ts:282
+packages/ethereum/src/types/HoprWhitehat.ts:287
 
 ___
 
@@ -369,7 +369,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/src/types/HoprWhitehat.ts:283
+packages/ethereum/src/types/HoprWhitehat.ts:288
 
 ___
 
@@ -411,7 +411,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/src/types/HoprWhitehat.ts:743
+packages/ethereum/src/types/HoprWhitehat.ts:748
 
 ___
 
@@ -425,7 +425,7 @@ BaseContract.provider
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:80
+node_modules/@ethersproject/contracts/lib/index.d.ts:82
 
 ___
 
@@ -439,7 +439,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/src/types/HoprWhitehat.ts:284
+packages/ethereum/src/types/HoprWhitehat.ts:289
 
 ___
 
@@ -453,7 +453,7 @@ BaseContract.resolvedAddress
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:96
+node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ___
 
@@ -467,7 +467,7 @@ BaseContract.signer
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:79
+node_modules/@ethersproject/contracts/lib/index.d.ts:81
 
 ## Methods
 

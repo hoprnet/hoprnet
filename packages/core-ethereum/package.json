@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "1.89.17",
+  "version": "1.89.20",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -38,12 +38,13 @@
     "bn.js": "5.2.0",
     "chalk": "5.0.1",
     "debug": "4.3.4",
-    "ethers": "5.5.4",
+    "ethers": "5.7.0",
     "heap-js": "2.2.0",
     "multiaddr": "10.0.1",
     "secp256k1": "4.0.3"
   },
   "devDependencies": {
+    "@types/chai": "4.3.3",
     "@types/mocha": "9.1.1",
     "@types/yargs": "17.0.10",
     "chai": "4.3.6",
