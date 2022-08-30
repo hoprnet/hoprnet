@@ -56,6 +56,7 @@
 - [getConnectedPeers](default.md#getconnectedpeers)
 - [getConnectionInfo](default.md#getconnectioninfo)
 - [getConnectivityHealth](default.md#getconnectivityhealth)
+- [getEntryNodes](default.md#getentrynodes)
 - [getEthereumAddress](default.md#getethereumaddress)
 - [getId](default.md#getid)
 - [getIntermediateNodes](default.md#getintermediatenodes)
@@ -730,6 +731,16 @@ Recalculates and retrieves the current connectivity health indicator.
 #### Returns
 
 [`NetworkHealthIndicator`](../enums/NetworkHealthIndicator.md)
+
+___
+
+### getEntryNodes
+
+▸ **getEntryNodes**(): `Promise`<{ `id`: `PeerId` ; `multiaddrs`: `Multiaddr`[]  }[]\>
+
+#### Returns
+
+`Promise`<{ `id`: `PeerId` ; `multiaddrs`: `Multiaddr`[]  }[]\>
 
 ___
 
