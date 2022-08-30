@@ -2,8 +2,14 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
-import { createTestApiInstance, ALICE_PEER_ID, ALICE_NATIVE_ADDR, INVALID_PEER_ID } from '../../fixtures.js'
-import { Balance, ChannelEntry, NativeBalance } from '@hoprnet/hopr-utils'
+import {
+  createTestApiInstance,
+  ALICE_PEER_ID,
+  BOB_PEER_ID,
+  ALICE_NATIVE_ADDR,
+  INVALID_PEER_ID
+} from '../../fixtures.js'
+import { Balance, ChannelEntry, NativeBalance, PublicKey, UINT256, Hash, ChannelStatus } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { STATUS_CODES } from '../../utils.js'
 
@@ -23,9 +29,30 @@ node.openChannel = sinon.fake.returns(
 )
 
 describe('GET /channels', function () {
-  const testChannel = ChannelEntry.createMock()
-  node.getChannelsFrom = sinon.fake.returns(Promise.resolve([testChannel]))
-  node.getChannelsTo = sinon.fake.returns(Promise.resolve([testChannel]))
+  const incoming = new ChannelEntry(
+    PublicKey.fromPeerId(ALICE_PEER_ID),
+    PublicKey.fromPeerId(BOB_PEER_ID),
+    new Balance(new BN(1)),
+    Hash.create(),
+    new UINT256(new BN(1)),
+    new UINT256(new BN(1)),
+    ChannelStatus.Closed,
+    new UINT256(new BN(1)),
+    new UINT256(new BN(1))
+  )
+  const outgoing = new ChannelEntry(
+    PublicKey.fromPeerId(BOB_PEER_ID),
+    PublicKey.fromPeerId(ALICE_PEER_ID),
+    new Balance(new BN(1)),
+    Hash.create(),
+    new UINT256(new BN(1)),
+    new UINT256(new BN(1)),
+    ChannelStatus.Closed,
+    new UINT256(new BN(1)),
+    new UINT256(new BN(1))
+  )
+  node.getChannelsFrom = sinon.fake.returns(Promise.resolve([outgoing]))
+  node.getChannelsTo = sinon.fake.returns(Promise.resolve([incoming]))
 
   let service: any
   before(async function () {
@@ -43,6 +70,8 @@ describe('GET /channels', function () {
     expect(res).to.satisfyApiSpec
     expect(res.body.incoming.length).to.be.equal(1)
     expect(res.body.outgoing.length).to.be.equal(1)
+    expect(res.body.incoming[0].channelId).to.deep.equal(incoming.getId().toHex())
+    expect(res.body.outgoing[0].channelId).to.deep.equal(outgoing.getId().toHex())
   })
   it('should get channels list excluding closed', async function () {
     const res = await request(service).get('/api/v2/channels')

@@ -5,7 +5,7 @@ export default class Sign extends Command {
   constructor(api: API, cache: CacheFunctions) {
     super(
       {
-        default: [[['string', 'message', false]], '']
+        default: [[['string', 'message']], 'Signs a message']
       },
       api,
       cache
@@ -28,7 +28,7 @@ export default class Sign extends Command {
 
     const response = await this.api.signMessage(message)
     if (!response.ok) {
-      return log(this.invalidResponse('sign message'))
+      return log(this.failedCommand('sign message'))
     } else {
       return log(`Signed message: ${(await response.json()).signature}`)
     }

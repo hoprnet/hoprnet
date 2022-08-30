@@ -28,7 +28,8 @@
     "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo ./build ./rest-api-v2-full-spec.json",
     "build": "yarn clean && yarn build:wasm && tsc -p . && yarn buildAdmin && chmod u+x lib/*.js",
     "buildAdmin": "HOPRD_GIT_COMMIT=$(git rev-parse --short HEAD) next build hopr-admin",
-    "test": "yarn test:wasm && mocha --reporter=tap --full-trace --exit . test",
+    "test": "yarn test:wasm && mocha --reporter=tap --full-trace --exit . test && yarn testAdmin",
+    "testAdmin": "cd hopr-admin && mocha --require ts-node/register ./**/*.spec.ts",
     "prebuild": "next telemetry disable",
     "start": "node lib/main.cjs --admin --init --api",
     "dev": "NODE_ENV=development yarn start --environment hardhat-localhost --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses --testPreferLocalAddresses --testNoAuthentication",
@@ -79,6 +80,7 @@
     "mocha": "9.2.2",
     "sinon": "12.0.1",
     "supertest": "^6.2.2",
+    "ts-node": "^10.9.1",
     "typedoc": "0.23.2",
     "typedoc-plugin-markdown": "3.13.1",
     "typescript": "4.7.4"

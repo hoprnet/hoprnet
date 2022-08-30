@@ -59,7 +59,7 @@ export const getChannels = async (node: Hopr, includingClosed: boolean) => {
     .filter((channel) => includingClosed || channel.status !== ChannelStatus.Closed)
     .map(formatOutgoingChannel)
 
-  return { incoming: channelsFrom, outgoing: channelsTo }
+  return { incoming: channelsTo, outgoing: channelsFrom }
 }
 
 const GET: Operation = [

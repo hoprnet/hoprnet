@@ -7,7 +7,7 @@ export default class Help extends Command {
     super(
       {
         default: [[], 'displays help'],
-        showAll: [[['constant', "show hidden commands using 'all'", true]], 'shows hidden commands']
+        showAll: [[['constant', "show hidden commands using 'all'"]], 'shows hidden commands']
       },
       api,
       cache

@@ -1,6 +1,6 @@
 import type API from '../utils/api'
 import { toPaddedString } from '../utils'
-import { Command, type CacheFunctions } from '../utils/command'
+import { Command, type CacheFunctions, type HoprOrNative } from '../utils/command'
 import { utils as ethersUtils } from 'ethers'
 
 export default class Balances extends Command {
@@ -8,7 +8,7 @@ export default class Balances extends Command {
     super(
       {
         default: [[], 'shows all balances'],
-        onlyOne: [[['hoprOrNative', 'type', false]], 'shows shows one balance']
+        onlyOne: [[['hoprOrNative']], 'shows shows one balance']
       },
       api,
       cache
@@ -28,12 +28,20 @@ export default class Balances extends Command {
    * @notice triggered by the CLI
    */
   public async execute(log: (msg: string) => void, query: string): Promise<void> {
-    const [error, use, type] = this.assertUsage(query) as [string | undefined, string, string]
+    const [error, use, type] = this.assertUsage(query) as [string | undefined, string, HoprOrNative]
     if (error) return log(error)
 
-    const balancesRes = await this.api.getBalances()
-    if (!balancesRes.ok) return log(this.invalidResponse('get balances'))
-    const balances = await balancesRes.json()
+    const response = await this.api.getBalances()
+
+    if (!response.ok) {
+      return log(
+        await this.failedApiCall(response, 'fetch balances', {
+          422: (v) => v.error
+        })
+      )
+    }
+
+    const balances = await response.json()
 
     const hoprPrefix = 'HOPR Balance:'
     const hoprBalance = ethersUtils.formatEther(balances.hopr)
@@ -42,9 +50,9 @@ export default class Balances extends Command {
 
     if (use === 'onlyOne') {
       if (type === 'hopr') {
-        return log(toPaddedString([[hoprPrefix, hoprBalance]]))
+        return log(hoprBalance)
       } else {
-        return log(toPaddedString([[nativePrefix, nativeBalance]]))
+        return log(nativeBalance)
       }
     } else {
       return log(
