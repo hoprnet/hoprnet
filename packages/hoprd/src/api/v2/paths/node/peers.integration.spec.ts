@@ -12,6 +12,7 @@ import {
 } from '../../fixtures.js'
 import { STATUS_CODES } from '../../utils.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
+import type Hopr from '@hoprnet/hopr-core'
 
 const ALICE_ENTRY = {
   id: ALICE_PEER_ID,
@@ -19,7 +20,8 @@ const ALICE_ENTRY = {
   heartbeatsSuccess: 10,
   lastSeen: 1646410980793,
   backoff: 0,
-  quality: 1
+  quality: 1,
+  origin: 'unit test'
 }
 const ALICE_PEER_INFO = {
   peerId: ALICE_PEER_ID.toString(),
@@ -40,7 +42,8 @@ const BOB_ENTRY = {
   heartbeatsSuccess: 0,
   lastSeen: 1646410680793,
   backoff: 0,
-  quality: 0.2
+  quality: 0.2,
+  origin: 'unit test'
 }
 const BOB_PEER_INFO = {
   peerId: BOB_PEER_ID.toString(),
@@ -61,7 +64,8 @@ const CHARLIE_ENTRY = {
   heartbeatsSuccess: 8,
   lastSeen: 1646410980993,
   backoff: 0,
-  quality: 0.8
+  quality: 0.8,
+  origin: 'unit test'
 }
 const CHARLIE_PEER_INFO = {
   peerId: CHARLIE_PEER_ID.toString(),
@@ -75,7 +79,7 @@ const CHARLIE_PEER_INFO = {
   isNew: false
 }
 
-let node = sinon.fake() as any
+let node = sinon.fake() as any as Hopr
 node.getConnectedPeers = sinon.fake.returns([ALICE_PEER_ID, BOB_PEER_ID, CHARLIE_PEER_ID])
 node.getAddressesAnnouncedOnChain = sinon.fake.resolves([ALICE_MULTI_ADDR, BOB_MULTI_ADDR])
 node.getConnectionInfo = (peer: PeerId) => {
