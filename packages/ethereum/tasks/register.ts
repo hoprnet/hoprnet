@@ -15,7 +15,8 @@ export type RegisterOpts =
     }
   | {
       task: 'remove'
-      nativeAddresses: string
+      nativeAddresses?: string
+      peerIds: string
       privatekey: string // private key of the caller
     }
   | {
@@ -109,18 +110,33 @@ async function main(
       }
       await (await hoprNetworkRegistry.ownerRegister(nativeAddresses, peerIds)).wait()
     } else if (opts.task === 'remove') {
-      const nativeAddresses = opts.nativeAddresses.split(',')
-      // ensure all native addresses are valid
-      if (nativeAddresses.some((a) => !utils.isAddress(a))) {
-        console.error(`Given address list '${nativeAddresses.join(',')}' contains an invalid address.`)
-        process.exit(1)
-      }
-
+      const peerIds = opts.peerIds.split(',')
+      
       // in staging account, deregister; in non-stagin environment, remove addresses directly from proxy
       if (network.tags.development || network.tags.production) {
+        let nativeAddresses;
+        
+        if (opts.nativeAddresses) {
+          nativeAddresses = opts.nativeAddresses.split(',')
+          // ensure all native addresses are valid
+          if (nativeAddresses.some((a) => !utils.isAddress(a))) {
+            console.error(`Given address list '${nativeAddresses.join(',')}' contains an invalid address.`)
+            process.exit(1)
+          }
+
+          // ensure lists match in length
+          if (nativeAddresses.length !== peerIds.length) {
+            console.error('Given native and multiaddress lists do not match in length.')
+            process.exit(1)
+          }
+        }
+
         await (await (hoprProxy as HoprDummyProxyForNetworkRegistry).ownerBatchRemoveAccounts(nativeAddresses)).wait()
+      } else {
+        console.error(`Must provide addresses in ownerDeregister in ${environment}`)
+        process.exit(1)
       }
-      await (await hoprNetworkRegistry.ownerDeregister(nativeAddresses)).wait()
+      await (await hoprNetworkRegistry.ownerDeregister(peerIds)).wait()
     } else if (opts.task === 'enable' && !isEnabled) {
       await (await hoprNetworkRegistry.enableRegistry()).wait()
     } else if (opts.task === 'disable' && isEnabled) {
