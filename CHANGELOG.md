@@ -42,6 +42,7 @@
   - improved user experience with more consistent messages
 - Warn when manual path selection contains duplicate adjacent entries
 - Correctly recognize Avado/Dappnode private subnet ([#4032](https://github.com/hoprnet/hoprnet/pull/4032))
+- Add `entryNodes` command to API and `hopr-admin` ([#4049](https://github.com/hoprnet/hoprnet/pull/4049))
 
 # Breaking changes
 
