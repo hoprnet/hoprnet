@@ -150,9 +150,9 @@ export abstract class Command {
       // if one of the params is 'everything', we treat the rest
       // past everything as one string
       const arbitraryIndex = params.findIndex((p) => p[0] === 'arbitrary')
-      if (arbitraryIndex > 0) {
+      if (arbitraryIndex > -1) {
         const newParam = queryParams.slice(arbitraryIndex).join(' ')
-        queryParams = queryParams.slice(0, params.length - 1)
+        queryParams = queryParams.slice(0, arbitraryIndex)
         queryParams.push(newParam)
       }
 

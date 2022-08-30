@@ -7,7 +7,10 @@ export default class SendMessage extends Command {
       {
         default: [[['hoprAddressOrAlias'], ['arbitrary', 'message']], 'send a message, path is chosen automatically'],
         manual: [
-          [['string'], ['string', "path seperated by ','"], ['arbitrary', 'message']],
+          [
+            ['string', "path seperated by ','"],
+            ['arbitrary', 'message']
+          ],
           'send a message, path is manually specified'
         ]
       },
