@@ -17,7 +17,7 @@ const POST: Operation = [
 
     try {
       let ackChallenge = await req.context.node.sendMessage(message, recipient, path)
-      return res.status(204).json(ackChallenge)
+      return res.status(202).json(ackChallenge)
     } catch (err) {
       return res
         .status(422)
@@ -68,7 +68,7 @@ POST.apiDoc = {
     }
   },
   responses: {
-    '204': {
+    '202': {
       description: 'The message was sent successfully. NOTE: This does not imply successful delivery.',
       content: {
         'application/json': {
