@@ -166,11 +166,11 @@ export abstract class Command {
 
       // validate each parameter
       for (let i = 0; i < params.length; i++) {
-        const [paramType] = params[i]
+        const [paramType, customName] = params[i]
         const [, , validate] = CMD_PARAMS[paramType]
         const queryParam = queryParams[i]
 
-        const [valid, parsedValue] = validate(queryParam, { aliases })
+        const [valid, parsedValue] = validate(queryParam, { aliases, customName })
         if (!valid) {
           result = [this.invalidParameter(queryParam, paramType), use]
         } else {
@@ -275,10 +275,11 @@ export const CMD_PARAMS: Record<CmdTypes, CmdArg<any, any, any>> = {
   constant: [
     'constant',
     'A constant value',
-    (v) => {
-      return [true, v]
+    (v, { customName }) => {
+      if (!customName) return [false, v]
+      return [v === customName, v]
     }
-  ],
+  ] as CmdArg<string, { customName?: string }, any>,
   number: [
     'number',
     'Any number',
