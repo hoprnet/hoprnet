@@ -173,7 +173,6 @@ export abstract class Command {
         const [valid, parsedValue] = validate(queryParam, { aliases })
         if (!valid) {
           result = [this.invalidParameter(queryParam, paramType), use]
-          continue
         } else {
           parsedValues.push(parsedValue)
         }

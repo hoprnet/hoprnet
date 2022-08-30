@@ -1,6 +1,6 @@
 import type API from '../utils/api'
 import { utils as ethersUtils } from 'ethers'
-import { Command, type CacheFunctions } from '../utils/command'
+import { Command, type CacheFunctions, type HoprOrNative } from '../utils/command'
 
 export default class Withdraw extends Command {
   constructor(api: API, cache: CacheFunctions) {
@@ -29,7 +29,7 @@ export default class Withdraw extends Command {
       string | undefined,
       string,
       number,
-      string,
+      HoprOrNative,
       string
     ]
     if (error) return log(error)

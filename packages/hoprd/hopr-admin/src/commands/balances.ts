@@ -1,6 +1,6 @@
 import type API from '../utils/api'
 import { toPaddedString } from '../utils'
-import { Command, type CacheFunctions } from '../utils/command'
+import { Command, type CacheFunctions, type HoprOrNative } from '../utils/command'
 import { utils as ethersUtils } from 'ethers'
 
 export default class Balances extends Command {
@@ -28,7 +28,7 @@ export default class Balances extends Command {
    * @notice triggered by the CLI
    */
   public async execute(log: (msg: string) => void, query: string): Promise<void> {
-    const [error, use, type] = this.assertUsage(query) as [string | undefined, string, string]
+    const [error, use, type] = this.assertUsage(query) as [string | undefined, string, HoprOrNative]
     if (error) return log(error)
 
     const response = await this.api.getBalances()
