@@ -8,17 +8,11 @@ export default class Alias extends Command {
     super(
       {
         default: [[], 'show aliases'],
-        setAlias: [
-          [
-            ['hoprAddress', 'PeerId', true],
-            ['string', 'Name', true]
-          ],
-          'set alias'
-        ],
+        setAlias: [[['hoprAddress'], ['string', 'name']], 'set alias'],
         removeAlias: [
           [
-            ['constant', 'remove', false],
-            ['string', 'Name', true]
+            ['constant', 'remove'],
+            ['string', 'name']
           ],
           'remove alias'
         ]
@@ -62,7 +56,12 @@ export default class Alias extends Command {
         }))
         return log(`Alias '${name}' was set to '${peerId.toString()}'.`)
       } else {
-        return log(this.invalidResponse(`set alias '${name}'`))
+        return log(
+          await this.failedApiCall(response, `set alias '${name}'`, {
+            400: `invalid peer ID ${peerId.toString()}`,
+            422: (v) => v.error
+          })
+        )
       }
     } else {
       const response = await this.api.removeAlias(name)
@@ -74,7 +73,11 @@ export default class Alias extends Command {
         })
         return log(`Alias '${name}' was removed.`)
       } else {
-        return log(this.invalidResponse(`remove alias '${name}'`))
+        return log(
+          await this.failedApiCall(response, `remove alias '${name}'`, {
+            422: ''
+          })
+        )
       }
     }
   }

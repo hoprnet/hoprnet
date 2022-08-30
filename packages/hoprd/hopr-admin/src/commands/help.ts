@@ -7,7 +7,7 @@ export default class Help extends Command {
     super(
       {
         default: [[], 'displays help'],
-        showAll: [[['constant', "show hidden commands using 'all'", true]], 'shows hidden commands']
+        showAll: [[['constant', "show hidden commands using 'all'"]], 'shows hidden commands']
       },
       api,
       cache
@@ -34,6 +34,8 @@ export default class Help extends Command {
         return !cmd.hidden
       })
       .map<[string, string]>((cmd) => [cmd.name(), cmd.description()])
+      // Sort commands alphabetically
+      .sort((a, b) => a[0].localeCompare(b[0], 'en'))
 
     if (!showAll) arr.push(['', "* Display hidden commands by running 'help all'"])
 

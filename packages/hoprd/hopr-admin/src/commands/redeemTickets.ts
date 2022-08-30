@@ -26,7 +26,7 @@ export default class RedeemTickets extends Command {
   public async execute(log: (msg: string) => void, _query: string): Promise<void> {
     log('Redeeming all tickets...')
     const response = await this.api.redeemTickets()
-    if (!response.ok) return log(this.invalidResponse('redeem tickets'))
+    if (!response.ok) return log(this.failedCommand('redeem tickets'))
     log(`Redeemed all tickets. Run 'tickets' for details`)
   }
 }

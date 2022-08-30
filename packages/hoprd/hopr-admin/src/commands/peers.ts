@@ -17,7 +17,7 @@ export default class Peers extends Command {
 
   public async execute(log: (msg: string) => void, _query: string): Promise<void> {
     const peersRes = await this.api.getPeers()
-    if (!peersRes.ok) return log(this.invalidResponse('get peers'))
+    if (!peersRes.ok) return log(this.failedCommand('get peers'))
     const peers = await peersRes.json()
 
     const announced = peers.announced.map<[string, string]>((p) => [p.peerId, String(p.quality)])

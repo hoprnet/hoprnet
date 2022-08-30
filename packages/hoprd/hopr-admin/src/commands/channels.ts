@@ -8,8 +8,8 @@ export default class Channels extends Command {
     super(
       {
         default: [[], 'shows open channels'],
-        incoming: [[['constant', 'show incoming only', false]], 'show incoming channels'],
-        outgoing: [[['constant', 'show outgoing only', false]], 'show outgoing channels']
+        incoming: [[['direction']], 'show incoming channels'],
+        outgoing: [[['direction']], 'show outgoing channels']
       },
       api,
       cache
@@ -49,9 +49,17 @@ export default class Channels extends Command {
     const showOutgoing = param === 'outgoing'
 
     log('fetching channels...')
-    const channelsRes = await this.api.getChannels()
-    if (!channelsRes.ok) return log(this.invalidResponse('get channels'))
-    const channels = await channelsRes.json()
+    const response = await this.api.getChannels()
+
+    if (!response.ok) {
+      return log(
+        await this.failedApiCall(response, 'fetch channels', {
+          422: (v) => v.error
+        })
+      )
+    }
+
+    const channels = await response.json()
 
     if (!showOutgoing) {
       const incomingChannels = channels.incoming.filter((channel) => {

@@ -19,6 +19,7 @@ import PeerInfo from './peerInfo'
 import Info from './info'
 import Version from './version'
 import Help from './help'
+import EntryNodes from './entryNodes'
 
 export default class Commands {
   private commandMap: Map<string, Command> = new Map()
@@ -30,6 +31,7 @@ export default class Commands {
       new Balances(this.api, this.cache),
       new Sign(this.api, this.cache),
       new Peers(this.api, this.cache),
+      new EntryNodes(this.api, this.cache),
       new Ping(this.api, this.cache),
       new Channels(this.api, this.cache),
       new OpenChannel(this.api, this.cache),

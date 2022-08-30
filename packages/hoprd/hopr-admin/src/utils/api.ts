@@ -88,7 +88,7 @@ export default class API {
   }
   public async closeChannel(
     peerId: string,
-    direction: 'incoming' | 'outgoing'
+    direction: ChannelDirection
   ): ExpandedJsonResponse<{
     receipt: string
     channelStatus: string
@@ -168,6 +168,16 @@ export default class API {
   public async setSetting(key: string, value: string | boolean): ExpandedJsonResponse {
     return this.putReq(`/api/v2/settings/${key}`, { settingValue: value })
   }
+
+  // entryNodes API
+  public async getEntryNodes(): ExpandedJsonResponse<{
+    [id: string]: {
+      multiaddrs: string[]
+      isEligible: boolean
+    }
+  }> {
+    return this.getReq('/api/v2/node/entryNodes')
+  }
 }
 
 // some types
@@ -199,3 +209,5 @@ export type Addresses = {
   hopr: string
   native: string
 }
+
+export type ChannelDirection = 'incoming' | 'outgoing'

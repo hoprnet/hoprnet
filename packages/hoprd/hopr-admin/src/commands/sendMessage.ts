@@ -5,18 +5,9 @@ export default class SendMessage extends Command {
   constructor(api: API, cache: CacheFunctions) {
     super(
       {
-        default: [
-          [
-            ['hoprAddressOrAlias', 'recipient of the message', false],
-            ['string', 'message to send', false]
-          ],
-          'send a message, path is chosen automatically'
-        ],
+        default: [[['hoprAddressOrAlias'], ['arbitrary', 'message']], 'send a message, path is chosen automatically'],
         manual: [
-          [
-            ['string', "the path of the message seperated by ',', last one is the receiver", false],
-            ['string', 'message to send', false]
-          ],
+          [['string'], ['string', "path seperated by ','"], ['arbitrary', 'message']],
           'send a message, path is manually specified'
         ]
       },
@@ -38,7 +29,7 @@ export default class SendMessage extends Command {
   ): [valid: boolean, error: string | undefined, path?: { intermediateNodes: string[]; recipient: string }] {
     const peerIdStrings = pathStr.split(',').filter(Boolean)
 
-    const validatePeerIdOrAlias = CMD_PARAMS.hoprAddressOrAlias[1]
+    const validatePeerIdOrAlias = CMD_PARAMS.hoprAddressOrAlias[2]
     const aliases = this.cache.getCachedAliases()
 
     const path: string[] = []
@@ -48,7 +39,7 @@ export default class SendMessage extends Command {
         if (!valid) throw Error()
         path.push(peerId.toString())
       } catch (err) {
-        return [false, `<${pIdString}> is neither a valid alias nor a valid Hopr address string`, undefined]
+        return [false, `'${pIdString}' is neither a valid alias nor a valid Hopr address string`, undefined]
       }
     }
 
@@ -71,19 +62,58 @@ export default class SendMessage extends Command {
     }
 
     const [settingsRes, addressesRes] = await Promise.all([this.api.getSettings(), this.api.getAddresses()])
-    if (!settingsRes.ok || !addressesRes.ok) {
-      return log(this.invalidResponse('send message'))
+
+    if (!settingsRes.ok) {
+      return log(
+        await this.failedApiCall(settingsRes, `send message to ${recipient} when fetching latest settings`, {
+          422: (v) => v.error
+        })
+      )
     }
+
+    if (!addressesRes.ok) {
+      return log(
+        await this.failedApiCall(addressesRes, `send message to ${recipient} when fetching addresses`, {
+          422: (v) => v.error
+        })
+      )
+    }
+
     const settings = await settingsRes.json()
     const addresses = await addressesRes.json()
 
-    log(`Sending message to ${recipient} ..`)
+    // direct message
+    if (path && path.length === 0) {
+      log(`Sending direct message to ${recipient} ..`)
+    }
+    // manual message
+    else if (path && path.length > 0) {
+      // check if path contains an instance of the same adjacent node
+      const fullPath = [addresses.hopr, ...path, recipient]
+      for (let i = 0; i < fullPath.length - 1; ++i) {
+        const from = fullPath[i]
+        const to = fullPath[i + 1]
+        if (from === to) {
+          return log(this.failedCommand('construct path', 'cannot have the same adjacent nodes'))
+        }
+      }
+
+      log(`Sending message to ${recipient} via ${path.join('->')} ..`)
+    }
+    // automatic message
+    else {
+      log(`Sending message to ${recipient} using automatic path finding ..`)
+    }
 
     const payload = settings.includeRecipient ? `${addresses.hopr}:${message}` : message
     const response = await this.api.sendMessage(payload, recipient, path)
 
     if (!response.ok) {
-      return log(this.invalidResponse('send message'))
+      return log(
+        await this.failedApiCall(response, `send message to ${recipient}`, {
+          422: (v) => v.error
+        })
+      )
     } else {
       return log(`Message to ${recipient} sent`)
     }

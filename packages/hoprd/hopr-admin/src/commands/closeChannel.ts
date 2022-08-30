@@ -1,12 +1,12 @@
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type API from '../utils/api'
-import { Command, type CacheFunctions } from '../utils/command'
+import { Command, type CacheFunctions, type ChannelDirection } from '../utils/command'
 
 export default class CloseChannel extends Command {
   constructor(api: API, cache: CacheFunctions) {
     super(
       {
-        default: [[['hoprAddressOrAlias', "counterparty's HOPR address", false]], 'closes channel']
+        default: [[['hoprAddressOrAlias'], ['direction']], 'closes channel']
       },
       api,
       cache
@@ -22,7 +22,12 @@ export default class CloseChannel extends Command {
   }
 
   async execute(log: (msg: string) => void, query: string): Promise<void> {
-    const [error, , counterparty] = this.assertUsage(query) as [string | undefined, string, PeerId]
+    const [error, , counterparty, direction] = this.assertUsage(query) as [
+      string | undefined,
+      string,
+      PeerId,
+      ChannelDirection
+    ]
     if (error) return log(error)
 
     log(`Closing channel to "${counterparty}"..`)
@@ -30,13 +35,31 @@ export default class CloseChannel extends Command {
     let channelClosurePeriod: any = '?'
 
     const [closeChannelRes, infoRes] = await Promise.all([
-      this.api.closeChannel(counterparty.toString(), 'outgoing'),
+      this.api.closeChannel(counterparty.toString(), direction),
       this.api.getInfo()
     ])
 
     if (!closeChannelRes.ok) {
-      log(`Channel to "${counterparty}" closed.`)
+      return log(
+        await this.failedApiCall(closeChannelRes, `close channel with '${counterparty.toString()}'`, {
+          400: `invalid peer ID ${counterparty.toString()}`,
+          422: (v) => v.error
+        })
+      )
     }
+
+    if (!infoRes.ok) {
+      return log(
+        await this.failedApiCall(
+          infoRes,
+          `close channel with '${counterparty.toString()}' when fetching node information`,
+          {
+            422: (v) => v.error
+          }
+        )
+      )
+    }
+
     if (infoRes.ok) {
       channelClosurePeriod = (await infoRes.json()).channelClosurePeriod
     }
