@@ -1,6 +1,11 @@
 import type API from '../utils/api'
 import sinon from 'sinon'
-import * as behaviours from './behaviours.spec'
+import {
+  shouldFailExecutionOnInvalidQuery,
+  shouldFailExecutionOnInvalidParam,
+  shouldFailExecutionOnApiError,
+  shouldSucceedExecution
+} from './behaviours.spec'
 import Ping from './ping'
 import { PEER_A } from '../utils/fixtures'
 
@@ -27,8 +32,8 @@ describe('test Ping command', function () {
     ok: false
   } as Response)
 
-  behaviours.shouldFailExecutionOnInvalidQuery(cmdWithOkRes, 'x x')
-  behaviours.shouldFailExecutionOnInvalidParam(cmdWithOkRes, '1')
-  behaviours.shouldFailExecutionOnApiError(cmdWithBadRes, PEER_A)
-  behaviours.shouldSucceedExecution(cmdWithOkRes, [PEER_A, ['Pong received in 100 ms']])
+  shouldFailExecutionOnInvalidQuery(cmdWithOkRes, 'x x')
+  shouldFailExecutionOnInvalidParam(cmdWithOkRes, '1')
+  shouldFailExecutionOnApiError(cmdWithBadRes, PEER_A)
+  shouldSucceedExecution(cmdWithOkRes, [PEER_A, ['Pong received in 100 ms']])
 })

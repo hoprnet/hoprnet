@@ -1,6 +1,11 @@
 import type API from '../utils/api'
 import sinon from 'sinon'
-import * as behaviours from './behaviours.spec'
+import {
+  shouldFailExecutionOnInvalidQuery,
+  shouldFailExecutionOnApiError,
+  shouldSucceedExecution,
+  shouldFailExecution
+} from './behaviours.spec'
 import SendMessage from './sendMessage'
 import { PEER_A as HOP_1, PEER_B as HOP_2, PEER_C as RECIPIENT } from '../utils/fixtures'
 
@@ -60,19 +65,19 @@ describe('test SendMessage command', function () {
     ok: false
   } as Response)
 
-  behaviours.shouldFailExecutionOnInvalidQuery(cmdWithOkApiAuto, 'x')
-  behaviours.shouldFailExecutionOnApiError(cmdWithBadRes, `${RECIPIENT} hello`)
-  behaviours.shouldSucceedExecution(cmdWithOkApiAuto, [
+  shouldFailExecutionOnInvalidQuery(cmdWithOkApiAuto, 'x')
+  shouldFailExecutionOnApiError(cmdWithBadRes, `${RECIPIENT} hello`)
+  shouldSucceedExecution(cmdWithOkApiAuto, [
     `${RECIPIENT} hello world 1 2 3`,
     [`Sending message to ${RECIPIENT} using automatic path finding ..`, `Message to ${RECIPIENT} sent`]
   ])
-  behaviours.shouldSucceedExecution(cmdWithOkApiDirect, [
+  shouldSucceedExecution(cmdWithOkApiDirect, [
     `,${RECIPIENT} hello directly`,
     [`Sending direct message to ${RECIPIENT} ..`, `Message to ${RECIPIENT} sent`]
   ])
-  behaviours.shouldSucceedExecution(cmdWithOkApiManual, [
+  shouldSucceedExecution(cmdWithOkApiManual, [
     `${HOP_1},${HOP_2},${RECIPIENT} hello manually`,
     [`Sending message to ${RECIPIENT} via ${HOP_1}->${HOP_2} ..`, `Message to ${RECIPIENT} sent`]
   ])
-  behaviours.shouldFailExecution(cmdWithBadRes, [`${HOP_1},${HOP_1},${RECIPIENT} hello manually`, 'to construct path'])
+  shouldFailExecution(cmdWithBadRes, [`${HOP_1},${HOP_1},${RECIPIENT} hello manually`, 'to construct path'])
 })

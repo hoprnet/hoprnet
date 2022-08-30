@@ -1,6 +1,11 @@
 import type API from '../utils/api'
 import sinon from 'sinon'
-import * as behaviours from './behaviours.spec'
+import {
+  shouldFailExecutionOnInvalidQuery,
+  shouldFailExecutionOnInvalidParam,
+  shouldFailExecutionOnApiError,
+  shouldSucceedExecution
+} from './behaviours.spec'
 import Addresses from './addresses'
 
 type GetAddressesResponse = Awaited<ReturnType<API['getAddresses']>>
@@ -30,10 +35,10 @@ describe('test Addresses command', function () {
     ok: false
   } as GetAddressesResponse)
 
-  behaviours.shouldFailExecutionOnInvalidQuery(cmdWithOkApi, 'x x x')
-  behaviours.shouldFailExecutionOnInvalidParam(cmdWithOkApi, '1')
-  behaviours.shouldFailExecutionOnApiError(cmdWithBadApi, '')
-  behaviours.shouldSucceedExecution(cmdWithOkApi, ['', ['HOPR Address:']])
-  behaviours.shouldSucceedExecution(cmdWithOkApi, ['native', ['NATIVE_ADDRESS_MOCK']])
-  behaviours.shouldSucceedExecution(cmdWithOkApi, ['hopr', ['HOPR_ADDRESS_MOCK']])
+  shouldFailExecutionOnInvalidQuery(cmdWithOkApi, 'x x x')
+  shouldFailExecutionOnInvalidParam(cmdWithOkApi, '1')
+  shouldFailExecutionOnApiError(cmdWithBadApi, '')
+  shouldSucceedExecution(cmdWithOkApi, ['', ['HOPR Address:']])
+  shouldSucceedExecution(cmdWithOkApi, ['native', ['NATIVE_ADDRESS_MOCK']])
+  shouldSucceedExecution(cmdWithOkApi, ['hopr', ['HOPR_ADDRESS_MOCK']])
 })

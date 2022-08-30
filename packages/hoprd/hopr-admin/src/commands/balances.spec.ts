@@ -1,6 +1,11 @@
 import type API from '../utils/api'
 import sinon from 'sinon'
-import * as behaviours from './behaviours.spec'
+import {
+  shouldFailExecutionOnInvalidQuery,
+  shouldFailExecutionOnInvalidParam,
+  shouldFailExecutionOnApiError,
+  shouldSucceedExecution
+} from './behaviours.spec'
 import Balances from './balances'
 
 type Response = Awaited<ReturnType<API['getBalances']>>
@@ -27,10 +32,10 @@ describe('test Balances command', function () {
     ok: false
   } as Response)
 
-  behaviours.shouldFailExecutionOnInvalidQuery(cmdWithOkApi, 'x x x')
-  behaviours.shouldFailExecutionOnInvalidParam(cmdWithOkApi, '1')
-  behaviours.shouldFailExecutionOnApiError(cmdWithBadApi, '')
-  behaviours.shouldSucceedExecution(cmdWithOkApi, ['', ['HOPR Balance:']])
-  behaviours.shouldSucceedExecution(cmdWithOkApi, ['native', ['1']])
-  behaviours.shouldSucceedExecution(cmdWithOkApi, ['hopr', ['2']])
+  shouldFailExecutionOnInvalidQuery(cmdWithOkApi, 'x x x')
+  shouldFailExecutionOnInvalidParam(cmdWithOkApi, '1')
+  shouldFailExecutionOnApiError(cmdWithBadApi, '')
+  shouldSucceedExecution(cmdWithOkApi, ['', ['HOPR Balance:']])
+  shouldSucceedExecution(cmdWithOkApi, ['native', ['1']])
+  shouldSucceedExecution(cmdWithOkApi, ['hopr', ['2']])
 })
