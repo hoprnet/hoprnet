@@ -2,7 +2,7 @@ import { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
 import type { HoprBoost, ERC677Mock } from '../src/types'
 import { type ContractTransaction, utils } from 'ethers'
-import { CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES, DEV_NFT_BOOST, DEV_NFT_TYPE, MIN_STAKE } from '../utils/constants'
+import { CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES, DEV_NFT_BOOST, DEV_NFT_RANK_TECH_MAX_REGISTRATION, DEV_NFT_TYPE, MIN_STAKE } from '../utils/constants'
 import type { HoprStakingProxyForNetworkRegistry } from '../src/types'
 
 const NUM_DEV_NFT = 3
@@ -112,7 +112,8 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const ownerAddDevNftTypeTx = await registryProxy.ownerBatchAddNftTypeAndRank([devNftIndex], [DEV_NFT_BOOST])
     const ownerAddSpecialNftTypeTx = await registryProxy.ownerBatchAddSpecialNftTypeAndRank(
       [devNftIndex],
-      [DEV_NFT_BOOST]
+      [DEV_NFT_BOOST],
+      [DEV_NFT_RANK_TECH_MAX_REGISTRATION]
     )
 
     // don't wait when using local hardhat because its using auto-mine
