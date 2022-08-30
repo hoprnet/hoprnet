@@ -115,7 +115,7 @@ export default class SendMessage extends Command {
         })
       )
     } else {
-      return log(`Message to ${recipient} sent`)
+      return log(`Message to ${recipient} sent (ack challenge ${await response.text()})`)
     }
   }
 }

@@ -380,6 +380,10 @@ async function main() {
     }
   }
 
+  const messageAcknowledged = (ackChallenge: string): void => {
+    logs.log(`Message challenge ${ackChallenge} acknowledged`)
+  }
+
   if (!argv.testNoAuthentication && argv.api) {
     if (argv.apiToken == null) {
       throw Error(`Must provide --apiToken when --api is specified`)
@@ -430,8 +434,11 @@ async function main() {
     logs.log('Creating HOPR Node')
     node = await createHoprNode(peerId, options, false)
     logs.logStatus('PENDING')
+
+    // Subscribe to node events
     node.on('hopr:message', logMessageToNode)
     node.on('hopr:network-health-changed', networkHealthChanged)
+    node.on('hopr:message-acknowledged', messageAcknowledged)
     node.subscribeOnConnector('hopr:connector:created', () => {
       // 2.b - Connector has been created, and we can now trigger the next set of steps.
       logs.log('Connector has been loaded properly.')
@@ -504,7 +511,6 @@ async function main() {
         // Wait for actions to take place
         setTimeout(1e3)
         await node.stop()
-        return
       }
     })
 
