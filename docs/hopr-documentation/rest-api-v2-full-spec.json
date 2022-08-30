@@ -527,6 +527,55 @@
         }
       }
     },
+    "/node/entryNodes": {
+      "parameters": [],
+      "get": {
+        "description": "List all known entry nodes and their multiaddrs and their eligibility state",
+        "tags": ["Node"],
+        "operationId": "nodeGetEntryNodes",
+        "responses": {
+          "200": {
+            "description": "Entry node information fetched successfuly.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "multiaddrs": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Known Multiaddrs of the node"
+                      },
+                      "isEligible": {
+                        "type": "boolean",
+                        "description": "true if peer is allowed to access network, otherwise false"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unknown failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
+                  }
+                },
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+              }
+            }
+          }
+        }
+      }
+    },
     "/messages/websocket": {
       "parameters": [],
       "get": {
