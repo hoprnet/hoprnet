@@ -1,7 +1,7 @@
 import chai, { expect } from 'chai'
 import { deployments, ethers } from 'hardhat'
 import { smock } from '@defi-wonderland/smock'
-import { constants, Contract, Signer } from 'ethers'
+import { type BigNumber, constants, type Contract, type Signer } from 'ethers'
 import { HoprStakingProxyForNetworkRegistry } from '../../src/types'
 
 chai.should() // if you like should syntax
@@ -18,18 +18,30 @@ const SPECIAL_NFT_RANK_COM = 0 // 'Com'
 const MAX_REGISTRATION_TECH = constants.MaxUint256
 const MAX_REGISTRATION_COM = 1
 
+const checkMaxAllowance = async (registryContract: Contract, participantAddresses: string[], allowedRegistrationNum: Array<number | BigNumber>) => {
+  participantAddresses.forEach((participantAddress, accountIndex) => {
+    it(`participant ${accountIndex} should have allowance of ${allowedRegistrationNum}`, async () => {
+      expect(await registryContract.maxAllowedRegistrations(participantAddress)).to
+      .be.equal(allowedRegistrationNum[accountIndex])
+    })
+  })
+}
+
 /**
  * Allocation of NFTs and staks
+ * |---------------|---|---|---|---|------|-----|-------|
  * | NFT Type      | 0 | 0 | 1 | 1 | Dev  | Dev | Stake |
  * |---------------|---|---|---|---|------|-----|-------|
  * | NFT Rank      | 0 | 1 | 0 | 1 | Tech | Com | --    |
+ * |---------------|---|---|---|---|------|-----|-------|
  * | Participant_0 |   | x |   |   |      |     | 2000  |
  * | Participant_1 |   |   | x |   |      |     | 2000  |
- * | Participant_2 |   | x |   |   | x    |     | 0     |
- * | Participant_3 |   |   | x |   |      |     | 0     |
+ * | Participant_2 |   | x |   |   | x    |     | 100   |
+ * | Participant_3 |   |   | x |   |      |     | 100   |
  * | Participant_4 |   |   | x |   |      |     | 2000  |
- * | Participant_5 |   | x |   |   |      |     | 0     |
+ * | Participant_5 |   | x |   |   |      |     | 100   |
  * | Participant_6 |   |   | x |   |      | x   | 0     |
+ * |---------------|---|---|---|---|------|-----|-------|
  * @param participants
  * @returns
  */
@@ -100,10 +112,14 @@ const createFakeStakeV2Contract = async (participants: string[]) => {
       stakeV2Fake.isNftTypeAndRankRedeemed3.whenCalledWith(NFT_TYPE[1], NFT_RANK[0], participant).returns(true)
     }
 
-    if ([0, 1, 4].findIndex((element) => element === participantIndex) > -1) {
-      // participants at index 0, 1, 4 have 2000 staked tokens and others have 100 staked tokens
+    if (participantIndex === 6) {
+      // participants at index 6 have 0
+      stakeV2Fake.stakedHoprTokens.whenCalledWith(participant).returns(0)
+    } else if ([0, 1, 4].findIndex((element) => element === participantIndex) > -1) {
+      // participants at index 0, 1, 4 have 2000 staked tokens
       stakeV2Fake.stakedHoprTokens.whenCalledWith(participant).returns(HIGH_STAKE)
     } else {
+      // others have 100 staked tokens
       stakeV2Fake.stakedHoprTokens.whenCalledWith(participant).returns(LOW_STAKE)
     }
   })
@@ -148,24 +164,15 @@ describe('Registry proxy for stake v2', () => {
   let participantAddresses: string[]
   let hoprStakingProxyForNetworkRegistry: Contract
 
-  describe('Self register', () => {
+  describe('Self register', async () => {
     before(async () => {
       ;({ owner, participantAddresses, hoprStakingProxyForNetworkRegistry } = await useFixtures())
       //   add eligible NFT
       await hoprStakingProxyForNetworkRegistry.connect(owner).ownerAddNftTypeAndRank(NFT_TYPE[0], NFT_RANK[1])
     })
-    it('register staker with stake of high threshold and eligible NFT', async () => {
-      expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[0])).to.be.true
-    })
-    it('fail to register staker with stake of high threshold and non-eligible NFT', async () => {
-      expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[1])).to.be.false
-    })
-    it('fail to register staker with stake of low threshold and eligible NFT', async () => {
-      expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[2])).to.be.false
-    })
-    it('fail to register staker with stake of low threshold and non-eligible NFT', async () => {
-      expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[3])).to.be.false
-    })
+
+    const allowanceWhenTresholdIsLowered = [2, 0, 0, 0, 0, 0, 0]
+    await checkMaxAllowance(hoprStakingProxyForNetworkRegistry, participantAddresses, allowanceWhenTresholdIsLowered)
   })
 
   describe('Update threshold', () => {
@@ -184,29 +191,17 @@ describe('Registry proxy for stake v2', () => {
     })
   })
 
-  describe(`Owner add an existing NFT`, () => {
+  describe(`Owner add an existing NFT`, async () => {
     beforeEach(async () => {
       ;({ owner, participantAddresses, hoprStakingProxyForNetworkRegistry } = await useFixtures())
       await hoprStakingProxyForNetworkRegistry.connect(owner).ownerAddNftTypeAndRank(NFT_TYPE[0], NFT_RANK[1])
     })
-    const canSelfRegister = [0]
-    const cannotSelfRegister = [1, 2, 3, 4, 5]
-
-    canSelfRegister.forEach((accountIndex) => {
-      it(`participant ${accountIndex} is still registered`, async () => {
-        expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[accountIndex])).to
-          .be.true
-      })
-    })
-    cannotSelfRegister.forEach((accountIndex) => {
-      it(`participant ${accountIndex} is not registered`, async () => {
-        expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[accountIndex])).to
-          .be.false
-      })
-    })
+    const allowanceWhenTresholdIsLowered = [2, 0, 0, 0, 0, 0, 0]
+    await checkMaxAllowance(hoprStakingProxyForNetworkRegistry, participantAddresses, allowanceWhenTresholdIsLowered)
   })
 
-  describe(`Lower threshold to ${LOW_STAKE}`, () => {
+  
+  describe(`Lower threshold to ${LOW_STAKE}`, async () => {
     beforeEach(async () => {
       ;({ owner, participantAddresses, hoprStakingProxyForNetworkRegistry } = await useFixtures())
 
@@ -217,23 +212,12 @@ describe('Registry proxy for stake v2', () => {
       //   add eligible NFT
       await hoprStakingProxyForNetworkRegistry.connect(owner).ownerAddNftTypeAndRank(NFT_TYPE[0], NFT_RANK[1])
     })
-    const canSelfRegister = [0, 2, 5]
-    const cannotSelfRegister = [1, 3, 4]
 
-    canSelfRegister.forEach((accountIndex) => {
-      it(`participant ${accountIndex} is still registered`, async () => {
-        expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[accountIndex])).to
-          .be.true
-      })
-    })
-    cannotSelfRegister.forEach((accountIndex) => {
-      it(`participant ${accountIndex} is not registered`, async () => {
-        expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[accountIndex])).to
-          .be.false
-      })
-    })
+    const allowanceWhenTresholdIsLowered = [2, 0, 0, 0, 0, 0, 0]
+    await checkMaxAllowance(hoprStakingProxyForNetworkRegistry, participantAddresses, allowanceWhenTresholdIsLowered)
   })
-  describe(`Owner batch-add NFTs`, () => {
+
+  describe(`Owner batch-add NFTs`, async () => {
     beforeEach(async () => {
       ;({ owner, participantAddresses, hoprStakingProxyForNetworkRegistry } = await useFixtures())
       await hoprStakingProxyForNetworkRegistry.connect(owner).ownerUpdateThreshold(LOW_STAKE)
@@ -251,23 +235,12 @@ describe('Registry proxy for stake v2', () => {
           .ownerBatchAddNftTypeAndRank([NFT_TYPE[0]], [NFT_RANK[1], NFT_RANK[0]])
       ).to.be.revertedWith('HoprStakingProxyForNetworkRegistry: ownerBatchAddNftTypeAndRank lengths mismatch')
     })
-    const canSelfRegister = [0, 1, 2, 3, 4, 5]
-    const cannotSelfRegister = []
 
-    canSelfRegister.forEach((accountIndex) => {
-      it(`participant ${accountIndex} is still registered`, async () => {
-        expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[accountIndex])).to
-          .be.true
-      })
-    })
-    cannotSelfRegister.forEach((accountIndex) => {
-      it(`participant ${accountIndex} is not registered`, async () => {
-        expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[accountIndex])).to
-          .be.false
-      })
-    })
+    const allowanceWhenTresholdIsLowered = [20, 20, 1, 1, 20, 1, 0]
+    await checkMaxAllowance(hoprStakingProxyForNetworkRegistry, participantAddresses, allowanceWhenTresholdIsLowered)
   })
-  describe(`Owner remove NFT`, () => {
+
+  describe(`Owner remove NFT`, async () => {
     beforeEach(async () => {
       ;({ owner, participantAddresses, hoprStakingProxyForNetworkRegistry } = await useFixtures())
       await hoprStakingProxyForNetworkRegistry.connect(owner).ownerUpdateThreshold(LOW_STAKE)
@@ -278,23 +251,12 @@ describe('Registry proxy for stake v2', () => {
       await hoprStakingProxyForNetworkRegistry.connect(owner).ownerRemoveNftTypeAndRank(NFT_TYPE[0], NFT_RANK[1])
     })
 
-    const canSelfRegister = [1, 3, 4]
-    const cannotSelfRegister = [0, 2, 5]
+    const allowanceWhenTresholdIsLowered = [0, 20, 0, 1, 20, 0, 0]
+    await checkMaxAllowance(hoprStakingProxyForNetworkRegistry, participantAddresses, allowanceWhenTresholdIsLowered)
 
-    canSelfRegister.forEach((accountIndex) => {
-      it(`participant ${accountIndex} is still registered`, async () => {
-        expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[accountIndex])).to
-          .be.true
-      })
-    })
-    cannotSelfRegister.forEach((accountIndex) => {
-      it(`participant ${accountIndex} is not registered`, async () => {
-        expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[accountIndex])).to
-          .be.false
-      })
-    })
   })
-  describe(`Owner batch-remove NFTs`, () => {
+
+  describe(`Owner batch-remove NFTs`, async () => {
     beforeEach(async () => {
       ;({ owner, participantAddresses, hoprStakingProxyForNetworkRegistry } = await useFixtures())
       await hoprStakingProxyForNetworkRegistry.connect(owner).ownerUpdateThreshold(LOW_STAKE)
@@ -311,45 +273,50 @@ describe('Registry proxy for stake v2', () => {
           .ownerBatchRemoveNftTypeAndRank([NFT_TYPE[0]], [NFT_RANK[1], NFT_RANK[0]])
       ).to.be.revertedWith('HoprStakingProxyForNetworkRegistry: ownerBatchRemoveNftTypeAndRank lengths mismatch')
     })
-    const canSelfRegister = []
-    const cannotSelfRegister = [0, 1, 2, 3, 4, 5]
-
-    canSelfRegister.forEach((accountIndex) => {
-      it(`participant ${accountIndex} is still registered`, async () => {
-        expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[accountIndex])).to
-          .be.true
-      })
-    })
-    cannotSelfRegister.forEach((accountIndex) => {
-      it(`participant ${accountIndex} is not registered`, async () => {
-        expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[accountIndex])).to
-          .be.false
-      })
-    })
+    const allowanceWhenTresholdIsLowered = [0, 0, 0, 0, 0, 0, 0]
+    await checkMaxAllowance(hoprStakingProxyForNetworkRegistry, participantAddresses, allowanceWhenTresholdIsLowered)
   })
-  describe(`Special NFTs`, () => {
+
+  describe(`Special NFTs only`, async () => {
     beforeEach(async () => {
       ;({ owner, participantAddresses, hoprStakingProxyForNetworkRegistry } = await useFixtures())
 
       await hoprStakingProxyForNetworkRegistry
         .connect(owner)
-        .ownerBatchAddSpecialNftTypeAndRank([SPECIAL_NFT_TYPE], [SPECIAL_NFT_RANK])
+        .ownerBatchAddSpecialNftTypeAndRank([SPECIAL_NFT_TYPE, SPECIAL_NFT_TYPE], [SPECIAL_NFT_RANK_TECH, SPECIAL_NFT_RANK_COM], [MAX_REGISTRATION_TECH, MAX_REGISTRATION_COM])
     })
 
-    const canSelfRegister = [2]
-    const cannotSelfRegister = [0, 1, 3, 4, 5]
+    const allowance = [0, 0, MAX_REGISTRATION_TECH, 0, 0, 0, MAX_REGISTRATION_COM]
+    await checkMaxAllowance(hoprStakingProxyForNetworkRegistry, participantAddresses, allowance)
+  })
 
-    canSelfRegister.forEach((accountIndex) => {
-      it(`participant ${accountIndex} is still registered`, async () => {
-        expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[accountIndex])).to
-          .be.true
-      })
+  describe(`Special NFTs on top of normal nfts`, async () => {
+    beforeEach(async () => {
+      ;({ owner, participantAddresses, hoprStakingProxyForNetworkRegistry } = await useFixtures())
+      await hoprStakingProxyForNetworkRegistry.connect(owner).ownerAddNftTypeAndRank(NFT_TYPE[1], NFT_RANK[0])
+      await hoprStakingProxyForNetworkRegistry
+        .connect(owner)
+        .ownerBatchAddSpecialNftTypeAndRank([SPECIAL_NFT_TYPE, SPECIAL_NFT_TYPE], [SPECIAL_NFT_RANK_TECH, SPECIAL_NFT_RANK_COM], [MAX_REGISTRATION_TECH, MAX_REGISTRATION_COM])
     })
-    cannotSelfRegister.forEach((accountIndex) => {
-      it(`participant ${accountIndex} is not registered`, async () => {
-        expect(await hoprStakingProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[accountIndex])).to
-          .be.false
-      })
+
+    const allowance = [2, 0, MAX_REGISTRATION_TECH, 0, 0, 0, MAX_REGISTRATION_COM]
+    await checkMaxAllowance(hoprStakingProxyForNetworkRegistry, participantAddresses, allowance)
+  })
+  describe(`Both special NFTs on top of normal nfts`, async () => {
+    beforeEach(async () => {
+      let stakeV2Fake;
+      ;({ owner, participantAddresses, hoprStakingProxyForNetworkRegistry, stakeV2Fake } = await useFixtures())
+        // participant 6 redeemed two special NFTs (both COM and TECH)
+      stakeV2Fake.isNftTypeAndRankRedeemed3
+      .whenCalledWith(SPECIAL_NFT_TYPE, SPECIAL_NFT_RANK_TECH, participantAddresses[6])
+      .returns(true)
+      await hoprStakingProxyForNetworkRegistry.connect(owner).ownerAddNftTypeAndRank(NFT_TYPE[1], NFT_RANK[0])
+      await hoprStakingProxyForNetworkRegistry
+        .connect(owner)
+        .ownerBatchAddSpecialNftTypeAndRank([SPECIAL_NFT_TYPE, SPECIAL_NFT_TYPE], [SPECIAL_NFT_RANK_TECH, SPECIAL_NFT_RANK_COM], [MAX_REGISTRATION_TECH, MAX_REGISTRATION_COM])
     })
+
+    const allowance = [2, 0, MAX_REGISTRATION_TECH, 0, 0, 0, MAX_REGISTRATION_TECH]
+    await checkMaxAllowance(hoprStakingProxyForNetworkRegistry, participantAddresses, allowance)
   })
 })
