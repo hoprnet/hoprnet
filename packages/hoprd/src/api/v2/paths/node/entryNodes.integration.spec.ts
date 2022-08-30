@@ -27,7 +27,7 @@ node.isAllowedAccessToNetwork = (peer: PeerId) => {
   }
 }
 
-describe.only('GET /node/entryNodes', function () {
+describe('GET /node/entryNodes', function () {
   let service: any
   before(async function () {
     const loaded = await createTestApiInstance(node)
