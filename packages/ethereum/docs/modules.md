@@ -49,7 +49,7 @@
 | :------ | :------ |
 | `abi` | `any` |
 | `address` | `string` |
-| `blockNumber` | `string` |
+| `blockNumber` | `number` |
 | `transactionHash` | `string` |
 
 #### Defined in
