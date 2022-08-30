@@ -111,11 +111,11 @@ async function main(
       await (await hoprNetworkRegistry.ownerRegister(nativeAddresses, peerIds)).wait()
     } else if (opts.task === 'remove') {
       const peerIds = opts.peerIds.split(',')
-      
+
       // in staging account, deregister; in non-stagin environment, remove addresses directly from proxy
       if (network.tags.development || network.tags.production) {
-        let nativeAddresses;
-        
+        let nativeAddresses
+
         if (opts.nativeAddresses) {
           nativeAddresses = opts.nativeAddresses.split(',')
           // ensure all native addresses are valid
