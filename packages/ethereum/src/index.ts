@@ -34,7 +34,7 @@ export type ContractData = {
   address: string
   transactionHash: string
   abi: any
-  blockNumber: string
+  blockNumber: number
 }
 
 export const getContractData = (

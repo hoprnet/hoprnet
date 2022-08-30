@@ -102,24 +102,20 @@ export async function createChainWrapper(
   ) as HoprNetworkRegistry
 
   //getGenesisBlock, taking the earlier deployment block between the channel and network Registery
-  let channelDeployBlockNumber: any
-  if (Object.keys(hoprChannelsDeployment).some((key) => key === 'receipt')) {
-    // For newly deployed files, where `receipt` exists
-    channelDeployBlockNumber = (hoprChannelsDeployment as Deployment).receipt.blockNumber
-  } else {
-    // For legacy deployment files, it's possible that the deployment file has been overwritten during the `slimDeploy` and thus no `receipt`
-    channelDeployBlockNumber = (hoprChannelsDeployment as ContractData).blockNumber
-  }
+  const [channelDeployBlockNumber, networkRegistryDeployBlockNumber] = [
+    hoprChannelsDeployment,
+    hoprNetworkRegistryDeployment
+  ].map((deployment: Deployment | ContractData) => {
+    if ((deployment as Deployment).receipt?.blockNumber != undefined) {
+      return (deployment as Deployment).receipt.blockNumber
+    } else if ((deployment as ContractData).blockNumber != undefined) {
+      return (deployment as ContractData).blockNumber
+    } else {
+      throw Error(`Cannot get blockNumber for ${deployment.address}. Please add it manually to deployment file`)
+    }
+  })
 
-  let networkRegistryDeployBlockNumber: any
-  if (Object.keys(hoprNetworkRegistryDeployment).some((key) => key === 'receipt')) {
-    networkRegistryDeployBlockNumber = (hoprNetworkRegistryDeployment as Deployment).receipt.blockNumber
-  } else {
-    networkRegistryDeployBlockNumber = (hoprNetworkRegistryDeployment as ContractData).blockNumber
-  }
-
-  const genesisBlock = Math.min(parseInt(channelDeployBlockNumber), parseInt(networkRegistryDeployBlockNumber))
-
+  const genesisBlock = Math.min(channelDeployBlockNumber, networkRegistryDeployBlockNumber)
   const channelClosureSecs = await channels.secsClosure()
 
   const transactions = new TransactionManager()
