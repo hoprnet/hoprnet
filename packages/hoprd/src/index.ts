@@ -504,7 +504,7 @@ async function main() {
         }
 
         // Wait for actions to take place
-        setTimeout(1e3)
+        await setTimeout(1e3)
         await node.stop()
       }
     })
