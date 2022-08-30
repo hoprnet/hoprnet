@@ -247,7 +247,7 @@ export function setupWsApi(
       node.on('hopr:message', (msg: Uint8Array) => {
         socket.send(msg.toString())
       })
-      node.on(`horp:message-acknowledged`, (ackChallenge: string) => {
+      node.on(`hopr:message-acknowledged`, (ackChallenge: string) => {
         socket.send(`ack:${ackChallenge}`)
       })
     } else if (path === WS_PATHS.LEGACY_STREAM) {
