@@ -1197,6 +1197,10 @@ class Hopr extends EventEmitter {
     return await this.connector.getPublicKeyOf(addr)
   }
 
+  public async getEntryNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
+    return this.connector.waitForPublicNodes()
+  }
+
   // @TODO remove this
   // NB: The prefix "HOPR Signed Message: " is added as a security precaution.
   // Without it, the node could be convinced to sign a message like an Ethereum
