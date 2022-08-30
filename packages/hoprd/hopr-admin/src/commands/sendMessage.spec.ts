@@ -58,7 +58,10 @@ describe('test SendMessage command', function () {
   shouldFailExecutionOnApiError(cmdWithBadRes, `${RECIPIENT} hello`)
   shouldSucceedExecution(cmdWithOkApiAuto, [
     `${RECIPIENT} hello world 1 2 3`,
-    [`Sending message to ${RECIPIENT} using automatic path finding ..`, `Message to ${RECIPIENT} sent (ack challenge ${CHALLENGE})`]
+    [
+      `Sending message to ${RECIPIENT} using automatic path finding ..`,
+      `Message to ${RECIPIENT} sent (ack challenge ${CHALLENGE})`
+    ]
   ])
   shouldSucceedExecution(cmdWithOkApiDirect, [
     `,${RECIPIENT} hello directly`,
@@ -66,7 +69,10 @@ describe('test SendMessage command', function () {
   ])
   shouldSucceedExecution(cmdWithOkApiManual, [
     `${HOP_1},${HOP_2},${RECIPIENT} hello manually`,
-    [`Sending message to ${RECIPIENT} via ${HOP_1}->${HOP_2} ..`, `Message to ${RECIPIENT} sent (ack challenge ${CHALLENGE})`]
+    [
+      `Sending message to ${RECIPIENT} via ${HOP_1}->${HOP_2} ..`,
+      `Message to ${RECIPIENT} sent (ack challenge ${CHALLENGE})`
+    ]
   ])
   shouldFailExecution(cmdWithBadRes, [`${HOP_1},${HOP_1},${RECIPIENT} hello manually`, 'to construct path'])
 })
