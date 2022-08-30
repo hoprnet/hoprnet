@@ -354,7 +354,7 @@ class Hopr extends EventEmitter {
       this.getId(),
       (ackChallenge: HalfKeyChallenge) =>
       {
-        // Can subscribe both per specific message or all message acknowledgment
+        // Can subscribe both per specific message or all message acknowledgments
         this.emit(`hopr:message-acknowledged:${ackChallenge.toHex()}`)
         this.emit('hopr:message-acknowledged', ackChallenge.toHex())
       },

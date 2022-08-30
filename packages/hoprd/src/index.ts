@@ -381,7 +381,7 @@ async function main() {
   }
 
   const messageAcknowledged = (ackChallenge: string): void => {
-    logs.log(`Message challenge ${ackChallenge} acknowledged`)
+    logs.log(`MSG ACKNOWLEDGED: ${ackChallenge}`)
   }
 
   if (!argv.testNoAuthentication && argv.api) {
