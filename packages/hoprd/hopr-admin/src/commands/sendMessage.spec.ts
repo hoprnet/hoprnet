@@ -11,7 +11,7 @@ import { PEER_A as HOP_1, PEER_B as HOP_2, PEER_C as RECIPIENT } from '../utils/
 
 type Response = Awaited<ReturnType<API['sendMessage']>>
 
-const BODY = 'hello world'
+const CHALLENGE = '011223344556677889900aabbccddeeff'
 
 const createCommand = (sendMessageResponse: Response, getCachedAliasesResponse?: Record<any, any> | undefined) => {
   const api = sinon.fake() as unknown as API
@@ -40,26 +40,15 @@ const createCommand = (sendMessageResponse: Response, getCachedAliasesResponse?:
 describe('test SendMessage command', function () {
   const cmdWithOkApiAuto = createCommand({
     ok: true,
-    json: async () => ({
-      body: BODY,
-      recipient: RECIPIENT
-    })
+    text: async () => CHALLENGE
   } as Response)
   const cmdWithOkApiDirect = createCommand({
     ok: true,
-    json: async () => ({
-      body: BODY,
-      recipient: RECIPIENT,
-      path: []
-    })
+    text: async () => CHALLENGE
   } as Response)
   const cmdWithOkApiManual = createCommand({
     ok: true,
-    json: async () => ({
-      body: BODY,
-      recipient: RECIPIENT,
-      path: [HOP_1, HOP_2]
-    })
+    text: async () => CHALLENGE
   } as Response)
   const cmdWithBadRes = createCommand({
     ok: false
@@ -69,15 +58,15 @@ describe('test SendMessage command', function () {
   shouldFailExecutionOnApiError(cmdWithBadRes, `${RECIPIENT} hello`)
   shouldSucceedExecution(cmdWithOkApiAuto, [
     `${RECIPIENT} hello world 1 2 3`,
-    [`Sending message to ${RECIPIENT} using automatic path finding ..`, `Message to ${RECIPIENT} sent`]
+    [`Sending message to ${RECIPIENT} using automatic path finding ..`, `Message to ${RECIPIENT} sent (ack challenge ${CHALLENGE})`]
   ])
   shouldSucceedExecution(cmdWithOkApiDirect, [
     `,${RECIPIENT} hello directly`,
-    [`Sending direct message to ${RECIPIENT} ..`, `Message to ${RECIPIENT} sent`]
+    [`Sending direct message to ${RECIPIENT} ..`, `Message to ${RECIPIENT} sent (ack challenge ${CHALLENGE})`]
   ])
   shouldSucceedExecution(cmdWithOkApiManual, [
     `${HOP_1},${HOP_2},${RECIPIENT} hello manually`,
-    [`Sending message to ${RECIPIENT} via ${HOP_1}->${HOP_2} ..`, `Message to ${RECIPIENT} sent`]
+    [`Sending message to ${RECIPIENT} via ${HOP_1}->${HOP_2} ..`, `Message to ${RECIPIENT} sent (ack challenge ${CHALLENGE})`]
   ])
   shouldFailExecution(cmdWithBadRes, [`${HOP_1},${HOP_1},${RECIPIENT} hello manually`, 'to construct path'])
 })

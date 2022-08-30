@@ -17,7 +17,7 @@ const POST: Operation = [
 
     try {
       let ackChallenge = await req.context.node.sendMessage(message, recipient, path)
-      return res.status(204).json(ackChallenge).send()
+      return res.status(204).json(ackChallenge)
     } catch (err) {
       return res
         .status(422)

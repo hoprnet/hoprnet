@@ -114,7 +114,7 @@ export default class API {
   public async signMessage(msg: string): ExpandedJsonResponse {
     return this.postReq('/api/v2/messages/sign', { message: msg })
   }
-  public async sendMessage(body: string, recipient: string, path: string[]): ExpandedJsonResponse {
+  public async sendMessage(body: string, recipient: string, path: string[]): ExpandedTextResponse {
     return this.postReq('/api/v2/messages', { body: body, recipient: recipient, path: path })
   }
 
