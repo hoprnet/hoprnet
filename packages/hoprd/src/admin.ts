@@ -47,8 +47,8 @@ export class AdminServer {
       }
 
       if (!adminPath) {
-        console.log('Failed to start Admin interface: could not find NextJS app')
-        process.exit(1)
+        console.log('Failed to start Admin interface')
+        return reject(Error(`could not find NextJS app`))
       }
 
       debugLog('using', adminPath)
@@ -78,7 +78,7 @@ export class AdminServer {
         reject(err)
       })
 
-      // Handles error resulting from broken client connection.
+      // Handles error resulting from broken client connections.
       // see https://nodejs.org/dist/latest-v16.x/docs/api/http.html#event-clienterror
       this.server.on('clientError', (err: Error, socket: Duplex) => {
         if ((err as any).code === 'ECONNRESET' || !socket.writable) {
@@ -127,7 +127,9 @@ export class AdminServer {
     startConnectionReports(this.node, this.logs)
     startResourceUsageLogger(debugLog)
 
-    process.env.NODE_ENV == 'production' && showDisclaimer(this.logs)
+    if (process.env.NODE_ENV === 'production') {
+      showDisclaimer(this.logs)
+    }
   }
 
   public onConnection(socket: WebSocket) {
