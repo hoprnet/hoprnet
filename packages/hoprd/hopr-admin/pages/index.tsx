@@ -180,23 +180,6 @@ export default function Home() {
     }
   }, [app.streamWS.socketRef.current, app.streamWS.state.status])
 
-  // attach event listener for new messages
-  const handleMessageEvent = (event: MessageEvent<any>) => {
-    console.log(event)
-  }
-  useEffect(() => {
-    const socket = app.messagesWS.socketRef.current
-    if (!socket) return
-
-    socket.addEventListener('message', handleMessageEvent)
-
-    return () => {
-      const socket = app.messagesWS.socketRef.current
-      if (!socket) return
-      socket.removeEventListener('message', handleMessageEvent)
-    }
-  }, [app.messagesWS.socketRef.current, app.messagesWS.state.status])
-
   return (
     <div className={styles.container}>
       <Head>
