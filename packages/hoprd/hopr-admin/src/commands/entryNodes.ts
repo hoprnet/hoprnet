@@ -22,7 +22,9 @@ export default class EntryNodes extends Command {
   public async execute(log: (msg: string) => void, _query: string): Promise<void> {
     const entryNodesRes = await this.api.getEntryNodes()
     if (!entryNodesRes.ok) {
-      return log(this.failedCommand('get entryNodes'))
+      // use this line at when merging release/paleochora
+      // return log(this.failedCommand('get entryNodes'))
+      return log(this.invalidUsage('get entryNodes'))
     }
 
     const peers = await entryNodesRes.json()
