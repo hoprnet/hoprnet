@@ -205,7 +205,7 @@
     "/node/stream/websocket": {
       "parameters": [],
       "get": {
-        "description": "This is a websocket endpoint which streams legacy hopr-admin data excluding messages. Authentication (if enabled) is done via either passing an `apiToken` parameter in the url or cookie `X-Auth-Token`. Connect to the endpoint by using a WS client. No preview available. Example: `ws://127.0.0.1:3001/api/v2/node/stream/websocket/?apiToken=myApiToken`",
+        "description": "This is a websocket endpoint which streams legacy hopr-admin data. Authentication (if enabled) is done via either passing an `apiToken` parameter in the url or cookie `X-Auth-Token`. Connect to the endpoint by using a WS client. No preview available. Example: `ws://127.0.0.1:3001/api/v2/node/stream/websocket/?apiToken=myApiToken`",
         "tags": ["Node"],
         "operationId": "nodeStreamWebsocket",
         "deprecated": true,
