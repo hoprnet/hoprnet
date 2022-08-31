@@ -435,6 +435,8 @@ async function main() {
     logs.log('Creating HOPR Node')
     node = await createHoprNode(peerId, options, false)
     logs.logStatus('PENDING')
+
+    // Subscribe to node events
     node.on('hopr:message', logMessageToNode)
     node.on('hopr:network-health-changed', networkHealthChanged)
     node.subscribeOnConnector('hopr:connector:created', () => {
@@ -507,9 +509,8 @@ async function main() {
         }
 
         // Wait for actions to take place
-        setTimeout(1e3)
+        await setTimeout(1e3)
         await node.stop()
-        return
       }
     })
 
