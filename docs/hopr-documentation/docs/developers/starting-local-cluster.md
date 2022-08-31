@@ -99,7 +99,7 @@ make -j deps && make -j build
 3. **Run the one-line setup script**: Run the following script:
 
 ```bash
-./scripts/setup-local-cluster.sh -m "http://app.myne.chat" -i scripts/topologies/full_interconnected_cluster.sh
+./scripts/setup-local-cluster.sh -m "http://app.myne.chat" -i topologies/full_interconnected_cluster.sh
 ```
 
 Please wait while this script creates
@@ -111,7 +111,7 @@ If you are planning to run [MyneChat](http://app.myne.chat/)
 alongside your cluster, then make sure to pass the `-m` flag with your MyneChat instance URL, i.e.:
 
 ```bash
-./scripts/setup-local-cluster.sh -m "http://app.myne.chat" -i scripts/topologies/full_interconnected_cluster.sh
+./scripts/setup-local-cluster.sh -m "http://app.myne.chat" -i topologies/full_interconnected_cluster.sh
 ```
 
 As the script runs, a set of accounts with their respective HTTP REST API, HOPR Admin, and WebSocket interfaces will be displayed
