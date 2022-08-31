@@ -2,7 +2,7 @@ import { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
 import type { HoprBoost, ERC677Mock } from '../src/types'
 import { type ContractTransaction, utils } from 'ethers'
-import { CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES, DEV_NFT_BOOST, DEV_NFT_RANK_TECH_MAX_REGISTRATION, DEV_NFT_TYPE, MIN_STAKE } from '../utils/constants'
+import { CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES, DEV_NFT_BOOST, DEV_NFT_MAX_REGISTRATION_COM, DEV_NFT_MAX_REGISTRATION_TECH, DEV_NFT_RANK_COM, DEV_NFT_RANK_TECH, DEV_NFT_TYPE, MIN_STAKE } from '../utils/constants'
 import type { HoprStakingProxyForNetworkRegistry } from '../src/types'
 
 const NUM_DEV_NFT = 3
@@ -73,10 +73,11 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       console.log(`Minting type of index ${index}`)
       let mintTx: ContractTransaction
       if (index === devNftIndex) {
+        // mint Dev NFT for tech
         mintTx = await hoprBoost.batchMint(
           new Array(NUM_DEV_NFT).fill(admin),
           DEV_NFT_TYPE,
-          DEV_NFT_TYPE,
+          DEV_NFT_RANK_TECH,
           DEV_NFT_BOOST,
           0,
           {
@@ -88,7 +89,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
         mintTx = await hoprBoost.mint(admin, `${DUMMY_NFT_TYPE}_${index}`, DUMMY_NFT_TYPE, DUMMY_NFT_BOOST, 0, {
           gasLimit: 4e6
         })
-        console.log(`... minting 1 ${DUMMY_NFT_TYPE} NFTs type of index ${index}`)
+        console.log(`... minting 1 ${DUMMY_NFT_TYPE} NFTs type of rank ${inDEV_NFT_RANK_TECHdex}`)
       }
 
       // don't wait when using local hardhat because its using auto-mine
@@ -98,6 +99,24 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
       index++
     }
+
+    // mint Dev NFT for community
+    const mintTx2 = await hoprBoost.batchMint(
+      new Array(NUM_DEV_NFT).fill(admin),
+      DEV_NFT_TYPE,
+      DEV_NFT_RANK_COM,
+      DEV_NFT_BOOST,
+      0,
+      {
+        gasLimit: 4e6
+      }
+    )
+     // don't wait when using local hardhat because its using auto-mine
+     if (!environment.match('hardhat')) {
+      await ethers.provider.waitForTransaction(mintTx2.hash, 2)
+    }
+
+    console.log(`... minting ${NUM_DEV_NFT} ${DEV_NFT_TYPE} NFTs type of rank ${DEV_NFT_RANK_COM}`)
 
     console.log(`Admin ${admin} has ${await hoprBoost.balanceOf(admin)} Boost NFTs`)
     // // renounce its MINTER_ROLE, if needed
@@ -109,11 +128,15 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const registryProxy = (await ethers.getContractFactory('HoprStakingProxyForNetworkRegistry')).attach(
       registryProxyDeployment.address
     ) as HoprStakingProxyForNetworkRegistry
-    const ownerAddDevNftTypeTx = await registryProxy.ownerBatchAddNftTypeAndRank([devNftIndex], [DEV_NFT_BOOST])
+    const ownerAddDevNftTypeTx = await registryProxy.ownerBatchAddNftTypeAndRank(
+      [devNftIndex, devNftIndex],
+      [DEV_NFT_RANK_TECH, DEV_NFT_RANK_COM],
+      [DEV_NFT_MAX_REGISTRATION_TECH, DEV_NFT_MAX_REGISTRATION_COM]
+    )
     const ownerAddSpecialNftTypeTx = await registryProxy.ownerBatchAddSpecialNftTypeAndRank(
-      [devNftIndex],
-      [DEV_NFT_BOOST],
-      [DEV_NFT_RANK_TECH_MAX_REGISTRATION]
+      [devNftIndex, devNftIndex],
+      [DEV_NFT_RANK_TECH, DEV_NFT_RANK_COM],
+      [DEV_NFT_MAX_REGISTRATION_TECH, DEV_NFT_MAX_REGISTRATION_COM]
     )
 
     // don't wait when using local hardhat because its using auto-mine
@@ -154,7 +177,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
           ...Array(10).fill(DEV_BANK_ADDRESS)
         ],
         DEV_NFT_TYPE,
-        DEV_NFT_TYPE,
+        DEV_NFT_MAX_REGISTRATION_TECH,
         DEV_NFT_BOOST,
         0,
         {

@@ -14,9 +14,9 @@ import '../IHoprNetworkRegistryRequirement.sol';
 contract IHoprStake {
   function stakedHoprTokens(address _account) public view returns (uint256) {}
 
-  function isNftTypeAndRankRedeemed3(
+  function isNftTypeAndRankRedeemed2(
     uint256 nftTypeIndex,
-    uint256 boostNumerator,
+    string memory nftRank,
     address hodler
   ) external view returns (bool) {}
 }
@@ -35,7 +35,7 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
 
   struct NftTypeAndRank {
     uint256 nftType;
-    uint256 nftRank;
+    string nftRank;
   }
 
   IHoprStake public stakeContract; // contract of HoprStake contract
@@ -46,10 +46,10 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   uint256[] public maxRegistrationsPerSpecialNft; // for holders of special NFT, it's the cap of peer ids one address can register.
   NftTypeAndRank[] public specialNftTypeAndRank; // list of NFTs whose owner are considered as eligible to the network without meeting the `stakeThreshold`, e.g. "Dev NFT"
 
-  event NftTypeAndRankAdded(uint256 indexed nftType, uint256 indexed nftRank); // emit when a new NFT type and rank gets included in the eligibility list
-  event NftTypeAndRankRemoved(uint256 indexed nftType, uint256 indexed nftRank); // emit when a NFT type and rank gets removed from the eligibility list
-  event SpecialNftTypeAndRankAdded(uint256 indexed nftType, uint256 indexed nftRank, uint256 indexed maxRegistration); // emit when a new special type and rank of NFT gets included in the eligibility list
-  event SpecialNftTypeAndRankRemoved(uint256 indexed nftType, uint256 indexed nftRank); // emit when a special type and rank of NFT gets removed from the eligibility list
+  event NftTypeAndRankAdded(uint256 indexed nftType, string nftRank); // emit when a new NFT type and rank gets included in the eligibility list
+  event NftTypeAndRankRemoved(uint256 indexed nftType, string nftRank); // emit when a NFT type and rank gets removed from the eligibility list
+  event SpecialNftTypeAndRankAdded(uint256 indexed nftType, string nftRank, uint256 indexed maxRegistration); // emit when a new special type and rank of NFT gets included in the eligibility list
+  event SpecialNftTypeAndRankRemoved(uint256 indexed nftType, string nftRank); // emit when a special type and rank of NFT gets removed from the eligibility list
   event ThresholdUpdated(uint256 indexed threshold); // emit when the staking threshold gets updated.
   event StakeContractUpdated(address indexed stakeContract); // emit when the staking threshold gets updated.
 
@@ -80,7 +80,7 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
     // if the account owns a special NFT, requirement is fulfilled
     for (uint256 i = 0; i < specialNftTypeAndRank.length; i++) {
       NftTypeAndRank memory eligible = specialNftTypeAndRank[i];
-      if (stakeContract.isNftTypeAndRankRedeemed3(eligible.nftType, eligible.nftRank, account)) {
+      if (stakeContract.isNftTypeAndRankRedeemed2(eligible.nftType, eligible.nftRank, account)) {
         allowedRegistration = allowedRegistration.max(maxRegistrationsPerSpecialNft[i]);
       }
     }
@@ -95,7 +95,7 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
     // check on regular eligible NFTs.
     for (uint256 i = 0; i < eligibleNftTypeAndRank.length; i++) {
       NftTypeAndRank memory eligible = eligibleNftTypeAndRank[i];
-      if (stakeContract.isNftTypeAndRankRedeemed3(eligible.nftType, eligible.nftRank, account)) {
+      if (stakeContract.isNftTypeAndRankRedeemed2(eligible.nftType, eligible.nftRank, account)) {
         allowedRegistration = allowedRegistration.max(amount / stakeThreshold);
       }
     }
@@ -106,12 +106,12 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   /**
    * @dev Owner adds/updates NFT type and rank to the list of special NFTs in batch.
    * @param nftTypes Array of type indexes of the special HoprBoost NFT
-   * @param nftRanks Array of HOPR boost numerator, which is associated to the special NFT
+   * @param nftRanks Array of HOPR boost rank, which is associated to the special NFT, in string[]
    * @param maxRegistrations Array of maximum registration per special NFT type
    */
   function ownerBatchAddSpecialNftTypeAndRank(
     uint256[] calldata nftTypes,
-    uint256[] calldata nftRanks,
+    string[] calldata nftRanks,
     uint256[] calldata maxRegistrations
   ) external onlyOwner {
     require(
@@ -130,9 +130,9 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   /**
    * @dev Owner removes from list of special NFTs in batch.
    * @param nftTypes Array of type index of the special HoprBoost NFT
-   * @param nftRanks Array of  HOPR boost numerator, which is associated to the special NFT
+   * @param nftRanks Array of HOPR boost rank, which is associated to the special NFT, in string[]
    */
-  function ownerBatchRemoveSpecialNftTypeAndRank(uint256[] calldata nftTypes, uint256[] calldata nftRanks)
+  function ownerBatchRemoveSpecialNftTypeAndRank(uint256[] calldata nftTypes, string[] calldata nftRanks)
     external
     onlyOwner
   {
@@ -148,9 +148,9 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   /**
    * @dev Owner adds/updates NFT type and rank to the list of eligibles NFTs in batch.
    * @param nftTypes Array of type indexes of the eligible HoprBoost NFT
-   * @param nftRanks Array of HOPR boost numerator, which is associated to the eligible NFT
+   * @param nftRanks Array of HOPR boost rank, which is associated to the eligible NFT, in string[]
    */
-  function ownerBatchAddNftTypeAndRank(uint256[] calldata nftTypes, uint256[] calldata nftRanks) external onlyOwner {
+  function ownerBatchAddNftTypeAndRank(uint256[] calldata nftTypes, string[] calldata nftRanks) external onlyOwner {
     require(
       nftTypes.length == nftRanks.length,
       'HoprStakingProxyForNetworkRegistry: ownerBatchAddNftTypeAndRank lengths mismatch'
@@ -163,9 +163,9 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   /**
    * @dev Owner removes from list of eligible NFTs in batch.
    * @param nftTypes Array of type index of the eligible HoprBoost NFT
-   * @param nftRanks Array of  HOPR boost numerator, which is associated to the eligible NFT
+   * @param nftRanks Array of HOPR boost rank, which is associated to the eligible NFT, in string[]
    */
-  function ownerBatchRemoveNftTypeAndRank(uint256[] calldata nftTypes, uint256[] calldata nftRanks) external onlyOwner {
+  function ownerBatchRemoveNftTypeAndRank(uint256[] calldata nftTypes, string[] calldata nftRanks) external onlyOwner {
     require(
       nftTypes.length == nftRanks.length,
       'HoprStakingProxyForNetworkRegistry: ownerBatchRemoveNftTypeAndRank lengths mismatch'
@@ -178,18 +178,18 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   /**
    * @dev Owner adds/updates NFT type and rank to the list of eligibles NFTs.
    * @param nftType Type index of the eligible HoprBoost NFT
-   * @param nftRank HOPR boost numerator, which is associated to the eligible NFT
+   * @param nftRank HoprBoost rank which is associated to the eligible NFT, in string
    */
-  function ownerAddNftTypeAndRank(uint256 nftType, uint256 nftRank) external onlyOwner {
+  function ownerAddNftTypeAndRank(uint256 nftType, string memory nftRank) external onlyOwner {
     _addNftTypeAndRank(nftType, nftRank);
   }
 
   /**
    * @dev Owner removes from list of eligible NFTs
    * @param nftType Type index of the eligible HoprBoost NFT
-   * @param nftRank HOPR boost numerator, which is associated to the eligible NFT
+   * @param nftRank HoprBoost rank which is associated to the eligible NFT, in string
    */
-  function ownerRemoveNftTypeAndRank(uint256 nftType, uint256 nftRank) external onlyOwner {
+  function ownerRemoveNftTypeAndRank(uint256 nftType, string memory nftRank) external onlyOwner {
     _removeNftTypeAndRank(nftType, nftRank);
   }
 
@@ -217,18 +217,21 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   /**
    * @dev adds NFT type and rank to the list of special NFTs.
    * @param nftType Type index of the special HoprBoost NFT
-   * @param nftRank HOPR boost numerator, which is associated to the special NFT
+   * @param nftRank HoprBoost rank which is associated to the special NFT, in string
    * @param maxRegistration maximum registration of HOPR node per special NFT
    */
   function _addSpecialNftTypeAndRank(
     uint256 nftType,
-    uint256 nftRank,
+    string memory nftRank,
     uint256 maxRegistration
   ) private {
     uint256 i = 0;
     for (i; i < specialNftTypeAndRank.length; i++) {
       // walk through all the types
-      if (specialNftTypeAndRank[i].nftType == nftType && specialNftTypeAndRank[i].nftRank == nftRank) {
+      if (
+        specialNftTypeAndRank[i].nftType == nftType &&
+        keccak256(bytes(specialNftTypeAndRank[i].nftRank)) == keccak256(bytes(nftRank))
+      ) {
         // already exist, overwrite maxRegistration
         maxRegistrationsPerSpecialNft[i] = maxRegistration;
       }
@@ -240,12 +243,15 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   /**
    * @dev Remove from list of special NFTs
    * @param nftType Type index of the special HoprBoost NFT
-   * @param nftRank HOPR boost numerator, which is associated to the special NFT
+   * @param nftRank HoprBoost rank which is associated to the special NFT, in string
    */
-  function _removeSpecialNftTypeAndRank(uint256 nftType, uint256 nftRank) private {
+  function _removeSpecialNftTypeAndRank(uint256 nftType, string memory nftRank) private {
     // walk through
     for (uint256 i = 0; i < specialNftTypeAndRank.length; i++) {
-      if (specialNftTypeAndRank[i].nftType == nftType && specialNftTypeAndRank[i].nftRank == nftRank) {
+      if (
+        specialNftTypeAndRank[i].nftType == nftType &&
+        keccak256(bytes(specialNftTypeAndRank[i].nftRank)) == keccak256(bytes(nftRank))
+      ) {
         // overwrite with the last element in the array
         specialNftTypeAndRank[i] = specialNftTypeAndRank[specialNftTypeAndRank.length - 1];
         specialNftTypeAndRank.pop();
@@ -259,13 +265,16 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   /**
    * @dev adds NFT type and rank to the list of eligibles NFTs.
    * @param nftType Type index of the eligible HoprBoost NFT
-   * @param nftRank HOPR boost numerator, which is associated to the eligible NFT
+   * @param nftRank HoprBoost rank which is associated to the eligible NFT, in string
    */
-  function _addNftTypeAndRank(uint256 nftType, uint256 nftRank) private {
+  function _addNftTypeAndRank(uint256 nftType, string memory nftRank) private {
     uint256 i = 0;
     for (i; i < eligibleNftTypeAndRank.length; i++) {
       // walk through all the types
-      if (eligibleNftTypeAndRank[i].nftType == nftType && eligibleNftTypeAndRank[i].nftRank == nftRank) {
+      if (
+        eligibleNftTypeAndRank[i].nftType == nftType &&
+        keccak256(bytes(eligibleNftTypeAndRank[i].nftRank)) == keccak256(bytes(nftRank))
+      ) {
         // already exist;
         return;
       }
@@ -277,12 +286,15 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   /**
    * @dev Remove from list of eligible NFTs
    * @param nftType Type index of the eligible HoprBoost NFT
-   * @param nftRank HOPR boost numerator, which is associated to the eligible NFT
+   * @param nftRank HoprBoost rank which is associated to the eligible NFT, in string
    */
-  function _removeNftTypeAndRank(uint256 nftType, uint256 nftRank) private {
+  function _removeNftTypeAndRank(uint256 nftType, string memory nftRank) private {
     // walk through
     for (uint256 i = 0; i < eligibleNftTypeAndRank.length; i++) {
-      if (eligibleNftTypeAndRank[i].nftType == nftType && eligibleNftTypeAndRank[i].nftRank == nftRank) {
+      if (
+        eligibleNftTypeAndRank[i].nftType == nftType &&
+        keccak256(bytes(eligibleNftTypeAndRank[i].nftRank)) == keccak256(bytes(nftRank))
+      ) {
         // overwrite with the last element in the array
         eligibleNftTypeAndRank[i] = eligibleNftTypeAndRank[eligibleNftTypeAndRank.length - 1];
         eligibleNftTypeAndRank.pop();

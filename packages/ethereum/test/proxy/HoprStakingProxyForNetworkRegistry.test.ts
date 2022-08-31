@@ -12,9 +12,9 @@ const NFT_TYPE = [1, 2]
 const NFT_RANK = [123, 456]
 const HIGH_STAKE = 2000
 const LOW_STAKE = 100
-const SPECIAL_NFT_TYPE = 3 // 'Dev'
-const SPECIAL_NFT_RANK_TECH = 0 // 'Tech'
-const SPECIAL_NFT_RANK_COM = 0 // 'Com'
+const SPECIAL_NFT_TYPE = 3 // 'Network_registry'
+const SPECIAL_NFT_RANK_TECH = 'developer' // 'Tech'
+const SPECIAL_NFT_RANK_COM = 'community' // 'Com'
 const MAX_REGISTRATION_TECH = constants.MaxUint256
 const MAX_REGISTRATION_COM = 1
 
