@@ -2,7 +2,16 @@ import { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
 import type { HoprBoost, ERC677Mock } from '../src/types'
 import { type ContractTransaction, utils } from 'ethers'
-import { CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES, DEV_NFT_BOOST, DEV_NFT_MAX_REGISTRATION_COM, DEV_NFT_MAX_REGISTRATION_TECH, DEV_NFT_RANK_COM, DEV_NFT_RANK_TECH, DEV_NFT_TYPE, MIN_STAKE } from '../utils/constants'
+import {
+  CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES,
+  DEV_NFT_BOOST,
+  DEV_NFT_MAX_REGISTRATION_COM,
+  DEV_NFT_MAX_REGISTRATION_TECH,
+  DEV_NFT_RANK_COM,
+  DEV_NFT_RANK_TECH,
+  DEV_NFT_TYPE,
+  MIN_STAKE
+} from '../utils/constants'
 import type { HoprStakingProxyForNetworkRegistry } from '../src/types'
 
 const NUM_DEV_NFT = 3

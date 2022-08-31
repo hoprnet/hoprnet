@@ -18,11 +18,16 @@ const SPECIAL_NFT_RANK_COM = 'community' // 'Com'
 const MAX_REGISTRATION_TECH = constants.MaxUint256
 const MAX_REGISTRATION_COM = 1
 
-const checkMaxAllowance = async (registryContract: Contract, participantAddresses: string[], allowedRegistrationNum: Array<number | BigNumber>) => {
+const checkMaxAllowance = async (
+  registryContract: Contract,
+  participantAddresses: string[],
+  allowedRegistrationNum: Array<number | BigNumber>
+) => {
   participantAddresses.forEach((participantAddress, accountIndex) => {
     it(`participant ${accountIndex} should have allowance of ${allowedRegistrationNum}`, async () => {
-      expect(await registryContract.maxAllowedRegistrations(participantAddress)).to
-      .be.equal(allowedRegistrationNum[accountIndex])
+      expect(await registryContract.maxAllowedRegistrations(participantAddress)).to.be.equal(
+        allowedRegistrationNum[accountIndex]
+      )
     })
   })
 }
@@ -200,7 +205,6 @@ describe('Registry proxy for stake v2', () => {
     await checkMaxAllowance(hoprStakingProxyForNetworkRegistry, participantAddresses, allowanceWhenTresholdIsLowered)
   })
 
-  
   describe(`Lower threshold to ${LOW_STAKE}`, async () => {
     beforeEach(async () => {
       ;({ owner, participantAddresses, hoprStakingProxyForNetworkRegistry } = await useFixtures())
@@ -253,7 +257,6 @@ describe('Registry proxy for stake v2', () => {
 
     const allowanceWhenTresholdIsLowered = [0, 20, 0, 1, 20, 0, 0]
     await checkMaxAllowance(hoprStakingProxyForNetworkRegistry, participantAddresses, allowanceWhenTresholdIsLowered)
-
   })
 
   describe(`Owner batch-remove NFTs`, async () => {
@@ -283,7 +286,11 @@ describe('Registry proxy for stake v2', () => {
 
       await hoprStakingProxyForNetworkRegistry
         .connect(owner)
-        .ownerBatchAddSpecialNftTypeAndRank([SPECIAL_NFT_TYPE, SPECIAL_NFT_TYPE], [SPECIAL_NFT_RANK_TECH, SPECIAL_NFT_RANK_COM], [MAX_REGISTRATION_TECH, MAX_REGISTRATION_COM])
+        .ownerBatchAddSpecialNftTypeAndRank(
+          [SPECIAL_NFT_TYPE, SPECIAL_NFT_TYPE],
+          [SPECIAL_NFT_RANK_TECH, SPECIAL_NFT_RANK_COM],
+          [MAX_REGISTRATION_TECH, MAX_REGISTRATION_COM]
+        )
     })
 
     const allowance = [0, 0, MAX_REGISTRATION_TECH, 0, 0, 0, MAX_REGISTRATION_COM]
@@ -296,7 +303,11 @@ describe('Registry proxy for stake v2', () => {
       await hoprStakingProxyForNetworkRegistry.connect(owner).ownerAddNftTypeAndRank(NFT_TYPE[1], NFT_RANK[0])
       await hoprStakingProxyForNetworkRegistry
         .connect(owner)
-        .ownerBatchAddSpecialNftTypeAndRank([SPECIAL_NFT_TYPE, SPECIAL_NFT_TYPE], [SPECIAL_NFT_RANK_TECH, SPECIAL_NFT_RANK_COM], [MAX_REGISTRATION_TECH, MAX_REGISTRATION_COM])
+        .ownerBatchAddSpecialNftTypeAndRank(
+          [SPECIAL_NFT_TYPE, SPECIAL_NFT_TYPE],
+          [SPECIAL_NFT_RANK_TECH, SPECIAL_NFT_RANK_COM],
+          [MAX_REGISTRATION_TECH, MAX_REGISTRATION_COM]
+        )
     })
 
     const allowance = [2, 0, MAX_REGISTRATION_TECH, 0, 0, 0, MAX_REGISTRATION_COM]
@@ -304,16 +315,20 @@ describe('Registry proxy for stake v2', () => {
   })
   describe(`Both special NFTs on top of normal nfts`, async () => {
     beforeEach(async () => {
-      let stakeV2Fake;
+      let stakeV2Fake
       ;({ owner, participantAddresses, hoprStakingProxyForNetworkRegistry, stakeV2Fake } = await useFixtures())
-        // participant 6 redeemed two special NFTs (both COM and TECH)
+      // participant 6 redeemed two special NFTs (both COM and TECH)
       stakeV2Fake.isNftTypeAndRankRedeemed3
-      .whenCalledWith(SPECIAL_NFT_TYPE, SPECIAL_NFT_RANK_TECH, participantAddresses[6])
-      .returns(true)
+        .whenCalledWith(SPECIAL_NFT_TYPE, SPECIAL_NFT_RANK_TECH, participantAddresses[6])
+        .returns(true)
       await hoprStakingProxyForNetworkRegistry.connect(owner).ownerAddNftTypeAndRank(NFT_TYPE[1], NFT_RANK[0])
       await hoprStakingProxyForNetworkRegistry
         .connect(owner)
-        .ownerBatchAddSpecialNftTypeAndRank([SPECIAL_NFT_TYPE, SPECIAL_NFT_TYPE], [SPECIAL_NFT_RANK_TECH, SPECIAL_NFT_RANK_COM], [MAX_REGISTRATION_TECH, MAX_REGISTRATION_COM])
+        .ownerBatchAddSpecialNftTypeAndRank(
+          [SPECIAL_NFT_TYPE, SPECIAL_NFT_TYPE],
+          [SPECIAL_NFT_RANK_TECH, SPECIAL_NFT_RANK_COM],
+          [MAX_REGISTRATION_TECH, MAX_REGISTRATION_COM]
+        )
     })
 
     const allowance = [2, 0, MAX_REGISTRATION_TECH, 0, 0, 0, MAX_REGISTRATION_TECH]
