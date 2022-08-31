@@ -21,7 +21,7 @@ export const readStreamEvent = (event: any): Log | undefined => {
 
     // we ignore plain messages, instead print HOPRd logs
     if (data.type === 'message') return undefined
-    // we are only interested in messages which contain 'content'
+    // we are only interested in messages which have a message
     if (!data.msg) return undefined
 
     return createLog(data.msg, +new Date(data.ts))
