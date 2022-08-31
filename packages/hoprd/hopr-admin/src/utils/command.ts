@@ -90,8 +90,10 @@ export abstract class Command {
    * Generate 'invalid paramater' message.
    * @returns Specific paramater was invalid.
    */
-  protected invalidParameter(param: string, type: string): string {
-    return `Invalid parameter "${param}" of type "${type}".\n${this.usage()}`
+  protected invalidParameter(param: string, type: string, error?: string): string {
+    return `Invalid parameter "${param}" of type "${type}"${
+      error ? ' with error "' + error + '"' : ''
+    }".\n${this.usage()}`
   }
 
   /**
@@ -153,7 +155,7 @@ export abstract class Command {
       if (arbitraryIndex > -1) {
         const newParam = queryParams.slice(arbitraryIndex).join(' ')
         queryParams = queryParams.slice(0, arbitraryIndex)
-        queryParams.push(newParam)
+        if (newParam.length > 0) queryParams.push(newParam)
       }
 
       // invalid when query params are less than expected params

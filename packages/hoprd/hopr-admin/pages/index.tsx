@@ -162,10 +162,8 @@ export default function Home() {
 
   // attach event listener for new streams events
   const handleStreamEvent = (event: MessageEvent<any>) => {
-    const eventLogs = readStreamEvent(event)
-    for (const log of eventLogs) {
-      addLog(log)
-    }
+    const log = readStreamEvent(event)
+    if (log) addLog(log)
   }
   useEffect(() => {
     const socket = app.streamWS.socketRef.current
