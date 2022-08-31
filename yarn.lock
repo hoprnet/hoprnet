@@ -3798,6 +3798,7 @@ __metadata:
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@libp2p/interface-peer-id": 1.0.2
     "@libp2p/peer-id": 1.1.13
+    "@multiformats/multiaddr": 10.3.3
     "@types/chai": 4.3.3
     "@types/cors": 2.8.12
     "@types/js-cookie": ^3.0.1
