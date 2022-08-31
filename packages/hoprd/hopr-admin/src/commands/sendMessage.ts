@@ -7,7 +7,10 @@ export default class SendMessage extends Command {
       {
         default: [[['hoprAddressOrAlias'], ['arbitrary', 'message']], 'send a message, path is chosen automatically'],
         manual: [
-          [['string'], ['string', "path seperated by ','"], ['arbitrary', 'message']],
+          [
+            ['string', "path seperated by ','"],
+            ['arbitrary', 'message']
+          ],
           'send a message, path is manually specified'
         ]
       },
@@ -39,7 +42,7 @@ export default class SendMessage extends Command {
         if (!valid) throw Error()
         path.push(peerId.toString())
       } catch (err) {
-        return [false, `'${pIdString}' is neither a valid alias nor a valid Hopr address string`, undefined]
+        return [false, `'${pIdString}' is not an alias or HOPR address`, undefined]
       }
     }
 
@@ -56,7 +59,7 @@ export default class SendMessage extends Command {
 
     if (use === 'manual') {
       const [valid, error, result] = this.parsePathStr(pathOrRecipient)
-      if (!valid) return log(`${error}\n${this.usage()}`)
+      if (!valid) return log(this.invalidParameter(pathOrRecipient, 'path', error))
       path = result.intermediateNodes
       recipient = result.recipient
     }

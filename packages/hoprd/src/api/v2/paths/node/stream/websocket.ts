@@ -10,7 +10,7 @@ const GET: Operation = [
 // This endpoint only exists to document the websocket's behaviour.
 GET.apiDoc = {
   description: generateWsApiDescription(
-    'This is a websocket endpoint which streams legacy hopr-admin data excluding messages.',
+    'This is a websocket endpoint which streams legacy hopr-admin data.',
     '/node/stream/websocket'
   ),
   tags: ['Node'],

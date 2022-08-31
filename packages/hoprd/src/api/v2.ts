@@ -239,6 +239,10 @@ export function setupWsApi(
     debugLog('WS client connected!')
     const path = removeQueryParams(req.url)
 
+    socket.on('close', () => {
+      logStream.unsubscribe(socket)
+    })
+
     socket.on('error', (err: string) => {
       debugLog('WS error', err.toString())
     })
@@ -251,17 +255,7 @@ export function setupWsApi(
         socket.send(`ack:'${ackChallenge}'`)
       })
     } else if (path === WS_PATHS.LEGACY_STREAM) {
-      logStream.addMessageListener((msg) => {
-        if (msg.type !== 'message') {
-          socket.send(
-            JSON.stringify({
-              type: msg.type,
-              timestamp: msg.ts,
-              content: msg.msg
-            })
-          )
-        }
-      })
+      logStream.subscribe(socket)
     } else {
       // close connection on unsupported paths
       socket.close(1000)
