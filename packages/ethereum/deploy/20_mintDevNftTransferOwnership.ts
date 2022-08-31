@@ -98,7 +98,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
         mintTx = await hoprBoost.mint(admin, `${DUMMY_NFT_TYPE}_${index}`, DUMMY_NFT_TYPE, DUMMY_NFT_BOOST, 0, {
           gasLimit: 4e6
         })
-        console.log(`... minting 1 ${DUMMY_NFT_TYPE} NFTs type of rank ${inDEV_NFT_RANK_TECHdex}`)
+        console.log(`... minting 1 ${DUMMY_NFT_TYPE} NFTs type of rank ${DEV_NFT_RANK_TECH}`)
       }
 
       // don't wait when using local hardhat because its using auto-mine
@@ -139,8 +139,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     ) as HoprStakingProxyForNetworkRegistry
     const ownerAddDevNftTypeTx = await registryProxy.ownerBatchAddNftTypeAndRank(
       [devNftIndex, devNftIndex],
-      [DEV_NFT_RANK_TECH, DEV_NFT_RANK_COM],
-      [DEV_NFT_MAX_REGISTRATION_TECH, DEV_NFT_MAX_REGISTRATION_COM]
+      [DEV_NFT_RANK_TECH, DEV_NFT_RANK_COM]
     )
     const ownerAddSpecialNftTypeTx = await registryProxy.ownerBatchAddSpecialNftTypeAndRank(
       [devNftIndex, devNftIndex],
@@ -186,7 +185,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
           ...Array(10).fill(DEV_BANK_ADDRESS)
         ],
         DEV_NFT_TYPE,
-        DEV_NFT_MAX_REGISTRATION_TECH,
+        DEV_NFT_MAX_REGISTRATION_TECH.toString(),
         DEV_NFT_BOOST,
         0,
         {
