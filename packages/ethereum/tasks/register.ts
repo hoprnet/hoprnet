@@ -11,17 +11,17 @@ export type RegisterOpts =
       task: 'add'
       nativeAddresses: string
       peerIds: string
-      privatekey: string // private key of the caller
+      privatekey?: string // private key of the caller
     }
   | {
       task: 'remove'
       nativeAddresses?: string
       peerIds: string
-      privatekey: string // private key of the caller
+      privatekey?: string // private key of the caller
     }
   | {
       task: 'disable' | 'enable'
-      privatekey: string // private key of the caller
+      privatekey?: string // private key of the caller
     }
 
 /**
@@ -112,7 +112,8 @@ async function main(
     } else if (opts.task === 'remove') {
       const peerIds = opts.peerIds.split(',')
 
-      // in staging account, deregister; in non-stagin environment, remove addresses directly from proxy
+      // in staging account (where "HoprStakingProxyForNetworkRegistry" is used), deregister; in non-staging environment (where "HoprDummyProxyForNetworkRegistry" is used), remove addresses directly from proxy
+      // FIXME: production should also use staking proxy
       if (network.tags.development || network.tags.production) {
         let nativeAddresses
 

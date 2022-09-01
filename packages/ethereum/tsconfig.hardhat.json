@@ -3,7 +3,8 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "noEmit": true,
-    "rootDir": "."
+    "rootDir": ".",
+    "esModuleInterop": true
   },
   "include": ["type-extension.ts", "hardhat.config.ts", "types.ts", "tasks", "test", "deploy", "src", "utils"],
   "references": [{ "path": "../utils" }]
