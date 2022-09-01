@@ -3,12 +3,18 @@
 # use slim version of node on Debian buster for smaller image sizes
 FROM node:16-bullseye-slim@sha256:8265ac132f720998222008355e11535caf53d6bccecbb562a055605138975b4e as build
 
+# use bash to have source command and persistent environment
+SHELL ["/bin/bash", "-lc"]
+
 # python is used by some nodejs dependencies as an installation requirement
 RUN apt-get update && \
     apt-get install -y \
     git \
     python3 \
+    unzip \
+    curl \
     build-essential \
+    ca-certificates \
   && rm -rf /var/lib/apt/lists/* \
   && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
 
@@ -28,8 +34,30 @@ ENV npm_config_build_from_source false
 
 WORKDIR /app
 
-# install hoprd as a local module
-RUN yarn add @hoprnet/hoprd@${PACKAGE_VERSION}
+# Install minimal version of Rust
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
+
+# Make cargo available in home path
+RUN source $HOME/.cargo/env
+
+ADD https://github.com/hoprnet/hoprnet/archive/refs/tags/v${PACKAGE_VERSION}.zip .
+RUN unzip ./v${PACKAGE_VERSION}.zip 
+RUN mv /app/hoprnet-${PACKAGE_VERSION} /app/hoprnet
+
+WORKDIR /app/hoprnet
+
+RUN CI=true make -j deps
+
+# Remove all tests
+RUN find ./packages -type f -name '*.spec.ts' -delete 
+
+RUN make -j build
+
+# Remove all typescript files
+RUN find ./packages -type f -name '*.ts' -delete
+
+# Remove all other directories and files that we don't need
+RUN rm -R target packages/*/src test docs .github .processes .vscode *.md tsconfig* flake* shell.nix scripts cloudbuild.yaml Makefile Dockerfile.hardhat Cargo.* rust-toolchain.toml Brewfile 
 
 # use slim version of node on Debian buster for smaller image sizes
 FROM node:16-bullseye-slim@sha256:8265ac132f720998222008355e11535caf53d6bccecbb562a055605138975b4e as runtime
@@ -59,7 +87,9 @@ RUN apt-get update \
 WORKDIR /app
 
 # copy over the contents of node_modules etc
-COPY --from=build /app .
+COPY --from=build /app/hoprnet .
+
+WORKDIR /app/packages/hoprd
 
 # create directory which is later used for the database, so that it inherits
 # permissions when mapped to a volume
