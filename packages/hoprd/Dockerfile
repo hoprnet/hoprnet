@@ -3,6 +3,7 @@
 # use slim version of node on Debian buster for smaller image sizes
 FROM node:16-bullseye-slim@sha256:8265ac132f720998222008355e11535caf53d6bccecbb562a055605138975b4e as build
 
+# use bash to have source command and persistent environment
 SHELL ["/bin/bash", "-lc"]
 
 # python is used by some nodejs dependencies as an installation requirement
@@ -34,9 +35,8 @@ ENV npm_config_build_from_source false
 WORKDIR /app
 
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
-# ADD https://sh.rustup.rs .
-# RUN chmod +x ./rustup-init.sh
-# RUN ./rustup-init.sh -y
+
+# Make cargo available in home path
 RUN source $HOME/.cargo/env
 
 ADD https://github.com/hoprnet/hoprnet/archive/refs/tags/v${PACKAGE_VERSION}.zip .
@@ -44,8 +44,6 @@ RUN unzip ./v${PACKAGE_VERSION}.zip
 RUN mv /app/hoprnet-${PACKAGE_VERSION} /app/hoprnet
 
 WORKDIR /app/hoprnet
-
-# RUN CI=true yarn install --immutable
 
 RUN CI=true make -j deps
 RUN make -j build
