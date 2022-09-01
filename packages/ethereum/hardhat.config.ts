@@ -50,7 +50,7 @@ import { task, types, extendEnvironment, subtask } from 'hardhat/config'
 import { writeFileSync, realpathSync } from 'fs'
 import { TASK_TEST_SETUP_TEST_ENVIRONMENT } from 'hardhat/builtin-tasks/task-names'
 import { HARDHAT_NETWORK_NAME } from 'hardhat/plugins'
-import stake, { StakeOpts } from './tasks/stake'
+import stake, { DevNftRank, StakeOpts } from './tasks/stake'
 import { MIN_STAKE } from './utils/constants'
 import type { BigNumber } from 'ethers'
 
@@ -271,6 +271,7 @@ task<StakeOpts>('stake', 'Used by CI tests to stake tokens to the running stakin
     MIN_STAKE.toString(),
     types.string
   )
+  .addOptionalParam<DevNftRank>('nftRank', 'Dev NFT rank ("developer" or "community")', undefined, types.string)
   .addOptionalParam<string>('privatekey', 'Private key of the signer', undefined, types.string)
 
 function getSortedFiles(dependenciesGraph) {
