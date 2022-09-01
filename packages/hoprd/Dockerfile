@@ -29,7 +29,7 @@ ENV npm_config_build_from_source false
 WORKDIR /app
 
 # install hoprd as a local module
-RUN yarn add @hoprnet/hoprd@${PACKAGE_VERSION}
+RUN npm install @hoprnet/hoprd@${PACKAGE_VERSION}
 
 # use slim version of node on Debian buster for smaller image sizes
 FROM node:16-bullseye-slim@sha256:8265ac132f720998222008355e11535caf53d6bccecbb562a055605138975b4e as runtime
@@ -76,4 +76,4 @@ VOLUME ["/app/hoprd-db"]
 # finally set the non-root user so the process also run un-privilidged
 # USER node
 
-ENTRYPOINT ["/usr/bin/tini", "--", "yarn", "hoprd"]
+ENTRYPOINT ["/usr/bin/tini", "--", "npx", "hoprd"]
