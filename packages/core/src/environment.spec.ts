@@ -6,7 +6,7 @@ describe('test environment and flags', async function () {
     const customProvider = 'https://a-dummy-provider.com'
     const environment_id = 'hardhat-localhost'
 
-    const resolvedEnvironment = resolveEnvironment(environment_id, '*', customProvider)
+    const resolvedEnvironment = resolveEnvironment(environment_id, '1.0.0', customProvider)
     assert.equal(resolvedEnvironment.network.default_provider, customProvider, 'provider')
   })
 })
