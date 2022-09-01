@@ -21,6 +21,7 @@ export const DEV_NFT_RANK_TECH = 'developer'
 export const DEV_NFT_RANK_COM = 'community'
 export const DEV_NFT_MAX_REGISTRATION_TECH = constants.MaxUint256
 export const DEV_NFT_MAX_REGISTRATION_COM = 1
+export type DevNftRank = typeof DEV_NFT_RANK_TECH | typeof DEV_NFT_RANK_COM
 
 export const CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES = [
   '0x6c150A63941c6d58a2f2687a23d5a8E0DbdE181C', // nat_with_stake

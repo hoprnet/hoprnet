@@ -1,8 +1,6 @@
 import { Signer, Wallet } from 'ethers'
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
-import { DEV_NFT_BOOST, DEV_NFT_RANK_COM, DEV_NFT_RANK_TECH, DEV_NFT_TYPE, DEV_NFT_TYPE_INDEX } from '../utils/constants'
-
-export type DevNftRank = typeof DEV_NFT_RANK_TECH | typeof DEV_NFT_RANK_COM
+import { DevNftRank, DEV_NFT_BOOST, DEV_NFT_TYPE, DEV_NFT_TYPE_INDEX } from '../utils/constants'
 
 export type StakeOpts = {
   type: 'xhopr'

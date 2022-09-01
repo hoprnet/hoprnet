@@ -1,12 +1,18 @@
 import { type Signer, type Contract, Wallet } from 'ethers'
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
-import { DEV_NFT_BOOST, DEV_NFT_TYPE } from '../utils/constants'
+import { DevNftRank, DEV_NFT_BOOST, DEV_NFT_TYPE, DEV_NFT_TYPE_INDEX } from '../utils/constants'
 
 export type RequestTestTokensOpts = {
-  type: 'devnft' | 'xhopr'
-  amount?: string // target amount in wei
+  type: 'xhopr'
+  amount: string // target amount in wei
   recipient: string // address of the recipient
-  privatekey: string // private key of the Boost NFT owner
+  privatekey?: string // private key of the Boost NFT owner
+} | {
+  type: 'devnft'
+  nftRank: DevNftRank
+  recipient: string // address of the recipient
+  privatekey?: string // private key of the Boost NFT owner
+
 }
 
 async function requestXhopr(hre: HardhatRuntimeEnvironment, signer: Signer, amount: string, recipientAddress: string) {
@@ -48,6 +54,7 @@ async function requestDevNft(
   hre: HardhatRuntimeEnvironment,
   signer: Signer,
   hoprStake: Contract,
+  nftRank: DevNftRank,
   recipientAddress: string
 ) {
   const { ethers, deployments } = hre
@@ -58,41 +65,13 @@ async function requestDevNft(
   const hoprBoost = (await ethers.getContractFactory('HoprBoost')).connect(signer).attach(nftContract.address)
 
   // check if the recipient has staked Dev NFT
-  const hasStaked = await hoprStake.isNftTypeAndRankRedeemed4(DEV_NFT_TYPE, DEV_NFT_BOOST, recipientAddress)
+  const hasStaked = await hoprStake.isNftTypeAndRankRedeemed2(DEV_NFT_TYPE_INDEX, DEV_NFT_BOOST, recipientAddress)
+  const tokenUriSuffix = DEV_NFT_TYPE + "/" + nftRank
 
   if (hasStaked) {
     // Recipient has staked Dev NFT, not going to send NFT again.
     console.log(`Address ${recipientAddress} has staked Dev NFT. No need to request more.`)
     return
-  }
-
-  // get Dev NFT index
-  let devNFTIndex: number | null = null
-  let index = 1
-  // loop through the array storage and record the length and dev nft index, if any
-  while (true) {
-    try {
-      console.error(`Check DevNFT type at index = ${index}`)
-      const createdNftTypes = await hoprBoost.typeAt(index) // array of types are 1-based
-      if (createdNftTypes === DEV_NFT_TYPE) {
-        console.error(`Found usable DevNFT type at index = ${index}`)
-        devNFTIndex = index
-        break
-      }
-    } catch (error) {
-      // reaching the end of nft index array storage: panic code 0x32 (Array accessed at an out-of-bounds or negative index
-      if (!(`${error}`.match(/0x32/g) || `${error}`.match(/cannot estimate gas/g))) {
-        console.error(`Error in checking HoprBoost types. ${error}`)
-      }
-      console.error(`Completed DevNFT check loop without result`)
-      break
-    }
-    index++
-  }
-
-  if (!devNFTIndex) {
-    console.error(`Cannot find Dev NFT index before sending.`)
-    process.exit(1)
   }
 
   // check if the recipient has Dev NFT
@@ -103,8 +82,8 @@ async function requestDevNft(
 
   while (recipientNftFindingIndex.lt(recipientBoostNFTBalance) && !recipientNftFound) {
     recipientOwnedNFTTokenId = await hoprBoost.tokenOfOwnerByIndex(signerAddress, recipientNftFindingIndex)
-    const ownedNFTType = await hoprBoost.typeIndexOf(recipientOwnedNFTTokenId)
-    if (ownedNFTType.eq(devNFTIndex)) {
+    const recipientOwnedNftUri = await hoprBoost.tokenURI(recipientOwnedNFTTokenId)
+    if (new RegExp(tokenUriSuffix, 'g').test(recipientOwnedNftUri)) {
       console.log(`Found usable DevNFT at index ${recipientNftFindingIndex}`)
       recipientNftFound = true
     }
@@ -125,8 +104,8 @@ async function requestDevNft(
 
   while (signerNftFindingIndex.lt(signerBoostNFTBalance) && !signerNftFound) {
     signerOwnedNFTTokenId = await hoprBoost.tokenOfOwnerByIndex(signerAddress, signerNftFindingIndex)
-    const ownedNFTType = await hoprBoost.typeIndexOf(signerOwnedNFTTokenId)
-    if (ownedNFTType.eq(devNFTIndex)) {
+    const signerOwnedNftUri = await hoprBoost.tokenURI(signerOwnedNFTTokenId)
+    if (new RegExp(tokenUriSuffix, 'g').test(signerOwnedNftUri)) {
       console.log(`Found usable DevNFT at index ${signerNftFindingIndex}`)
       signerNftFound = true
     }
@@ -188,7 +167,7 @@ async function main(opts: RequestTestTokensOpts, hre: HardhatRuntimeEnvironment,
     .attach(stakingContract.address)
 
   if (opts.type === 'devnft') {
-    await requestDevNft(hre, signer, hoprStake, recipientAddress)
+    await requestDevNft(hre, signer, hoprStake, opts.nftRank, recipientAddress)
   } else if (opts.type === 'xhopr') {
     if (opts.amount) {
       await requestXhopr(hre, signer, opts.amount, recipientAddress)

@@ -50,8 +50,8 @@ import { task, types, extendEnvironment, subtask } from 'hardhat/config'
 import { writeFileSync, realpathSync } from 'fs'
 import { TASK_TEST_SETUP_TEST_ENVIRONMENT } from 'hardhat/builtin-tasks/task-names'
 import { HARDHAT_NETWORK_NAME } from 'hardhat/plugins'
-import stake, { DevNftRank, StakeOpts } from './tasks/stake'
-import { MIN_STAKE } from './utils/constants'
+import stake, { StakeOpts } from './tasks/stake'
+import { DevNftRank, MIN_STAKE } from './utils/constants'
 import type { BigNumber } from 'ethers'
 
 const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, HOPR_ENVIRONMENT_ID, HOPR_HARDHAT_TAG } = process.env
@@ -261,7 +261,8 @@ task<RequestTestTokensOpts>(
     types.string
   )
   .addParam<string>('recipient', 'Address of the NFT recipient', undefined, types.string)
-  .addParam<string>('privatekey', 'Private key of the current owner of NFTs', undefined, types.string)
+  .addOptionalParam<DevNftRank>('nftRank', 'Dev NFT rank ("developer" or "community")', undefined, types.string)
+  .addOptionalParam<string>('privatekey', 'Private key of the current owner of NFTs', undefined, types.string)
 
 task<StakeOpts>('stake', 'Used by CI tests to stake tokens to the running staking program.', stake)
   .addParam<StakeOpts['type']>('type', 'Token type to stake', undefined, types.string)
