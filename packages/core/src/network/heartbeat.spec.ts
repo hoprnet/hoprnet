@@ -1,5 +1,5 @@
 import Heartbeat, { type HeartbeatConfig, NetworkHealthIndicator } from './heartbeat.js'
-import NetworkPeers from './network-peers.js'
+import NetworkPeers, { NetworkPeersOrigin } from './network-peers.js'
 import { assert } from 'chai'
 import { type LibP2PHandlerFunction, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { EventEmitter, once } from 'events'
@@ -184,7 +184,7 @@ describe('unit test heartbeat', async () => {
     assert.equal(peerA.peers.qualityOf(Bob).toFixed(1), '0.2')
     assert.equal(netHealthA.state, NetworkHealthIndicator.RED)
 
-    peerA.peers.register(Bob, 'test')
+    peerA.peers.register(Bob, NetworkPeersOrigin.TESTING)
 
     peerA.heartbeat.recalculateNetworkHealth()
 
@@ -199,7 +199,7 @@ describe('unit test heartbeat', async () => {
     assert.equal(netHealthA.state, NetworkHealthIndicator.YELLOW)
 
     const peerC = await getPeer(Charly, network, new NetworkHealth())
-    peerA.peers.register(Charly, 'test')
+    peerA.peers.register(Charly, NetworkPeersOrigin.TESTING)
 
     assert.equal(netHealthA.state, NetworkHealthIndicator.YELLOW)
 
@@ -229,7 +229,7 @@ describe('unit test heartbeat', async () => {
 
     assert.equal(peerA.peers.qualityOf(Bob).toFixed(1), '0.2')
 
-    peerA.peers.register(Bob, 'test')
+    peerA.peers.register(Bob, NetworkPeersOrigin.TESTING)
 
     assert.equal(peerA.peers.qualityOf(Bob).toFixed(1), '0.2')
 
@@ -246,7 +246,7 @@ describe('unit test heartbeat', async () => {
 
     assert.equal(peerA.peers.qualityOf(Charly).toFixed(1), '0.2')
 
-    peerA.peers.register(Charly, 'test')
+    peerA.peers.register(Charly, NetworkPeersOrigin.TESTING)
 
     assert.equal(peerA.peers.qualityOf(Charly).toFixed(1), '0.2')
 
@@ -265,8 +265,8 @@ describe('unit test heartbeat', async () => {
     const peerB = await getPeer(Bob, network, new NetworkHealth())
     const peerC = await getPeer(Charly, network, new NetworkHealth())
 
-    peerA.peers.register(Bob, 'test')
-    peerA.peers.register(Charly, 'test')
+    peerA.peers.register(Bob, NetworkPeersOrigin.TESTING)
+    peerA.peers.register(Charly, NetworkPeersOrigin.TESTING)
 
     assert(peerA.peers.has(Charly), `Alice should know about Charly now.`)
     assert(peerA.peers.has(Bob), `Alice should know about Bob now.`)

@@ -17,7 +17,7 @@ import { compareAddressesLocalMode, compareAddressesPublicMode, type HoprConnect
 import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants.js'
 
 import AccessControl from './network/access-control.js'
-import NetworkPeers, { Entry } from './network/network-peers.js'
+import NetworkPeers, { type Entry, NetworkPeersOrigin } from './network/network-peers.js'
 import Heartbeat, { NetworkHealthIndicator } from './network/heartbeat.js'
 
 import { findPath } from './path/index.js'
@@ -271,7 +271,7 @@ class Hopr extends EventEmitter {
       this.options,
       initialNodes,
       this.publicNodesEmitter,
-      async (peerId: PeerId, origin: string): Promise<boolean> => {
+      async (peerId: PeerId, origin: NetworkPeersOrigin): Promise<boolean> => {
         return accessControl.reviewConnection(peerId, origin)
       }
     )) as Libp2p
@@ -321,7 +321,7 @@ class Hopr extends EventEmitter {
         const peerId = node.toPeerId()
         const origin = this.networkPeers.has(peerId)
           ? this.networkPeers.getConnectionInfo(peerId).origin
-          : 'network registry'
+          : NetworkPeersOrigin.NETWORK_REGISTRY
         accessControl.reviewConnection(peerId, origin)
       }
     )
@@ -341,7 +341,7 @@ class Hopr extends EventEmitter {
     )
 
     this.libp2pComponents.getConnectionManager().addEventListener('peer:connect', (event: CustomEvent<Connection>) => {
-      this.networkPeers.register(event.detail.remotePeer, 'libp2p peer connect')
+      this.networkPeers.register(event.detail.remotePeer, NetworkPeersOrigin.INCOMING_CONNECTION)
     })
 
     const protocolMsg = `/hopr/${this.environment.id}/msg`
@@ -540,7 +540,7 @@ class Hopr extends EventEmitter {
     }
 
     for (const channel of currentChannels) {
-      this.networkPeers.register(channel.destination.toPeerId(), 'channel strategy tick (existing channel)') // Make sure current channels are 'interesting'
+      this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_EXISTING_CHANNEL) // Make sure current channels are 'interesting'
     }
 
     let balance: Balance
@@ -597,7 +597,7 @@ class Hopr extends EventEmitter {
 
     for (let i = 0; i < tickResult.toOpen.length; i++) {
       const channel = tickResult.toOpen[i]
-      this.networkPeers.register(channel.destination.toPeerId(), 'channel strategy tick (new channel)')
+      this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_NEW_CHANNEL)
       try {
         // Opening channels can fail if we can't establish a connection.
         const hash = await this.openChannel(channel.destination.toPeerId(), channel.stake)
@@ -802,7 +802,7 @@ class Hopr extends EventEmitter {
       if (this.networkPeers.has(destination)) {
         this.networkPeers.updateRecord(pingResult)
       } else {
-        this.networkPeers.register(destination, 'manual ping')
+        this.networkPeers.register(destination, NetworkPeersOrigin.MANUAL_PING)
       }
       return { latency: pingResult.lastSeen - start }
     } else {

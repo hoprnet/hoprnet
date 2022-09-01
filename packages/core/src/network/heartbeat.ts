@@ -9,6 +9,7 @@ import { createHash, randomBytes } from 'crypto'
 
 import type { Subscribe, SendMessage } from '../index.js'
 import EventEmitter from 'events'
+import { NetworkPeersOrigin } from './network-peers.js'
 
 const log = debug('hopr-core:heartbeat')
 const error = debug('hopr-core:heartbeat:error')
@@ -103,7 +104,7 @@ export default class Heartbeat {
         lastSeen: Date.now()
       })
     } else {
-      this.networkPeers.register(remotePeer, 'incoming heartbeat')
+      this.networkPeers.register(remotePeer, NetworkPeersOrigin.INCOMING_CONNECTION)
     }
 
     // Recalculate network health when incoming heartbeat has been received
@@ -124,7 +125,7 @@ export default class Heartbeat {
 
     const origin = this.networkPeers.has(destination)
       ? this.networkPeers.getConnectionInfo(destination).origin
-      : 'unknown'
+      : NetworkPeersOrigin.OUTGOING_CONNECTION
     const allowed = await this.reviewConnection(destination, origin)
     if (!allowed) throw Error('Connection to node is not allowed')
 
@@ -176,7 +177,7 @@ export default class Heartbeat {
     let highQualityNonPublic = 0
 
     // Count quality of public/non-public nodes
-    for (let entry of this.networkPeers.allEntries()) {
+    for (let entry of this.networkPeers.getAllEntries()) {
       let quality = this.networkPeers.qualityOf(entry.id)
       if (this.publicNodeLookup(entry.id)) {
         quality > this.config.networkQualityThreshold ? ++highQualityPublic : ++lowQualityPublic
@@ -252,8 +253,9 @@ export default class Heartbeat {
     // Recalculate the network health indicator state after checking nodes
     this.recalculateNetworkHealth()
 
-    log(`finished checking nodes since ${thresholdTime} ${this.networkPeers.length()} nodes`)
-    log(this.networkPeers.debugLog())
+    log(
+      this.networkPeers.debugLog(`finished checking nodes since ${thresholdTime} ${this.networkPeers.length()} nodes`)
+    )
   }
 
   /**
