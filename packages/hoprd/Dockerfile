@@ -80,6 +80,17 @@ WORKDIR /app
 # copy over the contents of node_modules etc
 COPY --from=build /app/hoprnet .
 
+# Remove build artifacts and source code and tests
+RUN rm -R target packages/*/src
+
+WORKDIR /app/packages
+
+# Remove all typescript files
+RUN find . -type f -name '*.ts' -delete
+
+# Remove all built tests
+RUN find . -type f -name '*.spec.js' -delete
+
 WORKDIR /app/packages/hoprd
 
 # create directory which is later used for the database, so that it inherits
