@@ -14,7 +14,6 @@ import '@nomicfoundation/hardhat-chai-matchers'
 // load hardhat plugins
 import '@nomiclabs/hardhat-ethers'
 import '@nomiclabs/hardhat-solhint'
-import '@nomiclabs/hardhat-waffle'
 import 'hardhat-deploy'
 import 'hardhat-gas-reporter'
 import '@nomiclabs/hardhat-etherscan'
