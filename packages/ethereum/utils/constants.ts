@@ -16,7 +16,7 @@ export const getHoprStakeContractName = (latestBlockTimestamp: number): string =
 
 export const DEV_NFT_BOOST = 0
 export const DEV_NFT_TYPE = 'Network_registry'
-export const DEV_NFT_TYPE_INDEX = 26; // as seen in https://dune.com/queries/837196/1463806
+export const DEV_NFT_TYPE_INDEX = 26 // as seen in https://dune.com/queries/837196/1463806
 export const DEV_NFT_RANK_TECH = 'developer'
 export const DEV_NFT_RANK_COM = 'community'
 export const DEV_NFT_MAX_REGISTRATION_TECH = constants.MaxUint256

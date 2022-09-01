@@ -21,7 +21,10 @@ const MINTER_ROLE = utils.keccak256(utils.toUtf8Bytes('MINTER_ROLE'))
 const DEFAULT_ADMIN_ROLE = '0x0000000000000000000000000000000000000000000000000000000000000000'
 const DEV_BANK_ADDRESS = '0x2402da10A6172ED018AEEa22CA60EDe1F766655C'
 
-const getToCreateDummyNftIndexes = async (hoprBoost: HoprBoost, shouldHaveIndexesBefore: number): Promise<Array<number>> => {
+const getToCreateDummyNftIndexes = async (
+  hoprBoost: HoprBoost,
+  shouldHaveIndexesBefore: number
+): Promise<Array<number>> => {
   // get nft types created in the HoprBoost contract
   let mintedIndex = 0
   // loop through the array storage and record the length and dev nft index, if any
@@ -32,7 +35,7 @@ const getToCreateDummyNftIndexes = async (hoprBoost: HoprBoost, shouldHaveIndexe
     } catch (error) {
       // reaching the end of nft index array storage: panic code 0x32 (Array accessed at an out-of-bounds or negative index
       if (`${error}`.match(/0x32/g) || `${error}`.match(/cannot estimate gas/g)) {
-        break;
+        break
       } else {
         console.log(`Error in checking HoprBoost types. ${error}`)
       }
@@ -40,18 +43,24 @@ const getToCreateDummyNftIndexes = async (hoprBoost: HoprBoost, shouldHaveIndexe
     mintedIndex++
   }
 
-  
-  const dummyNftIndexsToMint = mintedIndex > shouldHaveIndexesBefore ? [] : Array.from({length: shouldHaveIndexesBefore - mintedIndex + 1}, (_, i) => i + mintedIndex);
-  
+  const dummyNftIndexsToMint =
+    mintedIndex > shouldHaveIndexesBefore
+      ? []
+      : Array.from({ length: shouldHaveIndexesBefore - mintedIndex + 1 }, (_, i) => i + mintedIndex)
+
   console.log(
     `To have HoprBoost NFT of ${DEV_NFT_TYPE} type at index ${shouldHaveIndexesBefore}, ${dummyNftIndexsToMint.length} type(s) of dummy NFTs of indexes ${dummyNftIndexsToMint} should be minted.`
   )
-  
-  return dummyNftIndexsToMint;
+
+  return dummyNftIndexsToMint
 }
 
-const awaitTxConfirmation = async (tx: Promise<ContractTransaction>, hreEnvirionment: string, hreEthers: HardhatRuntimeEnvironment['ethers']) => {
-  const mintTx = await tx;
+const awaitTxConfirmation = async (
+  tx: Promise<ContractTransaction>,
+  hreEnvirionment: string,
+  hreEthers: HardhatRuntimeEnvironment['ethers']
+) => {
+  const mintTx = await tx
   // don't wait when using local hardhat because its using auto-mine
   if (!hreEnvirionment.match('hardhat')) {
     await hreEthers.provider.waitForTransaction(mintTx.hash, 2)
@@ -59,9 +68,9 @@ const awaitTxConfirmation = async (tx: Promise<ContractTransaction>, hreEnvirion
 }
 
 /**
- * 
+ *
  * @notice This script should only be run in staging/hardhat-localhost envirionment
- * @param hre 
+ * @param hre
  */
 
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
@@ -74,47 +83,56 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const hoprBoost = (await ethers.getContractFactory('HoprBoost')).attach(boostDeployment.address) as HoprBoost
 
   // check type index of HoprBoost NFTs
-  const dummyNftTypesToBeMinted = await getToCreateDummyNftIndexes(hoprBoost, DEV_NFT_TYPE_INDEX);
-  
+  const dummyNftTypesToBeMinted = await getToCreateDummyNftIndexes(hoprBoost, DEV_NFT_TYPE_INDEX)
+
   const isDeployerMinter = await hoprBoost.hasRole(MINTER_ROLE, deployer)
   if (isDeployerMinter) {
-    // current deployer is minter, mint 
+    // current deployer is minter, mint
     console.log('Deployer is a minter. Mint necessary HoprBoost NFTs')
 
     if (dummyNftTypesToBeMinted.length > 0) {
       // need to mint dummy NFTs
       for (const dummyNftIndex of dummyNftTypesToBeMinted) {
         console.log(`... minting 1 ${DUMMY_NFT_TYPE} NFTs type of rank ${DUMMY_NFT_TYPE}`)
-        await awaitTxConfirmation(hoprBoost.mint(admin, `${DUMMY_NFT_TYPE}_${dummyNftIndex}`, DUMMY_NFT_TYPE, DUMMY_NFT_BOOST, 0, {
-          gasLimit: 4e6
-        }),
-        environment, hre.ethers
+        await awaitTxConfirmation(
+          hoprBoost.mint(admin, `${DUMMY_NFT_TYPE}_${dummyNftIndex}`, DUMMY_NFT_TYPE, DUMMY_NFT_BOOST, 0, {
+            gasLimit: 4e6
+          }),
+          environment,
+          hre.ethers
         )
       }
     }
 
     // mint NR NFTs
     for (const networkRegistryNftRank of [DEV_NFT_RANK_TECH, DEV_NFT_RANK_COM]) {
-      console.log(`... minting ${NUM_DEV_NFT} ${DEV_NFT_TYPE} NFTs type of index ${DEV_NFT_TYPE_INDEX} to ${admin}\n...minting 1 ${DEV_NFT_TYPE} NFTs to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1], [3]\n...minting 10 ${DEV_NFT_TYPE} NFTs to dev bank ${DEV_BANK_ADDRESS}`)
-      await awaitTxConfirmation(hoprBoost.batchMint(
-        [
-          ...new Array(NUM_DEV_NFT).fill(admin),
-          CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1],
-          CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[3],
-          ...Array(10).fill(DEV_BANK_ADDRESS)
-        ],
-        DEV_NFT_TYPE,
-        networkRegistryNftRank,
-        DEV_NFT_BOOST,
-        0,
-        {
-          gasLimit: 4e6
-      }), environment, ethers);
+      console.log(
+        `... minting ${NUM_DEV_NFT} ${DEV_NFT_TYPE} NFTs type of index ${DEV_NFT_TYPE_INDEX} to ${admin}\n...minting 1 ${DEV_NFT_TYPE} NFTs to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1], [3]\n...minting 10 ${DEV_NFT_TYPE} NFTs to dev bank ${DEV_BANK_ADDRESS}`
+      )
+      await awaitTxConfirmation(
+        hoprBoost.batchMint(
+          [
+            ...new Array(NUM_DEV_NFT).fill(admin),
+            CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1],
+            CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[3],
+            ...Array(10).fill(DEV_BANK_ADDRESS)
+          ],
+          DEV_NFT_TYPE,
+          networkRegistryNftRank,
+          DEV_NFT_BOOST,
+          0,
+          {
+            gasLimit: 4e6
+          }
+        ),
+        environment,
+        ethers
+      )
     }
 
     console.log(`Admin ${admin} has ${await hoprBoost.balanceOf(admin)} Boost NFTs`)
   } else {
-    console.log(`Deployer is not minter. Skip minting NFTs.`);
+    console.log(`Deployer is not minter. Skip minting NFTs.`)
   }
 
   // Add special NFTs in staging environment
@@ -124,23 +142,39 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       registryProxyDeployment.address
     ) as HoprStakingProxyForNetworkRegistry
 
-    await awaitTxConfirmation(registryProxy.ownerBatchAddNftTypeAndRank(
-      [DEV_NFT_TYPE_INDEX, DEV_NFT_TYPE_INDEX],
-      [DEV_NFT_RANK_TECH, DEV_NFT_RANK_COM]
-    ), environment, ethers);
-    await awaitTxConfirmation(registryProxy.ownerBatchAddSpecialNftTypeAndRank(
-      [DEV_NFT_TYPE_INDEX, DEV_NFT_TYPE_INDEX],
-      [DEV_NFT_RANK_TECH, DEV_NFT_RANK_COM],
-      [DEV_NFT_MAX_REGISTRATION_TECH, DEV_NFT_MAX_REGISTRATION_COM]
-    ), environment, ethers);
+    await awaitTxConfirmation(
+      registryProxy.ownerBatchAddNftTypeAndRank(
+        [DEV_NFT_TYPE_INDEX, DEV_NFT_TYPE_INDEX],
+        [DEV_NFT_RANK_TECH, DEV_NFT_RANK_COM]
+      ),
+      environment,
+      ethers
+    )
+    await awaitTxConfirmation(
+      registryProxy.ownerBatchAddSpecialNftTypeAndRank(
+        [DEV_NFT_TYPE_INDEX, DEV_NFT_TYPE_INDEX],
+        [DEV_NFT_RANK_TECH, DEV_NFT_RANK_COM],
+        [DEV_NFT_MAX_REGISTRATION_TECH, DEV_NFT_MAX_REGISTRATION_COM]
+      ),
+      environment,
+      ethers
+    )
 
     try {
       // mint minimum stake to addresses that will stake and are binded to nodes in NR
       const tokenContract = await deployments.get('xHoprToken')
       const hoprToken = (await ethers.getContractFactory('ERC677Mock')).attach(tokenContract.address) as ERC677Mock
 
-      await awaitTxConfirmation(hoprToken.batchMintInternal([CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0]], MIN_STAKE), environment, ethers);
-      await awaitTxConfirmation(hoprToken.batchMintInternal([CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[2]], MIN_STAKE), environment, ethers);
+      await awaitTxConfirmation(
+        hoprToken.batchMintInternal([CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0]], MIN_STAKE),
+        environment,
+        ethers
+      )
+      await awaitTxConfirmation(
+        hoprToken.batchMintInternal([CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[2]], MIN_STAKE),
+        environment,
+        ethers
+      )
       console.log(`... minting ${MIN_STAKE} txHOPR to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0] and [2]`)
     } catch (error) {
       console.error(
@@ -152,12 +186,12 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const isDeployerAdmin = await hoprBoost.hasRole(DEFAULT_ADMIN_ROLE, deployer)
   if (isDeployerAdmin && deployer !== admin) {
     // make admin MINTER
-    await awaitTxConfirmation(hoprBoost.grantRole(MINTER_ROLE, admin), environment, ethers);
+    await awaitTxConfirmation(hoprBoost.grantRole(MINTER_ROLE, admin), environment, ethers)
     // transfer DEFAULT_ADMIN_ROLE from deployer to admin
-    await awaitTxConfirmation(hoprBoost.grantRole(DEFAULT_ADMIN_ROLE, admin), environment, ethers);
+    await awaitTxConfirmation(hoprBoost.grantRole(DEFAULT_ADMIN_ROLE, admin), environment, ethers)
     console.log('DEFAULT_ADMIN_ROLE is transferred.')
 
-    await awaitTxConfirmation(hoprBoost.renounceRole(DEFAULT_ADMIN_ROLE, deployer), environment, ethers);
+    await awaitTxConfirmation(hoprBoost.renounceRole(DEFAULT_ADMIN_ROLE, deployer), environment, ethers)
     console.log('DEFAULT_ADMIN_ROLE is transferred.')
   }
 }

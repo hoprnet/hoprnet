@@ -1,4 +1,4 @@
-import 'hardhat/types/runtime';
+import 'hardhat/types/runtime'
 import 'hardhat-deploy'
 import type { BigNumber } from 'ethers'
 
