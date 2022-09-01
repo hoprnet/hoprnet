@@ -34,6 +34,7 @@ ENV npm_config_build_from_source false
 
 WORKDIR /app
 
+# Install minimal version of Rust
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
 
 # Make cargo available in home path
@@ -46,9 +47,17 @@ RUN mv /app/hoprnet-${PACKAGE_VERSION} /app/hoprnet
 WORKDIR /app/hoprnet
 
 RUN CI=true make -j deps
+
+# Remove all tests
+RUN find ./packages -type f -name '*.spec.ts' -delete 
+
 RUN make -j build
 
-RUN cat ./node_modules/@multiformats/multiaddr/package.json
+# Remove all typescript files
+RUN find ./packages -type f -name '*.ts' -delete
+
+# Remove build artifacts and source code and tests
+RUN rm -R target packages/*/src
 
 # use slim version of node on Debian buster for smaller image sizes
 FROM node:16-bullseye-slim@sha256:8265ac132f720998222008355e11535caf53d6bccecbb562a055605138975b4e as runtime
@@ -80,17 +89,6 @@ WORKDIR /app
 # copy over the contents of node_modules etc
 COPY --from=build /app/hoprnet .
 
-# Remove build artifacts and source code and tests
-RUN rm -R target packages/*/src
-
-WORKDIR /app/packages
-
-# Remove all typescript files
-RUN find . -type f -name '*.ts' -delete
-
-# Remove all built tests
-RUN find . -type f -name '*.spec.js' -delete
-
 WORKDIR /app/packages/hoprd
 
 # create directory which is later used for the database, so that it inherits
@@ -107,5 +105,7 @@ VOLUME ["/app/hoprd-db"]
 # DISABLED temporarily until a migration path has been tested
 # finally set the non-root user so the process also run un-privilidged
 # USER node
+
+RUN yarn hoprd
 
 ENTRYPOINT ["/usr/bin/tini", "--", "yarn", "hoprd"]
