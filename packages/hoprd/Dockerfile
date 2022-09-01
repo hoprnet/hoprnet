@@ -56,8 +56,8 @@ RUN make -j build
 # Remove all typescript files
 RUN find ./packages -type f -name '*.ts' -delete
 
-# Remove build artifacts and source code and tests
-RUN rm -R target packages/*/src
+# Remove all other directories and files that we don't need
+RUN rm -R target packages/*/src test docs .github .processes .vscode *.md tsconfig* flake* shell.nix scripts cloudbuild.yaml Makefile Dockerfile.hardhat Cargo.* rust-toolchain.toml Brewfile 
 
 # use slim version of node on Debian buster for smaller image sizes
 FROM node:16-bullseye-slim@sha256:8265ac132f720998222008355e11535caf53d6bccecbb562a055605138975b4e as runtime
@@ -105,7 +105,5 @@ VOLUME ["/app/hoprd-db"]
 # DISABLED temporarily until a migration path has been tested
 # finally set the non-root user so the process also run un-privilidged
 # USER node
-
-RUN yarn hoprd
 
 ENTRYPOINT ["/usr/bin/tini", "--", "yarn", "hoprd"]
