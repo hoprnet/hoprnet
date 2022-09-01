@@ -2,7 +2,6 @@ import { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
 import type { HoprBoost, ERC677Mock, HoprStakingProxyForNetworkRegistry } from '../src/types'
 import { type ContractTransaction, utils } from 'ethers'
-// import { type ContractTransaction, utils } from 'ethers'
 import {
   CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES,
   DEV_NFT_BOOST,
@@ -86,14 +85,6 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       // need to mint dummy NFTs
       for (const dummyNftIndex of dummyNftTypesToBeMinted) {
         console.log(`... minting 1 ${DUMMY_NFT_TYPE} NFTs type of rank ${DUMMY_NFT_TYPE}`)
-        // const mintTx = await hoprBoost.mint(admin, `${DUMMY_NFT_TYPE}_${dummyNftIndex}`, DUMMY_NFT_TYPE, DUMMY_NFT_BOOST, 0, {
-        //   gasLimit: 4e6
-        // })
-      
-        // // don't wait when using local hardhat because its using auto-mine
-        // if (!environment.match('hardhat')) {
-        //   await ethers.provider.waitForTransaction(mintTx.hash, 2)
-        // }
         await awaitTxConfirmation(hoprBoost.mint(admin, `${DUMMY_NFT_TYPE}_${dummyNftIndex}`, DUMMY_NFT_TYPE, DUMMY_NFT_BOOST, 0, {
           gasLimit: 4e6
         }),
@@ -119,30 +110,9 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
         {
           gasLimit: 4e6
       }), environment, ethers);
-      // const mintTx = await hoprBoost.batchMint(
-      //   [
-      //     ...new Array(NUM_DEV_NFT).fill(admin),
-      //     CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1],
-      //     CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[3],
-      //     ...Array(10).fill(DEV_BANK_ADDRESS)
-      //   ],
-      //   DEV_NFT_TYPE,
-      //   networkRegistryNftRank,
-      //   DEV_NFT_BOOST,
-      //   0,
-      //   {
-      //     gasLimit: 4e6
-      // })
-    
-      // // don't wait when using local hardhat because its using auto-mine
-      // if (!environment.match('hardhat')) {
-      //   await ethers.provider.waitForTransaction(mintTx.hash, 2)
-      // }
     }
 
     console.log(`Admin ${admin} has ${await hoprBoost.balanceOf(admin)} Boost NFTs`)
-    // // renounce its MINTER_ROLE, if needed
-    // await hoprBoost.renounceRole(MINTER_ROLE, deployer);
   } else {
     console.log(`Deployer is not minter. Skip minting NFTs.`);
   }
@@ -164,41 +134,13 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       [DEV_NFT_MAX_REGISTRATION_TECH, DEV_NFT_MAX_REGISTRATION_COM]
     ), environment, ethers);
 
-    // const ownerAddDevNftTypeTx = await registryProxy.ownerBatchAddNftTypeAndRank(
-    //   [DEV_NFT_TYPE_INDEX, DEV_NFT_TYPE_INDEX],
-    //   [DEV_NFT_RANK_TECH, DEV_NFT_RANK_COM]
-    // )
-    // const ownerAddSpecialNftTypeTx = await registryProxy.ownerBatchAddSpecialNftTypeAndRank(
-    //   [DEV_NFT_TYPE_INDEX, DEV_NFT_TYPE_INDEX],
-    //   [DEV_NFT_RANK_TECH, DEV_NFT_RANK_COM],
-    //   [DEV_NFT_MAX_REGISTRATION_TECH, DEV_NFT_MAX_REGISTRATION_COM]
-    // )
-
-    // // don't wait when using local hardhat because its using auto-mine
-    // if (!environment.match('hardhat')) {
-    //   await ethers.provider.waitForTransaction(ownerAddDevNftTypeTx.hash, 2)
-    //   await ethers.provider.waitForTransaction(ownerAddSpecialNftTypeTx.hash, 2)
-    // }
-
     try {
       // mint minimum stake to addresses that will stake and are binded to nodes in NR
       const tokenContract = await deployments.get('xHoprToken')
       const hoprToken = (await ethers.getContractFactory('ERC677Mock')).attach(tokenContract.address) as ERC677Mock
 
       await awaitTxConfirmation(hoprToken.batchMintInternal([CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0]], MIN_STAKE), environment, ethers);
-      // const mintTx1 = await hoprToken.batchMintInternal([CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0]], MIN_STAKE)
-      // // don't wait when using local hardhat because its using auto-mine
-      // if (!environment.match('hardhat')) {
-        //   await ethers.provider.waitForTransaction(mintTx1.hash, 2)
-        // }
-        
       await awaitTxConfirmation(hoprToken.batchMintInternal([CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[2]], MIN_STAKE), environment, ethers);
-      // const mintTx2 = await hoprToken.batchMintInternal([CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[2]], MIN_STAKE)
-      // // don't wait when using local hardhat because its using auto-mine
-      // if (!environment.match('hardhat')) {
-      //   await ethers.provider.waitForTransaction(mintTx2.hash, 2)
-      // }
-
       console.log(`... minting ${MIN_STAKE} txHOPR to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0] and [2]`)
     } catch (error) {
       console.error(
@@ -211,27 +153,11 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   if (isDeployerAdmin && deployer !== admin) {
     // make admin MINTER
     await awaitTxConfirmation(hoprBoost.grantRole(MINTER_ROLE, admin), environment, ethers);
-    // const grantMinterTx = await hoprBoost.grantRole(MINTER_ROLE, admin)
-    // // don't wait when using local hardhat because its using auto-mine
-    // if (!environment.match('hardhat')) {
-      //   await ethers.provider.waitForTransaction(grantMinterTx.hash, 2)
-      // }
-      
     // transfer DEFAULT_ADMIN_ROLE from deployer to admin
     await awaitTxConfirmation(hoprBoost.grantRole(DEFAULT_ADMIN_ROLE, admin), environment, ethers);
-    // const grantAdminTx = await hoprBoost.grantRole(DEFAULT_ADMIN_ROLE, admin)
-    // // don't wait when using local hardhat because its using auto-mine
-    // if (!environment.match('hardhat')) {
-    //   await ethers.provider.waitForTransaction(grantAdminTx.hash, 2)
-    // }
     console.log('DEFAULT_ADMIN_ROLE is transferred.')
 
     await awaitTxConfirmation(hoprBoost.renounceRole(DEFAULT_ADMIN_ROLE, deployer), environment, ethers);
-    // const renounceAdminTx = await hoprBoost.renounceRole(DEFAULT_ADMIN_ROLE, deployer)
-    // // don't wait when using local hardhat because its using auto-mine
-    // if (!environment.match('hardhat')) {
-    //   await ethers.provider.waitForTransaction(renounceAdminTx.hash, 2)
-    // }
     console.log('DEFAULT_ADMIN_ROLE is transferred.')
   }
 }
