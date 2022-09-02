@@ -184,15 +184,26 @@ endif
 
 deregister-nodes: ensure-environment-is-set
 deregister-nodes: ## owner de-register given nodes in network registry contract
-ifeq ($(native_addresses),)
-	echo "parameter <native_addresses> missing" >&2 && exit 1
+ifeq ($(peer_ids),)
+	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
+ifeq ($(native_addresses),)
+	echo "no parameter <native_addresses>" >&2
 	TS_NODE_PROJECT=./tsconfig.hardhat.json \
 	HOPR_ENVIRONMENT_ID="$(environment)" \
 	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
    --network $(network) \
    --task remove \
-   --native-addresses "$(native_addresses)"
+   --peer-ids "$(peer_ids)"
+else
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
+   --network $(network) \
+   --task remove \
+   --peer-ids "$(peer_ids)" \
+   --native-addresses "$(native_addresses)" 
+endif
 
 .PHONY: self-register-node
 self-register-node: ensure-environment-is-set
