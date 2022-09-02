@@ -253,6 +253,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
             [
               // Relevant HoprNetworkRegistry events
               this.chain.getNetworkRegistry().interface.getEventTopic('Registered'),
+              this.chain.getNetworkRegistry().interface.getEventTopic('Deregistered'),
               this.chain.getNetworkRegistry().interface.getEventTopic('RegisteredByOwner'),
               this.chain.getNetworkRegistry().interface.getEventTopic('DeregisteredByOwner'),
               this.chain.getNetworkRegistry().interface.getEventTopic('EligibilityUpdated'),
