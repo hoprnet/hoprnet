@@ -19,10 +19,6 @@
             "type": "string",
             "description": "regex which is matched against git refs and determins if the release is build and deployed"
           },
-          "environment_id": {
-            "type": "string",
-            "description": "the environment id to run release nodes in, see protocol-config.json"
-          },
           "deprecated": {
             "type": "boolean",
             "description": "if true, this release is kept for historical purposes and not re-deployed",
@@ -34,7 +30,7 @@
             "default": false
           }
         },
-        "required": ["id", "git_ref", "environment_id"],
+        "required": ["id", "git_ref"],
         "additionalProperties": false
       }
     }
