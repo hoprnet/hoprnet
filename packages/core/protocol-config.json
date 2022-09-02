@@ -145,7 +145,7 @@
     "monte_rosa": {
       "network_id": "xdai",
       "environment_type": "production",
-      "version_range": "1.89",
+      "version_range": "1.89||1.90",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0x978D91ddFdb0c6eaCC22A258fE498957a79c5F4C",
       "channels_contract_address": "0xCe7209FD81ED129C2ea8369715c168419e4148Ef",
