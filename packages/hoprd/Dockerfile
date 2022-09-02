@@ -120,8 +120,6 @@ RUN mkdir -p hoprd-db
 # set volume which can be mapped by users on the host system
 VOLUME ["/app/hoprd-db"]
 
-# RUN yarn hoprd
-
 # DISABLED temporarily until a migration path has been tested
 # finally set the non-root user so the process also run un-privilidged
 # USER node
