@@ -120,6 +120,9 @@ request-devnft: ## Request one HoprBoost Dev NFT for the recipient given it has 
 ifeq ($(recipient),)
 	echo "parameter <recipient> missing" >&2 && exit 1
 endif
+ifeq ($(nftrank),)
+	echo "parameter <nftrank> missing, it can be either 'developer' or 'community'" >&2 && exit 1
+endif
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
@@ -128,6 +131,7 @@ endif
 	  yarn workspace @hoprnet/hopr-ethereum run hardhat request-test-tokens \
    --network $(network) \
    --type devnft \
+   --nftrank $(nftrank) \
    --recipient $(recipient) \
    --privatekey "$(PRIVATE_KEY)"
 
