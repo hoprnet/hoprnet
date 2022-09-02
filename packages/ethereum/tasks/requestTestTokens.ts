@@ -2,18 +2,19 @@ import { type Signer, type Contract, Wallet } from 'ethers'
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import { DevNftRank, DEV_NFT_BOOST, DEV_NFT_TYPE, DEV_NFT_TYPE_INDEX } from '../utils/constants'
 
-export type RequestTestTokensOpts = {
-  type: 'xhopr'
-  amount: string // target amount in wei
-  recipient: string // address of the recipient
-  privatekey?: string // private key of the Boost NFT owner
-} | {
-  type: 'devnft'
-  nftRank: DevNftRank
-  recipient: string // address of the recipient
-  privatekey?: string // private key of the Boost NFT owner
-
-}
+export type RequestTestTokensOpts =
+  | {
+      type: 'xhopr'
+      amount: string // target amount in wei
+      recipient: string // address of the recipient
+      privatekey?: string // private key of the Boost NFT owner
+    }
+  | {
+      type: 'devnft'
+      nftRank: DevNftRank
+      recipient: string // address of the recipient
+      privatekey?: string // private key of the Boost NFT owner
+    }
 
 async function requestXhopr(hre: HardhatRuntimeEnvironment, signer: Signer, amount: string, recipientAddress: string) {
   const { ethers, deployments } = hre
@@ -66,7 +67,7 @@ async function requestDevNft(
 
   // check if the recipient has staked Dev NFT
   const hasStaked = await hoprStake.isNftTypeAndRankRedeemed2(DEV_NFT_TYPE_INDEX, DEV_NFT_BOOST, recipientAddress)
-  const tokenUriSuffix = DEV_NFT_TYPE + "/" + nftRank
+  const tokenUriSuffix = DEV_NFT_TYPE + '/' + nftRank
 
   if (hasStaked) {
     // Recipient has staked Dev NFT, not going to send NFT again.

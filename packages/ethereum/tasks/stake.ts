@@ -2,15 +2,17 @@ import { Signer, Wallet } from 'ethers'
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import { DevNftRank, DEV_NFT_BOOST, DEV_NFT_TYPE, DEV_NFT_TYPE_INDEX } from '../utils/constants'
 
-export type StakeOpts = {
-  type: 'xhopr'
-  amount: string // target amount in wei
-  privatekey?: string // private key of the caller
-} | {
-  type: 'devnft'
-  nftRank: DevNftRank
-  privatekey?: string // private key of the caller
-}
+export type StakeOpts =
+  | {
+      type: 'xhopr'
+      amount: string // target amount in wei
+      privatekey?: string // private key of the caller
+    }
+  | {
+      type: 'devnft'
+      nftRank: DevNftRank
+      privatekey?: string // private key of the caller
+    }
 
 async function stakeXhopr(hre: HardhatRuntimeEnvironment, signer, hoprStake, amount) {
   const { ethers, deployments } = hre
@@ -75,7 +77,7 @@ async function stakeDevNft(hre: HardhatRuntimeEnvironment, signer, hoprStake, nf
   // check if the signer has staked Dev NFT
   const signerAddress = await signer.getAddress()
   const hasStaked = await hoprStake.isNftTypeAndRankRedeemed2(DEV_NFT_TYPE_INDEX, DEV_NFT_BOOST, signerAddress)
-  const tokenUriSuffix = DEV_NFT_TYPE + "/" + nftRank
+  const tokenUriSuffix = DEV_NFT_TYPE + '/' + nftRank
 
   if (hasStaked) {
     // Caller has staked Dev NFT, no need to repeat the process.
