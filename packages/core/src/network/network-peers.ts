@@ -37,15 +37,15 @@ export const MAX_BACKOFF = MAX_DELAY / MIN_DELAY
 const BAD_QUALITY = 0.2 // Default quality for nodes we don't know about or which are considered offline.
 const IGNORE_TIMEFRAME = 10 * 60 * 1000 // 10mins
 
-// function compareQualities(a: Entry, b: Entry, qualityOf: (id: PeerId) => number): number {
-//   const result = qualityOf(b.id) - qualityOf(a.id)
+function compareQualities(a: Entry, b: Entry, qualityOf: (id: PeerId) => number): number {
+  const result = qualityOf(b.id) - qualityOf(a.id)
 
-//   if (result == 0) {
-//     return a.id.toString().localeCompare(b.id.toString(), 'en')
-//   } else {
-//     return result
-//   }
-// }
+  if (result == 0) {
+    return a.id.toString().localeCompare(b.id.toString(), 'en')
+  } else {
+    return result
+  }
+}
 
 function printPeerOrigin(origin: NetworkPeersOrigin): string {
   switch (origin) {
@@ -71,7 +71,7 @@ function printPeerOrigin(origin: NetworkPeersOrigin): string {
 }
 
 function printEntries(
-  entries: Iterable<Entry>,
+  entries: Map<string, Entry>,
   qualityOf: (id: PeerId) => number,
   networkQualityThreshold: number,
   prefix: string
@@ -84,7 +84,18 @@ function printEntries(
   let out = `${prefix}\n`
   let length = 0
 
-  for (const entry of entries) {
+  const peerIds: string[] = []
+  for (const entry of entries.values()) {
+    peerIds.push(entry.id.toString())
+  }
+
+  peerIds.sort((a: string, b: string) => {
+    return compareQualities(entries[a], entries[b], qualityOf)
+  })
+
+  for (const peer of peerIds) {
+    const entry = entries[peer]
+
     const quality = qualityOf(entry.id)
     if (quality.toFixed(1) === '1.0') {
       bestAvailabilityNodes++
@@ -201,13 +212,18 @@ class NetworkPeers {
 
   public pingSince(thresholdTime: number): PeerId[] {
     const toPing: PeerId[] = []
+
+    // Returns filtered values in order of insertion into Map
     for (const entry of this.entries.values()) {
       if (nextPing(entry) < thresholdTime) {
         toPing.push(entry.id)
       }
     }
 
-    return toPing
+    // Ping most recently seen nodes last
+    return toPing.sort(
+      (a: PeerId, b: PeerId) => this.entries[a.toString()].lastSeen - this.entries[b.toString()].lastSeen
+    )
   }
 
   public updateRecord(pingResult: HeartbeatPingResult): void {
@@ -340,7 +356,7 @@ class NetworkPeers {
    * @returns a string describing the connection quality of all connected peers
    */
   public debugLog(prefix: string = ''): string {
-    return printEntries(this.entries.values(), this.qualityOf.bind(this), this.networkQualityThreshold, prefix)
+    return printEntries(this.entries, this.qualityOf.bind(this), this.networkQualityThreshold, prefix)
   }
 
   private ignoreEntry(entry: Entry): void {
