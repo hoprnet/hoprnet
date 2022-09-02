@@ -61,4 +61,4 @@ PRIVATE_KEY="${account_privkey}" make stake-devnft \
 PRIVATE_KEY="${account_privkey}" make self-register-node \
     environment=master-goerli \
     network=goerli \
-    peer_id=${peer_id}"
+    peer_ids=${peer_id}"
