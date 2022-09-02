@@ -283,14 +283,17 @@ endif
 ifeq ($(account),)
 	echo "parameter <account> missing" >&2 && exit 1
 endif
+ifeq ($(nftrank),)
+	echo "parameter <nftrank> missing, it can be either 'developer' or 'community'" >&2 && exit 1
+endif
 ifeq ($(origin ACCOUNT_PRIVKEY),undefined)
 	echo "<ACCOUNT_PRIVKEY> environment variable missing" >&2 && exit 1
 endif
 ifeq ($(origin DEV_BANK_PRIVKEY),undefined)
 	echo "<DEV_BANK_PRIVKEY> environment variable missing" >&2 && exit 1
 endif
-	PRIVATE_KEY=${DEV_BANK_PRIVKEY} make request-devnft recipient=${account}
-	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-devnft
+	PRIVATE_KEY=${DEV_BANK_PRIVKEY} make request-devnft recipient=${account} nftrank=${nftrank}
+	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-devnft nftrank=${nftrank}
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_ids=$(shell ./scripts/get-hopr-address.sh "$(endpoint)")
 
 .PHONY: register-node-with-stake

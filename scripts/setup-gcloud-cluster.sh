@@ -167,7 +167,7 @@ if [[ "${environment}" != "paleochora" ]]; then
     if [[ "$((staking_index%2))" = "0" ]]; then
       PRIVATE_KEY="${staking_addrs_dict[${staking_addr}]}" make -C "${mydir}/.." stake-funds environment="${environment}"
     else
-      PRIVATE_KEY="${staking_addrs_dict[${staking_addr}]}" make -C "${mydir}/.." stake-devnft environment="${environment}"
+      PRIVATE_KEY="${staking_addrs_dict[${staking_addr}]}" make -C "${mydir}/.." stake-devnft environment="${environment}" nftrank=developer
     fi
     ((++staking_index))
   done
