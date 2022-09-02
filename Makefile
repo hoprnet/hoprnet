@@ -275,7 +275,7 @@ ifeq ($(origin DEV_BANK_PRIVKEY),undefined)
 endif
 	PRIVATE_KEY=${DEV_BANK_PRIVKEY} make request-devnft recipient=${account}
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-devnft
-	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_id=$(shell ./scripts/get-hopr-address.sh "$(endpoint)")
+	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_ids=$(shell ./scripts/get-hopr-address.sh "$(endpoint)")
 
 .PHONY: register-node-with-stake
 # node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'
