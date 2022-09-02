@@ -1,5 +1,5 @@
 import secp256k1 from 'secp256k1'
-import { u8aToHex, u8aEquals, stringToU8a } from '../u8a/index.js'
+import { u8aToHex, u8aEquals, stringToU8a, u8aConcat } from '../u8a/index.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { peerIdFromString } from '@libp2p/peer-id'
 import { pubKeyToPeerId } from '../libp2p/index.js'
@@ -46,6 +46,50 @@ export class PublicKey {
       default:
         throw Error(`Invalid length ${arr.length} of public key`)
     }
+  }
+
+  /**
+   * Deserializes a Uint8Array containing serialized publicKeys
+   * @param arr u8a containing serialized pubkeys
+   * @returns an array of deserialized publicKeys
+   */
+  static deserializeArray(arr: Uint8Array): PublicKey[] {
+    const result: PublicKey[] = []
+    for (let offset = 0; offset < arr.length; ) {
+      switch (arr[offset]) {
+        case 2:
+        case 3:
+          if (arr.length < offset + SIZE_PUBKEY_COMPRESSED) {
+            throw Error(`Invalid array length. U8a has ${offset + SIZE_PUBKEY_COMPRESSED - arr.length} to few elements`)
+          }
+          // clone array
+          result.push(new PublicKey(arr.slice(offset, offset + SIZE_PUBKEY_COMPRESSED)))
+          offset += SIZE_PUBKEY_COMPRESSED
+          break
+        case 4:
+          if (arr.length < offset + SIZE_PUBKEY_UNCOMPRESSED) {
+            throw Error(
+              `Invalid array length. U8a has ${offset + SIZE_PUBKEY_UNCOMPRESSED - arr.length} to few elements`
+            )
+          }
+          // clone array
+          result.push(new PublicKey(arr.slice(offset, offset + SIZE_PUBKEY_UNCOMPRESSED)))
+          offset += SIZE_PUBKEY_UNCOMPRESSED
+          break
+        default:
+          throw Error(`Invalid prefix ${u8aToHex(arr.subarray(offset, offset + 1))} at ${offset}`)
+      }
+    }
+
+    return result
+  }
+
+  /**
+   * Serializes an array of publicKeys
+   * @returns a Uint8Array containing the given publicKeys
+   */
+  static serializeArray(pKeys: PublicKey[]): Uint8Array {
+    return u8aConcat(...pKeys.map((p) => p.arr))
   }
 
   static fromPeerId(peerId: PeerId): PublicKey {
