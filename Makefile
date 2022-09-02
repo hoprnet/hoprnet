@@ -208,8 +208,8 @@ endif
 .PHONY: self-register-node
 self-register-node: ensure-environment-is-set
 self-register-node: ## staker register a node in network registry contract
-ifeq ($(peer_id),)
-	echo "parameter <peer_id> missing" >&2 && exit 1
+ifeq ($(peer_ids),)
+	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
@@ -219,7 +219,7 @@ endif
 	  yarn workspace @hoprnet/hopr-ethereum run hardhat register:self \
    --network $(network) \
    --task add \
-   --peer-id "$(peer_id)" \
+   --peer-ids "$(peer_ids)" \
    --privatekey "$(PRIVATE_KEY)"
 
 .PHONY: self-deregister-node
