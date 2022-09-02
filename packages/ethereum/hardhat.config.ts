@@ -245,7 +245,7 @@ task<SelfRegisterOpts>(
   selfRegister
 )
   .addParam<SelfRegisterOpts['task']>('task', 'The task to run', undefined, types.string)
-  .addOptionalParam<string>('peerIds', 'A list of comma-seperated peerIds', undefined, types.string)
+  .addParam<string>('peerIds', 'A list of comma-seperated peerIds', undefined, types.string)
   .addOptionalParam<string>('privatekey', 'Private key of the signer', undefined, types.string)
 
 task<RequestTestTokensOpts>(

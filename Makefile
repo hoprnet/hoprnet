@@ -225,11 +225,15 @@ endif
 .PHONY: self-deregister-node
 self-deregister-node: ensure-environment-is-set
 self-deregister-node: ## staker deregister a node in network registry contract
+ifeq ($(peer_ids),)
+	echo "parameter <peer_ids> missing" >&2 && exit 1
+endif
 	TS_NODE_PROJECT=./tsconfig.hardhat.json \
 	HOPR_ENVIRONMENT_ID="$(environment)" \
 	  yarn workspace @hoprnet/hopr-ethereum run hardhat register:self \
    --network $(network) \
    --task remove \
+   --peer-ids "$(peer_ids)" \
    --privatekey "$(PRIVATE_KEY)"
 
 .PHONY: register-node-when-dummy-proxy
