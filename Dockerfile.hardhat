@@ -52,8 +52,8 @@ WORKDIR /app
 
 COPY . /app
 
-RUN make -j deps \
- && make -j build \
+RUN CI=true make -j deps
+RUN make -j build \
  && cp tsconfig.json packages/ethereum/tsconfig.base.json \
  && cd packages/ethereum \
  && cat tsconfig.hardhat.json | jq '.extends = "./tsconfig.base.json" | del(.references)' > tsconfig.hardhat.json.new \
