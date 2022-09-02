@@ -41,7 +41,7 @@
   },
   "paleochora": {
     "git_ref": "^release/paleochora$",
-    "environment_id": "monte_rosa",
+    "environment_id": "paleochora",
     "version_major": "1",
     "version_minor": "89"
   },
