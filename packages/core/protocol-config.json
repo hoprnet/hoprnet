@@ -33,13 +33,13 @@
       "environment_type": "staging",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xa3C8f4044b30Fb3071F5b3b02913DE524F1041dc",
-      "channels_contract_address": "0x3Bad568f50e5436fb1757C8B3582fEDdA686583C",
+      "channels_contract_address": "0xc81E2Bf738f8018202c8Bd9dA85a12D5D7291d08",
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
       "xhopr_contract_address": "0xe8aD2ac347dA7549Aaca8F5B1c5Bf979d85bC78F",
       "boost_contract_address": "0x2B3Dc48E74da0176f761d0aA864e81A8170df24f",
       "stake_contract_address": "0xAc677660cb7F525F6e74c0560924fB6D16EF2681",
       "network_registry_proxy_contract_address": "0x2dBf1d5b4012291C0EFaec26c4DAb105B059D898",
-      "network_registry_contract_address": "0x5df074701a46e34f83cF0Bc18874BB83c34A5BD3",
+      "network_registry_contract_address": "0xB3732fE5B08AC573b48932189A9d7DB1F7891820",
       "tags": ["etherscan"]
     },
     "debug-goerli": {

@@ -180,5 +180,5 @@ make register-node-when-dummy-proxy endpoint=<hoprd_endpoint> api_token=<api_tok
 e.g.
 
 ```
-make register-node-when-dummy-proxy endpoint="localhost:3001" api_token="^MYtoken4testing^" account=0x35A3e15A2E2C297686A4fac5999647312fdDfa3f environment=paleochora network=xdai
+make register-node-when-dummy-proxy endpoint="localhost:3001" api_token="^MYtoken4testing^" account=0x35A3e15A2E2C297686A4fac5999647312fdDfa3f environment=master-goerli network=goerli
 ```

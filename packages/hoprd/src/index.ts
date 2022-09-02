@@ -2,7 +2,6 @@ import { passwordStrength } from 'check-password-strength'
 import path from 'path'
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
-import { setTimeout } from 'timers/promises'
 
 import { loadJson, NativeBalance, SUGGESTED_NATIVE_BALANCE, get_package_version } from '@hoprnet/hopr-utils'
 import {
@@ -28,8 +27,6 @@ import { LogStream } from './logs.js'
 import { getIdentity } from './identity.js'
 import { register as registerUnhandled, setLogger } from 'trace-unhandled'
 import { decodeMessage } from './api/utils.js'
-
-import runCommand, { isSupported as isSupportedCommand } from './run.js'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
@@ -147,11 +144,6 @@ const argv = yargsInstance
     string: true,
     describe: 'The path to the identity file [env: HOPRD_IDENTITY]',
     default: DEFAULT_ID_PATH
-  })
-  .option('run', {
-    string: true,
-    describe: 'Run a single hopr command, same syntax as in hopr-admin [env: HOPRD_RUN]',
-    default: ''
   })
   .option('dryRun', {
     boolean: true,

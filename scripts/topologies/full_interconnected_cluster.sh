@@ -76,6 +76,9 @@ done
 
 log "Opening channels in background to parallelize operations"
 
+# put 0.5 HOPR token into each channel
+declare amount_per_channel="500000000000000000"
+
 for endpoint in ${endpoints}; do
   for other_endpoint in ${endpoints}; do
     # only perform operation if endpoints differ
@@ -83,7 +86,7 @@ for endpoint in ${endpoints}; do
       log "${endpoint} opening channel to other node at ${other_endpoint}"
       declare src="${peers["${endpoint}"]}"
       declare dst="${peers["${other_endpoint}"]}"
-      api_open_channel "${src}" "${dst}" "${endpoint}" "${dst}" &
+      api_open_channel "${src}" "${dst}" "${endpoint}" "${dst}" "${amount_per_channel}" &
     fi
   done
 done
