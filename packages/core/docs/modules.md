@@ -132,7 +132,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/environment.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L45)
+[packages/core/src/environment.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L47)
 
 ___
 
@@ -401,25 +401,36 @@ ___
 
 ### resolveEnvironment
 
-▸ **resolveEnvironment**(`environment_id`, `customProvider?`): [`ResolvedEnvironment`](modules.md#resolvedenvironment)
+▸ **resolveEnvironment**(`environment_id`, `version`, `customProvider?`): [`ResolvedEnvironment`](modules.md#resolvedenvironment)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `environment_id` | `string` |
-| `customProvider?` | `string` |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `environment_id` | `string` | environment name |
+| `version` | `string` | HOPR version |
+| `customProvider?` | `string` |  |
 
 #### Returns
 
 [`ResolvedEnvironment`](modules.md#resolvedenvironment)
 
+the environment details, throws if environment is not supported
+
 ___
 
 ### supportedEnvironments
 
-▸ **supportedEnvironments**(): `Environment`[]
+▸ **supportedEnvironments**(`version`): `Environment`[]
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `version` | `string` | HOPR version |
 
 #### Returns
 
 `Environment`[]
+
+environments that the given HOPR version should be able to use

@@ -1,5 +1,5 @@
 import { setImmediate } from 'timers/promises'
-import EventEmitter, { once } from 'events'
+import EventEmitter from 'events'
 
 import { protocols, Multiaddr } from '@multiformats/multiaddr'
 
@@ -273,7 +273,8 @@ class Hopr extends EventEmitter {
       this.publicNodesEmitter,
       async (peerId: PeerId, origin: NetworkPeersOrigin): Promise<boolean> => {
         return accessControl.reviewConnection(peerId, origin)
-      }
+      },
+      this.isAllowedAccessToNetwork.bind(this)
     )) as Libp2p
 
     // Needed to stop libp2p instance
@@ -353,7 +354,9 @@ class Hopr extends EventEmitter {
       this.db,
       this.getId(),
       (ackChallenge: HalfKeyChallenge) => {
-        this.emit(`message-acknowledged:${ackChallenge.toHex()}`)
+        // Can subscribe to both: per specific message or all message acknowledgments
+        this.emit(`hopr:message-acknowledged:${ackChallenge.toHex()}`)
+        this.emit('hopr:message-acknowledged', ackChallenge.toHex())
       },
       (ack: AcknowledgedTicket) => this.connector.emit('ticket:win', ack),
       // TODO: automatically reinitialize commitments
@@ -717,11 +720,41 @@ class Hopr extends EventEmitter {
   }
 
   /**
+   * Validates the manual intermediate path by checking if it does not contain
+   * channels that are not opened.
+   * Throws an error if some channel is not opened.
+   * @param intermediatePath
+   */
+  private async validateIntermediatePath(intermediatePath: PublicKey[]) {
+    // checking if path makes sense
+    for (let i = 0; i < intermediatePath.length; i++) {
+      let ticketIssuer: PublicKey
+      let ticketReceiver: PublicKey
+
+      if (i == 0) {
+        ticketIssuer = PublicKey.fromPeerId(this.getId())
+        ticketReceiver = intermediatePath[0]
+      } else {
+        ticketIssuer = intermediatePath[i - 1]
+        ticketReceiver = intermediatePath[i]
+      }
+
+      if (ticketIssuer.eq(ticketReceiver)) log(`WARNING: duplicated adjacent path entries.`)
+
+      const channel = await this.db.getChannelX(ticketIssuer, ticketReceiver)
+
+      if (channel.status !== ChannelStatus.Open) {
+        throw Error(`Channel ${channel.getId().toHex()} is not open`)
+      }
+    }
+  }
+
+  /**
    * @param msg message to send
    * @param destination PeerId of the destination
    * @param intermediatePath optional set path manually
    */
-  public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PublicKey[]): Promise<void> {
+  public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PublicKey[]) {
     if (this.status != 'RUNNING') {
       throw new Error('Cannot send message until the node is running')
     }
@@ -731,27 +764,8 @@ class Hopr extends EventEmitter {
     }
 
     if (intermediatePath != undefined) {
-      // checking if path makes sense
-      for (let i = 0; i < intermediatePath.length; i++) {
-        let ticketIssuer: PublicKey
-        let ticketReceiver: PublicKey
-
-        if (i == 0) {
-          ticketIssuer = PublicKey.fromPeerId(this.getId())
-          ticketReceiver = intermediatePath[0]
-        } else {
-          ticketIssuer = intermediatePath[i - 1]
-          ticketReceiver = intermediatePath[i]
-        }
-
-        if (ticketIssuer.eq(ticketReceiver)) log(`WARNING: duplicated adjacent path entries.`)
-
-        const channel = await this.db.getChannelX(ticketIssuer, ticketReceiver)
-
-        if (channel.status !== ChannelStatus.Open) {
-          throw Error(`Channel ${channel.getId().toHex()} is not open`)
-        }
-      }
+      // Validate the manually specified intermediate path
+      await this.validateIntermediatePath(intermediatePath)
     } else {
       intermediatePath = await this.getIntermediateNodes(PublicKey.fromPeerId(destination))
 
@@ -776,15 +790,13 @@ class Hopr extends EventEmitter {
 
     await packet.storePendingAcknowledgement(this.db)
 
-    const acknowledged: Promise<void> = once(this, 'message-acknowledged:' + packet.ackChallenge.toHex()) as any
-
     try {
       await this.forward.interact(path[0].toPeerId(), packet)
     } catch (err) {
       throw Error(`Error while trying to send final packet ${JSON.stringify(err)}`)
     }
 
-    return acknowledged
+    return packet.ackChallenge.toHex()
   }
 
   /**

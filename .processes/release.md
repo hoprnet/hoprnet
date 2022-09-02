@@ -148,6 +148,9 @@ particular branch to deploy on every change.
 
 1. Create a release tracking issue on GitHub. Use previous issues as templates: https://github.com/hoprnet/hoprnet/issues/3044
 2. (on `master`) As a preparation for a release there should be a respective entry in `packages/hoprd/releases.json` and if needed in `packages/core/protocol-config.json`. If the entries are missing, create and merge them before starting the actual release process. This step can be done way in advance to plan environments and releases, too.
+
+   1. In `packages/core/protocol-config.json` remember to _create_ or _update_ an environment's `version_range` with the upcoming version of the next release.
+
 3. (on `master`) Now create the release branch locally. E.g. doing `git checkout -b release/${RELEASE_NAME}`.
 4. (on `release/${RELEASE_NAME}`) Before pushing the branch to GitHub, some release-specific changes should be applied to ensure the resulting CD artifacts actually are proper release artifacts.
 

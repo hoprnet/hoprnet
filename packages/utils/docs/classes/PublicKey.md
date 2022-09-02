@@ -30,6 +30,7 @@
 - [toUncompressedPubKeyHex](PublicKey.md#touncompressedpubkeyhex)
 - [createMock](PublicKey.md#createmock)
 - [deserialize](PublicKey.md#deserialize)
+- [deserializeArray](PublicKey.md#deserializearray)
 - [fromPeerId](PublicKey.md#frompeerid)
 - [fromPeerIdString](PublicKey.md#frompeeridstring)
 - [fromPrivKey](PublicKey.md#fromprivkey)
@@ -37,6 +38,7 @@
 - [fromSignature](PublicKey.md#fromsignature)
 - [fromSignatureString](PublicKey.md#fromsignaturestring)
 - [fromString](PublicKey.md#fromstring)
+- [serializeArray](PublicKey.md#serializearray)
 
 ## Constructors
 
@@ -204,6 +206,26 @@ ___
 
 ___
 
+### deserializeArray
+
+▸ `Static` **deserializeArray**(`arr`): [`PublicKey`](PublicKey.md)[]
+
+Deserializes a Uint8Array containing serialized publicKeys
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `arr` | `Uint8Array` | u8a containing serialized pubkeys |
+
+#### Returns
+
+[`PublicKey`](PublicKey.md)[]
+
+an array of deserialized publicKeys
+
+___
+
 ### fromPeerId
 
 ▸ `Static` **fromPeerId**(`peerId`): [`PublicKey`](PublicKey.md)
@@ -318,3 +340,23 @@ ___
 #### Returns
 
 [`PublicKey`](PublicKey.md)
+
+___
+
+### serializeArray
+
+▸ `Static` **serializeArray**(`pKeys`): `Uint8Array`
+
+Serializes an array of publicKeys
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `pKeys` | [`PublicKey`](PublicKey.md)[] |
+
+#### Returns
+
+`Uint8Array`
+
+a Uint8Array containing the given publicKeys

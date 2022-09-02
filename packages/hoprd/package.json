@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.89.24",
+  "version": "1.89.37",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -43,6 +43,7 @@
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "@libp2p/interface-peer-id": "1.0.2",
     "@libp2p/peer-id": "1.1.13",
+    "@multiformats/multiaddr": "10.3.3",
     "bn.js": "5.2.0",
     "body-parser": "1.19.2",
     "check-password-strength": "2.0.4",

@@ -66,7 +66,7 @@ const argv = yargsInstance
   .option('environment', {
     string: true,
     describe: 'Environment id which the node shall run on (HOPRD_ENVIRONMENT)',
-    choices: supportedEnvironments().map((env) => env.id),
+    choices: supportedEnvironments(version).map((env) => env.id),
     default: defaultEnvironment()
   })
   .option('host', {
@@ -401,10 +401,15 @@ async function main() {
   // as if the HOPR node fails, we need to put an error message up.
   if (argv.admin) {
     adminServer = new AdminServer(logs, argv.adminHost, argv.adminPort)
-    await adminServer.setup()
+    try {
+      await adminServer.setup()
+    } catch (err) {
+      console.error(err)
+      process.exit(1)
+    }
   }
 
-  const environment = resolveEnvironment(argv.environment, argv.provider)
+  const environment = resolveEnvironment(argv.environment, version, argv.provider)
   let options = generateNodeOptions(environment)
   if (argv.dryRun) {
     console.log(JSON.stringify(options, undefined, 2))
@@ -430,6 +435,8 @@ async function main() {
     logs.log('Creating HOPR Node')
     node = await createHoprNode(peerId, options, false)
     logs.logStatus('PENDING')
+
+    // Subscribe to node events
     node.on('hopr:message', logMessageToNode)
     node.on('hopr:network-health-changed', networkHealthChanged)
     node.subscribeOnConnector('hopr:connector:created', () => {
@@ -502,9 +509,8 @@ async function main() {
         }
 
         // Wait for actions to take place
-        setTimeout(1e3)
+        await setTimeout(1e3)
         await node.stop()
-        return
       }
     })
 

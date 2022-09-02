@@ -308,7 +308,7 @@ class NetworkPeers {
     const isExcluded = !hasEntry && this.excludedPeers.has(peerId.toString())
     const isDenied = !hasEntry && this.deniedEntries.has(id)
 
-    log('registering peer', id, { hasEntry, isExcluded, isDenied })
+    //log('registering peer', id, { hasEntry, isExcluded, isDenied })
 
     // does not have peer and it's not excluded or denied
     if (!hasEntry && !isExcluded && !isDenied) {

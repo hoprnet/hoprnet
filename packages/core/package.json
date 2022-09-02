@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "1.89.24",
+  "version": "1.89.37",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -54,7 +54,8 @@
     "leveldown": "6.1.1",
     "levelup": "5.1.1",
     "libp2p": "0.37.3",
-    "secp256k1": "4.0.3"
+    "secp256k1": "4.0.3",
+    "semver": "7.3.7"
   },
   "devDependencies": {
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum",
@@ -64,6 +65,7 @@
     "@types/chai": "4.3.3",
     "@types/chai-as-promised": "7.1.5",
     "@types/mocha": "9.1.1",
+    "@types/semver": "^7",
     "@types/yargs": "17.0.10",
     "chai": "4.3.6",
     "chai-as-promised": "7.1.1",

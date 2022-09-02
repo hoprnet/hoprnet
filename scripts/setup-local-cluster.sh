@@ -318,10 +318,10 @@ log "All nodes came up online"
 declare endpoints="localhost:13301 localhost:13302 localhost:13303 localhost:13304 localhost:13305"
 
 # --- Call init script--- {{{
-if [ -n "${init_script}" ] && [ -x "${init_script}" ]; then
+if [ -n "${init_script}" ] && [ -x "${mydir}/${init_script}" ]; then
   log "Calling init script ${init_script}"
   HOPRD_API_TOKEN="${api_token}" \
-    "${init_script}" ${endpoints}
+    "${mydir}/${init_script}" ${endpoints}
 fi
 # }}}
 
