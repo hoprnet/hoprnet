@@ -1,5 +1,3 @@
-import { setImmediate } from 'timers/promises'
-
 import type NetworkPeers from './network-peers.js'
 import type AccessControl from './access-control.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
@@ -64,7 +62,7 @@ export default class Heartbeat {
     private closeConnectionsTo: (peer: PeerId) => Promise<void>,
     private reviewConnection: AccessControl['reviewConnection'],
     private stateChangeEmitter: EventEmitter,
-    private publicNodeLookup: (addr: PeerId) => boolean,
+    private isPublicNode: (addr: PeerId) => boolean,
     environmentId: string,
     config?: Partial<HeartbeatConfig>
   ) {
@@ -179,7 +177,7 @@ export default class Heartbeat {
     // Count quality of public/non-public nodes
     for (let entry of this.networkPeers.getAllEntries()) {
       let quality = this.networkPeers.qualityOf(entry.id)
-      if (this.publicNodeLookup(entry.id)) {
+      if (this.isPublicNode(entry.id)) {
         quality > this.config.networkQualityThreshold ? ++highQualityPublic : ++lowQualityPublic
       } else {
         quality > this.config.networkQualityThreshold ? ++highQualityNonPublic : ++lowQualityNonPublic
@@ -231,12 +229,9 @@ export default class Heartbeat {
     const start = Date.now()
     const pingResults = await nAtATime(this._pingNode, pingWork, this.config.maxParallelHeartbeats)
 
-    log(`Heartbeat run pinging ${pingWork.length} nodes took ${Date.now() - start} ms`)
-
     finished = true
 
     for (const [resultIndex, pingResult] of pingResults.entries()) {
-      await setImmediate()
       if (pingResult instanceof Error) {
         // we need to get the destination so we can map a ping error properly
         const [destination, _abortSignal] = pingWork[resultIndex]
@@ -254,7 +249,11 @@ export default class Heartbeat {
     this.recalculateNetworkHealth()
 
     log(
-      this.networkPeers.debugLog(`finished checking nodes since ${thresholdTime} ${this.networkPeers.length()} nodes`)
+      this.networkPeers.debugLog(
+        `finished checking ${pingWork.length} node${pingWork.length == 1 ? '' : 's'} since ${thresholdTime} within ${
+          Date.now() - start
+        } ms`
+      )
     )
   }
 

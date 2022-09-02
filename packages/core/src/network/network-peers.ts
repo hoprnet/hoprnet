@@ -1,7 +1,6 @@
 import { type HeartbeatPingResult } from './heartbeat.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { randomSubset, debug } from '@hoprnet/hopr-utils'
-// import Heap from 'heap-js'
 
 const DEBUG_PREFIX = 'hopr-core:network-peers'
 const log = debug(DEBUG_PREFIX)
@@ -76,9 +75,6 @@ function printEntries(
   networkQualityThreshold: number,
   prefix: string
 ): string {
-  // Sort a copy of peers in-place
-  // peers.sort((a: PeerId, b: PeerId) => )
-
   let bestAvailabilityNodes = 0
   let badAvailabilityNodes = 0
   let out = `${prefix}\n`
@@ -89,12 +85,10 @@ function printEntries(
     peerIds.push(entry.id.toString())
   }
 
-  peerIds.sort((a: string, b: string) => {
-    return compareQualities(entries[a], entries[b], qualityOf)
-  })
+  peerIds.sort((a: string, b: string) => compareQualities(entries.get(a), entries.get(b), qualityOf))
 
   for (const peer of peerIds) {
-    const entry = entries[peer]
+    const entry = entries.get(peer)
 
     const quality = qualityOf(entry.id)
     if (quality.toFixed(1) === '1.0') {
@@ -119,6 +113,8 @@ function printEntries(
 
   if (out.length == prefix.length + 1) {
     return 'no connected peers'
+  } else {
+    out += '\n'
   }
 
   const msgTotalNodes = `${length} node${length == 1 ? '' : 's'} in total`
@@ -176,8 +172,7 @@ class NetworkPeers {
 
   /**
    * Returns the quality of the node, where
-   * -1.0 => unknown node
-   * 0.0 => completely unreliable / offline
+   * 0.0 => completely unreliable / offline or unknown
    * 1.0 => completely reliable / online
    * @param peerId id for which to get quality
    * @returns a float between 0.0 and 1.0
@@ -187,7 +182,7 @@ class NetworkPeers {
 
     if (!entry) {
       // Lower than anything else
-      return -1.0
+      return 0.0
     }
 
     if (entry.heartbeatsSent > 0) {
@@ -213,7 +208,7 @@ class NetworkPeers {
   public pingSince(thresholdTime: number): PeerId[] {
     const toPing: PeerId[] = []
 
-    // Returns filtered values in order of insertion into Map
+    // Returns list of filtered nodes, statically ordered after *insertion* into Map
     for (const entry of this.entries.values()) {
       if (nextPing(entry) < thresholdTime) {
         toPing.push(entry.id)
@@ -222,7 +217,7 @@ class NetworkPeers {
 
     // Ping most recently seen nodes last
     return toPing.sort(
-      (a: PeerId, b: PeerId) => this.entries[a.toString()].lastSeen - this.entries[b.toString()].lastSeen
+      (a: PeerId, b: PeerId) => this.entries.get(a.toString()).lastSeen - this.entries.get(b.toString()).lastSeen
     )
   }
 
@@ -233,10 +228,8 @@ class NetworkPeers {
 
     if (pingResult.lastSeen < 0) {
       this.onFailedPing(id)
-      // failed ping
     } else {
       this.onSuccessfulPing(id)
-      // successful ping
     }
   }
 
@@ -263,7 +256,8 @@ class NetworkPeers {
       // delete peer from internal store
       this.entries.delete(id.toString())
       // add entry to temporarily ignored peers
-      this.ignoreEntry(newEntry)
+      // Create or overwrite entry in ignore list
+      this.ignoredEntries.set(newEntry.id.toString(), Date.now())
       // done, return early so the rest can update the entry instead
       return
     }
@@ -304,14 +298,32 @@ class NetworkPeers {
   public register(peerId: PeerId, origin: NetworkPeersOrigin) {
     const id = peerId.toString()
     const now = Date.now()
-    const hasEntry = this.entries.has(id)
-    const isExcluded = !hasEntry && this.excludedPeers.has(peerId.toString())
-    const isDenied = !hasEntry && this.deniedEntries.has(id)
 
-    //log('registering peer', id, { hasEntry, isExcluded, isDenied })
+    // Assumes that all maps / sets are disjoint
+    const hasEntry = this.entries.has(id)
+    const isExcluded = !hasEntry && this.excludedPeers.has(id)
+    const isDenied = !isExcluded && this.deniedEntries.has(id)
+    let isIgnored = !isDenied && this.ignoredEntries.has(id)
+
+    // the peer is excluded or denied
+    if (isExcluded || isDenied) {
+      // not adding peer
+      return
+    }
+
+    if (isIgnored) {
+      const ignoreTimestamp: undefined | number = this.ignoredEntries.get(peerId.toString())
+
+      // Must test for undefined because if(1) is treated as if(true)
+      if (ignoreTimestamp != undefined && ignoreTimestamp + IGNORE_TIMEFRAME < now) {
+        // release and continue
+        this.ignoredEntries.delete(peerId.toString())
+        isIgnored = false
+      }
+    }
 
     // does not have peer and it's not excluded or denied
-    if (!hasEntry && !isExcluded && !isDenied) {
+    if (!hasEntry && !isIgnored) {
       this.entries.set(id, {
         id: peerId,
         heartbeatsSent: 0,
@@ -321,22 +333,6 @@ class NetworkPeers {
         quality: BAD_QUALITY,
         origin
       })
-    }
-
-    // the peer is excluded or denied
-    if (isExcluded || isDenied) {
-      return
-    }
-
-    const ignoreTimestamp: undefined | number = this.ignoredEntries.get(peerId.toString())
-
-    // Must test for undefined because if(1) is treated as if(true)
-    if (ignoreTimestamp != undefined && ignoreTimestamp + IGNORE_TIMEFRAME < now) {
-      // release and continue
-      this.unignoreEntry(peerId)
-    } else {
-      // ignore still valid, thus skipping this registration
-      return
     }
   }
 
@@ -359,21 +355,16 @@ class NetworkPeers {
     return printEntries(this.entries, this.qualityOf.bind(this), this.networkQualityThreshold, prefix)
   }
 
-  private ignoreEntry(entry: Entry): void {
-    // Create or overwrite entry in ignore list
-    this.ignoredEntries.set(entry.id.toString(), Date.now())
-  }
-
-  private unignoreEntry(peer: PeerId): void {
-    this.ignoredEntries.delete(peer.toString())
-  }
-
   public getAllDenied(): IterableIterator<Pick<Entry, 'id' | 'origin'>> {
     return this.deniedEntries.values()
   }
 
   public getAllEntries(): IterableIterator<Entry> {
     return this.entries.values()
+  }
+
+  public getAllIgnored(): IterableIterator<string> {
+    return this.ignoredEntries.keys()
   }
 
   public addPeerToDenied(peerId: PeerId, origin: NetworkPeersOrigin): void {
