@@ -34,11 +34,7 @@
             "default": false
           }
         },
-        "required": [
-          "id",
-          "git_ref",
-          "environment_id"
-        ],
+        "required": ["id", "git_ref", "environment_id"],
         "additionalProperties": false
       }
     }
