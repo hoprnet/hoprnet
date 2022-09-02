@@ -1341,6 +1341,7 @@ export {
   findPath,
   type StrategyTickResult,
   NetworkHealthIndicator,
+  NetworkPeersOrigin,
   type ChannelStrategyInterface
 }
 export { resolveEnvironment, supportedEnvironments, type ResolvedEnvironment } from './environment.js'

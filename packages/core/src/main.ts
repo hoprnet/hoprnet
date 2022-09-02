@@ -19,6 +19,7 @@ import Hopr, { type HoprOptions } from './index.js'
 import { getAddrs } from './identity.js'
 import type AccessControl from './network/access-control.js'
 import { createLibp2pMock } from './libp2p.mock.js'
+import { NetworkPeersOrigin } from './network/network-peers.js'
 
 const log = debug(`hopr-core:create-hopr`)
 
@@ -124,10 +125,10 @@ export async function createLibp2pInstance(
       },
       connectionGater: {
         denyDialPeer: async (peer: PeerId) => {
-          return !(await reviewConnection(peer, 'libp2p peer connect'))
+          return !(await reviewConnection(peer, NetworkPeersOrigin.OUTGOING_CONNECTION))
         },
         denyInboundEncryptedConnection: async (peer: PeerId) => {
-          return !(await reviewConnection(peer, 'libp2p peer connect'))
+          return !(await reviewConnection(peer, NetworkPeersOrigin.INCOMING_CONNECTION))
         }
       },
       relay: {
