@@ -142,7 +142,7 @@
       "tags": ["etherscan"],
       "network_registry_proxy_contract_address": "0x15e068Ef1f76319b1848b1fcB3e49D68724AEE07"
     },
-    "monte-rosa": {
+    "monte_rosa": {
       "network_id": "xdai",
       "environment_type": "production",
       "version_range": "1.89",
