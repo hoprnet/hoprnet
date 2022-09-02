@@ -166,6 +166,22 @@ endif
 		--nftrank $(nftrank) \
 		--privatekey "$(PRIVATE_KEY)"
 
+enable-network-registry: ensure-environment-is-set
+enable-network-registry: ## owner enables network registry (smart contract) globally
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
+   --network $(network) \
+   --task enable
+
+disable-network-registry: ensure-environment-is-set
+disable-network-registry: ## owner disables network registry (smart contract) globally
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
+   --network $(network) \
+   --task disable
+
 register-nodes: ensure-environment-is-set
 register-nodes: ## owner register given nodes in network registry contract
 ifeq ($(native_addresses),)

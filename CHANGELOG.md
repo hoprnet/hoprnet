@@ -4,6 +4,10 @@
 
 ## 1.90
 
+### Changes
+
+- Improve Network Registry smart contract to allow 1-to-many node registration, add enable/disable make targets ([#4008](https://github.com/hoprnet/hoprnet/pull/4008))
+
 ---
 
 <a name="1.89"></a>
