@@ -470,11 +470,11 @@ class WebRTCConnection implements MultiaddrConnection {
                     break
                   }
 
-                  this.log(
+                  /*this.log(
                     `sinking ${received.value.slice().length} bytes into webrtc[${
                       (this.relayConn.getWebRTCInstance() as any)._id
                     }]`
-                  )
+                  )*/
 
                   // WebRTC tends to send multiple messages in one chunk, so add a
                   // length prefix to split messages when receiving them
