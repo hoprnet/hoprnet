@@ -155,11 +155,15 @@ stake-devnft: ## stake Dev NFTs (idempotent operation)
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
+ifeq ($(nftrank),)
+	echo "parameter <nftrank> missing, it can be either 'developer' or 'community'" >&2 && exit 1
+endif
 	@TS_NODE_PROJECT=./tsconfig.hardhat.json \
 	HOPR_ENVIRONMENT_ID="$(environment)" \
 		yarn workspace @hoprnet/hopr-ethereum run hardhat stake \
 		--network $(network) \
 		--type devnft \
+		--nftrank $(nftrank) \
 		--privatekey "$(PRIVATE_KEY)"
 
 register-nodes: ensure-environment-is-set
