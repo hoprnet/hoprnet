@@ -79,7 +79,7 @@ export function supportedEnvironments(): Environment[] {
 /**
  * @param environment_id environment name
  * @param customProvider
- * @returns the environment details, throws if given version is not supported by the environment
+ * @returns the environment details
  */
 export function resolveEnvironment(environment_id: string, customProvider?: string): ResolvedEnvironment {
   const environment = (protocolConfig as ProtocolConfig).environments[environment_id]
