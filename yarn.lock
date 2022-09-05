@@ -3546,7 +3546,7 @@ __metadata:
     "@libp2p/interface-address-manager": ^1.0.1
     "@libp2p/interface-connection": 1.0.1
     "@libp2p/interface-peer-discovery": 1.0.0
-    "@libp2p/interface-peer-id": 1.0.2
+    "@libp2p/interface-peer-id": 1.0.4
     "@libp2p/interface-peer-store": 1.0.0
     "@libp2p/interface-transport": 1.0.0
     "@libp2p/interfaces": 2.0.4
@@ -3593,7 +3593,7 @@ __metadata:
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@libp2p/crypto": 1.0.0
-    "@libp2p/interface-peer-id": 1.0.2
+    "@libp2p/interface-peer-id": 1.0.4
     "@libp2p/peer-id": 1.1.13
     "@multiformats/multiaddr": 10.3.3
     "@sinonjs/referee": 9.1.1
@@ -3631,7 +3631,7 @@ __metadata:
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@libp2p/crypto": 1.0.0
     "@libp2p/interface-content-routing": 1.0.2
-    "@libp2p/interface-peer-id": 1.0.2
+    "@libp2p/interface-peer-id": 1.0.4
     "@libp2p/interface-registrar": 1.1.0
     "@libp2p/interfaces": 2.0.4
     "@libp2p/kad-dht": 1.0.16
@@ -3674,7 +3674,7 @@ __metadata:
   dependencies:
     "@hoprnet/hopr-core": "workspace:packages/core"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
-    "@libp2p/interface-peer-id": 1.0.2
+    "@libp2p/interface-peer-id": 1.0.4
     "@libp2p/peer-id": 1.1.13
     "@multiformats/multiaddr": 10.3.3
     "@types/chai": 4.3.3
@@ -3754,7 +3754,7 @@ __metadata:
     "@libp2p/interface-connection": 1.0.1
     "@libp2p/interface-connection-manager": 1.0.0
     "@libp2p/interface-keys": 1.0.3
-    "@libp2p/interface-peer-id": 1.0.2
+    "@libp2p/interface-peer-id": 1.0.4
     "@libp2p/interface-peer-store": 1.0.0
     "@libp2p/kad-dht": 1.0.16
     "@libp2p/mplex": 1.2.1
@@ -3798,7 +3798,7 @@ __metadata:
     "@hoprnet/hopr-core": "workspace:packages/core"
     "@hoprnet/hopr-real": "workspace:packages/real"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
-    "@libp2p/interface-peer-id": 1.0.2
+    "@libp2p/interface-peer-id": 1.0.4
     "@libp2p/peer-id": 1.1.13
     "@multiformats/multiaddr": 10.3.3
     "@types/chai": 4.3.3
@@ -4077,16 +4077,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@libp2p/interface-peer-id@npm:1.0.2":
-  version: 1.0.2
-  resolution: "@libp2p/interface-peer-id@npm:1.0.2"
-  dependencies:
-    multiformats: ^9.6.3
-  checksum: c2a16c4fa8907dd3477c82e0d1a6c98450496a452b6ae34c82d18e27fe9f9e5bda23eec7b53ce2f382165f2a42201732a6004859a831f0c8835958eaadcbdf00
-  languageName: node
-  linkType: hard
-
-"@libp2p/interface-peer-id@npm:^1.0.0, @libp2p/interface-peer-id@npm:^1.0.2":
+"@libp2p/interface-peer-id@npm:1.0.4, @libp2p/interface-peer-id@npm:^1.0.0, @libp2p/interface-peer-id@npm:^1.0.2":
   version: 1.0.4
   resolution: "@libp2p/interface-peer-id@npm:1.0.4"
   dependencies:
