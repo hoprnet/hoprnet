@@ -1,5 +1,5 @@
 import { setImmediate } from 'timers/promises'
-import EventEmitter, { once } from 'events'
+import EventEmitter from 'events'
 
 import { protocols, Multiaddr } from '@multiformats/multiaddr'
 
@@ -33,11 +33,16 @@ import {
   ChannelStatus,
   MIN_NATIVE_BALANCE,
   isMultiaddrLocal,
-  retryWithBackoff,
+  retryWithBackoffThenThrow,
   durations,
   isErrorOutOfFunds,
   debug,
   retimer,
+  createRelayerKey,
+  createCircuitAddress,
+  convertPubKeyFromPeerId,
+  getBackoffRetryTimeout,
+  getBackoffRetries,
   type LibP2PHandlerFunction,
   type AcknowledgedTicket,
   type ChannelEntry,
@@ -45,10 +50,7 @@ import {
   type DialOpts,
   type Hash,
   type HalfKeyChallenge,
-  type Ticket,
-  createRelayerKey,
-  createCircuitAddress,
-  convertPubKeyFromPeerId
+  type Ticket
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { type Indexer } from '@hoprnet/hopr-core-ethereum'
 
@@ -271,7 +273,8 @@ class Hopr extends EventEmitter {
       this.publicNodesEmitter,
       async (peerId: PeerId, origin: string): Promise<boolean> => {
         return accessControl.reviewConnection(peerId, origin)
-      }
+      },
+      this.isAllowedAccessToNetwork.bind(this)
     )) as Libp2p
 
     // Needed to stop libp2p instance
@@ -351,7 +354,9 @@ class Hopr extends EventEmitter {
       this.db,
       this.getId(),
       (ackChallenge: HalfKeyChallenge) => {
-        this.emit(`message-acknowledged:${ackChallenge.toHex()}`)
+        // Can subscribe to both: per specific message or all message acknowledgments
+        this.emit(`hopr:message-acknowledged:${ackChallenge.toHex()}`)
+        this.emit('hopr:message-acknowledged', ackChallenge.toHex())
       },
       (ack: AcknowledgedTicket) => this.connector.emit('ticket:win', ack),
       // TODO: automatically reinitialize commitments
@@ -442,7 +447,16 @@ class Hopr extends EventEmitter {
   private async onChannelWaitingForCommitment(c: ChannelEntry): Promise<void> {
     if (this.strategy.shouldCommitToChannel(c)) {
       log(`Found channel ${c.getId().toHex()} to us with unset commitment. Setting commitment`)
-      retryWithBackoff(() => this.connector.commitToChannel(c))
+      try {
+        await retryWithBackoffThenThrow(() => this.connector.commitToChannel(c))
+      } catch (err) {
+        // @TODO what to do here? E.g. delete channel from db?
+        error(
+          `Couldn't set commitment in channel to ${c.destination.toPeerId().toString()} (channelId ${c
+            .getId()
+            .toHex()})`
+        )
+      }
     }
   }
 
@@ -628,15 +642,15 @@ class Hopr extends EventEmitter {
   // @TODO make modules Startable
   public async stop(): Promise<void> {
     if (this.status == 'DESTROYED') {
-      throw Error(`alreayd destroyed. Cannot destroy twice`)
+      throw Error(`Hopr instance already destroyed.`)
     }
     this.status = 'DESTROYED'
     verbose('Stopping checking timeout')
     this.stopPeriodicCheck?.()
     verbose('Stopping heartbeat & indexer')
-    await this.heartbeat.stop()
+    this.heartbeat?.stop()
     verbose(`Stopping connector`)
-    await this.connector.stop()
+    await this.connector?.stop()
     verbose('Stopping database')
     await this.db?.close()
     log(`Database closed.`)
@@ -706,11 +720,41 @@ class Hopr extends EventEmitter {
   }
 
   /**
+   * Validates the manual intermediate path by checking if it does not contain
+   * channels that are not opened.
+   * Throws an error if some channel is not opened.
+   * @param intermediatePath
+   */
+  private async validateIntermediatePath(intermediatePath: PublicKey[]) {
+    // checking if path makes sense
+    for (let i = 0; i < intermediatePath.length; i++) {
+      let ticketIssuer: PublicKey
+      let ticketReceiver: PublicKey
+
+      if (i == 0) {
+        ticketIssuer = PublicKey.fromPeerId(this.getId())
+        ticketReceiver = intermediatePath[0]
+      } else {
+        ticketIssuer = intermediatePath[i - 1]
+        ticketReceiver = intermediatePath[i]
+      }
+
+      if (ticketIssuer.eq(ticketReceiver)) log(`WARNING: duplicated adjacent path entries.`)
+
+      const channel = await this.db.getChannelX(ticketIssuer, ticketReceiver)
+
+      if (channel.status !== ChannelStatus.Open) {
+        throw Error(`Channel ${channel.getId().toHex()} is not open`)
+      }
+    }
+  }
+
+  /**
    * @param msg message to send
    * @param destination PeerId of the destination
    * @param intermediatePath optional set path manually
    */
-  public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PublicKey[]): Promise<void> {
+  public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PublicKey[]) {
     if (this.status != 'RUNNING') {
       throw new Error('Cannot send message until the node is running')
     }
@@ -720,25 +764,8 @@ class Hopr extends EventEmitter {
     }
 
     if (intermediatePath != undefined) {
-      // checking if path makes sense
-      for (let i = 0; i < intermediatePath.length; i++) {
-        let ticketIssuer: PublicKey
-        let ticketReceiver: PublicKey
-
-        if (i == 0) {
-          ticketIssuer = PublicKey.fromPeerId(this.getId())
-          ticketReceiver = intermediatePath[0]
-        } else {
-          ticketIssuer = intermediatePath[i - 1]
-          ticketReceiver = intermediatePath[i]
-        }
-
-        const channel = await this.db.getChannelX(ticketIssuer, ticketReceiver)
-
-        if (channel.status !== ChannelStatus.Open) {
-          throw Error(`Channel ${channel.getId().toHex()} is not open`)
-        }
-      }
+      // Validate the manually specified intermediate path
+      await this.validateIntermediatePath(intermediatePath)
     } else {
       intermediatePath = await this.getIntermediateNodes(PublicKey.fromPeerId(destination))
 
@@ -763,15 +790,13 @@ class Hopr extends EventEmitter {
 
     await packet.storePendingAcknowledgement(this.db)
 
-    const acknowledged: Promise<void> = once(this, 'message-acknowledged:' + packet.ackChallenge.toHex()) as any
-
     try {
       await this.forward.interact(path[0].toPeerId(), packet)
     } catch (err) {
       throw Error(`Error while trying to send final packet ${JSON.stringify(err)}`)
     }
 
-    return acknowledged
+    return packet.ackChallenge.toHex()
   }
 
   /**
@@ -998,7 +1023,7 @@ class Hopr extends EventEmitter {
   /**
    * Open a payment channel
    *
-   * @param counterparty the counter party's peerId
+   * @param counterparty the counterparty's peerId
    * @param amountToFund the amount to fund in HOPR(wei)
    */
   public async openChannel(
@@ -1008,6 +1033,10 @@ class Hopr extends EventEmitter {
     channelId: Hash
     receipt: string
   }> {
+    if (this.id.equals(counterparty)) {
+      throw Error('Cannot open channel to self!')
+    }
+
     const counterpartyPubKey = PublicKey.fromPeerId(counterparty)
     const myAvailableTokens = await this.connector.getBalance(true)
 
@@ -1179,6 +1208,10 @@ class Hopr extends EventEmitter {
     return await this.connector.getPublicKeyOf(addr)
   }
 
+  public async getEntryNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
+    return this.connector.waitForPublicNodes()
+  }
+
   // @TODO remove this
   // NB: The prefix "HOPR Signed Message: " is added as a security precaution.
   // Without it, the node could be convinced to sign a message like an Ethereum
@@ -1247,10 +1280,13 @@ class Hopr extends EventEmitter {
    * MAX_DELAY is reached, this function will reject.
    */
   public async waitForFunds(): Promise<void> {
+    const minDelay = durations.seconds(1)
+    const maxDelay = durations.seconds(200)
+    const delayMultiple = 1.05
     try {
-      return retryWithBackoff(
-        () => {
-          return new Promise<void>(async (resolve, reject) => {
+      await retryWithBackoffThenThrow(
+        () =>
+          new Promise<void>(async (resolve, reject) => {
             try {
               // call connector directly and don't use cache, since this is
               // most likely outdated during node startup
@@ -1265,17 +1301,24 @@ class Hopr extends EventEmitter {
               log('error with native balance call, trying again soon')
               reject()
             }
-          })
-        },
+          }),
         {
-          minDelay: durations.seconds(1),
-          maxDelay: durations.seconds(200),
-          delayMultiple: 1.05
+          minDelay,
+          maxDelay,
+          delayMultiple
         }
       )
     } catch {
-      log(`unfunded for more than 200 seconds, shutting down`)
+      log(
+        `unfunded for more than ${getBackoffRetryTimeout(
+          minDelay,
+          maxDelay,
+          delayMultiple
+        )} seconds and ${getBackoffRetries(minDelay, maxDelay, delayMultiple)} retries, shutting down`
+      )
+      // Close DB etc.
       await this.stop()
+      process.exit(1)
     }
   }
 

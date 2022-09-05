@@ -12,7 +12,7 @@
   "links": {
     "OnboardingWizard": "http://hopr.my.ava.do:3000/",
     "homepage": "https://hoprnet.org",
-    "Admin interface": "http://hopr.my.ava.do:3000",
+    "Admin interface": "http://hopr.my.ava.do:3000?apiEndpoint=http://hopr.my.ava.do:3001&apiToken=%TOKEN%",
     "Rest API V2": "http://hopr.my.ava.do:3001/api/v2/_swagger/"
   },
   "ui": {

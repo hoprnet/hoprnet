@@ -10,7 +10,13 @@ import {
   type ContractTransaction,
   type BaseContract
 } from 'ethers'
-import { getContractData, type HoprToken, type HoprChannels, type HoprNetworkRegistry } from '@hoprnet/hopr-ethereum'
+import {
+  getContractData,
+  type HoprToken,
+  type HoprChannels,
+  type HoprNetworkRegistry,
+  ContractData
+} from '@hoprnet/hopr-ethereum'
 import {
   Address,
   Balance,
@@ -27,6 +33,7 @@ import TransactionManager, { type TransactionPayload } from './transaction-manag
 import { debug } from '@hoprnet/hopr-utils'
 import { TX_CONFIRMATION_WAIT } from './constants.js'
 import type { Block } from '@ethersproject/abstract-provider'
+import type { Deployment } from 'hardhat-deploy/dist/types.js'
 
 const log = debug('hopr:core-ethereum:ethereum')
 const abiCoder = new utils.AbiCoder()
@@ -94,7 +101,21 @@ export async function createChainWrapper(
     provider
   ) as any as HoprNetworkRegistry
 
-  const genesisBlock = parseInt(hoprChannelsDeployment.blockNumber)
+  //getGenesisBlock, taking the earlier deployment block between the channel and network Registery
+  const [channelDeployBlockNumber, networkRegistryDeployBlockNumber] = [
+    hoprChannelsDeployment,
+    hoprNetworkRegistryDeployment
+  ].map((deployment: Deployment | ContractData) => {
+    if ((deployment as Deployment).receipt?.blockNumber != undefined) {
+      return (deployment as Deployment).receipt.blockNumber
+    } else if ((deployment as ContractData).blockNumber != undefined) {
+      return (deployment as ContractData).blockNumber
+    } else {
+      throw Error(`Cannot get blockNumber for ${deployment.address}. Please add it manually to deployment file`)
+    }
+  })
+
+  const genesisBlock = Math.min(channelDeployBlockNumber, networkRegistryDeployBlockNumber)
   const channelClosureSecs = await channels.secsClosure()
 
   const transactions = new TransactionManager()

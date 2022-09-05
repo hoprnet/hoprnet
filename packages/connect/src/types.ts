@@ -67,6 +67,8 @@ export type HoprConnectOptions = {
   dhtRenewalTimeout?: number
   entryNodeReconnectBaseTimeout?: number
   entryNodeReconnectBackoff?: number
+  // To be removed once NR got removed
+  isAllowedToAccessNetwork?: (id: PeerId) => Promise<boolean>
 }
 
 export type HoprConnectTestingOptions = {

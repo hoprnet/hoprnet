@@ -66,7 +66,7 @@ const argv = yargsInstance
   .option('environment', {
     string: true,
     describe: 'Environment id which the node shall run on (HOPRD_ENVIRONMENT)',
-    choices: supportedEnvironments().map((env) => env.id),
+    choices: supportedEnvironments(version).map((env) => env.id),
     default: defaultEnvironment()
   })
   .option('host', {
@@ -306,7 +306,7 @@ function addUnhandledPromiseRejectionHandler() {
 
   // See https://github.com/hoprnet/hoprnet/issues/3755
   process.on('unhandledRejection', (reason: any, _promise: Promise<any>) => {
-    if (reason.message && reason.message.toString) {
+    if (reason && reason.message && reason.message.toString) {
       const msgString = reason.toString()
 
       // Only silence very specific errors
@@ -314,7 +314,9 @@ function addUnhandledPromiseRejectionHandler() {
         // HOPR uses the `stream-to-it` library to convert streams from Node.js sockets
         // to async iterables. This library has shown to have issues with runtime errors,
         // mainly ECONNRESET and EPIPE
+        msgString.match(/read ETIMEDOUT/) ||
         msgString.match(/read ECONNRESET/) ||
+        msgString.match(/write ETIMEDOUT/) ||
         msgString.match(/write ECONNRESET/) ||
         msgString.match(/write EPIPE/) ||
         // Requires changes in libp2p, tbd in upstream PRs to libp2p
@@ -399,10 +401,15 @@ async function main() {
   // as if the HOPR node fails, we need to put an error message up.
   if (argv.admin) {
     adminServer = new AdminServer(logs, argv.adminHost, argv.adminPort)
-    await adminServer.setup()
+    try {
+      await adminServer.setup()
+    } catch (err) {
+      console.error(err)
+      process.exit(1)
+    }
   }
 
-  const environment = resolveEnvironment(argv.environment, argv.provider)
+  const environment = resolveEnvironment(argv.environment, version, argv.provider)
   let options = generateNodeOptions(environment)
   if (argv.dryRun) {
     console.log(JSON.stringify(options, undefined, 2))
@@ -411,7 +418,9 @@ async function main() {
 
   try {
     logs.log(`This is HOPRd version ${version}`)
-    if (on_avado) logs.log('This node appears to be running on an AVADO')
+    if (on_avado) {
+      logs.log('This node appears to be running on an AVADO/Dappnode')
+    }
 
     // 1. Find or create an identity
     const peerId = await getIdentity({
@@ -426,6 +435,8 @@ async function main() {
     logs.log('Creating HOPR Node')
     node = await createHoprNode(peerId, options, false)
     logs.logStatus('PENDING')
+
+    // Subscribe to node events
     node.on('hopr:message', logMessageToNode)
     node.on('hopr:network-health-changed', networkHealthChanged)
     node.subscribeOnConnector('hopr:connector:created', () => {
@@ -498,9 +509,8 @@ async function main() {
         }
 
         // Wait for actions to take place
-        setTimeout(1e3)
+        await setTimeout(1e3)
         await node.stop()
-        return
       }
     })
 

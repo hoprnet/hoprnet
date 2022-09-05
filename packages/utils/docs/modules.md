@@ -70,6 +70,7 @@
 - [A\_STRICLY\_LESS\_THAN\_B](modules.md#a_stricly_less_than_b)
 - [A\_STRICTLY\_GREATER\_THAN\_B](modules.md#a_strictly_greater_than_b)
 - [CARRIER\_GRADE\_NAT\_NETWORK](modules.md#carrier_grade_nat_network)
+- [DEFAULT\_BACKOFF\_PARAMETERS](modules.md#default_backoff_parameters)
 - [HASH\_LENGTH](modules.md#hash_length)
 - [INVERSE\_TICKET\_WIN\_PROB](modules.md#inverse_ticket_win_prob)
 - [LENGTH\_PREFIX\_LENGTH](modules.md#length_prefix_length)
@@ -89,6 +90,7 @@
 - [PRIVATE\_KEY\_LENGTH](modules.md#private_key_length)
 - [PRIVATE\_NETWORKS](modules.md#private_networks)
 - [PRIVATE\_V4\_CLASS\_A](modules.md#private_v4_class_a)
+- [PRIVATE\_V4\_CLASS\_AVADO](modules.md#private_v4_class_avado)
 - [PRIVATE\_V4\_CLASS\_B](modules.md#private_v4_class_b)
 - [PRIVATE\_V4\_CLASS\_C](modules.md#private_v4_class_c)
 - [PRP\_IV\_LENGTH](modules.md#prp_iv_length)
@@ -135,6 +137,8 @@
 - [generateChannelId](modules.md#generatechannelid)
 - [generateKeyShares](modules.md#generatekeyshares)
 - [getB58String](modules.md#getb58string)
+- [getBackoffRetries](modules.md#getbackoffretries)
+- [getBackoffRetryTimeout](modules.md#getbackoffretrytimeout)
 - [getHeaderLength](modules.md#getheaderlength)
 - [getLocalAddresses](modules.md#getlocaladdresses)
 - [getLocalHosts](modules.md#getlocalhosts)
@@ -179,7 +183,7 @@
 - [randomSubset](modules.md#randomsubset)
 - [recoverIteratedHash](modules.md#recoveriteratedhash)
 - [retimer](modules.md#retimer)
-- [retryWithBackoff](modules.md#retrywithbackoff)
+- [retryWithBackoffThenThrow](modules.md#retrywithbackoffthenthrow)
 - [sampleGroupElement](modules.md#samplegroupelement)
 - [serializeKeyPair](modules.md#serializekeypair)
 - [serializeToU8a](modules.md#serializetou8a)
@@ -398,7 +402,7 @@ ___
 
 #### Defined in
 
-[db/db.ts:115](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L115)
+[db/db.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L119)
 
 ___
 
@@ -442,7 +446,7 @@ ___
 
 #### Defined in
 
-[db/db.ts:110](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L110)
+[db/db.ts:114](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L114)
 
 ___
 
@@ -458,7 +462,7 @@ ___
 
 #### Defined in
 
-[db/db.ts:106](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L106)
+[db/db.ts:110](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L110)
 
 ___
 
@@ -560,7 +564,25 @@ ___
 
 #### Defined in
 
-[network/constants.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L27)
+[network/constants.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L34)
+
+___
+
+### DEFAULT\_BACKOFF\_PARAMETERS
+
+• `Const` **DEFAULT\_BACKOFF\_PARAMETERS**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `delayMultiple` | `number` |
+| `maxDelay` | `number` |
+| `minDelay` | `number` |
+
+#### Defined in
+
+[async/backoff.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/backoff.ts#L9)
 
 ___
 
@@ -600,7 +622,7 @@ ___
 
 #### Defined in
 
-[network/constants.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L48)
+[network/constants.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L55)
 
 ___
 
@@ -610,7 +632,7 @@ ___
 
 #### Defined in
 
-[network/constants.ts:62](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L62)
+[network/constants.ts:69](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L69)
 
 ___
 
@@ -744,7 +766,7 @@ ___
 
 #### Defined in
 
-[network/constants.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L34)
+[network/constants.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L41)
 
 ___
 
@@ -755,6 +777,16 @@ ___
 #### Defined in
 
 [network/constants.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L9)
+
+___
+
+### PRIVATE\_V4\_CLASS\_AVADO
+
+• `Const` **PRIVATE\_V4\_CLASS\_AVADO**: [`Network`](modules.md#network)
+
+#### Defined in
+
+[network/constants.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L22)
 
 ___
 
@@ -774,7 +806,7 @@ ___
 
 #### Defined in
 
-[network/constants.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L21)
+[network/constants.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L28)
 
 ___
 
@@ -824,7 +856,7 @@ ___
 
 #### Defined in
 
-[network/constants.ts:75](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L75)
+[network/constants.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L82)
 
 ___
 
@@ -1516,6 +1548,47 @@ Returns the b58String within a given content. Returns empty string if none is fo
 
 ___
 
+### getBackoffRetries
+
+▸ **getBackoffRetries**(`minDelay`, `maxDelay`, `delayMultiple`): `number`
+
+Returns the maximal number of retries after which the `retryWithBackoff` throws
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `minDelay` | `number` | initial delay |
+| `maxDelay` | `number` | maximal delay to retry |
+| `delayMultiple` | `number` | factor by which last delay got multiplied |
+
+#### Returns
+
+`number`
+
+___
+
+### getBackoffRetryTimeout
+
+▸ **getBackoffRetryTimeout**(`minDelay`, `maxDelay`, `delayMultiple`): `number`
+
+Returns the *total* amount of time between calling `retryWithBackThenThrow` and
+once it throws because it ran out of retries.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `minDelay` | `number` | initial delay |
+| `maxDelay` | `number` | maximal delay to retry |
+| `delayMultiple` | `number` | factor by which last delay got multiplied |
+
+#### Returns
+
+`number`
+
+___
+
 ### getHeaderLength
 
 ▸ **getHeaderLength**(`maxHops`, `additionalDataRelayerLength`, `additionalDataLastHopLength`): `number`
@@ -2007,7 +2080,7 @@ ___
 
 ### nAtATime
 
-▸ **nAtATime**<`ArgType`, `Return`, `Args`\>(`fn`, `args`, `concurrency`): `Promise`<(`Return` \| `Error`)[]\>
+▸ **nAtATime**<`ArgType`, `Return`, `Args`\>(`fn`, `args`, `concurrency`, `done?`): `Promise`<(`Return` \| `Error`)[]\>
 
 Runs the same worker function with multiple arguments but does not run more
 than a given number of workers concurrently.
@@ -2036,6 +2109,7 @@ const result = await nAtaTime(setTimeout, [[300, 'one'], [200, 'two'], [100, 'th
 | `fn` | (...`args`: `Args`) => `Promise`<`Return`\> | worker function |
 | `args` | `Args`[] | arguments passed to worker function |
 | `concurrency` | `number` | number of parallel jobs |
+| `done?` | (`results`: (`Error` \| `Return`)[]) => `boolean` | - |
 
 #### Returns
 
@@ -2458,11 +2532,14 @@ Repeatedly apply a function after a timeout
 
 ___
 
-### retryWithBackoff
+### retryWithBackoffThenThrow
 
-▸ **retryWithBackoff**<`T`\>(`fn`, `options?`): `Promise`<`T`\>
+▸ **retryWithBackoffThenThrow**<`T`\>(`fn`, `options?`): `Promise`<`T`\>
 
-A general use backoff that will reject once MAX_DELAY is reached.
+A general-use exponential backoff that will throw once
+iteratively increased timeout reaches MAX_DELAY.
+
+**`dev`** this function THROWS if retries were not successful
 
 #### Type parameters
 
@@ -2472,13 +2549,13 @@ A general use backoff that will reject once MAX_DELAY is reached.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `fn` | () => `Promise`<`T`\> | asynchronous function to run on every tick |
-| `options` | `Object` | - |
-| `options.delayMultiple?` | `number` | multiplier to apply to increase running delay |
-| `options.maxDelay?` | `number` | maximum delay, we reject once we reach this |
-| `options.minDelay?` | `number` | minimum delay, we start with this |
+| Name | Type | Default value | Description |
+| :------ | :------ | :------ | :------ |
+| `fn` | () => `Promise`<`T`\> | `undefined` | asynchronous function to run on every tick |
+| `options` | `Object` | `DEFAULT_BACKOFF_PARAMETERS` | - |
+| `options.delayMultiple?` | `number` | `undefined` | multiplier to apply to increase running delay |
+| `options.maxDelay?` | `number` | `undefined` | maximum delay, we reject once we reach this |
+| `options.minDelay?` | `number` | `undefined` | minimum delay, we start with this |
 
 #### Returns
 

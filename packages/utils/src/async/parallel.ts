@@ -37,17 +37,19 @@ async function runTask<ArgType, Return, Args extends Array<ArgType>>(
 export function nAtATime<ArgType, Return, Args extends Array<ArgType>>(
   fn: (...args: Args) => Promise<Return>,
   args: Args[],
-  concurrency: number
+  concurrency: number,
+  done?: (results: (Return | Error | undefined)[]) => boolean
 ): Promise<(Return | Error)[]> {
   if (concurrency <= 0 || args.length == 0) {
     return Promise.resolve([])
   }
 
   return new Promise<(Return | Error)[]>((resolve) => {
-    const results = new Array<Return | Error>(args.length)
+    const results = new Array<Return | Error | undefined>(args.length)
 
     let currentIndex = 0
     let activeWorkers = 0
+    let ending = false
 
     const update = (resultIndex: number, result: Return | Error) => {
       // console.log(
@@ -56,7 +58,11 @@ export function nAtATime<ArgType, Return, Args extends Array<ArgType>>(
       // )
       results[resultIndex] = result
 
-      if (currentIndex < args.length) {
+      if (done != undefined) {
+        ending = ending || done(results)
+      }
+
+      if (!ending && currentIndex < args.length) {
         runTask(fn, args[currentIndex], currentIndex, update)
         currentIndex++
       } else {

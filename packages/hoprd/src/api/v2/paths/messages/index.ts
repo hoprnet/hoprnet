@@ -16,8 +16,8 @@ const POST: Operation = [
     }
 
     try {
-      await req.context.node.sendMessage(message, recipient, path)
-      return res.status(204).send()
+      let ackChallenge = await req.context.node.sendMessage(message, recipient, path)
+      return res.status(202).json(ackChallenge)
     } catch (err) {
       return res
         .status(422)
@@ -68,8 +68,17 @@ POST.apiDoc = {
     }
   },
   responses: {
-    '204': {
-      description: 'The message was sent successfully. NOTE: This does not imply successful delivery.'
+    '202': {
+      description: 'The message was sent successfully. NOTE: This does not imply successful delivery.',
+      content: {
+        'application/json': {
+          schema: {
+            type: 'string',
+            description: 'Challenge token used to poll for the acknowledgment of the sent message by the first hop.',
+            example: 'e61bbdda74873540c7244fe69c39f54e5270bd46709c1dcb74c8e3afce7b9e616d'
+          }
+        }
+      }
     },
     '422': {
       description: 'Unknown failure.',

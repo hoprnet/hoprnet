@@ -161,7 +161,7 @@ async function main(opts: StakeOpts, hre: HardhatRuntimeEnvironment, _runSuper: 
       process.exit(1)
     }
   } else {
-    console.error(`Unsupported staking type ${opts.type}`)
+    console.error(`Unsupported staking type ${JSON.stringify(opts)}`)
     process.exit(1)
   }
 }

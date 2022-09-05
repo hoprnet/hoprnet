@@ -205,7 +205,7 @@
     "/node/stream/websocket": {
       "parameters": [],
       "get": {
-        "description": "This is a websocket endpoint which streams legacy hopr-admin data excluding messages. Authentication (if enabled) is done via either passing an `apiToken` parameter in the url or cookie `X-Auth-Token`. Connect to the endpoint by using a WS client. No preview available. Example: `ws://127.0.0.1:3001/api/v2/node/stream/websocket/?apiToken=myApiToken`",
+        "description": "This is a websocket endpoint which streams legacy hopr-admin data. Authentication (if enabled) is done via either passing an `apiToken` parameter in the url or cookie `X-Auth-Token`. Connect to the endpoint by using a WS client. No preview available. Example: `ws://127.0.0.1:3001/api/v2/node/stream/websocket/?apiToken=myApiToken`",
         "tags": ["Node"],
         "operationId": "nodeStreamWebsocket",
         "deprecated": true,
@@ -527,6 +527,55 @@
         }
       }
     },
+    "/node/entryNodes": {
+      "parameters": [],
+      "get": {
+        "description": "List all known entry nodes and their multiaddrs and their eligibility state",
+        "tags": ["Node"],
+        "operationId": "nodeGetEntryNodes",
+        "responses": {
+          "200": {
+            "description": "Entry node information fetched successfuly.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "multiaddrs": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Known Multiaddrs of the node"
+                      },
+                      "isEligible": {
+                        "type": "boolean",
+                        "description": "true if peer is allowed to access network, otherwise false"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unknown failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
+                  }
+                },
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+              }
+            }
+          }
+        }
+      }
+    },
     "/messages/websocket": {
       "parameters": [],
       "get": {
@@ -638,7 +687,18 @@
           }
         },
         "responses": {
-          "204": { "description": "The message was sent successfully. NOTE: This does not imply successful delivery." },
+          "202": {
+            "description": "The message was sent successfully. NOTE: This does not imply successful delivery.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "description": "Challenge token used to poll for the acknowledgment of the sent message by the first hop.",
+                  "example": "e61bbdda74873540c7244fe69c39f54e5270bd46709c1dcb74c8e3afce7b9e616d"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Unknown failure.",
             "content": {

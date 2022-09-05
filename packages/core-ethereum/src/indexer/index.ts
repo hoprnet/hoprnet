@@ -17,7 +17,7 @@ import {
   PublicKey,
   Snapshot,
   debug,
-  retryWithBackoff,
+  retryWithBackoffThenThrow,
   Balance,
   ordered,
   u8aToHex,
@@ -39,7 +39,7 @@ import {
   IndexerStatus
 } from './types.js'
 import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils.js'
-import { BigNumber, Contract, errors } from 'ethers'
+import { BigNumber, type Contract, errors } from 'ethers'
 import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants.js'
 import type { TypedEvent, TypedEventFilter } from '@hoprnet/hopr-ethereum'
 
@@ -48,7 +48,7 @@ const verbose = debug('hopr-core-ethereum:verbose:indexer')
 
 const getSyncPercentage = (start: number, current: number, end: number) =>
   (((current - start) / (end - start)) * 100).toFixed(2)
-const backoffOption: Parameters<typeof retryWithBackoff>[1] = { maxDelay: MAX_TRANSACTION_BACKOFF }
+const backoffOption: Parameters<typeof retryWithBackoffThenThrow>[1] = { maxDelay: MAX_TRANSACTION_BACKOFF }
 
 /**
  * Indexes HoprChannels smart contract and stores to the DB,
@@ -233,7 +233,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     const queries: { contract: Contract; filter: TypedEventFilter<any> }[] = [
       // HoprChannels
       {
-        contract: this.chain.getChannels(),
+        contract: this.chain.getChannels() as unknown as Contract,
         filter: {
           topics: [
             [
@@ -247,7 +247,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       },
       // HoprNetworkRegistry
       {
-        contract: this.chain.getNetworkRegistry(),
+        contract: this.chain.getNetworkRegistry() as unknown as Contract,
         filter: {
           topics: [
             [
@@ -270,7 +270,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     // handle errors produced by internal Ethers.js provider calls
     if (fetchTokenTransactions) {
       queries.push({
-        contract: this.chain.getToken(),
+        contract: this.chain.getToken() as unknown as Contract,
         filter: {
           topics: [
             // Token transfer *from* us
@@ -280,7 +280,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         }
       })
       queries.push({
-        contract: this.chain.getToken(),
+        contract: this.chain.getToken() as unknown as Contract,
         filter: {
           topics: [
             // Token transfer *towards* us
@@ -395,7 +395,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       ) {
         log(chalk.blue('code error falls here', this.chain.getAllQueuingTransactionRequests().length))
         // allow the indexer to restart even there is no transaction in queue
-        await retryWithBackoff(
+        await retryWithBackoffThenThrow(
           () =>
             Promise.allSettled([
               ...this.chain.getAllQueuingTransactionRequests().map((request) => {
@@ -412,7 +412,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
           backoffOption
         )
       } else {
-        await retryWithBackoff(() => this.restart(), backoffOption)
+        await retryWithBackoffThenThrow(() => this.restart(), backoffOption)
       }
     } catch (err) {
       log(`error: exception while processing another provider error ${error}`, err)

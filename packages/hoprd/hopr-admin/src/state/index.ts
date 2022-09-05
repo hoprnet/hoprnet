@@ -31,7 +31,6 @@ const useAppState = () => {
 
   // initialize websocket connections
   const streamWS = useWS(state.config, '/api/v2/node/stream/websocket')
-  const messagesWS = useWS(state.config, '/api/v2/messages/websocket')
 
   /**
    * Updates the app's connectivity config.
@@ -59,15 +58,13 @@ const useAppState = () => {
    * Takes into account all WS connections.
    */
   const status = useMemo<'DISCONNECTED' | 'CONNECTED'>(() => {
-    if (streamWS.state.status === 'CONNECTED' && messagesWS.state.status === 'CONNECTED') return 'CONNECTED'
-    return 'DISCONNECTED'
-  }, [streamWS.state.status, messagesWS.state.status])
+    return streamWS.state.status
+  }, [streamWS.state.status])
 
   return {
     state,
     api,
     streamWS,
-    messagesWS,
     updateConfig,
     updateAliases,
     status

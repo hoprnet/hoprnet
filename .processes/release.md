@@ -39,7 +39,7 @@ The purpose of this process is to streamline the releases of HOPR packages.
 
 - Internal releases are more frequent and their goal is to test new features and bug fixes.
 - There should be no public involvement unless the [internal release](#internal-release) is promoted to a [public release](#public-release).
-- All releases start as an [internal release](#internal-release) release and may be promoted to a [public release](#public-release), see [release promotion](#release-promotion).
+- All releases start as an [internal release](#internal-release) and may be promoted to a [public release](#public-release), see [release promotion](#release-promotion).
 - When an internal release is created, one of the [representatives](./development.md#representatives) is assigned to oversee the release cycle, this includes:
   - notifies the HOPR team that the [internal release](#internal-release) has been created in element channel `releases`
   - [creating release](#release-cycle)
@@ -49,7 +49,7 @@ The purpose of this process is to streamline the releases of HOPR packages.
 ### Public release
 
 - Public releases are less frequent and their goal is to showcase new features and bug fixes.
-- A [public release](#public-release) release occurs when an [internal release](#internal-release) release is promoted to a [public release](#public-release), see [release promotion](#release-promotion).
+- A [public release](#public-release) occurs when an [internal release](#internal-release) is promoted to a [public release](#public-release), see [release promotion](#release-promotion).
 
 ## When to release
 
@@ -83,7 +83,7 @@ For every phase completed, release owner must update the release's PR with the c
 
 ### HOPR team testing
 
-- Occurs after [Tech team testing](#tech-team-testing) is succesful.
+- Occurs after [Tech team testing](#tech-team-testing) is successful.
 - With the help of a [changelog](#release-cycle), test HOPRd.
 
 ### Ambassador testing
@@ -91,16 +91,16 @@ For every phase completed, release owner must update the release's PR with the c
 A third and final phase of testing is to include ambassadors.
 This is optional in the possibility we want to gather more data points and/or a specific feature requires larger network topology.
 
-- May occur after [HOPR team testing](#hopr-team-testing) is succesful.
+- May occur after [HOPR team testing](#hopr-team-testing) is successful.
 - Launch and fund HOPRd, then follow release instructions.
 
 ## Release promotion
 
 - All releases start by being internal releases.
-- An [internal release](#internal-release) may be promoted to a [public release](#public-release) when all [testing phases](#testing-phases) are succesful.
+- An [internal release](#internal-release) may be promoted to a [public release](#public-release) when all [testing phases](#testing-phases) are successful.
 - Before promoting, release owner ensures that comm team actually needs this to be public.
 
-An [internal release](#internal-release) is promoted to a [public release](#public-release) by tagging it's binaries with the public facing release name. See [Deployment checklist](#deployment-checklist).
+An [internal release](#internal-release) is promoted to a [public release](#public-release) by tagging its binaries with the public facing release name. See [Deployment checklist](#deployment-checklist).
 
 Once promoted, a release owner notifies the HOPR team that the [internal release](#internal-release) has been promoted to a [public release](#public-release):
 
@@ -109,7 +109,7 @@ Once promoted, a release owner notifies the HOPR team that the [internal release
 
 ## On a new chain
 
-Every chain has it's own unique characteristics. While it may be EVM compatible, various other factors can make the chain incompatible with HOPR.
+Every chain has its own unique characteristics. While it may be EVM compatible, various other factors can make the chain incompatible with HOPR.
 When an epic is prioritized to switch the default `HOPRd` chain to a new one, [this issue](../.github/ISSUE_TEMPLATE/new-chain-epic.md) must be added to the sprint as part of the new chain epic.
 
 This requirement will become simpler once [#2140](https://github.com/hoprnet/hoprnet/issues/2140) is completed.
@@ -146,10 +146,13 @@ particular branch to deploy on every change.
 
 ```
 
-1. Create a release tracking issue on Github. Use previous issues as templates: https://github.com/hoprnet/hoprnet/issues/3044
+1. Create a release tracking issue on GitHub. Use previous issues as templates: https://github.com/hoprnet/hoprnet/issues/3044
 2. (on `master`) As a preparation for a release there should be a respective entry in `packages/hoprd/releases.json` and if needed in `packages/core/protocol-config.json`. If the entries are missing, create and merge them before starting the actual release process. This step can be done way in advance to plan environments and releases, too.
+
+   1. In `packages/core/protocol-config.json` remember to _create_ or _update_ an environment's `version_range` with the upcoming version of the next release.
+
 3. (on `master`) Now create the release branch locally. E.g. doing `git checkout -b release/${RELEASE_NAME}`.
-4. (on `release/${RELEASE_NAME}`) Before pushing the branch to Github, some release-specific changes should be applied to ensure the resulting CD artifacts actually are proper release artifacts.
+4. (on `release/${RELEASE_NAME}`) Before pushing the branch to GitHub, some release-specific changes should be applied to ensure the resulting CD artifacts actually are proper release artifacts.
 
    1. Change all occurences of the last release name to the new release name within documentation files and Docker files. Don't touch the `protocol-config.json` and `releases.json` files in this step. Changes should be committed locally.
    2. Update `CHANGELOG.md` with the new release's information. Changes should be committed locally.
@@ -171,7 +174,7 @@ particular branch to deploy on every change.
    ```sh
    gcloud compute instance-groups managed delete ${INSTANCE_GROUP_NAME} --region=$REGION
    ```
-6. (on `release/${RELEASE_NAME}`) Now everything is ready and can be pushed to Github: `git push origin`. Wait until the deployment of the basic cluster has completed by the CD.
+6. (on `release/${RELEASE_NAME}`) Now everything is ready and can be pushed to GitHub: `git push origin`. Wait until the deployment of the basic cluster has completed by the CD.
 7. Create a release tracking PR which can be used to follow CD builds. However, the PR should never be merged! As a reference take a look at https://github.com/hoprnet/hoprnet/pull/3048
 8. (on `release/${RELEASE_NAME}`) Start a topology cluster using the [script](./release.md#topology-deployment-script) mentioned at the end of this document.
 9. Create a release testnet page in the wiki at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
@@ -180,10 +183,10 @@ particular branch to deploy on every change.
     On the `#testing` channel, members are expected to run their own nodes (either AVADO or via their workstation) to participate in the release.
 11. Patches to the release are created via `hotfix/RELEASE_NAME/**` branches.
     Each of these merges will trigger a new release version, and re-build our infrastructure
-    for that version. Upon successfullly testing a release
+    for that version. Upon successfully testing a release
 12. Once the first release version has been built and is running, the release branch should be merged-back into `master` once to trigger version upgrades on `master`. See the next section for details.
 
-Once the release testing has concluded, or if any signifant amount of patches were applied to the release branch, the release branch should be merged back into `master` again.
+Once the release testing has concluded, or if any significant amount of patches has been applied to the release branch, the release branch should be merged back into `master` again.
 
 #### Release merge-back
 
@@ -195,7 +198,8 @@ Once the release testing has concluded, or if any signifant amount of patches we
    2. Revert any chain specific changes.
    3. Revert changes made to Avado configuration files as part of the initial release creation.
 3. merge the `merge-back-release-${RELEASE_NAME}` PR back to `master` (ask someone to review first)
-4. Release must be merged-back every week (Friday) to minimise conflicts whenever we want to merge a hotfix back to master.
+4. re-deploy `api.hoprnet.org` Vercel to pickup release specific changes from the `protocol-config.json`
+5. Release must be merged-back every week (Friday) to minimise conflicts whenever we want to merge a hotfix back to master.
 
 ### Actions
 

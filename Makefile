@@ -259,6 +259,9 @@ register-node-when-dummy-proxy: ensure-environment-is-set
 ifeq ($(endpoint),)
 	echo "parameter <endpoint> is default to localhost:3001" >&2
 endif
+ifeq ($(api_token),)
+	echo "parameter <api_token> missing" >&2 && exit 1
+endif
 ifeq ($(account),)
 	echo "parameter <account> missing" >&2 && exit 1
 endif
@@ -271,7 +274,7 @@ endif
    --network $(network) \
    --task add \
    --native-addresses "$(account)" \
-   --peer-ids "$(shell ./scripts/get-hopr-address.sh "$(endpoint)")" \
+   --peer-ids "$(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")" \
    --privatekey "$(CI_DEPLOYER_PRIVKEY)"
 
 .PHONY: register-node-with-nft
@@ -279,6 +282,9 @@ endif
 register-node-with-nft: ensure-environment-is-set
 ifeq ($(endpoint),)
 	echo "parameter <endpoint> is default to localhost:3001" >&2
+endif
+ifeq ($(api_token),)
+	echo "parameter <api_token> missing" >&2 && exit 1
 endif
 ifeq ($(account),)
 	echo "parameter <account> missing" >&2 && exit 1
@@ -294,14 +300,11 @@ ifeq ($(origin DEV_BANK_PRIVKEY),undefined)
 endif
 	PRIVATE_KEY=${DEV_BANK_PRIVKEY} make request-devnft recipient=${account} nftrank=${nftrank}
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-devnft nftrank=${nftrank}
-	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_ids=$(shell ./scripts/get-hopr-address.sh "$(endpoint)")
+	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_ids=$(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")
 
 .PHONY: register-node-with-stake
 # node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'
 register-node-with-stake: ensure-environment-is-set
-ifeq ($(endpoint),)
-	echo "parameter <endpoint> is default to localhost:3001" >&2
-endif
 ifeq ($(account),)
 	echo "parameter <account> missing" >&2 && exit 1
 endif
@@ -313,7 +316,7 @@ ifeq ($(origin DEV_BANK_PRIVKEY),undefined)
 endif
 	PRIVATE_KEY=${DEV_BANK_PRIVKEY} make request-funds recipient=${account}
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-funds
-	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_id=$(shell ./scripts/get-hopr-address.sh "$(endpoint)")
+	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_id=$(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")
 
 ensure-environment-is-set:
 ifeq ($(environment),)

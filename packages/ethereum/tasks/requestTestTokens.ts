@@ -177,7 +177,7 @@ async function main(opts: RequestTestTokensOpts, hre: HardhatRuntimeEnvironment,
       process.exit(1)
     }
   } else {
-    console.error(`Unsupported requesting type ${opts.type}`)
+    console.error(`Unsupported requesting type ${JSON.stringify(opts)}`)
     process.exit(1)
   }
 }

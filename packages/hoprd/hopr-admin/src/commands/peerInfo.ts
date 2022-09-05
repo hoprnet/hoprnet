@@ -6,7 +6,7 @@ export default class PeerInfo extends Command {
   constructor(api: API, cache: CacheFunctions) {
     super(
       {
-        default: [[['hoprAddressOrAlias', 'peer', false]], 'gets information about peer']
+        default: [[['hoprAddressOrAlias']], 'gets information about peer']
       },
       api,
       cache,
@@ -28,7 +28,7 @@ export default class PeerInfo extends Command {
 
     const peerIdStr = peerId.toString()
     const peerInfoRes = await this.api.getPeerInfo(peerIdStr)
-    if (!peerInfoRes.ok) return log(this.invalidResponse("get peer's information"))
+    if (!peerInfoRes.ok) return log(this.failedCommand("get peer's information"))
     const { announced, observed } = await peerInfoRes.json()
 
     return log(

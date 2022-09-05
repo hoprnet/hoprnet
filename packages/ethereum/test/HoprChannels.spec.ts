@@ -1,4 +1,4 @@
-import type { Wallet } from '@ethersproject/wallet'
+import { Wallet } from '@ethersproject/wallet'
 import { deployments, ethers } from 'hardhat'
 import { expect } from 'chai'
 import BN from 'bn.js'
@@ -190,9 +190,11 @@ describe('HoprChannels', async function () {
       const [deployer] = await ethers.getSigners()
 
       const deployerPubKey = await recoverPublicKeyFromSigner(deployer)
-      const accountA = new ethers.Wallet(ACCOUNT_A.privateKey).connect(ethers.provider)
+      // @TODO globally bump ethers.js
+      const accountA = new Wallet(ACCOUNT_A.privateKey).connect(ethers.provider as any)
       const accountAPubKey = PublicKey.fromPrivKeyString(accountA.privateKey)
-      const accountB = new ethers.Wallet(ACCOUNT_B.privateKey).connect(ethers.provider)
+      // @TODO globally bump ethers.js
+      const accountB = new Wallet(ACCOUNT_B.privateKey).connect(ethers.provider as any)
       const accountBPubKey = PublicKey.fromPrivKeyString(accountB.privateKey)
 
       // run migrations
@@ -275,9 +277,15 @@ describe('HoprChannels', async function () {
     it('should announce user', async function () {
       const { channels, deployer, deployerPubKey } = await useFixtures()
 
+      const deployerAddress = await deployer.getAddress();
+      const publicKey = deployerPubKey.toUncompressedPubKeyHex()
       await expect(channels.connect(deployer).announce(deployerPubKey.toUncompressedPubKeyHex(), MULTI_ADDR))
         .to.emit(channels, 'Announcement')
-        .withArgs(await deployer.getAddress(), deployerPubKey.toUncompressedPubKeyHex(), MULTI_ADDR)
+        .withArgs({
+          deployerAddress,
+          publicKey,
+          MULTI_ADDR
+        })
     })
 
     it('should fail to announce user', async function () {
@@ -757,7 +765,7 @@ describe('HoprChannels', async function () {
 
     it('should fail to initialize channel closure when channel is not open', async function () {
       await expect(channels.connect(fixtures.accountA).initiateChannelClosure(ACCOUNT_B.address)).to.be.revertedWith(
-        'channel must be open'
+        'channel must be open or waiting for commitment'
       )
     })
 
@@ -825,7 +833,7 @@ describe('HoprChannels', async function () {
     it('should fail to redeem ticket when channel in closed', async function () {
       await expect(
         channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(fixtures.TICKET_AB_WIN.ticket))
-      ).to.be.revertedWith('channel must be open or pending to close')
+      ).to.be.revertedWith('spending channel must be open or pending to close')
     })
 
     it('should allow a fund to reopen channel', async function () {

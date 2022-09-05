@@ -8,8 +8,8 @@ export default class Channels extends Command {
     super(
       {
         default: [[], 'shows open channels'],
-        incoming: [[['constant', 'show incoming only', false]], 'show incoming channels'],
-        outgoing: [[['constant', 'show outgoing only', false]], 'show outgoing channels']
+        incoming: [[['direction']], 'show incoming channels'],
+        outgoing: [[['direction']], 'show outgoing channels']
       },
       api,
       cache
@@ -28,9 +28,9 @@ export default class Channels extends Command {
    * Creates the log output for a channel
    * @returns a channel log
    */
-  private getChannelLog(channel) {
+  private getChannelLog(prefix, channel) {
     return toPaddedString([
-      ['Outgoing Channel:', channel.channelId],
+      [prefix + ' Channel:', channel.channelId],
       ['To:', channel.peerId],
       ['Status:', channel.status],
       ['Balance:', ethersUtils.formatEther(channel.balance)]
@@ -49,9 +49,17 @@ export default class Channels extends Command {
     const showOutgoing = param === 'outgoing'
 
     log('fetching channels...')
-    const channelsRes = await this.api.getChannels()
-    if (!channelsRes.ok) return log(this.invalidResponse('get channels'))
-    const channels = await channelsRes.json()
+    const response = await this.api.getChannels()
+
+    if (!response.ok) {
+      return log(
+        await this.failedApiCall(response, 'fetch channels', {
+          422: (v) => v.error
+        })
+      )
+    }
+
+    const channels = await response.json()
 
     if (!showOutgoing) {
       const incomingChannels = channels.incoming.filter((channel) => {
@@ -62,7 +70,7 @@ export default class Channels extends Command {
         log(`\nNo channels opened to you.`)
       } else {
         for (const channel of incomingChannels) {
-          log(this.getChannelLog(channel))
+          log(this.getChannelLog('Incoming', channel))
         }
       }
     }
@@ -76,7 +84,7 @@ export default class Channels extends Command {
         log(`\nNo channels opened by you.`)
       } else {
         for (const channel of channelsOutgoing) {
-          log(this.getChannelLog(channel))
+          log(this.getChannelLog('Outgoing', channel))
         }
       }
     }

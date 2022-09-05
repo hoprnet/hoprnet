@@ -1,4 +1,5 @@
 import type Hopr from '@hoprnet/hopr-core'
+import type { Duplex } from 'stream'
 import http from 'http'
 import fs from 'fs'
 import path from 'path'
@@ -32,53 +33,65 @@ export class AdminServer {
 
   constructor(private logs: LogStream, private host: string, private port: number) {}
 
-  async setup() {
-    let adminPath: string
-    for (const adminRelPath of ['../hopr-admin', './hopr-admin']) {
-      const adminPathInt = new URL(adminRelPath, import.meta.url).pathname
-      const nextPath = path.resolve(adminPathInt, '.next')
-      if (!fs.existsSync(nextPath)) {
-        continue
+  setup(): Promise<void> {
+    return new Promise(async (resolve, reject) => {
+      let adminPath: string
+      for (const adminRelPath of ['../hopr-admin', './hopr-admin']) {
+        const adminPathInt = new URL(adminRelPath, import.meta.url).pathname
+        const nextPath = path.resolve(adminPathInt, '.next')
+        if (!fs.existsSync(nextPath)) {
+          continue
+        }
+        adminPath = adminPathInt
+        break
       }
-      adminPath = adminPathInt
-      break
-    }
 
-    if (!adminPath) {
-      console.log('Failed to start Admin interface: could not find NextJS app')
-      process.exit(1)
-    }
-
-    debugLog('using', adminPath)
-
-    const nextConfig = {
-      dev: NODE_ENV === 'development',
-      dir: adminPath
-    } as any
-
-    if (NODE_ENV === 'development') {
-      nextConfig.conf = {
-        distDir: `build/${this.port}`
+      if (!adminPath) {
+        console.log('Failed to start Admin interface')
+        return reject(Error(`could not find NextJS app`))
       }
-    }
 
-    this.app = next(nextConfig)
-    const handle = this.app.getRequestHandler()
-    await this.app.prepare()
+      debugLog('using', adminPath)
 
-    this.server = http.createServer((req, res) => {
-      const parsedUrl = parse(req.url || '', true)
-      handle(req, res, parsedUrl)
+      const nextConfig = {
+        dev: NODE_ENV === 'development',
+        dir: adminPath
+      } as any
+
+      if (NODE_ENV === 'development') {
+        nextConfig.conf = {
+          distDir: `build/${this.port}`
+        }
+      }
+
+      this.app = next(nextConfig)
+      const handle = this.app.getRequestHandler()
+      await this.app.prepare()
+
+      this.server = http.createServer((req, res) => {
+        const parsedUrl = parse(req.url || '', true)
+        handle(req, res, parsedUrl)
+      })
+
+      this.server.once('error', (err: any) => {
+        console.log('Failed to start Admin interface')
+        reject(err)
+      })
+
+      // Handles error resulting from broken client connections.
+      // see https://nodejs.org/dist/latest-v16.x/docs/api/http.html#event-clienterror
+      this.server.on('clientError', (err: Error, socket: Duplex) => {
+        if ((err as any).code === 'ECONNRESET' || !socket.writable) {
+          return
+        }
+
+        // End the socket
+        socket.end('HTTP/1.1 400 Bad Request\r\n\r\n')
+      })
+
+      this.server.listen(this.port, this.host, resolve)
+      this.logs.log('Admin server listening on port ' + this.port)
     })
-
-    this.server.once('error', (err: any) => {
-      console.log('Failed to start Admin interface')
-      console.log(err)
-      process.exit(1)
-    })
-
-    this.server.listen(this.port, this.host)
-    this.logs.log('Admin server listening on port ' + this.port)
   }
 
   registerNode(node: Hopr) {
@@ -114,7 +127,9 @@ export class AdminServer {
     startConnectionReports(this.node, this.logs)
     startResourceUsageLogger(debugLog)
 
-    process.env.NODE_ENV == 'production' && showDisclaimer(this.logs)
+    if (process.env.NODE_ENV === 'production') {
+      showDisclaimer(this.logs)
+    }
   }
 
   public onConnection(socket: WebSocket) {
