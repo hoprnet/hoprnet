@@ -46,7 +46,7 @@
     "@multiformats/multiaddr": "10.3.3",
     "bn.js": "5.2.0",
     "body-parser": "1.19.2",
-    "check-password-strength": "2.0.4",
+    "check-password-strength": "2.0.7",
     "cookie": "0.4.2",
     "cors": "2.8.5",
     "debug": "4.3.4",
