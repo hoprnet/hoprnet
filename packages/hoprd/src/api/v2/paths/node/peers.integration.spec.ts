@@ -13,6 +13,7 @@ import {
 import { STATUS_CODES } from '../../utils.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type Hopr from '@hoprnet/hopr-core'
+import { NetworkPeersOrigin } from '@hoprnet/hopr-core'
 
 const ALICE_ENTRY = {
   id: ALICE_PEER_ID,
@@ -21,7 +22,7 @@ const ALICE_ENTRY = {
   lastSeen: 1646410980793,
   backoff: 0,
   quality: 1,
-  origin: 'unit test'
+  origin: NetworkPeersOrigin.TESTING
 }
 const ALICE_PEER_INFO = {
   peerId: ALICE_PEER_ID.toString(),
@@ -43,7 +44,7 @@ const BOB_ENTRY = {
   lastSeen: 1646410680793,
   backoff: 0,
   quality: 0.2,
-  origin: 'unit test'
+  origin: NetworkPeersOrigin.TESTING
 }
 const BOB_PEER_INFO = {
   peerId: BOB_PEER_ID.toString(),
@@ -65,7 +66,7 @@ const CHARLIE_ENTRY = {
   lastSeen: 1646410980993,
   backoff: 0,
   quality: 0.8,
-  origin: 'unit test'
+  origin: NetworkPeersOrigin.TESTING
 }
 const CHARLIE_PEER_INFO = {
   peerId: CHARLIE_PEER_ID.toString(),

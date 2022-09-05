@@ -60,7 +60,7 @@ Implementors should bear in mind:
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:88](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L88)
+[packages/core/src/channel-strategy.ts:89](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L89)
 
 ___
 
@@ -78,7 +78,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:83](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L83)
+[packages/core/src/channel-strategy.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L84)
 
 ## Methods
 

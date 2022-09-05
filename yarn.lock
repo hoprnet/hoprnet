@@ -3643,6 +3643,7 @@ __metadata:
     "@types/chai": 4.3.3
     "@types/chai-as-promised": 7.1.5
     "@types/mocha": 9.1.1
+    "@types/semver": ^7
     "@types/yargs": 17.0.10
     abort-controller: 3.0.0
     bn.js: 5.2.0
@@ -3659,6 +3660,7 @@ __metadata:
     mocha: 9.2.2
     nyc: 15.1.0
     secp256k1: 4.0.3
+    semver: 7.3.7
     sinon: 12.0.1
     typedoc: 0.23.2
     typedoc-plugin-markdown: 3.13.1
@@ -6495,6 +6497,13 @@ __metadata:
   version: 3.0.1
   resolution: "@types/seedrandom@npm:3.0.1"
   checksum: d9755452f224a4f5072a1d8738da6c9de3039fc59a2a449b1f658e51087be7b48ada49bcabc8b0f16633c095f55598c32fcd072c448858422a2f6a0566569e4c
+  languageName: node
+  linkType: hard
+
+"@types/semver@npm:^7":
+  version: 7.3.12
+  resolution: "@types/semver@npm:7.3.12"
+  checksum: 35536b2fc5602904f21cae681f6c9498e177dab3f54ae37c92f9a1b7e43c35f18bcd81e1c98c1cf0d33ee046bb06c771e9928c1c00a401d56a03f56549252a15
   languageName: node
   linkType: hard
 
