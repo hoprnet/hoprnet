@@ -133,7 +133,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/environment.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L48)
+[packages/core/src/environment.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L54)
 
 ___
 
