@@ -59,7 +59,7 @@ export default class API {
 
   // account API
   public async withdraw(amount: string, currency: string, recipient: string): ExpandedJsonResponse {
-    return this.postReq('/api/v2/account/withdraw', { amount, currency, recipient })
+    return this.postReq('/api/v2/account/withdraw', { amount, currency: currency.toUpperCase(), recipient })
   }
   public async getBalances(): ExpandedJsonResponse<Balances> {
     return this.getReq('/api/v2/account/balances')
@@ -88,7 +88,7 @@ export default class API {
   }
   public async closeChannel(
     peerId: string,
-    direction: 'incoming' | 'outgoing'
+    direction: ChannelDirection
   ): ExpandedJsonResponse<{
     receipt: string
     channelStatus: string
@@ -114,7 +114,7 @@ export default class API {
   public async signMessage(msg: string): ExpandedJsonResponse {
     return this.postReq('/api/v2/messages/sign', { message: msg })
   }
-  public async sendMessage(body: string, recipient: string, path: string[]): ExpandedJsonResponse {
+  public async sendMessage(body: string, recipient: string, path: string[]): ExpandedTextResponse {
     return this.postReq('/api/v2/messages', { body: body, recipient: recipient, path: path })
   }
 
@@ -209,3 +209,5 @@ export type Addresses = {
   hopr: string
   native: string
 }
+
+export type ChannelDirection = 'incoming' | 'outgoing'

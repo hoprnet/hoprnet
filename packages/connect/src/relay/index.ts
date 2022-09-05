@@ -38,6 +38,18 @@ type ConnResult = ProtocolStream & {
   conn: Connection
 }
 
+function printUsedRelays(peers: PeerId[], prefix = '') {
+  let out = `${prefix}\n`
+
+  for (const peer of peers) {
+    if (out.length > prefix.length + 1) {
+      out += `  - ${peer.toString()}`
+    }
+  }
+
+  return out
+}
+
 /**
  * API interface for relayed connections
  */
@@ -165,7 +177,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
   }
 
   public setUsedRelays(peers: PeerId[]) {
-    log(`set used relays`, peers)
+    log(printUsedRelays(peers, `set used relays:`))
     this.usedRelays = peers
   }
 

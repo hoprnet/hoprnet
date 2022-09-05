@@ -1,14 +1,17 @@
 import type API from '../utils/api'
 import sinon from 'sinon'
-import { shouldBehaveLikeACommand } from './behaviours.spec'
+import {
+  shouldFailExecutionOnInvalidQuery,
+  shouldFailExecutionOnInvalidParam,
+  shouldFailExecutionOnApiError,
+  shouldSucceedExecution
+} from './behaviours.spec'
 import Ping from './ping'
+import { PEER_A } from '../utils/fixtures'
 
-type PingResponse = Awaited<ReturnType<API['ping']>>
+type Response = Awaited<ReturnType<API['ping']>>
 
-const createAddressesCommand = (
-  pingResponse: PingResponse,
-  getCachedAliasesResponse?: Record<any, any> | undefined
-) => {
+const createCommand = (pingResponse: Response, getCachedAliasesResponse?: Record<any, any> | undefined) => {
   const api = sinon.fake() as unknown as API
   api.ping = () => Promise.resolve(pingResponse)
   const cache = {
@@ -19,26 +22,18 @@ const createAddressesCommand = (
 }
 
 describe('test Ping command', function () {
-  const cmdWithApi = createAddressesCommand({
+  const cmdWithOkRes = createCommand({
     ok: true,
     json: async () => ({
-      latecny: 100
+      latency: 100
     })
-  } as PingResponse)
-  const cmdWithNoApi = createAddressesCommand({
+  } as Response)
+  const cmdWithBadRes = createCommand({
     ok: false
-  } as PingResponse)
+  } as Response)
 
-  shouldBehaveLikeACommand(
-    cmdWithApi,
-    cmdWithNoApi,
-    'INVALID',
-    '',
-    [
-      ['', ['HOPR_ADDRESS_MOCK']],
-      ['hopr', ['HOPR_ADDRESS_MOCK']],
-      ['native', ['NATIVE_ADDRESS_MOCK']]
-    ],
-    []
-  )
+  shouldFailExecutionOnInvalidQuery(cmdWithOkRes, 'x x')
+  shouldFailExecutionOnInvalidParam(cmdWithOkRes, '1')
+  shouldFailExecutionOnApiError(cmdWithBadRes, PEER_A)
+  shouldSucceedExecution(cmdWithOkRes, [PEER_A, ['Pong received in 100 ms']])
 })

@@ -53,10 +53,12 @@ export abstract class Command {
       let use: string[] = ['- usage:']
 
       if (params.length > 0) {
-        for (const [type, name, optional] of params) {
-          // const [paramDesc] = CMD_PARAMS[type]
-          // use.push(`<${name} [${optional ? '?' : ''}${type} (${paramDesc})]>`)
-          use.push(`<${name} [${optional ? '?' : ''}${type}]>`)
+        for (const [type, givenName] of params) {
+          const [defName, defDesc] = CMD_PARAMS[type]
+          const name = givenName || defName // pick given name or default name
+          const desc = defDesc
+
+          use.push(`<${name} (${desc})>`)
         }
       } else {
         use.push('<none>')
@@ -69,18 +71,62 @@ export abstract class Command {
   }
 
   /**
-   * @returns Generic invalid query message.
+   * Generate 'no query provided' message.
+   * @returns When no query is provided.
    */
-  protected invalidUsage(query: string): string {
-    return `Invalid arguments, received "${query}".\n${this.usage()}`
+  protected noQuery(): string {
+    return `No query provided.\n${this.usage()}`
   }
 
   /**
-   * @param task what has failed
-   * @returns Generic error message when request has failed.
+   * Generate 'invalid query' message.
+   * @returns Generic invalid query message.
    */
-  protected invalidResponse(task: string): string {
-    return `Failed to ${task}.`
+  protected invalidQuery(query: string): string {
+    return `Invalid query, received "${query}".\n${this.usage()}`
+  }
+
+  /**
+   * Generate 'invalid paramater' message.
+   * @returns Specific paramater was invalid.
+   */
+  protected invalidParameter(param: string, type: string, error?: string): string {
+    return `Invalid parameter "${param}" of type "${type}"${
+      error ? ' with error "' + error + '"' : ''
+    }".\n${this.usage()}`
+  }
+
+  /**
+   * Generate 'failed command' message.
+   * @param task what action has failed
+   * @param error optional error message
+   * @returns Generic error message when something has failed.
+   */
+  protected failedCommand(task: string, error?: string): string {
+    return `Failed to ${task}${error ? ' with error "' + error + '"' : ''}.`
+  }
+
+  /**
+   * Generate 'failed command' message with API
+   * failure context.
+   * @param response API response that failed
+   * @param task what action has failed
+   * @param knownErrors an object containing known errors
+   * @returns Error message when something has failed.
+   */
+  protected async failedApiCall<T extends Response>(
+    response: T,
+    task: string,
+    knownErrors: {
+      [statusCode: number]: string | ((v: any) => string)
+    }
+  ): Promise<string> {
+    const knownError = knownErrors[response.status]
+    if (knownError) {
+      return this.failedCommand(task, typeof knownError === 'string' ? knownError : knownError(await response.json()))
+    } else {
+      return this.failedCommand(task, `unknown error code '${response.status}'`)
+    }
   }
 
   /**
@@ -97,15 +143,24 @@ export abstract class Command {
 
       // invalid when query is not present while parameters are expected
       if (!query && params.length > 0) {
-        result = [`No query provided.\n${this.usage()}`, use]
+        result = [this.noQuery(), use]
         continue
       }
 
-      const queryParams = query.length > 0 ? query.split(' ') : ''
+      let queryParams = query.length > 0 ? query.split(' ') : []
 
-      // invalid when query params and expected params are not the same length
+      // if one of the params is 'everything', we treat the rest
+      // past everything as one string
+      const arbitraryIndex = params.findIndex((p) => p[0] === 'arbitrary')
+      if (arbitraryIndex > -1) {
+        const newParam = queryParams.slice(arbitraryIndex).join(' ')
+        queryParams = queryParams.slice(0, arbitraryIndex)
+        if (newParam.length > 0) queryParams.push(newParam)
+      }
+
+      // invalid when query params are less than expected params
       if (queryParams.length !== params.length) {
-        result = [this.invalidUsage(query), use]
+        result = [this.invalidQuery(query), use]
         continue
       }
 
@@ -113,14 +168,13 @@ export abstract class Command {
 
       // validate each parameter
       for (let i = 0; i < params.length; i++) {
-        const [paramType] = params[i]
-        const [, validate] = CMD_PARAMS[paramType]
+        const [paramType, customName] = params[i]
+        const [, , validate] = CMD_PARAMS[paramType]
         const queryParam = queryParams[i]
 
-        const [valid, parsedValue] = validate(queryParam, { aliases })
+        const [valid, parsedValue] = validate(queryParam, { aliases, customName })
         if (!valid) {
-          result = [`Incorrect parameter "${queryParam}" of type "${paramType}".\n${this.usage()}`, use]
-          continue
+          result = [this.invalidParameter(queryParam, paramType), use]
         } else {
           parsedValues.push(parsedValue)
         }
@@ -135,21 +189,34 @@ export abstract class Command {
   }
 }
 
-export type CmdParameter = [type: CmdTypes, name: string, optional?: boolean]
-type CmdTypes =
+/**
+ * All possible command types
+ */
+export type CmdTypes =
   | 'hoprAddress'
   | 'nativeAddress'
   | 'hoprAddressOrAlias'
   | 'hoprOrNative'
+  | 'direction'
+  | 'constant'
   | 'number'
   | 'string'
+  | 'arbitrary'
   | 'boolean'
-  | 'constant'
-type CmdArg<I, O, R> = [description: string, validation: (v: I, ops: O) => [valid: boolean, value: R]]
+export type { ChannelDirection } from './api'
+export type HoprOrNative = 'hopr' | 'native'
+
+/**
+ * Used in a Command constructor to specify a command's syntax
+ */
+export type CmdParameter = [type: CmdTypes, customName?: string]
+
+type CmdArg<I, O, R> = [name: string, description: string, validation: (v: I, ops: O) => [valid: boolean, value: R]]
 
 export const CMD_PARAMS: Record<CmdTypes, CmdArg<any, any, any>> = {
   hoprAddress: [
-    'A HOPR address (PeerId)',
+    'HOPR address',
+    "'16Ui..'",
     (v) => {
       try {
         return [true, peerIdFromString(v)]
@@ -159,13 +226,15 @@ export const CMD_PARAMS: Record<CmdTypes, CmdArg<any, any, any>> = {
     }
   ],
   nativeAddress: [
-    'A native address',
+    'NATIVE address',
+    "'0x..",
     (v) => {
       return [ethersUtils.isAddress(v), v]
     }
   ],
   hoprAddressOrAlias: [
-    'A HOPR address (PeerId) or an alias',
+    'HOPR address or alias',
+    "'16Ui..' or 'alice'",
     (peerIdStrOrAlias, { aliases }) => {
       // is PeerId
       let peerId: PeerId | undefined
@@ -173,18 +242,14 @@ export const CMD_PARAMS: Record<CmdTypes, CmdArg<any, any, any>> = {
       // try PeerId
       try {
         peerId = peerIdFromString(peerIdStrOrAlias)
-      } catch {
-        console.log(`Could not create peer id from '${peerIdStrOrAlias}'`)
-      }
+      } catch {}
 
       // try aliases
       if (!peerId && aliases) {
         const alias = aliases[peerIdStrOrAlias]
         try {
           peerId = peerIdFromString(alias)
-        } catch {
-          console.log(`Could not create peer id from alias '${alias}' for '${peerIdStrOrAlias}'`)
-        }
+        } catch {}
       }
 
       if (peerId) return [true, peerId]
@@ -192,33 +257,57 @@ export const CMD_PARAMS: Record<CmdTypes, CmdArg<any, any, any>> = {
     }
   ] as CmdArg<string, { aliases: Record<string, string> }, PeerId>,
   hoprOrNative: [
-    "'HOPR' or 'NATIVE'",
-    (v) => {
-      return [v === 'HOPR' || v === 'NATIVE', v]
+    'currency',
+    "'hopr' or 'native'",
+    (input) => {
+      if (typeof input !== 'string') return [false, input]
+      const v = input.toLowerCase()
+      return [v === 'hopr' || v === 'native', v]
     }
   ],
+  direction: [
+    'direction',
+    "'incoming' or 'outgoing'",
+    (input) => {
+      if (typeof input !== 'string') return [false, input]
+      const v = input.toLowerCase()
+      return [v === 'incoming' || v === 'outgoing', v]
+    }
+  ],
+  constant: [
+    'constant',
+    'A constant value',
+    (v, { customName }) => {
+      if (!customName) return [false, v]
+      return [v === customName, v]
+    }
+  ] as CmdArg<string, { customName?: string }, any>,
   number: [
-    'A number',
+    'number',
+    'Any number',
     (v) => {
-      return [!isNaN(v), v]
+      return [!isNaN(v) && isFinite(v), v]
     }
   ],
   string: [
-    'A string',
+    'string',
+    'Any string with no spaces',
+    (v) => {
+      return [typeof v === 'string', v]
+    }
+  ],
+  arbitrary: [
+    'arbitrary',
+    'An arbitrary string',
     (v) => {
       return [typeof v === 'string', v]
     }
   ],
   boolean: [
-    'A boolean',
+    'boolean',
+    "Any boolean, 'true' or 'false'",
     (v) => {
-      return [v === 'true' || v === 'false', Boolean(v)]
-    }
-  ],
-  constant: [
-    'A constant value',
-    (v) => {
-      return [true, v]
+      return [v === 'true' || v === 'false', v === 'true']
     }
   ]
 }

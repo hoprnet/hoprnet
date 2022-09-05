@@ -501,7 +501,6 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       if (relayEntry == undefined) {
         log(`Relay ${relay.toString()} has been removed from list of available entry nodes. Not renewing this entry`)
         // this.updateUsedRelays([[relay.toString(), [undefined]]])
-        // this.updateUsedRelays([[relay.toString(), [undefined]]])
         continue
       }
 
@@ -646,12 +645,15 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
             .join(', ')} for ${peer.id.toString()}`
         )
 
-        const existing = new Set(entry.multiaddrs.map((ma: Multiaddr) => ma.decapsulateCode(CODE_P2P).toString()))
+        // Check if we received any *new* address(es)
+        const alreadyKnownAddrs = new Set(
+          entry.multiaddrs.map((ma: Multiaddr) => ma.decapsulateCode(CODE_P2P).toString())
+        )
         for (const ma of peer.multiaddrs) {
           if (!isUsableRelay(ma)) {
             continue
           }
-          if (!existing.has(ma.decapsulateCode(CODE_P2P).toString())) {
+          if (!alreadyKnownAddrs.has(ma.decapsulateCode(CODE_P2P).toString())) {
             entry.multiaddrs.push(ma.decapsulateCode(CODE_P2P).encapsulate(`/p2p/${peer.id.toString()}`))
             receivedNewAddrs = true
             break

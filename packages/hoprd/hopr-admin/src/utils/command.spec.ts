@@ -24,16 +24,20 @@ const createCommandMock = (...args: ConstructorParameters<typeof Command>) => {
   })()
 }
 
-const PRIMARY_USE: [CmdParameter[], string] = [
-  [['hoprAddressOrAlias', 'hopr-address-or-alias', false]],
-  'primary usage'
-]
+const PRIMARY_USE: [CmdParameter[], string] = [[['hoprAddressOrAlias', 'hopr-address-or-alias']], 'primary usage']
 const SECONDARY_USE: [CmdParameter[], string] = [
   [
-    ['hoprAddress', 'hopr-address-only', false],
-    ['boolean', 'no-alias', true]
+    ['hoprAddress', 'hopr-address-only'],
+    ['boolean', 'no-alias']
   ],
   'secondary usage'
+]
+const WITH_ARBITRARY: [CmdParameter[], string] = [
+  [
+    ['hoprAddress', 'hopr-address-only'],
+    ['arbitrary', 'some-long-text']
+  ],
+  'with arbitrary'
 ]
 const API_MOCK = {} as API
 
@@ -61,10 +65,7 @@ describe('test Command class', function () {
 
     assert(usage && typeof usage === 'string')
     assert(usage.startsWith('- usage:'))
-    assert.equal(
-      usage,
-      '- usage: <hopr-address-or-alias [hoprAddressOrAlias (A HOPR address (PeerId) or an alias)]>  primary usage'
-    )
+    assert.equal(usage, `- usage: <hopr-address-or-alias ('16Ui..' or 'alice')>  primary usage`)
   })
 
   it('should assert correct usage', function () {
@@ -107,12 +108,31 @@ describe('test Command class', function () {
 
     // @ts-ignore
     const invalidArgResult = cmd.assertUsage('not-a-address extra-arg')
-    assert(invalidArgResult[0] && invalidArgResult[0].startsWith('Invalid arguments'))
+    assert(invalidArgResult[0] && invalidArgResult[0].startsWith('Invalid query'))
     assert.equal(invalidArgResult[1], 'primary')
 
     // @ts-ignore
     const incorrectParamResult = cmd.assertUsage('not-a-address')
-    assert(incorrectParamResult[0] && incorrectParamResult[0].startsWith('Incorrect parameter'))
+    assert(incorrectParamResult[0] && incorrectParamResult[0].startsWith('Invalid parameter'))
     assert.equal(incorrectParamResult[1], 'primary')
+  })
+
+  it('should assert arbitrary usage', function () {
+    const cmd = createCommandMock(
+      {
+        primary: PRIMARY_USE,
+        secondary: SECONDARY_USE,
+        third: WITH_ARBITRARY
+      },
+      API_MOCK,
+      CACHE_MOCK
+    )
+
+    // @ts-ignore
+    const result = cmd.assertUsage(`${HOPR_ADDRESS_MOCK.toString()} hello world 1 2 3`)
+    assert.equal(result[0], undefined)
+    assert.equal(result[1], 'third')
+    assert(HOPR_ADDRESS_MOCK.equals(result[2]))
+    assert.equal(result[3], 'hello world 1 2 3')
   })
 })

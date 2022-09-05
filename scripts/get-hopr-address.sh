@@ -11,11 +11,21 @@ declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 source "${mydir}/utils.sh"
 
-: ${1:?"No <endpoint> is set, use default value localhost:3001"}
+# $1 = optional: apitoken, defaults to ""
+declare apitoken="${1:-}"
+# $2 = optional: endpoint, defaults to http://localhost:3001
+declare endpoint="${2:-localhost:3001}"
 
-# $1 = optional: endpoint, defaults to http://localhost:3001
-declare endpoint="${1:-localhost:3001}"
-declare url="${endpoint}/api/v2/account/addresses"
+if [[ -z "${apitoken}" ]]; then
+    msg "No <apitoken> is set"
+    exit 1
+fi
+if [[ -z "${endpoint}" ]]; then
+    msg "No <endpoint> is set, use default value localhost:3001"
+fi
+
+declare url="${apitoken}@${endpoint}/api/v2/account/addresses"
+
 declare cmd="$(get_authenticated_curl_cmd ${url})"
 
 try_cmd "${cmd}" 30 5 | jq -r ".hopr"

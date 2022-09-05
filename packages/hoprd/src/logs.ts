@@ -44,13 +44,23 @@ type Message = {
 //
 // @implements LoggerService of nestjs
 export class LogStream {
-  private messageListeners: ((msg: Message) => void)[] = []
   private messages: Message[] = []
   private connections: Socket[] = []
 
   subscribe(sock: Socket) {
+    debugLog('WS subscribing socket')
     this.connections.push(sock)
-    this.messages.forEach((m) => this._sendMessage(m, sock))
+    this.messages.forEach((m) => {
+      this._sendMessage(m, sock)
+    })
+  }
+
+  unsubscribe(sock: Socket) {
+    const index = this.connections.indexOf(sock)
+    debugLog(`WS unsubscribing socket`)
+    if (index > -1) {
+      this.connections.splice(index, 1)
+    }
   }
 
   log(...args: string[]) {
@@ -120,27 +130,9 @@ export class LogStream {
         }
       }
     })
-
-    // send message to all listeners
-    for (const listener of this.messageListeners) {
-      listener(msg)
-    }
   }
 
   _sendMessage(m: Message, s: Socket) {
     s.send(JSON.stringify(m))
-  }
-
-  /**
-   * Listen to new messages
-   * @param listener callback function to call on every new message
-   */
-  public addMessageListener(listener: (msg: Message) => void) {
-    this.messageListeners.push(listener)
-
-    // send cached messages to this listener
-    for (const msg of this.messages) {
-      listener(msg)
-    }
   }
 }

@@ -162,10 +162,8 @@ export default function Home() {
 
   // attach event listener for new streams events
   const handleStreamEvent = (event: MessageEvent<any>) => {
-    const eventLogs = readStreamEvent(event)
-    for (const log of eventLogs) {
-      addLog(log)
-    }
+    const log = readStreamEvent(event)
+    if (log) addLog(log)
   }
   useEffect(() => {
     const socket = app.streamWS.socketRef.current
@@ -179,23 +177,6 @@ export default function Home() {
       socket.removeEventListener('message', handleStreamEvent)
     }
   }, [app.streamWS.socketRef.current, app.streamWS.state.status])
-
-  // attach event listener for new messages
-  const handleMessageEvent = (event: MessageEvent<any>) => {
-    console.log(event)
-  }
-  useEffect(() => {
-    const socket = app.messagesWS.socketRef.current
-    if (!socket) return
-
-    socket.addEventListener('message', handleMessageEvent)
-
-    return () => {
-      const socket = app.messagesWS.socketRef.current
-      if (!socket) return
-      socket.removeEventListener('message', handleMessageEvent)
-    }
-  }, [app.messagesWS.socketRef.current, app.messagesWS.state.status])
 
   return (
     <div className={styles.container}>

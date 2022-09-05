@@ -98,6 +98,7 @@
 - [stop](default.md#stop)
 - [subscribeOnConnector](default.md#subscribeonconnector)
 - [tickChannelStrategy](default.md#tickchannelstrategy)
+- [validateIntermediatePath](default.md#validateintermediatepath)
 - [waitForFunds](default.md#waitforfunds)
 - [waitForRunning](default.md#waitforrunning)
 - [withdraw](default.md#withdraw)
@@ -1490,7 +1491,7 @@ ___
 
 ### sendMessage
 
-▸ **sendMessage**(`msg`, `destination`, `intermediatePath?`): `Promise`<`void`\>
+▸ **sendMessage**(`msg`, `destination`, `intermediatePath?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -1502,7 +1503,7 @@ ___
 
 #### Returns
 
-`Promise`<`void`\>
+`Promise`<`string`\>
 
 ___
 
@@ -1663,6 +1664,26 @@ ___
 ### tickChannelStrategy
 
 ▸ `Private` **tickChannelStrategy**(): `Promise`<`void`\>
+
+#### Returns
+
+`Promise`<`void`\>
+
+___
+
+### validateIntermediatePath
+
+▸ `Private` **validateIntermediatePath**(`intermediatePath`): `Promise`<`void`\>
+
+Validates the manual intermediate path by checking if it does not contain
+channels that are not opened.
+Throws an error if some channel is not opened.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `intermediatePath` | `PublicKey`[] |
 
 #### Returns
 

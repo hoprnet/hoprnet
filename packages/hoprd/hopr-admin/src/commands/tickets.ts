@@ -25,7 +25,7 @@ export default class Tickets extends Command {
   public async execute(log: (msg: string) => void, _query: string): Promise<void> {
     const response = await this.api.getTicketStats()
     if (!response.ok) {
-      return log(this.invalidResponse('get ticket statistics'))
+      return log(this.failedCommand('get ticket statistics'))
     } else {
       const stats = await response.json()
       return log(

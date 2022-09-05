@@ -174,5 +174,11 @@ source .env
 4. Run command
 
 ```
-make register-node-when-dummy-proxy endpoint=<hoprd_endpoint> account=<staking_account> environment=master-goerli network=goerli
+make register-node-when-dummy-proxy endpoint=<hoprd_endpoint> api_token=<api_token> account=<staking_account> environment=<release name> network=xdai
+```
+
+e.g.
+
+```
+make register-node-when-dummy-proxy endpoint="localhost:3001" api_token="^MYtoken4testing^" account=0x35A3e15A2E2C297686A4fac5999647312fdDfa3f environment=master-goerli network=goerli
 ```

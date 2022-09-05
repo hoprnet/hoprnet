@@ -21,7 +21,7 @@
           },
           "environment_id": {
             "type": "string",
-            "description": "the environment id to run release nodes in, see protocol-config.json"
+            "description": "the default environment id to run release nodes in, see protocol-config.json"
           },
           "deprecated": {
             "type": "boolean",

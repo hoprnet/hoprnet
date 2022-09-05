@@ -1,6 +1,11 @@
 import type API from '../utils/api'
 import sinon from 'sinon'
-import { shouldBehaveLikeACommand } from './behaviours.spec'
+import {
+  shouldFailExecutionOnInvalidQuery,
+  shouldFailExecutionOnInvalidParam,
+  shouldFailExecutionOnApiError,
+  shouldSucceedExecution
+} from './behaviours.spec'
 import Addresses from './addresses'
 
 type GetAddressesResponse = Awaited<ReturnType<API['getAddresses']>>
@@ -19,27 +24,21 @@ const createAddressesCommand = (
 }
 
 describe('test Addresses command', function () {
-  const cmdWithApi = createAddressesCommand({
+  const cmdWithOkApi = createAddressesCommand({
     ok: true,
     json: async () => ({
       native: 'NATIVE_ADDRESS_MOCK',
       hopr: 'HOPR_ADDRESS_MOCK'
     })
   } as GetAddressesResponse)
-  const cmdWithNoApi = createAddressesCommand({
+  const cmdWithBadApi = createAddressesCommand({
     ok: false
   } as GetAddressesResponse)
 
-  shouldBehaveLikeACommand(
-    cmdWithApi,
-    cmdWithNoApi,
-    'INVALID',
-    '',
-    [
-      ['', ['HOPR_ADDRESS_MOCK']],
-      ['hopr', ['HOPR_ADDRESS_MOCK']],
-      ['native', ['NATIVE_ADDRESS_MOCK']]
-    ],
-    []
-  )
+  shouldFailExecutionOnInvalidQuery(cmdWithOkApi, 'x x x')
+  shouldFailExecutionOnInvalidParam(cmdWithOkApi, '1')
+  shouldFailExecutionOnApiError(cmdWithBadApi, '')
+  shouldSucceedExecution(cmdWithOkApi, ['', ['HOPR Address:']])
+  shouldSucceedExecution(cmdWithOkApi, ['native', ['NATIVE_ADDRESS_MOCK']])
+  shouldSucceedExecution(cmdWithOkApi, ['hopr', ['HOPR_ADDRESS_MOCK']])
 })

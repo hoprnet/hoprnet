@@ -288,6 +288,7 @@ export async function createChainWrapper(
       log('Transaction with nonce %d failed to getFeeData', nonce, error)
       // TODO: find an API for fee data per environment
       feeData = {
+        lastBaseFeePerGas: null,
         maxFeePerGas: defaultMaxFeePerGas,
         maxPriorityFeePerGas: defaultMaxPriorityFeePerGas,
         gasPrice: null

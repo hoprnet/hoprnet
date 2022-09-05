@@ -1,5 +1,5 @@
 import { setImmediate } from 'timers/promises'
-import EventEmitter, { once } from 'events'
+import EventEmitter from 'events'
 
 import { protocols, Multiaddr } from '@multiformats/multiaddr'
 
@@ -17,7 +17,7 @@ import { compareAddressesLocalMode, compareAddressesPublicMode, type HoprConnect
 import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants.js'
 
 import AccessControl from './network/access-control.js'
-import NetworkPeers, { Entry } from './network/network-peers.js'
+import NetworkPeers, { type Entry, NetworkPeersOrigin } from './network/network-peers.js'
 import Heartbeat, { NetworkHealthIndicator } from './network/heartbeat.js'
 
 import { findPath } from './path/index.js'
@@ -271,7 +271,7 @@ class Hopr extends EventEmitter {
       this.options,
       initialNodes,
       this.publicNodesEmitter,
-      async (peerId: PeerId, origin: string): Promise<boolean> => {
+      async (peerId: PeerId, origin: NetworkPeersOrigin): Promise<boolean> => {
         return accessControl.reviewConnection(peerId, origin)
       },
       this.isAllowedAccessToNetwork.bind(this)
@@ -322,7 +322,7 @@ class Hopr extends EventEmitter {
         const peerId = node.toPeerId()
         const origin = this.networkPeers.has(peerId)
           ? this.networkPeers.getConnectionInfo(peerId).origin
-          : 'network registry'
+          : NetworkPeersOrigin.NETWORK_REGISTRY
         accessControl.reviewConnection(peerId, origin)
       }
     )
@@ -342,7 +342,7 @@ class Hopr extends EventEmitter {
     )
 
     this.libp2pComponents.getConnectionManager().addEventListener('peer:connect', (event: CustomEvent<Connection>) => {
-      this.networkPeers.register(event.detail.remotePeer, 'libp2p peer connect')
+      this.networkPeers.register(event.detail.remotePeer, NetworkPeersOrigin.INCOMING_CONNECTION)
     })
 
     const protocolMsg = `/hopr/${this.environment.id}/msg`
@@ -354,7 +354,9 @@ class Hopr extends EventEmitter {
       this.db,
       this.getId(),
       (ackChallenge: HalfKeyChallenge) => {
-        this.emit(`message-acknowledged:${ackChallenge.toHex()}`)
+        // Can subscribe to both: per specific message or all message acknowledgments
+        this.emit(`hopr:message-acknowledged:${ackChallenge.toHex()}`)
+        this.emit('hopr:message-acknowledged', ackChallenge.toHex())
       },
       (ack: AcknowledgedTicket) => this.connector.emit('ticket:win', ack),
       // TODO: automatically reinitialize commitments
@@ -541,7 +543,7 @@ class Hopr extends EventEmitter {
     }
 
     for (const channel of currentChannels) {
-      this.networkPeers.register(channel.destination.toPeerId(), 'channel strategy tick (existing channel)') // Make sure current channels are 'interesting'
+      this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_EXISTING_CHANNEL) // Make sure current channels are 'interesting'
     }
 
     let balance: Balance
@@ -598,7 +600,7 @@ class Hopr extends EventEmitter {
 
     for (let i = 0; i < tickResult.toOpen.length; i++) {
       const channel = tickResult.toOpen[i]
-      this.networkPeers.register(channel.destination.toPeerId(), 'channel strategy tick (new channel)')
+      this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_NEW_CHANNEL)
       try {
         // Opening channels can fail if we can't establish a connection.
         const hash = await this.openChannel(channel.destination.toPeerId(), channel.stake)
@@ -640,15 +642,15 @@ class Hopr extends EventEmitter {
   // @TODO make modules Startable
   public async stop(): Promise<void> {
     if (this.status == 'DESTROYED') {
-      throw Error(`alreayd destroyed. Cannot destroy twice`)
+      throw Error(`Hopr instance already destroyed.`)
     }
     this.status = 'DESTROYED'
     verbose('Stopping checking timeout')
     this.stopPeriodicCheck?.()
     verbose('Stopping heartbeat & indexer')
-    await this.heartbeat.stop()
+    this.heartbeat?.stop()
     verbose(`Stopping connector`)
-    await this.connector.stop()
+    await this.connector?.stop()
     verbose('Stopping database')
     await this.db?.close()
     log(`Database closed.`)
@@ -718,11 +720,41 @@ class Hopr extends EventEmitter {
   }
 
   /**
+   * Validates the manual intermediate path by checking if it does not contain
+   * channels that are not opened.
+   * Throws an error if some channel is not opened.
+   * @param intermediatePath
+   */
+  private async validateIntermediatePath(intermediatePath: PublicKey[]) {
+    // checking if path makes sense
+    for (let i = 0; i < intermediatePath.length; i++) {
+      let ticketIssuer: PublicKey
+      let ticketReceiver: PublicKey
+
+      if (i == 0) {
+        ticketIssuer = PublicKey.fromPeerId(this.getId())
+        ticketReceiver = intermediatePath[0]
+      } else {
+        ticketIssuer = intermediatePath[i - 1]
+        ticketReceiver = intermediatePath[i]
+      }
+
+      if (ticketIssuer.eq(ticketReceiver)) log(`WARNING: duplicated adjacent path entries.`)
+
+      const channel = await this.db.getChannelX(ticketIssuer, ticketReceiver)
+
+      if (channel.status !== ChannelStatus.Open) {
+        throw Error(`Channel ${channel.getId().toHex()} is not open`)
+      }
+    }
+  }
+
+  /**
    * @param msg message to send
    * @param destination PeerId of the destination
    * @param intermediatePath optional set path manually
    */
-  public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PublicKey[]): Promise<void> {
+  public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PublicKey[]) {
     if (this.status != 'RUNNING') {
       throw new Error('Cannot send message until the node is running')
     }
@@ -732,27 +764,8 @@ class Hopr extends EventEmitter {
     }
 
     if (intermediatePath != undefined) {
-      // checking if path makes sense
-      for (let i = 0; i < intermediatePath.length; i++) {
-        let ticketIssuer: PublicKey
-        let ticketReceiver: PublicKey
-
-        if (i == 0) {
-          ticketIssuer = PublicKey.fromPeerId(this.getId())
-          ticketReceiver = intermediatePath[0]
-        } else {
-          ticketIssuer = intermediatePath[i - 1]
-          ticketReceiver = intermediatePath[i]
-        }
-
-        if (ticketIssuer.eq(ticketReceiver)) log(`WARNING: duplicated adjacent path entries.`)
-
-        const channel = await this.db.getChannelX(ticketIssuer, ticketReceiver)
-
-        if (channel.status !== ChannelStatus.Open) {
-          throw Error(`Channel ${channel.getId().toHex()} is not open`)
-        }
-      }
+      // Validate the manually specified intermediate path
+      await this.validateIntermediatePath(intermediatePath)
     } else {
       intermediatePath = await this.getIntermediateNodes(PublicKey.fromPeerId(destination))
 
@@ -777,15 +790,13 @@ class Hopr extends EventEmitter {
 
     await packet.storePendingAcknowledgement(this.db)
 
-    const acknowledged: Promise<void> = once(this, 'message-acknowledged:' + packet.ackChallenge.toHex()) as any
-
     try {
       await this.forward.interact(path[0].toPeerId(), packet)
     } catch (err) {
       throw Error(`Error while trying to send final packet ${JSON.stringify(err)}`)
     }
 
-    return acknowledged
+    return packet.ackChallenge.toHex()
   }
 
   /**
@@ -803,7 +814,7 @@ class Hopr extends EventEmitter {
       if (this.networkPeers.has(destination)) {
         this.networkPeers.updateRecord(pingResult)
       } else {
-        this.networkPeers.register(destination, 'manual ping')
+        this.networkPeers.register(destination, NetworkPeersOrigin.MANUAL_PING)
       }
       return { latency: pingResult.lastSeen - start }
     } else {
@@ -1330,6 +1341,7 @@ export {
   findPath,
   type StrategyTickResult,
   NetworkHealthIndicator,
+  NetworkPeersOrigin,
   type ChannelStrategyInterface
 }
 export { resolveEnvironment, supportedEnvironments, type ResolvedEnvironment } from './environment.js'

@@ -7,6 +7,7 @@
 ### Enumerations
 
 - [NetworkHealthIndicator](enums/NetworkHealthIndicator.md)
+- [NetworkPeersOrigin](enums/NetworkPeersOrigin.md)
 
 ### Classes
 
@@ -132,7 +133,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/environment.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L45)
+[packages/core/src/environment.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L48)
 
 ___
 
@@ -159,7 +160,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L16)
+[packages/core/src/channel-strategy.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L17)
 
 ___
 
@@ -405,14 +406,16 @@ ___
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `environment_id` | `string` |
-| `customProvider?` | `string` |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `environment_id` | `string` | environment name |
+| `customProvider?` | `string` |  |
 
 #### Returns
 
 [`ResolvedEnvironment`](modules.md#resolvedenvironment)
+
+the environment details, throws if environment is not supported
 
 ___
 
@@ -423,3 +426,5 @@ ___
 #### Returns
 
 `Environment`[]
+
+environments that the given HOPR version should be able to use

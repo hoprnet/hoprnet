@@ -393,7 +393,12 @@ async function main() {
   // as if the HOPR node fails, we need to put an error message up.
   if (argv.admin) {
     adminServer = new AdminServer(logs, argv.adminHost, argv.adminPort)
-    await adminServer.setup()
+    try {
+      await adminServer.setup()
+    } catch (err) {
+      console.error(err)
+      process.exit(1)
+    }
   }
 
   const environment = resolveEnvironment(argv.environment, argv.provider)
@@ -422,6 +427,8 @@ async function main() {
     logs.log('Creating HOPR Node')
     node = await createHoprNode(peerId, options, false)
     logs.logStatus('PENDING')
+
+    // Subscribe to node events
     node.on('hopr:message', logMessageToNode)
     node.on('hopr:network-health-changed', networkHealthChanged)
     node.subscribeOnConnector('hopr:connector:created', () => {
