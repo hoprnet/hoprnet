@@ -63,7 +63,7 @@ const argv = yargsInstance
   .option('environment', {
     string: true,
     describe: 'Environment id which the node shall run on (HOPRD_ENVIRONMENT)',
-    choices: supportedEnvironments(version).map((env) => env.id),
+    choices: supportedEnvironments().map((env) => env.id),
     default: defaultEnvironment()
   })
   .option('host', {
@@ -401,7 +401,7 @@ async function main() {
     }
   }
 
-  const environment = resolveEnvironment(argv.environment, version, argv.provider)
+  const environment = resolveEnvironment(argv.environment, argv.provider)
   let options = generateNodeOptions(environment)
   if (argv.dryRun) {
     console.log(JSON.stringify(options, undefined, 2))

@@ -3,6 +3,7 @@
 // @ts-ignore
 import protocolConfig from '../protocol-config.json' assert { type: 'json' }
 import semver from 'semver'
+import { FULL_VERSION } from './constants.js'
 
 export type NetworkOptions = {
   id: string
@@ -62,12 +63,12 @@ export type ResolvedEnvironment = {
  * @param version HOPR version
  * @returns environments that the given HOPR version should be able to use
  */
-export function supportedEnvironments(version: string): Environment[] {
+export function supportedEnvironments(): Environment[] {
   const environments = Object.entries((protocolConfig as ProtocolConfig).environments)
 
   return environments
     .filter(([_, env]) => {
-      return semver.satisfies(version, env.version_range)
+      return semver.satisfies(FULL_VERSION, env.version_range)
     })
     .map(([id, env]) => ({
       id,
@@ -77,19 +78,14 @@ export function supportedEnvironments(version: string): Environment[] {
 
 /**
  * @param environment_id environment name
- * @param version HOPR version
  * @param customProvider
  * @returns the environment details, throws if environment is not supported
  */
-export function resolveEnvironment(
-  environment_id: string,
-  version: string,
-  customProvider?: string
-): ResolvedEnvironment {
+export function resolveEnvironment(environment_id: string, customProvider?: string): ResolvedEnvironment {
   const environment = (protocolConfig as ProtocolConfig).environments[environment_id]
   const network = (protocolConfig as ProtocolConfig).networks[environment?.network_id]
 
-  if (environment && network && semver.satisfies(version, environment.version_range)) {
+  if (environment && network && semver.satisfies(FULL_VERSION, environment.version_range)) {
     network.id = environment.network_id
     if (customProvider && customProvider.length > 0) {
       network.default_provider = customProvider
@@ -110,7 +106,7 @@ export function resolveEnvironment(
     }
   }
 
-  const supportedEnvsString: string = supportedEnvironments(version)
+  const supportedEnvsString: string = supportedEnvironments()
     .map((env) => env.id)
     .join(', ')
   throw new Error(`environment '${environment_id}' is not supported, supported environments: ${supportedEnvsString}`)

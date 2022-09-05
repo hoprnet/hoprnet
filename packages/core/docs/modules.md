@@ -133,7 +133,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/environment.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L47)
+[packages/core/src/environment.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L48)
 
 ___
 
@@ -402,14 +402,13 @@ ___
 
 ### resolveEnvironment
 
-▸ **resolveEnvironment**(`environment_id`, `version`, `customProvider?`): [`ResolvedEnvironment`](modules.md#resolvedenvironment)
+▸ **resolveEnvironment**(`environment_id`, `customProvider?`): [`ResolvedEnvironment`](modules.md#resolvedenvironment)
 
 #### Parameters
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `environment_id` | `string` | environment name |
-| `version` | `string` | HOPR version |
 | `customProvider?` | `string` |  |
 
 #### Returns
@@ -422,13 +421,7 @@ ___
 
 ### supportedEnvironments
 
-▸ **supportedEnvironments**(`version`): `Environment`[]
-
-#### Parameters
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `version` | `string` | HOPR version |
+▸ **supportedEnvironments**(): `Environment`[]
 
 #### Returns
 

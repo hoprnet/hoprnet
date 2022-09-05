@@ -132,7 +132,7 @@ async function main() {
   }
 
   const { resolveEnvironment } = await import('@hoprnet/hopr-core')
-  const environment = resolveEnvironment(argv.environment, '*')
+  const environment = resolveEnvironment(argv.environment)
   if (!environment) {
     console.error(`Cannot find environment ${environment}`)
     process.exit(1)
