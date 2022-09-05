@@ -298,15 +298,17 @@ describe(`database tests`, function () {
 
     // should be set
     await db.addToNetworkRegistry(hoprNode, account, TestingSnapshot)
-    assert((await db.findHoprNodeUsingAccountInNetworkRegistry(account)).eq(hoprNode), 'should match hoprNode')
+    assert((await db.findHoprNodesUsingAccountInNetworkRegistry(account)).length === 1, 'should have only 1 hoprNode registered')
+    assert((await db.findHoprNodesUsingAccountInNetworkRegistry(account))[0].eq(hoprNode), 'should match the registered hoprNode')
     assert((await db.getAccountFromNetworkRegistry(hoprNode)).eq(account), 'should match account added')
 
     // should be removed
-    await db.removeFromNetworkRegistry(account, TestingSnapshot)
+    await db.removeFromNetworkRegistry(hoprNode, account, TestingSnapshot)
     assert.rejects(
-      () => db.findHoprNodeUsingAccountInNetworkRegistry(account),
+      () => db.findHoprNodesUsingAccountInNetworkRegistry(account),
       'should throw when HoprNode is not linked to an account'
     )
+    assert((await db.findHoprNodesUsingAccountInNetworkRegistry(account)).length === 0, 'should have 0 hoprNode registered')
     assert.rejects(() => db.getAccountFromNetworkRegistry(hoprNode), 'should throw when account is deregistered')
   })
 
