@@ -237,7 +237,7 @@ api_send_message(){
   local path=$(echo ${peers} | tr -d '\n' | jq -R -s 'split(" ")')
   local payload='{"body":"'${msg}'","path":'${path}',"recipient":"'${recipient}'"}'
   # Node might need some time once commitment is set on-chain
-  api_call ${source_api} "/messages" "POST" "${payload}" "204" 90 15 "" true
+  api_call ${source_api} "/messages" "POST" "${payload}" "202" 90 15 "" true
 }
 
 # $1 = source node id
