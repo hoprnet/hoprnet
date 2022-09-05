@@ -74,7 +74,7 @@ const argv = yargsInstance
   .option('environment', {
     string: true,
     describe: 'Environment id which the node shall run on (HOPR_CTD_ENVIRONMENT)',
-    choices: supportedEnvironments(version).map((env) => env.id),
+    choices: supportedEnvironments().map((env) => env.id),
     default: defaultEnvironment()
   })
   .option('privateKey', {
@@ -166,7 +166,7 @@ function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
 }
 
 export async function main(update: (State: State) => void, peerId?: PeerId) {
-  const environment = resolveEnvironment(argv.environment, version, argv.provider)
+  const environment = resolveEnvironment(argv.environment, argv.provider)
   const options = generateNodeOptions(environment)
   if (!peerId) {
     peerId = privKeyToPeerId(argv.privateKey)
