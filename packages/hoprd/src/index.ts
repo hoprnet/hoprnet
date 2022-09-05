@@ -480,30 +480,6 @@ async function main() {
 
       logs.logStatus('READY')
       logs.log('Node has started!')
-
-      // Run a single command and then exit.
-      if (argv.run && argv.run !== '') {
-        // We support multiple semicolon separated commands
-        const toRun: string[] = argv.run.split(';').map((cmd: string) =>
-          // Remove obsolete ' and "
-          cmd.replace(/"/g, '')
-        )
-
-        for (let cmd of toRun) {
-          console.error('$', cmd)
-          if (!isSupportedCommand(cmd)) {
-            throw new Error(`Unsupported command: "${cmd}"`)
-          }
-
-          const [shouldExit, output] = await runCommand(node, cmd as any)
-          if (shouldExit) return
-          else logs.log(JSON.stringify(output, null, 2))
-        }
-
-        // Wait for actions to take place
-        await setTimeout(1e3)
-        await node.stop()
-      }
     })
 
     // 2.a - Setup connector listener to bubble up to node. Emit connector creation.
