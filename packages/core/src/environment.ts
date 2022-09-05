@@ -5,6 +5,12 @@ import protocolConfig from '../protocol-config.json' assert { type: 'json' }
 import semver from 'semver'
 import { FULL_VERSION } from './constants.js'
 
+/**
+ * Coerced full version using
+ * semver.coerce('42.6.7.9.3-alpha') // '42.6.7'
+ */
+const FULL_VERSION_COERCED = semver.coerce(FULL_VERSION).version
+
 export type NetworkOptions = {
   id: string
   description: string
@@ -68,7 +74,7 @@ export function supportedEnvironments(): Environment[] {
 
   return environments
     .filter(([_, env]) => {
-      return semver.satisfies(FULL_VERSION, env.version_range)
+      return semver.satisfies(FULL_VERSION_COERCED, env.version_range)
     })
     .map(([id, env]) => ({
       id,
@@ -85,7 +91,7 @@ export function resolveEnvironment(environment_id: string, customProvider?: stri
   const environment = (protocolConfig as ProtocolConfig).environments[environment_id]
   const network = (protocolConfig as ProtocolConfig).networks[environment?.network_id]
 
-  if (environment && network && semver.satisfies(FULL_VERSION, environment.version_range)) {
+  if (environment && network && semver.satisfies(FULL_VERSION_COERCED, environment.version_range)) {
     network.id = environment.network_id
     if (customProvider && customProvider.length > 0) {
       network.default_provider = customProvider
