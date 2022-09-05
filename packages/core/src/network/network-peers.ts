@@ -4,7 +4,7 @@ import { randomSubset, debug } from '@hoprnet/hopr-utils'
 
 const DEBUG_PREFIX = 'hopr-core:network-peers'
 const log = debug(DEBUG_PREFIX)
-const verbose = debug(DEBUG_PREFIX.concat(`:verbose`))
+//const verbose = debug(DEBUG_PREFIX.concat(`:verbose`))
 
 export type Entry = {
   id: PeerId
