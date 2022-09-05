@@ -59,7 +59,7 @@ export default class API {
 
   // account API
   public async withdraw(amount: string, currency: string, recipient: string): ExpandedJsonResponse {
-    return this.postReq('/api/v2/account/withdraw', { amount, currency, recipient })
+    return this.postReq('/api/v2/account/withdraw', { amount, currency: currency.toUpperCase(), recipient })
   }
   public async getBalances(): ExpandedJsonResponse<Balances> {
     return this.getReq('/api/v2/account/balances')
