@@ -277,7 +277,7 @@ describe('HoprChannels', async function () {
     it('should announce user', async function () {
       const { channels, deployer, deployerPubKey } = await useFixtures()
 
-      const deployerAddress = await deployer.getAddress();
+      const deployerAddress = await deployer.getAddress()
       const publicKey = deployerPubKey.toUncompressedPubKeyHex()
       await expect(channels.connect(deployer).announce(deployerPubKey.toUncompressedPubKeyHex(), MULTI_ADDR))
         .to.emit(channels, 'Announcement')

@@ -790,13 +790,13 @@ export class HoprDB {
    * @param snapshot
    */
   public async addToNetworkRegistry(pubKey: PublicKey, account: Address, snapshot: Snapshot): Promise<void> {
-    let registeredNodes = [];
+    let registeredNodes = []
     try {
-      registeredNodes = await this.findHoprNodesUsingAccountInNetworkRegistry(account);
+      registeredNodes = await this.findHoprNodesUsingAccountInNetworkRegistry(account)
     } catch (error) {}
 
     // add new node to the list
-    registeredNodes.push(pubKey);
+    registeredNodes.push(pubKey)
 
     await this.db
       .batch()
@@ -839,16 +839,16 @@ export class HoprDB {
    * @param snapshot
    */
   public async removeFromNetworkRegistry(pubKey: PublicKey, account: Address, snapshot: Snapshot): Promise<void> {
-    let registeredNodes = [];
+    let registeredNodes = []
     try {
-      registeredNodes = await this.findHoprNodesUsingAccountInNetworkRegistry(account);
+      registeredNodes = await this.findHoprNodesUsingAccountInNetworkRegistry(account)
     } catch (error) {
       log(`cannot remove node from network registry due to ${error}`)
       throw Error('HoprNode not registered to the account')
     }
 
     // find registered peer id index
-    const registeredIndex = registeredNodes.findIndex(registeredPubKey => pubKey.eq(registeredPubKey))
+    const registeredIndex = registeredNodes.findIndex((registeredPubKey) => pubKey.eq(registeredPubKey))
 
     if (registeredIndex < 0) {
       log(`cannot remove node from network registry, not found`)

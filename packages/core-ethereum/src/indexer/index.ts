@@ -727,7 +727,10 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         case 'Deregistered(address,string)':
         case 'DeregisteredByOwner':
         case 'DeregisteredByOwner(address,string)':
-          await this.onDeregistered(event  as RegistryEvent<'Deregistered'> | RegistryEvent<'DeregisteredByOwner'>, lastDatabaseSnapshot)
+          await this.onDeregistered(
+            event as RegistryEvent<'Deregistered'> | RegistryEvent<'DeregisteredByOwner'>,
+            lastDatabaseSnapshot
+          )
           break
         case 'EnabledNetworkRegistry':
         case 'EnabledNetworkRegistry(bool)':
@@ -865,7 +868,10 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     } catch {}
   }
 
-  private async onRegistered(event: RegistryEvent<'Registered'> | RegistryEvent<'RegisteredByOwner'>, lastSnapshot: Snapshot): Promise<void> {
+  private async onRegistered(
+    event: RegistryEvent<'Registered'> | RegistryEvent<'RegisteredByOwner'>,
+    lastSnapshot: Snapshot
+  ): Promise<void> {
     let hoprNode: PeerId
     try {
       hoprNode = peerIdFromString(event.args.hoprPeerId)
@@ -879,7 +885,10 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     verbose(`network-registry: node ${event.args.hoprPeerId} is allowed to connect`)
   }
 
-  private async onDeregistered(event: RegistryEvent<'Deregistered'> | RegistryEvent<'DeregisteredByOwner'>, lastSnapshot: Snapshot): Promise<void> {
+  private async onDeregistered(
+    event: RegistryEvent<'Deregistered'> | RegistryEvent<'DeregisteredByOwner'>,
+    lastSnapshot: Snapshot
+  ): Promise<void> {
     let hoprNode: PeerId
     try {
       hoprNode = peerIdFromString(event.args.hoprPeerId)
@@ -888,7 +897,11 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       log(error)
       return
     }
-    await this.db.removeFromNetworkRegistry(PublicKey.fromPeerId(hoprNode), Address.fromString(event.args.account), lastSnapshot)
+    await this.db.removeFromNetworkRegistry(
+      PublicKey.fromPeerId(hoprNode),
+      Address.fromString(event.args.account),
+      lastSnapshot
+    )
     verbose(`network-registry: node ${event.args.hoprPeerId} is not allowed to connect`)
   }
 
