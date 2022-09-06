@@ -323,7 +323,7 @@ class Hopr extends EventEmitter {
           const peerId = node.toPeerId()
           const origin = this.networkPeers.has(peerId)
             ? this.networkPeers.getConnectionInfo(peerId).origin
-            : 'network registry'
+            : NetworkPeersOrigin.NETWORK_REGISTRY
           accessControl.reviewConnection(peerId, origin)
         }
       }
