@@ -318,12 +318,14 @@ class Hopr extends EventEmitter {
     // react when an account's eligibility has changed
     this.connector.indexer.on(
       'network-registry-eligibility-changed',
-      (_account: Address, node: PublicKey, _eligible: boolean) => {
-        const peerId = node.toPeerId()
-        const origin = this.networkPeers.has(peerId)
-          ? this.networkPeers.getConnectionInfo(peerId).origin
-          : NetworkPeersOrigin.NETWORK_REGISTRY
-        accessControl.reviewConnection(peerId, origin)
+      (_account: Address, nodes: PublicKey[], _eligible: boolean) => {
+        for (const node of nodes) {
+          const peerId = node.toPeerId()
+          const origin = this.networkPeers.has(peerId)
+            ? this.networkPeers.getConnectionInfo(peerId).origin
+            : 'network registry'
+          accessControl.reviewConnection(peerId, origin)
+        }
       }
     )
 

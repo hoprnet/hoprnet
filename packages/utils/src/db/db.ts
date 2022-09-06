@@ -790,12 +790,22 @@ export class HoprDB {
    * @param snapshot
    */
   public async addToNetworkRegistry(pubKey: PublicKey, account: Address, snapshot: Snapshot): Promise<void> {
+    let registeredNodes = []
+    try {
+      registeredNodes = await this.findHoprNodesUsingAccountInNetworkRegistry(account)
+    } catch (error) {}
+
+    // add new node to the list
+    registeredNodes.push(pubKey)
+
     await this.db
       .batch()
+      // node public key to address (M->1)
       .put(Buffer.from(this.keyOf(createNetworkRegistryEntryKey(pubKey))), Buffer.from(account.serialize()))
+      // address to node public keys (1->M) in the format of key -> PublicKey[]
       .put(
         Buffer.from(this.keyOf(createNetworkRegistryAddressToPublicKeyKey(account))),
-        Buffer.from(pubKey.serializeCompressed())
+        Buffer.from(PublicKey.serializeArray(registeredNodes))
       )
       .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
       .write()
@@ -803,39 +813,62 @@ export class HoprDB {
 
   /**
    * Do a reverse find by searching the stored account to return
-   * the associated public key of the HoprNode.
+   * the associated public keys of registered HOPR nodes.
    * @param account
-   * @returns PublicKey of the associated HoprNode
+   * @returns array of PublicKey of the associated HOPR nodes
    */
-  public async findHoprNodeUsingAccountInNetworkRegistry(account: Address): Promise<PublicKey> {
-    const pubKey = await this.getCoercedOrDefault<PublicKey>(
+  public async findHoprNodesUsingAccountInNetworkRegistry(account: Address): Promise<PublicKey[]> {
+    const pubKeys = await this.getCoercedOrDefault<PublicKey[]>(
       createNetworkRegistryAddressToPublicKeyKey(account),
-      PublicKey.deserialize,
+      PublicKey.deserializeArray,
       undefined
     )
 
-    if (!pubKey) {
+    if (!pubKeys) {
       throw Error('HoprNode not found')
     }
 
-    return pubKey
+    return pubKeys
   }
 
   /**
    * Hopr Network Registry
    * Unlink hoprNode to an ETH address by removing the entry.
+   * @param pubKey the node's x
    * @param account the account to use so we can search for the key in the database
    * @param snapshot
    */
-  public async removeFromNetworkRegistry(account: Address, snapshot: Snapshot): Promise<void> {
-    const hoprNode = await this.findHoprNodeUsingAccountInNetworkRegistry(account)
-    const entryKey = createNetworkRegistryEntryKey(hoprNode)
+  public async removeFromNetworkRegistry(pubKey: PublicKey, account: Address, snapshot: Snapshot): Promise<void> {
+    let registeredNodes = []
+    try {
+      registeredNodes = await this.findHoprNodesUsingAccountInNetworkRegistry(account)
+    } catch (error) {
+      log(`cannot remove node from network registry due to ${error}`)
+      throw Error('HoprNode not registered to the account')
+    }
+
+    // find registered peer id index
+    const registeredIndex = registeredNodes.findIndex((registeredPubKey) => pubKey.eq(registeredPubKey))
+
+    if (registeredIndex < 0) {
+      log(`cannot remove node from network registry, not found`)
+      throw Error('HoprNode not registered to the account')
+    }
+
+    // remove nodes
+    registeredNodes.splice(registeredIndex, 1)
+
+    const entryKey = createNetworkRegistryEntryKey(pubKey)
 
     if (entryKey) {
       await this.db
         .batch()
         .del(Buffer.from(this.keyOf(entryKey)))
-        .del(Buffer.from(this.keyOf(createNetworkRegistryAddressToPublicKeyKey(account))))
+        // address to node public keys (1->M) in the format of key -> PublicKey[]
+        .put(
+          Buffer.from(this.keyOf(createNetworkRegistryAddressToPublicKeyKey(account))),
+          Buffer.from(PublicKey.serializeArray(registeredNodes))
+        )
         .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
         .write()
     }
