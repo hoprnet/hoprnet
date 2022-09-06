@@ -239,10 +239,6 @@ export function setupWsApi(
     debugLog('WS client connected!')
     const path = removeQueryParams(req.url)
 
-    socket.on('close', () => {
-      logStream.unsubscribe(socket)
-    })
-
     socket.on('error', (err: string) => {
       debugLog('WS error', err.toString())
     })

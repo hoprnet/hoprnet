@@ -21,6 +21,8 @@ export const readStreamEvent = (event: any): Log | undefined => {
 
     // we ignore plain messages, instead print HOPRd logs
     if (data.type === 'message') return undefined
+    // we ignore connected type, which is simply a line of all connected peers
+    if (data.type === 'connected') return undefined
     // we are only interested in messages which have a message
     if (!data.msg) return undefined
 
