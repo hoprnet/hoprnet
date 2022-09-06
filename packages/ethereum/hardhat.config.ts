@@ -9,10 +9,11 @@ import type {
 } from 'hardhat/types'
 // load env variables
 require('dotenv').config()
+// adds Ethereum-specific capabilities to the Chai assertion library
+import '@nomicfoundation/hardhat-chai-matchers'
 // load hardhat plugins
 import '@nomiclabs/hardhat-ethers'
 import '@nomiclabs/hardhat-solhint'
-import '@nomiclabs/hardhat-waffle'
 import 'hardhat-deploy'
 import 'hardhat-gas-reporter'
 import '@nomiclabs/hardhat-etherscan'
@@ -50,7 +51,7 @@ import { writeFileSync, realpathSync } from 'fs'
 import { TASK_TEST_SETUP_TEST_ENVIRONMENT } from 'hardhat/builtin-tasks/task-names'
 import { HARDHAT_NETWORK_NAME } from 'hardhat/plugins'
 import stake, { StakeOpts } from './tasks/stake'
-import { MIN_STAKE } from './utils/constants'
+import { DevNftRank, MIN_STAKE } from './utils/constants'
 import type { BigNumber } from 'ethers'
 
 const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, BLOCKSCOUT_KEY, HOPR_ENVIRONMENT_ID, HOPR_HARDHAT_TAG } =
@@ -233,21 +234,21 @@ task('disable-automine', 'Used by E2E tests to disable auto-mining once setup is
 
 task<RegisterOpts>(
   'register',
-  "Used by our E2E tests to interact with 'HoprNetworkRegistry' and 'HoprDummyProxyForNetworkRegistry'.",
+  "Used by our E2E tests to interact with 'HoprNetworkRegistry' and 'HoprNetworkRegistryProxy'.",
   register
 )
   .addParam<RegisterOpts['task']>('task', 'The task to run', undefined, types.string)
   .addOptionalParam<string>('nativeAddresses', 'A list of native addresses', undefined, types.string)
-  .addOptionalParam<string>('peerIds', 'A list of peerIds', undefined, types.string)
+  .addOptionalParam<string>('peerIds', 'A list of comma-seperated peerIds', undefined, types.string)
   .addOptionalParam<string>('privatekey', 'Private key of the signer', undefined, types.string)
 
 task<SelfRegisterOpts>(
   'register:self',
-  "Used by our E2E tests to interact with 'HoprNetworkRegistry' and 'HoprDummyProxyForNetworkRegistry'.",
+  "Used by our E2E tests to interact with 'HoprNetworkRegistry' and 'HoprNetworkRegistryProxy'.",
   selfRegister
 )
   .addParam<SelfRegisterOpts['task']>('task', 'The task to run', undefined, types.string)
-  .addOptionalParam<string>('peerId', 'HOPR peer ID to be registered', undefined, types.string)
+  .addParam<string>('peerIds', 'A list of comma-seperated peerIds', undefined, types.string)
   .addOptionalParam<string>('privatekey', 'Private key of the signer', undefined, types.string)
 
 task<RequestTestTokensOpts>(
@@ -263,7 +264,8 @@ task<RequestTestTokensOpts>(
     types.string
   )
   .addParam<string>('recipient', 'Address of the NFT recipient', undefined, types.string)
-  .addParam<string>('privatekey', 'Private key of the current owner of NFTs', undefined, types.string)
+  .addOptionalParam<DevNftRank>('nftRank', 'Dev NFT rank ("developer" or "community")', undefined, types.string)
+  .addOptionalParam<string>('privatekey', 'Private key of the current owner of NFTs', undefined, types.string)
 
 task<StakeOpts>('stake', 'Used by CI tests to stake tokens to the running staking program.', stake)
   .addParam<StakeOpts['type']>('type', 'Token type to stake', undefined, types.string)
@@ -273,6 +275,7 @@ task<StakeOpts>('stake', 'Used by CI tests to stake tokens to the running stakin
     MIN_STAKE.toString(),
     types.string
   )
+  .addOptionalParam<DevNftRank>('nftRank', 'Dev NFT rank ("developer" or "community")', undefined, types.string)
   .addOptionalParam<string>('privatekey', 'Private key of the signer', undefined, types.string)
 
 function getSortedFiles(dependenciesGraph) {
