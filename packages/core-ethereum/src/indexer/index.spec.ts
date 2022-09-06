@@ -662,7 +662,7 @@ describe('test indexer', function () {
     assert((await db.isEligible(fixtures.PARTY_A.toAddress())) === false)
   })
 
-  it('should process all registry events and account not be registered or but be eligible', async function () {
+  it('should process all registry events and account not be registered but be eligible', async function () {
     const { db, chain, indexer, newBlock } = await useFixtures({
       latestBlockNumber: 10,
       pastHoprRegistryEvents: [
