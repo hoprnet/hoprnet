@@ -281,11 +281,11 @@ describe('HoprChannels', async function () {
       const publicKey = deployerPubKey.toUncompressedPubKeyHex()
       await expect(channels.connect(deployer).announce(deployerPubKey.toUncompressedPubKeyHex(), MULTI_ADDR))
         .to.emit(channels, 'Announcement')
-        .withArgs({
+        .withArgs(
           deployerAddress,
           publicKey,
           MULTI_ADDR
-        })
+        )
     })
 
     it('should fail to announce user', async function () {
