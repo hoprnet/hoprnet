@@ -1,12 +1,18 @@
 import { Signer, Wallet } from 'ethers'
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
-import { DEV_NFT_BOOST, DEV_NFT_TYPE } from '../utils/constants'
+import { DevNftRank, DEV_NFT_BOOST, DEV_NFT_TYPE, DEV_NFT_TYPE_INDEX } from '../utils/constants'
 
-export type StakeOpts = {
-  type: 'devnft' | 'xhopr'
-  amount?: string // target amount in wei
-  privatekey: string // private key of the caller
-}
+export type StakeOpts =
+  | {
+      type: 'xhopr'
+      amount: string // target amount in wei
+      privatekey?: string // private key of the caller
+    }
+  | {
+      type: 'devnft'
+      nftRank: DevNftRank
+      privatekey?: string // private key of the caller
+    }
 
 async function stakeXhopr(hre: HardhatRuntimeEnvironment, signer, hoprStake, amount) {
   const { ethers, deployments } = hre
@@ -60,14 +66,18 @@ async function stakeXhopr(hre: HardhatRuntimeEnvironment, signer, hoprStake, amo
   }
 }
 
-async function stakeDevNft(hre: HardhatRuntimeEnvironment, signer, hoprStake) {
+/**
+ * @notice nftTypeIndex is fixed as the must specify the nft rank.
+ */
+async function stakeDevNft(hre: HardhatRuntimeEnvironment, signer, hoprStake, nftRank: DevNftRank) {
   const { ethers, deployments } = hre
   // check if dev nft exists
   const nftContract = await deployments.get('HoprBoost')
   const hoprBoost = (await ethers.getContractFactory('HoprBoost')).connect(signer).attach(nftContract.address)
   // check if the signer has staked Dev NFT
   const signerAddress = await signer.getAddress()
-  const hasStaked = await hoprStake.isNftTypeAndRankRedeemed4(DEV_NFT_TYPE, DEV_NFT_BOOST, signerAddress)
+  const hasStaked = await hoprStake.isNftTypeAndRankRedeemed2(DEV_NFT_TYPE_INDEX, DEV_NFT_BOOST, signerAddress)
+  const tokenUriSuffix = DEV_NFT_TYPE + '/' + nftRank
 
   if (hasStaked) {
     // Caller has staked Dev NFT, no need to repeat the process.
@@ -75,36 +85,7 @@ async function stakeDevNft(hre: HardhatRuntimeEnvironment, signer, hoprStake) {
     return
   }
 
-  // get Dev NFT index
-  let devNFTIndex: number | null = null
-  let index = 1
-  // loop through the array storage and record the length and dev nft index, if any
-  while (true) {
-    try {
-      console.error(`Check DevNFT type at index = ${index}`)
-      const createdNftTypes = await hoprBoost.typeAt(index) // array of types are 1-based
-      if (createdNftTypes === DEV_NFT_TYPE) {
-        console.error(`Found usable DevNFT type at index = ${index}`)
-        devNFTIndex = index
-        break
-      }
-    } catch (error) {
-      // reaching the end of nft index array storage: panic code 0x32 (Array accessed at an out-of-bounds or negative index
-      if (!(`${error}`.match(/0x32/g) || `${error}`.match(/cannot estimate gas/g))) {
-        console.error(`Error in checking HoprBoost types. ${error}`)
-      }
-      console.error(`Completed DevNFT check loop without result`)
-      break
-    }
-    index++
-  }
-
-  if (!devNFTIndex) {
-    console.error(`Cannot find Dev NFT index when staking.`)
-    process.exit(1)
-  }
-
-  // check if the signer has Dev NFT
+  // check if the signer has desired Dev NFT
   const boostNFTBalance = await hoprBoost.balanceOf(signerAddress)
   let nftFound = false
   let nftFindingIndex = ethers.constants.Zero
@@ -112,8 +93,8 @@ async function stakeDevNft(hre: HardhatRuntimeEnvironment, signer, hoprStake) {
 
   while (nftFindingIndex.lt(boostNFTBalance) && !nftFound) {
     ownedNFTTokenId = await hoprBoost.tokenOfOwnerByIndex(signerAddress, nftFindingIndex)
-    const ownedNFTType = await hoprBoost.typeIndexOf(ownedNFTTokenId)
-    if (ownedNFTType.eq(devNFTIndex)) {
+    const ownedNftUri = await hoprBoost.tokenURI(ownedNFTTokenId)
+    if (new RegExp(tokenUriSuffix, 'g').test(ownedNftUri)) {
       console.log(`Found usable DevNFT at index ${nftFindingIndex}`)
       nftFound = true
     }
@@ -171,7 +152,7 @@ async function main(opts: StakeOpts, hre: HardhatRuntimeEnvironment, _runSuper: 
     .attach(stakingContract.address)
 
   if (opts.type === 'devnft') {
-    await stakeDevNft(hre, signer, hoprStake)
+    await stakeDevNft(hre, signer, hoprStake, opts.nftRank)
   } else if (opts.type === 'xhopr') {
     if (opts.amount) {
       await stakeXhopr(hre, signer, hoprStake, opts.amount)
@@ -180,7 +161,7 @@ async function main(opts: StakeOpts, hre: HardhatRuntimeEnvironment, _runSuper: 
       process.exit(1)
     }
   } else {
-    console.error(`Unsupported staking type ${opts.type}`)
+    console.error(`Unsupported staking type ${JSON.stringify(opts)}`)
     process.exit(1)
   }
 }

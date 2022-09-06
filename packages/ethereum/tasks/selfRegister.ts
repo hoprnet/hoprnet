@@ -2,16 +2,11 @@ import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import { Signer, Wallet } from 'ethers'
 import type { HoprNetworkRegistry } from '../src/types'
 
-export type SelfRegisterOpts =
-  | {
-      task: 'add'
-      peerId: string
-      privatekey: string // private key of the caller
-    }
-  | {
-      task: 'remove'
-      privatekey: string // private key of the caller
-    }
+export type SelfRegisterOpts = {
+  task: 'add' | 'remove'
+  peerIds: string
+  privatekey: string // private key of the caller
+}
 
 /**
  * Used by developers in testnet to register or deregister a node
@@ -49,11 +44,11 @@ async function main(
 
   try {
     if (opts.task === 'add') {
-      const peerId = opts.peerId
-
-      await (await hoprNetworkRegistry.selfRegister(peerId)).wait()
+      const peerIds = opts.peerIds.split(',')
+      await (await hoprNetworkRegistry.selfRegister(peerIds)).wait()
     } else if (opts.task === 'remove') {
-      await (await hoprNetworkRegistry.selfDeregister()).wait()
+      const peerIds = opts.peerIds.split(',')
+      await (await hoprNetworkRegistry.selfDeregister(peerIds)).wait()
     } else {
       throw Error(`Task "${opts}" not available.`)
     }
