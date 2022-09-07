@@ -6,7 +6,6 @@ The purpose of this process is to document how crypto wallets are created and st
 
 | Wallet Address                               | Alias                                         | Description                                                                       |
 | -------------------------------------------- | --------------------------------------------- | --------------------------------------------------------------------------------- |
-| `0xA18732DC751BE0dB04157eb92C92BA9d0fC09FC5` | Dev Deployer (deprecated)                     | Used for deploying testnet or demo contracts across our network.                  |
 | `0x4fF4e61052a4DFb1bE72866aB711AE08DD861976` | Dev Deployer                                  | Used for deploying testnet or demo contracts across our network.                  |
 | `0x1A387b5103f28bc6601d085A3dDC878dEE631A56` | Dev Minter                                    | Used as user granted `mint`ing access to our test contracts in our network.       |
 | `0x34465FE0B25089Fc9D3a6D33e19F652e45B175e0` | Alice                                         | Used as first user for interacting with some of our contracts (e.g. `HOPRBoost`)  |
