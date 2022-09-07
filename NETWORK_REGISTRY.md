@@ -152,7 +152,7 @@ source .env
   make register-node-with-stake endpoint=<hoprd_endpoint> account=<staking_account> environment=master-goerli network=goerli
   ```
 
-### Production
+### [DEPRECATED] Production (with dummy proxy)
 
 Before "Network_registry" NFT gets minted in production environment, "Dummy proxy" is used to faciliate the process.
 Deployer wallet in the CI/CD registers node and its peerId when calling `make register-nodes` (followed by more flags and arguments). Developers must follow these steps to register their node in the registry:
@@ -182,3 +182,47 @@ e.g.
 ```
 make register-node-when-dummy-proxy endpoint="localhost:3001" api_token="^MYtoken4testing^" account=0x35A3e15A2E2C297686A4fac5999647312fdDfa3f environment=paleochora network=xdai
 ```
+
+### Production
+
+For nodes running in the upcoming "monte rosa" environment, only wallets with one "Network_registry" HoprBoost NFT (be `developer` or `community` rank) staked in the staking program are eligible to spin up HOPR nodes.
+
+""
+To register one (`community` rank) or many (`developer` rank) eligible node in the NR, please follow:
+
+#### Procedure
+
+1. Create a MetaMask wallet (note as “account”)
+2. Fund “account” with some xDAI (e.g 0.1 xDAI)
+3. Start your local HOPR node
+4. Save private keys (`ACCOUNT_PRIVKEY` and `DEV_BANK_PRIVKEY`) into `.env` file
+
+   ```
+   export ACCOUNT_PRIVKEY=<account_private_key>
+   ```
+
+   and
+
+   ```
+   source .env
+   ```
+
+5. Request "Network_registry" NFT. Either by requesting from TECH (or COM) team, or by obtaining directly from "Dev Bank". For the latter, add the following line into `.env` file
+
+   ```
+   export DEV_BANK_PRIVKEY=<dev_bank_private_key>
+   ```
+
+   and
+
+   ```
+   source .env
+   ```
+
+   run
+
+   ```
+   make register-node-with-nft endpoint=<hoprd_endpoint> nftrank=<"Network_registry" NFT Rank ("developer" or "community")> account=<staking_account> environment=<release_name> network=xdai
+   ```
+
+   Note: please provide `endpoint=<hoprd_endpoint>` when the node exposes port different from `localhost:3001`.
