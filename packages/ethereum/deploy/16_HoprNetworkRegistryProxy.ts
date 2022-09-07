@@ -36,6 +36,8 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log(`"HoprNetworkRegistryProxy" deployed at ${registryProxy.address}`)
 }
 
+// revert once we patch from Valencia's release
+main.skip = async (_env: HardhatRuntimeEnvironment) => true
 main.dependencies = ['preDeploy', 'HoprStake']
 main.tags = ['HoprNetworkRegistryProxy']
 
