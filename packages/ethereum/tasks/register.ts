@@ -23,6 +23,17 @@ export type RegisterOpts =
       task: 'disable' | 'enable'
       privatekey?: string // private key of the caller
     }
+  | {
+    task: 'force-eligibility-update'
+    nativeAddresses: string
+    eligibility: string
+    privatekey?: string // private key of the caller
+    }
+  | {
+    task: 'sync'
+    peerIds: string
+    privatekey?: string // private key of the caller
+  }
 
 /**
  * Used by our E2E tests to interact with 'HoprNetworkRegistry' and 'HoprDummyProxyForNetworkRegistry'.
@@ -107,6 +118,7 @@ async function main(
         await (await (hoprProxy as HoprDummyProxyForNetworkRegistry).ownerBatchAddAccounts(nativeAddresses)).wait()
       }
       await (await hoprNetworkRegistry.ownerRegister(nativeAddresses, peerIds)).wait()
+      console.log(`${nativeAddresses} with ${peerIds} is registered.`)
     } else if (opts.task === 'remove') {
       const peerIds = opts.peerIds.split(',')
 
@@ -137,8 +149,29 @@ async function main(
       await (await hoprNetworkRegistry.ownerDeregister(peerIds)).wait()
     } else if (opts.task === 'enable' && !isEnabled) {
       await (await hoprNetworkRegistry.enableRegistry()).wait()
+      console.log(`Registry contract is enabled.`)
     } else if (opts.task === 'disable' && isEnabled) {
       await (await hoprNetworkRegistry.disableRegistry()).wait()
+      console.log(`Registry contract is disabled.`)
+    } else if (opts.task === 'force-eligibility-update') {
+      const nativeAddresses = opts.nativeAddresses.split(',')
+      const eligibility = opts.eligibility.split(',')
+
+      // ensure lists match in length
+      if (nativeAddresses.length !== eligibility.length) {
+        console.error('Given native and eligibility lists do not match in length.')
+        process.exit(1)
+      }
+
+      const eligibilityToUpdate = eligibility.map(val => val.toLowerCase() === 'true')
+
+      await (await hoprNetworkRegistry.ownerForceEligibility(nativeAddresses, eligibilityToUpdate)).wait()
+      console.log(`Eligibility of accounts ${opts.nativeAddresses} are forced to updated to ${opts.eligibility}`)
+    } else if (opts.task === 'sync') {
+      const peerIds = opts.peerIds.split(',')
+
+      await (await hoprNetworkRegistry.sync(peerIds)).wait()
+      console.log(`Eligibility of peers ${opts.peerIds} are synced`)
     } else {
       throw Error(`Task "${opts.task}" not available.`)
     }

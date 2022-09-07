@@ -240,6 +240,7 @@ task<RegisterOpts>(
   .addParam<RegisterOpts['task']>('task', 'The task to run', undefined, types.string)
   .addOptionalParam<string>('nativeAddresses', 'A list of native addresses', undefined, types.string)
   .addOptionalParam<string>('peerIds', 'A list of comma-seperated peerIds', undefined, types.string)
+  .addOptionalParam<string>('eligibility', 'A list of comma-seperated boolean', undefined, types.string)
   .addOptionalParam<string>('privatekey', 'Private key of the signer', undefined, types.string)
 
 task<SelfRegisterOpts>(

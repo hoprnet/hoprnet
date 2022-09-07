@@ -182,6 +182,34 @@ disable-network-registry: ## owner disables network registry (smart contract) gl
    --network $(network) \
    --task disable
 
+force-eligibility-update: ensure-environment-is-set
+force-eligibility-update: ## owner forces eligibility update
+ifeq ($(native_addresses),)
+	echo "parameter <native_addresses> missing" >&2 && exit 1
+endif
+ifeq ($(eligibility),)
+	echo "parameter <eligibility> missing" >&2 && exit 1
+endif
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
+   --network $(network) \
+   --task force-eligibility-update \
+   --native-addresses "$(native_addresses)"\
+   --eligibility "$(eligibility)"
+
+sync-eligibility: ensure-environment-is-set
+sync-eligibility: ## owner sync eligibility of peers
+ifeq ($(peer_ids),)
+	echo "parameter <peer_ids> missing" >&2 && exit 1
+endif
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
+   --network $(network) \
+   --task sync \
+   --peer-ids "$(peer_ids)"
+
 register-nodes: ensure-environment-is-set
 register-nodes: ## owner register given nodes in network registry contract
 ifeq ($(native_addresses),)
