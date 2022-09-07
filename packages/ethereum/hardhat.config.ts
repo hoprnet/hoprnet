@@ -264,7 +264,12 @@ task<RequestTestTokensOpts>(
     types.string
   )
   .addParam<string>('recipient', 'Address of the NFT recipient', undefined, types.string)
-  .addOptionalParam<NetworkRegistryNftRank>('nftRank', 'Network_registry NFT rank ("developer" or "community")', undefined, types.string)
+  .addOptionalParam<NetworkRegistryNftRank>(
+    'nftRank',
+    'Network_registry NFT rank ("developer" or "community")',
+    undefined,
+    types.string
+  )
   .addOptionalParam<string>('privatekey', 'Private key of the current owner of NFTs', undefined, types.string)
 
 task<StakeOpts>('stake', 'Used by CI tests to stake tokens to the running staking program.', stake)
@@ -275,7 +280,12 @@ task<StakeOpts>('stake', 'Used by CI tests to stake tokens to the running stakin
     MIN_STAKE.toString(),
     types.string
   )
-  .addOptionalParam<NetworkRegistryNftRank>('nftRank', 'Network_registry NFT rank ("developer" or "community")', undefined, types.string)
+  .addOptionalParam<NetworkRegistryNftRank>(
+    'nftRank',
+    'Network_registry NFT rank ("developer" or "community")',
+    undefined,
+    types.string
+  )
   .addOptionalParam<string>('privatekey', 'Private key of the signer', undefined, types.string)
 
 function getSortedFiles(dependenciesGraph) {

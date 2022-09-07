@@ -69,14 +69,13 @@ async function main(
   const signerAddress = await signer.getAddress()
   console.log('Signer Address (register task)', signerAddress)
 
-  const hoprProxy =
-    network.tags.development
-      ? ((await ethers.getContractFactory('HoprDummyProxyForNetworkRegistry'))
-          .connect(signer)
-          .attach(hoprProxyAddress) as HoprDummyProxyForNetworkRegistry)
-      : ((await ethers.getContractFactory('HoprStakingProxyForNetworkRegistry'))
-          .connect(signer)
-          .attach(hoprProxyAddress) as HoprStakingProxyForNetworkRegistry)
+  const hoprProxy = network.tags.development
+    ? ((await ethers.getContractFactory('HoprDummyProxyForNetworkRegistry'))
+        .connect(signer)
+        .attach(hoprProxyAddress) as HoprDummyProxyForNetworkRegistry)
+    : ((await ethers.getContractFactory('HoprStakingProxyForNetworkRegistry'))
+        .connect(signer)
+        .attach(hoprProxyAddress) as HoprStakingProxyForNetworkRegistry)
 
   const hoprNetworkRegistry = (await ethers.getContractFactory('HoprNetworkRegistry'))
     .connect(signer)
