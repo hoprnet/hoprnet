@@ -157,13 +157,13 @@ particular branch to deploy on every change.
    1. Change all occurences of the last release name to the new release name within documentation files and Docker files. Don't touch the `protocol-config.json` and `releases.json` files in this step. Changes should be committed locally.
    2. Update `CHANGELOG.md` with the new release's information. Changes should be committed locally.
    3. Release owner checks if docs are correctly updated by comparing with the changes in `CHANGELOG.md`.
-   4. Copy contract deployment files from the old release. This can be done doing
+   4. Copy contract deployment files from the old environment (this is only done when we have introduced a new environment in `packages/core/protocol-config.json`). This can be done doing
 
    ```
-   mkdir -p packages/ethereum/deployments/${RELEASE_NAME}/xdai
-   cp packages/ethereum/deployments/${OLD_RELEASE_NAME}/xdai/* packages/ethereum/deployments/${RELEASE_NAME}/xdai/
-   cp packages/ethereum/deployments/${OLD_RELEASE_NAME}/xdai/.chainId packages/ethereum/deployments/${RELEASE_NAME}/xdai/
-   rm packages/ethereum/deployments/${RELEASE_NAME}/xdai/HoprChannels.json
+   mkdir -p packages/ethereum/deployments/${ENV}/xdai
+   cp packages/ethereum/deployments/${OLD_ENV}/xdai/* packages/ethereum/deployments/${ENV}/xdai/
+   cp packages/ethereum/deployments/${OLD_ENV}/xdai/.chainId packages/ethereum/deployments/${ENV}/xdai/
+   rm packages/ethereum/deployments/${ENV}/xdai/HoprChannels.json
    ```
 
    NOTE: Don't include the deployment of HoprChannels, because this will be re-deployed anyway by the CD system.
