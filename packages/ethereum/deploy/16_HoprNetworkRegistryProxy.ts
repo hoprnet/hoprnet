@@ -32,7 +32,11 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     ...deployOptions
   })
 
-  console.log(`"HoprNetworkRegistryProxy" (${STAKING_PROXY ? "StakingProxy.sol" : "DummyProxy.sol"}) deployed at ${registryProxy.address}`)
+  console.log(
+    `"HoprNetworkRegistryProxy" (${STAKING_PROXY ? 'StakingProxy.sol' : 'DummyProxy.sol'}) deployed at ${
+      registryProxy.address
+    }`
+  )
 }
 
 main.dependencies = ['preDeploy', 'HoprStake']

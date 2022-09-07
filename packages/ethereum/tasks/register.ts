@@ -24,16 +24,16 @@ export type RegisterOpts =
       privatekey?: string // private key of the caller
     }
   | {
-    task: 'force-eligibility-update'
-    nativeAddresses: string
-    eligibility: string
-    privatekey?: string // private key of the caller
+      task: 'force-eligibility-update'
+      nativeAddresses: string
+      eligibility: string
+      privatekey?: string // private key of the caller
     }
   | {
-    task: 'sync'
-    peerIds: string
-    privatekey?: string // private key of the caller
-  }
+      task: 'sync'
+      peerIds: string
+      privatekey?: string // private key of the caller
+    }
 
 /**
  * Used by our E2E tests to interact with 'HoprNetworkRegistry' and 'HoprDummyProxyForNetworkRegistry'.
@@ -163,7 +163,7 @@ async function main(
         process.exit(1)
       }
 
-      const eligibilityToUpdate = eligibility.map(val => val.toLowerCase() === 'true')
+      const eligibilityToUpdate = eligibility.map((val) => val.toLowerCase() === 'true')
 
       await (await hoprNetworkRegistry.ownerForceEligibility(nativeAddresses, eligibilityToUpdate)).wait()
       console.log(`Eligibility of accounts ${opts.nativeAddresses} are forced to updated to ${opts.eligibility}`)
