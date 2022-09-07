@@ -138,8 +138,8 @@
       "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
       "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
       "stake_contract_address": "0x5Bb7e435aDa333A6714e27962e4Bb6aFDE1cECd4",
-      "network_registry_contract_address": "0xf0D4D48866C4F9665212B29A64c14A1f0FEDFD4c",
-      "network_registry_proxy_contract_address": "0x15e068Ef1f76319b1848b1fcB3e49D68724AEE07",
+      "network_registry_contract_address": "0x5BC5E9cD02D0caAB0A478B69a7C97068fE5f031f",
+      "network_registry_proxy_contract_address": "0x920cC23b58adD4621327e6beE1282ba47EC17bE0",
       "tags": ["etherscan"]
     },
     "monte_rosa": {
