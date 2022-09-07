@@ -7,9 +7,10 @@ import { useState, useMemo } from 'react'
 import cookies from 'js-cookie'
 import useAPI from './useAPI'
 import useWS from './useWS'
-import { type Configuration, isSSR, getUrlParams, API_TOKEN_COOKIE } from '../utils'
+import { type Configuration, type Log, isSSR, getUrlParams, API_TOKEN_COOKIE } from '../utils'
+import { readStreamEvent } from '../utils/stream'
 
-const useAppState = () => {
+const useAppState = (onLog: (log: Log) => any) => {
   // search for parameters from url
   const urlParams = !isSSR ? getUrlParams(location) : {}
   // search for apiToken in cookies
@@ -30,7 +31,10 @@ const useAppState = () => {
   const api = useAPI(state.config)
 
   // initialize websocket connections
-  const streamWS = useWS(state.config, '/api/v2/node/stream/websocket')
+  const streamWS = useWS(state.config, '/api/v2/node/stream/websocket', (event) => {
+    const log = readStreamEvent(event)
+    if (log) onLog(log)
+  })
 
   /**
    * Updates the app's connectivity config.

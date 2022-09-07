@@ -6,8 +6,7 @@ import { type Log, createLog } from '.'
  * @param event Event coming from '/api/v2/node/stream/websocket'
  * @returns log readable by hopr-admin
  */
-export const readStreamEvent = (event: any): Log | undefined => {
-  console.log('event', event)
+export const readStreamEvent = (event: MessageEvent<any>): Log | undefined => {
   if (event.data === undefined) {
     return undefined
   }

@@ -7,15 +7,24 @@ import styles from '../styles/Home.module.css'
 import Commands from '../src/commands'
 import useAppState from '../src/state'
 import { type Log, type Configuration, createLog } from '../src/utils'
-import { readStreamEvent } from '../src/utils/stream'
 
 // TODO: fix type in refactor
 const Jazzicon = dynamic(() => import('../src/components/jazzicon'), { ssr: false }) as any
 const GIT_HASH = process.env.NEXT_PUBLIC_GIT_COMMIT
 
 export default function Home() {
+  // store logs
+  const [logs, setLogs] = useState<Log[]>([])
+  const addLog = (log: Log) => {
+    setLogs((prevLogs) => {
+      const newLogs = [...prevLogs]
+      newLogs.push(log)
+      return newLogs
+    })
+  }
+
   // initialize app state
-  const app = useAppState()
+  const app = useAppState(addLog)
   // initialize commands
   const cmds = new Commands(app.api.apiRef.current, {
     getCachedAliases() {
@@ -47,16 +56,6 @@ export default function Home() {
     const interval = setInterval(updateAliases, 5e3)
     return () => clearInterval(interval)
   }, [app.api.apiRef.current, app.status])
-
-  // store logs
-  const [logs, setLogs] = useState<Log[]>([])
-  const addLog = (log: Log) => {
-    setLogs((prevLogs) => {
-      const newLogs = [...prevLogs]
-      newLogs.push(log)
-      return newLogs
-    })
-  }
 
   // toggles connected panel
   const [showConnectedPanel, setShowConnectedPanel] = useState(false)
@@ -159,24 +158,6 @@ export default function Home() {
       }
     }
   }
-
-  // attach event listener for new streams events
-  const handleStreamEvent = (event: MessageEvent<any>) => {
-    const log = readStreamEvent(event)
-    if (log) addLog(log)
-  }
-  useEffect(() => {
-    const socket = app.streamWS.socketRef.current
-    if (!socket) return
-
-    socket.addEventListener('message', handleStreamEvent)
-
-    return () => {
-      const socket = app.streamWS.socketRef.current
-      if (!socket) return
-      socket.removeEventListener('message', handleStreamEvent)
-    }
-  }, [app.streamWS.socketRef.current, app.streamWS.state.status])
 
   return (
     <div className={styles.container}>
