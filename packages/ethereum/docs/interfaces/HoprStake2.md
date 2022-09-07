@@ -17,7 +17,6 @@
 - [\_wrappedEmits](HoprStake2.md#_wrappedemits)
 - [address](HoprStake2.md#address)
 - [callStatic](HoprStake2.md#callstatic)
-- [contractName](HoprStake2.md#contractname)
 - [deployTransaction](HoprStake2.md#deploytransaction)
 - [estimateGas](HoprStake2.md#estimategas)
 - [filters](HoprStake2.md#filters)
@@ -194,17 +193,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:698
-
-___
-
-### contractName
-
-• **contractName**: ``"HoprStake2"``
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:357
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:759
 
 ___
 
@@ -270,7 +259,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:908
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:969
 
 ___
 
@@ -303,7 +292,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:845
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:906
 
 ___
 
@@ -355,7 +344,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:383
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:444
 
 ___
 
@@ -369,7 +358,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:362
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:423
 
 ___
 
@@ -383,7 +372,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:378
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:439
 
 ___
 
@@ -397,7 +386,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:379
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:440
 
 ___
 
@@ -411,7 +400,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:380
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:441
 
 ___
 
@@ -463,7 +452,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:1058
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:1119
 
 ___
 
@@ -491,7 +480,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:381
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:442
 
 ___
 

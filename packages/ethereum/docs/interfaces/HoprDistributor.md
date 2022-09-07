@@ -17,7 +17,6 @@
 - [\_wrappedEmits](HoprDistributor.md#_wrappedemits)
 - [address](HoprDistributor.md#address)
 - [callStatic](HoprDistributor.md#callstatic)
-- [contractName](HoprDistributor.md#contractname)
 - [deployTransaction](HoprDistributor.md#deploytransaction)
 - [estimateGas](HoprDistributor.md#estimategas)
 - [filters](HoprDistributor.md#filters)
@@ -164,17 +163,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/src/types/HoprDistributor.ts:398
-
-___
-
-### contractName
-
-• **contractName**: ``"HoprDistributor"``
-
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:204
+packages/ethereum/src/types/contracts/HoprDistributor.ts:441
 
 ___
 
@@ -225,7 +214,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/src/types/HoprDistributor.ts:522
+packages/ethereum/src/types/contracts/HoprDistributor.ts:565
 
 ___
 
@@ -252,7 +241,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/src/types/HoprDistributor.ts:478
+packages/ethereum/src/types/contracts/HoprDistributor.ts:521
 
 ___
 
@@ -289,7 +278,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/src/types/HoprDistributor.ts:230
+packages/ethereum/src/types/contracts/HoprDistributor.ts:273
 
 ___
 
@@ -303,7 +292,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/src/types/HoprDistributor.ts:209
+packages/ethereum/src/types/contracts/HoprDistributor.ts:252
 
 ___
 
@@ -317,7 +306,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/src/types/HoprDistributor.ts:225
+packages/ethereum/src/types/contracts/HoprDistributor.ts:268
 
 ___
 
@@ -331,7 +320,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/src/types/HoprDistributor.ts:226
+packages/ethereum/src/types/contracts/HoprDistributor.ts:269
 
 ___
 
@@ -345,7 +334,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/src/types/HoprDistributor.ts:227
+packages/ethereum/src/types/contracts/HoprDistributor.ts:270
 
 ___
 
@@ -382,7 +371,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/src/types/HoprDistributor.ts:597
+packages/ethereum/src/types/contracts/HoprDistributor.ts:640
 
 ___
 
@@ -410,7 +399,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/src/types/HoprDistributor.ts:228
+packages/ethereum/src/types/contracts/HoprDistributor.ts:271
 
 ___
 

@@ -17,7 +17,6 @@
 - [\_wrappedEmits](HoprWhitehat.md#_wrappedemits)
 - [address](HoprWhitehat.md#address)
 - [callStatic](HoprWhitehat.md#callstatic)
-- [contractName](HoprWhitehat.md#contractname)
 - [deployTransaction](HoprWhitehat.md#deploytransaction)
 - [estimateGas](HoprWhitehat.md#estimategas)
 - [filters](HoprWhitehat.md#filters)
@@ -174,17 +173,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/src/types/HoprWhitehat.ts:493
-
-___
-
-### contractName
-
-• **contractName**: ``"HoprWhitehat"``
-
-#### Defined in
-
-packages/ethereum/src/types/HoprWhitehat.ts:265
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:549
 
 ___
 
@@ -240,7 +229,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/src/types/HoprWhitehat.ts:646
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:702
 
 ___
 
@@ -271,7 +260,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/src/types/HoprWhitehat.ts:584
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:640
 
 ___
 
@@ -313,7 +302,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/src/types/HoprWhitehat.ts:291
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:347
 
 ___
 
@@ -327,7 +316,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/src/types/HoprWhitehat.ts:270
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:326
 
 ___
 
@@ -341,7 +330,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/src/types/HoprWhitehat.ts:286
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:342
 
 ___
 
@@ -355,7 +344,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/src/types/HoprWhitehat.ts:287
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:343
 
 ___
 
@@ -369,7 +358,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/src/types/HoprWhitehat.ts:288
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:344
 
 ___
 
@@ -411,7 +400,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/src/types/HoprWhitehat.ts:748
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:804
 
 ___
 
@@ -439,7 +428,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/src/types/HoprWhitehat.ts:289
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:345
 
 ___
 

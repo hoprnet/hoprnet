@@ -17,7 +17,6 @@
 - [\_wrappedEmits](HoprBoost.md#_wrappedemits)
 - [address](HoprBoost.md#address)
 - [callStatic](HoprBoost.md#callstatic)
-- [contractName](HoprBoost.md#contractname)
 - [deployTransaction](HoprBoost.md#deploytransaction)
 - [estimateGas](HoprBoost.md#estimategas)
 - [filters](HoprBoost.md#filters)
@@ -196,17 +195,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:713
-
-___
-
-### contractName
-
-• **contractName**: ``"HoprBoost"``
-
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:352
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:793
 
 ___
 
@@ -273,7 +262,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:956
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:1036
 
 ___
 
@@ -306,7 +295,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:877
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:957
 
 ___
 
@@ -359,7 +348,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:378
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:458
 
 ___
 
@@ -373,7 +362,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:357
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:437
 
 ___
 
@@ -387,7 +376,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:373
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:453
 
 ___
 
@@ -401,7 +390,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:374
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:454
 
 ___
 
@@ -415,7 +404,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:375
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:455
 
 ___
 
@@ -468,7 +457,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:1135
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:1215
 
 ___
 
@@ -496,7 +485,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:376
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:456
 
 ___
 

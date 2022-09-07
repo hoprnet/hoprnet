@@ -17,7 +17,6 @@
 - [\_wrappedEmits](HoprStakeSeason4.md#_wrappedemits)
 - [address](HoprStakeSeason4.md#address)
 - [callStatic](HoprStakeSeason4.md#callstatic)
-- [contractName](HoprStakeSeason4.md#contractname)
 - [deployTransaction](HoprStakeSeason4.md#deploytransaction)
 - [estimateGas](HoprStakeSeason4.md#estimategas)
 - [filters](HoprStakeSeason4.md#filters)
@@ -200,17 +199,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStakeSeason4.ts:764
-
-___
-
-### contractName
-
-• **contractName**: ``"HoprStakeSeason4"``
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason4.ts:396
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason4.ts:834
 
 ___
 
@@ -279,7 +268,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStakeSeason4.ts:999
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason4.ts:1069
 
 ___
 
@@ -316,7 +305,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStakeSeason4.ts:926
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason4.ts:996
 
 ___
 
@@ -371,7 +360,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStakeSeason4.ts:422
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason4.ts:492
 
 ___
 
@@ -385,7 +374,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStakeSeason4.ts:401
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason4.ts:471
 
 ___
 
@@ -399,7 +388,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStakeSeason4.ts:417
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason4.ts:487
 
 ___
 
@@ -413,7 +402,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStakeSeason4.ts:418
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason4.ts:488
 
 ___
 
@@ -427,7 +416,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStakeSeason4.ts:419
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason4.ts:489
 
 ___
 
@@ -482,7 +471,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStakeSeason4.ts:1164
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason4.ts:1234
 
 ___
 
@@ -510,7 +499,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStakeSeason4.ts:420
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason4.ts:490
 
 ___
 
