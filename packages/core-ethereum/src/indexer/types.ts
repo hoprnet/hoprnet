@@ -65,7 +65,11 @@ type StatusListener = (status: IndexerStatus) => void
 type PeerListener = (peerData: { id: PeerId; multiaddrs: Multiaddr[] }) => void
 type ChannelUpdateListener = (channel: ChannelEntry) => void
 type IndexerEventsListener = (txHash: string) => void
-type NetworkRegistryEligibilityChangedListener = (account: Address, hoprNode: PublicKey, eligibility: boolean) => void
+type NetworkRegistryEligibilityChangedListener = (
+  account: Address,
+  hoprNodes: PublicKey[],
+  eligibility: boolean
+) => void
 type NetworkRegistryStatusChangedListener = (isEnabled: boolean) => void
 
 export interface IndexerEventEmitter {
@@ -92,7 +96,7 @@ export interface IndexerEventEmitter {
   emit(
     event: NetworkRegistryEligibilityChangedEventName,
     account: Address,
-    hoprNode: PublicKey,
+    hoprNodes: PublicKey[],
     eligibility: boolean
   ): boolean
   emit(event: NetworkRegistryStatusChangedEventName, isEnabled: boolean): boolean

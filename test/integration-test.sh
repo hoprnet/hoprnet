@@ -202,6 +202,7 @@ if ! [ -z $additional_nodes_addrs ] && ! [ -z $additional_nodes_peerids ]; then
   native_peerids_to_register+=",${additional_nodes_peerids}"
 fi
 
+# Register nodes in the NR, emit "Registered" events
 HOPR_ENVIRONMENT_ID=hardhat-localhost \
 TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
 yarn workspace @hoprnet/hopr-ethereum hardhat register \
@@ -209,7 +210,16 @@ yarn workspace @hoprnet/hopr-ethereum hardhat register \
   --task add \
   --native-addresses "${native_addrs_to_register}" \
   --peer-ids "${native_peerids_to_register}"
-log "Nodes added to register"
+log "Nodes added to register (Registered)"
+
+# Sync nodes in the NR, emit "EligibilityUpdated" events
+HOPR_ENVIRONMENT_ID=hardhat-localhost \
+TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
+yarn workspace @hoprnet/hopr-ethereum hardhat register \
+  --network hardhat \
+  --task sync \
+  --peer-ids "${native_peerids_to_register}"
+log "Nodes added to register (EligibilityUpdated)"
 
 # running withdraw and checking it results at the end of this test run
 balances=$(api_get_balances ${api1})

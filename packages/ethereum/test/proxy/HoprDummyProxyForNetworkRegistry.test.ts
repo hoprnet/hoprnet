@@ -28,7 +28,7 @@ const useFixtures = deployments.createFixture(async (_hre) => {
   }
 })
 
-describe('Registry proxy for stake v2', () => {
+describe('Dummy proxy', () => {
   let owner: Signer
   let participantAddresses: string[]
   let hoprDummyProxyForNetworkRegistry: Contract
@@ -64,7 +64,8 @@ describe('Registry proxy for stake v2', () => {
       await hoprDummyProxyForNetworkRegistry.connect(owner).ownerAddAccount(participantAddresses[3])
     })
     it(`participant is still eligible`, async () => {
-      expect(await hoprDummyProxyForNetworkRegistry.isRequirementFulfilled(participantAddresses[3])).to.be.true
+      // max allowed registration is greater than current registered amount 1
+      expect(await hoprDummyProxyForNetworkRegistry.maxAllowedRegistrations(participantAddresses[3])).to.be.gte(1)
     })
     it('fails to remove account by non-owner', async () => {
       await expect(hoprDummyProxyForNetworkRegistry.ownerRemoveAccount(participantAddresses[3])).to.be.revertedWith(

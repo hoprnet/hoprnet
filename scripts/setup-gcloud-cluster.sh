@@ -158,8 +158,11 @@ else
   )
 fi
 
-# FIXME: Quick hack, in production, due to lack of "Dev NFT", currently it uses Dummy proxy 
-# that only requires proxy owner (CI deployer account) to `register-nodes`
+# Deployer CI wallet should ideally be "eligible". To be eligible: 
+# 1. The wallet should have obtained a "Network_registry" NFT of `developer` rank (wallet should already have this)
+# 2. The wallet should have sent one above-mentioned NFT to the staking contract
+# FIXME: Correctly format the condition (in line with *meta* environment), so that the following lines are skipped for most of the time, and only be executed when: 
+# - the CI nodes wants to perform `selfRegister`
 if [[ "${environment}" != "paleochora" ]]; then
   # This can be called always, because the "stake" task is idempotent given the same arguments
   declare staking_index=0
@@ -169,13 +172,14 @@ if [[ "${environment}" != "paleochora" ]]; then
     if [[ "$((staking_index%2))" = "0" ]]; then
       PRIVATE_KEY="${staking_addrs_dict[${staking_addr}]}" make -C "${mydir}/.." stake-funds environment="${environment}"
     else
-      PRIVATE_KEY="${staking_addrs_dict[${staking_addr}]}" make -C "${mydir}/.." stake-devnft environment="${environment}"
+      PRIVATE_KEY="${staking_addrs_dict[${staking_addr}]}" make -C "${mydir}/.." stake-nrnft environment="${environment}" nftrank=developer
     fi
     ((++staking_index))
   done
 fi
 
 # Get names of all instances in this cluster
+# TODO: now `native-addresses` (a.k.a. `hopr_addrs`) doesn't need to contain unique values. The array can contain repetitive addresses
 declare instance_names
 instance_names="$(gcloud_get_managed_instance_group_instances_names "${cluster_id}")"
 declare -a instance_names_arr
