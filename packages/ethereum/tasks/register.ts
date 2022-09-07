@@ -69,9 +69,8 @@ async function main(
   const signerAddress = await signer.getAddress()
   console.log('Signer Address (register task)', signerAddress)
 
-  // FIXME: remove production when Network_registry NFT is ready in production
   const hoprProxy =
-    network.tags.development || network.tags.production
+    network.tags.development
       ? ((await ethers.getContractFactory('HoprDummyProxyForNetworkRegistry'))
           .connect(signer)
           .attach(hoprProxyAddress) as HoprDummyProxyForNetworkRegistry)
@@ -104,17 +103,16 @@ async function main(
         process.exit(1)
       }
 
-      // in staging account, register by owner; in non-stagin environment, add addresses directly to proxy
-      if (network.tags.development || network.tags.production) {
+      // in staging or production, register by owner; in non-staging environment, add addresses directly to proxy
+      if (network.tags.development) {
         await (await (hoprProxy as HoprDummyProxyForNetworkRegistry).ownerBatchAddAccounts(nativeAddresses)).wait()
       }
       await (await hoprNetworkRegistry.ownerRegister(nativeAddresses, peerIds)).wait()
     } else if (opts.task === 'remove') {
       const peerIds = opts.peerIds.split(',')
 
-      // in staging account (where "HoprStakingProxyForNetworkRegistry" is used), deregister; in non-staging environment (where "HoprDummyProxyForNetworkRegistry" is used), remove addresses directly from proxy
-      // FIXME: production should also use staking proxy
-      if (network.tags.development || network.tags.production) {
+      // in staging or production (where "HoprStakingProxyForNetworkRegistry" is used), deregister; in non-staging environment (where "HoprDummyProxyForNetworkRegistry" is used), remove addresses directly from proxy
+      if (network.tags.development) {
         let nativeAddresses
 
         if (opts.nativeAddresses) {
@@ -130,12 +128,12 @@ async function main(
             console.error('Given native and multiaddress lists do not match in length.')
             process.exit(1)
           }
+          // remove account from dummy proxy
+          await (await (hoprProxy as HoprDummyProxyForNetworkRegistry).ownerBatchRemoveAccounts(nativeAddresses)).wait()
+        } else {
+          console.error(`Must provide addresses in ownerDeregister in ${environment} (where dummy proxy is used)`)
+          process.exit(1)
         }
-
-        await (await (hoprProxy as HoprDummyProxyForNetworkRegistry).ownerBatchRemoveAccounts(nativeAddresses)).wait()
-      } else {
-        console.error(`Must provide addresses in ownerDeregister in ${environment}`)
-        process.exit(1)
       }
       await (await hoprNetworkRegistry.ownerDeregister(peerIds)).wait()
     } else if (opts.task === 'enable' && !isEnabled) {
