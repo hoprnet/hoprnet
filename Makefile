@@ -253,6 +253,7 @@ endif
    --privatekey "$(PRIVATE_KEY)"
 
 .PHONY: register-node-when-dummy-proxy
+# DEPRECATED. Only use it when a dummy network registry proxy is in use
 # Register a node when a dummy proxy is in place of staking proxy
 # node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'
 register-node-when-dummy-proxy: ensure-environment-is-set
