@@ -6,7 +6,8 @@ The purpose of this process is to document how crypto wallets are created and st
 
 | Wallet Address                               | Alias                                         | Description                                                                       |
 | -------------------------------------------- | --------------------------------------------- | --------------------------------------------------------------------------------- |
-| `0xA18732DC751BE0dB04157eb92C92BA9d0fC09FC5` | Dev Deployer                                  | Used for deploying testnet or demo contracts across our network.                  |
+| `0xA18732DC751BE0dB04157eb92C92BA9d0fC09FC5` | Dev Deployer (deprecated)                     | Used for deploying testnet or demo contracts across our network.                  |
+| `0x4fF4e61052a4DFb1bE72866aB711AE08DD861976` | Dev Deployer                                  | Used for deploying testnet or demo contracts across our network.                  |
 | `0x1A387b5103f28bc6601d085A3dDC878dEE631A56` | Dev Minter                                    | Used as user granted `mint`ing access to our test contracts in our network.       |
 | `0x34465FE0B25089Fc9D3a6D33e19F652e45B175e0` | Alice                                         | Used as first user for interacting with some of our contracts (e.g. `HOPRBoost`)  |
 | `0x2402da10A6172ED018AEEa22CA60EDe1F766655C` | Dev Bank                                      | `all-hands` wallet used by all HOPR team members to fund nodes or other accounts. |
@@ -19,7 +20,7 @@ The purpose of this process is to document how crypto wallets are created and st
 | `0x2D8E358487FeDa42629274CE041F98629Bf65cF3` | HOPR DAO Gnosis Safe Mainnet                  | Used to ratify actions on behalf of HOPR's DAO and holding Uniswap Liquidity fees |
 | `0xE9131488563776DE7FEa238d6112c5dA46be9a9F` | HOPR Association Gnosis Safe Gnosis Chain     | Used to ratify actions on behalf of HOPR's DAO                                    |
 | `0xcB2Ce4E13518e7Bb830D594fC1755B0A8802cd65` | HOPR DAO Gnosis Safe Gnosis Chain             | Used to ratify actions on behalf of HOPR's DAO                                    |
-| `0x8f7a2AbbC8741572427e3426538cD516A41102f3` | HOPR Deployer                                 | Main net minter account & HOPR Association and DAO multisig representative        |
+| `0x8f7a2AbbC8741572427e3426538cD516A41102f3` | HOPR Minter                                   | Main net minter account & HOPR Association and DAO multisig representative        |
 | `0x5AB4f2a41DEb3B925B23a3f7E00F206BED18ABB3` | Multisig n1                                   | HOPR Association representative n1 (both Gnosis Wallet + Gnosis Safe              |
 | `0x93bC372b4cC142dA75a365C5cB45be996347bfeC` | Multisig n2                                   | HOPR Association representative n2 (only Gnosis Safe)                             |
 | `0x50677B7e720102c5126e17f4485149208d3fce71` | Multisig n3                                   | HOPR Association representative n3 (only Gnosis Wallet)                           |
