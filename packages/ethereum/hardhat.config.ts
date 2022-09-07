@@ -51,7 +51,7 @@ import { writeFileSync, realpathSync } from 'fs'
 import { TASK_TEST_SETUP_TEST_ENVIRONMENT } from 'hardhat/builtin-tasks/task-names'
 import { HARDHAT_NETWORK_NAME } from 'hardhat/plugins'
 import stake, { StakeOpts } from './tasks/stake'
-import { DevNftRank, MIN_STAKE } from './utils/constants'
+import { NetworkRegistryNftRank, MIN_STAKE } from './utils/constants'
 import type { BigNumber } from 'ethers'
 
 const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, BLOCKSCOUT_KEY, HOPR_ENVIRONMENT_ID, HOPR_HARDHAT_TAG } =
@@ -253,7 +253,7 @@ task<SelfRegisterOpts>(
 
 task<RequestTestTokensOpts>(
   'request-test-tokens',
-  'Request test tokens ("Dev NFT" or "txHOPR") for a staker',
+  'Request test tokens ("Network_registry NFT" or "test wxHOPR (HOPR)") for a staker',
   requestTestTokens
 )
   .addParam<RequestTestTokensOpts['type']>('type', 'Token type to request', undefined, types.string)
@@ -264,7 +264,12 @@ task<RequestTestTokensOpts>(
     types.string
   )
   .addParam<string>('recipient', 'Address of the NFT recipient', undefined, types.string)
-  .addOptionalParam<DevNftRank>('nftRank', 'Dev NFT rank ("developer" or "community")', undefined, types.string)
+  .addOptionalParam<NetworkRegistryNftRank>(
+    'nftRank',
+    'Network_registry NFT rank ("developer" or "community")',
+    undefined,
+    types.string
+  )
   .addOptionalParam<string>('privatekey', 'Private key of the current owner of NFTs', undefined, types.string)
 
 task<StakeOpts>('stake', 'Used by CI tests to stake tokens to the running staking program.', stake)
@@ -275,7 +280,12 @@ task<StakeOpts>('stake', 'Used by CI tests to stake tokens to the running stakin
     MIN_STAKE.toString(),
     types.string
   )
-  .addOptionalParam<DevNftRank>('nftRank', 'Dev NFT rank ("developer" or "community")', undefined, types.string)
+  .addOptionalParam<NetworkRegistryNftRank>(
+    'nftRank',
+    'Network_registry NFT rank ("developer" or "community")',
+    undefined,
+    types.string
+  )
   .addOptionalParam<string>('privatekey', 'Private key of the signer', undefined, types.string)
 
 function getSortedFiles(dependenciesGraph) {

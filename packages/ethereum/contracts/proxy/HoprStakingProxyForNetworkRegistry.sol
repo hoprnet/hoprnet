@@ -44,7 +44,7 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   uint256 public stakeThreshold;
   NftTypeAndRank[] public eligibleNftTypeAndRank; // list of NFTs whose owner are considered as eligible to the network if the `stakeThreshold` is also met
   uint256[] public maxRegistrationsPerSpecialNft; // for holders of special NFT, it's the cap of peer ids one address can register.
-  NftTypeAndRank[] public specialNftTypeAndRank; // list of NFTs whose owner are considered as eligible to the network without meeting the `stakeThreshold`, e.g. "Dev NFT"
+  NftTypeAndRank[] public specialNftTypeAndRank; // list of NFTs whose owner are considered as eligible to the network without meeting the `stakeThreshold`, e.g. "Network_registry NFT"
 
   event NftTypeAndRankAdded(uint256 indexed nftType, string nftRank); // emit when a new NFT type and rank gets included in the eligibility list
   event NftTypeAndRankRemoved(uint256 indexed nftType, string nftRank); // emit when a NFT type and rank gets removed from the eligibility list

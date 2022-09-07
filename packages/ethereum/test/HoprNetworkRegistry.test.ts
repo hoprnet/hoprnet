@@ -35,7 +35,7 @@ const createFakeRegistryProxyContract = async (participants: string[]) => {
 
   participants.slice(0, 2).forEach((participant) => {
     // account 0, 1 return max uint256
-    // DEV NFT like
+    // Network_registry NFT like
     hoprNetworkRegistryRequirementFake.maxAllowedRegistrations.whenCalledWith(participant).returns(constants.MaxUint256)
   })
   participants.slice(2, 4).forEach((participant) => {

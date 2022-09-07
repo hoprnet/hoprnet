@@ -9,7 +9,7 @@ There are two ways of registering a node:
 - By the node runner itself, providing the node runner is eligible; or
 - By the owner of the `HoprNetworkRegistry` smart contract
 
-Relevant smart contracts are listed below, per environment:
+Relevant smart contracts are listed below, per environment **(to be updated)**:
 
 | Contract                 | Staging                                                                                                                      | Production                                                                                                                           |
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
@@ -25,7 +25,7 @@ Relevant smart contracts are listed below, per environment:
 
 A node can be registered by its runner if the runner is eligible. There are two ways to become an eligible account:
 
-- A node runner's Ethereum account is staking in the HOPR stake program for a minimum stake of 1000 xHOPR token
+- A node runner's Ethereum account is staking in the HOPR stake program for a minimum stake of 1000 xHOPR token and one of the NFTs from the "allowed list"
 - A node runner's Ethereum account is staking a "HOPR Boost NFT" of type `Network_registry`
 
 #### Stake xHOPR tokens in staging environment
@@ -44,17 +44,17 @@ If there's not enough xHOPR token, please use "Dev Bank" account to transfer som
 
 <mark>When not in production</mark>, CI/CD will mint "Network_registry" NFTs to `CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1]` and `CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[3]` on deployment.
 
-There are 10 "Network_registry" NFTs being minted to the "Dev Bank" account per deployment, where you can transfer some tokens from.
+There are 6 "Network_registry" NFTs (3 "developer" rank and 3 of "community" rank) being minted to the "Dev Bank" account per deployment, where you can transfer some tokens from.
 
 For the <mark>staging environment</mark>, please call the following function where the `PRIVATE_KEY` is the private key of the node runner's account. This call can only succeed if the caller (i.e. the `PRIVATE_KEY` or the node runner) has "Network_registry" NFT (on goerli staging environment).
 
 ```
-PRIVATE_KEY<private key of "account"> make stake-devnft environment=master-goerli network=goerli nftrank <rank of "Network_registry" nft>
+PRIVATE_KEY<private key of "account"> make stake-nrnft environment=master-goerli network=goerli nftrank=<rank of "Network_registry" nft>
 ```
 
 ### Register the peer ID
 
-An eligible node runner can call `selfRegister(string[] hoprPeerIds)` method from `HoprNetworkRegistry` smart contract to register one or multiple HOPR node(s).
+An eligible node runner can call `selfRegister(string[] hoprPeerIds)` method from `HoprNetworkRegistry` smart contract to register one or multiple HOPR node(s). The number of nodes one account is allowed to register is subject to the `rank` of the "Network Registry" NFT the account has staked.
 
 For the <mark>staging environment</mark>, please call the following function where the `PRIVATE_KEY` is the private key of the node runner's account. This call can only succeed if the caller (i.e. the `PRIVATE_KEY` of the node runner) is eligible (having enough stake or a "Network_registry" NFT).
 
@@ -64,7 +64,7 @@ PRIVATE_KEY=<private key of “account”> make self-register-node environment=m
 
 ## Deregister a node
 
-A node runner can call `selfDeregister(string[] hoprPeerIds)` method from `HoprNetworkRegistry` smart contract to de-register old HOPR node(s).
+A node runner can call `selfDeregister(string[] hoprPeerIds)` method from `HoprNetworkRegistry` smart contract to remove previously registered HOPR nodes.
 
 For the <mark>staging environment</mark>, please call the following function where the `PRIVATE_KEY` is the private key of the node runner's account.
 
@@ -88,7 +88,7 @@ make register-nodes environment=master-goerli network=goerli --native-addresses=
 
 ## Deregister a node
 
-Owner can call `ownerDeregister(string[] hoprPeerIds)` method from `HoprNetworkRegistry` smart contract to de-register for a list of peers.
+Owner can call `ownerDeregister(string[] hoprPeerIds)` method from `HoprNetworkRegistry` smart contract to remove a list of nodes.
 
 ```
 make deregister-nodes environment=master-goerli network=goerli --peer_ids=<peerId1,peerId2,peerId3,peerId4>
@@ -152,7 +152,7 @@ source .env
   make register-node-with-stake endpoint=<hoprd_endpoint> account=<staking_account> environment=master-goerli network=goerli
   ```
 
-### Production
+### [DEPRECATED] Production (with dummy proxy)
 
 Before "Network_registry" NFT gets minted in production environment, "Dummy proxy" is used to faciliate the process.
 Deployer wallet in the CI/CD registers node and its peerId when calling `make register-nodes` (followed by more flags and arguments). Developers must follow these steps to register their node in the registry:
@@ -182,3 +182,47 @@ e.g.
 ```
 make register-node-when-dummy-proxy endpoint="localhost:3001" api_token="^MYtoken4testing^" account=0x35A3e15A2E2C297686A4fac5999647312fdDfa3f environment=paleochora network=xdai
 ```
+
+### Production
+
+For nodes running in the upcoming "monte rosa" environment, only wallets with one "Network_registry" HoprBoost NFT (be `developer` or `community` rank) staked in the staking program are eligible to spin up HOPR nodes.
+
+""
+To register one (`community` rank) or many (`developer` rank) eligible node in the NR, please follow:
+
+#### Procedure
+
+1. Create a MetaMask wallet (note as “account”)
+2. Fund “account” with some xDAI (e.g 0.1 xDAI)
+3. Start your local HOPR node
+4. Save private keys (`ACCOUNT_PRIVKEY` and `DEV_BANK_PRIVKEY`) into `.env` file
+
+   ```
+   export ACCOUNT_PRIVKEY=<account_private_key>
+   ```
+
+   and
+
+   ```
+   source .env
+   ```
+
+5. Request "Network_registry" NFT. Either by requesting from TECH (or COM) team, or by obtaining directly from "Dev Bank". For the latter, add the following line into `.env` file
+
+   ```
+   export DEV_BANK_PRIVKEY=<dev_bank_private_key>
+   ```
+
+   and
+
+   ```
+   source .env
+   ```
+
+   run
+
+   ```
+   make register-node-with-nft endpoint=<hoprd_endpoint> nftrank=<"Network_registry" NFT Rank ("developer" or "community")> account=<staking_account> environment=<release_name> network=xdai
+   ```
+
+   Note: please provide `endpoint=<hoprd_endpoint>` when the node exposes port different from `localhost:3001`.

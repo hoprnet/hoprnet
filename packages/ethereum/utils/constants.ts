@@ -14,14 +14,14 @@ export const getHoprStakeContractName = (latestBlockTimestamp: number): string =
   }
 }
 
-export const DEV_NFT_BOOST = 0
-export const DEV_NFT_TYPE = 'Network_registry'
-export const DEV_NFT_TYPE_INDEX = 26 // as seen in https://dune.com/queries/837196/1463806
-export const DEV_NFT_RANK_TECH = 'developer'
-export const DEV_NFT_RANK_COM = 'community'
-export const DEV_NFT_MAX_REGISTRATION_TECH = constants.MaxUint256
-export const DEV_NFT_MAX_REGISTRATION_COM = 1
-export type DevNftRank = typeof DEV_NFT_RANK_TECH | typeof DEV_NFT_RANK_COM
+export const NR_NFT_BOOST = 0
+export const NR_NFT_TYPE = 'Network_registry'
+export const NR_NFT_TYPE_INDEX = 26 // as seen in https://dune.com/queries/837196/1463806
+export const NR_NFT_RANK_TECH = 'developer'
+export const NR_NFT_RANK_COM = 'community'
+export const NR_NFT_MAX_REGISTRATION_TECH = constants.MaxUint256
+export const NR_NFT_MAX_REGISTRATION_COM = 1
+export type NetworkRegistryNftRank = typeof NR_NFT_RANK_TECH | typeof NR_NFT_RANK_COM
 
 export const CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES = [
   '0x6c150A63941c6d58a2f2687a23d5a8E0DbdE181C', // nat_with_stake
