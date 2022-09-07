@@ -84,6 +84,7 @@ Owner can call `ownerRegister(address[] accounts, string[] hoprPeerIds)` method 
 
 ```
 make register-nodes environment=master-goerli network=goerli --native-addresses=<address1,address2,address3,address4> --peer-ids=<peerid1,peerid2,peerid3,peerid4>
+make force-eligibility-update environment=master-goerli network=goerli --native-addresses=<address1,address2,address3,address4> --eligibility=<true,false,true,true, etc>
 ```
 
 ## Deregister a node
