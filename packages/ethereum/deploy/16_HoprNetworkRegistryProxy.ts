@@ -37,7 +37,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 }
 
 // revert once we patch from Valencia's release
-main.skip = async (_env: HardhatRuntimeEnvironment) => true
+main.skip = async (env: HardhatRuntimeEnvironment) => env.network.name !== 'hardhat'
 main.dependencies = ['preDeploy', 'HoprStake']
 main.tags = ['HoprNetworkRegistryProxy']
 
