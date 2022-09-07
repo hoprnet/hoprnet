@@ -34,19 +34,18 @@ const checkMaxAllowance = async (
 
 /**
  * Allocation of NFTs and staks
- * |---------------|---|---|---|---|------|-----|-------|
- * | NFT Type      | 0 | 0 | 1 | 1 | Dev  | Dev | Stake |
- * |---------------|---|---|---|---|------|-----|-------|
- * | NFT Rank      | 0 | 1 | 0 | 1 | Tech | Com | --    |
- * |---------------|---|---|---|---|------|-----|-------|
- * | Participant_0 |   | x |   |   |      |     | 2000  |
- * | Participant_1 |   |   | x |   |      |     | 2000  |
- * | Participant_2 |   | x |   |   | x    |     | 100   |
- * | Participant_3 |   |   | x |   |      |     | 100   |
- * | Participant_4 |   |   | x |   |      |     | 2000  |
- * | Participant_5 |   | x |   |   |      |     | 100   |
- * | Participant_6 |   |   | x |   |      | x   | 0     |
- * |---------------|---|---|---|---|------|-----|-------|
+ * | NFT Type      | 0 | 0 | 1 | 1 | Network_registry | Network_registry | Stake |
+ * |---------------|---|---|---|---|------------------|------------------|-------|
+ * | NFT Rank      | 0 | 1 | 0 | 1 | developer        | community        | --    |
+ * |---------------|---|---|---|---|------------------|------------------|-------|
+ * | Participant_0 |   | x |   |   |                  |                  | 2000  |
+ * | Participant_1 |   |   | x |   |                  |                  | 2000  |
+ * | Participant_2 |   | x |   |   | x                |                  | 100   |
+ * | Participant_3 |   |   | x |   |                  |                  | 100   |
+ * | Participant_4 |   |   | x |   |                  |                  | 2000  |
+ * | Participant_5 |   | x |   |   |                  |                  | 100   |
+ * | Participant_6 |   |   | x |   |                  | x                | 0     |
+ * |---------------|---|---|---|---|------------------|------------------|-------|
  * @param participants
  * @returns
  */

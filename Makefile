@@ -114,9 +114,9 @@ endif
    --recipient $(recipient) \
    --privatekey "$(PRIVATE_KEY)"
    
-.PHONY: request-devnft
-request-devnft: ensure-environment-is-set
-request-devnft: ## Request one HoprBoost Dev NFT for the recipient given it has none and hasn't staked Dev NFT
+.PHONY: request-nrnft
+request-nrnft: ensure-environment-is-set
+request-nrnft: ## Request one HoprBoost Network_registry NFT for the recipient given it has none and hasn't staked Network_registry NFT
 ifeq ($(recipient),)
 	echo "parameter <recipient> missing" >&2 && exit 1
 endif
@@ -130,7 +130,7 @@ endif
 	HOPR_ENVIRONMENT_ID="$(environment)" \
 	  yarn workspace @hoprnet/hopr-ethereum run hardhat request-test-tokens \
    --network $(network) \
-   --type devnft \
+   --type nrnft \
    --nftrank $(nftrank) \
    --recipient $(recipient) \
    --privatekey "$(PRIVATE_KEY)"
@@ -149,9 +149,9 @@ endif
 		--amount 1000000000000000000000 \
 		--privatekey "$(PRIVATE_KEY)"
 
-.PHONY: stake-devnft
-stake-devnft: ensure-environment-is-set
-stake-devnft: ## stake Dev NFTs (idempotent operation)
+.PHONY: stake-nrnft
+stake-nrnft: ensure-environment-is-set
+stake-nrnft: ## stake Network_registry NFTs (idempotent operation)
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
@@ -162,7 +162,7 @@ endif
 	HOPR_ENVIRONMENT_ID="$(environment)" \
 		yarn workspace @hoprnet/hopr-ethereum run hardhat stake \
 		--network $(network) \
-		--type devnft \
+		--type nrnft \
 		--nftrank $(nftrank) \
 		--privatekey "$(PRIVATE_KEY)"
 
@@ -298,8 +298,8 @@ endif
 ifeq ($(origin DEV_BANK_PRIVKEY),undefined)
 	echo "<DEV_BANK_PRIVKEY> environment variable missing" >&2 && exit 1
 endif
-	PRIVATE_KEY=${DEV_BANK_PRIVKEY} make request-devnft recipient=${account} nftrank=${nftrank}
-	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-devnft nftrank=${nftrank}
+	PRIVATE_KEY=${DEV_BANK_PRIVKEY} make request-nrnft recipient=${account} nftrank=${nftrank}
+	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-nrnft nftrank=${nftrank}
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_ids=$(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")
 
 .PHONY: register-node-with-stake

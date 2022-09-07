@@ -19,9 +19,9 @@ There are two ways of registering a node:
 A node can be registered by its runner if the runner is eligible. There are two ways to become an eligible account:
 
 - A node runner's Ethereum account is staking in the HOPR stake program for a minimum stake of 1000 xHOPR token
-- A node runner's Ethereum account is staking a "HOPR Boost NFT" of type `Dev`
+- A node runner's Ethereum account is staking a "HOPR Boost NFT" of type `Network_registry`
 
-To stake xHOPR tokens or "Dev" HoprBoost NFT, you can interact directly with the staking contract of the environment your HOPR node is running on. For production network, there is even a [web application](/staking/how-to-stake) for such a purpose.
+To stake xHOPR tokens or "Network_registry" HoprBoost NFT, you can interact directly with the staking contract of the environment your HOPR node is running on. For production network, there is even a [web application](/staking/how-to-stake) for such a purpose.
 
 #### Register the peer ID
 

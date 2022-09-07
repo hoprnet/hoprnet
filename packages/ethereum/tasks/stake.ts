@@ -1,6 +1,6 @@
 import { Signer, Wallet } from 'ethers'
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
-import { DevNftRank, DEV_NFT_BOOST, DEV_NFT_TYPE, DEV_NFT_TYPE_INDEX } from '../utils/constants'
+import { NetworkRegistryNftRank, NR_NFT_BOOST, NR_NFT_TYPE, NR_NFT_TYPE_INDEX } from '../utils/constants'
 
 export type StakeOpts =
   | {
@@ -9,8 +9,8 @@ export type StakeOpts =
       privatekey?: string // private key of the caller
     }
   | {
-      type: 'devnft'
-      nftRank: DevNftRank
+      type: 'nrnft'
+      nftRank: NetworkRegistryNftRank
       privatekey?: string // private key of the caller
     }
 
@@ -69,23 +69,23 @@ async function stakeXhopr(hre: HardhatRuntimeEnvironment, signer, hoprStake, amo
 /**
  * @notice nftTypeIndex is fixed as the must specify the nft rank.
  */
-async function stakeDevNft(hre: HardhatRuntimeEnvironment, signer, hoprStake, nftRank: DevNftRank) {
+async function stakeNrNft(hre: HardhatRuntimeEnvironment, signer, hoprStake, nftRank: NetworkRegistryNftRank) {
   const { ethers, deployments } = hre
   // check if dev nft exists
   const nftContract = await deployments.get('HoprBoost')
   const hoprBoost = (await ethers.getContractFactory('HoprBoost')).connect(signer).attach(nftContract.address)
-  // check if the signer has staked Dev NFT
+  // check if the signer has staked Network_registry NFT
   const signerAddress = await signer.getAddress()
-  const hasStaked = await hoprStake.isNftTypeAndRankRedeemed2(DEV_NFT_TYPE_INDEX, DEV_NFT_BOOST, signerAddress)
-  const tokenUriSuffix = DEV_NFT_TYPE + '/' + nftRank
+  const hasStaked = await hoprStake.isNftTypeAndRankRedeemed2(NR_NFT_TYPE_INDEX, NR_NFT_BOOST, signerAddress)
+  const tokenUriSuffix = NR_NFT_TYPE + '/' + nftRank
 
   if (hasStaked) {
-    // Caller has staked Dev NFT, no need to repeat the process.
-    console.log(`Address ${signerAddress} has staked Dev NFT. No need to stake more.`)
+    // Caller has staked Network_registry NFT, no need to repeat the process.
+    console.log(`Address ${signerAddress} has staked Network_registry NFT. No need to stake more.`)
     return
   }
 
-  // check if the signer has desired Dev NFT
+  // check if the signer has desired Network_registry NFT
   const boostNFTBalance = await hoprBoost.balanceOf(signerAddress)
   let nftFound = false
   let nftFindingIndex = ethers.constants.Zero
@@ -95,23 +95,23 @@ async function stakeDevNft(hre: HardhatRuntimeEnvironment, signer, hoprStake, nf
     ownedNFTTokenId = await hoprBoost.tokenOfOwnerByIndex(signerAddress, nftFindingIndex)
     const ownedNftUri = await hoprBoost.tokenURI(ownedNFTTokenId)
     if (new RegExp(tokenUriSuffix, 'g').test(ownedNftUri)) {
-      console.log(`Found usable DevNFT at index ${nftFindingIndex}`)
+      console.log(`Found usable Network_registry NFT at index ${nftFindingIndex}`)
       nftFound = true
     }
     nftFindingIndex = nftFindingIndex.add(ethers.constants.One)
   }
 
   if (!nftFound) {
-    // exit when the account does not own Dev NFT
-    console.error(`Account ${signerAddress} does not have enough Dev NFT to proceed with staking`)
+    // exit when the account does not own Network_registry NFT
+    console.error(`Account ${signerAddress} does not have enough Network_registry NFT to proceed with staking`)
     process.exit(1)
   }
 
-  // now the caller has Dev NFT and no Dev NFT has been staked. Now proceed with staking
+  // now the caller has Network_registry NFT and no Network_registry NFT has been staked. Now proceed with staking
   await (
     await hoprBoost['safeTransferFrom(address,address,uint256)'](signerAddress, hoprStake.address, ownedNFTTokenId)
   ).wait()
-  console.log(`Address ${signerAddress} succeeded in staking Dev NFT.`)
+  console.log(`Address ${signerAddress} succeeded in staking Network_registry NFT.`)
 }
 
 /**
@@ -151,8 +151,8 @@ async function main(opts: StakeOpts, hre: HardhatRuntimeEnvironment, _runSuper: 
     .connect(signer)
     .attach(stakingContract.address)
 
-  if (opts.type === 'devnft') {
-    await stakeDevNft(hre, signer, hoprStake, opts.nftRank)
+  if (opts.type === 'nrnft') {
+    await stakeNrNft(hre, signer, hoprStake, opts.nftRank)
   } else if (opts.type === 'xhopr') {
     if (opts.amount) {
       await stakeXhopr(hre, signer, hoprStake, opts.amount)

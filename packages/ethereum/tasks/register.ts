@@ -69,7 +69,7 @@ async function main(
   const signerAddress = await signer.getAddress()
   console.log('Signer Address (register task)', signerAddress)
 
-  // FIXME: remove production when Dev NFT is ready in production
+  // FIXME: remove production when Network_registry NFT is ready in production
   const hoprProxy =
     network.tags.development || network.tags.production
       ? ((await ethers.getContractFactory('HoprDummyProxyForNetworkRegistry'))

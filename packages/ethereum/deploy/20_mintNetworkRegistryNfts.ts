@@ -4,17 +4,17 @@ import type { HoprBoost, ERC677Mock, HoprStakingProxyForNetworkRegistry } from '
 import { type ContractTransaction, utils } from 'ethers'
 import {
   CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES,
-  DEV_NFT_BOOST,
-  DEV_NFT_MAX_REGISTRATION_COM,
-  DEV_NFT_MAX_REGISTRATION_TECH,
-  DEV_NFT_RANK_COM,
-  DEV_NFT_RANK_TECH,
-  DEV_NFT_TYPE,
-  DEV_NFT_TYPE_INDEX,
+  NR_NFT_BOOST,
+  NR_NFT_MAX_REGISTRATION_COM,
+  NR_NFT_MAX_REGISTRATION_TECH,
+  NR_NFT_RANK_COM,
+  NR_NFT_RANK_TECH,
+  NR_NFT_TYPE,
+  NR_NFT_TYPE_INDEX,
   MIN_STAKE
 } from '../utils/constants'
 
-const NUM_DEV_NFT = 3
+const NUM_NR_NFT = 3
 const DUMMY_NFT_TYPE = 'Dummy'
 const DUMMY_NFT_BOOST = 10
 const MINTER_ROLE = utils.keccak256(utils.toUtf8Bytes('MINTER_ROLE'))
@@ -49,7 +49,7 @@ const getToCreateDummyNftIndexes = async (
       : Array.from({ length: shouldHaveIndexesBefore - mintedIndex + 1 }, (_, i) => i + mintedIndex)
 
   console.log(
-    `To have HoprBoost NFT of ${DEV_NFT_TYPE} type at index ${shouldHaveIndexesBefore}, ${dummyNftIndexsToMint.length} type(s) of dummy NFTs of indexes ${dummyNftIndexsToMint} should be minted.`
+    `To have HoprBoost NFT of ${NR_NFT_TYPE} type at index ${shouldHaveIndexesBefore}, ${dummyNftIndexsToMint.length} type(s) of dummy NFTs of indexes ${dummyNftIndexsToMint} should be minted.`
   )
 
   return dummyNftIndexsToMint
@@ -83,7 +83,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const hoprBoost = (await ethers.getContractFactory('HoprBoost')).attach(boostDeployment.address) as HoprBoost
 
   // check type index of HoprBoost NFTs
-  const dummyNftTypesToBeMinted = await getToCreateDummyNftIndexes(hoprBoost, DEV_NFT_TYPE_INDEX)
+  const dummyNftTypesToBeMinted = await getToCreateDummyNftIndexes(hoprBoost, NR_NFT_TYPE_INDEX)
 
   const isDeployerMinter = await hoprBoost.hasRole(MINTER_ROLE, deployer)
   if (isDeployerMinter) {
@@ -105,21 +105,21 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     }
 
     // mint NR NFTs
-    for (const networkRegistryNftRank of [DEV_NFT_RANK_TECH, DEV_NFT_RANK_COM]) {
+    for (const networkRegistryNftRank of [NR_NFT_RANK_TECH, NR_NFT_RANK_COM]) {
       console.log(
-        `... minting ${NUM_DEV_NFT} ${DEV_NFT_TYPE} NFTs type of index ${DEV_NFT_TYPE_INDEX} to ${admin}\n...minting 1 ${DEV_NFT_TYPE} NFTs to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1], [3]\n...minting 10 ${DEV_NFT_TYPE} NFTs to dev bank ${DEV_BANK_ADDRESS}`
+        `... minting ${NUM_NR_NFT} ${NR_NFT_TYPE} NFTs type of index ${NR_NFT_TYPE_INDEX} to ${admin}\n...minting 1 ${NR_NFT_TYPE} NFTs to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1], [3]\n...minting 10 ${NR_NFT_TYPE} NFTs to dev bank ${DEV_BANK_ADDRESS}`
       )
       await awaitTxConfirmation(
         hoprBoost.batchMint(
           [
-            ...new Array(NUM_DEV_NFT).fill(admin),
+            ...new Array(NUM_NR_NFT).fill(admin),
             CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1],
             CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[3],
             ...Array(10).fill(DEV_BANK_ADDRESS)
           ],
-          DEV_NFT_TYPE,
+          NR_NFT_TYPE,
           networkRegistryNftRank,
-          DEV_NFT_BOOST,
+          NR_NFT_BOOST,
           0,
           {
             gasLimit: 4e6
@@ -144,17 +144,17 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
     await awaitTxConfirmation(
       registryProxy.ownerBatchAddNftTypeAndRank(
-        [DEV_NFT_TYPE_INDEX, DEV_NFT_TYPE_INDEX],
-        [DEV_NFT_RANK_TECH, DEV_NFT_RANK_COM]
+        [NR_NFT_TYPE_INDEX, NR_NFT_TYPE_INDEX],
+        [NR_NFT_RANK_TECH, NR_NFT_RANK_COM]
       ),
       environment,
       ethers
     )
     await awaitTxConfirmation(
       registryProxy.ownerBatchAddSpecialNftTypeAndRank(
-        [DEV_NFT_TYPE_INDEX, DEV_NFT_TYPE_INDEX],
-        [DEV_NFT_RANK_TECH, DEV_NFT_RANK_COM],
-        [DEV_NFT_MAX_REGISTRATION_TECH, DEV_NFT_MAX_REGISTRATION_COM]
+        [NR_NFT_TYPE_INDEX, NR_NFT_TYPE_INDEX],
+        [NR_NFT_RANK_TECH, NR_NFT_RANK_COM],
+        [NR_NFT_MAX_REGISTRATION_TECH, NR_NFT_MAX_REGISTRATION_COM]
       ),
       environment,
       ethers
@@ -197,7 +197,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 }
 
 main.dependencies = ['preDeploy', 'HoprNetworkRegistry', 'HoprBoost', 'HoprStake']
-main.tags = ['MintDevNftTransferOwnership']
+main.tags = ['MintNetworkRegistryNfts']
 main.skip = async (env: HardhatRuntimeEnvironment) => !!env.network.tags.production
 
 export default main

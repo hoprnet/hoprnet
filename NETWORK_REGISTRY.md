@@ -49,7 +49,7 @@ There are 10 "Network_registry" NFTs being minted to the "Dev Bank" account per 
 For the <mark>staging environment</mark>, please call the following function where the `PRIVATE_KEY` is the private key of the node runner's account. This call can only succeed if the caller (i.e. the `PRIVATE_KEY` or the node runner) has "Network_registry" NFT (on goerli staging environment).
 
 ```
-PRIVATE_KEY<private key of "account"> make stake-devnft environment=master-goerli network=goerli nftrank <rank of "Network_registry" nft>
+PRIVATE_KEY<private key of "account"> make stake-nrnft environment=master-goerli network=goerli nftrank <rank of "Network_registry" nft>
 ```
 
 ### Register the peer ID
