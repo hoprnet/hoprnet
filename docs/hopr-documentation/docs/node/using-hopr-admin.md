@@ -91,7 +91,7 @@ If you are using a hardware node like Dappnode or Avado you can download your id
 
 **_Dappnode –_** Find HOPR in your packages and navigate to the backup section. From there all you have to do is click 'Download backup'.
 
-![dappnode backup](/docs/hopr-documentation/img/dappnde-backup.png)
+![dappnode backup](/docs/hopr-documentation/img/dappnode-backup.png)
 
 **_Avado –_** For Avado you have to specify you want to download /app/hoprd-db in the Avado UI. Once you have located your HOPR package click on the 'manage' icon.
 
