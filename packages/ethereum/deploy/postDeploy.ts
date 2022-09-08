@@ -88,7 +88,12 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const contractName = contract.replace('.json', '')
     const contractAddress = data.address
 
+    console.log('contractName', contractName)
+    console.log('contractAddress', contractAddress)
+    console.log('data', data)
+
     const result = await checkIfContractIsVerified(contractName, contractAddress, hre)
+    console.log('is verified', result)
 
     if ((result as any).status === '0') {
       // When {"message": "Contract source code not verified", "status": "0"} continue with the verification
