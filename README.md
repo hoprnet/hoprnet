@@ -63,19 +63,19 @@ The preferred way of installation should be via Docker.
 
 All our docker images can be found in [our Google Cloud Container Registry][4].
 Each image is prefixed with `gcr.io/hoprassociation/$PROJECT:$RELEASE`.
-The `master-goerli` tag represents the `master` branch, while the `paleochora` tag
+The `master-goerli` tag represents the `master` branch, while the `valencia` tag
 represents the most recent `release/*` branch.
 
 You can pull the Docker image like so:
 
 ```sh
-docker pull gcr.io/hoprassociation/hoprd:paleochora
+docker pull gcr.io/hoprassociation/hoprd:valencia
 ```
 
 For ease of use you can set up a shell alias to run the latest release as a docker container:
 
 ```sh
-alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:paleochora'
+alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:valencia'
 ```
 
 **IMPORTANT:** Using the above command will map the database folder used by hoprd to a local folder called `.hoprd-db` in your home directory. You can customize the location of that folder further by executing the following command:
@@ -141,7 +141,7 @@ $ hoprd --help
 Options:
   --help                         Show help  [boolean]
   --version                      Show version number  [boolean]
-  --environment                  Environment id which the node shall run on (HOPRD_ENVIRONMENT)  [string] [choices: "hardhat-localhost", "hardhat-localhost2", "master-goerli", "debug-goerli", "tuttlingen", "prague", "budapest", "athens", "lisbon", "ouagadougou", "paleochora"] [default: ""]
+  --environment                  Environment id which the node shall run on (HOPRD_ENVIRONMENT)  [string] [choices: "hardhat-localhost", "hardhat-localhost2", "master-goerli", "debug-goerli", "tuttlingen", "prague", "budapest", "athens", "lisbon", "ouagadougou", "paleochora", "monte_rosa"] [default: ""]
   --host                         The network host to run the HOPR node on [env: HOPRD_HOST]  [string] [default: "0.0.0.0:9091"]
   --announce                     Announce public IP to the network [env: HOPRD_ANNOUNCE]  [boolean] [default: false]
   --admin                        Run an admin interface on localhost:3000, requires --apiToken [env: HOPRD_ADMIN]  [boolean] [default: false]
@@ -183,7 +183,7 @@ As you might have noticed running the node without any command-line argument mig
 The following command assumes you've setup an alias like described in [Install via Docker](#install-via-docker).
 
 ```sh
-hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --admin --adminHost 0.0.0.0 --apiToken <MY_TOKEN> --environment paleochora
+hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --admin --adminHost 0.0.0.0 --apiToken <MY_TOKEN> --environment monte_rosa
 ```
 
 Here is a short break-down of each argument.
@@ -198,7 +198,7 @@ hoprd
   --admin   	            # enable the node's admin UI
   --adminHost 0.0.0.0       # set IP of the Rest API to the container's external IP so it can be reached on your host
   --apiToken <MY_TOKEN>     # specify password for accessing admin panel and REST API(REQUIRED)
-  --environment paleochora # an environment is defined as a chain plus a number of deployed smart contract addresses to use on that chain
+  --environment monte_rosa # an environment is defined as a chain plus a number of deployed smart contract addresses to use on that chain
                             # each release has a default environment id set, but the user can override this value
                             # nodes from different environments are **not able** to communicate
 ```
@@ -473,7 +473,7 @@ script to the creation script:
 ```sh
 ./scripts/setup-gcloud-cluster.sh \
   my-custom-cluster-without-name \
-  gcr.io/hoprassociation/hoprd:paleochora \
+  gcr.io/hoprassociation/hoprd:valencia \
   `pwd`/scripts/topologies/full_interconnected_cluster.sh
 ```
 
