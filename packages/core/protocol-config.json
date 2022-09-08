@@ -39,10 +39,10 @@
       "channels_contract_address": "0xc81E2Bf738f8018202c8Bd9dA85a12D5D7291d08",
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
       "xhopr_contract_address": "0xe8aD2ac347dA7549Aaca8F5B1c5Bf979d85bC78F",
-      "boost_contract_address": "0xc87850338815D8bBadDbfc5d67938500525f8F5a",
-      "stake_contract_address": "0x545e7F67F80e60928052Bd0385e76f71dc694262",
-      "network_registry_proxy_contract_address": "0x3065D24595cbcadB03b33C91c00593dc6119EF14",
-      "network_registry_contract_address": "0x920cC23b58adD4621327e6beE1282ba47EC17bE0",
+      "boost_contract_address": "0x52C7c5AC7d0570eF03d274E2644974fa0097089e",
+      "stake_contract_address": "0x8CF4c5e0e1A9DB314a959DFDFB488DdF66d5B23f",
+      "network_registry_proxy_contract_address": "0xBEf9de8A8EA1f6c18205E4c68DeC5f19Eb725C03",
+      "network_registry_contract_address": "0xf3374666487A58aa424BF9dB9bCf74250393a757",
       "tags": ["etherscan"]
     },
     "debug-goerli": {
