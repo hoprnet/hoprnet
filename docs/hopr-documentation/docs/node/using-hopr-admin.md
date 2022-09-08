@@ -91,15 +91,15 @@ If you are using a hardware node like Dappnode or Avado you can download your id
 
 **_Dappnode –_** Find HOPR in your packages and navigate to the backup section. From there all you have to do is click 'Download backup'.
 
-![dappnode backup](/docs/hopr-documentation/img/dappnode-backup.png)
+![dappnode backup](./images/dappnode-backup.png)
 
 **_Avado –_** For Avado you have to specify you want to download /app/hoprd-db in the Avado UI. Once you have located your HOPR package click on the 'manage' icon.
 
-![avado manage](/docs/hopr-documentation/img/avado-manage.png)
+![avado manage](./images/avado-manage.png)
 
 From here scroll down to the file manager and enter `/app/hoprd-db` in the field under `Download from DNP`. Then just click 'Download'.
 
-![avado download](/docs/hopr-documentation/img/avado-db.png)
+![avado download](./images/avado-db.png)
 
 **_Note:_** Make sure you enter `/app/hoprd-db` and not `/app/hoprd-db/`.
 
@@ -329,7 +329,7 @@ To use another node on the network to relay data, you have to pay them for their
 
 Payment channels are funded edges between two nodes. They are a link between two nodes with some HOPR tokens staked in them for the purpose of paying the nodes that relay data for the sender.
 
-![payment channel](/docs/hopr-documentation/img/payment-channel.png)
+![payment channel](./images/payment-channel.png)
 
 ### Opening a channel –
 
@@ -359,7 +359,7 @@ This will open a channel from you to Bob with **0.2 HOPR** staked in it. These t
 
 **_Note:_** Channels are unidirectional, opening this channel does not mean a channel from Bob to your node exists.
 
-![Channel direction](/docs/hopr-documentation/img/channel-direction.png)
+![Channel direction](./images/channel-direction.png)
 
 Only one channel can exist in a single direction between two nodes. You can have both a channel from Alice → Bob & Bob → Alice but not more than one channel from Alice → Bob.
 
@@ -458,7 +458,7 @@ In this example, we’re using Bob’s node to relay a message back to ourselves
 
 This is also why 0-HOP/direct messages are possible without any open payment channels.
 
-![1-HOP message](/docs/hopr-documentation/img/1-hop.png)
+![1-HOP message](./images/1-hop.png)
 
 This is a manually selected 1-HOP path. If you try and replicate this with Alice it should fail as you have no open channels with Alice.
 
@@ -486,7 +486,7 @@ Now let’s try and send a 2-HOP message. For this to work, every node in the pa
 
 So a 2-HOP message to yourself through Bob and Alice: me → Bob → Alice → me would require channels to be open from me → Bob & Bob → Alice (me → Bob → Alice). The final channel from Alice → me is optional.
 
-![2-hop-success](/docs/hopr-documentation/img/2-hop-success.png)
+![2-hop-success](./images/2-hop-success.png)
 
 You can try and send a 2-HOP message by typing:
 
@@ -498,13 +498,13 @@ send Bob,Alice,me Hi!
 
 If it fails to send then it is likely that Bob does not have a channel open with Alice. Since you should have a channel open with Bob with sufficient funds staked. A successful message costs 0.01 HOPR tokens per HOP currently.
 
-![2-hop-fail](/docs/hopr-documentation/img/2-hop-fail.png)
+![2-hop-fail](./images/2-hop-fail.png)
 
 ### Path directionality –
 
 Even if the message succeeds you should note that you won’t be able to make this 2-HOP message in the other direction as you don’t have an open channel with Alice. And Alice may not have an open channel with Bob.
 
-![Reverse route](/docs/hopr-documentation/img/reverse-route.png)
+![Reverse route](./images/reverse-route.png)
 
 Here the first route is viable whereas the second route will fail.
 
@@ -516,7 +516,7 @@ In order to increase your pathing options, you want to connect to other well-con
 
 You can not have consecutively repeating nodes. For example, me → Alice → Alice → Bob.
 
-![Consecutively repeating node](/docs/hopr-documentation/img/consecutively-repeating.png)
+![Consecutively repeating node](./images/consecutively-repeating.png)
 
 This is also the reason why the first node specified on a path cannot be yourself as you are also the sending node.
 
@@ -605,7 +605,7 @@ You should have earned tickets if your node was used to relay data. If you have 
 
 Tickets are redeemed automatically so the tickets which contain value will automatically be converted to HOPR tokens and added to the payment channel that was used for that relay.
 
-![tickets-channels](/docs/hopr-documentation/img/tickets-channels.png)
+![tickets-channels](./images/tickets-channels.png)
 
 **_Note:_** If no channel exists for the last HOP of a relay the tokens are added directly into the node balance.
 
