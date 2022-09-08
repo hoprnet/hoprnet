@@ -266,7 +266,7 @@ task<RequestTestTokensOpts>(
   )
   .addParam<string>('recipient', 'Address of the NFT recipient', undefined, types.string)
   .addOptionalParam<NetworkRegistryNftRank>(
-    'nftRank',
+    'nftrank',
     'Network_registry NFT rank ("developer" or "community")',
     undefined,
     types.string
@@ -282,7 +282,7 @@ task<StakeOpts>('stake', 'Used by CI tests to stake tokens to the running stakin
     types.string
   )
   .addOptionalParam<NetworkRegistryNftRank>(
-    'nftRank',
+    'nftrank',
     'Network_registry NFT rank ("developer" or "community")',
     undefined,
     types.string
