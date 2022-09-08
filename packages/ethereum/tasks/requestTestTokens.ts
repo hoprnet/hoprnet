@@ -11,7 +11,7 @@ export type RequestTestTokensOpts =
     }
   | {
       type: 'nrnft'
-      nftRank: NetworkRegistryNftRank
+      nftrank: NetworkRegistryNftRank
       recipient: string // address of the recipient
       privatekey?: string // private key of the Boost NFT owner
     }
@@ -55,7 +55,7 @@ async function requestNrNft(
   hre: HardhatRuntimeEnvironment,
   signer: Signer,
   hoprStake: Contract,
-  nftRank: NetworkRegistryNftRank,
+  nftrank: NetworkRegistryNftRank,
   recipientAddress: string
 ) {
   const { ethers, deployments } = hre
@@ -67,7 +67,7 @@ async function requestNrNft(
 
   // check if the recipient has staked Network_registry NFT
   const hasStaked = await hoprStake.isNftTypeAndRankRedeemed2(NR_NFT_TYPE_INDEX, NR_NFT_BOOST, recipientAddress)
-  const tokenUriSuffix = NR_NFT_TYPE + '/' + nftRank
+  const tokenUriSuffix = NR_NFT_TYPE + '/' + nftrank
 
   if (hasStaked) {
     // Recipient has staked Network_registry NFT, not going to send NFT again.
@@ -168,7 +168,7 @@ async function main(opts: RequestTestTokensOpts, hre: HardhatRuntimeEnvironment,
     .attach(stakingContract.address)
 
   if (opts.type === 'nrnft') {
-    await requestNrNft(hre, signer, hoprStake, opts.nftRank, recipientAddress)
+    await requestNrNft(hre, signer, hoprStake, opts.nftrank, recipientAddress)
   } else if (opts.type === 'xhopr') {
     if (opts.amount) {
       await requestXhopr(hre, signer, opts.amount, recipientAddress)

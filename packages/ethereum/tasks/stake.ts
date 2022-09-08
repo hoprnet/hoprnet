@@ -10,7 +10,7 @@ export type StakeOpts =
     }
   | {
       type: 'nrnft'
-      nftRank: NetworkRegistryNftRank
+      nftrank: NetworkRegistryNftRank
       privatekey?: string // private key of the caller
     }
 
@@ -69,7 +69,7 @@ async function stakeXhopr(hre: HardhatRuntimeEnvironment, signer, hoprStake, amo
 /**
  * @notice nftTypeIndex is fixed as the must specify the nft rank.
  */
-async function stakeNrNft(hre: HardhatRuntimeEnvironment, signer, hoprStake, nftRank: NetworkRegistryNftRank) {
+async function stakeNrNft(hre: HardhatRuntimeEnvironment, signer, hoprStake, nftrank: NetworkRegistryNftRank) {
   const { ethers, deployments } = hre
   // check if dev nft exists
   const nftContract = await deployments.get('HoprBoost')
@@ -77,7 +77,7 @@ async function stakeNrNft(hre: HardhatRuntimeEnvironment, signer, hoprStake, nft
   // check if the signer has staked Network_registry NFT
   const signerAddress = await signer.getAddress()
   const hasStaked = await hoprStake.isNftTypeAndRankRedeemed2(NR_NFT_TYPE_INDEX, NR_NFT_BOOST, signerAddress)
-  const tokenUriSuffix = NR_NFT_TYPE + '/' + nftRank
+  const tokenUriSuffix = NR_NFT_TYPE + '/' + nftrank
 
   if (hasStaked) {
     // Caller has staked Network_registry NFT, no need to repeat the process.
@@ -152,7 +152,7 @@ async function main(opts: StakeOpts, hre: HardhatRuntimeEnvironment, _runSuper: 
     .attach(stakingContract.address)
 
   if (opts.type === 'nrnft') {
-    await stakeNrNft(hre, signer, hoprStake, opts.nftRank)
+    await stakeNrNft(hre, signer, hoprStake, opts.nftrank)
   } else if (opts.type === 'xhopr') {
     if (opts.amount) {
       await stakeXhopr(hre, signer, hoprStake, opts.amount)
