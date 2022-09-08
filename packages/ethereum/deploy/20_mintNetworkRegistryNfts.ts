@@ -154,7 +154,10 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       registryProxy.ownerBatchAddSpecialNftTypeAndRank(
         [NR_NFT_TYPE_INDEX, NR_NFT_TYPE_INDEX],
         [NR_NFT_RANK_TECH, NR_NFT_RANK_COM],
-        [NR_NFT_MAX_REGISTRATION_TECH, NR_NFT_MAX_REGISTRATION_COM]
+        [NR_NFT_MAX_REGISTRATION_TECH, NR_NFT_MAX_REGISTRATION_COM],
+        {
+          gasLimit: 4e6
+        }
       ),
       environment,
       ethers
