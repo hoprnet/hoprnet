@@ -69,7 +69,7 @@ Now that you have started a node, what exactly is your node and what are its fea
 
 ### Identity file –
 
-The **_identity file_** contains your private key and is essentially your wallet for the node. When you start your node you supply `–identity` and `–password` arguments.
+The **_identity file_** contains your private key and is essentially your wallet for the node. When you installed your node you supplied `–identity` and `–password` arguments.
 
 ```bash
 docker run --pull always -ti -v $HOME/.hoprd-db:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:paleochora --admin --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --init --api --apiHost "0.0.0.0" --apiPort 3001 --identity /app/db/.hopr-id-paleochora --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --adminPort 3000 --host "0.0.0.0:9091"
@@ -83,7 +83,7 @@ If one doesn’t exist then it is created, encrypted and then stored at the give
 
 ### Backing up your identity file –
 
-If you used Docker to install your node then your identity file will be stored on your OS at the path you specified: `/app/db/.hopr-id-paleochora`
+If you used Docker to install your node then your identity file will be stored on your OS at the path you specified: `/app/db/.hopr-id-paleochora` so you can skip this step. 
 
 If you are using a hardware node like Dappnode or Avado you can download your identity file on their interfaces.
 
@@ -137,8 +137,8 @@ balance
 The output will look similar to this:
 
 ```
-HOPR Balance:  0.12 wxHOPR
-ETH Balance:   0.9915287 xDAI
+HOPR Balance:     0.12 wxHOPR
+Native Balance:   0.9915287 xDAI
 ```
 
 **HOPR Balance** – Either wxHOPR or mHOPR depending on the network, These HOPR tokens are used to fund payment channels / pay nodes to relay data.
@@ -151,9 +151,7 @@ Now that we have gone through a few of the properties of your node, let's try an
 
 ### Finding other nodes –
 
-First, let’s look at the available nodes for you to connect to.
-
-Type `peers` into the command line:
+First, let’s look at the available nodes for you to connect to, type `peers` into the command line:
 
 ```
 peers
@@ -566,9 +564,7 @@ settings strategy passive
 
 ## Tickets –
 
-Although you spend HOPR tokens to relay data you are actually paid in tickets. Some tickets contain a range of HOPR tokens but most are useless.
-
-The point of this is that over a sizeable amount of tickets the payment for your services will converge to the amount you would have been paid.
+Although you spend HOPR tokens to relay data you are actually paid in tickets. Some tickets contain a range of HOPR tokens but most are useless. The point of this is that over a sizeable amount of tickets the payment for your services will converge to the amount you would have been paid.
 
 But with the added benefit of:
 
@@ -603,7 +599,7 @@ You should have earned tickets if your node was used to relay data. If you have 
 
 ### Ticket redemption –
 
-Tickets are redeemed automatically so the tickets which contain value will automatically be converted to HOPR tokens and added to the payment channel that was used for that relay.
+Tickets are redeemed automatically, so the tickets which contain value will automatically be converted to HOPR tokens and added to the payment channels used for that relay. The rest will just be discarded with no trace left on the blockchain.
 
 ![tickets-channels](./images/tickets-channels.png)
 
