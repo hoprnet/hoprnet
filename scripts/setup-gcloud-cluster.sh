@@ -164,12 +164,10 @@ fi
 # FIXME: Correctly format the condition (in line with *meta* environment), so that the following lines are skipped for most of the time, and only be executed when: 
 # - the CI nodes wants to perform `selfRegister`
 # This can be called always, because the "stake" task is idempotent given the same arguments
-declare staking_index=0
 for staking_addr in "${!staking_addrs_dict[@]}" ; do
   fund_if_empty "${staking_addr}" "${environment}"
   # we only stake NFT for valencia release
   PRIVATE_KEY="${staking_addrs_dict[${staking_addr}]}" make -C "${mydir}/.." stake-nrnft environment="${environment}" nftrank=developer
-  ((++staking_index))
 done
 
 # Get names of all instances in this cluster
