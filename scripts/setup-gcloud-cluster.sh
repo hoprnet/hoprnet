@@ -163,20 +163,12 @@ fi
 # 2. The wallet should have sent one above-mentioned NFT to the staking contract
 # FIXME: Correctly format the condition (in line with *meta* environment), so that the following lines are skipped for most of the time, and only be executed when: 
 # - the CI nodes wants to perform `selfRegister`
-if [[ "${environment}" != "paleochora" ]]; then
-  # This can be called always, because the "stake" task is idempotent given the same arguments
-  declare staking_index=0
-  for staking_addr in "${!staking_addrs_dict[@]}" ; do
-    fund_if_empty "${staking_addr}" "${environment}"
-    # we alternate between staking funds or NFT
-    if [[ "$((staking_index%2))" = "0" ]]; then
-      PRIVATE_KEY="${staking_addrs_dict[${staking_addr}]}" make -C "${mydir}/.." stake-funds environment="${environment}"
-    else
-      PRIVATE_KEY="${staking_addrs_dict[${staking_addr}]}" make -C "${mydir}/.." stake-nrnft environment="${environment}" nftrank=developer
-    fi
-    ((++staking_index))
-  done
-fi
+# This can be called always, because the "stake" task is idempotent given the same arguments
+for staking_addr in "${!staking_addrs_dict[@]}" ; do
+  fund_if_empty "${staking_addr}" "${environment}"
+  # we only stake NFT for valencia release
+  PRIVATE_KEY="${staking_addrs_dict[${staking_addr}]}" make -C "${mydir}/.." stake-nrnft environment="${environment}" nftrank=developer
+done
 
 # Get names of all instances in this cluster
 # TODO: now `native-addresses` (a.k.a. `hopr_addrs`) doesn't need to contain unique values. The array can contain repetitive addresses
@@ -274,6 +266,10 @@ IFS=','
 make -C "${mydir}/.." register-nodes \
   environment="${environment}" \
   native_addresses="${used_staking_addrs[*]}" \
+  peer_ids="${hopr_addrs[*]}"
+
+make -C "${mydir}/.." sync-eligibility \
+  environment="${environment}" \
   peer_ids="${hopr_addrs[*]}"
 unset IFS
 
