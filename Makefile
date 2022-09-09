@@ -246,7 +246,7 @@ else
    --network $(network) \
    --task remove \
    --peer-ids "$(peer_ids)" \
-   --native-addresses "$(native_addresses)" 
+   --native-addresses "$(native_addresses)"
 endif
 
 .PHONY: self-register-node
@@ -311,6 +311,9 @@ endif
 register-node-with-nft: ensure-environment-is-set
 ifeq ($(endpoint),)
 	echo "parameter <endpoint> is default to localhost:3001" >&2
+endif
+ifeq ($(api_token),)
+	echo "parameter <api_token> missing" >&2 && exit 1
 endif
 ifeq ($(api_token),)
 	echo "parameter <api_token> missing" >&2 && exit 1

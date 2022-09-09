@@ -90,7 +90,7 @@ trap cleanup SIGINT SIGTERM ERR EXIT
 
 # Write AVADO docker build version & used provider
 sed -E "s/image:[ ]'hopr\.avado\.dnp\.dappnode\.eth:[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}/image: 'hopr.avado.dnp.dappnode.eth:${AVADO_VERSION}/ ;\
- s/(.+HOPRD_ENVIRONMENT=).+'(,?)/\1${environment_id}'\2/ ; s|(.+HOPRD_PROVIDER=).+'(,?)|\1${provider_url}'\2|" ./docker-compose.yml \
+ s/%ENV_ID%/${environment_id}/g ; s|(.+HOPRD_PROVIDER=).+'(,?)|\1${provider_url}'\2|" ./docker-compose.yml \
   > ./docker-compose.yml.tmp && mv ./docker-compose.yml.tmp ./docker-compose.yml
 
 # Copy sections between *_JSON_EXPORT of docker-compose.yaml to dappnode_package.json

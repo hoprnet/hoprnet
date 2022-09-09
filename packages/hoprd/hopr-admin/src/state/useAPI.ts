@@ -10,7 +10,7 @@ const useAPI = (config: Configuration) => {
   const apiRef = useRef<API>(new API(config.apiEndpoint, config.apiToken))
 
   useEffect(() => {
-    apiRef.current.updateConfig(config.apiEndpoint, config.apiToken)
+    apiRef.current = new API(config.apiEndpoint, config.apiToken)
   }, [config.apiEndpoint, config.apiToken])
 
   return {

@@ -8,7 +8,7 @@ import { type Configuration, type ApiPath, isSSR } from '../utils'
 
 export type ConnectionStatus = 'CONNECTED' | 'DISCONNECTED'
 
-const useWebsocket = (config: Configuration, apiPath: ApiPath) => {
+const useWebsocket = (config: Configuration, apiPath: ApiPath, onMessage: (e: MessageEvent<any>) => any) => {
   // update timestamp when you want to reconnect to the websocket
   const [reconnectTmsp, setReconnectTmsp] = useState<number>()
   const [state, setState] = useState<{
@@ -19,7 +19,8 @@ const useWebsocket = (config: Configuration, apiPath: ApiPath) => {
   const socketRef = useRef<WebSocket>()
 
   const setReconnectTmspDebounced = debounce((timestamp: number) => {
-    setReconnectTmsp(timestamp)
+    // do not attempt reconnection if connection is 'CONNECTED' already
+    if (state.status !== 'CONNECTED') setReconnectTmsp(timestamp)
   }, 5e3)
 
   const handleOpenEvent = () => {
@@ -74,6 +75,8 @@ const useWebsocket = (config: Configuration, apiPath: ApiPath) => {
     socketRef.current.addEventListener('close', handleCloseEvent)
     // handle errors
     socketRef.current.addEventListener('error', handleErrorEvent)
+    // handle messages
+    socketRef.current.addEventListener('message', onMessage)
 
     // cleanup when unmounting
     return () => {
@@ -82,6 +85,7 @@ const useWebsocket = (config: Configuration, apiPath: ApiPath) => {
       socketRef.current.removeEventListener('open', handleOpenEvent)
       socketRef.current.removeEventListener('close', handleCloseEvent)
       socketRef.current.removeEventListener('error', handleErrorEvent)
+      socketRef.current.removeEventListener('message', onMessage)
     }
   }, [config.apiEndpoint, config.apiToken, reconnectTmsp])
 
