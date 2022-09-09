@@ -124,6 +124,8 @@ export abstract class Command {
     const knownError = knownErrors[response.status]
     if (knownError) {
       return this.failedCommand(task, typeof knownError === 'string' ? knownError : knownError(await response.json()))
+    } else if (response.status === 403) {
+      return this.failedCommand(task, `Unauthorized. Please confirm apiToken is set`)
     } else {
       return this.failedCommand(task, `unknown error code '${response.status}'`)
     }
