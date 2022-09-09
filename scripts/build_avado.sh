@@ -60,11 +60,11 @@ fi
 
 cd "${mydir}/../packages/avado"
 
-declare default_development_environment="master-goerli"
+declare default_development_release_id="master-goerli"
 
-if [[ -z $(grep -E "${default_development_environment}" "./build/Dockerfile") ]]; then
+if [[ -z $(grep -E "${default_development_release_id}" "./build/Dockerfile") ]]; then
   # Fail if default environment is no longer `master-goerli`
-  msg "Avado Dockerfile differs. Could not find \"${default_development_environment}\" environment in it"
+  msg "Avado Dockerfile differs. Could not find \"${default_development_release_id}\" release id in it"
   exit 1
 fi
 
@@ -105,7 +105,7 @@ declare api_token=$(sed -rn "s/.+HOPRD_API_TOKEN=(.+)',/\1/p" ./docker-compose.y
 sed -E "s/%TOKEN%/${api_token}/" ./dappnode_package.json  > ./dappnode_package.json.tmp && mv ./dappnode_package.json.tmp ./dappnode_package.json
 
 # Overwrite default environment in Dockerfile with the one currently used
-sed -e "s/${default_development_environment}/${environment_id}/" ./build/Dockerfile \
+sed -e "s/${default_development_release_id}/${release_id}/" ./build/Dockerfile \
   > ./build/Dockerfile.tmp && mv ./build/Dockerfile.tmp ./build/Dockerfile
 
 # AVADO SDK does not do proper releases, therefore using GitHub + git commit hashes
