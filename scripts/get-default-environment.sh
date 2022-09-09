@@ -14,16 +14,25 @@ declare HOPR_LOG_ID="get-default-environment"
 
 source "${mydir}/utils.sh"
 
+declare key_to_extract=".value.environment_id"
+
+if [[ "$1" = "--release" ]] ; then
+  log "Getting the release id"
+  key_to_extract=".key"
+else
+  log "Getting the environment id"
+fi
+
 log "get default environment id"
 declare branch=$(git rev-parse --abbrev-ref HEAD)
 
 declare environment_id
 for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | .value.git_ref" | uniq); do
   if [[ "${branch}" =~ ${git_ref} ]]; then
-    environment_id=$(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\" and .value.default==true) | .value.environment_id")
+    environment_id=$(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\" and .value.default==true) | ${key_to_extract}")
     # if no default is set we take the first entry
     if [ -z "${environment_id}" ]; then
-      environment_id=$(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\") | .value.environment_id" | sed q)
+      environment_id=$(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\") | ${key_to_extract}" | sed q)
     fi
     break
   fi
