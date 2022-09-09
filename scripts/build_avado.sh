@@ -29,7 +29,7 @@ if [ -z "${1:-}" ]; then
 fi
 
 declare environment_id="${2:-"$(${mydir}/get-default-environment.sh)"}"
-declare release_id="${3:-"$(${mydir}/get-default-environment.sh) --release"}"
+declare release_id="${3:-"$(${mydir}/get-default-environment.sh --release)"}"
 
 if [ -z "${environment_id}" ]; then
   msg "Could not determine default environment"
@@ -112,10 +112,10 @@ sed -e "s/${default_development_release_id}/${release_id}/" ./build/Dockerfile \
 declare AVADO_SDK_COMMIT="7b035be"
 
 # Must be installed globally due to bad directory calls
-#npm install -g git+https://github.com/AvadoDServer/AVADOSDK.git#${AVADO_SDK_COMMIT}
+npm install -g git+https://github.com/AvadoDServer/AVADOSDK.git#${AVADO_SDK_COMMIT}
 
 # Must run as sudo due to underlying call to docker-compose
-#sudo avadosdk build --provider http://80.208.229.228:5001
+sudo avadosdk build --provider http://80.208.229.228:5001
 
 # http://go.ava.do/install/<IPFS HASH>
 
