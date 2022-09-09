@@ -237,7 +237,6 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
       }
     }
     specialNftTypeAndRank.push(NftTypeAndRank({nftType: nftType, nftRank: nftRank}));
-    maxRegistrationsPerSpecialNft.push(maxRegistration);
     emit SpecialNftTypeAndRankAdded(nftType, nftRank, maxRegistration);
   }
 

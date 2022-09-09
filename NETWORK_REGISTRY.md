@@ -186,8 +186,9 @@ make register-node-when-dummy-proxy endpoint="localhost:3001" api_token="^MYtoke
 
 ### Production
 
-For nodes running in the upcoming "monte_rosa" environment, only wallets with one "Network_registry" HoprBoost NFT (be `developer` or `community` rank) staked in the staking program are eligible to spin up HOPR nodes.
+For nodes running in the upcoming "monte rosa" environment, only wallets with one "Network_registry" HoprBoost NFT (be `developer` or `community` rank) staked in the staking program are eligible to spin up HOPR nodes.
 
+""
 To register one (`community` rank) or many (`developer` rank) eligible node in the NR, please follow:
 
 #### Procedure
@@ -207,49 +208,22 @@ To register one (`community` rank) or many (`developer` rank) eligible node in t
    source .env
    ```
 
-5. Request "Network_registry" NFT. Either by requesting from TECH (or COM) team, or by transferring it directly from "Dev Bank".
-
-6. Register nodes and eligible accounts onto Network Registry. There are three options:
-
-   a. For the **deployer** wallet: Deployer wallet should stake one `developer` NFT and
-   register some peer ids.
-   To stake one `developer` NFT:
+5. Request "Network_registry" NFT. Either by requesting from TECH (or COM) team, or by obtaining directly from "Dev Bank". For the latter, add the following line into `.env` file
 
    ```
-   HOPR_ENVIRONMENT_ID=monte_rosa \
-   TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-   yarn workspace @hoprnet/hopr-ethereum run hardhat stake \
-   	--network xdai \
-   	--type nrnft \
-   	--nftrank developer
+   export DEV_BANK_PRIVKEY=<dev_bank_private_key>
    ```
 
-   To register some peers:
-
-   1. When "staking proxy" is used:
-
-      ```
-      HOPR_ENVIRONMENT_ID=monte_rosa \
-      TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-      yarn workspace @hoprnet/hopr-ethereum run hardhat register:self \
-      --network xdai \
-      --task add \
-      --peer-ids <peerId1,peerId2,peerId3,peerId4...>
-      ```
-
-   2. When "dummy proxy" is used:
-      ```
-      HOPR_ENVIRONMENT_ID=monte_rosa \
-      TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-      yarn workspace @hoprnet/hopr-ethereum run hardhat register:self \
-      --network xdai \
-      --task sync \
-      --peer-ids <peerId1,peerId2,peerId3,peerId4...>
-      ```
-
-   b. For community/team testing:
+   and
 
    ```
-   PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-nrnft nftrank=<"developer" or "community"> environment=monte_rosa network=xdai
-   PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_ids=<peerId1,peerId2,peerId3,peerId4...> environment=monte_rosa network=xdai
+   source .env
    ```
+
+   run
+
+   ```
+   make register-node-with-nft endpoint=<hoprd_endpoint> nftrank=<"Network_registry" NFT Rank ("developer" or "community")> account=<staking_account> environment=<release_name> network=xdai
+   ```
+
+   Note: please provide `endpoint=<hoprd_endpoint>` when the node exposes port different from `localhost:3001`.

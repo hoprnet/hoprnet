@@ -2,9 +2,6 @@ import type { DeployFunction } from 'hardhat-deploy/types'
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { HoprNetworkRegistry } from '../src/types'
 
-/**
- * This Network Registry contract should not be redeployed, even when the proxy is deployed at a new address
- */
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { ethers, deployments, getNamedAccounts, network, environment, maxFeePerGas, maxPriorityFeePerGas } = hre
   const { deployer } = await getNamedAccounts()
@@ -64,6 +61,5 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 main.dependencies = ['preDeploy', 'HoprNetworkRegistryProxy']
 main.tags = ['HoprNetworkRegistry']
-main.skip = async (env: HardhatRuntimeEnvironment) => !!env.network.tags.production || !!env.network.tags.staging
 
 export default main
