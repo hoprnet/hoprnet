@@ -158,10 +158,10 @@ else
   )
 fi
 
-# Deployer CI wallet should ideally be "eligible". To be eligible: 
+# Deployer CI wallet should ideally be "eligible". To be eligible:
 # 1. The wallet should have obtained a "Network_registry" NFT of `developer` rank (wallet should already have this)
 # 2. The wallet should have sent one above-mentioned NFT to the staking contract
-# FIXME: Correctly format the condition (in line with *meta* environment), so that the following lines are skipped for most of the time, and only be executed when: 
+# FIXME: Correctly format the condition (in line with *meta* environment), so that the following lines are skipped for most of the time, and only be executed when:
 # - the CI nodes wants to perform `selfRegister`
 # This can be called always, because the "stake" task is idempotent given the same arguments
 for staking_addr in "${!staking_addrs_dict[@]}" ; do
