@@ -108,6 +108,7 @@ gcloud_update_container_with_image() {
     --container-arg="--healthCheck" \
     --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
     --container-arg="--identity" --container-arg="${mount_path}/.hopr-identity" \
+    --container-arg="--data" --container-arg="${mount_path}" \
     --container-arg="--init" \
     --container-arg="--password" --container-arg="${password}" \
     --container-arg="--environment" --container-arg="${environment_id}" \
@@ -268,6 +269,7 @@ gcloud_create_or_update_instance_template() {
       --container-arg="--healthCheck" \
       --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
       --container-arg="--identity" --container-arg="${mount_path}/.hopr-identity" \
+      --container-arg="--data" --container-arg="${mount_path}" \
       --container-arg="--init" \
       --container-arg="--api" \
       --container-arg="--apiHost" --container-arg="0.0.0.0" \
