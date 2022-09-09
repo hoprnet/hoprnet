@@ -42,15 +42,20 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   try {
     // if a NetworkRegistry contract instance exists, try to update with the latest proxy implementation
     const networkRegistry = await deployments.get('HoprNetworkRegistry')
-    const registryContract= (await ethers.getContractFactory('HoprNetworkRegistry')).attach(
+    const registryContract = (await ethers.getContractFactory('HoprNetworkRegistry')).attach(
       networkRegistry.address
     ) as HoprNetworkRegistry
-    const isImplementationDifferent = (await registryContract.requirementImplementation()).toLowerCase() !== registryProxy.address.toLowerCase();
-    const isDeployerRegistryOwner = (await registryContract.owner()).toLowerCase() === deployer.toLowerCase();
-    console.log(`Registry proxy implementation is ${isImplementationDifferent ? "": "not "}different; Deployer is ${isDeployerRegistryOwner ? "": "not "}owner.`)
+    const isImplementationDifferent =
+      (await registryContract.requirementImplementation()).toLowerCase() !== registryProxy.address.toLowerCase()
+    const isDeployerRegistryOwner = (await registryContract.owner()).toLowerCase() === deployer.toLowerCase()
+    console.log(
+      `Registry proxy implementation is ${isImplementationDifferent ? '' : 'not '}different; Deployer is ${
+        isDeployerRegistryOwner ? '' : 'not '
+      }owner.`
+    )
     if (isImplementationDifferent && isDeployerRegistryOwner) {
       // update proxy in NR contract
-      const updateTx = await registryContract.updateRequirementImplementation(registryProxy.address);
+      const updateTx = await registryContract.updateRequirementImplementation(registryProxy.address)
 
       // don't wait when using local hardhat because its using auto-mine
       if (!environment.match('hardhat')) {
@@ -59,7 +64,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       }
     }
   } catch (error) {
-    console.log("Cannot update proxy implementation.")
+    console.log('Cannot update proxy implementation.')
   }
 }
 
