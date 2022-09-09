@@ -32,7 +32,7 @@ describe('HoprToken', function () {
   it("should have symbol 'HOPR'", async function () {
     const { token } = await useFixtures()
 
-    expect(await token.symbol()).to.be.equal('txHOPR', 'wrong symbol')
+    expect(await token.symbol()).to.be.equal('mHOPR', 'wrong symbol')
   })
 
   it("should have a supply of '0'", async function () {
