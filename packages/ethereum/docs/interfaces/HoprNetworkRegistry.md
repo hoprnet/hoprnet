@@ -17,7 +17,6 @@
 - [\_wrappedEmits](HoprNetworkRegistry.md#_wrappedemits)
 - [address](HoprNetworkRegistry.md#address)
 - [callStatic](HoprNetworkRegistry.md#callstatic)
-- [contractName](HoprNetworkRegistry.md#contractname)
 - [deployTransaction](HoprNetworkRegistry.md#deploytransaction)
 - [estimateGas](HoprNetworkRegistry.md#estimategas)
 - [filters](HoprNetworkRegistry.md#filters)
@@ -37,9 +36,9 @@
 - [\_checkRunningEvents](HoprNetworkRegistry.md#_checkrunningevents)
 - [\_deployed](HoprNetworkRegistry.md#_deployed)
 - [\_wrapEvent](HoprNetworkRegistry.md#_wrapevent)
-- [accountToNodePeerId](HoprNetworkRegistry.md#accounttonodepeerid)
 - [attach](HoprNetworkRegistry.md#attach)
 - [connect](HoprNetworkRegistry.md#connect)
+- [countRegisterdNodesPerAccount](HoprNetworkRegistry.md#countregisterdnodesperaccount)
 - [deployed](HoprNetworkRegistry.md#deployed)
 - [disableRegistry](HoprNetworkRegistry.md#disableregistry)
 - [emit](HoprNetworkRegistry.md#emit)
@@ -53,6 +52,7 @@
 - [nodePeerIdToAccount](HoprNetworkRegistry.md#nodepeeridtoaccount)
 - [owner](HoprNetworkRegistry.md#owner)
 - [ownerDeregister](HoprNetworkRegistry.md#ownerderegister)
+- [ownerForceEligibility](HoprNetworkRegistry.md#ownerforceeligibility)
 - [ownerRegister](HoprNetworkRegistry.md#ownerregister)
 - [queryFilter](HoprNetworkRegistry.md#queryfilter)
 - [removeAllListeners](HoprNetworkRegistry.md#removealllisteners)
@@ -138,7 +138,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `accountToNodePeerId` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `countRegisterdNodesPerAccount` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `disableRegistry` | (`overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `enableRegistry` | (`overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `enabled` | (`overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
@@ -146,13 +146,14 @@ ___
 | `isNodeRegisteredAndEligible` | (`hoprPeerId`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
 | `nodePeerIdToAccount` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
 | `owner` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
-| `ownerDeregister` | (`accounts`: `string`[], `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `ownerDeregister` | (`hoprPeerIds`: `string`[], `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `ownerForceEligibility` | (`accounts`: `string`[], `eligibility`: `boolean`[], `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `ownerRegister` | (`accounts`: `string`[], `hoprPeerIds`: `string`[], `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `renounceOwnership` | (`overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `requirementImplementation` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
-| `selfDeregister` | (`overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
-| `selfRegister` | (`hoprPeerId`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
-| `sync` | (`accounts`: `string`[], `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `selfDeregister` | (`hoprPeerIds`: `string`[], `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `selfRegister` | (`hoprPeerIds`: `string`[], `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `sync` | (`hoprPeerIds`: `string`[], `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `transferOwnership` | (`newOwner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `updateRequirementImplementation` | (`_requirementImplementation`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 
@@ -162,17 +163,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/src/types/HoprNetworkRegistry.ts:415
-
-___
-
-### contractName
-
-• **contractName**: ``"HoprNetworkRegistry"``
-
-#### Defined in
-
-packages/ethereum/src/types/HoprNetworkRegistry.ts:247
+packages/ethereum/src/types/contracts/HoprNetworkRegistry.ts:498
 
 ___
 
@@ -198,7 +189,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `accountToNodePeerId` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `countRegisterdNodesPerAccount` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `disableRegistry` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `enableRegistry` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `enabled` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
@@ -206,13 +197,14 @@ ___
 | `isNodeRegisteredAndEligible` | (`hoprPeerId`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `nodePeerIdToAccount` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `owner` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `ownerDeregister` | (`accounts`: `string`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `ownerDeregister` | (`hoprPeerIds`: `string`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `ownerForceEligibility` | (`accounts`: `string`[], `eligibility`: `boolean`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `ownerRegister` | (`accounts`: `string`[], `hoprPeerIds`: `string`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `renounceOwnership` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `requirementImplementation` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `selfDeregister` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `selfRegister` | (`hoprPeerId`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `sync` | (`accounts`: `string`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `selfDeregister` | (`hoprPeerIds`: `string`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `selfRegister` | (`hoprPeerIds`: `string`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `sync` | (`hoprPeerIds`: `string`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `transferOwnership` | (`newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `updateRequirementImplementation` | (`_requirementImplementation`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 
@@ -222,7 +214,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/src/types/HoprNetworkRegistry.ts:541
+packages/ethereum/src/types/contracts/HoprNetworkRegistry.ts:641
 
 ___
 
@@ -234,10 +226,10 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `Deregistered` | (`account?`: `string`) => `DeregisteredEventFilter` |
-| `Deregistered(address)` | (`account?`: `string`) => `DeregisteredEventFilter` |
-| `DeregisteredByOwner` | (`account?`: `string`) => `DeregisteredByOwnerEventFilter` |
-| `DeregisteredByOwner(address)` | (`account?`: `string`) => `DeregisteredByOwnerEventFilter` |
+| `Deregistered` | (`account?`: `string`, `hoprPeerId?`: ``null``) => `DeregisteredEventFilter` |
+| `Deregistered(address,string)` | (`account?`: `string`, `hoprPeerId?`: ``null``) => `DeregisteredEventFilter` |
+| `DeregisteredByOwner` | (`account?`: `string`, `hoprPeerId?`: ``null``) => `DeregisteredByOwnerEventFilter` |
+| `DeregisteredByOwner(address,string)` | (`account?`: `string`, `hoprPeerId?`: ``null``) => `DeregisteredByOwnerEventFilter` |
 | `EligibilityUpdated` | (`account?`: `string`, `eligibility?`: `boolean`) => `EligibilityUpdatedEventFilter` |
 | `EligibilityUpdated(address,bool)` | (`account?`: `string`, `eligibility?`: `boolean`) => `EligibilityUpdatedEventFilter` |
 | `EnabledNetworkRegistry` | (`isEnabled?`: `boolean`) => `EnabledNetworkRegistryEventFilter` |
@@ -257,7 +249,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/src/types/HoprNetworkRegistry.ts:479
+packages/ethereum/src/types/contracts/HoprNetworkRegistry.ts:571
 
 ___
 
@@ -269,7 +261,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `accountToNodePeerId` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
+| `countRegisterdNodesPerAccount` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `disableRegistry` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `enableRegistry` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `enabled` | (`overrides?`: `CallOverrides`) => `Promise`<[`boolean`]\> |
@@ -277,13 +269,14 @@ ___
 | `isNodeRegisteredAndEligible` | (`hoprPeerId`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`boolean`]\> |
 | `nodePeerIdToAccount` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `owner` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
-| `ownerDeregister` | (`accounts`: `string`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `ownerDeregister` | (`hoprPeerIds`: `string`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `ownerForceEligibility` | (`accounts`: `string`[], `eligibility`: `boolean`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `ownerRegister` | (`accounts`: `string`[], `hoprPeerIds`: `string`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `renounceOwnership` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `requirementImplementation` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
-| `selfDeregister` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `selfRegister` | (`hoprPeerId`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `sync` | (`accounts`: `string`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `selfDeregister` | (`hoprPeerIds`: `string`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `selfRegister` | (`hoprPeerIds`: `string`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `sync` | (`hoprPeerIds`: `string`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `transferOwnership` | (`newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `updateRequirementImplementation` | (`_requirementImplementation`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 
@@ -293,7 +286,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/src/types/HoprNetworkRegistry.ts:273
+packages/ethereum/src/types/contracts/HoprNetworkRegistry.ts:339
 
 ___
 
@@ -307,7 +300,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/src/types/HoprNetworkRegistry.ts:252
+packages/ethereum/src/types/contracts/HoprNetworkRegistry.ts:318
 
 ___
 
@@ -321,7 +314,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/src/types/HoprNetworkRegistry.ts:268
+packages/ethereum/src/types/contracts/HoprNetworkRegistry.ts:334
 
 ___
 
@@ -335,7 +328,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/src/types/HoprNetworkRegistry.ts:269
+packages/ethereum/src/types/contracts/HoprNetworkRegistry.ts:335
 
 ___
 
@@ -349,7 +342,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/src/types/HoprNetworkRegistry.ts:270
+packages/ethereum/src/types/contracts/HoprNetworkRegistry.ts:336
 
 ___
 
@@ -361,7 +354,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `accountToNodePeerId` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `countRegisterdNodesPerAccount` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `disableRegistry` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `enableRegistry` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `enabled` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
@@ -369,13 +362,14 @@ ___
 | `isNodeRegisteredAndEligible` | (`hoprPeerId`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `nodePeerIdToAccount` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `owner` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
-| `ownerDeregister` | (`accounts`: `string`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `ownerDeregister` | (`hoprPeerIds`: `string`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `ownerForceEligibility` | (`accounts`: `string`[], `eligibility`: `boolean`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `ownerRegister` | (`accounts`: `string`[], `hoprPeerIds`: `string`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `renounceOwnership` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `requirementImplementation` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
-| `selfDeregister` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `selfRegister` | (`hoprPeerId`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `sync` | (`accounts`: `string`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `selfDeregister` | (`hoprPeerIds`: `string`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `selfRegister` | (`hoprPeerIds`: `string`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `sync` | (`hoprPeerIds`: `string`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `transferOwnership` | (`newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `updateRequirementImplementation` | (`_requirementImplementation`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 
@@ -385,7 +379,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/src/types/HoprNetworkRegistry.ts:616
+packages/ethereum/src/types/contracts/HoprNetworkRegistry.ts:723
 
 ___
 
@@ -413,7 +407,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/src/types/HoprNetworkRegistry.ts:271
+packages/ethereum/src/types/contracts/HoprNetworkRegistry.ts:337
 
 ___
 
@@ -507,23 +501,6 @@ BaseContract.\_wrapEvent
 
 ___
 
-### accountToNodePeerId
-
-▸ **accountToNodePeerId**(`arg0`, `overrides?`): `Promise`<`string`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `arg0` | `string` |
-| `overrides?` | `CallOverrides` |
-
-#### Returns
-
-`Promise`<`string`\>
-
-___
-
 ### attach
 
 ▸ **attach**(`addressOrName`): [`HoprNetworkRegistry`](HoprNetworkRegistry.md)
@@ -561,6 +538,23 @@ ___
 #### Overrides
 
 BaseContract.connect
+
+___
+
+### countRegisterdNodesPerAccount
+
+▸ **countRegisterdNodesPerAccount**(`arg0`, `overrides?`): `Promise`<`BigNumber`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `arg0` | `string` |
+| `overrides?` | `CallOverrides` |
+
+#### Returns
+
+`Promise`<`BigNumber`\>
 
 ___
 
@@ -798,13 +792,31 @@ ___
 
 ### ownerDeregister
 
-▸ **ownerDeregister**(`accounts`, `overrides?`): `Promise`<`ContractTransaction`\>
+▸ **ownerDeregister**(`hoprPeerIds`, `overrides?`): `Promise`<`ContractTransaction`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `hoprPeerIds` | `string`[] |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
+
+#### Returns
+
+`Promise`<`ContractTransaction`\>
+
+___
+
+### ownerForceEligibility
+
+▸ **ownerForceEligibility**(`accounts`, `eligibility`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `accounts` | `string`[] |
+| `eligibility` | `boolean`[] |
 | `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
@@ -935,12 +947,13 @@ ___
 
 ### selfDeregister
 
-▸ **selfDeregister**(`overrides?`): `Promise`<`ContractTransaction`\>
+▸ **selfDeregister**(`hoprPeerIds`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
+| `hoprPeerIds` | `string`[] |
 | `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
@@ -951,13 +964,13 @@ ___
 
 ### selfRegister
 
-▸ **selfRegister**(`hoprPeerId`, `overrides?`): `Promise`<`ContractTransaction`\>
+▸ **selfRegister**(`hoprPeerIds`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `hoprPeerId` | `string` |
+| `hoprPeerIds` | `string`[] |
 | `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
@@ -968,13 +981,13 @@ ___
 
 ### sync
 
-▸ **sync**(`accounts`, `overrides?`): `Promise`<`ContractTransaction`\>
+▸ **sync**(`hoprPeerIds`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `accounts` | `string`[] |
+| `hoprPeerIds` | `string`[] |
 | `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns

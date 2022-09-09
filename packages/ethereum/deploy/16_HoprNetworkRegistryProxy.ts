@@ -33,7 +33,11 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     ...deployOptions
   })
 
-  console.log(`"HoprNetworkRegistryProxy" deployed at ${registryProxy.address}`)
+  console.log(
+    `"HoprNetworkRegistryProxy" (${STAKING_PROXY ? 'StakingProxy.sol' : 'DummyProxy.sol'}) deployed at ${
+      registryProxy.address
+    }`
+  )
 }
 
 // revert once we patch from Valencia's release

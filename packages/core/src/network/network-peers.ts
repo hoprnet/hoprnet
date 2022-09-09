@@ -4,7 +4,7 @@ import { randomSubset, debug } from '@hoprnet/hopr-utils'
 
 const DEBUG_PREFIX = 'hopr-core:network-peers'
 const log = debug(DEBUG_PREFIX)
-const verbose = debug(DEBUG_PREFIX.concat(`:verbose`))
+//const verbose = debug(DEBUG_PREFIX.concat(`:verbose`))
 
 export type Entry = {
   id: PeerId
@@ -372,9 +372,9 @@ class NetworkPeers {
     if (!this.deniedEntries.has(peerIdStr)) {
       log('adding peer to denied', peerIdStr)
       this.deniedEntries.set(peerIdStr, { id: peerId, origin })
-    } else {
+    } /*else {
       verbose('peer is still denied', peerIdStr)
-    }
+    }*/
   }
 
   public removePeerFromDenied(peerId: PeerId): void {

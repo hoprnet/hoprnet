@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "1.89.46",
+  "version": "1.90.0-next.18",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -46,6 +46,7 @@
   "devDependencies": {
     "@types/chai": "4.3.3",
     "@types/mocha": "9.1.1",
+    "@types/sinon": "10.0.13",
     "@types/yargs": "17.0.10",
     "chai": "4.3.6",
     "chai-as-promised": "7.1.1",

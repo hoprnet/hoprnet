@@ -158,7 +158,6 @@ Options:
   --privateKey                   A private key to be used for the node [env: HOPRD_PRIVATE_KEY]  [string]
   --provider                     A custom RPC provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER]  [string]
   --identity                     The path to the identity file [env: HOPRD_IDENTITY]  [string] [default: "/home/tino/.hopr-identity"]
-  --run                          Run a single hopr command, same syntax as in hopr-admin [env: HOPRD_RUN]  [string] [default: ""]
   --dryRun                       List all the options used to run the HOPR node, but quit instead of starting [env: HOPRD_DRY_RUN]  [boolean] [default: false]
   --data                         manually specify the data directory to use [env: HOPRD_DATA]  [string] [default: "/home/tino/work/hopr/hoprnet/packages/hoprd"]
   --init                         initialize a database if it doesn't already exist [env: HOPRD_INIT]  [boolean] [default: false]

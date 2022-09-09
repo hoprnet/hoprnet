@@ -87,19 +87,19 @@ export async function createChainWrapper(
     'HoprNetworkRegistry'
   )
 
-  const token = new ethers.Contract(hoprTokenDeployment.address, hoprTokenDeployment.abi, provider) as HoprToken
+  const token = new ethers.Contract(hoprTokenDeployment.address, hoprTokenDeployment.abi, provider) as any as HoprToken
 
   const channels = new ethers.Contract(
     hoprChannelsDeployment.address,
     hoprChannelsDeployment.abi,
     provider
-  ) as HoprChannels
+  ) as any as HoprChannels
 
   const networkRegistry = new ethers.Contract(
     hoprNetworkRegistryDeployment.address,
     hoprNetworkRegistryDeployment.abi,
     provider
-  ) as HoprNetworkRegistry
+  ) as any as HoprNetworkRegistry
 
   //getGenesisBlock, taking the earlier deployment block between the channel and network Registery
   const [channelDeployBlockNumber, networkRegistryDeployBlockNumber] = [

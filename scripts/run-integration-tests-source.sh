@@ -67,7 +67,6 @@ declare node4_dir="${tmp}/${node_prefix}-4"
 declare node5_dir="${tmp}/${node_prefix}-5"
 declare node6_dir="${tmp}/${node_prefix}-6"
 declare node7_dir="${tmp}/${node_prefix}-7"
-declare node8_dir="${tmp}/${node_prefix}-8"
 
 declare ct_node1_dir="${tmp}/${node_prefix}-ct1"
 
@@ -78,7 +77,6 @@ declare node4_log="${node4_dir}.log"
 declare node5_log="${node5_dir}.log"
 declare node6_log="${node6_dir}.log"
 declare node7_log="${node7_dir}.log"
-declare node8_log="${node8_dir}.log"
 
 declare ct_node1_log="${ct_node1_dir}.log"
 
@@ -89,7 +87,6 @@ declare node4_id="${node4_dir}.id"
 declare node5_id="${node5_dir}.id"
 declare node6_id="${node6_dir}.id"
 declare node7_id="${node7_dir}.id"
-declare node8_id="${node8_dir}.id"
 
 declare node1_privkey="0x1f5b172a64947589be6e279fbcbc09aca6e623a64a92aa359fae9c6613b7e801"
 declare node2_privkey="0xcb9c3533beb75b996b6c77150ecda32134d13710a16121f04dc591113329cd7c"
@@ -98,7 +95,6 @@ declare node4_privkey="0x7dea49b4dbeea4dcbbb9d071bc7212347748dc3a2f16896f5044172
 declare node5_privkey="0x800fee12d472c1a8448b786eb9e5d6c7f643c78b9727032893da9a6a55db288b"
 declare node6_privkey="0x79b94be0c06dac87139c54416228dcacfb084c6884bbf4e48fff4cab8f40baa6"
 declare node7_privkey="0x9b813edd8a85cffbe3cd2e242dc0992cfa04be15caa9f50b0b03b5ebcb2f770a"
-declare node8_privkey="0xc7453d74b13c6ad452b2b261d9b85e47ef8e8781a18c3a7063c68c3cdf6600c0"
 
 declare password="e2e-test"
 
@@ -115,15 +111,15 @@ function cleanup {
 
   # Cleaning up everything
   log "Wiping databases"
-  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${node7_dir}" "${node8_dir}" "${ct_node1_dir}"
+  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${node7_dir}" "${ct_node1_dir}"
 
   log "Cleaning up processes"
-  for port in 8545 13301 13302 13303 13304 13305 13306 13307 13308 19091 19092 19093 19094 19095 19096 19097 19098 20000; do
+  for port in 8545 13301 13302 13303 13304 13305 13306 13307 19091 19092 19093 19094 19095 19096 19097 20000; do
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
 
   local log exit_code non_zero
-  for node_log in "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}" "${node5_log}" "${node6_log}" "${node7_log}" "${node8_log}"; do
+  for node_log in "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}" "${node5_log}" "${node6_log}" "${node7_log}"; do
     log=$(wait_for_regex ${node_log} "Process exiting with signal [0-9]")
 
     if [ -z "${log}" ]; then
@@ -288,10 +284,6 @@ log "\tnode7"
 log "\t\tdata dir: ${node7_dir} (will be removed)"
 log "\t\tlog: ${node7_log}"
 log "\t\tid: ${node7_id}"
-log "\tnode8"
-log "\t\tdata dir: ${node8_dir} (will be removed)"
-log "\t\tlog: ${node8_log}"
-log "\t\tid: ${node8_id}"
 log "\tct_node1"
 log "\t\tdata dir: ${ct_node1_dir} (will be removed)"
 log "\t\tlog: ${ct_node1_log}"
@@ -306,7 +298,6 @@ ensure_port_is_free 13304
 ensure_port_is_free 13305
 ensure_port_is_free 13306
 ensure_port_is_free 13307
-ensure_port_is_free 13308
 ensure_port_is_free 19091
 ensure_port_is_free 19092
 ensure_port_is_free 19093
@@ -314,7 +305,6 @@ ensure_port_is_free 19094
 ensure_port_is_free 19095
 ensure_port_is_free 19096
 ensure_port_is_free 19097
-ensure_port_is_free 19098
 ensure_port_is_free 20000
 # }}}
 
@@ -349,11 +339,10 @@ setup_node 13302 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "${node
 setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}" "${node3_privkey}" "--announce"
 setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}" "${node4_privkey}" "--testNoDirectConnections"
 setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}" "${node5_privkey}" "--testNoDirectConnections"
-setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "${node6_privkey}" "--announce --run \"info;balance\""
 # should not be able to talk to the rest
-setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "${node7_privkey}" "--announce --environment hardhat-localhost2"
+setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "${node6_privkey}" "--announce --environment hardhat-localhost2"
 # node n8 will be the only one NOT registered
-setup_node 13308 19098 19508 "${node8_dir}" "${node8_log}" "${node8_id}" "${node8_privkey}" "--announce"
+setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "${node7_privkey}" "--announce"
 setup_ct_node "${ct_node1_log}" "0xa08666bca1363cb00b5402bbeb6d47f6b84296f3bba0f2f95b1081df5588a613" 20000 "${ct_node1_dir}"
 # }}}
 
@@ -368,7 +357,6 @@ wait_for_regex ${node4_log} "please fund this node"
 wait_for_regex ${node5_log} "please fund this node"
 wait_for_regex ${node6_log} "please fund this node"
 wait_for_regex ${node7_log} "please fund this node"
-wait_for_regex ${node8_log} "please fund this node"
 # }}}
 
 log "Funding nodes"
@@ -384,14 +372,13 @@ wait_for_regex ${node2_log} "STARTED NODE"
 wait_for_regex ${node3_log} "STARTED NODE"
 wait_for_regex ${node4_log} "STARTED NODE"
 wait_for_regex ${node5_log} "STARTED NODE"
-# no need to wait for node 6 since that will stop right away
+wait_for_regex ${node6_log} "STARTED NODE"
+wait_for_port 19096 "127.0.0.1" "${node6_log}"
 wait_for_regex ${node7_log} "STARTED NODE"
-wait_for_port 19097 "127.0.0.1" "${node7_log}"
-wait_for_regex ${node8_log} "STARTED NODE"
 # }}}
 
 #  --- Ensure data directories are used --- {{{
-for node_dir in ${node1_dir} ${node2_dir} ${node3_dir} ${node4_dir} ${node5_dir} ${node7_dir} ${node8_dir}; do
+for node_dir in ${node1_dir} ${node2_dir} ${node3_dir} ${node4_dir} ${node5_dir} ${node6_dir} ${node7_dir}; do
   declare node_dir_db="${node_dir}/db/LOG"
   declare node_dir_peerstore="${node_dir}/peerstore/LOG"
   [ -f "${node_dir_db}" ] || { echo "Data file ${node_dir_db} missing"; exit 1; }
@@ -411,15 +398,7 @@ ADDITIONAL_NODE_ADDRS="0xde913eeed23bce5274ead3de8c196a41176fbd49" \
 ADDITIONAL_NODE_PEERIDS="16Uiu2HAm2VD6owCxPEZwP6Moe1jzapqziVeaTXf1h7jVzu5dW1mk" \
 HOPRD_API_TOKEN="${api_token}" \
 ${mydir}/../test/integration-test.sh \
-  "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305" "localhost:13306" "localhost:13307" "localhost:13308"
-# }}}
-
-# -- Verify node6 has executed the commands {{{
-log "Verifying node6 log output"
-grep -E "HOPR Balance: +20000 txHOPR" "${node6_log}"
-# Node balance must be a little bit smaller than 10 xDAI due to the announce transaction
-grep -E "ETH Balance: +[789]\.[[:digit:]]?.+ xDAI" "${node6_log}"
-log "Output of node6 correct"
+  "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305" "localhost:13306" "localhost:13307"
 # }}}
 
 # -- CT test {{{

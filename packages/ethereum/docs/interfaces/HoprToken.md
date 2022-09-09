@@ -17,7 +17,6 @@
 - [\_wrappedEmits](HoprToken.md#_wrappedemits)
 - [address](HoprToken.md#address)
 - [callStatic](HoprToken.md#callstatic)
-- [contractName](HoprToken.md#contractname)
 - [deployTransaction](HoprToken.md#deploytransaction)
 - [estimateGas](HoprToken.md#estimategas)
 - [filters](HoprToken.md#filters)
@@ -192,17 +191,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/src/types/HoprToken.ts:737
-
-___
-
-### contractName
-
-• **contractName**: ``"HoprToken"``
-
-#### Defined in
-
-packages/ethereum/src/types/HoprToken.ts:386
+packages/ethereum/src/types/contracts/HoprToken.ts:811
 
 ___
 
@@ -267,7 +256,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/src/types/HoprToken.ts:1021
+packages/ethereum/src/types/contracts/HoprToken.ts:1095
 
 ___
 
@@ -306,7 +295,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/src/types/HoprToken.ts:899
+packages/ethereum/src/types/contracts/HoprToken.ts:973
 
 ___
 
@@ -357,7 +346,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/src/types/HoprToken.ts:412
+packages/ethereum/src/types/contracts/HoprToken.ts:486
 
 ___
 
@@ -371,7 +360,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/src/types/HoprToken.ts:391
+packages/ethereum/src/types/contracts/HoprToken.ts:465
 
 ___
 
@@ -385,7 +374,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/src/types/HoprToken.ts:407
+packages/ethereum/src/types/contracts/HoprToken.ts:481
 
 ___
 
@@ -399,7 +388,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/src/types/HoprToken.ts:408
+packages/ethereum/src/types/contracts/HoprToken.ts:482
 
 ___
 
@@ -413,7 +402,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/src/types/HoprToken.ts:409
+packages/ethereum/src/types/contracts/HoprToken.ts:483
 
 ___
 
@@ -464,7 +453,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/src/types/HoprToken.ts:1185
+packages/ethereum/src/types/contracts/HoprToken.ts:1259
 
 ___
 
@@ -492,7 +481,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/src/types/HoprToken.ts:410
+packages/ethereum/src/types/contracts/HoprToken.ts:484
 
 ___
 

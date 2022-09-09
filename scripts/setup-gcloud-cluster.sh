@@ -51,6 +51,7 @@ usage() {
   msg "HOPRD_SHOW_PRESTART_INFO\tset to 'true' to print used parameter values before starting"
   msg "HOPRD_PERFORM_CLEANUP\t\tset to 'true' to perform the cleanup process for the given cluster id"
   msg "HOPRD_RESET_METADATA\t\tset to 'true' to trigger metadata reset on instances"
+  msg "HOPRD_SKIP_UNSTAKED\t\tset to 'true' to stake all nodes and not keep the first unstaked"
   msg
 }
 
@@ -77,6 +78,7 @@ declare password="${HOPRD_PASSWORD:-pw${RANDOM}${RANDOM}${RANDOM}pw}"
 declare perform_cleanup="${HOPRD_PERFORM_CLEANUP:-false}"
 declare show_prestartinfo="${HOPRD_SHOW_PRESTART_INFO:-false}"
 declare reset_metadata="${HOPRD_RESET_METADATA:-false}"
+declare skip_unstaked="${HOPRD_SKIP_UNSTAKED:-false}"
 
 # Append environment as Docker image version, if not specified
 [[ "${docker_image}" != *:* ]] && docker_image="${docker_image}:${environment}"
@@ -156,24 +158,20 @@ else
   )
 fi
 
-# FIXME: Quick hack, in production, due to lack of "Dev NFT", currently it uses Dummy proxy 
-# that only requires proxy owner (CI deployer account) to `register-nodes`
-if [[ "${environment}" != "paleochora" ]]; then
-  # This can be called always, because the "stake" task is idempotent given the same arguments
-  declare staking_index=0
-  for staking_addr in "${!staking_addrs_dict[@]}" ; do
-    fund_if_empty "${staking_addr}" "${environment}"
-    # we alternate between staking funds or NFT
-    if [[ "$((staking_index%2))" = "0" ]]; then
-      PRIVATE_KEY="${staking_addrs_dict[${staking_addr}]}" make -C "${mydir}/.." stake-funds environment="${environment}"
-    else
-      PRIVATE_KEY="${staking_addrs_dict[${staking_addr}]}" make -C "${mydir}/.." stake-devnft environment="${environment}"
-    fi
-    ((++staking_index))
-  done
-fi
+# Deployer CI wallet should ideally be "eligible". To be eligible:
+# 1. The wallet should have obtained a "Network_registry" NFT of `developer` rank (wallet should already have this)
+# 2. The wallet should have sent one above-mentioned NFT to the staking contract
+# FIXME: Correctly format the condition (in line with *meta* environment), so that the following lines are skipped for most of the time, and only be executed when:
+# - the CI nodes wants to perform `selfRegister`
+# This can be called always, because the "stake" task is idempotent given the same arguments
+for staking_addr in "${!staking_addrs_dict[@]}" ; do
+  fund_if_empty "${staking_addr}" "${environment}"
+  # we only stake NFT for valencia release
+  PRIVATE_KEY="${staking_addrs_dict[${staking_addr}]}" make -C "${mydir}/.." stake-nrnft environment="${environment}" nftrank=developer
+done
 
 # Get names of all instances in this cluster
+# TODO: now `native-addresses` (a.k.a. `hopr_addrs`) doesn't need to contain unique values. The array can contain repetitive addresses
 declare instance_names
 instance_names="$(gcloud_get_managed_instance_group_instances_names "${cluster_id}")"
 declare -a instance_names_arr
@@ -195,6 +193,8 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
   # Firstly, retrieve the IP address of this VM instance
   instance_name="${instance_names_arr[instance_idx]}"
   node_ip=$(gcloud_get_ip "${instance_name}")
+
+  wait_until_node_is_ready "${node_ip}"
 
   if [[ "${reset_metadata}" = "true" ]]; then
     gcloud_remove_instance_metadata "${instance_name}" "hopr-peer-id,hopr-wallet-addr,hopr-staking-addr"
@@ -226,7 +226,7 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
     # If the instance does not have metadata yet, we set it once
 
     # NOTE: We leave only the first public node unstaked
-    if [[ ${instance_idx} -eq 0 && "${docker_image}" != *-nat:* ]]; then
+    if [[ ${instance_idx} -eq 0 && "${docker_image}" != *-nat:* && "${skip_unstaked}" != "true" ]]; then
       staking_addr="unstaked"
     else
       # Staking accounts are assigned round-robin
@@ -257,7 +257,6 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
   fi
 
   # Fund the node as well
-  wait_until_node_is_ready "${node_ip}"
   fund_if_empty "${api_wallet_addr}" "${environment}"
 done
 
@@ -267,6 +266,10 @@ IFS=','
 make -C "${mydir}/.." register-nodes \
   environment="${environment}" \
   native_addresses="${used_staking_addrs[*]}" \
+  peer_ids="${hopr_addrs[*]}"
+
+make -C "${mydir}/.." sync-eligibility \
+  environment="${environment}" \
   peer_ids="${hopr_addrs[*]}"
 unset IFS
 

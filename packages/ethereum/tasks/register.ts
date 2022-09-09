@@ -11,16 +11,28 @@ export type RegisterOpts =
       task: 'add'
       nativeAddresses: string
       peerIds: string
-      privatekey: string // private key of the caller
+      privatekey?: string // private key of the caller
     }
   | {
       task: 'remove'
-      nativeAddresses: string
-      privatekey: string // private key of the caller
+      nativeAddresses?: string
+      peerIds: string
+      privatekey?: string // private key of the caller
     }
   | {
       task: 'disable' | 'enable'
-      privatekey: string // private key of the caller
+      privatekey?: string // private key of the caller
+    }
+  | {
+      task: 'force-eligibility-update'
+      nativeAddresses: string
+      eligibility: string
+      privatekey?: string // private key of the caller
+    }
+  | {
+      task: 'sync'
+      peerIds: string
+      privatekey?: string // private key of the caller
     }
 
 /**
@@ -68,15 +80,13 @@ async function main(
   const signerAddress = await signer.getAddress()
   console.log('Signer Address (register task)', signerAddress)
 
-  // FIXME: remove production when Dev NFT is ready in production
-  const hoprProxy =
-    network.tags.development || network.tags.production
-      ? ((await ethers.getContractFactory('HoprDummyProxyForNetworkRegistry'))
-          .connect(signer)
-          .attach(hoprProxyAddress) as HoprDummyProxyForNetworkRegistry)
-      : ((await ethers.getContractFactory('HoprStakingProxyForNetworkRegistry'))
-          .connect(signer)
-          .attach(hoprProxyAddress) as HoprStakingProxyForNetworkRegistry)
+  const hoprProxy = network.tags.development
+    ? ((await ethers.getContractFactory('HoprDummyProxyForNetworkRegistry'))
+        .connect(signer)
+        .attach(hoprProxyAddress) as HoprDummyProxyForNetworkRegistry)
+    : ((await ethers.getContractFactory('HoprStakingProxyForNetworkRegistry'))
+        .connect(signer)
+        .attach(hoprProxyAddress) as HoprStakingProxyForNetworkRegistry)
 
   const hoprNetworkRegistry = (await ethers.getContractFactory('HoprNetworkRegistry'))
     .connect(signer)
@@ -103,28 +113,65 @@ async function main(
         process.exit(1)
       }
 
-      // in staging account, register by owner; in non-stagin environment, add addresses directly to proxy
-      if (network.tags.development || network.tags.production) {
+      // in staging or production, register by owner; in non-staging environment, add addresses directly to proxy
+      if (network.tags.development) {
         await (await (hoprProxy as HoprDummyProxyForNetworkRegistry).ownerBatchAddAccounts(nativeAddresses)).wait()
       }
       await (await hoprNetworkRegistry.ownerRegister(nativeAddresses, peerIds)).wait()
+      console.log(`${nativeAddresses} with ${peerIds} is registered.`)
     } else if (opts.task === 'remove') {
+      const peerIds = opts.peerIds.split(',')
+
+      // in staging or production (where "HoprStakingProxyForNetworkRegistry" is used), deregister; in non-staging environment (where "HoprDummyProxyForNetworkRegistry" is used), remove addresses directly from proxy
+      if (network.tags.development) {
+        let nativeAddresses
+
+        if (opts.nativeAddresses) {
+          nativeAddresses = opts.nativeAddresses.split(',')
+          // ensure all native addresses are valid
+          if (nativeAddresses.some((a) => !utils.isAddress(a))) {
+            console.error(`Given address list '${nativeAddresses.join(',')}' contains an invalid address.`)
+            process.exit(1)
+          }
+
+          // ensure lists match in length
+          if (nativeAddresses.length !== peerIds.length) {
+            console.error('Given native and multiaddress lists do not match in length.')
+            process.exit(1)
+          }
+          // remove account from dummy proxy
+          await (await (hoprProxy as HoprDummyProxyForNetworkRegistry).ownerBatchRemoveAccounts(nativeAddresses)).wait()
+        } else {
+          console.error(`Must provide addresses in ownerDeregister in ${environment} (where dummy proxy is used)`)
+          process.exit(1)
+        }
+      }
+      await (await hoprNetworkRegistry.ownerDeregister(peerIds)).wait()
+    } else if (opts.task === 'enable' && !isEnabled) {
+      await (await hoprNetworkRegistry.enableRegistry()).wait()
+      console.log(`Registry contract is enabled.`)
+    } else if (opts.task === 'disable' && isEnabled) {
+      await (await hoprNetworkRegistry.disableRegistry()).wait()
+      console.log(`Registry contract is disabled.`)
+    } else if (opts.task === 'force-eligibility-update') {
       const nativeAddresses = opts.nativeAddresses.split(',')
-      // ensure all native addresses are valid
-      if (nativeAddresses.some((a) => !utils.isAddress(a))) {
-        console.error(`Given address list '${nativeAddresses.join(',')}' contains an invalid address.`)
+      const eligibility = opts.eligibility.split(',')
+
+      // ensure lists match in length
+      if (nativeAddresses.length !== eligibility.length) {
+        console.error('Given native and eligibility lists do not match in length.')
         process.exit(1)
       }
 
-      // in staging account, deregister; in non-stagin environment, remove addresses directly from proxy
-      if (network.tags.development || network.tags.production) {
-        await (await (hoprProxy as HoprDummyProxyForNetworkRegistry).ownerBatchRemoveAccounts(nativeAddresses)).wait()
-      }
-      await (await hoprNetworkRegistry.ownerDeregister(nativeAddresses)).wait()
-    } else if (opts.task === 'enable' && !isEnabled) {
-      await (await hoprNetworkRegistry.enableRegistry()).wait()
-    } else if (opts.task === 'disable' && isEnabled) {
-      await (await hoprNetworkRegistry.disableRegistry()).wait()
+      const eligibilityToUpdate = eligibility.map((val) => val.toLowerCase() === 'true')
+
+      await (await hoprNetworkRegistry.ownerForceEligibility(nativeAddresses, eligibilityToUpdate)).wait()
+      console.log(`Eligibility of accounts ${opts.nativeAddresses} are forced to updated to ${opts.eligibility}`)
+    } else if (opts.task === 'sync') {
+      const peerIds = opts.peerIds.split(',')
+
+      await (await hoprNetworkRegistry.sync(peerIds)).wait()
+      console.log(`Eligibility of peers ${opts.peerIds} are synced`)
     } else {
       throw Error(`Task "${opts.task}" not available.`)
     }

@@ -17,7 +17,6 @@
 - [\_wrappedEmits](xHoprToken.md#_wrappedemits)
 - [address](xHoprToken.md#address)
 - [callStatic](xHoprToken.md#callstatic)
-- [contractName](xHoprToken.md#contractname)
 - [deployTransaction](xHoprToken.md#deploytransaction)
 - [estimateGas](xHoprToken.md#estimategas)
 - [filters](xHoprToken.md#filters)
@@ -146,17 +145,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/src/types/ERC677.ts:255
-
-___
-
-### contractName
-
-• **contractName**: ``"ERC677"``
-
-#### Defined in
-
-packages/ethereum/src/types/ERC677.ts:131
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:292
 
 ___
 
@@ -198,7 +187,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/src/types/ERC677.ts:330
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:367
 
 ___
 
@@ -221,7 +210,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/src/types/ERC677.ts:305
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:342
 
 ___
 
@@ -249,7 +238,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/src/types/ERC677.ts:157
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:194
 
 ___
 
@@ -263,7 +252,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/src/types/ERC677.ts:136
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:173
 
 ___
 
@@ -277,7 +266,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/src/types/ERC677.ts:152
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:189
 
 ___
 
@@ -291,7 +280,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/src/types/ERC677.ts:153
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:190
 
 ___
 
@@ -305,7 +294,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/src/types/ERC677.ts:154
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:191
 
 ___
 
@@ -333,7 +322,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/src/types/ERC677.ts:380
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:417
 
 ___
 
@@ -361,7 +350,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/src/types/ERC677.ts:155
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:192
 
 ___
 

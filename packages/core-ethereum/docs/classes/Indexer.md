@@ -506,7 +506,7 @@ ___
 
 (EventEmitter as new () =\> IndexerEventEmitter).emit
 
-▸ **emit**(`event`, `account`, `hoprNode`, `eligibility`): `boolean`
+▸ **emit**(`event`, `account`, `hoprNodes`, `eligibility`): `boolean`
 
 #### Parameters
 
@@ -514,7 +514,7 @@ ___
 | :------ | :------ |
 | `event` | ``"network-registry-eligibility-changed"`` |
 | `account` | `Address` |
-| `hoprNode` | `PublicKey` |
+| `hoprNodes` | `PublicKey`[] |
 | `eligibility` | `boolean` |
 
 #### Returns
@@ -1064,7 +1064,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `event` | `DeregisteredByOwnerEvent` |
+| `event` | `DeregisteredEvent` \| `DeregisteredByOwnerEvent` |
 | `lastSnapshot` | `Snapshot` |
 
 #### Returns
@@ -1178,7 +1178,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `event` | `RegisteredEvent` |
+| `event` | `RegisteredEvent` \| `RegisteredByOwnerEvent` |
 | `lastSnapshot` | `Snapshot` |
 
 #### Returns

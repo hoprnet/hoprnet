@@ -97,7 +97,8 @@ api_withdraw() {
 # $1 = node api endpoint
 api_get_balances() {
   local origin=${1}
-  api_call ${1} "/account/balances" "GET" "" "native" 600
+
+  api_call ${origin} "/account/balances" "GET" "" "native" 600
 }
 
 # get addresses is in the utils file
@@ -205,14 +206,14 @@ api_ping() {
   local peer_id="${2}"
   local assertion="${3}"
 
-  api_call ${1} "/node/ping" "POST" "{\"peerId\": \"${peer_id}\"}" ${assertion} 600
+  api_call ${origin} "/node/ping" "POST" "{\"peerId\": \"${peer_id}\"}" "${assertion}" 600
 }
 
 # $1 = node api endpoint
 api_peers() {
   local origin=${1:-localhost:3001}
 
-  api_call ${1} "/node/peers" "GET" "" "" 600
+  api_call ${origin} "/node/peers" "GET" "" "" 600
 }
 
 # $1 = node api endpoint
@@ -221,7 +222,7 @@ api_get_ticket_statistics() {
   local origin=${1:-localhost:3001}
   local assertion="${2}"
 
-  api_call ${1} "/tickets/statistics" "GET" "" ${assertion} 600
+  api_call ${origin} "/tickets/statistics" "GET" "" "${assertion}" 600
 }
 
 # $1 = source api url
@@ -270,15 +271,17 @@ api_close_channel() {
 # $2 = destination node id
 # $3 = channel source api endpoint
 # $4 = channel destination peer id
+# $5 = OPTIONAL: amount of tokens to stake (full denomination), default is 100
 api_open_channel() {
   local source_id="${1}"
   local destination_id="${2}"
   local source_api="${3}"
   local destination_peer_id="${4}"
+  local amount="${5:-100000000000000000000}"
   local result
 
   log "Node ${source_id} open channel to Node ${destination_id}"
-  result=$(api_call ${source_api} "/channels" "POST" "{ \"peerId\": \"${destination_peer_id}\", \"amount\": \"100000000000000000000\" }" 'channelId|CHANNEL_ALREADY_OPEN' 600 30)
+  result=$(api_call ${source_api} "/channels" "POST" "{ \"peerId\": \"${destination_peer_id}\", \"amount\": \"${amount}\" }" 'channelId|CHANNEL_ALREADY_OPEN' 600 30)
   log "Node ${source_id} open channel to Node ${destination_id} result -- ${result}"
 }
 
@@ -290,7 +293,7 @@ api_validate_node_balance_gt0() {
   local balance eth_balance hopr_balance
   local endpoint=${1:-localhost:3001}
 
-  balance=$(api_get_balances ${1})
+  balance=$(api_get_balances ${endpoint})
   eth_balance=$(echo ${balance} | jq -r ".native")
   hopr_balance=$(echo ${balance} | jq -r ".hopr")
 
