@@ -1,5 +1,6 @@
 import type { DeployFunction } from 'hardhat-deploy/types'
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
+import { HoprNetworkRegistry } from '../src/types'
 import { MIN_STAKE } from '../utils/constants'
 
 const DUMMY_PROXY = 'HoprDummyProxyForNetworkRegistry'
@@ -7,7 +8,7 @@ const STAKING_PROXY = 'HoprStakingProxyForNetworkRegistry'
 
 // Deploy directly a HoprNetworkRegistry contract, using hardcoded staking contract.
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const { deployments, getNamedAccounts, network, environment, maxFeePerGas, maxPriorityFeePerGas } = hre
+  const { deployments, getNamedAccounts, network, ethers, environment, maxFeePerGas, maxPriorityFeePerGas } = hre
   const { deployer } = await getNamedAccounts()
 
   const stakeAddress = (await deployments.get('HoprStake')).address
@@ -37,6 +38,34 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       registryProxy.address
     }`
   )
+
+  try {
+    // if a NetworkRegistry contract instance exists, try to update with the latest proxy implementation
+    const networkRegistry = await deployments.get('HoprNetworkRegistry')
+    const registryContract = (await ethers.getContractFactory('HoprNetworkRegistry')).attach(
+      networkRegistry.address
+    ) as HoprNetworkRegistry
+    const isImplementationDifferent =
+      (await registryContract.requirementImplementation()).toLowerCase() !== registryProxy.address.toLowerCase()
+    const isDeployerRegistryOwner = (await registryContract.owner()).toLowerCase() === deployer.toLowerCase()
+    console.log(
+      `Registry proxy implementation is ${isImplementationDifferent ? '' : 'not '}different; Deployer is ${
+        isDeployerRegistryOwner ? '' : 'not '
+      }owner.`
+    )
+    if (isImplementationDifferent && isDeployerRegistryOwner) {
+      // update proxy in NR contract
+      const updateTx = await registryContract.updateRequirementImplementation(registryProxy.address)
+
+      // don't wait when using local hardhat because its using auto-mine
+      if (!environment.match('hardhat')) {
+        console.log(`Wait for minting tx on chain`)
+        await ethers.provider.waitForTransaction(updateTx.hash, 2)
+      }
+    }
+  } catch (error) {
+    console.log('Cannot update proxy implementation.')
+  }
 }
 
 main.dependencies = ['preDeploy', 'HoprStake']
