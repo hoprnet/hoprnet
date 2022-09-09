@@ -14,8 +14,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const stakeAddress = (await deployments.get('HoprStake')).address
 
   // Local development environment uses HoprDummyProxyForNetworkRegistry. All the other network uses HoprStakingProxyForNetworkRegistry
-  // FIXME: Before Dev NFTs are minted in production environment, dummy proxy gets deployed in production
-  const registryProxyName = network.name == 'hardhat' || network.tags.production ? DUMMY_PROXY : STAKING_PROXY
+  const registryProxyName = network.name == 'hardhat' ? DUMMY_PROXY : STAKING_PROXY
 
   const deployOptions = {
     log: true
