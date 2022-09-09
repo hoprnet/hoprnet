@@ -16,7 +16,7 @@ source "${mydir}/utils.sh"
 
 declare key_to_extract=".value.environment_id"
 
-if [[ "$1" = "--release" ]] ; then
+if [[ "${1:-}" = "--release" ]] ; then
   log "Getting the release id"
   key_to_extract=".key"
 else
