@@ -1,5 +1,6 @@
 import type { DeployFunction } from 'hardhat-deploy/types'
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
+import { HoprNetworkRegistry } from '../src/types'
 import { MIN_STAKE } from '../utils/constants'
 
 const DUMMY_PROXY = 'HoprDummyProxyForNetworkRegistry'
@@ -40,10 +41,13 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   try {
     // if a NetworkRegistry contract instance exists, try to update with the latest proxy implementation
-    const registryContract = deployments.get('HoprNetworkRegistry')
-    const isImplementationDifferent = (await registryContract.requirementImplementation()).toLowerCase() === registryProxy.address.toLowerCase();
+    const networkRegistry = await deployments.get('HoprNetworkRegistry')
+    const registryContract= (await ethers.getContractFactory('HoprNetworkRegistry')).attach(
+      networkRegistry.address
+    ) as HoprNetworkRegistry
+    const isImplementationDifferent = (await registryContract.requirementImplementation()).toLowerCase() !== registryProxy.address.toLowerCase();
     const isDeployerRegistryOwner = (await registryContract.owner()).toLowerCase() === deployer.toLowerCase();
-    console.log(`Registry proxy implementation is ${isImplementationDifferent ? " ": "not "}different; Deployer is ${isDeployerRegistryOwner ? " ": "not "}owner.`)
+    console.log(`Registry proxy implementation is ${isImplementationDifferent ? "": "not "}different; Deployer is ${isDeployerRegistryOwner ? "": "not "}owner.`)
     if (isImplementationDifferent && isDeployerRegistryOwner) {
       // update proxy in NR contract
       const updateTx = await registryContract.updateRequirementImplementation(registryProxy.address);
