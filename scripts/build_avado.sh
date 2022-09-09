@@ -15,10 +15,10 @@ source "${mydir}/utils.sh"
 
 usage() {
   msg
-  msg "Usage: $0 [-h|--help] version [environment]"
+  msg "Usage: $0 [-h|--help] version [environment] [release]"
   msg
   msg "Sets the version of the AVADO build and builds the image. Version must be semver"
-  msg "Optional: set default environment"
+  msg "Optional: set default environment and release name"
   msg
 }
 
@@ -29,6 +29,7 @@ if [ -z "${1:-}" ]; then
 fi
 
 declare environment_id="${2:-"$(${mydir}/get-default-environment.sh)"}"
+declare release_id="${3:-"$(${mydir}/get-default-environment.sh --release)"}"
 
 if [ -z "${environment_id}" ]; then
   msg "Could not determine default environment"
@@ -47,7 +48,7 @@ if [[ "${1}" == "-h" ]] || [[ "${1}" == "--help" ]]; then
   exit 0
 fi
 
-msg "Building Avado for ${environment_id} with default provider ${provider_url}"
+msg "Building Avado for release ${release_id} in environment ${environment_id} with default provider ${provider_url}"
 
 declare AVADO_VERSION="${1}"
 
@@ -59,11 +60,11 @@ fi
 
 cd "${mydir}/../packages/avado"
 
-declare default_development_environment="master-goerli"
+declare default_development_release_id="master-goerli"
 
-if [[ -z $(grep -E "${default_development_environment}" "./build/Dockerfile") ]]; then
+if [[ -z $(grep -E "${default_development_release_id}" "./build/Dockerfile") ]]; then
   # Fail if default environment is no longer `master-goerli`
-  msg "Avado Dockerfile differs. Could not find \"${default_development_environment}\" environment in it"
+  msg "Avado Dockerfile differs. Could not find \"${default_development_release_id}\" release id in it"
   exit 1
 fi
 
@@ -104,7 +105,7 @@ declare api_token=$(sed -rn "s/.+HOPRD_API_TOKEN=(.+)',/\1/p" ./docker-compose.y
 sed -E "s/%TOKEN%/${api_token}/" ./dappnode_package.json  > ./dappnode_package.json.tmp && mv ./dappnode_package.json.tmp ./dappnode_package.json
 
 # Overwrite default environment in Dockerfile with the one currently used
-sed -e "s/${default_development_environment}/${environment_id}/" ./build/Dockerfile \
+sed -e "s/${default_development_release_id}/${release_id}/" ./build/Dockerfile \
   > ./build/Dockerfile.tmp && mv ./build/Dockerfile.tmp ./build/Dockerfile
 
 # AVADO SDK does not do proper releases, therefore using GitHub + git commit hashes
