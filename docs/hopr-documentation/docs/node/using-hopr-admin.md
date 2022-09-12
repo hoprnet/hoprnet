@@ -2,7 +2,7 @@
 id: using-hopr-admin
 title: How to use hopr-admin
 ---
-This is a guide on how to use `hopr-admin`. It is not exhaustive and is intended only as a brief overview of it's functionality and use.
+This is a guide on how to use `hopr-admin`. It is not exhaustive and is intended only as a brief overview of its functionality and use.
 
 :::caution Warning
 
@@ -10,37 +10,37 @@ The HOPR client software (hoprd) is still under heavy development. Please do not
 
 :::
 
-To proceed with the tutorial you will need to have installed a `hoprd` node either through Docker or with a hardware node such as Avado or Dappnoce. If you have not completed the installation process please [start here](start-here).
+Make sure you have installed a `hoprd` node either through Docker or with a hardware node such as Avado or Dappnoce. If you have not completed the installation process, please [start here](start-here).
 
 :::info Tip
-Please be aware that it can take up to `10` minutes for your `hoprd` node instance to boot up.
+Please be aware that it can take 10 minutes for your `hoprd` node to boot up.
 :::
 
-**Network Registry:** If you are part of the network registry and are starting your node to find your peerID, please note that **step 3** of the Admin UI & Funding section is altered for you. The details for your funding process are explained there, otherwise follow the rest of the tutorial as normal.
+**Network Registry:** If you are part of the network registry and are starting your node to find your peerID, please note that **step 3** of the Admin UI & Funding section is altered for you. Your funding process is explained there. Otherwise, follow the rest of the tutorial as usual.
 
 ## Admin UI & Funding
 
-If you used docker to install your node you should be able to access it at: [http://localhost:3000](http://localhost:3000) (replace `localhost` with your server ip address if you are using a VPS). Otherwise locate the HOPR client on your hardware node's associated browser. You should end up with an admin interface that looks like this:
+If you used Docker to install your node, you should be able to access it at: [http://localhost:3000](http://localhost:3000) (replace `localhost` with your server IP address if you are using a VPS). Otherwise, locate the HOPR client on your hardware node's associated browser. You should end up with an admin interface that looks like this:
 
 ![hopr-admin user interface](./images/admin-UI-first.png)
 
-**_Note:_** You may be greeted with a yellow screen asking you to check your settings, you can fix this by entering the correct API endpoint and token (see step 1 & 2).
+**_Note:_** You may be greeted with a yellow screen asking you to check your settings. You can fix this by entering the correct API endpoint and token (see steps 1 & 2).
 
-(**1**) First clikck on the gear icon this should give you a pop-up similar to the one below.
+(**1**) First, click on the gear icon. This should give you a pop-up similar to the one below.
 
 ![API info](./images/API-info.png)
 
-(**2**) From here make sure you have the correct information by default `API endpoint` should be set to `http://localhost:3001` but you may need to replace `localhost`with your server ip address if you used a VPS and change the `port` if you adjusted the mapping on installation. The`apitoken`will be whatever you have set your security token as in the installation process.
+(**2**) From here, make sure you have the correct information by default `API endpoint` should be set to `http://localhost:3001`, but you may need to replace `localhost`with your server IP address if you used a VPS and change the `port` if you adjusted the mapping on installation. The`apitoken` is whatever you have set your security token as in the installation process.
 
 (**3**) You will see a newly generated ETH & Node address. Use the ETH address to send [xDAI](https://www.xdaichain.com/for-users/get-xdai-tokens) and [HOPR tokens](/staking/how-to-get-hopr) to in order to fund your node. **Your node will not start until it has been funded.**
 
-**Network Registry:** If you are being funded as a part of the Network Registry, expand and copy the full `node address`, by default you will see a contracted string of five letters, click on them to expand the full address. It should look similar to this: `16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV`.
+**Network Registry:** If you are being funded as a part of the Network Registry, expand and copy the full `node address`. By default, you will see a contracted string of five letters. Click on them to expand the full address. It should look similar to this: `16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV`.
 
-Make sure to copy your own `node address` and not the example above. Use your `node address` as your `peerID` when registering through this site to fund your node. Once you have submitted your details, your node will automatically receive both xDAI and mHOPR (assuming you are eligible).
+Make sure to copy your node address, not the example above. Use your `node address` as your `peerID` when registering through this site. Once you have submitted your details, your node will automatically receive both xDAI and mHOPR (assuming you are eligible).
 
 Otherwise, we recommend you fund your node with **0.01 xDai & 10 wxHOPR**. Remember to use the node's ETH address for this.
 
-**Note:** After funding your node, you will have to wait a few minutes for it to start. When the process is finished you should see the output: **Node has started!**
+**Note:** After funding your node, you will have to wait a few minutes for it to start. You should see this output when the process is complete: **Node has started!**
 
 :::info Tip
 
@@ -49,13 +49,13 @@ Please be aware that we have two types of tokens on the **xDAI/Gnosis Chain netw
 - `wxHOPR`, the ERC-777 token needed to run your `hoprd` instance and,
 - `xHOPR`, the ERC-677 token, the xDAI/Ethereum bridged `HOPR` instance
 
-You can use [cross-chains](/staking/convert-hopr) bridge to convert from HOPR to xHOPR or vice versa.
+You can use the [cross-chains](/staking/convert-hopr) bridge to convert from HOPR to xHOPR or vice versa.
 
 You can always use our [token wrapper](https://wrapper.hoprnet.org/) to wrap/unwrap xHOPR/wxHOPR. 
 
 :::
 
-(**4**) You will see your `Network Health Indicator` this can be either `Red`, `Orange`, `Yellow` or `Green`. If it is `Red` you may want to wait a few minutes after the node has started (post-funding) to see if it improves, but this is not required.
+(**4**) You will see your `Network Health Indicator`. This can be either `Red`, `Orange`, `Yellow` or `Green`. If it is `Red`, you may want to wait a few minutes after the node has started (post-funding) to see if it improves, but this is not required.
 
 ![hopr-admin user interface](./images/admin-UI-second.png)
 
@@ -73,7 +73,7 @@ Mentioned HOPR and ETH addresses are **examples**. Make sure you replace them wi
 
 :::
 
-## Interacting with your own node
+## Interacting with your node
 
 Now that you have started your node, what exactly is your node and what are its features? There is a lot that goes into making the HOPR node function but let's start with the following properties:
 
@@ -83,49 +83,49 @@ Now that you have started your node, what exactly is your node and what are its 
 
 ### Identity file
 
-The **_identity file_** contains your private key and is essentially your wallet for the node. When you installed your node you supplied `–identity` and `–password` arguments.
+The **_identity file_** contains your private key and is essentially your wallet for the node. When you installed your node, you supplied `–identity` and `–password` arguments.
 
 ```bash
 docker run --pull always -ti -v $HOME/.hoprd-db:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:paleochora --admin --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --init --api --apiHost "0.0.0.0" --apiPort 3001 --identity /app/db/.hopr-id-paleochora --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --adminPort 3000 --host "0.0.0.0:9091"
 ```
 
-`–identity` is a path to where the file is located and `–password` is used to decrypt the file.
+`–identity` is a path to where the file is located, and `–password` is used to decrypt the file.
 
 If a file exists at the specified location and is decrypted using the provided password, then your existing private key is used to access your funds and start up your node.
 
-If one doesn’t exist then it is created, encrypted and then stored at the given location with a newly generated private key.
+If one doesn’t exist, it is created, encrypted and stored at the given location with a newly generated private key.
 
 ### Backing up your identity file
 
-If you used Docker to install your node then your identity file will be stored on your OS at the path you specified: `/app/db/.hopr-id-paleochora` so you can skip this step.
+If you used Docker to install your node, then your identity file will be stored on your OS at the path you specified: `/app/db/.hopr-id-paleochora`, so you can skip this step.
 
-If you are using a hardware node like Dappnode or Avado you can download your identity file on their interfaces.
+If you are using Dappnode or Avado, you can download your identity file on their interfaces.
 
-**_Note:_** You should download your identity file as soon as possible. As downloading the backup or db folder will also download the database which can get quite large in size if you’ve been running your node for a while.
+**_Note:_** You should download your identity file as soon as possible. As downloading the backup or DB folder will also download the database, which can get quite large in size if you’ve been running your node for a while.
 
-**_Dappnode –_** Find HOPR in your packages and navigate to the backup section. From there all you have to do is click 'Download backup'.
+**_Dappnode –_** Find HOPR in your packages and navigate to the backup section. From there, all you have to do is click 'Download backup'.
 
 ![dappnode backup](./images/dappnode-backup.png)
 
-**_Avado –_** For Avado you have to specify you want to download /app/hoprd-db in the Avado UI. Once you have located your HOPR package click on the 'manage' icon.
+**_Avado –_** For Avado, you have to specify you want to download /app/hoprd-db in the Avado UI. Locate your HOPR package and click on the 'manage' icon.
 
 ![avado manage](./images/avado-manage.png)
 
-From here scroll down to the file manager and enter `/app/hoprd-db` in the field under `Download from DNP`. Then just click 'Download'.
+From here, scroll down to the file manager and enter `/app/hoprd-db` in the field under `Download from DNP`. Then click 'Download'.
 
 ![avado download](./images/avado-db.png)
 
 **_Note:_** Make sure you enter `/app/hoprd-db` and not `/app/hoprd-db/`.
 
-Now that you’ve backed up your identity file and have made note of your password, you will always be able to access your private key and node (as long as you keep them safe).
+Now that you’ve backed up your identity file and have noted your password, you will always be able to access your private key and node (as long as you keep them safe).
 
 ### ETH address & peerID
 
 From the private key, your **_ETH address_** and **_HOPR address_** are generated.
 
-Your HOPR address, aka your **_peer ID,_** is what other nodes on the network will use to interact with your node. An address for them to ping or send data to.
+Your HOPR address, aka your **_peer ID,_** is what other nodes on the network will use to interact with your node—an address for them to ping or send data.
 
-To view this information type `address` into the admin command line.
+To view this information, type `address` into the admin command line.
 
 ```
 address
@@ -142,7 +142,7 @@ By default, your HOPR address will only show the last five characters. Click the
 
 ### Balance
 
-Now that you have funded your node you can check your node's balance by typing `balance`.
+Now that you have funded your node, you can check your node's balance by typing `balance`.
 
 ```
 balance
@@ -155,17 +155,17 @@ HOPR Balance:     0.12
 Native Balance:   0.9915287
 ```
 
-**HOPR Balance** – Either wxHOPR or mHOPR depending on the network, These HOPR tokens are used to fund payment channels / pay nodes to relay data.
+**HOPR Balance** – Either wxHOPR or mHOPR, depending on the network. These HOPR tokens fund payment channels/pay nodes to relay data.
 
-**ETH Balance** – This will show the native tokens used to pay gas fees, currently xDAI. For example, opening and closing payment channels would require on-chain transactions paid in xDAI.
+**ETH Balance** – This will show the native tokens used to pay gas fees, currently xDAI. For example, opening and closing payment channels would require on-chain transactions paid for in xDAI.
 
 ## Interacting with other nodes
 
-Now that we have gone through a few of the properties of your node, let's try and interact with other nodes on the network.
+Now that we have gone through a few of the properties of your node let's try and interact with other nodes on the network.
 
 ### Finding other nodes
 
-First, let’s look at the available nodes for you to connect to, type `peers` into the command line:
+First, let’s look at the available nodes for you to connect to. Type `peers` into the command line:
 
 ```
 peers
@@ -186,13 +186,13 @@ Output will look similar to this:
 ...
 ```
 
-This shows all the nodes that have announced themselves onto the network. The HOPR addresses are contracted so click on them to expand the full address.
+This shows all the nodes that have announced themselves onto the network. The HOPR addresses are contracted, so click on them to expand the full address.
 
-For the purpose of this tutorial if you aren’t using Playground you will have to find two or more responsive nodes on the network. You can do this by pinging other nodes.
+For this tutorial, if you aren’t using Playground, you will have to find two or more responsive nodes on the network. You can do this by pinging other nodes.
 
 ### Pinging other nodes
 
-replace the following address with one from your list of `peers`
+Replace the following address with one from your list of `peers`
 
 ```
 ping 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV
@@ -204,9 +204,9 @@ Output will look similar to this:
 Pong received in: 84 ms
 ```
 
-You should receive a pong and a latency report, this can be used to assess the health of the target node and your own node.
+You should receive a pong and a latency report. This indicates the health of the target node as well as your own.
 
-But the main thing to see is if you received a response or not. If your output was: `Could not ping node. Timeout`, this means you could not ping the node and you should keep pinging other nodes until you find a responsive one.
+But the main thing to see is if you received a response or not. If your output was: `Could not ping node. Timeout`, it means you could not ping the node, and you should keep pinging other nodes until you find a responsive one.
 
 ### Setting aliases for other nodes
 
@@ -242,15 +242,15 @@ Bob -> jTzjV
 Alice -> FskLs
 ```
 
-All of these aliases can be used in place of their correspondinng HOPR address. For example, if you want to ping Bob’s node **16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV** you can use:
+All of these aliases can be used in place of their corresponding HOPR address. For example, if you want to ping Bob’s node **16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV**, you can use:
 
 ```
 ping Bob
 ```
 
-**_Note:_** you can assign multiple aliases to a single node but you cannot assign the same alias to multiple nodes. E.g two seperate HOPR addresses can not be aliased `Bob`
+**_Note:_** you can assign multiple aliases to a single node, but you cannot assign the same alias to multiple nodes. E.g. two separate HOPR addresses can not be aliased `Bob`
 
-If you want to remove an alias use:
+If you want to remove an alias, use:
 
 ```
 alias remove Bob
@@ -270,15 +270,15 @@ Expected output:
 Message sent
 ```
 
-**_Note:_** Don't forget to add the comma and use the correct alias. Bob is an alias I assigned to a previously found responsive node. Otherwise you can just write their HOPR address:
+**_Note:_** Don't forget to add the comma and use the correct alias. Bob is an alias I assigned to a previously found responsive node. Otherwise, you can just write their HOPR address:
 
 ```
 send ,16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV Hello Bob!
 ```
 
-This is a direct message or a 0-HOP message. It sends the message directly to another node without using any intermediaries and is costless.
+This is a direct message or a 0-HOP message. It sends the message directly to another node without intermediaries and is costless.
 
-The node you messaged (in my case `Bob`) will receive an output that looks like this:
+The node you messaged (in my case, `Bob`) will receive an output that looks like this:
 
 ```
 #### NODE RECEIVED MESSAGE ####
@@ -290,7 +290,7 @@ Latency: 295 ms
 
 ### Change includeRecipient type
 
-If you want the recipient to know you sent the message you can change your includeRecepient settings.
+If you want the recipient to know you sent the message, you can change your includeRecepient settings.
 
 ```
 settings includeRecipient true
@@ -302,7 +302,7 @@ Expected output:
 Settings updated.
 ```
 
-Now if you message a node it will receive an output including your address:
+Now, if you message a node, it will receive an output including your address:
 
 ```
 #### NODE RECEIVED MESSAGE ####
@@ -312,7 +312,7 @@ Message: M6psb:Hello Bob!
 Latency: 170 ms
 ```
 
-By default your includeRecipient type is set to false, you can check its current setting by typing `settings`:
+By default, your includeRecipient type is set to false. You can check its current setting by typing `settings`:
 
 ```
 settings
@@ -325,7 +325,7 @@ includeRecipient  true     Prepends your address to all messages (true|false)
 strategy          passive  Set an automatic strategy for the node. (passive|promiscuous)
 ```
 
-Ignore the strategy setting, for now, this will be covered down below. If you want to go back to being anonymous simply reset it to false:
+Ignore the strategy setting. For now, this is explained down below. If you want to go back to being anonymous, simply reset it to false:
 
 ```
 settings includeRecipient false
@@ -333,19 +333,19 @@ settings includeRecipient false
 
 ### Payment channels & path selection
 
-So far you’ve only sent a direct (0-HOP) message to another node. A direct message is not mixed or private. If you want to make your message private you need to send it through other nodes.
+So far, you’ve only sent a direct (0-HOP) message to another node. A direct message is not mixed or private. To make your message private, you must send it through other nodes.
 
 To use another node on the network to relay data, you have to pay them for their service in HOPR tokens. This is where payment channels come in.
 
 ### Payment channels
 
-Payment channels are funded edges between two nodes. They are a link between two nodes with some HOPR tokens staked in them for the purpose of paying the nodes that relay data for the sender.
+Payment channels are funded edges between two nodes. They are a link between two nodes with some HOPR tokens staked in them to pay the nodes that relay data for the sender.
 
 ![payment channel](./images/payment-channel.png)
 
 ### Opening a channel
 
-When opening a channel you need to choose a node to open the channel with and the amount of HOPR tokens you want to stake. You should stake at least 0.2 HOPR tokens to complete this tutorial.
+When opening a channel, you need to choose a node to open the channel with and the amount of HOPR tokens you want to stake. You should stake at least 0.2 HOPR tokens to complete this tutorial.
 
 You can open a payment channel with Bob by using:
 
@@ -362,14 +362,14 @@ open [HOPR address] [amount]
 Expected output:
 
 ```
-Opening channel to node "jTzjV"..
+Opening channel to node "jTzjV".
 
 Successfully opened channel to node "jTzjV".
 ```
 
-This will open a channel from you to Bob with **0.2 HOPR** staked in it. These tokens can be used by you to pay Bob and all the other nodes in any relay you use where Bob is the first intermediary node.
+This will open a channel from you to Bob with **0.2 HOPR** staked in it. You can use these tokens to pay Bob and all the other nodes in any relay you use, where Bob is the first intermediary node.
 
-**_Note:_** Channels are unidirectional, opening this channel does not mean a channel from Bob to your node exists.
+**_Note:_** Channels are unidirectional; opening this channel does not mean a channel from Bob to your node exists.
 
 ![Channel direction](./images/channel-direction.png)
 
@@ -384,7 +384,7 @@ open Bob 0.01
 Expected output:
 
 ```
-Opening channel to node "jTzjV"..
+Opening channel to node "jTzjV".
 
 Failed to open a channel to jTzjV.
 ```
@@ -393,7 +393,7 @@ Failed to open a channel to jTzjV.
 
 You should have a channel open with `Bob` or either one of your responsive nodes by now with at least 0.2 HOPR tokens staked.
 
-If you have underfunded the channel linked to Bob you can `close` the channel and retrieve all the funds staked before opening a new channel with Bob:
+If you have underfunded the channel linked to Bob, you can `close` the channel and retrieve all the funds staked before opening a new channel with Bob:
 
 ```
 close Bob
@@ -402,9 +402,9 @@ close Bob
 Expected output:
 
 ```
-Closing channel to "jTzjV"..
+Closing channel to "jTzjV".
 
-Initiated channel closure, the channel must remain open for at least 1 minutes. Please send the close command again once the cool-off has passed. Receipt: "0x4c529ee1d44249e42633b14036d9c037daf4d9f077ea853ef02ac37e458b41ba".
+Initiated channel closure, the channel must remain open for at least 1 minute. Please send the close command again once the cool-off has passed. Receipt: "0x4c529ee1d44249e42633b14036d9c037daf4d9f077ea853ef02ac37e458b41ba".
 ```
 
 This will take a minute as your funds need to be retrieved. You can view the progress of the channel closure by checking your open channels.
@@ -430,9 +430,9 @@ Balance:                0.2
 No open channels to node.
 ```
 
-If you see an incoming channel then someone has opened a channel with your node which might have happened, but won’t affect this walkthrough too much.
+If you see an incoming channel, someone has opened a channel with your node, which might have happened, but won’t affect this walkthrough too much.
 
-You may also see channels with the status `PendingToClose` if they are closing or `WaitingForCommitment` if they are in the process of opening.
+You may also see channels with the status `PendingToClose` if they are closing or `WaitingForCommitment` if they are opening.
 
 **_Note:_** If you closed your channel with Bob, make sure you have reopened it with 0.2 HOPR tokens staked before continuing this tutorial.
 
@@ -468,11 +468,11 @@ Latency: 445ms
 
 In this example, we’re using Bob’s node to relay a message back to ourselves. This works because the last HOP to the receiver doesn’t require funding. So is possible without an open payment channel.
 
-This is also why 0-HOP/direct messages are possible without any open payment channels.
+This is also why 0-HOP/direct messages are possible without open payment channels.
 
 ![1-HOP message](./images/1-hop.png)
 
-This is a manually selected 1-HOP path. If you try and replicate this with Alice it should fail as you have no open channels with Alice.
+This is a manually selected 1-HOP path. If you try and replicate this with Alice, it should fail as you have no open channels with Alice.
 
 ```
 send Alice,me This is a message for me!
@@ -486,15 +486,15 @@ Failed to send message.
 
 ### Maximum HOP length
 
-You can use more than one node as an intermediary, with a maximum of three. The HOPR network will only select 3-HOP paths when you use automatic pathing, all longer paths will not be considered and will also fail in manual path selection.
+You can use more than one node as an intermediary, with a maximum of three. The HOPR network will only select 3-HOP paths when you use automatic pathing; all longer paths will not be considered and will also fail in manual path selection.
 
-Longer paths require more information to be stored in packet headers, which make them distinguishable from normal relays. This is information HOPR would rather not broadcast to malicious actors.
+Longer paths require more information to be stored in packet headers, which makes them distinguishable from standard relays. This is information HOPR would rather not broadcast to malicious actors.
 
-For similar reasons 0-HOP, 1-HOP and 2-HOP paths are discouraged in manual path selection but for the purpose of this walkthrough, they are fine.
+For similar reasons, 0-HOP, 1-HOP and 2-HOP paths are discouraged in manual path selection, but for this walkthrough, they are fine.
 
 ### Send a 2-HOP message
 
-Now let’s try and send a 2-HOP message. For this to work, every node in the path must have a channel open with the next node in the path, with the exception of the last channel to the receiver.
+Now let’s try and send a 2-HOP message. For this to work, every node in the path must have a channel open with the next node in the path, excluding the last channel to the receiver.
 
 So a 2-HOP message to yourself through Bob and Alice: me → Bob → Alice → me would require channels to be open from me → Bob & Bob → Alice (me → Bob → Alice). The final channel from Alice → me is optional.
 
@@ -508,21 +508,21 @@ send Bob,Alice,me Hi!
 
 **_Note:_** make sure these aliases exist for you or replace Bob & Alice with whatever aliases you are using (or just the HOPR addresses of the nodes you want to use)
 
-If it fails to send then it is likely that Bob does not have a channel open with Alice. Since you should have a channel open with Bob with sufficient funds staked. A successful message costs 0.01 HOPR tokens per HOP currently.
+If it fails to send, it is likely, that Bob does not have a channel open to Alice (Bob -> Alice) since you should have a channel open to Bob (me -> Bob) with sufficient funds. A successful message costs 0.01 HOPR tokens per HOP currently.
 
 ![2-hop-fail](./images/2-hop-fail.png)
 
 ### Path directionality
 
-Even if the message succeeds you should note that you won’t be able to make this 2-HOP message in the other direction as you don’t have an open channel with Alice. And Alice may not have an open channel with Bob.
+Even if the message succeeds, you should note that you won’t be able to make this 2-HOP message in the other direction as you don’t have an open channel with Alice. And Alice may not have an open channel with Bob.
 
 ![Reverse route](./images/reverse-route.png)
 
-Here the first route is viable whereas the second route will fail.
+Here the first route is viable, whereas the second route will fail.
 
-In order to increase your pathing options, you want to connect to other well-connected nodes. But if you just want to experiment with different paths without the hassle you can use Playground. It will let you control five fully interconnected nodes costlessly without any installations.
+You want to connect to other well-connected nodes to increase your pathing options. But if you just want to experiment with different paths without the hassle, you can use Playground. It will let you control five fully interconnected nodes costlessly without any installations.
 
-**_Note:_** If using Playground, you will need to use the `close` command to remove channels in order to recreate incomplete paths.
+**_Note:_** If using Playground, you need to use the `close` command to remove channels and recreate incomplete paths.
 
 ### Path with consecutively repeating nodes
 
@@ -530,9 +530,9 @@ You can not have consecutively repeating nodes. For example, me → Alice → Al
 
 ![Consecutively repeating node](./images/consecutively-repeating.png)
 
-This is also the reason why the first node specified on a path cannot be yourself as you are also the sending node.
+This is also why the first node specified on a path cannot be yourself, as you are also the sending node.
 
-Try using the following route, it should fail:
+Try using the following route. It should fail:
 
 ```
 send me,Bob Hi!
@@ -540,13 +540,13 @@ send me,Bob Hi!
 
 ### Automatic pathing
 
-So far we have been using manually selected paths by entering the whole path into the command. Instead of this, we can simply let HOPR find a path for the relay by specifying just the receiver **_with no comma:_**
+So far, we have used manually selected paths by entering the whole path into the command. Instead of this, we can instead let HOPR find a path for the relay by specifying just the receiver **_with no comma:_**
 
 ```
 send Bob Hi!
 ```
 
-Automatic pathing will only look for 3-HOP paths from you to the receiver. If none exist or you don’t have sufficient funds staked in the first channel of the relay it will fail.
+Automatic pathing will only look for 3-HOP paths from you to the receiver. If none exist or you don’t have sufficient funds staked in the first channel of the relay, it will fail.
 
 ```
 Failed to send message.
@@ -562,7 +562,7 @@ The easiest way to increase your pathing options is to switch your strategy from
 
 By default, your strategy is set to passive which means your node will not try to open or close channels automatically.
 
-When you change the strategy to promiscuous, your node will try to open channels with a randomly selected group of nodes you have a healthy connection to. And at the same time close channels with nodes that are low on balance or considered unhealthy.
+When you change the strategy to promiscuous, your node will try to open channels with a randomly selected group of nodes you have a healthy connection to. And at the same time, close channels with nodes that are low on balance or considered unhealthy.
 
 You can change your strategy to promiscuous by entering:
 
@@ -578,7 +578,7 @@ settings strategy passive
 
 ## Tickets
 
-Although you spend HOPR tokens to relay data you are actually paid in tickets. Some tickets contain a range of HOPR tokens but most are useless. The point of this is that over a sizeable amount of tickets the payment for your services will converge to the amount you would have been paid.
+Although you spend HOPR tokens to relay data, you are actually paid in tickets. Some tickets contain a range of HOPR tokens, but most are useless. The point of this is that over a sizeable amount of tickets, the payment for your services will converge to the amount you would have received.
 
 But with the added benefit of:
 
@@ -609,17 +609,17 @@ Tickets:
 - Rejected Value:   0.00 txHOPR
 ```
 
-You should have earned tickets if your node was used to relay data. If you have earned none, try to set your strategy to promiscuous so you are more likely to be used for automatic pathing.
+You should have earned tickets if your node was used as an intermediary to relay data. If you have earned none, try to set your strategy to promiscuous, so you are more likely to be used for automatic pathing.
 
 ### Ticket redemption
 
-Tickets are redeemed automatically, so the tickets which contain value will automatically be converted to HOPR tokens and added to the payment channels used for that relay. The rest will just be discarded with no trace left on the blockchain.
+Tickets are redeemed automatically, so the tickets which contain value will automatically be converted to HOPR tokens and added to the payment channels used for that relay. The rest are discarded with no trace left on the blockchain.
 
 ![tickets-channels](./images/tickets-channels.png)
 
-**_Note:_** If no channel exists for the last HOP of a relay the tokens are added directly into the node balance.
+**_Note:_** If no channel exists for the last HOP of a relay, the tokens are added directly into the node balance.
 
-When channels are closed all staked tokens are also added to your balance.
+When channels are closed, all staked tokens are also added to your balance.
 
 ### Withdrawing funds
 
