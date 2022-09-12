@@ -132,7 +132,6 @@ const argv = yargsInstance
     describe: 'A password to encrypt your keys [env: HOPRD_PASSWORD]',
     default: ''
   })
-
   .option('provider', {
     string: true,
     describe: 'A custom RPC provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER]'
@@ -246,7 +245,7 @@ const argv = yargsInstance
     describe: 'Number of confirmations required for on-chain transactions [env: HOPRD_ON_CHAIN_CONFIRMATIONS]',
     default: CONFIRMATIONS
   })
-  .showHidden('show-hidden', 'see all options, including development options')
+  .showHidden('show-hidden', 'show all options, including debug options')
   .strict()
   .wrap(Math.min(120, yargsInstance.terminalWidth()))
   .parseSync()
