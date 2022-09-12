@@ -15,6 +15,13 @@ deps: ## install dependencies
 	yarn
 	command -v rustup && rustup update || echo "No rustup installed, ignoring"
 
+.PHONY: deps-production
+deps-production: ## install production dependencies
+	# only use corepack on non-nix systems
+	[ -n "${NIX_PATH}" ] || corepack enable
+	yarn workspaces focus --production @hoprnet/hoprd
+	command -v rustup && rustup set profile minimal && rustup update || echo "No rustup installed, ignoring"
+
 .PHONY: build
 build: ## build all packages
 build: build-hopr-admin build-yarn
