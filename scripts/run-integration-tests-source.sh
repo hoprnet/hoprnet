@@ -192,7 +192,6 @@ function setup_node() {
       --admin \
       --adminHost "127.0.0.1" \
       --adminPort ${admin_port} \
-      --api-token "${api_token}" \
       --data="${dir}" \
       --host="127.0.0.1:${node_port}" \
       --identity="${id}" \
