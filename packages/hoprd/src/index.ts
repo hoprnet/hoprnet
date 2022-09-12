@@ -245,7 +245,7 @@ const argv = yargsInstance
     describe: 'Number of confirmations required for on-chain transactions [env: HOPRD_ON_CHAIN_CONFIRMATIONS]',
     default: CONFIRMATIONS
   })
-  .showHidden('show-hidden', 'see all options, including development options')
+  .showHidden('show-hidden', 'show all options, including debug options')
   .strict()
   .wrap(Math.min(120, yargsInstance.terminalWidth()))
   .parseSync()
