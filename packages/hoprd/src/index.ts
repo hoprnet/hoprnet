@@ -195,7 +195,7 @@ const argv = yargsInstance
     hidden: true,
     boolean: true,
     describe: 'no remote authentication for easier testing [env: HOPRD_TEST_NO_AUTHENTICATION]',
-    default: false
+    default: undefined
   })
   .option('testNoDirectConnections', {
     hidden: true,
