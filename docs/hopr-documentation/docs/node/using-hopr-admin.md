@@ -30,13 +30,13 @@ If you used docker to install your node you should be able to access it at: [htt
 
 (**2**) From here make sure you have the correct information by default `API endpoint` should be set to `http://localhost:3001` but you may need to replace `localhost`with your server ip address if you used a VPS. The`apitoken`will be whatever you have set you security token to in the installation process.
 
-(**3**) You will see a newly generated ETH address. Ths is for you to send [xDAI](https://www.xdaichain.com/for-users/get-xdai-tokens) and [HOPR tokens](/staking/how-to-get-hopr) to in order to fund your node. If you are on the network registry then you will likely have had your node funded with mHOPR and so only need to send xDAI to start your node. **Your node won't start until it has been funded**
+(**3**) You will see a newly generated ETH address. Ths is for you to send [xDAI](https://www.xdaichain.com/for-users/get-xdai-tokens) and [HOPR tokens](/staking/how-to-get-hopr) to in order to fund your node. If you are on the network registry then you will have completed this step by now and can skip this.
 
-(**4**) You will see your `Network Health Indicator` this can be either `Red`, `Orange`, `Yellow` or `Green`. If it is `Red` you may want to wait a few minutes after it has started to see if it improves, but this is not required.
-
-We recommend you fund your node with **0.01 xDai & 10 wxHOPR (or mHOPR)**.
+We recommend you fund your node with **0.01 xDai & 10 wxHOPR**.
 
 **Note:** After funding your node, you will have to wait a few minutes for your node to start. When the process is finished you should see the output: **Node has started!**
+
+(**4**) You will see your `Network Health Indicator` this can be either `Red`, `Orange`, `Yellow` or `Green`. If it is `Red` you may want to wait a few minutes after it has started to see if it improves, but this is not required.
 
 :::info Tip
 
