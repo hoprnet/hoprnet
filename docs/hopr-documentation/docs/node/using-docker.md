@@ -86,6 +86,10 @@ This ensures the node cannot be accessed by a malicious user residing in the sam
 docker run --pull always -ti -v $HOME/.hoprd-db:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:paleochora --admin --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --init --api --apiHost "0.0.0.0" --apiPort 3001 --identity /app/db/.hopr-id-paleochora --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --adminPort 3000 --host "0.0.0.0:9091"
 ```
 
+Please make note of the `--apiToken` (Security token), as this will be used to access the `hopr-admin`. It may also be a good idea to note the `--password`, incase you want to decrypt your identity file and retrieve your private key or funds later.
+
+**Note:** Withdrawing funds is possible through the `hopr-admin`, this is just a precaution for safe keeping.
+
 All ports are mapped to your local host, assuming you stick to the default port numbers. You should be able to view the `hopr-admin` interface at: [http://localhost:3000](http://localhost:3000) (replace `localhost` with your server ip address if you are using a VPS).
 
 The installation process is now complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).

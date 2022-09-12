@@ -16,6 +16,8 @@ To proceed with the tutorial you will need to have installed a `hoprd` node eith
 Please be aware that it can take up to `10` minutes for your `hoprd` node instance to boot up.
 :::
 
+**Network Registry:** If you are part of the network registry and are starting your node to find your peerID, please note that **step 3** of the Admin UI & Funding section is altered for you. The details for your funding process are explained there, otherwise follow the rest of the tutorial as normal.
+
 ## Admin UI & Funding
 
 If you used docker to install your node you should be able to access it at: [http://localhost:3000](http://localhost:3000) (replace `localhost` with your server ip address if you are using a VPS). Otherwise locate the HOPR client on your hardware node's associated browser. You should end up with an admin interface that looks like this:
@@ -28,28 +30,32 @@ If you used docker to install your node you should be able to access it at: [htt
 
 ![API info](./images/API-info.png)
 
-(**2**) From here make sure you have the correct information by default `API endpoint` should be set to `http://localhost:3001` but you may need to replace `localhost`with your server ip address if you used a VPS. The`apitoken`will be whatever you have set you security token to in the installation process.
+(**2**) From here make sure you have the correct information by default `API endpoint` should be set to `http://localhost:3001` but you may need to replace `localhost`with your server ip address if you used a VPS and change the `port` if you adjusted the mapping on installation. The`apitoken`will be whatever you have set your security token as in the installation process.
 
-(**3**) You will see a newly generated ETH address. Ths is for you to send [xDAI](https://www.xdaichain.com/for-users/get-xdai-tokens) and [HOPR tokens](/staking/how-to-get-hopr) to in order to fund your node. If you are on the network registry then you will have completed this step by now and can skip this.
+(**3**) You will see a newly generated ETH & Node address. Use the ETH address to send [xDAI](https://www.xdaichain.com/for-users/get-xdai-tokens) and [HOPR tokens](/staking/how-to-get-hopr) to in order to fund your node. **Your node will not start until it has been funded.**
 
-We recommend you fund your node with **0.01 xDai & 10 wxHOPR**.
+**Network Registry:** If you are being funded as a part of the Network Registry, expand and copy the full `node address`, by default you will see a contracted string of five letters, click on them to expand the full address. It should look similar to this: `16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV`.
 
-**Note:** After funding your node, you will have to wait a few minutes for your node to start. When the process is finished you should see the output: **Node has started!**
+Make sure to copy your own `node address` and not the example above. Use your `node address` as your `peerID` when registering through this site to fund your node. Once you have submitted your details, your node will automatically receive both xDAI and mHOPR (assuming you are eligible).
 
-(**4**) You will see your `Network Health Indicator` this can be either `Red`, `Orange`, `Yellow` or `Green`. If it is `Red` you may want to wait a few minutes after it has started to see if it improves, but this is not required.
+Otherwise, we recommend you fund your node with **0.01 xDai & 10 wxHOPR**. Remember to use the node's ETH address for this.
+
+**Note:** After funding your node, you will have to wait a few minutes for it to start. When the process is finished you should see the output: **Node has started!**
 
 :::info Tip
 
-Please be aware that we have two types of tokens, both live in the **xDAI/Gnosis Chain network**:
+Please be aware that we have two types of tokens on the **xDAI/Gnosis Chain network**:
 
 - `wxHOPR`, the ERC-777 token needed to run your `hoprd` instance and,
 - `xHOPR`, the ERC-677 token, the xDAI/Ethereum bridged `HOPR` instance
 
 You can use [cross-chains](/staking/convert-hopr) bridge to convert from HOPR to xHOPR or vice versa.
 
-You can always use our [token wrapper](https://wrapper.hoprnet.org/) to see your balances and swap tokens between each other.
+You can always use our [token wrapper](https://wrapper.hoprnet.org/) to wrap/unwrap xHOPR/wxHOPR. 
 
 :::
+
+(**4**) You will see your `Network Health Indicator` this can be either `Red`, `Orange`, `Yellow` or `Green`. If it is `Red` you may want to wait a few minutes after the node has started (post-funding) to see if it improves, but this is not required.
 
 ![hopr-admin user interface](./images/admin-UI-second.png)
 
@@ -65,7 +71,7 @@ Before we start, you can find all the commands explained here: [HOPRd commands](
 
 Mentioned HOPR and ETH addresses are **examples**. Make sure you replace them with the addresses you are interacting with.
 
-::: 
+:::
 
 ## Interacting with your own node
 
@@ -180,7 +186,7 @@ Output will look similar to this:
 ...
 ```
 
-This shows all the nodes that have announced themselves onto the network.
+This shows all the nodes that have announced themselves onto the network. The HOPR addresses are contracted so click on them to expand the full address.
 
 For the purpose of this tutorial if you aren’t using Playground you will have to find two or more responsive nodes on the network. You can do this by pinging other nodes.
 

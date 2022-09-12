@@ -16,7 +16,9 @@ There are several ways to run `hoprd`: you can run it on your own device, instal
 
 ## Network Registry
 
-If you are using the Monte Rosa release you will not be able to interact with other nodes unless you have been added to the network reistry. You can view the current porcess and details for this here. Please don't join the network expecting to be able to interact wth other ndodes without having first been added to the registry.
+If you are using the Monte Rosa environment you will not be able to interact with other nodes unless you have been added to the network reistry. You can view the current porcess and details for this here. If you have been given an NFT and are installing your node to locate your peerID, remember to follow the altered funding steps at the start of the hopr-admin tutorial. Everything else is unaltered including the installation process.
+
+**Please make sure you are eligible 
 
 ## Hardware requirements
 

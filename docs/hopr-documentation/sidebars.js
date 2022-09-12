@@ -34,7 +34,7 @@ const sidebars = {
         'core/cover-traffic',
         'core/cover-traffic-nodes',
         'core/balancing-cover-traffic',
-        'network-registry-monte-rosa'
+        'network-registry-monte-rosa',
         'faq'
       ]
     },
