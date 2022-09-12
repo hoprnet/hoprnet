@@ -34,7 +34,7 @@ const sidebars = {
         'core/cover-traffic',
         'core/cover-traffic-nodes',
         'core/balancing-cover-traffic',
-        'network-registry-monte-rosa',
+        'core/network-registry-monte-rosa',
         'faq'
       ]
     },
@@ -42,7 +42,8 @@ const sidebars = {
     {
       type: 'category',
       label: 'Run a HOPR node',
-      items: ['node/start-here',
+      items: [
+        'node/start-here',
         'node/using-avado',
         'node/using-docker',
         'node/using-hopr-admin',

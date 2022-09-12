@@ -24,7 +24,7 @@ const FeatureList = [
     title: 'Run a hoprd node',
     Svg: <img class="svg_icon" src={'/img/front_icons/hopr-node.svg'} />,
     description: <>Start here to install and run a hoprd node.</>,
-    docName: '/node/start-here'
+    docName: 'node/start-here'
   },
   {
     title: 'HOPR core concepts',
