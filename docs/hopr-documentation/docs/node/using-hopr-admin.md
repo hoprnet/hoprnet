@@ -16,17 +16,27 @@ This is the `hopr-admin` user interface, which is browser based. To get access t
 Please be aware that it can take up to `10` minutes for your `hoprd` node instance to boot up.
 :::
 
-Access to the admin UI: [http://localhost:3000](http://localhost:3000)
+## Admin UI & Funding
 
-![hopr-admin user interface](/img/node/hoprd-api-token.png)
+If you used docker to install your node you should be able to access it at: [http://localhost:3000](http://localhost:3000) (replace `localhost` with your server ip address if you are using a VPS). Otherwise locate the HOPR client on your hardware node's associated browser. You should end up with an admin interface that looks like this:
 
-(**1**) Enter the password you specified in the command.
+![hopr-admin user interface](./images/admin-UI-first.png)
 
-(**2**) Fund your node (fund the address you see on admin UI, which starts with **0x...**) with **xDai** tokens (details [here](https://www.xdaichain.com/for-users/get-xdai-tokens)) and **wxHOPR tokens** (details [here](/staking/how-to-get-hopr)).
+**_Note:_** You may be greeted with a yellow screen asking you to check your settings, you can fix this by entering the correct API endpoint and token (see step 1 & 2).
 
-We recommend you to fund your node with **0.01 xDai & 10 wxHOPR**.
+(**1**) First clikck on the gear icon this should give you a pop-up similar to the one below.
 
-**Note:** After funding your node, please wait until your node will start and you will see this message: **Node has started!**
+![API info](./images/API-info.png)
+
+(**2**) From here make sure you have the correct information by default `API endpoint` should be set to `http://localhost:3001` but you may need to replace `localhost`with your server ip address if you used a VPS. The`apitoken`will be whatever you have set you security token to in the installation process.
+
+(**3**) You will see a newly generated ETH address. Ths is for you to send [xDAI](https://www.xdaichain.com/for-users/get-xdai-tokens) and [HOPR tokens](/staking/how-to-get-hopr) to in order to fund your node. If you are on the network registry then you will likely have had your node funded with mHOPR and so only need to send xDAI to start your node. **Your node won't start until it has been funded**
+
+(**4**) You will see your `Network Health Indicator` this can be either `Red`, `Orange`, `Yellow` or `Green`. If it is `Red` you may want to wait a few minutes after it has started to see if it improves, but this is not required.
+
+We recommend you fund your node with **0.01 xDai & 10 wxHOPR (or mHOPR)**.
+
+**Note:** After funding your node, you will have to wait a few minutes for your node to start. When the process is finished you should see the output: **Node has started!**
 
 :::info Tip
 
@@ -41,15 +51,13 @@ You can always use our [token wrapper](https://wrapper.hoprnet.org/) to see your
 
 :::
 
-Brief look at the admin UI:
+![hopr-admin user interface](./images/admin-UI-second.png)
 
-![hoprd admin user interface](/img/node/hoprd-admin-ui.png)
+(**5**) Click on the HOPR logo to see your node's connected peers.
 
-(**3**) Click on the HOPR logo to see your node's connected peers.
+(**6**) You can type commands and execute actions here.
 
-(**4**) You can type commands and execute actions.
-
-(**5**) Vew output here.
+(**7**) Output is displayed here.
 
 :::info
 
@@ -57,11 +65,11 @@ Before we start, you can find all the commands explained here: [HOPRd commands](
 
 Mentioned HOPR and ETH addresses are **examples**. Make sure you replace them with the addresses you are interacting with.
 
-:::
+::: 
 
 ## Interacting with your own node –
 
-Now that you have started a node, what exactly is your node and what are its features? There is a lot that goes into making the HOPR node function but let's start with the following properties:
+Now that you have started your node, what exactly is your node and what are its features? There is a lot that goes into making the HOPR node function but let's start with the following properties:
 
 * Identity file
 * ETH address & Peer ID
@@ -83,7 +91,7 @@ If one doesn’t exist then it is created, encrypted and then stored at the give
 
 ### Backing up your identity file –
 
-If you used Docker to install your node then your identity file will be stored on your OS at the path you specified: `/app/db/.hopr-id-paleochora` so you can skip this step. 
+If you used Docker to install your node then your identity file will be stored on your OS at the path you specified: `/app/db/.hopr-id-paleochora` so you can skip this step.
 
 If you are using a hardware node like Dappnode or Avado you can download your identity file on their interfaces.
 
@@ -137,8 +145,8 @@ balance
 The output will look similar to this:
 
 ```
-HOPR Balance:     0.12 wxHOPR
-Native Balance:   0.9915287 xDAI
+HOPR Balance:     0.12 
+Native Balance:   0.9915287
 ```
 
 **HOPR Balance** – Either wxHOPR or mHOPR depending on the network, These HOPR tokens are used to fund payment channels / pay nodes to relay data.
@@ -411,7 +419,7 @@ fetching channels...
 Outgoing Channel:       0xb0e3f7d81f0bd6d1783f3d44cf11653128e4f9ee95b98d49a07e4a8323cceb01
 To:                     jTzjV
 Status:                 Open
-Balance:                0.2 wxHOPR
+Balance:                0.2
 
 No open channels to node.
 ```

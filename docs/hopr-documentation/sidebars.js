@@ -44,7 +44,6 @@ const sidebars = {
       items: ['node/start-here',
         'node/using-avado',
         'node/using-docker',
-        'node/guide-using-a-hoprd-node',
         'node/using-hopr-admin',
         'node/hoprd-commands']
     },
@@ -75,7 +74,7 @@ const sidebars = {
 
     {
       type: 'category',
-      label: 'Clutter',
+      label: 'Ecosystem',
       items: [
         'about-hopr',
         'ecosystem/hopr-token',

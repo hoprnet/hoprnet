@@ -14,13 +14,21 @@ The instructions below are for Linux and macOS, however, due to the nature of Do
 The docker image is in alpha stage. The following instructions may not work for you.
 :::
 
-The Docker setup allows you quickly get started with **HOPRd** without having to download any other software requirements in your machine. This allows you to quickly get started using the system, but has some hardware requirements to be aware of.
+You can use Docker to install a `hoprd` node on your device quickly without worrying too much about the operating system or any additional software. There are however some hardware requirements needed in order to complete the installation.
 
 To use Docker, you will need a device that supports hardware-level virtualisation: VT-x for Intel-based PCs and AMD-V for AMD processors. Most of the Mac and Linux machines support it out of the box, so ensure you have enough memory \(e.g. 2 GB\) and disk space \(e.g. 1 GB\) before starting.
 
+You should also make sure your device has the following minimum requirements in order to run the node:
+
+* Dual Core CPU ~ 2 GHz
+* 4 GB RAM
+* at least 3 GB Disk Space
+
+At leasst 8 GB RAM and 10 GB Disk Space is ideal but not required. 
+
 ## Installing Docker
 
-Before doing anything else, you need to install **Docker Desktop** on your machine. Docker is natively supported in MacOS/Linux, and will prompt you with any additional requirements, depending on your operating system. Depending on your setup, you might need to follow additional steps to ensure your computer works properly with Docker.
+Before doing anything else, you need to install **Docker Desktop** on your machine. Docker is natively supported in MacOS/Linux, you will be promopted with any additional requirements after installing **Docker Desktop**. Depending on your setup, you might need to follow additional steps to ensure Docker runs smoothly on your machine.
 
 <Tabs>
 <TabItem value="linux" label="Linux">
@@ -46,7 +54,7 @@ Depending of your distribution, please follow the official guidelines for how to
 
 :::info NOTE
 
-Before downloading HOPRd image and starting a container, make sure the **Docker** is running.
+Before downloading the HOPRd image, make sure **Docker** is installaed.
 
 :::
 
@@ -78,6 +86,6 @@ This ensures the node cannot be accessed by a malicious user residing in the sam
 docker run --pull always -ti -v $HOME/.hoprd-db:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:paleochora --admin --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --init --api --apiHost "0.0.0.0" --apiPort 3001 --identity /app/db/.hopr-id-paleochora --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --adminPort 3000 --host "0.0.0.0:9091"
 ```
 
-Also all ports are mapped to your local host, assuming you stick to the default port numbers.
+All ports are mapped to your local host, assuming you stick to the default port numbers. You should be able to view the `hopr-admin` interface at: [http://localhost:3000](http://localhost:3000) (replace `localhost` with your server ip address if you are using a VPS).
 
-The installation process has been finished! Now you can proceed to [Guide using a hoprd node](guide-using-a-hoprd-node).
+The installation process is now complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).
