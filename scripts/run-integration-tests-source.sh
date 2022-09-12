@@ -27,7 +27,7 @@ usage() {
 declare wait_delay=2
 declare wait_max_wait=1000
 declare skip_cleanup="false"
-declare api_token="e2e-API-token^^"
+declare default_api_token="e2e-API-token^^"
 
 while (( "$#" )); do
   case "$1" in
@@ -157,13 +157,14 @@ fi
 # $8 = OPTIONAL: additional args to hoprd
 function setup_node() {
   local api_port=${1}
-  local node_port=${2}
-  local admin_port=${3}
-  local dir=${4}
-  local log=${5}
-  local id=${6}
-  local private_key=${7}
-  local additional_args=${8:-""}
+  local api_token=${2}
+  local node_port=${3}
+  local admin_port=${4}
+  local dir=${5}
+  local log=${6}
+  local id=${7}
+  local private_key=${8}
+  local additional_args=${9:-""}
 
   log "Run node ${id} on API port ${api_port} -> ${log}"
 
@@ -171,10 +172,16 @@ function setup_node() {
     additional_args="--environment hardhat-localhost ${additional_args}"
   fi
 
-  log "Additional args: \"${additional_args}\""
+  if [[ -n "${api_token}" ]]; then
+    additional_args="--api-token='${api_token}' ${additional_args}"
+  else
+    additional_args="--testNoAuthentication ${additional_args}"
+  fi
 
   # Remove previous logs to make sure the regex does not match
   rm -f "${log}"
+
+  log "Additional args: \"${additional_args}\""
 
   # Set NODE_ENV=development to rebuild hopr-admin next files
   # at runtime. Necessary to start multiple instances of hoprd
@@ -192,7 +199,6 @@ function setup_node() {
       --admin \
       --adminHost "127.0.0.1" \
       --adminPort ${admin_port} \
-      --api-token "${api_token}" \
       --data="${dir}" \
       --host="127.0.0.1:${node_port}" \
       --identity="${id}" \
@@ -334,15 +340,15 @@ cp -R \
 declare ct_node1_address="0xde913eeed23bce5274ead3de8c196a41176fbd49"
 
 #  --- Run nodes --- {{{
-setup_node 13301 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}" "${node1_privkey}" "--announce"
-setup_node 13302 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "${node2_privkey}" "--announce --testNoAuthentication"
-setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}" "${node3_privkey}" "--announce"
-setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}" "${node4_privkey}" "--testNoDirectConnections"
-setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}" "${node5_privkey}" "--testNoDirectConnections"
+setup_node 13301 ${default_api_token} 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}" "${node1_privkey}" "--announce"
+setup_node 13302 "" 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "${node2_privkey}" "--announce"
+setup_node 13303 ${default_api_token} 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}" "${node3_privkey}" "--announce"
+setup_node 13304 ${default_api_token} 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}" "${node4_privkey}" "--testNoDirectConnections"
+setup_node 13305 ${default_api_token} 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}" "${node5_privkey}" "--testNoDirectConnections"
 # should not be able to talk to the rest
-setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "${node6_privkey}" "--announce --environment hardhat-localhost2"
+setup_node 13306 ${default_api_token} 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "${node6_privkey}" "--announce --environment hardhat-localhost2"
 # node n8 will be the only one NOT registered
-setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "${node7_privkey}" "--announce"
+setup_node 13307 ${default_api_token} 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "${node7_privkey}" "--announce"
 setup_ct_node "${ct_node1_log}" "0xa08666bca1363cb00b5402bbeb6d47f6b84296f3bba0f2f95b1081df5588a613" 20000 "${ct_node1_dir}"
 # }}}
 
@@ -390,13 +396,13 @@ log "All nodes came up online"
 
 # --- Run security tests --- {{{
 ${mydir}/../test/security-test.sh \
-  127.0.0.1 13301 13302 19501 19502 "${api_token}"
+  127.0.0.1 13301 13302 19501 19502 "${default_api_token}"
 # }}}
 
 # --- Run protocol test --- {{{
 ADDITIONAL_NODE_ADDRS="0xde913eeed23bce5274ead3de8c196a41176fbd49" \
 ADDITIONAL_NODE_PEERIDS="16Uiu2HAm2VD6owCxPEZwP6Moe1jzapqziVeaTXf1h7jVzu5dW1mk" \
-HOPRD_API_TOKEN="${api_token}" \
+HOPRD_API_TOKEN="${default_api_token}" \
 ${mydir}/../test/integration-test.sh \
   "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305" "localhost:13306" "localhost:13307"
 # }}}
