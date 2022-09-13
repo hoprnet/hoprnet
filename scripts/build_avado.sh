@@ -107,11 +107,9 @@ sed -E "s/%TOKEN%/${api_token}/g" ./dappnode_package.json \
 declare avado_sdk_commit="7b035be"
 
 # Must be installed globally due to bad directory calls
-#npm install -g git+https://github.com/AvadoDServer/AVADOSDK.git#${avado_sdk_commit}
+npm install -g git+https://github.com/AvadoDServer/AVADOSDK.git#${avado_sdk_commit}
 
 # Must run as sudo due to underlying call to docker-compose
-#sudo avadosdk build --provider http://80.208.229.228:5001
+sudo avadosdk build --provider http://80.208.229.228:5001
 
 # http://go.ava.do/install/<IPFS HASH>
-
-sleep 300s
