@@ -101,8 +101,8 @@ COPY --from=build /app/hoprnet .
 # As we are on Debian, use hardlinks in node_modules to save space
 RUN yarn config set nmMode hardlinks-local
 
-# Install without devDependencies
-RUN CI=true yarn workspaces focus --production @hoprnet/hoprd
+# Install without devDependencies, and using WebRTC Release builds (`DEBUG=`)
+RUN DEBUG= CI=true yarn workspaces focus --production @hoprnet/hoprd
 
 # Remove yarn cache globally
 RUN yarn cache clean --all
