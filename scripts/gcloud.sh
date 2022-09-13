@@ -173,7 +173,7 @@ gcloud_create_or_update_instance_template() {
   # if set, let the node announce with a routable address on-chain
   local announce="${6:-}"
   # this parameter is mostly used on by CT nodes, although hoprd nodes also support it  
-  local private_key"${7:-}"
+  local private_key="${7:-}"
   local mount_path="/app/hoprd-db"
   local host_path="/var/hoprd"
   local metadata_value=""
