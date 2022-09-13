@@ -2,7 +2,6 @@
 id: using-docker
 title: Using Docker
 ---
-
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
@@ -24,7 +23,7 @@ You should also make sure your device has the following minimum requirements to 
 * 4 GB RAM
 * at least 3 GB Disk Space
 
-At least 8 GB RAM and 10 GB Disk Space is ideal but not required. 
+At least 8 GB RAM and 10 GB Disk Space is ideal but not required.
 
 ## Installing Docker
 
@@ -50,7 +49,9 @@ Depending on your distribution, please follow the official guidelines to install
 </TabItem>
 </Tabs>
 
-### Downloading HOPRd image using Docker
+All our docker images can be found in [our Google Cloud Container Registry](https://console.cloud.google.com/gcr/images/hoprassociation/global/hoprd). Each image is prefixed with `gcr.io/hoprassociation/hoprd`.
+
+## Installing HOPRd
 
 :::info NOTE
 
@@ -58,15 +59,9 @@ Before downloading the HOPRd image, make sure **Docker** is installed.
 
 :::
 
-All our docker images can be found in [our Google Cloud Container Registry](https://console.cloud.google.com/gcr/images/hoprassociation/global/hoprd).
-Each image is prefixed with `gcr.io/hoprassociation/hoprd`.
-The `paleochora` tag represents the latest community release version.
+(**1**) Open your terminal.
 
-Open your console based on your OS:
-
-- Terminal (Mac OS / Linux OS)
-
-Before starting a container, please create your own **Security Token**. Replace **YOUR_SECURITY_TOKEN** with your own, and only then paste the command.
+(**2**) Create a **Security Token** (password) which satisfies the following requirements:
 
 :::danger Requirements
 
@@ -82,13 +77,19 @@ This ensures the node cannot be accessed by a malicious user residing in the sam
 
 :::
 
+(**3**) Copy the following command and replace **YOUR_SECURITY_TOKEN** with your own.
+
 ```bash
 docker run --pull always -ti -v $HOME/.hoprd-db:/app/DB -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:paleochora --admin --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --init --API --apiHost "0.0.0.0" --apiPort 3001 --identity /app/DB/.hopr-id-paleochora --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --adminPort 3000 --host "0.0.0.0:9091"
 ```
 
-Please note the `--apiToken` (Security token), as this will be used to access the `hopr-admin`. It may also be a good idea to note the `--password`, in case you want to decrypt your identity file and retrieve your private key or funds later.
+(**4**) Paste the new adjusted command, and hit enter.
 
-**Note:** Withdrawing funds is possible through `hopr-admin`. This is just a precaution for safekeeping.
+(**5**) Wait until the node is installed. This can take up to 10 minutes.
+
+Please note the `--apiToken` (Security token), as this will be used to access hopr-admin. It may also be a good idea to note the `--password`, in case you want to decrypt your identity file and retrieve your private key or funds later.
+
+**Note:** Withdrawing funds is possible through hopr-admin. This is just a precaution for safekeeping.
 
 All ports are mapped to your local host, assuming you stick to the default port numbers. You should be able to view the `hopr-admin` interface at [http://localhost:3000](http://localhost:3000) (replace `localhost` with your server IP address if you are using a VPS).
 

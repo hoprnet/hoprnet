@@ -1,6 +1,6 @@
 ---
 id: hoprd-commands
-title: hoprd Commands
+title: Hopr-admin commands
 ---
 
 This page gives a short overview of the different commands you can run from your node, and the syntax for using them.
