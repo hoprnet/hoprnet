@@ -71,8 +71,7 @@ const sidebars = {
       type: 'category',
       label: 'HOPR dApps',
       items: [
-        'dapps/myne-chat',
-        'dapps/playground'
+        'dapps/myne-chat'
       ]
     },
 
