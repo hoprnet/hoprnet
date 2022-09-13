@@ -164,6 +164,7 @@ gcloud_create_instance_template_if_not_exists() {
 # $6 - optional: announce
 # $7 - optional: private key
 gcloud_create_or_update_instance_template() {
+  
   local name="${1}"
   local image="${2}"
   local environment_id="${3:-}"
@@ -177,7 +178,7 @@ gcloud_create_or_update_instance_template() {
   local mount_path="/app/hoprd-db"
   local host_path="/var/hoprd"
   local metadata_value=""
-
+  
   log "checking for instance template ${name}"
   if gcloud compute instance-templates describe "${name}" --quiet >/dev/null; then
     log "instance template ${name} already present"
