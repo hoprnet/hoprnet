@@ -164,7 +164,6 @@ gcloud_create_instance_template_if_not_exists() {
 # $6 - optional: announce
 # $7 - optional: private key
 gcloud_create_or_update_instance_template() {
-  
   local name="${1}"
   local image="${2}"
   local environment_id="${3:-}"
