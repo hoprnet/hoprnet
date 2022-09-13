@@ -37,7 +37,7 @@ fi
 declare avado_version="${1}"
 declare environment_id="${2:-"$(${mydir}/get-default-environment.sh)"}"
 declare release_id="${3:-"$(${mydir}/get-default-environment.sh --release)"}"
-declare api_token="${4:-"!5qxc9Lp1BE7IFQ-nrtttU"}"
+declare api_token="${4:-"!5qxc9Lp1BE7IFQ-nrtttU"}" # <- Default AVADO API token
 
 # Validate environment and release ids
 if [[ -z "${environment_id}" ]] || [[ -z "${release_id}" ]]; then
