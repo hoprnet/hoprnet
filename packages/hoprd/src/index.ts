@@ -298,6 +298,9 @@ function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
 
 async function addUnhandledPromiseRejectionHandler() {
   if (process.env.NODE_ENV !== 'production') {
+    console.log(
+      `Loading extended logger that enhances debugging of unhandled promise rejections. Disabled on production environments`
+    )
     const { register: registerUnhandled, setLogger } = await import('trace-unhandled')
 
     registerUnhandled()
