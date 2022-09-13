@@ -55,14 +55,6 @@ export class LogStream {
     })
   }
 
-  unsubscribe(sock: Socket) {
-    const index = this.connections.indexOf(sock)
-    debugLog(`WS unsubscribing socket`)
-    if (index > -1) {
-      this.connections.splice(index, 1)
-    }
-  }
-
   log(...args: string[]) {
     const msg: Message = { type: 'log', msg: `${args.join(' ')}`, ts: new Date().toISOString() }
     this._log(msg)

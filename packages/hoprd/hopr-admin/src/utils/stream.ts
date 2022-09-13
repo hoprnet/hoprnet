@@ -6,8 +6,7 @@ import { type Log, createLog } from '.'
  * @param event Event coming from '/api/v2/node/stream/websocket'
  * @returns log readable by hopr-admin
  */
-export const readStreamEvent = (event: any): Log | undefined => {
-  console.log('event', event)
+export const readStreamEvent = (event: MessageEvent<any>): Log | undefined => {
   if (event.data === undefined) {
     return undefined
   }
@@ -21,6 +20,8 @@ export const readStreamEvent = (event: any): Log | undefined => {
 
     // we ignore plain messages, instead print HOPRd logs
     if (data.type === 'message') return undefined
+    // we ignore connected type, which is simply a line of all connected peers
+    if (data.type === 'connected') return undefined
     // we are only interested in messages which have a message
     if (!data.msg) return undefined
 

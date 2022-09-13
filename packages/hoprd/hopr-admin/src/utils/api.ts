@@ -23,11 +23,6 @@ export default class API {
     return headers
   }
 
-  public updateConfig(apiEndpoint: string, apiToken?: string): void {
-    this.apiEndpoint = apiEndpoint
-    this.apiToken = apiToken
-  }
-
   public async getReq(apiPath: ApiPath): Promise<Response> {
     return fetch(this.getEndpoint(apiPath), {
       headers: this.getHeaders()

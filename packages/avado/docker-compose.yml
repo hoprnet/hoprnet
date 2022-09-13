@@ -12,7 +12,7 @@ services:
     'environment':
       [
         'DEBUG=hopr*',
-        'HOPRD_ENVIRONMENT=master-goerli',
+        'HOPRD_ENVIRONMENT=%ENV_ID%',
         'HOPRD_HOST=0.0.0.0:9091',
         'HOPRD_ANNOUNCE=false',
         'HOPRD_ADMIN=true',
@@ -27,7 +27,7 @@ services:
         'HOPRD_PASSWORD=open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0',
         'HOPRD_API_TOKEN=!5qxc9Lp1BE7IFQ-nrtttU',
         'HOPRD_IDENTITY=/app/hoprd-db/.hopr-identity',
-        'HOPRD_DATA=/app/hoprd-db/data-master-goerli',
+        'HOPRD_DATA=/app/hoprd-db/data-%ENV_ID%',
         'HOPRD_INIT=true',
         'HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS=false',
         'HOPRD_PROVIDER=https://provider-proxy.hoprnet.workers.dev/eth_goerli'

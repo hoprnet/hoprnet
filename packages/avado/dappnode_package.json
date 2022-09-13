@@ -17,7 +17,7 @@
   },
   "ui": {
     "OnboardingWizard": {
-      "url": "http://hopr.my.ava.do",
+      "url": "http://hopr.my.ava.do:3000/",
       "external": true
     }
   }

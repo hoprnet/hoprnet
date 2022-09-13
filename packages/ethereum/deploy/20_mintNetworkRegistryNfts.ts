@@ -1,6 +1,6 @@
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
-import type { HoprBoost, ERC677Mock, HoprStakingProxyForNetworkRegistry } from '../src/types'
+import type { HoprBoost, HoprStakingProxyForNetworkRegistry } from '../src/types'
 import { type ContractTransaction, utils } from 'ethers'
 import {
   CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES,
@@ -10,8 +10,7 @@ import {
   NR_NFT_RANK_COM,
   NR_NFT_RANK_TECH,
   NR_NFT_TYPE,
-  NR_NFT_TYPE_INDEX,
-  MIN_STAKE
+  NR_NFT_TYPE_INDEX
 } from '../utils/constants'
 
 const NUM_NR_NFT = 3
@@ -107,14 +106,13 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     // mint NR NFTs
     for (const networkRegistryNftRank of [NR_NFT_RANK_TECH, NR_NFT_RANK_COM]) {
       console.log(
-        `... minting ${NUM_NR_NFT} ${NR_NFT_TYPE} NFTs type of index ${NR_NFT_TYPE_INDEX} to ${admin}\n...minting 1 ${NR_NFT_TYPE} NFTs to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1], [3]\n...minting 10 ${NR_NFT_TYPE} NFTs to dev bank ${DEV_BANK_ADDRESS}`
+        `... minting ${NUM_NR_NFT} ${NR_NFT_TYPE} NFTs type of index ${NR_NFT_TYPE_INDEX} to ${admin}\n...minting 1 ${NR_NFT_TYPE} NFTs to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES\n...minting 10 ${NR_NFT_TYPE} NFTs to dev bank ${DEV_BANK_ADDRESS}`
       )
       await awaitTxConfirmation(
         hoprBoost.batchMint(
           [
             ...new Array(NUM_NR_NFT).fill(admin),
-            CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1],
-            CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[3],
+            ...CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES,
             ...Array(10).fill(DEV_BANK_ADDRESS)
           ],
           NR_NFT_TYPE,
@@ -154,33 +152,37 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       registryProxy.ownerBatchAddSpecialNftTypeAndRank(
         [NR_NFT_TYPE_INDEX, NR_NFT_TYPE_INDEX],
         [NR_NFT_RANK_TECH, NR_NFT_RANK_COM],
-        [NR_NFT_MAX_REGISTRATION_TECH, NR_NFT_MAX_REGISTRATION_COM]
+        [NR_NFT_MAX_REGISTRATION_TECH, NR_NFT_MAX_REGISTRATION_COM],
+        {
+          gasLimit: 4e6
+        }
       ),
       environment,
       ethers
     )
 
-    try {
-      // mint minimum stake to addresses that will stake and are binded to nodes in NR
-      const tokenContract = await deployments.get('xHoprToken')
-      const hoprToken = (await ethers.getContractFactory('ERC677Mock')).attach(tokenContract.address) as ERC677Mock
+    // // currently we don't use funds, only NFTs
+    // try {
+    //   // mint minimum stake to addresses that will stake and are binded to nodes in NR
+    //   const tokenContract = await deployments.get('xHoprToken')
+    //   const hoprToken = (await ethers.getContractFactory('ERC677Mock')).attach(tokenContract.address) as ERC677Mock
 
-      await awaitTxConfirmation(
-        hoprToken.batchMintInternal([CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0]], MIN_STAKE),
-        environment,
-        ethers
-      )
-      await awaitTxConfirmation(
-        hoprToken.batchMintInternal([CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[2]], MIN_STAKE),
-        environment,
-        ethers
-      )
-      console.log(`... minting ${MIN_STAKE} txHOPR to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0] and [2]`)
-    } catch (error) {
-      console.error(
-        `Cannot mint txHOPR to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0] and CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[2] due to ${error}`
-      )
-    }
+    //   await awaitTxConfirmation(
+    //     hoprToken.batchMintInternal([CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0]], MIN_STAKE),
+    //     environment,
+    //     ethers
+    //   )
+    //   await awaitTxConfirmation(
+    //     hoprToken.batchMintInternal([CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[2]], MIN_STAKE),
+    //     environment,
+    //     ethers
+    //   )
+    //   console.log(`... minting ${MIN_STAKE} txHOPR to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0] and [2]`)
+    // } catch (error) {
+    //   console.error(
+    //     `Cannot mint txHOPR to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0] and CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[2] due to ${error}`
+    //   )
+    // }
   }
 
   const isDeployerAdmin = await hoprBoost.hasRole(DEFAULT_ADMIN_ROLE, deployer)
