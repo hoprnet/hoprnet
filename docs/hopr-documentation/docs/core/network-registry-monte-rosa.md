@@ -5,7 +5,7 @@ title: Network Registry
 
 ## What is the Network Registry?
 
-The Network Registry is a list of nodes allowed to interact with others on the network. If your node is not registered on the "Network Registry" smart contract. It will be unable to send messages or communicate with other nodes on the network. This is a utility used by HOPR to scale and test the network at a controlled pace. 
+The Network Registry is a list of nodes allowed to interact with others on the network. This is a utility used by HOPR to scale and test the network at a controlled pace. 
 
 This restriction on the access guarded by the "Network Registry" is only enabled in the staging or production environment by default. If you run a cluster of HOPR nodes locally in the hardhat network, the "Network Registry" is not enabled. 
 

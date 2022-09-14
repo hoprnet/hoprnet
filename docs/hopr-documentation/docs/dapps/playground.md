@@ -2,16 +2,13 @@
 id: playground
 title: Playground
 ---
-
 HOPR Playground lets you launch and interact with a fully interconnected cluster of five hoprd nodes. The nodes and connecting channels are all pre-funded, allowing you to use or test dApps costlessly.
 
 ![Playground Cluster](./images-dApps/playground-cluster.png)
 
-You can launch a cluster without installing software or spending any HOPR tokens at playground.hoprnet.org.
+You can launch a cluster without installing software or spending any HOPR tokens at [playground.hoprnet.org](https://playground.hoprnet.org/).
 
-![Launch Cluster](./images-dApps/playground-launch-cluster.png)
-
-Once you launch your cluster, it will be active for 20 minutes before terminating. This allows other users access to the 40 available clusters. If you want to keep using Playground, you can just launch another cluster as long as one is available.
+Once you launch your cluster, it will be active for 20 minutes before terminating. This allows other users access to the 40 available clusters. If you want to keep using Playground, you can just launch another cluster after your time is up (as long as one is available).
 
 After clicking ‘Launch Cluster’, you should see a dock of dApps for you to explore. You can view a quick tutorial on how to use each one in the docs.
 
@@ -21,4 +18,4 @@ You can also use the node URLs and API keys to connect your dApp to Playground�
 
 ![Playground Cluster](./images-dApps/playground-single-node-details.png)
 
-You can also have your dApp added to Playground as long as it follows the HOPR dApp standard. Use the developer section to see how you can get started.
+You can have your dApp added to Playground as long as it follows the [HOPR dApp standard](https://github.com/hoprnet/hopr-community/blob/main/DAPP_STANDARD.md). Use the [developer section](/developers/intro) to see how you can get started.

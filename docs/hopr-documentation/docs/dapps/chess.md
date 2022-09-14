@@ -29,11 +29,11 @@ To start a game, both you and your opponent have to complete a few steps:
 
 (**5**) Click "Start" and wait for your opponent to connect.
 
-#### Your Opponent's Perspective:
+#### Opponent's Perspective:
 
 **Note:** You should have the URL of the node you will be using and the peerID of the host's node. If you don't have either of these details, ask the host to send them.
 
-![chess two nodes](./images-dApps/chess-connect-circled-2.png)
+![chess two nodes](./images-dApps/chess-playground-connect-circled.png)
 
 (**1**) Open the URL for your node and click "CONNECT" on the top right of the page. This should open a pop-up.
 

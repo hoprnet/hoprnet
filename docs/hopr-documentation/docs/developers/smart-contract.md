@@ -171,7 +171,7 @@ Emitted once a channel closure is initialized.
 | `destination`           | address | true    | Address of the destination node of a payment channel.        |
 | `closureInitiationTime` | uint32  | false   | Block timestamp at which the channel closure is initialized. |
 
-#### ChannelClosureInitiated
+#### ChannelClosureFinalized
 
 ```solidity
 event ChannelClosureFinalized(

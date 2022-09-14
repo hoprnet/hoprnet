@@ -10,7 +10,7 @@ The HOPR client software (hoprd) is still under heavy development. Please do not
 
 :::
 
-Make sure you have installed a `hoprd` node either through Docker or with a hardware node such as Avado or Dappnoce. If you have not completed the installation process, please [start here](start-here).
+Make sure you have installed a `hoprd` node either through Docker or with a hardware node such as Avado or Dappnode. If you have not completed the installation process, please [start here](start-here).
 
 :::info Tip
 Please be aware that it can take 10 minutes for your `hoprd` node to boot up.
@@ -22,7 +22,7 @@ Please be aware that it can take 10 minutes for your `hoprd` node to boot up.
 
 If you used Docker to install your node, you should be able to access it at: [http://localhost:3000](http://localhost:3000) (replace `localhost` with your server IP address if you are using a VPS). Otherwise, locate the HOPR client on your hardware node's associated browser. You should end up with an admin interface that looks like this:
 
-![hopr-admin user interface](./images/admin-UI-first.png)
+![hopr-admin user interface](./images/admin-UI-first-2.png)
 
 **_Note:_** You may be greeted with a yellow screen asking you to check your settings. You can fix this by entering the correct API endpoint and token (see steps 1 & 2).
 
@@ -34,9 +34,9 @@ If you used Docker to install your node, you should be able to access it at: [ht
 
 (**3**) You will see a newly generated ETH & Node address. Use the ETH address to send [xDAI](https://www.xdaichain.com/for-users/get-xdai-tokens) and [HOPR tokens](/staking/how-to-get-hopr) to in order to fund your node. **Your node will not start until it has been funded.**
 
-**Network Registry:** If you are being funded as a part of the Network Registry, expand and copy the full `node address`. By default, you will see a contracted string of five letters. Click on them to expand the full address. It should look similar to this: `16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV`.
+**Network Registry:** If you are being funded as a part of the Network Registry, expand and copy the full **node address**. By default, you will see a contracted string of five letters. Click on them to expand the full address. It should look similar to this: `16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV`.
 
-Make sure to copy your node address, not the example above. Use your `node address` as your `peerID` when registering through this site. Once you have submitted your details, your node will automatically receive both xDAI and mHOPR (assuming you are eligible).
+Make sure to copy your node address, not the example above. Use your node address as your **peerID** when registering through this site. Once you have submitted your details, your node will automatically receive both xDAI and mHOPR (assuming you are eligible).
 
 Otherwise, we recommend you fund your node with **0.01 xDai & 10 wxHOPR**. Remember to use the node's ETH address for this.
 
@@ -51,13 +51,13 @@ Please be aware that we have two types of tokens on the **xDAI/Gnosis Chain netw
 
 You can use the [cross-chains](/staking/convert-hopr) bridge to convert from HOPR to xHOPR or vice versa.
 
-You can always use our [token wrapper](https://wrapper.hoprnet.org/) to wrap/unwrap xHOPR/wxHOPR. 
+And you can always use our [token wrapper](https://wrapper.hoprnet.org/) to wrap/unwrap xHOPR/wxHOPR.
 
 :::
 
-(**4**) You will see your `Network Health Indicator`. This can be either `Red`, `Orange`, `Yellow` or `Green`. If it is `Red`, you may want to wait a few minutes after the node has started (post-funding) to see if it improves, but this is not required.
+![hopr-admin user interface](./images/admin-UI-second-2.png)
 
-![hopr-admin user interface](./images/admin-UI-second.png)
+(**4**) You will see your `Network Health Indicator`. This can be either Red, Orange, Yellow or Green depending on your connection to the network. It's normal for it to be **Red** when you first start your node, you can wait a few minutes to see if it improves but this is not required.
 
 (**5**) Click on the HOPR logo to see your node's connected peers.
 
@@ -131,7 +131,7 @@ To view this information, type `address` into the admin command line.
 address
 ```
 
-Output will look similar to this:
+Expected output:
 
 ```
 HOPR Address:  M6psb
@@ -148,7 +148,7 @@ Now that you have funded your node, you can check your node's balance by typing 
 balance
 ```
 
-The output will look similar to this:
+Expected output:
 
 ```
 HOPR Balance:     0.12 
@@ -171,7 +171,7 @@ First, let’s look at the available nodes for you to connect to. Type `peers` i
 peers
 ```
 
-Output will look similar to this:
+Expected output:
 
 ```
 122 peers have announced themselves on chain:
@@ -188,7 +188,7 @@ Output will look similar to this:
 
 This shows all the nodes that have announced themselves onto the network. The HOPR addresses are contracted, so click on them to expand the full address.
 
-For this tutorial, if you aren’t using Playground, you will have to find two or more responsive nodes on the network. You can do this by pinging other nodes.
+For this tutorial, if you aren’t using [Playground](/dapps/playground), you will have to find two or more responsive nodes on the network. You can do this by pinging other nodes.
 
 ### Pinging other nodes
 
@@ -198,7 +198,7 @@ Replace the following address with one from your list of `peers`
 ping 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV
 ```
 
-Output will look similar to this:
+Expected output:
 
 ```
 Pong received in: 84 ms
@@ -216,7 +216,7 @@ You can now give one of the responsive nodes an alias:
 alias 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV Bob
 ```
 
-The output will look similar to this:
+Expected output:
 
 ```
 Set alias 'Bob' to 'jTzjV'.
@@ -234,7 +234,7 @@ Type alias to see a list of all the aliases you have set.
 alias
 ```
 
-The output will look similar to this:
+Expected Output:
 
 ```
 me ->  M6psb
@@ -520,7 +520,7 @@ Even if the message succeeds, you should note that you won’t be able to make t
 
 Here the first route is viable, whereas the second route will fail.
 
-You want to connect to other well-connected nodes to increase your pathing options. But if you just want to experiment with different paths without the hassle, you can use Playground. It will let you control five fully interconnected nodes costlessly without any installations.
+You want to connect to other well-connected nodes to increase your pathing options. But if you just want to experiment with different paths without the hassle, you can use [Playground](https://playground.hoprnet.org/). It will let you control five fully interconnected nodes costlessly without any installations.
 
 **_Note:_** If using Playground, you need to use the `close` command to remove channels and recreate incomplete paths.
 

@@ -48,7 +48,7 @@ This allows you to access the admin interface locally (once the node is installe
 
 If you install your node through Docker, it will only run until you close your terminal. It is highly recommended that you use tmux or screen to run your node in the background. Tmux/screen will allow you to create multiple terminal windows that exist as their own independently running instances. All of these are on a separate session that will keep running after you have closed your terminal.
 
-If you intend to use your device to install and run a `hoprd` node, please familiarise yourself with [tmux](https://linuxize.com/post/getting-started-with-tmux/) or [screen](https://linuxize.com/post/how-to-use-linux-screen/) and create a new session before continuing.
+If you intend to use your device to install and run a `hoprd` node, please familiarise yourself with [tmux](https://linuxize.com/post/getting-started-with-tmux/) or [screen](https://linuxize.com/post/how-to-use-linux-screen/) before continuing.
 
 ## hoprd installation methods
 
@@ -60,7 +60,7 @@ An [AVADO](https://ava.do/) plug-n-play device, just set it up and install the H
 
 **[Dappnode](using-dappnode)**
 
-A [Dappnode](https://dappnode.io/) plug-n-play device.
+A [Dappnode](https://dappnode.io/) plug-n-play device, another quick set-up and installation. 
 
 **[Docker](using-docker)**
 

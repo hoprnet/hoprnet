@@ -25,7 +25,7 @@ To start a conversation, both you and your friend both have to complete a few st
 
 (**4**) To officially start a conversation, you have to send a message (if you don't, your friend won't see the open conversation).
 
-### Your Friend's Perspective:
+### Friend's Perspective:
 
 ![Mynechat find conversation](./images-dApps/myne-chat-open-conversations.png)
 

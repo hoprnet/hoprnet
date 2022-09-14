@@ -10,13 +10,13 @@ Please delete any old packages as necessary; make sure to withdraw your funds be
 
 ## Installing the HOPR client
 
-While connected to your Dappnode's network or via a VPN, go to the following [link](http://my.ava.do/#/installer/%2Fipfs%2FQmPhSZTZbM6kd9VizvZpKDN3fQe5bqvCDooCBPYEUXdTcy). Just click the install button and wait until the download completes.
-
-If you are unable to use the link above, search for this hash in the DappStore:
+Search for this hash in the DappStore:
 
 ```
 /ipfs/QmPhSZTZbM6kd9VizvZpKDN3fQe5bqvCDooCBPYEUXdTcy
 ```
+
+It should bring up the latest version of the HOPR client. Just install the package and you are good to go.
 
 ![DappStore](/img/node/avado-1.png)
 
