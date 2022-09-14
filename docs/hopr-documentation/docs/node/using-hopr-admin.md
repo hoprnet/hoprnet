@@ -20,7 +20,7 @@ Please be aware that it can take 10 minutes for your `hoprd` node to boot up.
 
 ## Admin UI & Funding
 
-If you used Docker to install your node, you should be able to access it at: [http://localhost:3000](http://localhost:3000) (replace `localhost` with your server IP address if you are using a VPS). Otherwise, locate the HOPR client on your hardware node's associated browser. You should end up with an admin interface that looks like this:
+If you used Docker to install your node, you should be able to access it at: [http://localhost:3000](http://localhost:3000) (replace `localhost` with your server IP address if you are using a VPS). Otherwise, locate the HOPR client on your hardware node's associated browser. You should end up with an interface that looks like this:
 
 ![hopr-admin user interface](./images/admin-UI-first-2.png)
 
@@ -30,7 +30,9 @@ If you used Docker to install your node, you should be able to access it at: [ht
 
 ![API info](./images/API-info.png)
 
-(**2**) From here, make sure you have the correct information by default `API endpoint` should be set to `http://localhost:3001`, but you may need to replace `localhost`with your server IP address if you used a VPS and change the `port` if you adjusted the mapping on installation. The`apitoken` is whatever you have set your security token as in the installation process.
+(**2**) From here, make sure you have the correct information. By default `API endpoint` should be set to `http://localhost:3001`, but you may need to replace `localhost`with your server IP address if you used a VPS and change the port if you adjusted the mapping on installation.
+
+The`apitoken` is whatever you set your security token as in the installation process.
 
 (**3**) You will see a newly generated ETH & Node address. Use the ETH address to send [xDAI](https://www.xdaichain.com/for-users/get-xdai-tokens) and [HOPR tokens](/staking/how-to-get-hopr) to in order to fund your node. **Your node will not start until it has been funded.**
 
@@ -67,7 +69,7 @@ And you can always use our [token wrapper](https://wrapper.hoprnet.org/) to wrap
 
 :::info
 
-Before we start, you can find all the commands explained here: [HOPRd commands](hoprd-commands).
+Before we start, you can find all the commands explained here: [Hopr-admin commands](hoprd-commands).
 
 Mentioned HOPR and ETH addresses are **examples**. Make sure you replace them with the addresses you are interacting with.
 
