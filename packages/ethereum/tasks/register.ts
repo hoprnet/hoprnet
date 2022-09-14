@@ -80,13 +80,14 @@ async function main(
   const signerAddress = await signer.getAddress()
   console.log('Signer Address (register task)', signerAddress)
 
-  const hoprProxy = network.tags.development
-    ? ((await ethers.getContractFactory('HoprDummyProxyForNetworkRegistry'))
-        .connect(signer)
-        .attach(hoprProxyAddress) as HoprDummyProxyForNetworkRegistry)
-    : ((await ethers.getContractFactory('HoprStakingProxyForNetworkRegistry'))
-        .connect(signer)
-        .attach(hoprProxyAddress) as HoprStakingProxyForNetworkRegistry)
+  const hoprProxy =
+    network.tags.development && network.name == 'hardhat'
+      ? ((await ethers.getContractFactory('HoprDummyProxyForNetworkRegistry'))
+          .connect(signer)
+          .attach(hoprProxyAddress) as HoprDummyProxyForNetworkRegistry)
+      : ((await ethers.getContractFactory('HoprStakingProxyForNetworkRegistry'))
+          .connect(signer)
+          .attach(hoprProxyAddress) as HoprStakingProxyForNetworkRegistry)
 
   const hoprNetworkRegistry = (await ethers.getContractFactory('HoprNetworkRegistry'))
     .connect(signer)
@@ -114,7 +115,7 @@ async function main(
       }
 
       // in staging or production, register by owner; in non-staging environment, add addresses directly to proxy
-      if (network.tags.development) {
+      if (network.tags.development && network.name == 'hardhat') {
         await (await (hoprProxy as HoprDummyProxyForNetworkRegistry).ownerBatchAddAccounts(nativeAddresses)).wait()
       }
       await (await hoprNetworkRegistry.ownerRegister(nativeAddresses, peerIds)).wait()
@@ -123,7 +124,7 @@ async function main(
       const peerIds = opts.peerIds.split(',')
 
       // in staging or production (where "HoprStakingProxyForNetworkRegistry" is used), deregister; in non-staging environment (where "HoprDummyProxyForNetworkRegistry" is used), remove addresses directly from proxy
-      if (network.tags.development) {
+      if (network.tags.development && network.name == 'hardhat') {
         let nativeAddresses
 
         if (opts.nativeAddresses) {

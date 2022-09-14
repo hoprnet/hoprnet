@@ -43,7 +43,7 @@ const getToCreateDummyNftIndexes = async (
   }
 
   const dummyNftIndexsToMint =
-    mintedIndex > shouldHaveIndexesBefore
+    mintedIndex >= shouldHaveIndexesBefore
       ? []
       : Array.from({ length: shouldHaveIndexesBefore - mintedIndex + 1 }, (_, i) => i + mintedIndex)
 
@@ -62,6 +62,7 @@ const awaitTxConfirmation = async (
   const mintTx = await tx
   // don't wait when using local hardhat because its using auto-mine
   if (!hreEnvirionment.match('hardhat')) {
+    console.log(`   > transaction hash is ${mintTx.hash}. Waiting for its confirmation.`)
     await hreEthers.provider.waitForTransaction(mintTx.hash, 2)
   }
 }
@@ -106,7 +107,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     // mint NR NFTs
     for (const networkRegistryNftRank of [NR_NFT_RANK_TECH, NR_NFT_RANK_COM]) {
       console.log(
-        `... minting ${NUM_NR_NFT} ${NR_NFT_TYPE} NFTs type of index ${NR_NFT_TYPE_INDEX} to ${admin}\n...minting 1 ${NR_NFT_TYPE} NFTs to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES\n...minting 10 ${NR_NFT_TYPE} NFTs to dev bank ${DEV_BANK_ADDRESS}`
+        `... minting ${NUM_NR_NFT} ${networkRegistryNftRank} ${NR_NFT_TYPE} NFTs to ${admin}\n...minting 1 ${networkRegistryNftRank} ${NR_NFT_TYPE} NFTs to ${CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES}\n...minting 10 ${networkRegistryNftRank} ${NR_NFT_TYPE} NFTs to dev bank ${DEV_BANK_ADDRESS}`
       )
       await awaitTxConfirmation(
         hoprBoost.batchMint(
@@ -120,7 +121,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
           NR_NFT_BOOST,
           0,
           {
-            gasLimit: 4e6
+            gasLimit: 5e6
           }
         ),
         environment,
@@ -200,6 +201,6 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 main.dependencies = ['preDeploy', 'HoprNetworkRegistry', 'HoprBoost', 'HoprStake']
 main.tags = ['MintNetworkRegistryNfts']
-main.skip = async (env: HardhatRuntimeEnvironment) => !!env.network.tags.production
+main.skip = async (env: HardhatRuntimeEnvironment) => !!env.network.tags.production || env.network.name === 'goerli' // FIXME: Goerli on drug, skip minting NR NFTs
 
 export default main
