@@ -348,7 +348,7 @@ ifeq ($(origin DEV_BANK_PRIVKEY),undefined)
 endif
 	PRIVATE_KEY=${DEV_BANK_PRIVKEY} make request-funds recipient=${account}
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-funds
-	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_id=$(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")
+	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_ids=$(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")
 
 ensure-environment-is-set:
 ifeq ($(environment),)
