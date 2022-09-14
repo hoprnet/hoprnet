@@ -30,16 +30,22 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const xhoprToken = (await ethers.getContractFactory('ERC677Mock')).attach(xHoprContract.address) as ERC677Mock
 
   const amount = ethers.utils.parseUnits(MINTED_AMOUNT, 'ether')
-  console.log(`Minting ${amount} xHoprToken (mock) tokens to account ${admin}`)
-  const mintTx = await xhoprToken.batchMintInternal([admin], amount)
+  console.log(`Minting ${amount} xHoprToken (mock) tokens at address ${xhoprToken.address} to account ${admin}`)
 
-  // don't wait when using local hardhat because its using auto-mine
-  if (!environment.match('hardhat')) {
-    console.log(`Wait for minting tx on chain`)
-    await ethers.provider.waitForTransaction(mintTx.hash, 2)
+  // FIXME: Goerli on drug, skip minting xHOPR token for the moment
+  if (hre.network.name !== 'goerli') {
+    const mintTx = await xhoprToken.batchMintInternal([admin], amount)
+  
+    // don't wait when using local hardhat because its using auto-mine
+    if (!environment.match('hardhat')) {
+      console.log(`Wait for minting tx on chain at hash ${mintTx.hash}`)
+      const mintedTx = await mintTx
+      console.log(`Transaction minted with ${mintedTx.confirmations} confirmation. Waiting for 2 confirmations`)
+      await ethers.provider.waitForTransaction(mintTx.hash, 2)
+    }
+  
+    console.log(`Minted ${amount} xHoprToken (mock) tokens to account ${admin}`)
   }
-
-  console.log(`Minted ${amount} xHoprToken (mock) tokens to account ${admin}`)
 }
 
 main.tags = ['xHoprToken']

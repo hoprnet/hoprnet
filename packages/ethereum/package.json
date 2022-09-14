@@ -24,6 +24,7 @@
     "coverage": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost HOPR_HARDHAT_TAG=testing hardhat coverage",
     "deploy:local": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost hardhat deploy --network hardhat --write true",
     "deploy:goerli": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=master-goerli hardhat deploy --network goerli --write true",
+    "deploy:debug-goerli": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=debug-goerli hardhat deploy --network goerli --write true",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },
