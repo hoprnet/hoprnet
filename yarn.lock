@@ -3085,7 +3085,7 @@ __metadata:
     "@libp2p/kad-dht": 1.0.16
     "@libp2p/mplex": 1.2.1
     "@libp2p/peer-id": 1.1.13
-    "@libp2p/peer-id-factory": 1.0.15
+    "@libp2p/peer-id-factory": 1.0.18
     "@libp2p/tcp": 1.0.11
     "@multiformats/multiaddr": 10.3.3
     "@types/chai": 4.3.3
@@ -3206,7 +3206,7 @@ __metadata:
     "@libp2p/kad-dht": 1.0.16
     "@libp2p/mplex": 1.2.1
     "@libp2p/peer-id": 1.1.13
-    "@libp2p/peer-id-factory": 1.0.15
+    "@libp2p/peer-id-factory": 1.0.18
     "@libp2p/tcp": 1.0.11
     "@multiformats/multiaddr": 10.3.3
     "@types/chai": 4.3.3
@@ -3734,18 +3734,19 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@libp2p/peer-id-factory@npm:1.0.15":
-  version: 1.0.15
-  resolution: "@libp2p/peer-id-factory@npm:1.0.15"
+"@libp2p/peer-id-factory@npm:1.0.18":
+  version: 1.0.18
+  resolution: "@libp2p/peer-id-factory@npm:1.0.18"
   dependencies:
     "@libp2p/crypto": ^1.0.0
     "@libp2p/interface-keys": ^1.0.2
     "@libp2p/interface-peer-id": ^1.0.0
-    "@libp2p/peer-id": ^1.1.0
+    "@libp2p/peer-id": ^1.0.0
     multiformats: ^9.6.3
-    protons-runtime: ^1.0.4
+    protons-runtime: ^3.1.0
+    uint8arraylist: ^2.0.0
     uint8arrays: ^3.0.0
-  checksum: 978a59c00811c0805dd69c4bef8b7cd90a1b1ce94591be16ff6058ee34b9077a4fdc1374d1cc250681948d9a51889dd613f5fe055f3fa8880da266e595f0426f
+  checksum: 12d894426f4e83baf256d48375f5206487767d18db92b7813ea677e2aae5f985c0df2f5b685cb011e50c1d3825650837f6b64c100f2312555fa8a19992f38ab9
   languageName: node
   linkType: hard
 
@@ -19308,6 +19309,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"protons-runtime@npm:^3.1.0":
+  version: 3.1.0
+  resolution: "protons-runtime@npm:3.1.0"
+  dependencies:
+    protobufjs: ^7.0.0
+    uint8arraylist: ^2.3.2
+  peerDependencies:
+    uint8arraylist: ^2.3.2
+  checksum: f24989391aee314c8c257d6e459df082b6849f3cdd0cda1b0196fd0a66f3b39089b82764f9b66c5bbb4dd0d4e68ff6284e222b10413859f7c54517d2efd62d43
+  languageName: node
+  linkType: hard
+
 "proxy-addr@npm:~2.0.7":
   version: 2.0.7
   resolution: "proxy-addr@npm:2.0.7"
@@ -23212,7 +23225,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"uint8arraylist@npm:^2.0.0":
+"uint8arraylist@npm:^2.0.0, uint8arraylist@npm:^2.3.2":
   version: 2.3.2
   resolution: "uint8arraylist@npm:2.3.2"
   dependencies:
