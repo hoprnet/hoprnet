@@ -157,7 +157,7 @@ const hardhatConfig: HardhatUserConfig = {
     deployer: 0,
     admin: {
       default: 1,
-      goerli: '0xA18732DC751BE0dB04157eb92C92BA9d0fC09FC5',
+      goerli: '0x4fF4e61052a4DFb1bE72866aB711AE08DD861976',
       xdai: '0xE9131488563776DE7FEa238d6112c5dA46be9a9F'
     },
     alice: {
