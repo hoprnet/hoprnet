@@ -182,6 +182,10 @@ gcloud_create_or_update_instance_template() {
   log "checking for instance template ${name}"
   if gcloud compute instance-templates describe "${name}" --quiet >/dev/null; then
     log "instance template ${name} already present"
+    instance_group_name=$(echo $name | sed 's/\-[0-9].*//')    
+    if gcloud compute instance-groups describe ${gcloud_region} $instance_group_name --quiet >/dev/null; then
+      gcloud_delete_managed_instance_group $instance_group_name
+    fi
     gcloud_delete_instance_template "${name}"
   fi
 
