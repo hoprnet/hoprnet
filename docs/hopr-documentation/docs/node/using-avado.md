@@ -3,7 +3,7 @@ id: using-avado
 title: Using an Avado Node
 ---
 
-To set up your AVADO Node, follow the instructions in the box. If you have a HOPR PC Node, it will come with HOPR pre-installed. Simply download the HOPR client to start interacting with your node!
+To set up your AVADO Node, follow the instructions that came with the box. If you have a HOPR PC Node, it will come with HOPR pre-installed. All you have to do is download the HOPR client to start interacting with your node!
 
 :::caution Warning
 Please delete any old packages as necessary; make sure to withdraw your funds before doing so.
@@ -11,15 +11,13 @@ Please delete any old packages as necessary; make sure to withdraw your funds be
 
 ## Installing the HOPR client
 
-While connected to your AVADO network or via a VPN, go to the following [link](http://my.ava.do/#/installer/%2Fipfs%2FQmPhSZTZbM6kd9VizvZpKDN3fQe5bqvCDooCBPYEUXdTcy). Just click the install button and wait until the download completes.
+While connected to your AVADO's network or via a VPN, go to the following [link](http://my.ava.do/#/installer/%2Fipfs%2FQmPhSZTZbM6kd9VizvZpKDN3fQe5bqvCDooCBPYEUXdTcy). Just click the install button and wait until the download completes.
 
 If you are unable to use the link above, search for this hash in the AVADO DappStore:
 
 ```
 /ipfs/QmPhSZTZbM6kd9VizvZpKDN3fQe5bqvCDooCBPYEUXdTcy
 ```
-
-Alternatively, you can click the following [link](http://my.ava.do/#/installer/%2Fipfs%2FQmPhSZTZbM6kd9VizvZpKDN3fQe5bqvCDooCBPYEUXdTcy).
 
 ![DappStore](/img/node/avado-1.png)
 

@@ -45,6 +45,7 @@ const sidebars = {
       items: [
         'node/start-here',
         'node/using-avado',
+        'node/using-dappnode',
         'node/using-docker',
         'node/using-hopr-admin',
         'node/hoprd-commands']
@@ -72,11 +73,11 @@ const sidebars = {
       label: 'HOPR dApps',
       items: [
         'dapps/playground',
+        'dapps/visualizer',
+        'dapps/hopr-admin',
+        'dapps/cockpit',
         'dapps/chess',
         'dapps/myne-chat-playground',
-        'dapps/hopr-admin',
-        'dapps/visualizer',
-        'dapps/cockpit',
         'dapps/boomerang'
       ]
     },
@@ -85,13 +86,9 @@ const sidebars = {
       type: 'category',
       label: 'Ecosystem',
       items: [
-        'about-hopr',
         'ecosystem/hopr-token',
         'ecosystem/gnosis-hopr-tokens',
-        'ecosystem/staking',
-        'ecosystem/hoprd',
         'staking/how-to-get-hopr',
-        'staking/how-to-stake',
         'staking/convert-hopr'
       ]
     }

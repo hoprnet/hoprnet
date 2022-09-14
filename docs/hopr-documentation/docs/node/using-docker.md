@@ -15,9 +15,7 @@ The docker image is in alpha. The following instructions may not work for you.
 
 You can use Docker to install a `hoprd` node on your device quickly without worrying too much about the operating system or any additional software. There are, however, some hardware requirements needed to complete the installation.
 
-To use Docker, you will need a device that supports hardware-level virtualisation: VT-x for Intel-based PCs and AMD-V for AMD processors. Most Mac and Linux machines support it out of the box, so ensure you have enough memory \(e.g. 2 GB\) and disk space \(e.g. 1 GB\) before starting.
-
-You should also make sure your device has the following minimum requirements to run the node:
+To use Docker, you will need a device that supports hardware-level virtualisation: VT-x for Intel-based PCs and AMD-V for AMD processors. Most Mac and Linux machines support it out of the box, so just ensure your device meets the following minimum requirements to run `hoprd`:
 
 * Dual Core CPU ~ 2 GHz
 * 4 GB RAM

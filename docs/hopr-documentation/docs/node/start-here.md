@@ -16,7 +16,7 @@ There are several ways to run `hoprd`: you can run it on your device, on a virtu
 
 ## Network Registry
 
-If you are using the Monte Rosa environment, you will not be able to interact with other nodes unless you have been added to the network registry. You can view the current process and details for this here. If you have been given an NFT and are installing your node to locate your peerID, remember to follow the altered funding steps at the start of the hopr-admin tutorial. Everything else is unaltered, including the installation process.
+If you are using the Monte Rosa environment, you will not be able to interact with other nodes unless you have been added to the network registry. You can view the current process and details for this [here](/core/network-registry-monte-rosa). If you have been given an NFT and are installing your node to locate your peerID, remember to follow the altered funding steps at the start of the hopr-admin tutorial. Everything else is unaltered, including the installation process.
 
 ## Hardware requirements
 
@@ -52,11 +52,15 @@ If you intend to use your device to install and run a `hoprd` node, please famil
 
 ## hoprd installation methods
 
-We support multiple distribution mechanisms to install a `hoprd`:
+We support multiple distribution mechanisms to install `hoprd`:
 
 **[Avado](using-avado)**
 
 An [AVADO](https://ava.do/) plug-n-play device, just set it up and install the HOPR package from their Dappstore.
+
+**[Dappnode](using-dappnode)**
+
+A [Dappnode](https://dappnode.io/) plug-n-play device.
 
 **[Docker](using-docker)**
 
