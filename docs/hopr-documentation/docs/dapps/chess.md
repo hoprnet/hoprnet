@@ -11,7 +11,7 @@ To start a game, both you and your opponent have to complete a few steps:
 
 ### Step-by-step instructions
 
-#### You (the host):
+#### Your Perspective (the host):
 
 ![chess two nodes](./images-dApps/chess-two-nodes-2.png)
 
@@ -29,7 +29,7 @@ To start a game, both you and your opponent have to complete a few steps:
 
 (**5**) Click "Start" and wait for your opponent to connect.
 
-#### Your opponent:
+#### Your Opponent's Perspective:
 
 **Note:** You should have the URL of the node you will be using and the peerID of the host's node. If you don't have either of these details, ask the host to send them.
 

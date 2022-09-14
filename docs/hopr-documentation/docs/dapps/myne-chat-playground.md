@@ -7,7 +7,7 @@ Myne Chat is a private and decentralised messaging dApp. Share links and peerIDs
 
 To start a conversation, both you and your friend both have to complete a few steps:
 
-### You (the host):
+### Your Perspective (the host):
 
 ![Myne Chat two nodes](./images-dApps/mynechat-two-nodes-2.png)
 
@@ -25,7 +25,7 @@ To start a conversation, both you and your friend both have to complete a few st
 
 (**4**) To officially start a conversation, you have to send a message (if you don't, your friend won't see the open conversation).
 
-### Your friend:
+### Your Friend's Perspective:
 
 ![Mynechat find conversation](./images-dApps/myne-chat-open-conversations.png)
 
