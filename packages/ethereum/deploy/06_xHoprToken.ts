@@ -35,7 +35,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // FIXME: Goerli on drug, skip minting xHOPR token for the moment
   if (hre.network.name !== 'goerli') {
     const mintTx = await xhoprToken.batchMintInternal([admin], amount)
-  
+
     // don't wait when using local hardhat because its using auto-mine
     if (!environment.match('hardhat')) {
       console.log(`Wait for minting tx on chain at hash ${mintTx.hash}`)
@@ -43,7 +43,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       console.log(`Transaction minted with ${mintedTx.confirmations} confirmation. Waiting for 2 confirmations`)
       await ethers.provider.waitForTransaction(mintTx.hash, 2)
     }
-  
+
     console.log(`Minted ${amount} xHoprToken (mock) tokens to account ${admin}`)
   }
 }

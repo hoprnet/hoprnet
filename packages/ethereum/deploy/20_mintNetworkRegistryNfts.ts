@@ -201,6 +201,6 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 main.dependencies = ['preDeploy', 'HoprNetworkRegistry', 'HoprBoost', 'HoprStake']
 main.tags = ['MintNetworkRegistryNfts']
-main.skip = async (env: HardhatRuntimeEnvironment) => !!env.network.tags.production || env.network.name === 'goerli'   // FIXME: Goerli on drug, skip minting NR NFTs
+main.skip = async (env: HardhatRuntimeEnvironment) => !!env.network.tags.production || env.network.name === 'goerli' // FIXME: Goerli on drug, skip minting NR NFTs
 
 export default main
