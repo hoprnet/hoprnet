@@ -71,7 +71,13 @@ const sidebars = {
       type: 'category',
       label: 'HOPR dApps',
       items: [
-        'dapps/myne-chat'
+        'dapps/playground',
+        'dapps/chess',
+        'dapps/myne-chat-playground',
+        'dapps/hopr-admin',
+        'dapps/visualizer',
+        'dapps/cockpit',
+        'dapps/boomerang'
       ]
     },
 
