@@ -9,21 +9,9 @@ Find a friend (or enemy) to play against, share the link and PeerID of another n
 
 To start a game, both you and your opponent have to complete a few steps:
 
-**You (the host):**
-
-(**1**) Start a new game and enter the peerID of the opponent you want to play.
-
-(**2**) Click "Start" and wait for your opponent to connect.
-
-**Your opponent:**
-
-(**1**) Click connect and enter the peerID of the host.
-
-(**2**) Click the connect button (after the host has started a new game) and wait for the game to start.
-
 ### Step-by-step instructions
 
-**You (the host):**
+#### You (the host):
 
 ![chess two nodes](./images-dApps/chess-two-nodes-2.png)
 
@@ -41,7 +29,7 @@ To start a game, both you and your opponent have to complete a few steps:
 
 (**5**) Click "Start" and wait for your opponent to connect.
 
-**Your opponent:**
+#### Your opponent:
 
 **Note:** You should have the URL of the node you will be using and the peerID of the host's node. If you don't have either of these details, ask the host to send them.
 
