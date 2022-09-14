@@ -108,7 +108,6 @@ gcloud_update_container_with_image() {
     --container-arg="--healthCheck" \
     --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
     --container-arg="--identity" --container-arg="${mount_path}/.hopr-identity" \
-    --container-arg="--data" --container-arg="${mount_path}" \
     --container-arg="--init" \
     --container-arg="--password" --container-arg="${password}" \
     --container-arg="--environment" --container-arg="${environment_id}" \
@@ -153,9 +152,8 @@ gcloud_cleanup_docker_images() {
 # $5 - optional: password
 # $6 - optional: announce
 # $7 - optional: private key
-# $8 - optional: no args
 gcloud_create_instance_template_if_not_exists() {
-  gcloud_create_or_update_instance_template "${1}" "${2}" "${3:-}" "${4:-}" "${5:-}" "${6:-}" "${7:-}" "${8:-}" "true"
+  gcloud_create_or_update_instance_template "${1}" "${2}" "${3:-}" "${4:-}" "${5:-}" "${6:-}" "${7:-}"
 }
 
 # $1 - template name
@@ -165,117 +163,75 @@ gcloud_create_instance_template_if_not_exists() {
 # $5 - optional: password
 # $6 - optional: announce
 # $7 - optional: private key
-# $8 - optional: no args
-# $9 - optional: skip_update if exists already
 gcloud_create_or_update_instance_template() {
-  local args name mount_path image rpc api_token password host_path no_args private_key announce skip_update_if_exists
-  local extra_args=""
-
-  name="${1}"
-  image="${2}"
-  environment_id="${3:-}"
-
+  
+  local name="${1}"
+  local image="${2}"
+  local environment_id="${3:-}"
   # these parameters are only used by hoprd nodes
-  api_token="${4:-}"
-  password="${5:-}"
-
+  local api_token="${4:-}"
+  local password="${5:-}"
   # if set, let the node announce with a routable address on-chain
-  announce="${6:-}"
-
-  # this parameter is mostly used on by CT nodes, although hoprd nodes also
-  # support it
-  private_key="${7:-}"
-
-  # if set no additional arguments are used to start the container
-  no_args="${8:-}"
-
-  skip_update_if_exists="${9:-false}"
-
-  args=""
-  # the environment is optional, since each docker image has a default environment set
-  if [ -n "${environment_id}" ]; then
-    args="--container-arg=\"--environment\" --container-arg=\"${environment_id}\""
-  fi
-
-  if [ -n "${api_token}" ]; then
-    extra_args="${extra_args} --container-arg=\"--apiToken\" --container-arg=\"${api_token}\""
-  fi
-
-  if [ -n "${password}" ]; then
-    extra_args="${extra_args} --container-arg=\"--password\" --container-arg=\"${password}\""
-  fi
-
-  if [ -n "${private_key}" ]; then
-    extra_args="${extra_args} --container-arg=\"--privateKey\" --container-arg=\"${private_key}\""
-  fi
-
-  if [ -n "${announce}" ]; then
-    extra_args="${extra_args} --container-arg=\"--announce\""
-  fi
-
-  mount_path="/app/hoprd-db"
-  host_path="/var/hoprd"
-
+  local announce="${6:-}"
+  # this parameter is mostly used on by CT nodes, although hoprd nodes also support it  
+  local private_key="${7:-}"
+  local mount_path="/app/hoprd-db"
+  local host_path="/var/hoprd"
+  local metadata_value=""
+  
   log "checking for instance template ${name}"
   if gcloud compute instance-templates describe "${name}" --quiet >/dev/null; then
     log "instance template ${name} already present"
-
-    if [ "${skip_update_if_exists}" = "true" ]; then
-      # short-circuit, stop operation
-      return
+    instance_group_name=$(echo $name | sed 's/\-[0-9].*//')    
+    if gcloud compute instance-groups describe ${gcloud_region} $instance_group_name --quiet >/dev/null; then
+      gcloud_delete_managed_instance_group $instance_group_name
     fi
-
     gcloud_delete_instance_template "${name}"
   fi
 
-  log "creating instance template ${name}"
+  metadata_value="google-logging-enabled=true"
+  metadata_value="${metadata_value},google-monitoring-enabled=true"
+  metadata_value="${metadata_value},enable-oslogin=true"
+  metadata_value="${metadata_value},startup-script='/opt/hoprd/startup-script.sh'"
+  metadata_value="${metadata_value},HOPRD_DOCKER_IMAGE=${image}"
 
-  if [ "${no_args}" = "true" ]; then
-    eval gcloud compute instance-templates create-with-container "${name}" \
-      --machine-type=c2d-highcpu-2 \
-      --metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true \
-      --maintenance-policy=MIGRATE \
-      --tags=hopr-node,web-client,rest-client,portainer,healthcheck \
-      --boot-disk-device-name=boot-disk \
-      --boot-disk-size=20GB \
-      --boot-disk-type=pd-balanced \
-      --image-family=cos-stable \
-      --image-project=cos-cloud \
-      --container-image="${image}" \
-      --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
-      --container-mount-host-path=mount-path="${mount_path}",host-path="${host_path}" \
-      --container-mount-host-path=mount-path=/var/run/docker.sock,host-path=/var/run/docker.sock \
-      --container-restart-policy=on-failure \
-      ${args} \
-      ${extra_args}
-  else
-    eval gcloud compute instance-templates create-with-container "${name}" \
-      --machine-type=c2d-highcpu-2 \
-      --metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true \
-      --maintenance-policy=MIGRATE \
-      --tags=hopr-node,web-client,rest-client,portainer,healthcheck \
-      --boot-disk-device-name=boot-disk \
-      --boot-disk-size=20GB \
-      --boot-disk-type=pd-balanced \
-      --image-family=cos-stable \
-      --image-project=cos-cloud \
-      --container-image="${image}" \
-      --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
-      --container-mount-host-path=mount-path="${mount_path}",host-path="${host_path}" \
-      --container-mount-host-path=mount-path=/var/run/docker.sock,host-path=/var/run/docker.sock \
-      --container-restart-policy=on-failure \
-      --container-arg="--admin" \
-      --container-arg="--adminHost" --container-arg="0.0.0.0" \
-      --container-arg="--healthCheck" \
-      --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
-      --container-arg="--identity" --container-arg="${mount_path}/.hopr-identity" \
-      --container-arg="--data" --container-arg="${mount_path}" \
-      --container-arg="--init" \
-      --container-arg="--api" \
-      --container-arg="--apiHost" --container-arg="0.0.0.0" \
-      ${args} \
-      ${extra_args}
+  if [ -n "${password}" ]; then
+    metadata_value="${metadata_value},HOPRD_PASSWORD=${password}"
   fi
+
+  if [ -n "${api_token}" ]; then
+    metadata_value="${metadata_value},HOPRD_API_TOKEN=${api_token}"
+  fi
+
+  # the environment is optional, since each docker image has a default environment set
+  if [ -n "${environment_id}" ]; then
+    metadata_value="${metadata_value},HOPRD_ENVIRONMENT_ID=${environment_id}"
+  fi
+
+
+  if [ -n "${private_key}" ]; then
+    metadata_value="${metadata_value},HOPRD_PRIVATE_KEY=\"--privateKey ${private_key}\""
+  fi
+
+  if [ -n "${announce}" ]; then
+    metadata_value="${metadata_value},HOPRD_ANNOUNCE=--announce"
+  fi
+
+  echo ${metadata_value}
+
+  log "creating instance template ${name}"
+  eval gcloud compute instance-templates create "${name}" \
+      --machine-type=c2d-highcpu-2 \
+      --maintenance-policy=MIGRATE \
+      --tags=hopr-node,web-client,rest-client,portainer,healthcheck \
+      --boot-disk-device-name=boot-disk \
+      --boot-disk-size=20GB \
+      --boot-disk-type=pd-balanced \
+      --image-family=debian-11 \
+      --image-project=hoprassociation \
+      --maintenance-policy=MIGRATE \
+      --metadata=${metadata_value}
+
 }
 
 # $1 - template name

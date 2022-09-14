@@ -98,8 +98,7 @@ gcloud_create_or_update_instance_template \
   "" \
   "" \
   "true" \
-  "${CT_PRIV_KEY}" \
-  "true"
+  "${CT_PRIV_KEY}"
 
 # start nodes
 gcloud_create_or_update_managed_instance_group \
