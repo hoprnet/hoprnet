@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@hoprnet/hopr-utils": "workspace:packages/utils",
+    "@koush/wrtc": "0.5.3",
     "@libp2p/interface-peer-discovery": "1.0.0",
     "@libp2p/interface-transport": "1.0.0",
     "@libp2p/interfaces": "2.0.4",
@@ -46,8 +47,7 @@
     "nat-api": "0.3.1",
     "simple-peer": "9.11.1",
     "stream-to-it": "0.2.4",
-    "webrtc-stun": "3.0.0",
-    "wrtc": "0.4.7"
+    "webrtc-stun": "3.0.0"
   },
   "devDependencies": {
     "@chainsafe/libp2p-noise": "7.0.0",

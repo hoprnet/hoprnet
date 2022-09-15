@@ -1,7 +1,6 @@
 import { Multiaddr } from '@multiformats/multiaddr'
-import { setTimeout } from 'timers/promises'
 
-// import assert from 'assert'
+import assert from 'assert'
 
 import { WebRTCUpgrader } from './upgrader.js'
 import { EntryNodes, EntryNodeData } from '../entry.js'
@@ -10,7 +9,7 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { startStunServer, createPeerId } from '../base/utils.spec.js'
 import { ConnectComponents } from '../components.js'
 import { once } from 'events'
-// import { u8aEquals } from '@hoprnet/hopr-utils'
+import { u8aEquals } from '@hoprnet/hopr-utils'
 
 function getFakeConnectComponents(
   lastUpdate: number,
@@ -40,7 +39,7 @@ function getPeerStoreEntry(ip: string, port: number, id: PeerId = createPeerId()
   }
 }
 
-describe.only('webrtc upgrader', function () {
+describe('webrtc upgrader', function () {
   it('base functionality', async function () {
     this.timeout(10e3)
     // If this test fails, either simple-peer library or WebRTC binary is broken
@@ -67,37 +66,33 @@ describe.only('webrtc upgrader', function () {
 
     await Promise.all([initiatorConnect, receiverConnect])
 
-    // const pingInitiator = new TextEncoder().encode('PING initiator')
-    // const pingReceiver = new TextEncoder().encode('PING receiver')
+    const pingInitiator = new TextEncoder().encode('PING initiator')
+    const pingReceiver = new TextEncoder().encode('PING receiver')
 
-    // const pongInitiator = new TextEncoder().encode('PONG initiator')
-    // const pongReceiver = new TextEncoder().encode('PONG receiver')
+    const pongInitiator = new TextEncoder().encode('PONG initiator')
+    const pongReceiver = new TextEncoder().encode('PONG receiver')
 
-    // initiatorPeer.write(pingInitiator)
-    // receiverPeer.write(pingReceiver)
+    initiatorPeer.write(pingInitiator)
+    receiverPeer.write(pingReceiver)
 
-    // const initiatorIterator = initiatorPeer[Symbol.asyncIterator]()
-    // const receiverIterator = receiverPeer[Symbol.asyncIterator]()
+    const initiatorIterator = initiatorPeer[Symbol.asyncIterator]()
+    const receiverIterator = receiverPeer[Symbol.asyncIterator]()
 
-    // assert(u8aEquals((await initiatorIterator.next()).value, pingReceiver))
-    // assert(u8aEquals((await receiverIterator.next()).value, pingInitiator))
+    assert(u8aEquals((await initiatorIterator.next()).value, pingReceiver))
+    assert(u8aEquals((await receiverIterator.next()).value, pingInitiator))
 
-    // initiatorPeer.write(pongInitiator)
-    // receiverPeer.write(pongReceiver)
+    initiatorPeer.write(pongInitiator)
+    receiverPeer.write(pongReceiver)
 
-    // assert(u8aEquals((await initiatorIterator.next()).value, pongReceiver))
-    // assert(u8aEquals((await receiverIterator.next()).value, pongInitiator))
+    assert(u8aEquals((await initiatorIterator.next()).value, pongReceiver))
+    assert(u8aEquals((await receiverIterator.next()).value, pongInitiator))
 
-    // await new Promise<void>((resolve) => initiatorPeer.end(resolve))
-    // await new Promise<void>((resolve) => receiverPeer.end(resolve))
+    await new Promise<void>((resolve) => initiatorPeer.end(resolve))
+    await new Promise<void>((resolve) => receiverPeer.end(resolve))
 
     stunServer.close()
 
     initiatorPeer.destroy()
     receiverPeer.destroy()
-
-    await setTimeout(4e3)
-
-    await setTimeout(4e3)
   })
 })

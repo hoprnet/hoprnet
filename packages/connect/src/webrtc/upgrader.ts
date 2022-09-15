@@ -10,7 +10,7 @@ import errCode from 'err-code'
 
 // No types for wrtc
 // @ts-ignore
-import wrtc from 'wrtc'
+import wrtc from '@koush/wrtc'
 
 // @TODO adjust this
 export const MAX_STUN_SERVERS = 23
