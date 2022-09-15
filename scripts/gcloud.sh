@@ -193,7 +193,6 @@ gcloud_create_or_update_instance_template() {
       --image-project=hoprassociation \
       --maintenance-policy=MIGRATE \
       --metadata="${metadata_value}"
-
 }
 
 # $1 - template name
