@@ -71,7 +71,7 @@ reset: clean
 .PHONY: test
 test: ## run unit tests for all packages, or a single package if package= is set
 ifeq ($(package),)
-	yarn workspaces foreach -pv run test
+	yarn workspace @hoprnet/hopr-connect run test
 else
 	yarn workspace @hoprnet/${package} run test
 endif
