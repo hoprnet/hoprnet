@@ -110,7 +110,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     if (fromBlock - this.maxConfirmations > 0) {
       fromBlock = fromBlock - this.maxConfirmations
     }
-    // no need to query before HoprChannels existed
+    // no need to query before HoprChannels or HoprNetworkRegistry existed
     fromBlock = Math.max(fromBlock, this.genesisBlock)
 
     log('Starting to index from block %d, sync progress 0%%', fromBlock)
@@ -129,10 +129,13 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     const newBlocks = ordered<number>()
 
     const unsubscribeBlock = this.chain.subscribeBlock(async (block: number) => {
-      newBlocks.push({
-        index: block,
-        value: block
-      })
+      // only subscribe to block from block "Latest on-chain block" + finality + 1 to prevent double processing of events in blocks ["Latest on-chain block" - maxConfirmations, "Latest on-chain block"] 
+      if (block > this.latestBlock + this.maxConfirmations) {
+        newBlocks.push({
+          index: block,
+          value: block
+        })
+      }
     })
 
     this.unsubscribeBlock = () => {
