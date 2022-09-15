@@ -33,7 +33,7 @@ export default class Channels extends Command {
       [prefix + ' Channel:', channel.channelId],
       ['To:', channel.peerId],
       ['Status:', channel.status],
-      ['Balance:', ethersUtils.formatEther(channel.balance)]
+      ['Balance:', `${ethersUtils.formatEther(channel.balance)} ${this.cache.getSymbols().hopr}`]
     ])
   }
 

@@ -42,10 +42,11 @@ export default class Addresses extends Command {
     }
 
     const addresses = await response.json()
+    const symbols = this.cache.getSymbols()
 
-    const hoprPrefix = 'HOPR Address:'
+    const hoprPrefix = `${symbols.hoprDisplay} Address:`
     const hoprAddress = addresses.hopr
-    const nativePrefix = 'ETH Address:'
+    const nativePrefix = `${symbols.nativeDisplay} Address:`
     const nativeAddress = addresses.native
 
     if (use === 'onlyOne') {

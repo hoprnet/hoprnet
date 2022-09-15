@@ -32,6 +32,18 @@ export default function Home() {
     },
     updateAliasCache(fn) {
       return app.updateAliases(fn)
+    },
+    getSymbols() {
+      // TODO: fetch from API once supported
+      const native = 'xDAI'
+      const hopr = 'mHOPR'
+
+      return {
+        native,
+        hopr,
+        nativeDisplay: `NATIVE (${native})`,
+        hoprDisplay: `HOPR (${hopr})`
+      }
     }
   })
 
