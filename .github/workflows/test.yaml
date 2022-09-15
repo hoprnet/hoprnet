@@ -49,6 +49,6 @@ jobs:
         run: make -j build
 
       - name: Test
-        run: make -j test
+        run: yarn workspace @hoprnet/hopr-connect run test
         env:
           HOPR_ENVIRONMENT_ID: hardhat-localhost
