@@ -2,6 +2,8 @@
 
 import assert from 'assert'
 
+import { setTimeout } from 'timers/promises'
+
 import { WebRTCUpgrader } from './upgrader.js'
 import { EntryNodes, EntryNodeData } from '../entry.js'
 import type { PeerStoreType } from '../types.js'
@@ -90,6 +92,7 @@ describe('webrtc upgrader', function () {
     await new Promise<void>((resolve) => initiatorPeer.end(resolve))
     await new Promise<void>((resolve) => receiverPeer.end(resolve))
 
+    await setTimeout(500)
     // stunServer.close()
 
     initiatorPeer.destroy()
