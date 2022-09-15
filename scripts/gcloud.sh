@@ -79,42 +79,6 @@ gcloud_get_image_running_on_vm() {
     | cut -f3 -d' '
 }
 
-# $1=vm name
-# $2=container-image
-# $3=disk name
-# $4=mount path
-# $5=environment_id
-gcloud_update_container_with_image() {
-  local vm_name="${1}"
-  local container_image="${2}"
-  local disk_image="${3}"
-  local mount_path="${4}"
-  local environment_id="${5}"
-  local api_token="${HOPRD_API_TOKEN}"
-  local password="${BS_PASSWORD}"
-
-  log "${vm_name}"
-  log "${container_image}"
-  log "${disk_image}"
-  log "${mount_path}"
-
-  log "Updating container on vm:${vm_name} - ${container_image} (disk: ${disk_image}:${mount_path})"
-  gcloud compute instances update-container $1 $ZONE \
-    --container-image=${container_image} --container-mount-disk name=${disk_image},mount-path="${mount_path}" \
-    --container-arg="--admin" \
-    --container-arg="--adminHost" --container-arg="0.0.0.0" \
-    --container-arg="--announce" \
-    --container-arg="--apiToken" --container-arg="${api_token}" \
-    --container-arg="--healthCheck" \
-    --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
-    --container-arg="--identity" --container-arg="${mount_path}/.hopr-identity" \
-    --container-arg="--init" \
-    --container-arg="--password" --container-arg="${password}" \
-    --container-arg="--environment" --container-arg="${environment_id}" \
-    --container-arg="--api" \
-    --container-arg="--apiHost" --container-arg="0.0.0.0" \
-    --container-restart-policy=always
-}
 
 # $1 - vm name
 # $2 - docker image
@@ -175,16 +139,14 @@ gcloud_create_or_update_instance_template() {
   local announce="${6:-}"
   # this parameter is mostly used on by CT nodes, although hoprd nodes also support it  
   local private_key="${7:-}"
-  local mount_path="/app/hoprd-db"
-  local host_path="/var/hoprd"
   local metadata_value=""
   
   log "checking for instance template ${name}"
   if gcloud compute instance-templates describe "${name}" --quiet >/dev/null; then
     log "instance template ${name} already present"
-    instance_group_name=$(echo $name | sed 's/\-[0-9].*//')    
-    if gcloud compute instance-groups describe ${gcloud_region} $instance_group_name --quiet >/dev/null; then
-      gcloud_delete_managed_instance_group $instance_group_name
+    instance_group_name=${name//\-[0-9]*/}
+    if gcloud compute instance-groups describe ${gcloud_region} "${instance_group_name}" --quiet >/dev/null; then
+      gcloud_delete_managed_instance_group "${instance_group_name}"
     fi
     gcloud_delete_instance_template "${name}"
   fi
@@ -217,7 +179,7 @@ gcloud_create_or_update_instance_template() {
     metadata_value="${metadata_value},HOPRD_ANNOUNCE=--announce"
   fi
 
-  echo ${metadata_value}
+  log "Metadata Fields: ${metadata_value}"
 
   log "creating instance template ${name}"
   eval gcloud compute instance-templates create "${name}" \
@@ -230,7 +192,7 @@ gcloud_create_or_update_instance_template() {
       --image-family=debian-11 \
       --image-project=hoprassociation \
       --maintenance-policy=MIGRATE \
-      --metadata=${metadata_value}
+      --metadata="${metadata_value}"
 
 }
 
