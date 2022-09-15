@@ -312,7 +312,7 @@ jobs:
       - name: Run deploy script for public nodes
         if: ${{ !env.ACT }}
         run: |
-          ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd" 3
+          ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd" 15
         env:
           DEPLOYER_WALLET_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
           HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
@@ -395,7 +395,7 @@ jobs:
       - name: Run deploy script for nodes behind NAT
         if: ${{ !env.ACT }}
         run: |
-          ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd-nat" 2 "-nat"
+          ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd-nat" 10 "-nat"
         env:
           DEPLOYER_WALLET_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
           HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
