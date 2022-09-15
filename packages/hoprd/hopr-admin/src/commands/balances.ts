@@ -46,7 +46,7 @@ export default class Balances extends Command {
 
     const hoprPrefix = `${symbols.hoprDisplay} Balance:`
     const hoprBalance = ethersUtils.formatEther(balances.hopr)
-    const nativePrefix = `${symbols.nativeDisplay} Balance`
+    const nativePrefix = `${symbols.nativeDisplay} Balance:`
     const nativeBalance = ethersUtils.formatEther(balances.native)
 
     if (use === 'onlyOne') {
