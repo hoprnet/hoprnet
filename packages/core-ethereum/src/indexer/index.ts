@@ -129,7 +129,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     const newBlocks = ordered<number>()
 
     const unsubscribeBlock = this.chain.subscribeBlock(async (block: number) => {
-      // only subscribe to block from block "Latest on-chain block" + finality + 1 to prevent double processing of events in blocks ["Latest on-chain block" - maxConfirmations, "Latest on-chain block"] 
+      // only subscribe to block from block "Latest on-chain block" + finality + 1 to prevent double processing of events in blocks ["Latest on-chain block" - maxConfirmations, "Latest on-chain block"]
       if (block > this.latestBlock + this.maxConfirmations) {
         newBlocks.push({
           index: block,
