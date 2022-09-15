@@ -142,10 +142,10 @@ gcloud_create_or_update_instance_template() {
   local metadata_value=""
   
   log "checking for instance template ${name}"
-  if gcloud compute instance-templates describe "${name}" --quiet >/dev/null; then
+  if gcloud compute instance-templates describe "${name}" --quiet 2> /dev/null; then
     log "instance template ${name} already present"
     instance_group_name=${name//\-[0-9]*/}
-    if gcloud compute instance-groups describe ${gcloud_region} "${instance_group_name}" --quiet >/dev/null; then
+    if gcloud compute instance-groups describe ${gcloud_region} "${instance_group_name}" --quiet 2>/dev/null; then
       gcloud_delete_managed_instance_group "${instance_group_name}"
     fi
     gcloud_delete_instance_template "${name}"
@@ -213,7 +213,7 @@ gcloud_create_or_update_managed_instance_group() {
   local template="${3}"
 
   log "checking for managed instance group ${name}"
-  if gcloud compute instance-groups managed describe "${name}" ${gcloud_region} --quiet; then
+  if gcloud compute instance-groups managed describe "${name}" ${gcloud_region} --quiet 2> /dev/null; then
     # get current instance template name
     local group_instance_name="$(gcloud compute instance-groups list-instances \
       "${name}" ${gcloud_region} --format=json | jq '.[1].instance' | tr -d '"')"
@@ -360,7 +360,7 @@ gcloud_reserve_static_ip_address() {
   local address="${1}"
   local ip="${2}"
 
-  if gcloud compute addresses describe "${address}" ${gcloud_region}; then
+  if gcloud compute addresses describe ${gcloud_region} "${address}" 2> /dev/null; then
     # already reserved, no-op
     :
   else
