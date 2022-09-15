@@ -1,12 +1,12 @@
-import { Multiaddr } from '@multiformats/multiaddr'
+// import { Multiaddr } from '@multiformats/multiaddr'
 
 import assert from 'assert'
 
 import { WebRTCUpgrader } from './upgrader.js'
 import { EntryNodes, EntryNodeData } from '../entry.js'
 import type { PeerStoreType } from '../types.js'
-import type { PeerId } from '@libp2p/interface-peer-id'
-import { startStunServer, createPeerId } from '../base/utils.spec.js'
+// import type { PeerId } from '@libp2p/interface-peer-id'
+// import { startStunServer, createPeerId } from '../base/utils.spec.js'
 import { ConnectComponents } from '../components.js'
 import { once } from 'events'
 import { u8aEquals } from '@hoprnet/hopr-utils'
@@ -32,24 +32,24 @@ function getFakeConnectComponents(
   } as ConnectComponents
 }
 
-function getPeerStoreEntry(ip: string, port: number, id: PeerId = createPeerId()): PeerStoreType {
-  return {
-    id,
-    multiaddrs: [new Multiaddr(`/ip4/${ip}/tcp/${port}/p2p/${id.toString()}`)]
-  }
-}
+// function getPeerStoreEntry(ip: string, port: number, id: PeerId = createPeerId()): PeerStoreType {
+//   return {
+//     id,
+//     multiaddrs: [new Multiaddr(`/ip4/${ip}/tcp/${port}/p2p/${id.toString()}`)]
+//   }
+// }
 
 describe('webrtc upgrader', function () {
   it('base functionality', async function () {
     this.timeout(10e3)
     // If this test fails, either simple-peer library or WebRTC binary is broken
-    const stunServer = await startStunServer()
+    // const stunServer = await startStunServer()
 
     const initiator = new WebRTCUpgrader()
     const receiver = new WebRTCUpgrader()
 
     const fakedComponents = getFakeConnectComponents(-1, undefined, [
-      getPeerStoreEntry('127.0.0.1', stunServer.address().port)
+      // getPeerStoreEntry('127.0.0.1', stunServer.address().port)
     ])
 
     initiator.initConnect(fakedComponents)
@@ -90,7 +90,7 @@ describe('webrtc upgrader', function () {
     await new Promise<void>((resolve) => initiatorPeer.end(resolve))
     await new Promise<void>((resolve) => receiverPeer.end(resolve))
 
-    stunServer.close()
+    // stunServer.close()
 
     initiatorPeer.destroy()
     receiverPeer.destroy()
