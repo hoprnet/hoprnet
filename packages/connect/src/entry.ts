@@ -1,10 +1,10 @@
-import type { HoprConnectOptions, PeerStoreType } from '../types.js'
+import type { HoprConnectOptions, PeerStoreType } from './types.js'
 import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Initializable, Components } from '@libp2p/interfaces/components'
 import type { Startable } from '@libp2p/interfaces/startable'
 import { Multiaddr } from '@multiformats/multiaddr'
-import type { HoprConnect } from '../index.js'
+import type { HoprConnect } from './index.js'
 import { peerIdFromBytes, peerIdFromString } from '@libp2p/peer-id'
 
 import errCode from 'err-code'
@@ -22,7 +22,7 @@ import {
   OK,
   DEFAULT_DHT_ENTRY_RENEWAL,
   CODE_P2P
-} from '../constants.js'
+} from './constants.js'
 
 import {
   createCircuitAddress,
@@ -35,7 +35,7 @@ import {
   durations,
   defer
 } from '@hoprnet/hopr-utils'
-import { attemptClose, relayFromRelayAddress } from '../utils/index.js'
+import { attemptClose, relayFromRelayAddress } from './utils/index.js'
 
 const DEBUG_PREFIX = 'hopr-connect:entry'
 const log = Debug(DEBUG_PREFIX)
@@ -50,7 +50,7 @@ const DEFAULT_ENTRY_NODE_RECONNECT_BACKOFF = 2
 
 const KNOWN_DISCONNECT_ERROR = `Not successful`
 
-type EntryNodeData = PeerStoreType & {
+export type EntryNodeData = PeerStoreType & {
   latency: number
 }
 
@@ -283,6 +283,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
   private addToUpdateQueue: ReturnType<typeof oneAtATime>
 
+  public lastUpdate: number
+
   constructor(
     private dialDirectly: HoprConnect['dialDirectly'],
     private options: HoprConnectOptions,
@@ -294,6 +296,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     }
   ) {
     super()
+
+    this.lastUpdate = Date.now()
 
     this.maxRelaysPerNode = overwrites?.maxRelaysPerNode ?? MAX_RELAYS_PER_NODE
     this.minRelaysPerNode = overwrites?.minRelaysPerNode ?? MIN_RELAYS_PER_NODE
@@ -314,7 +318,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
     this._isStarted = false
     this.availableEntryNodes = []
-    this.uncheckedEntryNodes = options.initialNodes ?? []
+    // Copy list of initial nodes
+    this.uncheckedEntryNodes = [...(options.initialNodes ?? [])]
     this.offlineEntryNodes = []
 
     this.usedRelays = []
@@ -377,7 +382,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     this.components = components
   }
 
-  public getComponents(): Components {
+  private getComponents(): Components {
     if (this.components == null) {
       throw errCode(new Error('components not set'), 'ERR_SERVICE_MISSING')
     }
@@ -602,16 +607,16 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
   /**
    * @returns a list of entry nodes that are considered to be online
    */
-  public getAvailabeEntryNodes() {
-    return this.availableEntryNodes
+  public getAvailableEntryNodes(): IterableIterator<EntryNodeData> {
+    return this.availableEntryNodes.values()
   }
 
   /**
    * @returns a list of entry nodes that will be checked once the
    * list of entry nodes is built or rebuilt next time
    */
-  public getUncheckedEntryNodes() {
-    return this.uncheckedEntryNodes
+  public getUncheckedEntryNodes(): IterableIterator<PeerStoreType> {
+    return this.uncheckedEntryNodes.values()
   }
 
   /**
@@ -655,6 +660,9 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
           }
           if (!alreadyKnownAddrs.has(ma.decapsulateCode(CODE_P2P).toString())) {
             entry.multiaddrs.push(ma.decapsulateCode(CODE_P2P).encapsulate(`/p2p/${peer.id.toString()}`))
+
+            // List of addresses has changed, so signal this to consumers
+            this.lastUpdate = Date.now()
             receivedNewAddrs = true
             break
           }
@@ -692,6 +700,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
         // Remove node without changing order
         this.availableEntryNodes.splice(index, 1)
         this.offlineEntryNodes.push(publicNode)
+
+        this.lastUpdate = Date.now()
 
         // Assuming that node does not appear more than once
         break
@@ -881,6 +891,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
     // sorts in-place
     this.availableEntryNodes.sort(latencyCompare)
+
+    this.lastUpdate = Date.now()
   }
 
   /**

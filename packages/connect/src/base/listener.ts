@@ -14,17 +14,16 @@ import { createSocket, type RemoteInfo, type Socket as UDPSocket } from 'dgram'
 import { once } from 'events'
 
 import Debug from 'debug'
-import { peerIdFromBytes } from '@libp2p/peer-id'
 import { Multiaddr } from '@multiformats/multiaddr'
 
 import { isAnyAddress, u8aEquals, defer } from '@hoprnet/hopr-utils'
 
 import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP } from '../constants.js'
-import type { PeerStoreType, HoprConnectOptions, HoprConnectTestingOptions } from '../types.js'
+import type { HoprConnectOptions, HoprConnectTestingOptions } from '../types.js'
 import { handleStunRequest, getExternalIp } from './stun.js'
 import { getAddrs } from './addrs.js'
 import { TCPConnection } from './tcp.js'
-import { RELAY_CHANGED_EVENT } from './entry.js'
+import { RELAY_CHANGED_EVENT } from '../entry.js'
 import { bindToPort, attemptClose, nodeToMultiaddr } from '../utils/index.js'
 
 import type { Components } from '@libp2p/interfaces/components'
@@ -104,19 +103,10 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
         .getAddressFilter()
         .setAddrs(this.getAddrs(), [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${this.components.getPeerId().toString()}`)])
 
-      const usedRelays = this.connectComponents.getEntryNodes().getUsedRelayAddresses()
+      const usedRelays = this.connectComponents.getEntryNodes().getUsedRelayPeerIds()
 
       if (usedRelays && usedRelays.length > 0) {
-        const relayPeerIds = this.connectComponents
-          .getEntryNodes()
-          .getUsedRelayAddresses()
-          .map((ma: Multiaddr) => {
-            const tuples = ma.tuples()
-
-            return peerIdFromBytes((tuples[0][1] as Uint8Array).slice(1))
-          })
-
-        this.connectComponents.getRelay().setUsedRelays(relayPeerIds)
+        this.connectComponents.getRelay().setUsedRelays(usedRelays)
       }
 
       this.dispatchEvent(new CustomEvent('listening'))
@@ -654,14 +644,11 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
   private getUsableStunServers(ownHost: string, ownPort: number): Multiaddr[] {
     const filtered = []
 
-    let usableNodes: PeerStoreType[] = this.connectComponents.getEntryNodes().getAvailabeEntryNodes()
-
-    if (usableNodes.length == 0) {
-      // Use unchecked nodes at startup
-      usableNodes = this.connectComponents.getEntryNodes().getUncheckedEntryNodes()
-    }
-
-    for (const usableNode of usableNodes) {
+    for (const usableNode of function* (this: Listener) {
+      yield* this.connectComponents.getEntryNodes().getAvailableEntryNodes()
+      // Use unchecked nodes at startup if none of the nodes have been contacted
+      yield* this.connectComponents.getEntryNodes().getUncheckedEntryNodes()
+    }.call(this)) {
       if (usableNode.id.equals(this.components.getPeerId())) {
         // Exclude self
         continue

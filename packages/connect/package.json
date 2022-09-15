@@ -77,7 +77,7 @@
   },
   "mocha": {
     "spec": [
-      "lib/**/*.spec.js"
+      "lib/webrtc/upgrader.spec.js"
     ]
   },
   "publishConfig": {

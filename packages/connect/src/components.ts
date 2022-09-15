@@ -4,7 +4,7 @@ import errCode from 'err-code'
 import type { WebRTCUpgrader } from './webrtc/upgrader.js'
 import type { UpnpManager } from './base/upnp.js'
 import type { Filter } from './filter.js'
-import type { EntryNodes } from './base/entry.js'
+import type { EntryNodes } from './entry.js'
 import type { Relay } from './relay/index.js'
 
 import { isInitializable, type Initializable, type Components } from '@libp2p/interfaces/components'

@@ -23,7 +23,7 @@ import { Relay } from './relay/index.js'
 import { Filter } from './filter.js'
 import { Discovery } from './discovery.js'
 import { ConnectComponents } from './components.js'
-import { EntryNodes } from './base/entry.js'
+import { EntryNodes } from './entry.js'
 import { WebRTCUpgrader } from './webrtc/upgrader.js'
 import { UpnpManager } from './base/upnp.js'
 import { timeout } from '@hoprnet/hopr-utils'
@@ -89,7 +89,7 @@ class HoprConnect implements Transport, Initializable, Startable {
       entryNodes: new EntryNodes(dialDirectly, this.options),
       relay: new Relay(dialDirectly, filter, this.options, this.testingOptions),
       upnpManager: new UpnpManager(),
-      webRTCUpgrader: new WebRTCUpgrader(this.options)
+      webRTCUpgrader: new WebRTCUpgrader()
     })
 
     // Pass libp2p internals

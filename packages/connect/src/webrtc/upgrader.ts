@@ -1,35 +1,19 @@
 import SimplePeer from 'simple-peer'
-import debug from 'debug'
 
 import { Multiaddr } from '@multiformats/multiaddr'
-import type { PeerStoreType, HoprConnectOptions } from '../types.js'
-import { CODE_IP4, CODE_TCP, CODE_UDP } from '../constants.js'
-import type { PeerId } from '@libp2p/interface-peer-id'
-import type { Startable } from '@libp2p/interfaces/startable'
+import type { PeerStoreType } from '../types.js'
+import type { ConnectComponents, ConnectInitializable } from '../components.js'
 
 import { AbortError } from 'abortable-iterator'
+
+import errCode from 'err-code'
 
 // No types for wrtc
 // @ts-ignore
 import wrtc from 'wrtc'
 
-const DEBUG_PREFIX = `hopr-connect:webrtc`
-
-const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
-
 // @TODO adjust this
 export const MAX_STUN_SERVERS = 23
-
-/**
- * Check if we can use given Multiaddr as STUN server
- * @param ma Multiaddr to check
- * @returns true if given Multiaddr can be used as STUN server
- */
-function isUsableMultiaddr(ma: Multiaddr): boolean {
-  const tuples = ma.tuples()
-
-  return tuples[0].length >= 2 && tuples[0][0] == CODE_IP4 && [CODE_UDP, CODE_TCP].includes(tuples[1][0])
-}
 
 /**
  * Converts a Multiaddr into an ICEServer string
@@ -48,150 +32,59 @@ export function multiaddrToIceServer(ma: Multiaddr): string {
  * @param peerData PeerIds and their Multiaddrs
  * @returns a configuration object to be used with RTCPeerConnection
  */
-function publicNodesToRTCServers(peerData: PeerStoreType[]): RTCIceServer[] {
-  return Array.from({ length: peerData.length }, (_, index: number) => {
-    const entry = peerData[index]
-
-    return {
+function publicNodesToRTCServers(peerData: IterableIterator<PeerStoreType>): RTCIceServer[] {
+  const result: RTCIceServer[] = []
+  for (const peer of peerData) {
+    result.push({
       urls:
-        entry.multiaddrs.length == 1
-          ? multiaddrToIceServer(entry.multiaddrs[0])
-          : entry.multiaddrs.map(multiaddrToIceServer)
-    }
-  })
+        peer.multiaddrs.length == 1
+          ? multiaddrToIceServer(peer.multiaddrs[0])
+          : peer.multiaddrs.map(multiaddrToIceServer)
+    })
+  }
+
+  return result
 }
 
 /**
  * Encapsulate configuration used to create WebRTC instances
  */
-class WebRTCUpgrader implements Startable {
-  public rtcConfig?: RTCConfiguration
-  private publicNodes: PeerStoreType[]
+class WebRTCUpgrader implements ConnectInitializable {
+  private iceServers: RTCIceServer[]
+  private lastEntryNodeUpdate: number | undefined
 
-  private _isStarted: boolean
+  private connectComponents: ConnectComponents | undefined
 
-  private _onNewPublicNode: WebRTCUpgrader['onNewPublicNode'] | undefined
-  private _onOfflineNode: WebRTCUpgrader['onOfflineNode'] | undefined
-
-  constructor(private options: HoprConnectOptions) {
-    this._isStarted = false
-    this.publicNodes = []
+  constructor() {
+    this.iceServers = []
   }
 
-  public isStarted(): boolean {
-    return this._isStarted
+  public initConnect(connectComponents: ConnectComponents) {
+    this.connectComponents = connectComponents
   }
 
-  /**
-   * Attach event listeners to handle newly discovered public nodes and offline public nodes
-   */
-  public start(): void {
-    if (this._isStarted) {
-      return
+  public getConnectComponents(): ConnectComponents {
+    if (this.connectComponents == null) {
+      throw errCode(new Error('connectComponents not set'), 'ERR_SERVICE_MISSING')
     }
 
-    this._onNewPublicNode = this.onNewPublicNode.bind(this)
-    this._onOfflineNode = this.onOfflineNode.bind(this)
-
-    this.options.initialNodes?.forEach(this._onNewPublicNode)
-
-    if (this.options.publicNodes != undefined) {
-      this.options.publicNodes.on('addPublicNode', this._onNewPublicNode)
-      this.options.publicNodes.on('removePublicNode', this._onOfflineNode)
-    }
-
-    this._isStarted = true
+    return this.connectComponents
   }
 
-  /**
-   * Unassign event listeners
-   */
-  public stop(): void {
-    if (!this._isStarted) {
-      throw Error(`Could not stop module because it is not yet started.`)
-    }
-
+  private getRTCConfig(): RTCConfiguration {
     if (
-      this.options.publicNodes != undefined &&
-      this._onNewPublicNode != undefined &&
-      this._onOfflineNode != undefined
+      this.lastEntryNodeUpdate == undefined ||
+      this.lastEntryNodeUpdate < this.getConnectComponents().getEntryNodes().lastUpdate
     ) {
-      this.options.publicNodes.removeListener('addPublicNode', this._onNewPublicNode)
-      this.options.publicNodes.removeListener('removePublicNode', this._onOfflineNode)
+      this.iceServers = publicNodesToRTCServers(
+        function* (this: WebRTCUpgrader) {
+          yield* this.getConnectComponents().getEntryNodes().getAvailableEntryNodes()
+          yield* this.getConnectComponents().getEntryNodes().getUncheckedEntryNodes()
+        }.call(this)
+      )
     }
-
-    this._isStarted = false
-  }
-
-  /**
-   * Called on newly discovered public nodes
-   * @param peer PeerId and its Multiaddrs
-   * @returns
-   */
-  private onNewPublicNode(peer: PeerStoreType): void {
-    if (
-      this.rtcConfig != undefined &&
-      this.rtcConfig.iceServers != undefined &&
-      this.rtcConfig.iceServers.length >= MAX_STUN_SERVERS
-    ) {
-      return
-    }
-
-    let entryIndex = this.publicNodes.findIndex((entry: PeerStoreType) => entry.id.equals(peer.id))
-
-    if (entryIndex < 0) {
-      const usableAddresses = peer.multiaddrs.filter(isUsableMultiaddr)
-
-      if (usableAddresses.length > 0) {
-        this.publicNodes.unshift({ id: peer.id, multiaddrs: usableAddresses })
-      }
-
-      this.updateRTCConfig()
-      return
-    }
-
-    let addrsChanged = false
-
-    for (const ma of peer.multiaddrs) {
-      // Also try "TCP addresses" as we expect that node is listening on TCP *and* UDP
-      if (!isUsableMultiaddr(ma)) {
-        verbose(`Dropping potential STUN ${ma.toString()} because format is invalid`)
-        continue
-      }
-
-      if (this.publicNodes[entryIndex].multiaddrs.some(ma.equals.bind(ma))) {
-        continue
-      }
-
-      addrsChanged = true
-      this.publicNodes[entryIndex].multiaddrs.unshift(ma)
-    }
-
-    if (!addrsChanged) {
-      return
-    }
-
-    this.updateRTCConfig()
-  }
-
-  /**
-   * Called whenever a peer is considered offline
-   * @param peer peer who is considered offline
-   */
-  private onOfflineNode(peer: PeerId): void {
-    if (this.rtcConfig == undefined || this.rtcConfig.iceServers == undefined) {
-      return
-    }
-
-    this.publicNodes = this.publicNodes.filter((entry: PeerStoreType) => !entry.id.equals(peer))
-
-    this.updateRTCConfig()
-  }
-
-  private updateRTCConfig(): void {
-    this.rtcConfig = {
-      ...this.rtcConfig,
-      iceServers: publicNodesToRTCServers(this.publicNodes)
+    return {
+      iceServers: this.iceServers
     }
   }
 
@@ -226,7 +119,7 @@ class WebRTCUpgrader implements Startable {
       initiator,
       trickle: true,
       allowHalfTrickle: true,
-      config: this.rtcConfig
+      config: this.getRTCConfig()
     })
 
     if (signal) {

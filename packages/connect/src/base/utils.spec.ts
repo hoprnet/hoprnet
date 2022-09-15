@@ -40,7 +40,7 @@ export async function stopNode(socket: Closing) {
  * @param state used to track incoming messages
  */
 export async function startStunServer(
-  port: number | undefined,
+  port?: number | undefined,
   state?: { msgReceived?: DeferType<void> }
 ): Promise<Socket> {
   const socket = await bindToUdpSocket(port)

@@ -25,7 +25,7 @@ import { RelayState } from './state.js'
 import { createRelayerKey, randomInteger, retimer, tryExistingConnections } from '@hoprnet/hopr-utils'
 
 import { attemptClose } from '../utils/index.js'
-import { type ConnectComponents, ConnectInitializable } from '../components.js'
+import type { ConnectComponents, ConnectInitializable } from '../components.js'
 
 const DEBUG_PREFIX = 'hopr-connect:relay'
 const DEFAULT_MAX_RELAYED_CONNECTIONS = 10
@@ -43,8 +43,9 @@ function printUsedRelays(peers: PeerId[], prefix = '') {
 
   for (const peer of peers) {
     if (out.length > prefix.length + 1) {
-      out += `  - ${peer.toString()}`
+      out += '\n'
     }
+    out += `  - ${peer.toString()}`
   }
 
   return out

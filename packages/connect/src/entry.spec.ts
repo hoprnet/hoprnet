@@ -1,7 +1,7 @@
 import { EntryNodes, RELAY_CHANGED_EVENT } from './entry.js'
-import { createPeerId, getPeerStoreEntry } from './utils.spec.js'
-import { OK } from '../constants.js'
-import type { PeerStoreType, PublicNodesEmitter } from '../types.js'
+import { createPeerId, getPeerStoreEntry } from './base/utils.spec.js'
+import { OK } from './constants.js'
+import type { PeerStoreType, PublicNodesEmitter } from './types.js'
 
 import assert from 'assert'
 import { once, EventEmitter } from 'events'
@@ -167,7 +167,7 @@ describe('entry node functionality - basic functionality', function () {
     // Should filter duplicate
     entryNodes.onNewRelay(peerStoreEntry)
 
-    const uncheckedNodes = entryNodes.getUncheckedEntryNodes()
+    const uncheckedNodes = [...entryNodes.getUncheckedEntryNodes()]
 
     assert(uncheckedNodes.length == 1, `Unchecked nodes must contain one entry`)
     assert(uncheckedNodes[0].id.equals(peerStoreEntry.id), `id must match the generated one`)
@@ -201,7 +201,7 @@ describe('entry node functionality - basic functionality', function () {
 
     entryNodes.onRemoveRelay(peerStoreEntry.id)
 
-    const availablePublicNodes = entryNodes.getAvailabeEntryNodes()
+    const availablePublicNodes = [...entryNodes.getAvailableEntryNodes()]
     assert(availablePublicNodes.length == 0, `must remove node from public nodes`)
 
     entryNodes.stop()
@@ -325,7 +325,7 @@ describe('entry node functionality', function () {
 
     await connectPromise
 
-    const availableEntryNodes = entryNodes.getAvailabeEntryNodes()
+    const availableEntryNodes = [...entryNodes.getAvailableEntryNodes()]
     assert(availableEntryNodes.length == 1, `must contain exactly one public node`)
     assert(availableEntryNodes[0].id.equals(relay.id), `must contain correct peerId`)
     assert(availableEntryNodes[0].latency >= 0, `latency must be non-negative`)
@@ -447,7 +447,7 @@ describe('entry node functionality', function () {
     assert(usedRelays != undefined, `must expose relay addresses`)
     assert(usedRelays.length == maxRelaysPerNode, `must expose ${maxRelaysPerNode} relay addresses`)
 
-    const availableEntryNodes = entryNodes.getAvailabeEntryNodes()
+    const availableEntryNodes = [...entryNodes.getAvailableEntryNodes()]
     assert(availableEntryNodes.length == maxParallelDials + 1)
     assert(
       relayNodes.every((relayNode) =>
@@ -485,8 +485,8 @@ describe('entry node functionality', function () {
     entryNodes.usedRelays.push(usedRelay)
 
     // Should have one unchecked node and one relay node
-    assert(entryNodes.getUsedRelayAddresses().length == 1)
-    assert(entryNodes.getUncheckedEntryNodes().length == 1)
+    assert([...entryNodes.getUsedRelayAddresses()].length == 1)
+    assert([...entryNodes.getUncheckedEntryNodes()].length == 1)
 
     const connectPromise = once(newNodeListener, 'connected')
 
@@ -496,7 +496,7 @@ describe('entry node functionality', function () {
 
     await Promise.all([connectPromise, updatePromise])
 
-    assert(entryNodes.getAvailabeEntryNodes().length == 1)
+    assert([...entryNodes.getAvailableEntryNodes()].length == 1)
 
     const usedRelays = entryNodes.getUsedRelayAddresses()
     assert(entryNodes.getUsedRelayAddresses().length == 1)
@@ -530,7 +530,7 @@ describe('entry node functionality', function () {
 
     await connectPromise
 
-    const availableEntryNodes = entryNodes.getAvailabeEntryNodes()
+    const availableEntryNodes = [...entryNodes.getAvailableEntryNodes()]
     assert(availableEntryNodes.length == 1)
     assert(availableEntryNodes[0].id.equals(relay.id))
 
@@ -586,7 +586,7 @@ describe('entry node functionality', function () {
 
     await entryNodes.updatePublicNodes()
 
-    const availableEntryNodes = entryNodes.getAvailabeEntryNodes()
+    const availableEntryNodes = [...entryNodes.getAvailableEntryNodes()]
     assert(availableEntryNodes.length == 0)
 
     const usedRelays = entryNodes.getUsedRelayAddresses()
@@ -617,7 +617,7 @@ describe('entry node functionality', function () {
 
     entryNodes.onNewRelay(peerStoreEntry)
 
-    const uncheckedNodes = entryNodes.getUncheckedEntryNodes()
+    const uncheckedNodes = [...entryNodes.getUncheckedEntryNodes()]
 
     assert(uncheckedNodes.length == 1, `Unchecked nodes must contain one entry`)
     assert(uncheckedNodes[0].id.equals(peerStoreEntry.id), `id must match the generated one`)
@@ -761,7 +761,7 @@ describe('entry node functionality - automatic reconnect', function () {
     // Wait for end of event loop
     await new Promise((resolve) => setImmediate(resolve))
 
-    const availablePublicNodes = entryNodes.getAvailabeEntryNodes()
+    const availablePublicNodes = [...entryNodes.getAvailableEntryNodes()]
     assert(availablePublicNodes.length == 1, `must keep entry node after reconnect`)
     const usedRelays = entryNodes.getUsedRelayAddresses()
     assert(usedRelays.length == 1, `must keep relay address after reconnect`)
@@ -812,7 +812,7 @@ describe('entry node functionality - automatic reconnect', function () {
 
     await entryNodeRemoved
 
-    const availablePublicNodes = entryNodes.getAvailabeEntryNodes()
+    const availablePublicNodes = [...entryNodes.getAvailableEntryNodes()]
 
     assert(availablePublicNodes.length == 0, `must remove node from public nodes`)
 
@@ -952,7 +952,7 @@ describe('entry node functionality - min relays per node', function () {
       assert.fail(`Must not connect more than once`)
     }
 
-    const availablePublicNodes = entryNodes.getAvailabeEntryNodes()
+    const availablePublicNodes = [...entryNodes.getAvailableEntryNodes()]
     assert(availablePublicNodes.length == 1, `must keep entry node after reconnect`)
     const usedRelays = entryNodes.getUsedRelayAddresses()
     assert(usedRelays.length == 1, `must keep relay address after reconnect`)
