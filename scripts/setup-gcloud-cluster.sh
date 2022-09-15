@@ -158,6 +158,8 @@ else
   )
 fi
 
+declare network_id=$(get_network "${environment}")
+
 # Deployer CI wallet should ideally be "eligible". To be eligible:
 # 1. The wallet should have obtained a "Network_registry" NFT of `developer` rank (wallet should already have this)
 # 2. The wallet should have sent one above-mentioned NFT to the staking contract
@@ -167,7 +169,7 @@ fi
 for staking_addr in "${!staking_addrs_dict[@]}" ; do
   fund_if_empty "${staking_addr}" "${environment}"
   # we only stake NFT for valencia release
-  PRIVATE_KEY="${staking_addrs_dict[${staking_addr}]}" make -C "${mydir}/.." stake-nrnft environment="${environment}" nftrank=developer
+  PRIVATE_KEY="${staking_addrs_dict[${staking_addr}]}" make -C "${mydir}/.." stake-nrnft environment="${environment}" nftrank=developer network="${network_id}"
 done
 
 # Get names of all instances in this cluster
@@ -175,7 +177,7 @@ done
 declare instance_names
 instance_names="$(gcloud_get_managed_instance_group_instances_names "${cluster_id}")"
 declare -a instance_names_arr
-IFS="," read -r -a instance_names_arr <<< "$(echo "${instance_names}" | jq -r '@csv' | tr -d '"')"
+IFS="," read -r -a instance_names_arr <<< "$(echo "${instance_names}" | jq -r '@csv' | tr -d '\"')"
 
 # Prepare sorted staking account addresses so we ensure a stable order of assignment
 declare staking_addresses_arr=( "${!staking_addrs_dict[@]}" )
@@ -266,11 +268,13 @@ IFS=','
 make -C "${mydir}/.." register-nodes \
   environment="${environment}" \
   native_addresses="${used_staking_addrs[*]}" \
-  peer_ids="${hopr_addrs[*]}"
+  peer_ids="${hopr_addrs[*]}" \
+  network="${network_id}"
 
 make -C "${mydir}/.." sync-eligibility \
   environment="${environment}" \
-  peer_ids="${hopr_addrs[*]}"
+  peer_ids="${hopr_addrs[*]}" \
+  network="${network_id}"
 unset IFS
 
 # Finally wait for the public nodes to come up, for NAT nodes this isn't possible

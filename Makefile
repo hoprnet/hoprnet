@@ -351,6 +351,9 @@ endif
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_ids=$(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")
 
 ensure-environment-is-set:
+ifeq ($(network),)
+	echo "parameter <network> missing" >&2 && exit 1
+endif
 ifeq ($(environment),)
 	echo "parameter <environment> missing" >&2 && exit 1
 else

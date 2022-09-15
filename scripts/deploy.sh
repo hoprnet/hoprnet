@@ -80,8 +80,9 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
           "" \
           "${cluster_name}" \
           "${docker_image_full}" \
-          "2" \
-          "${cluster_template_name}"
+          "${cluster_size}" \
+          "${cluster_template_name}" \
+          "true"
       else
         # announce on-chain with routable address
         ${mydir}/setup-gcloud-cluster.sh \
@@ -89,7 +90,7 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
           "" \
           "${cluster_name}" \
           "${docker_image_full}" \
-          "3" \
+          "${cluster_size}" \
           "${cluster_template_name}" \
           "true"
       fi
