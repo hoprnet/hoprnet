@@ -49,7 +49,7 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
       version_minor=$(_jq "${row}" ".value.version_minor")
       docker_image_version=$(_jq "${row}" ".value.docker_image_version")
 
-      if [ "${docker_image_version}" != "" ]; then 
+      if [ "${docker_image_version}" != "null" ]; then 
         docker_image_full="${docker_image}:${docker_image_version}"
       else 
         docker_image_full="${docker_image}:${release_id}"
@@ -79,7 +79,7 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
       log "\tcluster template name: ${cluster_template_name}"
 
       if [ "${cluster_tag}" = "-nat" ]; then
-        log "\tNATed node, no announcements"
+        log "\tNATed node, no announcements"  
         ${mydir}/setup-gcloud-cluster.sh \
           "${environment_id}" \
           "" \
@@ -87,7 +87,7 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
           "${docker_image_full}" \
           "${cluster_size}" \
           "${cluster_template_name}" \
-          "true"
+          ""
       else
         # announce on-chain with routable address
         ${mydir}/setup-gcloud-cluster.sh \

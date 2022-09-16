@@ -161,7 +161,6 @@ gcloud_create_instance_template() {
     metadata_value="${metadata_value},HOPRD_ENVIRONMENT_ID=${environment_id}"
   fi
 
-
   if [ -n "${private_key}" ]; then
     metadata_value="${metadata_value},HOPRD_PRIVATE_KEY=\"--privateKey ${private_key}\""
   fi
@@ -170,8 +169,12 @@ gcloud_create_instance_template() {
     metadata_value="${metadata_value},HOPRD_ANNOUNCE=--announce"
   fi
 
-  log "Metadata Fields: ${metadata_value}"
+  if [[ "${name}" == *'-nat'* ]]; then
+    metadata_value="${metadata_value},HOPRD_NAT=true"
+  fi
 
+  log "Metadata Fields: ${metadata_value}"
+ 
   log "creating instance template ${name}"
   eval gcloud compute instance-templates create "${name}" \
       --machine-type=c2d-highcpu-2 \
