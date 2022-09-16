@@ -431,6 +431,7 @@ class Hopr extends EventEmitter {
 
   /**
    * Total hack
+   Mannually wipes DHT's ping queues as they get unnecessarily populated
    */
   private freeMemory() {
     console.log(
