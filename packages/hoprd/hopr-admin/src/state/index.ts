@@ -3,7 +3,7 @@
   Manages the dApps state.
 */
 import type { Aliases } from '../utils/api'
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import cookies from 'js-cookie'
 import useAPI from './useAPI'
 import useWS from './useWS'
@@ -57,21 +57,12 @@ const useAppState = (onLog: (log: Log) => any) => {
     })
   }
 
-  /**
-   * Connection status of the app.
-   * Takes into account all WS connections.
-   */
-  const status = useMemo<'DISCONNECTED' | 'CONNECTED'>(() => {
-    return streamWS.state.status
-  }, [streamWS.state.status])
-
   return {
     state,
     api,
     streamWS,
     updateConfig,
-    updateAliases,
-    status
+    updateAliases
   }
 }
 

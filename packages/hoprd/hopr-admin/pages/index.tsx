@@ -32,12 +32,24 @@ export default function Home() {
     },
     updateAliasCache(fn) {
       return app.updateAliases(fn)
+    },
+    getSymbols() {
+      // TODO: fetch from API once supported
+      const native = 'xDAI'
+      const hopr = 'mHOPR'
+
+      return {
+        native,
+        hopr,
+        nativeDisplay: `NATIVE (${native})`,
+        hoprDisplay: `HOPR (${hopr})`
+      }
     }
   })
 
   const updateAliases = async () => {
     const api = app.api.apiRef.current
-    if (api && app.status === 'CONNECTED') {
+    if (api && app.streamWS.state.status === 'CONNECTED') {
       try {
         api
           .getAliases()
@@ -55,7 +67,7 @@ export default function Home() {
 
     const interval = setInterval(updateAliases, 5e3)
     return () => clearInterval(interval)
-  }, [app.api.apiRef.current, app.status])
+  }, [app.api.apiRef.current, app.streamWS.state.status === 'CONNECTED'])
 
   // toggles connected panel
   const [showConnectedPanel, setShowConnectedPanel] = useState(false)
@@ -173,7 +185,7 @@ export default function Home() {
         </span>
       </h1>
 
-      <Logs messages={logs} isConnected={app.status === 'CONNECTED'} />
+      <Logs messages={logs} isConnected={app.streamWS.state.status === 'CONNECTED'} />
 
       <div className="send">
         <input
