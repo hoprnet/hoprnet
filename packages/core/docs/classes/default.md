@@ -43,6 +43,7 @@
 - [emit](default.md#emit)
 - [emitOnConnector](default.md#emitonconnector)
 - [eventNames](default.md#eventnames)
+- [freeMemory](default.md#freememory)
 - [fundChannel](default.md#fundchannel)
 - [getAddressesAnnouncedOnChain](default.md#getaddressesannouncedonchain)
 - [getAddressesAnnouncedToDHT](default.md#getaddressesannouncedtodht)
@@ -94,6 +95,7 @@
 - [signMessage](default.md#signmessage)
 - [smartContractInfo](default.md#smartcontractinfo)
 - [start](default.md#start)
+- [startMemoryFreeInterval](default.md#startmemoryfreeinterval)
 - [startPeriodicStrategyCheck](default.md#startperiodicstrategycheck)
 - [stop](default.md#stop)
 - [subscribeOnConnector](default.md#subscribeonconnector)
@@ -542,6 +544,19 @@ console.log(myEE.eventNames());
 #### Inherited from
 
 EventEmitter.eventNames
+
+___
+
+### freeMemory
+
+▸ `Private` **freeMemory**(): `void`
+
+Total hack
+Mannually wipes DHT's ping queues as they get unnecessarily populated
+
+#### Returns
+
+`void`
 
 ___
 
@@ -1619,6 +1634,18 @@ If the node is not funded, it will throw.
 #### Returns
 
 `Promise`<`void`\>
+
+___
+
+### startMemoryFreeInterval
+
+▸ `Private` **startMemoryFreeInterval**(): `void`
+
+Total hack
+
+#### Returns
+
+`void`
 
 ___
 
