@@ -618,15 +618,15 @@ describe('test indexer', function () {
     // confirmations == 1
     // block nr 1, confirmed block 0
     newBlock()
-    
+
     newTokenEvent(fixtures.PARTY_A_TRANSFER_INCOMING) // +3
     // block nr 2, confirmed block 1
     newBlock()
-    
+
     // block nr 3, confirmed block 2
     newBlock()
     await secondBlockProcessed.promise
-    
+
     newTokenEvent(fixtures.PARTY_A_TRANSFER_OUTGOING) // -1
     // block nr 4, confirmed block 3
     newBlock()
