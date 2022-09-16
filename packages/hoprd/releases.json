@@ -55,7 +55,8 @@
     "git_ref": "^testnet/valencia$",
     "environment_id": "monte_rosa",
     "version_major": "1",
-    "version_minor": "90"
+    "version_minor": "90",
+    "docker_image_version": "valencia"
   },  
   "debug-goerli": {
     "git_ref": "^debug-deploy/.*",

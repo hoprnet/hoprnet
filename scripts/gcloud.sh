@@ -116,18 +116,7 @@ gcloud_cleanup_docker_images() {
 # $5 - optional: password
 # $6 - optional: announce
 # $7 - optional: private key
-gcloud_create_instance_template_if_not_exists() {
-  gcloud_create_or_update_instance_template "${1}" "${2}" "${3:-}" "${4:-}" "${5:-}" "${6:-}" "${7:-}"
-}
-
-# $1 - template name
-# $2 - container image
-# $3 - optional: environment id
-# $4 - optional: api token
-# $5 - optional: password
-# $6 - optional: announce
-# $7 - optional: private key
-gcloud_create_or_update_instance_template() {
+gcloud_create_instance_template() {
   
   local name="${1}"
   local image="${2}"
@@ -144,18 +133,19 @@ gcloud_create_or_update_instance_template() {
   log "checking for instance template ${name}"
   if gcloud compute instance-templates describe "${name}" --quiet 2> /dev/null; then
     log "instance template ${name} already present"
-    instance_group_name=$(gcloud compute instance-groups managed list --format="json(name)" \
-    --filter="instanceTemplate ~ '.*${name}$'" | jq -r ' .[].name ')
-    if [ "$instance_group_name" != "" ]; then     
-      gcloud_delete_managed_instance_group "${instance_group_name}"
-    fi
-    gcloud_delete_instance_template "${name}"
+    # instance_group_name=$(gcloud compute instance-groups managed list --format="json(name)" \
+    # --filter="instanceTemplate ~ '.*${name}$'" | jq -r ' .[].name ')
+    # if [ "$instance_group_name" != "" ]; then     
+    #   gcloud_delete_managed_instance_group "${instance_group_name}"
+    # fi
+    # gcloud_delete_instance_template "${name}"
+    return 0
   fi
 
   metadata_value="google-logging-enabled=true"
   metadata_value="${metadata_value},google-monitoring-enabled=true"
   metadata_value="${metadata_value},enable-oslogin=true"
-  metadata_value="${metadata_value},startup-script='/opt/hoprd/startup-script.sh'"
+  metadata_value="${metadata_value},startup-script='/opt/hoprd/startup-script.sh > /tmp/startup-script-`date +%Y%m%d-%H%M%S`.log'"
   metadata_value="${metadata_value},HOPRD_DOCKER_IMAGE=${image}"
 
   if [ -n "${password}" ]; then
@@ -366,4 +356,11 @@ gcloud_reserve_static_ip_address() {
   else
     gcloud compute addresses create "${address}" --addresses="${ip}" ${gcloud_region}
   fi
+}
+
+gcloud_execute_command_instance() {
+  local name="${1}"
+  command="${2}"
+
+  gcloud compute ssh "${name}" --command "${command}"
 }
