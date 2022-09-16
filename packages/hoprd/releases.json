@@ -51,7 +51,7 @@
     "version_major": "1",
     "version_minor": "90"
   },
-  "valencia-testnet-github": {
+  "valencia-testnet": {
     "git_ref": "^testnet/valencia$",
     "environment_id": "monte_rosa",
     "version_major": "1",
