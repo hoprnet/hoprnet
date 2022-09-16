@@ -41,7 +41,7 @@
       "xhopr_contract_address": "0xe8aD2ac347dA7549Aaca8F5B1c5Bf979d85bC78F",
       "boost_contract_address": "0x1C0C4EFb9a2ccE18d66eaFFc585876d8CA768013",
       "stake_contract_address": "0xa2288a817D2E05EaA179375A9A10b05Bd182259b",
-      "network_registry_proxy_contract_address": "0x2012c9F916a77ab814aFc75eef5B3BF2b1A82981",
+      "network_registry_proxy_contract_address": "0x1B30E79915D8905E2Ad305cff4D05F0D911570fB",
       "network_registry_contract_address": "0xf3374666487A58aa424BF9dB9bCf74250393a757",
       "tags": ["etherscan"]
     },
