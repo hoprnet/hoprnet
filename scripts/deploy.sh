@@ -61,13 +61,13 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
       fi
 
       declare version_maj_min cluster_name
-      cluster_name="${release_id}${cluster_tag}"      
+      cluster_name="${release_id}${cluster_tag}"
       if [ "${version_major}" != "null" ] && [ "${version_minor}" != "null" ]; then
         version_maj_min="${version_major}.${version_minor}"
         cluster_name="${cluster_name}-${version_maj_min//./-}"
       else
         version_maj_min=""
-      fi      
+      fi
 
       cluster_template_name="${cluster_name}"
 
@@ -79,7 +79,7 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
       log "\tcluster template name: ${cluster_template_name}"
 
       if [ "${cluster_tag}" = "-nat" ]; then
-        log "\tNATed node, no announcements"  
+        log "\tNATed node, no announcements"
         ${mydir}/setup-gcloud-cluster.sh \
           "${environment_id}" \
           "" \
