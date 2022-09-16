@@ -292,7 +292,9 @@ describe('test indexer', function () {
       }
     })
 
-    await indexer.start(chain, 0)
+    await indexer.start(chain, 1)
+    // block nr 2, confirmed nr 1
+    newBlock()
     const ev = {
       event: 'ChannelUpdated',
       transactionHash: '',
@@ -316,8 +318,9 @@ describe('test indexer', function () {
     // We are ACCOUNT_A - if B opens a channel to us, we should automatically
     // commit.
     newEvent(ev)
-
+    // block nr 3, confirmed nr 2
     newBlock()
+    // block nr 4, confirmed nr 3
     newBlock()
     await opened.promise
 
@@ -343,7 +346,9 @@ describe('test indexer', function () {
       } as any
     } as Event<'ChannelUpdated'>
     newEvent(evClose)
+    // block nr 5, confirmed nr 4
     newBlock()
+    // block nr 6, confirmed nr 5
     newBlock()
 
     await pendingIniated.promise
@@ -371,7 +376,9 @@ describe('test indexer', function () {
     } as Event<'ChannelUpdated'>
 
     newEvent(evClosed)
+    // block nr 7, confirmed nr 6
     newBlock()
+    // block nr 8, confirmed nr 7
     newBlock()
 
     await closed.promise
@@ -609,14 +616,19 @@ describe('test indexer', function () {
     assert.equal((await db.getHoprBalance()).toString(), '0')
 
     // confirmations == 1
+    // block nr 1, confirmed block 0
     newBlock()
-
+    
     newTokenEvent(fixtures.PARTY_A_TRANSFER_INCOMING) // +3
+    // block nr 2, confirmed block 1
     newBlock()
-
+    
+    // block nr 3, confirmed block 2
+    newBlock()
     await secondBlockProcessed.promise
-
+    
     newTokenEvent(fixtures.PARTY_A_TRANSFER_OUTGOING) // -1
+    // block nr 4, confirmed block 3
     newBlock()
 
     await thirdBlockProcessed.promise
@@ -626,17 +638,20 @@ describe('test indexer', function () {
 
   it('should process first 2 registry events and account be registered and eligible', async function () {
     const { db, chain, indexer, newBlock } = await useFixtures({
-      latestBlockNumber: 10,
+      latestBlockNumber: 4,
       pastHoprRegistryEvents: [fixtures.PARTY_A_REGISTERED, fixtures.PARTY_A_ELEGIBLE],
       id: fixtures.PARTY_A
     })
 
     const processed = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
-      if (blockNumber == 10) processed.resolve()
+      if (blockNumber >= 3) processed.resolve()
     })
+
     await indexer.start(chain, 0)
 
+    // block nr 4, confirmed block 3
+    newBlock()
     newBlock()
     await processed.promise
     assert(await db.getAccountFromNetworkRegistry(PublicKey.fromPeerIdString(PARTY_B_MULTIADDR.getPeerId())))
@@ -652,10 +667,11 @@ describe('test indexer', function () {
 
     const processed = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
-      if (blockNumber == 10) processed.resolve()
+      if (blockNumber >= 5) processed.resolve()
     })
     await indexer.start(chain, 0)
 
+    newBlock()
     newBlock()
     await processed.promise
     assert(await db.getAccountFromNetworkRegistry(PublicKey.fromPeerIdString(PARTY_B_MULTIADDR.getPeerId())))
@@ -677,10 +693,11 @@ describe('test indexer', function () {
 
     const processed = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
-      if (blockNumber == 10) processed.resolve()
+      if (blockNumber >= 9) processed.resolve()
     })
     await indexer.start(chain, 0)
 
+    newBlock()
     newBlock()
     await processed.promise
     assert.rejects(() => db.getAccountFromNetworkRegistry(PublicKey.fromPeerIdString(PARTY_B_MULTIADDR.getPeerId())))
@@ -696,10 +713,11 @@ describe('test indexer', function () {
 
     const processed = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
-      if (blockNumber == 3) processed.resolve()
+      if (blockNumber >= 3) processed.resolve()
     })
     await indexer.start(chain, 0)
 
+    newBlock()
     newBlock()
     await processed.promise
     assert(await db.isNetworkRegistryEnabled())
@@ -714,10 +732,11 @@ describe('test indexer', function () {
 
     const processed = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
-      if (blockNumber == 3) processed.resolve()
+      if (blockNumber >= 3) processed.resolve()
     })
     await indexer.start(chain, 0)
 
+    newBlock()
     newBlock()
     await processed.promise
     assert((await db.isNetworkRegistryEnabled()) === false)
@@ -748,10 +767,11 @@ describe('test indexer', function () {
 
     const processed = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
-      if (blockNumber == 3) processed.resolve()
+      if (blockNumber >= 3) processed.resolve()
     })
     await indexer.start(chain, 0)
 
+    newBlock()
     newBlock()
     await processed.promise
     assert(trySendTransaction)
