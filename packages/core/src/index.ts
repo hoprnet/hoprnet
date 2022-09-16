@@ -425,6 +425,33 @@ class Hopr extends EventEmitter {
     }
     await this.maybeLogProfilingToGCloud()
     this.heartbeat.recalculateNetworkHealth()
+
+    this.startMemoryFreeInterval()
+  }
+
+  /**
+   * Total hack
+   */
+  private freeMemory() {
+    console.log(
+      // @ts-ignore
+      `Freeing memory, size wan ${this.libp2pComponents.getDHT().wan.routingTable.pingQueue.size} lan ${
+        // @ts-ignore
+
+        this.libp2pComponents.getDHT().lan.routingTable.pingQueue.size
+      }`
+    )
+    // @ts-ignore
+    this.libp2pComponents.getDHT().wan.routingTable.pingQueue.clear()
+    // @ts-ignore
+    this.libp2pComponents.getDHT().lan.routingTable.pingQueue.clear()
+  }
+
+  /**
+   * Total hack
+   */
+  private startMemoryFreeInterval() {
+    retimer(this.freeMemory.bind(this), () => durations.minutes(1))
   }
 
   private async maybeLogProfilingToGCloud() {
