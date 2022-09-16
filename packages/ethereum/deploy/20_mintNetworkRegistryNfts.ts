@@ -130,24 +130,16 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
     console.log(`Admin ${admin} has ${await hoprBoost.balanceOf(admin)} Boost NFTs`)
   } else {
-    console.log(`Deployer is not minter. Skip minting NFTs.`)
+    console.log(`Deployer is not minter. Skip minting NFTs, although ${dummyNftTypesToBeMinted} need to be minted.`)
   }
 
-  // Add special NFTs in staging environment
-  if (network.tags.staging) {
-    // add special NFT types (dev NFTs) in network registry for staging envionment
+  // Add special NFTs in staging environment (for both staging and production environments)
+  if (network.tags.staging || network.tags.production) {
+    // add special NFT types (dev NFTs) in network registry for both staging and production envionment
     const registryProxy = (await ethers.getContractFactory('HoprStakingProxyForNetworkRegistry')).attach(
       registryProxyDeployment.address
     ) as HoprStakingProxyForNetworkRegistry
 
-    await awaitTxConfirmation(
-      registryProxy.ownerBatchAddNftTypeAndRank(
-        [NR_NFT_TYPE_INDEX, NR_NFT_TYPE_INDEX],
-        [NR_NFT_RANK_TECH, NR_NFT_RANK_COM]
-      ),
-      environment,
-      ethers
-    )
     await awaitTxConfirmation(
       registryProxy.ownerBatchAddSpecialNftTypeAndRank(
         [NR_NFT_TYPE_INDEX, NR_NFT_TYPE_INDEX],
@@ -162,6 +154,14 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     )
 
     // // currently we don't use funds, only NFTs
+    // await awaitTxConfirmation(
+    //   registryProxy.ownerBatchAddNftTypeAndRank(
+    //     [NR_NFT_TYPE_INDEX, NR_NFT_TYPE_INDEX],
+    //     [NR_NFT_RANK_TECH, NR_NFT_RANK_COM]
+    //   ),
+    //   environment,
+    //   ethers
+    // )
     // try {
     //   // mint minimum stake to addresses that will stake and are binded to nodes in NR
     //   const tokenContract = await deployments.get('xHoprToken')
@@ -200,6 +200,5 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 main.dependencies = ['preDeploy', 'HoprNetworkRegistry', 'HoprBoost', 'HoprStake']
 main.tags = ['MintNetworkRegistryNfts']
-main.skip = async (env: HardhatRuntimeEnvironment) => !!env.network.tags.production
 
 export default main

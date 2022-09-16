@@ -25,7 +25,6 @@ import setupHealthcheck from './healthcheck.js'
 import { AdminServer } from './admin.js'
 import { LogStream } from './logs.js'
 import { getIdentity } from './identity.js'
-import { register as registerUnhandled, setLogger } from 'trace-unhandled'
 import { decodeMessage } from './api/utils.js'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
@@ -106,6 +105,12 @@ const argv = yargsInstance
     describe: 'Set host port to which the API server will bind. [env: HOPRD_API_PORT]',
     default: 3001
   })
+  .option('apiToken', {
+    string: true,
+    describe: 'A REST API token and admin panel password for user authentication [env: HOPRD_API_TOKEN]',
+    default: undefined,
+    conflicts: 'testNoAuthentication'
+  })
   .option('healthCheck', {
     boolean: true,
     describe: 'Run a health check end point on localhost:8080 [env: HOPRD_HEALTH_CHECK]',
@@ -125,16 +130,6 @@ const argv = yargsInstance
     string: true,
     describe: 'A password to encrypt your keys [env: HOPRD_PASSWORD]',
     default: ''
-  })
-  .option('apiToken', {
-    string: true,
-    describe: 'A REST API token and admin panel password for user authentication [env: HOPRD_API_TOKEN]',
-    default: undefined
-  })
-  .option('privateKey', {
-    string: true,
-    describe: 'A private key to be used for the node [env: HOPRD_PRIVATE_KEY]',
-    default: undefined
   })
   .option('provider', {
     string: true,
@@ -160,6 +155,12 @@ const argv = yargsInstance
     describe: "initialize a database if it doesn't already exist [env: HOPRD_INIT]",
     default: false
   })
+  .option('privateKey', {
+    hidden: true,
+    string: true,
+    describe: 'A private key to be used for the node [env: HOPRD_PRIVATE_KEY]',
+    default: undefined
+  })
   .option('allowLocalNodeConnections', {
     boolean: true,
     describe: 'Allow connections to other nodes running on localhost [env: HOPRD_ALLOW_LOCAL_NODE_CONNECTIONS]',
@@ -172,45 +173,49 @@ const argv = yargsInstance
     default: false
   })
   .option('testAnnounceLocalAddresses', {
+    hidden: true,
     boolean: true,
     describe: 'For testing local testnets. Announce local addresses [env: HOPRD_TEST_ANNOUNCE_LOCAL_ADDRESSES]',
     default: false
   })
   .option('testPreferLocalAddresses', {
+    hidden: true,
     boolean: true,
     describe: 'For testing local testnets. Prefer local peers to remote [env: HOPRD_TEST_PREFER_LOCAL_ADDRESSES]',
     default: false
   })
   .option('testUseWeakCrypto', {
+    hidden: true,
     boolean: true,
     describe: 'weaker crypto for faster node startup [env: HOPRD_TEST_USE_WEAK_CRYPTO]',
     default: false
   })
   .option('testNoAuthentication', {
+    hidden: true,
     boolean: true,
     describe: 'no remote authentication for easier testing [env: HOPRD_TEST_NO_AUTHENTICATION]',
-    default: false
+    default: undefined
   })
   .option('testNoDirectConnections', {
+    hidden: true,
     boolean: true,
     describe:
       'NAT traversal testing: prevent nodes from establishing direct TCP connections [env: HOPRD_TEST_NO_DIRECT_CONNECTIONS]',
-    default: false,
-    hidden: true
+    default: false
   })
   .option('testNoWebRTCUpgrade', {
+    hidden: true,
     boolean: true,
     describe:
       'NAT traversal testing: prevent nodes from establishing direct TCP connections [env: HOPRD_TEST_NO_WEB_RTC_UPGRADE]',
-    default: false,
-    hidden: true
+    default: false
   })
   .option('testNoUPNP', {
+    hidden: true,
     boolean: true,
     describe:
       'NAT traversal testing: disable automatic detection of external IP address using UPNP [env: HOPRD_TEST_NO_UPNP]',
-    default: false,
-    hidden: true
+    default: false
   })
   .option('heartbeatInterval', {
     number: true,
@@ -239,7 +244,8 @@ const argv = yargsInstance
     describe: 'Number of confirmations required for on-chain transactions [env: HOPRD_ON_CHAIN_CONFIRMATIONS]',
     default: CONFIRMATIONS
   })
-
+  .showHidden('show-hidden', 'show all options, including debug options')
+  .strict()
   .wrap(Math.min(120, yargsInstance.terminalWidth()))
   .parseSync()
 
@@ -290,11 +296,18 @@ function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
   return options
 }
 
-function addUnhandledPromiseRejectionHandler() {
-  registerUnhandled()
-  setLogger((msg) => {
-    console.error(msg)
-  })
+async function addUnhandledPromiseRejectionHandler() {
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(
+      `Loading extended logger that enhances debugging of unhandled promise rejections. Disabled on production environments`
+    )
+    const { register: registerUnhandled, setLogger } = await import('trace-unhandled')
+
+    registerUnhandled()
+    setLogger((msg) => {
+      console.error(msg)
+    })
+  }
 
   // See https://github.com/hoprnet/hoprnet/issues/3755
   process.on('unhandledRejection', (reason: any, _promise: Promise<any>) => {

@@ -101,8 +101,9 @@ COPY --from=build /app/hoprnet .
 # As we are on Debian, use hardlinks in node_modules to save space
 RUN yarn config set nmMode hardlinks-local
 
-# Install without devDependencies
-RUN CI=true yarn workspaces focus --production @hoprnet/hoprd
+# Install without devDependencies, and using WebRTC Release builds (`DEBUG=`)
+# see https://github.com/node-webrtc/node-webrtc/blob/685aa433623b9bf98e8c7c0124e7864e01b883e6/scripts/download-prebuilt.js#L11
+RUN DEBUG= CI=true yarn workspaces focus --production @hoprnet/hoprd
 
 # Remove yarn cache globally
 RUN yarn cache clean --all
@@ -119,6 +120,9 @@ RUN mkdir -p hoprd-db
 
 # set volume which can be mapped by users on the host system
 VOLUME ["/app/hoprd-db"]
+
+# set data directory to user-mountable directory
+ENV HOPRD_DATA=/app/hoprd-db
 
 # DISABLED temporarily until a migration path has been tested
 # finally set the non-root user so the process also run un-privilidged

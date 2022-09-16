@@ -1,6 +1,6 @@
 import { Signer, Wallet } from 'ethers'
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
-import { NetworkRegistryNftRank, NR_NFT_BOOST, NR_NFT_TYPE, NR_NFT_TYPE_INDEX } from '../utils/constants'
+import { NetworkRegistryNftRank, NR_NFT_TYPE, NR_NFT_TYPE_INDEX } from '../utils/constants'
 
 export type StakeOpts =
   | {
@@ -58,12 +58,8 @@ async function stakeXhopr(hre: HardhatRuntimeEnvironment, signer, hoprStake, amo
     process.exit(1)
   }
 
-  try {
-    await (await hoprToken.transferAndCall(hoprStake.address, amountToStake, ethers.constants.HashZero)).wait()
-    console.log(`Account ${signerAddress} staked ${amount} HOPR tokens successfully`)
-  } catch (error) {
-    console.error(`Staking HOPR tokens failed due to ${error}`)
-  }
+  await (await hoprToken.transferAndCall(hoprStake.address, amountToStake, ethers.constants.HashZero)).wait()
+  console.log(`Account ${signerAddress} staked ${amount} HOPR tokens successfully`)
 }
 
 /**
@@ -76,7 +72,7 @@ async function stakeNrNft(hre: HardhatRuntimeEnvironment, signer, hoprStake, nft
   const hoprBoost = (await ethers.getContractFactory('HoprBoost')).connect(signer).attach(nftContract.address)
   // check if the signer has staked Network_registry NFT
   const signerAddress = await signer.getAddress()
-  const hasStaked = await hoprStake.isNftTypeAndRankRedeemed2(NR_NFT_TYPE_INDEX, NR_NFT_BOOST, signerAddress)
+  const hasStaked = await hoprStake.isNftTypeAndRankRedeemed2(NR_NFT_TYPE_INDEX, nftrank, signerAddress)
   const tokenUriSuffix = NR_NFT_TYPE + '/' + nftrank
 
   if (hasStaked) {

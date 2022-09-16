@@ -8,6 +8,7 @@ import { toPaddedString } from '.'
 export type CacheFunctions = {
   getCachedAliases: () => Aliases
   updateAliasCache: (fn: (prevAliases: Aliases) => Aliases) => void
+  getSymbols: () => { native: string; hopr: string; nativeDisplay: string; hoprDisplay: string }
 }
 
 /**

@@ -17,7 +17,13 @@ const createAddressesCommand = (
   const api = sinon.fake() as unknown as API
   api.getAddresses = () => Promise.resolve(getAddressesResponse)
   const cache = {
-    getCachedAliases: () => getCachedAliasesResponse || ({} as Record<any, any>)
+    getCachedAliases: () => getCachedAliasesResponse || ({} as Record<any, any>),
+    getSymbols: () => ({
+      native: 'native',
+      hopr: 'hopr',
+      nativeDisplay: `NATIVE (native)`,
+      hoprDisplay: `HOPR (hopr)`
+    })
   }
 
   return new Addresses(api, cache as any)
@@ -38,7 +44,7 @@ describe('test Addresses command', function () {
   shouldFailExecutionOnInvalidQuery(cmdWithOkApi, 'x x x')
   shouldFailExecutionOnInvalidParam(cmdWithOkApi, '1')
   shouldFailExecutionOnApiError(cmdWithBadApi, '')
-  shouldSucceedExecution(cmdWithOkApi, ['', ['HOPR Address:']])
+  shouldSucceedExecution(cmdWithOkApi, ['', ['HOPR (hopr) Address:']])
   shouldSucceedExecution(cmdWithOkApi, ['native', ['NATIVE_ADDRESS_MOCK']])
   shouldSucceedExecution(cmdWithOkApi, ['hopr', ['HOPR_ADDRESS_MOCK']])
 })
