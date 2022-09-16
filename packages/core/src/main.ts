@@ -109,7 +109,7 @@ export async function createLibp2pInstance(
       ],
       streamMuxers: [new Mplex()],
       connectionEncryption: [new Noise()],
-      dht: new KadDHT({ protocolPrefix }),
+      dht: new KadDHT({ protocolPrefix, pingTimeout: 2000 }),
       connectionManager: {
         autoDial: true,
         // Use custom sorting to prevent from problems with libp2p
