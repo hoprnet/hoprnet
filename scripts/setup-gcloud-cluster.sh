@@ -228,7 +228,7 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
     # If the instance does not have metadata yet, we set it once
 
     # NOTE: We leave only the first public node unstaked
-    if [[ ${instance_idx} -eq 0 && "${docker_image}" != *-nat:* && "${skip_unstaked}" != "true" ]]; then
+    if [[ ${instance_idx} -eq 0 && "${instance_template_name}" != *-nat* && "${skip_unstaked}" != "true" ]]; then
       staking_addr="unstaked"
     else
       # Staking accounts are assigned round-robin
@@ -280,7 +280,7 @@ unset IFS
 
 # Finally wait for the public nodes to come up, for NAT nodes this isn't possible
 # because the P2P port is not exposed.
-if [[ "${docker_image}" != *-nat:* ]]; then
+if [[ "${instance_template_name}" != *-nat* ]]; then
   for ip in "${ip_addrs[@]}"; do
     wait_for_port "9091" "${ip}"
   done

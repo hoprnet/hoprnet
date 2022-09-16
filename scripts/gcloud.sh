@@ -174,7 +174,7 @@ gcloud_create_instance_template() {
   fi
 
   log "Metadata Fields: ${metadata_value}"
- 
+
   log "creating instance template ${name}"
   eval gcloud compute instance-templates create "${name}" \
       --machine-type=c2d-highcpu-2 \
@@ -208,10 +208,10 @@ gcloud_create_or_update_managed_instance_group() {
   log "checking for managed instance group ${name}"
   if gcloud compute instance-groups managed describe "${name}" ${gcloud_region} --quiet 2> /dev/null; then
     # get current instance template name
-    local group_instance_name="$(gcloud compute instance-groups list-instances \
-      "${name}" ${gcloud_region} --format=json | jq '.[1].instance' | tr -d '"')"
+    local first_instance_name="$(gcloud compute instance-groups list-instances \
+      "${name}" ${gcloud_region} --format=json | jq '.[0].instance' | tr -d '"')"
     local previous_template="$(gcloud compute instances describe \
-      ${group_instance_name} --format=json | \
+      ${first_instance_name} --format=json | \
       jq '.metadata.items[] | select(.key=="instance-template") | .value' | \
       tr -d '"' | awk -F'/' '{ print $5; }')"
 
