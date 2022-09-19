@@ -51,7 +51,7 @@ export default function Home() {
     const api = app.api.apiRef.current
     if (api && app.streamWS.state.status === 'CONNECTED') {
       try {
-        api
+        await api
           .getAliases()
           .then((res) => res.json())
           .then((aliases) => app.updateAliases(() => aliases))
