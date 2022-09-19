@@ -101,8 +101,7 @@ class RelayHandshake {
     try {
       this.shaker.write(Uint8Array.of(msg))
       this.shaker.rest()
-    }
-    catch (err) {
+    } catch (err) {
       log(`Error when writing to the shaker ${err}`)
     }
   }
