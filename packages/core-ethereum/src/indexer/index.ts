@@ -1012,16 +1012,20 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         setImmediate(resolve, tx)
       }
 
-      setTimeout(() => {
-        if (done) {
-          return
-        }
-        done = true
-        // remove listener but throw now error
-        this.removeListener(eventType, deferred.resolve)
-        log('listener %s on %s timed out and thus removed', eventType, tx)
-        setImmediate(reject, tx)
-      }, INDEXER_TIMEOUT, `Timeout while indexer waiting for confirming transaction ${tx}`)
+      setTimeout(
+        () => {
+          if (done) {
+            return
+          }
+          done = true
+          // remove listener but throw now error
+          this.removeListener(eventType, deferred.resolve)
+          log('listener %s on %s timed out and thus removed', eventType, tx)
+          setImmediate(reject, tx)
+        },
+        INDEXER_TIMEOUT,
+        `Timeout while indexer waiting for confirming transaction ${tx}`
+      )
 
       deferred.resolve = () => {
         if (done) {
