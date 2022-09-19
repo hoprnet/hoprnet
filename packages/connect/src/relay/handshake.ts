@@ -300,7 +300,7 @@ class RelayHandshake {
         break
       default:
         log(`Counterparty replied with ${destinationAnswer} but expected ${RelayHandshakeMessage.OK}`)
-        await this.shakerWrite(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY)
+        this.shakerWrite(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY)
 
         destinationShaker.rest()
         return
