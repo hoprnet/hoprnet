@@ -58,6 +58,7 @@ const backoffOption: Parameters<typeof retryWithBackoffThenThrow>[1] = { maxDela
 class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   public status: IndexerStatus = IndexerStatus.STOPPED
   public latestBlock: number = 0 // latest known on-chain block number
+  public startupBlock: number = 0 // blocknumber at which the indexer starts
 
   // Use FIFO + sliding window for many events
   private unconfirmedEvents: FIFO<TypedEvent<any, any>>
@@ -101,6 +102,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     ])
 
     this.latestBlock = latestOnChainBlock
+    this.startupBlock = latestOnChainBlock
 
     log('Latest saved block %d', latestSavedBlock)
     log('Latest on-chain block %d', latestOnChainBlock)
@@ -110,7 +112,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     if (fromBlock - this.maxConfirmations > 0) {
       fromBlock = fromBlock - this.maxConfirmations
     }
-    // no need to query before HoprChannels existed
+    // no need to query before HoprChannels or HoprNetworkRegistry existed
     fromBlock = Math.max(fromBlock, this.genesisBlock)
 
     log('Starting to index from block %d, sync progress 0%%', fromBlock)
@@ -508,7 +510,12 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       let res: Awaited<ReturnType<Indexer['getEvents']>>
 
       for (let i = 0; i < RETRIES; i++) {
-        res = await this.getEvents(currentBlock, currentBlock, true)
+        if (currentBlock > this.startupBlock + this.maxConfirmations) {
+          // between starting block "Latest on-chain block" and finality + 1 to prevent double processing of events in blocks ["Latest on-chain block" - maxConfirmations, "Latest on-chain block"]
+          res = await this.getEvents(currentBlock, currentBlock, true)
+        } else {
+          res = await this.getEvents(currentBlock, currentBlock, false)
+        }
 
         if (res.success) {
           this.onNewEvents(res.events)
@@ -1005,16 +1012,20 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         setImmediate(resolve, tx)
       }
 
-      setTimeout(() => {
-        if (done) {
-          return
-        }
-        done = true
-        // remove listener but throw now error
-        this.removeListener(eventType, deferred.resolve)
-        log('listener %s on %s timed out and thus removed', eventType, tx)
-        setImmediate(reject, tx)
-      }, INDEXER_TIMEOUT)
+      setTimeout(
+        () => {
+          if (done) {
+            return
+          }
+          done = true
+          // remove listener but throw now error
+          this.removeListener(eventType, deferred.resolve)
+          log('listener %s on %s timed out and thus removed', eventType, tx)
+          setImmediate(reject, tx)
+        },
+        INDEXER_TIMEOUT,
+        `Timeout while indexer waiting for confirming transaction ${tx}`
+      )
 
       deferred.resolve = () => {
         if (done) {
@@ -1022,7 +1033,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         }
         done = true
         this.removeListener(eventType, deferred.resolve)
-        log('listener %s on %s is removed', eventType, tx)
+        log('listener %s on %s is resolved and thus removed', eventType, tx)
 
         setImmediate(resolve, tx)
       }
