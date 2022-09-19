@@ -90,11 +90,20 @@ class RelayHandshake {
    * @returns
    */
   async reject(reason: RelayHandshakeMessage) {
-    this.shaker.write(Uint8Array.of(reason))
-    this.shaker.rest()
+    this.shakerWrite(reason)
     return {
       success: false,
       code: 'FAIL'
+    }
+  }
+
+  private shakerWrite(msg: any) {
+    try {
+      this.shaker.write(Uint8Array.of(msg))
+      this.shaker.rest()
+    }
+    catch (err) {
+      log(`Error when writing to the shaker ${err}`)
     }
   }
 
@@ -181,13 +190,12 @@ class RelayHandshake {
     }
 
     if (chunk == null || chunk.length == 0) {
-      this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_INVALID_PUBLIC_KEY))
-      this.shaker.rest()
       error(
         `Received empty message from peer ${chalk.yellow(
           source
         )}. Ending stream because unable to identify counterparty`
       )
+      this.shakerWrite(RelayHandshakeMessage.FAIL_INVALID_PUBLIC_KEY)
       return
     }
 
@@ -201,8 +209,7 @@ class RelayHandshake {
 
     if (destination == null) {
       error(`Cannot decode public key of destination.`)
-      this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_INVALID_PUBLIC_KEY))
-      this.shaker.rest()
+      this.shakerWrite(RelayHandshakeMessage.FAIL_INVALID_PUBLIC_KEY)
       return
     }
 
@@ -210,8 +217,7 @@ class RelayHandshake {
 
     if (source.equals(destination)) {
       error(`Peer ${source.toString()} is trying to loopback to itself. Dropping connection.`)
-      this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_LOOPBACKS_ARE_NOT_ALLOWED))
-      this.shaker.rest()
+      this.shakerWrite(RelayHandshakeMessage.FAIL_LOOPBACKS_ARE_NOT_ALLOWED)
       return
     }
 
@@ -222,8 +228,7 @@ class RelayHandshake {
       const connectionIsActive = await state.isActive(source, destination)
 
       if (connectionIsActive) {
-        this.shaker.write(Uint8Array.of(RelayHandshakeMessage.OK))
-        this.shaker.rest()
+        this.shakerWrite(RelayHandshakeMessage.OK)
 
         // Relayed connection could have been closed meanwhile
         if (state.updateExisting(source, destination, this.shaker.stream)) {
@@ -247,8 +252,7 @@ class RelayHandshake {
       error(
         `Failed to create circuit from ${source.toString()} to ${destination.toString()} because destination is not reachable`
       )
-      this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY))
-      this.shaker.rest()
+      this.shakerWrite(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY)
       return
     }
 
@@ -268,8 +272,7 @@ class RelayHandshake {
     }
 
     if (destinationChunk == null || destinationChunk.length == 0) {
-      this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY))
-      this.shaker.rest()
+      this.shakerWrite(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY)
 
       destinationShaker.rest()
       try {
@@ -298,8 +301,7 @@ class RelayHandshake {
         break
       default:
         log(`Counterparty replied with ${destinationAnswer} but expected ${RelayHandshakeMessage.OK}`)
-        this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY))
-        this.shaker.rest()
+        await this.shakerWrite(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY)
 
         destinationShaker.rest()
         return
