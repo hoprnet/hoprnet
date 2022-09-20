@@ -125,7 +125,7 @@ describe('relay connection', function () {
       assert.fail(`Stream should be closed`)
     }
 
-    assert(alice.destroyed, `Stream must be destroyed`)
+    assert(alice.state.destroyed, `Stream must be destroyed`)
 
     assert(
       alice.timeline.close != undefined && Date.now() >= alice.timeline.close,
@@ -169,7 +169,7 @@ describe('relay connection', function () {
       assert.fail(`Stream must have ended`)
     }
 
-    assert(alice.destroyed, `Stream must be destroyed`)
+    assert(alice.state.destroyed, `Stream must be destroyed`)
 
     assert(
       alice.timeline.close != undefined && Date.now() >= alice.timeline.close,
