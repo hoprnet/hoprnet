@@ -55,8 +55,7 @@ export default function Home() {
         if (aliasesResp.ok) {
           const aliases = await aliasesResp.json()
           app.updateAliases(() => aliases)
-        }
-        else {
+        } else {
           console.error(`failed to get aliases with HTTP status: ${aliasesResp.status}`)
         }
       } catch (error) {
@@ -89,8 +88,7 @@ export default function Home() {
             }[]
           } = await peersResp.json()
           setPeers(fetchedPeers.connected.map((o) => o.peerId))
-        }
-        else {
+        } else {
           console.error(`failed to get peers with HTTP status: ${peersResp.status}`)
         }
       } catch (error) {
