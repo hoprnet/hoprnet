@@ -138,11 +138,11 @@ export default function Home() {
       cmds.execute((msg: string) => addLog(createLog(msg)), input)
       setHistory((prevHistory) => {
         if (!input) return prevHistory
-        const history = prevHistory.history.slice(0)
-        history.unshift(input)
+        const newHistory = prevHistory.history.slice(0)
+        newHistory.unshift(input)
 
         return {
-          history: history.slice(0, 50),
+          history: newHistory.slice(0, 50),
           index: 0
         }
       })
