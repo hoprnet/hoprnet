@@ -32,17 +32,32 @@ export default function Home() {
     },
     updateAliasCache(fn) {
       return app.updateAliases(fn)
+    },
+    getSymbols() {
+      // TODO: fetch from API once supported
+      const native = 'xDAI'
+      const hopr = 'mHOPR'
+
+      return {
+        native,
+        hopr,
+        nativeDisplay: `NATIVE (${native})`,
+        hoprDisplay: `HOPR (${hopr})`
+      }
     }
   })
 
   const updateAliases = async () => {
     const api = app.api.apiRef.current
-    if (api && app.status === 'CONNECTED') {
+    if (api && app.streamWS.state.status === 'CONNECTED') {
       try {
-        api
-          .getAliases()
-          .then((res) => res.json())
-          .then((aliases) => app.updateAliases(() => aliases))
+        const aliasesResp = await api.getAliases()
+        if (aliasesResp.ok) {
+          const aliases = await aliasesResp.json()
+          app.updateAliases(() => aliases)
+        } else {
+          console.error(`failed to get aliases with HTTP status: ${aliasesResp.status}`)
+        }
       } catch (error) {
         console.error(error)
       }
@@ -55,7 +70,7 @@ export default function Home() {
 
     const interval = setInterval(updateAliases, 5e3)
     return () => clearInterval(interval)
-  }, [app.api.apiRef.current, app.status])
+  }, [app.api.apiRef.current, app.streamWS.state.status === 'CONNECTED'])
 
   // toggles connected panel
   const [showConnectedPanel, setShowConnectedPanel] = useState(false)
@@ -65,13 +80,17 @@ export default function Home() {
     const updatePeers = async () => {
       try {
         const api = app.api.apiRef.current
-        const peers: {
-          connected: {
-            peerId: string
-          }[]
-        } = await api.getPeers().then((res) => res.json())
-
-        setPeers(peers.connected.map((o) => o.peerId))
+        const peersResp = await api.getPeers()
+        if (peersResp.ok) {
+          const fetchedPeers: {
+            connected: {
+              peerId: string
+            }[]
+          } = await peersResp.json()
+          setPeers(fetchedPeers.connected.map((o) => o.peerId))
+        } else {
+          console.error(`failed to get peers with HTTP status: ${peersResp.status}`)
+        }
       } catch (error) {
         console.error(error)
       }
@@ -117,11 +136,11 @@ export default function Home() {
       cmds.execute((msg: string) => addLog(createLog(msg)), input)
       setHistory((prevHistory) => {
         if (!input) return prevHistory
-        const history = prevHistory.history.slice(0)
-        history.unshift(input)
+        const newHistory = prevHistory.history.slice(0)
+        newHistory.unshift(input)
 
         return {
-          history: history.slice(0, 50),
+          history: newHistory.slice(0, 50),
           index: 0
         }
       })
@@ -146,9 +165,9 @@ export default function Home() {
     } else if (event.key === 'ArrowUp') {
       if (history.index < history.history.length) {
         const newIndex = ++history.index
-        const input = history.history[history.index - 1]
+        const newInput = history.history[history.index - 1]
 
-        setInput(input)
+        setInput(newInput)
         setHistory((prevHistory) => {
           return {
             ...prevHistory,
@@ -173,7 +192,7 @@ export default function Home() {
         </span>
       </h1>
 
-      <Logs messages={logs} isConnected={app.status === 'CONNECTED'} />
+      <Logs messages={logs} isConnected={app.streamWS.state.status === 'CONNECTED'} />
 
       <div className="send">
         <input

@@ -25,7 +25,6 @@ import setupHealthcheck from './healthcheck.js'
 import { AdminServer } from './admin.js'
 import { LogStream } from './logs.js'
 import { getIdentity } from './identity.js'
-import { register as registerUnhandled, setLogger } from 'trace-unhandled'
 import { decodeMessage } from './api/utils.js'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
@@ -297,11 +296,18 @@ function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
   return options
 }
 
-function addUnhandledPromiseRejectionHandler() {
-  registerUnhandled()
-  setLogger((msg) => {
-    console.error(msg)
-  })
+async function addUnhandledPromiseRejectionHandler() {
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(
+      `Loading extended logger that enhances debugging of unhandled promise rejections. Disabled on production environments`
+    )
+    const { register: registerUnhandled, setLogger } = await import('trace-unhandled')
+
+    registerUnhandled()
+    setLogger((msg) => {
+      console.error(msg)
+    })
+  }
 
   // See https://github.com/hoprnet/hoprnet/issues/3755
   process.on('unhandledRejection', (reason: any, _promise: Promise<any>) => {

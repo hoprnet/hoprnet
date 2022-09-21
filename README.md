@@ -226,8 +226,7 @@ hoprd
 
 ## Testnet accessibility
 
-Currently, to be able to participate in a public testnet or public staging environment running in Google Cloud (e.g. `master-goerli`), you need to satisfy certain criteria to be eligible to join.
-See [Network Registry](NETWORK_REGISTRY.md) for details.
+Currently, to be able to participate in a public testnet or public staging environment, you need to satisfy certain criteria to be eligible to join. See [Network Registry](NETWORK_REGISTRY.md) for details.
 
 These criteria however, are not required when you develop using your local nodes or a locally running cluster (see [Develop section below](#develop)).
 

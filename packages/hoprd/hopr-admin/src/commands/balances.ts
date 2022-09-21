@@ -41,11 +41,12 @@ export default class Balances extends Command {
       )
     }
 
+    const symbols = this.cache.getSymbols()
     const balances = await response.json()
 
-    const hoprPrefix = 'HOPR Balance:'
+    const hoprPrefix = `${symbols.hoprDisplay} Balance:`
     const hoprBalance = ethersUtils.formatEther(balances.hopr)
-    const nativePrefix = 'Native Balance:'
+    const nativePrefix = `${symbols.nativeDisplay} Balance:`
     const nativeBalance = ethersUtils.formatEther(balances.native)
 
     if (use === 'onlyOne') {
