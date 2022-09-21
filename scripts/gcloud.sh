@@ -133,12 +133,6 @@ gcloud_create_instance_template() {
   log "checking for instance template ${name}"
   if gcloud compute instance-templates describe "${name}" --quiet 2> /dev/null; then
     log "instance template ${name} already present"
-    # instance_group_name=$(gcloud compute instance-groups managed list --format="json(name)" \
-    # --filter="instanceTemplate ~ '.*${name}$'" | jq -r ' .[].name ')
-    # if [ "$instance_group_name" != "" ]; then     
-    #   gcloud_delete_managed_instance_group "${instance_group_name}"
-    # fi
-    # gcloud_delete_instance_template "${name}"
     return 0
   fi
 
@@ -361,6 +355,8 @@ gcloud_reserve_static_ip_address() {
   fi
 }
 
+# $1=instance name
+# $2=command to execute
 gcloud_execute_command_instance() {
   local name="${1}"
   command="${2}"
