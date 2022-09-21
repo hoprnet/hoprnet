@@ -158,7 +158,8 @@ else
   )
 fi
 
-declare network_id=$(get_network "${environment}")
+declare network_id
+network_id="$(get_network "${environment}")"
 
 # Deployer CI wallet should ideally be "eligible". To be eligible:
 # 1. The wallet should have obtained a "Network_registry" NFT of `developer` rank (wallet should already have this)
