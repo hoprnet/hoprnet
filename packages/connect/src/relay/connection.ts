@@ -120,11 +120,9 @@ type SourceEvent = CloseEvent | SourceSwitchEvent | PayloadEvent
 
 const RELAYED_CONNECTION_RESTART = 'restart'
 
-// Extract function type but ignore type of `this`
-// Used as type for bounded functions
-type FunctionType<K extends keyof T, T> = T[K] extends (...args: any[]) => any
-  ? (...args: Parameters<T[K]>) => ReturnType<T[K]>
-  : never
+// Extracts function type but ignores type of `this`
+// Used as type for context-bounded functions
+type FunctionType<K extends keyof T, T> = T[K] extends (...args: infer P) => infer R ? (...args: P) => R : never
 
 /**
  * Encapsulates the client-side stream state management of a relayed connection
@@ -186,7 +184,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   public _setClosed: FunctionType<'setClosed', RelayConnection>
   public _switch: FunctionType<'switch', RelayConnection>
   public _attachWebRTCListeners: FunctionType<'attachWebRTCListeners', RelayConnection>
-  public _upgradeInbound: WebRTCUpgrader['upgradeInbound']
+  public _upgradeInbound: WebRTCUpgrader['upgradeInbound'] | undefined
   public _emitRestart: () => void
 
   public readonly remoteAddr: MultiaddrConnection['remoteAddr']
@@ -252,17 +250,18 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     })
 
     this._attachWebRTCListeners = this.attachWebRTCListeners.bind({
-      queueStatusMessage: this._queueStatusMessage,
+      _queueStatusMessage: this._queueStatusMessage,
       state: this.state
     })
 
-    this._upgradeInbound = this.connectComponents
-      .getWebRTCUpgrader()
-      .upgradeInbound.bind(this.connectComponents.getWebRTCUpgrader())
-
     this._switch = this.switch.bind(this)
+
     // For testing fallback relayed connection, disable WebRTC upgrade attempts
     if (!this.testingOptions.__noWebRTCUpgrade) {
+      this._upgradeInbound = this.connectComponents
+        .getWebRTCUpgrader()
+        .upgradeInbound.bind(this.connectComponents.getWebRTCUpgrader())
+
       switch (direction) {
         case 'inbound':
           Object.assign(this.state, {
@@ -432,7 +431,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       } catch (err) {
         this.logging.error(`Error while destroying WebRTC instance`, err)
       }
-      this.state.channel = this._upgradeInbound()
+      this.state.channel = this._upgradeInbound?.()
     }
 
     this.state._migrationDone = defer<void>()
@@ -619,7 +618,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
         | 'queueStatusMessage'
         | 'unqueueStatusMessage'
         | 'setClosed'
-        | 'attachWebRTCListeners'
+        | '_attachWebRTCListeners'
         | 'testingOptions'
         | '_onReconnect'
         | '_switch'
@@ -639,7 +638,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
       if (!this.testingOptions.__noWebRTCUpgrade) {
         // We're now ready to fetch WebRTC signalling messages
-        this.attachWebRTCListeners(drainIteration)
+        this._attachWebRTCListeners(drainIteration)
       }
 
       let leave = false
@@ -831,7 +830,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
         queueStatusMessage: this._queueStatusMessage,
         unqueueStatusMessage: this._unqueueStatusMessage,
         setClosed: this._setClosed,
-        attachWebRTCListeners: this._attachWebRTCListeners,
+        _attachWebRTCListeners: this._attachWebRTCListeners,
         _switch: this._switch,
         _onReconnect: this._onReconnect,
         testingOptions: this.testingOptions,
@@ -853,16 +852,16 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
    * and removes it once there is a reconnect
    * @param drainIteration index of current iteration
    */
-  public attachWebRTCListeners(this: Pick<RelayConnection, 'state' | 'queueStatusMessage'>, drainIteration: number) {
+  public attachWebRTCListeners(this: Pick<RelayConnection, 'state' | '_queueStatusMessage'>, drainIteration: number) {
     let currentChannel: SimplePeer.Instance
-    function onSignal(this: Pick<RelayConnection, 'state' | 'queueStatusMessage'>, data: Object) {
+    function onSignal(this: Pick<RelayConnection, 'state' | '_queueStatusMessage'>, data: Object) {
       if (this.state._iteration != drainIteration) {
         currentChannel.removeListener('signal', onSignal)
 
         return
       }
 
-      this.queueStatusMessage(
+      this._queueStatusMessage(
         Uint8Array.from([RelayPrefix.WEBRTC_SIGNALLING, ...new TextEncoder().encode(JSON.stringify(data))])
       )
     }
@@ -871,7 +870,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     currentChannel = (this.state.channel as SimplePeer.Instance).on(
       'signal',
       onSignal.bind({
-        queueStatusMessage: this.queueStatusMessage,
+        _queueStatusMessage: this._queueStatusMessage,
         state: this.state
       })
     )

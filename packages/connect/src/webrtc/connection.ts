@@ -407,7 +407,7 @@ class WebRTCConnection implements MultiaddrConnection {
                 }
 
                 if (toYield != undefined) {
-                  //this.log(`sinking ${toYield.length} bytes into relayed connection`)
+                  // this.log(`sinking ${toYield.length} bytes into relayed connection`)
                   yield toYield
                 }
               }
@@ -474,11 +474,11 @@ class WebRTCConnection implements MultiaddrConnection {
                     break
                   }
 
-                  /*this.log(
-                    `sinking ${received.value.slice().length} bytes into webrtc[${
-                      (this.relayConn.getWebRTCInstance() as any)._id
-                    }]`
-                  )*/
+                  // this.log(
+                  //   `sinking ${received.value.slice().length} bytes into webrtc[${
+                  //     (this.relayConn.state.channel as any)._id
+                  //   }]`
+                  // )
 
                   // WebRTC tends to send multiple messages in one chunk, so add a
                   // length prefix to split messages when receiving them
@@ -525,7 +525,7 @@ class WebRTCConnection implements MultiaddrConnection {
           migrated = true
           break
         case MigrationStatus.NOT_DONE:
-          this.log(`getting ${payload.length} bytes from relayed connection`)
+          // this.log(`getting ${payload.length} bytes from relayed connection`)
           yield payload
           break
         default:
@@ -577,7 +577,7 @@ class WebRTCConnection implements MultiaddrConnection {
               break
             }
 
-            this.log(`Getting NOT_DONE from WebRTC - ${msg.length} bytes`)
+            // this.log(`Getting NOT_DONE from WebRTC - ${msg.length} bytes`)
             yield payload
           }
 
