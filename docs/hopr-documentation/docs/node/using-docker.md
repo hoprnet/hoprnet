@@ -81,7 +81,7 @@ This ensures the node cannot be accessed by a malicious user residing in the sam
 docker run --pull always -ti -v $HOME/.hoprd-db:/app/DB -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:paleochora --admin --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --init --API --apiHost "0.0.0.0" --apiPort 3001 --identity /app/DB/.hopr-id-paleochora --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --adminPort 3000 --host "0.0.0.0:9091"
 ```
 
-(**4**) Paste the new adjusted command, and hit enter.
+(**4**) Paste the new adjusted command into your terminal, and hit enter.
 
 (**5**) Wait until the node is installed. This can take up to 10 minutes.
 

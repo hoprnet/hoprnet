@@ -25,6 +25,6 @@ After you have installed the HOPR package, you can find the HOPR client in `my D
 
 ![MyDapps](/img/node/avado-2.png)
 
-If the HOPR client asks you to enter a **security token**, paste the following into the command line: `!5qxc9Lp1BE7IFQ-nrtttU` and hit enter.
+Your **security token** is set to `!5qxc9Lp1BE7IFQ-nrtttU`, you may need this for the [tutorial.](using-hopr-admin) 
 
 The installation process is now complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).  
