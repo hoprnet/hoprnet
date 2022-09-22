@@ -17,7 +17,7 @@ Make sure you have installed a `hoprd` node either through Docker or with a hard
 Please be aware that it can take 10 minutes for your `hoprd` node to boot up.
 :::
 
-**Network Registry:** If you have registered your node on the network registry, you will have been airdropped mHOPR/xDAI along with your NFT. In **step three** of Admin UI & Funding below, make sure to use the mHOPR and xDAI provided instead of purchasing wxHOPR. 
+**Network Registry:** If you have registered your node on the network registry, you will have been airdropped mHOPR/xDAI along with your NFT. In **step three** of Admin UI & Funding below, make sure to use the mHOPR and xDAI provided instead of purchasing wxHOPR.
 
 ## Admin UI & Funding
 
@@ -78,9 +78,9 @@ Mentioned HOPR and ETH addresses are **examples**. Make sure you replace them wi
 
 Now that you have started your node, what exactly is your node and what are its features? There is a lot that goes into making the HOPR node function but let's start with the following properties:
 
-* Identity file
-* ETH address & Peer ID
-* Balance
+- Identity file
+- ETH address & Peer ID
+- Balance
 
 ### Identity file
 
@@ -152,7 +152,7 @@ balance
 Expected output:
 
 ```
-HOPR Balance:     0.12 
+HOPR Balance:     0.12
 Native Balance:   0.9915287
 ```
 
@@ -359,7 +359,7 @@ open Betty 0.2
 The general format is:
 
 ```
-open [HOPR address] [amount] 
+open [HOPR address] [amount]
 ```
 
 Expected output:
@@ -585,8 +585,8 @@ Although you spend HOPR tokens to relay data, you are actually paid in tickets. 
 
 But with the added benefit of:
 
-* massively reduced on-chain transactions (letting you keep more of the payment)
-* And a decoupling of interactions on the HOPR network from on-chain data (increasing privacy)
+- massively reduced on-chain transactions (letting you keep more of the payment)
+- And a decoupling of interactions on the HOPR network from on-chain data (increasing privacy)
 
 ### Checking your tickets
 

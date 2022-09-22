@@ -2,6 +2,7 @@
 id: using-docker
 title: Using Docker
 ---
+
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
@@ -13,9 +14,9 @@ You can use Docker to install a `hoprd` node on your device quickly without worr
 
 To use Docker, you will need a device that supports hardware-level virtualisation: VT-x for Intel-based PCs and AMD-V for AMD processors. Most Mac and Linux machines support it out of the box, so just ensure your device meets the following minimum requirements to run `hoprd`:
 
-* Dual Core CPU ~ 2 GHz
-* 4 GB RAM
-* at least 3 GB Disk Space
+- Dual Core CPU ~ 2 GHz
+- 4 GB RAM
+- at least 3 GB Disk Space
 
 At least 8 GB RAM and 10 GB Disk Space is ideal but not required.
 
@@ -97,10 +98,10 @@ Otherwise, the installation process is complete! You can proceed to our [hopr-ad
 
 ## Default ports
 
-* 3000 on TCP : Admin UI port (speaks HTTP protocol)
-* 3001 on TCP: REST API port (speaks HTTP)
-* 8080 on TCP: Healthcheck service - is used to see that the node is up & running (speaks HTTP)
-* 9091 on TCP: main P2P port used for HOPR protocol
-* 9091 on UDP: used for STUN requests by other non-public nodes reaching out to you to see what their IP address is
+- 3000 on TCP : Admin UI port (speaks HTTP protocol)
+- 3001 on TCP: REST API port (speaks HTTP)
+- 8080 on TCP: Healthcheck service - is used to see that the node is up & running (speaks HTTP)
+- 9091 on TCP: main P2P port used for HOPR protocol
+- 9091 on UDP: used for STUN requests by other non-public nodes reaching out to you to see what their IP address is
 
 In general, you will only want to change these port numbers if you intend to run multiple nodes simultaneously. Otherwise, use the Docker command with the default mapping.

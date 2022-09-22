@@ -2,6 +2,7 @@
 id: start-here
 title: Start here
 ---
+
 # Start here
 
 :::caution Warning
@@ -22,9 +23,9 @@ If you are using the Monte Rosa environment, you will not be able to interact wi
 
 The minimum requirements for running `hoprd` on your device:
 
-* Dual Core CPU ~ 2 GHz
-* 4 GB RAM
-* at least 3 GB Disk Space
+- Dual Core CPU ~ 2 GHz
+- 4 GB RAM
+- at least 3 GB Disk Space
 
 Although it is recommended that you have at least 8 GB of RAM and 10 GB of disk space.
 
@@ -38,7 +39,7 @@ ssh -L 3000:127.0.0.1:3000 <root or username>@<Your_server_ip>
 
 `<root or username>` - replace with your server username.
 
-`<Your_server_ip>` - replace with your server IP address. 
+`<Your_server_ip>` - replace with your server IP address.
 
 Example: `ssh -L 3000:127.0.0.1:3000 root@192.168.0.1`
 
@@ -60,7 +61,7 @@ An [AVADO](https://ava.do/) plug-n-play device, just set it up and install the H
 
 **[Dappnode](using-dappnode)**
 
-A [Dappnode](https://dappnode.io/) plug-n-play device, another quick set-up and installation. 
+A [Dappnode](https://dappnode.io/) plug-n-play device, another quick set-up and installation.
 
 **[Docker](using-docker)**
 

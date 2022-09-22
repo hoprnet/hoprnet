@@ -13,6 +13,6 @@ This overview is also expandable; clicking on the individual fields will give yo
 
 ![cockpit overview](./images-dApps/cockpit-overvview-playgrouund.png)
 
-Here you can view detailed information about the tickets your node has collected, its open payment channels,  messages, balance and general info.
+Here you can view detailed information about the tickets your node has collected, its open payment channels, messages, balance and general info.
 
 ![cockpit overview](./images-dApps/cockpit-details.png)

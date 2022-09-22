@@ -95,6 +95,7 @@ Output:
 HOPR Balance:    3.0
 Native Balance:  0.009595814498026512
 ```
+
 :::info
 
 The HOPR client is running by default on xDAI, so balance will show the xDAI balance as well as the wxHOPR/mHOPR balance.
@@ -139,7 +140,7 @@ This command will let you close an open channel.
 close [HOPR address]
 ```
 
-**HOPR address** - the address of the node you have an open channel with. 
+**HOPR address** - the address of the node you have an open channel with.
 
 Example use:
 
@@ -151,7 +152,7 @@ Output:
 
 ```
 Closing channel to "uLoho"..
- 
+
 Initiated channel closure, the channel must remain open for at least 1 minutes. Please send the close command again once the cool-off has passed. Receipt: "0xb85d2d668316e6d62e960e48d95cc1c9e27dad89f009be9ae8b045500590fc9a".
 
 Closed channel to uLoho
@@ -400,7 +401,7 @@ Sign your personal non-custodial wallet address to receive rewards in NFT's. Thi
 sign [address]
 ```
 
-**address** - Your personal ETH wallet address. 
+**address** - Your personal ETH wallet address.
 
 ## tickets
 

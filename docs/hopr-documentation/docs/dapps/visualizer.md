@@ -2,6 +2,7 @@
 id: visualizer
 title: Visualizer
 ---
+
 Visualizer draws a graphical representation of the HOPR network showing all the nodes and connections between them.
 
 **Disclaimer: **The data in this app is from a previous internal testnet (Paleochera) and does not represent the Playground state.

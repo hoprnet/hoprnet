@@ -2,6 +2,7 @@
 id: network-registry-tutorial
 title: Network Registry
 ---
+
 ## What is the Network Registry?
 
 The Network Registry is a list of nodes allowed to interact with others on the network. This is a utility used by HOPR to scale and test the network at a controlled pace.
@@ -52,9 +53,9 @@ If you are chosen to join the registry, you will be sent a network registry NFT 
 
 To continue, you first need to have installed a HOPR node. You can use one of the following three methods to do so:
 
-* [Using Docker](./using-docker.md)
-* [Using Avado](./using-avado.md)
-* [Using Dappnode](./using-dappnode.md)
+- [Using Docker](./using-docker.md)
+- [Using Avado](./using-avado.md)
+- [Using Dappnode](./using-dappnode.md)
 
 If you do not have an Avado or Dappnode, use Docker to install the node on your device.
 
@@ -67,7 +68,6 @@ You should be greeted with a screen similar to the one below, if your screen is 
 (**1**) Clicking on the gear icon. This will open a pop-up similar to the one below.
 
 ![NR gear](./images/NR-admin-gear.png)
-
 
 (**2**) From here, make sure you have the correct information. By default, `API endpoint` should be set to `http://localhost:3001`, but you may need to replace `localhost`with your server IP address if you used a VPS and change the port if you adjusted the mapping on installation.
 
@@ -107,9 +107,9 @@ If you have connected a wallet which has staked an NFT and entered a valid peerI
 
 If it fails, make sure you:
 
-* Have entered the correct peerID
-* Have staked your NFT
-* Are connected to this contract using the same wallet you staked your NFT with
+- Have entered the correct peerID
+- Have staked your NFT
+- Are connected to this contract using the same wallet you staked your NFT with
 
 If all of the above is true and the transaction still fails, message us on [telegram](https://t.me/hoprnet), and a member of our team will assist you.
 
