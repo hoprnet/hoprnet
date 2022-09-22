@@ -2,35 +2,30 @@ import { type Log, createLog } from '.'
 
 /**
  * Legacy event reader from stream socket.
- * Read incoming stream event and convert it to client logs.
+ * Read incoming stream event and convert it to a client log.
+ * @param event Event coming from '/api/v2/node/stream/websocket'
+ * @returns log readable by hopr-admin
  */
-export const readStreamEvent = (event: any): Log[] => {
+export const readStreamEvent = (event: MessageEvent<any>): Log | undefined => {
   if (event.data === undefined) {
-    return []
+    return undefined
   }
 
-  const logs: Log[] = []
-
   try {
-    const msg: {
+    const data: {
       type: string
-      content: string
-      timestamp: string
+      msg: string
+      ts: string
     } = JSON.parse(event.data)
 
-    switch (msg.type) {
-      case 'log':
-        logs.push(createLog(msg.content, +new Date(msg.timestamp)))
-        break
-      case 'fatal-error':
-        logs.push(createLog(msg.content, +new Date(msg.timestamp)))
-        break
-      case 'auth-failed':
-        logs.push(createLog(msg.content, +new Date(msg.timestamp)))
-        break
-    }
+    // we ignore plain messages, instead print HOPRd logs
+    if (data.type === 'message') return undefined
+    // we ignore connected type, which is simply a line of all connected peers
+    if (data.type === 'connected') return undefined
+    // we are only interested in messages which have a message
+    if (!data.msg) return undefined
 
-    return logs
+    return createLog(data.msg, +new Date(data.ts))
   } catch (error) {
     console.log('error reading stream log', error)
   }

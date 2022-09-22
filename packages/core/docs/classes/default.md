@@ -56,6 +56,7 @@
 - [getConnectedPeers](default.md#getconnectedpeers)
 - [getConnectionInfo](default.md#getconnectioninfo)
 - [getConnectivityHealth](default.md#getconnectivityhealth)
+- [getEntryNodes](default.md#getentrynodes)
 - [getEthereumAddress](default.md#getethereumaddress)
 - [getId](default.md#getid)
 - [getIntermediateNodes](default.md#getintermediatenodes)
@@ -97,6 +98,7 @@
 - [stop](default.md#stop)
 - [subscribeOnConnector](default.md#subscribeonconnector)
 - [tickChannelStrategy](default.md#tickchannelstrategy)
+- [validateIntermediatePath](default.md#validateintermediatepath)
 - [waitForFunds](default.md#waitforfunds)
 - [waitForRunning](default.md#waitforrunning)
 - [withdraw](default.md#withdraw)
@@ -135,7 +137,7 @@ EventEmitter.constructor
 
 #### Defined in
 
-[packages/core/src/index.ts:179](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L179)
+[packages/core/src/index.ts:181](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L181)
 
 ___
 
@@ -145,7 +147,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:173](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L173)
+[packages/core/src/index.ts:175](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L175)
 
 ___
 
@@ -155,7 +157,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:172](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L172)
+[packages/core/src/index.ts:174](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L174)
 
 ___
 
@@ -165,7 +167,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:181](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L181)
+[packages/core/src/index.ts:183](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L183)
 
 ___
 
@@ -175,7 +177,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:177](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L177)
+[packages/core/src/index.ts:179](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L179)
 
 ___
 
@@ -185,7 +187,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:174](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L174)
+[packages/core/src/index.ts:176](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L176)
 
 ___
 
@@ -195,7 +197,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:171](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L171)
+[packages/core/src/index.ts:173](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L173)
 
 ___
 
@@ -205,7 +207,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:176](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L176)
+[packages/core/src/index.ts:178](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L178)
 
 ___
 
@@ -215,7 +217,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:167](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L167)
+[packages/core/src/index.ts:169](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L169)
 
 ___
 
@@ -237,7 +239,7 @@ It should not assume any other components are running when it is called.
 
 #### Defined in
 
-[packages/core/src/index.ts:175](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L175)
+[packages/core/src/index.ts:177](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L177)
 
 ___
 
@@ -255,7 +257,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:169](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L169)
+[packages/core/src/index.ts:171](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L171)
 
 ___
 
@@ -265,7 +267,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:170](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L170)
+[packages/core/src/index.ts:172](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L172)
 
 ___
 
@@ -733,6 +735,16 @@ Recalculates and retrieves the current connectivity health indicator.
 
 ___
 
+### getEntryNodes
+
+▸ **getEntryNodes**(): `Promise`<{ `id`: `PeerId` ; `multiaddrs`: `Multiaddr`[]  }[]\>
+
+#### Returns
+
+`Promise`<{ `id`: `PeerId` ; `multiaddrs`: `Multiaddr`[]  }[]\>
+
+___
+
 ### getEthereumAddress
 
 ▸ **getEthereumAddress**(): `Address`
@@ -1173,7 +1185,7 @@ Open a payment channel
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `counterparty` | `PeerId` | the counter party's peerId |
+| `counterparty` | `PeerId` | the counterparty's peerId |
 | `amountToFund` | `BN` | the amount to fund in HOPR(wei) |
 
 #### Returns
@@ -1479,7 +1491,7 @@ ___
 
 ### sendMessage
 
-▸ **sendMessage**(`msg`, `destination`, `intermediatePath?`): `Promise`<`void`\>
+▸ **sendMessage**(`msg`, `destination`, `intermediatePath?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -1491,7 +1503,7 @@ ___
 
 #### Returns
 
-`Promise`<`void`\>
+`Promise`<`string`\>
 
 ___
 
@@ -1652,6 +1664,26 @@ ___
 ### tickChannelStrategy
 
 ▸ `Private` **tickChannelStrategy**(): `Promise`<`void`\>
+
+#### Returns
+
+`Promise`<`void`\>
+
+___
+
+### validateIntermediatePath
+
+▸ `Private` **validateIntermediatePath**(`intermediatePath`): `Promise`<`void`\>
+
+Validates the manual intermediate path by checking if it does not contain
+channels that are not opened.
+Throws an error if some channel is not opened.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `intermediatePath` | `PublicKey`[] |
 
 #### Returns
 

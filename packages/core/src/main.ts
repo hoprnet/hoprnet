@@ -19,6 +19,7 @@ import Hopr, { type HoprOptions } from './index.js'
 import { getAddrs } from './identity.js'
 import type AccessControl from './network/access-control.js'
 import { createLibp2pMock } from './libp2p.mock.js'
+import { NetworkPeersOrigin } from './network/network-peers.js'
 
 const log = debug(`hopr-core:create-hopr`)
 
@@ -37,7 +38,8 @@ export async function createLibp2pInstance(
   options: HoprOptions,
   initialNodes: { id: PeerId; multiaddrs: Multiaddr[] }[],
   publicNodes: PublicNodesEmitter,
-  reviewConnection: AccessControl['reviewConnection']
+  reviewConnection: AccessControl['reviewConnection'],
+  isAllowedToAccessNetwork: Hopr['isAllowedAccessToNetwork']
 ): Promise<Libp2p> {
   let libp2p: Libp2p
   if (options.testing?.useMockedLibp2p) {
@@ -85,7 +87,8 @@ export async function createLibp2pInstance(
             allowLocalConnections: options.allowLocalConnections,
             allowPrivateConnections: options.allowPrivateConnections,
             // Amount of nodes for which we are willing to act as a relay
-            maxRelayedConnections: 50_000
+            maxRelayedConnections: 50_000,
+            isAllowedToAccessNetwork
           },
           testing: {
             // Treat local and private addresses as public addresses
@@ -122,10 +125,10 @@ export async function createLibp2pInstance(
       },
       connectionGater: {
         denyDialPeer: async (peer: PeerId) => {
-          return !(await reviewConnection(peer, 'libp2p peer connect'))
+          return !(await reviewConnection(peer, NetworkPeersOrigin.OUTGOING_CONNECTION))
         },
         denyInboundEncryptedConnection: async (peer: PeerId) => {
-          return !(await reviewConnection(peer, 'libp2p peer connect'))
+          return !(await reviewConnection(peer, NetworkPeersOrigin.INCOMING_CONNECTION))
         }
       },
       relay: {
@@ -136,10 +139,17 @@ export async function createLibp2pInstance(
         // Conflicts with HoprConnect's own mechanism
         enabled: false
       },
+      metrics: {
+        // Not needed right now
+        enabled: false
+      },
       ping: {
         protocolPrefix
       },
       fetch: {
+        protocolPrefix
+      },
+      push: {
         protocolPrefix
       },
       identify: {
@@ -169,6 +179,12 @@ export async function createHoprNode(
   try {
     const dbPath = path.join(options.dataPath, 'db')
     await db.init(options.createDbIfNotExist, dbPath, options.forceCreateDB, options.environment.id)
+
+    // Dump entire database to a file if given by the env variable
+    const dump_file = process.env.DB_DUMP ?? ''
+    if (dump_file.length > 0) {
+      db.dumpDatabase(dump_file)
+    }
   } catch (err: unknown) {
     log(`failed init db:`, err)
     throw err

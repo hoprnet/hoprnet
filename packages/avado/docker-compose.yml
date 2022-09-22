@@ -1,8 +1,14 @@
+# NOTE: This cannot be built as is, it must be built using scripts/build_avado.sh
+# %AVADO_VERSION%, %TOKEN%, %ENV_ID% and %PROVIDER_URL% will be replaced with actual values
+# when built using the above script.
 version: '3.4'
 services:
   hopr.avado.dnp.dappnode.eth:
-    build: ./build
-    image: 'hopr.avado.dnp.dappnode.eth:0.100.0'
+    image: 'hopr.avado.dnp.dappnode.eth:%AVADO_VERSION%'
+    build:
+      context: ./build
+      args:
+        UPSTREAM_VERSION: '%AVADO_VERSION%'
     network_mode: host
     # Lines between *_JSON_EXPORT are intentionally also a valid JSON
     # DO NOT REMOVE
@@ -12,7 +18,7 @@ services:
     'environment':
       [
         'DEBUG=hopr*',
-        'HOPRD_ENVIRONMENT=master-goerli',
+        'HOPRD_ENVIRONMENT=%ENV_ID%',
         'HOPRD_HOST=0.0.0.0:9091',
         'HOPRD_ANNOUNCE=false',
         'HOPRD_ADMIN=true',
@@ -25,12 +31,12 @@ services:
         'HOPRD_HEALTH_CHECK_HOST=0.0.0.0',
         'HOPRD_HEALTH_CHECK_PORT=8080',
         'HOPRD_PASSWORD=open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0',
-        'HOPRD_API_TOKEN=!5qxc9Lp1BE7IFQ-nrtttU',
+        'HOPRD_API_TOKEN=%TOKEN%',
         'HOPRD_IDENTITY=/app/hoprd-db/.hopr-identity',
-        'HOPRD_DATA=/app/hoprd-db/data-master-goerli',
+        'HOPRD_DATA=/app/hoprd-db/data-%ENV_ID%',
         'HOPRD_INIT=true',
         'HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS=false',
-        'HOPRD_PROVIDER=https://provider-proxy.hoprnet.workers.dev/eth_goerli'
+        'HOPRD_PROVIDER=%PROVIDER_URL%'
       ]
     'ports': ['3000:3000/tcp', '3001:3001/tcp', '8080:8080/tcp', '9091:9091/tcp', '9091:9091/udp']
     'restart': 'always'

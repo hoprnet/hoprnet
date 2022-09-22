@@ -17,7 +17,6 @@
 - [\_wrappedEmits](HoprStake2.md#_wrappedemits)
 - [address](HoprStake2.md#address)
 - [callStatic](HoprStake2.md#callstatic)
-- [contractName](HoprStake2.md#contractname)
 - [deployTransaction](HoprStake2.md#deploytransaction)
 - [estimateGas](HoprStake2.md#estimategas)
 - [filters](HoprStake2.md#filters)
@@ -92,7 +91,7 @@ BaseContract.\_deployedPromise
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:98
+node_modules/@ethersproject/contracts/lib/index.d.ts:100
 
 ___
 
@@ -110,7 +109,7 @@ BaseContract.\_runningEvents
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:99
+node_modules/@ethersproject/contracts/lib/index.d.ts:101
 
 ___
 
@@ -128,7 +127,7 @@ BaseContract.\_wrappedEmits
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:102
+node_modules/@ethersproject/contracts/lib/index.d.ts:104
 
 ___
 
@@ -142,7 +141,7 @@ BaseContract.address
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:77
+node_modules/@ethersproject/contracts/lib/index.d.ts:79
 
 ___
 
@@ -194,17 +193,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:693
-
-___
-
-### contractName
-
-• **contractName**: ``"HoprStake2"``
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:352
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:759
 
 ___
 
@@ -218,7 +207,7 @@ BaseContract.deployTransaction
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:97
+node_modules/@ethersproject/contracts/lib/index.d.ts:99
 
 ___
 
@@ -270,7 +259,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:903
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:969
 
 ___
 
@@ -303,7 +292,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:840
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:906
 
 ___
 
@@ -355,7 +344,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:378
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:444
 
 ___
 
@@ -369,7 +358,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:357
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:423
 
 ___
 
@@ -383,7 +372,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:373
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:439
 
 ___
 
@@ -397,7 +386,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:374
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:440
 
 ___
 
@@ -411,7 +400,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:375
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:441
 
 ___
 
@@ -463,7 +452,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:1053
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:1119
 
 ___
 
@@ -477,7 +466,7 @@ BaseContract.provider
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:80
+node_modules/@ethersproject/contracts/lib/index.d.ts:82
 
 ___
 
@@ -491,7 +480,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:376
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:442
 
 ___
 
@@ -505,7 +494,7 @@ BaseContract.resolvedAddress
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:96
+node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ___
 
@@ -519,7 +508,7 @@ BaseContract.signer
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:79
+node_modules/@ethersproject/contracts/lib/index.d.ts:81
 
 ## Methods
 

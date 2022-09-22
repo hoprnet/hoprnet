@@ -16,7 +16,7 @@ export default class Version extends Command {
 
   public async execute(log: (msg: string) => void, _query: string): Promise<void> {
     const response = await this.api.getVersion()
-    if (!response.ok) return log(this.invalidResponse('get version'))
+    if (!response.ok) return log(this.failedCommand('get version'))
     return log(await response.text())
   }
 }

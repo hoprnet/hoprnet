@@ -22,7 +22,8 @@
 - [del](HoprDB.md#del)
 - [delAcknowledgedTicket](HoprDB.md#delacknowledgedticket)
 - [deleteAcknowledgedTicketsFromChannel](HoprDB.md#deleteacknowledgedticketsfromchannel)
-- [findHoprNodeUsingAccountInNetworkRegistry](HoprDB.md#findhoprnodeusingaccountinnetworkregistry)
+- [dumpDatabase](HoprDB.md#dumpdatabase)
+- [findHoprNodesUsingAccountInNetworkRegistry](HoprDB.md#findhoprnodesusingaccountinnetworkregistry)
 - [get](HoprDB.md#get)
 - [getAccount](HoprDB.md#getaccount)
 - [getAccountFromNetworkRegistry](HoprDB.md#getaccountfromnetworkregistry)
@@ -109,7 +110,7 @@
 
 #### Defined in
 
-[db/db.ts:140](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L140)
+[db/db.ts:144](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L144)
 
 ## Methods
 
@@ -220,13 +221,13 @@ ___
 
 ▸ **delAcknowledgedTicket**(`ack`): `Promise`<`void`\>
 
-Delete acknowledged ticket in database
+Deletes an acknowledged ticket in database
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `ack` | [`AcknowledgedTicket`](AcknowledgedTicket.md) |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `ack` | [`AcknowledgedTicket`](AcknowledgedTicket.md) | acknowledged ticket |
 
 #### Returns
 
@@ -238,11 +239,14 @@ ___
 
 ▸ **deleteAcknowledgedTicketsFromChannel**(`channel`): `Promise`<`void`\>
 
+Deletes all acknowledged tickets in a channel and updates
+neglected tickets counter.
+
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `channel` | [`ChannelEntry`](ChannelEntry.md) |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `channel` | [`ChannelEntry`](ChannelEntry.md) | in which channel to delete tickets |
 
 #### Returns
 
@@ -250,12 +254,28 @@ ___
 
 ___
 
-### findHoprNodeUsingAccountInNetworkRegistry
+### dumpDatabase
 
-▸ **findHoprNodeUsingAccountInNetworkRegistry**(`account`): `Promise`<[`PublicKey`](PublicKey.md)\>
+▸ **dumpDatabase**(`destFile`): `void`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `destFile` | `string` |
+
+#### Returns
+
+`void`
+
+___
+
+### findHoprNodesUsingAccountInNetworkRegistry
+
+▸ **findHoprNodesUsingAccountInNetworkRegistry**(`account`): `Promise`<[`PublicKey`](PublicKey.md)[]\>
 
 Do a reverse find by searching the stored account to return
-the associated public key of the HoprNode.
+the associated public keys of registered HOPR nodes.
 
 #### Parameters
 
@@ -265,9 +285,9 @@ the associated public key of the HoprNode.
 
 #### Returns
 
-`Promise`<[`PublicKey`](PublicKey.md)\>
+`Promise`<[`PublicKey`](PublicKey.md)[]\>
 
-PublicKey of the associated HoprNode
+array of PublicKey of the associated HOPR nodes
 
 ___
 
@@ -864,13 +884,13 @@ ___
 
 ▸ **isNetworkRegistryEnabled**(): `Promise`<`boolean`\>
 
-Hopr Network Registry
+Check ifs Network registry is enabled
 
 #### Returns
 
 `Promise`<`boolean`\>
 
-true if register is enabled
+true if register is enabled or if key is not preset in the dababase
 
 ___
 
@@ -989,7 +1009,7 @@ ___
 
 ### removeFromNetworkRegistry
 
-▸ **removeFromNetworkRegistry**(`account`, `snapshot`): `Promise`<`void`\>
+▸ **removeFromNetworkRegistry**(`pubKey`, `account`, `snapshot`): `Promise`<`void`\>
 
 Hopr Network Registry
 Unlink hoprNode to an ETH address by removing the entry.
@@ -998,6 +1018,7 @@ Unlink hoprNode to an ETH address by removing the entry.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
+| `pubKey` | [`PublicKey`](PublicKey.md) | the node's x |
 | `account` | [`Address`](Address.md) | the account to use so we can search for the key in the database |
 | `snapshot` | [`Snapshot`](Snapshot.md) |  |
 

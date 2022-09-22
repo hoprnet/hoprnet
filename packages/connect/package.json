@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-connect",
-  "version": "1.90.0-next.5",
+  "version": "1.90.16",
   "description": "A libp2p-complaint transport module that handles NAT traversal by using WebRTC",
   "repository": "https://github.com/hoprnet/hopr-connect.git",
   "homepage": "https://github.com/hoprnet/hopr-connect",
@@ -50,15 +50,15 @@
     "wrtc": "0.4.7"
   },
   "devDependencies": {
-    "@chainsafe/libp2p-noise": "7.0.0",
+    "@chainsafe/libp2p-noise": "7.0.3",
     "@libp2p/crypto": "1.0.0",
     "@libp2p/interface-address-manager": "^1.0.1",
     "@libp2p/interface-connection": "1.0.1",
-    "@libp2p/interface-peer-id": "1.0.2",
+    "@libp2p/interface-peer-id": "1.0.4",
     "@libp2p/interface-peer-store": "1.0.0",
     "@libp2p/mplex": "1.2.1",
     "@types/bl": "5.0.2",
-    "@types/chai": "4.3.0",
+    "@types/chai": "4.3.3",
     "@types/chai-spies": "1.0.3",
     "@types/debug": "4.1.7",
     "@types/mocha": "9.1.1",

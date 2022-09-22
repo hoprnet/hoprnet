@@ -6,7 +6,9 @@ import type { HoprChannels, HoprToken, ChannelsMock } from '../src/types'
 import { increaseTime } from './utils'
 import { ACCOUNT_A, ACCOUNT_B } from './utils'
 import { BigNumber, utils } from 'ethers'
-import type { providers, BigNumberish } from 'ethers'
+import type { BigNumberish } from 'ethers'
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
+import type { Signer } from 'ethers'
 
 describe('HoprChannels', async function () {
   // CommonJS / ESM issue with `hardhat-core`
@@ -79,7 +81,7 @@ describe('HoprChannels', async function () {
       closureTime: undefined
     }
     const channel = [] as unknown as ChannelProps
-    Object.keys(_emptyChannelProps).map((key, index) => {
+    Object.keys(_emptyChannelProps).forEach((key, index) => {
       if (props[key] != undefined) {
         channel[index] = props[key]
         channel[key] = props[key]
@@ -93,7 +95,7 @@ describe('HoprChannels', async function () {
 
   const createMockChannelFromMerge = (channel: ChannelProps, props: ChannelProps) => {
     let newChannel = []
-    Object.keys(channel).map((key) => (newChannel[key] = props[key] != undefined ? props[key] : channel[key]))
+    Object.keys(channel).forEach((key) => (newChannel[key] = props[key] != undefined ? props[key] : channel[key]))
     return newChannel
   }
 
@@ -166,7 +168,7 @@ describe('HoprChannels', async function () {
   // recover the public key from the signer passed by ethers
   // could not find a way to get the public key through the API
   const recoverPublicKeyFromSigner = async (
-    deployer: providers.JsonRpcSigner
+    deployer: SignerWithAddress
   ): Promise<ReturnType<typeof PublicKey['fromSignatureString']>> => {
     const tx = await deployer.populateTransaction({
       to: await deployer.getAddress(),
@@ -185,7 +187,7 @@ describe('HoprChannels', async function () {
 
   const useFixtures = deployments.createFixture(
     async (_, ops: { skipAnnounceForAccountA: boolean; skipAnnounceForAccountB: boolean }) => {
-      const deployer = ethers.provider.getSigner()
+      const [deployer] = await ethers.getSigners()
 
       const deployerPubKey = await recoverPublicKeyFromSigner(deployer)
       // @TODO globally bump ethers.js
@@ -217,7 +219,7 @@ describe('HoprChannels', async function () {
       const fund = async (addr: string, amount: BigNumberish) =>
         await token.connect(deployer).mint(addr, amount + '', ethers.constants.HashZero, ethers.constants.HashZero)
 
-      const approve = async (account: Wallet, amount: BigNumberish) =>
+      const approve = async (account: Signer, amount: BigNumberish) =>
         await token.connect(account).approve(channels.address, amount)
 
       const fundAndApprove = async (account: Wallet, amount: BigNumberish) => {
@@ -275,9 +277,11 @@ describe('HoprChannels', async function () {
     it('should announce user', async function () {
       const { channels, deployer, deployerPubKey } = await useFixtures()
 
+      const deployerAddress = await deployer.getAddress()
+      const publicKey = deployerPubKey.toUncompressedPubKeyHex()
       await expect(channels.connect(deployer).announce(deployerPubKey.toUncompressedPubKeyHex(), MULTI_ADDR))
         .to.emit(channels, 'Announcement')
-        .withArgs(await deployer.getAddress(), deployerPubKey.toUncompressedPubKeyHex(), MULTI_ADDR)
+        .withArgs(deployerAddress, publicKey, MULTI_ADDR)
     })
 
     it('should fail to announce user', async function () {
@@ -329,25 +333,29 @@ describe('HoprChannels', async function () {
 
     it('should fail to fund channel A->A', async function () {
       await expect(
-        channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_A.address, '70', '30')
+        channels.connect(accountA as Signer).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_A.address, '70', '30')
       ).to.be.revertedWith('source and destination must not be the same')
     })
 
     it('should fail to fund channel 0->A', async function () {
       await expect(
-        channels.connect(accountA).fundChannelMulti(ethers.constants.AddressZero, ACCOUNT_B.address, '70', '30')
+        channels
+          .connect(accountA as Signer)
+          .fundChannelMulti(ethers.constants.AddressZero, ACCOUNT_B.address, '70', '30')
       ).to.be.revertedWith('source must not be empty')
     })
 
     it('should fail to fund channel A->0', async function () {
       await expect(
-        channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ethers.constants.AddressZero, '70', '30')
+        channels
+          .connect(accountA as Signer)
+          .fundChannelMulti(ACCOUNT_A.address, ethers.constants.AddressZero, '70', '30')
       ).to.be.revertedWith('destination must not be empty')
     })
 
     it('should fail to fund a channel with 0 amount', async function () {
       await expect(
-        channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '0', '0')
+        channels.connect(accountA as Signer).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '0', '0')
       ).to.be.revertedWith('amount must be greater than 0')
     })
   })
@@ -358,7 +366,9 @@ describe('HoprChannels', async function () {
     it('should multi fund and open channel A->B, no commitment', async function () {
       const { channels, accountA, fundAndApprove, token } = await useFixtures()
       await fundAndApprove(accountA, 100)
-      await expect(channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30'))
+      await expect(
+        channels.connect(accountA as Signer).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+      )
         .to.emit(channels, 'ChannelUpdated')
         .and.to.emit(channels, 'ChannelFunded')
         .and.not.to.emit(channels, 'ChannelOpened')
@@ -373,7 +383,9 @@ describe('HoprChannels', async function () {
     it('should multi fund and open channel B->A, no commitment', async function () {
       const { channels, accountB, fundAndApprove } = await useFixtures()
       await fundAndApprove(accountB, 100)
-      await expect(channels.connect(accountB).fundChannelMulti(ACCOUNT_B.address, ACCOUNT_A.address, '30', '70'))
+      await expect(
+        channels.connect(accountB as Signer).fundChannelMulti(ACCOUNT_B.address, ACCOUNT_A.address, '30', '70')
+      )
         .to.emit(channels, 'ChannelUpdated')
         .and.to.emit(channels, 'ChannelFunded')
         .and.not.to.emit(channels, 'ChannelOpened')
@@ -749,7 +761,7 @@ describe('HoprChannels', async function () {
 
     it('should fail to initialize channel closure when channel is not open', async function () {
       await expect(channels.connect(fixtures.accountA).initiateChannelClosure(ACCOUNT_B.address)).to.be.revertedWith(
-        'channel must be open'
+        'channel must be open or waiting for commitment'
       )
     })
 
@@ -817,7 +829,7 @@ describe('HoprChannels', async function () {
     it('should fail to redeem ticket when channel in closed', async function () {
       await expect(
         channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(fixtures.TICKET_AB_WIN.ticket))
-      ).to.be.revertedWith('channel must be open or pending to close')
+      ).to.be.revertedWith('spending channel must be open or pending to close')
     })
 
     it('should allow a fund to reopen channel', async function () {

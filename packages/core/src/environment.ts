@@ -2,6 +2,14 @@
 // Don't do type-checks on JSON files
 // @ts-ignore
 import protocolConfig from '../protocol-config.json' assert { type: 'json' }
+import semver from 'semver'
+import { FULL_VERSION } from './constants.js'
+
+/**
+ * Coerced full version using
+ * semver.coerce('42.6.7.9.3-alpha') // '42.6.7'
+ */
+const FULL_VERSION_COERCED = semver.coerce(FULL_VERSION).version
 
 export type NetworkOptions = {
   id: string
@@ -23,6 +31,7 @@ export type Environment = {
   id: string
   network_id: string // must match one of the Network.id
   environment_type: EnvironmentType
+  version_range: string
   channel_contract_deploy_block: number // >= 0
   token_contract_address: string // an Ethereum address
   channels_contract_address: string // an Ethereum address
@@ -56,17 +65,33 @@ export type ResolvedEnvironment = {
   network_registry_contract_address: string // an Ethereum address,
 }
 
+/**
+ * @param version HOPR version
+ * @returns environments that the given HOPR version should be able to use
+ */
 export function supportedEnvironments(): Environment[] {
-  return Object.entries((protocolConfig as ProtocolConfig).environments).map(([id, env]) => ({
-    id,
-    ...env
-  }))
+  const environments = Object.entries((protocolConfig as ProtocolConfig).environments)
+
+  return environments
+    .filter(([_, env]) => {
+      return semver.satisfies(FULL_VERSION_COERCED, env.version_range)
+    })
+    .map(([id, env]) => ({
+      id,
+      ...env
+    }))
 }
 
+/**
+ * @param environment_id environment name
+ * @param customProvider
+ * @returns the environment details, throws if environment is not supported
+ */
 export function resolveEnvironment(environment_id: string, customProvider?: string): ResolvedEnvironment {
   const environment = (protocolConfig as ProtocolConfig).environments[environment_id]
   const network = (protocolConfig as ProtocolConfig).networks[environment?.network_id]
-  if (environment && network) {
+
+  if (environment && network && semver.satisfies(FULL_VERSION_COERCED, environment.version_range)) {
     network.id = environment.network_id
     if (customProvider && customProvider.length > 0) {
       network.default_provider = customProvider
@@ -86,6 +111,7 @@ export function resolveEnvironment(environment_id: string, customProvider?: stri
       network_registry_contract_address: environment.network_registry_contract_address
     }
   }
+
   const supportedEnvsString: string = supportedEnvironments()
     .map((env) => env.id)
     .join(', ')

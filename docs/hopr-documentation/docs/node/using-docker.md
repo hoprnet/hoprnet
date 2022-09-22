@@ -53,8 +53,8 @@ Before downloading the HOPRd image, make sure **Docker** is installed.
 
 :::
 
-All our docker images can be found in [our Google Cloud Container Registry](https://console.cloud.google.com/gcr/images/hoprassociation/global/hoprd). Each image is prefixed with `gcr.io/hoprassociation/hoprd`.
-
+All our docker images can be found in [our Google Cloud Container Registry](https://console.cloud.google.com/gcr/images/hoprassociation/global/hoprd).
+Each image is prefixed with `gcr.io/hoprassociation/hoprd`.
 The `valencia` tag represents the latest community release version.
 
 (**1**) Open your terminal.

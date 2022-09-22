@@ -14,7 +14,7 @@ export const withdraw = async (node: Hopr, currency: 'native' | 'hopr', recipien
     throw Error(STATUS_CODES.INVALID_CURRENCY)
   }
 
-  if (isNaN(Number(amount))) {
+  if (isNaN(Number(amount)) || !isFinite(Number(amount))) {
     throw Error(STATUS_CODES.INVALID_AMOUNT)
   }
 

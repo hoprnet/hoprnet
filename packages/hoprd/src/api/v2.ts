@@ -247,18 +247,11 @@ export function setupWsApi(
       node.on('hopr:message', (msg: Uint8Array) => {
         socket.send(msg.toString())
       })
-    } else if (path === WS_PATHS.LEGACY_STREAM) {
-      logStream.addMessageListener((msg) => {
-        if (msg.type !== 'message') {
-          socket.send(
-            JSON.stringify({
-              type: msg.type,
-              timestamp: msg.ts,
-              content: msg.msg
-            })
-          )
-        }
+      node.on(`hopr:message-acknowledged`, (ackChallenge: string) => {
+        socket.send(`ack:'${ackChallenge}'`)
       })
+    } else if (path === WS_PATHS.LEGACY_STREAM) {
+      logStream.subscribe(socket)
     } else {
       // close connection on unsupported paths
       socket.close(1000)

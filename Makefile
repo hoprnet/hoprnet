@@ -114,11 +114,14 @@ endif
    --recipient $(recipient) \
    --privatekey "$(PRIVATE_KEY)"
    
-.PHONY: request-devnft
-request-devnft: ensure-environment-is-set
-request-devnft: ## Request one HoprBoost Dev NFT for the recipient given it has none and hasn't staked Dev NFT
+.PHONY: request-nrnft
+request-nrnft: ensure-environment-is-set
+request-nrnft: ## Request one HoprBoost Network_registry NFT for the recipient given it has none and hasn't staked Network_registry NFT
 ifeq ($(recipient),)
 	echo "parameter <recipient> missing" >&2 && exit 1
+endif
+ifeq ($(nftrank),)
+	echo "parameter <nftrank> missing, it can be either 'developer' or 'community'" >&2 && exit 1
 endif
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
@@ -127,7 +130,8 @@ endif
 	HOPR_ENVIRONMENT_ID="$(environment)" \
 	  yarn workspace @hoprnet/hopr-ethereum run hardhat request-test-tokens \
    --network $(network) \
-   --type devnft \
+   --type nrnft \
+   --nftrank $(nftrank) \
    --recipient $(recipient) \
    --privatekey "$(PRIVATE_KEY)"
 
@@ -145,18 +149,66 @@ endif
 		--amount 1000000000000000000000 \
 		--privatekey "$(PRIVATE_KEY)"
 
-.PHONY: stake-devnft
-stake-devnft: ensure-environment-is-set
-stake-devnft: ## stake Dev NFTs (idempotent operation)
+.PHONY: stake-nrnft
+stake-nrnft: ensure-environment-is-set
+stake-nrnft: ## stake Network_registry NFTs (idempotent operation)
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
+endif
+ifeq ($(nftrank),)
+	echo "parameter <nftrank> missing, it can be either 'developer' or 'community'" >&2 && exit 1
 endif
 	@TS_NODE_PROJECT=./tsconfig.hardhat.json \
 	HOPR_ENVIRONMENT_ID="$(environment)" \
 		yarn workspace @hoprnet/hopr-ethereum run hardhat stake \
 		--network $(network) \
-		--type devnft \
+		--type nrnft \
+		--nftrank $(nftrank) \
 		--privatekey "$(PRIVATE_KEY)"
+
+enable-network-registry: ensure-environment-is-set
+enable-network-registry: ## owner enables network registry (smart contract) globally
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
+   --network $(network) \
+   --task enable
+
+disable-network-registry: ensure-environment-is-set
+disable-network-registry: ## owner disables network registry (smart contract) globally
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
+   --network $(network) \
+   --task disable
+
+force-eligibility-update: ensure-environment-is-set
+force-eligibility-update: ## owner forces eligibility update
+ifeq ($(native_addresses),)
+	echo "parameter <native_addresses> missing" >&2 && exit 1
+endif
+ifeq ($(eligibility),)
+	echo "parameter <eligibility> missing" >&2 && exit 1
+endif
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
+   --network $(network) \
+   --task force-eligibility-update \
+   --native-addresses "$(native_addresses)"\
+   --eligibility "$(eligibility)"
+
+sync-eligibility: ensure-environment-is-set
+sync-eligibility: ## owner sync eligibility of peers
+ifeq ($(peer_ids),)
+	echo "parameter <peer_ids> missing" >&2 && exit 1
+endif
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
+   --network $(network) \
+   --task sync \
+   --peer-ids "$(peer_ids)"
 
 register-nodes: ensure-environment-is-set
 register-nodes: ## owner register given nodes in network registry contract
@@ -176,21 +228,32 @@ endif
 
 deregister-nodes: ensure-environment-is-set
 deregister-nodes: ## owner de-register given nodes in network registry contract
-ifeq ($(native_addresses),)
-	echo "parameter <native_addresses> missing" >&2 && exit 1
+ifeq ($(peer_ids),)
+	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
+ifeq ($(native_addresses),)
+	echo "no parameter <native_addresses>" >&2
 	TS_NODE_PROJECT=./tsconfig.hardhat.json \
 	HOPR_ENVIRONMENT_ID="$(environment)" \
 	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
    --network $(network) \
    --task remove \
+   --peer-ids "$(peer_ids)"
+else
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
+   --network $(network) \
+   --task remove \
+   --peer-ids "$(peer_ids)" \
    --native-addresses "$(native_addresses)"
+endif
 
 .PHONY: self-register-node
 self-register-node: ensure-environment-is-set
 self-register-node: ## staker register a node in network registry contract
-ifeq ($(peer_id),)
-	echo "parameter <peer_id> missing" >&2 && exit 1
+ifeq ($(peer_ids),)
+	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
@@ -200,25 +263,33 @@ endif
 	  yarn workspace @hoprnet/hopr-ethereum run hardhat register:self \
    --network $(network) \
    --task add \
-   --peer-id "$(peer_id)" \
+   --peer-ids "$(peer_ids)" \
    --privatekey "$(PRIVATE_KEY)"
 
 .PHONY: self-deregister-node
 self-deregister-node: ensure-environment-is-set
 self-deregister-node: ## staker deregister a node in network registry contract
+ifeq ($(peer_ids),)
+	echo "parameter <peer_ids> missing" >&2 && exit 1
+endif
 	TS_NODE_PROJECT=./tsconfig.hardhat.json \
 	HOPR_ENVIRONMENT_ID="$(environment)" \
 	  yarn workspace @hoprnet/hopr-ethereum run hardhat register:self \
    --network $(network) \
    --task remove \
+   --peer-ids "$(peer_ids)" \
    --privatekey "$(PRIVATE_KEY)"
 
 .PHONY: register-node-when-dummy-proxy
+# DEPRECATED. Only use it when a dummy network registry proxy is in use
 # Register a node when a dummy proxy is in place of staking proxy
 # node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'
 register-node-when-dummy-proxy: ensure-environment-is-set
 ifeq ($(endpoint),)
 	echo "parameter <endpoint> is default to localhost:3001" >&2
+endif
+ifeq ($(api_token),)
+	echo "parameter <api_token> missing" >&2 && exit 1
 endif
 ifeq ($(account),)
 	echo "parameter <account> missing" >&2 && exit 1
@@ -232,7 +303,7 @@ endif
    --network $(network) \
    --task add \
    --native-addresses "$(account)" \
-   --peer-ids "$(shell ./scripts/get-hopr-address.sh "$(endpoint)")" \
+   --peer-ids "$(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")" \
    --privatekey "$(CI_DEPLOYER_PRIVKEY)"
 
 .PHONY: register-node-with-nft
@@ -240,6 +311,15 @@ endif
 register-node-with-nft: ensure-environment-is-set
 ifeq ($(endpoint),)
 	echo "parameter <endpoint> is default to localhost:3001" >&2
+endif
+ifeq ($(api_token),)
+	echo "parameter <api_token> missing" >&2 && exit 1
+endif
+ifeq ($(api_token),)
+	echo "parameter <api_token> missing" >&2 && exit 1
+endif
+ifeq ($(nftrank),)
+	echo "parameter <nftrank> missing, it can be either 'developer' or 'community'" >&2 && exit 1
 endif
 ifeq ($(account),)
 	echo "parameter <account> missing" >&2 && exit 1
@@ -250,16 +330,13 @@ endif
 ifeq ($(origin DEV_BANK_PRIVKEY),undefined)
 	echo "<DEV_BANK_PRIVKEY> environment variable missing" >&2 && exit 1
 endif
-	PRIVATE_KEY=${DEV_BANK_PRIVKEY} make request-devnft recipient=${account}
-	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-devnft
-	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_id=$(shell ./scripts/get-hopr-address.sh "$(endpoint)")
+	PRIVATE_KEY=${DEV_BANK_PRIVKEY} make request-nrnft recipient=${account} nftrank=${nftrank}
+	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-nrnft nftrank=${nftrank}
+	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_ids=$(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")
 
 .PHONY: register-node-with-stake
 # node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'
 register-node-with-stake: ensure-environment-is-set
-ifeq ($(endpoint),)
-	echo "parameter <endpoint> is default to localhost:3001" >&2
-endif
 ifeq ($(account),)
 	echo "parameter <account> missing" >&2 && exit 1
 endif
@@ -271,7 +348,7 @@ ifeq ($(origin DEV_BANK_PRIVKEY),undefined)
 endif
 	PRIVATE_KEY=${DEV_BANK_PRIVKEY} make request-funds recipient=${account}
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-funds
-	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_id=$(shell ./scripts/get-hopr-address.sh "$(endpoint)")
+	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_ids=$(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")
 
 ensure-environment-is-set:
 ifeq ($(environment),)

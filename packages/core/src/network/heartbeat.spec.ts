@@ -1,5 +1,5 @@
 import Heartbeat, { type HeartbeatConfig, NetworkHealthIndicator } from './heartbeat.js'
-import NetworkPeers from './network-peers.js'
+import NetworkPeers, { NetworkPeersOrigin } from './network-peers.js'
 import { assert } from 'chai'
 import { type LibP2PHandlerFunction, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { EventEmitter, once } from 'events'
@@ -136,7 +136,8 @@ async function getPeer(
     TESTING_ENVIRONMENT,
     {
       ...SHORT_TIMEOUTS,
-      heartbeatThreshold: -3000,
+      // Eliminate backoff
+      heartbeatThreshold: -15000,
       heartbeatInterval: 2000
     }
   )
@@ -181,10 +182,10 @@ describe('unit test heartbeat', async () => {
 
     peerA.heartbeat.recalculateNetworkHealth()
 
-    assert.equal(peerA.peers.qualityOf(Bob).toFixed(1), '0.2')
+    assert(peerA.peers.qualityOf(Bob) == 0)
     assert.equal(netHealthA.state, NetworkHealthIndicator.RED)
 
-    peerA.peers.register(Bob, 'test')
+    peerA.peers.register(Bob, NetworkPeersOrigin.TESTING)
 
     peerA.heartbeat.recalculateNetworkHealth()
 
@@ -199,7 +200,7 @@ describe('unit test heartbeat', async () => {
     assert.equal(netHealthA.state, NetworkHealthIndicator.YELLOW)
 
     const peerC = await getPeer(Charly, network, new NetworkHealth())
-    peerA.peers.register(Charly, 'test')
+    peerA.peers.register(Charly, NetworkPeersOrigin.TESTING)
 
     assert.equal(netHealthA.state, NetworkHealthIndicator.YELLOW)
 
@@ -213,7 +214,9 @@ describe('unit test heartbeat', async () => {
     network.unsubscribe(Charly)
     peerC.heartbeat.stop()
 
-    await Promise.all(Array.from({ length: 6 }, (_) => peerA.heartbeat.checkNodes()))
+    for (let i = 0; i < 6; i++) {
+      await peerA.heartbeat.checkNodes()
+    }
 
     assert.equal(peerA.heartbeat.recalculateNetworkHealth(), NetworkHealthIndicator.YELLOW)
     assert.equal(netHealthA.state, NetworkHealthIndicator.YELLOW)
@@ -227,9 +230,9 @@ describe('unit test heartbeat', async () => {
     const peerA = await getPeer(Alice, network, new NetworkHealth())
     const peerB = await getPeer(Bob, network, new NetworkHealth())
 
-    assert.equal(peerA.peers.qualityOf(Bob).toFixed(1), '0.2')
+    assert(peerA.peers.qualityOf(Bob) == 0)
 
-    peerA.peers.register(Bob, 'test')
+    peerA.peers.register(Bob, NetworkPeersOrigin.TESTING)
 
     assert.equal(peerA.peers.qualityOf(Bob).toFixed(1), '0.2')
 
@@ -244,15 +247,18 @@ describe('unit test heartbeat', async () => {
     const network = createFakeNetwork()
     const peerA = await getPeer(Alice, network, new NetworkHealth())
 
-    assert.equal(peerA.peers.qualityOf(Charly).toFixed(1), '0.2')
+    assert(peerA.peers.qualityOf(Charly) == 0)
 
-    peerA.peers.register(Charly, 'test')
+    peerA.peers.register(Charly, NetworkPeersOrigin.TESTING)
 
-    assert.equal(peerA.peers.qualityOf(Charly).toFixed(1), '0.2')
+    assert.equal(peerA.peers.qualityOf(Charly).toFixed(1), '0.2', `Should have initial quality`)
 
     await peerA.heartbeat.checkNodes()
 
-    assert.equal(peerA.peers.qualityOf(Charly).toFixed(1), '0.2')
+    // Could not ping node, so should be ignored now
+    assert(peerA.peers.qualityOf(Charly) == 0)
+    assert([...peerA.peers.getAllIgnored()].length == 1, `Must contain exactly one ignored entry`)
+    assert([...peerA.peers.getAllIgnored()][0] === Charly.toString(), `Ignored entry must be Charly`)
 
     peerA.heartbeat.stop()
     network.close()
@@ -265,8 +271,8 @@ describe('unit test heartbeat', async () => {
     const peerB = await getPeer(Bob, network, new NetworkHealth())
     const peerC = await getPeer(Charly, network, new NetworkHealth())
 
-    peerA.peers.register(Bob, 'test')
-    peerA.peers.register(Charly, 'test')
+    peerA.peers.register(Bob, NetworkPeersOrigin.TESTING)
+    peerA.peers.register(Charly, NetworkPeersOrigin.TESTING)
 
     assert(peerA.peers.has(Charly), `Alice should know about Charly now.`)
     assert(peerA.peers.has(Bob), `Alice should know about Bob now.`)

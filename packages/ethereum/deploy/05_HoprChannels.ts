@@ -6,10 +6,10 @@ const shortDuration = 15 * 1e3 // 15 seconds in ms
 const longDuration = 5 * 60 * 1e3 // 5 minutes in ms
 
 // inlined from @hoprnet/hopr-utils to remove dependency on whole package
-const pickVersion = (full_version: string): string => {
-  const split = full_version.split('.')
-  return split[0] + '.' + split[1] + '.0'
-}
+// const pickVersion = (full_version: string): string => {
+//   const split = full_version.split('.')
+//   return split[0] + '.' + split[1] + '.0'
+// }
 
 const closures: {
   [key in DeploymentTypes]: number
@@ -30,8 +30,8 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // on a new combination of environment and version `X.X.0`
   // this is necessary to ensure that all nodes that have announced
   // in HoprChannels can reach each other
-  const version = pickVersion(require('../package.json').version)
-  const salt = `${hre.environment}@${version}`
+  // const version = pickVersion(require('../package.json').version)
+  // const salt = `${hre.environment}@${version}`
 
   const deploymentType = Object.keys(network.tags).find((tag) => closures[tag])
   const closure = Math.floor((closures[deploymentType] ?? closures.testing) / 1e3)
@@ -44,16 +44,13 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     deployOptions['waitConfirmations'] = 2
   }
 
-  const result = await deployments.deterministic('HoprChannels', {
+  await deployments.deploy('HoprChannels', {
     from: deployer.address,
     args: [hoprToken.address, closure],
-    salt: ethers.utils.formatBytes32String(salt),
     maxFeePerGas,
     maxPriorityFeePerGas,
     ...deployOptions
   })
-
-  await result.deploy()
 }
 
 main.dependencies = ['preDeploy', 'HoprToken']

@@ -7,15 +7,24 @@ import styles from '../styles/Home.module.css'
 import Commands from '../src/commands'
 import useAppState from '../src/state'
 import { type Log, type Configuration, createLog } from '../src/utils'
-import { readStreamEvent } from '../src/utils/stream'
 
 // TODO: fix type in refactor
 const Jazzicon = dynamic(() => import('../src/components/jazzicon'), { ssr: false }) as any
 const GIT_HASH = process.env.NEXT_PUBLIC_GIT_COMMIT
 
 export default function Home() {
+  // store logs
+  const [logs, setLogs] = useState<Log[]>([])
+  const addLog = (log: Log) => {
+    setLogs((prevLogs) => {
+      const newLogs = [...prevLogs]
+      newLogs.push(log)
+      return newLogs
+    })
+  }
+
   // initialize app state
-  const app = useAppState()
+  const app = useAppState(addLog)
   // initialize commands
   const cmds = new Commands(app.api.apiRef.current, {
     getCachedAliases() {
@@ -23,12 +32,24 @@ export default function Home() {
     },
     updateAliasCache(fn) {
       return app.updateAliases(fn)
+    },
+    getSymbols() {
+      // TODO: fetch from API once supported
+      const native = 'xDAI'
+      const hopr = 'mHOPR'
+
+      return {
+        native,
+        hopr,
+        nativeDisplay: `NATIVE (${native})`,
+        hoprDisplay: `HOPR (${hopr})`
+      }
     }
   })
 
   const updateAliases = async () => {
     const api = app.api.apiRef.current
-    if (api && app.status === 'CONNECTED') {
+    if (api && app.streamWS.state.status === 'CONNECTED') {
       try {
         api
           .getAliases()
@@ -46,17 +67,7 @@ export default function Home() {
 
     const interval = setInterval(updateAliases, 5e3)
     return () => clearInterval(interval)
-  }, [app.api.apiRef.current, app.status])
-
-  // store logs
-  const [logs, setLogs] = useState<Log[]>([])
-  const addLog = (log: Log) => {
-    setLogs((prevLogs) => {
-      const newLogs = [...prevLogs]
-      newLogs.push(log)
-      return newLogs
-    })
-  }
+  }, [app.api.apiRef.current, app.streamWS.state.status === 'CONNECTED'])
 
   // toggles connected panel
   const [showConnectedPanel, setShowConnectedPanel] = useState(false)
@@ -160,43 +171,6 @@ export default function Home() {
     }
   }
 
-  // attach event listener for new streams events
-  const handleStreamEvent = (event: MessageEvent<any>) => {
-    const eventLogs = readStreamEvent(event)
-    for (const log of eventLogs) {
-      addLog(log)
-    }
-  }
-  useEffect(() => {
-    const socket = app.streamWS.socketRef.current
-    if (!socket) return
-
-    socket.addEventListener('message', handleStreamEvent)
-
-    return () => {
-      const socket = app.streamWS.socketRef.current
-      if (!socket) return
-      socket.removeEventListener('message', handleStreamEvent)
-    }
-  }, [app.streamWS.socketRef.current, app.streamWS.state.status])
-
-  // attach event listener for new messages
-  const handleMessageEvent = (event: MessageEvent<any>) => {
-    console.log(event)
-  }
-  useEffect(() => {
-    const socket = app.messagesWS.socketRef.current
-    if (!socket) return
-
-    socket.addEventListener('message', handleMessageEvent)
-
-    return () => {
-      const socket = app.messagesWS.socketRef.current
-      if (!socket) return
-      socket.removeEventListener('message', handleMessageEvent)
-    }
-  }, [app.messagesWS.socketRef.current, app.messagesWS.state.status])
-
   return (
     <div className={styles.container}>
       <Head>
@@ -211,7 +185,7 @@ export default function Home() {
         </span>
       </h1>
 
-      <Logs messages={logs} isConnected={app.status === 'CONNECTED'} />
+      <Logs messages={logs} isConnected={app.streamWS.state.status === 'CONNECTED'} />
 
       <div className="send">
         <input

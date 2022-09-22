@@ -17,7 +17,7 @@ import {
   PublicKey,
   Snapshot,
   debug,
-  retryWithBackoff,
+  retryWithBackoffThenThrow,
   Balance,
   ordered,
   u8aToHex,
@@ -39,7 +39,7 @@ import {
   IndexerStatus
 } from './types.js'
 import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils.js'
-import { BigNumber, Contract, errors } from 'ethers'
+import { BigNumber, type Contract, errors } from 'ethers'
 import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants.js'
 import type { TypedEvent, TypedEventFilter } from '@hoprnet/hopr-ethereum'
 
@@ -48,7 +48,7 @@ const verbose = debug('hopr-core-ethereum:verbose:indexer')
 
 const getSyncPercentage = (start: number, current: number, end: number) =>
   (((current - start) / (end - start)) * 100).toFixed(2)
-const backoffOption: Parameters<typeof retryWithBackoff>[1] = { maxDelay: MAX_TRANSACTION_BACKOFF }
+const backoffOption: Parameters<typeof retryWithBackoffThenThrow>[1] = { maxDelay: MAX_TRANSACTION_BACKOFF }
 
 /**
  * Indexes HoprChannels smart contract and stores to the DB,
@@ -233,7 +233,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     const queries: { contract: Contract; filter: TypedEventFilter<any> }[] = [
       // HoprChannels
       {
-        contract: this.chain.getChannels(),
+        contract: this.chain.getChannels() as unknown as Contract,
         filter: {
           topics: [
             [
@@ -247,12 +247,13 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       },
       // HoprNetworkRegistry
       {
-        contract: this.chain.getNetworkRegistry(),
+        contract: this.chain.getNetworkRegistry() as unknown as Contract,
         filter: {
           topics: [
             [
               // Relevant HoprNetworkRegistry events
               this.chain.getNetworkRegistry().interface.getEventTopic('Registered'),
+              this.chain.getNetworkRegistry().interface.getEventTopic('Deregistered'),
               this.chain.getNetworkRegistry().interface.getEventTopic('RegisteredByOwner'),
               this.chain.getNetworkRegistry().interface.getEventTopic('DeregisteredByOwner'),
               this.chain.getNetworkRegistry().interface.getEventTopic('EligibilityUpdated'),
@@ -269,7 +270,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     // handle errors produced by internal Ethers.js provider calls
     if (fetchTokenTransactions) {
       queries.push({
-        contract: this.chain.getToken(),
+        contract: this.chain.getToken() as unknown as Contract,
         filter: {
           topics: [
             // Token transfer *from* us
@@ -279,7 +280,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         }
       })
       queries.push({
-        contract: this.chain.getToken(),
+        contract: this.chain.getToken() as unknown as Contract,
         filter: {
           topics: [
             // Token transfer *towards* us
@@ -394,7 +395,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       ) {
         log(chalk.blue('code error falls here', this.chain.getAllQueuingTransactionRequests().length))
         // allow the indexer to restart even there is no transaction in queue
-        await retryWithBackoff(
+        await retryWithBackoffThenThrow(
           () =>
             Promise.allSettled([
               ...this.chain.getAllQueuingTransactionRequests().map((request) => {
@@ -411,7 +412,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
           backoffOption
         )
       } else {
-        await retryWithBackoff(() => this.restart(), backoffOption)
+        await retryWithBackoffThenThrow(() => this.restart(), backoffOption)
       }
     } catch (err) {
       log(`error: exception while processing another provider error ${error}`, err)
@@ -723,10 +724,13 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
           )
           break
         case 'Deregistered':
-        case 'Deregistered(address)':
+        case 'Deregistered(address,string)':
         case 'DeregisteredByOwner':
-        case 'DeregisteredByOwner(address)':
-          await this.onDeregistered(event as RegistryEvent<'DeregisteredByOwner'>, lastDatabaseSnapshot)
+        case 'DeregisteredByOwner(address,string)':
+          await this.onDeregistered(
+            event as RegistryEvent<'Deregistered'> | RegistryEvent<'DeregisteredByOwner'>,
+            lastDatabaseSnapshot
+          )
           break
         case 'EnabledNetworkRegistry':
         case 'EnabledNetworkRegistry(bool)':
@@ -859,12 +863,15 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     verbose(`network-registry: account ${account} is ${event.args.eligibility ? 'eligible' : 'not eligible'}`)
     // emit event only when eligibility changes on accounts with a HoprNode associated
     try {
-      const hoprNode = await this.db.findHoprNodeUsingAccountInNetworkRegistry(account)
-      this.emit('network-registry-eligibility-changed', account, hoprNode, event.args.eligibility)
+      const hoprNodes = await this.db.findHoprNodesUsingAccountInNetworkRegistry(account)
+      this.emit('network-registry-eligibility-changed', account, hoprNodes, event.args.eligibility)
     } catch {}
   }
 
-  private async onRegistered(event: RegistryEvent<'Registered'>, lastSnapshot: Snapshot): Promise<void> {
+  private async onRegistered(
+    event: RegistryEvent<'Registered'> | RegistryEvent<'RegisteredByOwner'>,
+    lastSnapshot: Snapshot
+  ): Promise<void> {
     let hoprNode: PeerId
     try {
       hoprNode = peerIdFromString(event.args.hoprPeerId)
@@ -878,8 +885,24 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     verbose(`network-registry: node ${event.args.hoprPeerId} is allowed to connect`)
   }
 
-  private async onDeregistered(event: RegistryEvent<'DeregisteredByOwner'>, lastSnapshot: Snapshot): Promise<void> {
-    await this.db.removeFromNetworkRegistry(Address.fromString(event.args.account), lastSnapshot)
+  private async onDeregistered(
+    event: RegistryEvent<'Deregistered'> | RegistryEvent<'DeregisteredByOwner'>,
+    lastSnapshot: Snapshot
+  ): Promise<void> {
+    let hoprNode: PeerId
+    try {
+      hoprNode = peerIdFromString(event.args.hoprPeerId)
+    } catch (error) {
+      log(`Invalid peer Id '${event.args.hoprPeerId}' given in event 'onDeregistered'`)
+      log(error)
+      return
+    }
+    await this.db.removeFromNetworkRegistry(
+      PublicKey.fromPeerId(hoprNode),
+      Address.fromString(event.args.account),
+      lastSnapshot
+    )
+    verbose(`network-registry: node ${event.args.hoprPeerId} is not allowed to connect`)
   }
 
   private async onEnabledNetworkRegistry(

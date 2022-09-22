@@ -54,7 +54,11 @@ get_rpc() {
 funding_wallet_info() {
   local environment="${1}"
   local token="${2}"
-  curl -L --silent "$API_ENDPOINT/api/faucet/$environment/info?text=$token"
+  local secret="${FAUCET_SECRET_API_KEY}"
+
+  curl -L --silent \
+    --header "x-api-key: ${secret}" \
+    "$API_ENDPOINT/api/faucet/$environment/info?text=$token"
 }
 
 # $1 = environment
@@ -64,7 +68,11 @@ wallet_balance() {
   local environment="${1}"
   local address="${2}"
   local token="${3}"
-  curl -L --silent "$API_ENDPOINT/api/balance/$environment/$address/$token?text=true"
+  local secret="${FAUCET_SECRET_API_KEY}"
+
+  curl -L --silent \
+    --header "x-api-key: ${secret}" \
+    "$API_ENDPOINT/api/balance/$environment/$address/$token?text=true"
 }
 
 # $1 = environment
@@ -79,7 +87,7 @@ faucet_to_address() {
   curl -L --silent --request POST \
     "$API_ENDPOINT/api/faucet/$environment/$address/$token" \
     --header 'Content-Type: application/json' \
-    --data-raw "{\"secret\": \"$secret\"}"
+    --header "x-api-key: ${secret}"
 }
 
 # $1=account (hex)
@@ -90,10 +98,23 @@ fund_if_empty() {
 
   local faucet_address
   faucet_address=$(funding_wallet_info "${environment}" "address")
+  if [[ ! ${faucet_address} =~  ^0x[a-fA-F0-9]{40}$ ]]; then
+    log "Failed to retrieve funding wallet address: ${faucet_address}"
+    exit 1
+  fi;
 
   local faucet_native_balance faucet_hopr_balance
   faucet_native_balance=$(funding_wallet_info "${environment}" "native")
+  if [[ ! ${faucet_native_balance} =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+    log "Failed to retrieve funding wallet native balance: ${faucet_native_balance}"
+    exit 1
+  fi;
+
   faucet_hopr_balance=$(funding_wallet_info "${environment}" "hopr")
+  if [[ ! ${faucet_hopr_balance} =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+    log "Failed to retrieve funding wallet token balance: ${faucet_hopr_balance}"
+    exit 1
+  fi;
 
   if [ "${faucet_native_balance}" = '0.0' ]; then
     log "Wallet ${faucet_address} has zero balance and cannot fund node ${address}"

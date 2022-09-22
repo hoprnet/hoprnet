@@ -10,7 +10,13 @@ import {
   type ContractTransaction,
   type BaseContract
 } from 'ethers'
-import { getContractData, type HoprToken, type HoprChannels, type HoprNetworkRegistry } from '@hoprnet/hopr-ethereum'
+import {
+  getContractData,
+  type HoprToken,
+  type HoprChannels,
+  type HoprNetworkRegistry,
+  ContractData
+} from '@hoprnet/hopr-ethereum'
 import {
   Address,
   Balance,
@@ -27,6 +33,7 @@ import TransactionManager, { type TransactionPayload } from './transaction-manag
 import { debug } from '@hoprnet/hopr-utils'
 import { TX_CONFIRMATION_WAIT } from './constants.js'
 import type { Block } from '@ethersproject/abstract-provider'
+import type { Deployment } from 'hardhat-deploy/dist/types.js'
 
 const log = debug('hopr:core-ethereum:ethereum')
 const abiCoder = new utils.AbiCoder()
@@ -80,21 +87,35 @@ export async function createChainWrapper(
     'HoprNetworkRegistry'
   )
 
-  const token = new ethers.Contract(hoprTokenDeployment.address, hoprTokenDeployment.abi, provider) as HoprToken
+  const token = new ethers.Contract(hoprTokenDeployment.address, hoprTokenDeployment.abi, provider) as any as HoprToken
 
   const channels = new ethers.Contract(
     hoprChannelsDeployment.address,
     hoprChannelsDeployment.abi,
     provider
-  ) as HoprChannels
+  ) as any as HoprChannels
 
   const networkRegistry = new ethers.Contract(
     hoprNetworkRegistryDeployment.address,
     hoprNetworkRegistryDeployment.abi,
     provider
-  ) as HoprNetworkRegistry
+  ) as any as HoprNetworkRegistry
 
-  const genesisBlock = parseInt(hoprChannelsDeployment.blockNumber)
+  //getGenesisBlock, taking the earlier deployment block between the channel and network Registery
+  const [channelDeployBlockNumber, networkRegistryDeployBlockNumber] = [
+    hoprChannelsDeployment,
+    hoprNetworkRegistryDeployment
+  ].map((deployment: Deployment | ContractData) => {
+    if ((deployment as Deployment).receipt?.blockNumber != undefined) {
+      return (deployment as Deployment).receipt.blockNumber
+    } else if ((deployment as ContractData).blockNumber != undefined) {
+      return (deployment as ContractData).blockNumber
+    } else {
+      throw Error(`Cannot get blockNumber for ${deployment.address}. Please add it manually to deployment file`)
+    }
+  })
+
+  const genesisBlock = Math.min(channelDeployBlockNumber, networkRegistryDeployBlockNumber)
   const channelClosureSecs = await channels.secsClosure()
 
   const transactions = new TransactionManager()
@@ -267,6 +288,7 @@ export async function createChainWrapper(
       log('Transaction with nonce %d failed to getFeeData', nonce, error)
       // TODO: find an API for fee data per environment
       feeData = {
+        lastBaseFeePerGas: null,
         maxFeePerGas: defaultMaxFeePerGas,
         maxPriorityFeePerGas: defaultMaxPriorityFeePerGas,
         gasPrice: null

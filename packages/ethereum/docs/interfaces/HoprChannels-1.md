@@ -17,7 +17,6 @@
 - [\_wrappedEmits](HoprChannels-1.md#_wrappedemits)
 - [address](HoprChannels-1.md#address)
 - [callStatic](HoprChannels-1.md#callstatic)
-- [contractName](HoprChannels-1.md#contractname)
 - [deployTransaction](HoprChannels-1.md#deploytransaction)
 - [estimateGas](HoprChannels-1.md#estimategas)
 - [filters](HoprChannels-1.md#filters)
@@ -74,7 +73,7 @@ BaseContract.\_deployedPromise
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:98
+node_modules/@ethersproject/contracts/lib/index.d.ts:100
 
 ___
 
@@ -92,7 +91,7 @@ BaseContract.\_runningEvents
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:99
+node_modules/@ethersproject/contracts/lib/index.d.ts:101
 
 ___
 
@@ -110,7 +109,7 @@ BaseContract.\_wrappedEmits
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:102
+node_modules/@ethersproject/contracts/lib/index.d.ts:104
 
 ___
 
@@ -124,7 +123,7 @@ BaseContract.address
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:77
+node_modules/@ethersproject/contracts/lib/index.d.ts:79
 
 ___
 
@@ -158,17 +157,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:498
-
-___
-
-### contractName
-
-• **contractName**: ``"HoprChannels"``
-
-#### Defined in
-
-packages/ethereum/src/types/HoprChannels.ts:292
+packages/ethereum/src/types/contracts/HoprChannels.ts:548
 
 ___
 
@@ -182,7 +171,7 @@ BaseContract.deployTransaction
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:97
+node_modules/@ethersproject/contracts/lib/index.d.ts:99
 
 ___
 
@@ -216,7 +205,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:693
+packages/ethereum/src/types/contracts/HoprChannels.ts:743
 
 ___
 
@@ -251,7 +240,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:585
+packages/ethereum/src/types/contracts/HoprChannels.ts:635
 
 ___
 
@@ -285,7 +274,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:318
+packages/ethereum/src/types/contracts/HoprChannels.ts:368
 
 ___
 
@@ -299,7 +288,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:297
+packages/ethereum/src/types/contracts/HoprChannels.ts:347
 
 ___
 
@@ -313,7 +302,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:313
+packages/ethereum/src/types/contracts/HoprChannels.ts:363
 
 ___
 
@@ -327,7 +316,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:314
+packages/ethereum/src/types/contracts/HoprChannels.ts:364
 
 ___
 
@@ -341,7 +330,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:315
+packages/ethereum/src/types/contracts/HoprChannels.ts:365
 
 ___
 
@@ -375,7 +364,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:772
+packages/ethereum/src/types/contracts/HoprChannels.ts:822
 
 ___
 
@@ -389,7 +378,7 @@ BaseContract.provider
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:80
+node_modules/@ethersproject/contracts/lib/index.d.ts:82
 
 ___
 
@@ -403,7 +392,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:316
+packages/ethereum/src/types/contracts/HoprChannels.ts:366
 
 ___
 
@@ -417,7 +406,7 @@ BaseContract.resolvedAddress
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:96
+node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ___
 
@@ -431,7 +420,7 @@ BaseContract.signer
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:79
+node_modules/@ethersproject/contracts/lib/index.d.ts:81
 
 ## Methods
 

@@ -1,6 +1,6 @@
 import assert from 'assert'
 import { peerIdFromString } from '@libp2p/peer-id'
-import { stringToU8a, u8aToHex } from '../u8a/index.js'
+import { stringToU8a, u8aEquals, u8aToHex } from '../u8a/index.js'
 import { PublicKey } from './publicKey.js'
 import { Address } from './primitives.js'
 
@@ -142,5 +142,69 @@ describe('test PublicKey primitive', function () {
 
     assert(pKeyFromCompressed.toString() === b58String)
     assert(pKeyFromUncompressed.toString() === b58String)
+  })
+
+  it('serialize array', function () {
+    const uncompressed = PublicKey.fromString(uncompressedPubKey)
+    const compressed = PublicKey.fromString(compressedPubKey)
+
+    const result = PublicKey.serializeArray([compressed, uncompressed])
+
+    assert(result.length == PublicKey.SIZE_COMPRESSED + PublicKey.SIZE_UNCOMPRESSED)
+
+    assert(
+      u8aEquals(Uint8Array.from([...compressed.serializeCompressed(), ...uncompressed.serializeUncompressed()]), result)
+    )
+
+    assert(PublicKey.serializeArray([]).length == 0)
+  })
+
+  it('deserialize array', function () {
+    const uncompressed = PublicKey.fromString(uncompressedPubKey)
+    const compressed = PublicKey.fromString(compressedPubKey)
+
+    const result = PublicKey.deserializeArray(
+      Uint8Array.from([...compressed.serializeCompressed(), ...uncompressed.serializeUncompressed()])
+    )
+
+    assert(result.length == 2, `Must contain two PublicKeys`)
+
+    assert(result[0].isCompressed, `First one must be compressed`)
+    assert(result[0].eq(compressed))
+    assert(!result[1].isCompressed, `Second one must be uncompressed`)
+    assert(result[1].eq(uncompressed))
+
+    assert(PublicKey.deserializeArray(Uint8Array.from([])).length == 0)
+
+    assert.throws(
+      () =>
+        PublicKey.deserializeArray(
+          Uint8Array.from([2, ...compressed.serializeCompressed(), ...uncompressed.serializeUncompressed()])
+        ),
+      Error('Invalid prefix 0xb8 at 33')
+    )
+
+    assert.throws(
+      () =>
+        PublicKey.deserializeArray(
+          Uint8Array.from([...compressed.serializeCompressed(), 2, ...uncompressed.serializeUncompressed()])
+        ),
+      Error('Invalid prefix 0xb8 at 66')
+    )
+
+    assert.throws(
+      () => PublicKey.deserializeArray(Uint8Array.from([2])),
+      Error('Invalid array length. U8a has 32 to few elements')
+    )
+
+    assert.throws(
+      () => PublicKey.deserializeArray(Uint8Array.from([3])),
+      Error('Invalid array length. U8a has 32 to few elements')
+    )
+
+    assert.throws(
+      () => PublicKey.deserializeArray(Uint8Array.from([4])),
+      Error('Invalid array length. U8a has 64 to few elements')
+    )
   })
 })

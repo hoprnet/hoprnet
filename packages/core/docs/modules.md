@@ -7,6 +7,7 @@
 ### Enumerations
 
 - [NetworkHealthIndicator](enums/NetworkHealthIndicator.md)
+- [NetworkPeersOrigin](enums/NetworkPeersOrigin.md)
 
 ### Classes
 
@@ -96,7 +97,7 @@
 
 #### Defined in
 
-[packages/core/src/index.ts:91](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L91)
+[packages/core/src/index.ts:93](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L93)
 
 ___
 
@@ -106,7 +107,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:142](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L142)
+[packages/core/src/index.ts:144](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L144)
 
 ___
 
@@ -132,7 +133,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/environment.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L45)
+[packages/core/src/environment.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L54)
 
 ___
 
@@ -142,7 +143,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:157](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L157)
+[packages/core/src/index.ts:159](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L159)
 
 ___
 
@@ -159,7 +160,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L16)
+[packages/core/src/channel-strategy.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L17)
 
 ___
 
@@ -169,7 +170,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:144](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L144)
+[packages/core/src/index.ts:146](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L146)
 
 ## Variables
 
@@ -405,14 +406,16 @@ ___
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `environment_id` | `string` |
-| `customProvider?` | `string` |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `environment_id` | `string` | environment name |
+| `customProvider?` | `string` |  |
 
 #### Returns
 
 [`ResolvedEnvironment`](modules.md#resolvedenvironment)
+
+the environment details, throws if environment is not supported
 
 ___
 
@@ -423,3 +426,5 @@ ___
 #### Returns
 
 `Environment`[]
+
+environments that the given HOPR version should be able to use

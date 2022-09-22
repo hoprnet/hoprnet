@@ -10,6 +10,7 @@ import {
 import BN from 'bn.js'
 import { MAX_NEW_CHANNELS_PER_TICK, NETWORK_QUALITY_THRESHOLD, INTERMEDIATE_HOPS, CHECK_TIMEOUT } from './constants.js'
 import type NetworkPeers from './network/network-peers.js'
+import { NetworkPeersOrigin } from './network/network-peers.js'
 
 const log = debug('hopr-core:channel-strategy')
 
@@ -148,7 +149,7 @@ export class PromiscuousStrategy extends SaneDefaults implements ChannelStrategy
         break
       }
       log('evaluating', randomChannel.source.toString())
-      peers.register(randomChannel.source.toPeerId(), 'promiscuous channel strategy')
+      peers.register(randomChannel.source.toPeerId(), NetworkPeersOrigin.STRATEGY_CONSIDERING_CHANNEL)
       if (
         !toOpen.find((x) => x[0].eq(randomChannel.source)) &&
         !currentChannels.find((x) => x.destination.eq(randomChannel.source)) &&

@@ -40,7 +40,7 @@ export const WS_DEFAULT_RESPONSES: Record<string, { description: string }> = {
 }
 
 /**
- * Generate a websocket endpoint description suffixed with general securty data.
+ * Generate a websocket endpoint description suffixed with general security data.
  * @param summary Short summary to prefix the endpoint's description.
  * @param path Path of the endpoint after `/api/v2`.
  * @returns endpoint's description

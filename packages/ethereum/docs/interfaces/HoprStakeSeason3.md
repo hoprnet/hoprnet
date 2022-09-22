@@ -17,7 +17,6 @@
 - [\_wrappedEmits](HoprStakeSeason3.md#_wrappedemits)
 - [address](HoprStakeSeason3.md#address)
 - [callStatic](HoprStakeSeason3.md#callstatic)
-- [contractName](HoprStakeSeason3.md#contractname)
 - [deployTransaction](HoprStakeSeason3.md#deploytransaction)
 - [estimateGas](HoprStakeSeason3.md#estimategas)
 - [filters](HoprStakeSeason3.md#filters)
@@ -95,7 +94,7 @@ BaseContract.\_deployedPromise
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:98
+node_modules/@ethersproject/contracts/lib/index.d.ts:100
 
 ___
 
@@ -113,7 +112,7 @@ BaseContract.\_runningEvents
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:99
+node_modules/@ethersproject/contracts/lib/index.d.ts:101
 
 ___
 
@@ -131,7 +130,7 @@ BaseContract.\_wrappedEmits
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:102
+node_modules/@ethersproject/contracts/lib/index.d.ts:104
 
 ___
 
@@ -145,7 +144,7 @@ BaseContract.address
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:77
+node_modules/@ethersproject/contracts/lib/index.d.ts:79
 
 ___
 
@@ -200,17 +199,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStakeSeason3.ts:759
-
-___
-
-### contractName
-
-• **contractName**: ``"HoprStakeSeason3"``
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStakeSeason3.ts:391
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason3.ts:834
 
 ___
 
@@ -224,7 +213,7 @@ BaseContract.deployTransaction
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:97
+node_modules/@ethersproject/contracts/lib/index.d.ts:99
 
 ___
 
@@ -279,7 +268,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStakeSeason3.ts:994
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason3.ts:1069
 
 ___
 
@@ -316,7 +305,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStakeSeason3.ts:921
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason3.ts:996
 
 ___
 
@@ -371,7 +360,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStakeSeason3.ts:417
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason3.ts:492
 
 ___
 
@@ -385,7 +374,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStakeSeason3.ts:396
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason3.ts:471
 
 ___
 
@@ -399,7 +388,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStakeSeason3.ts:412
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason3.ts:487
 
 ___
 
@@ -413,7 +402,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStakeSeason3.ts:413
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason3.ts:488
 
 ___
 
@@ -427,7 +416,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStakeSeason3.ts:414
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason3.ts:489
 
 ___
 
@@ -482,7 +471,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStakeSeason3.ts:1159
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason3.ts:1234
 
 ___
 
@@ -496,7 +485,7 @@ BaseContract.provider
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:80
+node_modules/@ethersproject/contracts/lib/index.d.ts:82
 
 ___
 
@@ -510,7 +499,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStakeSeason3.ts:415
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason3.ts:490
 
 ___
 
@@ -524,7 +513,7 @@ BaseContract.resolvedAddress
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:96
+node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ___
 
@@ -538,7 +527,7 @@ BaseContract.signer
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:79
+node_modules/@ethersproject/contracts/lib/index.d.ts:81
 
 ## Methods
 

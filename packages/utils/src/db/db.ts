@@ -22,6 +22,7 @@ import {
 } from '../types/index.js'
 import BN from 'bn.js'
 import { u8aToNumber, u8aConcat, toU8a } from '../u8a/index.js'
+import fs from 'fs'
 
 const log = debug(`hopr-core:db`)
 
@@ -45,6 +46,9 @@ const NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX: Uint8Array = encoder.encode('net
 const NETWORK_REGISTRY_ADDRESS_PUBLIC_KEY_PREFIX: Uint8Array = encoder.encode('networkRegistry:addressPublicKey-')
 
 const NETWORK_REGISTRY_ENABLED_PREFIX: Uint8Array = encoder.encode('networkRegistry:enabled')
+
+// Max value 2**32 - 1
+const DEFAULT_SERIALIZED_NUMBER_LENGTH = 4
 
 function createChannelKey(channelId: Hash): Uint8Array {
   return Uint8Array.from([...CHANNEL_PREFIX, ...channelId.serialize()])
@@ -170,7 +174,7 @@ export class HoprDB {
           await mkdir(dbPath, { recursive: true })
           setEnvironment = true
         } else {
-          throw new Error('Database does not exist: ' + dbPath)
+          throw new Error(`Database does not exist: ${dbPath}`)
         }
       }
     }
@@ -217,6 +221,38 @@ export class HoprDB {
 
   protected async put(key: Uint8Array, value: Uint8Array): Promise<void> {
     await this.db.put(Buffer.from(this.keyOf(key)), Buffer.from(value))
+  }
+
+  public dumpDatabase(destFile: string) {
+    log(`Dumping current database to ${destFile}`)
+    let dumpFile = fs.createWriteStream(destFile, { flags: 'a' })
+    this.db
+      .createReadStream({ keys: true, keyAsBuffer: true, values: true, valueAsBuffer: true })
+      .on('data', (d) => {
+        // Skip the public key prefix in each key
+        let key = (d.key as Buffer).subarray(PublicKey.SIZE_COMPRESSED)
+        let keyString = ''
+        let isHex = false
+        let sawDelimiter = false
+        for (const b of key) {
+          if (!sawDelimiter && b >= 32 && b <= 126) {
+            // Print sequences of ascii chars normally
+            let cc = String.fromCharCode(b)
+            keyString += (isHex ? ' ' : '') + cc
+            isHex = false
+            // Once a delimiter is encountered, always print as hex since then
+            sawDelimiter = sawDelimiter || cc == '-' || cc == ':'
+          } else {
+            // Print sequences of non-ascii chars as hex
+            keyString += (!isHex ? '0x' : '') + (b as number).toString(16)
+            isHex = true
+          }
+        }
+        dumpFile.write(keyString + ':' + d.value.toString('hex') + '\n')
+      })
+      .on('end', function () {
+        dumpFile.close()
+      })
   }
 
   private async touch(key: Uint8Array): Promise<void> {
@@ -308,7 +344,8 @@ export class HoprDB {
 
   private async increment(key: Uint8Array): Promise<number> {
     let val = await this.getCoercedOrDefault<number>(key, u8aToNumber, 0)
-    await this.put(key, Uint8Array.of(val + 1))
+    // Always store using 4 bytes, max value 2**32 - 1
+    await this.put(key, toU8a(val + 1, DEFAULT_SERIALIZED_NUMBER_LENGTH))
     return val + 1
   }
 
@@ -352,7 +389,10 @@ export class HoprDB {
   }
 
   public async getPendingAcknowledgement(halfKeyChallenge: HalfKeyChallenge): Promise<PendingAckowledgement> {
-    return await this.getCoerced(createPendingAcknowledgement(halfKeyChallenge), deserializePendingAcknowledgement)
+    return await this.getCoerced<PendingAckowledgement>(
+      createPendingAcknowledgement(halfKeyChallenge),
+      deserializePendingAcknowledgement
+    )
   }
 
   public async storePendingAcknowledgement(halfKeyChallenge: HalfKeyChallenge, isMessageSender: true): Promise<void>
@@ -414,10 +454,15 @@ export class HoprDB {
     )
   }
 
+  /**
+   * Deletes all acknowledged tickets in a channel and updates
+   * neglected tickets counter.
+   * @param channel in which channel to delete tickets
+   */
   public async deleteAcknowledgedTicketsFromChannel(channel: ChannelEntry): Promise<void> {
     const tickets = await this.getAcknowledgedTickets({ signer: channel.source })
 
-    let neglectedTickets = await this.getCoercedOrDefault<number>(NEGLECTED_TICKET_COUNT, u8aToNumber, 0)
+    const neglectedTicketsCount = await this.getCoercedOrDefault<number>(NEGLECTED_TICKET_COUNT, u8aToNumber, 0)
 
     const batch = this.db.batch()
 
@@ -425,14 +470,21 @@ export class HoprDB {
       batch.del(Buffer.from(this.keyOf(createAcknowledgedTicketKey(ack.ticket.challenge, ack.ticket.channelEpoch))))
     }
 
-    batch.put(Buffer.from(this.keyOf(NEGLECTED_TICKET_COUNT)), Uint8Array.of(neglectedTickets + 1))
+    // only update count if there has been a change
+    if (tickets.length > 0) {
+      batch.put(
+        Buffer.from(this.keyOf(NEGLECTED_TICKET_COUNT)),
+        // store updated number in 4 bytes
+        Buffer.from(toU8a(neglectedTicketsCount + tickets.length, 4))
+      )
+    }
 
     await batch.write()
   }
 
   /**
-   * Delete acknowledged ticket in database
-   * @param index Uint8Array
+   * Deletes an acknowledged ticket in database
+   * @param ack acknowledged ticket
    */
   public async delAcknowledgedTicket(ack: AcknowledgedTicket): Promise<void> {
     await this.del(createAcknowledgedTicketKey(ack.ticket.challenge, ack.ticket.channelEpoch))
@@ -451,7 +503,6 @@ export class HoprDB {
 
   /**
    * Get tickets, both unacknowledged and acknowledged
-   * @param node
    * @param filter optionally filter by signer
    * @returns an array of signed tickets
    */
@@ -513,7 +564,11 @@ export class HoprDB {
   }
 
   async getCurrentTicketIndex(channelId: Hash): Promise<UINT256 | undefined> {
-    return await this.getCoercedOrDefault(createCurrentTicketIndexKey(channelId), UINT256.deserialize, undefined)
+    return await this.getCoercedOrDefault<UINT256>(
+      createCurrentTicketIndexKey(channelId),
+      UINT256.deserialize,
+      undefined
+    )
   }
 
   setCurrentTicketIndex(channelId: Hash, ticketIndex: UINT256): Promise<void> {
@@ -532,7 +587,7 @@ export class HoprDB {
   }
 
   async getLatestConfirmedSnapshotOrUndefined(): Promise<Snapshot | undefined> {
-    return await this.getCoercedOrDefault(LATEST_CONFIRMED_SNAPSHOT_KEY, Snapshot.deserialize, undefined)
+    return await this.getCoercedOrDefault<Snapshot>(LATEST_CONFIRMED_SNAPSHOT_KEY, Snapshot.deserialize, undefined)
   }
 
   async updateLatestConfirmedSnapshot(snapshot: Snapshot): Promise<void> {
@@ -540,7 +595,7 @@ export class HoprDB {
   }
 
   async getChannel(channelId: Hash): Promise<ChannelEntry> {
-    return await this.getCoerced(createChannelKey(channelId), ChannelEntry.deserialize)
+    return await this.getCoerced<ChannelEntry>(createChannelKey(channelId), ChannelEntry.deserialize)
   }
 
   async getChannels(filter?: (channel: ChannelEntry) => boolean): Promise<ChannelEntry[]> {
@@ -563,7 +618,7 @@ export class HoprDB {
   }
 
   async getAccount(address: Address): Promise<AccountEntry | undefined> {
-    return await this.getCoercedOrDefault(createAccountKey(address), AccountEntry.deserialize, undefined)
+    return await this.getCoercedOrDefault<AccountEntry>(createAccountKey(address), AccountEntry.deserialize, undefined)
   }
 
   async updateAccountAndSnapshot(account: AccountEntry, snapshot: Snapshot): Promise<void> {
@@ -586,14 +641,14 @@ export class HoprDB {
   }
 
   public async getRedeemedTicketsValue(): Promise<Balance> {
-    return await this.getCoercedOrDefault(REDEEMED_TICKETS_VALUE, Balance.deserialize, Balance.ZERO)
+    return await this.getCoercedOrDefault<Balance>(REDEEMED_TICKETS_VALUE, Balance.deserialize, Balance.ZERO)
   }
   public async getRedeemedTicketsCount(): Promise<number> {
-    return this.getCoercedOrDefault(REDEEMED_TICKETS_COUNT, u8aToNumber, 0)
+    return this.getCoercedOrDefault<number>(REDEEMED_TICKETS_COUNT, u8aToNumber, 0)
   }
 
   public async getNeglectedTicketsCount(): Promise<number> {
-    return this.getCoercedOrDefault(NEGLECTED_TICKET_COUNT, u8aToNumber, 0)
+    return this.getCoercedOrDefault<number>(NEGLECTED_TICKET_COUNT, u8aToNumber, 0)
   }
 
   public async getPendingTicketCount(): Promise<number> {
@@ -601,11 +656,15 @@ export class HoprDB {
   }
 
   public async getPendingBalanceTo(counterparty: Address): Promise<Balance> {
-    return await this.getCoercedOrDefault(createPendingTicketsCountKey(counterparty), Balance.deserialize, Balance.ZERO)
+    return await this.getCoercedOrDefault<Balance>(
+      createPendingTicketsCountKey(counterparty),
+      Balance.deserialize,
+      Balance.ZERO
+    )
   }
 
   public async getLosingTicketCount(): Promise<number> {
-    return await this.getCoercedOrDefault(LOSING_TICKET_COUNT, u8aToNumber, 0)
+    return await this.getCoercedOrDefault<number>(LOSING_TICKET_COUNT, u8aToNumber, 0)
   }
 
   public async markPending(ticket: Ticket) {
@@ -643,10 +702,10 @@ export class HoprDB {
   }
 
   public async getRejectedTicketsValue(): Promise<Balance> {
-    return await this.getCoercedOrDefault(REJECTED_TICKETS_VALUE, Balance.deserialize, Balance.ZERO)
+    return await this.getCoercedOrDefault<Balance>(REJECTED_TICKETS_VALUE, Balance.deserialize, Balance.ZERO)
   }
   public async getRejectedTicketsCount(): Promise<number> {
-    return this.getCoercedOrDefault(REJECTED_TICKETS_COUNT, u8aToNumber, 0)
+    return this.getCoercedOrDefault<number>(REJECTED_TICKETS_COUNT, u8aToNumber, 0)
   }
   public async markRejected(t: Ticket): Promise<void> {
     await this.increment(REJECTED_TICKETS_COUNT)
@@ -696,7 +755,7 @@ export class HoprDB {
   }
 
   public async getHoprBalance(): Promise<Balance> {
-    return this.getCoercedOrDefault(HOPR_BALANCE_KEY, Balance.deserialize, Balance.ZERO)
+    return this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, Balance.deserialize, Balance.ZERO)
   }
 
   public async setHoprBalance(value: Balance): Promise<void> {
@@ -731,12 +790,22 @@ export class HoprDB {
    * @param snapshot
    */
   public async addToNetworkRegistry(pubKey: PublicKey, account: Address, snapshot: Snapshot): Promise<void> {
+    let registeredNodes = []
+    try {
+      registeredNodes = await this.findHoprNodesUsingAccountInNetworkRegistry(account)
+    } catch (error) {}
+
+    // add new node to the list
+    registeredNodes.push(pubKey)
+
     await this.db
       .batch()
+      // node public key to address (M->1)
       .put(Buffer.from(this.keyOf(createNetworkRegistryEntryKey(pubKey))), Buffer.from(account.serialize()))
+      // address to node public keys (1->M) in the format of key -> PublicKey[]
       .put(
         Buffer.from(this.keyOf(createNetworkRegistryAddressToPublicKeyKey(account))),
-        Buffer.from(pubKey.serializeCompressed())
+        Buffer.from(PublicKey.serializeArray(registeredNodes))
       )
       .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
       .write()
@@ -744,39 +813,62 @@ export class HoprDB {
 
   /**
    * Do a reverse find by searching the stored account to return
-   * the associated public key of the HoprNode.
+   * the associated public keys of registered HOPR nodes.
    * @param account
-   * @returns PublicKey of the associated HoprNode
+   * @returns array of PublicKey of the associated HOPR nodes
    */
-  public async findHoprNodeUsingAccountInNetworkRegistry(account: Address): Promise<PublicKey> {
-    const pubKey = await this.getCoercedOrDefault(
+  public async findHoprNodesUsingAccountInNetworkRegistry(account: Address): Promise<PublicKey[]> {
+    const pubKeys = await this.getCoercedOrDefault<PublicKey[]>(
       createNetworkRegistryAddressToPublicKeyKey(account),
-      PublicKey.deserialize,
+      PublicKey.deserializeArray,
       undefined
     )
 
-    if (!pubKey) {
+    if (!pubKeys) {
       throw Error('HoprNode not found')
     }
 
-    return pubKey
+    return pubKeys
   }
 
   /**
    * Hopr Network Registry
    * Unlink hoprNode to an ETH address by removing the entry.
+   * @param pubKey the node's x
    * @param account the account to use so we can search for the key in the database
    * @param snapshot
    */
-  public async removeFromNetworkRegistry(account: Address, snapshot: Snapshot): Promise<void> {
-    const hoprNode = await this.findHoprNodeUsingAccountInNetworkRegistry(account)
-    const entryKey = createNetworkRegistryEntryKey(hoprNode)
+  public async removeFromNetworkRegistry(pubKey: PublicKey, account: Address, snapshot: Snapshot): Promise<void> {
+    let registeredNodes = []
+    try {
+      registeredNodes = await this.findHoprNodesUsingAccountInNetworkRegistry(account)
+    } catch (error) {
+      log(`cannot remove node from network registry due to ${error}`)
+      throw Error('HoprNode not registered to the account')
+    }
+
+    // find registered peer id index
+    const registeredIndex = registeredNodes.findIndex((registeredPubKey) => pubKey.eq(registeredPubKey))
+
+    if (registeredIndex < 0) {
+      log(`cannot remove node from network registry, not found`)
+      throw Error('HoprNode not registered to the account')
+    }
+
+    // remove nodes
+    registeredNodes.splice(registeredIndex, 1)
+
+    const entryKey = createNetworkRegistryEntryKey(pubKey)
 
     if (entryKey) {
       await this.db
         .batch()
         .del(Buffer.from(this.keyOf(entryKey)))
-        .del(Buffer.from(this.keyOf(createNetworkRegistryAddressToPublicKeyKey(account))))
+        // address to node public keys (1->M) in the format of key -> PublicKey[]
+        .put(
+          Buffer.from(this.keyOf(createNetworkRegistryAddressToPublicKeyKey(account))),
+          Buffer.from(PublicKey.serializeArray(registeredNodes))
+        )
         .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
         .write()
     }
@@ -822,7 +914,7 @@ export class HoprDB {
    * @returns true if account is eligible
    */
   public async isEligible(account: Address): Promise<boolean> {
-    return this.getCoercedOrDefault(createNetworkRegistryAddressEligibleKey(account), () => true, false)
+    return this.getCoercedOrDefault<boolean>(createNetworkRegistryAddressEligibleKey(account), () => true, false)
   }
 
   /**
@@ -838,11 +930,11 @@ export class HoprDB {
   }
 
   /**
-   * Hopr Network Registry
-   * @returns true if register is enabled
+   * Check ifs Network registry is enabled
+   * @returns true if register is enabled or if key is not preset in the dababase
    */
   public async isNetworkRegistryEnabled(): Promise<boolean> {
-    return this.getCoercedOrDefault(NETWORK_REGISTRY_ENABLED_PREFIX, (v) => Boolean(v[0]), true)
+    return this.getCoercedOrDefault<boolean>(NETWORK_REGISTRY_ENABLED_PREFIX, (v) => Boolean(v[0]), true)
   }
 
   static createMock(id?: PublicKey): HoprDB {
