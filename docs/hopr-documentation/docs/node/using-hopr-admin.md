@@ -16,7 +16,7 @@ Make sure you have installed a `hoprd` node either through Docker or with a hard
 Please be aware that it can take 10 minutes for your `hoprd` node to boot up.
 :::
 
-**Network Registry:** If you have registered your node on the network registry youw will be airdropped mHOPR/xDAI and don't need to worry about funding your node. Please skip step three of the Admin UI & Funding section.
+**Network Registry:** If you have registered your node on the network registry youw will have been airdropped mHOPR/xDAI along with your NFT. In **step three** of Admin UI & Funding below make sure to use the mHOPR and xDAI provided instead of purchasing wxHOPR. 
 
 ## Admin UI & Funding
 
@@ -34,9 +34,9 @@ If you used Docker to install your node, you should be able to access it at: [ht
 
 The`apitoken` is whatever you set your security token as in the installation process.
 
-**Network Registry:** Skip the following step if you have been or are waiting to be airdropped mHOPR & xDAI as part of the Monte Rosa release.
-
 (**3**) You will see a newly generated ETH & Node address. Use the ETH address to send [xDAI](https://www.xdaichain.com/for-users/get-xdai-tokens) and [HOPR tokens](/staking/how-to-get-hopr) to in order to fund your node. **Your node will not start until it has been funded.**
+
+**Network Registry:** If you are participating in the Monte Rosa release, send the mHOPR and xDAI you have been airdropped.
 
 Otherwise, we recommend you fund your node with **0.01 xDai & 10 wxHOPR**. Remember to use the node's ETH address for this.
 

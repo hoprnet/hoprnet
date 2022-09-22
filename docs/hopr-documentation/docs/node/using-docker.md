@@ -74,7 +74,7 @@ This ensures the node cannot be accessed by a malicious user residing in the sam
 (**3**) Copy the following command and replace **YOUR_SECURITY_TOKEN** with your own.
 
 ```bash
-docker run --pull always -ti -v $HOME/.hoprd-db:/app/DB -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:paleochora --admin --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --init --API --apiHost "0.0.0.0" --apiPort 3001 --identity /app/DB/.hopr-id-paleochora --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --adminPort 3000 --host "0.0.0.0:9091"
+sudo docker run --pull always -ti -v $HOME/.hoprd-db:/app/DB -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:paleochora --admin --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --init --API --apiHost "0.0.0.0" --apiPort 3001 --identity /app/DB/.hopr-id-paleochora --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --adminPort 3000 --host "0.0.0.0:9091"
 ```
 
 (**4**) Paste the new adjusted command into your terminal, and hit enter.
@@ -91,7 +91,7 @@ If you are in the process of registering your node on the network registry pleas
 
 Otherwise, the installation process is complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).
 
-### Default ports
+## Default ports
 
 * 3000 on TCP : Admin UI port (speaks HTTP protocol)
 * 3001 on TCP: REST API port (speaks HTTP)

@@ -12,23 +12,23 @@ This is the process to register your node onto the Network Registry smart contra
 
 ## Monte Rosa Release
 
-The Network Registry is being used for the Monte Rosa release, so please make sure you are eligible and have been registered before trying to use this environment. To add your node to the registry, you must first register your interest to participate in the release by completing this form.
+The Network Registry is being used for the Monte Rosa release, so please make sure you are eligible and have been registered before trying to use this environment. To add your node to the registry, you must first register your interest to participate in the release by completing [this form.](https://docs.google.com/forms/d/1Vl5tD0Fy0Vrm3oxxjGepVAiq-HQU3kWDJEuk35jpjeY/edit)
 
 The staking address you provide on this form will be the primary indicator in assessing your eligibility to be added to the registry.
 
-### Eligibility
+## Eligibility
 
-From the list of interested participants, an ordered waitlist will be generated. Your staking address determines this, it will be given a score based on NFT holdings from previous testnets/staking seasons and HOPR tokens currently staked.
+From the list of interested participants, an ordered waitlist will be generated. Your rank on the waitlist is determined by the NFTs held in your staking address from past testnets/staking seasons and how much HOPR you have staked currently.
 
-Users from the waitlist will be added to the registry in blocks of 20. Most of these 20 will be the highest-ranking unregistered participants on the waitlist. But one of every 20 will be given randomly to people further down the list (so you always have a chance of being added even if you don't have the highest rank).
+Users from the waitlist will then be given an NFT in blocks of 20. You can use this NFT to register your node on the network registry smart contract. 
 
-A few of every 20 may also be allocated to Dappnode and Avado users ranked, wth priority given to the highest ranking participants on the waitlist.
+For every 20 NFTs given out, the majority will go to the next highest ranking participants on te waitlist but a few will also be alllocated to Dappnode/Avado users. And one fo every 20 will be given to someone at random further down the waitlist (so you always have a chance of being chosen even without having participated in previous staking seasons or releases).
 
-You can view the current waitlist and the registered participants here.
+Depending on your prefered method of contact you will either be notified by email when you have been chosen or you can review the waitlist manually here. 
 
 ## Registering your node
 
-If you are chosen to join the registry you will be sent a network registry NFT to your staking address. You will be contacted confirming your eligibility. Once you have been sent an NFT and a confirmation, you can register your node by following these steps:
+If you are chosen to join the registry you will be sent a network registry NFT to your staking address as well as mHOPR and xDAI to fund your node. You will be contacted confirming your eligibility. Once you have been sent an NFT and a confirmation, you can register your node by following these steps:
 
 ### Step 1: Stake your NFT
 
@@ -129,6 +129,4 @@ To check if you have been registered:
 (**3**) Check that Network registry eligibility is set to ‘true’
 (**4**) If it is still false wait a few minutes and check again
 
-## Funding your node
-
-Once you have successfully been added to the network registry you will be airdropped mHOPR and xDAI. You will need to wait for your node to be funded before using hopr-admin.
+The registration process is now complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).
