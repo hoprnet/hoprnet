@@ -10,22 +10,24 @@ Please withdraw all your funds and delete the old package before installing a ne
 
 ## Installing the HOPR client
 
-Open the DappStore and enter this hash into the search bar:
+(**1**) Open the DAppStore using the sidebar to the left.
+
+(**2**) Enter the following hash into the search bar:
 
 ```
 /ipfs/QmPhSZTZbM6kd9VizvZpKDN3fQe5bqvCDooCBPYEUXdTcy
 ```
 
-It should bring up the latest version of the HOPR client. Click install and wait for the download to complete.
+(**3**) It should bring up the latest version of the HOPR client. Click install and wait for the download to complete.
 
-![DappStore](/img/node/avado-1.png)
-
-After you have installed the package, you can find the HOPR client in `packages`.
+(**4**) After you have installed the package, go to 'packages'. You should see the HOPR client downlaoded and ready to use.
 
 ![MyDapps](./images/Dappnode-2.png)
 
-Open the client and you should be greeted with the hopr-admin interface. 
+(**5**) Simply, open the client and you should be greeted with the hopr-admin interface. That's all, you are now ready to start using hopr-admin.
 
-Your **security token** is set to `!5qxc9Lp1BE7IFQ-nrtttU`, you may need this for the [tutorial.](using-hopr-admin) 
+Your **security token** is set to `!5qxc9Lp1BE7IFQ-nrtttU`. You will need this to access hopr-admin.
 
-The installation process is now complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).
+If you are in the process of registering your node on the network registry please complete the process [here.](./network-registry-tutorial.md)
+
+Otherwise, the installation process is complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).

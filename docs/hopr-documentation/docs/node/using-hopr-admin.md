@@ -16,7 +16,7 @@ Make sure you have installed a `hoprd` node either through Docker or with a hard
 Please be aware that it can take 10 minutes for your `hoprd` node to boot up.
 :::
 
-**Network Registry:** If you are part of the network registry and are starting your node to find your peerID, please note that **step 3** of the Admin UI & Funding section is altered for you. Your funding process is explained there. Otherwise, follow the rest of the tutorial as usual.
+**Network Registry:** If you have registered your node on the network registry youw will be airdropped mHOPR/xDAI and don't need to worry about funding your node. Please skip step three of the Admin UI & Funding section.
 
 ## Admin UI & Funding
 
@@ -34,11 +34,9 @@ If you used Docker to install your node, you should be able to access it at: [ht
 
 The`apitoken` is whatever you set your security token as in the installation process.
 
+**Network Registry:** Skip the following step if you have been or are waiting to be airdropped mHOPR & xDAI as part of the Monte Rosa release.
+
 (**3**) You will see a newly generated ETH & Node address. Use the ETH address to send [xDAI](https://www.xdaichain.com/for-users/get-xdai-tokens) and [HOPR tokens](/staking/how-to-get-hopr) to in order to fund your node. **Your node will not start until it has been funded.**
-
-**Network Registry:** If you are being funded as a part of the Network Registry, expand and copy the full **node address**. By default, you will see a contracted string of five letters. Click on them to expand the full address. It should look similar to this: `16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV`.
-
-Make sure to copy your node address, not the example above. Use your node address as your **peerID** when registering through this site. Once you have submitted your details, your node will automatically receive both xDAI and mHOPR (assuming you are eligible).
 
 Otherwise, we recommend you fund your node with **0.01 xDai & 10 wxHOPR**. Remember to use the node's ETH address for this.
 
@@ -215,18 +213,18 @@ But the main thing to see is if you received a response or not. If your output w
 You can now give one of the responsive nodes an alias:
 
 ```
-alias 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV Bob
+alias 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV Betty
 ```
 
 Expected output:
 
 ```
-Set alias 'Bob' to 'jTzjV'.
+Set alias 'Betty' to 'jTzjV'.
 ```
 
 This is useful as you can use the alias in place of their HOPR address when using commands.
 
-At this point, you should ideally have found two responsive nodes and given them both an alias. I will be using Alice and Bob.
+At this point, you should ideally have found two responsive nodes and given them both an alias. I will be using Betty and Chao.
 
 ### Check aliases
 
@@ -240,22 +238,24 @@ Expected Output:
 
 ```
 me ->  M6psb
-Bob -> jTzjV
-Alice -> FskLs
+Betty -> jTzjV
+Chao -> FskLs
 ```
 
-All of these aliases can be used in place of their corresponding HOPR address. For example, if you want to ping Bob’s node **16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV**, you can use:
+By default, you will have the alias **me** set to your own address. If you don't see this you should set it manually as I will be using it quite often in this tutorial.
+
+All of these aliases can be used in place of their corresponding HOPR address. For example, if you want to ping Betty’s node **16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV**, you can use:
 
 ```
-ping Bob
+ping Betty
 ```
 
-**_Note:_** you can assign multiple aliases to a single node, but you cannot assign the same alias to multiple nodes. E.g. two separate HOPR addresses can not be aliased `Bob`
+**_Note:_** you can assign multiple aliases to a single node, but you cannot assign the same alias to multiple nodes. E.g. two separate HOPR addresses can not be aliased `Betty`
 
 If you want to remove an alias, use:
 
 ```
-alias remove Bob
+alias remove Betty
 ```
 
 ### Sending a direct/0-HOP message
@@ -263,7 +263,7 @@ alias remove Bob
 Now that we have found nodes we want to interact with, we can send a simple direct message to one of them.
 
 ```
-send ,Bob Hello Bob!
+send ,Betty Hello Betty!
 ```
 
 Expected output:
@@ -272,20 +272,20 @@ Expected output:
 Message sent
 ```
 
-**_Note:_** Don't forget to add the comma and use the correct alias. Bob is an alias I assigned to a previously found responsive node. Otherwise, you can just write their HOPR address:
+**_Note:_** Don't forget to add the comma and use the correct alias. Betty is an alias I assigned to a previously found responsive node. Otherwise, you can just write their HOPR address:
 
 ```
-send ,16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV Hello Bob!
+send ,16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV Hello Betty!
 ```
 
 This is a direct message or a 0-HOP message. It sends the message directly to another node without intermediaries and is costless.
 
-The node you messaged (in my case, `Bob`) will receive an output that looks like this:
+The node you messaged (in my case, `Betty`) will receive an output that looks like this:
 
 ```
 #### NODE RECEIVED MESSAGE ####
 
-Message: Hello Bob!
+Message: Hello Betty!
 
 Latency: 295 ms
 ```
@@ -309,7 +309,7 @@ Now, if you message a node, it will receive an output including your address:
 ```
 #### NODE RECEIVED MESSAGE ####
 
-Message: M6psb:Hello Bob!
+Message: M6psb:Hello Betty!
 
 Latency: 170 ms
 ```
@@ -343,16 +343,16 @@ To use another node on the network to relay data, you have to pay them for their
 
 Payment channels are funded edges between two nodes. They are a link between two nodes with some HOPR tokens staked in them to pay the nodes that relay data for the sender.
 
-![payment channel](./images/payment-channel.png)
+![payment channel](./images/payment-channel-2.png)
 
 ### Opening a channel
 
 When opening a channel, you need to choose a node to open the channel with and the amount of HOPR tokens you want to stake. You should stake at least 0.2 HOPR tokens to complete this tutorial.
 
-You can open a payment channel with Bob by using:
+You can open a payment channel with Betty by using:
 
 ```
-open Bob 0.2
+open Betty 0.2
 ```
 
 The general format is:
@@ -369,18 +369,18 @@ Opening channel to node "jTzjV".
 Successfully opened channel to node "jTzjV".
 ```
 
-This will open a channel from you to Bob with **0.2 HOPR** staked in it. You can use these tokens to pay Bob and all the other nodes in any relay you use, where Bob is the first intermediary node.
+This will open a channel from you to Betty with **0.2 HOPR** staked in it. You can use these tokens to pay Betty and all the other nodes in any relay you use, where Betty is the first intermediary node.
 
-**_Note:_** Channels are unidirectional; opening this channel does not mean a channel from Bob to your node exists.
+**_Note:_** Channels are unidirectional; opening this channel does not mean a channel from Betty to your node exists.
 
-![Channel direction](./images/channel-direction.png)
+![Channel direction](./images/channel-direction-2.png)
 
-Only one channel can exist in a single direction between two nodes. You can have both a channel from Alice → Bob & Bob → Alice but not more than one channel from Alice → Bob.
+Only one channel can exist in a single direction between two nodes. You can have both a channel from Betty → Chao & Chao → Betty but not more than one channel from Betty → Chao.
 
-Once you have opened a channel to Bob, trying to open another one will fail.
+Once you have opened a channel to Betty, trying to open another one will fail.
 
 ```
-open Bob 0.01
+open Betty 0.01
 ```
 
 Expected output:
@@ -393,12 +393,12 @@ Failed to open a channel to jTzjV.
 
 ### Closing a channel
 
-You should have a channel open with `Bob` or either one of your responsive nodes by now with at least 0.2 HOPR tokens staked.
+You should have a channel open with `Betty` or either one of your responsive nodes by now with at least 0.2 HOPR tokens staked.
 
-If you have underfunded the channel linked to Bob, you can `close` the channel and retrieve all the funds staked before opening a new channel with Bob:
+If you have underfunded the channel linked to Betty, you can `close` the channel and retrieve all the funds staked before opening a new channel with Betty:
 
 ```
-close Bob
+close Betty
 ```
 
 Expected output:
@@ -406,7 +406,7 @@ Expected output:
 ```
 Closing channel to "jTzjV".
 
-Initiated channel closure, the channel must remain open for at least 1 minute. Please send the close command again once the cool-off has passed. Receipt: "0x4c529ee1d44249e42633b14036d9c037daf4d9f077ea853ef02ac37e458b41ba".
+Initiated channel closure, the channel must remain open for at least 1 minute. Receipt: "0x4c529ee1d44249e42633b14036d9c037daf4d9f077ea853ef02ac37e458b41ba".
 ```
 
 This will take a minute as your funds need to be retrieved. You can view the progress of the channel closure by checking your open channels.
@@ -419,7 +419,7 @@ You can check on all your open channels by entering `channels`:
 channels
 ```
 
-You should have a single outgoing channel to Bob’s address and no incoming channels (if you haven't closed the channel).
+You should have a single outgoing channel to Betty’s address and no incoming channels (if you haven't closed the channel).
 
 ```
 fetching channels...
@@ -436,14 +436,14 @@ If you see an incoming channel, someone has opened a channel with your node, whi
 
 You may also see channels with the status `PendingToClose` if they are closing or `WaitingForCommitment` if they are opening.
 
-**_Note:_** If you closed your channel with Bob, make sure you have reopened it with 0.2 HOPR tokens staked before continuing this tutorial.
+**_Note:_** If you closed your channel with Betty, make sure you have reopened it with 0.2 HOPR tokens staked before continuing this tutorial.
 
 ### Send a 1-HOP message
 
-Now that you have an open channel with Bob, you can use Bob as an intermediary node to relay your message.
+Now that you have an open channel with Betty, you can use them as an intermediary node to relay your message.
 
 ```
-send Bob,me This is a message for me!
+send Betty,me This is a message for me!
 ```
 
 The general format is:
@@ -468,16 +468,16 @@ Latency: 445ms
 
 **_Note:_** I have includeRecipient set to false. Your output might look slightly different.
 
-In this example, we’re using Bob’s node to relay a message back to ourselves. This works because the last HOP to the receiver doesn’t require funding. So is possible without an open payment channel.
+In this example, we’re using Betty’s node to relay a message back to ourselves. This works because the last HOP to the receiver doesn’t require funding. So is possible without an open payment channel.
 
 This is also why 0-HOP/direct messages are possible without open payment channels.
 
-![1-HOP message](./images/1-hop.png)
+![1-HOP message](./images/1-hop-2.png)
 
-This is a manually selected 1-HOP path. If you try and replicate this with Alice, it should fail as you have no open channels with Alice.
+This is a manually selected 1-HOP path. If you try and replicate this with Chao, it should fail as you have no open channels with Chao.
 
 ```
-send Alice,me This is a message for me!
+send Chao,me This is a message for me!
 ```
 
 Expected output:
@@ -490,54 +490,54 @@ Failed to send message.
 
 You can use more than one node as an intermediary, with a maximum of three. The HOPR network will only select 3-HOP paths when you use automatic pathing; all longer paths will not be considered and will also fail in manual path selection.
 
-Longer paths require more information to be stored in packet headers, which makes them distinguishable from standard relays. This is information HOPR would rather not broadcast to malicious actors.
+Longer paths require more information to be stored in packet headers, which makes them distinguishable from standard relays. This difference in packet header is a metadata leak that HOPR tries to avoid.
 
-For similar reasons, 0-HOP, 1-HOP and 2-HOP paths are discouraged in manual path selection, but for this walkthrough, they are fine.
+0-HOP, 1-HOP and 2-HOP paths use padded headers to stay consistent with this requirement but are not as mixed or as private as a 3-HOP path. But for the purpose of this walkthrough they are fine.
 
 ### Send a 2-HOP message
 
 Now let’s try and send a 2-HOP message. For this to work, every node in the path must have a channel open with the next node in the path, excluding the last channel to the receiver.
 
-So a 2-HOP message to yourself through Bob and Alice: me → Bob → Alice → me would require channels to be open from me → Bob & Bob → Alice (me → Bob → Alice). The final channel from Alice → me is optional.
+So a 2-HOP message to yourself through Betty and Chao: me → Betty → Chao → me would require channels to be open from me → Betty & Betty → Chao (me → Betty → Chao). The final channel from Chao → me is not required as the last HOP of a relay is not incentivised. We assume that the reciever has an inherant desire to receive messages.
 
-![2-hop-success](./images/2-hop-success.png)
+![2-hop-success](./images/2-hop-success-2.png)
 
 You can try and send a 2-HOP message by typing:
 
 ```
-send Bob,Alice,me Hi!
+send Betty,Chao,me Hi!
 ```
 
-**_Note:_** make sure these aliases exist for you or replace Bob & Alice with whatever aliases you are using (or just the HOPR addresses of the nodes you want to use)
+**_Note:_** make sure these aliases exist for you or replace Betty & Chao with whatever aliases you are using (or just the HOPR addresses of the nodes you want to use)
 
-If it fails to send, it is likely, that Bob does not have a channel open to Alice (Bob -> Alice) since you should have a channel open to Bob (me -> Bob) with sufficient funds. A successful message costs 0.01 HOPR tokens per HOP currently.
+If it fails to send, it is likely, that Betty does not have a channel open to Chao (Betty → Chao) since you should have a channel open to Betty (me → Betty) with sufficient funds staked. A successful message costs 0.01 HOPR tokens per HOP currently.
 
-![2-hop-fail](./images/2-hop-fail.png)
+![2-hop-fail](./images/2-hop-fail-2.png)
 
 ### Path directionality
 
-Even if the message succeeds, you should note that you won’t be able to make this 2-HOP message in the other direction as you don’t have an open channel with Alice. And Alice may not have an open channel with Bob.
+Even if the message succeeds, you should note that you won’t be able to make this 2-HOP message in the other direction as you don’t have an open channel with Chao. And Chao may not have an open channel with Betty.
 
-![Reverse route](./images/reverse-route.png)
+![Reverse route](./images/reverse-directionality-2.png)
 
 Here the first route is viable, whereas the second route will fail.
 
 You want to connect to other well-connected nodes to increase your pathing options. But if you just want to experiment with different paths without the hassle, you can use [Playground](https://playground.hoprnet.org/). It will let you control five fully interconnected nodes costlessly without any installations.
 
-**_Note:_** If using Playground, you need to use the `close` command to remove channels and recreate incomplete paths.
+**_Note:_** If using Playground, you will need to use the `close` command to remove channels and recreate incomplete paths.
 
 ### Path with consecutively repeating nodes
 
-You can not have consecutively repeating nodes. For example, me → Alice → Alice → Bob.
+You can not have consecutively repeating nodes. For example, me → Betty → Betty → Zoe.
 
-![Consecutively repeating node](./images/consecutively-repeating.png)
+![Consecutively repeating node](./images/consecutively-repeating-2.png)
 
 This is also why the first node specified on a path cannot be yourself, as you are also the sending node.
 
 Try using the following route. It should fail:
 
 ```
-send me,Bob Hi!
+send me,Betty Hi!
 ```
 
 ### Automatic pathing
@@ -545,7 +545,7 @@ send me,Bob Hi!
 So far, we have used manually selected paths by entering the whole path into the command. Instead of this, we can instead let HOPR find a path for the relay by specifying just the receiver **_with no comma:_**
 
 ```
-send Bob Hi!
+send Betty Hi!
 ```
 
 Automatic pathing will only look for 3-HOP paths from you to the receiver. If none exist or you don’t have sufficient funds staked in the first channel of the relay, it will fail.
@@ -554,7 +554,7 @@ Automatic pathing will only look for 3-HOP paths from you to the receiver. If no
 Failed to send message.
 ```
 
-**_Note:_** Automatic pathing will discard any repeating nodes even if they are non-consecutive. With manual path selection, you can repeat nodes non-consecutively: me → Bob → Alice → Bob → me
+**_Note:_** Automatic pathing will discard any repeating nodes even if they are non-consecutive. With manual path selection, you can repeat nodes non-consecutively: me → Betty → Chao → Betty → me
 
 But this will also throw a warning as it is less than ideal for most relays.
 
@@ -615,13 +615,19 @@ You should have earned tickets if your node was used as an intermediary to relay
 
 ### Ticket redemption
 
-Tickets are redeemed automatically, so the tickets which contain value will automatically be converted to HOPR tokens and added to the payment channels used for that relay. The rest are discarded with no trace left on the blockchain.
+Tickets are redeemed automatically, so the tickets which contain value will be converted to HOPR tokens and added to the balance of the node used for that relay. The rest are discarded with no trace left on the blockchain.
 
-![tickets-channels](./images/tickets-channels.png)
+If a channel exists in both directions between consecutive nodes on the relay, the ticket is redeemed into the following nodes channel instead of it's balance.
 
-**_Note:_** If no channel exists for the last HOP of a relay, the tokens are added directly into the node balance.
+![tickets-channels](./images/tickets-channels-2.png)
 
-When channels are closed, all staked tokens are also added to your balance.
+In the above example, you as the sender will create a ticket of value 0.02 HOPR to pay for the entire relay. Since no channel exists from Betty -> me the ticket is redeemed into Betty's node. Betty now generates a ticket of value 0.01 HOPR to pay for the remaining relay and since a channel does exist from Chao -> Betty, the ticket is redeemed into this channel instead of Chao's balance.
+
+Chao then sends the message to Zoe and does not generate a ticket for the last HOP of the relay.
+
+By redeeming tickets into channels nodes are keeping healthy connections funded. In the long run this means your node will be more active on the network earning more HOPR!
+
+When channels are closed, all staked tokens are added to your balance and from there can be withdrawn to an external wallet.
 
 ### Withdrawing funds
 

@@ -34,7 +34,6 @@ const sidebars = {
         'core/cover-traffic',
         'core/cover-traffic-nodes',
         'core/balancing-cover-traffic',
-        'core/network-registry-monte-rosa',
         'faq'
       ]
     },
@@ -48,7 +47,9 @@ const sidebars = {
         'node/using-dappnode',
         'node/using-docker',
         'node/using-hopr-admin',
-        'node/hoprd-commands']
+        'node/hoprd-commands',
+        'node/network-registry-tutorial'
+      ]
     },
 
     {

@@ -9,10 +9,6 @@ import TabItem from '@theme/TabItem';
 The instructions below are for Linux and macOS, it is possible to use Windows, but this may result in some issues. Using a VPS if you are on Windows is recommended.
 :::
 
-:::caution WARNING
-The docker image is in alpha. The following instructions may not work for you.
-:::
-
 You can use Docker to install a `hoprd` node on your device quickly without worrying too much about the operating system or any additional software. There are, however, some hardware requirements needed to complete the installation.
 
 To use Docker, you will need a device that supports hardware-level virtualisation: VT-x for Intel-based PCs and AMD-V for AMD processors. Most Mac and Linux machines support it out of the box, so just ensure your device meets the following minimum requirements to run `hoprd`:
@@ -91,4 +87,16 @@ Please note the `--apiToken` (Security token), as this will be used to access ho
 
 All ports are mapped to your local host, assuming you stick to the default port numbers. You should be able to view the `hopr-admin` interface at [http://localhost:3000](http://localhost:3000) (replace `localhost` with your server IP address if you are using a VPS).
 
-The installation process is now complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).
+If you are in the process of registering your node on the network registry please complete the process [here.](./network-registry-tutorial.md)
+
+Otherwise, the installation process is complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).
+
+### Default ports
+
+* 3000 on TCP : Admin UI port (speaks HTTP protocol)
+* 3001 on TCP: REST API port (speaks HTTP)
+* 8080 on TCP: Healthcheck service - is used to see that the node is up & running (speaks HTTP)
+* 9091 on TCP: main P2P port used for HOPR protocol
+* 9091 on UDP: used for STUN requests by other non-public nodes reaching out to you to see what their IP address is
+
+In general, you will only want to change these port numbers if you intend to run multiple nodes simultaneously. Otherwise, use the Docker command with the default mapping.

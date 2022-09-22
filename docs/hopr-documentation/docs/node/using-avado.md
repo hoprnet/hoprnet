@@ -6,7 +6,7 @@ title: Using an Avado Node
 To set up your AVADO Node, follow the instructions that came with the box. If you have a HOPR PC Node, it will come with HOPR pre-installed. All you have to do is download the HOPR client to start interacting with your node!
 
 :::caution Warning
-Please delete any old packages as necessary; make sure to withdraw your funds before doing so.
+Please withdraw all your funds and delete the old package before installing a new one.
 :::
 
 ## Installing the HOPR client
@@ -25,6 +25,8 @@ After you have installed the HOPR package, you can find the HOPR client in `my D
 
 ![MyDapps](/img/node/avado-2.png)
 
-Your **security token** is set to `!5qxc9Lp1BE7IFQ-nrtttU`, you may need this for the [tutorial.](using-hopr-admin) 
+Your **security token** is set to `!5qxc9Lp1BE7IFQ-nrtttU`. You will need this to access the hopr-admin. 
 
-The installation process is now complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).  
+If you are in the process of registering your node on the network registry please complete the process [here.](./network-registry-tutorial.md)
+
+Otherwise, the installation process is complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin). 
