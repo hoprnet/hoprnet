@@ -7,25 +7,27 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 :::info INFO
-The instructions below are for Linux and macOS, however, due to the nature of Docker, you may also run this on Windows.
+The instructions below are for Linux and macOS, it is possible to use Windows, but this may result in some issues. Using a VPS if you are on Windows is recommended.
 :::
 
-:::caution WARNING
-The docker image is in alpha stage. The following instructions may not work for you.
-:::
+You can use Docker to install a `hoprd` node on your device quickly without worrying too much about the operating system or any additional software. There are, however, some hardware requirements needed to complete the installation.
 
-The Docker setup allows you quickly get started with **HOPRd** without having to download any other software requirements in your machine. This allows you to quickly get started using the system, but has some hardware requirements to be aware of.
+To use Docker, you will need a device that supports hardware-level virtualisation: VT-x for Intel-based PCs and AMD-V for AMD processors. Most Mac and Linux machines support it out of the box, so just ensure your device meets the following minimum requirements to run `hoprd`:
 
-To use Docker, you will need a device that supports hardware-level virtualisation: VT-x for Intel-based PCs and AMD-V for AMD processors. Most of the Mac and Linux machines support it out of the box, so ensure you have enough memory \(e.g. 2 GB\) and disk space \(e.g. 1 GB\) before starting.
+- Dual Core CPU ~ 2 GHz
+- 4 GB RAM
+- at least 3 GB Disk Space
+
+At least 8 GB RAM and 10 GB Disk Space is ideal but not required.
 
 ## Installing Docker
 
-Before doing anything else, you need to install **Docker Desktop** on your machine. Docker is natively supported in MacOS/Linux, and will prompt you with any additional requirements, depending on your operating system. Depending on your setup, you might need to follow additional steps to ensure your computer works properly with Docker.
+Before doing anything else, you need to install **Docker Desktop** on your machine.
 
 <Tabs>
-<TabItem value="linux" label="Linux">
+<TabItem value="Linux" label="Linux">
 
-Depending of your distribution, please follow the official guidelines for how to install and run Docker on your workstation.
+Depending on your distribution, please follow the official guidelines to install and run Docker on your workstation.
 
 - [Installing Docker in Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
 - [Installing Docker in Fedora](https://docs.docker.com/engine/install/fedora/)
@@ -42,11 +44,13 @@ Depending of your distribution, please follow the official guidelines for how to
 </TabItem>
 </Tabs>
 
-### Downloading HOPRd image using Docker
+All our docker images can be found in [our Google Cloud Container Registry](https://console.cloud.google.com/gcr/images/hoprassociation/global/hoprd). Each image is prefixed with `gcr.io/hoprassociation/hoprd`.
+
+## Installing HOPRd
 
 :::info NOTE
 
-Before downloading HOPRd image and starting a container, make sure the **Docker** is running.
+Before downloading the HOPRd image, make sure **Docker** is installed.
 
 :::
 
@@ -54,11 +58,9 @@ All our docker images can be found in [our Google Cloud Container Registry](http
 Each image is prefixed with `gcr.io/hoprassociation/hoprd`.
 The `valencia` tag represents the latest community release version.
 
-Open your console based on your OS:
+(**1**) Open your terminal.
 
-- Terminal (Mac OS / Linux OS)
-
-Before starting a container, please create your own **Security Token**. Replace **YOUR_SECURITY_TOKEN** with your own and only then paste the command.
+(**2**) Create a **Security Token** (password) which satisfies the following requirements:
 
 :::danger Requirements
 
@@ -74,10 +76,32 @@ This ensures the node cannot be accessed by a malicious user residing in the sam
 
 :::
 
+(**3**) Copy the following command and replace **YOUR_SECURITY_TOKEN** with your own.
+
 ```bash
 docker run --pull always -ti -v $HOME/.hoprd-db-monte_rosa:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:valencia --admin --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --init --api --apiHost "0.0.0.0" --apiPort 3001 --identity /app/db/.hopr-id-valencia --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --adminPort 3000 --host "0.0.0.0:9091" --data /app/db
 ```
 
-Also all ports are mapped to your local host, assuming you stick to the default port numbers.
+(**4**) Paste the new adjusted command into your terminal, and hit enter.
 
-The installation process has been finished! Now you can proceed to [Guide using a hoprd node](guide-using-a-hoprd-node).
+(**5**) Wait until the node is installed. This can take up to 10 minutes.
+
+Please note the `--apiToken` (Security token), as this will be used to access hopr-admin. It may also be a good idea to note the `--password`, in case you want to decrypt your identity file and retrieve your private key or funds later.
+
+**Note:** Withdrawing funds is possible through hopr-admin. This is just a precaution for safekeeping.
+
+All ports are mapped to your local host, assuming you stick to the default port numbers. You should be able to view the `hopr-admin` interface at [http://localhost:3000](http://localhost:3000) (replace `localhost` with your server IP address if you are using a VPS).
+
+If you are in the process of registering your node on the network registry, please complete the process [here.](./network-registry-tutorial.md)
+
+Otherwise, the installation process is complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).
+
+## Default ports
+
+- 3000 on TCP : Admin UI port (speaks HTTP protocol)
+- 3001 on TCP: REST API port (speaks HTTP)
+- 8080 on TCP: Healthcheck service - is used to see that the node is up & running (speaks HTTP)
+- 9091 on TCP: main P2P port used for HOPR protocol
+- 9091 on UDP: used for STUN requests by other non-public nodes reaching out to you to see what their IP address is
+
+In general, you will only want to change these port numbers if you intend to run multiple nodes simultaneously. Otherwise, use the Docker command with the default mapping.
