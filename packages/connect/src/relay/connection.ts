@@ -616,9 +616,9 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       this: Pick<
         RelayConnection,
         | 'state'
-        | 'queueStatusMessage'
-        | 'unqueueStatusMessage'
-        | 'setClosed'
+        | '_queueStatusMessage'
+        | '_unqueueStatusMessage'
+        | '_setClosed'
         | '_attachWebRTCListeners'
         | 'testingOptions'
         | '_onReconnect'
@@ -731,7 +731,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
                     this.logging.log(`STOP received. Ending stream ...`)
                     this.state.destroyed = true
                     this.state._destroyedPromise.resolve()
-                    this.setClosed()
+                    this._setClosed()
                     leave = true
                     break
                   // A reconnect at the other of the relay happened,
@@ -771,14 +771,14 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
                 switch (SUFFIX[0]) {
                   case StatusMessages.PING:
                     this.logging.verbose(`PING received`)
-                    this.queueStatusMessage(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PONG))
+                    this._queueStatusMessage(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PONG))
                     break
                   case StatusMessages.PONG:
                     // noop, left for future usage
                     break
                   default:
                     this.logging.error(
-                      `Received invalid status message ${u8aToHex(SUFFIX || new Uint8Array([]))}. Dropping message.`
+                      `Received invalid status message ${u8aToHex(SUFFIX ?? new Uint8Array([]))}. Dropping message.`
                     )
                     break
                 }
@@ -828,9 +828,9 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     }.call(
       {
         state: this.state,
-        queueStatusMessage: this._queueStatusMessage,
-        unqueueStatusMessage: this._unqueueStatusMessage,
-        setClosed: this._setClosed,
+        _queueStatusMessage: this._queueStatusMessage,
+        _unqueueStatusMessage: this._unqueueStatusMessage,
+        _setClosed: this._setClosed,
         _attachWebRTCListeners: this._attachWebRTCListeners,
         _switch: this._switch,
         _onReconnect: this._onReconnect,
@@ -893,7 +893,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
    * Removes the most recent status message from the queue
    * @returns most recent status message
    */
-  public unqueueStatusMessage(): Uint8Array {
+  public unqueueStatusMessage(this: Pick<RelayConnection, 'state'>): Uint8Array {
     switch (this.state.statusMessages.length) {
       case 0:
         throw Error(`No status messages available`)
