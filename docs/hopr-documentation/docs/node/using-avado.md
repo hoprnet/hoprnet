@@ -27,6 +27,6 @@ After you have installed the HOPR package, you can find the HOPR client in `my D
 
 Your **security token** is set to `!5qxc9Lp1BE7IFQ-nrtttU`. You will need this to access the hopr-admin. 
 
-If you are in the process of registering your node on the network registry please complete the process [here.](./network-registry-tutorial.md)
+If you are in the process of registering your node on the network registry, please complete the process [here.](./network-registry-tutorial.md)
 
 Otherwise, the installation process is complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin). 

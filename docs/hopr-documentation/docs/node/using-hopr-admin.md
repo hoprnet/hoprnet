@@ -2,6 +2,7 @@
 id: using-hopr-admin
 title: How to use hopr-admin
 ---
+
 This is a guide on how to use `hopr-admin`. It is not exhaustive and is intended only as a brief overview of its functionality and use.
 
 :::caution Warning
@@ -16,7 +17,7 @@ Make sure you have installed a `hoprd` node either through Docker or with a hard
 Please be aware that it can take 10 minutes for your `hoprd` node to boot up.
 :::
 
-**Network Registry:** If you have registered your node on the network registry youw will have been airdropped mHOPR/xDAI along with your NFT. In **step three** of Admin UI & Funding below make sure to use the mHOPR and xDAI provided instead of purchasing wxHOPR. 
+**Network Registry:** If you have registered your node on the network registry, you will have been airdropped mHOPR/xDAI along with your NFT. In **step three** of Admin UI & Funding below, make sure to use the mHOPR and xDAI provided instead of purchasing wxHOPR. 
 
 ## Admin UI & Funding
 
@@ -30,7 +31,7 @@ If you used Docker to install your node, you should be able to access it at: [ht
 
 ![API info](./images/API-info.png)
 
-(**2**) From here, make sure you have the correct information. By default `API endpoint` should be set to `http://localhost:3001`, but you may need to replace `localhost`with your server IP address if you used a VPS and change the port if you adjusted the mapping on installation.
+(**2**) From here, make sure you have the correct information. By default, `API endpoint` should be set to `http://localhost:3001`, but you may need to replace `localhost`with your server IP address if you used a VPS and change the port if you adjusted the mapping on installation.
 
 The`apitoken` is whatever you set your security token as in the installation process.
 
@@ -57,7 +58,7 @@ And you can always use our [token wrapper](https://wrapper.hoprnet.org/) to wrap
 
 ![hopr-admin user interface](./images/admin-UI-second-2.png)
 
-(**4**) You will see your `Network Health Indicator`. This can be either Red, Orange, Yellow or Green depending on your connection to the network. It's normal for it to be **Red** when you first start your node, you can wait a few minutes to see if it improves but this is not required.
+(**4**) You will see your `Network Health Indicator`. Depending on your connection to the network, this can be either Red, Orange, Yellow or Green. It's normal for it to be **Red** when you first start your node, you should wait a few minutes to see if it improves, but this is not required.
 
 (**5**) Click on the HOPR logo to see your node's connected peers.
 
