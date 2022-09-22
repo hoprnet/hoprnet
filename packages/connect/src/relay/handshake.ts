@@ -131,7 +131,7 @@ class RelayHandshake {
       }
     }
 
-    const answer = chunk.slice(0, 1)[0]
+    const answer = chunk.subarray(0, 1)[0]
 
     this.shaker.rest()
 
@@ -201,7 +201,7 @@ class RelayHandshake {
     let destination: PeerId | undefined
 
     try {
-      destination = pubKeyToPeerId(chunk.slice())
+      destination = pubKeyToPeerId(chunk)
     } catch (err) {
       error(err)
     }
@@ -282,7 +282,7 @@ class RelayHandshake {
       return
     }
 
-    const destinationAnswer = destinationChunk.slice(0, 1)[0]
+    const destinationAnswer = destinationChunk.subarray(0, 1)[0]
 
     switch (destinationAnswer as RelayHandshakeMessage) {
       case RelayHandshakeMessage.OK:
@@ -335,7 +335,7 @@ class RelayHandshake {
     let initiator: PeerId | undefined
 
     try {
-      initiator = pubKeyToPeerId(chunk.slice())
+      initiator = pubKeyToPeerId(chunk)
     } catch (err: any) {
       error(`Could not decode sender peerId.`, err.message)
     }

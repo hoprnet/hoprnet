@@ -590,7 +590,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
           nextMessagePromise = currentSourceIterator.next()
           this.logging.flow(`FLOW: loop end`)
 
-          toYield = Uint8Array.from([RelayPrefix.PAYLOAD, ...result.value.value.slice()])
+          toYield = Uint8Array.from([RelayPrefix.PAYLOAD, ...result.value.value.subarray()])
           break
         default:
           throw Error(`Invalid result. Received ${result}`)
@@ -712,7 +712,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
               break
             }
 
-            const [PREFIX, SUFFIX] = [result.value.value.slice(0, 1), result.value.value.slice(1)]
+            const [PREFIX, SUFFIX] = [result.value.value.subarray(0, 1), result.value.value.subarray(1)]
 
             // Anything can happen
             if (SUFFIX.length == 0) {
