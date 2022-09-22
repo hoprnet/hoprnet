@@ -171,7 +171,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     source: AsyncIterable<StreamType>
   }
 
-  public logging: {
+  public readonly logging: {
     log: (...args: any[]) => void
     verbose: (...args: any[]) => void
     error: (...args: any[]) => void
@@ -194,7 +194,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   // Current connection endpoint to be used by libp2p
   public readonly sink: StreamSink
 
-  public conn: Stream
+  public readonly conn: Stream
 
   public readonly timeline: MultiaddrConnection['timeline']
 
@@ -205,8 +205,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     direction: 'inbound' | 'outbound',
     public connectComponents: ConnectComponents,
     public testingOptions: HoprConnectTestingOptions,
-    public _onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>,
-    state?: RelayConnection['state']
+    public _onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>
   ) {
     super()
 
@@ -234,7 +233,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     this.remoteAddr = createCircuitAddress(relay, counterparty)
 
     // Pre-generate object to attach to function pointers
-    this.state = state ?? ({} as any)
+    this.state = {} as RelayConnection['state']
 
     this._queueStatusMessage = this.queueStatusMessage.bind({
       state: this.state
@@ -302,7 +301,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     // to make sure we can attach an error handler to it
     const sinkCreator = this._stream.sink(
       this.sinkFunction.call({
-        unqueueStatusMessage: this._unqueueStatusMessage,
+        _unqueueStatusMessage: this._unqueueStatusMessage,
         state: this.state,
         logging: this.logging
       })
@@ -351,7 +350,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     return deferred.promise
   }
 
-  public get source() {
+  public get source(): AsyncIterable<Uint8Array> {
     return this.state.source
   }
 
@@ -469,7 +468,9 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
    * and control messages.
    * Once a source is attached, forward the messages from the source to the relay.
    */
-  private async *sinkFunction(this: Pick<RelayConnection, 'state' | 'unqueueStatusMessage' | 'logging'>): StreamSource {
+  private async *sinkFunction(
+    this: Pick<RelayConnection, 'state' | '_unqueueStatusMessage' | 'logging'>
+  ): StreamSource {
     let currentSourceIterator: AsyncIterator<StreamType> | undefined
     let nextMessagePromise: Promise<StreamResult> | undefined
 
@@ -554,7 +555,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
           break
         // There is a status message to be sent
         case ConnectionEventTypes.STATUS_MESSAGE:
-          const statusMsg = this.unqueueStatusMessage()
+          const statusMsg = this._unqueueStatusMessage()
 
           if (u8aEquals(statusMsg, Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP))) {
             this.state.destroyed = true

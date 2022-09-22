@@ -1,4 +1,4 @@
-import type { Stream, StreamType } from '../types.js'
+import type { StreamType } from '../types.js'
 import type { AddressInfo, Server as TCPServer } from 'net'
 import type { Socket as UDPSocket } from 'dgram'
 import type { Connection, MultiaddrConnection } from '@libp2p/interface-connection'
@@ -20,16 +20,20 @@ function isAsyncStream<T>(iterator: AsyncIterable<T> | Iterable<T>): iterator is
   }
   return false
 }
+
+type SourceType = StreamType | string
+
 /**
  * Converts messages of a stream into Uint8Arrays.
  * @param source a stream
  * @returns a stream of Uint8Arrays
  */
-type SourceType = StreamType | string
-export type toU8aStream = ((source: AsyncIterator<SourceType>) => AsyncIterable<StreamType>) &
-  ((source: Iterable<SourceType>) => Iterable<StreamType>)
-
-export function toU8aStream(source: Stream<StreamType | string>['source']): Stream['source'] {
+export type toU8aStream<K extends Iterable<SourceType> | AsyncIterable<SourceType>> = (
+  source: K
+) => K extends AsyncIterable<Uint8Array> ? AsyncIterable<Uint8Array> : Iterable<SourceType>
+export function toU8aStream(
+  source: AsyncIterable<SourceType> | Iterable<SourceType>
+): AsyncIterable<Uint8Array> | Iterable<Uint8Array> {
   if (isAsyncStream(source)) {
     return (async function* () {
       for await (const msg of source) {
@@ -64,8 +68,9 @@ export function toU8aStream(source: Stream<StreamType | string>['source']): Stre
  * @param iterator an async iterator
  * @returns given iterator that eagerly fetches messages
  */
-export type eagerIterator<T> = ((iterator: AsyncIterable<T>) => AsyncIterable<T>) &
-  ((iterator: Iterable<T>) => Iterable<T>)
+export type eagerIterator<K extends Iterable<Uint8Array> | AsyncIterable<Uint8Array>> = (
+  source: K
+) => K extends AsyncIterable<Uint8Array> ? AsyncIterable<Uint8Array> : Iterable<SourceType>
 export function eagerIterator<T>(iterator: AsyncIterable<T> | Iterable<T>): AsyncIterable<T> | Iterable<T> {
   let _iterator: Iterator<T> | AsyncIterator<T>
 
@@ -162,21 +167,9 @@ export function nodeToMultiaddr(addr: AddressInfo, peerId: PeerId | undefined): 
  * @param opts host and port to bind to
  * @returns a Promise that resolves once the socket is bound
  */
-export type bindToPort = ((
-  protocol: 'TCP',
-  socket: TCPServer,
-  logError: (...args: any[]) => void,
-  opts?: { host?: string; port: number }
-) => Promise<void>) &
-  ((
-    protocol: 'UDP',
-    socket: UDPSocket,
-    logError: (...args: any[]) => void,
-    opts?: { host?: string; port: number }
-  ) => Promise<void>)
-export function bindToPort(
-  protocol: 'UDP' | 'TCP',
-  socket: TCPServer | UDPSocket,
+export function bindToPort<T extends 'UDP' | 'TCP'>(
+  protocol: T,
+  socket: T extends 'TCP' ? TCPServer : UDPSocket,
   logError: (...args: any[]) => void,
   opts?: { host?: string; port: number }
 ): Promise<void> {
