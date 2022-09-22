@@ -2,7 +2,6 @@
 id: network-registry-tutorial
 title: Network Registry
 ---
-
 ## What is the Network Registry?
 
 The Network Registry is a list of nodes allowed to interact with others on the network. This is a utility used by HOPR to scale and test the network at a controlled pace.
@@ -19,11 +18,11 @@ The staking address you provide on this form will be the primary indicator of yo
 
 From the list of interested participants, an ordered waitlist will be generated. Your rank on the waitlist is determined by the NFTs held in your staking address from past testnets/staking seasons and how much HOPR you have staked currently.
 
-Users from the waitlist will then be given an NFT in blocks of 20. You can use this NFT to register your node on the network registry smart contract. 
+Users from the waitlist will then be given an NFT in blocks of 20. You can use this NFT to register your node on the network registry smart contract.
 
 For every 20 NFTs given out, the majority will go to the next highest-ranking participants on the waitlist, but a few will also be allocated to Dappnode/Avado users. And one of every 20 will be given to someone at random further down the waitlist (so you always have a chance of being chosen even without having participated in previous staking seasons or releases).
 
-Depending on your prefered method of contact, you will either be notified by email when you have been chosen or you can review the waitlist manually here. 
+Depending on your prefered method of contact, you will either be notified by email when you have been chosen or you can review the waitlist manually here.
 
 ## Registering your node
 
@@ -33,21 +32,19 @@ If you are chosen to join the registry, you will be sent a network registry NFT 
 
 (**1**) Go to stake.hoprnet.org
 
-(**2**) Connect your wallet (make sure this is the one containing your NFT). You should see an icon for this on the top right of the site.
+(**2**) Connect your wallet (make sure this is the one containing your NFT). You should see an icon for this on the top right of the site. Once you have connected your wallet, you should see the option to 'Sync'.
 
 ![connect wallet](./images/connect_wallet_NR.png)
 
-Once you have connected your wallet, you should see the option to 'Sync'.
-
-![sync](./images/sync_NR.png)
-
 (**3**) Click the sync icon.
 
-![NFT](./images/NFT-NR.png)
+![sync](./images/sync_NR.png)
 
 (**4**) You should now see your Network Registry NFT under available HOPR NFTs
 
 (**5**) Click Lock NFT
+
+![NFT](./images/NFT-NR.png)
 
 (**6**) Then click sync again and make sure your NFT now appears under 'locked HOPR NFTs'.
 
@@ -65,23 +62,22 @@ Continue here once you have installed a node and can see the hopr-admin interfac
 
 #### Hopr-admin interface
 
-You should be greeted with the following screen:
-
-![NR gear](./images/NR-admin-gear.png)
-
-If your screen is yellow and asks you to check your settings, you need to check your security token and API endpoint. You can do this by:
+You should be greeted with a screen similar to the one below, if your screen is yellow and asks you to check your settings, you need to check your security token and API endpoint. You can do this by:
 
 (**1**) Clicking on the gear icon. This will open a pop-up similar to the one below.
 
-![API info](./images/API-info.png)
+![NR gear](./images/NR-admin-gear.png)
+
 
 (**2**) From here, make sure you have the correct information. By default, `API endpoint` should be set to `http://localhost:3001`, but you may need to replace `localhost`with your server IP address if you used a VPS and change the port if you adjusted the mapping on installation.
 
 The`apitoken` is whatever you set your security token as in the installation process.
 
-![NR peerID](./images/NR-admin-peerID.png)
+![API info](./images/API-info.png)
 
-(**3**) From the admin interface, you should be able to see the peerID labelled as node address. Click on this contracted 5-letter address to expand it to its full length. Copy the address; it should look similar to this: `16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV`.
+(**3**) From the admin interface, you should be able to see the peerID labelled as node address. Click on this contracted 5-letter address to expand it to its full length. Copy this address; it should look similar to this: `16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV`.
+
+![NR peerID](./images/NR-admin-peerID.png)
 
 (**4**) Alternatively, you can type ‘address’ into the command line.
 
@@ -121,7 +117,7 @@ If all of the above is true and the transaction still fails, message us on [tele
 
 Once the transaction has successfully been completed, you can use the hopr-admin to check you have been registered.
 
-**Note: **you will not be registered instantly and should wait a few minutes before checking.
+**Note:** you will not be registered instantly and should wait a few minutes before checking.
 
 To check if you have been registered:
 
