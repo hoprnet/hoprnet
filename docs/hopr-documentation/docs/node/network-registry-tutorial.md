@@ -32,6 +32,7 @@ If you are chosen to join the registry, you will be sent a network registry NFT 
 ### Step 1: Stake your NFT
 
 (**1**) Go to stake.hoprnet.org
+
 (**2**) Connect your wallet (make sure this is the one containing your NFT). You should see an icon for this on the top right of the site.
 
 ![connect wallet](./images/connect_wallet_NR.png)
@@ -45,7 +46,9 @@ Once you have connected your wallet, you should see the option to 'Sync'.
 ![NFT](./images/NFT-NR.png)
 
 (**4**) You should now see your Network Registry NFT under available HOPR NFTs
+
 (**5**) Click Lock NFT
+
 (**6**) Then click sync again and make sure your NFT now appears under 'locked HOPR NFTs'.
 
 ### Step 2: Get your peerID
@@ -95,11 +98,13 @@ Scroll down and make sure you are on the 'write contract' tab.
 ![connect wallet blockscout](./images/blockscout-NR-connect%20wallet.png)
 
 (**2**) Connect the wallet which you used to stake your NFT
+
 (**3**) Locate the 8th function. It will be named selfRegister
 
 ![selfRegister NR](./images/NR-SelfRegister.png)
 
 (**4**) In the text field, paste your peerID
+
 (**5**) Click ‘Write’ and confirm the transaction if your wallet gives you a prompt.
 
 If you have connected a wallet which has staked an NFT and entered a valid peerID, this transaction should succeed. You can find your block confirmation on Blockscout.
@@ -125,7 +130,9 @@ To check if you have been registered:
 ![info admin command](./images/info-NR-admin.png)
 
 (**2**) Type ‘info’ into the command line
+
 (**3**) Check that Network registry eligibility is set to ‘true’
+
 (**4**) If it is still false, wait a few minutes and check again
 
 The registration process is now complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).
