@@ -9,6 +9,7 @@ import { isAnyAddress } from '@hoprnet/hopr-utils'
 
 import { Multiaddr } from '@multiformats/multiaddr'
 import { CODE_CIRCUIT, CODE_P2P } from '../constants.js'
+import { type Uint8ArrayList, isUint8ArrayList } from 'uint8arraylist'
 
 export * from './addrs.js'
 export * from './addressSorters.js'
@@ -21,43 +22,44 @@ function isAsyncStream<T>(iterator: AsyncIterable<T> | Iterable<T>): iterator is
   return false
 }
 
-type SourceType = StreamType | string
+type SourceType = StreamType | Uint8ArrayList | Buffer | string
 
 /**
  * Converts messages of a stream into Uint8Arrays.
  * @param source a stream
  * @returns a stream of Uint8Arrays
  */
-export type toU8aStream<K extends Iterable<SourceType> | AsyncIterable<SourceType>> = (
+export function toU8aStream<K extends AsyncIterable<SourceType> | Iterable<SourceType>>(
   source: K
-) => K extends AsyncIterable<Uint8Array> ? AsyncIterable<Uint8Array> : Iterable<SourceType>
-export function toU8aStream(
-  source: AsyncIterable<SourceType> | Iterable<SourceType>
-): AsyncIterable<Uint8Array> | Iterable<Uint8Array> {
-  if (isAsyncStream(source)) {
+): K extends Iterable<any> ? Iterable<Uint8Array> : AsyncIterable<Uint8Array> {
+  if (isAsyncStream<SourceType>(source)) {
     return (async function* () {
       for await (const msg of source) {
         if (typeof msg === 'string') {
           yield new TextEncoder().encode(msg)
         } else if (Buffer.isBuffer(msg)) {
-          yield msg
-        } else {
+          yield new Uint8Array(msg.buffer, msg.byteOffset, msg.byteLength)
+        } else if (isUint8ArrayList(msg)) {
           yield msg.slice()
+        } else {
+          yield msg
         }
       }
-    })()
+    })() as any
   } else {
     return (function* () {
-      for (const msg of source) {
+      for (const msg of source as Iterable<SourceType>) {
         if (typeof msg === 'string') {
           yield new TextEncoder().encode(msg)
         } else if (Buffer.isBuffer(msg)) {
-          yield msg
-        } else {
+          yield new Uint8Array(msg.buffer, msg.byteOffset, msg.byteLength)
+        } else if (isUint8ArrayList(msg)) {
           yield msg.slice()
+        } else {
+          yield msg
         }
       }
-    })()
+    })() as any
   }
 }
 
@@ -68,10 +70,9 @@ export function toU8aStream(
  * @param iterator an async iterator
  * @returns given iterator that eagerly fetches messages
  */
-export type eagerIterator<K extends Iterable<Uint8Array> | AsyncIterable<Uint8Array>> = (
-  source: K
-) => K extends AsyncIterable<Uint8Array> ? AsyncIterable<Uint8Array> : Iterable<SourceType>
-export function eagerIterator<T>(iterator: AsyncIterable<T> | Iterable<T>): AsyncIterable<T> | Iterable<T> {
+export function eagerIterator<T, K extends Iterable<T> | AsyncIterable<T>>(
+  iterator: K
+): K extends Iterable<any> ? Iterable<T> : AsyncIterable<T> {
   let _iterator: Iterator<T> | AsyncIterator<T>
 
   let received: IteratorResult<T>
@@ -90,7 +91,7 @@ export function eagerIterator<T>(iterator: AsyncIterable<T> | Iterable<T>): Asyn
         result = _iterator.next()
         yield received.value
       }
-    })()
+    })() as any
   } else {
     _iterator = (iterator as Iterable<T>)[Symbol.iterator]()
 
@@ -105,7 +106,7 @@ export function eagerIterator<T>(iterator: AsyncIterable<T> | Iterable<T>): Asyn
         result = _iterator.next()
         yield received.value
       }
-    })()
+    })() as any
   }
 }
 

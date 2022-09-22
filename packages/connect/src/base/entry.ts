@@ -1072,7 +1072,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     // calls the iterator, thereby starts the stream and
     // consumes the first messages, afterwards closes the stream
     for await (const msg of conn.stream.source as AsyncIterable<Uint8Array>) {
-      verbose(`can relay received ${new TextDecoder().decode(msg.slice())} from ${id.toString()}`)
+      verbose(`can relay received ${new TextDecoder().decode(msg.subarray())} from ${id.toString()}`)
       if (u8aEquals(msg.slice(), OK)) {
         done = true
       }
