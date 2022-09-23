@@ -124,11 +124,10 @@ export async function libp2pSendMessage(
   destination: PeerId,
   protocol: string,
   message: Uint8Array,
-  includeReply: boolean,
-  opts?: DialOpts
+  includeReply: boolean
 ): Promise<void | Uint8Array[]> {
   // Components is not part of interface
-  const r = await dial(components, destination, protocol, opts)
+  const r = await dial(components, destination, protocol)
 
   if (r.status !== 'SUCCESS') {
     logError(r)

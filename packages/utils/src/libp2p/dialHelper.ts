@@ -2,11 +2,11 @@
  * Add a more usable API on top of LibP2P
  */
 import type { PeerId } from '@libp2p/interface-peer-id'
-import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
+import type { Connection, ProtocolStream, Stream } from '@libp2p/interface-connection'
 import type { Components } from '@libp2p/interfaces/components'
 import { type Multiaddr, protocols } from '@multiformats/multiaddr'
 
-import { timeout, abortableTimeout, type TimeoutOpts } from '../async/index.js'
+import { timeout, type TimeoutOpts } from '../async/index.js'
 
 import { debug } from '../process/index.js'
 import { createRelayerKey } from './relayCode.js'
@@ -62,8 +62,21 @@ async function printPeerStoreAddresses(msg: string, destination: PeerId, compone
   }
 }
 
-const PROTOCOL_SELECT_TIMEOUT = 10e3
+// Timeout protocol selection to prevent from irresponsive nodes
+const PROTOCOL_SELECTION_TIMEOUT = 10e3
 
+/**
+ * Tries to use existing connection to connect to the given peer.
+ * Closes all connection that could not be used to speak the desired
+ * protocols.
+ * @dev if used with unsupported protocol, this function might close
+ * connections unintendedly
+ *
+ * @param components libp2p components
+ * @param destination peer to connect to
+ * @param protocol desired protocol
+ * @returns
+ */
 export async function tryExistingConnections(
   components: Components,
   destination: PeerId,
@@ -87,7 +100,8 @@ export async function tryExistingConnections(
 
   for (const existingConnection of existingConnections) {
     try {
-      stream = (await timeout(PROTOCOL_SELECT_TIMEOUT, () => existingConnection.newStream(protocol)))?.stream
+      // Timeout protocol selection to prevent from irresponsive peers
+      stream = (await timeout(PROTOCOL_SELECTION_TIMEOUT, () => existingConnection.newStream(protocol)))?.stream
     } catch (err) {}
 
     if (stream == undefined) {
@@ -105,14 +119,17 @@ export async function tryExistingConnections(
     )
   }
 
-  for (const deadConnection of deadConnections) {
-    // @fixme does that work?
-    try {
-      await deadConnection.close()
-    } catch (err) {
-      error(`Error while closing dead connection`, err)
+  // Close dead connections later
+  ;(async function () {
+    for (const deadConnection of deadConnections) {
+      // @fixme does that work?
+      try {
+        await deadConnection.close()
+      } catch (err) {
+        error(`Error while closing dead connection`, err)
+      }
     }
-  }
+  })()
 
   if (stream != undefined && conn != undefined) {
     return { conn, stream, protocol }
@@ -121,28 +138,15 @@ export async function tryExistingConnections(
 
 /**
  * Performs a dial attempt and handles possible errors.
+ * Uses global connection timeout as defined in libp2p constructor call
+ * (see ConnectionManager config)
+ *
  * @param components Libp2p components
  * @param destination which peer to dial
  * @param protocol which protocol to use
- * @param opts timeout options
  */
-async function establishNewConnection(
-  components: Components,
-  destination: PeerId | Multiaddr,
-  protocol: string,
-  opts: {
-    signal: AbortSignal
-  }
-) {
+async function establishNewConnection(components: Components, destination: PeerId | Multiaddr, protocol: string) {
   const start = Date.now()
-
-  let aborted = false
-
-  const onAbort = () => {
-    aborted = true
-  }
-
-  opts.signal?.addEventListener('abort', onAbort)
 
   log(`Trying to establish connection to ${destination.toString()}`)
 
@@ -158,22 +162,19 @@ async function establishNewConnection(
   }
 
   if (!conn) {
-    // Do not forget to remove event listener, to prevent leakage
-    opts.signal?.removeEventListener('abort', onAbort)
     return
   }
 
   log(`Connection ${destination.toString()} established !`)
 
-  const stream = (await timeout(10000, () => (conn as Connection).newStream(protocol)))?.stream
-
-  opts.signal?.removeEventListener('abort', onAbort)
-
-  // Libp2p's return types tend to change every now and then
-  if (stream != null && aborted) {
+  let stream: Stream
+  try {
+    // Timeout protocol selection to prevent from irresponsive nodes
+    stream = (await timeout(PROTOCOL_SELECTION_TIMEOUT, () => (conn as Connection).newStream(protocol)))?.stream
+  } catch (err) {
     log(`ending obsolete write stream after ${Date.now() - start} ms`)
     try {
-      stream.sink((async function* () {})()).catch((err: any) => error(`Error while ending obsolete write stream`, err))
+      await conn.close()
     } catch (err) {
       error(`Error while ending obsolete write stream`, err)
     }
@@ -214,6 +215,7 @@ async function queryDHT(components: Components, destination: PeerId): Promise<Pe
 
     abort.abort()
   }, DEFAULT_DHT_QUERY_TIMEOUT).unref()
+
   try {
     // libp2p type clash
     for await (const relayer of components.getContentRouting().findProviders(key as any, { signal: abort.signal })) {
@@ -249,15 +251,9 @@ const CODE_P2P = protocols('p2p').code
  * @param components components of libp2p instance
  * @param destination which peer to connect to
  * @param protocol which protocol to use
- * @param opts timeout options
  * @returns
  */
-async function doDial(
-  components: Components,
-  destination: PeerId,
-  protocol: string,
-  opts: Required<TimeoutOpts>
-): Promise<DialResponse> {
+export async function dial(components: Components, destination: PeerId, protocol: string): Promise<DialResponse> {
   // First let's try already existing connections
   let struct = await tryExistingConnections(components, destination, protocol)
 
@@ -274,7 +270,7 @@ async function doDial(
     for (const address of knownAddressesForPeer) {
       log(`- ${address.multiaddr.toString()}`)
     }
-    struct = await establishNewConnection(components, destination, protocol, opts)
+    struct = await establishNewConnection(components, destination, protocol)
     if (struct) {
       log(`Successfully reached ${destination.toString()} via already known addresses !`)
       return { status: DialStatus.SUCCESS, resp: struct }
@@ -343,10 +339,7 @@ async function doDial(
 
     log(`Trying to reach ${destination.toString()} via circuit ${circuitAddress}...`)
 
-    relayStruct = await establishNewConnection(components, circuitAddress, protocol, {
-      ...opts,
-      signal: undefined
-    })
+    relayStruct = await establishNewConnection(components, circuitAddress, protocol)
 
     // Return if we were successful
     if (relayStruct) {
@@ -356,32 +349,6 @@ async function doDial(
   }
 
   return { status: DialStatus.DIAL_ERROR, dhtContacted: true }
-}
-
-/**
- * Performs a dial strategy using libp2p.dialProtocol and libp2p.findPeer
- * to establish a connection.
- * Contains a baseline protection against dialing same addresses twice.
- * @param components components of a libp2p instance
- * @param destination PeerId of the destination
- * @param protocol protocols to use
- * @param opts
- */
-export async function dial(
-  components: Components,
-  destination: PeerId,
-  protocol: string,
-  opts?: TimeoutOpts
-): Promise<DialResponse> {
-  return abortableTimeout(
-    (timeoutOpts: Required<TimeoutOpts>) => doDial(components, destination, protocol, timeoutOpts),
-    { status: DialStatus.ABORTED },
-    { status: DialStatus.TIMEOUT },
-    {
-      timeout: opts?.timeout ?? DEFAULT_DHT_QUERY_TIMEOUT,
-      signal: opts?.signal
-    }
-  )
 }
 
 export type { TimeoutOpts as DialOpts }
