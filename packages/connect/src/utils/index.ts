@@ -45,7 +45,7 @@ export function toU8aStream<K extends AsyncIterable<SourceType> | Iterable<Sourc
           yield msg
         }
       }
-    })() as any
+    })() as any // Typescript limitation
   } else {
     return (function* () {
       for (const msg of source as Iterable<SourceType>) {
@@ -59,7 +59,7 @@ export function toU8aStream<K extends AsyncIterable<SourceType> | Iterable<Sourc
           yield msg
         }
       }
-    })() as any
+    })() as any // Typescript limitation
   }
 }
 
