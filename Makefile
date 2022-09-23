@@ -113,7 +113,7 @@ endif
    --amount 1000000000000000000000 \
    --recipient $(recipient) \
    --privatekey "$(PRIVATE_KEY)"
-   
+
 .PHONY: request-nrnft
 request-nrnft: ensure-environment-is-set
 request-nrnft: ## Request one HoprBoost Network_registry NFT for the recipient given it has none and hasn't staked Network_registry NFT
