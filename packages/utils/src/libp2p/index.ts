@@ -154,7 +154,7 @@ type HandlerFunction<T> = (props: LibP2PHandlerArgs) => T
 
 type ErrHandler = (msg: any) => void
 
-function generateHandler<T = boolean>(
+function generateHandler<T extends boolean>(
   handlerFunction: LibP2PHandlerFunction<T extends true ? Promise<Uint8Array> : Promise<void> | void>,
   errHandler: ErrHandler,
   includeReply: T
@@ -215,7 +215,7 @@ function generateHandler<T = boolean>(
  * @param errHandler handle stream pipeline errors
  * @param includeReply try to receive a reply
  */
-export async function libp2pSubscribe<T = boolean>(
+export async function libp2pSubscribe<T extends boolean>(
   components: Components,
   protocol: string,
   handler: LibP2PHandlerFunction<T extends true ? Promise<Uint8Array> : Promise<void> | void>,
