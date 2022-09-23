@@ -34,7 +34,7 @@ GCLOUD_IMAGE="--image-family=cos-stable --image-project=cos-cloud"
 GCLOUD_DEFAULTS="$ZONE $GCLOUD_MACHINE $GCLOUD_META $GCLOUD_TAGS $GCLOUD_BOOTDISK $GCLOUD_IMAGE"
 
 # let keys expire after 1 hour
-alias gssh="gcloud compute ssh --force-key-file-overwrite --ssh-key-expire-after=1h --ssh-flag='-t' $ZONE"
+declare gssh="gcloud compute ssh --force-key-file-overwrite --ssh-key-expire-after=1h --ssh-flag=-t"
 
 # $1=ip
 # $2=optional: healthcheck port, defaults to 8080
@@ -87,7 +87,7 @@ gcloud_stop() {
   local docker_image="${2}"
 
   log "Stopping docker image:${docker_image} on vm ${vm_name}"
-  gssh ${vm_name} -- "export DOCKER_IMAGE=${docker_image} && docker stop \$(docker ps -q --filter ancestor=\$DOCKER_IMAGE)"
+  ${gssh} ${vm_name} -- "export DOCKER_IMAGE=${docker_image} && docker stop \$(docker ps -q --filter ancestor=\$DOCKER_IMAGE)"
 }
 
 # $1 - vm name
@@ -97,8 +97,8 @@ gcloud_get_logs() {
   local docker_image="${2}"
 
   # Docker sucks and gives us warnings in stdout.
-  local id=$(gssh ${vm_name} --command "docker ps -q --filter ancestor='${docker_image}' | xargs docker inspect --format='{{.Id}}'" | grep -v 'warning')
-  gssh ${vm_name} --command "docker logs $id"
+  local id=$(${gssh} ${vm_name} --command "docker ps -q --filter ancestor='${docker_image}' | xargs docker inspect --format='{{.Id}}'" | grep -v 'warning')
+  ${gssh} ${vm_name} --command "docker logs $id"  
 }
 
 # $1 - vm name
@@ -106,7 +106,7 @@ gcloud_cleanup_docker_images() {
   local vm_name="${1}"
 
   log "pruning docker images on host ${vm_name}"
-  gssh "${vm_name}" --command "sudo docker system prune -a -f"
+  ${gssh} "${vm_name}" --command "sudo docker system prune -a -f"
 }
 
 # $1 - template name
@@ -117,7 +117,6 @@ gcloud_cleanup_docker_images() {
 # $6 - optional: announce
 # $7 - optional: private key
 gcloud_create_instance_template() {
-  
   local name="${1}"
   local image="${2}"
   local environment_id="${3:-}"
@@ -129,7 +128,7 @@ gcloud_create_instance_template() {
   # this parameter is mostly used on by CT nodes, although hoprd nodes also support it  
   local private_key="${7:-}"
   local metadata_value=""
-  
+
   log "checking for instance template ${name}"
   if gcloud compute instance-templates describe "${name}" --quiet 2> /dev/null; then
     log "instance template ${name} already present"
@@ -359,7 +358,7 @@ gcloud_reserve_static_ip_address() {
 # $2=command to execute
 gcloud_execute_command_instance() {
   local name="${1}"
-  command="${2}"
+  local command="${2}"
 
-  gcloud compute ssh "${name}" --command "${command}"
+  ${gssh} "${name}" --command "${command}"
 }

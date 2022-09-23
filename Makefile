@@ -113,7 +113,7 @@ endif
    --amount 1000000000000000000000 \
    --recipient $(recipient) \
    --privatekey "$(PRIVATE_KEY)"
-   
+
 .PHONY: request-nrnft
 request-nrnft: ensure-environment-is-set
 request-nrnft: ## Request one HoprBoost Network_registry NFT for the recipient given it has none and hasn't staked Network_registry NFT
@@ -351,9 +351,6 @@ endif
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_ids=$(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")
 
 ensure-environment-is-set:
-ifeq ($(network),)
-	echo "parameter <network> missing" >&2 && exit 1
-endif
 ifeq ($(environment),)
 	echo "parameter <environment> missing" >&2 && exit 1
 else
