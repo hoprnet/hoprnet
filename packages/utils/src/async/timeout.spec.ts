@@ -8,7 +8,7 @@ describe('testing timeoutAfter', () => {
   })
 
   it('reject with timeout', async () => {
-    await assert.rejects(async () => await timeout(100, () => new Promise<void>(() => {})))
+    await assert.rejects(async () => await timeout(100, () => new Promise<void>(() => {})), Error('Timeout'))
   })
 
   it('reject asynchronously', async () => {
@@ -20,7 +20,8 @@ describe('testing timeoutAfter', () => {
             new Promise((_, reject) => {
               setTimeout(reject, 50)
             })
-        )
+        ),
+      undefined
     )
   })
 
@@ -28,8 +29,9 @@ describe('testing timeoutAfter', () => {
     await assert.rejects(
       async () =>
         await timeout(100, () => {
-          throw Error()
-        })
+          throw Error('internal error')
+        }),
+      Error(`internal error`)
     )
   })
 })

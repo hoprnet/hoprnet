@@ -12,6 +12,7 @@ import { peerIdFromString } from '@libp2p/peer-id'
 import { debug } from '../process/index.js'
 import { pipe } from 'it-pipe'
 import { dial, type DialOpts } from './dialHelper.js'
+import { timeout } from '../index.js'
 
 export * from './addressSorters.js'
 export * from './dialHelper.js'
@@ -102,6 +103,8 @@ const logError = debug(`hopr-core:libp2p:error`)
  * @param opts [optional] timeout
  */
 
+const DEFAULT_SEND_TIMEOUT = 10_000
+
 export type libp2pSendMessage = ((
   components: Components,
   destination: PeerId,
@@ -124,9 +127,13 @@ export async function libp2pSendMessage(
   destination: PeerId,
   protocol: string,
   message: Uint8Array,
-  includeReply: boolean
+  includeReply: boolean,
+  opts?: {
+    timeout?: number
+  }
 ): Promise<void | Uint8Array[]> {
-  // Components is not part of interface
+  // Timeout handled by Libp2p ConnectionManager and defined
+  // within constructor call
   const r = await dial(components, destination, protocol)
 
   if (r.status !== 'SUCCESS') {
@@ -135,26 +142,30 @@ export async function libp2pSendMessage(
   }
 
   if (includeReply) {
-    const result = (await pipe(
-      // prettier-ignore
-      [message],
-      r.resp.stream,
-      async function collect(source: AsyncIterable<any>) {
-        const vals = []
-        for await (const val of source) {
-          // Convert from potential BufferList to Uint8Array
-          vals.push(Uint8Array.from(val.slice()))
+    const result = await timeout(opts?.timeout ?? DEFAULT_SEND_TIMEOUT, () =>
+      pipe(
+        // prettier-ignore
+        [message],
+        r.resp.stream,
+        async function collect(source: AsyncIterable<Uint8Array>) {
+          const vals: Uint8Array[] = []
+          for await (const val of source) {
+            // Convert from potential BufferList to Uint8Array
+            vals.push(Uint8Array.from(val.slice()))
+          }
+          return vals
         }
-        return vals
-      }
-    )) as Uint8Array[]
+      )
+    )
 
     return result
   } else {
-    await pipe(
-      // prettier-ignore
-      [message],
-      r.resp.stream
+    await timeout(opts?.timeout ?? DEFAULT_SEND_TIMEOUT, () =>
+      pipe(
+        // prettier-ignore
+        [message],
+        r.resp.stream
+      )
     )
   }
 }

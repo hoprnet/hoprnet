@@ -33,7 +33,7 @@ export function timeout<T>(timeout: number, work: () => Promise<T>): Promise<T> 
     resolve(res)
   }
 
-  setTimeout(onReject, timeout)
+  setTimeout(onReject, timeout, Error('Timeout'))
 
   try {
     work().then(onResolve, onReject)
