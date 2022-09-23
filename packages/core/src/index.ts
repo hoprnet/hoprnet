@@ -290,7 +290,7 @@ class Hopr extends EventEmitter {
     ) => libp2pSubscribe(this.libp2pComponents, protocol, handler, errHandler, includeReply)
 
     const sendMessage = ((dest: PeerId, protocol: string, msg: Uint8Array, includeReply: boolean, opts: DialOpts) =>
-      libp2pSendMessage(this.libp2pComponents, dest, protocol, msg, includeReply, opts)) as SendMessage
+      libp2pSendMessage(this.libp2pComponents, dest, protocol, msg, includeReply, opts)) as SendMessage // Typescript limitation
 
     // Attach network health measurement functionality
     const peers: Peer[] = await this.libp2pComponents.getPeerStore().all()

@@ -91,7 +91,7 @@ export function eagerIterator<T, K extends Iterable<T> | AsyncIterable<T>>(
         result = _iterator.next()
         yield received.value
       }
-    })() as any
+    })() as any // Typescript limitation
   } else {
     _iterator = (iterator as Iterable<T>)[Symbol.iterator]()
 
@@ -106,7 +106,7 @@ export function eagerIterator<T, K extends Iterable<T> | AsyncIterable<T>>(
         result = _iterator.next()
         yield received.value
       }
-    })() as any
+    })() as any // Typescript limitation
   }
 }
 
