@@ -201,7 +201,7 @@ class RelayHandshake {
     let destination: PeerId | undefined
 
     try {
-      destination = pubKeyToPeerId(chunk)
+      destination = pubKeyToPeerId(chunk.subarray())
     } catch (err) {
       error(err)
     }
@@ -335,7 +335,7 @@ class RelayHandshake {
     let initiator: PeerId | undefined
 
     try {
-      initiator = pubKeyToPeerId(chunk)
+      initiator = pubKeyToPeerId(chunk.subarray())
     } catch (err: any) {
       error(`Could not decode sender peerId.`, err.message)
     }
