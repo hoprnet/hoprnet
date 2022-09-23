@@ -34,7 +34,9 @@ describe('test webrtc connection', function () {
         source: BobAlice.source,
         sink: AliceBob.sink,
         sendUpgraded: () => {},
-        getWebRTCInstance: () => fakedWebRTCInstance
+        state: {
+          channel: fakedWebRTCInstance
+        }
       } as RelayConnection,
       {}
     )
@@ -79,7 +81,9 @@ describe('test webrtc connection', function () {
         sendUpgraded: () => {
           upgradeCalls++
         },
-        getWebRTCInstance: () => webRTCInstance
+        state: {
+          channel: webRTCInstance
+        }
       } as RelayConnection,
       {}
     )
@@ -107,7 +111,9 @@ describe('test webrtc connection', function () {
         source: BobAlice.source,
         sink: AliceBob.sink,
         sendUpgraded: () => {},
-        getWebRTCInstance: () => webRTCInstance
+        state: {
+          channel: webRTCInstance
+        }
       } as RelayConnection,
       {}
     )
@@ -136,7 +142,9 @@ describe('test webrtc connection', function () {
       {
         source: BobAlice.source,
         sink: AliceBob.sink,
-        getWebRTCInstance: () => webRTCInstance
+        state: {
+          channel: webRTCInstance
+        }
       } as RelayConnection,
       {}
     )
@@ -177,7 +185,9 @@ describe('test webrtc connection', function () {
       {
         ...AliceBob,
         sendUpgraded: () => {},
-        getWebRTCInstance: () => webRTCInstance
+        state: {
+          channel: webRTCInstance
+        }
       } as RelayConnection,
       {}
     )
@@ -236,7 +246,9 @@ describe('test webrtc connection', function () {
         ...AliceBob,
         remoteAddr: new Multiaddr(`/p2p/${Bob.toString()}`),
         sendUpgraded: () => {},
-        getWebRTCInstance: () => webRTCInstance
+        state: {
+          channel: webRTCInstance
+        }
       } as RelayConnection,
       {}
     )
@@ -296,7 +308,9 @@ describe('test webrtc connection', function () {
     const conn = new WebRTCConnection(
       {
         ...AliceBob,
-        getWebRTCInstance: () => webRTCInstance
+        state: {
+          channel: webRTCInstance
+        }
       } as RelayConnection,
       {},
       {
@@ -336,7 +350,9 @@ describe('webrtc connection - stream error propagation', function () {
         source: BobAlice.source,
         sink: (_source: AsyncIterable<Uint8Array>) => waitForSinkAttach.promise,
         sendUpgraded: () => {},
-        getWebRTCInstance: () => fakedWebRTCInstance
+        state: {
+          channel: fakedWebRTCInstance
+        }
       } as RelayConnection,
       {}
     )
@@ -373,7 +389,9 @@ describe('webrtc connection - stream error propagation', function () {
           return Promise.reject(Error(falsySinkError))
         },
         sendUpgraded: () => {},
-        getWebRTCInstance: () => fakedWebRTCInstance
+        state: {
+          channel: fakedWebRTCInstance
+        }
       } as RelayConnection,
       {}
     )
@@ -396,7 +414,9 @@ describe('webrtc connection - stream error propagation', function () {
       {
         ...AliceBob,
         sendUpgraded: () => {},
-        getWebRTCInstance: () => fakedWebRTCInstance
+        state: {
+          channel: fakedWebRTCInstance
+        }
       } as RelayConnection,
       {}
     )
@@ -428,7 +448,9 @@ describe('webrtc connection - stream error propagation', function () {
         })() as AsyncIterable<Uint8Array>,
         sink: AliceBob.sink,
         sendUpgraded: () => {},
-        getWebRTCInstance: () => fakedWebRTCInstance
+        state: {
+          channel: fakedWebRTCInstance
+        }
       } as RelayConnection,
       {}
     )
