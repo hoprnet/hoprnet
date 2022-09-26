@@ -1,5 +1,8 @@
 import { protocols } from '@multiformats/multiaddr'
 import { pickVersion } from '@hoprnet/hopr-utils'
+
+import type { Environment } from './types.js'
+
 // Do not type-check JSON files
 // @ts-ignore
 import pkg from '../package.json' assert { type: 'json' }
@@ -67,33 +70,70 @@ export const MIN_RELAYS_PER_NODE = 3
 
 /**
  * @param environment [optional] isolate from nodes running in other environments
- * @returns the relay request protocol string
+ * @returns the relay request protocol strings
  */
-export function CAN_RELAY_PROTCOL(environment?: string): string {
-  if (environment) {
-    return `/${NAME}/${environment}/can-relay/${NORMALIZED_VERSION}`
-  }
-  return `/${NAME}/can-relay/${NORMALIZED_VERSION}`
+export function CAN_RELAY_PROTOCOLS(environment?: string, environments?: Environment[]): string[] {
+  return determine_protocols('can-relay', environment, environments)
 }
 
 /**
  * @param environment [optional] isolate from nodes running in other environments
- * @returns the relay request protocol string
+ * @returns the relay request protocol strings
  */
-export function RELAY_PROTCOL(environment?: string): string {
-  if (environment) {
-    return `/${NAME}/${environment}/relay/${NORMALIZED_VERSION}`
-  }
-  return `/${NAME}/relay/${NORMALIZED_VERSION}`
+export function RELAY_PROTOCOLS(environment?: string, environments?: Environment[]): string[] {
+  return determine_protocols('relay', environment, environments)
 }
 
 /**
  * @param environment [optional] isolate from nodes running in other environments
- * @returns the relay delivery protocol string
+ * @returns the relay delivery protocol strings
  */
-export function DELIVERY_PROTOCOL(environment?: string): string {
-  if (environment) {
-    return `/${NAME}/${environment}/delivery/${NORMALIZED_VERSION}`
+export function DELIVERY_PROTOCOLS(environment?: string, environments?: Environment[]): string[] {
+  return determine_protocols('delivery', environment, environments)
+}
+
+/*
+ * @param tag protocol tag which should be used
+ * @param environment [optional] isolate from nodes running in other environments
+ * @param environments [optional] supported environments which can be considered
+ * @returns the supported protocol strings
+ *
+ * This function uses the given environments information to determine the
+ * supported protocols. If no environment is given, it will return a list with a
+ * single, version-specific entry, e.g.:
+ *
+ *   /hopr/{TAG}/1.90
+ *
+ * When an environment is given, multiple protocols are returned. To illustrate
+ * this the environment 'monte_rosa' and releases 'paleochora' and 'valencia'
+ * are used here:
+ *
+ *   /hopr/monte_rosa/{TAG}/1.89
+ *   /hopr/monte_rosa/{TAG}/1.90
+ */
+function determine_protocols(tag: string, environment?: string, environments?: Environment[]): string[] {
+  const supportedEnvironmentIds = environments?.map((env) => env.id)
+  let protos = []
+
+  // only add environment-specific protocols if we run a supported environment
+  if (environment && supportedEnvironmentIds && environment in supportedEnvironmentIds) {
+    environments?.forEach((env: Environment) => {
+      const versions = env.versionRange.split('||')
+      versions.forEach((v: string) => {
+        // the placeholder '*' will open up the protocol to the entire
+        // environment, otherwise we pin to the given version
+        if (v === '*') {
+          protos.push(`/${NAME}/${environment}/${tag}`)
+        }
+        // pinning each versions allows to support other protocol versions
+        // within the same environment
+        protos.push(`/${NAME}/${environment}/${tag}/${v}`)
+      })
+    })
+  } else {
+    // legacy entry which can also be used for internal testing
+    protos.push(`/${NAME}/${tag}/${NORMALIZED_VERSION}`)
   }
-  return `/${NAME}/delivery/${NORMALIZED_VERSION}`
+
+  return protos
 }

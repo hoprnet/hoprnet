@@ -18,7 +18,7 @@ import debug from 'debug'
 import chalk from 'chalk'
 
 import { WebRTCConnection } from '../webrtc/index.js'
-import { RELAY_PROTCOL, DELIVERY_PROTOCOL, CODE_P2P, OK, CAN_RELAY_PROTCOL } from '../constants.js'
+import { RELAY_PROTOCOLS, DELIVERY_PROTOCOLS, CODE_P2P, OK, CAN_RELAY_PROTOCOLS } from '../constants.js'
 import { RelayConnection } from './connection.js'
 import { RelayHandshake, RelayHandshakeMessage } from './handshake.js'
 import { RelayState } from './state.js'
@@ -141,9 +141,12 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     this._dialNodeDirectly = this.dialNodeDirectly.bind(this)
 
     // Requires registrar to be started first
-    await this.components.getRegistrar().handle(DELIVERY_PROTOCOL(this.options.environment), this._onDelivery)
-    await this.components.getRegistrar().handle(RELAY_PROTCOL(this.options.environment), this._onRelay)
-    await this.components.getRegistrar().handle(CAN_RELAY_PROTCOL(this.options.environment), this._onCanRelay)
+    const protocolsDelivery = DELIVERY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
+    const protocolsRelay = RELAY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
+    const protocolsCanRelay = CAN_RELAY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
+    await this.components.getRegistrar().handle(protocolsDelivery, this._onDelivery)
+    await this.components.getRegistrar().handle(protocolsRelay, this._onRelay)
+    await this.components.getRegistrar().handle(protocolsCanRelay, this._onCanRelay)
 
     // Periodic function that prints relay connections (and will also do pings in future)
     const periodicKeepAlive = async function (this: Relay) {
@@ -210,7 +213,8 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     destination: PeerId,
     options?: DialOptions
   ): Promise<MultiaddrConnection | undefined> {
-    const baseConnection = await this.dialNodeDirectly(relay, RELAY_PROTCOL(this.options.environment), {
+    const protocolsRelay = RELAY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
+    const baseConnection = await this.dialNodeDirectly(relay, protocolsRelay, {
       signal: options?.signal,
       // libp2p interface type clash
       upgrader: this.getComponents().getUpgrader() as any
@@ -449,18 +453,22 @@ class Relay implements Initializable, ConnectInitializable, Startable {
   /**
    * Attempts to establish a direct connection to the destination
    * @param destination peer to connect to
-   * @param protocol
+   * @param protocols
    * @param opts
    * @returns a stream to the given peer
    */
-  private async dialNodeDirectly(destination: PeerId, protocol: string, opts: DialOptions): Promise<ConnResult | void> {
-    let connResult = await tryExistingConnections(this.getComponents(), destination, protocol)
+  private async dialNodeDirectly(
+    destination: PeerId,
+    protocols: string[],
+    opts: DialOptions
+  ): Promise<ConnResult | void> {
+    let connResult = await tryExistingConnections(this.getComponents(), destination, protocols)
 
     // Only establish a new connection if we don't have any.
     // Don't establish a new direct connection to the recipient when using
     // simulated NAT
     if (connResult == undefined) {
-      connResult = await this.establishDirectConnection(destination, protocol, opts)
+      connResult = await this.establishDirectConnection(destination, protocols, opts)
     }
 
     return connResult
@@ -470,13 +478,13 @@ class Relay implements Initializable, ConnectInitializable, Startable {
    * Establishes a new connection to the given by using a direct
    * TCP connection.
    * @param destination peer to connect to
-   * @param protocol desired protocol
+   * @param protocols desired protocols
    * @param opts additional options such as timeout
    * @returns a stream to the given peer
    */
   private async establishDirectConnection(
     destination: PeerId,
-    protocol: string,
+    protocols: string[],
     opts: DialOptions
   ): Promise<ConnResult | undefined> {
     const usableAddresses: Multiaddr[] = []
@@ -495,7 +503,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       return
     }
 
-    let stream: ProtocolStream['stream'] | undefined
+    let stream: ProtocolStream | undefined
     let conn: Connection | undefined
 
     for (const usable of usableAddresses) {
@@ -508,7 +516,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
       if (conn != undefined) {
         try {
-          stream = (await conn.newStream([protocol]))?.stream
+          stream = await conn.newStream(protocols)
         } catch (err) {
           await attemptClose(conn, error)
           continue
@@ -523,7 +531,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
         }
       }
     }
-    return conn != undefined && stream != undefined ? { conn, stream, protocol } : undefined
+    return conn != undefined && stream != undefined ? { conn, ...stream } : undefined
   }
 }
 

@@ -61,7 +61,7 @@ async function getNode(id: PeerId, withDht = false, maDestination?: Multiaddr): 
     return dial(maDestination, options)
   }) as any
 
-  node.handle(TEST_PROTOCOL, async ({ stream }) => {
+  node.handle([TEST_PROTOCOL], async ({ stream }) => {
     await pipe(stream.source, stream.sink)
   })
 
@@ -117,7 +117,7 @@ describe('test dialHelper', function () {
     const peerA = await getNode(Alice)
 
     // components not part of interface
-    const result = await dialHelper((peerA as any).components, Bob, TEST_PROTOCOL)
+    const result = await dialHelper((peerA as any).components, Bob, [TEST_PROTOCOL])
 
     assert(result.status === DialStatus.NO_DHT)
 
@@ -132,7 +132,7 @@ describe('test dialHelper', function () {
     await peerA.peerStore.addressBook.add(peerB.peerId, peerB.getMultiaddrs())
 
     // components not part of interface
-    const result = await dialHelper((peerA as any).components, Bob, TEST_PROTOCOL)
+    const result = await dialHelper((peerA as any).components, Bob, [TEST_PROTOCOL])
 
     assert(result.status === DialStatus.SUCCESS)
 
@@ -150,7 +150,7 @@ describe('test dialHelper', function () {
     const peerA = await getNode(Alice, true)
 
     // components not part of interface
-    const result = await dialHelper((peerA as any).components, Bob, TEST_PROTOCOL)
+    const result = await dialHelper((peerA as any).components, Bob, [TEST_PROTOCOL])
 
     assert(result.status === DialStatus.DHT_ERROR, `Must return dht error`)
 
@@ -189,7 +189,7 @@ describe('test dialHelper', function () {
     await new Promise((resolve) => setTimeout(resolve, 200))
 
     // components not part of interface
-    let result = await dialHelper((peerA as any).components, Chris, TEST_PROTOCOL)
+    let result = await dialHelper((peerA as any).components, Chris, [TEST_PROTOCOL])
 
     assert(result.status === DialStatus.SUCCESS, `Dial must be successful`)
 
@@ -221,7 +221,7 @@ describe('test dialHelper', function () {
     }
 
     // Try to call Bob but does not exist
-    const result = await dialHelper(peerAComponents as any, Bob, TEST_PROTOCOL)
+    const result = await dialHelper(peerAComponents as any, Bob, [TEST_PROTOCOL])
 
     // Must fail with a DHT error because we obviously can't find
     // Bob's relay address in the DHT
@@ -248,7 +248,7 @@ describe('test dialHelper', function () {
       getPeerStore
     }
 
-    const result = await dialHelper(peerAComponents as any, Bob, TEST_PROTOCOL)
+    const result = await dialHelper(peerAComponents as any, Bob, [TEST_PROTOCOL])
 
     assert(result.status === DialStatus.DHT_ERROR)
   })
