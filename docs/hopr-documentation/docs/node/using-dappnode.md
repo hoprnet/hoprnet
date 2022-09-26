@@ -16,7 +16,7 @@ Please withdraw all your funds and delete the old package before installing a ne
 /ipfs/QmPhSZTZbM6kd9VizvZpKDN3fQe5bqvCDooCBPYEUXdTcy
 ```
 
-![MyDapps](./images/DappStore-NR.png)
+![DappStore](./images/DappStore-NR.png)
 
 (**2**) It should bring up the latest version of the HOPR client. Click **Get** and wait for the download to complete.
 

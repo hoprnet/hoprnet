@@ -52,9 +52,9 @@ If you are chosen to join the registry, you will be sent a network registry NFT 
 
 To continue, you first need to have installed a HOPR node. You can use one of the following three methods to do so:
 
-* [Using Avado](./using-avado.md)
-* [Using Dappnode](./using-dappnode.md)
-* [Using Docker](./using-docker.md)
+- [Using Avado](./using-avado.md)
+- [Using Dappnode](./using-dappnode.md)
+- [Using Docker](./using-docker.md)
 
 If you do not have an Avado or Dappnode, use Docker to install the node on your device.
 
@@ -142,12 +142,12 @@ These five nodes will ping each node on the network registry at randomised inter
 
 You can use this site to search your peerID (or any peerID on the network) and view their availability, average latency and total pings received. These metrics will be used to give each node its score and at the end of the initial release, rewards will be distributed as follows:
 
-* Top 25% receive a diamond NFT
-* 25-50% receive a gold NFT
-* 50-75% receive a silver NFT
-* Bottom 25% receive a bronze NFT
+- Top 25% receive a diamond NFT
+- 25-50% receive a gold NFT
+- 50-75% receive a silver NFT
+- Bottom 25% receive a bronze NFT
 
 Each NFT gives a sizeable APR boost when [staking HOPR tokens](stake.hoprnet.org), with higher ranked NFTs providing both a better APR and a better rank on future waitlists. As HOPR NFTs are often used as an indicator to decide participants for early access. So if you are not using a hardware node such as Avado or Dappnode, consider the following setups to maximise your uptime:
 
-* Using Tmux or Screen on a VPS to run your node 24/7
-* Using a machine that can remain plugged in throughout the day. E.g. avoid laptops
+- Using Tmux or Screen on a VPS to run your node 24/7
+- Using a machine that can remain plugged in throughout the day. E.g. avoid laptops
