@@ -102,34 +102,44 @@ export function DELIVERY_PROTOCOLS(environment?: string, environments?: Environm
  * supported protocols. If no environment is given, it will return a list with a
  * single, version-specific entry, e.g.:
  *
- *   /hopr/{TAG}/1.90
+ *   /hopr-connect/{TAG}/1.90
  *
  * When an environment is given, multiple protocols are returned. To illustrate
  * this the environment 'monte_rosa' and releases 'paleochora' and 'valencia'
  * are used here:
  *
- *   /hopr/monte_rosa/{TAG}/1.89
- *   /hopr/monte_rosa/{TAG}/1.90
+ *   /hopr-connect/monte_rosa/{TAG}/1.89
+ *   /hopr-connect/monte_rosa/{TAG}/1.90
  */
 function determine_protocols(tag: string, environment?: string, environments?: Environment[]): string[] {
   const supportedEnvironmentIds = environments?.map((env) => env.id)
-  let protos = []
+  let protos: string[] = []
 
   // only add environment-specific protocols if we run a supported environment
-  if (environment && supportedEnvironmentIds && environment in supportedEnvironmentIds) {
-    environments?.forEach((env: Environment) => {
+  if (environment && supportedEnvironmentIds && supportedEnvironmentIds.indexOf(environment) > -1) {
+    const env = environments?.find((el) => el.id === environment)
+    if (env) {
       const versions = env.versionRange.split('||')
       versions.forEach((v: string) => {
-        // the placeholder '*' will open up the protocol to the entire
-        // environment, otherwise we pin to the given version
-        if (v === '*') {
-          protos.push(`/${NAME}/${environment}/${tag}`)
+        let proto
+        if (v === '') {
+          proto = ''
         }
-        // pinning each versions allows to support other protocol versions
-        // within the same environment
-        protos.push(`/${NAME}/${environment}/${tag}/${v}`)
+        if (v === '*') {
+          // the placeholder '*' will open up the protocol to the entire
+          // environment, otherwise we pin to the given version
+          proto = `/${NAME}/${environment}/${tag}`
+        } else {
+          // pinning each versions allows to support other protocol versions
+          // within the same environment
+          proto = `/${NAME}/${environment}/${tag}/${pickVersion(v)}`
+        }
+
+        if (proto != '' && protos.indexOf(proto) == -1) {
+          protos.push(proto)
+        }
       })
-    })
+    }
   } else {
     // legacy entry which can also be used for internal testing
     protos.push(`/${NAME}/${tag}/${NORMALIZED_VERSION}`)
