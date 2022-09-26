@@ -352,11 +352,9 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     if (this.testingOptions.__runningLocally || natSituation.bidirectionalNAT || !natSituation.isExposed) {
       this.connectComponents.getEntryNodes().on(RELAY_CHANGED_EVENT, this._emitListening)
 
-      // Finish startup
-      this.connectComponents.getEntryNodes().start()
-
-      // Initiate update but don't await its result
-      this.connectComponents.getEntryNodes().updatePublicNodes()
+      // Instructs entry node manager to assign to available
+      // entry once startup has finished
+      this.connectComponents.getEntryNodes().enable()
     }
 
     this.state = ListenerState.LISTENING
@@ -458,23 +456,6 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       }
 
       return
-    }
-
-    for (const peer of this.connectComponents.getEntryNodes().getUsedRelayPeerIds()) {
-      if (peer.equals(conn.remotePeer)) {
-        // Make sure that Multiaddr contains a PeerId
-        const maWithPeerId = maConn.remoteAddr
-          .decapsulateCode(CODE_P2P)
-          .encapsulate(`/p2p/${conn.remotePeer.toString()}`)
-
-        ;(maConn.conn as TCPSocket).on('close', () => {
-          if (maConn!.closed) {
-            return
-          }
-
-          this.connectComponents.getEntryNodes()._onEntryNodeDisconnect!(maWithPeerId)
-        })
-      }
     }
 
     log('inbound connection %s upgraded', maConn.remoteAddr)

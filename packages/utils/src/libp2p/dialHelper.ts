@@ -17,6 +17,8 @@ const DEBUG_PREFIX = `hopr-core:libp2p`
 const log = debug(DEBUG_PREFIX)
 const error = debug(DEBUG_PREFIX.concat(`:error`))
 
+const CODE_P2P = protocols('p2p').code
+
 const DEFAULT_DHT_QUERY_TIMEOUT = 20000
 
 export enum DialStatus {
@@ -53,13 +55,23 @@ export type DialResponse =
       status: DialStatus.NO_DHT
     }
 
-async function printPeerStoreAddresses(msg: string, destination: PeerId, components: Components): Promise<void> {
-  error(msg)
-  error(`Known addresses:`)
+async function printPeerStoreAddresses(prefix: string, destination: PeerId, components: Components): Promise<string> {
+  const SUFFIX = 'Known addresses:'
+
+  let out = `${prefix}\n${SUFFIX}`
 
   for (const address of await components.getPeerStore().addressBook.get(destination)) {
-    error(address.multiaddr.toString())
+    if (out.length > prefix.length + 1 + SUFFIX.length) {
+      out += '  \n'
+    }
+    out += `  ${address.multiaddr.toString()}`
   }
+
+  if (out.length == prefix.length + 1 + SUFFIX.length) {
+    out += `  No addresses known for peer ${destination.toString()}`
+  }
+
+  return out
 }
 
 // Timeout protocol selection to prevent from irresponsive nodes
@@ -146,8 +158,6 @@ export async function tryExistingConnections(
  * @param protocol which protocol to use
  */
 async function establishNewConnection(components: Components, destination: PeerId | Multiaddr, protocol: string) {
-  const start = Date.now()
-
   log(`Trying to establish connection to ${destination.toString()}`)
 
   let conn: Connection | undefined
@@ -168,20 +178,21 @@ async function establishNewConnection(components: Components, destination: PeerI
   log(`Connection ${destination.toString()} established !`)
 
   let stream: Stream
+  let errThrown = false
   try {
     // Timeout protocol selection to prevent from irresponsive nodes
     stream = (await timeout(PROTOCOL_SELECTION_TIMEOUT, () => (conn as Connection).newStream(protocol)))?.stream
   } catch (err) {
-    log(`ending obsolete write stream after ${Date.now() - start} ms`)
+    error(`error while trying to establish protocol ${protocol} with ${destination.toString()}`, err)
+    errThrown = true
+  }
+
+  if (stream == undefined || errThrown) {
     try {
       await conn.close()
     } catch (err) {
       error(`Error while ending obsolete write stream`, err)
     }
-    return
-  }
-
-  if (!stream) {
     return
   }
 
@@ -239,21 +250,7 @@ async function queryDHT(components: Components, destination: PeerId): Promise<Pe
   return relayers
 }
 
-const CODE_P2P = protocols('p2p').code
-
-/**
- * Runs through the dial strategy and handles possible errors
- *
- * 1. Use already known addresses
- * 2. Check the DHT (if available) for additional addresses
- * 3. Try new addresses
- *
- * @param components components of libp2p instance
- * @param destination which peer to connect to
- * @param protocol which protocol to use
- * @returns
- */
-export async function dial(components: Components, destination: PeerId, protocol: string): Promise<DialResponse> {
+async function doDirectDial(components: Components, destination: PeerId, protocol: string): Promise<DialResponse> {
   // First let's try already existing connections
   let struct = await tryExistingConnections(components, destination, protocol)
 
@@ -278,7 +275,13 @@ export async function dial(components: Components, destination: PeerId, protocol
   } else {
     log(`No currently known addresses for peer ${destination.toString()}`)
   }
+}
 
+async function fetchCircuitAddressesAndDial(
+  components: Components,
+  destination: PeerId,
+  protocol: string
+): Promise<DialResponse> {
   let noDht = false
   try {
     components.getDHT()
@@ -290,23 +293,29 @@ export async function dial(components: Components, destination: PeerId, protocol
   // Check if DHT is available
   if (noDht || components.getDHT()[Symbol.toStringTag] === /* catchall package of libp2p */ '@libp2p/dummy-dht') {
     // Stop if there is no DHT available
-    await printPeerStoreAddresses(
-      `Could not establish a connection to ${destination.toString()} and libp2p was started without a DHT. Giving up`,
-      destination,
-      components
+    error(
+      await printPeerStoreAddresses(
+        `Could not establish a connection to ${destination.toString()} and libp2p was started without a DHT. Giving up`,
+        destination,
+        components
+      )
     )
     return { status: DialStatus.NO_DHT }
   }
+
+  const knownAddressesForPeer = await components.getPeerStore().addressBook.get(destination)
 
   // Try to get some fresh addresses from the DHT
   log(`Could not reach ${destination.toString()} using known addresses, querying DHT for more addresses...`)
   const dhtResult = await queryDHT(components, destination)
 
   if (dhtResult.length == 0) {
-    await printPeerStoreAddresses(
-      `Direct dial attempt to ${destination.toString()} failed and DHT query has not brought any new addresses. Giving up`,
-      destination,
-      components
+    error(
+      await printPeerStoreAddresses(
+        `Direct dial attempt to ${destination.toString()} failed and DHT query has not brought any new addresses. Giving up`,
+        destination,
+        components
+      )
     )
     return { status: DialStatus.DHT_ERROR, query: destination.toString() }
   }
@@ -328,12 +337,14 @@ export async function dial(components: Components, destination: PeerId, protocol
       })
     | undefined
 
-  // Filter out the circuit addresses that were tried using the previous attempt
-  const circuitsNotTriedYet = dhtResult
-    .map((relay) => createCircuitAddress(relay, destination))
-    .filter((circuitAddr) => !knownCircuitAddressSet.has(circuitAddr.toString()))
+  for (const relay of dhtResult) {
+    const circuitAddress = createCircuitAddress(relay, destination)
 
-  for (const circuitAddress of circuitsNotTriedYet) {
+    // Filter out the circuit addresses that were tried using the previous attempt
+    if (knownCircuitAddressSet.has(circuitAddress.toString())) {
+      continue
+    }
+
     // Share new knowledge about peer with Libp2p's peerStore
     await components.getPeerStore().addressBook.add(destination, [circuitAddress as any])
 
@@ -349,6 +360,34 @@ export async function dial(components: Components, destination: PeerId, protocol
   }
 
   return { status: DialStatus.DIAL_ERROR, dhtContacted: true }
+}
+
+/**
+ * Runs through the dial strategy and handles possible errors
+ *
+ * 1. Use already known addresses
+ * 2. Check the DHT (if available) for additional addresses
+ * 3. Try new addresses
+ *
+ * @param components components of libp2p instance
+ * @param destination which peer to connect to
+ * @param protocol which protocol to use
+ * @returns
+ */
+export async function dial(
+  components: Components,
+  destination: PeerId,
+  protocol: string,
+  withDHT: boolean = true
+): Promise<DialResponse> {
+  const res = await doDirectDial(components, destination, protocol)
+
+  if (withDHT == false) {
+    // Take first result and don't do any further steps
+    return res
+  }
+
+  return await fetchCircuitAddressesAndDial(components, destination, protocol)
 }
 
 export type { TimeoutOpts as DialOpts }
