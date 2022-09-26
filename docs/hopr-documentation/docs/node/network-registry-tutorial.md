@@ -30,7 +30,7 @@ If you are chosen to join the registry, you will be sent a network registry NFT 
 
 ### Step 1: Stake your NFT
 
-(**1**) Go to [stake.hoprnet.org](stake.hoprnet.org)
+(**1**) Go to [stake.hoprnet.org](https://stake.hoprnet.org/)
 
 (**2**) Connect your wallet (make sure this is the one containing your NFT). You should see an icon for this on the top right of the site. Once you have connected your wallet, you should see the option to 'Sync'.
 
@@ -138,7 +138,7 @@ The registration process is now complete! You can proceed to our [hopr-admin tut
 
 Participants of the Monte Rosa release will be rewarded depending on their uptime. The more active and available your node is, the higher you will score. Your uptime (and score) will be measured through pings sent out by five nodes controlled by HOPR.
 
-These five nodes will ping each node on the network registry at randomised intervals throughout the day and record whether or not the node received the ping and the latency of the ping is received. This is publicly viewable at [network.hoprnet.org](network.hoprnet.org).
+These five nodes will ping each node on the network registry at randomised intervals throughout the day and record whether or not the node received the ping and the latency of the ping is received. This is publicly viewable at [network.hoprnet.org](https://network.hoprnet.org/).
 
 You can use this site to search your peerID (or any peerID on the network) and view their availability, average latency and total pings received. These metrics will be used to give each node its score and at the end of the initial release, rewards will be distributed as follows:
 
@@ -147,7 +147,7 @@ You can use this site to search your peerID (or any peerID on the network) and v
 - 50-75% receive a silver NFT
 - Bottom 25% receive a bronze NFT
 
-Each NFT gives a sizeable APR boost when [staking HOPR tokens](stake.hoprnet.org), with higher ranked NFTs providing both a better APR and a better rank on future waitlists. As HOPR NFTs are often used as an indicator to decide participants for early access. So if you are not using a hardware node such as Avado or Dappnode, consider the following setups to maximise your uptime:
+Each NFT gives a sizeable APR boost when [staking HOPR tokens](https://stake.hoprnet.org/), with higher ranked NFTs providing both a better APR and a better rank on future waitlists. As HOPR NFTs are often used as an indicator to decide participants for early access. So if you are not using a hardware node such as Avado or Dappnode, consider the following setups to maximise your uptime:
 
 - Using Tmux or Screen on a VPS to run your node 24/7
 - Using a machine that can remain plugged in throughout the day. E.g. avoid laptops
