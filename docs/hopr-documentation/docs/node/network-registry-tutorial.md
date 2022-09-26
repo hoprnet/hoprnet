@@ -2,7 +2,6 @@
 id: network-registry-tutorial
 title: Network Registry
 ---
-
 ## What is the Network Registry?
 
 The Network Registry is a list of nodes allowed to interact with others on the network. This is a utility used by HOPR to scale and test the network at a controlled pace.
@@ -31,7 +30,7 @@ If you are chosen to join the registry, you will be sent a network registry NFT 
 
 ### Step 1: Stake your NFT
 
-(**1**) Go to stake.hoprnet.org
+(**1**) Go to [stake.hoprnet.org](stake.hoprnet.org)
 
 (**2**) Connect your wallet (make sure this is the one containing your NFT). You should see an icon for this on the top right of the site. Once you have connected your wallet, you should see the option to 'Sync'.
 
@@ -53,9 +52,9 @@ If you are chosen to join the registry, you will be sent a network registry NFT 
 
 To continue, you first need to have installed a HOPR node. You can use one of the following three methods to do so:
 
-- [Using Docker](./using-docker.md)
-- [Using Avado](./using-avado.md)
-- [Using Dappnode](./using-dappnode.md)
+* [Using Avado](./using-avado.md)
+* [Using Dappnode](./using-dappnode.md)
+* [Using Docker](./using-docker.md)
 
 If you do not have an Avado or Dappnode, use Docker to install the node on your device.
 
@@ -71,11 +70,13 @@ You should be greeted with a screen similar to the one below, if your screen is 
 
 (**2**) From here, make sure you have the correct information. By default, `API endpoint` should be set to `http://localhost:3001`, but you may need to replace `localhost`with your server IP address if you used a VPS and change the port if you adjusted the mapping on installation.
 
-The`apitoken` is whatever you set your security token as in the installation process.
+If you are using an Avado or Dappnode then the endpoints are `http://hopr.my.ava.do:3001` and `http://hopr.dappnode:3001` respectively.
+
+The`API Token` is whatever you set your security token as in the installation process.
 
 ![API info](./images/API-info.png)
 
-(**3**) From the admin interface, you should be able to see the peerID labelled as node address. Click on this contracted 5-letter address to expand it to its full length. Copy this address; it should look similar to this: `16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV`.
+(**3**) From the admin interface, you should be able to see the peerID labelled as node address. Click on this contracted 5-letter address to expand it to its full length and copy it.The address should look similar to this: `16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV`.
 
 ![NR peerID](./images/NR-admin-peerID.png)
 
@@ -89,13 +90,13 @@ At this point, you should have the peerID of the node you want to register copie
 
 (**1**) Go to [the smart contract on blockscout](https://blockscout.com/xdai/mainnet/address/0x819E6a81e1e3f96CF1ac9200477C2d09c676959D/write-contract#address-tabs)
 
-Scroll down and make sure you are on the 'write contract' tab.
+Scroll down and make sure you are on the **write contract** tab.
 
 ![connect wallet blockscout](./images/blockscout-NR-connect%20wallet.png)
 
 (**2**) Connect the wallet which you used to stake your NFT
 
-(**3**) Locate the 8th function. It will be named selfRegister
+(**3**) Locate the 8th function. It will be named `selfRegister`
 
 ![selfRegister NR](./images/NR-SelfRegister.png)
 
@@ -132,3 +133,21 @@ To check if you have been registered:
 (**4**) If it is still false, wait a few minutes and check again
 
 The registration process is now complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).
+
+## Monte Rosa rewards
+
+Participants of the Monte Rosa release will be rewarded depending on their uptime. The more active and available your node is, the higher you will score. Your uptime (and score) will be measured through pings sent out by five nodes controlled by HOPR.
+
+These five nodes will ping each node on the network registry at randomised intervals throughout the day and record whether or not the node received the ping and the latency of the ping is received. This is publicly viewable at [network.hoprnet.org](network.hoprnet.org).
+
+You can use this site to search your peerID (or any peerID on the network) and view their availability, average latency and total pings received. These metrics will be used to give each node its score and at the end of the initial release, rewards will be distributed as follows:
+
+* Top 25% receive a diamond NFT
+* 25-50% receive a gold NFT
+* 50-75% receive a silver NFT
+* Bottom 25% receive a bronze NFT
+
+Each NFT gives a sizeable APR boost when [staking HOPR tokens](stake.hoprnet.org), with higher ranked NFTs providing both a better APR and a better rank on future waitlists. As HOPR NFTs are often used as an indicator to decide participants for early access. So if you are not using a hardware node such as Avado or Dappnode, consider the following setups to maximise your uptime:
+
+* Using Tmux or Screen on a VPS to run your node 24/7
+* Using a machine that can remain plugged in throughout the day. E.g. avoid laptops

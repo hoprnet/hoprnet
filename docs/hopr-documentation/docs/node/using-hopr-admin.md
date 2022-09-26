@@ -2,7 +2,6 @@
 id: using-hopr-admin
 title: How to use hopr-admin
 ---
-
 This is a guide on how to use `hopr-admin`. It is not exhaustive and is intended only as a brief overview of its functionality and use.
 
 :::caution Warning
@@ -17,15 +16,15 @@ Make sure you have installed a `hoprd` node either through Docker or with a hard
 Please be aware that it can take 10 minutes for your `hoprd` node to boot up.
 :::
 
-**Network Registry:** If you have registered your node on the network registry, you will have been airdropped mHOPR/xDAI along with your NFT. In **step three** of Admin UI & Funding below, make sure to use the mHOPR and xDAI provided instead of purchasing wxHOPR.
+**Network Registry:** If you have registered your node on the network registry, you will have been airdropped mHOPR/xDAI along with your NFT. In **step three** of Admin UI & Funding below, make sure to use the **mHOPR** and **xDAI** provided instead of purchasing **wxHOPR**.
 
 ## Admin UI & Funding
 
 If you used Docker to install your node, you should be able to access it at: [http://localhost:3000](http://localhost:3000) (replace `localhost` with your server IP address if you are using a VPS). Otherwise, locate the HOPR client on your hardware node's associated browser. You should end up with an interface that looks like this:
 
-![hopr-admin user interface](./images/admin-UI-first-2.png)
-
 **_Note:_** You may be greeted with a yellow screen asking you to check your settings. You can fix this by entering the correct API endpoint and token (see steps 1 & 2).
+
+![hopr-admin user interface](./images/admin-UI-first-2.png)
 
 (**1**) First, click on the gear icon. This should give you a pop-up similar to the one below.
 
@@ -33,7 +32,9 @@ If you used Docker to install your node, you should be able to access it at: [ht
 
 (**2**) From here, make sure you have the correct information. By default, `API endpoint` should be set to `http://localhost:3001`, but you may need to replace `localhost`with your server IP address if you used a VPS and change the port if you adjusted the mapping on installation.
 
-The`apitoken` is whatever you set your security token as in the installation process.
+If you are using an Avado or Dappnode then the endpoints are `http://hopr.my.ava.do:3001` and `http://hopr.dappnode:3001` respectively.
+
+The`API Token` is whatever you set your security token as in the installation process.
 
 (**3**) You will see a newly generated ETH & Node address. Use the ETH address to send [xDAI](https://www.xdaichain.com/for-users/get-xdai-tokens) and [HOPR tokens](/staking/how-to-get-hopr) to in order to fund your node. **Your node will not start until it has been funded.**
 
@@ -84,13 +85,13 @@ Now that you have started your node, what exactly is your node and what are its 
 
 ### Identity file
 
-The **_identity file_** contains your private key and is essentially your wallet for the node. When you installed your node, you supplied `–identity` and `–password` arguments.
+The **_identity file_** contains your private key and is essentially your wallet for the node. When you installed your node, you supplied `--identity` and `--password` arguments.
 
 ```bash
-docker run --pull always -ti -v $HOME/.hoprd-db:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:paleochora --admin --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --init --api --apiHost "0.0.0.0" --apiPort 3001 --identity /app/db/.hopr-id-paleochora --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --adminPort 3000 --host "0.0.0.0:9091"
+docker run --pull always -ti -v $HOME/.hoprd-db-monte_rosa:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:valencia --admin --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --init --api --apiHost "0.0.0.0" --apiPort 3001 --identity /app/db/.hopr-id-valencia --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --adminPort 3000 --host "0.0.0.0:9091" --data /app/db
 ```
 
-`–identity` is a path to where the file is located, and `–password` is used to decrypt the file.
+`--identity` is a path to where the file is located, and `--password` is used to decrypt the file.
 
 If a file exists at the specified location and is decrypted using the provided password, then your existing private key is used to access your funds and start up your node.
 
@@ -98,7 +99,7 @@ If one doesn’t exist, it is created, encrypted and stored at the given locatio
 
 ### Backing up your identity file
 
-If you used Docker to install your node, then your identity file will be stored on your OS at the path you specified: `/app/db/.hopr-id-paleochora`, so you can skip this step.
+If you used Docker to install your node, then your identity file will be stored on your OS at the path you specified: `/<computer username>/.hoprd-db/.hopr-id-valencia`, so you can skip this step.
 
 If you are using Dappnode or Avado, you can download your identity file on their interfaces.
 
@@ -659,3 +660,5 @@ withdraw 0.1 HOPR 0xc8Aa5a085c23dfEa903312a73EfC30888bB61f0B
 ```
 
 This will withdraw 0.01 wxHOPR or mHOPR from your balance and send it to **0xc8Aa5a085c23dfEa903312a73EfC30888bB61f0B**
+
+**Please use your own ETH address to withdraw funds and not the example address**

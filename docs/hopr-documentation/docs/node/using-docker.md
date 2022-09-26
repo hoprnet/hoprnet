@@ -2,7 +2,6 @@
 id: using-docker
 title: Using Docker
 ---
-
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
@@ -90,9 +89,9 @@ Please note the `--apiToken` (Security token), as this will be used to access ho
 
 **Note:** Withdrawing funds is possible through hopr-admin. This is just a precaution for safekeeping.
 
-All ports are mapped to your local host, assuming you stick to the default port numbers. You should be able to view the `hopr-admin` interface at [http://localhost:3000](http://localhost:3000) (replace `localhost` with your server IP address if you are using a VPS).
+All ports are mapped to your local host, assuming you stick to the default port numbers. You should be able to view the `hopr-admin` interface at [http://localhost:3000](http://localhost:3000) (replace `localhost` with your `server IP address` if you are using a VPS, for example `http://142.93.5.175:3000`).
 
-If you are in the process of registering your node on the network registry, please complete the process [here.](./network-registry-tutorial.md)
+If you are in the process of registering your node on the network registry, please complete the process [here](./network-registry-tutorial.md) before continuing.
 
 Otherwise, the installation process is complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).
 

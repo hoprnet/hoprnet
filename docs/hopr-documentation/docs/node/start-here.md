@@ -2,7 +2,6 @@
 id: start-here
 title: Start here
 ---
-
 # Start here
 
 :::caution Warning
@@ -31,25 +30,9 @@ Although it is recommended that you have at least 8 GB of RAM and 10 GB of disk 
 
 ## For VPS users
 
-Using a Linux or macOS-based VPS is recommended if you are on Windows, as Windows is not entirely supported. If you plan to run your node on a VPS, make sure you setup port forwarding as shown below:
+Using a VPS is recommended if you are on Windows, as all the instructions for installing your node are for Linux/macOS users. A VPS, in general, is an ideal setup as you can use Tmux or Screen to run your node constantly in the background without needing your machine to be plugged in or turned on. If you install your node through Docker, it will only run until you close your terminal for both your local machine and a VPS. This is why it is highly recommended you quickly familiarise yourself with[tmux](https://linuxize.com/post/getting-started-with-tmux/) or [screen](https://linuxize.com/post/how-to-use-linux-screen/) before continuing.
 
-```
-ssh -L 3000:127.0.0.1:3000 <root or username>@<Your_server_ip>
-```
-
-`<root or username>` - replace with your server username.
-
-`<Your_server_ip>` - replace with your server IP address.
-
-Example: `ssh -L 3000:127.0.0.1:3000 root@192.168.0.1`
-
-This allows you to access the admin interface locally (once the node is installed).
-
-## For Linux/macOS users
-
-If you install your node through Docker, it will only run until you close your terminal. It is highly recommended that you use tmux or screen to run your node in the background. Tmux/screen will allow you to create multiple terminal windows that exist as their own independently running instances. All of these are on a separate session that will keep running after you have closed your terminal.
-
-If you intend to use your device to install and run a `hoprd` node, please familiarise yourself with [tmux](https://linuxize.com/post/getting-started-with-tmux/) or [screen](https://linuxize.com/post/how-to-use-linux-screen/) before continuing.
+If you intend to run your node locally, try and use a setup where your PC or machine can stay plugged in throughout the day. This is especially important if you are participating in the Monte Rosa release. Otherwise, you can use a plug-n-play device such as Avado or Dappnode, which you can plug in and forget about.  
 
 ## hoprd installation methods
 
@@ -67,4 +50,4 @@ A [Dappnode](https://dappnode.io/) plug-n-play device, another quick set-up and 
 
 Using [Docker](https://www.docker.com/) you can run `hoprd` on your device.
 
-Regardless of which way you install `hoprd`, you will access and interact with it through your browser. By default, `hoprd` exposes an admin interface available on `localhost:3000`, although flags can change these settings.
+Regardless of which way you install `hoprd`, you will access and interact with it through your browser. The exact URL for this will vary depending on your installation method and whether or not you used a VPS. All details can be found in their respective installation section.
