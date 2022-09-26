@@ -167,7 +167,7 @@ describe(`test libp2pSendMessage`, function () {
       }
     )
 
-    await libp2pSendMessage(libp2pComponents, destination, 'demo protocol', msgToReceive, false, {
+    await libp2pSendMessage(libp2pComponents, destination, ['demo protocol'], msgToReceive, false, {
       timeout: 5000
     })
 
@@ -199,7 +199,7 @@ describe(`test libp2pSendMessage with response`, function () {
 
     const results = await Promise.all([
       msgReceived.promise,
-      libp2pSendMessage(libp2pComponents, destination, 'demo protocol', msgToReceive, true, {
+      libp2pSendMessage(libp2pComponents, destination, ['demo protocol'], msgToReceive, true, {
         timeout: 5000
       })
     ])
@@ -259,7 +259,7 @@ describe(`test libp2pSubscribe`, async function () {
       }
     } as Components
 
-    libp2pSubscribe(libp2pComponents, 'demo protocol', fakeOnMessage, () => {}, true)
+    libp2pSubscribe(libp2pComponents, ['demo protocol'], fakeOnMessage, () => {}, true)
 
     await Promise.all([msgReceived.promise, msgReplied.promise])
   })
@@ -301,7 +301,7 @@ describe(`test libp2pSubscribe`, async function () {
       }
     } as Components
 
-    libp2pSubscribe(libp2pComponents, 'demo protocol', fakeOnMessage, () => {}, false)
+    libp2pSubscribe(libp2pComponents, ['demo protocol'], fakeOnMessage, () => {}, false)
 
     await msgReceived.promise
   })

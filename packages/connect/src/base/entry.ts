@@ -18,7 +18,7 @@ import {
   CODE_UDP,
   MAX_RELAYS_PER_NODE,
   MIN_RELAYS_PER_NODE,
-  CAN_RELAY_PROTCOL,
+  CAN_RELAY_PROTOCOLS,
   OK,
   DEFAULT_DHT_ENTRY_RENEWAL,
   CODE_P2P
@@ -1012,11 +1012,11 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       return
     }
 
-    const protocol = CAN_RELAY_PROTCOL(this.options.environment)
+    const protocols = CAN_RELAY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
 
-    let stream: ProtocolStream['stream'] | undefined
+    let stream: ProtocolStream | undefined
     try {
-      stream = (await conn.newStream([protocol]))?.stream
+      stream = await conn.newStream(protocols)
     } catch (err) {
       await attemptClose(conn, error)
       log(`Cannot use entry node ${destination.toString()} because protocol selection failed`)
@@ -1026,8 +1026,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     if (conn != undefined && stream != undefined) {
       return {
         conn,
-        stream,
-        protocol
+        ...stream
       }
     }
   }
@@ -1046,7 +1045,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
   ): Promise<{ entry: EntryNodeData; conn?: Connection }> {
     const start = Date.now()
 
-    let conn = await tryExistingConnections(this.getComponents(), id, CAN_RELAY_PROTCOL(this.options.environment))
+    const protocolsCanRelay = CAN_RELAY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
+    let conn = await tryExistingConnections(this.getComponents(), id, protocolsCanRelay)
 
     if (conn == null) {
       conn = await this.establishNewConnection(
