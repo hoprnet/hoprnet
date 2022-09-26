@@ -2,6 +2,7 @@
 id: using-hopr-admin
 title: How to use hopr-admin
 ---
+
 This is a guide on how to use `hopr-admin`. It is not exhaustive and is intended only as a brief overview of its functionality and use.
 
 :::caution Warning
