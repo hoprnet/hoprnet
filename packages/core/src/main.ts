@@ -72,7 +72,8 @@ export async function createLibp2pInstance(
     log(`using peerstore at ${datastorePath}`)
 
     // Make libp2p aware of environments
-    const protocolPrefix = `/hopr/${options.environment.id}`
+    const protocolPrefix = `hopr/${options.environment.id}`
+    const protocolDHTPrefix = `/hopr/${options.environment.id}`
 
     libp2p = await createLibp2p({
       peerId,
@@ -109,7 +110,7 @@ export async function createLibp2pInstance(
       ],
       streamMuxers: [new Mplex()],
       connectionEncryption: [new Noise()],
-      dht: new KadDHT({ protocolPrefix, pingTimeout: 2000 }),
+      dht: new KadDHT({ protocolPrefix: protocolDHTPrefix, pingTimeout: 2000 }),
       connectionManager: {
         autoDial: true,
         // Use custom sorting to prevent from problems with libp2p

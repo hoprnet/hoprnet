@@ -3,6 +3,7 @@
  */
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Connection, ProtocolStream, Stream } from '@libp2p/interface-connection'
+import type { ConnectionManager, Dialer } from '@libp2p/interface-connection-manager'
 import type { Components } from '@libp2p/interfaces/components'
 import { type Multiaddr, protocols } from '@multiformats/multiaddr'
 
@@ -20,6 +21,8 @@ const error = debug(DEBUG_PREFIX.concat(`:error`))
 const CODE_P2P = protocols('p2p').code
 
 const DEFAULT_DHT_QUERY_TIMEOUT = 20000
+
+type MyConnectionManager = ConnectionManager & { dialer: Dialer }
 
 export enum DialStatus {
   SUCCESS = 'SUCCESS',
@@ -56,7 +59,7 @@ export type DialResponse =
     }
 
 async function printPeerStoreAddresses(prefix: string, destination: PeerId, components: Components): Promise<string> {
-  const SUFFIX = 'Known addresses:'
+  const SUFFIX = 'Known addresses:\n'
 
   let out = `${prefix}\n${SUFFIX}`
 
@@ -162,9 +165,10 @@ async function establishNewConnection(components: Components, destination: PeerI
 
   let conn: Connection | undefined
   try {
-    // @ts-ignore Dialer is not yet part of interface
-    conn = await components.getConnectionManager().dialer.dial(destination, opts)
-  } catch (err) {
+    conn = (await (components.getConnectionManager() as unknown as MyConnectionManager).dialer.dial(
+      destination
+    )) as any as Connection
+  } catch (err: any) {
     error(`Error while establishing connection to ${destination.toString()}.`)
     if (err?.message) {
       error(`Dial error:`, err)
@@ -177,7 +181,7 @@ async function establishNewConnection(components: Components, destination: PeerI
 
   log(`Connection ${destination.toString()} established !`)
 
-  let stream: Stream
+  let stream: Stream | undefined
   let errThrown = false
   try {
     // Timeout protocol selection to prevent from irresponsive nodes
@@ -233,7 +237,7 @@ async function queryDHT(components: Components, destination: PeerId): Promise<Pe
       relayers.push(relayer.id)
     }
     done = true
-  } catch (err) {
+  } catch (err: any) {
     done = true
     error(`Error while querying the DHT for ${destination.toString()}.`)
     if (err?.message) {
@@ -242,7 +246,7 @@ async function queryDHT(components: Components, destination: PeerId): Promise<Pe
   }
 
   if (relayers.length > 0) {
-    log(`found ${relayers.map((relayer) => relayer.toString()).join(' ,')} for node ${destination.toString()}.`)
+    log(`found ${relayers.map((relayer) => relayer.toString()).join(', ')} for node ${destination.toString()}.`)
   } else {
     log(`could not find any relayer for ${destination.toString()}`)
   }
@@ -275,6 +279,8 @@ async function doDirectDial(components: Components, destination: PeerId, protoco
   } else {
     log(`No currently known addresses for peer ${destination.toString()}`)
   }
+
+  return { status: DialStatus.DIAL_ERROR, dhtContacted: false }
 }
 
 async function fetchCircuitAddressesAndDial(
@@ -338,15 +344,20 @@ async function fetchCircuitAddressesAndDial(
     | undefined
 
   for (const relay of dhtResult) {
-    const circuitAddress = createCircuitAddress(relay, destination)
+    // Make sure we don't use self as relay
+    if (relay.equals(components.getPeerId())) {
+      continue
+    }
+
+    const circuitAddress = createCircuitAddress(relay).encapsulate(`/p2p/${destination.toString()}`)
 
     // Filter out the circuit addresses that were tried using the previous attempt
     if (knownCircuitAddressSet.has(circuitAddress.toString())) {
       continue
     }
 
-    // Share new knowledge about peer with Libp2p's peerStore
-    await components.getPeerStore().addressBook.add(destination, [circuitAddress as any])
+    // Share new knowledge about peer with Libp2p's peerStore, dropping `/p2p/<DESTINATION>`
+    await components.getPeerStore().addressBook.add(destination, [createCircuitAddress(relay) as any])
 
     log(`Trying to reach ${destination.toString()} via circuit ${circuitAddress}...`)
 
@@ -382,7 +393,7 @@ export async function dial(
 ): Promise<DialResponse> {
   const res = await doDirectDial(components, destination, protocol)
 
-  if (withDHT == false) {
+  if (withDHT == false || (withDHT == true && res.status == DialStatus.SUCCESS)) {
     // Take first result and don't do any further steps
     return res
   }

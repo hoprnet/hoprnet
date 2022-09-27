@@ -6,10 +6,9 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { unmarshalPublicKey } from '@libp2p/crypto/keys'
 
 import chalk from 'chalk'
-import { pubKeyToPeerId } from '@hoprnet/hopr-utils'
+import { dial, DialStatus, pubKeyToPeerId } from '@hoprnet/hopr-utils'
 
 import { RelayState } from './state.js'
-import type { Relay } from './index.js'
 
 import debug from 'debug'
 import { DELIVERY_PROTOCOL } from '../constants.js'
@@ -173,9 +172,8 @@ class RelayHandshake {
    */
   async negotiate(
     source: PeerId,
-    getStreamToCounterparty: InstanceType<typeof Relay>['dialNodeDirectly'],
+    components: Components,
     state: Pick<RelayState, 'exists' | 'isActive' | 'updateExisting' | 'createNew'>,
-    upgrader: Components['upgrader'],
     __relayFreeTimeout?: number
   ): Promise<void> {
     log(`handling relay request`)
@@ -237,17 +235,10 @@ class RelayHandshake {
       }
     }
 
-    let toDestinationStruct: Awaited<ReturnType<typeof getStreamToCounterparty>>
-    try {
-      toDestinationStruct = await getStreamToCounterparty(destination, DELIVERY_PROTOCOL(this.options.environment), {
-        upgrader
-      })
-    } catch (err) {
-      error(err)
-    }
+    const result = await dial(components, destination, DELIVERY_PROTOCOL(this.options.environment), false)
 
     // Anything can happen while attempting to connect
-    if (toDestinationStruct == null) {
+    if (result.status != DialStatus.SUCCESS) {
       error(
         `Failed to create circuit from ${source.toString()} to ${destination.toString()} because destination is not reachable`
       )
@@ -256,11 +247,27 @@ class RelayHandshake {
     }
 
     const destinationShaker = handshake({
-      source: toU8aStream(toDestinationStruct.stream.source as any),
-      sink: toDestinationStruct.stream.sink as any
+      source: toU8aStream(result.resp.stream.source as any),
+      sink: result.resp.stream.sink as any
     })
 
-    destinationShaker.write(unmarshalPublicKey(source.publicKey as Uint8Array).marshal())
+    let errThrown = false
+    try {
+      destinationShaker.write(unmarshalPublicKey(source.publicKey as Uint8Array).marshal())
+    } catch (err) {
+      error(`Error while writing to destination ${destination.toString()}`)
+      errThrown = true
+    }
+
+    if (errThrown) {
+      destinationShaker.rest()
+      try {
+        await result.resp.conn.close()
+      } catch (err) {
+        error(`Error while closing connection to destination ${destination.toString()}.`, err)
+      }
+      return
+    }
 
     let destinationChunk: StreamType | undefined
 
@@ -275,7 +282,7 @@ class RelayHandshake {
 
       destinationShaker.rest()
       try {
-        await toDestinationStruct.conn.close()
+        await result.resp.conn.close()
       } catch (err) {
         error(`Error while closing connection to destination ${destination.toString()}.`, err)
       }

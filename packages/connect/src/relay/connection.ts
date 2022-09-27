@@ -230,7 +230,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
     this._counterparty = counterparty
 
-    this.remoteAddr = createCircuitAddress(relay, counterparty)
+    this.remoteAddr = createCircuitAddress(relay)
 
     // Pre-generate object to attach to function pointers
     this.state = {} as RelayConnection['state']

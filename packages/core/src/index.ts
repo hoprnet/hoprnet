@@ -43,6 +43,7 @@ import {
   convertPubKeyFromPeerId,
   getBackoffRetryTimeout,
   getBackoffRetries,
+  pickVersion,
   type LibP2PHandlerFunction,
   type AcknowledgedTicket,
   type ChannelEntry,
@@ -53,6 +54,12 @@ import {
   type Ticket
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { type Indexer } from '@hoprnet/hopr-core-ethereum'
+
+// Do not type-check JSON files
+// @ts-ignore
+import pkg from '../package.json' assert { type: 'json' }
+
+const NORMALIZED_VERSION = pickVersion(pkg.version)
 
 import {
   type StrategyTickResult,
@@ -347,8 +354,8 @@ class Hopr extends EventEmitter {
       this.networkPeers.register(event.detail.remotePeer, NetworkPeersOrigin.INCOMING_CONNECTION)
     })
 
-    const protocolMsg = `/hopr/${this.environment.id}/msg`
-    const protocolAck = `/hopr/${this.environment.id}/ack`
+    const protocolMsg = `/hopr/${this.environment.id}/msg/${NORMALIZED_VERSION}`
+    const protocolAck = `/hopr/${this.environment.id}/ack/${NORMALIZED_VERSION}`
 
     // Attach mixnet functionality
     await subscribeToAcknowledgements(
@@ -427,6 +434,8 @@ class Hopr extends EventEmitter {
     this.heartbeat.recalculateNetworkHealth()
 
     this.startMemoryFreeInterval()
+
+    console.log(libp2p.registrar.getProtocols())
   }
 
   /**
@@ -719,7 +728,7 @@ class Hopr extends EventEmitter {
       try {
         // @TODO add abort controller
         for await (const relayer of this.libp2pComponents.getContentRouting().findProviders(createRelayerKey(peer))) {
-          const relayAddress = createCircuitAddress(relayer.id, peer)
+          const relayAddress = createCircuitAddress(relayer.id)
           if (addrs.findIndex((ma) => ma.equals(relayAddress)) < 0) {
             addrs.push(relayAddress)
           }

@@ -1,15 +1,13 @@
 import type { PeerId } from '@libp2p/interface-peer-id'
-import type { Connection, ProtocolStream, MultiaddrConnection } from '@libp2p/interface-connection'
+import type { Connection, MultiaddrConnection } from '@libp2p/interface-connection'
 import type { IncomingStreamData } from '@libp2p/interfaces/registrar'
 import type { Initializable, Components } from '@libp2p/interfaces/components'
 import type { Startable } from '@libp2p/interfaces/startable'
 import type { DialOptions } from '@libp2p/interface-transport'
+import type { Stream, HoprConnectOptions, HoprConnectTestingOptions } from '../types.js'
+import type { ConnectComponents, ConnectInitializable } from '../components.js'
 
 import { peerIdFromString } from '@libp2p/peer-id'
-
-import type { HoprConnect } from '../index.js'
-
-import type { Stream, HoprConnectOptions, HoprConnectTestingOptions } from '../types.js'
 
 import errCode from 'err-code'
 import debug from 'debug'
@@ -21,8 +19,6 @@ import { RelayConnection } from './connection.js'
 import { RelayHandshake, RelayHandshakeMessage } from './handshake.js'
 import { RelayState } from './state.js'
 import { createRelayerKey, dial, DialStatus, randomInteger, retimer } from '@hoprnet/hopr-utils'
-
-import { type ConnectComponents, ConnectInitializable } from '../components.js'
 
 const DEBUG_PREFIX = 'hopr-connect:relay'
 const DEFAULT_MAX_RELAYED_CONNECTIONS = 10
@@ -88,12 +84,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     return this.connectComponents
   }
 
-  constructor(
-    private dialDirectly: HoprConnect['dialDirectly'],
-    private filter: HoprConnect['filter'],
-    private options: HoprConnectOptions,
-    private testingOptions: HoprConnectTestingOptions
-  ) {
+  constructor(private options: HoprConnectOptions, private testingOptions: HoprConnectTestingOptions) {
     this._isStarted = false
 
     log(`relay testing options`, testingOptions)
@@ -330,12 +321,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       } else {
         // NOTE: This cannot be awaited, otherwise it stalls the relay loop. Therefore, promise rejections must
         // be handled downstream to avoid unhandled promise rejection crashes
-        shaker.negotiate(
-          conn.connection.remotePeer,
-          this._dialNodeDirectly as Relay['dialNodeDirectly'],
-          this.relayState,
-          this.getComponents().getUpgrader()
-        )
+        shaker.negotiate(conn.connection.remotePeer, this.getComponents(), this.relayState)
       }
     } catch (e) {
       error(`Error while processing relay request from ${conn.connection.remotePeer.toString()}: ${e}`)

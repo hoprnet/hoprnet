@@ -1,7 +1,7 @@
 import type NetworkPeers from './network-peers.js'
 import type AccessControl from './access-control.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import { randomInteger, u8aEquals, debug, retimer, nAtATime, u8aToHex } from '@hoprnet/hopr-utils'
+import { randomInteger, u8aEquals, debug, retimer, nAtATime, u8aToHex, pickVersion } from '@hoprnet/hopr-utils'
 import { HEARTBEAT_TIMEOUT } from '../constants.js'
 import { createHash, randomBytes } from 'crypto'
 
@@ -11,6 +11,12 @@ import { NetworkPeersOrigin } from './network-peers.js'
 
 const log = debug('hopr-core:heartbeat')
 const error = debug('hopr-core:heartbeat:error')
+
+// Do not type-check JSON files
+// @ts-ignore
+import pkg from '../../package.json' assert { type: 'json' }
+
+const NORMALIZED_VERSION = pickVersion(pkg.version)
 
 const PING_HASH_ALGORITHM = 'blake2s256'
 
@@ -75,7 +81,7 @@ export default class Heartbeat {
       networkQualityThreshold: config?.networkQualityThreshold,
       maxParallelHeartbeats: config?.maxParallelHeartbeats ?? MAX_PARALLEL_HEARTBEATS
     }
-    this.protocolHeartbeat = `/hopr/${environmentId}/heartbeat`
+    this.protocolHeartbeat = `/hopr/${environmentId}/heartbeat/${NORMALIZED_VERSION}`
   }
 
   private errHandler(err: any) {

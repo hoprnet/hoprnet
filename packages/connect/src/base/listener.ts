@@ -100,9 +100,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       // hopr-connect does not enable IPv6 connections right now, therefore we can set `listeningAddrs` statically
       // to `/ip4/0.0.0.0/tcp/0`, meaning listening on IPv4 using a canonical port
       // TODO check IPv6
-      this.connectComponents
-        .getAddressFilter()
-        .setAddrs(this.getAddrs(), [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${this.components.getPeerId().toString()}`)])
+      this.connectComponents.getAddressFilter().setAddrs(this.getAddrs(), [new Multiaddr(`/ip4/0.0.0.0/tcp/0`)])
 
       const usedRelays = this.connectComponents.getEntryNodes().getUsedRelayAddresses()
 
@@ -324,20 +322,15 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       }
 
       this.addrs.external = [
-        nodeToMultiaddr(
-          {
-            address: natSituation.externalAddress,
-            port: natSituation.externalPort,
-            family: 'IPv4'
-          },
-          this.components.getPeerId()
-        )
+        nodeToMultiaddr({
+          address: natSituation.externalAddress,
+          port: natSituation.externalPort,
+          family: 'IPv4'
+        })
       ]
     }
 
-    this.addrs.interface = internalInterfaces.map((internalInterface) =>
-      nodeToMultiaddr(internalInterface, this.components.getPeerId())
-    )
+    this.addrs.interface = internalInterfaces.map(nodeToMultiaddr)
 
     this.attachSocketHandlers()
 
@@ -429,7 +422,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     let maConn: TCPConnection | undefined
 
     try {
-      maConn = TCPConnection.fromSocket(socket, this.components.getPeerId())
+      maConn = TCPConnection.fromSocket(socket)
     } catch (err: any) {
       error(`inbound connection failed. ${err.message}`)
     }
