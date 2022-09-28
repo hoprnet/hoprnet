@@ -16,7 +16,7 @@ While connected to your AVADO's network or via a VPN, go to the following [link]
 If you are unable to use the link above, search for this hash in the AVADO DappStore:
 
 ```
-/ipfs/QmPhSZTZbM6kd9VizvZpKDN3fQe5bqvCDooCBPYEUXdTcy
+/ipfs/Qme42vdAeuF7cWBo7bwYGQGVT4bouT6yLKVYoc6Qkjj1jU
 ```
 
 ![DappStore](/img/node/avado-1.png)
