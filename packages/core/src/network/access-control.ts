@@ -2,7 +2,6 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import type NetworkPeers from './network-peers.js'
 import { debug } from '@hoprnet/hopr-utils'
 import { NetworkPeersOrigin } from './network-peers.js'
-import type { Connection } from '@libp2p/interfaces/connection'
 
 // const log = debug('hopr-core:access-control')
 const logError = debug('hopr-core:access-control:error')
