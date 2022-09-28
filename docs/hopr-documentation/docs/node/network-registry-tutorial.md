@@ -22,7 +22,7 @@ Users from the waitlist will then be given an NFT in blocks of 20. You can use t
 
 For every 20 NFTs given out, the majority will go to the next highest-ranking participants on the waitlist, but a few will also be allocated to Dappnode/Avado users. And one of every 20 will be given to someone at random further down the waitlist (so you always have a chance of being chosen even without having participated in previous staking seasons or releases).
 
-Depending on your prefered method of contact, you will either be notified by email when you have been chosen or you can review the waitlist manually here.
+Depending on your prefered method of contact, you will either be notified by email when you have been chosen or you can review the waitlist manually.
 
 ## Registering your node
 
@@ -62,11 +62,13 @@ Continue here once you have installed a node and can see the hopr-admin interfac
 
 #### Hopr-admin interface
 
-You should be greeted with a screen similar to the one below, if your screen is yellow and asks you to check your settings, you need to check your security token and API endpoint. You can do this by:
-
-(**1**) Clicking on the gear icon. This will open a pop-up similar to the one below.
+You should be greeted with a screen similar to the one below, if your screen is yellow and asks you to check your settings, you need to check your security token and API endpoint. (See steps 1 & 2 below.)
 
 ![NR gear](./images/NR-admin-gear.png)
+
+(**1**) Click on the gear icon, this should open a pop-up box.
+
+![API info](./images/API-info.png)
 
 (**2**) From here, make sure you have the correct information. By default, `API endpoint` should be set to `http://localhost:3001`, but you may need to replace `localhost`with your server IP address if you used a VPS and change the port if you adjusted the mapping on installation.
 
@@ -74,23 +76,23 @@ If you are using an Avado or Dappnode then the endpoints are `http://hopr.my.ava
 
 The`API Token` is whatever you set your security token as in the installation process.
 
-![API info](./images/API-info.png)
-
 (**3**) From the admin interface, you should be able to see the peerID labelled as node address. Click on this contracted 5-letter address to expand it to its full length and copy it.The address should look similar to this: `16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV`.
 
 ![NR peerID](./images/NR-admin-peerID.png)
+
+(**3**) From the admin interface, you should be able to see the peerID labelled as node address. Click on this contracted 5-letter address to expand it to its full length and copy it.The address should look similar to this: `16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV`.
 
 (**4**) Alternatively, you can type ‘address’ into the command line.
 
 (**5**) your peerID will be outputted as your `HOPR address`.
 
-At this point, you should have the peerID of the node you want to register copied and your network registry NFT staked. Keep the admin interface open. You will need it to confirm your registration later.
+At this point, you should have the peerID of the node you want to register copied and your network registry NFT staked. Keep the admin interface open. You may need it to confirm your registration later.
 
 ### Step 3: Registering your peerID
 
-(**1**) Go to [the smart contract on blockscout](https://blockscout.com/xdai/mainnet/address/0x819E6a81e1e3f96CF1ac9200477C2d09c676959D/write-contract#address-tabs)
+(**1**) Go to [the network registry smart contract on blockscout](https://blockscout.com/xdai/mainnet/address/0x819E6a81e1e3f96CF1ac9200477C2d09c676959D/write-contract#address-tabs)
 
-Scroll down and make sure you are on the **write contract** tab.
+Scroll down and make sure you are on the **Write Contract** tab.
 
 ![connect wallet blockscout](./images/blockscout-NR-connect%20wallet.png)
 
@@ -102,7 +104,7 @@ Scroll down and make sure you are on the **write contract** tab.
 
 (**4**) In the text field, paste your peerID
 
-(**5**) Click ‘Write’ and confirm the transaction if your wallet gives you a prompt.
+(**5**) Click **Write** and confirm the transaction if your wallet gives you a prompt.
 
 If you have connected a wallet which has staked an NFT and entered a valid peerID, this transaction should succeed. You can find your block confirmation on Blockscout.
 
@@ -116,11 +118,29 @@ If all of the above is true and the transaction still fails, message us on [tele
 
 ### Step 4: Confirm your registration
 
-Once the transaction has successfully been completed, you can use the hopr-admin to check you have been registered.
+Once the transaction has successfully been completed, you can use the same smart contract to confirm your registration.
 
 **Note:** you will not be registered instantly and should wait a few minutes before checking.
 
 To check if you have been registered:
+
+(**1**) Switch to the [**Read Contract** tab.]([https://blockscout.com/xdai/mainnet/address/0x819E6a81e1e3f96CF1ac9200477C2d09c676959D/read-contract#address-tabs](https://blockscout.com/xdai/mainnet/address/0x819E6a81e1e3f96CF1ac9200477C2d09c676959D/read-contract#address-tabs))
+
+![Read Contract Tab](./images/Read-contract-NR.png)
+
+(**2**) Find the functon `isNodeRegisteredAndEligible`, it should be the 4th function under read contract.
+
+![Eligibility function](./images/isNodeEligible-NR.png)
+
+(**3**) Enter your peerID into the text field and click **Query**.
+
+(**4**) You should recieve the text output: `(bool) : true` if your node has been registered.
+
+(**5**) If it returns false, wait a few minutes and try again.
+
+The registration process is now complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).
+
+#### Alternative method: Using hopr-admin
 
 (**1**) Open the hopr-admin interface, you should hopefully have kept it open from step 2. If not, reopen it.
 
@@ -131,8 +151,6 @@ To check if you have been registered:
 (**3**) Check that Network registry eligibility is set to ‘true’
 
 (**4**) If it is still false, wait a few minutes and check again
-
-The registration process is now complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).
 
 ## Monte Rosa rewards
 

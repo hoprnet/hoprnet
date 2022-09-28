@@ -45,6 +45,32 @@ Depending on your distribution, please follow the official guidelines to install
 
 All our docker images can be found in [our Google Cloud Container Registry](https://console.cloud.google.com/gcr/images/hoprassociation/global/hoprd). Each image is prefixed with `gcr.io/hoprassociation/hoprd`.
 
+## Using Tmux
+
+If you are using a VPS, it is highly recommended that you use Tmux to run your node in the background. Otherwise, your node will terminate as soon as you exit the terminal. 
+
+You can use these basic commands to set up a separate session to run your node in:
+
+(**1**) First, install Tmux.
+
+```bash
+sudo apt install tmux
+```
+
+(**2**) Enter `tmux` to open a new session running in the background.
+
+```bash
+tmux
+```
+
+That's it! You now have a new session running in the background even when you close your terminal. You should familiarise yourself with other [Tmux commands]((https://linuxize.com/post/getting-started-with-tmux/)) to navigate between sessions. The main one you may need is:
+
+```bash
+ctrl+b d
+```
+
+To be clear, you press ctrl and b simultaneously, then press d after letting them go. This will exit the current session without closing it. Please make sure you are in a newly opened session and haven't exited it before continuing.
+
 ## Installing HOPRd
 
 :::info NOTE
