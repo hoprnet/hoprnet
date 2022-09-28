@@ -47,7 +47,7 @@ All our docker images can be found in [our Google Cloud Container Registry](http
 
 ## Using Tmux
 
-If you are using a VPS, it is highly recommended that you use Tmux to run your node in the background. Otherwise, your node will terminate as soon as you exit the terminal. 
+If you are using a VPS, it is highly recommended that you use Tmux to run your node in the background. Otherwise, your node will terminate as soon as you exit the terminal.
 
 You can use these basic commands to set up a separate session to run your node in:
 
@@ -57,19 +57,33 @@ You can use these basic commands to set up a separate session to run your node i
 sudo apt install tmux
 ```
 
-(**2**) Enter `tmux` to open a new session running in the background.
+(**2**) Enter `tmux` to open a new session.
 
 ```bash
 tmux
 ```
 
-That's it! You now have a new session running in the background even when you close your terminal. You should familiarise yourself with other [Tmux commands](https://linuxize.com/post/getting-started-with-tmux/) to navigate between sessions. The main one you may need is:
+That's it! You now have a new session running in the background even when you close your terminal. To navigate between sessions, you should familiarise yourself with other [Tmux commands](https://linuxize.com/post/getting-started-with-tmux/). The three main ones you may need are:
+
+```bash
+tmux ls
+```
+
+To output a list of all your open sessions.
+
+```bash
+tmux attach-session -t <session ID or name>
+```
+
+To navigate to a particular session, the first session you have created will have an id of `0`. Use the list command to view all your current sessions.
 
 ```bash
 ctrl+b d
 ```
 
-To be clear, you press ctrl and b simultaneously, then press d after letting them go. This will exit the current session without closing it. Please make sure you are in a newly opened session and haven't exited it before continuing.
+To exit your current session without closing it. To be clear, you press ctrl and b simultaneously, then press d after letting them go.
+
+Please make sure you are in a newly opened session and haven't exited it before continuing.
 
 ## Installing HOPRd
 
@@ -107,7 +121,9 @@ This ensures the node cannot be accessed by a malicious user residing in the sam
 docker run --pull always --restart on-failure -m 1g -ti -v $HOME/.hoprd-db-valencia:/app/hoprd-db -p 9091:9091 -p 3000:3000 -p 3001:3001 -e DEBUG="hopr*" gcr.io/hoprassociation/hoprd:valencia --environment monte_rosa --init --api --admin --identity /app/hoprd-db/.hopr-id-valencia --data /app/hoprd-db --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --apiHost "0.0.0.0" --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --healthCheck --healthCheckHost "0.0.0.0"
 ```
 
-(**4**) Paste the new adjusted command into your terminal, and hit enter.
+If you are not logged in as the root user, add sudo to the start of the above command. E.g. `sudo docker run ...`. If you are using a VPS, you are likely a root user and can use the default command.
+
+(**4**) Paste the command into your terminal with your unique security token, and hit enter.
 
 (**5**) Wait until the node is installed. This can take up to 10 minutes.
 
