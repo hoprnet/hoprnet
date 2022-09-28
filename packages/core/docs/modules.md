@@ -139,7 +139,7 @@ ___
 
 ### SendMessage
 
-Ƭ **SendMessage**: (`dest`: `PeerId`, `protocols`: `string` \| `string`[], `msg`: `Uint8Array`, `includeReply`: ``false``, `opts`: `DialOpts`) => `Promise`<`void`\> & (`dest`: `PeerId`, `protocols`: `string` \| `string`[], `msg`: `Uint8Array`, `includeReply`: ``true``, `opts`: `DialOpts`) => `Promise`<`Uint8Array`[]\>
+Ƭ **SendMessage**: (`dest`: `PeerId`, `protocols`: `string` \| `string`[], `msg`: `Uint8Array`, `includeReply`: ``true``, `opts`: `DialOpts`) => `Promise`<`Uint8Array`[]\> & (`dest`: `PeerId`, `protocols`: `string` \| `string`[], `msg`: `Uint8Array`, `includeReply`: ``false``, `opts`: `DialOpts`) => `Promise`<`void`\>
 
 #### Defined in
 
@@ -166,7 +166,7 @@ ___
 
 ### Subscribe
 
-Ƭ **Subscribe**: (`protocols`: `string` \| `string`[], `handler`: `LibP2PHandlerFunction`<`Promise`<`void`\> \| `void`\>, `includeReply`: ``false``, `errHandler`: (`err`: `any`) => `void`) => `void` & (`protocols`: `string` \| `string`[], `handler`: `LibP2PHandlerFunction`<`Promise`<`Uint8Array`\>\>, `includeReply`: ``true``, `errHandler`: (`err`: `any`) => `void`) => `void`
+Ƭ **Subscribe**: (`protocols`: `string` \| `string`[], `handler`: `LibP2PHandlerFunction`<`Promise`<`Uint8Array`\>\>, `includeReply`: ``true``, `errHandler`: (`err`: `any`) => `void`) => `void` & (`protocol`: `string`, `handler`: `LibP2PHandlerFunction`<`Promise`<`void`\> \| `void`\>, `includeReply`: ``false``, `errHandler`: (`err`: `any`) => `void`) => `void`
 
 #### Defined in
 
