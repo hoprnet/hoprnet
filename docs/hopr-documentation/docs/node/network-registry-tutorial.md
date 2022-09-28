@@ -71,17 +71,15 @@ You should be greeted with a screen similar to the one below, if your screen is 
 
 ![API info](./images/API-info.png)
 
-(**2**) From here, make sure you have the correct information. By default, `API endpoint` should be set to `http://localhost:3001`, but you may need to replace `localhost`with your server IP address if you used a VPS and change the port if you adjusted the mapping on installation.
+(**2**) From here, make sure you have the correct information. By default, `API endpoint` should be set to `http://localhost:3001`, but you may need to replace `localhost` with your server IP address if you used a VPS and change the port if you adjusted the mapping on installation.
 
 If you are using an Avado or Dappnode then the endpoints are `http://hopr.my.ava.do:3001` and `http://hopr.dappnode:3001` respectively.
 
-The`API Token` is whatever you set your security token as in the installation process.
-
-(**3**) From the admin interface, you should be able to see the peerID labelled as node address. Click on this contracted 5-letter address to expand it to its full length and copy it.The address should look similar to this: `16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV`.
+The `API Token` is whatever you set your security token as in the installation process.
 
 ![NR peerID](./images/NR-admin-peerID.png)
 
-(**3**) From the admin interface, you should be able to see the peerID labelled as node address. Click on this contracted 5-letter address to expand it to its full length and copy it.The address should look similar to this: `16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV`.
+(**3**) From the admin interface, you should be able to see the peerID labelled as node address. Click on this contracted 5-letter address to expand it to its full length and copy it. The address should look similar to this: `16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV`.
 
 (**4**) Alternatively, you can type ‘address’ into the command line.
 
@@ -99,13 +97,13 @@ Scroll down and make sure you are on the **Write Contract** tab.
 
 (**2**) Connect the wallet which you used to stake your NFT
 
-(**3**) Locate the 8th function. It will be named `selfRegister`
+(**3**) Locate the function `selfRegister`. It should be the 8th function under 'Write Contract'.
 
 ![selfRegister NR](./images/NR-SelfRegister.png)
 
 (**4**) In the text field, paste your peerID
 
-(**5**) Click **Write** and confirm the transaction if your wallet gives you a prompt.
+(**5**) Click **Write** and confirm the transaction (if prompted to do so by your wallet).
 
 If you have connected a wallet which has staked an NFT and entered a valid peerID, this transaction should succeed. You can find your block confirmation on Blockscout.
 
@@ -129,7 +127,7 @@ To check if you have been registered:
 
 ![Read Contract Tab](./images/Read-contract-NR.png)
 
-(**2**) Find the functon `isNodeRegisteredAndEligible`, it should be the 4th function under read contract.
+(**2**) Find the functon `isNodeRegisteredAndEligible`, it should be the 4th function under 'Read Contract'.
 
 ![Eligibility function](./images/isNodeEligible-NR.png)
 
@@ -157,7 +155,7 @@ The registration process is now complete! You can proceed to our [hopr-admin tut
 
 Participants of the Monte Rosa release will be rewarded depending on their uptime. The more active and available your node is, the higher you will score. Your uptime (and score) will be measured through pings sent out by five nodes controlled by HOPR.
 
-These five nodes will ping each node on the network registry at randomised intervals throughout the day and record whether or not the node received the ping and the latency of the ping is received. This is publicly viewable at [network.hoprnet.org](https://network.hoprnet.org/).
+These five nodes will ping each node on the network registry at randomised intervals throughout the day and record whether or not the node received the ping and the latency of the ping. This is publicly viewable at [network.hoprnet.org](https://network.hoprnet.org/).
 
 You can use this site to search your peerID (or any peerID on the network) and view their availability, average latency and total pings received. These metrics will be used to give each node its score and at the end of the initial release, rewards will be distributed as follows:
 

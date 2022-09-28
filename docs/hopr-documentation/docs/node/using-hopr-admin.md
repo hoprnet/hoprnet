@@ -31,11 +31,11 @@ If you used Docker to install your node, you should be able to access it at: [ht
 
 ![API info](./images/API-info.png)
 
-(**2**) From here, make sure you have the correct information. By default, `API endpoint` should be set to `http://localhost:3001`, but you may need to replace `localhost`with your server IP address if you used a VPS and change the port if you adjusted the mapping on installation.
+(**2**) From here, make sure you have the correct information. By default, `API endpoint` should be set to `http://localhost:3001`, but you may need to replace `localhost` with your server IP address if you used a VPS and change the port if you adjusted the mapping on installation.
 
 If you are using an Avado or Dappnode then the endpoints are `http://hopr.my.ava.do:3001` and `http://hopr.dappnode:3001` respectively.
 
-The`API Token` is whatever you set your security token as in the installation process.
+The `API Token` is whatever you set your security token as in the installation process.
 
 (**3**) You will see a newly generated ETH & Node address. Use the ETH address to send [xDAI](https://www.xdaichain.com/for-users/get-xdai-tokens) and [HOPR tokens](/staking/how-to-get-hopr) to in order to fund your node. **Your node will not start until it is funded.**
 
@@ -43,7 +43,7 @@ The`API Token` is whatever you set your security token as in the installation pr
 
 **Local network:** If using a local network, we recommend you fund your node with **0.01 xDai & 10 wxHOPR**.
 
-After funding your node, you will have to wait a few minutes for it to start. When the process is complete, you should see this output: **Node has started!**
+After funding your node, you will have to wait a few minutes for it to start. When the process is complete, you should see the output: **Node has started!**
 
 :::info Tip
 
