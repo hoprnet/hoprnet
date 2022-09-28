@@ -315,12 +315,13 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     this.sink = this._sink.bind({
       state: this.state,
       _queueStatusMessage: this._queueStatusMessage,
-      sinkCreator
+      sinkCreator,
+      testingOptions: this.testingOptions
     })
   }
 
   public async _sink(
-    this: Pick<RelayConnection, 'state' | '_queueStatusMessage'> & { sinkCreator: Promise<void> },
+    this: Pick<RelayConnection, 'state' | '_queueStatusMessage' | 'testingOptions'> & { sinkCreator: Promise<void> },
     source: StreamSource
   ): Promise<void> {
     if (this.state._migrationDone != undefined) {
@@ -333,16 +334,22 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
     this.state._sinkSourceAttachedPromise.resolve({
       type: ConnectionEventTypes.SINK_SOURCE_ATTACHED,
-      value: async function* (this: Pick<RelayConnection, '_queueStatusMessage'>) {
+      value: async function* (this: Pick<RelayConnection, '_queueStatusMessage' | 'testingOptions'>) {
         try {
-          yield* toU8aStream(source) as StreamSourceAsync
+          if (this.testingOptions.__noWebRTCUpgrade) {
+            yield* toU8aStream(source) as StreamSourceAsync
+          } else {
+            // No need to convert it twice since we're using WebRTCConnection class
+            yield* source
+          }
           deferred.resolve()
         } catch (err: any) {
           this._queueStatusMessage(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP))
           deferred.reject(err)
         }
       }.call({
-        _queueStatusMessage: this._queueStatusMessage
+        _queueStatusMessage: this._queueStatusMessage,
+        testingOptions: this.testingOptions
       }),
       ignore: false
     })
@@ -590,7 +597,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
           nextMessagePromise = currentSourceIterator.next()
           this.logging.flow(`FLOW: loop end`)
 
-          toYield = Uint8Array.from([RelayPrefix.PAYLOAD, ...result.value.value.slice()])
+          toYield = Uint8Array.from([RelayPrefix.PAYLOAD, ...result.value.value.subarray()])
           break
         default:
           throw Error(`Invalid result. Received ${result}`)
@@ -712,7 +719,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
               break
             }
 
-            const [PREFIX, SUFFIX] = [result.value.value.slice(0, 1), result.value.value.slice(1)]
+            const [PREFIX, SUFFIX] = [result.value.value.subarray(0, 1), result.value.value.subarray(1)]
 
             // Anything can happen
             if (SUFFIX.length == 0) {

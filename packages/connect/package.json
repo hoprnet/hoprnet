@@ -73,6 +73,7 @@
     "libp2p": "0.37.3",
     "mocha": "9.2.2",
     "typescript": "4.7.4",
+    "uint8arraylist": "2.3.2",
     "yargs": "17.5.1"
   },
   "mocha": {
