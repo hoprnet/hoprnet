@@ -12,7 +12,7 @@ import { RelayState } from './state.js'
 import type { Relay } from './index.js'
 
 import debug from 'debug'
-import { DELIVERY_PROTOCOL } from '../constants.js'
+import { DELIVERY_PROTOCOLS } from '../constants.js'
 import { Components } from '@libp2p/interfaces/components'
 
 export enum RelayHandshakeMessage {
@@ -239,7 +239,8 @@ class RelayHandshake {
 
     let toDestinationStruct: Awaited<ReturnType<typeof getStreamToCounterparty>>
     try {
-      toDestinationStruct = await getStreamToCounterparty(destination, DELIVERY_PROTOCOL(this.options.environment), {
+      const protocolsDelivery = DELIVERY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
+      toDestinationStruct = await getStreamToCounterparty(destination, protocolsDelivery, {
         upgrader
       })
     } catch (err) {

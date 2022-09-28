@@ -96,7 +96,7 @@ const logError = debug(`hopr-core:libp2p:error`)
  * send message. If `includeReply` is set, wait for a response
  * @param components libp2p components
  * @param destination peer to connect to
- * @param protocol protocol to speak
+ * @param protocols protocols to speak
  * @param message message to send
  * @param includeReply try to receive a reply
  * @param opts [optional] timeout
@@ -104,13 +104,13 @@ const logError = debug(`hopr-core:libp2p:error`)
 export async function libp2pSendMessage<T extends boolean>(
   components: Components,
   destination: PeerId,
-  protocol: string,
+  protocols: string | string[],
   message: Uint8Array,
   includeReply: T,
   opts?: DialOpts
 ): Promise<T extends true ? Uint8Array[] : void> {
   // Components is not part of interface
-  const r = await dial(components, destination, protocol, opts)
+  const r = await dial(components, destination, protocols, opts)
 
   if (r.status !== 'SUCCESS') {
     logError(r)
@@ -210,17 +210,17 @@ function generateHandler<T extends boolean>(
  * Generates a handler that pulls messages out of a stream
  * and feeds them to the given handler.
  * @param components libp2p components
- * @param protocol protocol to dial
+ * @param protocols protocol to dial
  * @param handler called once another node requests that protocol
  * @param errHandler handle stream pipeline errors
  * @param includeReply try to receive a reply
  */
 export async function libp2pSubscribe<T extends boolean>(
   components: Components,
-  protocol: string,
+  protocols: string | string[],
   handler: LibP2PHandlerFunction<T extends true ? Promise<Uint8Array> : Promise<void> | void>,
   errHandler: ErrHandler,
   includeReply: T
 ): Promise<void> {
-  await components.getRegistrar().handle([protocol], generateHandler(handler, errHandler, includeReply))
+  await components.getRegistrar().handle(protocols, generateHandler(handler, errHandler, includeReply))
 }

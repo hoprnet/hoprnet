@@ -274,7 +274,7 @@ ___
 
 #### Defined in
 
-[libp2p/dialHelper.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L31)
+[libp2p/dialHelper.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L33)
 
 ___
 
@@ -468,7 +468,7 @@ ___
 
 ### libp2pSendMessage
 
-Ƭ **libp2pSendMessage**: (`components`: `Components`, `destination`: `PeerId`, `protocol`: `string`, `message`: `Uint8Array`, `includeReply`: ``false``, `opts?`: [`TimeoutOpts`](modules.md#timeoutopts)) => `Promise`<`void`\> & (`components`: `Components`, `destination`: `PeerId`, `protocol`: `string`, `message`: `Uint8Array`, `includeReply`: ``true``, `opts?`: [`TimeoutOpts`](modules.md#timeoutopts)) => `Promise`<`Uint8Array`[]\>
+Ƭ **libp2pSendMessage**: (`components`: `Components`, `destination`: `PeerId`, `protocols`: `string` \| `string`[], `message`: `Uint8Array`, `includeReply`: ``false``, `opts?`: [`TimeoutOpts`](modules.md#timeoutopts)) => `Promise`<`void`\> & (`components`: `Components`, `destination`: `PeerId`, `protocols`: `string` \| `string`[], `message`: `Uint8Array`, `includeReply`: ``true``, `opts?`: [`TimeoutOpts`](modules.md#timeoutopts)) => `Promise`<`Uint8Array`[]\>
 
 Asks libp2p to establish a connection to another node and
 send message. If `includeReply` is set, wait for a response
@@ -477,7 +477,7 @@ send message. If `includeReply` is set, wait for a response
 
 **`param`** peer to connect to
 
-**`param`** protocol to speak
+**`param`** protocols to speak
 
 **`param`** message to send
 
@@ -495,7 +495,7 @@ ___
 
 ### libp2pSubscribe
 
-Ƭ **libp2pSubscribe**: (`components`: `Components`, `protocol`: `string`, `handler`: [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`Promise`<`void`\> \| `void`\>, `errHandler`: `ErrHandler`, `includeReply`: ``false``) => `void` & (`components`: `Components`, `protocol`: `string`, `handler`: [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`Promise`<`Uint8Array`\>\>, `errHandler`: `ErrHandler`, `includeReply`: ``true``) => `void`
+Ƭ **libp2pSubscribe**: (`components`: `Components`, `protocols`: `string` \| `string`[], `handler`: [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`Promise`<`void`\> \| `void`\>, `errHandler`: `ErrHandler`, `includeReply`: ``false``) => `void` & (`components`: `Components`, `protocols`: `string` \| `string`[], `handler`: [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`Promise`<`Uint8Array`\>\>, `errHandler`: `ErrHandler`, `includeReply`: ``true``) => `void`
 
 Generates a handler that pulls messages out of a stream
 and feeds them to the given handler.
@@ -1399,7 +1399,7 @@ ___
 
 ### dial
 
-▸ **dial**(`components`, `destination`, `protocol`, `opts?`): `Promise`<[`DialResponse`](modules.md#dialresponse)\>
+▸ **dial**(`components`, `destination`, `protocols`, `opts?`): `Promise`<[`DialResponse`](modules.md#dialresponse)\>
 
 Performs a dial strategy using libp2p.dialProtocol and libp2p.findPeer
 to establish a connection.
@@ -1411,7 +1411,7 @@ Contains a baseline protection against dialing same addresses twice.
 | :------ | :------ | :------ |
 | `components` | `Components` | components of a libp2p instance |
 | `destination` | `PeerId` | PeerId of the destination |
-| `protocol` | `string` | protocols to use |
+| `protocols` | `string` \| `string`[] | protocols to use |
 | `opts?` | [`TimeoutOpts`](modules.md#timeoutopts) |  |
 
 #### Returns
@@ -2000,7 +2000,7 @@ ___
 
 ### libp2pSendMessage
 
-▸ **libp2pSendMessage**(`components`, `destination`, `protocol`, `message`, `includeReply`, `opts?`): `Promise`<`void` \| `Uint8Array`[]\>
+▸ **libp2pSendMessage**(`components`, `destination`, `protocols`, `message`, `includeReply`, `opts?`): `Promise`<`void` \| `Uint8Array`[]\>
 
 #### Parameters
 
@@ -2008,7 +2008,7 @@ ___
 | :------ | :------ |
 | `components` | `Components` |
 | `destination` | `PeerId` |
-| `protocol` | `string` |
+| `protocols` | `string` \| `string`[] |
 | `message` | `Uint8Array` |
 | `includeReply` | `boolean` |
 | `opts?` | [`TimeoutOpts`](modules.md#timeoutopts) |
@@ -2021,14 +2021,14 @@ ___
 
 ### libp2pSubscribe
 
-▸ **libp2pSubscribe**(`components`, `protocol`, `handler`, `errHandler`, `includeReply?`): `Promise`<`void`\>
+▸ **libp2pSubscribe**(`components`, `protocols`, `handler`, `errHandler`, `includeReply?`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type | Default value |
 | :------ | :------ | :------ |
 | `components` | `Components` | `undefined` |
-| `protocol` | `string` | `undefined` |
+| `protocols` | `string` \| `string`[] | `undefined` |
 | `handler` | [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`void` \| `Promise`<`void` \| `Uint8Array`\>\> | `undefined` |
 | `errHandler` | `ErrHandler` | `undefined` |
 | `includeReply` | `boolean` | `false` |
@@ -2765,7 +2765,7 @@ ___
 
 ### tryExistingConnections
 
-▸ **tryExistingConnections**(`components`, `destination`, `protocol`): `Promise`<`void` \| `ProtocolStream` & { `conn`: `Connection`  }\>
+▸ **tryExistingConnections**(`components`, `destination`, `protocols`): `Promise`<`void` \| `ProtocolStream` & { `conn`: `Connection`  }\>
 
 #### Parameters
 
@@ -2773,7 +2773,7 @@ ___
 | :------ | :------ |
 | `components` | `Components` |
 | `destination` | `PeerId` |
-| `protocol` | `string` |
+| `protocols` | `string` \| `string`[] |
 
 #### Returns
 

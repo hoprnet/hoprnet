@@ -32,6 +32,11 @@ build-yarn: ## build yarn packages
 build-yarn: build-solidity-types build-cargo
 	npx tsc --build tsconfig.build.json
 
+.PHONY: build-yarn-watch
+build-yarn-watch: ## build yarn packages (in watch mode)
+build-yarn-watch: build-solidity-types build-cargo
+	npx tsc --build tsconfig.build.json -w
+
 .PHONY: build-cargo
 build-cargo: ## build cargo packages and create boilerplate JS code
 	cargo build --release --target wasm32-unknown-unknown
