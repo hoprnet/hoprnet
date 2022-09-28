@@ -124,7 +124,7 @@ Once the transaction has successfully been completed, you can use the same smart
 
 To check if you have been registered:
 
-(**1**) Switch to the [**Read Contract** tab.]([https://blockscout.com/xdai/mainnet/address/0x819E6a81e1e3f96CF1ac9200477C2d09c676959D/read-contract#address-tabs](https://blockscout.com/xdai/mainnet/address/0x819E6a81e1e3f96CF1ac9200477C2d09c676959D/read-contract#address-tabs))
+(**1**) Switch to the [**Read Contract** tab.](https://blockscout.com/xdai/mainnet/address/0x819E6a81e1e3f96CF1ac9200477C2d09c676959D/read-contract#address-tabs)
 
 ![Read Contract Tab](./images/Read-contract-NR.png)
 
