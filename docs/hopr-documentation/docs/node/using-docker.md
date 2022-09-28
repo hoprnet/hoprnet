@@ -63,7 +63,7 @@ sudo apt install tmux
 tmux
 ```
 
-That's it! You now have a new session running in the background even when you close your terminal. You should familiarise yourself with other [Tmux commands]((https://linuxize.com/post/getting-started-with-tmux/)) to navigate between sessions. The main one you may need is:
+That's it! You now have a new session running in the background even when you close your terminal. You should familiarise yourself with other [Tmux commands](https://linuxize.com/post/getting-started-with-tmux/) to navigate between sessions. The main one you may need is:
 
 ```bash
 ctrl+b d
