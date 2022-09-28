@@ -483,7 +483,7 @@ class WebRTCConnection implements MultiaddrConnection {
                   // WebRTC tends to send multiple messages in one chunk, so add a
                   // length prefix to split messages when receiving them
                   toYield = encodeWithLengthPrefix(
-                    Uint8Array.from([MigrationStatus.NOT_DONE, ...received.value.slice()])
+                    Uint8Array.from([MigrationStatus.NOT_DONE, ...received.value.subarray()])
                   )
 
                   advanceIterator()
@@ -517,7 +517,7 @@ class WebRTCConnection implements MultiaddrConnection {
         continue
       }
 
-      const [migrationStatus, payload] = [msg.slice(0, 1), msg.slice(1)]
+      const [migrationStatus, payload] = [msg.subarray(0, 1), msg.subarray(1)]
 
       // Handle sub-protocol
       switch (migrationStatus[0] as MigrationStatus) {
@@ -565,10 +565,10 @@ class WebRTCConnection implements MultiaddrConnection {
           // WebRTC tends to bundle multiple message into one chunk,
           // so we need to encode messages and decode them before passing
           // to libp2p
-          const decoded = decodeWithLengthPrefix(msg.slice())
+          const decoded = decodeWithLengthPrefix(msg.subarray())
 
           for (const decodedMsg of decoded) {
-            const [finished, payload] = [decodedMsg.slice(0, 1), decodedMsg.slice(1)]
+            const [finished, payload] = [decodedMsg.subarray(0, 1), decodedMsg.subarray(1)]
 
             // WebRTC is based on UDP, so we need to explicitly end the connection
             if (finished[0] == MigrationStatus.DONE) {

@@ -53,10 +53,7 @@ export function u8aEquals(...arrays: (Uint8Array | undefined)[]) {
     canUse16 = canUse16 && array.byteOffset % 2 == 0
   }
 
-  const views: DataView[] = Array.from(
-    { length: aLength },
-    (_, i: number) => new DataView((arrays[i] as Uint8Array).buffer, (arrays[i] as Uint8Array).byteOffset, firstLength)
-  )
+  const views: DataView[] = arrays.map((array) => new DataView(array.buffer, array.byteOffset, firstLength))
 
   let index = 0
 

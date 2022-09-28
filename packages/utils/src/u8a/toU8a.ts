@@ -29,22 +29,67 @@ export function toU8a(arg: number, length?: number): Uint8Array {
     }
 
     if (buf[1]) {
-      return buf.slice(1)
+      return buf.subarray(1)
     }
 
     if (buf[2]) {
-      return buf.slice(2)
+      return buf.subarray(2)
     }
 
-    return buf.slice(3)
+    return buf.subarray(3)
   } else if (length <= 4) {
-    return buf.slice(4 - length)
+    return buf.subarray(4 - length)
   } else {
     let result = new Uint8Array(length)
 
     result.set(buf, length - 4)
 
     return result
+  }
+}
+
+function lookup(str: string): 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 {
+  switch (str.charCodeAt(0)) {
+    case 48:
+      return 0
+    case 49:
+      return 1
+    case 50:
+      return 2
+    case 51:
+      return 3
+    case 52:
+      return 4
+    case 53:
+      return 5
+    case 54:
+      return 6
+    case 55:
+      return 7
+    case 56:
+      return 8
+    case 57:
+      return 9
+    case 65:
+    case 97:
+      return 10
+    case 66:
+    case 98:
+      return 11
+    case 67:
+    case 99:
+      return 12
+    case 68:
+    case 100:
+      return 13
+    case 69:
+    case 101:
+      return 14
+    case 70:
+    case 102:
+      return 15
+    default:
+      throw Error(`Got unknown hex character '${str.substring(0, 1)}'`)
   }
 }
 
@@ -63,7 +108,7 @@ export function stringToU8a(str: string, length?: number): Uint8Array {
   }
 
   if (str.startsWith('0x')) {
-    str = str.slice(2)
+    str = str.substring(2)
   }
 
   let strLength = str.length
@@ -85,13 +130,7 @@ export function stringToU8a(str: string, length?: number): Uint8Array {
   const arr = new Uint8Array(strLength >> 1)
 
   for (let i = 0; i < strLength; i += 2) {
-    const strSlice = str.slice(i, i + 2).match(/[0-9a-fA-F]{2}/g)
-
-    if (strSlice == null || strSlice.length != 1) {
-      throw Error(`Got unknown character '${str.slice(i, i + 2)}'`)
-    }
-
-    arr[i >> 1] = parseInt(strSlice[0], 16)
+    arr[i >> 1] = (lookup(str.substring(i, i + 1)) << 4) + lookup(str.substring(i + 1, i + 2))
   }
 
   return arr
