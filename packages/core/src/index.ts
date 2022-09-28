@@ -895,15 +895,18 @@ class Hopr extends EventEmitter {
    * Similar to `libp2p.hangUp` but catching all errors.
    * @param peer PeerId of the peer from whom we want to disconnect
    */
-  private async closeConnectionsTo(peer: PeerId): Promise<void> {
+  private closeConnectionsTo(peer: PeerId): void {
     const connections = this.libp2pComponents.getConnectionManager().getConnections(peer)
 
     for (const conn of connections) {
-      try {
-        await conn.close()
-      } catch (err: any) {
-        error(`Error while intentionally closing connection to ${peer.toString()}`, err)
-      }
+      // Don't block event loop
+      ;(async function () {
+        try {
+          await conn.close()
+        } catch (err: any) {
+          error(`Error while intentionally closing connection to ${peer.toString()}`, err)
+        }
+      })()
     }
   }
 

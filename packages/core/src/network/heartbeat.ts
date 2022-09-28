@@ -65,7 +65,7 @@ export default class Heartbeat {
     private networkPeers: NetworkPeers,
     private subscribe: Subscribe,
     protected sendMessage: SendMessage,
-    private closeConnectionsTo: (peer: PeerId) => Promise<void>,
+    private closeConnectionsTo: (peer: PeerId) => void,
     private reviewConnection: AccessControl['reviewConnection'],
     private stateChangeEmitter: EventEmitter,
     private isPublicNode: (addr: PeerId) => boolean,
@@ -154,7 +154,7 @@ export default class Heartbeat {
     if (pingResponse == null || pingResponse.length != 1 || !u8aEquals(expectedResponse, pingResponse[0])) {
       log(`Mismatched challenge. Got ${u8aToHex(pingResponse[0])} but expected ${u8aToHex(expectedResponse)}`)
 
-      await this.closeConnectionsTo(destination)
+      this.closeConnectionsTo(destination)
 
       return {
         destination,

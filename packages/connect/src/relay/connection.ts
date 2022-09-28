@@ -9,7 +9,7 @@ import type {
   HoprConnectTestingOptions
 } from '../types.js'
 import { randomBytes } from 'crypto'
-import { RelayPrefix, ConnectionStatusMessages, StatusMessages } from '../constants.js'
+import { RelayPrefix, ConnectionStatusMessages, StatusMessages, CODE_P2P } from '../constants.js'
 import { u8aEquals, u8aToHex, defer, createCircuitAddress, type DeferType } from '@hoprnet/hopr-utils'
 import HeapPkg, { type Heap as HeapType } from 'heap-js'
 
@@ -231,6 +231,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     this._counterparty = counterparty
 
     this.remoteAddr = createCircuitAddress(relay)
+      .decapsulateCode(CODE_P2P)
+      .encapsulate(`/p2p/${counterparty.toString()}`)
 
     // Pre-generate object to attach to function pointers
     this.state = {} as RelayConnection['state']

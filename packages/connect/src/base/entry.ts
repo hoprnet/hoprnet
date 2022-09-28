@@ -977,6 +977,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
     // Once we got at least one entry node, stop the interval
     if (this.usedRelays != undefined && this.usedRelays.length > 0) {
+      console.log(`stop reconnect called`)
       this.stopReconnectAttempts?.()
     }
 
