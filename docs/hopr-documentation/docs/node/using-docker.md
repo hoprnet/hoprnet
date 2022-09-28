@@ -49,7 +49,7 @@ All our docker images can be found in [our Google Cloud Container Registry](http
 
 If you are using a VPS, it is highly recommended that you use Tmux to run your node in the background. Otherwise, your node will terminate as soon as you exit the terminal.
 
-You can use these basic commands to set up a separate session to run your node in:
+You can use these basic commands to set up a separate session:
 
 (**1**) First, install Tmux.
 
@@ -63,7 +63,7 @@ sudo apt install tmux
 tmux
 ```
 
-That's it! You now have a new session running in the background even when you close your terminal. To navigate between sessions, you should familiarise yourself with other [Tmux commands](https://linuxize.com/post/getting-started-with-tmux/). The three main ones you may need are:
+That's it! You now have a new session running in the background even when you close your terminal. To navigate between sessions, you should familiarise yourself with other [Tmux commands](https://linuxize.com/post/getting-started-with-tmux/). The three main ones you will need are:
 
 ```bash
 tmux ls
