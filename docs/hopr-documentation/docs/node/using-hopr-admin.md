@@ -48,7 +48,7 @@ After funding your node, you will have to wait a few minutes for it to start. Wh
 
 Please be aware that we have three types of tokens on the **xDAI/Gnosis Chain network**:
 
-- `mHOPR`, the ERC-777 token used by the monte rosa environment,
+- `mHOPR`, the ERC-20 token used by the monte rosa environment,
 - `wxHOPR`, the ERC-777 token used by local networks,
 - `xHOPR`, the ERC-677 token, the xDAI/Ethereum bridged `HOPR` token
 
