@@ -42,7 +42,7 @@ The `API Token` is whatever you set your security token as in the installation p
 
 **Local network:** If using a local network, we recommend you fund your node with **0.01 xDai & 10 wxHOPR**.
 
-After funding your node, you will have to wait a few minutes for it to start. When the process is complete, you should see this output: **Node has started!**
+After funding your node, you will have to wait a few minutes for it to start. When the process is complete, you should see the output: **Node has started!**
 
 :::info Tip
 
