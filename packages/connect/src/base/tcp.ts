@@ -29,6 +29,8 @@ class TCPConnection implements MultiaddrConnection {
 
   private _signal?: AbortSignal
 
+  private keepAlive: boolean
+
   public timeline: {
     open: number
     close?: number
@@ -38,10 +40,25 @@ class TCPConnection implements MultiaddrConnection {
     this.localAddr = nodeToMultiaddr(this.conn.address() as AddressInfo)
 
     this.closed = false
-    this.timeline = {
-      open: Date.now()
-    }
 
+    // @ts-ignore - hack
+    this.keepAlive = options?.keepAlive ?? false
+
+    this.timeline = new Proxy(
+      {
+        open: Date.now()
+      },
+      {
+        set: (...args) => {
+          console.log(args)
+          if (args[1] === 'keepAlive' && args[2] == true) {
+            this.keepAlive = true
+            console.log(`keepAlive true`)
+          }
+          return Reflect.set(...args)
+        }
+      }
+    )
     this.conn.once('close', () => {
       // Whenever the socket gets closed, mark the
       // connection closed to cleanup data structures in
@@ -146,8 +163,13 @@ class TCPConnection implements MultiaddrConnection {
       return
     }
 
-    // End the socket
-    this.conn.end()
+    if (!this.keepAlive) {
+      // End the socket
+      this.conn.end()
+      console.log(`ending socket`)
+    } else {
+      console.log(`prevent ending socket`)
+    }
   }
 
   /**

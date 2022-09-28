@@ -393,7 +393,6 @@ class Hopr extends EventEmitter {
     // Add all entry nodes that were announced during startup
     this.connector.indexer.off('peer', pushToRecentlyAnnouncedNodes)
     for (const announcedNode of recentlyAnnouncedNodes) {
-      await setImmediate()
       await this.onPeerAnnouncement(announcedNode)
     }
 

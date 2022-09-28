@@ -276,8 +276,14 @@ class Relay implements Initializable, ConnectInitializable, Startable {
   private async onCanRelay(conn: IncomingStreamData) {
     // Only called if protocol is supported which
     // means that environments match
+
+    // @ts-ignore - hack
+    conn.connection.stat.timeline.keepAlive = true
+
     try {
       await conn.stream.sink(
+        // @TODO add handshake protocol to announce only
+        // if peer has selected this relay
         async function* (this: Relay) {
           // @TODO check if there is a relay slot available
 
@@ -321,7 +327,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       } else {
         // NOTE: This cannot be awaited, otherwise it stalls the relay loop. Therefore, promise rejections must
         // be handled downstream to avoid unhandled promise rejection crashes
-        shaker.negotiate(conn.connection.remotePeer, this.getComponents(), this.relayState)
+        await shaker.negotiate(conn.connection.remotePeer, this.getComponents(), this.relayState)
       }
     } catch (e) {
       error(`Error while processing relay request from ${conn.connection.remotePeer.toString()}: ${e}`)

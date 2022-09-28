@@ -340,18 +340,18 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       this._connectToRelay = this.connectToRelay.bind(this)
 
       if (this.options.publicNodes != undefined) {
-        this._onNewRelay = (peer: PeerStoreType) => {
+        this._onNewRelay = function (this: EntryNodes, peer: PeerStoreType) {
           this.addToUpdateQueue(async () => {
             log(`peer online`, peer.id.toString())
             await this.onNewRelay(peer)
           })
-        }
-        this._onRemoveRelay = (peer: PeerId) => {
+        }.bind(this)
+        this._onRemoveRelay = function (this: EntryNodes, peer: PeerId) {
           this.addToUpdateQueue(async () => {
             log(`peer offline`, peer.toString())
             await this.onRemoveRelay(peer)
           })
-        }
+        }.bind(this)
 
         this.options.publicNodes.on('addPublicNode', this._onNewRelay)
         this.options.publicNodes.on('removePublicNode', this._onRemoveRelay)
@@ -598,7 +598,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       },
       () => {
         if (!allowed) {
-          return durations.minutes(1)
+          return durations.seconds(30)
         }
 
         return (initialDelay *= 1.5)
@@ -778,6 +778,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
   private rebuildUsedRelays(groupedResults: Grouped[]) {
     this.usedRelays = []
 
+    // Assuming groupedResults is sorted
     for (const [_id, results] of groupedResults) {
       if (results[0] == undefined || results[0] instanceof Error) {
         break
@@ -794,6 +795,9 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
         // Don't add entry node
         break
       }
+
+      // hack - mark socket to not get closed
+      ;((results[0] as Required<ConnectionResult>).conn.stat.timeline as any).keepAlive = true
 
       this.usedRelays.push({
         // @TODO take the address that really got used
@@ -993,7 +997,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    * @returns a PeerStoreEntry containing the measured latency
    */
   private async connectToRelay(id: PeerId, relay: Multiaddr): Promise<{ entry: EntryNodeData; conn?: Connection }> {
-    const result = await dial(this.getComponents(), id, CAN_RELAY_PROTCOL(this.options.environment), false)
+    const result = await dial(this.getComponents(), id, CAN_RELAY_PROTCOL(this.options.environment), false, true)
 
     if (result.status != DialStatus.SUCCESS) {
       // Dial error

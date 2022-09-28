@@ -160,14 +160,20 @@ export async function tryExistingConnections(
  * @param destination which peer to dial
  * @param protocol which protocol to use
  */
-async function establishNewConnection(components: Components, destination: PeerId | Multiaddr, protocol: string) {
+async function establishNewConnection(
+  components: Components,
+  destination: PeerId | Multiaddr,
+  protocol: string,
+  keepAlive: boolean = false
+) {
   log(`Trying to establish connection to ${destination.toString()}`)
 
   let conn: Connection | undefined
   try {
-    conn = (await (components.getConnectionManager() as unknown as MyConnectionManager).dialer.dial(
-      destination
-    )) as any as Connection
+    conn = (await (components.getConnectionManager() as unknown as MyConnectionManager).dialer.dial(destination, {
+      // @ts-ignore - hack
+      keepAlive
+    })) as any as Connection
   } catch (err: any) {
     error(`Error while establishing connection to ${destination.toString()}.`)
     if (err?.message) {
@@ -254,7 +260,12 @@ async function queryDHT(components: Components, destination: PeerId): Promise<Pe
   return relayers
 }
 
-async function doDirectDial(components: Components, destination: PeerId, protocol: string): Promise<DialResponse> {
+async function doDirectDial(
+  components: Components,
+  destination: PeerId,
+  protocol: string,
+  keepAlive: boolean = false
+): Promise<DialResponse> {
   // First let's try already existing connections
   let struct = await tryExistingConnections(components, destination, protocol)
 
@@ -271,7 +282,7 @@ async function doDirectDial(components: Components, destination: PeerId, protoco
     for (const address of knownAddressesForPeer) {
       log(`- ${address.multiaddr.toString()}`)
     }
-    struct = await establishNewConnection(components, destination, protocol)
+    struct = await establishNewConnection(components, destination, protocol, keepAlive)
     if (struct) {
       log(`Successfully reached ${destination.toString()} via already known addresses !`)
       return { status: DialStatus.SUCCESS, resp: struct }
@@ -389,9 +400,10 @@ export async function dial(
   components: Components,
   destination: PeerId,
   protocol: string,
-  withDHT: boolean = true
+  withDHT: boolean = true,
+  keepAlive: boolean = false
 ): Promise<DialResponse> {
-  const res = await doDirectDial(components, destination, protocol)
+  const res = await doDirectDial(components, destination, protocol, keepAlive)
 
   if (withDHT == false || (withDHT == true && res.status == DialStatus.SUCCESS)) {
     // Take first result and don't do any further steps
