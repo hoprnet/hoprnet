@@ -38,20 +38,23 @@ The`API Token` is whatever you set your security token as in the installation pr
 
 (**3**) You will see a newly generated ETH & Node address. Use the ETH address to send [xDAI](https://www.xdaichain.com/for-users/get-xdai-tokens) and [HOPR tokens](/staking/how-to-get-hopr) to in order to fund your node. **Your node will not start until it has been funded.**
 
-**Network Registry:** If you are participating in the Monte Rosa release, send the mHOPR and xDAI you have been airdropped.
+**Monte Rosa release:** If you are participating in the Monte Rosa release, send the **mHOPR** and **xDAI** you have been airdropped.
 
-Otherwise, we recommend you fund your node with **0.01 xDai & 10 wxHOPR**. Remember to use the node's ETH address for this.
+**Local network:** If using a local network, we recommend you fund your node with **0.01 xDai & 10 wxHOPR**.
 
-**Note:** After funding your node, you will have to wait a few minutes for it to start. You should see this output when the process is complete: **Node has started!**
+Make sure to use the node's ETH address when sending tokens or xDAI. After funding your node, you will have to wait a few minutes for it to start. You should see this output when the process is complete: **Node has started!**
 
 :::info Tip
 
-Please be aware that we have two types of tokens on the **xDAI/Gnosis Chain network**:
+Please be aware that we have three types of tokens on the **xDAI/Gnosis Chain network**:
 
-- `wxHOPR`, the ERC-777 token needed to run your `hoprd` instance and,
-- `xHOPR`, the ERC-677 token, the xDAI/Ethereum bridged `HOPR` instance
+- `mHOPR`, the ERC-777 token used by the monte rosa environment,
+- `wxHOPR`, the ERC-777 token used by local networks,
+- `xHOPR`, the ERC-677 token, the xDAI/Ethereum bridged `HOPR` token
 
-You can use the [cross-chains](/staking/convert-hopr) bridge to convert from HOPR to xHOPR or vice versa.
+If you are using the Monte Rosa environment make sure to use `mHOPR`.
+
+Otherwise, you can use the [cross-chains](/staking/convert-hopr) bridge to convert from HOPR to xHOPR or vice versa.
 
 And you can always use our [token wrapper](https://wrapper.hoprnet.org/) to wrap/unwrap xHOPR/wxHOPR.
 
