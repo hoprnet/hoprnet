@@ -31,7 +31,7 @@ Although it is recommended that you have at least 8 GB of RAM and 10 GB of disk 
 
 ## For VPS users
 
-Using a VPS is recommended if you are on Windows, as all the instructions for installing your node are for Linux/macOS users. A VPS, in general, is an ideal setup as you can use Tmux or Screen to run your node constantly in the background without needing your machine to be plugged in or turned on. If you install your node through Docker, it will only run until you close your terminal for both your local machine and a VPS. This is why it is highly recommended you quickly familiarise yourself with[tmux](https://linuxize.com/post/getting-started-with-tmux/) or [screen](https://linuxize.com/post/how-to-use-linux-screen/) before continuing.
+Using a VPS is recommended if you are on Windows, as all the instructions for installing your node are for Linux/macOS users. A VPS, in general, is an ideal setup as you can use Tmux or Screen to run your node constantly in the background without needing your machine to be plugged in or turned on. If you install your node through Docker, it will only run until you close your terminal for both your local machine and a VPS. This is why it is highly recommended you quickly familiarise yourself with [tmux](https://linuxize.com/post/getting-started-with-tmux/) or [screen](https://linuxize.com/post/how-to-use-linux-screen/) before continuing.
 
 If you intend to run your node locally, try and use a setup where your PC or machine can stay plugged in throughout the day. This is especially important if you are participating in the Monte Rosa release. Otherwise, you can use a plug-n-play device such as Avado or Dappnode, which you can plug in and forget about.
 
