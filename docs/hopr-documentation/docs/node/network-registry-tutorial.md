@@ -26,7 +26,7 @@ Depending on your prefered method of contact, you will either be notified by ema
 
 ## Registering your node
 
-If you are chosen to join the registry, you will be sent a network registry NFT to your staking address as well as mHOPR and xDAI to fund your node. You will be contacted to confirm your eligibility. Once you have been sent an NFT and a confirmation, you can register your node by following these steps:
+If you are chosen to join the registry, you will be sent a network registry NFT to your staking address as well as mHOPR and xDAI to fund your node. Once you have been sent an NFT, you can register your node by following these steps:
 
 ### Step 1: Stake your NFT
 
