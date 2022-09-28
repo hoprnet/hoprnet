@@ -23,7 +23,7 @@ Users from the waitlist will then be given an NFT in blocks of 20. You can use t
 
 For every 20 NFTs given out, the majority will go to the next highest-ranking participants on the waitlist, but a few will also be allocated to Dappnode/Avado users. And one of every 20 will be given to someone at random further down the waitlist (so you always have a chance of being chosen even without having participated in previous staking seasons or releases).
 
-Depending on your prefered method of contact, you will either be notified by email when you have been chosen or you can review the waitlist manually.
+Depending on your prefered method of contact, you will either be notified by email when you have been chosen or you can review the waitlist manually [here.](https://docs.google.com/spreadsheets/d/13RcEaB2PyovJ4oEx0ViT3v5QeqpdxBJ74Pk3dyALCF8/edit#gid=0)
 
 ## Registering your node
 
