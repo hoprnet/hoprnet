@@ -42,7 +42,7 @@ The`API Token` is whatever you set your security token as in the installation pr
 
 **Local network:** If using a local network, we recommend you fund your node with **0.01 xDai & 10 wxHOPR**.
 
-Use the node's ETH address when sending tokens or xDAI. After funding your node, you will have to wait a few minutes for it to start. When the process is complete, you should see this output: **Node has started!**
+After funding your node, you will have to wait a few minutes for it to start. When the process is complete, you should see this output: **Node has started!**
 
 :::info Tip
 
@@ -651,7 +651,7 @@ withdraw [amount] [NATIVE/HOPR] [address]
 Example sending native tokens –
 
 ```
-withdraw 0.1 NATIVE 0xc8Aa5a085c23dfEa903312a73EfC30888bB61f0B
+withdraw 0.01 NATIVE 0xc8Aa5a085c23dfEa903312a73EfC30888bB61f0B
 ```
 
 This will withdraw 0.01 xDAI from your balance and send it to **0xc8Aa5a085c23dfEa903312a73EfC30888bB61f0B**
@@ -659,7 +659,7 @@ This will withdraw 0.01 xDAI from your balance and send it to **0xc8Aa5a085c23df
 Example sending hopr tokens –
 
 ```
-withdraw 0.1 HOPR 0xc8Aa5a085c23dfEa903312a73EfC30888bB61f0B
+withdraw 0.01 HOPR 0xc8Aa5a085c23dfEa903312a73EfC30888bB61f0B
 ```
 
 This will withdraw 0.01 wxHOPR or mHOPR from your balance and send it to **0xc8Aa5a085c23dfEa903312a73EfC30888bB61f0B**
