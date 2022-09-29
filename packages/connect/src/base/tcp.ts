@@ -181,12 +181,9 @@ class TCPConnection implements MultiaddrConnection {
       return
     }
 
+    // End the socket (= send FIN packet) unless otherwise requested
     if (!this.keepAlive) {
-      // End the socket
       this.conn.end()
-      console.log(`ending socket`)
-    } else {
-      console.log(`prevent ending socket`)
     }
   }
 

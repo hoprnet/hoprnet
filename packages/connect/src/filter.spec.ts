@@ -9,7 +9,6 @@ import { toNetworkPrefix, privKeyToPeerId, type Network } from '@hoprnet/hopr-ut
 
 let firstPeer = privKeyToPeerId(`0x22f7c3c101db7a73c42d3adecbd2700173f19a249b5ef115c25020b091822083`)
 let secondPeer = privKeyToPeerId(`0xbb25701334f6f989ab51322d0064b3755fc3a65770e4a240df163c355bd8cd26`)
-// let thirdPeer = privKeyToPeerId(`0x175590e95d378e66572e09bc9d8badffe087ae962fc7551f17380293d1ca2fc5`)
 
 function createFakeComponents(peer: PeerId) {
   return {
