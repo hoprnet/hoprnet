@@ -119,27 +119,25 @@ class HoprConnect implements Transport, Initializable, Startable {
   // we populate the address mapping of the router.
   // Or, if we get contacted by a relay to which we already have an *outgoing*
   // connection that gets reused.
-  // @TODO
   private setupSimulatedNAT(): void {
     // Simulated NAT using connection gater
     const denyInboundConnection = this.getComponents().getConnectionGater().denyInboundConnection
     this.getComponents().getConnectionGater().denyInboundConnection = async (maConn: MultiaddrConnection) => {
-      log(`New connection:`)
-      log(`remoteAddr: ${maConn.remoteAddr.toString()}`)
+      if (await denyInboundConnection(maConn)) {
+        // Blocked by e.g. Network Registry
+        return true
+      }
+
+      if (maConn.remoteAddr.toString().startsWith(`/p2p/`)) {
+        return false
+      }
+
+      log(`closing due to simulated NAT`)
       // log(`remotePeer ${maConn.remotePeer.toB58String()}`)
       // log(`localAddr: ${conn.localAddr?.toString()}`)
       // log(`remotePeer ${conn.localPeer.toB58String()}`)
-      if (await denyInboundConnection(maConn)) {
-        log(`closing due to simulated NAT`)
-        return true
-      } else if (maConn.remoteAddr.toString().startsWith(`/p2p/`)) {
-        return false
-      }
-      log(`closing due to simulated NAT`)
       return true
     }
-    // @TODO only allow connections to entry nodes
-    // this.getComponents().getConnectionGater().denyDialMultiaddr
   }
 
   public async beforeStart() {

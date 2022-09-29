@@ -338,15 +338,15 @@ async function fetchCircuitAddressesAndDial(
   }
 
   // Take all the known circuit addresses from the existing set of known addresses
-  const knownCircuitAddressSet = new Set(
-    knownAddressesForPeer
-      .map((address) => address.multiaddr)
-      .filter((address) => {
-        const tuples = address.tuples()
-        return tuples[0][0] == CODE_P2P
-      })
-      .map((address) => address.toString())
-  )
+  const knownCircuitAddressSet = new Set<string>()
+
+  for (const knownAddressForPeer of knownAddressesForPeer) {
+    const tuples = knownAddressForPeer.multiaddr.tuples()
+
+    if (tuples.length > 0 && tuples[0].length > 0 && tuples[0][0] == CODE_P2P) {
+      knownCircuitAddressSet.add(knownAddressForPeer.multiaddr.toString())
+    }
+  }
 
   let relayStruct:
     | (ProtocolStream & {
