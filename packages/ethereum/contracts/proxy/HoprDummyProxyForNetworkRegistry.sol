@@ -16,6 +16,8 @@ contract HoprDummyProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Ow
 
   event AccountRegistered(address indexed account);
   event AccountDeregistered(address indexed account);
+  bool public isAllAllowed;
+
   event AllowAllAccountsEligible(bool isAllowed);
 
   constructor(address newOwner) {
@@ -24,15 +26,23 @@ contract HoprDummyProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Ow
     emit AllowAllAccountsEligible(false);
   }
 
-  /**
-   * @dev Checks if the provided account is registered by the owner
-   * @param account address of the account that runs a hopr node
-   */
   function maxAllowedRegistrations(address account) external view returns (uint256) {
     if (isAllAllowed || registeredAccounts[account]) {
       return MAX_REGISTRATION_PER_ACCOUNT;
     } else {
       return 0;
+    }
+  }
+
+  /**
+   * @dev Checks if the provided account is registered by the owner
+   * @param account address of the account that runs a hopr node
+   */
+  function isRequirementFulfilled(address account) external view returns (bool) {
+    if (isAllAllowed) {
+      return true;
+    } else {
+      return registeredAccounts[account];
     }
   }
 

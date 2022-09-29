@@ -21,10 +21,10 @@
   },
   "devDependencies": {
     "@hoprnet/hopr-utils": "1",
-    "@nomiclabs/hardhat-ethers": "2.0.5",
-    "@nomiclabs/hardhat-solhint": "2.0.1",
-    "@nomiclabs/hardhat-etherscan": "3.0.1",
     "@nomicfoundation/hardhat-chai-matchers": "1.0.3",
+    "@nomiclabs/hardhat-ethers": "2.1.1",
+    "@nomiclabs/hardhat-solhint": "2.0.1",
+    "@nomiclabs/hardhat-etherscan": "3.1.0",
     "@typechain/ethers-v5": "9.0.0",
     "@typechain/hardhat": "4.0.0",
     "chai": "4.3.6",
