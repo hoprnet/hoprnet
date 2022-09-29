@@ -341,9 +341,12 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
       if (this.options.publicNodes != undefined) {
         this._onNewRelay = function (this: EntryNodes, peer: PeerStoreType) {
+          console.log(`on new relay called`)
           this.addToUpdateQueue(async () => {
+            console.log(`on new relay running`, this)
             log(`peer online`, peer.id.toString())
             await this.onNewRelay(peer)
+            console.log(`after on new relay running`)
           })
         }.bind(this)
         this._onRemoveRelay = function (this: EntryNodes, peer: PeerId) {
@@ -359,7 +362,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
       this.startDHTRenewInterval()
 
-      await this.updatePublicNodes()
+      this.addToUpdateQueue(this.updatePublicNodes.bind(this))
     }
   }
 
@@ -977,7 +980,6 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
     // Once we got at least one entry node, stop the interval
     if (this.usedRelays != undefined && this.usedRelays.length > 0) {
-      console.log(`stop reconnect called`)
       this.stopReconnectAttempts?.()
     }
 
