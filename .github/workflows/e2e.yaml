@@ -64,7 +64,7 @@ jobs:
         run: ./scripts/run-integration-tests-source.sh
 
       - name: Upload node logs (Linux)
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         if: ${{ always() && runner.os == 'Linux' }}
         with:
           name: hopr-linux-e2e-source-node-logs
@@ -73,7 +73,7 @@ jobs:
             /tmp/hopr-source-hardhat-rpc.log
 
       - name: Upload node logs (macOS)
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         if: ${{ always() && runner.os == 'macOS' }}
         with:
           name: hopr-macOS-e2e-source-node-logs
