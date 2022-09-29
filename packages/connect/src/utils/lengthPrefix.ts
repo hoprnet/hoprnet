@@ -20,14 +20,14 @@ export function decodeWithLengthPrefix(msg: Uint8Array): Uint8Array[] {
 
   let index = 0
   while (index < msg.length) {
-    const length = u8aToNumber(msg.slice(index, index + LENGTH_PREFIX_SIZE)) as number
+    const length = u8aToNumber(msg.subarray(index, index + LENGTH_PREFIX_SIZE)) as number
 
     index += LENGTH_PREFIX_SIZE
     if (index + length > msg.length) {
       throw Error(`Invalid length prefix encoding. Encoded length does not fit to given array`)
     }
 
-    result.push(msg.slice(index, index + length))
+    result.push(msg.subarray(index, index + length))
 
     index += length
   }

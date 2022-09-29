@@ -72,9 +72,16 @@ function createFakeNetwork() {
   // mocks libp2p.handle(protocol)
   const subscribe = (
     self: PeerId,
-    protocol: string,
+    protocols: string | string[],
     handler: (msg: Uint8Array, remotePeer: PeerId) => Promise<Uint8Array>
   ) => {
+    let protocol
+    if (typeof protocols === 'string') {
+      protocol = protocols
+    } else {
+      protocol = protocol[0]
+    }
+
     network.on(reqEventName(self, protocol), async (from: PeerId, request: Uint8Array) => {
       const response = await handler(request, from)
 
@@ -85,7 +92,14 @@ function createFakeNetwork() {
   }
 
   // mocks libp2p.dialProtocol
-  const sendMessage = async (self: PeerId, dest: PeerId, protocol: string, msg: Uint8Array) => {
+  const sendMessage = async (self: PeerId, dest: PeerId, protocols: string | string[], msg: Uint8Array) => {
+    let protocol
+    if (typeof protocols === 'string') {
+      protocol = protocols
+    } else {
+      protocol = protocol[0]
+    }
+
     if (network.listenerCount(reqEventName(dest, protocol)) > 0) {
       const recvPromise = once(network, resEventName(dest, self, protocol))
 
@@ -125,8 +139,9 @@ async function getPeer(
 
   const heartbeat = new TestingHeartbeat(
     peers,
-    (protocol: string, handler: LibP2PHandlerFunction<any>) => network.subscribe(self, protocol, handler),
-    ((dest: PeerId, protocol: string, msg: Uint8Array) => network.sendMessage(self, dest, protocol, msg)) as any,
+    (protocols: string | string[], handler: LibP2PHandlerFunction<any>) => network.subscribe(self, protocols, handler),
+    ((dest: PeerId, protocols: string | string[], msg: Uint8Array) =>
+      network.sendMessage(self, dest, protocols, msg)) as any,
     (async () => {
       assert.fail(`must not call hangUp`)
     }) as any,

@@ -151,26 +151,26 @@ export type HoprOptions = {
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
 
 export type Subscribe = ((
-  protocol: string,
-  handler: LibP2PHandlerFunction<Promise<void> | void>,
-  includeReply: false,
+  protocols: string | string[],
+  handler: LibP2PHandlerFunction<Promise<Uint8Array>>,
+  includeReply: true,
   errHandler: (err: any) => void
 ) => void) &
   ((
     protocol: string,
-    handler: LibP2PHandlerFunction<Promise<Uint8Array>>,
-    includeReply: true,
+    handler: LibP2PHandlerFunction<Promise<void> | void>,
+    includeReply: false,
     errHandler: (err: any) => void
   ) => void)
 
 export type SendMessage = ((
   dest: PeerId,
-  protocol: string,
+  protocols: string | string[],
   msg: Uint8Array,
-  includeReply: false,
+  includeReply: true,
   opts: DialOpts
-) => Promise<void>) &
-  ((dest: PeerId, protocol: string, msg: Uint8Array, includeReply: true, opts: DialOpts) => Promise<Uint8Array[]>)
+) => Promise<Uint8Array[]>) &
+  ((dest: PeerId, protocols: string | string[], msg: Uint8Array, includeReply: false, opts: DialOpts) => Promise<void>)
 
 class Hopr extends EventEmitter {
   public status: NodeStatus = 'UNINITIALIZED'
@@ -289,15 +289,20 @@ class Hopr extends EventEmitter {
 
     this.libp2pComponents = libp2p.components
     // Subscribe to p2p events from libp2p. Wraps our instance of libp2p.
-    const subscribe = ((
-      protocol: string,
-      handler: LibP2PHandlerFunction<Promise<void | Uint8Array>>,
+    const subscribe = (
+      protocols: string | string[],
+      handler: LibP2PHandlerFunction<Promise<Uint8Array> | Promise<void> | void>,
       includeReply: boolean,
       errHandler: (err: any) => void
-    ) => libp2pSubscribe(this.libp2pComponents, protocol, handler, errHandler, includeReply)) as Subscribe
+    ) => libp2pSubscribe(this.libp2pComponents, protocols, handler, errHandler, includeReply)
 
-    const sendMessage = ((dest: PeerId, protocol: string, msg: Uint8Array, includeReply: boolean, opts: DialOpts) =>
-      libp2pSendMessage(this.libp2pComponents, dest, protocol, msg, includeReply, opts)) as SendMessage
+    const sendMessage = ((
+      dest: PeerId,
+      protocols: string | string[],
+      msg: Uint8Array,
+      includeReply: boolean,
+      opts: DialOpts
+    ) => libp2pSendMessage(this.libp2pComponents, dest, protocols, msg, includeReply, opts)) as SendMessage // Typescript limitation
 
     // Attach network health measurement functionality
     const peers: Peer[] = await this.libp2pComponents.getPeerStore().all()

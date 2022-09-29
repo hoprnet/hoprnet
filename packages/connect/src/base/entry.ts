@@ -17,7 +17,7 @@ import {
   CODE_UDP,
   MAX_RELAYS_PER_NODE,
   MIN_RELAYS_PER_NODE,
-  CAN_RELAY_PROTCOL,
+  CAN_RELAY_PROTOCOLS,
   OK,
   DEFAULT_DHT_ENTRY_RENEWAL,
   CODE_P2P
@@ -1000,7 +1000,13 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    * @returns a PeerStoreEntry containing the measured latency
    */
   private async connectToRelay(id: PeerId, relay: Multiaddr): Promise<{ entry: EntryNodeData; conn?: Connection }> {
-    const result = await dial(this.getComponents(), id, CAN_RELAY_PROTCOL(this.options.environment), false, true)
+    const result = await dial(
+      this.getComponents(),
+      id,
+      CAN_RELAY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments),
+      false,
+      true
+    )
 
     if (result.status != DialStatus.SUCCESS) {
       // Dial error
@@ -1021,7 +1027,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     // consumes the first messages, afterwards closes the stream
     for await (const msg of result.resp.stream.source as AsyncIterable<Uint8Array>) {
       verbose(`can relay received ${new TextDecoder().decode(msg.slice())} from ${id.toString()}`)
-      if (u8aEquals(msg.slice(), OK)) {
+      if (u8aEquals(msg.subarray(), OK)) {
         done = true
       }
       // End receive stream after first message

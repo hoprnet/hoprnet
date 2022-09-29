@@ -20,6 +20,7 @@ import { getAddrs } from './identity.js'
 import type AccessControl from './network/access-control.js'
 import { createLibp2pMock } from './libp2p.mock.js'
 import { NetworkPeersOrigin } from './network/network-peers.js'
+import { supportedEnvironments } from './environment.js'
 
 const log = debug(`hopr-core:create-hopr`)
 
@@ -75,6 +76,12 @@ export async function createLibp2pInstance(
     const protocolPrefix = `hopr/${options.environment.id}`
     const protocolDHTPrefix = `/hopr/${options.environment.id}`
 
+    // Collect supported environments and versions to be passed to HoprConnect
+    // because hopr-connect doesn't have access to the protocol config file
+    const supportedEnvironmentsInfo = supportedEnvironments().map((env) => {
+      return { id: env.id, versionRange: env.version_range }
+    })
+
     libp2p = await createLibp2p({
       peerId,
       addresses: { listen: getAddrs(peerId, options).map((x: Multiaddr) => x.toString()) },
@@ -85,6 +92,7 @@ export async function createLibp2pInstance(
             initialNodes,
             publicNodes,
             environment: options.environment.id,
+            supportedEnvironments: supportedEnvironmentsInfo,
             allowLocalConnections: options.allowLocalConnections,
             allowPrivateConnections: options.allowPrivateConnections,
             // Amount of nodes for which we are willing to act as a relay

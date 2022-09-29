@@ -3026,6 +3026,7 @@ __metadata:
     simple-peer: 9.11.1
     stream-to-it: 0.2.4
     typescript: 4.7.4
+    uint8arraylist: 2.3.2
     webrtc-stun: 3.0.0
     wrtc: 0.4.7
     yargs: 17.5.1
@@ -23253,21 +23254,21 @@ __metadata:
   languageName: node
   linkType: hard
 
+"uint8arraylist@npm:2.3.2, uint8arraylist@npm:^2.0.0, uint8arraylist@npm:^2.1.1":
+  version: 2.3.2
+  resolution: "uint8arraylist@npm:2.3.2"
+  dependencies:
+    uint8arrays: ^3.1.0
+  checksum: 468bb198a34be14fb061f40ef0d9f6703412a07a05d4f01223ece546b76ed578e8cb5696ecf2132dc6303b4d97a2c2d937b0c75e7517ed7c7cb135f3d8bbd280
+  languageName: node
+  linkType: hard
+
 "uint8arraylist@npm:^1.2.0, uint8arraylist@npm:^1.3.0, uint8arraylist@npm:^1.4.0, uint8arraylist@npm:^1.5.1":
   version: 1.6.0
   resolution: "uint8arraylist@npm:1.6.0"
   dependencies:
     uint8arrays: ^3.0.0
   checksum: ad92148a2b61ec04a450736107edae2c7e7556a22a8488a6df67cd63efcbcc29a18b91a2b8f1869afaf5648b88a6f35464428fd1d5171af21702ca4bb7e14e7b
-  languageName: node
-  linkType: hard
-
-"uint8arraylist@npm:^2.0.0, uint8arraylist@npm:^2.1.1":
-  version: 2.3.2
-  resolution: "uint8arraylist@npm:2.3.2"
-  dependencies:
-    uint8arrays: ^3.1.0
-  checksum: 468bb198a34be14fb061f40ef0d9f6703412a07a05d4f01223ece546b76ed578e8cb5696ecf2132dc6303b4d97a2c2d937b0c75e7517ed7c7cb135f3d8bbd280
   languageName: node
   linkType: hard
 

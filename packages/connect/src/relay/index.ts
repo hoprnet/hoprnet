@@ -14,7 +14,7 @@ import debug from 'debug'
 import chalk from 'chalk'
 
 import { WebRTCConnection } from '../webrtc/index.js'
-import { RELAY_PROTCOL, DELIVERY_PROTOCOL, OK, CAN_RELAY_PROTCOL } from '../constants.js'
+import { RELAY_PROTOCOLS, DELIVERY_PROTOCOLS, OK, CAN_RELAY_PROTOCOLS } from '../constants.js'
 import { RelayConnection } from './connection.js'
 import { RelayHandshake, RelayHandshakeMessage } from './handshake.js'
 import { RelayState } from './state.js'
@@ -122,9 +122,12 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     this._onCanRelay = this.onCanRelay.bind(this)
 
     // Requires registrar to be started first
-    await this.components.getRegistrar().handle(DELIVERY_PROTOCOL(this.options.environment), this._onDelivery)
-    await this.components.getRegistrar().handle(RELAY_PROTCOL(this.options.environment), this._onRelay)
-    await this.components.getRegistrar().handle(CAN_RELAY_PROTCOL(this.options.environment), this._onCanRelay)
+    const protocolsDelivery = DELIVERY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
+    const protocolsRelay = RELAY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
+    const protocolsCanRelay = CAN_RELAY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
+    await this.components.getRegistrar().handle(protocolsDelivery, this._onDelivery)
+    await this.components.getRegistrar().handle(protocolsRelay, this._onRelay)
+    await this.components.getRegistrar().handle(protocolsCanRelay, this._onCanRelay)
 
     // Periodic function that prints relay connections (and will also do pings in future)
     const periodicKeepAlive = async function (this: Relay) {
@@ -191,7 +194,12 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     destination: PeerId,
     options?: DialOptions
   ): Promise<MultiaddrConnection | undefined> {
-    const response = await dial(this.getComponents(), relay, RELAY_PROTCOL(this.options.environment), false)
+    const response = await dial(
+      this.getComponents(),
+      relay,
+      RELAY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments),
+      false
+    )
 
     if (response.status != DialStatus.SUCCESS) {
       error(

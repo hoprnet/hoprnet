@@ -2,10 +2,10 @@
  * Add a more usable API on top of LibP2P
  */
 import type { PeerId } from '@libp2p/interface-peer-id'
-import type { Connection, ProtocolStream, Stream } from '@libp2p/interface-connection'
+import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
 import type { ConnectionManager, Dialer } from '@libp2p/interface-connection-manager'
 import type { Components } from '@libp2p/interfaces/components'
-import { type Multiaddr, protocols } from '@multiformats/multiaddr'
+import { type Multiaddr, protocols as maProtocols } from '@multiformats/multiaddr'
 
 import { timeout, type TimeoutOpts } from '../async/index.js'
 
@@ -15,10 +15,10 @@ import { createCircuitAddress } from '../network/index.js'
 
 const DEBUG_PREFIX = `hopr-core:libp2p`
 
+const CODE_P2P = maProtocols('p2p').code
+
 const log = debug(DEBUG_PREFIX)
 const error = debug(DEBUG_PREFIX.concat(`:error`))
-
-const CODE_P2P = protocols('p2p').code
 
 const DEFAULT_DHT_QUERY_TIMEOUT = 20000
 
@@ -95,7 +95,7 @@ const PROTOCOL_SELECTION_TIMEOUT = 10e3
 export async function tryExistingConnections(
   components: Components,
   destination: PeerId,
-  protocol: string
+  protocols: string | string[]
 ): Promise<
   | void
   | (ProtocolStream & {
@@ -108,15 +108,14 @@ export async function tryExistingConnections(
     return
   }
 
-  let stream: ProtocolStream['stream'] | undefined
+  let stream: ProtocolStream | undefined
   let conn: Connection | undefined
 
   const deadConnections: Connection[] = []
 
   for (const existingConnection of existingConnections) {
     try {
-      // Timeout protocol selection to prevent from irresponsive peers
-      stream = (await timeout(PROTOCOL_SELECTION_TIMEOUT, () => existingConnection.newStream(protocol)))?.stream
+      stream = await timeout(PROTOCOL_SELECTION_TIMEOUT, () => existingConnection.newStream(protocols))
     } catch (err) {}
 
     if (stream == undefined) {
@@ -147,7 +146,7 @@ export async function tryExistingConnections(
   })()
 
   if (stream != undefined && conn != undefined) {
-    return { conn, stream, protocol }
+    return { conn, ...stream }
   }
 }
 
@@ -158,14 +157,19 @@ export async function tryExistingConnections(
  *
  * @param components Libp2p components
  * @param destination which peer to dial
- * @param protocol which protocol to use
+ * @param protocols which protocol to use
  */
 async function establishNewConnection(
   components: Components,
   destination: PeerId | Multiaddr,
-  protocol: string,
+  protocols: string | string[],
   keepAlive: boolean = false
-) {
+): Promise<
+  | void
+  | (ProtocolStream & {
+      conn: Connection
+    })
+> {
   log(`Trying to establish connection to ${destination.toString()}`)
 
   let conn: Connection | undefined
@@ -187,13 +191,13 @@ async function establishNewConnection(
 
   log(`Connection ${destination.toString()} established !`)
 
-  let stream: Stream | undefined
+  let stream: ProtocolStream | undefined
   let errThrown = false
   try {
     // Timeout protocol selection to prevent from irresponsive nodes
-    stream = (await timeout(PROTOCOL_SELECTION_TIMEOUT, () => (conn as Connection).newStream(protocol)))?.stream
+    stream = await timeout(PROTOCOL_SELECTION_TIMEOUT, () => (conn as Connection).newStream(protocols))
   } catch (err) {
-    error(`error while trying to establish protocol ${protocol} with ${destination.toString()}`, err)
+    error(`error while trying to establish protocol ${protocols} with ${destination.toString()}`, err)
     errThrown = true
   }
 
@@ -208,8 +212,7 @@ async function establishNewConnection(
 
   return {
     conn,
-    stream,
-    protocol
+    ...stream
   }
 }
 
@@ -263,11 +266,11 @@ async function queryDHT(components: Components, destination: PeerId): Promise<Pe
 async function doDirectDial(
   components: Components,
   destination: PeerId,
-  protocol: string,
+  protocols: string | string[],
   keepAlive: boolean = false
 ): Promise<DialResponse> {
   // First let's try already existing connections
-  let struct = await tryExistingConnections(components, destination, protocol)
+  let struct = await tryExistingConnections(components, destination, protocols)
 
   if (struct) {
     log(`Successfully reached ${destination.toString()} via existing connection !`)
@@ -282,7 +285,7 @@ async function doDirectDial(
     for (const address of knownAddressesForPeer) {
       log(`- ${address.multiaddr.toString()}`)
     }
-    struct = await establishNewConnection(components, destination, protocol, keepAlive)
+    struct = await establishNewConnection(components, destination, protocols, keepAlive)
     if (struct) {
       log(`Successfully reached ${destination.toString()} via already known addresses !`)
       return { status: DialStatus.SUCCESS, resp: struct }
@@ -297,7 +300,7 @@ async function doDirectDial(
 async function fetchCircuitAddressesAndDial(
   components: Components,
   destination: PeerId,
-  protocol: string
+  protocols: string | string[]
 ): Promise<DialResponse> {
   let noDht = false
   try {
@@ -349,10 +352,10 @@ async function fetchCircuitAddressesAndDial(
   }
 
   let relayStruct:
+    | void
     | (ProtocolStream & {
         conn: Connection
       })
-    | undefined
 
   for (const relay of dhtResult) {
     // Make sure we don't use self as relay
@@ -372,7 +375,7 @@ async function fetchCircuitAddressesAndDial(
 
     log(`Trying to reach ${destination.toString()} via circuit ${circuitAddress}...`)
 
-    relayStruct = await establishNewConnection(components, circuitAddress, protocol)
+    relayStruct = await establishNewConnection(components, circuitAddress, protocols)
 
     // Return if we were successful
     if (relayStruct) {
@@ -393,24 +396,24 @@ async function fetchCircuitAddressesAndDial(
  *
  * @param components components of libp2p instance
  * @param destination which peer to connect to
- * @param protocol which protocol to use
+ * @param protocols which protocol to use
  * @returns
  */
 export async function dial(
   components: Components,
   destination: PeerId,
-  protocol: string,
+  protocols: string | string[],
   withDHT: boolean = true,
   keepAlive: boolean = false
 ): Promise<DialResponse> {
-  const res = await doDirectDial(components, destination, protocol, keepAlive)
+  const res = await doDirectDial(components, destination, protocols, keepAlive)
 
   if (withDHT == false || (withDHT == true && res.status == DialStatus.SUCCESS)) {
     // Take first result and don't do any further steps
     return res
   }
 
-  return await fetchCircuitAddressesAndDial(components, destination, protocol)
+  return await fetchCircuitAddressesAndDial(components, destination, protocols)
 }
 
 export type { TimeoutOpts as DialOpts }
