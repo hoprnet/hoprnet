@@ -1,4 +1,4 @@
-import { type Address, ChannelEntry, PublicKey } from '.'
+import { type Address, ChannelEntry, PublicKey } from './index.js'
 import assert from 'assert'
 
 const PARTY_A = PublicKey.fromString(

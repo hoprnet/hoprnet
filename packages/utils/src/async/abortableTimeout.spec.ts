@@ -1,7 +1,6 @@
-import type { TimeoutOpts } from './abortableTimeout'
+import { type TimeoutOpts, abortableTimeout } from './abortableTimeout.js'
 
 import assert from 'assert'
-import { abortableTimeout } from './abortableTimeout'
 
 enum Messages {
   ABORT_MSG,

@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { verifySignatureFromPeerId } from './verifySignatureFromPeerId'
+import { verifySignatureFromPeerId } from './verifySignatureFromPeerId.js'
 
 const myPeerId = '16Uiu2HAm3irRrBjLeHGY5GmriGZKYyNeWa7xU7z3LAj95UkMmnZM'
 const message = `Hi there, this is a signed message.`

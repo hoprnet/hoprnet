@@ -1,8 +1,15 @@
-import { publicKeyConvert, publicKeyCreate, ecdsaRecover } from 'secp256k1'
-import { u8aToHex, u8aEquals, stringToU8a } from '../u8a'
-import PeerId from 'peer-id'
-import { pubKeyToPeerId } from '../libp2p'
-import { Address, Hash } from './primitives'
+import secp256k1 from 'secp256k1'
+import { u8aToHex, u8aEquals, stringToU8a, u8aConcat } from '../u8a/index.js'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
+import { pubKeyToPeerId } from '../libp2p/index.js'
+import { Address, Hash } from './primitives.js'
+import { unmarshalPublicKey } from '@libp2p/crypto/keys'
+
+const SIZE_PUBKEY_UNCOMPRESSED = 65
+const SIZE_PUBKEY_UNCOMPRESSED_WITHOUT_PREFIX = 64
+const SIZE_PUBKEY_COMPRESSED = 33
+const SIZE_PRIVKEY = 32
 
 export class PublicKey {
   // Cache expensive computation result
@@ -15,23 +22,23 @@ export class PublicKey {
   }
 
   static fromPrivKey(privKey: Uint8Array): PublicKey {
-    if (privKey.length !== 32) {
+    if (privKey.length != SIZE_PRIVKEY) {
       throw new Error('Incorrect size Uint8Array for private key')
     }
 
-    return new PublicKey(publicKeyCreate(privKey, false))
+    return new PublicKey(secp256k1.publicKeyCreate(privKey, false))
   }
 
   static deserialize(arr: Uint8Array) {
     switch (arr.length) {
-      case 65:
+      case SIZE_PUBKEY_UNCOMPRESSED:
         if (arr[0] != 4) {
           throw Error(`Invalid uncompressed public key`)
         }
         return new PublicKey(arr)
-      case 64:
+      case SIZE_PUBKEY_UNCOMPRESSED_WITHOUT_PREFIX:
         return new PublicKey(Uint8Array.from([4, ...arr]))
-      case 33:
+      case SIZE_PUBKEY_COMPRESSED:
         if (![2, 3].includes(arr[0])) {
           throw Error(`Invalid compressed public key`)
         }
@@ -41,16 +48,63 @@ export class PublicKey {
     }
   }
 
+  /**
+   * Deserializes a Uint8Array containing serialized publicKeys
+   * @param arr u8a containing serialized pubkeys
+   * @returns an array of deserialized publicKeys
+   */
+  static deserializeArray(arr: Uint8Array): PublicKey[] {
+    const result: PublicKey[] = []
+    for (let offset = 0; offset < arr.length; ) {
+      switch (arr[offset]) {
+        case 2:
+        case 3:
+          if (arr.length < offset + SIZE_PUBKEY_COMPRESSED) {
+            throw Error(`Invalid array length. U8a has ${offset + SIZE_PUBKEY_COMPRESSED - arr.length} to few elements`)
+          }
+          // clone array
+          result.push(new PublicKey(arr.slice(offset, offset + SIZE_PUBKEY_COMPRESSED)))
+          offset += SIZE_PUBKEY_COMPRESSED
+          break
+        case 4:
+          if (arr.length < offset + SIZE_PUBKEY_UNCOMPRESSED) {
+            throw Error(
+              `Invalid array length. U8a has ${offset + SIZE_PUBKEY_UNCOMPRESSED - arr.length} to few elements`
+            )
+          }
+          // clone array
+          result.push(new PublicKey(arr.slice(offset, offset + SIZE_PUBKEY_UNCOMPRESSED)))
+          offset += SIZE_PUBKEY_UNCOMPRESSED
+          break
+        default:
+          throw Error(`Invalid prefix ${u8aToHex(arr.subarray(offset, offset + 1))} at ${offset}`)
+      }
+    }
+
+    return result
+  }
+
+  /**
+   * Serializes an array of publicKeys
+   * @returns a Uint8Array containing the given publicKeys
+   */
+  static serializeArray(pKeys: PublicKey[]): Uint8Array {
+    return u8aConcat(...pKeys.map((p) => p.arr))
+  }
+
   static fromPeerId(peerId: PeerId): PublicKey {
-    return PublicKey.deserialize(peerId.pubKey.marshal())
+    if (peerId.type !== 'secp256k1') {
+      throw Error(`PublicKey class only supports secp256k1 public keys`)
+    }
+    return PublicKey.deserialize(unmarshalPublicKey(peerId.publicKey).marshal())
   }
 
   static fromPeerIdString(peerIdString: string) {
-    return PublicKey.fromPeerId(PeerId.createFromB58String(peerIdString))
+    return PublicKey.fromPeerId(peerIdFromString(peerIdString))
   }
 
   static fromSignature(hash: Uint8Array, signature: Uint8Array, v: number): PublicKey {
-    return new PublicKey(ecdsaRecover(signature, v, hash, false))
+    return new PublicKey(secp256k1.ecdsaRecover(signature, v, hash, false))
   }
 
   static fromSignatureString(hash: string, r: string, s: string, v: number): PublicKey {
@@ -65,11 +119,11 @@ export class PublicKey {
   }
 
   static get SIZE_COMPRESSED(): number {
-    return 33
+    return SIZE_PUBKEY_COMPRESSED
   }
 
   static get SIZE_UNCOMPRESSED(): number {
-    return 65
+    return SIZE_PUBKEY_UNCOMPRESSED
   }
 
   public get isCompressed(): boolean {
@@ -83,7 +137,7 @@ export class PublicKey {
 
     if (this.isCompressed) {
       // Expensive EC-operation, only do if necessary
-      this.arr = publicKeyConvert(this.arr, false)
+      this.arr = secp256k1.publicKeyConvert(this.arr, false)
     }
 
     this._address = new Address(Hash.create(this.arr.slice(1)).serialize().slice(12))
@@ -107,25 +161,21 @@ export class PublicKey {
     if (this.isCompressed) {
       return this.arr
     } else {
-      return publicKeyConvert(this.arr, true)
+      return secp256k1.publicKeyConvert(this.arr, true)
     }
   }
 
   public serializeUncompressed() {
     if (this.isCompressed) {
-      // Expensive EC-operation, only do if necessary
-      this.arr = publicKeyConvert(this.arr, false)
+      // Expensive EC-operation, only do if really necessary
+      this.arr = secp256k1.publicKeyConvert(this.arr, false)
     }
 
     return this.arr
   }
 
   toString(): string {
-    return `<PubKey:${this.toB58String()}>`
-  }
-
-  toB58String(): string {
-    return this.toPeerId().toB58String()
+    return this.toPeerId().toString()
   }
 
   eq(b: PublicKey) {

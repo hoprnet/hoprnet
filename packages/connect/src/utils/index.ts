@@ -1,18 +1,18 @@
-import type { Stream, StreamType } from '../types'
+import type { Stream, StreamType } from '../types.js'
 import type { AddressInfo, Server as TCPServer } from 'net'
 import type { Socket as UDPSocket } from 'dgram'
-import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
-import type Connection from 'libp2p-interfaces/src/connection/connection'
-import PeerId from 'peer-id'
+import type { Connection, MultiaddrConnection } from '@libp2p/interface-connection'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { peerIdFromBytes } from '@libp2p/peer-id'
 
 import { isAnyAddress } from '@hoprnet/hopr-utils'
 
-import { Multiaddr } from 'multiaddr'
-import { CODE_CIRCUIT, CODE_P2P } from '../constants'
+import { Multiaddr } from '@multiformats/multiaddr'
+import { CODE_CIRCUIT, CODE_P2P } from '../constants.js'
 
-export * from './addrs'
-export * from './addressSorters'
-export { encodeWithLengthPrefix, decodeWithLengthPrefix } from './lengthPrefix'
+export * from './addrs.js'
+export * from './addressSorters.js'
+export { encodeWithLengthPrefix, decodeWithLengthPrefix } from './lengthPrefix.js'
 
 function isAsyncStream<T>(iterator: AsyncIterable<T> | Iterable<T>): iterator is AsyncIterable<T> {
   if ((iterator as AsyncIterable<T>)[Symbol.asyncIterator]) {
@@ -148,7 +148,7 @@ export function nodeToMultiaddr(addr: AddressInfo, peerId: PeerId | undefined): 
   )
 
   if (peerId != undefined) {
-    ma = ma.encapsulate(`/p2p/${peerId.toB58String()}`)
+    ma = ma.encapsulate(`/p2p/${peerId.toString()}`)
   }
 
   return ma
@@ -258,5 +258,5 @@ export function relayFromRelayAddress(ma: Multiaddr): PeerId {
   }
 
   // Remove length prefix
-  return PeerId.createFromBytes(tuples[0][1].slice(1))
+  return peerIdFromBytes(tuples[0][1].slice(1))
 }

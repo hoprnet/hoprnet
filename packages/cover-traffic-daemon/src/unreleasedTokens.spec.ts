@@ -1,10 +1,14 @@
 import assert from 'assert'
 import BN from 'bn.js'
-import PeerId from 'peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import { utils } from 'ethers'
-import { UnreleasedTokens } from './utils'
+import { UnreleasedTokens } from './utils.js'
 
-const unreleasedTokenInput: UnreleasedTokens = require('../unreleasedTokens.json')
+// @TODO inefficient & does not support runtime updates
+// Don't do typechecks on JSON files
+// @ts-ignore
+import unreleasedTokenInput from '../unreleasedTokens.json' assert { type: 'json' }
+
 const unreleasedTokenInputs: UnreleasedTokens[] = [
   { ...unreleasedTokenInput },
   { ...unreleasedTokenInput, link: {} },
@@ -56,7 +60,7 @@ unreleasedTokenInputs.forEach(function (input, index) {
         let validHoprId = false
         let errMsg = ''
         try {
-          PeerId.createFromB58String(hoprId)
+          peerIdFromString(hoprId)
           validHoprId = true
         } catch (err) {
           errMsg = err

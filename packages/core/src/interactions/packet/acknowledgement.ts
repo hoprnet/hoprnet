@@ -1,10 +1,10 @@
 import { oneAtATime, debug, AcknowledgedTicket, HoprDB } from '@hoprnet/hopr-utils'
 import type { PendingAckowledgement, HalfKeyChallenge, Hash } from '@hoprnet/hopr-utils'
 import { findCommitmentPreImage, bumpCommitment } from '@hoprnet/hopr-core-ethereum'
-import type { SendMessage, Subscribe } from '../../index'
-import type PeerId from 'peer-id'
-import { ACKNOWLEDGEMENT_TIMEOUT } from '../../constants'
-import { Acknowledgement, Packet } from '../../messages'
+import type { SendMessage, Subscribe } from '../../index.js'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { ACKNOWLEDGEMENT_TIMEOUT } from '../../constants.js'
+import { Acknowledgement, Packet } from '../../messages/index.js'
 const log = debug('hopr-core:acknowledgement')
 
 type OnAcknowledgement = (halfKey: HalfKeyChallenge) => void

@@ -1,20 +1,28 @@
-import type { ChannelEntry } from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum, { type ChannelEntry } from '@hoprnet/hopr-core-ethereum'
 import {
-  AcknowledgedTicket,
+  type AcknowledgedTicket,
   PublicKey,
   MINIMUM_REASONABLE_CHANNEL_STAKE,
   MAX_AUTO_CHANNELS,
-  PRICE_PER_PACKET
+  PRICE_PER_PACKET,
+  debug
 } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { MAX_NEW_CHANNELS_PER_TICK, NETWORK_QUALITY_THRESHOLD, INTERMEDIATE_HOPS, CHECK_TIMEOUT } from './constants'
-import { debug } from '@hoprnet/hopr-utils'
-import type NetworkPeers from './network/network-peers'
-import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+import { MAX_NEW_CHANNELS_PER_TICK, NETWORK_QUALITY_THRESHOLD, INTERMEDIATE_HOPS, CHECK_TIMEOUT } from './constants.js'
+import type NetworkPeers from './network/network-peers.js'
+import { NetworkPeersOrigin } from './network/network-peers.js'
+
 const log = debug('hopr-core:channel-strategy')
 
-export type ChannelsToOpen = [PublicKey, BN]
-export type ChannelsToClose = PublicKey
+export type StrategyTickResult = {
+  toOpen: {
+    destination: PublicKey
+    stake: BN
+  }[]
+  toClose: {
+    destination: PublicKey
+  }[]
+}
 
 /**
  * Staked nodes will likely want to automate opening and closing of channels. By
@@ -25,7 +33,7 @@ export type ChannelsToClose = PublicKey
  * - Churn is expensive
  * - Path finding will prefer high stakes, and high availability of nodes.
  */
-export interface ChannelStrategy {
+export interface ChannelStrategyInterface {
   name: string
 
   tick(
@@ -33,7 +41,7 @@ export interface ChannelStrategy {
     currentChannels: ChannelEntry[],
     networkPeers: NetworkPeers,
     getRandomChannel: () => Promise<ChannelEntry>
-  ): Promise<[ChannelsToOpen[], ChannelsToClose[]]>
+  ): Promise<StrategyTickResult>
   // TBD: Include ChannelsToClose as well.
 
   onChannelWillClose(channel: ChannelEntry, chain: HoprCoreEthereum): Promise<void> // Before a channel closes
@@ -51,7 +59,7 @@ export interface ChannelStrategy {
 export abstract class SaneDefaults {
   async onWinningTicket(ackTicket: AcknowledgedTicket, chain: HoprCoreEthereum) {
     const counterparty = ackTicket.signer
-    log(`auto redeeming tickets in channel to ${counterparty.toPeerId().toB58String()}`)
+    log(`auto redeeming tickets in channel to ${counterparty.toPeerId().toString()}`)
     await chain.redeemTicketsInChannelByCounterparty(counterparty)
   }
 
@@ -59,7 +67,7 @@ export abstract class SaneDefaults {
     const counterparty = channel.source
     const selfPubKey = chain.getPublicKey()
     if (!counterparty.eq(selfPubKey)) {
-      log(`auto redeeming tickets in channel to ${counterparty.toPeerId().toB58String()}`)
+      log(`auto redeeming tickets in channel to ${counterparty.toPeerId().toString()}`)
       try {
         await chain.redeemTicketsInChannel(channel)
       } catch (err) {
@@ -77,16 +85,16 @@ export abstract class SaneDefaults {
 }
 
 // Don't auto open any channels
-export class PassiveStrategy extends SaneDefaults implements ChannelStrategy {
+export class PassiveStrategy extends SaneDefaults implements ChannelStrategyInterface {
   name = 'passive'
 
-  async tick(_balance: BN, _c: ChannelEntry[], _p: NetworkPeers): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
-    return [[], []]
+  async tick(_balance: BN, _c: ChannelEntry[], _p: NetworkPeers): Promise<StrategyTickResult> {
+    return { toOpen: [], toClose: [] }
   }
 }
 
 // Open channel to as many peers as possible
-export class PromiscuousStrategy extends SaneDefaults implements ChannelStrategy {
+export class PromiscuousStrategy extends SaneDefaults implements ChannelStrategyInterface {
   name = 'promiscuous'
 
   async tick(
@@ -94,36 +102,37 @@ export class PromiscuousStrategy extends SaneDefaults implements ChannelStrategy
     currentChannels: ChannelEntry[],
     peers: NetworkPeers,
     getRandomChannel: () => Promise<ChannelEntry>
-  ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
+  ): Promise<StrategyTickResult> {
     log(
       'currently open',
       currentChannels.map((x) => x.toString())
     )
-    let toOpen: ChannelsToOpen[] = []
+    let toOpen: StrategyTickResult['toOpen'] = []
 
     let i = 0
-    let toClose = currentChannels
-      .filter((x: ChannelEntry) => {
-        return (
-          peers.qualityOf(x.destination.toPeerId()) < 0.1 ||
-          // Lets append channels with less balance than a full hop messageto toClose.
-          // NB: This is based on channel balance, not expected balance so may not be
-          // aggressive enough.
-          x.balance.toBN().lte(PRICE_PER_PACKET.muln(INTERMEDIATE_HOPS))
-        )
-      })
-      .map((x) => x.destination)
+    let toClose = currentChannels.filter((x: ChannelEntry) => {
+      return (
+        peers.qualityOf(x.destination.toPeerId()) < 0.1 ||
+        // Lets append channels with less balance than a full hop messageto toClose.
+        // NB: This is based on channel balance, not expected balance so may not be
+        // aggressive enough.
+        x.balance.toBN().lte(PRICE_PER_PACKET.muln(INTERMEDIATE_HOPS))
+      )
+    })
 
     // First let's open channels to any interesting peers we have
     peers.all().forEach((peerId) => {
       if (
         balance.gtn(0) &&
         currentChannels.length + toOpen.length < MAX_AUTO_CHANNELS &&
-        !toOpen.find((x) => x[0].eq(PublicKey.fromPeerId(peerId))) &&
+        !toOpen.find((x: typeof toOpen[number]) => x.destination.eq(PublicKey.fromPeerId(peerId))) &&
         !currentChannels.find((x) => x.destination.toPeerId().equals(peerId)) &&
         peers.qualityOf(peerId) > NETWORK_QUALITY_THRESHOLD
       ) {
-        toOpen.push([PublicKey.fromPeerId(peerId), MINIMUM_REASONABLE_CHANNEL_STAKE])
+        toOpen.push({
+          destination: PublicKey.fromPeerId(peerId),
+          stake: MINIMUM_REASONABLE_CHANNEL_STAKE
+        })
         balance.isub(MINIMUM_REASONABLE_CHANNEL_STAKE)
       }
     })
@@ -140,13 +149,16 @@ export class PromiscuousStrategy extends SaneDefaults implements ChannelStrategy
         break
       }
       log('evaluating', randomChannel.source.toString())
-      peers.register(randomChannel.source.toPeerId(), 'promiscuous channel strategy')
+      peers.register(randomChannel.source.toPeerId(), NetworkPeersOrigin.STRATEGY_CONSIDERING_CHANNEL)
       if (
         !toOpen.find((x) => x[0].eq(randomChannel.source)) &&
         !currentChannels.find((x) => x.destination.eq(randomChannel.source)) &&
         peers.qualityOf(randomChannel.source.toPeerId()) > NETWORK_QUALITY_THRESHOLD
       ) {
-        toOpen.push([randomChannel.source, MINIMUM_REASONABLE_CHANNEL_STAKE])
+        toOpen.push({
+          destination: randomChannel.source,
+          stake: MINIMUM_REASONABLE_CHANNEL_STAKE
+        })
         balance.isub(MINIMUM_REASONABLE_CHANNEL_STAKE)
       }
     }
@@ -154,6 +166,6 @@ export class PromiscuousStrategy extends SaneDefaults implements ChannelStrategy
       'Promiscuous toOpen: ',
       toOpen.map((p) => p.toString())
     )
-    return [toOpen, toClose]
+    return { toOpen, toClose }
   }
 }

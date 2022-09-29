@@ -1,11 +1,11 @@
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
+import type { Duplex } from 'stream'
 import http from 'http'
 import fs from 'fs'
 import path from 'path'
 import { parse } from 'url'
 import { default as next } from 'next'
 import type { Server as HttpServer } from 'http'
-import stripAnsi from 'strip-ansi'
 import type { LogStream } from './logs.js'
 import { NODE_ENV } from './env.js'
 import {
@@ -16,7 +16,6 @@ import {
   debug,
   startResourceUsageLogger
 } from '@hoprnet/hopr-utils'
-import { Commands } from './commands/index.js'
 import type { WebSocket } from 'ws'
 
 let debugLog = debug('hoprd:admin')
@@ -24,76 +23,86 @@ let debugLog = debug('hoprd:admin')
 const MIN_BALANCE = new Balance(SUGGESTED_BALANCE).toFormattedString()
 const MIN_NATIVE_BALANCE = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()
 
+/**
+ * Server that hosts hopr-admin website
+ */
 export class AdminServer {
   private app: ReturnType<typeof next>
   public server: HttpServer | undefined
   private node: Hopr | undefined
-  private cmds: Commands
 
   constructor(private logs: LogStream, private host: string, private port: number) {}
 
-  async setup() {
-    let adminPath: string
-    for (const adminRelPath of ['../hopr-admin', './hopr-admin']) {
-      const adminPathInt = new URL(adminRelPath, import.meta.url).pathname
-      const nextPath = path.resolve(adminPathInt, '.next')
-      if (!fs.existsSync(nextPath)) {
-        continue
+  setup(): Promise<void> {
+    return new Promise(async (resolve, reject) => {
+      let adminPath: string
+      for (const adminRelPath of ['../hopr-admin', './hopr-admin']) {
+        const adminPathInt = new URL(adminRelPath, import.meta.url).pathname
+        const nextPath = path.resolve(adminPathInt, '.next')
+        if (!fs.existsSync(nextPath)) {
+          continue
+        }
+        adminPath = adminPathInt
+        break
       }
-      adminPath = adminPathInt
-      break
-    }
 
-    if (!adminPath) {
-      console.log('Failed to start Admin interface: could not find NextJS app')
-      process.exit(1)
-    }
-
-    debugLog('using', adminPath)
-
-    const nextConfig = {
-      dev: NODE_ENV === 'development',
-      dir: adminPath
-    } as any
-
-    if (NODE_ENV === 'development') {
-      nextConfig.conf = {
-        distDir: `build/${this.port}`
+      if (!adminPath) {
+        console.log('Failed to start Admin interface')
+        return reject(Error(`could not find NextJS app`))
       }
-    }
 
-    this.app = next(nextConfig)
-    const handle = this.app.getRequestHandler()
-    await this.app.prepare()
+      debugLog('using', adminPath)
 
-    this.server = http.createServer((req, res) => {
-      const parsedUrl = parse(req.url || '', true)
-      handle(req, res, parsedUrl)
+      const nextConfig = {
+        dev: NODE_ENV === 'development',
+        dir: adminPath
+      } as any
+
+      if (NODE_ENV === 'development') {
+        nextConfig.conf = {
+          distDir: `build/${this.port}`
+        }
+      }
+
+      this.app = next(nextConfig)
+      const handle = this.app.getRequestHandler()
+      await this.app.prepare()
+
+      this.server = http.createServer((req, res) => {
+        const parsedUrl = parse(req.url || '', true)
+        handle(req, res, parsedUrl)
+      })
+
+      this.server.once('error', (err: any) => {
+        console.log('Failed to start Admin interface')
+        reject(err)
+      })
+
+      // Handles error resulting from broken client connections.
+      // see https://nodejs.org/dist/latest-v16.x/docs/api/http.html#event-clienterror
+      this.server.on('clientError', (err: Error, socket: Duplex) => {
+        if ((err as any).code === 'ECONNRESET' || !socket.writable) {
+          return
+        }
+
+        // End the socket
+        socket.end('HTTP/1.1 400 Bad Request\r\n\r\n')
+      })
+
+      this.server.listen(this.port, this.host, resolve)
+      this.logs.log('Admin server listening on port ' + this.port)
     })
-
-    this.server.once('error', (err: any) => {
-      console.log('Failed to start Admin interface')
-      console.log(err)
-      process.exit(1)
-    })
-
-    this.server.listen(this.port, this.host)
-    this.logs.log('Admin server listening on port ' + this.port)
   }
 
-  registerNode(node: Hopr, cmds: any, settings?: any) {
+  registerNode(node: Hopr) {
     this.node = node
-    this.cmds = cmds
-    if (settings) {
-      this.cmds.stateOps.setState(settings)
-    }
 
     this.node.on('hopr:channel:opened', (channel) => {
-      this.logs.log(`Opened channel to ${channel[0].toB58String()}`)
+      this.logs.log(`Opened channel to ${channel[0].toString()}`)
     })
 
     this.node.on('hopr:channel:closed', (peer) => {
-      this.logs.log(`Closed channel to ${peer.toB58String()}`)
+      this.logs.log(`Closed channel to ${peer.toString()}`)
     })
 
     this.node.on('hopr:warning:unfunded', (addr) => {
@@ -118,25 +127,15 @@ export class AdminServer {
     startConnectionReports(this.node, this.logs)
     startResourceUsageLogger(debugLog)
 
-    process.env.NODE_ENV == 'production' && showDisclaimer(this.logs)
-
-    this.cmds.execute(() => {}, `alias ${node.getId().toB58String()} me`)
+    if (process.env.NODE_ENV === 'production') {
+      showDisclaimer(this.logs)
+    }
   }
 
   public onConnection(socket: WebSocket) {
     socket.on('message', (message: string) => {
       debugLog('Message from client', message)
       this.logs.logFullLine(`admin > ${message}`)
-
-      if (this.cmds) {
-        this.cmds.execute((resp: string) => {
-          if (resp) {
-            // Strings may have ansi stuff in it, get rid of it:
-            resp = stripAnsi(resp)
-            this.logs.logFullLine(resp)
-          }
-        }, message.toString())
-      }
     })
 
     socket.on('error', (err: string) => {
@@ -157,8 +156,8 @@ export function showDisclaimer(logs: LogStream) {
 }
 
 export async function startConnectionReports(node: Hopr, logs: LogStream) {
-  logs.logConnectedPeers(node.getConnectedPeers().map((p) => p.toB58String()))
+  logs.logConnectedPeers(node.getConnectedPeers().map((p) => p.toString()))
   setInterval(() => {
-    logs.logConnectedPeers(node.getConnectedPeers().map((p) => p.toB58String()))
+    logs.logConnectedPeers(node.getConnectedPeers().map((p) => p.toString()))
   }, 60 * 1000)
 }

@@ -1,9 +1,16 @@
-import { stringToU8a, u8aToHex } from '..'
-import { PRIVATE_NETWORKS, LINK_LOCAL_NETWORKS, LOOPBACK_ADDRS, RESERVED_ADDRS, type Network } from './constants'
+import { stringToU8a, u8aToHex } from '../u8a/index.js'
+import {
+  PRIVATE_NETWORKS,
+  LINK_LOCAL_NETWORKS,
+  LOOPBACK_ADDRS,
+  RESERVED_ADDRS,
+  type Network,
+  PRIVATE_V4_CLASS_AVADO
+} from './constants.js'
 
 import { networkInterfaces, type NetworkInterfaceInfo } from 'os'
-import PeerId from 'peer-id'
-import { Multiaddr } from 'multiaddr'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { Multiaddr } from '@multiformats/multiaddr'
 
 /**
  * Checks if given address is any address
@@ -38,7 +45,12 @@ export function isLocalhost(address: Uint8Array, family: NetworkInterfaceInfo['f
  * @returns true if private address
  */
 export function isPrivateAddress(address: Uint8Array, family: NetworkInterfaceInfo['family']): boolean {
-  return checkNetworks(PRIVATE_NETWORKS, address, family)
+  // DAppnode/Avado consider 172.33.0.0/16 a private network
+  let priv_networks = PRIVATE_NETWORKS
+  if ((process.env.AVADO ?? 'false').toLowerCase() === 'true')
+    priv_networks = [...PRIVATE_NETWORKS, PRIVATE_V4_CLASS_AVADO]
+
+  return checkNetworks(priv_networks, address, family)
 }
 
 /**
@@ -288,5 +300,5 @@ export function getLocalHosts(_iface?: string): Network[] {
  * @param destination Destination peer ID
  */
 export function createCircuitAddress(relay: PeerId, destination: PeerId) {
-  return new Multiaddr(`/p2p/${relay.toB58String()}/p2p-circuit/p2p/${destination.toB58String()}`)
+  return new Multiaddr(`/p2p/${relay.toString()}/p2p-circuit/p2p/${destination.toString()}`)
 }

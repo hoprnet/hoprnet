@@ -1,10 +1,10 @@
 import { createBlank, createBindingRequest, generateTransactionId } from 'webrtc-stun'
 
 import type { Socket, RemoteInfo } from 'dgram'
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 import debug from 'debug'
 import { randomSubset, ipToU8aAddress, isLocalhost, isPrivateAddress } from '@hoprnet/hopr-utils'
-import { CODE_IP4, CODE_IP6, CODE_DNS4, CODE_DNS6 } from '../constants'
+import { CODE_IP4, CODE_IP6, CODE_DNS4, CODE_DNS6 } from '../constants.js'
 
 const log = debug('hopr-connect:stun:error')
 const error = debug('hopr-connect:stun:error')
@@ -245,7 +245,7 @@ function decodeIncomingSTUNResponses(addrs: Request[], socket: Socket, ms: numbe
         } selected STUN servers replied.`
       )
       done()
-    }, ms)
+    }, ms).unref()
 
     // Receiving a Buffer, not a Uint8Array
     listener = (msg: Buffer) => {

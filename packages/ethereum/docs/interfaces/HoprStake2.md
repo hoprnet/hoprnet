@@ -17,7 +17,6 @@
 - [\_wrappedEmits](HoprStake2.md#_wrappedemits)
 - [address](HoprStake2.md#address)
 - [callStatic](HoprStake2.md#callstatic)
-- [contractName](HoprStake2.md#contractname)
 - [deployTransaction](HoprStake2.md#deploytransaction)
 - [estimateGas](HoprStake2.md#estimategas)
 - [filters](HoprStake2.md#filters)
@@ -92,7 +91,7 @@ BaseContract.\_deployedPromise
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:98
+node_modules/@ethersproject/contracts/lib/index.d.ts:100
 
 ___
 
@@ -110,7 +109,7 @@ BaseContract.\_runningEvents
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:99
+node_modules/@ethersproject/contracts/lib/index.d.ts:101
 
 ___
 
@@ -128,7 +127,7 @@ BaseContract.\_wrappedEmits
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:102
+node_modules/@ethersproject/contracts/lib/index.d.ts:104
 
 ___
 
@@ -142,7 +141,7 @@ BaseContract.address
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:77
+node_modules/@ethersproject/contracts/lib/index.d.ts:79
 
 ___
 
@@ -194,17 +193,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:693
-
-___
-
-### contractName
-
-• **contractName**: ``"HoprStake2"``
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:352
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:759
 
 ___
 
@@ -218,7 +207,7 @@ BaseContract.deployTransaction
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:97
+node_modules/@ethersproject/contracts/lib/index.d.ts:99
 
 ___
 
@@ -270,7 +259,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:903
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:969
 
 ___
 
@@ -303,7 +292,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:840
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:906
 
 ___
 
@@ -355,7 +344,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:378
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:444
 
 ___
 
@@ -369,7 +358,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:357
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:423
 
 ___
 
@@ -383,7 +372,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:373
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:439
 
 ___
 
@@ -397,7 +386,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:374
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:440
 
 ___
 
@@ -411,7 +400,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:375
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:441
 
 ___
 
@@ -463,7 +452,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:1053
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:1119
 
 ___
 
@@ -477,7 +466,7 @@ BaseContract.provider
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:80
+node_modules/@ethersproject/contracts/lib/index.d.ts:82
 
 ___
 
@@ -491,7 +480,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/src/types/HoprStake2.ts:376
+packages/ethereum/src/types/contracts/stake/HoprStake2.ts:442
 
 ___
 
@@ -505,7 +494,7 @@ BaseContract.resolvedAddress
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:96
+node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ___
 
@@ -519,7 +508,7 @@ BaseContract.signer
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:79
+node_modules/@ethersproject/contracts/lib/index.d.ts:81
 
 ## Methods
 
@@ -537,10 +526,6 @@ node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:79
 
 `Promise`<`BigNumber`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:538
-
 ___
 
 ### BOOST\_CAP
@@ -556,10 +541,6 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:540
 
 ___
 
@@ -577,10 +558,6 @@ ___
 
 `Promise`<`BigNumber`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:542
-
 ___
 
 ### LOCK\_TOKEN
@@ -596,10 +573,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:544
 
 ___
 
@@ -617,10 +590,6 @@ ___
 
 `Promise`<`string`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:546
-
 ___
 
 ### PROGRAM\_END
@@ -636,10 +605,6 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:548
 
 ___
 
@@ -657,10 +622,6 @@ ___
 
 `Promise`<`BigNumber`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:550
-
 ___
 
 ### REWARD\_TOKEN
@@ -676,10 +637,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:552
 
 ___
 
@@ -701,10 +658,6 @@ ___
 
 BaseContract.\_checkRunningEvents
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:119
-
 ___
 
 ### \_deployed
@@ -724,10 +677,6 @@ ___
 #### Inherited from
 
 BaseContract.\_deployed
-
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:112
 
 ___
 
@@ -751,10 +700,6 @@ ___
 
 BaseContract.\_wrapEvent
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:120
-
 ___
 
 ### accounts
@@ -771,10 +716,6 @@ ___
 #### Returns
 
 `Promise`<[`BigNumber`, `BigNumber`, `BigNumber`, `BigNumber`] & { `actualLockedTokenAmount`: `BigNumber` ; `claimedRewards`: `BigNumber` ; `cumulatedRewards`: `BigNumber` ; `lastSyncTimestamp`: `BigNumber`  }\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:554
 
 ___
 
@@ -796,10 +737,6 @@ ___
 
 BaseContract.attach
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:354
-
 ___
 
 ### availableReward
@@ -815,10 +752,6 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:566
 
 ___
 
@@ -836,10 +769,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:568
 
 ___
 
@@ -861,10 +790,6 @@ ___
 
 BaseContract.connect
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:353
-
 ___
 
 ### deployed
@@ -878,10 +803,6 @@ ___
 #### Overrides
 
 BaseContract.deployed
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:355
 
 ___
 
@@ -904,10 +825,6 @@ ___
 
 BaseContract.emit
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:125
-
 ___
 
 ### fallback
@@ -928,10 +845,6 @@ ___
 
 BaseContract.fallback
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:113
-
 ___
 
 ### getCumulatedRewardsIncrement
@@ -948,10 +861,6 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:573
 
 ___
 
@@ -972,10 +881,6 @@ ___
 
 `Promise`<`boolean`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:578
-
 ___
 
 ### isNftTypeAndRankRedeemed2
@@ -994,10 +899,6 @@ ___
 #### Returns
 
 `Promise`<`boolean`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:585
 
 ___
 
@@ -1018,10 +919,6 @@ ___
 
 `Promise`<`boolean`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:592
-
 ___
 
 ### isNftTypeAndRankRedeemed4
@@ -1040,10 +937,6 @@ ___
 #### Returns
 
 `Promise`<`boolean`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:599
 
 ___
 
@@ -1064,10 +957,6 @@ ___
 #### Inherited from
 
 BaseContract.listenerCount
-
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:126
 
 ___
 
@@ -1095,10 +984,6 @@ ___
 
 BaseContract.listeners
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:365
-
 ▸ **listeners**(`eventName?`): `Listener`[]
 
 #### Parameters
@@ -1114,10 +999,6 @@ packages/ethereum/src/types/HoprStake2.ts:365
 #### Overrides
 
 BaseContract.listeners
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:368
 
 ___
 
@@ -1139,10 +1020,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:606
-
 ___
 
 ### onTokenTransfer
@@ -1162,10 +1039,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:614
-
 ___
 
 ### owner
@@ -1181,10 +1054,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:621
 
 ___
 
@@ -1214,10 +1083,6 @@ ___
 
 BaseContract.queryFilter
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:359
-
 ___
 
 ### reclaimErc20Tokens
@@ -1234,10 +1099,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:623
 
 ___
 
@@ -1257,10 +1118,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:628
-
 ___
 
 ### redeemedFactor
@@ -1279,10 +1136,6 @@ ___
 
 `Promise`<`BigNumber`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:634
-
 ___
 
 ### redeemedFactorIndex
@@ -1299,10 +1152,6 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:640
 
 ___
 
@@ -1322,10 +1171,6 @@ ___
 
 `Promise`<`BigNumber`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:645
-
 ___
 
 ### redeemedNftIndex
@@ -1342,10 +1187,6 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:651
 
 ___
 
@@ -1373,10 +1214,6 @@ ___
 
 BaseContract.removeAllListeners
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:369
-
 ▸ **removeAllListeners**(`eventName?`): [`HoprStake2`](HoprStake2.md)
 
 #### Parameters
@@ -1393,10 +1230,6 @@ packages/ethereum/src/types/HoprStake2.ts:369
 
 BaseContract.removeAllListeners
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:372
-
 ___
 
 ### renounceOwnership
@@ -1412,10 +1245,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:653
 
 ___
 
@@ -1434,10 +1263,6 @@ ___
 
 `Promise`<`BigNumber`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:657
-
 ___
 
 ### sync
@@ -1454,10 +1279,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:662
 
 ___
 
@@ -1481,10 +1302,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:667
-
 ___
 
 ### totalLocked
@@ -1500,10 +1317,6 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:677
 
 ___
 
@@ -1522,10 +1335,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:679
-
 ___
 
 ### unlock
@@ -1541,10 +1350,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:684
 
 ___
 
@@ -1562,7 +1367,3 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprStake2.ts:688

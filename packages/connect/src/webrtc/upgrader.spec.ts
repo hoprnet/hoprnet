@@ -1,12 +1,12 @@
 import { EventEmitter } from 'events'
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 
 import assert from 'assert'
 
-import { MAX_STUN_SERVERS, multiaddrToIceServer, WebRTCUpgrader } from './upgrader'
-import type { PublicNodesEmitter, PeerStoreType } from '../types'
-import { createPeerId } from '../base/utils.spec'
-import type PeerId from 'peer-id'
+import { MAX_STUN_SERVERS, multiaddrToIceServer, WebRTCUpgrader } from './upgrader.js'
+import type { PublicNodesEmitter, PeerStoreType } from '../types.js'
+import { createPeerId } from '../base/utils.spec.js'
+import type { PeerId } from '@libp2p/interface-peer-id'
 
 async function getPeerStoreEntry(addr: string): Promise<PeerStoreType> {
   return {
@@ -112,7 +112,7 @@ describe('webrtc upgrader', function () {
     webRTCUpgrader.start()
 
     const peerId = createPeerId()
-    const invalidMultiaddr = new Multiaddr(`/ip4/1.2.3.4/p2p/${peerId.toB58String()}`)
+    const invalidMultiaddr = new Multiaddr(`/ip4/1.2.3.4/p2p/${peerId.toString()}`)
 
     publicNodes.emit(`addPublicNode`, { id: peerId, multiaddrs: [invalidMultiaddr] })
 
@@ -170,7 +170,7 @@ describe('webrtc upgrader', function () {
     const peerIds: PeerId[] = []
     for (let i = 0; i < ATTEMPTS; i++) {
       const peerId = createPeerId()
-      const multiaddr = new Multiaddr(`/ip4/1.2.3.4/udp/${i}/p2p/${peerId.toB58String()}`)
+      const multiaddr = new Multiaddr(`/ip4/1.2.3.4/udp/${i}/p2p/${peerId.toString()}`)
       peerIds.push(peerId)
 
       publicNodes.emit(`addPublicNode`, { id: peerId, multiaddrs: [multiaddr] })

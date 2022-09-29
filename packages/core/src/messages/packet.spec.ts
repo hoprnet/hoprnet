@@ -1,7 +1,7 @@
 import { HoprDB, UINT256, u8aEquals, Balance, u8aToHex } from '@hoprnet/hopr-utils'
 import { PRICE_PER_PACKET } from '@hoprnet/hopr-utils'
-import { Packet, INTERMEDIATE_HOPS } from './packet'
-import PeerId from 'peer-id'
+import { Packet, INTERMEDIATE_HOPS } from './packet.js'
+import { createSecp256k1PeerId } from '@libp2p/peer-id-factory'
 import assert from 'assert'
 import BN from 'bn.js'
 
@@ -37,9 +37,7 @@ function createMockTickets() {
 describe('packet creation and transformation', function () {
   it('create packet and transform it', async function () {
     const AMOUNT = INTERMEDIATE_HOPS + 1
-    const [self, ...path] = await Promise.all(
-      Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
-    )
+    const [self, ...path] = await Promise.all(Array.from({ length: AMOUNT }).map(createSecp256k1PeerId))
     const { db } = createMockTickets()
     const testMsg = new TextEncoder().encode('test')
     let packet = await Packet.create(testMsg, path, self, db)
@@ -62,9 +60,7 @@ describe('packet creation and transformation', function () {
 
   it('create packet and transform it - reduced path', async function () {
     const AMOUNT = INTERMEDIATE_HOPS
-    const [self, ...path] = await Promise.all(
-      Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
-    )
+    const [self, ...path] = await Promise.all(Array.from({ length: AMOUNT }).map(createSecp256k1PeerId))
     const { db } = createMockTickets()
     const testMsg = new TextEncoder().encode('test')
     let packet = await Packet.create(testMsg, path, self, db)
@@ -90,9 +86,7 @@ describe('packet creation and transformation', function () {
 
   it('create packet and transform it - zero hop', async function () {
     const AMOUNT = 2
-    const [self, ...path] = await Promise.all(
-      Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
-    )
+    const [self, ...path] = await Promise.all(Array.from({ length: AMOUNT }).map(createSecp256k1PeerId))
 
     const { db } = createMockTickets()
     const testMsg = new TextEncoder().encode('test')
@@ -119,9 +113,7 @@ describe('packet creation and transformation', function () {
 
   it('create packet and transform it - false positives', async function () {
     const AMOUNT = INTERMEDIATE_HOPS + 1
-    const [self, ...path] = await Promise.all(
-      Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
-    )
+    const [self, ...path] = await Promise.all(Array.from({ length: AMOUNT }).map(createSecp256k1PeerId))
     const { db } = createMockTickets()
     const testMsg = new TextEncoder().encode('test')
     const packet = await Packet.create(testMsg, path, self, db)

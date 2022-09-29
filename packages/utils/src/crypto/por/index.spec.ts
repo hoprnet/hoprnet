@@ -6,12 +6,12 @@ import {
   validatePoRHalfKeys,
   validatePoRHint,
   validatePoRResponse
-} from '.'
-import { Response } from '../../types'
+} from './index.js'
+import { Response } from '../../types/index.js'
 import { randomBytes } from 'crypto'
-import { deriveAckKeyShare } from './keyDerivation'
+import { deriveAckKeyShare } from './keyDerivation.js'
 import assert from 'assert'
-import { SECRET_LENGTH } from './constants'
+import { SECRET_LENGTH } from './constants.js'
 
 describe('PoR - proof of relay', function () {
   it('generate PoR string, preVerify, validate', function () {

@@ -1,6 +1,7 @@
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
-import PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import { STATUS_CODES } from '../../utils.js'
 
 /**
@@ -10,7 +11,7 @@ import { STATUS_CODES } from '../../utils.js'
 export const ping = async ({ node, peerId }: { node: Hopr; peerId: string }) => {
   let validPeerId: PeerId
   try {
-    validPeerId = PeerId.createFromB58String(peerId)
+    validPeerId = peerIdFromString(peerId)
   } catch (err) {
     throw Error(STATUS_CODES.INVALID_PEERID)
   }
@@ -24,17 +25,18 @@ export const ping = async ({ node, peerId }: { node: Hopr; peerId: string }) => 
     error = err
   }
 
+  if (error && error.message) {
+    throw error
+  }
+
   if (pingResult.latency >= 0) {
     return { latency: pingResult.latency }
   }
 
-  if (error && error.message) {
-    throw error
-  }
   throw Error(STATUS_CODES.TIMEOUT)
 }
 
-export const POST: Operation = [
+const POST: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
     const { peerId } = req.body
@@ -42,11 +44,13 @@ export const POST: Operation = [
     try {
       const pingRes = await ping({ peerId, node })
       return res.status(200).send(pingRes)
-    } catch (error) {
-      if (STATUS_CODES[error.message]) {
-        return res.status(422).send({ status: STATUS_CODES[error.message] })
+    } catch (err) {
+      const errString = err instanceof Error ? err.message : 'Unknown error'
+
+      if (STATUS_CODES[errString]) {
+        return res.status(422).send({ status: STATUS_CODES[errString] })
       } else {
-        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
+        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: errString })
       }
     }
   }
@@ -106,7 +110,7 @@ POST.apiDoc = {
       }
     },
     '422': {
-      description: `Timout, node with specified PeerId didn't respond in time.`,
+      description: `An error occured (see error details) or timeout - node with specified PeerId didn't respond in time.`,
       content: {
         'application/json': {
           schema: {
@@ -118,3 +122,5 @@ POST.apiDoc = {
     }
   }
 }
+
+export default { POST }

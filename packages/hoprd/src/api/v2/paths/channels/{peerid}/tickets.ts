@@ -1,15 +1,15 @@
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
-import PeerId from 'peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import { STATUS_CODES } from '../../../utils.js'
 import { formatTicket } from '../../tickets/index.js'
 
 export const getTickets = async (node: Hopr, peerId: string) => {
-  const tickets = await node.getTickets(PeerId.createFromB58String(peerId))
+  const tickets = await node.getTickets(peerIdFromString(peerId))
   return tickets.map(formatTicket)
 }
 
-export const GET: Operation = [
+const GET: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
     const { peerid } = req.params
@@ -21,7 +21,9 @@ export const GET: Operation = [
       }
       return res.status(200).send(tickets)
     } catch (err) {
-      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+      return res
+        .status(422)
+        .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 ]
@@ -102,3 +104,5 @@ GET.apiDoc = {
     }
   }
 }
+
+export default { GET }

@@ -1,76 +1,76 @@
 {
   "name": "@hoprnet/hopr-utils",
   "description": "HOPR-based utilities to process multiple data structures",
-  "version": "1.89.0-next.21",
+  "version": "1.90.16",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
   "types": "lib/index.d.ts",
   "main": "lib/index.js",
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
     "clean:wasm": "make -C crates clean",
     "build:wasm": "make -C crates all && make -C crates install",
     "test:wasm": "make -C crates test",
-    "clean": "yarn clean:wasm && rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
-    "test": "yarn test:wasm && mocha --parallel",
+    "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo",
+    "test": "yarn test:wasm && mocha",
     "dev": "yarn clean && yarn build:wasm && tsc -w",
     "build": "yarn clean && yarn build:wasm && tsc -p .",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },
   "engines": {
-    "node": "14 || 16"
+    "node": ">=16.15"
   },
   "files": [
     "lib"
   ],
   "dependencies": {
+    "@ethersproject/wallet": "5.7.0",
+    "@hoprnet/hopr-real": "workspace:packages/real",
+    "@libp2p/crypto": "1.0.0",
+    "@libp2p/peer-id": "1.1.13",
+    "@multiformats/multiaddr": "10.3.3",
     "abort-controller": "~3.0.0",
     "bignumber.js": "9.0.2",
     "bn.js": "5.2.0",
-    "chalk": "4.1.2",
+    "chalk": "5.0.1",
     "debug": "4.3.4",
-    "ethers": "5.5.4",
+    "ethers": "5.7.0",
     "futoin-hkdf": "1.5.0",
     "hjson": "3.2.2",
-    "it-pipe": "1.1.0",
+    "it-pipe": "2.0.3",
     "jsonschema": "1.4.0",
     "leveldown": "6.1.1",
     "levelup": "5.1.1",
-    "libp2p-crypto": "0.21.2",
     "memdown": "6.1.1",
-    "multiaddr": "10.0.1",
-    "multiformats": "^9.4.5",
-    "multihashes": "4.0.3",
-    "peer-id": "0.16.0",
-    "pino": "7.8.0",
-    "pino-logflare": "0.3.12",
+    "multiformats": "9.6.5",
     "secp256k1": "4.0.3"
   },
   "devDependencies": {
-    "@chainsafe/libp2p-noise": "5.0.3",
-    "@types/mocha": "9.1.0",
-    "@types/pino": "7.0.4",
+    "@chainsafe/libp2p-noise": "7.0.3",
+    "@libp2p/interface-connection": "1.0.1",
+    "@libp2p/interface-connection-manager": "1.0.0",
+    "@libp2p/interface-keys": "1.0.3",
+    "@libp2p/interface-peer-id": "1.0.4",
+    "@libp2p/interface-peer-store": "1.0.0",
+    "@libp2p/kad-dht": "1.0.16",
+    "@libp2p/mplex": "1.2.1",
+    "@libp2p/peer-id-factory": "1.0.18",
+    "@libp2p/tcp": "1.0.11",
+    "@types/chai": "4.3.3",
+    "@types/mocha": "9.1.1",
     "bl": "5.0.0",
     "chai": "4.3.6",
-    "libp2p": "0.36.2",
-    "libp2p-kad-dht": "0.28.6",
-    "libp2p-mplex": "0.10.7",
-    "libp2p-tcp": "0.17.2",
+    "libp2p": "0.37.3",
     "mocha": "9.2.2",
     "rewiremock": "3.14.3",
-    "rimraf": "3.0.2",
     "sinon": "12.0.1",
-    "typedoc": "0.22.13",
-    "typedoc-plugin-markdown": "3.11.14"
+    "typedoc": "0.23.2",
+    "typedoc-plugin-markdown": "3.13.1",
+    "typescript": "4.7.4"
   },
   "mocha": {
-    "extension": [
-      "ts"
-    ],
-    "spec": "src/**/*.spec.ts",
-    "require": "ts-node/register"
-  },
-  "stableVersion": "1.76.0-next.30"
+    "spec": "lib/**/*.spec.js"
+  }
 }

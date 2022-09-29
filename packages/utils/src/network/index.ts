@@ -1,3 +1,3 @@
-export * from './addrs'
-export * from './constants'
-export * from './hosts'
+export * from './addrs.js'
+export * from './constants.js'
+export * from './hosts.js'

@@ -1,25 +1,27 @@
 import type { Operation } from 'express-openapi'
-import PeerId from 'peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import { PublicKey } from '@hoprnet/hopr-utils'
-import { encodeMessage } from '../../../../commands/utils/index.js'
 import { STATUS_CODES } from '../../utils.js'
+import { encodeMessage } from '../../../utils.js'
 
-export const POST: Operation = [
+const POST: Operation = [
   async (req, res, _next) => {
     const message = encodeMessage(req.body.body)
-    const recipient: PeerId = PeerId.createFromB58String(req.body.recipient)
+    const recipient = peerIdFromString(req.body.recipient)
 
     // only set path if given, otherwise a path will be chosen by hopr core
     let path: PublicKey[]
     if (req.body.path != undefined) {
-      path = req.body.path.map((peer) => PublicKey.fromPeerId(PeerId.createFromB58String(peer)))
+      path = req.body.path.map((peer: string) => PublicKey.fromPeerId(peerIdFromString(peer)))
     }
 
     try {
-      await req.context.node.sendMessage(message, recipient, path)
-      res.status(204).send()
+      let ackChallenge = await req.context.node.sendMessage(message, recipient, path)
+      return res.status(202).json(ackChallenge)
     } catch (err) {
-      res.status(422).json({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+      return res
+        .status(422)
+        .json({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 ]
@@ -66,8 +68,17 @@ POST.apiDoc = {
     }
   },
   responses: {
-    '204': {
-      description: 'The message was sent successfully. NOTE: This does not imply successful delivery.'
+    '202': {
+      description: 'The message was sent successfully. NOTE: This does not imply successful delivery.',
+      content: {
+        'application/json': {
+          schema: {
+            type: 'string',
+            description: 'Challenge token used to poll for the acknowledgment of the sent message by the first hop.',
+            example: 'e61bbdda74873540c7244fe69c39f54e5270bd46709c1dcb74c8e3afce7b9e616d'
+          }
+        }
+      }
     },
     '422': {
       description: 'Unknown failure.',
@@ -86,3 +97,5 @@ POST.apiDoc = {
     }
   }
 }
+
+export default { POST }

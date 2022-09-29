@@ -1,29 +1,31 @@
 /*
  * Add a more usable API on top of LibP2P
  */
-import PeerId from 'peer-id'
-import { keys, PublicKey } from 'libp2p-crypto'
-import multihashes from 'multihashes'
-import type { Connection, MuxedStream } from 'libp2p'
-import type LibP2P from 'libp2p'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import type { PublicKey } from '@libp2p/interface-keys'
+import type { Components } from '@libp2p/interfaces/components'
+import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
 
-import { debug } from '../process'
-import pipe from 'it-pipe'
-import { dial, type DialOpts } from './dialHelper'
+import { keys } from '@libp2p/crypto'
+import { peerIdFromString } from '@libp2p/peer-id'
 
-export * from './addressSorters'
-export * from './dialHelper'
-export * from './pickVersion'
-export * from './pubKeyToPeerId'
-export * from './privKeyToPeerId'
-export * from './relayCode'
-export * from './verifySignatureFromPeerId'
+import { debug } from '../process/index.js'
+import { pipe } from 'it-pipe'
+import { dial, type DialOpts } from './dialHelper.js'
+
+export * from './addressSorters.js'
+export * from './dialHelper.js'
+export * from './pickVersion.js'
+export * from './pubKeyToPeerId.js'
+export * from './privKeyToPeerId.js'
+export * from './relayCode.js'
+export * from './verifySignatureFromPeerId.js'
 
 /**
  * Regular expresion used to match b58Strings
  *
  */
-export const b58StringRegex = /16Uiu2HA[A-Za-z0-9]{1,45}/i
+export const b58StringRegex = /16Uiu2HA[A-Za-z0-9]{45}/i
 
 /**
  * Takes a peerId and returns its corresponding public key.
@@ -31,24 +33,24 @@ export const b58StringRegex = /16Uiu2HA[A-Za-z0-9]{1,45}/i
  * @param peerId the PeerId used to generate a public key
  */
 export function convertPubKeyFromPeerId(peerId: PeerId): PublicKey {
-  return keys.unmarshalPublicKey(multihashes.decode(peerId.toBytes()).digest)
+  return keys.unmarshalPublicKey(peerId.publicKey)
 }
 
 /**
  *
  * Takes a B58String and converts them to a PublicKey
  *
- * @param string the B58String used to represent the PeerId
+ * @param b58string the B58String used to represent the PeerId
  */
 export function convertPubKeyFromB58String(b58string: string): PublicKey {
-  return convertPubKeyFromPeerId(PeerId.createFromB58String(b58string))
+  return convertPubKeyFromPeerId(peerIdFromString(b58string))
 }
 
 /**
  *
  * Returns true or false if given string does not contain a b58string
  *
- * @param string arbitrary content with maybe a b58string
+ * @param content arbitrary content with maybe a b58string
  */
 export function hasB58String(content: string): Boolean {
   const hasMatcheableContent = content.match(b58StringRegex)
@@ -65,13 +67,13 @@ export function hasB58String(content: string): Boolean {
  *
  * Returns the b58String within a given content. Returns empty string if none is found.
  *
- * @param string arbitrary content with maybe a b58string
+ * @param content arbitrary content with maybe a b58string
  */
 export function getB58String(content: string): string {
   const hasMatcheableContent = content.match(b58StringRegex)
   if (hasMatcheableContent) {
     const [maybeB58String] = hasMatcheableContent
-    const b58String = maybeB58String.substr(0, 53)
+    const b58String = maybeB58String.substring(0, 53)
     return b58String
   } else {
     return ''
@@ -84,9 +86,7 @@ export function getB58String(content: string): string {
  * @returns whether embedded privKey is a secp256k1 key
  */
 export function isSecp256k1PeerId(peer: PeerId): boolean {
-  const decoded = keys.keysPBM.PrivateKey.decode(peer.privKey.bytes)
-
-  return decoded.Type == keys.keysPBM.KeyType.Secp256k1
+  return peer.type === 'secp256k1'
 }
 
 const logError = debug(`hopr-core:libp2p:error`)
@@ -103,7 +103,7 @@ const logError = debug(`hopr-core:libp2p:error`)
  */
 
 export type libp2pSendMessage = ((
-  libp2p: LibP2P,
+  components: Components,
   destination: PeerId,
   protocol: string,
   message: Uint8Array,
@@ -111,7 +111,7 @@ export type libp2pSendMessage = ((
   opts?: DialOpts
 ) => Promise<void>) &
   ((
-    libp2p: LibP2P,
+    components: Components,
     destination: PeerId,
     protocol: string,
     message: Uint8Array,
@@ -120,14 +120,15 @@ export type libp2pSendMessage = ((
   ) => Promise<Uint8Array[]>)
 
 export async function libp2pSendMessage(
-  libp2p: LibP2P,
+  components: Components,
   destination: PeerId,
   protocol: string,
   message: Uint8Array,
   includeReply: boolean,
   opts?: DialOpts
 ): Promise<void | Uint8Array[]> {
-  const r = await dial(libp2p, destination, protocol, opts)
+  // Components is not part of interface
+  const r = await dial(components, destination, protocol, opts)
 
   if (r.status !== 'SUCCESS') {
     logError(r)
@@ -142,7 +143,7 @@ export async function libp2pSendMessage(
       async function collect(source: AsyncIterable<any>) {
         const vals = []
         for await (const val of source) {
-          // Convert from BufferList to Uint8Array
+          // Convert from potential BufferList to Uint8Array
           vals.push(Uint8Array.from(val.slice()))
         }
         return vals
@@ -164,7 +165,7 @@ export async function libp2pSendMessage(
  *  interact with - this function simply allows us to assign a handler
  *  function that is called on each 'message' of the stream.
  */
-export type LibP2PHandlerArgs = { connection: Connection; stream: MuxedStream; protocol: string }
+export type LibP2PHandlerArgs = { connection: Connection; stream: ProtocolStream['stream']; protocol: string }
 export type LibP2PHandlerFunction<T> = (msg: Uint8Array, remotePeer: PeerId) => T
 
 type HandlerFunction<T> = (props: LibP2PHandlerArgs) => T
@@ -197,10 +198,11 @@ function generateHandler(
           props.stream,
           async function* pipeToHandler(source: AsyncIterable<Uint8Array>) {
             for await (const msg of source) {
-              // Convert from BufferList to Uint8Array
+              // Convert from potential BufferList to Uint8Array
               yield await handlerFunction(Uint8Array.from(msg.slice()), props.connection.remotePeer)
             }
           },
+          // @fixme correct type
           props.stream
         )
       } catch (err) {
@@ -222,7 +224,7 @@ function generateHandler(
         props.stream,
         async function collect(source: AsyncIterable<Uint8Array>) {
           for await (const msg of source) {
-            // Convert from BufferList to Uint8Array
+            // Convert from potential BufferList to Uint8Array
             await handlerFunction(Uint8Array.from(msg.slice()), props.connection.remotePeer)
           }
         }
@@ -242,14 +244,14 @@ function generateHandler(
  */
 
 export type libp2pSubscribe = ((
-  libp2p: LibP2P,
+  components: Components,
   protocol: string,
   handler: LibP2PHandlerFunction<Promise<void> | void>,
   errHandler: ErrHandler,
   includeReply: false
 ) => void) &
   ((
-    libp2p: LibP2P,
+    components: Components,
     protocol: string,
     handler: LibP2PHandlerFunction<Promise<Uint8Array>>,
     errHandler: ErrHandler,
@@ -257,11 +259,11 @@ export type libp2pSubscribe = ((
   ) => void)
 
 export async function libp2pSubscribe(
-  libp2p: LibP2P,
+  components: Components,
   protocol: string,
   handler: LibP2PHandlerFunction<Promise<void | Uint8Array> | void>,
   errHandler: ErrHandler,
   includeReply = false
 ): Promise<void> {
-  await libp2p.handle([protocol], generateHandler(handler, errHandler, includeReply))
+  await components.getRegistrar().handle([protocol], generateHandler(handler, errHandler, includeReply))
 }

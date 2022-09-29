@@ -1,4 +1,4 @@
-import { FIFO } from '../collection'
+import { FIFO } from '../collection/index.js'
 
 type Item<T> = {
   index: number

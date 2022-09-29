@@ -1,5 +1,5 @@
-import { serializeKeyPair, deserializeKeyPair } from './keyPair'
-import { privKeyToPeerId, stringToU8a, u8aEquals } from '..'
+import { serializeKeyPair, deserializeKeyPair } from './keyPair.js'
+import { privKeyToPeerId, stringToU8a, u8aEquals } from '../index.js'
 import assert from 'assert'
 
 describe('Identity', function () {

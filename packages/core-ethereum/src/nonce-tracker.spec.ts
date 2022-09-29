@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import NonceTracker, { Transaction } from './nonce-tracker'
+import NonceTracker, { Transaction } from './nonce-tracker.js'
 import { durations, Address } from '@hoprnet/hopr-utils'
 import { BigNumber } from 'ethers'
 
@@ -278,7 +278,14 @@ describe('nonce-tracker', function () {
 
 const genTx = (opts: { nonce: number; createdAt?: number }): Transaction => {
   const { createdAt = new Date().getTime() } = opts
-  return { ...opts, from: USER_ADDRESS.toHex(), createdAt, maxPrority: MAX_PRIORITY_FEE }
+  return {
+    ...opts,
+    from: USER_ADDRESS.toHex(),
+    createdAt,
+    maxPriority: MAX_PRIORITY_FEE,
+    maxFeePerGas: BigNumber.from(10e9),
+    gasLimit: BigNumber.from(400e3)
+  }
 }
 
 const genMultiTx = (opts: {

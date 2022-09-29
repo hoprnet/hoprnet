@@ -1,15 +1,15 @@
-import { createRoutingInfo, forwardTransform } from './routingInfo'
-import type { RelayNodeOutput } from './routingInfo'
-import { generateKeyShares } from './keyShares'
-import PeerId from 'peer-id'
-import { u8aEquals } from '../../u8a'
+import { createRoutingInfo, forwardTransform, type RelayNodeOutput } from './routingInfo.js'
+import { generateKeyShares } from './keyShares.js'
+import { createSecp256k1PeerId } from '@libp2p/peer-id-factory'
+import { unmarshalPublicKey } from '@libp2p/crypto/keys'
+import { u8aEquals } from '../../u8a/index.js'
 import assert from 'assert'
 
 describe('routing info generation and mutation', function () {
   it('generate routing info and transform it', async function () {
     const AMOUNT = 3
 
-    const peerIds = await Promise.all(Array.from({ length: AMOUNT }, (_) => PeerId.create({ keyType: 'secp256k1' })))
+    const peerIds = await Promise.all(Array.from({ length: AMOUNT }, (_) => createSecp256k1PeerId()))
 
     const { secrets } = generateKeyShares(peerIds)
     const maxHops = 3
@@ -38,7 +38,7 @@ describe('routing info generation and mutation', function () {
       if (i < secrets.length - 1) {
         assert(transformedOutput.lastNode == false)
 
-        assert(u8aEquals(peerIds[i + 1].pubKey.marshal(), transformedOutput.nextNode))
+        assert(u8aEquals(unmarshalPublicKey(peerIds[i + 1].publicKey).marshal(), transformedOutput.nextNode))
       } else {
         assert(transformedOutput.lastNode == true)
 
@@ -50,7 +50,7 @@ describe('routing info generation and mutation', function () {
   it('generate routing info and transform it - reduced path', async function () {
     const AMOUNT = 2
 
-    const peerIds = await Promise.all(Array.from({ length: AMOUNT }, (_) => PeerId.create({ keyType: 'secp256k1' })))
+    const peerIds = await Promise.all(Array.from({ length: AMOUNT }, (_) => createSecp256k1PeerId()))
 
     const { secrets } = generateKeyShares(peerIds)
     const maxHops = 3
@@ -78,7 +78,7 @@ describe('routing info generation and mutation', function () {
       if (i < secrets.length - 1) {
         assert(transformedOutput.lastNode == false)
 
-        assert(u8aEquals(peerIds[i + 1].pubKey.marshal(), transformedOutput.nextNode))
+        assert(u8aEquals(unmarshalPublicKey(peerIds[i + 1].publicKey).marshal(), transformedOutput.nextNode))
       } else {
         assert(transformedOutput.lastNode == true)
 
@@ -90,7 +90,7 @@ describe('routing info generation and mutation', function () {
   it('generate routing info and transform it - zero hop (no filler)', async function () {
     const AMOUNT = 1
 
-    const peerIds = await Promise.all(Array.from({ length: AMOUNT }, (_) => PeerId.create({ keyType: 'secp256k1' })))
+    const peerIds = await Promise.all(Array.from({ length: AMOUNT }, (_) => createSecp256k1PeerId()))
 
     const { secrets } = generateKeyShares(peerIds)
     const maxHops = 3
@@ -119,7 +119,12 @@ describe('routing info generation and mutation', function () {
       if (i < secrets.length - 1) {
         assert(transformedOutput.lastNode == false)
 
-        assert(u8aEquals(peerIds[i + 1].pubKey.marshal(), (transformedOutput as RelayNodeOutput).nextNode))
+        assert(
+          u8aEquals(
+            unmarshalPublicKey(peerIds[i + 1].publicKey).marshal(),
+            (transformedOutput as RelayNodeOutput).nextNode
+          )
+        )
       } else {
         assert(transformedOutput.lastNode == true)
 

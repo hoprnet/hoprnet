@@ -1,13 +1,14 @@
-import { u8aEquals, u8aXOR } from '../../u8a'
-import { derivePRGParameters } from './keyDerivation'
-import { MAC_LENGTH, END_PREFIX, END_PREFIX_LENGTH, SECRET_LENGTH } from './constants'
-import { SECP256K1_CONSTANTS } from '../constants'
+import { u8aEquals, u8aXOR } from '../../u8a/index.js'
+import { derivePRGParameters } from './keyDerivation.js'
+import { MAC_LENGTH, END_PREFIX, END_PREFIX_LENGTH, SECRET_LENGTH } from './constants.js'
+import { SECP256K1_CONSTANTS } from '../constants.js'
 import { randomFillSync } from 'crypto'
-import { PRG } from '../prg'
-import { generateFiller } from './filler'
-import { createMAC } from './mac'
-import { publicKeyVerify } from 'secp256k1'
-import type PeerId from 'peer-id'
+import { PRG } from '../prg.js'
+import { generateFiller } from './filler.js'
+import { createMAC } from './mac.js'
+import secp256k1 from 'secp256k1'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { unmarshalPublicKey } from '@libp2p/crypto/keys'
 
 /**
  * Creates the routing information of the mixnet packet
@@ -79,7 +80,7 @@ export function createRoutingInfo(
       extendedHeader.copyWithin(routingInfoLength, 0, headerLength)
 
       // Add pubkey of next downstream node
-      extendedHeader.set(path[invIndex + 1].pubKey.marshal())
+      extendedHeader.set(unmarshalPublicKey(path[invIndex + 1].publicKey).marshal())
 
       extendedHeader.set(mac, SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH)
 
@@ -169,7 +170,7 @@ export function forwardTransform(
     SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH + additionalDataRelayerLength
   )
 
-  if (!publicKeyVerify(nextHop)) {
+  if (!secp256k1.publicKeyVerify(nextHop)) {
     throw Error(`Blinding of the group element failed. Result is not a valid curve point.`)
   }
 

@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { findPath } from '.'
+import { findPath } from './index.js'
 import BN from 'bn.js'
 import { Balance, type ChannelEntry, PublicKey } from '@hoprnet/hopr-utils'
 

@@ -9,10 +9,11 @@ import type {
 } from 'hardhat/types'
 // load env variables
 require('dotenv').config()
+// adds Ethereum-specific capabilities to the Chai assertion library
+import '@nomicfoundation/hardhat-chai-matchers'
 // load hardhat plugins
 import '@nomiclabs/hardhat-ethers'
 import '@nomiclabs/hardhat-solhint'
-import '@nomiclabs/hardhat-waffle'
 import 'hardhat-deploy'
 import 'hardhat-gas-reporter'
 import '@nomiclabs/hardhat-etherscan'
@@ -21,31 +22,73 @@ import '@typechain/hardhat'
 import faucet, { type FaucetCLIOPts } from './tasks/faucet'
 import parallelTest, { type ParallelTestCLIOpts } from './tasks/parallelTest'
 import register, { type RegisterOpts } from './tasks/register'
+import selfRegister, { type SelfRegisterOpts } from './tasks/selfRegister'
+import requestTestTokens, { type RequestTestTokensOpts } from './tasks/requestTestTokens'
+import disableAutoMine from './tasks/disableAutoMine'
 import getAccounts from './tasks/getAccounts'
+import type { NetworkOptions } from './types'
 
-import { expandVars } from '@hoprnet/hopr-utils'
-import type { ResolvedEnvironment } from '@hoprnet/hopr-core'
+// Copied from `utils` to prevent from ESM import issues
+// ESM support requires code changes within `hardhat-core`
+/**
+ *
+ * @param input a string containing templated references to environment variables e.g. 'foo ${bar}'
+ * @param vars a key-value vars storage object, e.g. { 'bar': 'bar_value' }
+ * @returns a string with variables resolved to the actual values
+ */
+export function expandVars(input: string, vars: { [key: string]: any }) {
+  return input.replace(/\$\{(.*)\}/g, (_, varName) => {
+    if (!(varName in vars)) {
+      throw new Error(`failed to expand vars in string '${input}', var ${varName} not defined`)
+    }
+    return vars[varName]
+  })
+}
 
 // rest
 import { task, types, extendEnvironment, subtask } from 'hardhat/config'
 import { writeFileSync, realpathSync } from 'fs'
 import { TASK_TEST_SETUP_TEST_ENVIRONMENT } from 'hardhat/builtin-tasks/task-names'
 import { HARDHAT_NETWORK_NAME } from 'hardhat/plugins'
-import { TASK_DEPLOY_RUN_DEPLOY } from 'hardhat-deploy'
+import stake, { StakeOpts } from './tasks/stake'
+import { NetworkRegistryNftRank, MIN_STAKE } from './utils/constants'
+import type { BigNumber } from 'ethers'
 
-const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, HOPR_ENVIRONMENT_ID, HOPR_HARDHAT_TAG } = process.env
+const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, BLOCKSCOUT_KEY, HOPR_ENVIRONMENT_ID, HOPR_HARDHAT_TAG } =
+  process.env
 
 const PROTOCOL_CONFIG = require('../core/protocol-config.json')
 
+function ethereumUnitToNumberString(fee: string, hre: HardhatRuntimeEnvironment): BigNumber {
+  const parsedGasPrice = fee.split(' ')
+
+  let gasPrice: BigNumber
+  if (parsedGasPrice.length > 1) {
+    gasPrice = hre.ethers.BigNumber.from(hre.ethers.utils.parseUnits(parsedGasPrice[0], parsedGasPrice[1]).toString())
+  } else {
+    gasPrice = hre.ethers.BigNumber.from(parsedGasPrice[0])
+  }
+
+  return gasPrice
+}
+
 extendEnvironment((hre: HardhatRuntimeEnvironment) => {
-  hre.environment = HOPR_ENVIRONMENT_ID
+  hre.environment = HOPR_ENVIRONMENT_ID as string
+  hre.maxFeePerGas = ethereumUnitToNumberString(
+    (PROTOCOL_CONFIG.networks[hre.network.name] as NetworkOptions).max_fee_per_gas,
+    hre
+  )
+  hre.maxPriorityFeePerGas = ethereumUnitToNumberString(
+    (PROTOCOL_CONFIG.networks[hre.network.name] as NetworkOptions).max_priority_fee_per_gas,
+    hre
+  )
 })
 
 // For reference on how the configuration is structured refer to:
 //
 // https://hardhat.org/hardhat-network/reference/#config
 // https://github.com/wighawag/hardhat-deploy/blob/master/README.md
-function networkToHardhatNetwork(name: String, input: ResolvedEnvironment['network']): NetworkUserConfig {
+function networkToHardhatNetwork(name: String, input: NetworkOptions): NetworkUserConfig {
   let cfg: NetworkUserConfig = {
     chainId: input.chain_id,
     live: input.live,
@@ -75,6 +118,7 @@ function networkToHardhatNetwork(name: String, input: ResolvedEnvironment['netwo
   }
   if (cfg.tags && cfg.tags.indexOf('development') >= 0) {
     ;(cfg as HardhatNetworkUserConfig).mining = {
+      // Disabled using hardhat-specific RPC call after deployment
       auto: true, // every transaction will trigger a new block (without this deployments fail)
       interval: [1000, 3000] // mine new block every 1 - 3s
     }
@@ -91,12 +135,16 @@ function networkToHardhatNetwork(name: String, input: ResolvedEnvironment['netwo
 
 const networks: NetworksUserConfig = {}
 
-for (const [networkId, network] of Object.entries<ResolvedEnvironment['network']>(PROTOCOL_CONFIG.networks)) {
+for (const [networkId, network] of Object.entries<NetworkOptions>(PROTOCOL_CONFIG.networks)) {
   if (
     PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID] &&
     PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID].network_id === networkId
   ) {
-    network['tags'] = PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID].tags
+    network['tags'] = [
+      // always insert 'environment_type' as a tag so we know this info during smart contract deployment
+      PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID].environment_type,
+      ...PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID].tags
+    ]
   }
   // environment could be undefined at this point
   const hardhatNetwork = networkToHardhatNetwork(networkId, network)
@@ -150,9 +198,11 @@ const hardhatConfig: HardhatUserConfig = {
     currency: 'USD',
     excludeContracts: ['mocks', 'utils/console.sol']
   },
-  verify: {
-    etherscan: {
-      apiKey: ETHERSCAN_KEY
+  etherscan: {
+    apiKey: {
+      mainnet: ETHERSCAN_KEY,
+      goerli: ETHERSCAN_KEY,
+      xdai: BLOCKSCOUT_KEY
     }
   }
 }
@@ -161,7 +211,7 @@ const DEFAULT_IDENTITY_DIRECTORY = '/tmp'
 const DEFAULT_FUND_AMOUNT = '1'
 
 task<FaucetCLIOPts>('faucet', 'Faucets a local development HOPR node account with ETH and HOPR tokens', faucet)
-  .addOptionalParam<string>('address', 'HoprToken address', undefined, types.string)
+  .addOptionalParam<string>('address', 'destination address which should receive funds', undefined, types.string)
   .addOptionalParam<string>('amount', 'Amount of HOPR to fund', DEFAULT_FUND_AMOUNT, types.string)
   .addFlag('useLocalIdentities', `Fund all identities stored in identity directory`)
   .addOptionalParam<string>(
@@ -180,14 +230,64 @@ task<FaucetCLIOPts>('faucet', 'Faucets a local development HOPR node account wit
 
 task('accounts', 'View unlocked accounts', getAccounts)
 
+task('disable-automine', 'Used by E2E tests to disable auto-mining once setup is done', disableAutoMine)
+
 task<RegisterOpts>(
   'register',
-  "Used by our E2E tests to interact with 'HoprNetworkRegistry' and 'HoprDummyProxyForNetworkRegistry'.",
+  "Used by our E2E tests to interact with 'HoprNetworkRegistry' and 'HoprNetworkRegistryProxy'.",
   register
 )
   .addParam<RegisterOpts['task']>('task', 'The task to run', undefined, types.string)
   .addOptionalParam<string>('nativeAddresses', 'A list of native addresses', undefined, types.string)
-  .addOptionalParam<string>('peerIds', 'A list of peerIds', undefined, types.string)
+  .addOptionalParam<string>('peerIds', 'A list of comma-seperated peerIds', undefined, types.string)
+  .addOptionalParam<string>('eligibility', 'A list of comma-seperated boolean', undefined, types.string)
+  .addOptionalParam<string>('privatekey', 'Private key of the signer', undefined, types.string)
+
+task<SelfRegisterOpts>(
+  'register:self',
+  "Used by our E2E tests to interact with 'HoprNetworkRegistry' and 'HoprNetworkRegistryProxy'.",
+  selfRegister
+)
+  .addParam<SelfRegisterOpts['task']>('task', 'The task to run', undefined, types.string)
+  .addParam<string>('peerIds', 'A list of comma-seperated peerIds', undefined, types.string)
+  .addOptionalParam<string>('privatekey', 'Private key of the signer', undefined, types.string)
+
+task<RequestTestTokensOpts>(
+  'request-test-tokens',
+  'Request test tokens ("Network_registry NFT" or "test wxHOPR (HOPR)") for a staker',
+  requestTestTokens
+)
+  .addParam<RequestTestTokensOpts['type']>('type', 'Token type to request', undefined, types.string)
+  .addOptionalParam<string>(
+    'amount',
+    'target txHOPR token amount (in wei) to request for',
+    MIN_STAKE.toString(),
+    types.string
+  )
+  .addParam<string>('recipient', 'Address of the NFT recipient', undefined, types.string)
+  .addOptionalParam<NetworkRegistryNftRank>(
+    'nftrank',
+    'Network_registry NFT rank ("developer" or "community")',
+    undefined,
+    types.string
+  )
+  .addOptionalParam<string>('privatekey', 'Private key of the current owner of NFTs', undefined, types.string)
+
+task<StakeOpts>('stake', 'Used by CI tests to stake tokens to the running staking program.', stake)
+  .addParam<StakeOpts['type']>('type', 'Token type to stake', undefined, types.string)
+  .addOptionalParam<string>(
+    'amount',
+    'target txHOPR token amount (in wei) that will be staked',
+    MIN_STAKE.toString(),
+    types.string
+  )
+  .addOptionalParam<NetworkRegistryNftRank>(
+    'nftrank',
+    'Network_registry NFT rank ("developer" or "community")',
+    undefined,
+    types.string
+  )
+  .addOptionalParam<string>('privatekey', 'Private key of the signer', undefined, types.string)
 
 function getSortedFiles(dependenciesGraph) {
   const tsort = require('tsort')
@@ -340,40 +440,4 @@ task('test:in-group', 'Reset the hardhat node instances per testFiles array.').s
   await run('test:in-group:with-same-instance', parallelConfig)
 })
 
-/**
- * Override https://github.com/wighawag/hardhat-deploy/blob/819df0fad56d75a5de5218c3307bec2093f8794c/src/index.ts#L396
- * in hardhat-deploy plugin, as it does not support EIP-1559
- */
-subtask(TASK_DEPLOY_RUN_DEPLOY, 'Override the deploy task, with an explicit gas price.').setAction(
-  async (taskArgs, { network, ethers }, runSuper) => {
-    // const protocolConfigNetworkNames = Object.keys<ResolvedEnvironment['network']>(PROTOCOL_CONFIG.networks);
-    // const protocolConfigNetworks = Object.values<ResolvedEnvironment['network']>(PROTOCOL_CONFIG.networks);
-    const protocolConfigNetwork = PROTOCOL_CONFIG.networks[network.name] ?? undefined
-    if (!protocolConfigNetwork) {
-      throw Error(
-        'Cannot deploy with hardhat-deploy due to missing hardhat_deploy_gas_price field in protocol-config.json file'
-      )
-    }
-
-    const hardhatDeployGasPrice = (protocolConfigNetwork as ResolvedEnvironment['network']).hardhat_deploy_gas_price
-    const parsedGasPrice = hardhatDeployGasPrice.split(' ')
-
-    // as in https://github.com/wighawag/hardhat-deploy/blob/819df0fad56d75a5de5218c3307bec2093f8794c/src/DeploymentsManager.ts#L974
-    let gasPrice: string
-    if (parsedGasPrice.length > 1) {
-      gasPrice = ethers.utils.parseUnits(parsedGasPrice[0], parsedGasPrice[1]).toString()
-    } else {
-      gasPrice = parsedGasPrice[0]
-    }
-
-    console.log(`Deployment arguments are ${JSON.stringify({ ...taskArgs, gasprice: gasPrice }, null, 2)}`)
-
-    try {
-      await runSuper({ ...taskArgs, gasprice: gasPrice })
-    } catch (error) {
-      console.log(error)
-      throw Error('Cannot override hardhat task TASK_DEPLOY_RUN_DEPLOY')
-    }
-  }
-)
 export default hardhatConfig

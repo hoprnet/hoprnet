@@ -1,4 +1,5 @@
 import cookie from 'cookie'
+import RLP from 'rlp'
 import { debug } from '@hoprnet/hopr-utils'
 import { STATUS_CODES } from './v2/utils.js'
 
@@ -16,6 +17,7 @@ export const authenticateWsConnection = (
 ): boolean => {
   // throw if apiToken is empty
   if (apiToken === '') throw Error('Cannot authenticate empty apiToken')
+  let encodedApiToken = encodeURI(apiToken)
 
   // attempt to authenticate via URL parameter
   if (req.url) {
@@ -41,9 +43,13 @@ export const authenticateWsConnection = (
       debugLog(`failed parsing cookies`, e)
     }
 
+    // We compare the encoded token against an encoded token from the user, thus avoiding having to decodeURI on the user input
+    // and therefore avoiding the need to handle any decoding errors at all.
+    // The encodeURI function on an already encoded input acts as an identity function
     if (
       cookies &&
-      (decodeURI(cookies['X-Auth-Token'] || '') === apiToken || decodeURI(cookies['x-auth-token'] || '') === apiToken)
+      (encodeURI(cookies['X-Auth-Token'] || '') === encodedApiToken ||
+        encodeURI(cookies['x-auth-token'] || '') === encodedApiToken)
     ) {
       debugLog('ws client connected [ authentication SUCCESS via cookie ]')
       return true
@@ -87,5 +93,38 @@ export const getStatusCodeForInvalidInputInRequest = (inputPath: string) => {
       return STATUS_CODES.INVALID_QUALITY
     default:
       return 'INVALID_INPUT'
+  }
+}
+
+/**
+ * Adds the current timestamp to the message in order to measure the latency.
+ * @param msg the message
+ */
+export function encodeMessage(msg: string): Uint8Array {
+  return RLP.encode([msg, Date.now()])
+}
+
+/**
+ * Tries to decode the message and returns the message as well as
+ * the measured latency.
+ * @param encoded an encoded message
+ */
+export function decodeMessage(encoded: Uint8Array): {
+  latency: number
+  msg: string
+} {
+  let msg: Uint8Array, time: Uint8Array
+  try {
+    ;[msg, time] = RLP.decode(encoded) as [Uint8Array, Uint8Array]
+
+    return {
+      latency: Date.now() - Buffer.from(time).readUintBE(0, time.length),
+      msg: new TextDecoder().decode(msg)
+    }
+  } catch (err) {
+    return {
+      latency: NaN,
+      msg: 'Error: Could not decode message'
+    }
   }
 }

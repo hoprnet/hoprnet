@@ -1,7 +1,7 @@
 import { setImmediate } from 'timers/promises'
-import type { Multiaddr } from 'multiaddr'
-import type PeerId from 'peer-id'
-import { ChainWrapper, createChainWrapper, Receipt } from './ethereum'
+import type { Multiaddr } from '@multiformats/multiaddr'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { ChainWrapper, createChainWrapper, Receipt } from './ethereum.js'
 import chalk from 'chalk'
 import {
   AcknowledgedTicket,
@@ -19,11 +19,11 @@ import {
   type DeferType,
   type PublicKey
 } from '@hoprnet/hopr-utils'
-import Indexer from './indexer'
-import { CONFIRMATIONS, INDEXER_BLOCK_RANGE, PROVIDER_CACHE_TTL } from './constants'
+import Indexer from './indexer/index.js'
+import { CONFIRMATIONS, INDEXER_BLOCK_RANGE, PROVIDER_CACHE_TTL } from './constants.js'
 import { EventEmitter } from 'events'
-import { initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCommitmentInfo } from './commitment'
-import type { IndexerEvents } from './indexer/types'
+import { initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCommitmentInfo } from './commitment.js'
+import type { IndexerEvents } from './indexer/types.js'
 
 const log = debug('hopr-core-ethereum')
 
@@ -362,7 +362,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       }
     }
 
-    log(`redemption of tickets from ${channel.source.toB58String()} is complete`)
+    log(`redemption of tickets from ${channel.source.toString()} is complete`)
     // delete operation before returning
     delete this.ticketRedemtionInChannelOperations[channelId]
   }
@@ -501,9 +501,9 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 }
 
-export { createConnectorMock } from './index.mock'
-export { useFixtures } from './indexer/index.mock'
-export { sampleChainOptions } from './ethereum.mock'
+export { createConnectorMock } from './index.mock.js'
+export { useFixtures } from './indexer/index.mock.js'
+export { sampleChainOptions } from './ethereum.mock.js'
 
 export {
   ChannelEntry,

@@ -4,12 +4,12 @@
 
 ## Table of contents
 
-### Type aliases
+### Type Aliases
 
 - [ChannelStruct](HoprChannels.md#channelstruct)
 - [ChannelStructOutput](HoprChannels.md#channelstructoutput)
 
-## Type aliases
+## Type Aliases
 
 ### ChannelStruct
 
@@ -29,7 +29,7 @@
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:21
+packages/ethereum/src/types/contracts/HoprChannels.ts:30
 
 ___
 
@@ -39,4 +39,4 @@ ___
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:31
+packages/ethereum/src/types/contracts/HoprChannels.ts:40

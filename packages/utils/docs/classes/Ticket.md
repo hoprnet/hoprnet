@@ -56,15 +56,15 @@
 | `channelEpoch` | [`UINT256`](UINT256.md) |
 | `signature` | [`Signature`](Signature.md) |
 
-#### Defined in
-
-[types/ticket.ts:49](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L49)
-
 ## Properties
 
 ### amount
 
 • `Readonly` **amount**: [`Balance`](Balance.md)
+
+#### Defined in
+
+[types/ticket.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L54)
 
 ___
 
@@ -72,11 +72,19 @@ ___
 
 • `Readonly` **challenge**: [`EthereumChallenge`](EthereumChallenge.md)
 
+#### Defined in
+
+[types/ticket.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L51)
+
 ___
 
 ### channelEpoch
 
 • `Readonly` **channelEpoch**: [`UINT256`](UINT256.md)
+
+#### Defined in
+
+[types/ticket.ts:56](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L56)
 
 ___
 
@@ -84,11 +92,19 @@ ___
 
 • `Readonly` **counterparty**: [`Address`](Address.md)
 
+#### Defined in
+
+[types/ticket.ts:50](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L50)
+
 ___
 
 ### epoch
 
 • `Readonly` **epoch**: [`UINT256`](UINT256.md)
+
+#### Defined in
+
+[types/ticket.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L52)
 
 ___
 
@@ -96,17 +112,29 @@ ___
 
 • `Readonly` **index**: [`UINT256`](UINT256.md)
 
+#### Defined in
+
+[types/ticket.ts:53](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L53)
+
 ___
 
 ### signature
 
 • `Readonly` **signature**: [`Signature`](Signature.md)
 
+#### Defined in
+
+[types/ticket.ts:57](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L57)
+
 ___
 
 ### winProb
 
 • `Readonly` **winProb**: [`UINT256`](UINT256.md)
+
+#### Defined in
+
+[types/ticket.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L55)
 
 ## Accessors
 
@@ -118,10 +146,6 @@ ___
 
 `number`
 
-#### Defined in
-
-[types/ticket.ts:138](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L138)
-
 ## Methods
 
 ### getHash
@@ -131,10 +155,6 @@ ___
 #### Returns
 
 [`Hash`](Hash.md)
-
-#### Defined in
-
-[types/ticket.ts:134](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L134)
 
 ___
 
@@ -153,10 +173,6 @@ ___
 
 [`UINT256`](UINT256.md)
 
-#### Defined in
-
-[types/ticket.ts:160](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L160)
-
 ___
 
 ### getPathPosition
@@ -166,10 +182,6 @@ ___
 #### Returns
 
 `number`
-
-#### Defined in
-
-[types/ticket.ts:184](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L184)
 
 ___
 
@@ -195,10 +207,6 @@ a ticket before we submit it to the blockchain.
 
 `boolean`
 
-#### Defined in
-
-[types/ticket.ts:179](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L179)
-
 ___
 
 ### recoverSigner
@@ -208,10 +216,6 @@ ___
 #### Returns
 
 [`PublicKey`](PublicKey.md)
-
-#### Defined in
-
-[types/ticket.ts:151](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L151)
 
 ___
 
@@ -223,10 +227,6 @@ ___
 
 `Uint8Array`
 
-#### Defined in
-
-[types/ticket.ts:89](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L89)
-
 ___
 
 ### serializeUnsigned
@@ -237,10 +237,6 @@ ___
 
 `Uint8Array`
 
-#### Defined in
-
-[types/ticket.ts:93](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L93)
-
 ___
 
 ### toString
@@ -250,10 +246,6 @@ ___
 #### Returns
 
 `string`
-
-#### Defined in
-
-[types/ticket.ts:120](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L120)
 
 ___
 
@@ -270,10 +262,6 @@ ___
 #### Returns
 
 `boolean`
-
-#### Defined in
-
-[types/ticket.ts:155](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L155)
 
 ___
 
@@ -298,10 +286,6 @@ ___
 
 [`Ticket`](Ticket.md)
 
-#### Defined in
-
-[types/ticket.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L60)
-
 ___
 
 ### deserialize
@@ -317,7 +301,3 @@ ___
 #### Returns
 
 [`Ticket`](Ticket.md)
-
-#### Defined in
-
-[types/ticket.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L97)

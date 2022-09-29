@@ -4,24 +4,24 @@
  * reuse the code for commands, will change if said
  * otherwise.
  */
-export const STATUS_CODES = {
+export enum STATUS_CODES {
   // invalid inputs
-  INVALID_PEERID: 'INVALID_PEERID',
-  INVALID_CURRENCY: 'INVALID_CURRENCY',
-  INVALID_AMOUNT: 'INVALID_AMOUNT',
-  INVALID_ADDRESS: 'INVALID_ADDRESS',
-  INVALID_SETTING: 'INVALID_SETTING',
-  INVALID_SETTING_VALUE: 'INVALID_SETTING_VALUE',
-  INVALID_QUALITY: 'INVALID_QUALITY',
+  INVALID_PEERID = 'INVALID_PEERID',
+  INVALID_CURRENCY = 'INVALID_CURRENCY',
+  INVALID_AMOUNT = 'INVALID_AMOUNT',
+  INVALID_ADDRESS = 'INVALID_ADDRESS',
+  INVALID_SETTING = 'INVALID_SETTING',
+  INVALID_SETTING_VALUE = 'INVALID_SETTING_VALUE',
+  INVALID_QUALITY = 'INVALID_QUALITY',
   // protocol
-  PEERID_NOT_FOUND: 'PEERID_NOT_FOUND',
-  CHANNEL_NOT_FOUND: 'CHANNEL_NOT_FOUND',
-  TICKETS_NOT_FOUND: 'TICKETS_NOT_FOUND',
-  NOT_ENOUGH_BALANCE: 'NOT_ENOUGH_BALANCE',
-  CHANNEL_ALREADY_OPEN: 'CHANNEL_ALREADY_OPEN',
-  TIMEOUT: 'TIMEOUT',
+  PEERID_NOT_FOUND = 'PEERID_NOT_FOUND',
+  CHANNEL_NOT_FOUND = 'CHANNEL_NOT_FOUND',
+  TICKETS_NOT_FOUND = 'TICKETS_NOT_FOUND',
+  NOT_ENOUGH_BALANCE = 'NOT_ENOUGH_BALANCE',
+  CHANNEL_ALREADY_OPEN = 'CHANNEL_ALREADY_OPEN',
+  TIMEOUT = 'TIMEOUT',
   // other
-  UNKNOWN_FAILURE: 'UNKNOWN_FAILURE'
+  UNKNOWN_FAILURE = 'UNKNOWN_FAILURE'
 }
 
 /**
@@ -40,7 +40,7 @@ export const WS_DEFAULT_RESPONSES: Record<string, { description: string }> = {
 }
 
 /**
- * Generate a websocket endpoint description suffixed with general securty data.
+ * Generate a websocket endpoint description suffixed with general security data.
  * @param summary Short summary to prefix the endpoint's description.
  * @param path Path of the endpoint after `/api/v2`.
  * @returns endpoint's description

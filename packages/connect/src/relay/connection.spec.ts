@@ -1,15 +1,16 @@
-import { RelayConnection, statusMessagesCompare } from './connection'
+import { RelayConnection, statusMessagesCompare } from './connection.js'
 import assert from 'assert'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 
-import PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import { EventEmitter, once } from 'events'
-import Pair from 'it-pair'
-import DuplexPair from 'it-pair/duplex'
-import { ConnectionStatusMessages, RelayPrefix, StatusMessages } from '../constants'
-import handshake from 'it-handshake'
-import { StreamType } from '../types'
-import { createPeerId } from '../base/utils.spec'
+import { pair } from 'it-pair'
+import { duplexPair } from 'it-pair/duplex'
+import { ConnectionStatusMessages, RelayPrefix, StatusMessages } from '../constants.js'
+import { handshake } from 'it-handshake'
+import type { StreamType } from '../types.js'
+import { createPeerId } from '../base/utils.spec.js'
+import type { ConnectComponents } from '../components.js'
 
 describe('test status message sorting', function () {
   it('sort status messages', function () {
@@ -27,39 +28,47 @@ describe('test status message sorting', function () {
 })
 
 describe('relay connection', function () {
-  const Alice: PeerId = createPeerId()
   const Relay: PeerId = createPeerId()
   const Bob: PeerId = createPeerId()
 
   it('ping message', async function () {
-    const [AliceRelay, RelayAlice] = DuplexPair<StreamType>()
+    const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
 
-    new RelayConnection({
-      stream: AliceRelay,
-      self: Alice,
-      relay: Relay,
-      counterparty: Bob,
-      onReconnect: async () => {}
-    })
+    new RelayConnection(
+      AliceRelay,
+      Relay,
+      Bob,
+      'outbound',
+      {} as ConnectComponents,
+      {
+        __noWebRTCUpgrade: true
+      },
+      async () => {}
+    )
 
     const relayShaker = handshake(RelayAlice)
 
     relayShaker.write(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PING))
-    const msg = await relayShaker.read()
+    const msg = (await relayShaker.read()) as Uint8Array
     const expectedMsg = Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PONG)
 
     assert(u8aEquals(msg.slice(), expectedMsg))
   })
 
   it('forward payload', async function () {
-    const [AliceRelay, RelayAlice] = DuplexPair<StreamType>()
+    const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
 
-    const alice = new RelayConnection({
-      stream: AliceRelay,
-      self: Alice,
-      relay: Relay,
-      counterparty: Bob
-    })
+    const alice = new RelayConnection(
+      AliceRelay,
+      Relay,
+      Bob,
+      'outbound',
+      {} as ConnectComponents,
+      {
+        __noWebRTCUpgrade: true
+      },
+      async () => {}
+    )
 
     const relayShaker = handshake(RelayAlice)
 
@@ -73,24 +82,34 @@ describe('relay connection', function () {
       const relayHello = new TextEncoder().encode('Hello from Relay')
       relayShaker.write(Uint8Array.from([RelayPrefix.PAYLOAD, ...relayHello]))
 
-      assert(u8aEquals((await aliceShaker.read()).slice(), relayHello))
+      assert(u8aEquals(((await aliceShaker.read()) as Uint8Array).slice(), relayHello))
 
       const aliceHello = new TextEncoder().encode('Hello from Alice')
       aliceShaker.write(aliceHello)
 
-      assert(u8aEquals((await relayShaker.read()).slice(), Uint8Array.from([RelayPrefix.PAYLOAD, ...aliceHello])))
+      assert(
+        u8aEquals(
+          ((await relayShaker.read()) as Uint8Array).slice(),
+          Uint8Array.from([RelayPrefix.PAYLOAD, ...aliceHello])
+        )
+      )
     }
   })
 
   it('stop a relayed connection from the relay', async function () {
-    const [AliceRelay, RelayAlice] = DuplexPair<StreamType>()
+    const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
 
-    const alice = new RelayConnection({
-      stream: AliceRelay,
-      self: Alice,
-      relay: Relay,
-      counterparty: Bob
-    })
+    const alice = new RelayConnection(
+      AliceRelay,
+      Relay,
+      Bob,
+      'outbound',
+      {} as ConnectComponents,
+      {
+        __noWebRTCUpgrade: true
+      },
+      async () => {}
+    )
 
     const relayShaker = handshake(RelayAlice)
 
@@ -115,14 +134,19 @@ describe('relay connection', function () {
   })
 
   it('stop a relayed connection from the client', async function () {
-    const [AliceRelay, RelayAlice] = DuplexPair<StreamType>()
+    const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
 
-    const alice = new RelayConnection({
-      stream: AliceRelay,
-      self: Alice,
-      relay: Relay,
-      counterparty: Bob
-    })
+    const alice = new RelayConnection(
+      AliceRelay,
+      Relay,
+      Bob,
+      'outbound',
+      {} as ConnectComponents,
+      {
+        __noWebRTCUpgrade: true
+      },
+      async () => {}
+    )
 
     const relayShaker = handshake(RelayAlice)
 
@@ -130,7 +154,7 @@ describe('relay connection', function () {
 
     assert(
       u8aEquals(
-        (await relayShaker.read()).slice(),
+        ((await relayShaker.read()) as Uint8Array).slice(),
         Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP)
       )
     )
@@ -154,19 +178,23 @@ describe('relay connection', function () {
   })
 
   it('reconnect before using stream and use new stream', async function () {
-    const [AliceRelay, RelayAlice] = DuplexPair<StreamType>()
+    const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
 
     let aliceAfterReconnect: RelayConnection | undefined
 
-    const alice = new RelayConnection({
-      stream: AliceRelay,
-      self: Alice,
-      relay: Relay,
-      counterparty: Bob,
-      onReconnect: async (newStream: RelayConnection) => {
+    const alice = new RelayConnection(
+      AliceRelay,
+      Relay,
+      Bob,
+      'outbound',
+      {} as ConnectComponents,
+      {
+        __noWebRTCUpgrade: true
+      },
+      async (newStream: RelayConnection) => {
         aliceAfterReconnect = newStream
       }
-    })
+    )
 
     const aliceShakerBeforeReconnect = handshake({
       source: alice.source,
@@ -194,30 +222,37 @@ describe('relay connection', function () {
     const relayHelloAfterReconnect = new TextEncoder().encode('Hello after reconnect!')
     relayShaker.write(Uint8Array.from([RelayPrefix.PAYLOAD, ...relayHelloAfterReconnect]))
 
-    assert(u8aEquals((await aliceShaker.read()).slice(), relayHelloAfterReconnect))
+    assert(u8aEquals(((await aliceShaker.read()) as Uint8Array).slice(), relayHelloAfterReconnect))
 
     const aliceHelloAfterReconnect = new TextEncoder().encode('Hello from Alice after reconnect!')
 
     aliceShaker.write(aliceHelloAfterReconnect)
     assert(
-      u8aEquals((await relayShaker.read()).slice(), Uint8Array.from([RelayPrefix.PAYLOAD, ...aliceHelloAfterReconnect]))
+      u8aEquals(
+        ((await relayShaker.read()) as Uint8Array).slice(),
+        Uint8Array.from([RelayPrefix.PAYLOAD, ...aliceHelloAfterReconnect])
+      )
     )
   })
 
   it('reconnect before using stream and use new stream', async function () {
-    const [AliceRelay, RelayAlice] = DuplexPair<StreamType>()
+    const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
 
     let aliceAfterReconnect: RelayConnection | undefined
 
-    const alice = new RelayConnection({
-      stream: AliceRelay,
-      self: Alice,
-      relay: Relay,
-      counterparty: Bob,
-      onReconnect: async (newStream: RelayConnection) => {
+    const alice = new RelayConnection(
+      AliceRelay,
+      Relay,
+      Bob,
+      'outbound',
+      {} as ConnectComponents,
+      {
+        __noWebRTCUpgrade: true
+      },
+      async (newStream: RelayConnection) => {
         aliceAfterReconnect = newStream
       }
-    })
+    )
 
     const aliceShakerBeforeReconnect = handshake({
       source: alice.source,
@@ -231,7 +266,7 @@ describe('relay connection', function () {
 
     assert(
       u8aEquals(
-        (await relayShaker.read()).slice(),
+        ((await relayShaker.read()) as Uint8Array).slice(),
         Uint8Array.from([RelayPrefix.PAYLOAD, ...aliceHelloBeforeReconnect])
       )
     )
@@ -239,7 +274,7 @@ describe('relay connection', function () {
     let relayHelloBeforeReconnect = new TextEncoder().encode(`Hello from relay before reconnecting`)
     relayShaker.write(Uint8Array.from([RelayPrefix.PAYLOAD, ...relayHelloBeforeReconnect]))
 
-    assert(u8aEquals((await aliceShakerBeforeReconnect.read()).slice(), relayHelloBeforeReconnect))
+    assert(u8aEquals(((await aliceShakerBeforeReconnect.read()) as Uint8Array).slice(), relayHelloBeforeReconnect))
 
     const ATTEMPTS = 5
     for (let i = 0; i < ATTEMPTS; i++) {
@@ -259,14 +294,14 @@ describe('relay connection', function () {
       const relayHelloAfterReconnect = new TextEncoder().encode('Hello after reconnect!')
       relayShaker.write(Uint8Array.from([RelayPrefix.PAYLOAD, ...relayHelloAfterReconnect]))
 
-      assert(u8aEquals((await aliceShaker.read()).slice(), relayHelloAfterReconnect))
+      assert(u8aEquals(((await aliceShaker.read()) as Uint8Array).slice(), relayHelloAfterReconnect))
 
       const aliceHelloAfterReconnect = new TextEncoder().encode('Hello from Alice after reconnect!')
 
       aliceShaker.write(aliceHelloAfterReconnect)
       assert(
         u8aEquals(
-          (await relayShaker.read()).slice(),
+          ((await relayShaker.read()) as Uint8Array).slice(),
           Uint8Array.from([RelayPrefix.PAYLOAD, ...aliceHelloAfterReconnect])
         )
       )
@@ -282,18 +317,30 @@ describe('relay connection', function () {
 
     const webRTC = new WebRTC()
 
-    const [AliceRelay, RelayAlice] = DuplexPair<StreamType>()
+    const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
 
-    new RelayConnection({
-      stream: AliceRelay,
-      self: Alice,
-      relay: Relay,
-      counterparty: Bob,
-      webRTC: {
-        channel: webRTC as any,
-        upgradeInbound: (): any => {}
-      }
-    })
+    new RelayConnection(
+      AliceRelay,
+      Relay,
+      Bob,
+      'outbound',
+      {
+        getWebRTCUpgrader() {
+          return {
+            upgradeOutbound() {
+              return webRTC
+            },
+            upgradeInbound() {
+              return webRTC
+            }
+          }
+        }
+      } as ConnectComponents,
+      {
+        __noWebRTCUpgrade: false
+      },
+      async () => {}
+    )
 
     const relayShaker = handshake(RelayAlice)
 
@@ -318,7 +365,10 @@ describe('relay connection', function () {
       message: webRTCResponse
     })
 
-    assert(JSON.parse(new TextDecoder().decode((await relayShaker.read()).slice(1))).message === webRTCResponse)
+    assert(
+      JSON.parse(new TextDecoder().decode(((await relayShaker.read()) as Uint8Array).slice(1))).message ===
+        webRTCResponse
+    )
   })
 
   it('forward and prefix WebRTC messages after reconnect', async function () {
@@ -330,23 +380,45 @@ describe('relay connection', function () {
 
     const webRTC = new WebRTC()
 
-    const [AliceRelay, RelayAlice] = DuplexPair<StreamType>()
+    const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
 
     let webRTCAfterReconnect: WebRTC | undefined
+    let secondAttempt = false
 
-    const alice = new RelayConnection({
-      stream: AliceRelay,
-      self: Alice,
-      relay: Relay,
-      counterparty: Bob,
-      webRTC: {
-        channel: webRTC as any,
-        upgradeInbound: (): any => {
-          webRTCAfterReconnect = new WebRTC()
-          return webRTCAfterReconnect
+    const alice = new RelayConnection(
+      AliceRelay,
+      Relay,
+      Bob,
+      'outbound',
+      {
+        getWebRTCUpgrader() {
+          return {
+            upgradeOutbound() {
+              if (!secondAttempt) {
+                secondAttempt = true
+                return webRTC
+              } else {
+                webRTCAfterReconnect ??= new WebRTC()
+                return webRTCAfterReconnect
+              }
+            },
+            upgradeInbound() {
+              if (!secondAttempt) {
+                secondAttempt = true
+                return webRTC
+              } else {
+                webRTCAfterReconnect ??= new WebRTC()
+                return webRTCAfterReconnect
+              }
+            }
+          }
         }
-      }
-    })
+      } as ConnectComponents,
+      {
+        __noWebRTCUpgrade: false
+      },
+      async () => {}
+    )
 
     const relayShaker = handshake(RelayAlice)
 
@@ -371,7 +443,10 @@ describe('relay connection', function () {
       message: webRTCResponse
     })
 
-    assert(JSON.parse(new TextDecoder().decode((await relayShaker.read()).slice(1))).message === webRTCResponse)
+    assert(
+      JSON.parse(new TextDecoder().decode(((await relayShaker.read()) as Uint8Array).slice(1))).message ===
+        webRTCResponse
+    )
 
     const ATTEMPTS = 5
     for (let i = 0; i < ATTEMPTS; i++) {
@@ -393,7 +468,7 @@ describe('relay connection', function () {
       })
 
       assert(
-        JSON.parse(new TextDecoder().decode((await relayShaker.read()).slice(1))).message ===
+        JSON.parse(new TextDecoder().decode(((await relayShaker.read()) as Uint8Array).slice(1))).message ===
           correctWebRTCResponseAfterReconnect
       )
     }
@@ -401,21 +476,25 @@ describe('relay connection', function () {
 })
 
 describe('relay connection - stream error propagation', function () {
-  const Alice: PeerId = createPeerId()
   const Relay: PeerId = createPeerId()
   const Bob: PeerId = createPeerId()
 
   it('falsy sources in sinks', async function () {
-    const [AliceRelay, RelayAlice] = DuplexPair<StreamType>()
+    const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
 
     const errorInSource = 'error in source'
 
-    const alice = new RelayConnection({
-      stream: RelayAlice,
-      self: Alice,
-      relay: Relay,
-      counterparty: Bob
-    })
+    const alice = new RelayConnection(
+      RelayAlice,
+      Relay,
+      Bob,
+      'outbound',
+      {} as ConnectComponents,
+      {
+        __noWebRTCUpgrade: true
+      },
+      async () => {}
+    )
 
     const sourcePromise = (AliceRelay.source as AsyncIterable<StreamType>)[Symbol.asyncIterator]().next()
 
@@ -432,19 +511,24 @@ describe('relay connection - stream error propagation', function () {
   })
 
   it('correct sources in falsy sinks', async function () {
-    const RelayAlice = Pair<StreamType>()
+    const RelayAlice = pair<StreamType>()
 
     const errorInSinkFunction = 'error in sink function'
 
-    const alice = new RelayConnection({
-      stream: {
+    const alice = new RelayConnection(
+      {
         sink: () => Promise.reject(Error(errorInSinkFunction)),
         source: RelayAlice.source
       },
-      self: Alice,
-      relay: Relay,
-      counterparty: Bob
-    })
+      Relay,
+      Bob,
+      'outbound',
+      {} as ConnectComponents,
+      {
+        __noWebRTCUpgrade: true
+      },
+      async () => {}
+    )
 
     await assert.rejects(
       alice.sink(
@@ -457,21 +541,26 @@ describe('relay connection - stream error propagation', function () {
   })
 
   it('falsy sources', async function () {
-    const AliceRelay = Pair<StreamType>()
+    const AliceRelay = pair<StreamType>()
 
     const errorInSource = 'error in source'
 
-    const alice = new RelayConnection({
-      stream: {
+    const alice = new RelayConnection(
+      {
         sink: AliceRelay.sink,
         source: (async function* () {
           throw Error(errorInSource)
         })()
       },
-      self: Alice,
-      relay: Relay,
-      counterparty: Bob
-    })
+      Relay,
+      Bob,
+      'outbound',
+      {} as ConnectComponents,
+      {
+        __noWebRTCUpgrade: true
+      },
+      async () => {}
+    )
 
     await assert.rejects(
       (alice.source as AsyncIterable<StreamType>)[Symbol.asyncIterator]().next(),

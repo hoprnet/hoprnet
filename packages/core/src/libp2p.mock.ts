@@ -1,73 +1,192 @@
-import PeerId from 'peer-id'
-import { Multiaddr } from 'multiaddr'
-import PeerStore from 'libp2p/src/peer-store'
-import AddressManager from 'libp2p/src/address-manager'
+import { PeerId } from '@libp2p/interface-peer-id'
+import { Multiaddr } from '@multiformats/multiaddr'
+import type { StreamHandler } from '@libp2p/interface-registrar'
+import type { Connection } from '@libp2p/interface-connection'
+import { PersistentPeerStore } from '@libp2p/peer-store'
+import type { Components } from '@libp2p/interfaces/components'
+import { EventEmitter } from '@libp2p/interfaces/events'
+
+import type { Duplex } from 'it-stream-types'
+
+import type { ContentRouting } from '@libp2p/interface-content-routing'
+import type { PeerInfo } from '@libp2p/interface-peer-info'
+import { CID } from 'multiformats/cid'
+import { duplexPair } from 'it-pair/duplex'
+import { setImmediate } from 'timers/promises'
+
 import { MemoryDatastore } from 'datastore-core/memory'
 
-import { debug } from '@hoprnet/hopr-utils'
+import type { Libp2p } from 'libp2p'
+import { peerIdFromString } from '@libp2p/peer-id'
 
-import type LibP2P from 'libp2p'
+interface FakeIncomingStream {
+  peer: PeerId
+  stream: Duplex<Uint8Array>
+}
 
-function createLibp2pMock(peerId: PeerId): LibP2P {
-  const libp2pLogger = debug(`hopr:mocks:libp2p`)
+function createFakeDHT(peer: PeerId, dht: Map<string, string[]>) {
+  // Map: relayToken -> peerId
+  const fakeDHT = dht ?? new Map<string, string[]>()
 
-  const libp2p = {} as unknown as LibP2P
+  const provide = async (relayToken: CID) => {
+    const entries: string[] = fakeDHT.get(relayToken.toString()) ?? []
 
-  libp2p.peerId = peerId
-
-  libp2p._options = Object.assign({}, libp2p._options, {
-    addresses: {
-      announceFilter: () => [new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${peerId.toB58String()}`)]
+    if (!entries.includes(peer.toString())) {
+      entries.push(peer.toString())
     }
-  })
-  libp2p.start = () => {
-    libp2pLogger(`Libp2p start method called`)
-    return Promise.resolve()
+
+    // Make call asynchronous
+    await setImmediate()
+
+    fakeDHT.set(relayToken.toString(), entries)
   }
-  libp2p.stop = () => {
-    libp2pLogger(`Libp2p stop method called`)
-    return Promise.resolve()
+
+  const findProviders = async function* (relayToken: CID): AsyncIterable<PeerInfo> {
+    const entries = (fakeDHT.get(relayToken.toString()) ?? []).map((idString) => ({
+      id: peerIdFromString(idString),
+      multiaddrs: [],
+      protocols: []
+    }))
+
+    // Make call asynchronous
+    await setImmediate()
+
+    return entries
   }
-  libp2p.handle = async () => {
-    libp2pLogger(`Libp2 handle method called`)
+
+  return {
+    dht: fakeDHT,
+    interface: {
+      provide,
+      findProviders
+    } as ContentRouting
   }
-  libp2p.hangUp = () => {
-    libp2pLogger(`Libp2 hangUp method called`)
-    return Promise.resolve()
+}
+
+function createFakeNetwork(peer: PeerId, network: EventEmitter<any>) {
+  const events = network ?? new EventEmitter()
+
+  function protocolName(protocol: string, destination: PeerId) {
+    return `${destination.toString()}-${protocol}`
   }
-  libp2p.connectionManager = {} as unknown as LibP2P['connectionManager']
-  libp2p.connectionManager.on = (event: string) => {
-    libp2pLogger(`Connection manager event handler called with event "${event}"`)
-    return libp2p.connectionManager
+
+  const handle: Libp2p['handle'] = async (protocol: string, handler: StreamHandler) => {
+    await setImmediate()
+
+    events.addEventListener(protocolName(protocol, peer), (event: CustomEvent<FakeIncomingStream>) => {
+      handler({
+        protocol,
+        stream: event.detail.stream as any,
+        connection: { remotePeer: event.detail.peer } as Connection
+      })
+    })
   }
+
+  const dial: Libp2p['dial'] = async (destination: Multiaddr | PeerId) => {
+    let destPeerId: PeerId
+
+    if (Multiaddr.isMultiaddr(destination)) {
+      destPeerId = peerIdFromString(destination.getPeerId())
+    } else {
+      destPeerId = destination
+    }
+
+    // Make call asynchronous
+    await setImmediate()
+
+    return {
+      // remotePeer: destPeerId
+      async newStream(protocol: string) {
+        await setImmediate()
+        const stream = duplexPair<Uint8Array>()
+        events.dispatchEvent(
+          new CustomEvent<FakeIncomingStream>(protocolName(protocol, destPeerId), {
+            detail: {
+              peer,
+              stream: {
+                sink: stream[0].sink,
+                source: stream[1].source
+              }
+            }
+          })
+        )
+
+        return {
+          protocol,
+          stream: {
+            sink: stream[1].sink,
+            source: stream[0].source
+          }
+        }
+      }
+    } as Connection
+  }
+
+  return {
+    events,
+    dial,
+    handle
+  }
+}
+
+function createLibp2pMock(peer: PeerId, shared?: { dht?: Map<string, string[]>; network?: EventEmitter<any> }) {
+  const network = createFakeNetwork(peer, shared?.network)
+  const dht = createFakeDHT(peer, shared?.dht)
   const datastore = new MemoryDatastore()
-  const addressFilter = async () => Promise.resolve(true)
-  libp2p.peerStore = new PeerStore({ peerId, datastore, addressFilter })
-  libp2p.addressManager = new AddressManager(peerId, {
-    announce: [new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${peerId.toB58String()}`).toString()]
-  })
+  const peerStore = new PersistentPeerStore()
 
-  libp2p.upgrader = {} as any
+  const libp2p = {
+    components: {
+      getContenRouting(): ContentRouting {
+        return dht.interface
+      },
+      getDht() {
+        return {
+          [Symbol.toStringTag]: 'some nice DHT implementation'
+        }
+      },
+      getRegistrar() {
+        return {
+          handle: network.handle
+        }
+      },
+      getConnectionManager() {
+        return Object.assign(new EventEmitter(), {
+          getConnections(_peer: PeerId) {
+            return []
+          },
+          dialer: {
+            dial: network.dial
+          }
+        })
+      },
+      getDatastore() {
+        return datastore
+      },
+      getPeerStore() {
+        return peerStore
+      },
+      getAddressManager() {
+        return {
+          getAddresses() {
+            return [new Multiaddr(`/ip4/127.0.0.1/tcp/123/p2p/${peer.toString()}`)]
+          }
+        }
+      }
+    },
+    async start() {
+      await setImmediate()
+      Promise.resolve()
+    },
+    async stop() {
+      await setImmediate()
+      Promise.resolve()
+    }
+  }
 
-  // Add DHT environments
-  libp2p._dht = {}
-  libp2p._dht._wan = {}
-  libp2p._dht._wan._network = {}
-  libp2p._dht._wan._topologyListener = {}
-  libp2p._dht._lan = {}
-  libp2p._dht._lan._network = {}
-  libp2p._dht._lan._topologyListener = {}
+  peerStore.init(libp2p.components as any as Components)
 
-  libp2p._dht._wan._network._protocol =
-    libp2p._dht._wan._topologyListener._protocol =
-    libp2p._dht._wan._protocol =
-      '/ipfs/kad/1.0.0'
-  libp2p._dht._lan._network._protocol =
-    libp2p._dht._lan._topologyListener._protocol =
-    libp2p._dht._lan._protocol =
-      '/ipfs/lan/kad/1.0.0'
-
-  return libp2p
+  return libp2p as any as Libp2p
 }
 
 export { createLibp2pMock }

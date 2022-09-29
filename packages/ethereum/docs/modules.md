@@ -11,7 +11,7 @@
 ### Interfaces
 
 - [HoprBoost](interfaces/HoprBoost.md)
-- [HoprChannels](interfaces/HoprChannels.md)
+- [HoprChannels](interfaces/HoprChannels-1.md)
 - [HoprDistributor](interfaces/HoprDistributor.md)
 - [HoprNetworkRegistry](interfaces/HoprNetworkRegistry.md)
 - [HoprStake](interfaces/HoprStake.md)
@@ -24,7 +24,7 @@
 - [TypedEventFilter](interfaces/TypedEventFilter.md)
 - [xHoprToken](interfaces/xHoprToken.md)
 
-### Type aliases
+### Type Aliases
 
 - [ContractData](modules.md#contractdata)
 - [ContractNames](modules.md#contractnames)
@@ -37,7 +37,7 @@
 
 - [getContractData](modules.md#getcontractdata)
 
-## Type aliases
+## Type Aliases
 
 ### ContractData
 
@@ -49,12 +49,12 @@
 | :------ | :------ |
 | `abi` | `any` |
 | `address` | `string` |
-| `blockNumber` | `string` |
+| `blockNumber` | `number` |
 | `transactionHash` | `string` |
 
 #### Defined in
 
-[packages/ethereum/src/index.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L32)
+[packages/ethereum/src/index.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L33)
 
 ___
 
@@ -64,7 +64,7 @@ ___
 
 #### Defined in
 
-[packages/ethereum/src/index.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L20)
+[packages/ethereum/src/index.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L21)
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 ### getContractData
 
-▸ **getContractData**(`network`, `environmentId`, `contract`): [`ContractData`](modules.md#contractdata)
+▸ **getContractData**(`network`, `environmentId`, `contract`): [`ContractData`](modules.md#contractdata) \| `Deployment`
 
 #### Parameters
 
@@ -127,8 +127,4 @@ ___
 
 #### Returns
 
-[`ContractData`](modules.md#contractdata)
-
-#### Defined in
-
-[packages/ethereum/src/index.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L39)
+[`ContractData`](modules.md#contractdata) \| `Deployment`

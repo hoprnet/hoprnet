@@ -1,6 +1,6 @@
-import type { Multiaddr } from 'multiaddr'
+import type { Multiaddr } from '@multiformats/multiaddr'
 
-import { CODE_IP4, CODE_IP6, CODE_P2P } from '../constants'
+import { CODE_IP4, CODE_IP6, CODE_P2P } from '../constants.js'
 import {
   inSameNetwork,
   isLinkLocaleAddress,
@@ -122,10 +122,26 @@ export function maToClass(ma: Multiaddr): AddressClass {
   }
 }
 
-export function compareAddressesLocalMode(addrA: Multiaddr, addrB: Multiaddr): number {
-  return addressPriorityLocal(maToClass(addrA)) - addressPriorityLocal(maToClass(addrB))
+export function compareAddressesLocalMode(addrA: Multiaddr, addrB: Multiaddr): -1 | 0 | 1 {
+  const result = addressPriorityLocal(maToClass(addrA)) - addressPriorityLocal(maToClass(addrB))
+
+  if (result == 0) {
+    return 0
+  } else if (result < 0) {
+    return -1
+  } else {
+    return 1
+  }
 }
 
-export function compareAddressesPublicMode(addrA: Multiaddr, addrB: Multiaddr): number {
-  return addressPriorityPublic(maToClass(addrA)) - addressPriorityPublic(maToClass(addrB))
+export function compareAddressesPublicMode(addrA: Multiaddr, addrB: Multiaddr): -1 | 0 | 1 {
+  const result = addressPriorityPublic(maToClass(addrA)) - addressPriorityPublic(maToClass(addrB))
+
+  if (result == 0) {
+    return 0
+  } else if (result < 0) {
+    return -1
+  } else {
+    return 1
+  }
 }

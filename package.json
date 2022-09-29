@@ -13,57 +13,37 @@
     "docs/hopr-documentation"
   ],
   "scripts": {
-    "build": "yarn workspaces foreach -pt run build:wasm && tsc --build packages/utils/tsconfig.json && yarn workspace @hoprnet/hopr-ethereum run build:sol:types && echo \"Building Typescript files\" && tsc --build tsconfig.build.json && yarn workspace @hoprnet/hoprd run buildAdmin",
     "build:core": "yarn workspace @hoprnet/hopr-core run build",
     "build:core:all": "yarn workspaces foreach -ptv --include @hoprnet/hopr-core --include @hoprnet/hopr-core-ethereum run build",
     "build:hoprd": "yarn workspace @hoprnet/hoprd run build",
-    "build:wasm": "yarn workspaces foreach -pt run build:wasm",
     "build:utils": "yarn workspace @hoprnet/hopr-utils run build",
     "build:chain": "yarn workspace @hoprnet/hopr-core-ethereum run build",
-    "build:yp": "yarn exec \"make -C docs/yellowpaper\"",
-    "lint": "prettier --check .",
-    "lint:fix": "prettier --write .",
-    "test": "yarn workspaces foreach -pv run test",
-    "test:connect": "yarn workspace @hoprnet/hopr-connect run test",
-    "test:core": "yarn workspace @hoprnet/hopr-core run test",
-    "test:connector": "yarn workspace @hoprnet/hopr-core-ethereum run test",
-    "test:hoprd": "yarn workspace @hoprnet/hoprd run test",
-    "test:ct": "yarn workspace @hoprnet/hopr-cover-traffic-daemon run test",
-    "test:utils": "yarn workspace @hoprnet/hopr-utils run test",
-    "test:contracts": "yarn workspace @hoprnet/hopr-ethereum run test",
-    "run:network": "yarn workspace @hoprnet/hopr-ethereum run network",
+    "run:network": "yarn workspace @hoprnet/hopr-ethereum run run:network",
     "run:ctd": "yarn workspace @hoprnet/hopr-cover-traffic-daemon run start",
     "run:hoprd": "yarn workspace @hoprnet/hoprd run start --password='d3f4uL+!' --identity=/tmp/default-identity --testNoAuthentication",
-    "run:hoprd:xdai": "yarn workspace @hoprnet/hoprd run start --host=0.0.0.0:9080 --adminPort=2990 --restPort=2991 --password='xDai' --announce --data=/tmp/xdai --identity=/tmp/xdai-identity --testNoAuthentication",
-    "run:hoprd:xdai:protected": "yarn workspace @hoprnet/hoprd run start --host=0.0.0.0:9080 --adminPort=2990 --restPort=2991 --password='xDai' --announce --data=/tmp/xdai --identity=/tmp/xdai-identity --apiToken=xD4!-N3+w0rK",
-    "run:hoprd:goerli": "yarn workspace @hoprnet/hoprd run start --host=0.0.0.0:9060 --adminPort=2970 --restPort=2971 --provider=https://goerli.infura.io/v3/${HOPRD_INFURA_KEY} --password='goerli' --announce --data=/tmp/goerli --identity=/tmp/goerli-identity --testNoAuthentication",
-    "run:hoprd:goerli:protected": "yarn workspace @hoprnet/hoprd run start --host=0.0.0.0:9060 --adminPort=2970 --restPort=2971 --provider=https://goerli.infura.io/v3/${HOPRD_INFURA_KEY} --password='goerli' --announce --data=/tmp/goerli --identity=/tmp/goerli-identity --apiToken=g03rL!-N3+w0rK",
-    "run:hoprd:alice": "yarn workspace @hoprnet/hoprd run dev --host=0.0.0.0:9092 --adminPort=3010 --restPort=3011  --data=/tmp/local-alice --identity=/tmp/local-alice.id",
-    "run:hoprd:bob": "yarn workspace @hoprnet/hoprd run dev --host=0.0.0.0:9093 --adminPort=3020 --restPort=3021 --data=/tmp/local-bob --identity=/tmp/local-bob.id",
-    "run:hoprd:charlie": "yarn workspace @hoprnet/hoprd run dev --host=0.0.0.0:9094 --adminPort=3030 --restPort=3031 --data=/tmp/local-charlie --identity=/tmp/local-charly.id",
+    "run:hoprd:xdai": "yarn workspace @hoprnet/hoprd run start --host=0.0.0.0:9080 --adminPort=2990 --apiPort=2991 --password='xDai' --announce --data=/tmp/xdai --identity=/tmp/xdai-identity --testNoAuthentication",
+    "run:hoprd:xdai:protected": "yarn workspace @hoprnet/hoprd run start --host=0.0.0.0:9080 --adminPort=2990 --apiPort=2991 --password='xDai' --announce --data=/tmp/xdai --identity=/tmp/xdai-identity --apiToken=xD4!-N3+w0rK",
+    "run:hoprd:goerli": "yarn workspace @hoprnet/hoprd run start --host=0.0.0.0:9060 --adminPort=2970 --apiPort=2971 --provider=https://goerli.infura.io/v3/${HOPRD_INFURA_KEY} --password='goerli' --announce --data=/tmp/goerli --identity=/tmp/goerli-identity --testNoAuthentication",
+    "run:hoprd:goerli:protected": "yarn workspace @hoprnet/hoprd run start --host=0.0.0.0:9060 --adminPort=2970 --apiPort=2971 --provider=https://goerli.infura.io/v3/${HOPRD_INFURA_KEY} --password='goerli' --announce --data=/tmp/goerli --identity=/tmp/goerli-identity --apiToken=g03rL!-N3+w0rK",
+    "run:hoprd:alice": "yarn workspace @hoprnet/hoprd run dev --host=0.0.0.0:9092 --adminPort=3010 --apiPort=3011  --data=/tmp/local-alice --identity=/tmp/local-alice.id",
+    "run:hoprd:bob": "yarn workspace @hoprnet/hoprd run dev --host=0.0.0.0:9093 --adminPort=3020 --apiPort=3021 --data=/tmp/local-bob --identity=/tmp/local-bob.id",
+    "run:hoprd:charlie": "yarn workspace @hoprnet/hoprd run dev --host=0.0.0.0:9094 --adminPort=3030 --apiPort=3031 --data=/tmp/local-charlie --identity=/tmp/local-charly.id",
     "run:faucet:all": "yarn workspace @hoprnet/hopr-ethereum run faucet",
-    "docs:generate": "yarn workspaces foreach -pv run docs:generate",
-    "clean": "yarn workspaces foreach --exclude hoprnet -v run clean && rimraf ./tsconfig.scripts.tsbuildinfo ./tsconfig.build.tsbuildinfo",
-    "reset": "rimraf packages/*/node_modules node_modules"
+    "clean": "yarn workspaces foreach --exclude hoprnet --exclude hopr-docs -v run clean && rm -Rf ./target ./tsconfig.scripts.tsbuildinfo ./tsconfig.build.tsbuildinfo",
+    "reset": "rm -Rf packages/*/node_modules node_modules"
   },
   "devDependencies": {
-    "@ethersproject/cli": "5.5.0",
-    "@wasm-tool/wasm-pack-plugin": "^1.1.0",
-    "prettier": "2.6.1",
-    "rimraf": "3.0.2",
-    "ts-node": "10.7.0",
-    "typescript": "4.7.0-beta",
-    "wasm-pack": "0.10.2",
-    "yargs": "17.4.0"
+    "@ethersproject/cli": "5.7.0",
+    "prettier": "2.7.1",
+    "ts-node": "10.8.1",
+    "typescript": "4.7.4",
+    "wasm-pack": "0.10.3",
+    "yargs": "17.5.1"
   },
   "resolutions": {
-    "express-openapi": "https://github.com/hoprnet/open-api/raw/robertkiel/built-esm-support/packages/express-openapi/express-openapi-11.0.4.tgz",
-    "openapi-framework": "https://github.com/hoprnet/open-api/raw/robertkiel/built-esm-support/packages/openapi-framework/openapi-framework-11.0.4.tgz",
-    "@ethersproject/providers": "https://github.com/hoprnet/ethers-js-provider/archive/refs/tags/fixed-memory-leak.tar.gz",
+    "@ethersproject/providers": "https://github.com/hoprnet/ethers-js-provider/archive/refs/tags/v5.7.0-fixed-memory-leak.tar.gz",
     "@overnightjs/logger": "1.2.1",
-    "colors": "1.4.0",
-    "eth-sig-util": "3.0.1",
-    "libp2p": "https://github.com/hoprnet/js-libp2p/archive/refs/tags/v0.36.4.tar.gz"
+    "colors": "1.4.0"
   },
   "prettier": {
     "tabWidth": 2,
@@ -72,5 +52,5 @@
     "printWidth": 120,
     "trailingComma": "none"
   },
-  "packageManager": "yarn@3.2.0"
+  "packageManager": "yarn@3.2.1"
 }

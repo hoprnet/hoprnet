@@ -1,7 +1,7 @@
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 import assert from 'assert'
 
-import { maToClass, AddressClass, compareAddressesPublicMode, compareAddressesLocalMode } from './addressSorters'
+import { maToClass, AddressClass, compareAddressesPublicMode, compareAddressesLocalMode } from './addressSorters.js'
 
 const PUBLIC_ADDRESS = new Multiaddr(
   `/ip4/84.148.73.225/tcp/62492/p2p/16Uiu2HAm85aCSXNVxwQPBsfHm2hZEvNRmYxvfBhHSQgNgKyKBnWG`
@@ -37,13 +37,21 @@ describe('test address sorting', function () {
 
     assert(
       addrs
-        .sort(compareAddressesPublicMode)
+        .sort((a: Multiaddr, b: Multiaddr) => {
+          const result = compareAddressesPublicMode(a, b)
+          assert([-1, 0, 1].includes(result))
+          return result
+        })
         .every((addr: Multiaddr, index: number) => addr.equals(addrsPublicOrder[index]))
     )
 
     assert(
       addrs
-        .sort(compareAddressesLocalMode)
+        .sort((a: Multiaddr, b: Multiaddr) => {
+          const result = compareAddressesLocalMode(a, b)
+          assert([-1, 0, 1].includes(result))
+          return result
+        })
         .every((addr: Multiaddr, index: number) => addr.equals(addrsLocalOrder[index]))
     )
   })

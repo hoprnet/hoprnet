@@ -1,5 +1,5 @@
 import type { Operation } from 'express-openapi'
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import { STATUS_CODES } from '../../utils.js'
 
 /**
@@ -12,7 +12,7 @@ export const getAddresses = (
   hopr: string
 } => {
   const native = node.getEthereumAddress().toHex()
-  const hopr = node.getId().toB58String()
+  const hopr = node.getId().toString()
 
   return {
     native,
@@ -20,21 +20,23 @@ export const getAddresses = (
   }
 }
 
-export const GET: Operation = [
+const GET: Operation = [
   (req, res, _next) => {
     const { node } = req.context
 
     try {
       const addresses = getAddresses(node)
 
-      res.status(200).json({
+      return res.status(200).json({
         nativeAddress: addresses.native,
         native: addresses.native,
         hoprAddress: addresses.hopr,
         hopr: addresses.hopr
       })
-    } catch (error) {
-      res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
+    } catch (err) {
+      return res
+        .status(422)
+        .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 ]
@@ -100,3 +102,5 @@ GET.apiDoc = {
     }
   }
 }
+
+export default { GET }

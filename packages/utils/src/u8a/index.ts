@@ -1,22 +1,18 @@
-export * from './constants'
+export * from './constants.js'
 
-export * from './allocate'
-export * from './concat'
+export * from './concat.js'
 
-export * from './xor'
-export * from './u8aAdd'
+export * from './xor.js'
+export * from './u8aAdd.js'
 
-export * from './lengthPrefixedToU8a'
-export * from './toLengthPrefixedU8a'
+export * from './toU8a.js'
+export * from './toHex.js'
 
-export * from './toU8a'
-export * from './toHex'
+export * from './u8aToNumber.js'
 
-export * from './u8aToNumber'
-
-export * from './equals'
-export * from './u8aAdd'
-export * from './u8aCompare'
+export * from './equals.js'
+export * from './u8aAdd.js'
+export * from './u8aCompare.js'
 
 export type U8aAndSize = [Uint8Array, number]
 

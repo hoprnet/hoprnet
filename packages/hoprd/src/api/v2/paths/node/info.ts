@@ -1,13 +1,14 @@
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
 
 /**
  * @returns Information about the HOPR Node, including any options it started with.
  */
-export const getInfo = async ({ node }: { node: Hopr }) => {
+export const getInfo = async (node: Hopr) => {
   try {
-    const { network, hoprTokenAddress, hoprChannelsAddress, channelClosureSecs } = node.smartContractInfo()
+    const { network, hoprTokenAddress, hoprChannelsAddress, channelClosureSecs, hoprNetworkRegistryAddress } =
+      node.smartContractInfo()
 
     return {
       environment: node.environment.id,
@@ -16,22 +17,29 @@ export const getInfo = async ({ node }: { node: Hopr }) => {
       network: network,
       hoprToken: hoprTokenAddress,
       hoprChannels: hoprChannelsAddress,
+      hoprNetworkRegistry: hoprNetworkRegistryAddress,
+      isEligible: await node.isAllowedAccessToNetwork(node.getId()),
+      connectivityStatus: node.getConnectivityHealth().toString(),
       channelClosurePeriod: Math.ceil(channelClosureSecs / 60)
     }
   } catch (error) {
-    throw new Error(STATUS_CODES.UNKNOWN_FAILURE + error.message)
+    // Make sure this doesn't throw
+    const errString = error instanceof Error ? error.message : 'Unknown error'
+    throw new Error(errString)
   }
 }
 
-export const GET: Operation = [
+const GET: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
 
     try {
-      const info = await getInfo({ node })
+      const info = await getInfo(node)
       return res.status(200).send(info)
-    } catch (error) {
-      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
+    } catch (err) {
+      return res
+        .status(422)
+        .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 ]
@@ -92,6 +100,24 @@ GET.apiDoc = {
                 description:
                   'Contract address of the HoprChannels smart contract on ethereum network. This smart contract is used to open payment channels between nodes on blockchain.'
               },
+              hoprNetworkRegistryAddress: {
+                type: 'string',
+                example: '0xBEE1F5d64b562715E749771408d06D57EE0892A7',
+                description:
+                  'Contract address of the contract that allows to control the number of nodes in the network'
+              },
+              connectivityStatus: {
+                type: 'string',
+                example: 'GREEN',
+                description:
+                  'Indicates how good is the connectivity of this node to the HOPR network: either RED, ORANGE, YELLOW or GREEN'
+              },
+              isEligible: {
+                type: 'boolean',
+                example: true,
+                description:
+                  'Determines whether the staking account associated with this node is eligible for accessing the HOPR network. Always true if network registry is disabled.'
+              },
               channelClosurePeriod: {
                 type: 'number',
                 example: 1,
@@ -120,3 +146,5 @@ GET.apiDoc = {
     }
   }
 }
+
+export default { GET }

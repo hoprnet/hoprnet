@@ -1,7 +1,7 @@
 import express from 'express'
 import http from 'http'
 import cors from 'cors'
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 
 import type { LogStream } from './logs.js'
 

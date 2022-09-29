@@ -12,7 +12,9 @@ export type TransactionPayload = {
 export type Transaction = {
   nonce: number
   createdAt: number
-  maxPrority: BigNumber
+  maxPriority: BigNumber
+  maxFeePerGas: BigNumber
+  gasLimit: BigNumber
 }
 
 /**
@@ -57,13 +59,15 @@ class TranscationManager {
     const queuingTxHash = Array.from(this.queuing.keys())
     return queuingTxHash.map((txHash) => {
       const { to, data, value } = this.payloads.get(txHash)
-      const { nonce, maxPrority } = this.queuing.get(txHash)
+      const { nonce, maxPriority, maxFeePerGas, gasLimit } = this.queuing.get(txHash)
       return {
         to,
         data,
         value,
         nonce,
-        maxPrority
+        maxPriorityFeePerGas: maxPriority,
+        maxFeePerGas,
+        gasLimit
       }
     })
   }
@@ -87,10 +91,10 @@ class TranscationManager {
   /**
    * If a transaction payload exists in mined or pending with a higher/equal gas price
    * @param payload object
-   * @param maxPrority Max Priority Fee. Tips paying to the miners, which correlates to the likelyhood of getting transactions included.
+   * @param maxPriority Max Priority Fee. Tips paying to the miners, which correlates to the likelyhood of getting transactions included.
    * @returns [true if it exists, transaction hash]
    */
-  public existInMinedOrPendingWithHigherFee(payload: TransactionPayload, maxPrority: BigNumber): [boolean, string] {
+  public existInMinedOrPendingWithHigherFee(payload: TransactionPayload, maxPriority: BigNumber): [boolean, string] {
     // Using isDeepStrictEqual to compare TransactionPayload objects, see
     // https://nodejs.org/api/util.html#util_util_isdeepstrictequal_val1_val2
     const index = Array.from(this.payloads.values()).findIndex((pl) => isDeepStrictEqual(pl, payload))
@@ -101,7 +105,7 @@ class TranscationManager {
     const hash = Array.from(this.payloads.keys())[index]
     if (
       !this.mined.get(hash) &&
-      BigNumber.from((this.pending.get(hash) ?? this.queuing.get(hash)).maxPrority).lt(maxPrority)
+      BigNumber.from((this.pending.get(hash) ?? this.queuing.get(hash)).maxPriority).lt(maxPriority)
     ) {
       return [false, hash]
     }
@@ -112,17 +116,28 @@ class TranscationManager {
    * Adds queuing transaction
    * @param hash transaction hash
    * @param transaction object
+   * @returns true if transaction got added to queue, otherwise false
    */
   public addToQueuing(
     hash: string,
     transaction: Omit<Transaction, 'createdAt'>,
     transactionPayload: TransactionPayload
-  ): void {
-    if (this.queuing.has(hash)) return
+  ): boolean {
+    if (this.queuing.has(hash)) {
+      return false
+    }
 
     log('Adding queuing transaction %s %i', hash, transaction.nonce)
     this.payloads.set(hash, transactionPayload)
-    this.queuing.set(hash, { nonce: transaction.nonce, createdAt: 0, maxPrority: transaction.maxPrority })
+    this.queuing.set(hash, {
+      nonce: transaction.nonce,
+      createdAt: 0,
+      maxPriority: transaction.maxPriority,
+      maxFeePerGas: transaction.maxFeePerGas,
+      gasLimit: transaction.gasLimit
+    })
+
+    return true
   }
 
   /**

@@ -1,6 +1,6 @@
 import assert from 'assert'
-import { fakePeerId, showBackoff } from '../test-utils.spec'
-import PeerStore, { MAX_BACKOFF } from './network-peers'
+import { fakePeerId, showBackoff } from '../test-utils.spec.js'
+import NetworkPeers, { MAX_BACKOFF, NetworkPeersOrigin } from './network-peers.js'
 
 const NETWORK_QUALITY_THRESHOLD = 0.5
 
@@ -9,31 +9,31 @@ describe('test PeerStore', async function () {
 
   const SELF = fakePeerId(6)
   it('should register new peers', async function () {
-    const networkPeers = new PeerStore([], [SELF], NETWORK_QUALITY_THRESHOLD)
+    const networkPeers = new NetworkPeers([], [SELF], NETWORK_QUALITY_THRESHOLD)
     assert(networkPeers.length() == 0, 'networkPeers must be empty')
 
-    networkPeers.register(SELF, 'test')
+    networkPeers.register(SELF, NetworkPeersOrigin.TESTING)
     assert(networkPeers.length() == 0, 'networkPeers must be empty after inserting self')
 
-    networkPeers.register(IDS[0], 'test')
-    networkPeers.register(IDS[1], 'test')
+    networkPeers.register(IDS[0], NetworkPeersOrigin.TESTING)
+    networkPeers.register(IDS[1], NetworkPeersOrigin.TESTING)
     assert(networkPeers.length() == 2, 'now has 2 peers')
-    networkPeers.register(IDS[0], 'test')
+    networkPeers.register(IDS[0], NetworkPeersOrigin.TESTING)
     assert(networkPeers.length() == 2, `Updating a peer should not increase len`)
   })
 
   it('should allow randomSubset to be taken of peer ids', function () {
-    const networkPeers = new PeerStore(IDS, [SELF], NETWORK_QUALITY_THRESHOLD)
+    const networkPeers = new NetworkPeers(IDS, [SELF], NETWORK_QUALITY_THRESHOLD)
     assert(networkPeers.randomSubset(3).length == 3)
   })
 
   it('should _ping_ peers', async function () {
     const id = fakePeerId(5)
-    const networkPeers = new PeerStore([], [SELF], NETWORK_QUALITY_THRESHOLD)
+    const networkPeers = new NetworkPeers([], [SELF], NETWORK_QUALITY_THRESHOLD)
     assert(networkPeers.length() == 0, 'networkPeers must be empty')
     assert(networkPeers.pingSince(123).length === 0, 'no peers yet')
 
-    networkPeers.register(id, 'test')
+    networkPeers.register(id, NetworkPeersOrigin.TESTING)
     assert(networkPeers.qualityOf(id) < NETWORK_QUALITY_THRESHOLD, 'initial peers have low quality')
     assert(networkPeers.length() === 1)
 
@@ -80,10 +80,10 @@ describe('test PeerStore', async function () {
       peerConsideredOffline = true
     }
 
-    const networkPeers = new PeerStore([], [SELF], NETWORK_QUALITY_THRESHOLD, onPeerOffline)
+    const networkPeers = new NetworkPeers([], [SELF], NETWORK_QUALITY_THRESHOLD, onPeerOffline)
 
     const id = fakePeerId(5)
-    networkPeers.register(id, 'test')
+    networkPeers.register(id, NetworkPeersOrigin.TESTING)
 
     while (networkPeers.qualityOf(id) <= NETWORK_QUALITY_THRESHOLD) {
       networkPeers.updateRecord({

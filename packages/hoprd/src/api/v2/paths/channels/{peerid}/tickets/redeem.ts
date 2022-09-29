@@ -1,14 +1,14 @@
 import type { Operation } from 'express-openapi'
-import PeerId from 'peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import { STATUS_CODES } from '../../../../utils.js'
 
-export const POST: Operation = [
+const POST: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
     const { peerid } = req.params
 
     try {
-      const validPeerId = PeerId.createFromB58String(peerid)
+      const validPeerId = peerIdFromString(peerid)
       const tickets = await node.getTickets(validPeerId)
       if (tickets.length <= 0) {
         return res.status(404).send({ status: STATUS_CODES.TICKETS_NOT_FOUND })
@@ -16,7 +16,9 @@ export const POST: Operation = [
       await node.redeemTicketsInChannel(validPeerId)
       return res.status(204).send()
     } catch (err) {
-      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+      return res
+        .status(422)
+        .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 ]
@@ -88,3 +90,5 @@ POST.apiDoc = {
     }
   }
 }
+
+export default { POST }

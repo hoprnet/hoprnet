@@ -1,24 +1,22 @@
 import assert from 'assert'
-import sinon from 'sinon'
-import { wait, retryWithBackoff as backoff } from './backoff'
+import { wait, retryWithBackoffThenThrow as backoff, getBackoffRetries, getBackoffRetryTimeout } from './backoff.js'
 
-const getRoundedDiff = (startTime: number, endTime: number): number => {
-  return Math.round((endTime - startTime) / 100) * 100
-}
+// Additional time that Node.js takes to compute functions
+// and process timeouts
+const PROPAGATION_DELAY = 50
 
 describe('test wait', function () {
   it('should resolve after 100 ms', async function () {
     const startTime = Date.now()
-    await wait(100)
-    const endTime = Date.now()
-    const roundedDiff = getRoundedDiff(startTime, endTime)
-    assert.strictEqual(roundedDiff, 100)
+    const expectedWait = 100
+    await wait(expectedWait)
+    assert(Date.now() - startTime - expectedWait <= PROPAGATION_DELAY)
   })
 })
 
 describe('test backoff', function () {
   it('should validate options', async function () {
-    const fn = sinon.fake(() => Promise.resolve())
+    const fn = () => Promise.resolve()
 
     assert.rejects(
       backoff(fn, {
@@ -40,10 +38,12 @@ describe('test backoff', function () {
     this.timeout(3000)
 
     const ticks: number[] = []
-    const fn = sinon.fake(() => {
+    let callCount = 0
+    const fn = () => {
+      callCount++
       ticks.push(Date.now())
       return Promise.reject()
-    })
+    }
 
     let timedout = false
     try {
@@ -57,20 +57,61 @@ describe('test backoff', function () {
     }
 
     assert(timedout)
-    assert.strictEqual(fn.callCount, 5)
-    assert.strictEqual(getRoundedDiff(ticks[0], ticks[1]), 100)
-    assert.strictEqual(getRoundedDiff(ticks[1], ticks[2]), 200)
-    assert.strictEqual(getRoundedDiff(ticks[2], ticks[3]), 400)
-    assert.strictEqual(getRoundedDiff(ticks[3], ticks[4]), 800)
+    assert(callCount == 5)
+    assert(ticks[0] - ticks[1] - 100 <= PROPAGATION_DELAY)
+    assert(ticks[1] - ticks[2] - 200 <= PROPAGATION_DELAY)
+    assert(ticks[2] - ticks[3] - 400 <= PROPAGATION_DELAY)
+    assert(ticks[3] - ticks[4] - 800 <= PROPAGATION_DELAY)
+  })
+
+  it('should timeout after computed retries', async function () {
+    this.timeout(3000)
+    const start = Date.now()
+
+    let callCount = 0
+
+    const fn = () => {
+      callCount++
+      return Promise.reject()
+    }
+
+    const minDelay = 100
+    const maxDelay = 500
+    const delayMultiple = 2
+    let timedout = false
+    try {
+      await backoff(fn, {
+        minDelay,
+        maxDelay,
+        delayMultiple
+      })
+    } catch {
+      timedout = true
+    }
+
+    assert(
+      getBackoffRetries(minDelay, maxDelay, delayMultiple) == callCount - 1,
+      'Expected call count must be equal to computed call count'
+    )
+
+    const PROPAGATION_DELAY = 50
+    assert(Date.now() - start - getBackoffRetryTimeout(minDelay, maxDelay, delayMultiple) <= PROPAGATION_DELAY)
+    assert(timedout)
   })
 
   it('should resolve after 4th try', async function () {
     const ticks: number[] = []
-    const fn = sinon.fake(() => {
+    let callCount = 0
+
+    const fn = () => {
       ticks.push(Date.now())
-      if (fn.callCount === 4) return Promise.resolve()
+      callCount++
+      if (callCount == 4) {
+        return Promise.resolve()
+      }
+
       return Promise.reject()
-    })
+    }
 
     let timedout = false
     try {
@@ -84,9 +125,9 @@ describe('test backoff', function () {
     }
 
     assert(!timedout)
-    assert.strictEqual(fn.callCount, 4)
-    assert.strictEqual(getRoundedDiff(ticks[0], ticks[1]), 100)
-    assert.strictEqual(getRoundedDiff(ticks[1], ticks[2]), 200)
-    assert.strictEqual(getRoundedDiff(ticks[2], ticks[3]), 400)
+    assert(callCount == 4)
+    assert(ticks[0] - ticks[1] - 100 <= PROPAGATION_DELAY)
+    assert(ticks[1] - ticks[2] - 200 <= PROPAGATION_DELAY)
+    assert(ticks[2] - ticks[3] - 400 <= PROPAGATION_DELAY)
   })
 })

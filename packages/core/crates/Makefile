@@ -8,16 +8,13 @@ JS_FILES = $(foreach package,$(PACKAGES),$(package)/pkg/$(subst -,_,$(package)).
 .PHONY := all clean test install
 
 all: $(JS_FILES)
-	@echo "All WASM modules built successfully"
 
 test: $(JS_FILES)
-	$(foreach pkg,$(PACKAGES),cargo test -p $(pkg) && wasm-pack test --node $(pkg))
+	$(foreach pkg,$(PACKAGES),npx wasm-pack test --node `pwd`/$(pkg))
 
 $(JS_FILES):
-	@echo "--- Building WASM module to '$(@D)' ... ---"
 	mkdir -p $(@D)
-	cd $(@D)/.. && wasm-pack build --target=nodejs
-	@echo "--- Built WASM module in '$(@D)' ---"
+	npx wasm-pack build --target=nodejs `pwd`/$(@D)/..
 
 install:
 ifneq ($(PACKAGES),)

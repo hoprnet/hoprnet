@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# prevent souring of this script, only allow execution
+# prevent sourcing of this script, only allow execution
 $(return >/dev/null 2>&1)
 test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
 
@@ -11,6 +11,8 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="e2e-source-test"
+
+source "${mydir}/testnet.sh"
 source "${mydir}/utils.sh"
 
 usage() {
@@ -25,7 +27,7 @@ usage() {
 declare wait_delay=2
 declare wait_max_wait=1000
 declare skip_cleanup="false"
-declare api_token="e2e-API-token^^"
+declare default_api_token="e2e-API-token^^"
 
 while (( "$#" )); do
   case "$1" in
@@ -65,7 +67,6 @@ declare node4_dir="${tmp}/${node_prefix}-4"
 declare node5_dir="${tmp}/${node_prefix}-5"
 declare node6_dir="${tmp}/${node_prefix}-6"
 declare node7_dir="${tmp}/${node_prefix}-7"
-declare node8_dir="${tmp}/${node_prefix}-8"
 
 declare ct_node1_dir="${tmp}/${node_prefix}-ct1"
 
@@ -76,7 +77,6 @@ declare node4_log="${node4_dir}.log"
 declare node5_log="${node5_dir}.log"
 declare node6_log="${node6_dir}.log"
 declare node7_log="${node7_dir}.log"
-declare node8_log="${node8_dir}.log"
 
 declare ct_node1_log="${ct_node1_dir}.log"
 
@@ -87,7 +87,14 @@ declare node4_id="${node4_dir}.id"
 declare node5_id="${node5_dir}.id"
 declare node6_id="${node6_dir}.id"
 declare node7_id="${node7_dir}.id"
-declare node8_id="${node8_dir}.id"
+
+declare node1_privkey="0x1f5b172a64947589be6e279fbcbc09aca6e623a64a92aa359fae9c6613b7e801"
+declare node2_privkey="0xcb9c3533beb75b996b6c77150ecda32134d13710a16121f04dc591113329cd7c"
+declare node3_privkey="0x9a96a7711e2e9c9f71767bb9f248f699b29aebe7f590de8eeec0e71796b869e0"
+declare node4_privkey="0x7dea49b4dbeea4dcbbb9d071bc7212347748dc3a2f16896f504417236b6adb84"
+declare node5_privkey="0x800fee12d472c1a8448b786eb9e5d6c7f643c78b9727032893da9a6a55db288b"
+declare node6_privkey="0x79b94be0c06dac87139c54416228dcacfb084c6884bbf4e48fff4cab8f40baa6"
+declare node7_privkey="0x9b813edd8a85cffbe3cd2e242dc0992cfa04be15caa9f50b0b03b5ebcb2f770a"
 
 declare password="e2e-test"
 
@@ -104,15 +111,15 @@ function cleanup {
 
   # Cleaning up everything
   log "Wiping databases"
-  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${node7_dir}" "${node8_dir}" "${ct_node1_dir}"
+  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${node7_dir}" "${ct_node1_dir}"
 
   log "Cleaning up processes"
-  for port in 8545 13301 13302 13303 13304 13305 13306 13307 13308 19091 19092 19093 19094 19095 19096 19097 19098 20000; do
+  for port in 8545 13301 13302 13303 13304 13305 13306 13307 19091 19092 19093 19094 19095 19096 19097 20000; do
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
 
   local log exit_code non_zero
-  for node_log in "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}" "${node5_log}" "${node6_log}" "${node7_log}" "${node8_log}"; do
+  for node_log in "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}" "${node5_log}" "${node6_log}" "${node7_log}"; do
     log=$(wait_for_regex ${node_log} "Process exiting with signal [0-9]")
 
     if [ -z "${log}" ]; then
@@ -146,21 +153,33 @@ fi
 # $4 = node data directory
 # $5 = node log file
 # $6 = node id file
-# $7 = OPTIONAL: additional args to hoprd
+# $7 = private key to use
+# $8 = OPTIONAL: additional args to hoprd
 function setup_node() {
   local api_port=${1}
-  local node_port=${2}
-  local admin_port=${3}
-  local dir=${4}
-  local log=${5}
-  local id=${6}
-  local additional_args=${7:-""}
+  local api_token=${2}
+  local node_port=${3}
+  local admin_port=${4}
+  local dir=${5}
+  local log=${6}
+  local id=${7}
+  local private_key=${8}
+  local additional_args=${9:-""}
 
   log "Run node ${id} on API port ${api_port} -> ${log}"
 
   if [[ "${additional_args}" != *"--environment "* ]]; then
     additional_args="--environment hardhat-localhost ${additional_args}"
   fi
+
+  if [[ -n "${api_token}" ]]; then
+    additional_args="--api-token='${api_token}' ${additional_args}"
+  else
+    additional_args="--testNoAuthentication ${additional_args}"
+  fi
+
+  # Remove previous logs to make sure the regex does not match
+  rm -f "${log}"
 
   log "Additional args: \"${additional_args}\""
 
@@ -180,12 +199,12 @@ function setup_node() {
       --admin \
       --adminHost "127.0.0.1" \
       --adminPort ${admin_port} \
-      --api-token "${api_token}" \
       --data="${dir}" \
       --host="127.0.0.1:${node_port}" \
       --identity="${id}" \
       --init \
       --password="${password}" \
+      --privateKey="${private_key}" \
       --api \
       --apiPort "${api_port}" \
       --testAnnounceLocalAddresses \
@@ -210,6 +229,9 @@ function setup_ct_node() {
   local dir=${4}
   local additional_args=${5:-""}
 
+  # Remove previous logs to make sure the regex does not match
+  rm -f "${log}"
+
   log "Run CT node -> ${log}"
 
   if [[ "${additional_args}" != *"--environment "* ]]; then
@@ -217,6 +239,12 @@ function setup_ct_node() {
   fi
   log "Additional args: \"${additional_args}\""
 
+  # Remove previous logs to make sure the regex does not match
+  rm -f "${log}"
+
+  HOPR_CTD_HEARTBEAT_INTERVAL=2500 \
+  HOPR_CTD_HEARTBEAT_THRESHOLD=2500 \
+  HOPR_CTD_HEARTBEAT_VARIANCE=1000 \
   DEBUG="hopr*" NODE_ENV=development node packages/cover-traffic-daemon/lib/index.js \
     --privateKey "${private_key}" \
     --dbFile "${ct_db_file}" \
@@ -262,10 +290,6 @@ log "\tnode7"
 log "\t\tdata dir: ${node7_dir} (will be removed)"
 log "\t\tlog: ${node7_log}"
 log "\t\tid: ${node7_id}"
-log "\tnode8"
-log "\t\tdata dir: ${node8_dir} (will be removed)"
-log "\t\tlog: ${node8_log}"
-log "\t\tid: ${node8_id}"
 log "\tct_node1"
 log "\t\tdata dir: ${ct_node1_dir} (will be removed)"
 log "\t\tlog: ${ct_node1_log}"
@@ -280,7 +304,6 @@ ensure_port_is_free 13304
 ensure_port_is_free 13305
 ensure_port_is_free 13306
 ensure_port_is_free 13307
-ensure_port_is_free 13308
 ensure_port_is_free 19091
 ensure_port_is_free 19092
 ensure_port_is_free 19093
@@ -288,7 +311,6 @@ ensure_port_is_free 19094
 ensure_port_is_free 19095
 ensure_port_is_free 19096
 ensure_port_is_free 19097
-ensure_port_is_free 19098
 ensure_port_is_free 20000
 # }}}
 
@@ -300,13 +322,7 @@ rm -Rf \
 # }}}
 
 # --- Running Mock Blockchain --- {{{
-log "Running hardhat local node"
-HOPR_ENVIRONMENT_ID="hardhat-localhost" \
-TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-yarn workspace @hoprnet/hopr-ethereum hardhat node \
-  --network hardhat \
-  --show-stack-traces > \
-  "${hardhat_rpc_log}" 2>&1 &
+start_local_hardhat "${hardhat_rpc_log}"
 
 wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
 log "Hardhat node started (127.0.0.1:8545)"
@@ -321,19 +337,18 @@ cp -R \
 # }}}
 
 # static address because static private key
-declare ct_node1_address="0xDe913EeED23Bce5274eAD3dE8c196A41176fbd49"
+declare ct_node1_address="0xde913eeed23bce5274ead3de8c196a41176fbd49"
 
 #  --- Run nodes --- {{{
-setup_node 13301 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}" "--announce"
-setup_node 13302 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "--announce --testNoAuthentication"
-setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}" "--announce"
-setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}" "--testNoDirectConnections"
-setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}" "--testNoDirectConnections"
-setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--announce --run \"info;balance\""
+setup_node 13301 ${default_api_token} 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}" "${node1_privkey}" "--announce"
+setup_node 13302 "" 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "${node2_privkey}" "--announce"
+setup_node 13303 ${default_api_token} 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}" "${node3_privkey}" "--announce"
+setup_node 13304 ${default_api_token} 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}" "${node4_privkey}" "--testNoDirectConnections"
+setup_node 13305 ${default_api_token} 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}" "${node5_privkey}" "--testNoDirectConnections"
 # should not be able to talk to the rest
-setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--announce --environment hardhat-localhost2"
+setup_node 13306 ${default_api_token} 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "${node6_privkey}" "--announce --environment hardhat-localhost2"
 # node n8 will be the only one NOT registered
-setup_node 13308 19098 19508 "${node8_dir}" "${node8_log}" "${node8_id}" "--announce"
+setup_node 13307 ${default_api_token} 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "${node7_privkey}" "--announce"
 setup_ct_node "${ct_node1_log}" "0xa08666bca1363cb00b5402bbeb6d47f6b84296f3bba0f2f95b1081df5588a613" 20000 "${ct_node1_dir}"
 # }}}
 
@@ -348,20 +363,11 @@ wait_for_regex ${node4_log} "please fund this node"
 wait_for_regex ${node5_log} "please fund this node"
 wait_for_regex ${node6_log} "please fund this node"
 wait_for_regex ${node7_log} "please fund this node"
-wait_for_regex ${node8_log} "please fund this node"
 # }}}
 
 log "Funding nodes"
 #  --- Fund nodes --- {{{
-HOPR_ENVIRONMENT_ID=hardhat-localhost \
-TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
-  --identity-prefix "${node_prefix}" \
-  --identity-directory "${tmp}" \
-  --use-local-identities \
-  --network hardhat \
-  --address "${ct_node1_address}" \
-  --password "${password}"
+fund_nodes "${node_prefix}" "${tmp}" "${password}" "${ct_node1_address}"
 # }}}
 
 log "Waiting for port binding"
@@ -372,14 +378,13 @@ wait_for_regex ${node2_log} "STARTED NODE"
 wait_for_regex ${node3_log} "STARTED NODE"
 wait_for_regex ${node4_log} "STARTED NODE"
 wait_for_regex ${node5_log} "STARTED NODE"
-# no need to wait for node 6 since that will stop right away
+wait_for_regex ${node6_log} "STARTED NODE"
+wait_for_port 19096 "127.0.0.1" "${node6_log}"
 wait_for_regex ${node7_log} "STARTED NODE"
-wait_for_port 19097 "127.0.0.1" "${node7_log}"
-wait_for_regex ${node8_log} "STARTED NODE"
 # }}}
 
 #  --- Ensure data directories are used --- {{{
-for node_dir in ${node1_dir} ${node2_dir} ${node3_dir} ${node4_dir} ${node5_dir} ${node7_dir} ${node8_dir}; do
+for node_dir in ${node1_dir} ${node2_dir} ${node3_dir} ${node4_dir} ${node5_dir} ${node6_dir} ${node7_dir}; do
   declare node_dir_db="${node_dir}/db/LOG"
   declare node_dir_peerstore="${node_dir}/peerstore/LOG"
   [ -f "${node_dir_db}" ] || { echo "Data file ${node_dir_db} missing"; exit 1; }
@@ -391,20 +396,15 @@ log "All nodes came up online"
 
 # --- Run security tests --- {{{
 ${mydir}/../test/security-test.sh \
-  127.0.0.1 13301 13302 19501 19502 "${api_token}"
+  127.0.0.1 13301 13302 19501 19502 "${default_api_token}"
 # }}}
 
 # --- Run protocol test --- {{{
-HOPRD_API_TOKEN="${api_token}" ${mydir}/../test/integration-test.sh \
-  "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305" "localhost:13306" "localhost:13307" "localhost:13308"
-# }}}
-
-# -- Verify node6 has executed the commands {{{
-log "Verifying node6 log output"
-grep -E "HOPR Balance: +20000 txHOPR" "${node6_log}"
-grep -E "ETH Balance: +10 xDAI" "${node6_log}"
-grep -E "Running on: hardhat" "${node6_log}"
-log "Output of node6 correct"
+ADDITIONAL_NODE_ADDRS="0xde913eeed23bce5274ead3de8c196a41176fbd49" \
+ADDITIONAL_NODE_PEERIDS="16Uiu2HAm2VD6owCxPEZwP6Moe1jzapqziVeaTXf1h7jVzu5dW1mk" \
+HOPRD_API_TOKEN="${default_api_token}" \
+${mydir}/../test/integration-test.sh \
+  "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305" "localhost:13306" "localhost:13307"
 # }}}
 
 # -- CT test {{{

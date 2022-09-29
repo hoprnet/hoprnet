@@ -1,18 +1,19 @@
 import { stringToU8a } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
 import { Address, Balance, PublicKey, UINT256, Ticket, ChannelEntry, ChannelStatus } from '@hoprnet/hopr-utils'
-import { validateUnacknowledgedTicket } from '.'
+import { validateUnacknowledgedTicket } from './index.js'
 
 chai.use(chaiAsPromised)
 
 // target is party A, sender is party B
-const TARGET = PeerId.createFromB58String('16Uiu2HAmM9KAPaXA4eAz58Q7Eb3LEkDvLarU4utkyLwDeEK6vM5m')
+const TARGET = peerIdFromString('16Uiu2HAmM9KAPaXA4eAz58Q7Eb3LEkDvLarU4utkyLwDeEK6vM5m')
 const TARGET_PUBKEY = PublicKey.fromPeerId(TARGET)
 const TARGET_ADDRESS = new Address(stringToU8a('0x65e78d07acf7b654e5ae6777a93ebbf30f639356'))
-const SENDER = PeerId.createFromB58String('16Uiu2HAm5g4fTADcjPQrtp9LtN2wCmPJTQPD7vMnWCZp4kwKCVUT')
+const SENDER = peerIdFromString('16Uiu2HAm5g4fTADcjPQrtp9LtN2wCmPJTQPD7vMnWCZp4kwKCVUT')
 // const SENDER_ADDRESS = new Address(stringToU8a('0xf3a509473be4bcd8af0d1961d75a5a3dc9e47ba0'))
 
 const createMockTicket = ({

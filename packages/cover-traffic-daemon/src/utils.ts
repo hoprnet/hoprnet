@@ -1,10 +1,17 @@
 import { findPath } from '@hoprnet/hopr-core'
 import BN from 'bn.js'
-import { BigNumber } from 'bignumber.js'
-import type { PublicKey, ChannelEntry } from '@hoprnet/hopr-utils'
-import type { State, ChannelData, PersistedState } from './state'
-import { CT_PATH_RANDOMNESS, CT_INTERMEDIATE_HOPS } from './constants'
+import BigNumberPkg from 'bignumber.js'
+import { type PublicKey, type ChannelEntry, randomFloat } from '@hoprnet/hopr-utils'
+import type { State, PersistedState } from './state.js'
+import { CT_PATH_RANDOMNESS, CT_INTERMEDIATE_HOPS } from './constants.js'
 import { debug } from '@hoprnet/hopr-utils'
+
+// @TODO inefficient & does not support runtime updates
+// Don't do typechecks on JSON files
+// @ts-ignore
+import unreleasedTokens from '../unreleasedTokens.json' assert { type: 'json' }
+
+const { BigNumber } = BigNumberPkg
 
 const log = debug('hopr:cover-traffic')
 
@@ -21,25 +28,40 @@ export type UnreleasedSchedule = {
 
 export type UnreleasedTokens = {
   // hopr id to node Ethereum addresses
-  link: Record<string, string[]>
+  link: {
+    [index: string]: string[]
+  }
   // Node Ethereum address to the array of unreleased token schedule
-  allocation: Record<string, UnreleasedSchedule[]>
+  allocation: {
+    [index: string]: UnreleasedSchedule[]
+  }
 }
 
-const unreleasedTokens: UnreleasedTokens = require('../unreleasedTokens.json')
-
-export const addBN = (a: BN, b: BN): BN => a.add(b)
-export const sqrtBN = (a: BN): BN => new BN(new BigNumber(a.toString()).squareRoot().integerValue().toFixed(), 10)
+/**
+ * Gets the integer part of the sqaure root of a an integer
+ * @dev squaring the result in general does not lead to the input value
+ * @param int the integer to compute the square root
+ * @returns the rounded square root
+ */
+export function sqrtBN(int: BN): BN {
+  return new BN(new BigNumber(int.toString()).squareRoot().integerValue().toFixed(), 10)
+}
 
 /**
  * Get channels opened from a node with a given public key in the state.
  * @param p Public key of the `source` node
  * @returns a list of channel entries where the `source` is the given public key
  */
-export const findChannelsFrom = (p: PublicKey, state: State): ChannelEntry[] =>
-  Object.values(state.channels)
-    .map((c) => c.channel)
-    .filter((c: ChannelEntry) => c.source.eq(p))
+export function findChannelsFrom(p: PublicKey, state: State): ChannelEntry[] {
+  let result: ChannelEntry[] = []
+  for (const channelId in state.channels) {
+    const channel = state.channels[channelId].channel
+    if (channel.source.eq(p)) {
+      result.push(channel)
+    }
+  }
+  return result
+}
 
 /**
  * Get the total outgoing channel balance of a node, given the network state.
@@ -48,10 +70,13 @@ export const findChannelsFrom = (p: PublicKey, state: State): ChannelEntry[] =>
  * @param state State of the network
  * @returns Total channel balance in big number
  */
-export const totalChannelBalanceFor = (p: PublicKey, state: State): BN =>
-  findChannelsFrom(p, state)
-    .map((c) => c.balance.toBN())
-    .reduce(addBN, new BN('0'))
+export function totalChannelBalanceFor(p: PublicKey, state: State): BN {
+  const result = new BN(0)
+  for (const channel of findChannelsFrom(p, state)) {
+    result.iadd(channel.balance.toBN())
+  }
+  return result
+}
 
 /**
  * Get the stake of a node which consists of the total channel balance
@@ -63,28 +88,38 @@ export const totalChannelBalanceFor = (p: PublicKey, state: State): BN =>
  * @param state State of the network
  * @returns Stake of a node in big number
  */
-export const stakeFor = (p: PublicKey, state: State): BN => {
-  const linkedAccountsIndex = Object.keys(unreleasedTokens.link).findIndex(
-    (id) => id.toLowerCase() == p.toB58String().toLowerCase()
-  )
+export function stakeFor(p: PublicKey, state: State): BN {
+  let linkedAccounts: UnreleasedTokens['link'][string] = null
 
-  if (linkedAccountsIndex < 0) {
+  const b58String = p.toString()
+  for (const id in unreleasedTokens.link) {
+    // Base58 encoding is case-sensitive
+    if (id === b58String) {
+      linkedAccounts = unreleasedTokens.link[id]
+    }
+  }
+
+  if (!linkedAccounts) {
     return totalChannelBalanceFor(p, state)
   }
 
   const currentBlockNumber = state.block.toNumber()
 
-  return Object.values(unreleasedTokens.link)
-    [linkedAccountsIndex].map((nodeAddress) => {
-      const scheduleIndex = unreleasedTokens.allocation[nodeAddress].findIndex(
-        (schedule) => schedule.lowerBlock <= currentBlockNumber && currentBlockNumber < schedule.upperBlock
-      )
-      return scheduleIndex < 0
-        ? new BN('0')
-        : new BN(unreleasedTokens.allocation[nodeAddress][scheduleIndex].unreleased)
-    })
-    .reduce(addBN, new BN('0'))
-    .add(totalChannelBalanceFor(p, state))
+  const result = totalChannelBalanceFor(p, state)
+  for (const linkedAccount of linkedAccounts) {
+    let accountSchedule: UnreleasedSchedule = null
+    for (const schedule of unreleasedTokens.allocation[linkedAccount]) {
+      if (schedule.lowerBlock <= currentBlockNumber && currentBlockNumber < schedule.upperBlock) {
+        accountSchedule = schedule
+      }
+    }
+
+    if (accountSchedule) {
+      result.iadd(new BN(accountSchedule.unreleased))
+    }
+  }
+
+  return result
 }
 
 /**
@@ -96,10 +131,13 @@ export const stakeFor = (p: PublicKey, state: State): BN => {
  * @param state State of the network
  * @returns Total channel balance in big number
  */
-export const importance = (p: PublicKey, state: State): BN =>
-  findChannelsFrom(p, state)
-    .map((c: ChannelEntry) => sqrtBN(stakeFor(p, state).mul(c.balance.toBN()).mul(stakeFor(c.destination, state))))
-    .reduce(addBN, new BN('0'))
+export function importance(p: PublicKey, state: State): BN {
+  const result = new BN(0)
+  for (const channel of findChannelsFrom(p, state)) {
+    result.iadd(sqrtBN(stakeFor(p, state).imul(channel.balance.toBN()).imul(stakeFor(channel.destination, state))))
+  }
+  return result
+}
 
 /**
  * Return the randomnized importance score of a node, given the network state.
@@ -107,8 +145,8 @@ export const importance = (p: PublicKey, state: State): BN =>
  * @param state State of the network
  * @returns the randmonized importance score
  */
-export const randomWeightedImportance = (p: PublicKey, state: State): BN => {
-  const randomComponent = 1 + Math.random() * CT_PATH_RANDOMNESS
+export function randomWeightedImportance(p: PublicKey, state: State): BN {
+  const randomComponent = 1 + randomFloat() * CT_PATH_RANDOMNESS
   return importance(p, state).muln(randomComponent)
 }
 
@@ -119,18 +157,24 @@ export const randomWeightedImportance = (p: PublicKey, state: State): BN => {
  * @param dest Public key of the `destination` of the channel
  * @returns ChannelEntry between `source` and `destination`, undefined otherwise.
  */
-export const findChannel = (src: PublicKey, dest: PublicKey, state: State): ChannelEntry =>
-  Object.values(state.channels)
-    .map((c: ChannelData): ChannelEntry => c.channel)
-    .find((c: ChannelEntry) => c.source.eq(src) && c.destination.eq(dest))
+export function findChannel(src: PublicKey, dest: PublicKey, state: State): ChannelEntry | null {
+  for (const channelId in state.channels) {
+    const channel = state.channels[channelId].channel
+    if (channel.source.eq(src) && channel.destination.eq(dest)) {
+      return channel
+    }
+  }
+  return null
+}
 
 /*
  * Find the timestamp at which a CT channel is opened.
+ * Returns current time if channel does not exist.
  * @param dest Public key of the `destination` of the channel
  * @param state State of the network
  */
-export const findCtChannelOpenTime = (dest: PublicKey, state: State): number => {
-  const ctChannel = state.ctChannels.find((ctChannel) => ctChannel.destination === dest)
+export function findCtChannelOpenTime(dest: PublicKey, state: State): number {
+  const ctChannel = state.ctChannels.find((ctChannel) => ctChannel.destination.eq(dest))
   return !ctChannel ? Date.now() : ctChannel.openFrom ?? Date.now()
 }
 
@@ -148,8 +192,6 @@ export const sendCTMessage = async (
   sendMessage: (message: Uint8Array, path: PublicKey[]) => Promise<void>,
   data: PersistedState
 ): Promise<boolean> => {
-  // get the randomized weighted importance score of the destination of a given channel.
-  const weight = async (edge: ChannelEntry): Promise<BN> => randomWeightedImportance(edge.destination, data.get())
   let path: PublicKey[]
 
   // build CT message,
@@ -163,7 +205,8 @@ export const sendCTMessage = async (
       CT_INTERMEDIATE_HOPS - 1, // As us to start is first intermediate
       (_p: PublicKey): number => 1, // TODO: network quality?
       (p: PublicKey) => Promise.resolve(data.findChannelsFrom(p)),
-      weight
+      // get the randomized weighted importance score of the destination of a given channel.
+      (edge: ChannelEntry): Promise<BN> => Promise.resolve(randomWeightedImportance(edge.destination, data.get()))
     )
 
     // update counters in the state
@@ -180,16 +223,16 @@ export const sendCTMessage = async (
     // build the complete path
     path.unshift(startNode) // Path doesn't normally include this
 
-    log(`SEND ${path.map((pub) => pub.toB58String()).join(',')}`)
+    log(`SEND ${path.map((pub) => pub.toString()).join(',')}`)
   } catch (e) {
     return false
   }
   try {
     await sendMessage(message, path)
-    log(`success sending ${path.map((pub) => pub.toB58String()).join(',')} message ${message}`)
+    log(`success sending ${path.map((pub) => pub.toString()).join(',')} message ${message}`)
     return true
   } catch (e) {
-    log(`error ${e} sending to ${startNode.toB58String()}`)
+    log(`error ${e} sending to ${startNode.toString()}`)
     return false
   }
 }

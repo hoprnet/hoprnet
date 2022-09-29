@@ -1,6 +1,6 @@
-import type { Address } from 'libp2p/src/peer-store/address-book'
-import { isPrivateAddress, isLocalhost } from '../network'
-import { type Multiaddr, protocols } from 'multiaddr'
+import type { Address } from '@libp2p/interface-peer-store'
+import { isPrivateAddress, isLocalhost } from '../network/index.js'
+import { type Multiaddr, protocols } from '@multiformats/multiaddr'
 import type { NetworkInterfaceInfo } from 'os'
 
 const CODE_IP4 = protocols('ip4').code
@@ -25,6 +25,8 @@ export function isMultiaddrLocal(multiaddr: Multiaddr): boolean {
     case CODE_IP6:
       ipFamily = 'IPv6'
       break
+    default:
+      throw Error(`invalid input arguments`)
   }
 
   return isLocalhost(tuples[0][1], ipFamily) || isPrivateAddress(tuples[0][1], ipFamily)

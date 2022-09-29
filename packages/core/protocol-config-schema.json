@@ -5,10 +5,18 @@
       "type": "object",
       "patternProperties": {
         "^[a-z0-9-]+$": {
-          "type": "string",
+          "type": "object",
           "properties": {
             "network_id": {
               "type": "string"
+            },
+            "environment_type": {
+              "type": "string",
+              "enum": ["production", "staging", "development"]
+            },
+            "version_range": {
+              "type": "string",
+              "description": "The version range is a string which has one or more space-separated descriptors (same as npm dependancies, https://github.com/npm/node-semver)."
             },
             "channel_contract_deploy_block": {
               "type": "integer"
@@ -46,9 +54,12 @@
           },
           "required": [
             "network_id",
+            "environment_type",
+            "version_range",
             "channel_contract_deploy_block",
             "token_contract_address",
             "channels_contract_address",
+            "stake_contract_address",
             "network_registry_contract_address",
             "tags"
           ],
@@ -61,7 +72,7 @@
       "type": "object",
       "patternProperties": {
         "^[a-z0-9]+$": {
-          "type": "string",
+          "type": "object",
           "properties": {
             "description": {
               "type": "string"
@@ -71,10 +82,6 @@
             },
             "chain_id": {
               "type": "integer"
-            },
-            "hardhat_deploy_gas_price": {
-              "type": "string",
-              "description": "Gas price as either a number string '11' or a value which should be converted like '1 gwei'. Used in hardhat-deploy plugin."
             },
             "max_fee_per_gas": {
               "type": "string",
@@ -102,7 +109,6 @@
             "chain_id",
             "default_provider",
             "description",
-            "hardhat_deploy_gas_price",
             "max_fee_per_gas",
             "max_priority_fee_per_gas",
             "hopr_token_name",

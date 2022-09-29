@@ -12,9 +12,9 @@ import {
   getPublicAddresses,
   prefixLength,
   u8aAddressToCIDR
-} from './addrs'
-import { type Network, PRIVATE_V4_CLASS_B, PRIVATE_V4_CLASS_C } from './constants'
-import { u8aEquals, u8aToHex } from '..'
+} from './addrs.js'
+import { type Network, PRIVATE_V4_CLASS_B, PRIVATE_V4_CLASS_C } from './constants.js'
+import { u8aEquals, u8aToHex } from '../u8a/index.js'
 import assert from 'assert'
 import { type NetworkInterfaceInfo } from 'os'
 

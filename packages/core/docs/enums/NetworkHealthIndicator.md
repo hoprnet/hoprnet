@@ -7,7 +7,7 @@ based on the different node types we can ping.
 
 ## Table of contents
 
-### Enumeration members
+### Enumeration Members
 
 - [GREEN](NetworkHealthIndicator.md#green)
 - [ORANGE](NetworkHealthIndicator.md#orange)
@@ -15,31 +15,21 @@ based on the different node types we can ping.
 - [UNKNOWN](NetworkHealthIndicator.md#unknown)
 - [YELLOW](NetworkHealthIndicator.md#yellow)
 
-## Enumeration members
+## Enumeration Members
 
 ### GREEN
 
-• **GREEN** = `"Green"`
+• **GREEN**
 
 #### Defined in
 
-[packages/core/src/network/heartbeat.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/network/heartbeat.ts#L45)
+[packages/core/src/network/heartbeat.ts:44](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/network/heartbeat.ts#L44)
 
 ___
 
 ### ORANGE
 
-• **ORANGE** = `"Orange"`
-
-#### Defined in
-
-[packages/core/src/network/heartbeat.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/network/heartbeat.ts#L43)
-
-___
-
-### RED
-
-• **RED** = `"Red"`
+• **ORANGE**
 
 #### Defined in
 
@@ -47,9 +37,9 @@ ___
 
 ___
 
-### UNKNOWN
+### RED
 
-• **UNKNOWN** = `"Unknown"`
+• **RED**
 
 #### Defined in
 
@@ -57,10 +47,20 @@ ___
 
 ___
 
-### YELLOW
+### UNKNOWN
 
-• **YELLOW** = `"Yellow"`
+• **UNKNOWN**
 
 #### Defined in
 
-[packages/core/src/network/heartbeat.ts:44](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/network/heartbeat.ts#L44)
+[packages/core/src/network/heartbeat.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/network/heartbeat.ts#L40)
+
+___
+
+### YELLOW
+
+• **YELLOW**
+
+#### Defined in
+
+[packages/core/src/network/heartbeat.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/network/heartbeat.ts#L43)

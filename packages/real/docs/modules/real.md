@@ -19,7 +19,3 @@ Dummy function to test WASM.
 #### Returns
 
 `string`
-
-#### Defined in
-
-lib/hopr_real.d.ts:7

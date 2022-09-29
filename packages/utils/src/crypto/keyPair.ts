@@ -1,6 +1,7 @@
-import type PeerId from 'peer-id'
-import { privKeyToPeerId } from '..'
-import { debug } from '../process'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { keysPBM } from '@libp2p/crypto/keys'
+import debug from 'debug'
+import { privKeyToPeerId } from '../index.js'
 import { Wallet } from '@ethersproject/wallet'
 
 const logError = debug('hopr:keypair')
@@ -23,7 +24,7 @@ export async function serializeKeyPair(
   __salt?: string,
   __uuidSalt?: string
 ): Promise<Uint8Array> {
-  const w = new Wallet(peerId.privKey.marshal() as Buffer)
+  const w = new Wallet(keysPBM.PrivateKey.decode(peerId.privateKey).Data)
 
   let serialized: string
   if (useWeakCrypto) {
@@ -47,15 +48,6 @@ export async function serializeKeyPair(
   // for privacy reasons keyStore files should
   // not include the Ethereum address
   delete decoded.address
-
-  // Following the Ethereum specification,
-  // the crypto property in keystore is lowercase
-  Object.assign(decoded, {
-    crypto: decoded.Crypto
-  })
-
-  // Removing property to follow Ethereum standard
-  delete decoded.Crypto
 
   return new TextEncoder().encode(JSON.stringify(decoded))
 }

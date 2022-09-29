@@ -29,7 +29,7 @@ cd hoprnet-master
    to install and build the required packages and project modules. Ideally, you also have setup your computer with basic development toolset[^5]. Please bear in mind that this process will take at least 5-10 minutes depending on your computer.
 
 ```
-yarn && yarn build
+make -j deps && make -j build
 ```
 
 3. **Run the one-line setup script**: Proceed to run the following script. If you are planning to run [MyneChat](http://app.myne.chat/)
@@ -67,6 +67,6 @@ the basic commands. Afterwards, it might also make sense to check the API v2 Swa
 [^4]:
     By using the `master` tag, you are downloading the latest version of `hoprnet` to spin up your nodes, which might be ideal
     to your particular use case. However, due to the rapid development done on the project, you might be better off using a stable
-    release. The latest stable release known at the time of writing is [`ouagadougou`](https://github.com/hoprnet/hoprnet/archive/refs/heads/release/ouagadougou.zip).
+    release. The latest stable release known at the time of writing is [`valencia`](https://github.com/hoprnet/hoprnet/archive/refs/heads/release/valencia.zip).
 
 [^5]: If you have installed and built another `node.js` application from your computer in the past, you likely will not need to do anything else. However, in the case your are only starting to develop in `node.js`, there's a high chance you might need to install a few extra tools. For instance, in `Linux`-based OS, you will likely also need to install `build-essentials` (e.g. in Ubuntu do `apt-get install build-essentials`), whereas in `macOS` you need Xcode developer tools, installable via `xcode-select --install`.

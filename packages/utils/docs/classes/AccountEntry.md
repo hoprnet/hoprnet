@@ -42,15 +42,15 @@
 | `multiAddr` | `Multiaddr` |
 | `updatedBlock` | `BN` |
 
-#### Defined in
-
-[types/accountEntry.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L16)
-
 ## Properties
 
 ### multiAddr
 
 • `Readonly` **multiAddr**: `Multiaddr`
+
+#### Defined in
+
+[types/accountEntry.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L18)
 
 ___
 
@@ -58,11 +58,19 @@ ___
 
 • `Readonly` **publicKey**: [`PublicKey`](PublicKey.md)
 
+#### Defined in
+
+[types/accountEntry.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L17)
+
 ___
 
 ### updatedBlock
 
 • `Readonly` **updatedBlock**: `BN`
+
+#### Defined in
+
+[types/accountEntry.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L19)
 
 ## Accessors
 
@@ -74,10 +82,6 @@ ___
 
 `boolean`
 
-#### Defined in
-
-[types/accountEntry.ts:81](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L81)
-
 ___
 
 ### hasAnnounced
@@ -87,10 +91,6 @@ ___
 #### Returns
 
 `boolean`
-
-#### Defined in
-
-[types/accountEntry.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L90)
 
 ___
 
@@ -102,10 +102,6 @@ ___
 
 `number`
 
-#### Defined in
-
-[types/accountEntry.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L22)
-
 ## Methods
 
 ### getAddress
@@ -115,10 +111,6 @@ ___
 #### Returns
 
 [`Address`](Address.md)
-
-#### Defined in
-
-[types/accountEntry.ts:77](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L77)
 
 ___
 
@@ -130,10 +122,6 @@ ___
 
 `PeerId`
 
-#### Defined in
-
-[types/accountEntry.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L73)
-
 ___
 
 ### serialize
@@ -144,10 +132,6 @@ ___
 
 `Uint8Array`
 
-#### Defined in
-
-[types/accountEntry.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L45)
-
 ___
 
 ### toString
@@ -157,10 +141,6 @@ ___
 #### Returns
 
 `string`
-
-#### Defined in
-
-[types/accountEntry.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L94)
 
 ___
 
@@ -177,7 +157,3 @@ ___
 #### Returns
 
 [`AccountEntry`](AccountEntry.md)
-
-#### Defined in
-
-[types/accountEntry.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L26)

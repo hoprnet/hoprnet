@@ -4,11 +4,11 @@
 
 ## Table of contents
 
-### Type aliases
+### Type Aliases
 
 - [DefaultEnvironment](modules.md#defaultenvironment)
 
-## Type aliases
+## Type Aliases
 
 ### DefaultEnvironment
 
@@ -22,4 +22,4 @@
 
 #### Defined in
 
-[index.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/hoprd/src/index.ts#L39)
+[index.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/hoprd/src/index.ts#L32)

@@ -1,7 +1,8 @@
-import PeerId from 'peer-id'
-import { keys as libp2p_crypto } from 'libp2p-crypto'
-import { stringToU8a } from '../u8a'
-import { encode } from 'multihashes'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { peerIdFromPeerId } from '@libp2p/peer-id'
+import { keys } from '@libp2p/crypto'
+import { stringToU8a } from '../u8a/index.js'
+import { identity } from 'multiformats/hashes/identity'
 
 const COMPRESSED_PUBLIC_KEY_LENGTH = 33
 
@@ -15,19 +16,33 @@ const COMPRESSED_PUBLIC_KEY_LENGTH = 33
  * @param pubKey the plain public key
  */
 export function pubKeyToPeerId(pubKey: Uint8Array | string): PeerId {
-  if (typeof pubKey === 'string') {
-    pubKey = stringToU8a(pubKey, COMPRESSED_PUBLIC_KEY_LENGTH)
+  let internalPubKey: Uint8Array
+  switch (typeof pubKey) {
+    case 'string':
+      const matched = pubKey.match(/(?<=^0x|^)[0-9a-fA-F]{66}/)
+
+      if (!matched) {
+        throw Error(`Invalid input argument. Either key length or key characters were incorrect.`)
+      }
+      internalPubKey = stringToU8a(pubKey, COMPRESSED_PUBLIC_KEY_LENGTH)
+      break
+    case 'object':
+      if (pubKey.length != COMPRESSED_PUBLIC_KEY_LENGTH) {
+        throw Error(
+          `Invalid public key. Expected a buffer of size ${COMPRESSED_PUBLIC_KEY_LENGTH} bytes. Got one of ${pubKey.length} bytes.`
+        )
+      }
+      internalPubKey = pubKey
+      break
+    default:
+      throw Error(`Invalid input arguments`)
   }
 
-  if (pubKey.length != COMPRESSED_PUBLIC_KEY_LENGTH) {
-    throw Error(
-      `Invalid public key. Expected a buffer of size ${COMPRESSED_PUBLIC_KEY_LENGTH} bytes. Got one of ${pubKey.length} bytes.`
-    )
-  }
+  const secp256k1PubKey = new keys.supportedKeys.secp256k1.Secp256k1PublicKey(internalPubKey)
 
-  const secp256k1PubKey = new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PublicKey(Buffer.from(pubKey))
-
-  const id = encode(secp256k1PubKey.bytes, 'identity')
-
-  return new PeerId(id, undefined, secp256k1PubKey)
+  return peerIdFromPeerId({
+    type: 'secp256k1',
+    multihash: identity.digest(secp256k1PubKey.bytes),
+    publicKey: secp256k1PubKey.bytes
+  })
 }

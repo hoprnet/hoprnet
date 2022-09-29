@@ -1,22 +1,24 @@
-import Multiaddr from 'multiaddr'
+import { protocols } from '@multiformats/multiaddr'
 import { pickVersion } from '@hoprnet/hopr-utils'
+// Do not type-check JSON files
+// @ts-ignore
+import pkg from '../package.json' assert { type: 'json' }
 
-const { name, version } = require('../package.json')
-const NORMALIZED_VERSION = pickVersion(version)
+const NORMALIZED_VERSION = pickVersion(pkg.version)
 
 // Use name without organisation prefix
-export const NAME = name.replace(/@[a-zA-z0-9\-]+\//, '')
+export const NAME = pkg.name.replace(/@[a-zA-z0-9\-]+\//, '')
 
 // p2p multi-address code
-export const CODE_P2P = Multiaddr.protocols.names['p2p'].code
-export const CODE_IP4 = Multiaddr.protocols.names['ip4'].code
-export const CODE_IP6 = Multiaddr.protocols.names['ip6'].code
-export const CODE_DNS4 = Multiaddr.protocols.names['dns4'].code
-export const CODE_DNS6 = Multiaddr.protocols.names['dns6'].code
+export const CODE_P2P = protocols('p2p').code
+export const CODE_IP4 = protocols('ip4').code
+export const CODE_IP6 = protocols('ip6').code
+export const CODE_DNS4 = protocols('dns4').code
+export const CODE_DNS6 = protocols('dns6').code
 
-export const CODE_CIRCUIT = Multiaddr.protocols.names['p2p-circuit'].code
-export const CODE_TCP = Multiaddr.protocols.names['tcp'].code
-export const CODE_UDP = Multiaddr.protocols.names['udp'].code
+export const CODE_CIRCUIT = protocols('p2p-circuit').code
+export const CODE_TCP = protocols('tcp').code
+export const CODE_UDP = protocols('udp').code
 
 // Time to wait for a connection to close gracefully before destroying it manually
 export const CLOSE_TIMEOUT = 6000 // ms
@@ -54,19 +56,14 @@ export enum RelayPrefix {
   WEBRTC_SIGNALLING
 }
 
-export function isValidPrefix(prefix: RelayPrefix): boolean {
-  switch (prefix) {
-    case RelayPrefix.PAYLOAD:
-    case RelayPrefix.STATUS_MESSAGE:
-    case RelayPrefix.CONNECTION_STATUS:
-    case RelayPrefix.WEBRTC_SIGNALLING:
-      return true
-    default:
-      return false
-  }
-}
-
+// In order to traverse NATs, nodes needs to maintain
+// a connection to at least one of the entry nodes.
+// To always have a fallback option, nodes connect to multiple
+// entry nodes up to MAX_RELAYS_PER_NODE. If the number of active
+// connections falls below MIN_RELAYS_PER_NODE, the node will
+// actively try to connect to different entry nodes
 export const MAX_RELAYS_PER_NODE = 5
+export const MIN_RELAYS_PER_NODE = 3
 
 /**
  * @param environment [optional] isolate from nodes running in other environments

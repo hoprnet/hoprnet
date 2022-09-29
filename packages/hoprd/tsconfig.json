@@ -1,10 +1,13 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    // Make sure that all kinds of errors are handled since
+    // package is a leaf in the dependency graph
+    "useUnknownInCatchVariables": true,
     "outDir": "./lib",
     "rootDir": "./src"
   },
-  "include": ["src/**/*.ts", "src/main.cts"],
+  "include": ["src"],
   "typedocOptions": {
     "entryPoints": ["src/index.ts"],
     "out": "docs",

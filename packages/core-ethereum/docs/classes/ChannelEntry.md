@@ -55,10 +55,6 @@
 | `channelEpoch` | `UINT256` |
 | `closureTime` | `UINT256` |
 
-#### Defined in
-
-packages/utils/lib/types/channelEntry.d.ts:39
-
 ## Properties
 
 ### balance
@@ -159,10 +155,6 @@ packages/utils/lib/types/channelEntry.d.ts:35
 
 `number`
 
-#### Defined in
-
-packages/utils/lib/types/channelEntry.d.ts:40
-
 ## Methods
 
 ### closureTimePassed
@@ -173,10 +165,6 @@ packages/utils/lib/types/channelEntry.d.ts:40
 
 `boolean`
 
-#### Defined in
-
-packages/utils/lib/types/channelEntry.d.ts:46
-
 ___
 
 ### getId
@@ -186,10 +174,6 @@ ___
 #### Returns
 
 `Hash`
-
-#### Defined in
-
-packages/utils/lib/types/channelEntry.d.ts:45
 
 ___
 
@@ -207,10 +191,6 @@ closure time of this channel is unknown.
 
 `BN`
 
-#### Defined in
-
-packages/utils/lib/types/channelEntry.d.ts:53
-
 ___
 
 ### serialize
@@ -220,10 +200,6 @@ ___
 #### Returns
 
 `Uint8Array`
-
-#### Defined in
-
-packages/utils/lib/types/channelEntry.d.ts:43
 
 ___
 
@@ -235,10 +211,6 @@ ___
 
 `string`
 
-#### Defined in
-
-packages/utils/lib/types/channelEntry.d.ts:44
-
 ___
 
 ### createMock
@@ -248,10 +220,6 @@ ___
 #### Returns
 
 [`ChannelEntry`](ChannelEntry.md)
-
-#### Defined in
-
-packages/utils/lib/types/channelEntry.d.ts:54
 
 ___
 
@@ -269,10 +237,6 @@ ___
 
 [`ChannelEntry`](ChannelEntry.md)
 
-#### Defined in
-
-packages/utils/lib/types/channelEntry.d.ts:41
-
 ___
 
 ### fromSCEvent
@@ -289,7 +253,3 @@ ___
 #### Returns
 
 `Promise`<[`ChannelEntry`](ChannelEntry.md)\>
-
-#### Defined in
-
-packages/utils/lib/types/channelEntry.d.ts:42

@@ -76,9 +76,9 @@
 - [waitForPublicNodes](default.md#waitforpublicnodes)
 - [withdraw](default.md#withdraw)
 - [getEventListeners](default.md#geteventlisteners)
-- [listenerCount](default.md#listenercount)
-- [on](default.md#on)
-- [once](default.md#once)
+- [listenerCount](default.md#listenercount-1)
+- [on](default.md#on-1)
+- [once](default.md#once-1)
 
 ## Constructors
 
@@ -100,10 +100,6 @@
 
 EventEmitter.constructor
 
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:68](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L68)
-
 ## Properties
 
 ### CHAIN\_NAME
@@ -119,6 +115,10 @@ ___
 ### automaticChainCreation
 
 • `Protected` **automaticChainCreation**: `boolean` = `true`
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L74)
 
 ___
 
@@ -162,11 +162,12 @@ ___
 | `getNetworkRegistry` | () => `HoprNetworkRegistry` |
 | `getPrivateKey` | () => `Uint8Array` |
 | `getPublicKey` | () => `PublicKey` |
+| `getTimestamp` | (`blockNumber`: `number`) => `Promise`<`number`\> |
 | `getToken` | () => `HoprToken` |
 | `getTransactionsInBlock` | (`blockNumber`: `number`) => `Promise`<`string`[]\> |
 | `initiateChannelClosure` | (`counterparty`: `Address`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
 | `redeemTicket` | (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
-| `sendTransaction` | (`signedTransaction`: `string` \| `Promise`<`string`\>) => `Promise`<`TransactionResponse`\> |
+| `sendTransaction` | (`checkDuplicate`: `Boolean`, `essentialTxPayload`: `TransactionPayload`, `handleTxListener`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`SendTransactionReturn`\> |
 | `setCommitment` | (`counterparty`: `Address`, `commitment`: `Hash`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
 | `subscribeBlock` | (`cb`: (`blockNumber`: `number`) => `void` \| `Promise`<`void`\>) => () => `void` |
 | `subscribeError` | (`cb`: (`err`: `any`) => `void` \| `Promise`<`void`\>) => () => `void` |
@@ -310,10 +311,6 @@ Alias for `emitter.on(eventName, listener)`.
 
 EventEmitter.addListener
 
-#### Defined in
-
-node_modules/@types/node/events.d.ts:299
-
 ___
 
 ### announce
@@ -329,10 +326,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:148](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L148)
 
 ___
 
@@ -350,10 +343,6 @@ ___
 
 `Promise`<`void`\>
 
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:222](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L222)
-
 ___
 
 ### createChain
@@ -363,10 +352,6 @@ ___
 #### Returns
 
 `Promise`<`void`\>
-
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L98)
 
 ___
 
@@ -429,10 +414,6 @@ myEmitter.emit('event', 1, 2, 3, 4, 5);
 
 EventEmitter.emit
 
-#### Defined in
-
-node_modules/@types/node/events.d.ts:555
-
 ___
 
 ### eventNames
@@ -465,10 +446,6 @@ console.log(myEE.eventNames());
 
 EventEmitter.eventNames
 
-#### Defined in
-
-node_modules/@types/node/events.d.ts:614
-
 ___
 
 ### finalizeClosure
@@ -484,10 +461,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:437](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L437)
 
 ___
 
@@ -507,10 +480,6 @@ ___
 
 `Promise`<`string`\>
 
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:465](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L465)
-
 ___
 
 ### getAccount
@@ -526,10 +495,6 @@ ___
 #### Returns
 
 `Promise`<`AccountEntry`\>
-
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:167](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L167)
 
 ___
 
@@ -553,10 +518,6 @@ the coming events which require 8 blocks to be confirmed.
 
 HOPR balance
 
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:185](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L185)
-
 ___
 
 ### getMaxListeners
@@ -576,10 +537,6 @@ set by `emitter.setMaxListeners(n)` or defaults to [defaultMaxListeners](default
 
 EventEmitter.getMaxListeners
 
-#### Defined in
-
-node_modules/@types/node/events.d.ts:471
-
 ___
 
 ### getNativeBalance
@@ -595,10 +552,6 @@ ___
 #### Returns
 
 `Promise`<`NativeBalance`\>
-
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:204](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L204)
 
 ___
 
@@ -616,10 +569,6 @@ ___
 
 `Promise`<[`ChannelEntry`](ChannelEntry.md)[]\>
 
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:163](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L163)
-
 ___
 
 ### getPublicKey
@@ -629,10 +578,6 @@ ___
 #### Returns
 
 `PublicKey`
-
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:189](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L189)
 
 ___
 
@@ -650,10 +595,6 @@ ___
 
 `Promise`<`PublicKey`\>
 
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:171](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L171)
-
 ___
 
 ### getRandomOpenChannel
@@ -664,10 +605,6 @@ ___
 
 `Promise`<[`ChannelEntry`](ChannelEntry.md)\>
 
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:175](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L175)
-
 ___
 
 ### initializeChainWrapper
@@ -677,10 +614,6 @@ ___
 #### Returns
 
 `Promise`<`void`\>
-
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:86](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L86)
 
 ___
 
@@ -697,10 +630,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:427](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L427)
 
 ___
 
@@ -723,10 +652,6 @@ when the register is enabled, a `hoprNode` needs to also be `eligible`.
 `Promise`<`boolean`\>
 
 true if registered
-
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:487](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L487)
 
 ___
 
@@ -751,10 +676,6 @@ Returns the number of listeners listening to the event named `eventName`.
 #### Inherited from
 
 EventEmitter.listenerCount
-
-#### Defined in
-
-node_modules/@types/node/events.d.ts:561
 
 ___
 
@@ -788,10 +709,6 @@ console.log(util.inspect(server.listeners('connection')));
 
 EventEmitter.listeners
 
-#### Defined in
-
-node_modules/@types/node/events.d.ts:484
-
 ___
 
 ### off
@@ -816,10 +733,6 @@ Alias for `emitter.removeListener()`.
 #### Inherited from
 
 EventEmitter.off
-
-#### Defined in
-
-node_modules/@types/node/events.d.ts:444
 
 ___
 
@@ -870,10 +783,6 @@ myEE.emit('foo');
 
 EventEmitter.on
 
-#### Defined in
-
-node_modules/@types/node/events.d.ts:330
-
 ___
 
 ### once
@@ -921,10 +830,6 @@ myEE.emit('foo');
 
 EventEmitter.once
 
-#### Defined in
-
-node_modules/@types/node/events.d.ts:359
-
 ___
 
 ### openChannel
@@ -941,10 +846,6 @@ ___
 #### Returns
 
 `Promise`<{ `channelId`: `Hash` ; `receipt`: `string`  }\>
-
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:447](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L447)
 
 ___
 
@@ -982,10 +883,6 @@ Returns a reference to the `EventEmitter`, so that calls can be chained.
 
 EventEmitter.prependListener
 
-#### Defined in
-
-node_modules/@types/node/events.d.ts:579
-
 ___
 
 ### prependOnceListener
@@ -1019,10 +916,6 @@ Returns a reference to the `EventEmitter`, so that calls can be chained.
 #### Inherited from
 
 EventEmitter.prependOnceListener
-
-#### Defined in
-
-node_modules/@types/node/events.d.ts:595
 
 ___
 
@@ -1073,10 +966,6 @@ emitter.emit('log');
 
 EventEmitter.rawListeners
 
-#### Defined in
-
-node_modules/@types/node/events.d.ts:514
-
 ___
 
 ### redeemAllTickets
@@ -1087,10 +976,6 @@ ___
 
 `Promise`<`void`\>
 
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:243](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L243)
-
 ___
 
 ### redeemAllTicketsInternalLoop
@@ -1100,10 +985,6 @@ ___
 #### Returns
 
 `Promise`<`void`\>
-
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:258](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L258)
 
 ___
 
@@ -1122,10 +1003,6 @@ ___
 
 `Promise`<[`RedeemTicketResponse`](../modules.md#redeemticketresponse)\>
 
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:371](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L371)
-
 ___
 
 ### redeemTicketsInChannel
@@ -1141,10 +1018,6 @@ ___
 #### Returns
 
 `Promise`<`unknown`\>
-
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:284](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L284)
 
 ___
 
@@ -1162,10 +1035,6 @@ ___
 
 `Promise`<`unknown`\>
 
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:279](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L279)
-
 ___
 
 ### redeemTicketsInChannelLoop
@@ -1181,10 +1050,6 @@ ___
 #### Returns
 
 `Promise`<`void`\>
-
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:306](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L306)
 
 ___
 
@@ -1215,10 +1080,6 @@ Returns a reference to the `EventEmitter`, so that calls can be chained.
 #### Inherited from
 
 EventEmitter.removeAllListeners
-
-#### Defined in
-
-node_modules/@types/node/events.d.ts:455
 
 ___
 
@@ -1320,10 +1181,6 @@ Returns a reference to the `EventEmitter`, so that calls can be chained.
 
 EventEmitter.removeListener
 
-#### Defined in
-
-node_modules/@types/node/events.d.ts:439
-
 ___
 
 ### setMaxListeners
@@ -1353,10 +1210,6 @@ Returns a reference to the `EventEmitter`, so that calls can be chained.
 
 EventEmitter.setMaxListeners
 
-#### Defined in
-
-node_modules/@types/node/events.d.ts:465
-
 ___
 
 ### setTxHandler
@@ -1373,10 +1226,6 @@ ___
 #### Returns
 
 `DeferType`<`string`\>
-
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:159](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L159)
 
 ___
 
@@ -1396,10 +1245,6 @@ ___
 | `hoprTokenAddress` | `string` |
 | `network` | `string` |
 
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:208](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L208)
-
 ___
 
 ### start
@@ -1409,10 +1254,6 @@ ___
 #### Returns
 
 `Promise`<[`default`](default.md)\>
-
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:111](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L111)
 
 ___
 
@@ -1425,10 +1266,6 @@ Stops the connector.
 #### Returns
 
 `Promise`<`void`\>
-
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:143](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L143)
 
 ___
 
@@ -1444,10 +1281,6 @@ Retrieves ETH balance, optionally uses the cache.
 
 ETH balance
 
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:197](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L197)
-
 ___
 
 ### waitForPublicNodes
@@ -1457,10 +1290,6 @@ ___
 #### Returns
 
 `Promise`<{ `id`: `PeerId` ; `multiaddrs`: `Multiaddr`[]  }[]\>
-
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:218](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L218)
 
 ___
 
@@ -1479,10 +1308,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-[packages/core-ethereum/src/index.ts:152](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L152)
 
 ___
 
@@ -1532,10 +1357,6 @@ const { getEventListeners, EventEmitter } = require('events');
 
 EventEmitter.getEventListeners
 
-#### Defined in
-
-node_modules/@types/node/events.d.ts:262
-
 ___
 
 ### listenerCount
@@ -1571,10 +1392,6 @@ console.log(listenerCount(myEmitter, 'event'));
 #### Inherited from
 
 EventEmitter.listenerCount
-
-#### Defined in
-
-node_modules/@types/node/events.d.ts:234
 
 ___
 
@@ -1655,10 +1472,6 @@ that iterates `eventName` events emitted by the `emitter`
 #### Inherited from
 
 EventEmitter.on
-
-#### Defined in
-
-node_modules/@types/node/events.d.ts:217
 
 ___
 
@@ -1764,10 +1577,6 @@ ee.emit('foo'); // Prints: Waiting for the event was canceled!
 
 EventEmitter.once
 
-#### Defined in
-
-node_modules/@types/node/events.d.ts:157
-
 ▸ `Static` **once**(`emitter`, `eventName`, `options?`): `Promise`<`any`[]\>
 
 #### Parameters
@@ -1785,7 +1594,3 @@ node_modules/@types/node/events.d.ts:157
 #### Inherited from
 
 EventEmitter.once
-
-#### Defined in
-
-node_modules/@types/node/events.d.ts:158

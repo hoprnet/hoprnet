@@ -1,6 +1,6 @@
-import type { Multiaddr } from 'multiaddr'
-import type { ValidAddress } from './utils'
-import type PeerId from 'peer-id'
+import type { Multiaddr } from '@multiformats/multiaddr'
+import type { ValidAddress } from './utils/index.js'
+import type { Initializable, Components } from '@libp2p/interfaces/components'
 
 import {
   u8aEquals,
@@ -14,25 +14,38 @@ import {
   u8aAddressToCIDR,
   type Network
 } from '@hoprnet/hopr-utils'
-import { AddressType, parseAddress, type DirectAddress, type CircuitAddress } from './utils'
+import { AddressType, parseAddress, type DirectAddress, type CircuitAddress } from './utils/index.js'
 
+import errCode from 'err-code'
 import Debug from 'debug'
-import { HoprConnectOptions } from './types'
+import type { HoprConnectOptions } from './types.js'
 
 const log = Debug('hopr-connect:filter')
 
 const INVALID_PORTS = [0]
 
-export class Filter {
+export class Filter implements Initializable {
   private announcedAddrs?: ValidAddress[]
   private listeningFamilies?: (AddressType.IPv4 | AddressType.IPv6)[]
-  private myPublicKey: Uint8Array
 
   protected myPrivateNetworks: Network[]
 
-  constructor(peerId: PeerId, private opts: HoprConnectOptions) {
+  private components: Components | undefined
+
+  constructor(private opts: HoprConnectOptions) {
     this.myPrivateNetworks = getPrivateAddresses()
-    this.myPublicKey = peerId.marshalPubKey()
+  }
+
+  public init(components: Components): void {
+    this.components = components
+  }
+
+  public getComponents(): Components {
+    if (this.components == null) {
+      throw errCode(new Error('components not set'), 'ERR_SERVICE_MISSING')
+    }
+
+    return this.components
   }
 
   /**
@@ -104,7 +117,10 @@ export class Filter {
     switch (parsed.address.type) {
       case AddressType.IPv4:
       case AddressType.IPv6:
-        if (parsed.address.node != undefined && !u8aEquals(parsed.address.node, this.myPublicKey)) {
+        if (
+          parsed.address.node != undefined &&
+          !u8aEquals(parsed.address.node, this.getComponents().getPeerId().publicKey)
+        ) {
           log(`Cannot listen to multiaddrs with other peerId than our own. Given addr: ${ma.toString()}`)
           return false
         }
@@ -144,12 +160,12 @@ export class Filter {
    * @returns
    */
   private filterCircuitDial(address: CircuitAddress, ma: Multiaddr): boolean {
-    if (u8aEquals(address.node, this.myPublicKey)) {
+    if (u8aEquals(address.node, this.getComponents().getPeerId().publicKey)) {
       log(`Prevented self-dial using circuit addr. Used addr: ${ma.toString()}`)
       return false
     }
 
-    if (u8aEquals(address.relayer, this.myPublicKey)) {
+    if (u8aEquals(address.relayer, this.getComponents().getPeerId().publicKey)) {
       log(`Prevented dial using self as relay node. Used addr: ${ma.toString()}`)
       return false
     }
@@ -164,7 +180,7 @@ export class Filter {
    * @returns
    */
   private filterDirectDial(address: DirectAddress, ma: Multiaddr): boolean {
-    if (address.node != undefined && u8aEquals(address.node, this.myPublicKey)) {
+    if (address.node != undefined && u8aEquals(address.node, this.getComponents().getPeerId().publicKey)) {
       log(`Prevented self-dial. Used addr: ${ma.toString()}`)
       return false
     }

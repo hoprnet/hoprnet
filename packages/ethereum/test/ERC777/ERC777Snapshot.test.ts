@@ -1,10 +1,11 @@
 import type { ERC777SnapshotMock } from '../../src/types'
 import { deployments, ethers } from 'hardhat'
+import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import { expect } from 'chai'
 import { advanceBlock } from '../utils'
 import deployERC1820Registry from '../../deploy/01_ERC1820Registry'
 
-const useFixtures = deployments.createFixture(async (hre) => {
+const useFixtures = deployments.createFixture(async (hre: HardhatRuntimeEnvironment) => {
   const [initialHolder, recipient, other] = await ethers.getSigners()
 
   await deployERC1820Registry(hre, initialHolder)

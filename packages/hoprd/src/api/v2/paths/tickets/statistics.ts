@@ -1,4 +1,4 @@
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
 
@@ -19,7 +19,7 @@ export const getTicketsStatistics = async (node: Hopr) => {
   }
 }
 
-export const GET: Operation = [
+const GET: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
 
@@ -27,7 +27,9 @@ export const GET: Operation = [
       const tickets = await getTicketsStatistics(node)
       return res.status(200).send(tickets)
     } catch (err) {
-      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+      return res
+        .status(422)
+        .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 ]
@@ -99,3 +101,5 @@ GET.apiDoc = {
     }
   }
 }
+
+export default { GET }

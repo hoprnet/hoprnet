@@ -22,12 +22,13 @@
 - [Table of Contents](#table-of-contents)
 - [Getting Started](#getting-started)
 - [Install](#install)
-  - [Install via NPM](#install-via-npm)
   - [Install via Docker](#install-via-docker)
+  - [Install via NPM](#install-via-npm)
   - [Install via Nix package manager](#install-via-nix-package-manager)
 - [Using](#using)
-  - [Using NPM](#using-npm)
   - [Using Docker](#using-docker)
+  - [Using NPM](#using-npm)
+- [Testnet accessibility](#testnet-accessibility)
 - [Migrating between releases](#migrating-between-releases)
 - [Develop](#develop)
 - [Test](#test)
@@ -56,6 +57,35 @@ The following instructions show how the latest community release may be
 installed. The instructions should be adapted if you want to use the latest
 development release or any other older release.
 
+The preferred way of installation should be via Docker.
+
+### Install via Docker
+
+All our docker images can be found in [our Google Cloud Container Registry][4].
+Each image is prefixed with `gcr.io/hoprassociation/$PROJECT:$RELEASE`.
+The `master-goerli` tag represents the `master` branch, while the `valencia` tag
+represents the most recent `release/*` branch.
+
+You can pull the Docker image like so:
+
+```sh
+docker pull gcr.io/hoprassociation/hoprd:valencia
+```
+
+For ease of use you can set up a shell alias to run the latest release as a docker container:
+
+```sh
+alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:valencia'
+```
+
+**IMPORTANT:** Using the above command will map the database folder used by hoprd to a local folder called `.hoprd-db` in your home directory. You can customize the location of that folder further by executing the following command:
+
+```sh
+HOPRD_DATA_DIR=${HOME}/.hoprd-better-db-folder eval hoprd
+```
+
+Also all ports are mapped to your localhost, assuming you stick to the default port numbers.
+
 ### Install via NPM
 
 Please make sure you are running a compatible version of Node.js.
@@ -80,37 +110,10 @@ cd MY_NEW_HOPR_TEST_FOLDER
 npm install @hoprnet/hoprd@1.88
 ```
 
-### Install via Docker
-
-All our docker images can be found in [our Google Cloud Container Registry][4].
-Each image is prefixed with `gcr.io/hoprassociation/$PROJECT:$RELEASE`.
-The `master-goerli` tag represents the `master` branch, while the `ouagadougou` tag
-represents the most recent `release/*` branch.
-
-You can pull the Docker image like so:
-
-```sh
-docker pull gcr.io/hoprassociation/hoprd:ouagadougou
-```
-
-For ease of use you can set up a shell alias to run the latest release as a docker container:
-
-```sh
-alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:ouagadougou'
-```
-
-**IMPORTANT:** Using the above command will map the database folder used by hoprd to a local folder called `.hoprd-db` in your home directory. You can customize the location of that folder further by executing the following command:
-
-```sh
-HOPRD_DATA_DIR=${HOME}/.hoprd-better-db-folder eval hoprd
-```
-
-Also all ports are mapped to your local host, assuming you stick to the default port numbers.
-
 ### Install via [Nix package manager][1]
 
 NOTE: This setup should only be used for development or if you know what you
-are doing and don't neetd further supported. Otherwise you should use the `npm`
+are doing and don't need further support. Otherwise you should use the `npm`
 or `docker` setup.
 
 You will need to clone the `hoprnet` repo first:
@@ -138,15 +141,15 @@ $ hoprd --help
 Options:
   --help                         Show help  [boolean]
   --version                      Show version number  [boolean]
-  --environment                  Environment id which the node shall run on (HOPRD_ENVIRONMENT)  [string] [choices: "hardhat-localhost", "hardhat-localhost2", "master-goerli", "debug-goerli", "tuttlingen", "prague", "budapest", "athens", "lisbon", "ouagadougou"] [default: ""]
+  --environment                  Environment id which the node shall run on (HOPRD_ENVIRONMENT)  [string] [choices: "hardhat-localhost", "hardhat-localhost2", "master-goerli", "debug-goerli", "tuttlingen", "prague", "budapest", "athens", "lisbon", "ouagadougou", "paleochora", "monte_rosa"] [default: ""]
   --host                         The network host to run the HOPR node on [env: HOPRD_HOST]  [string] [default: "0.0.0.0:9091"]
   --announce                     Announce public IP to the network [env: HOPRD_ANNOUNCE]  [boolean] [default: false]
   --admin                        Run an admin interface on localhost:3000, requires --apiToken [env: HOPRD_ADMIN]  [boolean] [default: false]
   --adminHost                    Host to listen to for admin console [env: HOPRD_ADMIN_HOST]  [string] [default: "localhost"]
   --adminPort                    Port to listen to for admin console [env: HOPRD_ADMIN_PORT]  [string] [default: 3000]
-  --api, --rest                  Expose the Rest (V1, V2) and Websocket (V2) API on localhost:3001, requires --apiToken. "--rest" is deprecated [env: HOPRD_API]  [boolean] [default: false]
-  --apiHost, --restHost          Set host IP to which the Rest and Websocket API server will bind. "--restHost" is deprecated [env: HOPRD_API_HOST]  [string] [default: "localhost"]
-  --apiPort, --restPort          Set host port to which the Rest and Websocket API server will bind. "--restPort" is deprecated [env: HOPRD_API_PORT]  [number] [default: 3001]
+  --api                          Expose the API on localhost:3001, requires --apiToken. [env: HOPRD_API]  [boolean] [default: false]
+  --apiHost                      Set host IP to which the API server will bind. [env: HOPRD_API_HOST]  [string] [default: "localhost"]
+  --apiPort                      Set host port to which the API server will bind. [env: HOPRD_API_PORT]  [number] [default: 3001]
   --healthCheck                  Run a health check end point on localhost:8080 [env: HOPRD_HEALTH_CHECK]  [boolean] [default: false]
   --healthCheckHost              Updates the host for the healthcheck server [env: HOPRD_HEALTH_CHECK_HOST]  [string] [default: "localhost"]
   --healthCheckPort              Updates the port for the healthcheck server [env: HOPRD_HEALTH_CHECK_PORT]  [number] [default: 8080]
@@ -155,7 +158,6 @@ Options:
   --privateKey                   A private key to be used for the node [env: HOPRD_PRIVATE_KEY]  [string]
   --provider                     A custom RPC provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER]  [string]
   --identity                     The path to the identity file [env: HOPRD_IDENTITY]  [string] [default: "/home/tino/.hopr-identity"]
-  --run                          Run a single hopr command, same syntax as in hopr-admin [env: HOPRD_RUN]  [string] [default: ""]
   --dryRun                       List all the options used to run the HOPR node, but quit instead of starting [env: HOPRD_DRY_RUN]  [boolean] [default: false]
   --data                         manually specify the data directory to use [env: HOPRD_DATA]  [string] [default: "/home/tino/work/hopr/hoprnet/packages/hoprd"]
   --init                         initialize a database if it doesn't already exist [env: HOPRD_INIT]  [boolean] [default: false]
@@ -176,6 +178,31 @@ All CLI options can be configured through environment variables as well. CLI par
 
 As you might have noticed running the node without any command-line argument might not work depending on the installation method used. Here are examples to run a node with some safe configurations set.
 
+### Using Docker
+
+The following command assumes you've setup an alias like described in [Install via Docker](#install-via-docker).
+
+```sh
+hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --admin --adminHost 0.0.0.0 --apiToken <MY_TOKEN> --environment monte_rosa
+```
+
+Here is a short breakdown of each argument.
+
+```sh
+hoprd
+  --identity /app/hoprd-db/.hopr-identity      # store your node identity information in the persisted database folder
+  --password switzerland   	# set the encryption password for your identity
+  --init 				    # initialize the database and identity if not present
+  --announce 				# announce the node to other nodes in the network and act as relay if publicly reachable
+  --host "0.0.0.0:9091"   	# set IP and port of the P2P API to the container's external IP so it can be reached on your host
+  --admin   	            # enable the node's admin UI
+  --adminHost 0.0.0.0       # set IP of the Rest API to the container's external IP so it can be reached on your host
+  --apiToken <MY_TOKEN>     # specify password for accessing admin panel and REST API(REQUIRED)
+  --environment monte_rosa # an environment is defined as a chain plus a number of deployed smart contract addresses to use on that chain
+                            # each release has a default environment id set, but the user can override this value
+                            # nodes from different environments are **not able** to communicate
+```
+
 ### Using NPM
 
 The following command assumes you've setup a local installation like described in [Install via NPM](#install-via-npm).
@@ -189,38 +216,19 @@ Here is a short break-down of each argument.
 
 ```sh
 hoprd
-  --admin   	                         # enable the node's admin UI, available at localhost:3000
-  --init 				 # initialize the database and identity if not present
-  --announce 				 # announce the node to other nodes in the network and act as relay if publicly reachable
-  --identity .hopr-identity              # store your node identity information in your test folder
-  --password switzerland   		 # set the encryption password for your identity
-  --apiToken <MY_TOKEN> # specify password for accessing admin panel and REST API (REQUIRED)
+  --admin   	              # enable the node's admin UI, available at localhost:3000
+  --init 				      # initialize the database and identity if not present
+  --announce 				  # announce the node to other nodes in the network and act as relay if publicly reachable
+  --identity .hopr-identity   # store your node identity information in your test folder
+  --password switzerland   	  # set the encryption password for your identity
+  --apiToken <MY_TOKEN>       # specify password for accessing admin panel and REST API (REQUIRED)
 ```
 
-### Using Docker
+## Testnet accessibility
 
-The following command assumes you've setup an alias like described in [Install via Docker](#install-via-docker).
+Currently, to be able to participate in a public testnet or public staging environment, you need to satisfy certain criteria to be eligible to join. See [Network Registry](NETWORK_REGISTRY.md) for details.
 
-```sh
-hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --admin --adminHost 0.0.0.0 --apiToken <MY_TOKEN> --environment jungfrau
-```
-
-Here is a short break-down of each argument.
-
-```sh
-hoprd
-  --identity /app/hoprd-db/.hopr-identity      # store your node identity information in the persisted database folder
-  --password switzerland   		 # set the encryption password for your identity
-  --init 				 # initialize the database and identity if not present
-  --announce 				 # announce the node to other nodes in the network and act as relay if publicly reachable
-  --host "0.0.0.0:9091"   		 # set IP and port of the P2P API to the container's external IP so it can be reached on your host
-  --admin   	                         # enable the node's admin UI
-  --adminHost 0.0.0.0                    # set IP of the Rest API to the container's external IP so it can be reached on your host
-  --apiToken <MY_TOKEN> # specify password for accessing admin panel and REST API(REQUIRED)
-  --environment jungfrau # an environment is defined as a chain plus a number of deployed smart contract addresses to use on that chain
-                         # each release has a default environment id set, but the user can override this value
-                         # nodes from different environments are **not able** to communicate
-```
+These criteria however, are not required when you develop using your local nodes or a locally running cluster (see [Develop section below](#develop)).
 
 ## Migrating between releases
 
@@ -235,29 +243,36 @@ We attempt to provide instructions on how to migrate your tokens between release
 5. Run `info` and take note of the **network name**.
 6. Once funds are confirmed to exist in a different wallet, backup `.hopr-identity` folder.
 7. Launch new `HOPRd` instance using latest release, observe the account address.
-8. Only tranfer funds to new `HOPRd` instance if `HOPRd` operates on the **same network** as last release, you can compare the two networks using `info`.
+8. Only transfer funds to new `HOPRd` instance if `HOPRd` operates on the **same network** as last release, you can compare the two networks using `info`.
 
 ## Develop
 
+HOPR contains modules written in Rust, therefore a Rust toolchain is needed to successfully build the artifacts.
+To install Rust toolchain (at least version 1.60) please follow instructions at [https://www.rust-lang.org/tools/install](https://www.rust-lang.org/tools/install) first.
+
 ```sh
-yarn          # Install dependencies and sets up workspces
-yarn build    # Builds contracts, clients, etc
+make -j deps && make -j build
 
 # starting network
 HOPR_ENVIRONMENT_ID=hardhat-localhost yarn run:network
 
 # workaround for a temp issue with local hardhat-network
-cp -R packages/ethereum/deployments/hardhat-localhost/localhost/* packages/ethereum/deployments/hardhat-localhost/hardhat
+cp -R packages/ethereum/deployments/hardhat-localhost/localhost/. packages/ethereum/deployments/hardhat-localhost/hardhat
 
 # running normal node alice (separate terminal)
-DEBUG="hopr*" yarn run:hoprd:alice --environment hardhat-localhost
+DEBUG="hopr*" yarn run:hoprd:alice
 
 # running normal node bob (separate terminal)
-DEBUG="hopr*" yarn run:hoprd:bob --environment hardhat-localhost
+DEBUG="hopr*" yarn run:hoprd:bob
 
 # fund all your nodes to get started
 HOPR_ENVIRONMENT_ID=hardhat-localhost yarn run:faucet:all
 ```
+
+## Local cluster
+
+The best way to test with multiple HOPR nodes is by using a local cluster of interconnected nodes.
+See [how to start your local HOPR cluster](SETUP_LOCAL_CLUSTER.md).
 
 ## Test
 
@@ -267,13 +282,13 @@ We use [mocha][9] for our tests. You can run our test suite across all
 packages using the following command:
 
 ```sh
-yarn test
+make test
 ```
 
 To run tests of a single package (e.g. hoprd) execute:
 
 ```sh
-yarn --cwd packages/hoprd test
+make test package=hoprd
 ```
 
 To run tests of a single test suite (e.g. Identity) within a
@@ -344,11 +359,11 @@ Read the full help information of the script in case of questions:
 ```
 
 That command will spawn multiple `hoprd` nodes locally from the local
-source-code and run the tests against this cluster of nodes. The tests can be
-found in the files `test/*.sh`. The script will cleanup all nodes once completed
+source code and run the tests against this cluster of nodes. The tests can be
+found in the files `test/*.sh`. The script will clean up all nodes once completed
 unless instructed otherwise.
 
-An alternative to using the local source-code is running the tests against
+An alternative to using the local source code is running the tests against
 a NPM package.
 
 ```sh
@@ -367,9 +382,9 @@ Read the full help information of the script in case of questions:
 
 #### Running Tests on Google Cloud Platform
 
-In some unique cases, some bugs might not had been picked up by our end-to-end
+In some unique cases, some bugs might not have been picked up by our end-to-end
 testing and instead only show up when deployed to production. To avoid having
-to see these only after a time consuming build, a cluster of nodes can be
+to see these only after a time-consuming build, a cluster of nodes can be
 deployed to Google Cloud Platform which is then used to run tests against it.
 
 A requirement for this setup is a working `gcloud` configuration locally.
@@ -395,7 +410,7 @@ Read the full help information of the script in case of questions:
 
 ## Deploy
 
-The deployment nodes and networks is mostly orchestrated through the script
+The deployment nodes and networks are mostly orchestrated through the script
 files in `scripts/` which are executed by the Github Actions CI workflows.
 Therefore, all common and minimal networks do not require manual steps to be
 deployed.
@@ -457,7 +472,7 @@ script to the creation script:
 ```sh
 ./scripts/setup-gcloud-cluster.sh \
   my-custom-cluster-without-name \
-  gcr.io/hoprassociation/hoprd:ouagadougou \
+  gcr.io/hoprassociation/hoprd:valencia \
   `pwd`/scripts/topologies/full_interconnected_cluster.sh
 ```
 

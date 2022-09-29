@@ -37,15 +37,15 @@ used to generate the initial channel commitment.
 | `channelId` | `Hash` |
 | `channelEpoch` | `UINT256` |
 
-#### Defined in
-
-[packages/core-ethereum/src/commitment.ts:69](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L69)
-
 ## Properties
 
 ### chainId
 
 • `Readonly` **chainId**: `number`
+
+#### Defined in
+
+[packages/core-ethereum/src/commitment.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L71)
 
 ___
 
@@ -53,17 +53,29 @@ ___
 
 • `Readonly` **channelEpoch**: `UINT256`
 
+#### Defined in
+
+[packages/core-ethereum/src/commitment.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L74)
+
 ___
 
 ### channelId
 
 • `Readonly` **channelId**: `Hash`
 
+#### Defined in
+
+[packages/core-ethereum/src/commitment.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L73)
+
 ___
 
 ### contractAddress
 
 • `Readonly` **contractAddress**: `string`
+
+#### Defined in
+
+[packages/core-ethereum/src/commitment.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L72)
 
 ## Methods
 
@@ -84,7 +96,3 @@ All members need to be specified (non-null).
 #### Returns
 
 `Uint8Array`
-
-#### Defined in
-
-[packages/core-ethereum/src/commitment.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L82)

@@ -10,11 +10,11 @@ import {
   type Request,
   intepreteResults,
   getExternalIp
-} from './stun'
-import { Multiaddr } from 'multiaddr'
+} from './stun.js'
+import { Multiaddr } from '@multiformats/multiaddr'
 import assert from 'assert'
 import { defer, type DeferType } from '@hoprnet/hopr-utils'
-import { stopNode, startStunServer, bindToUdpSocket } from './utils.spec'
+import { stopNode, startStunServer, bindToUdpSocket } from './utils.spec.js'
 
 /**
  * Creates a STUN server that answers with tweaked STUN responses to simulate

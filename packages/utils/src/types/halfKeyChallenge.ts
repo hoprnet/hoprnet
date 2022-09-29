@@ -1,11 +1,12 @@
-import type PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { unmarshalPublicKey } from '@libp2p/crypto/keys'
 
-import { publicKeyCreate, publicKeyConvert } from 'secp256k1'
-import { Address, Hash } from '.'
+import secp256k1 from 'secp256k1'
+import { Address, Hash } from './index.js'
 
-import { SECP256K1_CONSTANTS } from '../crypto'
-import { u8aToHex, u8aEquals, stringToU8a } from '../u8a'
-import { pubKeyToPeerId } from '../libp2p'
+import { SECP256K1_CONSTANTS } from '../crypto/index.js'
+import { u8aToHex, u8aEquals, stringToU8a } from '../u8a/index.js'
+import { pubKeyToPeerId } from '../libp2p/index.js'
 
 export class HalfKeyChallenge {
   // @TODO use uncompressed point internally
@@ -20,7 +21,7 @@ export class HalfKeyChallenge {
       throw new Error('Incorrect size Uint8Array for private key')
     }
 
-    return new HalfKeyChallenge(publicKeyCreate(exponent, true))
+    return new HalfKeyChallenge(secp256k1.publicKeyCreate(exponent, true))
   }
 
   static fromUncompressedUncompressedCurvePoint(arr: Uint8Array) {
@@ -28,20 +29,20 @@ export class HalfKeyChallenge {
       throw new Error('Incorrect size Uint8Array for uncompressed public key')
     }
 
-    return new HalfKeyChallenge(publicKeyConvert(arr, true))
+    return new HalfKeyChallenge(secp256k1.publicKeyConvert(arr, true))
   }
 
   static fromPeerId(peerId: PeerId) {
-    return new HalfKeyChallenge(peerId.pubKey.marshal())
+    return new HalfKeyChallenge(unmarshalPublicKey(peerId.publicKey).marshal())
   }
 
   toAddress(): Address {
-    return new Address(Hash.create(publicKeyConvert(this.arr, false).slice(1)).serialize().slice(12))
+    return new Address(Hash.create(secp256k1.publicKeyConvert(this.arr, false).slice(1)).serialize().slice(12))
   }
 
   toUncompressedCurvePoint(): string {
     // Needed in only a few cases for interacting with secp256k1
-    return u8aToHex(publicKeyConvert(this.arr, false).slice(1))
+    return u8aToHex(secp256k1.publicKeyConvert(this.arr, false).slice(1))
   }
 
   toPeerId(): PeerId {

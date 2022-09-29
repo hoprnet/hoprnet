@@ -1,9 +1,9 @@
-import { Multiaddr, protocols } from 'multiaddr'
-import PeerId from 'peer-id'
-import { u8aSplit, serializeToU8a, MULTI_ADDR_MAX_LENGTH, toU8a, u8aToNumber } from '..'
+import { Multiaddr, protocols } from '@multiformats/multiaddr'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { u8aSplit, serializeToU8a, MULTI_ADDR_MAX_LENGTH, toU8a, u8aToNumber } from '../index.js'
 import BN from 'bn.js'
-import { PublicKey } from './publicKey'
-import type { Address } from './primitives'
+import { PublicKey } from './publicKey.js'
+import type { Address } from './primitives.js'
 
 const LENGTH_PREFIX_LENGTH = 4
 const BLOCK_NUMBER_LENGTH = 4
@@ -94,7 +94,7 @@ export class AccountEntry {
   public toString(): string {
     return (
       // prettier-ignore
-      `AccountEntry: ${this.publicKey.toB58String()}\n` +
+      `AccountEntry: ${this.publicKey.toString()}\n` +
       `  PublicKey: ${this.publicKey.toCompressedPubKeyHex()}\n` +
       `  Multiaddr: ${this.multiAddr ? this.multiAddr.toString() : 'not announced'}\n` +
       `  updatedAt: ${this.updatedBlock ? `Block ${this.updatedBlock.toString(10)}` : `not annonced`}\n` +

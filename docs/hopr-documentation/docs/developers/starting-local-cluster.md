@@ -93,13 +93,13 @@ cd hoprnet-release-lisbon
    to install and build the required packages and project modules. Ideally you will also have basic development toolsets[^2] set up on your computer. Please bear in mind that this process will take at least 5-10 minutes depending on your computer.
 
 ```bash
-yarn && yarn build
+make -j deps && make -j build
 ```
 
 3. **Run the one-line setup script**: Run the following script:
 
 ```bash
-./scripts/setup-local-cluster.sh -m "http://app.myne.chat" -i scripts/topologies/full_interconnected_cluster.sh
+./scripts/setup-local-cluster.sh -m "http://app.myne.chat" -i topologies/full_interconnected_cluster.sh
 ```
 
 Please wait while this script creates
@@ -111,7 +111,7 @@ If you are planning to run [MyneChat](http://app.myne.chat/)
 alongside your cluster, then make sure to pass the `-m` flag with your MyneChat instance URL, i.e.:
 
 ```bash
-./scripts/setup-local-cluster.sh -m "http://app.myne.chat" -i scripts/topologies/full_interconnected_cluster.sh
+./scripts/setup-local-cluster.sh -m "http://app.myne.chat" -i topologies/full_interconnected_cluster.sh
 ```
 
 As the script runs, a set of accounts with their respective HTTP REST API, HOPR Admin, and WebSocket interfaces will be displayed

@@ -4,9 +4,11 @@
 */
 
 import type { Operation } from 'express-openapi'
-import { GET as original } from './addresses.js'
+import { default as original } from './addresses.js'
 
-export const GET: Operation = [original[0].bind()]
-GET.apiDoc = JSON.parse(JSON.stringify(original.apiDoc))
+const GET: Operation = [original.GET[0].bind({})]
+GET.apiDoc = JSON.parse(JSON.stringify(original.GET.apiDoc))
 GET.apiDoc.deprecated = true
 GET.apiDoc.operationId = 'accountGetAddress'
+
+export default { GET }

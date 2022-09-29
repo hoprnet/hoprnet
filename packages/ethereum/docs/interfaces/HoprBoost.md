@@ -17,7 +17,6 @@
 - [\_wrappedEmits](HoprBoost.md#_wrappedemits)
 - [address](HoprBoost.md#address)
 - [callStatic](HoprBoost.md#callstatic)
-- [contractName](HoprBoost.md#contractname)
 - [deployTransaction](HoprBoost.md#deploytransaction)
 - [estimateGas](HoprBoost.md#estimategas)
 - [filters](HoprBoost.md#filters)
@@ -93,7 +92,7 @@ BaseContract.\_deployedPromise
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:98
+node_modules/@ethersproject/contracts/lib/index.d.ts:100
 
 ___
 
@@ -111,7 +110,7 @@ BaseContract.\_runningEvents
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:99
+node_modules/@ethersproject/contracts/lib/index.d.ts:101
 
 ___
 
@@ -129,7 +128,7 @@ BaseContract.\_wrappedEmits
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:102
+node_modules/@ethersproject/contracts/lib/index.d.ts:104
 
 ___
 
@@ -143,7 +142,7 @@ BaseContract.address
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:77
+node_modules/@ethersproject/contracts/lib/index.d.ts:79
 
 ___
 
@@ -196,17 +195,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:708
-
-___
-
-### contractName
-
-• **contractName**: ``"HoprBoost"``
-
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:347
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:793
 
 ___
 
@@ -220,7 +209,7 @@ BaseContract.deployTransaction
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:97
+node_modules/@ethersproject/contracts/lib/index.d.ts:99
 
 ___
 
@@ -273,7 +262,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:951
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:1036
 
 ___
 
@@ -306,7 +295,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:872
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:957
 
 ___
 
@@ -359,7 +348,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:373
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:458
 
 ___
 
@@ -373,7 +362,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:352
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:437
 
 ___
 
@@ -387,7 +376,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:368
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:453
 
 ___
 
@@ -401,7 +390,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:369
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:454
 
 ___
 
@@ -415,7 +404,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:370
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:455
 
 ___
 
@@ -468,7 +457,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:1130
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:1215
 
 ___
 
@@ -482,7 +471,7 @@ BaseContract.provider
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:80
+node_modules/@ethersproject/contracts/lib/index.d.ts:82
 
 ___
 
@@ -496,7 +485,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/src/types/HoprBoost.ts:371
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:456
 
 ___
 
@@ -510,7 +499,7 @@ BaseContract.resolvedAddress
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:96
+node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ___
 
@@ -524,7 +513,7 @@ BaseContract.signer
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:79
+node_modules/@ethersproject/contracts/lib/index.d.ts:81
 
 ## Methods
 
@@ -542,10 +531,6 @@ node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:79
 
 `Promise`<`string`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:546
-
 ___
 
 ### MINTER\_ROLE
@@ -561,10 +546,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:548
 
 ___
 
@@ -586,10 +567,6 @@ ___
 
 BaseContract.\_checkRunningEvents
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:119
-
 ___
 
 ### \_deployed
@@ -609,10 +586,6 @@ ___
 #### Inherited from
 
 BaseContract.\_deployed
-
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:112
 
 ___
 
@@ -636,10 +609,6 @@ ___
 
 BaseContract.\_wrapEvent
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:120
-
 ___
 
 ### approve
@@ -657,10 +626,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:550
 
 ___
 
@@ -682,10 +647,6 @@ ___
 
 BaseContract.attach
 
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:349
-
 ___
 
 ### balanceOf
@@ -702,10 +663,6 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:556
 
 ___
 
@@ -728,10 +685,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:558
-
 ___
 
 ### boostOf
@@ -748,10 +701,6 @@ ___
 #### Returns
 
 `Promise`<[`BigNumber`, `BigNumber`]\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:567
 
 ___
 
@@ -773,10 +722,6 @@ ___
 
 BaseContract.connect
 
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:348
-
 ___
 
 ### deployed
@@ -790,10 +735,6 @@ ___
 #### Overrides
 
 BaseContract.deployed
-
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:350
 
 ___
 
@@ -816,10 +757,6 @@ ___
 
 BaseContract.emit
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:125
-
 ___
 
 ### fallback
@@ -840,10 +777,6 @@ ___
 
 BaseContract.fallback
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:113
-
 ___
 
 ### getApproved
@@ -861,10 +794,6 @@ ___
 
 `Promise`<`string`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:572
-
 ___
 
 ### getRoleAdmin
@@ -881,10 +810,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:577
 
 ___
 
@@ -904,10 +829,6 @@ ___
 
 `Promise`<`string`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:579
-
 ___
 
 ### getRoleMemberCount
@@ -924,10 +845,6 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:585
 
 ___
 
@@ -947,10 +864,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:590
-
 ___
 
 ### hasRole
@@ -969,10 +882,6 @@ ___
 
 `Promise`<`boolean`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:596
-
 ___
 
 ### isApprovedForAll
@@ -990,10 +899,6 @@ ___
 #### Returns
 
 `Promise`<`boolean`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:602
 
 ___
 
@@ -1014,10 +919,6 @@ ___
 #### Inherited from
 
 BaseContract.listenerCount
-
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:126
 
 ___
 
@@ -1045,10 +946,6 @@ ___
 
 BaseContract.listeners
 
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:360
-
 ▸ **listeners**(`eventName?`): `Listener`[]
 
 #### Parameters
@@ -1064,10 +961,6 @@ packages/ethereum/src/types/HoprBoost.ts:360
 #### Overrides
 
 BaseContract.listeners
-
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:363
 
 ___
 
@@ -1090,10 +983,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:608
-
 ___
 
 ### name
@@ -1109,10 +998,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:617
 
 ___
 
@@ -1130,10 +1015,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:619
 
 ___
 
@@ -1163,10 +1044,6 @@ ___
 
 BaseContract.queryFilter
 
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:354
-
 ___
 
 ### reclaimErc20Tokens
@@ -1183,10 +1060,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:621
 
 ___
 
@@ -1205,10 +1078,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:626
 
 ___
 
@@ -1236,10 +1105,6 @@ ___
 
 BaseContract.removeAllListeners
 
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:364
-
 ▸ **removeAllListeners**(`eventName?`): [`HoprBoost`](HoprBoost.md)
 
 #### Parameters
@@ -1255,10 +1120,6 @@ packages/ethereum/src/types/HoprBoost.ts:364
 #### Overrides
 
 BaseContract.removeAllListeners
-
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:367
 
 ___
 
@@ -1278,10 +1139,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:632
-
 ___
 
 ### revokeRole
@@ -1299,10 +1156,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:638
 
 ___
 
@@ -1322,10 +1175,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:644
 
 ___
 
@@ -1347,10 +1196,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:651
-
 ___
 
 ### setApprovalForAll
@@ -1369,10 +1214,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:659
-
 ___
 
 ### supportsInterface
@@ -1390,10 +1231,6 @@ ___
 
 `Promise`<`boolean`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:665
-
 ___
 
 ### symbol
@@ -1409,10 +1246,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:670
 
 ___
 
@@ -1430,10 +1263,6 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:672
 
 ___
 
@@ -1453,10 +1282,6 @@ ___
 
 `Promise`<`BigNumber`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:677
-
 ___
 
 ### tokenURI
@@ -1474,10 +1299,6 @@ ___
 
 `Promise`<`string`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:683
-
 ___
 
 ### totalSupply
@@ -1493,10 +1314,6 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:685
 
 ___
 
@@ -1517,10 +1334,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:687
-
 ___
 
 ### typeAt
@@ -1537,10 +1350,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:694
 
 ___
 
@@ -1559,10 +1368,6 @@ ___
 
 `Promise`<`BigNumber`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:696
-
 ___
 
 ### typeOf
@@ -1580,10 +1385,6 @@ ___
 
 `Promise`<`string`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:701
-
 ___
 
 ### updateBaseURI
@@ -1600,7 +1401,3 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprBoost.ts:703

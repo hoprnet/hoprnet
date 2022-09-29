@@ -21,14 +21,80 @@ const sidebars = {
   tutorialSidebar: [
     {
       type: 'category',
+      label: 'What is HOPR?',
+      items: [
+        'core/what-is-hopr',
+        'core/what-is-metadata',
+        'core/anonymous-routing',
+        'core/mixnets',
+        'core/incentives',
+        'core/proof-of-relay',
+        'core/tickets-and-payment-channels',
+        'core/probabilistic-payments',
+        'core/cover-traffic',
+        'core/cover-traffic-nodes',
+        'core/balancing-cover-traffic',
+        'faq'
+      ]
+    },
+
+    {
+      type: 'category',
+      label: 'Run a HOPR node',
+      items: [
+        'node/start-here',
+        'node/using-avado',
+        'node/using-dappnode',
+        'node/using-docker',
+        'node/using-hopr-admin',
+        'node/hoprd-commands',
+        'node/network-registry-tutorial'
+      ]
+    },
+
+    {
+      type: 'category',
+      label: 'Developers',
+      link: { type: 'doc', id: 'developers/intro' },
+      items: [
+        'developers/starting-local-cluster',
+        'developers/connecting-node',
+        'developers/tutorial-hello-world',
+        'developers/demo-boomerang-chat',
+        'developers/demo-rps-game',
+        'developers/rest-api',
+        'developers/smart-contract',
+        'developers/snippets',
+        'developers/visualising-hopr-network-topology'
+      ]
+    },
+
+    {
+      type: 'category',
+      label: 'HOPR dApps',
+      items: [
+        'dapps/visualizer',
+        'dapps/hopr-admin',
+        'dapps/cockpit',
+        'dapps/chess',
+        'dapps/myne-chat-playground',
+        'dapps/playground',
+        'dapps/boomerang'
+      ]
+    },
+
+    {
+      type: 'category',
+      label: 'Ecosystem',
+      items: ['ecosystem/hopr-token', 'ecosystem/gnosis-hopr-tokens', 'staking/how-to-get-hopr', 'staking/convert-hopr']
+    }
+
+    /*
+    {
+      type: 'category',
       label: 'About HOPR',
       items: ['about-hopr']
     },
-    /* {
-      type: 'doc',
-      id: 'intro',
-      label: 'Welcome to HOPR',
-    },*/
     {
       type: 'category',
       label: 'Installing a hoprd node',
@@ -68,6 +134,7 @@ const sidebars = {
       items: [
         'developers/starting-local-cluster',
         'developers/connecting-node',
+        'developers/network-registry',
         'developers/tutorial-hello-world',
         'developers/demo-boomerang-chat',
         'developers/demo-rps-game',
@@ -82,16 +149,17 @@ const sidebars = {
       label: 'dApps',
       items: ['dapps/myne-chat']
     },
-    /*{
-        type: 'doc',
-  id: 'staking',
-        label: 'Staking',
-    },*/
+    {
+      type: 'category',
+      label: 'Ecosystem',
+      link: { type: 'doc', id: 'ecosystem/introduction' },
+      items: ['ecosystem/hopr-token', 'ecosystem/gnosis-hopr-tokens', 'ecosystem/staking', 'ecosystem/hoprd']
+    },
     {
       type: 'doc',
       id: 'faq',
       label: 'FAQ'
-    }
+    }*/
   ]
 }
 

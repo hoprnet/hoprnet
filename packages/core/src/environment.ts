@@ -1,9 +1,21 @@
+// May not change at runtime
+// Don't do type-checks on JSON files
+// @ts-ignore
+import protocolConfig from '../protocol-config.json' assert { type: 'json' }
+import semver from 'semver'
+import { FULL_VERSION } from './constants.js'
+
+/**
+ * Coerced full version using
+ * semver.coerce('42.6.7.9.3-alpha') // '42.6.7'
+ */
+const FULL_VERSION_COERCED = semver.coerce(FULL_VERSION).version
+
 export type NetworkOptions = {
   id: string
   description: string
   chain_id: number // >= 0
   live: boolean
-  hardhat_deploy_gas_price: string // Gas price as either a number string '11' or a value which should be converted like '1 gwei'. Used in hardhat-deploy plugin.
   default_provider: string // a valid HTTP url pointing at a RPC endpoint
   etherscan_api_url?: string // a valid HTTP url pointing at a RPC endpoint
   max_fee_per_gas: string // The absolute maximum you are willing to pay per unit of gas to get your transaction included in a block, e.g. '10 gwei'
@@ -13,9 +25,13 @@ export type NetworkOptions = {
   tags: string[]
 }
 
+export type EnvironmentType = 'production' | 'staging' | 'development'
+
 export type Environment = {
   id: string
   network_id: string // must match one of the Network.id
+  environment_type: EnvironmentType
+  version_range: string
   channel_contract_deploy_block: number // >= 0
   token_contract_address: string // an Ethereum address
   channels_contract_address: string // an Ethereum address
@@ -27,13 +43,18 @@ export type Environment = {
 }
 
 export type ProtocolConfig = {
-  environments: Environment[]
-  networks: NetworkOptions[]
+  environments: {
+    [key: string]: Environment
+  }
+  networks: {
+    [key: string]: NetworkOptions
+  }
 }
 
 export type ResolvedEnvironment = {
   id: string
   network: NetworkOptions
+  environment_type: EnvironmentType
   channel_contract_deploy_block: number
   token_contract_address: string // an Ethereum address
   channels_contract_address: string // an Ethereum address
@@ -44,22 +65,42 @@ export type ResolvedEnvironment = {
   network_registry_contract_address: string // an Ethereum address,
 }
 
+/**
+ * @param version HOPR version
+ * @returns environments that the given HOPR version should be able to use
+ */
 export function supportedEnvironments(): Environment[] {
-  const protocolConfig = require('../protocol-config.json') as ProtocolConfig
-  const environments = Object.entries(protocolConfig.environments).map(([id, env]) => ({ id, ...env }))
+  const environments = Object.entries((protocolConfig as ProtocolConfig).environments)
+
   return environments
+    .filter(([_, env]) => {
+      return semver.satisfies(FULL_VERSION_COERCED, env.version_range)
+    })
+    .map(([id, env]) => ({
+      id,
+      ...env
+    }))
 }
 
+/**
+ * @param environment_id environment name
+ * @param customProvider
+ * @returns the environment details, throws if environment is not supported
+ */
 export function resolveEnvironment(environment_id: string, customProvider?: string): ResolvedEnvironment {
-  const protocolConfig = require('../protocol-config.json') as ProtocolConfig
-  const environment = protocolConfig.environments[environment_id]
-  const network = protocolConfig.networks[environment?.network_id]
-  if (environment && network) {
-    network.id = environment?.network_id
-    network.default_provider = customProvider ?? network?.default_provider
+  const environment = (protocolConfig as ProtocolConfig).environments[environment_id]
+  const network = (protocolConfig as ProtocolConfig).networks[environment?.network_id]
+
+  if (environment && network && semver.satisfies(FULL_VERSION_COERCED, environment.version_range)) {
+    network.id = environment.network_id
+    if (customProvider && customProvider.length > 0) {
+      network.default_provider = customProvider
+    }
+
     return {
       id: environment_id,
       network,
+      environment_type: environment.environment_type,
       channel_contract_deploy_block: environment.channel_contract_deploy_block,
       token_contract_address: environment.token_contract_address,
       channels_contract_address: environment.channels_contract_address,
@@ -70,6 +111,7 @@ export function resolveEnvironment(environment_id: string, customProvider?: stri
       network_registry_contract_address: environment.network_registry_contract_address
     }
   }
+
   const supportedEnvsString: string = supportedEnvironments()
     .map((env) => env.id)
     .join(', ')

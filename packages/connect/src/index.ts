@@ -1,29 +1,40 @@
-import Debug from 'debug'
-import { CODE_DNS4, CODE_DNS6, CODE_IP4, CODE_IP6, CODE_P2P } from './constants'
-import type { Multiaddr } from 'multiaddr'
-import PeerId from 'peer-id'
-import type Connection from 'libp2p-interfaces/src/connection/connection'
-import type { Upgrader, Transport } from 'libp2p-interfaces/src/transport/types'
-import type libp2p from 'libp2p'
-import chalk from 'chalk'
-import { TCPConnection, Listener } from './base'
-import { Relay } from './relay'
-import { Filter } from './filter'
-import { Discovery } from './discovery'
+import type { Multiaddr } from '@multiformats/multiaddr'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import type { Initializable, Components } from '@libp2p/interfaces/components'
+import type { Startable } from '@libp2p/interfaces/startable'
+import type { Connection, MultiaddrConnection } from '@libp2p/interface-connection'
 
-import type {
-  PublicNodesEmitter,
-  HoprConnectListeningOptions,
-  HoprConnectDialOptions,
-  HoprConnectOptions,
-  HoprConnectTestingOptions
-} from './types'
+import errCode from 'err-code'
+import Debug from 'debug'
+import { CODE_DNS4, CODE_DNS6, CODE_IP4, CODE_IP6, CODE_P2P } from './constants.js'
+
+import { peerIdFromBytes } from '@libp2p/peer-id'
+import { type CreateListenerOptions, type DialOptions, symbol, type Transport } from '@libp2p/interface-transport'
+import chalk from 'chalk'
+import { TCPConnection, Listener } from './base/index.js'
+
+// Do not type-check JSON files
+// @ts-ignore
+import pkg from '../package.json' assert { type: 'json' }
+
+import type { PublicNodesEmitter, HoprConnectOptions, HoprConnectTestingOptions } from './types.js'
+
+import { Relay } from './relay/index.js'
+import { Filter } from './filter.js'
+import { Discovery } from './discovery.js'
+import { ConnectComponents } from './components.js'
+import { EntryNodes } from './base/entry.js'
+import { WebRTCUpgrader } from './webrtc/upgrader.js'
+import { UpnpManager } from './base/upnp.js'
+import { timeout } from '@hoprnet/hopr-utils'
 
 const DEBUG_PREFIX = 'hopr-connect'
 const log = Debug(DEBUG_PREFIX)
 const verbose = Debug(DEBUG_PREFIX.concat(':verbose'))
 const warn = Debug(DEBUG_PREFIX.concat(':warn'))
 const error = Debug(DEBUG_PREFIX.concat(':error'))
+
+const DEFAULT_CONNECTION_UPGRADE_TIMEOUT = 2000
 
 type HoprConnectConfig = {
   config?: HoprConnectOptions
@@ -33,99 +44,22 @@ type HoprConnectConfig = {
 /**
  * @class HoprConnect
  */
-class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListeningOptions> {
-  get [Symbol.toStringTag]() {
-    return 'HoprConnect'
-  }
-
+class HoprConnect implements Transport, Initializable, Startable {
   public discovery: Discovery
-
-  private _dialDirectly: HoprConnect['dialDirectly']
-  private _upgradeOutbound: Upgrader['upgradeOutbound']
-  private _upgradeInbound: Upgrader['upgradeInbound']
 
   private options: HoprConnectOptions
   private testingOptions: HoprConnectTestingOptions
 
-  private _peerId: PeerId
-  private relay: Relay
-  private _addressFilter: Filter
-  private _libp2p: libp2p
+  components: Components | undefined
+  connectComponents: ConnectComponents | undefined
 
-  constructor(
-    opts: {
-      upgrader: Upgrader
-      libp2p: libp2p
-    } & HoprConnectConfig
-  ) {
-    if (!opts.upgrader) {
-      throw new Error('An upgrader must be provided. See https://github.com/libp2p/interface-transport#upgrader.')
-    }
-
-    if (!opts.libp2p) {
-      throw new Error('Transport module needs access to libp2p.')
-    }
-
+  constructor(opts: HoprConnectConfig) {
     this.options = opts.config ?? {}
     this.testingOptions = opts.testing ?? {}
 
-    this._peerId = opts.libp2p.peerId
-    this._libp2p = opts.libp2p
-
-    this._addressFilter = new Filter(this._peerId, this.options)
-
     this.discovery = new Discovery()
 
-    this._upgradeOutbound = opts.upgrader.upgradeOutbound.bind(opts.upgrader)
-    this._upgradeInbound = opts.upgrader.upgradeInbound.bind(opts.upgrader)
-
-    this._dialDirectly = this.dialDirectly.bind(this)
-
-    this.relay = new Relay(this._libp2p, this._dialDirectly, this.filter.bind(this), this.options, this.testingOptions)
-
-    try {
-      const { version } = require('../package.json')
-
-      log(`HoprConnect: `, version)
-    } catch {
-      throw Error(`Cannot find package.json to load version tag. Exitting.`)
-    }
-
-    if (!!this.testingOptions.__noDirectConnections) {
-      verbose(`DEBUG mode: always using relayed or WebRTC connections.`)
-
-      const onConnection = this._libp2p.upgrader.onConnection
-
-      // Simulated NAT:
-      // If we don't allow direct connections (being a NATed node), then a connection
-      // can happen if outgoing, i.e. by establishing a connection to someone else
-      // we populate the address mapping of the router.
-      // Or, if we get contacted by a relay to which we already have an *outgoing*
-      // connection that gets reused.
-      this._libp2p.upgrader.onConnection = (conn) => {
-        log(`New connection:`)
-        log(`remoteAddr: ${conn.remoteAddr.toString()}`)
-        log(`remotePeer ${conn.remotePeer.toB58String()}`)
-        log(`localAddr: ${conn.localAddr?.toString()}`)
-        log(`remotePeer ${conn.localPeer.toB58String()}`)
-
-        if (conn.remoteAddr.toString().startsWith(`/p2p/`)) {
-          onConnection(conn)
-          return
-        }
-
-        if (conn.stat.direction === 'outbound') {
-          onConnection(conn)
-          return
-        }
-
-        log(`closing due to NAT`)
-
-        // Close the NATed connection as there is no need to keep
-        // unused connections open.
-        conn.close()
-      }
-    }
+    log(`HoprConnect: `, pkg.version)
 
     if (!!this.testingOptions.__noWebRTCUpgrade) {
       verbose(`DEBUG mode: no WebRTC upgrade`)
@@ -136,21 +70,117 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
     }
   }
 
+  get [symbol](): true {
+    return true
+  }
+
+  get [Symbol.toStringTag]() {
+    return 'HoprConnect'
+  }
+
+  public init(components: Components) {
+    this.components = components
+
+    const dialDirectly = this.dialDirectly.bind(this)
+    const filter = this.filter.bind(this)
+
+    this.connectComponents = new ConnectComponents({
+      addressFilter: new Filter(this.options),
+      entryNodes: new EntryNodes(dialDirectly, this.options),
+      relay: new Relay(dialDirectly, filter, this.options, this.testingOptions),
+      upnpManager: new UpnpManager(),
+      webRTCUpgrader: new WebRTCUpgrader(this.options)
+    })
+
+    // Pass libp2p internals
+    this.connectComponents.init(components)
+  }
+
+  public getComponents(): Components {
+    if (this.components == null) {
+      throw errCode(new Error('components not set'), 'ERR_SERVICE_MISSING')
+    }
+
+    return this.components
+  }
+
+  public getConnectComponents(): ConnectComponents {
+    if (this.connectComponents == null) {
+      throw errCode(new Error('connectComponents not set'), 'ERR_SERVICE_MISSING')
+    }
+
+    return this.connectComponents
+  }
+
+  public isStarted(): boolean {
+    return true
+  }
+
+  // Simulated NAT:
+  // If we don't allow direct connections (being a NATed node), then a connection
+  // can happen if outgoing, i.e. by establishing a connection to someone else
+  // we populate the address mapping of the router.
+  // Or, if we get contacted by a relay to which we already have an *outgoing*
+  // connection that gets reused.
+  // @TODO
+  private setupSimulatedNAT(): void {
+    // Simulated NAT using connection gater
+    const denyInboundConnection = this.getComponents().getConnectionGater().denyInboundConnection
+    this.getComponents().getConnectionGater().denyInboundConnection = async (maConn: MultiaddrConnection) => {
+      log(`New connection:`)
+      log(`remoteAddr: ${maConn.remoteAddr.toString()}`)
+      // log(`remotePeer ${maConn.remotePeer.toB58String()}`)
+      // log(`localAddr: ${conn.localAddr?.toString()}`)
+      // log(`remotePeer ${conn.localPeer.toB58String()}`)
+      if (await denyInboundConnection(maConn)) {
+        log(`closing due to simulated NAT`)
+        return true
+      } else if (maConn.remoteAddr.toString().startsWith(`/p2p/`)) {
+        return false
+      }
+      log(`closing due to simulated NAT`)
+      return true
+    }
+    // @TODO only allow connections to entry nodes
+    // this.getComponents().getConnectionGater().denyDialMultiaddr
+  }
+
+  public async beforeStart() {
+    await this.getConnectComponents().beforeStart()
+  }
+
+  public async start(): Promise<void> {
+    if (!!this.testingOptions.__noDirectConnections) {
+      verbose(`DEBUG mode: always using relayed or WebRTC connections.`)
+
+      this.setupSimulatedNAT()
+    }
+    await this.getConnectComponents().start()
+  }
+
+  public async afterStart() {
+    await this.getConnectComponents().afterStart()
+  }
+
+  public async stop(): Promise<void> {
+    await this.getConnectComponents().stop()
+  }
+
   /**
    * Tries to establish a connection to the given destination
    * @param ma destination
    * @param options optional dial options
    * @returns An upgraded Connection
    */
-  async dial(ma: Multiaddr, options: HoprConnectDialOptions = {}): Promise<Connection> {
+  async dial(ma: Multiaddr, options: DialOptions): Promise<Connection> {
     const maTuples = ma.tuples()
 
     // This works because destination peerId is for both address
     // types at the third place.
     // Other addresses are not supported.
-    const destination = PeerId.createFromBytes((maTuples[2][1] as Uint8Array).slice(1))
+    const destination = peerIdFromBytes((maTuples[2][1] as Uint8Array).slice(1))
 
-    if (destination.equals(this._peerId)) {
+    if (destination.equals(this.getComponents().getPeerId())) {
       throw new Error(`Cannot dial ourself`)
     }
 
@@ -161,7 +191,7 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
       case CODE_IP6:
         return this.dialDirectly(ma, options)
       case CODE_P2P:
-        const relay = PeerId.createFromBytes((maTuples[0][1] as Uint8Array).slice(1))
+        const relay = peerIdFromBytes((maTuples[0][1] as Uint8Array).slice(1))
 
         return this.dialWithRelay(relay, destination, options)
       default:
@@ -169,34 +199,16 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
     }
   }
 
-  private onClose(): void {
-    this.relay.stop()
-  }
-
-  private onListening(): void {
-    this.relay.start()
-  }
-
   /**
    * Creates a TCP listener. The provided `handler` function will be called
    * anytime a new incoming Connection has been successfully upgraded via
    * `upgrader.upgradeInbound`.
-   * @param _handler
+   * @param opts
    * @returns A TCP listener
    */
-  public createListener(_options: HoprConnectListeningOptions, _handler?: Function): Listener {
-    return new Listener(
-      this.onClose.bind(this),
-      this.onListening.bind(this),
-      this._dialDirectly,
-      this._upgradeInbound,
-      this._peerId,
-      this.options,
-      this.testingOptions,
-      this._addressFilter,
-      this.relay,
-      this._libp2p
-    )
+  // @ts-ignore libp2p type clash
+  public createListener(opts: CreateListenerOptions): Listener {
+    return new Listener(this.options, this.testingOptions, this.getComponents(), this.getConnectComponents())
   }
 
   /**
@@ -209,7 +221,7 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
    */
   public filter(multiaddrs: Multiaddr[]): Multiaddr[] {
     return (Array.isArray(multiaddrs) ? multiaddrs : [multiaddrs]).filter(
-      this._addressFilter.filter.bind(this._addressFilter)
+      this.getConnectComponents().getAddressFilter().filter.bind(this.getConnectComponents().getAddressFilter())
     )
   }
 
@@ -219,16 +231,10 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
    * @param destination peerId of destination
    * @param options optional dial options
    */
-  private async dialWithRelay(
-    relay: PeerId,
-    destination: PeerId,
-    options: HoprConnectDialOptions
-  ): Promise<Connection> {
-    log(
-      `Attempting to dial ${chalk.yellow(`/p2p/${relay.toB58String()}/p2p-circuit/p2p/${destination.toB58String()}`)}`
-    )
+  private async dialWithRelay(relay: PeerId, destination: PeerId, options: DialOptions): Promise<Connection> {
+    log(`Attempting to dial ${chalk.yellow(`/p2p/${relay.toString()}/p2p-circuit/p2p/${destination.toString()}`)}`)
 
-    let maConn = await this.relay.connect(relay, destination, options)
+    let maConn = await this.getConnectComponents().getRelay().connect(relay, destination, options)
 
     if (maConn == undefined) {
       throw Error(`Could not establish relayed connection.`)
@@ -237,8 +243,8 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
     let conn: Connection
 
     try {
-      conn = await this._upgradeOutbound(maConn)
-      log(`Successfully established relayed connection to ${destination.toB58String()}`)
+      conn = await options.upgrader.upgradeOutbound(maConn)
+      log(`Successfully established relayed connection to ${destination.toString()}`)
     } catch (err) {
       error(err)
       // libp2p needs this error to understand that this connection attempt failed but we
@@ -254,16 +260,19 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
    * @param ma destination
    * @param options optional dial options
    */
-  public async dialDirectly(ma: Multiaddr, options?: HoprConnectDialOptions): Promise<Connection> {
+  public async dialDirectly(
+    ma: Multiaddr,
+    options: DialOptions & { onDisconnect?: (ma: Multiaddr) => void }
+  ): Promise<Connection> {
     log(`Attempting to dial ${chalk.yellow(ma.toString())}`)
 
-    const maConn = await TCPConnection.create(ma, this._peerId, options)
+    const maConn = await TCPConnection.create(ma, this.getComponents().getPeerId(), options)
 
     verbose(
       `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshake.`
     )
 
-    const conn = await this._upgradeOutbound(maConn)
+    const conn = await timeout(DEFAULT_CONNECTION_UPGRADE_TIMEOUT, () => options.upgrader.upgradeOutbound(maConn))
 
     // Assign various connection properties once we're sure that public keys match,
     // i.e. dialed node == desired destination
@@ -272,7 +281,7 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
     maConn.conn.setKeepAlive(true, 1000)
 
     maConn.conn.on('end', function () {
-      log(`SOCKET END on connection to ${maConn.remoteAddr.toString()}:  other end of the socket sent a FIN packet`)
+      log(`SOCKET END on connection to ${maConn.remoteAddr.toString()}: other end of the socket sent a FIN packet`)
     })
 
     maConn.conn.on('timeout', function () {
@@ -297,7 +306,7 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
   }
 }
 
-export type { PublicNodesEmitter, HoprConnectConfig, HoprConnectDialOptions, HoprConnectListeningOptions }
-export { compareAddressesLocalMode, compareAddressesPublicMode } from './utils'
+export type { PublicNodesEmitter, HoprConnectConfig }
+export { compareAddressesLocalMode, compareAddressesPublicMode } from './utils/index.js'
 
-export default HoprConnect
+export { HoprConnect }

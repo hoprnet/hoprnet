@@ -1,14 +1,13 @@
-import { setImmediate } from 'timers/promises'
-
-import type NetworkPeers from './network-peers'
-import type AccessControl from './access-control'
-import type PeerId from 'peer-id'
+import type NetworkPeers from './network-peers.js'
+import type AccessControl from './access-control.js'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import { randomInteger, u8aEquals, debug, retimer, nAtATime, u8aToHex } from '@hoprnet/hopr-utils'
-import { HEARTBEAT_TIMEOUT } from '../constants'
+import { HEARTBEAT_TIMEOUT } from '../constants.js'
 import { createHash, randomBytes } from 'crypto'
 
-import type { Subscribe, SendMessage } from '../index'
+import type { Subscribe, SendMessage } from '../index.js'
 import EventEmitter from 'events'
+import { NetworkPeersOrigin } from './network-peers.js'
 
 const log = debug('hopr-core:heartbeat')
 const error = debug('hopr-core:heartbeat:error')
@@ -63,7 +62,7 @@ export default class Heartbeat {
     private closeConnectionsTo: (peer: PeerId) => Promise<void>,
     private reviewConnection: AccessControl['reviewConnection'],
     private stateChangeEmitter: EventEmitter,
-    private publicNodeLookup: (addr: PeerId) => boolean,
+    private isPublicNode: (addr: PeerId) => boolean,
     environmentId: string,
     config?: Partial<HeartbeatConfig>
   ) {
@@ -103,13 +102,13 @@ export default class Heartbeat {
         lastSeen: Date.now()
       })
     } else {
-      this.networkPeers.register(remotePeer, 'incoming heartbeat')
+      this.networkPeers.register(remotePeer, NetworkPeersOrigin.INCOMING_CONNECTION)
     }
 
     // Recalculate network health when incoming heartbeat has been received
     this.recalculateNetworkHealth()
 
-    log(`received heartbeat from ${remotePeer.toB58String()}`)
+    log(`received heartbeat from ${remotePeer.toString()}`)
     return Promise.resolve(Heartbeat.calculatePingResponse(msg))
   }
 
@@ -120,11 +119,11 @@ export default class Heartbeat {
    * @returns a Promise of a pingResult object with property `lastSeen < 0` if there were a timeout
    */
   public async pingNode(destination: PeerId, signal?: AbortSignal): Promise<HeartbeatPingResult> {
-    log(`ping ${destination.toB58String()} (timeout ${this.config.heartbeatDialTimeout})`)
+    log(`ping ${destination.toString()} (timeout ${this.config.heartbeatDialTimeout})`)
 
     const origin = this.networkPeers.has(destination)
       ? this.networkPeers.getConnectionInfo(destination).origin
-      : 'unknown'
+      : NetworkPeersOrigin.OUTGOING_CONNECTION
     const allowed = await this.reviewConnection(destination, origin)
     if (!allowed) throw Error('Connection to node is not allowed')
 
@@ -137,7 +136,7 @@ export default class Heartbeat {
         signal
       })
     } catch (err) {
-      log(`Connection to ${destination.toB58String()} failed: ${err?.message}`)
+      log(`Connection to ${destination.toString()} failed: ${err?.message}`)
       return {
         destination,
         lastSeen: -1
@@ -176,9 +175,9 @@ export default class Heartbeat {
     let highQualityNonPublic = 0
 
     // Count quality of public/non-public nodes
-    for (let entry of this.networkPeers.allEntries()) {
+    for (let entry of this.networkPeers.getAllEntries()) {
       let quality = this.networkPeers.qualityOf(entry.id)
-      if (this.publicNodeLookup(entry.id)) {
+      if (this.isPublicNode(entry.id)) {
         quality > this.config.networkQualityThreshold ? ++highQualityPublic : ++lowQualityPublic
       } else {
         quality > this.config.networkQualityThreshold ? ++highQualityNonPublic : ++lowQualityNonPublic
@@ -219,7 +218,7 @@ export default class Heartbeat {
       if (!finished) {
         abort.abort()
       }
-    }, this.config.heartbeatRunTimeout)
+    }, this.config.heartbeatRunTimeout).unref()
 
     // Create an object that describes which work has to be done
     // by the workers, i.e. the pingNode code
@@ -230,12 +229,9 @@ export default class Heartbeat {
     const start = Date.now()
     const pingResults = await nAtATime(this._pingNode, pingWork, this.config.maxParallelHeartbeats)
 
-    log(`Heartbeat run pinging ${pingWork.length} nodes took ${Date.now() - start} ms`)
-
     finished = true
 
     for (const [resultIndex, pingResult] of pingResults.entries()) {
-      await setImmediate()
       if (pingResult instanceof Error) {
         // we need to get the destination so we can map a ping error properly
         const [destination, _abortSignal] = pingWork[resultIndex]
@@ -252,8 +248,13 @@ export default class Heartbeat {
     // Recalculate the network health indicator state after checking nodes
     this.recalculateNetworkHealth()
 
-    log(`finished checking nodes since ${thresholdTime} ${this.networkPeers.length()} nodes`)
-    log(this.networkPeers.debugLog())
+    log(
+      this.networkPeers.debugLog(
+        `finished checking ${pingWork.length} node${pingWork.length == 1 ? '' : 's'} since ${thresholdTime} within ${
+          Date.now() - start
+        } ms`
+      )
+    )
   }
 
   /**

@@ -1,11 +1,9 @@
 import { passwordStrength } from 'check-password-strength'
-import { decode } from 'rlp'
 import path from 'path'
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
-import { setTimeout } from 'timers/promises'
 
-import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
+import { loadJson, NativeBalance, SUGGESTED_NATIVE_BALANCE, get_package_version } from '@hoprnet/hopr-utils'
 import {
   default as Hopr,
   type HoprOptions,
@@ -25,14 +23,9 @@ import type { State } from './types.js'
 import setupAPI from './api/index.js'
 import setupHealthcheck from './healthcheck.js'
 import { AdminServer } from './admin.js'
-import { Commands } from './commands/index.js'
 import { LogStream } from './logs.js'
 import { getIdentity } from './identity.js'
-import { register as registerUnhandled } from 'trace-unhandled'
-
-import { setLogger } from 'trace-unhandled'
-
-import * as wasm from '../lib/hoprd_misc.cjs'
+import { decodeMessage } from './api/utils.js'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
@@ -42,7 +35,7 @@ export type DefaultEnvironment = {
 
 function defaultEnvironment(): string {
   try {
-    const config = require('../default-environment.json') as DefaultEnvironment
+    const config = loadJson('../default-environment.json') as DefaultEnvironment
     return config?.id || ''
   } catch (error) {
     // its ok if the file isn't there or cannot be read
@@ -51,10 +44,12 @@ function defaultEnvironment(): string {
 }
 
 // Use environment-specific default data path
-const defaultDataPath = path.join(
-  path.dirname(new URL('../package.json', import.meta.url).pathname),
-  defaultEnvironment()
-)
+const defaultDataPath = path.join(process.cwd(), 'hoprd-db', defaultEnvironment())
+
+// reading the version manually to ensure the path is read correctly
+const packageFile = path.normalize(new URL('../package.json', import.meta.url).pathname)
+const version = get_package_version(packageFile)
+const on_avado = (process.env.AVADO ?? 'false').toLowerCase() === 'true'
 
 const yargsInstance = yargs(hideBin(process.argv))
 
@@ -63,6 +58,7 @@ const argv = yargsInstance
   .epilogue(
     'All CLI options can be configured through environment variables as well. CLI parameters have precedence over environment variables.'
   )
+  .version(version)
   .option('environment', {
     string: true,
     describe: 'Environment id which the node shall run on (HOPRD_ENVIRONMENT)',
@@ -96,24 +92,24 @@ const argv = yargsInstance
   })
   .option('api', {
     boolean: true,
-    describe:
-      'Expose the Rest (V1, V2) and Websocket (V2) API on localhost:3001, requires --apiToken. "--rest" is deprecated [env: HOPRD_API]',
-    default: false,
-    alias: 'rest'
+    describe: 'Expose the API on localhost:3001. [env: HOPRD_API]',
+    default: false
   })
   .option('apiHost', {
     string: true,
-    describe:
-      'Set host IP to which the Rest and Websocket API server will bind. "--restHost" is deprecated [env: HOPRD_API_HOST]',
-    default: 'localhost',
-    alias: 'restHost'
+    describe: 'Set host IP to which the API server will bind. [env: HOPRD_API_HOST]',
+    default: 'localhost'
   })
   .option('apiPort', {
     number: true,
-    describe:
-      'Set host port to which the Rest and Websocket API server will bind. "--restPort" is deprecated [env: HOPRD_API_PORT]',
-    default: 3001,
-    alias: 'restPort'
+    describe: 'Set host port to which the API server will bind. [env: HOPRD_API_PORT]',
+    default: 3001
+  })
+  .option('apiToken', {
+    string: true,
+    describe: 'A REST API token and admin panel password for user authentication [env: HOPRD_API_TOKEN]',
+    default: undefined,
+    conflicts: 'testNoAuthentication'
   })
   .option('healthCheck', {
     boolean: true,
@@ -135,16 +131,6 @@ const argv = yargsInstance
     describe: 'A password to encrypt your keys [env: HOPRD_PASSWORD]',
     default: ''
   })
-  .option('apiToken', {
-    string: true,
-    describe: 'A REST API token and admin panel password for user authentication [env: HOPRD_API_TOKEN]',
-    default: undefined
-  })
-  .option('privateKey', {
-    string: true,
-    describe: 'A private key to be used for the node [env: HOPRD_PRIVATE_KEY]',
-    default: undefined
-  })
   .option('provider', {
     string: true,
     describe: 'A custom RPC provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER]'
@@ -153,11 +139,6 @@ const argv = yargsInstance
     string: true,
     describe: 'The path to the identity file [env: HOPRD_IDENTITY]',
     default: DEFAULT_ID_PATH
-  })
-  .option('run', {
-    string: true,
-    describe: 'Run a single hopr command, same syntax as in hopr-admin [env: HOPRD_RUN]',
-    default: ''
   })
   .option('dryRun', {
     boolean: true,
@@ -174,6 +155,12 @@ const argv = yargsInstance
     describe: "initialize a database if it doesn't already exist [env: HOPRD_INIT]",
     default: false
   })
+  .option('privateKey', {
+    hidden: true,
+    string: true,
+    describe: 'A private key to be used for the node [env: HOPRD_PRIVATE_KEY]',
+    default: undefined
+  })
   .option('allowLocalNodeConnections', {
     boolean: true,
     describe: 'Allow connections to other nodes running on localhost [env: HOPRD_ALLOW_LOCAL_NODE_CONNECTIONS]',
@@ -186,45 +173,49 @@ const argv = yargsInstance
     default: false
   })
   .option('testAnnounceLocalAddresses', {
+    hidden: true,
     boolean: true,
     describe: 'For testing local testnets. Announce local addresses [env: HOPRD_TEST_ANNOUNCE_LOCAL_ADDRESSES]',
     default: false
   })
   .option('testPreferLocalAddresses', {
+    hidden: true,
     boolean: true,
     describe: 'For testing local testnets. Prefer local peers to remote [env: HOPRD_TEST_PREFER_LOCAL_ADDRESSES]',
     default: false
   })
   .option('testUseWeakCrypto', {
+    hidden: true,
     boolean: true,
     describe: 'weaker crypto for faster node startup [env: HOPRD_TEST_USE_WEAK_CRYPTO]',
     default: false
   })
   .option('testNoAuthentication', {
+    hidden: true,
     boolean: true,
     describe: 'no remote authentication for easier testing [env: HOPRD_TEST_NO_AUTHENTICATION]',
-    default: false
+    default: undefined
   })
   .option('testNoDirectConnections', {
+    hidden: true,
     boolean: true,
     describe:
       'NAT traversal testing: prevent nodes from establishing direct TCP connections [env: HOPRD_TEST_NO_DIRECT_CONNECTIONS]',
-    default: false,
-    hidden: true
+    default: false
   })
   .option('testNoWebRTCUpgrade', {
+    hidden: true,
     boolean: true,
     describe:
       'NAT traversal testing: prevent nodes from establishing direct TCP connections [env: HOPRD_TEST_NO_WEB_RTC_UPGRADE]',
-    default: false,
-    hidden: true
+    default: false
   })
   .option('testNoUPNP', {
+    hidden: true,
     boolean: true,
     describe:
       'NAT traversal testing: disable automatic detection of external IP address using UPNP [env: HOPRD_TEST_NO_UPNP]',
-    default: false,
-    hidden: true
+    default: false
   })
   .option('heartbeatInterval', {
     number: true,
@@ -253,7 +244,8 @@ const argv = yargsInstance
     describe: 'Number of confirmations required for on-chain transactions [env: HOPRD_ON_CHAIN_CONFIRMATIONS]',
     default: CONFIRMATIONS
   })
-
+  .showHidden('show-hidden', 'show all options, including debug options')
+  .strict()
   .wrap(Math.min(120, yargsInstance.terminalWidth()))
   .parseSync()
 
@@ -304,21 +296,35 @@ function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
   return options
 }
 
-function addUnhandledPromiseRejectionHandler() {
-  registerUnhandled()
-  setLogger((msg) => {
-    console.error(msg)
-  })
+async function addUnhandledPromiseRejectionHandler() {
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(
+      `Loading extended logger that enhances debugging of unhandled promise rejections. Disabled on production environments`
+    )
+    const { register: registerUnhandled, setLogger } = await import('trace-unhandled')
+
+    registerUnhandled()
+    setLogger((msg) => {
+      console.error(msg)
+    })
+  }
 
   // See https://github.com/hoprnet/hoprnet/issues/3755
   process.on('unhandledRejection', (reason: any, _promise: Promise<any>) => {
-    if (reason.message && reason.message.toString) {
+    if (reason && reason.message && reason.message.toString) {
       const msgString = reason.toString()
 
       // Only silence very specific errors
       if (
+        // HOPR uses the `stream-to-it` library to convert streams from Node.js sockets
+        // to async iterables. This library has shown to have issues with runtime errors,
+        // mainly ECONNRESET and EPIPE
+        msgString.match(/read ETIMEDOUT/) ||
         msgString.match(/read ECONNRESET/) ||
+        msgString.match(/write ETIMEDOUT/) ||
         msgString.match(/write ECONNRESET/) ||
+        msgString.match(/write EPIPE/) ||
+        // Requires changes in libp2p, tbd in upstream PRs to libp2p
         msgString.match(/The operation was aborted/)
       ) {
         console.error('Unhandled promise rejection silenced')
@@ -344,10 +350,6 @@ async function main() {
   let node: Hopr
   let logs = new LogStream()
   let adminServer: AdminServer = undefined
-  let cmds: Commands
-  // As the daemon aims to maintain for the time being
-  // both APIv1 and APIv2 (hopr-admin / myne-chat), we need
-  // to ensure that daemon's state can be used by both APIs.
   let state: State = {
     aliases: new Map(),
     settings: {
@@ -355,37 +357,37 @@ async function main() {
       strategy: 'passive'
     }
   }
-  function setState(newState: State): void {
+  const setState = (newState: State): void => {
     state = newState
   }
-  function getState(): State {
+  const getState = (): State => {
     return state
   }
 
-  function networkHealthChanged(oldState: NetworkHealthIndicator, newState: NetworkHealthIndicator) {
+  const networkHealthChanged = (oldState: NetworkHealthIndicator, newState: NetworkHealthIndicator): void => {
     // Log the network health indicator state change (goes over the WS as well)
     logs.log(`Network health indicator changed: ${oldState} -> ${newState}`)
     logs.log(`NETWORK HEALTH: ${newState}`)
   }
 
-  function logMessageToNode(msg: Uint8Array) {
+  const logMessageToNode = (msg: Uint8Array): void => {
     logs.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
     try {
-      let [decoded, time] = decode(msg) as [Buffer, Buffer]
-      logs.log(`Message: ${decoded.toString()}`)
-      logs.log(`Latency: ${Date.now() - parseInt(time.toString('hex'), 16)}ms`)
+      let decodedMsg = decodeMessage(msg)
+      logs.log(`Message: ${decodedMsg.msg}`)
+      logs.log(`Latency: ${decodedMsg.latency} ms`)
 
       // also send it tagged as message for apps to use
-      logs.logMessage(decoded.toString())
+      logs.logMessage(decodedMsg.msg)
     } catch (err) {
-      logs.log('Could not decode message', err)
+      logs.log('Could not decode message', err instanceof Error ? err.message : 'Unknown error')
       logs.log(msg.toString())
     }
   }
 
-  if (!argv.testNoAuthentication && (argv.api || argv.admin)) {
+  if (!argv.testNoAuthentication && argv.api) {
     if (argv.apiToken == null) {
-      throw Error(`Must provide --apiToken when --api, --rest or --admin is specified`)
+      throw Error(`Must provide --apiToken when --api is specified`)
     }
     const { contains: hasSymbolTypes, length }: { contains: string[]; length: number } = passwordStrength(argv.apiToken)
     for (const requiredSymbolType of ['uppercase', 'lowercase', 'symbol', 'number']) {
@@ -404,7 +406,12 @@ async function main() {
   // as if the HOPR node fails, we need to put an error message up.
   if (argv.admin) {
     adminServer = new AdminServer(logs, argv.adminHost, argv.adminPort)
-    await adminServer.setup()
+    try {
+      await adminServer.setup()
+    } catch (err) {
+      console.error(err)
+      process.exit(1)
+    }
   }
 
   const environment = resolveEnvironment(argv.environment, argv.provider)
@@ -415,8 +422,10 @@ async function main() {
   }
 
   try {
-    let packageFile = path.normalize(new URL('../package.json', import.meta.url).pathname)
-    logs.log(`This is hoprd version ${wasm.get_package_version(packageFile)}`)
+    logs.log(`This is HOPRd version ${version}`)
+    if (on_avado) {
+      logs.log('This node appears to be running on an AVADO/Dappnode')
+    }
 
     // 1. Find or create an identity
     const peerId = await getIdentity({
@@ -431,6 +440,8 @@ async function main() {
     logs.log('Creating HOPR Node')
     node = await createHoprNode(peerId, options, false)
     logs.logStatus('PENDING')
+
+    // Subscribe to node events
     node.on('hopr:message', logMessageToNode)
     node.on('hopr:network-health-changed', networkHealthChanged)
     node.subscribeOnConnector('hopr:connector:created', () => {
@@ -441,28 +452,25 @@ async function main() {
     node.once('hopr:monitoring:start', async () => {
       // 3. start all monitoring services, and continue with the rest of the setup.
 
-      if (argv.api || argv.admin) {
-        /*
-          When `--api` is used, we turn on Rest API v1, v2 and WS API v2.
-          When `--admin` is used, we turn on WS API v1 only.
-        */
-        setupAPI(
-          node,
-          logs,
-          { getState, setState },
-          {
-            ...argv,
-            apiToken
-          },
-          adminServer // api V1: required by hopr-admin
-        )
-      }
+      const startApiListen = setupAPI(
+        node,
+        logs,
+        { getState, setState },
+        {
+          ...argv,
+          apiHost: argv.apiHost,
+          apiPort: argv.apiPort,
+          apiToken
+        }
+      )
+      // start API server only if API flag is true
+      if (argv.api) startApiListen()
 
       if (argv.healthCheck) {
         setupHealthcheck(node, logs, argv.healthCheckHost, argv.healthCheckPort)
       }
 
-      logs.log(`Node address: ${node.getId().toB58String()}`)
+      logs.log(`Node address: ${node.getId().toString()}`)
 
       const ethAddr = node.getEthereumAddress().toHex()
       const fundsReq = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()
@@ -475,38 +483,16 @@ async function main() {
 
       // 3. Start the node.
       await node.start()
-      cmds = new Commands(node, { setState, getState })
 
       if (adminServer) {
-        adminServer.registerNode(node, cmds)
+        adminServer.registerNode(node)
       }
+
+      // alias self
+      state.aliases.set('me', node.getId())
 
       logs.logStatus('READY')
       logs.log('Node has started!')
-
-      if (argv.run && argv.run !== '') {
-        // Run a single command and then exit.
-        // We support multiple semicolon separated commands
-        let toRun = argv.run.split(';').map((c: string) =>
-          // Remove obsolete ' and "
-          c.replace(/"/g, '')
-        )
-
-        for (let c of toRun) {
-          console.error('$', c)
-          if (c === 'daemonize') {
-            return
-          }
-
-          await cmds.execute((msg) => {
-            logs.log(msg)
-          }, c)
-        }
-        // Wait for actions to take place
-        await setTimeout(1e3)
-        await node.stop()
-        return
-      }
     })
 
     // 2.a - Setup connector listener to bubble up to node. Emit connector creation.

@@ -4,7 +4,7 @@
 
 ## Table of contents
 
-### Enumeration members
+### Enumeration Members
 
 - [ABORTED](DialStatus.md#aborted)
 - [DHT\_ERROR](DialStatus.md#dht_error)
@@ -13,31 +13,21 @@
 - [SUCCESS](DialStatus.md#success)
 - [TIMEOUT](DialStatus.md#timeout)
 
-## Enumeration members
+## Enumeration Members
 
 ### ABORTED
 
-• **ABORTED** = `"E_ABORTED"`
+• **ABORTED**
 
 #### Defined in
 
-[libp2p/dialHelper.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L26)
+[libp2p/dialHelper.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L25)
 
 ___
 
 ### DHT\_ERROR
 
-• **DHT\_ERROR** = `"E_DHT_QUERY"`
-
-#### Defined in
-
-[libp2p/dialHelper.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L28)
-
-___
-
-### DIAL\_ERROR
-
-• **DIAL\_ERROR** = `"E_DIAL"`
+• **DHT\_ERROR**
 
 #### Defined in
 
@@ -45,30 +35,40 @@ ___
 
 ___
 
-### NO\_DHT
+### DIAL\_ERROR
 
-• **NO\_DHT** = `"E_NO_DHT"`
+• **DIAL\_ERROR**
 
 #### Defined in
 
-[libp2p/dialHelper.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L29)
+[libp2p/dialHelper.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L26)
+
+___
+
+### NO\_DHT
+
+• **NO\_DHT**
+
+#### Defined in
+
+[libp2p/dialHelper.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L28)
 
 ___
 
 ### SUCCESS
 
-• **SUCCESS** = `"SUCCESS"`
+• **SUCCESS**
 
 #### Defined in
 
-[libp2p/dialHelper.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L24)
+[libp2p/dialHelper.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L23)
 
 ___
 
 ### TIMEOUT
 
-• **TIMEOUT** = `"E_TIMEOUT"`
+• **TIMEOUT**
 
 #### Defined in
 
-[libp2p/dialHelper.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L25)
+[libp2p/dialHelper.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L24)

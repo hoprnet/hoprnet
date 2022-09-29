@@ -1,6 +1,7 @@
-import type PeerId from 'peer-id'
-import type NetworkPeers from './network-peers'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import type NetworkPeers from './network-peers.js'
 import { debug } from '@hoprnet/hopr-utils'
+import { NetworkPeersOrigin } from './network-peers.js'
 
 // const log = debug('hopr-core:access-control')
 const logError = debug('hopr-core:access-control:error')
@@ -15,12 +16,12 @@ export default class AccessControl {
     private closeConnectionsTo: (peerId: PeerId) => Promise<void>
   ) {}
 
-  private async allowConnectionWithPeer(peerId: PeerId, origin: string): Promise<void> {
+  private allowConnectionWithPeer(peerId: PeerId, origin: NetworkPeersOrigin): void {
     this.networkPeers.removePeerFromDenied(peerId)
     this.networkPeers.register(peerId, origin)
   }
 
-  private async denyConnectionWithPeer(peerId: PeerId, origin: string): Promise<void> {
+  private async denyConnectionWithPeer(peerId: PeerId, origin: NetworkPeersOrigin): Promise<void> {
     this.networkPeers.addPeerToDenied(peerId, origin)
     await this.closeConnectionsTo(peerId)
   }
@@ -31,15 +32,18 @@ export default class AccessControl {
    * @param origin of the connection
    * @returns true if peer is allowed access
    */
-  public async reviewConnection(peerId: PeerId, origin: string): Promise<boolean> {
+  public async reviewConnection(peerId: PeerId, origin: NetworkPeersOrigin): Promise<boolean> {
     let allowed: boolean = false
 
     try {
       allowed = await this.isAllowedAccessToNetwork(peerId)
-      if (allowed) await this.allowConnectionWithPeer(peerId, origin)
-      else await this.denyConnectionWithPeer(peerId, origin)
+      if (allowed) {
+        this.allowConnectionWithPeer(peerId, origin)
+      } else {
+        await this.denyConnectionWithPeer(peerId, origin)
+      }
     } catch (error) {
-      logError(`unexpected error when reviewing connection ${peerId.toB58String()} from ${origin}`, error)
+      logError(`unexpected error when reviewing connection ${peerId.toString()} from ${origin}`, error)
     }
 
     return allowed
@@ -49,7 +53,14 @@ export default class AccessControl {
    * Iterate all peers and update their connection status.
    */
   public async reviewConnections(): Promise<void> {
-    const allPeers = [...this.networkPeers.allEntries(), ...this.networkPeers.getAllDenied()]
-    for (const { id, origin } of allPeers) await this.reviewConnection(id, origin)
+    // Use iterator to prevent from cloning elements
+    for (const { id, origin } of this.networkPeers.getAllEntries()) {
+      await this.reviewConnection(id, origin)
+    }
+
+    // Use iterator to prevent from cloning elements
+    for (const { id, origin } of this.networkPeers.getAllDenied()) {
+      await this.reviewConnection(id, origin)
+    }
   }
 }

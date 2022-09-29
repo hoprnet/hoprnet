@@ -23,23 +23,25 @@ export function u8aConcat(...list: (Uint8Array | undefined)[]): Uint8Array {
 
   const listLength = list.length
   for (let i = 0; i < listLength; i++) {
-    if (list[i] == undefined || list[i].length == 0) {
+    const item = list[i]
+    if (item == undefined || item.length == 0) {
       continue
     }
 
-    totalLength += list[i].length
+    totalLength += item.length
   }
 
   const result = new Uint8Array(totalLength)
   let offset = 0
 
   for (let i = 0; i < listLength; i++) {
-    if (list[i] == undefined || list[i].length == 0) {
+    const item = list[i]
+    if (item == undefined || item.length == 0) {
       continue
     }
 
-    result.set(list[i], offset)
-    offset += list[i].length
+    result.set(item, offset)
+    offset += item.length
   }
 
   return result

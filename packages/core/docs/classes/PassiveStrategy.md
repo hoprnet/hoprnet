@@ -2,6 +2,14 @@
 
 # Class: PassiveStrategy
 
+Staked nodes will likely want to automate opening and closing of channels. By
+implementing the following interface, they can decide how to allocate their
+stake to best attract traffic with a useful channel graph.
+
+Implementors should bear in mind:
+- Churn is expensive
+- Path finding will prefer high stakes, and high availability of nodes.
+
 ## Hierarchy
 
 - [`SaneDefaults`](SaneDefaults.md)
@@ -10,7 +18,7 @@
 
 ## Implements
 
-- `ChannelStrategy`
+- [`ChannelStrategyInterface`](../interfaces/ChannelStrategyInterface.md)
 
 ## Table of contents
 
@@ -48,11 +56,11 @@
 
 #### Implementation of
 
-ChannelStrategy.name
+[ChannelStrategyInterface](../interfaces/ChannelStrategyInterface.md).[name](../interfaces/ChannelStrategyInterface.md#name)
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:81](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L81)
+[packages/core/src/channel-strategy.ts:89](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L89)
 
 ___
 
@@ -62,7 +70,7 @@ ___
 
 #### Implementation of
 
-ChannelStrategy.tickInterval
+[ChannelStrategyInterface](../interfaces/ChannelStrategyInterface.md).[tickInterval](../interfaces/ChannelStrategyInterface.md#tickinterval)
 
 #### Inherited from
 
@@ -70,7 +78,7 @@ ChannelStrategy.tickInterval
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:76](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L76)
+[packages/core/src/channel-strategy.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L84)
 
 ## Methods
 
@@ -91,15 +99,11 @@ ChannelStrategy.tickInterval
 
 #### Implementation of
 
-ChannelStrategy.onChannelWillClose
+[ChannelStrategyInterface](../interfaces/ChannelStrategyInterface.md).[onChannelWillClose](../interfaces/ChannelStrategyInterface.md#onchannelwillclose)
 
 #### Inherited from
 
 [SaneDefaults](SaneDefaults.md).[onChannelWillClose](SaneDefaults.md#onchannelwillclose)
-
-#### Defined in
-
-[packages/core/src/channel-strategy.ts:58](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L58)
 
 ___
 
@@ -120,15 +124,11 @@ ___
 
 #### Implementation of
 
-ChannelStrategy.onWinningTicket
+[ChannelStrategyInterface](../interfaces/ChannelStrategyInterface.md).[onWinningTicket](../interfaces/ChannelStrategyInterface.md#onwinningticket)
 
 #### Inherited from
 
 [SaneDefaults](SaneDefaults.md).[onWinningTicket](SaneDefaults.md#onwinningticket)
-
-#### Defined in
-
-[packages/core/src/channel-strategy.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L52)
 
 ___
 
@@ -148,21 +148,17 @@ ___
 
 #### Implementation of
 
-ChannelStrategy.shouldCommitToChannel
+[ChannelStrategyInterface](../interfaces/ChannelStrategyInterface.md).[shouldCommitToChannel](../interfaces/ChannelStrategyInterface.md#shouldcommittochannel)
 
 #### Inherited from
 
 [SaneDefaults](SaneDefaults.md).[shouldCommitToChannel](SaneDefaults.md#shouldcommittochannel)
 
-#### Defined in
-
-[packages/core/src/channel-strategy.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L71)
-
 ___
 
 ### tick
 
-▸ **tick**(`_balance`, `_c`, `_p`): `Promise`<[[`ChannelsToOpen`](../modules.md#channelstoopen)[], `PublicKey`[]]\>
+▸ **tick**(`_balance`, `_c`, `_p`): `Promise`<[`StrategyTickResult`](../modules.md#strategytickresult)\>
 
 #### Parameters
 
@@ -174,12 +170,8 @@ ___
 
 #### Returns
 
-`Promise`<[[`ChannelsToOpen`](../modules.md#channelstoopen)[], `PublicKey`[]]\>
+`Promise`<[`StrategyTickResult`](../modules.md#strategytickresult)\>
 
 #### Implementation of
 
-ChannelStrategy.tick
-
-#### Defined in
-
-[packages/core/src/channel-strategy.ts:83](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L83)
+[ChannelStrategyInterface](../interfaces/ChannelStrategyInterface.md).[tick](../interfaces/ChannelStrategyInterface.md#tick)

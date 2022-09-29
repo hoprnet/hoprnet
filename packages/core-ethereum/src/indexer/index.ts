@@ -1,9 +1,10 @@
 import { setImmediate as setImmediatePromise } from 'timers/promises'
 import BN from 'bn.js'
-import PeerId from 'peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
 import chalk from 'chalk'
 import { EventEmitter } from 'events'
-import { Multiaddr } from 'multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 import {
   randomChoice,
   defer,
@@ -16,7 +17,7 @@ import {
   PublicKey,
   Snapshot,
   debug,
-  retryWithBackoff,
+  retryWithBackoffThenThrow,
   Balance,
   ordered,
   u8aToHex,
@@ -25,19 +26,21 @@ import {
   type Ticket
 } from '@hoprnet/hopr-utils'
 
-import type { ChainWrapper } from '../ethereum'
-import type {
-  Event,
-  EventNames,
-  IndexerEvents,
-  TokenEvent,
-  TokenEventNames,
-  RegistryEvent,
-  RegistryEventNames
-} from './types'
-import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils'
-import { Contract, errors } from 'ethers'
-import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants'
+import type { ChainWrapper } from '../ethereum.js'
+import {
+  type Event,
+  type EventNames,
+  type IndexerEvents,
+  type TokenEvent,
+  type TokenEventNames,
+  type RegistryEvent,
+  type RegistryEventNames,
+  type IndexerEventEmitter,
+  IndexerStatus
+} from './types.js'
+import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils.js'
+import { BigNumber, type Contract, errors } from 'ethers'
+import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants.js'
 import type { TypedEvent, TypedEventFilter } from '@hoprnet/hopr-ethereum'
 
 const log = debug('hopr-core-ethereum:indexer')
@@ -45,21 +48,14 @@ const verbose = debug('hopr-core-ethereum:verbose:indexer')
 
 const getSyncPercentage = (start: number, current: number, end: number) =>
   (((current - start) / (end - start)) * 100).toFixed(2)
-const backoffOption: Parameters<typeof retryWithBackoff>[1] = { maxDelay: MAX_TRANSACTION_BACKOFF }
-
-export enum IndexerStatus {
-  STARTING = 'starting',
-  STARTED = 'started',
-  RESTARTING = 'restarting',
-  STOPPED = 'stopped'
-}
+const backoffOption: Parameters<typeof retryWithBackoffThenThrow>[1] = { maxDelay: MAX_TRANSACTION_BACKOFF }
 
 /**
  * Indexes HoprChannels smart contract and stores to the DB,
  * all channels in the network.
  * Also keeps track of the latest block number.
  */
-class Indexer extends EventEmitter {
+class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   public status: IndexerStatus = IndexerStatus.STOPPED
   public latestBlock: number = 0 // latest known on-chain block number
 
@@ -162,7 +158,7 @@ class Indexer extends EventEmitter {
     log('Subscribing to events from block %d', fromBlock)
 
     this.status = IndexerStatus.STARTED
-    this.emit('status', 'started')
+    this.emit('status', IndexerStatus.STARTED)
     log(chalk.green('Indexer started!'))
   }
 
@@ -182,7 +178,7 @@ class Indexer extends EventEmitter {
     this.blockProcessingLock && (await this.blockProcessingLock.promise)
 
     this.status = IndexerStatus.STOPPED
-    this.emit('status', 'stopped')
+    this.emit('status', IndexerStatus.STOPPED)
     log(chalk.green('Indexer stopped!'))
   }
 
@@ -205,7 +201,7 @@ class Indexer extends EventEmitter {
       await this.start(this.chain, this.genesisBlock)
     } catch (err) {
       this.status = IndexerStatus.STOPPED
-      this.emit('status', 'stopped')
+      this.emit('status', IndexerStatus.STOPPED)
       log(chalk.red('Failed to restart: %s', err.message))
       throw err
     }
@@ -237,7 +233,7 @@ class Indexer extends EventEmitter {
     const queries: { contract: Contract; filter: TypedEventFilter<any> }[] = [
       // HoprChannels
       {
-        contract: this.chain.getChannels(),
+        contract: this.chain.getChannels() as unknown as Contract,
         filter: {
           topics: [
             [
@@ -251,12 +247,13 @@ class Indexer extends EventEmitter {
       },
       // HoprNetworkRegistry
       {
-        contract: this.chain.getNetworkRegistry(),
+        contract: this.chain.getNetworkRegistry() as unknown as Contract,
         filter: {
           topics: [
             [
               // Relevant HoprNetworkRegistry events
               this.chain.getNetworkRegistry().interface.getEventTopic('Registered'),
+              this.chain.getNetworkRegistry().interface.getEventTopic('Deregistered'),
               this.chain.getNetworkRegistry().interface.getEventTopic('RegisteredByOwner'),
               this.chain.getNetworkRegistry().interface.getEventTopic('DeregisteredByOwner'),
               this.chain.getNetworkRegistry().interface.getEventTopic('EligibilityUpdated'),
@@ -273,7 +270,7 @@ class Indexer extends EventEmitter {
     // handle errors produced by internal Ethers.js provider calls
     if (fetchTokenTransactions) {
       queries.push({
-        contract: this.chain.getToken(),
+        contract: this.chain.getToken() as unknown as Contract,
         filter: {
           topics: [
             // Token transfer *from* us
@@ -283,7 +280,7 @@ class Indexer extends EventEmitter {
         }
       })
       queries.push({
-        contract: this.chain.getToken(),
+        contract: this.chain.getToken() as unknown as Contract,
         filter: {
           topics: [
             // Token transfer *towards* us
@@ -397,20 +394,25 @@ class Indexer extends EventEmitter {
         )
       ) {
         log(chalk.blue('code error falls here', this.chain.getAllQueuingTransactionRequests().length))
-        if (this.chain.getAllQueuingTransactionRequests().length > 0) {
-          await retryWithBackoff(
-            () =>
-              Promise.allSettled([
-                ...this.chain
-                  .getAllQueuingTransactionRequests()
-                  .map((request) => this.chain.sendTransaction(request as string)),
-                this.restart()
-              ]),
-            backoffOption
-          )
-        }
+        // allow the indexer to restart even there is no transaction in queue
+        await retryWithBackoffThenThrow(
+          () =>
+            Promise.allSettled([
+              ...this.chain.getAllQueuingTransactionRequests().map((request) => {
+                // convert TransactionRequest to signed transaction and send out
+                return this.chain.sendTransaction(
+                  true,
+                  { to: request.to, value: request.value as BigNumber, data: request.data as string },
+                  // the transaction is resolved without the specific tag for its action, but rather as a result of provider retry
+                  (txHash: string) => this.resolvePendingTransaction(`on-provider-error-${txHash}`, txHash)
+                )
+              }),
+              this.restart()
+            ]),
+          backoffOption
+        )
       } else {
-        await retryWithBackoff(() => this.restart(), backoffOption)
+        await retryWithBackoffThenThrow(() => this.restart(), backoffOption)
       }
     } catch (err) {
       log(`error: exception while processing another provider error ${error}`, err)
@@ -520,6 +522,42 @@ class Indexer extends EventEmitter {
     }
 
     await this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot, blocking)
+
+    // resend queuing transactions, when there are transactions (in queue) that haven't been accepted by the RPC
+    // and resend transactions if the current balance is sufficient.
+
+    const allQueuingTxs = this.chain.getAllQueuingTransactionRequests()
+    if (allQueuingTxs.length > 0) {
+      const minimumBalanceForQueuingTxs = allQueuingTxs.reduce(
+        (acc, queuingTx) =>
+          // to get the minimum balance required to resend a queuing transaction,
+          // use the gasLimit (that shouldn't change, unless the contract state is different)
+          // multiplies the maxFeePerGas of the queuing transaction
+          acc.add(new BN(queuingTx.gasLimit.toString()).mul(new BN(queuingTx.maxFeePerGas.toString()))),
+        new BN(0)
+      )
+      const currentBalance = await this.chain.getNativeBalance(this.address)
+      if (
+        // compare the current balance with the minimum balance required at the time of transaction being queued.
+        // NB: Both gasLimit and maxFeePerGas requirement may be different due to "drastic" changes in contract state and network condition
+        currentBalance.toBN().gte(minimumBalanceForQueuingTxs)
+      ) {
+        try {
+          await Promise.all(
+            allQueuingTxs.map((request) => {
+              // convert TransactionRequest to signed transaction and send out
+              return this.chain.sendTransaction(
+                true,
+                { to: request.to, value: request.value as BigNumber, data: request.data as string },
+                (txHash: string) => this.resolvePendingTransaction(`on-new-block-${txHash}`, txHash)
+              )
+            })
+          )
+        } catch (err) {
+          log(`error: failed to send queuing transaction on new block`, err)
+        }
+      }
+    }
 
     try {
       await this.db.updateLatestBlockNumber(new BN(blockNumber))
@@ -686,10 +724,13 @@ class Indexer extends EventEmitter {
           )
           break
         case 'Deregistered':
-        case 'Deregistered(address)':
+        case 'Deregistered(address,string)':
         case 'DeregisteredByOwner':
-        case 'DeregisteredByOwner(address)':
-          await this.onDeregistered(event as RegistryEvent<'DeregisteredByOwner'>, lastDatabaseSnapshot)
+        case 'DeregisteredByOwner(address,string)':
+          await this.onDeregistered(
+            event as RegistryEvent<'Deregistered'> | RegistryEvent<'DeregisteredByOwner'>,
+            lastDatabaseSnapshot
+          )
           break
         case 'EnabledNetworkRegistry':
         case 'EnabledNetworkRegistry(bool)':
@@ -721,7 +762,7 @@ class Indexer extends EventEmitter {
         // remove "p2p" and corresponding peerID
         .decapsulateCode(421)
         // add new peerID
-        .encapsulate(`/p2p/${publicKey.toPeerId().toB58String()}`)
+        .encapsulate(`/p2p/${publicKey.toPeerId().toString()}`)
     } catch (error) {
       log(`Invalid multiaddr '${event.args.multiaddr}' given in event 'onAnnouncement'`)
       log(error)
@@ -822,15 +863,18 @@ class Indexer extends EventEmitter {
     verbose(`network-registry: account ${account} is ${event.args.eligibility ? 'eligible' : 'not eligible'}`)
     // emit event only when eligibility changes on accounts with a HoprNode associated
     try {
-      const hoprNode = await this.db.findHoprNodeUsingAccountInNetworkRegistry(account)
-      this.emit('network-registry-eligibility-changed', account, hoprNode, event.args.eligibility)
+      const hoprNodes = await this.db.findHoprNodesUsingAccountInNetworkRegistry(account)
+      this.emit('network-registry-eligibility-changed', account, hoprNodes, event.args.eligibility)
     } catch {}
   }
 
-  private async onRegistered(event: RegistryEvent<'Registered'>, lastSnapshot: Snapshot): Promise<void> {
+  private async onRegistered(
+    event: RegistryEvent<'Registered'> | RegistryEvent<'RegisteredByOwner'>,
+    lastSnapshot: Snapshot
+  ): Promise<void> {
     let hoprNode: PeerId
     try {
-      hoprNode = PeerId.createFromB58String(event.args.hoprPeerId)
+      hoprNode = peerIdFromString(event.args.hoprPeerId)
     } catch (error) {
       log(`Invalid peer Id '${event.args.hoprPeerId}' given in event 'onRegistered'`)
       log(error)
@@ -841,8 +885,24 @@ class Indexer extends EventEmitter {
     verbose(`network-registry: node ${event.args.hoprPeerId} is allowed to connect`)
   }
 
-  private async onDeregistered(event: RegistryEvent<'DeregisteredByOwner'>, lastSnapshot: Snapshot): Promise<void> {
-    await this.db.removeFromNetworkRegistry(Address.fromString(event.args.account), lastSnapshot)
+  private async onDeregistered(
+    event: RegistryEvent<'Deregistered'> | RegistryEvent<'DeregisteredByOwner'>,
+    lastSnapshot: Snapshot
+  ): Promise<void> {
+    let hoprNode: PeerId
+    try {
+      hoprNode = peerIdFromString(event.args.hoprPeerId)
+    } catch (error) {
+      log(`Invalid peer Id '${event.args.hoprPeerId}' given in event 'onDeregistered'`)
+      log(error)
+      return
+    }
+    await this.db.removeFromNetworkRegistry(
+      PublicKey.fromPeerId(hoprNode),
+      Address.fromString(event.args.account),
+      lastSnapshot
+    )
+    verbose(`network-registry: node ${event.args.hoprPeerId} is not allowed to connect`)
   }
 
   private async onEnabledNetworkRegistry(
@@ -896,7 +956,7 @@ class Indexer extends EventEmitter {
         id: account.getPeerId(),
         multiaddrs: [account.multiAddr]
       }
-      log(`\t${account.getPeerId().toB58String()} ${account.multiAddr.toString()}`)
+      log(`\t${account.getPeerId().toString()} ${account.multiAddr.toString()}`)
     }
 
     return result

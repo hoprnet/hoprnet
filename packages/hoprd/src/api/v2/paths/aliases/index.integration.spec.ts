@@ -22,7 +22,7 @@ describe('GET /aliases', () => {
 
   it('should successfuly get aliases', async () => {
     await request(service).post('/api/v2/aliases').send({
-      peerId: ALICE_PEER_ID.toB58String(),
+      peerId: ALICE_PEER_ID.toString(),
       alias: ALIAS
     })
 
@@ -30,7 +30,7 @@ describe('GET /aliases', () => {
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({
-      [ALIAS]: ALICE_PEER_ID.toB58String()
+      [ALIAS]: ALICE_PEER_ID.toString()
     })
   })
 })
@@ -44,7 +44,7 @@ describe('POST /aliases', () => {
   })
   it('should set alias successfuly', async () => {
     const res = await request(service).post('/api/v2/aliases').send({
-      peerId: ALICE_PEER_ID.toB58String(),
+      peerId: ALICE_PEER_ID.toString(),
       alias: ALIAS
     })
     expect(res.status).to.equal(201)

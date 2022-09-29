@@ -1,13 +1,28 @@
 import NatAPI from 'nat-api'
+import type { Startable } from '@libp2p/interfaces/startable'
 
-export class UpnpManager {
-  protected client: NatAPI
+export class UpnpManager implements Startable {
+  private client: NatAPI | undefined
+  private _isStarted: boolean
+
   constructor() {
+    this._isStarted = false
+  }
+
+  public isStarted(): boolean {
+    return this._isStarted
+  }
+
+  public beforeStart() {
     this.client = new NatAPI()
 
     // Reduce default timeout
     //@ts-ignore
     this.client._upnpClient.timeout = 700
+  }
+
+  public start(): void {
+    this._isStarted = true
   }
 
   /**
@@ -16,7 +31,7 @@ export class UpnpManager {
    */
   externalIp(): Promise<string | void> {
     return new Promise<string | void>((resolve) => {
-      this.client.externalIp((err: any, ip: any) => {
+      ;(this.client as NatAPI).externalIp((err: any, ip: any) => {
         if (err) {
           resolve()
         }
@@ -35,7 +50,7 @@ export class UpnpManager {
       (['UDP', 'TCP'] as ('UDP' | 'TCP')[]).map(
         (name) =>
           new Promise<boolean>((resolve) => {
-            this.client.map(
+            ;(this.client as NatAPI).map(
               {
                 publicPort: port,
                 privatePort: port,
@@ -60,7 +75,13 @@ export class UpnpManager {
    * Frees all allocated ports and cleans all opened sockets
    * @returns a promise that resolves once done
    */
-  stop(): Promise<void> {
-    return new Promise((resolve) => this.client.destroy(resolve))
+  async stop(): Promise<void> {
+    if (!this._isStarted) {
+      return
+    }
+
+    await new Promise<void>((resolve) => (this.client as NatAPI).destroy(resolve))
+
+    this._isStarted = false
   }
 }

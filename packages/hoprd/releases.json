@@ -39,6 +39,18 @@
     "version_major": "1",
     "version_minor": "88"
   },
+  "paleochora": {
+    "git_ref": "^release/paleochora$",
+    "environment_id": "paleochora",
+    "version_major": "1",
+    "version_minor": "89"
+  },
+  "valencia": {
+    "git_ref": "^release/valencia$",
+    "environment_id": "monte_rosa",
+    "version_major": "1",
+    "version_minor": "90"
+  },
   "debug-goerli": {
     "git_ref": "^debug-deploy/.*",
     "environment_id": "debug-goerli"

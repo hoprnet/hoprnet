@@ -1,6 +1,5 @@
-import type { Multiaddr } from 'multiaddr'
-import type PeerId from 'peer-id'
-import type BufferList from 'bl/BufferList'
+import type { Multiaddr } from '@multiformats/multiaddr'
+import type { PeerId } from '@libp2p/interface-peer-id'
 
 type Suffix = 'PublicNode'
 type AddEventName = `add${Suffix}`
@@ -13,40 +12,37 @@ export interface PublicNodesEmitter {
   addListener(event: AddEventName | RemoveEventName, listener: () => void): this
   addListener(event: AddEventName, listener: NewNodeListener): this
   addListener(event: RemoveEventName, listener: (removeNode: PeerId) => void): this
-  addListener(event: string | symbol, listener: (...args: any[]) => void): this
 
   emit(event: AddEventName | RemoveEventName): boolean
   emit(event: AddEventName, newNode: PeerStoreType): boolean
   emit(event: RemoveEventName, removeNode: PeerId): boolean
-  emit(event: string | symbol, ...args: any[]): boolean
 
   on(event: AddEventName | RemoveEventName, listener: () => void): this
   on(event: AddEventName, listener: NewNodeListener): this
   on(event: RemoveEventName, listener: (removeNode: PeerId) => void): this
-  on(event: string | symbol, listener: (...args: any[]) => void): this
 
   once(event: AddEventName | RemoveEventName, listener: () => void): this
   once(event: AddEventName, listener: NewNodeListener): this
   once(event: RemoveEventName, listener: (removeNode: PeerId) => void): this
-  once(event: string | symbol, listener: (...args: any[]) => void): this
 
   prependListener(event: AddEventName | RemoveEventName, listener: () => void): this
   prependListener(event: AddEventName, listener: NewNodeListener): this
   prependListener(event: RemoveEventName, listener: (removeNode: PeerId) => void): this
-  prependListener(event: string | symbol, listener: (...args: any[]) => void): this
 
   prependOnceListener(event: AddEventName | RemoveEventName, listener: () => void): this
   prependOnceListener(event: AddEventName, listener: NewNodeListener): this
   prependOnceListener(event: RemoveEventName, listener: (removeNode: PeerId) => void): this
-  prependOnceListener(event: string | symbol, listener: (...args: any[]) => void): this
 
   removeListener(event: AddEventName | RemoveEventName, listener: () => void): this
   removeListener(event: AddEventName, listener: NewNodeListener): this
   removeListener(event: RemoveEventName, listener: (removeNode: PeerId) => void): this
-  removeListener(event: string | symbol, listener: (...args: any[]) => void): this
+
+  off(event: AddEventName | RemoveEventName, listener: () => void): this
+  off(event: AddEventName, listener: NewNodeListener): this
+  off(event: RemoveEventName, listener: (removeNode: PeerId) => void): this
 }
 
-export type StreamType = BufferList | Uint8Array
+export type StreamType = Uint8Array
 
 export type StreamSourceAsync<T = StreamType> = AsyncIterable<T>
 export type StreamSource<T = StreamType> = AsyncIterable<T> | Iterable<T>
@@ -71,9 +67,13 @@ export type HoprConnectOptions = {
   dhtRenewalTimeout?: number
   entryNodeReconnectBaseTimeout?: number
   entryNodeReconnectBackoff?: number
+  // To be removed once NR got removed
+  isAllowedToAccessNetwork?: (id: PeerId) => Promise<boolean>
 }
 
 export type HoprConnectTestingOptions = {
+  // @TODO implement this
+  __useLocalAddresses?: boolean
   // Simulated NAT: only connect directly to relays
   __noDirectConnections?: boolean
   // Simulated NAT: ignore WebRTC upgrade
@@ -86,14 +86,4 @@ export type HoprConnectTestingOptions = {
   __runningLocally?: boolean
   // Disable UPNP support
   __noUPNP?: boolean
-}
-
-export type HoprConnectListeningOptions = undefined
-
-export type HoprConnectDialOptions = {
-  // Used to cancel dial attempts after a timeout
-  signal?: AbortSignal
-  // Called when closing socket with the Multiaddr that
-  // was used to establish the connection
-  onDisconnect?: (ma: Multiaddr) => void
 }

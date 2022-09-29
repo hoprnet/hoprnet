@@ -29,12 +29,7 @@ Add expiry date if applicable:
 ### Definition of Done
 
 <!--
-Various definition of done points that could be added if they are applicable:
-
-- include a README.md file in project repository
-  - include a description of the submission
-- host submission using a service such as vercel, include previewable URL in the README.md
-  - if hosting submission is not possible, insert screenshots
+If bounty is a dapp it should follow the dapp standard https://github.com/hoprnet/hopr-community/blob/main/DAPP_STANDARD.md
 -->
 
 ### Developing HOPR

@@ -5,35 +5,20 @@
   "avatar": "/ipfs/QmX8oTreTovBjr3QmV4UT5nfNbjYxJJJy3dswYVgcYattE",
   "type": "service",
   "autoupdate": true,
-  "image": {
-    "volumes": [
-      "db:/app/hoprd-db"
-    ],
-    "environment": [
-      "DEBUG=hopr*"
-    ],
-    "ports": [
-      "3000:3000/tcp",
-      "3001:3001/tcp",
-      "8080:8080/tcp",
-      "9091:9091/tcp",
-      "9091:9091/udp"
-    ],
-    "restart": "always"
-  },
   "author": "HOPR",
   "license": "GPL-3.0",
   "dependencies": {},
+  "image": {},
   "links": {
-    "OnboardingWizard": "http://hopr.my.ava.do:3000/",
+    "OnboardingWizard": "http://hopr.my.ava.do:3000/?apiEndpoint=http://hopr.my.ava.do:3001&apiToken=%TOKEN%",
     "homepage": "https://hoprnet.org",
-    "Admin interface": "http://hopr.my.ava.do:3000",
+    "Admin interface": "http://hopr.my.ava.do:3000?apiEndpoint=http://hopr.my.ava.do:3001&apiToken=%TOKEN%",
     "Rest API V2": "http://hopr.my.ava.do:3001/api/v2/_swagger/"
   },
   "ui": {
     "OnboardingWizard": {
-      "url": "http://hopr.my.ava.do",
-      "external": true
+      "url": "http://hopr.my.ava.do:3000/?apiEndpoint=http://hopr.my.ava.do:3001&apiToken=%TOKEN%",
+      "external": false
     }
   }
 }

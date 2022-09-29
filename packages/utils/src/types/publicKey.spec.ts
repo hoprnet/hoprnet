@@ -1,8 +1,8 @@
 import assert from 'assert'
-import PeerId from 'peer-id'
-import { stringToU8a, u8aToHex } from '../u8a'
-import { PublicKey } from './publicKey'
-import { Address } from './primitives'
+import { peerIdFromString } from '@libp2p/peer-id'
+import { stringToU8a, u8aEquals, u8aToHex } from '../u8a/index.js'
+import { PublicKey } from './publicKey.js'
+import { Address } from './primitives.js'
 
 const privateKey = '0xe17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8'
 const uncompressedPubKey =
@@ -18,15 +18,13 @@ const compressedInvalidPubKey = '0x041464586aeaea0eb5736884ca1bf42d165fc8e2243b1
 const b58String = '16Uiu2HAkvoGszJh3KCuxxZPsNjcCN5X1PHbnhAyGzvSyub88b679'
 const address = '0x115Bc5B501CdD8D1fA5098D3c9Be8dd5954CA371'
 
-const pubKeyString = `<PubKey:${b58String}>`
-
 describe('test PublicKey primitive', function () {
   it('from private key', function () {
     const pKey = PublicKey.fromPrivKey(stringToU8a(privateKey))
 
     assert(u8aToHex(pKey.serializeUncompressed()) === uncompressedPubKey)
     assert(u8aToHex(pKey.serializeCompressed()) === compressedPubKey)
-    assert(pKey.toB58String() === b58String)
+    assert(pKey.toString() === b58String)
   })
 
   it('from Uint8Array', function () {
@@ -34,19 +32,19 @@ describe('test PublicKey primitive', function () {
 
     assert(u8aToHex(pKeyFromUncompressed.serializeUncompressed()) === uncompressedPubKey)
     assert(u8aToHex(pKeyFromUncompressed.serializeCompressed()) === compressedPubKey)
-    assert(pKeyFromUncompressed.toB58String() === b58String)
+    assert(pKeyFromUncompressed.toString() === b58String)
 
     const pKeyFromCompressed = PublicKey.deserialize(stringToU8a(compressedPubKey))
 
     assert(u8aToHex(pKeyFromCompressed.serializeUncompressed()) === uncompressedPubKey)
     assert(u8aToHex(pKeyFromCompressed.serializeCompressed()) === compressedPubKey)
-    assert(pKeyFromCompressed.toB58String() === b58String)
+    assert(pKeyFromCompressed.toString() === b58String)
 
     const pKeyFromUnPrefixedUncompressed = PublicKey.deserialize(stringToU8a(uncompressedPubKeyWithoutPrefix))
 
     assert(u8aToHex(pKeyFromUnPrefixedUncompressed.serializeUncompressed()) === uncompressedPubKey)
     assert(u8aToHex(pKeyFromUnPrefixedUncompressed.serializeCompressed()) === compressedPubKey)
-    assert(pKeyFromUnPrefixedUncompressed.toB58String() === b58String)
+    assert(pKeyFromUnPrefixedUncompressed.toString() === b58String)
 
     assert.throws(() => PublicKey.deserialize(stringToU8a(uncompressedInvalidPubKey)))
     assert.throws(() => PublicKey.deserialize(stringToU8a(compressedInvalidPubKey)))
@@ -57,38 +55,38 @@ describe('test PublicKey primitive', function () {
 
     assert(u8aToHex(pKeyFromUncompressed.serializeUncompressed()) === uncompressedPubKey)
     assert(u8aToHex(pKeyFromUncompressed.serializeCompressed()) === compressedPubKey)
-    assert(pKeyFromUncompressed.toB58String() === b58String)
+    assert(pKeyFromUncompressed.toString() === b58String)
 
     const pKeyFromCompressed = PublicKey.fromString(compressedPubKey)
 
     assert(u8aToHex(pKeyFromCompressed.serializeUncompressed()) === uncompressedPubKey)
     assert(u8aToHex(pKeyFromCompressed.serializeCompressed()) === compressedPubKey)
-    assert(pKeyFromCompressed.toB58String() === b58String)
+    assert(pKeyFromCompressed.toString() === b58String)
 
     const pKeyFromUnPrefixedUncompressed = PublicKey.fromString(uncompressedPubKeyWithoutPrefix)
 
     assert(u8aToHex(pKeyFromUnPrefixedUncompressed.serializeUncompressed()) === uncompressedPubKey)
     assert(u8aToHex(pKeyFromUnPrefixedUncompressed.serializeCompressed()) === compressedPubKey)
-    assert(pKeyFromUnPrefixedUncompressed.toB58String() === b58String)
+    assert(pKeyFromUnPrefixedUncompressed.toString() === b58String)
 
     assert.throws(() => PublicKey.fromString(uncompressedInvalidPubKey))
     assert.throws(() => PublicKey.fromString(compressedInvalidPubKey))
   })
 
   it('from PeerId', function () {
-    const pId = PeerId.createFromB58String(b58String)
+    const pId = peerIdFromString(b58String)
 
     const pKey = PublicKey.fromPeerId(pId)
 
     assert(u8aToHex(pKey.serializeUncompressed()) === uncompressedPubKey)
     assert(u8aToHex(pKey.serializeCompressed()) === compressedPubKey)
-    assert(pKey.toB58String() === b58String)
+    assert(pKey.toString() === b58String)
 
     const pKeyfromB58String = PublicKey.fromPeerIdString(b58String)
 
     assert(u8aToHex(pKeyfromB58String.serializeUncompressed()) === uncompressedPubKey)
     assert(u8aToHex(pKeyfromB58String.serializeCompressed()) === compressedPubKey)
-    assert(pKeyfromB58String.toB58String() === b58String)
+    assert(pKeyfromB58String.toString() === b58String)
   })
 
   it('equals', function () {
@@ -142,7 +140,71 @@ describe('test PublicKey primitive', function () {
     const pKeyFromUncompressed = PublicKey.fromString(uncompressedPubKey)
     const pKeyFromCompressed = PublicKey.fromString(compressedPubKey)
 
-    assert(pKeyFromCompressed.toString() === pubKeyString)
-    assert(pKeyFromUncompressed.toString() === pubKeyString)
+    assert(pKeyFromCompressed.toString() === b58String)
+    assert(pKeyFromUncompressed.toString() === b58String)
+  })
+
+  it('serialize array', function () {
+    const uncompressed = PublicKey.fromString(uncompressedPubKey)
+    const compressed = PublicKey.fromString(compressedPubKey)
+
+    const result = PublicKey.serializeArray([compressed, uncompressed])
+
+    assert(result.length == PublicKey.SIZE_COMPRESSED + PublicKey.SIZE_UNCOMPRESSED)
+
+    assert(
+      u8aEquals(Uint8Array.from([...compressed.serializeCompressed(), ...uncompressed.serializeUncompressed()]), result)
+    )
+
+    assert(PublicKey.serializeArray([]).length == 0)
+  })
+
+  it('deserialize array', function () {
+    const uncompressed = PublicKey.fromString(uncompressedPubKey)
+    const compressed = PublicKey.fromString(compressedPubKey)
+
+    const result = PublicKey.deserializeArray(
+      Uint8Array.from([...compressed.serializeCompressed(), ...uncompressed.serializeUncompressed()])
+    )
+
+    assert(result.length == 2, `Must contain two PublicKeys`)
+
+    assert(result[0].isCompressed, `First one must be compressed`)
+    assert(result[0].eq(compressed))
+    assert(!result[1].isCompressed, `Second one must be uncompressed`)
+    assert(result[1].eq(uncompressed))
+
+    assert(PublicKey.deserializeArray(Uint8Array.from([])).length == 0)
+
+    assert.throws(
+      () =>
+        PublicKey.deserializeArray(
+          Uint8Array.from([2, ...compressed.serializeCompressed(), ...uncompressed.serializeUncompressed()])
+        ),
+      Error('Invalid prefix 0xb8 at 33')
+    )
+
+    assert.throws(
+      () =>
+        PublicKey.deserializeArray(
+          Uint8Array.from([...compressed.serializeCompressed(), 2, ...uncompressed.serializeUncompressed()])
+        ),
+      Error('Invalid prefix 0xb8 at 66')
+    )
+
+    assert.throws(
+      () => PublicKey.deserializeArray(Uint8Array.from([2])),
+      Error('Invalid array length. U8a has 32 to few elements')
+    )
+
+    assert.throws(
+      () => PublicKey.deserializeArray(Uint8Array.from([3])),
+      Error('Invalid array length. U8a has 32 to few elements')
+    )
+
+    assert.throws(
+      () => PublicKey.deserializeArray(Uint8Array.from([4])),
+      Error('Invalid array length. U8a has 64 to few elements')
+    )
   })
 })

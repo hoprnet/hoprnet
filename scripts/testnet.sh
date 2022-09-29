@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-# API used for funding the calls, source code in https://github.com/hoprnet/api
-declare API_ENDPOINT="https://api.hoprnet.org"
-
 # prevent execution of this script, only allow sourcing
 $(return >/dev/null 2>&1)
 test "$?" -eq "0" || { echo "This script should only be sourced." >&2; exit 1; }
@@ -17,6 +14,9 @@ declare HOPR_LOG_ID="testnet"
 source "${mydir}/utils.sh"
 source "${mydir}/gcloud.sh"
 source "${mydir}/dns.sh"
+
+# API used for funding the calls, source code in https://github.com/hoprnet/api
+declare API_ENDPOINT="${API_ENDPOINT:-https://api.hoprnet.org}"
 
 # Native (e.g. XDAI)
 declare min_funds=0.1
@@ -54,7 +54,11 @@ get_rpc() {
 funding_wallet_info() {
   local environment="${1}"
   local token="${2}"
-  curl --silent "$API_ENDPOINT/api/faucet/$environment/info?text=$token"
+  local secret="${FAUCET_SECRET_API_KEY}"
+
+  curl -L --silent \
+    --header "x-api-key: ${secret}" \
+    "$API_ENDPOINT/api/faucet/$environment/info?text=$token"
 }
 
 # $1 = environment
@@ -64,7 +68,11 @@ wallet_balance() {
   local environment="${1}"
   local address="${2}"
   local token="${3}"
-  curl --silent "$API_ENDPOINT/api/balance/$environment/$address/$token?text=true"
+  local secret="${FAUCET_SECRET_API_KEY}"
+
+  curl -L --silent \
+    --header "x-api-key: ${secret}" \
+    "$API_ENDPOINT/api/balance/$environment/$address/$token?text=true"
 }
 
 # $1 = environment
@@ -76,10 +84,10 @@ faucet_to_address() {
   local token="${3}"
   local secret="${FAUCET_SECRET_API_KEY}"
 
-  curl --silent --request POST \
-  "$API_ENDPOINT/api/faucet/$environment/$address/$token?text=true" \
-  --header 'Content-Type: application/json' \
-  --data-raw "{\"secret\": \"$secret\"}"
+  curl -L --silent --request POST \
+    "$API_ENDPOINT/api/faucet/$environment/$address/$token" \
+    --header 'Content-Type: application/json' \
+    --header "x-api-key: ${secret}"
 }
 
 # $1=account (hex)
@@ -90,10 +98,23 @@ fund_if_empty() {
 
   local faucet_address
   faucet_address=$(funding_wallet_info "${environment}" "address")
+  if [[ ! ${faucet_address} =~  ^0x[a-fA-F0-9]{40}$ ]]; then
+    log "Failed to retrieve funding wallet address: ${faucet_address}"
+    exit 1
+  fi;
 
   local faucet_native_balance faucet_hopr_balance
   faucet_native_balance=$(funding_wallet_info "${environment}" "native")
+  if [[ ! ${faucet_native_balance} =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+    log "Failed to retrieve funding wallet native balance: ${faucet_native_balance}"
+    exit 1
+  fi;
+
   faucet_hopr_balance=$(funding_wallet_info "${environment}" "hopr")
+  if [[ ! ${faucet_hopr_balance} =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+    log "Failed to retrieve funding wallet token balance: ${faucet_hopr_balance}"
+    exit 1
+  fi;
 
   if [ "${faucet_native_balance}" = '0.0' ]; then
     log "Wallet ${faucet_address} has zero balance and cannot fund node ${address}"
@@ -111,6 +132,7 @@ fund_if_empty() {
   local address_native_balance address_hopr_balance
   log "Checking balance of the address to fund: ${address}"
   address_native_balance=$(wallet_balance "${environment}" "${address}" "native")
+
   log "Checking balance of the address to fund: ${address}"
   address_hopr_balance=$(wallet_balance "${environment}" "${address}" "hopr")
 
@@ -120,21 +142,30 @@ fund_if_empty() {
   if [ "${address_native_balance}" = '0.0' ]; then
     # @TODO: Provide retry by checking balance again.
     log "${address} has no native balance. Funding native tokens..."
-    faucet_to_address "${environment}" "${address}" "native"
+    local tx_hash tx_error tx_res
+    tx_res="$(faucet_to_address "${environment}" "${address}" "native")"
+    tx_error="$(echo "${tx_res}" | jq -r '.err // empty' 2>/dev/null || echo "${tx_res}")"
+    tx_hash="$(echo "${tx_res}" | jq -r '.hash // empty' 2>/dev/null || echo "")"
+    if [ -n "${tx_error}" ]; then
+      log "Funding native tokens failed with error: ${tx_error}"
+    exit 1
+    fi
+    log "Funded native tokens, see tx hash ${tx_hash}"
   fi
 
   if [ "${address_hopr_balance}" = '0.0' ]; then
     # @TODO: Provide retry by checking balance again.
     log "${address} has no HOPR tokens. Funding HOPR tokens..."
-    faucet_to_address "${environment}" "${address}" "hopr"
+    local tx_hash tx_error tx_res
+    tx_res="$(faucet_to_address "${environment}" "${address}" "hopr")"
+    tx_error="$(echo "${tx_res}" | jq -r '.err // empty' 2>/dev/null || echo "${tx_res}")"
+    tx_hash="$(echo "${tx_res}" | jq -r '.hash // empty' 2>/dev/null || echo "")"
+    if [ -n "${tx_error}" ]; then
+      log "Funding HOPR tokens failed with error: ${tx_error}"
+    exit 1
+    fi
+    log "Funded HOPR tokens, see tx hash ${tx_hash}"
   fi
-}
-
-# $1=IP
-# $2=Hopr command
-# $3=optional: port
-run_command(){
-  curl --silent -X POST --data "${2}" "${1}:${3:-3001}/api/v1/command"
 }
 
 # $1=vm name
@@ -155,4 +186,52 @@ add_keys() {
   else
     echo "Authorized keys file not found"
   fi
+}
+
+# $1 hardhat debug log file
+start_local_hardhat() {
+  # Remove previous log file to make sure that the regex does not match
+  rm -f "${hardhat_rpc_log}"
+
+  log "Running hardhat local node"
+  HOPR_ENVIRONMENT_ID="hardhat-localhost" \
+    TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
+    yarn workspace @hoprnet/hopr-ethereum hardhat node \
+      --network hardhat \
+      --show-stack-traces > \
+      "$1" 2>&1 &
+}
+
+# $1 prefix, e.g. "e2e-source"
+# $2 identity file directory, e.g. "/tmp"
+# $3 password, e.g. "dummy e2e password"
+# $4 optional: additional address, e.g CT node address
+fund_nodes() {
+  local node_prefix="${1}"
+  local tmp_dir="${2}"
+  local password="${3}"
+  local addr_arg=""
+  [[ -n "${4:-}" ]] && addr_arg="--address ${4}"
+
+  HOPR_ENVIRONMENT_ID=hardhat-localhost \
+  TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
+    yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
+      --identity-prefix "${node_prefix}" \
+      --identity-directory "${tmp}" \
+      --use-local-identities \
+      --network hardhat \
+      --password "${password}" \
+      ${addr_arg}
+}
+
+
+disable_network_registry() {
+  log "Disabling register"
+  HOPR_ENVIRONMENT_ID=hardhat-localhost \
+  TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
+  yarn workspace @hoprnet/hopr-ethereum hardhat register \
+    --network hardhat \
+    --task disable
+
+  log "Register disabled"
 }

@@ -17,7 +17,6 @@
 - [\_wrappedEmits](HoprDistributor.md#_wrappedemits)
 - [address](HoprDistributor.md#address)
 - [callStatic](HoprDistributor.md#callstatic)
-- [contractName](HoprDistributor.md#contractname)
 - [deployTransaction](HoprDistributor.md#deploytransaction)
 - [estimateGas](HoprDistributor.md#estimategas)
 - [filters](HoprDistributor.md#filters)
@@ -77,7 +76,7 @@ BaseContract.\_deployedPromise
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:98
+node_modules/@ethersproject/contracts/lib/index.d.ts:100
 
 ___
 
@@ -95,7 +94,7 @@ BaseContract.\_runningEvents
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:99
+node_modules/@ethersproject/contracts/lib/index.d.ts:101
 
 ___
 
@@ -113,7 +112,7 @@ BaseContract.\_wrappedEmits
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:102
+node_modules/@ethersproject/contracts/lib/index.d.ts:104
 
 ___
 
@@ -127,7 +126,7 @@ BaseContract.address
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:77
+node_modules/@ethersproject/contracts/lib/index.d.ts:79
 
 ___
 
@@ -164,17 +163,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/src/types/HoprDistributor.ts:393
-
-___
-
-### contractName
-
-• **contractName**: ``"HoprDistributor"``
-
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:199
+packages/ethereum/src/types/contracts/HoprDistributor.ts:441
 
 ___
 
@@ -188,7 +177,7 @@ BaseContract.deployTransaction
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:97
+node_modules/@ethersproject/contracts/lib/index.d.ts:99
 
 ___
 
@@ -225,7 +214,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/src/types/HoprDistributor.ts:517
+packages/ethereum/src/types/contracts/HoprDistributor.ts:565
 
 ___
 
@@ -252,7 +241,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/src/types/HoprDistributor.ts:473
+packages/ethereum/src/types/contracts/HoprDistributor.ts:521
 
 ___
 
@@ -289,7 +278,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/src/types/HoprDistributor.ts:225
+packages/ethereum/src/types/contracts/HoprDistributor.ts:273
 
 ___
 
@@ -303,7 +292,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/src/types/HoprDistributor.ts:204
+packages/ethereum/src/types/contracts/HoprDistributor.ts:252
 
 ___
 
@@ -317,7 +306,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/src/types/HoprDistributor.ts:220
+packages/ethereum/src/types/contracts/HoprDistributor.ts:268
 
 ___
 
@@ -331,7 +320,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/src/types/HoprDistributor.ts:221
+packages/ethereum/src/types/contracts/HoprDistributor.ts:269
 
 ___
 
@@ -345,7 +334,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/src/types/HoprDistributor.ts:222
+packages/ethereum/src/types/contracts/HoprDistributor.ts:270
 
 ___
 
@@ -382,7 +371,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/src/types/HoprDistributor.ts:592
+packages/ethereum/src/types/contracts/HoprDistributor.ts:640
 
 ___
 
@@ -396,7 +385,7 @@ BaseContract.provider
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:80
+node_modules/@ethersproject/contracts/lib/index.d.ts:82
 
 ___
 
@@ -410,7 +399,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/src/types/HoprDistributor.ts:223
+packages/ethereum/src/types/contracts/HoprDistributor.ts:271
 
 ___
 
@@ -424,7 +413,7 @@ BaseContract.resolvedAddress
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:96
+node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ___
 
@@ -438,7 +427,7 @@ BaseContract.signer
 
 #### Defined in
 
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:79
+node_modules/@ethersproject/contracts/lib/index.d.ts:81
 
 ## Methods
 
@@ -455,10 +444,6 @@ node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:79
 #### Returns
 
 `Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:310
 
 ___
 
@@ -480,10 +465,6 @@ ___
 
 BaseContract.\_checkRunningEvents
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:119
-
 ___
 
 ### \_deployed
@@ -503,10 +484,6 @@ ___
 #### Inherited from
 
 BaseContract.\_deployed
-
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:112
 
 ___
 
@@ -530,10 +507,6 @@ ___
 
 BaseContract.\_wrapEvent
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:120
-
 ___
 
 ### addAllocations
@@ -552,10 +525,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:312
 
 ___
 
@@ -576,10 +545,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:319
-
 ___
 
 ### allocations
@@ -597,10 +562,6 @@ ___
 #### Returns
 
 `Promise`<[`BigNumber`, `BigNumber`, `BigNumber`, `boolean`] & { `amount`: `BigNumber` ; `claimed`: `BigNumber` ; `lastClaim`: `BigNumber` ; `revoked`: `boolean`  }\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:326
 
 ___
 
@@ -622,10 +583,6 @@ ___
 
 BaseContract.attach
 
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:201
-
 ___
 
 ### claim
@@ -642,10 +599,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:339
 
 ___
 
@@ -664,10 +617,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:344
 
 ___
 
@@ -689,10 +638,6 @@ ___
 
 BaseContract.connect
 
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:200
-
 ___
 
 ### deployed
@@ -706,10 +651,6 @@ ___
 #### Overrides
 
 BaseContract.deployed
-
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:202
 
 ___
 
@@ -732,10 +673,6 @@ ___
 
 BaseContract.emit
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:125
-
 ___
 
 ### fallback
@@ -756,10 +693,6 @@ ___
 
 BaseContract.fallback
 
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:113
-
 ___
 
 ### getClaimable
@@ -778,10 +711,6 @@ ___
 
 `Promise`<`BigNumber`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:350
-
 ___
 
 ### getSchedule
@@ -798,10 +727,6 @@ ___
 #### Returns
 
 `Promise`<[`BigNumber`[], `BigNumber`[]]\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:356
 
 ___
 
@@ -822,10 +747,6 @@ ___
 #### Inherited from
 
 BaseContract.listenerCount
-
-#### Defined in
-
-node_modules/ethers/node_modules/@ethersproject/contracts/lib/index.d.ts:126
 
 ___
 
@@ -853,10 +774,6 @@ ___
 
 BaseContract.listeners
 
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:212
-
 ▸ **listeners**(`eventName?`): `Listener`[]
 
 #### Parameters
@@ -872,10 +789,6 @@ packages/ethereum/src/types/HoprDistributor.ts:212
 #### Overrides
 
 BaseContract.listeners
-
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:215
 
 ___
 
@@ -893,10 +806,6 @@ ___
 
 `Promise`<`BigNumber`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:361
-
 ___
 
 ### owner
@@ -912,10 +821,6 @@ ___
 #### Returns
 
 `Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:363
 
 ___
 
@@ -945,10 +850,6 @@ ___
 
 BaseContract.queryFilter
 
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:206
-
 ___
 
 ### removeAllListeners
@@ -975,10 +876,6 @@ ___
 
 BaseContract.removeAllListeners
 
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:216
-
 ▸ **removeAllListeners**(`eventName?`): [`HoprDistributor`](HoprDistributor.md)
 
 #### Parameters
@@ -995,10 +892,6 @@ packages/ethereum/src/types/HoprDistributor.ts:216
 
 BaseContract.removeAllListeners
 
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:219
-
 ___
 
 ### renounceOwnership
@@ -1014,10 +907,6 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:365
 
 ___
 
@@ -1037,10 +926,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:369
-
 ___
 
 ### startTime
@@ -1056,10 +941,6 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:375
 
 ___
 
@@ -1077,10 +958,6 @@ ___
 
 `Promise`<`string`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:377
-
 ___
 
 ### totalMinted
@@ -1097,10 +974,6 @@ ___
 
 `Promise`<`BigNumber`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:379
-
 ___
 
 ### totalToBeMinted
@@ -1116,10 +989,6 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:381
 
 ___
 
@@ -1138,10 +1007,6 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:383
-
 ___
 
 ### updateStartTime
@@ -1158,7 +1023,3 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/src/types/HoprDistributor.ts:388
