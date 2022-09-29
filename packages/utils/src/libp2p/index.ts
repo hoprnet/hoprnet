@@ -11,7 +11,7 @@ import { peerIdFromString } from '@libp2p/peer-id'
 
 import { debug } from '../process/index.js'
 import { pipe } from 'it-pipe'
-import { dial, type DialOpts } from './dialHelper.js'
+import { dial } from './dialHelper.js'
 import { timeout } from '../index.js'
 
 export * from './addressSorters.js'
