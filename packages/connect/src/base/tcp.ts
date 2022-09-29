@@ -78,7 +78,7 @@ class TCPConnection implements MultiaddrConnection {
     }
     this.closed = true
 
-    return new Promise<void>((resolve) => {
+    return new Promise<void>((resolve, reject) => {
       let done = false
 
       const start = Date.now()
@@ -103,7 +103,7 @@ class TCPConnection implements MultiaddrConnection {
           log(`destroying connection ${cOptions.host}:${cOptions.port}`)
           this.conn.destroy()
         }
-      }, SOCKET_CLOSE_TIMEOUT)
+      }, SOCKET_CLOSE_TIMEOUT).unref()
 
       // Resolve once closed
       // Could take place after timeout or as a result of `.end()` call
@@ -116,13 +116,31 @@ class TCPConnection implements MultiaddrConnection {
         resolve()
       })
 
-      try {
-        this.conn.end(() => {
-          this.timeline.close ??= Date.now()
+      this.conn.once('error', (err: Error) => {
+        log('socket error', err)
+
+        // error closing socket
+        this.timeline.close ??= Date.now()
+
+        if (this.conn.destroyed) {
           done = true
+        }
+
+        reject(err)
+      })
+
+      this.conn.end()
+
+      if (this.conn.writableLength > 0) {
+        // there are outgoing bytes waiting to be sent
+        this.conn.once('drain', () => {
+          log('socket drained')
+
+          // all bytes have been sent we can destroy the socket (maybe) before the timeout
+          this.conn.destroy()
         })
-      } catch (err) {
-        // Anything can happen
+      } else {
+        // nothing to send, destroy immediately
         this.conn.destroy()
       }
     })
