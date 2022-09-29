@@ -342,7 +342,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
             yield* toU8aStream(source) as StreamSourceAsync
           } else {
             // No need to convert it twice since we're using WebRTCConnection class
-            yield* source
+            yield* source as AsyncIterable<Uint8Array>
           }
           deferred.resolve()
         } catch (err: any) {
