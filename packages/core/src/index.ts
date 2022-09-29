@@ -543,22 +543,28 @@ class Hopr extends EventEmitter {
       return tuples.length > 1 && tuples[0][0] != protocols('p2p').code
     })
 
+    const pubKey = convertPubKeyFromPeerId(peer.id)
     try {
-      const pubKey = convertPubKeyFromPeerId(peer.id)
       await this.libp2pComponents.getPeerStore().keyBook.set(peer.id, pubKey.bytes)
-
-      if (dialables.length > 0) {
-        this.publicNodesEmitter.emit('addPublicNode', { id: peer.id, multiaddrs: dialables })
-
-        await this.libp2pComponents.getPeerStore().addressBook.add(peer.id, dialables)
-      }
-
-      // Mark the corresponding entry as public & recalculate network health indicator
-      this.knownPublicNodesCache.add(peer.id.toString())
-      this.heartbeat.recalculateNetworkHealth()
     } catch (err) {
-      log(`Failed to update peer-store with new peer ${peer.id.toString()} info`, err)
+      log(`Failed to update key peer-store with new peer ${peer.id.toString()} info`, err)
     }
+
+    console.log(`dialables`, dialables)
+    if (dialables.length > 0) {
+      console.log(`emitting addPublicNode`)
+      this.publicNodesEmitter.emit('addPublicNode', { id: peer.id, multiaddrs: dialables })
+
+      try {
+        await this.libp2pComponents.getPeerStore().addressBook.add(peer.id, dialables)
+      } catch (err) {
+        log(`Failed to update address peer-store with new peer ${peer.id.toString()} info`, err)
+      }
+    }
+
+    // Mark the corresponding entry as public & recalculate network health indicator
+    this.knownPublicNodesCache.add(peer.id.toString())
+    this.heartbeat.recalculateNetworkHealth()
   }
 
   // On the strategy interval, poll the strategy to see what channel changes
