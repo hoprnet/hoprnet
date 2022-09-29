@@ -177,7 +177,7 @@ export async function validateUnacknowledgedTicket(
     throw Error(
       `Ticket epoch '${ticket.epoch.toBN().toString()}' does not match our account epoch ${channel.ticketEpoch
         .toBN()
-        .toString()}`
+        .toString()} of channel ${channel.getId().toHex()}`
     )
   }
 
@@ -186,7 +186,7 @@ export async function validateUnacknowledgedTicket(
     throw Error(
       `Ticket was created for a different channel iteration ${ticket.channelEpoch
         .toBN()
-        .toString()} != ${channel.channelEpoch.toBN().toString()}`
+        .toString()} != ${channel.channelEpoch.toBN().toString()} of channel ${channel.getId().toHex()}`
     )
   }
 
@@ -221,15 +221,15 @@ export async function validateUnacknowledgedTicket(
   // ticket's index MUST be higher than the channel's ticket index
   if (ticket.index.toBN().lt(unrealizedIndex.toBN())) {
     throw Error(
-      `Ticket index ${ticket.index.toBN().toString()} must be higher than last ticket index ${unrealizedIndex
-        .toBN()
-        .toString()}`
+      `Ticket index ${ticket.index.toBN().toString()} for channel ${channel
+        .getId()
+        .toHex()} must be higher than last ticket index ${unrealizedIndex.toBN().toString()}`
     )
   }
 
   // ensure sender has enough funds
   if (ticket.amount.toBN().gt(unrealizedBalance.toBN())) {
-    throw Error(`Payment channel does not have enough funds`)
+    throw Error(`Payment channel ${channel.getId().toHex()} does not have enough funds`)
   }
 }
 
