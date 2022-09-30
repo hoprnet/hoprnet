@@ -60,8 +60,6 @@
 - [U8aAndSize](modules.md#u8aandsize)
 - [WaitingAsRelayer](modules.md#waitingasrelayer)
 - [WaitingAsSender](modules.md#waitingassender)
-- [libp2pSendMessage](modules.md#libp2psendmessage)
-- [libp2pSubscribe](modules.md#libp2psubscribe)
 
 ### Variables
 
@@ -161,8 +159,8 @@
 - [isReservedAddress](modules.md#isreservedaddress)
 - [isSecp256k1PeerId](modules.md#issecp256k1peerid)
 - [iterateHash](modules.md#iteratehash)
-- [libp2pSendMessage](modules.md#libp2psendmessage-1)
-- [libp2pSubscribe](modules.md#libp2psubscribe-1)
+- [libp2pSendMessage](modules.md#libp2psendmessage)
+- [libp2pSubscribe](modules.md#libp2psubscribe)
 - [loadJson](modules.md#loadjson)
 - [moveDecimalPoint](modules.md#movedecimalpoint)
 - [nAtATime](modules.md#natatime)
@@ -309,7 +307,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:168](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L168)
+[libp2p/index.ts:150](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L150)
 
 ___
 
@@ -340,7 +338,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:169](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L169)
+[libp2p/index.ts:151](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L151)
 
 ___
 
@@ -463,58 +461,6 @@ ___
 #### Defined in
 
 [db/db.ts:110](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L110)
-
-___
-
-### libp2pSendMessage
-
-Ƭ **libp2pSendMessage**: (`components`: `Components`, `destination`: `PeerId`, `protocols`: `string` \| `string`[], `message`: `Uint8Array`, `includeReply`: ``false``, `opts?`: [`TimeoutOpts`](modules.md#timeoutopts)) => `Promise`<`void`\> & (`components`: `Components`, `destination`: `PeerId`, `protocols`: `string` \| `string`[], `message`: `Uint8Array`, `includeReply`: ``true``, `opts?`: [`TimeoutOpts`](modules.md#timeoutopts)) => `Promise`<`Uint8Array`[]\>
-
-Asks libp2p to establish a connection to another node and
-send message. If `includeReply` is set, wait for a response
-
-**`param`** libp2p instance
-
-**`param`** peer to connect to
-
-**`param`** protocols to speak
-
-**`param`** message to send
-
-**`param`** try to receive a reply
-
-**`param`** [optional] timeout
-
-#### Defined in
-
-[libp2p/index.ts:122](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L122)
-
-[libp2p/index.ts:105](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L105)
-
-___
-
-### libp2pSubscribe
-
-Ƭ **libp2pSubscribe**: (`components`: `Components`, `protocols`: `string` \| `string`[], `handler`: [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`Promise`<`void`\> \| `void`\>, `errHandler`: `ErrHandler`, `includeReply`: ``false``) => `void` & (`components`: `Components`, `protocols`: `string` \| `string`[], `handler`: [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`Promise`<`Uint8Array`\>\>, `errHandler`: `ErrHandler`, `includeReply`: ``true``) => `void`
-
-Generates a handler that pulls messages out of a stream
-and feeds them to the given handler.
-
-**`param`** libp2p instance
-
-**`param`** protocol to dial
-
-**`param`** called once another node requests that protocol
-
-**`param`** handle stream pipeline errors
-
-**`param`** try to receive a reply
-
-#### Defined in
-
-[libp2p/index.ts:261](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L261)
-
-[libp2p/index.ts:246](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L246)
 
 ## Variables
 
@@ -2000,38 +1946,56 @@ ___
 
 ### libp2pSendMessage
 
-▸ **libp2pSendMessage**(`components`, `destination`, `protocols`, `message`, `includeReply`, `opts?`): `Promise`<`void` \| `Uint8Array`[]\>
+▸ **libp2pSendMessage**<`T`\>(`components`, `destination`, `protocols`, `message`, `includeReply`, `opts?`): `Promise`<`T` extends ``true`` ? `Uint8Array`[] : `void`\>
 
-#### Parameters
+Asks libp2p to establish a connection to another node and
+send message. If `includeReply` is set, wait for a response
+
+#### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `components` | `Components` |
-| `destination` | `PeerId` |
-| `protocols` | `string` \| `string`[] |
-| `message` | `Uint8Array` |
-| `includeReply` | `boolean` |
-| `opts?` | [`TimeoutOpts`](modules.md#timeoutopts) |
+| `T` | extends `boolean` |
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `components` | `Components` | libp2p components |
+| `destination` | `PeerId` | peer to connect to |
+| `protocols` | `string` \| `string`[] | protocols to speak |
+| `message` | `Uint8Array` | message to send |
+| `includeReply` | `T` | try to receive a reply |
+| `opts?` | [`TimeoutOpts`](modules.md#timeoutopts) | [optional] timeout |
 
 #### Returns
 
-`Promise`<`void` \| `Uint8Array`[]\>
+`Promise`<`T` extends ``true`` ? `Uint8Array`[] : `void`\>
 
 ___
 
 ### libp2pSubscribe
 
-▸ **libp2pSubscribe**(`components`, `protocols`, `handler`, `errHandler`, `includeReply?`): `Promise`<`void`\>
+▸ **libp2pSubscribe**<`T`\>(`components`, `protocols`, `handler`, `errHandler`, `includeReply`): `Promise`<`void`\>
+
+Generates a handler that pulls messages out of a stream
+and feeds them to the given handler.
+
+#### Type parameters
+
+| Name | Type |
+| :------ | :------ |
+| `T` | extends `boolean` |
 
 #### Parameters
 
-| Name | Type | Default value |
+| Name | Type | Description |
 | :------ | :------ | :------ |
-| `components` | `Components` | `undefined` |
-| `protocols` | `string` \| `string`[] | `undefined` |
-| `handler` | [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`void` \| `Promise`<`void` \| `Uint8Array`\>\> | `undefined` |
-| `errHandler` | `ErrHandler` | `undefined` |
-| `includeReply` | `boolean` | `false` |
+| `components` | `Components` | libp2p components |
+| `protocols` | `string` \| `string`[] | protocol to dial |
+| `handler` | [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`T` extends ``true`` ? `Promise`<`Uint8Array`\> : `void` \| `Promise`<`void`\>\> | called once another node requests that protocol |
+| `errHandler` | `ErrHandler` | handle stream pipeline errors |
+| `includeReply` | `T` | try to receive a reply |
 
 #### Returns
 

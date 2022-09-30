@@ -14,7 +14,7 @@ declare -x HOPR_LOG_ID="deploy"
 source "${mydir}/utils.sh"
 source "${mydir}/testnet.sh"
 
-declare branch cluster_size package_version docker_image
+declare branch cluster_size docker_image
 
 : ${HOPRD_API_TOKEN:?"env var missing"}
 : ${HOPRD_PASSWORD:?"env var missing"}
@@ -26,7 +26,6 @@ cluster_size=${2:-3}
 cluster_tag=${3:-} # optional cluster tag
 
 branch=$(git rev-parse --abbrev-ref HEAD)
-package_version=$(${mydir}/get-package-version.sh)
 api_token="${HOPRD_API_TOKEN}"
 password="${HOPRD_PASSWORD}"
 
@@ -48,8 +47,14 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
       environment_id=$(_jq "${row}" ".value.environment_id")
       version_major=$(_jq "${row}" ".value.version_major")
       version_minor=$(_jq "${row}" ".value.version_minor")
-      docker_image_full="${docker_image}:${release_id}"
+      docker_image_version=$(_jq "${row}" ".value.docker_image_version")
 
+      if [ "${docker_image_version}" != "null" ]; then 
+        docker_image_full="${docker_image}:${docker_image_version}"
+      else 
+        docker_image_full="${docker_image}:${release_id}"
+      fi
+      
       if [ "${deprecated}" == "true" ]; then
         log "${release_id} deprecated, skipping deployment"
         continue
@@ -64,7 +69,7 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
         version_maj_min=""
       fi
 
-      cluster_template_name="${cluster_name}-${package_version//./-}"
+      cluster_template_name="${cluster_name}"
 
       log "deploying release ${release_id}"
       log "\tversion: ${version_maj_min}"
@@ -80,8 +85,9 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
           "" \
           "${cluster_name}" \
           "${docker_image_full}" \
-          "2" \
-          "${cluster_template_name}"
+          "${cluster_size}" \
+          "${cluster_template_name}" \
+          ""
       else
         # announce on-chain with routable address
         ${mydir}/setup-gcloud-cluster.sh \
@@ -89,7 +95,7 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
           "" \
           "${cluster_name}" \
           "${docker_image_full}" \
-          "3" \
+          "${cluster_size}" \
           "${cluster_template_name}" \
           "true"
       fi

@@ -41,12 +41,17 @@ disk_name() {
 }
 
 # $1=environment id
-get_rpc() {
+get_network() {
   local environment_id="${1}"
-  local network_id=$(cat "${mydir}/../packages/core/protocol-config.json" | jq -r ".environments.\"${environment_id}\".network_id")
-  local unresolved_rpc=$(cat "${mydir}/../packages/core/protocol-config.json" | jq -r ".networks.\"${network_id}\".default_provider")
+  jq -r ".environments.\"${environment_id}\".network_id" "${mydir}/../packages/core/protocol-config.json"
+}
 
-  echo "${unresolved_rpc}" | envsubst
+# $1=environment id
+get_rpc() {
+  local network_id
+  network_id="$(get_network "${1}")"
+  
+  jq -r ".networks.\"${network_id}\".default_provider" "${mydir}/../packages/core/protocol-config.json" | envsubst
 }
 
 # $1 = environment

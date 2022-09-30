@@ -145,14 +145,14 @@ export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROY
 
 export type Subscribe = ((
   protocols: string | string[],
-  handler: LibP2PHandlerFunction<Promise<void> | void>,
-  includeReply: false,
+  handler: LibP2PHandlerFunction<Promise<Uint8Array>>,
+  includeReply: true,
   errHandler: (err: any) => void
 ) => void) &
   ((
-    protocols: string | string[],
-    handler: LibP2PHandlerFunction<Promise<Uint8Array>>,
-    includeReply: true,
+    protocol: string,
+    handler: LibP2PHandlerFunction<Promise<void> | void>,
+    includeReply: false,
     errHandler: (err: any) => void
   ) => void)
 
@@ -160,16 +160,10 @@ export type SendMessage = ((
   dest: PeerId,
   protocols: string | string[],
   msg: Uint8Array,
-  includeReply: false,
+  includeReply: true,
   opts: DialOpts
-) => Promise<void>) &
-  ((
-    dest: PeerId,
-    protocols: string | string[],
-    msg: Uint8Array,
-    includeReply: true,
-    opts: DialOpts
-  ) => Promise<Uint8Array[]>)
+) => Promise<Uint8Array[]>) &
+  ((dest: PeerId, protocols: string | string[], msg: Uint8Array, includeReply: false, opts: DialOpts) => Promise<void>)
 
 class Hopr extends EventEmitter {
   public status: NodeStatus = 'UNINITIALIZED'
@@ -288,12 +282,12 @@ class Hopr extends EventEmitter {
 
     this.libp2pComponents = libp2p.components
     // Subscribe to p2p events from libp2p. Wraps our instance of libp2p.
-    const subscribe = ((
+    const subscribe = (
       protocols: string | string[],
-      handler: LibP2PHandlerFunction<Promise<void | Uint8Array>>,
+      handler: LibP2PHandlerFunction<Promise<Uint8Array> | Promise<void> | void>,
       includeReply: boolean,
       errHandler: (err: any) => void
-    ) => libp2pSubscribe(this.libp2pComponents, protocols, handler, errHandler, includeReply)) as Subscribe
+    ) => libp2pSubscribe(this.libp2pComponents, protocols, handler, errHandler, includeReply)
 
     const sendMessage = ((
       dest: PeerId,
@@ -301,7 +295,7 @@ class Hopr extends EventEmitter {
       msg: Uint8Array,
       includeReply: boolean,
       opts: DialOpts
-    ) => libp2pSendMessage(this.libp2pComponents, dest, protocols, msg, includeReply, opts)) as SendMessage
+    ) => libp2pSendMessage(this.libp2pComponents, dest, protocols, msg, includeReply, opts)) as SendMessage // Typescript limitation
 
     // Attach network health measurement functionality
     const peers: Peer[] = await this.libp2pComponents.getPeerStore().all()
@@ -436,6 +430,34 @@ class Hopr extends EventEmitter {
     }
     await this.maybeLogProfilingToGCloud()
     this.heartbeat.recalculateNetworkHealth()
+
+    this.startMemoryFreeInterval()
+  }
+
+  /**
+   * Total hack
+   Mannually wipes DHT's ping queues as they get unnecessarily populated
+   */
+  private freeMemory() {
+    console.log(
+      // @ts-ignore
+      `Freeing memory, size wan ${this.libp2pComponents.getDHT().wan.routingTable.pingQueue.size} lan ${
+        // @ts-ignore
+
+        this.libp2pComponents.getDHT().lan.routingTable.pingQueue.size
+      }`
+    )
+    // @ts-ignore
+    this.libp2pComponents.getDHT().wan.routingTable.pingQueue.clear()
+    // @ts-ignore
+    this.libp2pComponents.getDHT().lan.routingTable.pingQueue.clear()
+  }
+
+  /**
+   * Total hack
+   */
+  private startMemoryFreeInterval() {
+    retimer(this.freeMemory.bind(this), () => durations.minutes(1))
   }
 
   private async maybeLogProfilingToGCloud() {

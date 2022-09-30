@@ -43,8 +43,9 @@ function printUsedRelays(peers: PeerId[], prefix = '') {
 
   for (const peer of peers) {
     if (out.length > prefix.length + 1) {
-      out += `  - ${peer.toString()}`
+      out += `\n`
     }
+    out += `  - ${peer.toString()}`
   }
 
   return out

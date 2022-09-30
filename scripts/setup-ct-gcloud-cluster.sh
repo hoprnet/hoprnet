@@ -91,7 +91,7 @@ fi
 # create test specific instance template
 # the empty values are placeholders for optional parameters which are not used
 # announce on-chain with routable address
-gcloud_create_or_update_instance_template \
+gcloud_create_instance_template \
   "${cluster_id}" \
   "${docker_image}" \
   "${environment}" \

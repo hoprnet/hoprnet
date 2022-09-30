@@ -123,7 +123,7 @@ fi
 
 # create instance template
 # announce on-chain with routable address
-gcloud_create_instance_template_if_not_exists \
+gcloud_create_instance_template \
   "${instance_template_name}" \
   "${docker_image}" \
   "${environment}" \
@@ -158,6 +158,9 @@ else
   )
 fi
 
+declare network_id
+network_id="$(get_network "${environment}")"
+
 # Deployer CI wallet should ideally be "eligible". To be eligible:
 # 1. The wallet should have obtained a "Network_registry" NFT of `developer` rank (wallet should already have this)
 # 2. The wallet should have sent one above-mentioned NFT to the staking contract
@@ -167,7 +170,7 @@ fi
 for staking_addr in "${!staking_addrs_dict[@]}" ; do
   fund_if_empty "${staking_addr}" "${environment}"
   # we only stake NFT for valencia release
-  PRIVATE_KEY="${staking_addrs_dict[${staking_addr}]}" make -C "${mydir}/.." stake-nrnft environment="${environment}" nftrank=developer
+  PRIVATE_KEY="${staking_addrs_dict[${staking_addr}]}" make -C "${mydir}/.." stake-nrnft environment="${environment}" nftrank=developer network="${network_id}"
 done
 
 # Get names of all instances in this cluster
@@ -175,7 +178,7 @@ done
 declare instance_names
 instance_names="$(gcloud_get_managed_instance_group_instances_names "${cluster_id}")"
 declare -a instance_names_arr
-IFS="," read -r -a instance_names_arr <<< "$(echo "${instance_names}" | jq -r '@csv' | tr -d '"')"
+IFS="," read -r -a instance_names_arr <<< "$(echo "${instance_names}" | jq -r '@csv' | tr -d '\"')"
 
 # Prepare sorted staking account addresses so we ensure a stable order of assignment
 declare staking_addresses_arr=( "${!staking_addrs_dict[@]}" )
@@ -197,7 +200,7 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
   wait_until_node_is_ready "${node_ip}"
 
   if [[ "${reset_metadata}" = "true" ]]; then
-    gcloud_remove_instance_metadata "${instance_name}" "hopr-peer-id,hopr-wallet-addr,hopr-staking-addr"
+    gcloud_remove_instance_metadata "${instance_name}" "HOPRD_PEER_ID,HOPRD_WALLET_ADDR,HOPRD_STAKING_ADDR"
   fi
 
   # All VM instances in the deployed cluster will get a special metadata entries
@@ -213,9 +216,9 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
 
   # known metadata keys
   declare wallet_addr peer_id staking_addr
-  wallet_addr="$(echo "${instance_metadata}" | jq -r '."hopr-wallet-addr" // empty')"
-  peer_id="$(echo "${instance_metadata}" | jq -r '."hopr-peer-id" // empty')"
-  staking_addr="$(echo "${instance_metadata}" | jq -r '."hopr-staking-addr" // empty')"
+  wallet_addr="$(echo "${instance_metadata}" | jq -r '."HOPRD_WALLET_ADDR" // empty')"
+  peer_id="$(echo "${instance_metadata}" | jq -r '."HOPRD_PEER_ID" // empty')"
+  staking_addr="$(echo "${instance_metadata}" | jq -r '."HOPRD_STAKING_ADDR" // empty')"
 
   # data from the node's API for verification or initialization
   declare api_wallet_addr api_peer_id
@@ -226,7 +229,7 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
     # If the instance does not have metadata yet, we set it once
 
     # NOTE: We leave only the first public node unstaked
-    if [[ ${instance_idx} -eq 0 && "${docker_image}" != *-nat:* && "${skip_unstaked}" != "true" ]]; then
+    if [[ ${instance_idx} -eq 0 && "${instance_template_name}" != *-nat* && "${skip_unstaked}" != "true" ]]; then
       staking_addr="unstaked"
     else
       # Staking accounts are assigned round-robin
@@ -235,8 +238,9 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
     fi
 
     # Save the metadata
-    declare new_metadata="hopr-wallet-addr=${api_wallet_addr},hopr-peer-id=${api_peer_id},hopr-staking-addr=${staking_addr}"
+    declare new_metadata="HOPRD_WALLET_ADDR=${api_wallet_addr},HOPRD_PEER_ID=${api_peer_id},HOPRD_STAKING_ADDR=${staking_addr}"
     gcloud_add_instance_metadata "${instance_name}" "${new_metadata}"
+    gcloud_execute_command_instance "${instance_name}" 'sudo /opt/hoprd/startup-script.sh >> /tmp/startup-script-`date +%Y%m%d-%H%M%S`.log'
   else
     # cross-check data, and log discrepancies, we keep going though and leave
     # the reconciliation for another process to do
@@ -266,16 +270,18 @@ IFS=','
 make -C "${mydir}/.." register-nodes \
   environment="${environment}" \
   native_addresses="${used_staking_addrs[*]}" \
-  peer_ids="${hopr_addrs[*]}"
+  peer_ids="${hopr_addrs[*]}" \
+  network="${network_id}"
 
 make -C "${mydir}/.." sync-eligibility \
   environment="${environment}" \
-  peer_ids="${hopr_addrs[*]}"
+  peer_ids="${hopr_addrs[*]}" \
+  network="${network_id}"
 unset IFS
 
 # Finally wait for the public nodes to come up, for NAT nodes this isn't possible
 # because the P2P port is not exposed.
-if [[ "${docker_image}" != *-nat:* ]]; then
+if [[ "${instance_template_name}" != *-nat* ]]; then
   for ip in "${ip_addrs[@]}"; do
     wait_for_port "9091" "${ip}"
   done
