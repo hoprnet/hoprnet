@@ -182,7 +182,9 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
         await mockChannelEntry(true, new Balance(new BN(0))),
         getTicketsMock
       )
-    ).to.eventually.rejectedWith('Payment channel does not have enough funds')
+    ).to.eventually.rejectedWith(
+      'Payment channel 0x434c7d4fdeadfc5b67c251d1a421d2d73e90c81355ade7744af5dddf160c27df does not have enough funds'
+    )
   })
 
   it('should throw if channel does not have enough funds when you include unredeemed tickets', async function () {
@@ -202,6 +204,8 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
         await mockChannelEntry(),
         async () => ticketsInDb
       )
-    ).to.eventually.rejectedWith('Payment channel does not have enough funds')
+    ).to.eventually.rejectedWith(
+      'Payment channel 0x434c7d4fdeadfc5b67c251d1a421d2d73e90c81355ade7744af5dddf160c27df does not have enough funds'
+    )
   })
 })

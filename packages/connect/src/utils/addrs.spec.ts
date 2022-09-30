@@ -5,7 +5,7 @@ import { Multiaddr } from '@multiformats/multiaddr'
 const firstPeer = `16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg`
 const secondPeer = `16Uiu2HAkyvdVZtG8btak5SLrxP31npfJo6maopj8xwx5XQhKfspb`
 
-describe.only('test address parsing', function () {
+describe('test address parsing', function () {
   it('good examples', function () {
     assert(parseAddress(new Multiaddr('/ip4/127.0.0.1/tcp/0')).valid === true)
 

@@ -7,15 +7,20 @@ const log = Debug('hopr-connect:tcp')
 const error = Debug('hopr-connect:tcp:error')
 const verbose = Debug('hopr-connect:verbose:tcp')
 
-// Timeout to wait for socket close before destroying it
-export const SOCKET_CLOSE_TIMEOUT = 1000
+// Timeout to wait for socket close before manually destroying it
+const SOCKET_CLOSE_TIMEOUT = 2000
 
 import type { MultiaddrConnection } from '@libp2p/interface-connection'
 
 import type { Multiaddr } from '@multiformats/multiaddr'
 import toIterable from 'stream-to-it'
 import type { Stream, StreamSink, StreamSource, StreamSourceAsync } from '../types.js'
-import type { DialOptions } from '@libp2p/interface-transport'
+
+type SocketOptions = {
+  signal?: AbortSignal
+  keepAlive?: boolean
+  closeTimeout?: number
+}
 
 /**
  * Class to encapsulate TCP sockets
@@ -30,19 +35,20 @@ class TCPConnection implements MultiaddrConnection {
   private _signal?: AbortSignal
 
   private keepAlive: boolean
+  private closeTimeout: number
 
   public timeline: {
     open: number
     close?: number
   }
 
-  constructor(public remoteAddr: Multiaddr, public conn: Socket, options?: DialOptions) {
+  constructor(public remoteAddr: Multiaddr, public conn: Socket, options?: SocketOptions) {
     this.localAddr = nodeToMultiaddr(this.conn.address() as AddressInfo)
 
     this.closed = false
-
-    // @ts-ignore - hack
     this.keepAlive = options?.keepAlive ?? false
+    this._signal = options?.signal
+    this.closeTimeout = options?.closeTimeout ?? SOCKET_CLOSE_TIMEOUT
 
     this.timeline = new Proxy(
       {
@@ -50,10 +56,8 @@ class TCPConnection implements MultiaddrConnection {
       },
       {
         set: (...args) => {
-          console.log(args)
           if (args[1] === 'keepAlive' && args[2] == true) {
             this.keepAlive = true
-            console.log(`keepAlive true`)
           }
           return Reflect.set(...args)
         }
@@ -66,9 +70,7 @@ class TCPConnection implements MultiaddrConnection {
       this.timeline.close ??= Date.now()
     })
 
-    this._signal = options?.signal
-
-    this.source = this.createSource(this.conn) as AsyncIterable<Uint8Array>
+    this.source = this.createSource(this.conn)
     this.sink = this._sink.bind(this)
   }
 
@@ -103,7 +105,7 @@ class TCPConnection implements MultiaddrConnection {
           log(`destroying connection ${cOptions.host}:${cOptions.port}`)
           this.conn.destroy()
         }
-      }, SOCKET_CLOSE_TIMEOUT).unref()
+      }, this.closeTimeout).unref()
 
       // Resolve once closed
       // Could take place after timeout or as a result of `.end()` call
@@ -132,6 +134,7 @@ class TCPConnection implements MultiaddrConnection {
       this.conn.end()
 
       if (this.conn.writableLength > 0) {
+        console.log(`here`)
         // there are outgoing bytes waiting to be sent
         this.conn.once('drain', () => {
           log('socket drained')
@@ -192,7 +195,7 @@ class TCPConnection implements MultiaddrConnection {
    * @param options
    * @returns Resolves a TCP Socket
    */
-  public static create(ma: Multiaddr, options?: DialOptions): Promise<TCPConnection> {
+  public static create(ma: Multiaddr, options?: SocketOptions): Promise<TCPConnection> {
     return new Promise<TCPConnection>((resolve, reject) => {
       const start = Date.now()
       const cOpts = ma.toOptions()

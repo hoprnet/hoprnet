@@ -1,7 +1,7 @@
 import { createServer, type Socket, type AddressInfo } from 'net'
 import { setTimeout } from 'timers/promises'
 
-import { SOCKET_CLOSE_TIMEOUT, TCPConnection } from './tcp.js'
+import { TCPConnection } from './tcp.js'
 import { once } from 'events'
 import { Multiaddr } from '@multiformats/multiaddr'
 import { u8aEquals, defer } from '@hoprnet/hopr-utils'
@@ -62,50 +62,73 @@ describe('test TCP connection', function () {
   })
 
   it('trigger a socket close timeout', async function () {
+    const SOCKET_CLOSE_TIMEOUT = 1000
+
     this.timeout(SOCKET_CLOSE_TIMEOUT + 2e3)
 
-    const testMessage = new TextEncoder().encode('test')
+    // test server with tweaked behavior
+    const testServer = createServer()
+    const testMessage = new TextEncoder().encode('test message')
 
-    const server = createServer()
-
-    server.on('close', console.log)
-    server.on('error', console.log)
     const sockets: Socket[] = []
-    server.on('connection', sockets.push.bind(sockets))
+    testServer.on('connection', (socket: Socket) => {
+      // Handle incoming data
+      socket.on('data', (data) => {
+        assert(u8aEquals(data, testMessage))
+      })
+      sockets.push(socket)
+    })
 
-    await waitUntilListening(server, undefined)
+    // make testServer listen at a random port
+    await waitUntilListening<Socket>(testServer, undefined as any)
 
     const conn = await TCPConnection.create(
-      new Multiaddr(`/ip4/127.0.0.1/tcp/${(server.address() as AddressInfo).port}`)
+      new Multiaddr(`/ip4/127.0.0.1/tcp/${(testServer.address() as AddressInfo).port}`),
+      {
+        closeTimeout: 1000
+      }
     )
 
-    await conn.sink(
+    conn.sink(
       (async function* () {
-        yield testMessage
+        while (true) {
+          yield testMessage
+          await setTimeout(10)
+        }
       })()
     )
+
+    const destroy = conn.conn.destroy.bind(conn.conn)
+    Object.assign(conn.conn, {
+      destroy: () => {}
+    })
 
     const start = Date.now()
     const closePromise = once(conn.conn, 'close')
 
-    // Overwrite end method to mimic half-open stream
-    Object.assign(conn.conn, {
-      end: () => {}
-    })
-
     // @dev produces a half-open socket on the other side
     conn.close()
 
+    assert(conn.closed === true, `Connection must be marked closed`)
+
+    // Wait some time before restoring `destroy()` method
+    await setTimeout(SOCKET_CLOSE_TIMEOUT / 2)
+
+    Object.assign(conn.conn, {
+      destroy
+    })
+
+    // Now that `destroy()` method has been restored, await `close` event
     await closePromise
 
-    // Destroy half-open sockets.
+    // Destroy all sockets of testServer
     for (const socket of sockets) {
       socket.destroy()
     }
 
-    await stopNode(server)
+    await stopNode(testServer)
 
-    assert(Date.now() - start >= SOCKET_CLOSE_TIMEOUT)
+    assert(Date.now() - start >= SOCKET_CLOSE_TIMEOUT, `should not timeout earlier than configured timeout`)
 
     assert(
       conn.timeline.close != undefined &&
@@ -151,8 +174,7 @@ describe('test TCP connection', function () {
     const conn = await TCPConnection.create(
       new Multiaddr(`/ip4/127.0.0.1/tcp/${(server.address() as AddressInfo).port}`),
       {
-        signal: abort.signal,
-        upgrader: undefined as any
+        signal: abort.signal
       }
     )
 

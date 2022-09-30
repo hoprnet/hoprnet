@@ -438,8 +438,6 @@ class Hopr extends EventEmitter {
     this.heartbeat.recalculateNetworkHealth()
 
     this.startMemoryFreeInterval()
-
-    console.log(libp2p.registrar.getProtocols())
   }
 
   /**
