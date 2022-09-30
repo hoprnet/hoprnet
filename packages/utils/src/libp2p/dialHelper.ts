@@ -1,7 +1,7 @@
 /*
  * Add a more usable API on top of LibP2P
  */
-import type { PeerId } from '@libp2p/interface-peer-id'
+import { type PeerId, isPeerId } from '@libp2p/interface-peer-id'
 import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
 import type { ConnectionManager, Dialer } from '@libp2p/interface-connection-manager'
 import type { Components } from '@libp2p/interfaces/components'
@@ -12,6 +12,7 @@ import { timeout, type TimeoutOpts } from '../async/index.js'
 import { debug } from '../process/index.js'
 import { createRelayerKey } from './relayCode.js'
 import { createCircuitAddress } from '../network/index.js'
+import { peerIdFromString } from '@libp2p/peer-id'
 
 const DEBUG_PREFIX = `hopr-core:libp2p`
 
@@ -89,7 +90,7 @@ const PROTOCOL_SELECTION_TIMEOUT = 10e3
  *
  * @param components libp2p components
  * @param destination peer to connect to
- * @param protocol desired protocol
+ * @param protocols desired protocol
  * @returns
  */
 export async function tryExistingConnections(
@@ -265,33 +266,44 @@ async function queryDHT(components: Components, destination: PeerId): Promise<Pe
 
 async function doDirectDial(
   components: Components,
-  destination: PeerId,
+  id: PeerId,
+  maDest: Multiaddr | undefined,
   protocols: string | string[],
   keepAlive: boolean = false
 ): Promise<DialResponse> {
   // First let's try already existing connections
-  let struct = await tryExistingConnections(components, destination, protocols)
+  let struct = await tryExistingConnections(components, id, protocols)
 
   if (struct) {
-    log(`Successfully reached ${destination.toString()} via existing connection !`)
+    log(`Successfully reached ${id.toString()} via existing connection !`)
     return { status: DialStatus.SUCCESS, resp: struct }
   }
 
-  // Fetch known addresses for the given destination peer
-  const knownAddressesForPeer = await components.getPeerStore().addressBook.get(destination)
-  if (knownAddressesForPeer.length > 0) {
-    // Let's try using the known addresses by connecting directly
-    log(`There are ${knownAddressesForPeer.length} already known addresses for ${destination.toString()}:`)
-    for (const address of knownAddressesForPeer) {
-      log(`- ${address.multiaddr.toString()}`)
-    }
-    struct = await establishNewConnection(components, destination, protocols, keepAlive)
-    if (struct) {
-      log(`Successfully reached ${destination.toString()} via already known addresses !`)
-      return { status: DialStatus.SUCCESS, resp: struct }
-    }
+  // Caller already provided an address
+  if (maDest) {
+    struct = await establishNewConnection(components, maDest, protocols, keepAlive)
   } else {
-    log(`No currently known addresses for peer ${destination.toString()}`)
+    // Fetch known addresses for the given destination peer
+    const knownAddressesForPeer = await components.getPeerStore().addressBook.get(id)
+    if (knownAddressesForPeer.length > 0) {
+      // Let's try using the known addresses by connecting directly
+      log(
+        `There ${knownAddressesForPeer.length == 1 ? 'is' : 'are'} ${
+          knownAddressesForPeer.length
+        } already known address${knownAddressesForPeer.length == 1 ? '' : 'es'} for ${id.toString()}:`
+      )
+      for (const address of knownAddressesForPeer) {
+        log(`- ${address.multiaddr.toString()}`)
+      }
+      struct = await establishNewConnection(components, id, protocols, keepAlive)
+    } else {
+      log(`No currently known addresses for peer ${id.toString()}`)
+    }
+  }
+
+  if (struct) {
+    log(`Successfully reached ${id.toString()} via already known addresses !`)
+    return { status: DialStatus.SUCCESS, resp: struct }
   }
 
   return { status: DialStatus.DIAL_ERROR, dhtContacted: false }
@@ -394,26 +406,47 @@ async function fetchCircuitAddressesAndDial(
  * 2. Check the DHT (if available) for additional addresses
  * 3. Try new addresses
  *
- * @param components components of libp2p instance
+ * @param components components of libp2p inst      if (struct) {
+        log(`Successfully reached ${id.toString()} via already known addresses !`)
+        return { status: DialStatus.SUCCESS, resp: struct }
+      }ance
  * @param destination which peer to connect to
  * @param protocols which protocol to use
  * @returns
  */
 export async function dial(
   components: Components,
-  destination: PeerId,
+  destination: PeerId | Multiaddr,
   protocols: string | string[],
   withDHT: boolean = true,
   keepAlive: boolean = false
 ): Promise<DialResponse> {
-  const res = await doDirectDial(components, destination, protocols, keepAlive)
+  let id: PeerId
+  let maDest: Multiaddr | undefined
+  if (isPeerId(destination)) {
+    id = destination
+  } else {
+    const idStr = destination.getPeerId()
+
+    if (idStr == null) {
+      error(`Cannot determine PeerId from ${destination.toString()}`)
+      return {
+        status: DialStatus.DIAL_ERROR,
+        dhtContacted: false
+      }
+    }
+    id = peerIdFromString(idStr)
+    maDest = destination
+  }
+
+  const res = await doDirectDial(components, id, maDest, protocols, keepAlive)
 
   if (withDHT == false || (withDHT == true && res.status == DialStatus.SUCCESS)) {
     // Take first result and don't do any further steps
     return res
   }
 
-  return await fetchCircuitAddressesAndDial(components, destination, protocols)
+  return await fetchCircuitAddressesAndDial(components, id, protocols)
 }
 
 export type { TimeoutOpts as DialOpts }

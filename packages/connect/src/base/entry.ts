@@ -362,7 +362,9 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
       this.startDHTRenewInterval()
 
-      this.addToUpdateQueue(this.updatePublicNodes.bind(this))
+      await new Promise((resolve, reject) => {
+        this.addToUpdateQueue(() => this.updatePublicNodes().then(resolve, reject))
+      })
     }
   }
 
@@ -763,6 +765,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
     for (const nodeList of [this.uncheckedEntryNodes, this.availableEntryNodes, this.offlineEntryNodes]) {
       for (const node of nodeList) {
+        // In case the addrs are not known to libp2p
+        this.getComponents().getPeerStore().addressBook.add(node.id, node.multiaddrs)
         for (const ma of node.multiaddrs) {
           args.push([node.id, ma])
         }
@@ -943,6 +947,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
         }
       )
     )
+    console.log(results)
 
     log(printGroupedConnectionResults(results, `Connection results after contacting entry nodes`))
 
