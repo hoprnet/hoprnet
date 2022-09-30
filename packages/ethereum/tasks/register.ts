@@ -15,13 +15,13 @@ export type RegisterOpts =
     }
   | {
       task: 'remove'
-      nativeAddresses: string
+      nativeAddresses?: string
       peerIds: string
       privatekey?: string // private key of the caller
     }
   | {
       task: 'disable' | 'enable'
-      privatekey: string // private key of the caller
+      privatekey?: string // private key of the caller
     }
   | {
       task: 'force-eligibility-update'
@@ -113,7 +113,7 @@ async function main(
         process.exit(1)
       }
 
-      // in staging account, register by owner; in non-stagin environment, add addresses directly to proxy
+      // in staging or production, register by owner; in non-staging environment, add addresses directly to proxy
       if (network.tags.development) {
         await (await (hoprProxy as HoprDummyProxyForNetworkRegistry).ownerBatchAddAccounts(nativeAddresses)).wait()
       }
