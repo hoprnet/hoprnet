@@ -4,7 +4,7 @@
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
 import type { Components } from '@libp2p/interfaces/components'
-import { type Multiaddr, protocols } from '@multiformats/multiaddr'
+import { type Multiaddr, protocols as maProtocols } from '@multiformats/multiaddr'
 
 import { timeout, abortableTimeout, type TimeoutOpts } from '../async/index.js'
 
@@ -13,6 +13,8 @@ import { createRelayerKey } from './relayCode.js'
 import { createCircuitAddress } from '../network/index.js'
 
 const DEBUG_PREFIX = `hopr-core:libp2p`
+
+const CODE_P2P = maProtocols('p2p').code
 
 const log = debug(DEBUG_PREFIX)
 const error = debug(DEBUG_PREFIX.concat(`:error`))
@@ -67,7 +69,7 @@ const PROTOCOL_SELECT_TIMEOUT = 10e3
 export async function tryExistingConnections(
   components: Components,
   destination: PeerId,
-  protocol: string
+  protocols: string | string[]
 ): Promise<
   | void
   | (ProtocolStream & {
@@ -80,14 +82,14 @@ export async function tryExistingConnections(
     return
   }
 
-  let stream: ProtocolStream['stream'] | undefined
+  let stream: ProtocolStream | undefined
   let conn: Connection | undefined
 
   const deadConnections: Connection[] = []
 
   for (const existingConnection of existingConnections) {
     try {
-      stream = (await timeout(PROTOCOL_SELECT_TIMEOUT, () => existingConnection.newStream(protocol)))?.stream
+      stream = await timeout(PROTOCOL_SELECT_TIMEOUT, () => existingConnection.newStream(protocols))
     } catch (err) {}
 
     if (stream == undefined) {
@@ -115,7 +117,7 @@ export async function tryExistingConnections(
   }
 
   if (stream != undefined && conn != undefined) {
-    return { conn, stream, protocol }
+    return { conn, ...stream }
   }
 }
 
@@ -123,13 +125,13 @@ export async function tryExistingConnections(
  * Performs a dial attempt and handles possible errors.
  * @param components Libp2p components
  * @param destination which peer to dial
- * @param protocol which protocol to use
+ * @param protocols which protocols to use
  * @param opts timeout options
  */
 async function establishNewConnection(
   components: Components,
   destination: PeerId | Multiaddr,
-  protocol: string,
+  protocols: string | string[],
   opts: {
     signal: AbortSignal
   }
@@ -165,15 +167,17 @@ async function establishNewConnection(
 
   log(`Connection ${destination.toString()} established !`)
 
-  const stream = (await timeout(10000, () => (conn as Connection).newStream(protocol)))?.stream
+  const stream: ProtocolStream | undefined = await timeout(10000, () => (conn as Connection).newStream(protocols))
 
   opts.signal?.removeEventListener('abort', onAbort)
 
   // Libp2p's return types tend to change every now and then
-  if (stream != null && aborted) {
+  if (stream && stream != null && aborted) {
     log(`ending obsolete write stream after ${Date.now() - start} ms`)
     try {
-      stream.sink((async function* () {})()).catch((err: any) => error(`Error while ending obsolete write stream`, err))
+      stream.stream
+        .sink((async function* () {})())
+        .catch((err: any) => error(`Error while ending obsolete write stream`, err))
     } catch (err) {
       error(`Error while ending obsolete write stream`, err)
     }
@@ -186,8 +190,7 @@ async function establishNewConnection(
 
   return {
     conn,
-    stream,
-    protocol
+    ...stream
   }
 }
 
@@ -237,8 +240,6 @@ async function queryDHT(components: Components, destination: PeerId): Promise<Pe
   return relayers
 }
 
-const CODE_P2P = protocols('p2p').code
-
 /**
  * Runs through the dial strategy and handles possible errors
  *
@@ -248,18 +249,18 @@ const CODE_P2P = protocols('p2p').code
  *
  * @param components components of libp2p instance
  * @param destination which peer to connect to
- * @param protocol which protocol to use
+ * @param protocols which protocols to use
  * @param opts timeout options
  * @returns
  */
 async function doDial(
   components: Components,
   destination: PeerId,
-  protocol: string,
+  protocols: string | string[],
   opts: Required<TimeoutOpts>
 ): Promise<DialResponse> {
   // First let's try already existing connections
-  let struct = await tryExistingConnections(components, destination, protocol)
+  let struct = await tryExistingConnections(components, destination, protocols)
 
   if (struct) {
     log(`Successfully reached ${destination.toString()} via existing connection !`)
@@ -274,7 +275,7 @@ async function doDial(
     for (const address of knownAddressesForPeer) {
       log(`- ${address.multiaddr.toString()}`)
     }
-    struct = await establishNewConnection(components, destination, protocol, opts)
+    struct = await establishNewConnection(components, destination, protocols, opts)
     if (struct) {
       log(`Successfully reached ${destination.toString()} via already known addresses !`)
       return { status: DialStatus.SUCCESS, resp: struct }
@@ -343,7 +344,7 @@ async function doDial(
 
     log(`Trying to reach ${destination.toString()} via circuit ${circuitAddress}...`)
 
-    relayStruct = await establishNewConnection(components, circuitAddress, protocol, {
+    relayStruct = await establishNewConnection(components, circuitAddress, protocols, {
       ...opts,
       signal: undefined
     })
@@ -364,17 +365,17 @@ async function doDial(
  * Contains a baseline protection against dialing same addresses twice.
  * @param components components of a libp2p instance
  * @param destination PeerId of the destination
- * @param protocol protocols to use
+ * @param protocols protocols to use
  * @param opts
  */
 export async function dial(
   components: Components,
   destination: PeerId,
-  protocol: string,
+  protocols: string | string[],
   opts?: TimeoutOpts
 ): Promise<DialResponse> {
   return abortableTimeout(
-    (timeoutOpts: Required<TimeoutOpts>) => doDial(components, destination, protocol, timeoutOpts),
+    (timeoutOpts: Required<TimeoutOpts>) => doDial(components, destination, protocols, timeoutOpts),
     { status: DialStatus.ABORTED },
     { status: DialStatus.TIMEOUT },
     {

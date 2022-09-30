@@ -32,6 +32,11 @@ build-yarn: ## build yarn packages
 build-yarn: build-solidity-types build-cargo
 	npx tsc --build tsconfig.build.json
 
+.PHONY: build-yarn-watch
+build-yarn-watch: ## build yarn packages (in watch mode)
+build-yarn-watch: build-solidity-types build-cargo
+	npx tsc --build tsconfig.build.json -w
+
 .PHONY: build-cargo
 build-cargo: ## build cargo packages and create boilerplate JS code
 	cargo build --release --target wasm32-unknown-unknown
@@ -113,7 +118,7 @@ endif
    --amount 1000000000000000000000 \
    --recipient $(recipient) \
    --privatekey "$(PRIVATE_KEY)"
-   
+
 .PHONY: request-nrnft
 request-nrnft: ensure-environment-is-set
 request-nrnft: ## Request one HoprBoost Network_registry NFT for the recipient given it has none and hasn't staked Network_registry NFT
@@ -311,9 +316,6 @@ endif
 register-node-with-nft: ensure-environment-is-set
 ifeq ($(endpoint),)
 	echo "parameter <endpoint> is default to localhost:3001" >&2
-endif
-ifeq ($(api_token),)
-	echo "parameter <api_token> missing" >&2 && exit 1
 endif
 ifeq ($(api_token),)
 	echo "parameter <api_token> missing" >&2 && exit 1
