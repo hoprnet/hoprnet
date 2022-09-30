@@ -1,11 +1,13 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { Signer } from 'ethers'
 
+export const ERC1820_DEPLOYER = '0xa990077c3205cbDf861e17Fa532eeB069cE9fF96'
+
 // Read https://eips.ethereum.org/EIPS/eip-1820 for more information as to how the ERC1820 registry is deployed to
 // ensure its address is the same on all chains.
-const main = async function (hre: HardhatRuntimeEnvironment, signer?: Signer) {
+const main = async function (hre: HardhatRuntimeEnvironment) {
   const { ethers, getNamedAccounts, environment } = hre
-  const deployer = signer || (await getNamedAccounts().then((o) => ethers.getSigner(o.deployer)))
+  const deployer = await getNamedAccounts().then((o) => ethers.getSigner(o.deployer))
 
   // check if it already exists
   if ((await ethers.provider.getCode(ERC1820_REGISTRY_ADDRESS)).length > '0x'.length) {
@@ -15,10 +17,19 @@ const main = async function (hre: HardhatRuntimeEnvironment, signer?: Signer) {
 
   // 0.08 ether is needed to deploy the registry, and those funds need to be transferred to the account that will deploy
   // the contract.
-  const fundDeployerTx = await deployer.sendTransaction({
-    to: ERC1820_DEPLOYER,
-    value: ethers.utils.parseEther('0.08')
-  })
+  const deployerBalance = await deployer.getBalance()
+  const registryDeployerBalance = await ethers.provider.getBalance(ERC1820_DEPLOYER)
+  if (registryDeployerBalance.lt(1)) {
+    console.log(`Fund ERC1820 registry deployer with required fees because it only has ${registryDeployerBalance.toNumber()}`)
+    if (deployerBalance.lt(1)) {
+      console.log(`Deployer is missing funds, has only ${deployerBalance.toNumber()}`)
+      throw new Error('deployer is missing funds')
+    }
+    const fundDeployerTx = await deployer.sendTransaction({
+      to: ERC1820_DEPLOYER,
+      value: ethers.utils.parseEther('0.08')
+    })
+  }
 
   // don't wait when using local hardhat because its using auto-mine
   if (!environment.match('hardhat')) {
@@ -26,6 +37,7 @@ const main = async function (hre: HardhatRuntimeEnvironment, signer?: Signer) {
   }
 
   // deploy
+  console.log('Deploy ERC1820 registry using separate deployer account')
   const deployTx = await ethers.provider.sendTransaction(ERC1820_REGISTRY_DEPLOY_TX)
 
   // don't wait when using local hardhat because its using auto-mine
@@ -39,8 +51,6 @@ const main = async function (hre: HardhatRuntimeEnvironment, signer?: Signer) {
 main.dependencies = ['preDeploy']
 
 export default main
-
-export const ERC1820_DEPLOYER = '0xa990077c3205cbDf861e17Fa532eeB069cE9fF96'
 
 export const ERC1820_REGISTRY_ABI = [
   {

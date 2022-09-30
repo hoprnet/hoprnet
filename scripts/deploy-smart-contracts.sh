@@ -80,25 +80,16 @@ for git_ref in $(cat "${release_config}" | jq -r "to_entries[] | .value.git_ref"
       stake_contract_address="$(cat "${deployments_path}/HoprStake.json" | jq -r ".address")"
       network_registry_proxy_contract_address="$(cat "${deployments_path}/HoprNetworkRegistryProxy.json" | jq -r ".address")"
 
-      cat "${protocol_config}" | jq ".environments.\"${environment_id}\".token_contract_address = \"${token_contract_address}\"" > "${protocol_config}.new"
-      mv "${protocol_config}.new" "${protocol_config}"
-
-      cat "${protocol_config}" | jq ".environments.\"${environment_id}\".channels_contract_address = \"${channels_contract_address}\"" > "${protocol_config}.new"
-      mv "${protocol_config}.new" "${protocol_config}"
-
-      cat "${protocol_config}" | jq ".environments.\"${environment_id}\".network_registry_contract_address = \"${network_registry_contract_address}\"" > "${protocol_config}.new"
-      mv "${protocol_config}.new" "${protocol_config}"
-
-      cat "${protocol_config}" | jq ".environments.\"${environment_id}\".xhopr_contract_address = \"${xhopr_contract_address}\"" > "${protocol_config}.new"
-      mv "${protocol_config}.new" "${protocol_config}"
-
-      cat "${protocol_config}" | jq ".environments.\"${environment_id}\".boost_contract_address = \"${boost_contract_address}\"" > "${protocol_config}.new"
-      mv "${protocol_config}.new" "${protocol_config}"
-
-      cat "${protocol_config}" | jq ".environments.\"${environment_id}\".stake_contract_address = \"${stake_contract_address}\"" > "${protocol_config}.new"
-      mv "${protocol_config}.new" "${protocol_config}"
-
-      cat "${protocol_config}" | jq ".environments.\"${environment_id}\".network_registry_proxy_contract_address = \"${network_registry_proxy_contract_address}\"" > "${protocol_config}.new"
+      # add new contract address to protocol_config config file
+      cat "${protocol_config}" | \
+        jq ".environments.\"${environment_id}\".token_contract_address = \"${token_contract_address}\"" | \
+        jq ".environments.\"${environment_id}\".channels_contract_address = \"${channels_contract_address}\"" | \
+        jq ".environments.\"${environment_id}\".network_registry_contract_address = \"${network_registry_contract_address}\"" | \
+        jq ".environments.\"${environment_id}\".xhopr_contract_address = \"${xhopr_contract_address}\"" | \
+        jq ".environments.\"${environment_id}\".boost_contract_address = \"${boost_contract_address}\"" | \
+        jq ".environments.\"${environment_id}\".stake_contract_address = \"${stake_contract_address}\"" | \
+        jq ".environments.\"${environment_id}\".network_registry_proxy_contract_address = \"${network_registry_proxy_contract_address}\"" \
+        > "${protocol_config}.new"
       mv "${protocol_config}.new" "${protocol_config}"
 
       log "contract addresses are updated in protocol configuration"
