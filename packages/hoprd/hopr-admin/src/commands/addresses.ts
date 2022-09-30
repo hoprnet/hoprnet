@@ -31,6 +31,8 @@ export default class Addresses extends Command {
     const [error, use, type] = this.assertUsage(query) as [string | undefined, string, HoprOrNative]
     if (error) return log(error)
 
+    const response = await this.api.getAddresses()
+
     if (!response.ok) {
       return log(
         await this.failedApiCall(response, 'fetch addresses', {

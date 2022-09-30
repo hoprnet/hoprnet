@@ -16,7 +16,6 @@ contract HoprDummyProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Ow
 
   event AccountRegistered(address indexed account);
   event AccountDeregistered(address indexed account);
-  bool public isAllAllowed;
 
   event AllowAllAccountsEligible(bool isAllowed);
 

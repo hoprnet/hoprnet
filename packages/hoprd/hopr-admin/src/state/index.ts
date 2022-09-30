@@ -57,14 +57,6 @@ const useAppState = (onLog: (log: Log) => any) => {
     })
   }
 
-  /**
-   * Connection status of the app.
-   * Takes into account all WS connections.
-   */
-  const status = useMemo<'DISCONNECTED' | 'CONNECTED'>(() => {
-    return streamWS.state.status
-  }, [streamWS.state.status])
-
   return {
     state,
     api,
