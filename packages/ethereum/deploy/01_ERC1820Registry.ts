@@ -20,7 +20,9 @@ const main = async function (hre: HardhatRuntimeEnvironment) {
   const deployerBalance = await deployer.getBalance()
   const registryDeployerBalance = await ethers.provider.getBalance(ERC1820_DEPLOYER)
   if (registryDeployerBalance.lt(1)) {
-    console.log(`Fund ERC1820 registry deployer with required fees because it only has ${registryDeployerBalance.toNumber()}`)
+    console.log(
+      `Fund ERC1820 registry deployer with required fees because it only has ${registryDeployerBalance.toNumber()}`
+    )
     if (deployerBalance.lt(1)) {
       console.log(`Deployer is missing funds, has only ${deployerBalance.toNumber()}`)
       throw new Error('deployer is missing funds')
