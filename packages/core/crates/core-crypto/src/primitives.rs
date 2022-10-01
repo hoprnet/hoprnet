@@ -1,6 +1,6 @@
 use blake2::Blake2s256;
 use chacha20::ChaCha20;
-use chacha20::cipher::{IvSizeUser, StreamCipher};
+use chacha20::cipher::{IvSizeUser, KeySizeUser, StreamCipher};
 use hmac::{Mac, SimpleHmac};
 use chacha20::cipher::KeyIvInit;
 use digest::FixedOutputReset;
