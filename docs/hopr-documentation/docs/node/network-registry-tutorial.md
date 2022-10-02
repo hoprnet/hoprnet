@@ -156,9 +156,7 @@ Participants of the Monte Rosa release will be rewarded depending on their uptim
 
 These five nodes will ping each node on the network registry at randomised intervals throughout the day and record whether or not the ping was received and its latency if received. This is publicly viewable at [network.hoprnet.org](https://network.hoprnet.org/).
 
-**Note:** Your node will not be visible until it has been pinged. This can take up to two hours after you have opened your first payment channel. You should go through the [hopr-admin tutorial](using-hopr-admin) to open a payment channel and test the new release. Don't worry too much if your node is not immediately visible on the dashboard.
-
-Once your node is pinged, you can use the [dashboard](https://network.hoprnet.org/) to search your peerID (or any peerID on the network) and view its availability, average latency, and total pings received. HOPR will use these metrics to give each node a score, and at the end of the initial release, rewards will be distributed as follows:
+You can use this site to search your peerID (or any peerID on the network) and view its availability, average latency, and total pings received. HOPR will use these metrics to give each node a score, and at the end of the initial release, rewards will be distributed as follows:
 
 - Top 25% receive a diamond NFT
 - 25-50% receive a gold NFT
