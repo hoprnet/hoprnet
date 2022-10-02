@@ -7,7 +7,7 @@ title: Network Registry
 
 The Network Registry is a list of nodes allowed to interact with others on the network. This is a utility used by HOPR to scale and test the network at a controlled pace.
 
-This restriction on the access guarded by the "Network Registry" is only enabled in the staging or production environment by default. If you run a cluster of HOPR nodes locally in the hardhat network, the "Network Registry" is not enabled.
+The Network Registry is only enabled in the staging or production environment by default. If you run a cluster of HOPR nodes locally in the hardhat network, the Network Registry is not enabled.
 
 ## Monte Rosa Release
 
@@ -155,9 +155,9 @@ The registration process is now complete! You can proceed to our [hopr-admin tut
 
 Participants of the Monte Rosa release will be rewarded depending on their uptime. The more active and available your node is, the higher you will score. Your uptime (and score) will be measured through pings sent out by five nodes controlled by HOPR.
 
-These five nodes will ping each node on the network registry at randomised intervals throughout the day and record whether or not the node received the ping and the latency of the ping. This is publicly viewable at [network.hoprnet.org](https://network.hoprnet.org/).
+These five nodes will ping each node on the network registry at randomised intervals throughout the day and record whether or not the ping was received and its latency if received. This is publicly viewable at [network.hoprnet.org](https://network.hoprnet.org/).
 
-You can use this site to search your peerID (or any peerID on the network) and view their availability, average latency and total pings received. These metrics will be used to give each node its score and at the end of the initial release, rewards will be distributed as follows:
+You can use this site to search your peerID (or any peerID on the network) and view its availability, average latency, and total pings received. HOPR will use these metrics to give each node a score, and at the end of the initial release, rewards will be distributed as follows:
 
 - Top 25% receive a diamond NFT
 - 25-50% receive a gold NFT
