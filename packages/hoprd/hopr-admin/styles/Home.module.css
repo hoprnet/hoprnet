@@ -19,6 +19,7 @@
   justify-content: space-around;
   align-items: center;
 }
+
 .peerIcon {
   display: block;
   padding: 0.1rem;
@@ -26,6 +27,12 @@
 
 .cogwheelIcon:hover {
   cursor: pointer;
+}
+
+.healtStatusIndicator {
+  font-size: 16px;
+  margin-left: 16px;
+  vertical-align: middle;
 }
 
 .configuration {
