@@ -2,7 +2,6 @@
 id: network-registry-tutorial
 title: Network Registry
 ---
-
 ## What is the Network Registry?
 
 The Network Registry is a list of nodes allowed to interact with others on the network. This is a utility used by HOPR to scale and test the network at a controlled pace.
@@ -11,7 +10,7 @@ The Network Registry is only enabled in the staging or production environment by
 
 ## Monte Rosa Release
 
-The Network Registry is being used for the Monte Rosa release, so please make sure you are eligible and have been registered before trying to use this environment. To add your node to the registry, you must first register your interest to participate in the release by completing [this form.](https://docs.google.com/forms/d/1Vl5tD0Fy0Vrm3oxxjGepVAiq-HQU3kWDJEuk35jpjeY/edit)
+The Network Registry is being used for the Monte Rosa release, so please make sure you are eligible and have been registered before trying to use this environment. To add your node to the registry, you must first register your interest to participate in the release by completing [this form.](https://forms.gle/jNWyWnKf5Ja1b1qn7)
 
 The staking address you provide on this form will be the primary indicator of your eligibility to be added to the registry.
 
@@ -87,6 +86,8 @@ The `API Token` is whatever you set your security token as in the installation p
 
 At this point, you should have the peerID of the node you want to register copied and your network registry NFT staked. Keep the admin interface open. You may need it to confirm your registration later.
 
+**Note:** A community NFT will only give you access to run a single node for the initial release. Although, it is possible to de-register a node to register a different one (explained at the end of step 3 below).
+
 ### Step 3: Registering your peerID
 
 (**1**) Go to [the network registry smart contract on blockscout](https://blockscout.com/xdai/mainnet/address/0x819E6a81e1e3f96CF1ac9200477C2d09c676959D/write-contract#address-tabs)
@@ -115,6 +116,14 @@ If it fails, make sure you:
 
 If all of the above is true and the transaction still fails, message us on [telegram](https://t.me/hoprnet), and a member of our team will assist you.
 
+#### De-registering your peerID
+
+You may want to de-register your peerID to use a different node since each community NFT currently only allows access to a single node.
+
+You can do this using the selfDeregister function under ['Write Contract'.](https://blockscout.com/xdai/mainnet/address/0x819E6a81e1e3f96CF1ac9200477C2d09c676959D/write-contract#address-tabs) Follow the same steps as when registering your node. Enter the peerID of the node you wish to de-register whilst having your wallet connected. The connected wallet must be the same as the one used to stake your NFT.
+
+Then, follow step 3 above to register the node you want to use.
+
 ### Step 4: Confirm your registration
 
 Once the transaction has successfully been completed, you can use the same smart contract to confirm your registration.
@@ -133,11 +142,13 @@ To check if you have been registered:
 
 (**3**) Enter your peerID into the text field and click **Query**.
 
-(**4**) You should recieve the text output: `(bool) : true` if your node has been registered.
+(**4**) If your node has been registered, you should receive the text output: `(bool) : true`.
 
 (**5**) If it returns false, wait a few minutes and try again.
 
 The registration process is now complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).
+
+**Note:** Opening a single payment channel massively increases your visibility to the nodes HOPR will use to ping and measure your uptime. You can read more about this below under Monte Rosa rewards, but we recommend completing the [tutorial](using-hopr-admin) to familiarise yourself with payment channels.
 
 #### Alternative method: Using hopr-admin
 
@@ -154,6 +165,23 @@ The registration process is now complete! You can proceed to our [hopr-admin tut
 ## Monte Rosa rewards
 
 Participants of the Monte Rosa release will be rewarded depending on their uptime. The more active and available your node is, the higher you will score. Your uptime (and score) will be measured through pings sent out by five nodes controlled by HOPR.
+
+To become visible to these nodes, you should:
+
+- Open a payment channel with any node on the network
+- Ping each of the HOPR-controlled nodes
+
+If you are unfamiliar with HOPR commands, start by completing the [hopr-admin tutorial.](using-hopr-admin)
+
+Nodes to ping:
+
+```bash
+16Uiu2HAmDBEQyPQbSvdUuAgm48evrjkVpbhibFCRCLxHXFtgixop
+16Uiu2HAm3dq3EBLzPGWS5D1e7jweQ8fwyMvTb3riq6xDcQbCBtwd
+16Uiu2HAmMz3sSsFc9mhycdAcuB6QHa3ybPdHuvZctbECUc1aCEhr
+16Uiu2HAm2Jd8uipA1QmUUDroY8EdPtRpn3JGuQ7yxCLnat1Sqm4L
+16Uiu2HAm6wh6qjrkfbyhHzktFovC7wUNZVCnTrU2dQ7sc22FYrVW
+```
 
 These five nodes will ping each node on the network registry at randomised intervals throughout the day and record whether or not the ping was received and its latency if received. This is publicly viewable at [network.hoprnet.org](https://network.hoprnet.org/).
 

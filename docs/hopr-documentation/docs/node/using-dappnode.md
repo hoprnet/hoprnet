@@ -32,3 +32,20 @@ Your **security token** is set to `!5qxc9Lp1BE7IFQ-nrtttU`. You will need this t
 If you are in the process of registering your node on the network registry, please complete the process [here](./network-registry-tutorial.md) before continuing.
 
 Otherwise, the installation process is complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).
+
+## Collecting Logs
+
+If your node crashes, you will want to collect the logs and pass them on to our ambassadors on telegram or create an issue on GitHub. 
+
+To collect the logs:
+
+(**1**) Find HOPR in your packages and navigate to the backup section.
+
+![Dappnode Logs](./images/Dappnode-logs.png)
+
+(**2**) From there, all you have to do is click 'Download all'.
+
+Using the downlaoded file either:
+
+- Send it to an ambassador on our [telegram](https://t.me/hoprnet) for assistance. 
+- Or, create an issue using our bug template on [GitHub.](https://github.com/hoprnet/hoprnet/issues) 
