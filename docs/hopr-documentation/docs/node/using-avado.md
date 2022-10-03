@@ -30,3 +30,24 @@ Your **security token** is set to `!5qxc9Lp1BE7IFQ-nrtttU`. You will need this t
 If you are in the process of registering your node on the network registry, please complete the process [here](./network-registry-tutorial.md) before continuing.
 
 Otherwise, the installation process is complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).
+
+## Collecting Logs
+
+If your node crashes, you will want to collect the logs and pass them on to our ambassadors on telegram or create an issue on GitHub. 
+
+To collect the logs:
+
+(**1**) Locate your HOPR package and click on the manage icon.
+
+![Manage Avado](./images/avado-manage.png)
+
+(**2**) Scroll to the bottom to find your logs.
+
+![Avado Logs](./images/Avado-logs.png)
+
+(**3**) Enter 1500 into the `Lines` text field instead of 200 and turn `auto-refresh logs` off. Now you should be able to copy your logs easily.
+
+With your copied loges either:
+
+- Save them in a .txt file and send them to an ambassador on our [telegram](https://t.me/hoprnet) for assistance. 
+- Or, create an issue using our bug template on [GitHub.](https://github.com/hoprnet/hoprnet/issues) 
