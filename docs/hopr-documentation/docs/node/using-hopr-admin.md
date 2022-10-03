@@ -2,7 +2,6 @@
 id: using-hopr-admin
 title: How to use hopr-admin
 ---
-
 This is a guide on how to use `hopr-admin`. It is not exhaustive and is intended only as a brief overview of its functionality and use.
 
 :::caution Warning
@@ -623,15 +622,15 @@ You should have earned tickets if your node was used as an intermediary to relay
 
 Tickets are redeemed automatically, so the tickets which contain value will be converted to HOPR tokens and added to the balance of the node used for that relay. The rest are discarded with no trace left on the blockchain.
 
-If a channel exists in both directions between consecutive nodes on the relay, the ticket is redeemed into the following nodes channel instead of it's balance.
+If a channel exists in both directions between consecutive nodes on the relay, the ticket is redeemed into the following nodes channel instead of its balance.
 
-![tickets-channels](./images/tickets-channels-2.png)
+![tickets-channels](./images/tickets-channels-3.png)
 
-In the above example, you as the sender will create a ticket of value 0.02 HOPR to pay for the entire relay. Since no channel exists from Betty -> me the ticket is redeemed into Betty's node. Betty now generates a ticket of value 0.01 HOPR to pay for the remaining relay and since a channel does exist from Chāo -> Betty, the ticket is redeemed into this channel instead of Chāo's balance.
+In the above example, you, as the sender, will create two tickets of value 0.02 HOPR to pay for the entire relay. Since no channel exists from Betty -> me, the tickets are redeemed into Betty's node. Betty now generates a ticket of value 0.01 HOPR to pay for the remaining relay, and since a channel does exist from Chāo -> Betty, the ticket is redeemed into this channel instead of Chāo's balance.
 
 Chāo then sends the message to Zoë and does not generate a ticket for the last HOP of the relay.
 
-By redeeming tickets into channels nodes are keeping healthy connections funded. In the long run this means your node will be more active on the network earning more HOPR!
+By redeeming tickets into channels, nodes are keeping healthy connections funded. In the long run, this means your node will be more active on the network earning more HOPR!
 
 When channels are closed, all staked tokens are added to your balance and from there can be withdrawn to an external wallet.
 
