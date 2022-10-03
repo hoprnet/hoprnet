@@ -14,7 +14,7 @@ Please withdraw all your funds and delete the old package before installing a ne
 (**1**) Open the DAppStore using the sidebar to the left and enter the following hash into the search bar:
 
 ```
-/ipfs/QmPhSZTZbM6kd9VizvZpKDN3fQe5bqvCDooCBPYEUXdTcy
+/ipfs/QmaGNSnRHduxb98FzZULnN9cuQTChybAUXdTw6Pza1b958
 ```
 
 ![DappStore](./images/DappStore-NR.png)

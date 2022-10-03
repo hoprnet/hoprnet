@@ -148,7 +148,7 @@ To check if you have been registered:
 
 The registration process is now complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).
 
-**Note:** Opening a single payment channel massively increases your visibility to the nodes HOPR will use to ping and measure your uptime. You can read more about this below under Monte Rosa rewards, but we recommend completing the [tutorial](using-hopr-admin) to familiarise yourself with payment channels.
+**Note:** Your node must have at least one payment channel open to be eligible for rewards. You can read more about this below under Monte Rosa rewards, but we recommend completing the [tutorial](using-hopr-admin) to familiarise yourself with payment channels.
 
 #### Alternative method: Using hopr-admin
 
