@@ -126,7 +126,7 @@ describe('test addr filtering', function () {
 
     assert(filter_no_local.filter(new Multiaddr(`/ip4/127.0.0.1/tcp/456`)) == false, 'Refuse dialing localhost')
 
-    assert(filter.filter(new Multiaddr(`/ip4/127.0.0.1/tcp/456/p2p`)) == true, 'Allow dialing localhost')
+    assert(filter.filter(new Multiaddr(`/ip4/127.0.0.1/tcp/456`)) == true, 'Allow dialing localhost')
 
     assert(filter_no_local.filter(new Multiaddr(`/ip4/10.0.0.1/tcp/456`)) == false, 'Refuse dialing private address')
 
@@ -193,13 +193,15 @@ describe('test addr filtering', function () {
   })
 
   it('self-dial', function () {
-    filter.setAddrs([new Multiaddr(`/ip4/1.1.1.1/tcp/123`)], [new Multiaddr(`/ip4/0.0.0.0/tcp/0`)])
+    filter.setAddrs(
+      [new Multiaddr(`/ip4/1.1.1.1/tcp/123`), new Multiaddr(`/ip4/127.0.0.1/tcp/1`)],
+      [new Multiaddr(`/ip4/0.0.0.0/tcp/0`)]
+    )
 
     assert(filter.addrsSet)
 
     assert(filter.filter(new Multiaddr(`/ip4/127.0.0.1/tcp/1`)) == false)
 
-    assert(filter.filter(new Multiaddr(`/p2p/${secondPeer.toString()}/p2p-circuit`)) == false)
     assert(filter.filter(new Multiaddr(`/p2p/${firstPeer.toString()}/p2p-circuit`)) == false)
   })
 

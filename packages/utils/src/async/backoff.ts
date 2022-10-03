@@ -106,7 +106,9 @@ export async function retryWithBackoffThenThrow<T>(
       log(`failed, attempting again in ${delay} (${err})`)
     }
 
-    await setTimeout(delay)
+    await setTimeout(delay, {
+      ref: false
+    })
 
     // Give other tasks CPU time to happen
     // Push next loop iteration to end of next event loop iteration
