@@ -77,7 +77,7 @@ If you are using an Avado or Dappnode then the endpoints are `http://hopr.my.ava
 
 The `API Token` is whatever you set your security token as in the installation process.
 
-![NR peerID](./images/NR-admin-peerID.png)
+![NR peerID](./images/NR-peerID-2.png)
 
 (**3**) From the admin interface, you should be able to see the peerID labelled as node address. Click on this contracted 5-letter address to expand it to its full length and copy it. The address should look similar to this: `16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV`.
 
