@@ -2,14 +2,13 @@
 id: using-avado
 title: Using an Avado Node
 ---
-
 To set up your AVADO Node, follow the instructions that came with the box. If you have a HOPR PC Node, it will come with HOPR pre-installed. All you have to do is download the HOPR client to start interacting with your node!
 
 :::caution Warning
 Please withdraw all your funds and delete the old package before installing a new one.
 :::
 
-## Installing the HOPR client
+## Installing the HOPR Client
 
 While connected to your AVADO's network or via a VPN, go to the following [link](http://my.ava.do/#/installer/%2Fipfs%2FQmPhSZTZbM6kd9VizvZpKDN3fQe5bqvCDooCBPYEUXdTcy). Just click the install button and wait until the download completes.
 
@@ -33,7 +32,7 @@ Otherwise, the installation process is complete! You can proceed to our [hopr-ad
 
 ## Collecting Logs
 
-If your node crashes, you will want to collect the logs and pass them on to our ambassadors on telegram or create an issue on GitHub. 
+If your node crashes, you will want to collect the logs and pass them on to our ambassadors on telegram or create an issue on GitHub.
 
 To collect the logs:
 
@@ -49,5 +48,35 @@ To collect the logs:
 
 With your copied loges either:
 
-- Save them in a .txt file and send them to an ambassador on our [telegram](https://t.me/hoprnet) for assistance. 
-- Or, create an issue using our bug template on [GitHub.](https://github.com/hoprnet/hoprnet/issues) 
+- Save them in a .txt file and send them to an ambassador on our [telegram](https://t.me/hoprnet) for assistance.
+- Or, create an issue using our bug template on [GitHub.](https://github.com/hoprnet/hoprnet/issues)
+
+## Using a Custom RPC Endpoint
+
+You can set your own RPC endpoint for HOPR to use. Ideally, you would install an ETH client on your Avado and use its local provider. A local provider helps increase decentralisation and is generally good practice, but you can also use any RPC provider of your choice.
+
+### Finding your local endpoint
+
+If you have already installed an ETH client, you can find its RPC endpoint on the client's settings page.
+
+![ETH client settings](./images/RPC-endpoint-avado.png)
+
+The image above shows the RPC for the GETH client: `http://ethchain-geth.my.ava.do:8545`. Your endpoint will be different depending on the client you have installed. Otherwise, you can also use any non-local RPC provider such as [ankr.](https://www.ankr.com/)
+
+### Changing your RPC endpoint
+
+To change your RPC endpoint:
+
+(**1**) Locate your HOPR package and click on the manage icon.
+
+![Manage Avado](./images/avado-manage.png)
+
+(**2**) Under `Environment Variables`, you should find the variable `HOPRD_PROVIDER` along with an editable text field to its right.
+
+![Environment variables](./images/HOPR-provider-Avado.png)
+
+(**3**) The default endpoint is `https://provider-proxy.hoprnet.workers.dev/dai_mainnet`. Replace this with your own, e.g. `http://ethchain-geth.my.ava.do:8545` in my case.
+
+(**4**) Click 'Update environment variables' and wait for your node to restart.
+
+All done! Your Avado node will now use your specified RPC provider.
