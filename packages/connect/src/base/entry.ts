@@ -757,13 +757,13 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    *
    * @returns array of arguments to probe nodes
    */
-  private getAddrsToContact(): Parameters<EntryNodes['connectToRelay']>[] {
+  private async getAddrsToContact(): Promise<Parameters<EntryNodes['connectToRelay']>[]> {
     const args: Parameters<EntryNodes['connectToRelay']>[] = []
 
     for (const nodeList of [this.uncheckedEntryNodes, this.availableEntryNodes, this.offlineEntryNodes]) {
       for (const node of nodeList) {
         // In case the addrs are not known to libp2p
-        this.getComponents().getPeerStore().addressBook.add(node.id, node.multiaddrs)
+        await this.getComponents().getPeerStore().addressBook.add(node.id, node.multiaddrs)
         for (const ma of node.multiaddrs) {
           args.push([node.id, ma])
         }
@@ -917,7 +917,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
   async updatePublicNodes(): Promise<void> {
     log(`Updating list of used relay nodes ...`)
 
-    const addrsToContact = this.getAddrsToContact()
+    const addrsToContact = await this.getAddrsToContact()
 
     const start = Date.now()
     const results = groupConnectionResults(

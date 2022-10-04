@@ -406,10 +406,7 @@ async function fetchCircuitAddressesAndDial(
  * 2. Check the DHT (if available) for additional addresses
  * 3. Try new addresses
  *
- * @param components components of libp2p inst      if (struct) {
-        log(`Successfully reached ${id.toString()} via already known addresses !`)
-        return { status: DialStatus.SUCCESS, resp: struct }
-      }ance
+ * @param components components of libp2p instance
  * @param destination which peer to connect to
  * @param protocols which protocol to use
  * @returns
