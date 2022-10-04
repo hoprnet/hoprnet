@@ -162,7 +162,7 @@ To collect the logs:
 docker container ls --all
 ```
 
-This will create a list of all your docker container similar to the one below:
+This will create a list of all your docker containers similar to the one below:
 
 ![Container ID logs](./images/container-ID-logs.png)
 
@@ -174,7 +174,7 @@ This will create a list of all your docker container similar to the one below:
 docker logs -t <CONTAINER_ID>
 ```
 
-This should output your logs, copy them and:
+This should output your logs, copy them and either:
 
 - Save them in a .txt file and send them to an ambassador on our [telegram](https://t.me/hoprnet) for assistance. 
 - Or, create an issue using our bug template on [GitHub.](https://github.com/hoprnet/hoprnet/issues) 
