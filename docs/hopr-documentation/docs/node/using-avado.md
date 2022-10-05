@@ -61,7 +61,7 @@ If you have already installed an ETH client, you can find its RPC endpoint on th
 
 ![ETH client settings](./images/RPC-endpoint-avado.png)
 
-The image above shows the RPC for the GETH client: `http://ethchain-geth.my.ava.do:8545`. Your endpoint will be different depending on the client you have installed. Otherwise, you can also use any non-local RPC provider such as [ankr.](https://www.ankr.com/)
+The image above shows the RPC for the GETH client: `http://ethchain-geth.my.ava.do:8545`. Your endpoint will be different depending on the client you have installed. Otherwise, you can use any non-local RPC provider such as [ankr.](https://www.ankr.com/)
 
 ### Changing your RPC endpoint
 
@@ -79,4 +79,4 @@ To change your RPC endpoint:
 
 (**4**) Click 'Update environment variables' and wait for your node to restart.
 
-All done! Your Avado node will now use your specified RPC provider.
+All done! Your Avado node will now use your specified RPC endpoint.
