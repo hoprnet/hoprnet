@@ -33,43 +33,46 @@ describe('test relay handshake', function () {
     const [relayToInitiator, initiatorToRelay] = duplexPair<StreamType>()
 
     const initiatorReceived = defer<void>()
-    const destinationEntry = getPeerStoreEntry('/ip4/127.0.0.1/tcp/1', destination)
+    const relayEntry = getPeerStoreEntry('/ip4/127.0.0.1/tcp/1', destination)
+    const destinationEntry = getPeerStoreEntry('/ip4/127.0.0.1/tcp/2', destination)
 
-    network.listen(destinationEntry.multiaddrs[0], [
-      [
-        DELIVERY_PROTOCOLS(),
-        () => {
-          console.log(`fooo`)
-          return {
-            source: (async function* () {
-              yield Uint8Array.from([RelayHandshakeMessage.OK])
-            })() as AsyncIterable<Uint8Array>,
-            sink: async function (source: Stream['source']) {
-              for await (const msg of source) {
-                if (u8aEquals(msg.slice(), unmarshalPublicKey(initiator.publicKey as Uint8Array).marshal())) {
-                  initiatorReceived.resolve()
-                }
+    const relayComponents = await createFakeComponents(relay, network, {
+      listeningAddrs: relayEntry.multiaddrs
+    })
+
+    const destinationComponents = await createFakeComponents(destination, network, {
+      listeningAddrs: destinationEntry.multiaddrs,
+      protocols: [
+        [
+          DELIVERY_PROTOCOLS(),
+          async ({ stream }) => {
+            stream.sink(
+              (async function* () {
+                console.log(`sent`)
+                yield Uint8Array.from([RelayHandshakeMessage.OK])
+              })()
+            )
+            for await (const msg of stream.source) {
+              if (u8aEquals(msg.slice(), unmarshalPublicKey(initiator.publicKey as Uint8Array).marshal())) {
+                initiatorReceived.resolve()
               }
             }
           }
-        }
+        ]
       ]
-    ])
-
-    const components = createFakeComponents(relay, {
-      outerDial: network.connect
     })
 
-    await components.getPeerStore().addressBook.add(destinationEntry.id, destinationEntry.multiaddrs)
+    await relayComponents
+      .getPeerStore()
+      .addressBook.add(destinationComponents.getPeerId(), destinationComponents.getTransportManager().getAddrs())
 
     const initiatorHandshake = new RelayHandshake(relayToInitiator)
     const relayHandshake = new RelayHandshake(initiatorToRelay)
 
     initiatorHandshake.initiate(relay, destination)
 
-    await relayHandshake.negotiate(initiator, components, getRelayState())
+    await relayHandshake.negotiate(initiator, relayComponents, getRelayState())
 
-    console.log(`after negotiate`)
     await initiatorReceived.promise
     network.stop()
   })
@@ -78,12 +81,24 @@ describe('test relay handshake', function () {
     const network = createFakeNetwork()
     const [destinationToRelay, relayToDestination] = duplexPair<StreamType>()
 
-    const destinationEntry = getPeerStoreEntry('/ip4/127.0.0.1/tcp/1', destination)
+    const relayEntry = getPeerStoreEntry('/ip4/127.0.0.1/tcp/1', destination)
+    const destinationEntry = getPeerStoreEntry('/ip4/127.0.0.1/tcp/2', destination)
 
-    network.listen(destinationEntry.multiaddrs[0], [[DELIVERY_PROTOCOLS(), () => destinationToRelay]])
+    const relayComponents = await createFakeComponents(relay, network, {
+      listeningAddrs: relayEntry.multiaddrs
+    })
 
-    const components = createFakeComponents(relay, {
-      outerDial: network.connect
+    const destinationComponents = await createFakeComponents(destination, network, {
+      listeningAddrs: destinationEntry.multiaddrs,
+      protocols: [
+        [
+          DELIVERY_PROTOCOLS(),
+          async ({ stream }) => {
+            stream.sink(destinationToRelay.source)
+            destinationToRelay.sink(stream.source)
+          }
+        ]
+      ]
     })
 
     const okReceived = defer<void>()
@@ -103,9 +118,11 @@ describe('test relay handshake', function () {
 
     const destinationHandshake = new RelayHandshake(relayToDestination).handle(relay)
 
-    await components.getPeerStore().addressBook.add(destinationEntry.id, destinationEntry.multiaddrs)
+    await relayComponents
+      .getPeerStore()
+      .addressBook.add(destinationComponents.getPeerId(), destinationComponents.getTransportManager().getAddrs())
 
-    const handshakePromise = relayHandshake.negotiate(initiator, components, getRelayState())
+    const handshakePromise = relayHandshake.negotiate(initiator, relayComponents, getRelayState())
 
     await Promise.all([handshakePromise, destinationHandshake])
 
@@ -117,22 +134,36 @@ describe('test relay handshake', function () {
     const [relayToInitiator, initiatorToRelay] = duplexPair<StreamType>()
     const [destinationToRelay, relayToDestination] = duplexPair<StreamType>()
 
-    const destinationEntry = getPeerStoreEntry('/ip4/127.0.0.1/tcp/1', destination)
+    const relayEntry = getPeerStoreEntry('/ip4/127.0.0.1/tcp/1', destination)
+    const destinationEntry = getPeerStoreEntry('/ip4/127.0.0.1/tcp/2', destination)
 
-    network.listen(destinationEntry.multiaddrs[0], [[DELIVERY_PROTOCOLS(), () => destinationToRelay]])
+    const relayComponents = await createFakeComponents(relay, network, {
+      listeningAddrs: relayEntry.multiaddrs
+    })
+
+    const destinationComponents = await createFakeComponents(destination, network, {
+      listeningAddrs: destinationEntry.multiaddrs,
+      protocols: [
+        [
+          DELIVERY_PROTOCOLS(),
+          async ({ stream }) => {
+            stream.sink(destinationToRelay.source)
+            destinationToRelay.sink(stream.source)
+          }
+        ]
+      ]
+    })
 
     const initiatorHandshake = new RelayHandshake(relayToInitiator)
     const relayHandshake = new RelayHandshake(initiatorToRelay)
 
     const destinationHandshake = new RelayHandshake(relayToDestination)
 
-    const components = createFakeComponents(relay, {
-      outerDial: network.connect
-    })
+    await relayComponents
+      .getPeerStore()
+      .addressBook.add(destinationComponents.getPeerId(), destinationComponents.getTransportManager().getAddrs())
 
-    await components.getPeerStore().addressBook.add(destinationEntry.id, destinationEntry.multiaddrs)
-
-    relayHandshake.negotiate(initiator, components, getRelayState(true))
+    relayHandshake.negotiate(initiator, relayComponents, getRelayState(true))
 
     const [initiatorResult, destinationResult] = await Promise.all([
       initiatorHandshake.initiate(relay, destination),

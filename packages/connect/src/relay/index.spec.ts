@@ -69,7 +69,7 @@ async function getPeer(
   return relay
 }
 
-describe.only('test relay', function () {
+describe('test relay', function () {
   it('connect to a relay, close the connection and reconnect', async function () {
     const network = createFakeNetwork()
 
@@ -111,7 +111,7 @@ describe.only('test relay', function () {
     network.stop()
   })
 
-  it.only('connect to a relay and reconnect', async function () {
+  it('connect to a relay and reconnect', async function () {
     const network = createFakeNetwork()
 
     const Alice = await getPeer(initiator, network, 1)

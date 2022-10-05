@@ -164,7 +164,7 @@ class RelayHandshake {
    * Negotiates between initiator and destination whether they can establish
    * a relayed connection.
    * @param source peerId of the initiator
-   * @param getStreamToCounterparty used to connect to counterparty
+   * @param components libp2p instance components
    * @param state.exists to check if relay state exists
    * @param state.isActive to check if existing relay state can be used
    * @param state.updateExisting to update existing connection with new stream if not active

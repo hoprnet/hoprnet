@@ -326,23 +326,15 @@ export function createFakeNetwork() {
     const emitter = new EventEmitter()
     network.on(connectEvent(ma), () => emitter.emit('connected'))
 
-    components.set(nodeComponents.getPeerId().toString(), nodeComponents)
+    components.set(addr.toString(), nodeComponents)
 
     return emitter
   }
 
   const connect = (self: PeerId, ma: Multiaddr, throwError: boolean = false) => {
-    let remotePeer: PeerId
-
-    if (isPeerId(ma)) {
-      remotePeer = ma
-    } else {
-      remotePeer = peerIdFromString((ma as Multiaddr).getPeerId() as string)
-    }
-
     network.emit(connectEvent(ma))
 
-    const remoteComponents = components.get(remotePeer.toString())
+    const remoteComponents = components.get(ma.toString())
 
     if (remoteComponents != undefined) {
       return createConnection(self, remoteComponents, throwError)
@@ -351,11 +343,11 @@ export function createFakeNetwork() {
     throw Error(`Cannot connect. Maybe not listening?`)
   }
 
-  const close = (ma: Multiaddr) => {
-    const peerId = ma.getPeerId() as string
-
+  const close = (ma: Multiaddr, emitEvent: boolean = true) => {
     components.delete(ma.toString())
-    network.emit(disconnectEvent(ma), ma)
+    if (emitEvent) {
+      network.emit(disconnectEvent(ma), ma)
+    }
   }
 
   return {
