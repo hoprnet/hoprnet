@@ -50,9 +50,6 @@ class Relay implements Initializable, ConnectInitializable, Startable {
   private _isStarted: boolean
 
   private _onReconnect: Relay['onReconnect'] | undefined
-  private _onDelivery: Relay['onDelivery'] | undefined
-  private _onRelay: Relay['onRelay'] | undefined
-  private _onCanRelay: Relay['onCanRelay'] | undefined
 
   private stopKeepAlive: (() => void) | undefined
   private connectedToRelays: Set<string>
@@ -117,17 +114,14 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     }
 
     this._onReconnect = this.onReconnect.bind(this)
-    this._onRelay = this.onRelay.bind(this)
-    this._onDelivery = this.onDelivery.bind(this)
-    this._onCanRelay = this.onCanRelay.bind(this)
 
     // Requires registrar to be started first
     const protocolsDelivery = DELIVERY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
     const protocolsRelay = RELAY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
     const protocolsCanRelay = CAN_RELAY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
-    await this.components.getRegistrar().handle(protocolsDelivery, this._onDelivery)
-    await this.components.getRegistrar().handle(protocolsRelay, this._onRelay)
-    await this.components.getRegistrar().handle(protocolsCanRelay, this._onCanRelay)
+    await this.components.getRegistrar().handle(protocolsDelivery, this.onDelivery.bind(this))
+    await this.components.getRegistrar().handle(protocolsRelay, this.onRelay.bind(this))
+    await this.components.getRegistrar().handle(protocolsCanRelay, this.onCanRelay.bind(this))
 
     // Periodic function that prints relay connections (and will also do pings in future)
     const periodicKeepAlive = async function (this: Relay) {
@@ -251,8 +245,6 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     if (!this.testingOptions.__noWebRTCUpgrade) {
       return new WebRTCConnection(conn, {
         __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade,
-        // libp2p interface type clash
-        upgrader: this.getComponents().getUpgrader() as any,
         ...opts
       })
     } else {
@@ -272,10 +264,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     )
 
     if (!this.testingOptions.__noWebRTCUpgrade) {
-      return new WebRTCConnection(conn, this.testingOptions, {
-        // libp2p interface type clash
-        upgrader: this.getComponents().getUpgrader() as any
-      })
+      return new WebRTCConnection(conn, this.testingOptions)
     } else {
       return conn
     }
@@ -392,7 +381,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
     let newConn: Connection
 
-    log(`Handling reconnection to ${counterparty.toString()}`)
+    log(`Handling reconnect attempt to ${counterparty.toString()}`)
 
     try {
       if (!this.testingOptions.__noWebRTCUpgrade) {

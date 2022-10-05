@@ -1,21 +1,84 @@
 import type { Connection } from '@libp2p/interface-connection'
 import type { Dialer, ConnectionManagerEvents } from '@libp2p/interface-connection-manager'
-import type { Components } from '@libp2p/interfaces/components'
+import type { Components, Initializable } from '@libp2p/interfaces/components'
 import type { AbortOptions } from '@libp2p/interfaces'
 import { type PeerId, isPeerId } from '@libp2p/interface-peer-id'
-
-import { CODE_P2P } from '../constants.js'
-
-import { EventEmitter } from 'events'
-
-import { Multiaddr } from '@multiformats/multiaddr'
-
+import { CustomEvent, EventEmitter as TypedEventEmitter } from '@libp2p/interfaces/events'
 import { peerIdFromString } from '@libp2p/peer-id'
 import type { PeerStore } from '@libp2p/interfaces/peer-store'
-import { CustomEvent, EventEmitter as TypedEventEmitter } from '@libp2p/interfaces/events'
-import type { Stream } from '../types.js'
+import { duplexPair } from 'it-pair/duplex'
 
-class MyConnectionManager extends TypedEventEmitter<ConnectionManagerEvents> {
+import { EventEmitter } from 'events'
+import { Multiaddr } from '@multiformats/multiaddr'
+
+import type { Stream } from '../types.js'
+import { CODE_P2P } from '../constants.js'
+import { StreamHandler } from '@libp2p/interfaces/registrar'
+import { MultiaddrConnection } from '@libp2p/interfaces/transport'
+
+/**
+ * Minimal TransportManager, used for unit testing
+ */
+class MyTransportManager implements Initializable {
+  private components: Components | undefined
+
+  private addrs: Set<string>
+
+  constructor(private network: ReturnType<typeof createFakeNetwork>) {
+    this.addrs = new Set<string>()
+  }
+
+  public init(components: Components) {
+    this.components = components
+  }
+
+  public getComponents() {
+    if (this.components == undefined) {
+      throw Error(`Components not set`)
+    }
+    return this.components
+  }
+
+  public async listen(addrs: Multiaddr[]) {
+    for (const addr of addrs) {
+      addr.decapsulateCode(CODE_P2P)
+      if (!this.addrs.has(addr.toString())) {
+        this.addrs.add(addr.toString())
+      }
+      this.network.listen(addr, this.getComponents())
+    }
+  }
+
+  public getAddrs(): Multiaddr[] {
+    return [...this.addrs].map((str) => new Multiaddr(str))
+  }
+}
+
+/**
+ * Minimal Registrar, used for unit testing
+ */
+class MyRegistrar {
+  handlers: Map<string, StreamHandler>
+
+  constructor() {
+    this.handlers = new Map<string, StreamHandler>()
+  }
+
+  public async handle(protocols: string | string[], handler: StreamHandler): Promise<void> {
+    for (const protocol of Array.isArray(protocols) ? protocols : [protocols]) {
+      this.handlers.set(protocol, handler)
+    }
+  }
+
+  public getHandler(protocol: string): StreamHandler {
+    return this.handlers.get(protocol) as StreamHandler
+  }
+}
+
+/**
+ * Minimal ConnectionManager used for unit testing
+ */
+class MyConnectionManager extends TypedEventEmitter<ConnectionManagerEvents> implements Initializable {
   dialer: Dialer
 
   connections: Map<string, Connection[]>
@@ -24,9 +87,9 @@ class MyConnectionManager extends TypedEventEmitter<ConnectionManagerEvents> {
 
   constructor(
     peerStore: PeerStore,
+    network: ReturnType<typeof createFakeNetwork>,
     connManagerOpts: {
-      outerDial?: (ma: Multiaddr, throwError?: boolean) => Connection
-      network?: EventEmitter
+      outerDial?: ReturnType<typeof createFakeNetwork>['connect']
       getStream?: (protocol?: string | string[]) => Stream
     } = {}
   ) {
@@ -36,9 +99,7 @@ class MyConnectionManager extends TypedEventEmitter<ConnectionManagerEvents> {
 
     this.dialer = {
       dial: async (peer: PeerId | Multiaddr, _opts: Parameters<Dialer['dial']>[1]) => {
-        if (connManagerOpts.outerDial == undefined) {
-          throw Error(`Network not connected`)
-        }
+        const dialMethod = connManagerOpts.outerDial ?? network.connect
 
         let conn: Connection | undefined
         let fullAddr: Multiaddr | undefined
@@ -56,7 +117,7 @@ class MyConnectionManager extends TypedEventEmitter<ConnectionManagerEvents> {
           for (const addr of addrs) {
             fullAddr = addr.multiaddr.decapsulateCode(CODE_P2P).encapsulate(`/p2p/${peer.toString()}`)
             try {
-              conn = connManagerOpts.outerDial(fullAddr) as any
+              conn = dialMethod(this.getComponents().getPeerId(), fullAddr) as any
             } catch (err) {
               // try next address
               continue
@@ -75,13 +136,13 @@ class MyConnectionManager extends TypedEventEmitter<ConnectionManagerEvents> {
           peerId = peerIdFromString(peer.getPeerId() as string)
           fullAddr = peer.decapsulateCode(CODE_P2P).encapsulate(`/p2p/${peer.toString()}`)
 
-          conn = connManagerOpts.outerDial(fullAddr)
+          conn = dialMethod(this.getComponents().getPeerId(), fullAddr)
         }
 
         if (conn != undefined) {
           this.connections.set(peer.toString(), (this.connections.get(peer.toString()) ?? []).concat([conn]))
 
-          connManagerOpts.network?.once(disconnectEvent(fullAddr as Multiaddr), () => this.onClose(peerId))
+          network.events.once(disconnectEvent(fullAddr as Multiaddr), () => this.onClose(peerId))
 
           return conn as any
         }
@@ -95,8 +156,19 @@ class MyConnectionManager extends TypedEventEmitter<ConnectionManagerEvents> {
     this.components = components
   }
 
-  public getConnections(_peer: PeerId | undefined, _options?: AbortOptions): Connection[] {
-    return []
+  public getConnections(peer: PeerId | undefined, _options?: AbortOptions): Connection[] {
+    if (peer == undefined) {
+      return [...this.connections.values()].flat(1)
+    } else {
+      return this.connections.get(peer.toString()) ?? []
+    }
+  }
+
+  public getComponents() {
+    if (this.components == undefined) {
+      throw Error(`Components not set`)
+    }
+    return this.components
   }
 
   private onClose(peer: PeerId) {
@@ -117,7 +189,11 @@ class MyConnectionManager extends TypedEventEmitter<ConnectionManagerEvents> {
   }
 }
 
-function fakePeerStore(): PeerStore {
+/**
+ * Implements a minimal, non-persistent PeerStore
+ * @returns mocked PeerStore
+ */
+function createFakePeerStore(): PeerStore {
   const addrs = new Map<string, Multiaddr[]>()
 
   return {
@@ -139,6 +215,29 @@ function fakePeerStore(): PeerStore {
   } as PeerStore
 }
 
+/**
+ * Implements a minimal Upgrader, bypassing any protocol uprades
+ * @param onInboundStream reply to inbound stream
+ * @returns
+ */
+function createFakeUpgrader(onInboundStream?: (stream: Stream) => Promise<void>): NonNullable<Components['upgrader']> {
+  return {
+    async upgradeInbound(maConn: MultiaddrConnection) {
+      maConn.timeline.upgraded = Date.now()
+
+      // @TODO enhance this
+      onInboundStream?.(maConn)
+
+      return maConn
+    },
+    async upgradeOutbound(maConn: MultiaddrConnection) {
+      maConn.timeline.upgraded = Date.now()
+
+      return maConn
+    }
+  }
+}
+
 export function connectEvent(addr: Multiaddr): string {
   return `connect:${addr.decapsulateCode(CODE_P2P).toString()}`
 }
@@ -147,19 +246,23 @@ export function disconnectEvent(addr: Multiaddr) {
   return `disconnect:${addr.decapsulateCode(CODE_P2P).toString()}`
 }
 
-function createConnection(
-  remotePeer: PeerId,
-  spokenProtocols: Map<string, () => Stream>,
-  throwError: boolean = false
-): Connection {
+/**
+ * Creates a connection that mimics libp2p's protocol selection
+ * @param self initiator of the connection
+ * @param remoteComponents libp2p instance of remote peer
+ * @param throwError if true, throw an error instead of returning a stream
+ * @returns
+ */
+function createConnection(self: PeerId, remoteComponents: Components, throwError: boolean = false): Connection {
   const conn = {
-    remotePeer,
+    remotePeer: remoteComponents.getPeerId(),
     _closed: false,
     close: async () => {
       // @ts-ignore
       conn._closed = true
     },
     stat: {
+      direction: 'outbound',
       timeline: {
         open: Date.now()
       }
@@ -170,11 +273,32 @@ function createConnection(
       }
 
       for (const protocol of protocols) {
-        const found = spokenProtocols.get(protocol)
-        if (found != undefined) {
+        const streamHandler = remoteComponents.getRegistrar().getHandler(protocol)
+        if (streamHandler != undefined) {
+          const duplex = duplexPair<Uint8Array>()
+
+          streamHandler({
+            stream: {
+              sink: duplex[1].sink,
+              source: duplex[1].source
+            } as any,
+            protocol,
+            connection: {
+              remotePeer: self,
+              stat: {
+                direction: 'inbound',
+                timeline: {
+                  open: Date.now()
+                }
+              }
+            } as any
+          })
           return {
             protocol,
-            stream: found()
+            stream: {
+              sink: duplex[0].sink,
+              source: duplex[0].source
+            }
           }
         }
       }
@@ -186,30 +310,28 @@ function createConnection(
   return conn as Connection
 }
 
+/**
+ * Creates a network that behaves similarly to a socket-based network
+ * @returns Event-based network implementation
+ */
 export function createFakeNetwork() {
   const network = new EventEmitter()
 
-  const protolHandlers = new Map<string, Map<string, () => Stream>>()
+  // Multiaddr (including PeerId) -> Components
+  let components: Map<string, Components> = new Map<string, Components>()
 
-  const listen = (addr: Multiaddr, protocols: Iterable<[string | string[], () => Stream]>) => {
+  const listen = (addr: Multiaddr, nodeComponents: Components) => {
+    const ma = addr.decapsulateCode(CODE_P2P).encapsulate(`/p2p/${nodeComponents.getPeerId().toString()}`)
+
     const emitter = new EventEmitter()
-    network.on(connectEvent(addr), () => emitter.emit('connected'))
+    network.on(connectEvent(ma), () => emitter.emit('connected'))
 
-    const peerId = addr.getPeerId() as string
-
-    const protocolMap = new Map<string, () => Stream>()
-    for (const [protocol, handler] of protocols) {
-      for (const individualProtocol of Array.isArray(protocol) ? protocol : [protocol]) {
-        protocolMap.set(individualProtocol, handler)
-      }
-    }
-
-    protolHandlers.set(peerId, protocolMap)
+    components.set(nodeComponents.getPeerId().toString(), nodeComponents)
 
     return emitter
   }
 
-  const connect = (ma: Multiaddr, throwError: boolean = false) => {
+  const connect = (self: PeerId, ma: Multiaddr, throwError: boolean = false) => {
     let remotePeer: PeerId
 
     if (isPeerId(ma)) {
@@ -219,10 +341,11 @@ export function createFakeNetwork() {
     }
 
     network.emit(connectEvent(ma))
-    const spokenProtocols = protolHandlers.get(remotePeer.toString())
 
-    if (spokenProtocols != undefined) {
-      return createConnection(remotePeer, spokenProtocols, throwError)
+    const remoteComponents = components.get(remotePeer.toString())
+
+    if (remoteComponents != undefined) {
+      return createConnection(self, remoteComponents, throwError)
     }
 
     throw Error(`Cannot connect. Maybe not listening?`)
@@ -231,7 +354,7 @@ export function createFakeNetwork() {
   const close = (ma: Multiaddr) => {
     const peerId = ma.getPeerId() as string
 
-    protolHandlers.delete(peerId)
+    components.delete(ma.toString())
     network.emit(disconnectEvent(ma), ma)
   }
 
@@ -244,28 +367,53 @@ export function createFakeNetwork() {
   }
 }
 
-export function createFakeComponents(
+/**
+ * Returns a minimal implementation of libp2p components
+ * @param peerId the components identity
+ * @param opts customizable dial behavior
+ * @returns
+ */
+export async function createFakeComponents(
   peerId: PeerId,
+  network: ReturnType<typeof createFakeNetwork>,
   opts: {
-    outerDial?: (ma: Multiaddr, throwError?: boolean) => Connection
-    network?: EventEmitter
-    defaultStream?: Stream
+    outerDial?: ReturnType<typeof createFakeNetwork>['connect']
+    protocols?: Iterable<[string | string[], StreamHandler]>
+    listeningAddrs?: Multiaddr[]
+    onIncomingStream?: (stream: Stream) => Promise<void>
   } = {}
 ) {
-  const peerStore = fakePeerStore()
+  const peerStore = createFakePeerStore()
 
-  const connectionManager = new MyConnectionManager(peerStore, opts) as NonNullable<Components['connectionManager']>
+  const registrar = new MyRegistrar() as NonNullable<Components['registrar']>
 
-  const getUpgrader = () =>
-    ({
-      upgradeInbound: (x: any) => x,
-      upgradeOutbound: (x: any) => x
-    } as Components['upgrader'])
+  const transportManager = new MyTransportManager(network) as NonNullable<Components['transportManager']>
 
-  return {
-    getPeerId: () => peerId,
+  const connectionManager = new MyConnectionManager(peerStore, network, opts) as NonNullable<
+    Components['connectionManager']
+  >
+
+  const upgrader = createFakeUpgrader(opts.onIncomingStream)
+
+  const components = {
     getConnectionManager: () => connectionManager,
-    getUpgrader,
-    getPeerStore: () => peerStore
+    getPeerId: () => peerId,
+    getPeerStore: () => peerStore,
+    getRegistrar: () => registrar,
+    getTransportManager: () => transportManager,
+    getUpgrader: () => upgrader
   } as Components
+
+  connectionManager.init(components)
+  transportManager.init(components)
+
+  for (const protcolHandler of opts.protocols ?? []) {
+    await components.getRegistrar().handle(...protcolHandler)
+  }
+
+  if (opts.listeningAddrs) {
+    await components.getTransportManager().listen(opts.listeningAddrs)
+  }
+
+  return components
 }
