@@ -1,5 +1,6 @@
 import type { Multiaddr } from '@multiformats/multiaddr'
 import type { PeerId } from '@libp2p/interface-peer-id'
+import { EventEmitter } from 'events'
 
 type Suffix = 'PublicNode'
 type AddEventName = `add${Suffix}`
@@ -55,6 +56,11 @@ export type Stream<T = StreamType> = {
 
 export type StreamResult = IteratorResult<StreamType, any>
 
+export enum PeerConnectionType {
+  DIRECT_CONNECTION = 0,
+  RELAYED_CONNECTION = 1
+}
+
 export type HoprConnectOptions = {
   publicNodes?: PublicNodesEmitter
   allowLocalConnections?: boolean
@@ -67,6 +73,7 @@ export type HoprConnectOptions = {
   dhtRenewalTimeout?: number
   entryNodeReconnectBaseTimeout?: number
   entryNodeReconnectBackoff?: number
+  peerConnectionMonitor?: EventEmitter
   // To be removed once NR got removed
   isAllowedToAccessNetwork?: (id: PeerId) => Promise<boolean>
 }

@@ -69,6 +69,7 @@ import { Packet } from './messages/index.js'
 import type { ResolvedEnvironment } from './environment.js'
 import { createLibp2pInstance } from './main.js'
 import type { EventEmitter as Libp2pEmitter } from '@libp2p/interfaces/events'
+import { PeerConnectionType } from '@hoprnet/hopr-connect/lib/types.js'
 
 const DEBUG_PREFIX = `hopr-core`
 const log = debug(DEBUG_PREFIX)
@@ -274,6 +275,7 @@ class Hopr extends EventEmitter {
       async (peerId: PeerId, origin: NetworkPeersOrigin): Promise<boolean> => {
         return accessControl.reviewConnection(peerId, origin)
       },
+      this,
       this.isAllowedAccessToNetwork.bind(this)
     )) as Libp2p
 
@@ -424,6 +426,7 @@ class Hopr extends EventEmitter {
       log(`No multiaddrs has been registered.`)
     }
     await this.maybeLogProfilingToGCloud()
+    this.on('hopr:new-peer-connection', this.onPeerConnection.bind(this))
     this.heartbeat.recalculateNetworkHealth()
 
     this.startMemoryFreeInterval()
@@ -550,6 +553,20 @@ class Hopr extends EventEmitter {
       this.heartbeat.recalculateNetworkHealth()
     } catch (err) {
       log(`Failed to update peer-store with new peer ${peer.id.toString()} info`, err)
+    }
+  }
+
+  /**
+   * Event emitted when Connect establishes a new outgoing connection to a peer.
+   * @param peerId Remote peer ID
+   * @param type Connection type (direct/relayed)
+   * @private
+   */
+  private onPeerConnection(peerId: string, type: PeerConnectionType) {
+    log(`New ${type == PeerConnectionType.RELAYED_CONNECTION ? 'relayed' : 'direct' } connection to ${peerId}`)
+    if (type == PeerConnectionType.DIRECT_CONNECTION) {
+      this.knownPublicNodesCache.add(peerId)
+      this.heartbeat.recalculateNetworkHealth()
     }
   }
 
