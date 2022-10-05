@@ -253,7 +253,11 @@ class HoprConnect implements Transport, Initializable, Startable {
       throw err
     }
 
-    this.options.peerConnectionMonitor?.emit('hopr:new-peer-connection', conn.remoteAddr.getPeerId(), PeerConnectionType.RELAYED_CONNECTION)
+    this.options.peerConnectionMonitor?.emit(
+      'hopr:new-peer-connection',
+      conn.remoteAddr.getPeerId(),
+      PeerConnectionType.RELAYED_CONNECTION
+    )
     return conn
   }
 
@@ -302,9 +306,12 @@ class HoprConnect implements Transport, Initializable, Startable {
       }
     })
 
-
     verbose(`Direct connection to ${maConn.remoteAddr.toString()} has been established successfully!`)
-    this.options.peerConnectionMonitor?.emit('hopr:new-peer-connection', maConn.remoteAddr.getPeerId(), PeerConnectionType.DIRECT_CONNECTION)
+    this.options.peerConnectionMonitor?.emit(
+      'hopr:new-peer-connection',
+      maConn.remoteAddr.getPeerId(),
+      PeerConnectionType.DIRECT_CONNECTION
+    )
 
     return conn
   }

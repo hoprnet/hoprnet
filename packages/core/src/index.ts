@@ -568,7 +568,7 @@ class Hopr extends EventEmitter {
    * @private
    */
   private onPeerConnection(peerId: string, type: PeerConnectionType) {
-    log(`New ${type == PeerConnectionType.RELAYED_CONNECTION ? 'relayed' : 'direct' } connection to ${peerId}`)
+    log(`New ${type == PeerConnectionType.RELAYED_CONNECTION ? 'relayed' : 'direct'} connection to ${peerId}`)
     if (type == PeerConnectionType.DIRECT_CONNECTION) {
       this.knownPublicNodesCache.add(peerId)
       this.heartbeat.recalculateNetworkHealth()
