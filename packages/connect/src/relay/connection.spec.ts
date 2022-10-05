@@ -12,6 +12,14 @@ import type { StreamType } from '../types.js'
 import { createPeerId } from '../base/utils.spec.js'
 import type { ConnectComponents } from '../components.js'
 
+class WebRTC extends EventEmitter {
+  signal(args: any) {
+    this.emit('incoming msg', args)
+  }
+
+  destroy() {}
+}
+
 describe('test status message sorting', function () {
   it('sort status messages', function () {
     const arr = [
@@ -125,7 +133,7 @@ describe('relay connection', function () {
       assert.fail(`Stream should be closed`)
     }
 
-    assert(alice.destroyed, `Stream must be destroyed`)
+    assert(alice.state.destroyed, `Stream must be destroyed`)
 
     assert(
       alice.timeline.close != undefined && Date.now() >= alice.timeline.close,
@@ -169,7 +177,7 @@ describe('relay connection', function () {
       assert.fail(`Stream must have ended`)
     }
 
-    assert(alice.destroyed, `Stream must be destroyed`)
+    assert(alice.state.destroyed, `Stream must be destroyed`)
 
     assert(
       alice.timeline.close != undefined && Date.now() >= alice.timeline.close,
@@ -309,12 +317,6 @@ describe('relay connection', function () {
   })
 
   it('forward and prefix WebRTC messages', async function () {
-    class WebRTC extends EventEmitter {
-      signal(args: any) {
-        this.emit('incoming msg', args)
-      }
-    }
-
     const webRTC = new WebRTC()
 
     const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
@@ -372,12 +374,6 @@ describe('relay connection', function () {
   })
 
   it('forward and prefix WebRTC messages after reconnect', async function () {
-    class WebRTC extends EventEmitter {
-      signal(args: any) {
-        this.emit('incoming msg', args)
-      }
-    }
-
     const webRTC = new WebRTC()
 
     const [AliceRelay, RelayAlice] = duplexPair<StreamType>()

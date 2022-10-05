@@ -349,7 +349,7 @@ class RelayContext extends EventEmitter {
               break
             }
 
-            const [PREFIX, SUFFIX] = [result.value.value.slice(0, 1), result.value.value.slice(1)]
+            const [PREFIX, SUFFIX] = [result.value.value.subarray(0, 1), result.value.value.subarray(1)]
 
             switch (PREFIX[0]) {
               case RelayPrefix.STATUS_MESSAGE:
@@ -410,7 +410,7 @@ class RelayContext extends EventEmitter {
                     advanceIterator()
                     break
                   default:
-                    throw Error(`Invalid connection status prefix. Received ${u8aToHex(SUFFIX.slice(0, 1))}`)
+                    throw Error(`Invalid connection status prefix. Received ${u8aToHex(SUFFIX.subarray(0, 1))}`)
                 }
                 break
               // Forward any WebRTC signalling
@@ -542,7 +542,7 @@ class RelayContext extends EventEmitter {
               break
             }
 
-            let [PREFIX, SUFFIX] = [result.value.value.slice(0, 1), result.value.value.slice(1)]
+            let [PREFIX, SUFFIX] = [result.value.value.subarray(0, 1), result.value.value.subarray(1)]
 
             // Anything can happen
             if (SUFFIX.length == 0) {

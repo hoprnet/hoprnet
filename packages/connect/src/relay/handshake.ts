@@ -12,7 +12,7 @@ import { RelayState } from './state.js'
 import type { Relay } from './index.js'
 
 import debug from 'debug'
-import { DELIVERY_PROTOCOL } from '../constants.js'
+import { DELIVERY_PROTOCOLS } from '../constants.js'
 import { Components } from '@libp2p/interfaces/components'
 
 export enum RelayHandshakeMessage {
@@ -131,7 +131,7 @@ class RelayHandshake {
       }
     }
 
-    const answer = chunk.slice(0, 1)[0]
+    const answer = chunk.subarray(0, 1)[0]
 
     this.shaker.rest()
 
@@ -201,7 +201,7 @@ class RelayHandshake {
     let destination: PeerId | undefined
 
     try {
-      destination = pubKeyToPeerId(chunk.slice())
+      destination = pubKeyToPeerId(chunk.subarray())
     } catch (err) {
       error(err)
     }
@@ -239,7 +239,8 @@ class RelayHandshake {
 
     let toDestinationStruct: Awaited<ReturnType<typeof getStreamToCounterparty>>
     try {
-      toDestinationStruct = await getStreamToCounterparty(destination, DELIVERY_PROTOCOL(this.options.environment), {
+      const protocolsDelivery = DELIVERY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
+      toDestinationStruct = await getStreamToCounterparty(destination, protocolsDelivery, {
         upgrader
       })
     } catch (err) {
@@ -282,7 +283,7 @@ class RelayHandshake {
       return
     }
 
-    const destinationAnswer = destinationChunk.slice(0, 1)[0]
+    const destinationAnswer = destinationChunk.subarray(0, 1)[0]
 
     switch (destinationAnswer as RelayHandshakeMessage) {
       case RelayHandshakeMessage.OK:
@@ -335,7 +336,7 @@ class RelayHandshake {
     let initiator: PeerId | undefined
 
     try {
-      initiator = pubKeyToPeerId(chunk.slice())
+      initiator = pubKeyToPeerId(chunk.subarray())
     } catch (err: any) {
       error(`Could not decode sender peerId.`, err.message)
     }

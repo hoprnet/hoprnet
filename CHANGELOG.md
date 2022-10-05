@@ -1,14 +1,14 @@
 # Changelog
 
-<a name="1.91"></a>
-
----
-
 <a name="1.90"></a>
 
 ## [1.90](https://github.com/hoprnet/hoprnet/compare/release/paleochora...hoprnet:release/valencia)
 
 - Improve Network Registry smart contract to allow 1-to-many node registration, add enable/disable make targets ([#4008](https://github.com/hoprnet/hoprnet/pull/4091))
+- Replace `yarn` with `npx` in `pluto` Docker image to run `hoprd` to fix binary discoverability issue
+- Add support for communication between different releases within the same environment
+- Avado: limit Docker container memory to maximum 1GB
+- Reduce memory copy operations by reusing underlying memory pages ([#4168](https://github.com/hoprnet/hoprnet/pull/4168))
 
 ---
 
