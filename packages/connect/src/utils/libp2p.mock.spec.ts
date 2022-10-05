@@ -142,7 +142,9 @@ class MyConnectionManager extends TypedEventEmitter<ConnectionManagerEvents> imp
         if (conn != undefined) {
           this.connections.set(peer.toString(), (this.connections.get(peer.toString()) ?? []).concat([conn]))
 
-          network.events.once(disconnectEvent(fullAddr as Multiaddr), () => this.onClose(peerId))
+          network.events.once(disconnectEvent(fullAddr as Multiaddr), (emitEvent: boolean = true) =>
+            this.onClose(peerId, emitEvent)
+          )
 
           return conn as any
         }
@@ -171,14 +173,14 @@ class MyConnectionManager extends TypedEventEmitter<ConnectionManagerEvents> imp
     return this.components
   }
 
-  private onClose(peer: PeerId) {
+  private onClose(peer: PeerId, emitEvent: boolean = true) {
     const existingConnections = this.connections.get(peer.toString())
     if (existingConnections != undefined && existingConnections.length > 0) {
       const toClose = existingConnections.shift()
 
       this.connections.set(peer.toString(), existingConnections)
 
-      if (existingConnections.length == 0) {
+      if (emitEvent && existingConnections.length == 0) {
         this.dispatchEvent(
           new CustomEvent<Connection>('peer:disconnect', {
             detail: toClose
@@ -321,19 +323,13 @@ export function createFakeNetwork() {
   let components: Map<string, Components> = new Map<string, Components>()
 
   const listen = (addr: Multiaddr, nodeComponents: Components) => {
-    const ma = addr.decapsulateCode(CODE_P2P).encapsulate(`/p2p/${nodeComponents.getPeerId().toString()}`)
-
-    const emitter = new EventEmitter()
-    network.on(connectEvent(ma), () => emitter.emit('connected'))
-
-    components.set(addr.toString(), nodeComponents)
-
-    return emitter
+    components.set(
+      addr.decapsulateCode(CODE_P2P).encapsulate(`/p2p/${nodeComponents.getPeerId().toString()}`).toString(),
+      nodeComponents
+    )
   }
 
   const connect = (self: PeerId, ma: Multiaddr, throwError: boolean = false) => {
-    network.emit(connectEvent(ma))
-
     const remoteComponents = components.get(ma.toString())
 
     if (remoteComponents != undefined) {
@@ -345,9 +341,7 @@ export function createFakeNetwork() {
 
   const close = (ma: Multiaddr, emitEvent: boolean = true) => {
     components.delete(ma.toString())
-    if (emitEvent) {
-      network.emit(disconnectEvent(ma), ma)
-    }
+    network.emit(disconnectEvent(ma), emitEvent)
   }
 
   return {
