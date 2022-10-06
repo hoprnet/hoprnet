@@ -69,6 +69,7 @@ import { Packet } from './messages/index.js'
 import type { ResolvedEnvironment } from './environment.js'
 import { createLibp2pInstance } from './main.js'
 import type { EventEmitter as Libp2pEmitter } from '@libp2p/interfaces/events'
+import { PeerConnectionType } from '@hoprnet/hopr-connect'
 
 const DEBUG_PREFIX = `hopr-core`
 const log = debug(DEBUG_PREFIX)
@@ -343,7 +344,22 @@ class Hopr extends EventEmitter {
       this.closeConnectionsTo.bind(this),
       accessControl.reviewConnection.bind(accessControl),
       this,
-      (peerId: PeerId) => this.knownPublicNodesCache.has(peerId.toString()),
+      (peerId: PeerId) => {
+        if (this.knownPublicNodesCache.has(peerId.toString())) return true
+
+        // If we have a direct connection to this peer ID, declare it a public node
+        if (
+          libp2p.connectionManager
+            .getConnections(peerId)
+            .flatMap((c) => c.tags ?? [])
+            .includes(PeerConnectionType.DIRECT)
+        ) {
+          this.knownPublicNodesCache.add(peerId)
+          return true
+        }
+
+        return false
+      },
       this.environment.id,
       this.options
     )
