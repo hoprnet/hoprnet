@@ -1,12 +1,13 @@
 import type { MultiaddrConnection } from '@libp2p/interface-connection'
-import type {
-  Stream,
-  StreamSink,
-  StreamSource,
-  StreamSourceAsync,
-  StreamResult,
-  StreamType,
-  HoprConnectTestingOptions
+import {
+  type Stream,
+  type StreamSink,
+  type StreamSource,
+  type StreamSourceAsync,
+  type StreamResult,
+  type StreamType,
+  type HoprConnectTestingOptions,
+  ConnectionTags
 } from '../types.js'
 import { randomBytes } from 'crypto'
 import { RelayPrefix, ConnectionStatusMessages, StatusMessages } from '../constants.js'
@@ -198,6 +199,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
   public readonly timeline: MultiaddrConnection['timeline']
 
+  public tags: ConnectionTags[]
+
   constructor(
     private _stream: Stream,
     relay: PeerId,
@@ -234,6 +237,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
     // Pre-generate object to attach to function pointers
     this.state = {} as RelayConnection['state']
+
+    this.tags = [ConnectionTags.RELAYED]
 
     this._queueStatusMessage = this.queueStatusMessage.bind({
       state: this.state

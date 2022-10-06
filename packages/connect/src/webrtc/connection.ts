@@ -8,13 +8,14 @@ import type { RelayConnection } from '../relay/connection.js'
 import { randomBytes } from 'crypto'
 import { toU8aStream, encodeWithLengthPrefix, decodeWithLengthPrefix, eagerIterator } from '../utils/index.js'
 import { abortableSource } from 'abortable-iterator'
-import type {
-  StreamSink,
-  StreamResult,
-  StreamType,
-  StreamSource,
-  StreamSourceAsync,
-  HoprConnectTestingOptions
+import {
+  type StreamSink,
+  type StreamResult,
+  type StreamType,
+  type StreamSource,
+  type StreamSourceAsync,
+  type HoprConnectTestingOptions,
+  ConnectionTags
 } from '../types.js'
 import assert from 'assert'
 import type { DialOptions } from '@libp2p/interface-transport'
@@ -126,6 +127,8 @@ class WebRTCConnection implements MultiaddrConnection {
 
   private _id: string
 
+  public tags: ConnectionTags[]
+
   // Set magic *close* property to end connection
   // @dev this is done using meta programming in libp2p
   public timeline: MultiaddrConnection['timeline']
@@ -151,6 +154,8 @@ class WebRTCConnection implements MultiaddrConnection {
     this.timeline = {
       open: Date.now()
     }
+
+    this.tags = [ConnectionTags.WEBRTC_RELAYED]
 
     // Give each WebRTC connection instance a unique identifier
     this._id = u8aToHex(randomBytes(4), false)
@@ -435,6 +440,9 @@ class WebRTCConnection implements MultiaddrConnection {
         if (this._sourceMigrated) {
           // Update state object once source *and* sink are migrated
           this.conn = this.relayConn.state.channel as SimplePeer
+          if (!this.tags.includes(ConnectionTags.WEBRTC_DIRECT)) {
+            this.tags = [ConnectionTags.WEBRTC_DIRECT]
+          }
         }
         await toIterable.sink(this.relayConn.state.channel as SimplePeer)(
           async function* (this: WebRTCConnection): StreamSource {
@@ -556,6 +564,9 @@ class WebRTCConnection implements MultiaddrConnection {
         if (this._sinkMigrated) {
           // Update state object once sink *and* source are migrated
           this.conn = this.relayConn.state.channel as SimplePeer
+          if (!this.tags.includes(ConnectionTags.WEBRTC_DIRECT)) {
+            this.tags = [ConnectionTags.WEBRTC_DIRECT]
+          }
         }
 
         this.log(`webRTC source handover done. Using direct connection to peer ${this.remoteAddr.getPeerId()}`)
