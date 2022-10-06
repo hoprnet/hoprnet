@@ -855,11 +855,11 @@ describe('entry node functionality - min relays per node', function () {
 
     entryNodes.usedRelays.push(
       {
-        ourCircuitAddress: createCircuitAddress(Alice, peerId),
+        ourCircuitAddress: createCircuitAddress(Alice),
         relayDirectAddress: firstPeerStoreEntry.multiaddrs[0]
       },
       {
-        ourCircuitAddress: createCircuitAddress(Bob, peerId),
+        ourCircuitAddress: createCircuitAddress(Bob),
         relayDirectAddress: secondPeerStoreEntry.multiaddrs[0]
       }
     )

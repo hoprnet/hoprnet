@@ -266,7 +266,7 @@ class HoprConnect implements Transport, Initializable, Startable {
   ): Promise<Connection> {
     log(`Attempting to dial ${chalk.yellow(ma.toString())}`)
 
-    const maConn = await TCPConnection.create(ma, this.getComponents().getPeerId(), options)
+    const maConn = await TCPConnection.create(ma, options)
 
     verbose(
       `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshake.`

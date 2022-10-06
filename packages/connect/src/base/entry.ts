@@ -776,10 +776,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       this.usedRelays.push({
         // @TODO take the address that really got used
         relayDirectAddress: (results[0] as ConnectionResult).entry.multiaddrs[0],
-        ourCircuitAddress: createCircuitAddress(
-          (results[0] as ConnectionResult).entry.id,
-          this.getComponents().getPeerId()
-        )
+        ourCircuitAddress: createCircuitAddress((results[0] as ConnectionResult).entry.id)
       })
     }
   }
