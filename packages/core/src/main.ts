@@ -20,7 +20,6 @@ import { getAddrs } from './identity.js'
 import type AccessControl from './network/access-control.js'
 import { createLibp2pMock } from './libp2p.mock.js'
 import { NetworkPeersOrigin } from './network/network-peers.js'
-import EventEmitter from 'events'
 import { supportedEnvironments } from './environment.js'
 
 const log = debug(`hopr-core:create-hopr`)
@@ -41,7 +40,6 @@ export async function createLibp2pInstance(
   initialNodes: { id: PeerId; multiaddrs: Multiaddr[] }[],
   publicNodes: PublicNodesEmitter,
   reviewConnection: AccessControl['reviewConnection'],
-  peerConnectionMonitor: EventEmitter,
   isAllowedToAccessNetwork: Hopr['isAllowedAccessToNetwork']
 ): Promise<Libp2p> {
   let libp2p: Libp2p
@@ -98,7 +96,6 @@ export async function createLibp2pInstance(
             allowPrivateConnections: options.allowPrivateConnections,
             // Amount of nodes for which we are willing to act as a relay
             maxRelayedConnections: 50_000,
-            peerConnectionMonitor: peerConnectionMonitor,
             isAllowedToAccessNetwork
           },
           testing: {
