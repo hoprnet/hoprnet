@@ -185,6 +185,7 @@
 - [sampleGroupElement](modules.md#samplegroupelement)
 - [serializeKeyPair](modules.md#serializekeypair)
 - [serializeToU8a](modules.md#serializetou8a)
+- [setupPromiseRejectionFilter](modules.md#setuppromiserejectionfilter)
 - [startResourceUsageLogger](modules.md#startresourceusagelogger)
 - [stringToU8a](modules.md#stringtou8a)
 - [timeout](modules.md#timeout)
@@ -2592,6 +2593,19 @@ ___
 #### Returns
 
 `Uint8Array`
+
+___
+
+### setupPromiseRejectionFilter
+
+▸ **setupPromiseRejectionFilter**(): `void`
+
+Sets a custom promise rejection handler to filter out known promise rejections
+that are harmless but couldn't be handled for some reason.
+
+#### Returns
+
+`void`
 
 ___
 
