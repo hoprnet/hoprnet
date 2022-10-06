@@ -8,6 +8,11 @@ type RemoveEventName = `remove${Suffix}`
 export type PeerStoreType = { id: PeerId; multiaddrs: Multiaddr[] }
 type NewNodeListener = (peer: PeerStoreType) => void
 
+export enum PeerConnectionType {
+  DIRECT_CONNECTION = 'DIRECT',
+  RELAYED_CONNECTION = 'RELAYED'
+}
+
 export interface PublicNodesEmitter {
   addListener(event: AddEventName | RemoveEventName, listener: () => void): this
   addListener(event: AddEventName, listener: NewNodeListener): this

@@ -27,6 +27,7 @@ import { EntryNodes } from './base/entry.js'
 import { WebRTCUpgrader } from './webrtc/upgrader.js'
 import { UpnpManager } from './base/upnp.js'
 import { timeout } from '@hoprnet/hopr-utils'
+import { PeerConnectionType } from './types.js'
 
 const DEBUG_PREFIX = 'hopr-connect'
 const log = Debug(DEBUG_PREFIX)
@@ -254,10 +255,10 @@ class HoprConnect implements Transport, Initializable, Startable {
 
     verbose(`Relayed connection to ${maConn.remoteAddr.toString()} has been established successfully!`)
     if (conn.tags) {
-      conn.tags = ['RELAYED', ...conn.tags]
+      conn.tags = [PeerConnectionType.RELAYED_CONNECTION, ...conn.tags]
     }
     else {
-      conn.tags = ['RELAYED']
+      conn.tags = [PeerConnectionType.RELAYED_CONNECTION]
     }
     return conn
   }
@@ -309,10 +310,10 @@ class HoprConnect implements Transport, Initializable, Startable {
 
     verbose(`Direct connection to ${maConn.remoteAddr.toString()} has been established successfully!`)
     if (conn.tags) {
-      conn.tags = ['DIRECT', ...conn.tags]
+      conn.tags = [PeerConnectionType.DIRECT_CONNECTION, ...conn.tags]
     }
     else {
-      conn.tags = ['DIRECT']
+      conn.tags = [PeerConnectionType.DIRECT_CONNECTION]
     }
 
     return conn
