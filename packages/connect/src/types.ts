@@ -8,11 +8,6 @@ type RemoveEventName = `remove${Suffix}`
 export type PeerStoreType = { id: PeerId; multiaddrs: Multiaddr[] }
 type NewNodeListener = (peer: PeerStoreType) => void
 
-export enum PeerConnectionType {
-  DIRECT_CONNECTION = 'DIRECT',
-  RELAYED_CONNECTION = 'RELAYED'
-}
-
 export interface PublicNodesEmitter {
   addListener(event: AddEventName | RemoveEventName, listener: () => void): this
   addListener(event: AddEventName, listener: NewNodeListener): this
@@ -63,6 +58,15 @@ export type StreamResult = IteratorResult<StreamType, any>
 export type Environment = {
   id: string
   versionRange: string
+}
+
+export enum PeerConnectionType {
+  DIRECT = 'DIRECT',
+  // @TODO to be implemented in https://github.com/hoprnet/hoprnet/pull/4171
+  DIRECT_TO_ENTRY = 'DIRECT_TO_ENTRY',
+  RELAYED = 'RELAYED',
+  WEBRTC_RELAYED = 'WEBRTC_RELAYED',
+  WEBRTC_DIRECT = 'WEBRTC_DIRECT'
 }
 
 export type HoprConnectOptions = {

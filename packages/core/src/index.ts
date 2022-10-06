@@ -352,7 +352,7 @@ class Hopr extends EventEmitter {
           libp2p.connectionManager
             .getConnections(peerId)
             .flatMap((c) => c.tags ?? [])
-            .includes(PeerConnectionType.DIRECT_CONNECTION)
+            .includes(PeerConnectionType.DIRECT)
         ) {
           this.knownPublicNodesCache.add(peerId)
           return true

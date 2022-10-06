@@ -17,7 +17,12 @@ import { TCPConnection, Listener } from './base/index.js'
 // @ts-ignore
 import pkg from '../package.json' assert { type: 'json' }
 
-import type { PublicNodesEmitter, HoprConnectOptions, HoprConnectTestingOptions } from './types.js'
+import {
+  type PublicNodesEmitter,
+  type HoprConnectOptions,
+  type HoprConnectTestingOptions,
+  PeerConnectionType
+} from './types.js'
 
 import { Relay } from './relay/index.js'
 import { Filter } from './filter.js'
@@ -27,7 +32,6 @@ import { EntryNodes } from './base/entry.js'
 import { WebRTCUpgrader } from './webrtc/upgrader.js'
 import { UpnpManager } from './base/upnp.js'
 import { timeout } from '@hoprnet/hopr-utils'
-import { PeerConnectionType } from './types.js'
 
 const DEBUG_PREFIX = 'hopr-connect'
 const log = Debug(DEBUG_PREFIX)
@@ -253,12 +257,15 @@ class HoprConnect implements Transport, Initializable, Startable {
       throw err
     }
 
+    const _tags = conn.tags ?? []
+    conn.tags = new Proxy(_tags, {
+      get: (target) => {
+        // Always get *latest* tags from maConn object
+        return [...target, ...((maConn as any).tags ?? [])]
+      }
+    })
+
     verbose(`Relayed connection to ${maConn.remoteAddr.toString()} has been established successfully!`)
-    if (conn.tags) {
-      conn.tags = [PeerConnectionType.RELAYED_CONNECTION, ...conn.tags]
-    } else {
-      conn.tags = [PeerConnectionType.RELAYED_CONNECTION]
-    }
     return conn
   }
 
@@ -309,9 +316,9 @@ class HoprConnect implements Transport, Initializable, Startable {
 
     verbose(`Direct connection to ${maConn.remoteAddr.toString()} has been established successfully!`)
     if (conn.tags) {
-      conn.tags = [PeerConnectionType.DIRECT_CONNECTION, ...conn.tags]
+      conn.tags = [PeerConnectionType.DIRECT, ...conn.tags]
     } else {
-      conn.tags = [PeerConnectionType.DIRECT_CONNECTION]
+      conn.tags = [PeerConnectionType.DIRECT]
     }
 
     return conn
@@ -320,5 +327,5 @@ class HoprConnect implements Transport, Initializable, Startable {
 
 export type { PublicNodesEmitter, HoprConnectConfig }
 export { compareAddressesLocalMode, compareAddressesPublicMode } from './utils/index.js'
-export { PeerConnectionType } from './types.js'
-export { HoprConnect }
+
+export { HoprConnect, PeerConnectionType }
