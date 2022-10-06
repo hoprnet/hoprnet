@@ -256,8 +256,7 @@ class HoprConnect implements Transport, Initializable, Startable {
     verbose(`Relayed connection to ${maConn.remoteAddr.toString()} has been established successfully!`)
     if (conn.tags) {
       conn.tags = [PeerConnectionType.RELAYED_CONNECTION, ...conn.tags]
-    }
-    else {
+    } else {
       conn.tags = [PeerConnectionType.RELAYED_CONNECTION]
     }
     return conn
@@ -311,8 +310,7 @@ class HoprConnect implements Transport, Initializable, Startable {
     verbose(`Direct connection to ${maConn.remoteAddr.toString()} has been established successfully!`)
     if (conn.tags) {
       conn.tags = [PeerConnectionType.DIRECT_CONNECTION, ...conn.tags]
-    }
-    else {
+    } else {
       conn.tags = [PeerConnectionType.DIRECT_CONNECTION]
     }
 
