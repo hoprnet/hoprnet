@@ -348,10 +348,12 @@ class Hopr extends EventEmitter {
         if (this.knownPublicNodesCache.has(peerId.toString())) return true
 
         // If we have a direct connection to this peer ID, declare it a public node
-        if (libp2p.connectionManager.getConnections(peerId)
-          .flatMap((c) => c.tags ?? [])
-          .includes(PeerConnectionType.DIRECT_CONNECTION))
-        {
+        if (
+          libp2p.connectionManager
+            .getConnections(peerId)
+            .flatMap((c) => c.tags ?? [])
+            .includes(PeerConnectionType.DIRECT_CONNECTION)
+        ) {
           this.knownPublicNodesCache.add(peerId)
           return true
         }
