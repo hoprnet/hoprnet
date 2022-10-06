@@ -64,39 +64,27 @@ contract HoprStakeBase is Ownable, IERC777Recipient, IERC721Receiver, Reentrancy
   event NftAllowed(uint256 indexed typeIndex);
 
   /**
-   * @dev Provide NFT contract address. Transfer owner role to the new owner address.
-   * At deployment, it also registers the lock contract as an ERC777 recipient.
-   * Also, it blocks HODLr, DAO_v2, Surveyor, Wildhorn_v2, PuzzleHunt_v1, PuzzleHunt_v2 NFTs
-   * @param _nftAddress address Address of the NFT contract.
+   * @dev Provide basic parameters for the new staking season.
+   * Transfer owner role to the new owner address.
+   * At deployment, it also registers the staking contract as an ERC777 recipient.
    * @param _newOwner address Address of the new owner. This new owner can reclaim any ERC20 and ERC721 token being accidentally sent to the lock contract.
-   * @param _lockToken address Address of the stake token xHOPR.
-   * @param _rewardToken address Address of the reward token wxHOPR.
+   * @param _programStart uint256 Timestamp from which the new staking season starts.
+   * @param _programEnd uint256 Timestamp till which the new staking season ends.
+   * @param _basicFactorNumerator uint256 Mumerator for the basic APY.
+   * @param _boostCap uint256 Cap for staked tokens to enjoy extra boost
    */
   constructor(
     address _newOwner,
-    address _programStart,
-    address _programEnd,
-    address _basicFactorNumerator,
-    address _boostCap
+    uint256 _programStart,
+    uint256 _programEnd,
+    uint256 _basicFactorNumerator,
+    uint256 _boostCap
   ) {
-    // implement in favor of testing
-    uint256 chainId;
-    assembly {
-      chainId := chainid()
-    }
-    if (chainId != 100) {
-      LOCK_TOKEN = _lockToken;
-      REWARD_TOKEN = _rewardToken;
-      NFT_CONTRACT = IHoprBoost(_nftAddress);
-    }
-    // block a selection of HoprBoost NFTs
-    _ownerBlockNftType(2); // HODLr
-    _ownerBlockNftType(3); // Wildhorn_v1
-    _ownerBlockNftType(4); // PuzzleHunt_v1
-    _ownerBlockNftType(7); // PuzzleHunt_v2
-    _ownerBlockNftType(8); // Wildhorn_v2
-    _ownerBlockNftType(9); // DAO_v2
-    _ownerBlockNftType(10); // Surveyor
+    // set program parameters
+    PROGRAM_START = _programStart;
+    PROGRAM_END = _programEnd;
+    BASIC_FACTOR_NUMERATOR = _basicFactorNumerator;
+    BOOST_CAP = _boostCap;
     transferOwnership(_newOwner);
     ERC1820_REGISTRY.setInterfaceImplementer(address(this), TOKENS_RECIPIENT_INTERFACE_HASH, address(this));
   }
@@ -398,7 +386,7 @@ contract HoprStakeBase is Ownable, IERC777Recipient, IERC721Receiver, Reentrancy
    * current block timestamp and lastSyncTimestamp are confined in [PROGRAM_START, PROGRAM_END] for basic and boosted lockup,
    * @param _account address Address of the account whose rewards will be calculated.
    */
-  function _getCumulatedRewardsIncrement(address _account) private view returns (uint256) {
+  function _getCumulatedRewardsIncrement(address _account) internal view returns (uint256) {
     Account memory account = accounts[_account];
     if (block.timestamp <= PROGRAM_START || account.lastSyncTimestamp >= PROGRAM_END) {
       // skip calculation and return directly 0;
@@ -425,7 +413,7 @@ contract HoprStakeBase is Ownable, IERC777Recipient, IERC721Receiver, Reentrancy
    * @param tokenURI string URI of the HoprBoost NFT. E.g. "https://stake.hoprnet.org/PuzzleHunt_v2/Bronze - Week 5"
    * @param substring string of the `boostRank` or `boostType/boostRank`. E.g. "Bronze - Week 5", "PuzzleHunt_v2/Bronze - Week 5"
    */
-  function _hasSubstring(string memory tokenURI, string memory substring) private pure returns (bool) {
+  function _hasSubstring(string memory tokenURI, string memory substring) internal pure returns (bool) {
     // convert string to bytes
     bytes memory tokenURIInBytes = bytes(tokenURI);
     bytes memory substringInBytes = bytes(substring);
@@ -471,7 +459,7 @@ contract HoprStakeBase is Ownable, IERC777Recipient, IERC721Receiver, Reentrancy
    * @dev Update “lastSyncTimestamp” with the current block timestamp and update “cumulatedRewards” with _getCumulatedRewardsIncrement(account)
    * @param _account address Address of the account whose rewards will be calculated.
    */
-  function _sync(address _account) private {
+  function _sync(address _account) internal {
     uint256 increment = _getCumulatedRewardsIncrement(_account);
     accounts[_account].cumulatedRewards += increment;
     accounts[_account].lastSyncTimestamp = block.timestamp;
@@ -482,7 +470,7 @@ contract HoprStakeBase is Ownable, IERC777Recipient, IERC721Receiver, Reentrancy
    * @dev Claim rewards for staking.
    * @param _account address Address of the staking account.
    */
-  function _claim(address _account) private {
+  function _claim(address _account) internal {
     Account memory account = accounts[_account];
     // update states
     uint256 amount = account.cumulatedRewards - account.claimedRewards;
@@ -500,7 +488,7 @@ contract HoprStakeBase is Ownable, IERC777Recipient, IERC721Receiver, Reentrancy
    * @dev Unlock staking for a given account
    * @param _account address Account that staked tokens.
    */
-  function _unlockFor(address _account) private {
+  function _unlockFor(address _account) internal {
     require(block.timestamp > PROGRAM_END, 'HoprStake: Program is ongoing, cannot unlock stake.');
     uint256 actualStake = accounts[_account].actualLockedTokenAmount;
     _sync(_account);
@@ -517,10 +505,10 @@ contract HoprStakeBase is Ownable, IERC777Recipient, IERC721Receiver, Reentrancy
   }
 
   /**
-   * @dev Private function to block an NFT
+   * @dev Internal function to block an NFT
    * @param typeIndex integer Type index to be blocked
    */
-  function _ownerBlockNftType(uint256 typeIndex) private {
+  function _ownerBlockNftType(uint256 typeIndex) internal {
     isBlockedNft[typeIndex] = true;
     emit NftBlocked(typeIndex);
   }
