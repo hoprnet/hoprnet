@@ -15,7 +15,7 @@ import {
   type StreamSource,
   type StreamSourceAsync,
   type HoprConnectTestingOptions,
-  ConnectionTags
+  PeerConnectionType
 } from '../types.js'
 import assert from 'assert'
 import type { DialOptions } from '@libp2p/interface-transport'
@@ -127,7 +127,7 @@ class WebRTCConnection implements MultiaddrConnection {
 
   private _id: string
 
-  public tags: ConnectionTags[]
+  public tags: PeerConnectionType[]
 
   // Set magic *close* property to end connection
   // @dev this is done using meta programming in libp2p
@@ -155,7 +155,8 @@ class WebRTCConnection implements MultiaddrConnection {
       open: Date.now()
     }
 
-    this.tags = [ConnectionTags.WEBRTC_RELAYED]
+    // Initial state + fallback if WebRTC failed
+    this.tags = [PeerConnectionType.WEBRTC_RELAYED]
 
     // Give each WebRTC connection instance a unique identifier
     this._id = u8aToHex(randomBytes(4), false)
@@ -440,8 +441,8 @@ class WebRTCConnection implements MultiaddrConnection {
         if (this._sourceMigrated) {
           // Update state object once source *and* sink are migrated
           this.conn = this.relayConn.state.channel as SimplePeer
-          if (!this.tags.includes(ConnectionTags.WEBRTC_DIRECT)) {
-            this.tags = [ConnectionTags.WEBRTC_DIRECT]
+          if (!this.tags.includes(PeerConnectionType.WEBRTC_DIRECT)) {
+            this.tags = [PeerConnectionType.WEBRTC_DIRECT]
           }
         }
         await toIterable.sink(this.relayConn.state.channel as SimplePeer)(
@@ -564,8 +565,8 @@ class WebRTCConnection implements MultiaddrConnection {
         if (this._sinkMigrated) {
           // Update state object once sink *and* source are migrated
           this.conn = this.relayConn.state.channel as SimplePeer
-          if (!this.tags.includes(ConnectionTags.WEBRTC_DIRECT)) {
-            this.tags = [ConnectionTags.WEBRTC_DIRECT]
+          if (!this.tags.includes(PeerConnectionType.WEBRTC_DIRECT)) {
+            this.tags = [PeerConnectionType.WEBRTC_DIRECT]
           }
         }
 

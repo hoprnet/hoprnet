@@ -7,7 +7,7 @@ import {
   type StreamResult,
   type StreamType,
   type HoprConnectTestingOptions,
-  ConnectionTags
+  PeerConnectionType
 } from '../types.js'
 import { randomBytes } from 'crypto'
 import { RelayPrefix, ConnectionStatusMessages, StatusMessages } from '../constants.js'
@@ -199,7 +199,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
   public readonly timeline: MultiaddrConnection['timeline']
 
-  public tags: ConnectionTags[]
+  public tags: PeerConnectionType[]
 
   constructor(
     private _stream: Stream,
@@ -238,7 +238,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     // Pre-generate object to attach to function pointers
     this.state = {} as RelayConnection['state']
 
-    this.tags = [ConnectionTags.RELAYED]
+    this.tags = [PeerConnectionType.RELAYED]
 
     this._queueStatusMessage = this.queueStatusMessage.bind({
       state: this.state
