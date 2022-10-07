@@ -8,7 +8,7 @@ import { handshake } from 'it-handshake'
 import type { StreamType } from '../types.js'
 import assert from 'assert'
 
-describe('relay swtich context', function () {
+describe.only('relay swtich context', function () {
   it('forward payload messages', async function () {
     const [relayToNode, nodeToRelay] = duplexPair<StreamType>()
 

@@ -108,10 +108,8 @@ class RelayContext extends EventEmitter {
   private _pingResponsePromise?: DeferType<PingResponseEvent>
   private _stream: Stream
 
-  private sinkCreator: Promise<void>
-
   public source: Stream['source']
-  public sink: Stream['sink']
+  // public sink: Stream['sink']
 
   constructor(stream: Stream, private relayFreeTimeout: number = 0) {
     super()
@@ -136,13 +134,27 @@ class RelayContext extends EventEmitter {
 
     // Initializes the sink and stores the handle to assign
     // an error handler
-    this.sinkCreator = this.createSink()
+    const sinkCreator = this.createSink()
 
     // Make sure that we catch all errors, even before a sink source has been attached
-    this.sinkCreator.catch((err) => this.error(`Sink has thrown error before attaching source`, err.message))
+    sinkCreator.catch((err) => this.error(`Sink has thrown error before attaching source`, err.message))
+
+    this.queueStatusMessage = this.queueStatusMessage.bind({
+      _statusMessages: this._statusMessages,
+      _statusMessagePromise: this._statusMessagePromise
+    })
+
+    this.unqueueStatusMessage = this.unqueueStatusMessage.bind({
+      _statusMessages: this._statusMessages,
+      _statusMessagePromise: this._statusMessagePromise
+    })
 
     // Passed as a function handle so we need to bind it explicitly
-    this.sink = this._sink.bind(this)
+    this.sink = this.sink.bind({
+      sinkCreator,
+      _sinkSourceAttachedPromise: this._sinkSourceAttachedPromise,
+      queueStatusMessage: this.queueStatusMessage
+    })
   }
 
   /**
@@ -241,13 +253,13 @@ class RelayContext extends EventEmitter {
    * @param source stream of messages to be sent
    * @returns a Promise that resovles once the source stream ends
    */
-  public async _sink(source: Stream['source']): Promise<void> {
+  public async sink(source: Stream['source']): Promise<void> {
     let deferred = defer<void>()
     // forward sink stream errors
     this.sinkCreator.catch(deferred.reject)
     this._sinkSourceAttachedPromise.resolve({
       type: ConnectionEventTypes.SINK_SOURCE_ATTACHED,
-      value: async function* (this: RelayContext) {
+      value: async function* (this: Pick<RelayContext, 'queueStatusMessage'>) {
         try {
           yield* source
           deferred.resolve()
@@ -256,7 +268,9 @@ class RelayContext extends EventEmitter {
           this.queueStatusMessage(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP))
           deferred.reject(err)
         }
-      }.call(this)
+      }.call({
+        queueStatusMessage: this.queueStatusMessage.bind(this)
+      })
     })
 
     return deferred.promise
@@ -635,7 +649,7 @@ class RelayContext extends EventEmitter {
    * Add status and control messages to queue
    * @param msg msg to add
    */
-  private queueStatusMessage(msg: Uint8Array) {
+  public queueStatusMessage(msg: Uint8Array) {
     this._statusMessages.push(msg)
 
     this._statusMessagePromise.resolve({
