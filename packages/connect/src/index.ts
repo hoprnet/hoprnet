@@ -257,20 +257,17 @@ class HoprConnect implements Transport, Initializable, Startable {
       throw err
     }
 
-    const existingTags = conn.tags ?? []
-    Object.assign(
-      conn,
-      new Proxy(conn, {
-        get: (...args) => {
-          if (args[1] === 'tags') {
-            // Always get *latest* tags from maConn object as it could
-            // get upgraded to a direct connection
-            return [...existingTags, ...((maConn as any).tags ?? [])]
-          }
-          return Reflect.get(...args)
-        }
-      })
-    )
+    // Merges all tags from `maConn` into `conn` and then make both objects
+    // use the *same* array
+    // This is necessary to dynamically change the connection tags once
+    // a connection gets upgraded from WEBRTC_RELAYED to WEBRTC_DIRECT
+    if (conn.tags == undefined) {
+      conn.tags = []
+    }
+    conn.tags.push(...maConn.tags)
+
+    // assign the array *by value* and its entries *by reference*
+    maConn.tags = conn.tags as any
 
     verbose(`Relayed connection to ${maConn.remoteAddr.toString()} has been established successfully!`)
     return conn
