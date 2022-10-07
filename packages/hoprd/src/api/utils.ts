@@ -17,7 +17,7 @@ export const authenticateWsConnection = (
 ): boolean => {
   // throw if apiToken is empty
   if (apiToken === '') throw Error('Cannot authenticate empty apiToken')
-  let encodedApiToken = encodeURI(apiToken)
+  let encodedApiToken = encodeURIComponent(apiToken)
 
   // attempt to authenticate via URL parameter
   if (req.url) {
@@ -25,7 +25,7 @@ export const authenticateWsConnection = (
       // NB: We use a placeholder domain since req.url only passes query params
       const url = new URL(`https://hoprnet.org${req.url}`)
       const paramApiToken = url.searchParams?.get('apiToken') || ''
-      if (decodeURI(paramApiToken) == apiToken) {
+      if (encodeURIComponent(paramApiToken) == encodedApiToken) {
         debugLog('ws client connected [ authentication SUCCESS via URL parameter ]')
         return true
       }
@@ -45,11 +45,11 @@ export const authenticateWsConnection = (
 
     // We compare the encoded token against an encoded token from the user, thus avoiding having to decodeURI on the user input
     // and therefore avoiding the need to handle any decoding errors at all.
-    // The encodeURI function on an already encoded input acts as an identity function
+    // The encodeURIComponent function on an already encoded input acts as an identity function
     if (
       cookies &&
-      (encodeURI(cookies['X-Auth-Token'] || '') === encodedApiToken ||
-        encodeURI(cookies['x-auth-token'] || '') === encodedApiToken)
+      (encodeURIComponent(cookies['X-Auth-Token'] || '') === encodedApiToken ||
+        encodeURIComponent(cookies['x-auth-token'] || '') === encodedApiToken)
     ) {
       debugLog('ws client connected [ authentication SUCCESS via cookie ]')
       return true
