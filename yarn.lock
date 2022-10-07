@@ -3259,7 +3259,6 @@ __metadata:
     body-parser: 1.19.2
     chai: 4.3.6
     chai-openapi-response-validator: ^0.14.2
-    check-password-strength: 2.0.4
     cookie: 0.4.2
     cors: 2.8.5
     debug: 4.3.4
@@ -8018,13 +8017,6 @@ __metadata:
   version: 1.0.2
   resolution: "check-error@npm:1.0.2"
   checksum: d9d106504404b8addd1ee3f63f8c0eaa7cd962a1a28eb9c519b1c4a1dc7098be38007fc0060f045ee00f075fbb7a2a4f42abcf61d68323677e11ab98dc16042e
-  languageName: node
-  linkType: hard
-
-"check-password-strength@npm:2.0.4":
-  version: 2.0.4
-  resolution: "check-password-strength@npm:2.0.4"
-  checksum: e6797f2b8b94fbe1a5bcab2153fb213b0436c223328377bb5dd2ff93a34d09891479702e1b64108b303c317d89ed9e48be2895285ac23389903365204a6a1fcf
   languageName: node
   linkType: hard
 

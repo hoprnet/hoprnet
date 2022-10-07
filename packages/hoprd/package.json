@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.90.29",
+  "version": "1.90.31",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -46,7 +46,6 @@
     "@multiformats/multiaddr": "10.3.3",
     "bn.js": "5.2.0",
     "body-parser": "1.19.2",
-    "check-password-strength": "2.0.4",
     "cookie": "0.4.2",
     "cors": "2.8.5",
     "debug": "4.3.4",
