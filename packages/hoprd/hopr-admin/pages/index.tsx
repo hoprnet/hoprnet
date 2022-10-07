@@ -105,11 +105,9 @@ export default function Home() {
   const [showConfigPanel, setShowConfigPanel] = useState(false)
   const [draftConfig, setDraftConfig] = useState<Configuration>(app.state.config)
   const HandleConfigUpdate = (k: keyof Configuration) => (event: React.ChangeEvent<HTMLInputElement>) => {
-    let value = event.target.value
-    if (k === 'apiToken') value = encodeURI(value)
     setDraftConfig({
       ...draftConfig,
-      [k]: value
+      [k]: event.target.value
     })
   }
   const handleDraftConfigSave = () => {
