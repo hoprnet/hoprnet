@@ -25,7 +25,7 @@ export const authenticateWsConnection = (
       // NB: We use a placeholder domain since req.url only passes query params
       const url = new URL(`https://hoprnet.org${req.url}`)
       const paramApiToken = url.searchParams?.get('apiToken') || ''
-      if (encodeURIComponent(paramApiToken) == apiToken) {
+      if (encodeURIComponent(paramApiToken) == encodedApiToken) {
         debugLog('ws client connected [ authentication SUCCESS via URL parameter ]')
         return true
       }
