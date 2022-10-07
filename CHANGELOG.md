@@ -12,6 +12,7 @@
 - Fix public node resolution for connectivity indicator ([#4205]https://github.com/hoprnet/hoprnet/pull/4205)
 - Remove charset complexity validation on API token ([#4210]https://github.com/hoprnet/hoprnet/pull/4210)
 - Properly encode API token passed from the Admin UI ([#4210]https://github.com/hoprnet/hoprnet/pull/4210)
+
 ---
 
 <a name="1.89"></a>
