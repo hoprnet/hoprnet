@@ -116,7 +116,7 @@ export function eagerIterator<T, K extends Iterable<T> | AsyncIterable<T>>(
  * @param addr a Node.js address instance
  * @returns
  */
-export function nodeToMultiaddr(addr: AddressInfo, peerId: PeerId | undefined): Multiaddr {
+export function nodeToMultiaddr(addr: AddressInfo): Multiaddr {
   let address: string
   let family: 4 | 6
   switch (addr.family) {
@@ -152,10 +152,6 @@ export function nodeToMultiaddr(addr: AddressInfo, peerId: PeerId | undefined): 
     },
     'tcp'
   )
-
-  if (peerId != undefined) {
-    ma = ma.encapsulate(`/p2p/${peerId.toString()}`)
-  }
 
   return ma
 }
@@ -247,7 +243,7 @@ export async function attemptClose(
 export function relayFromRelayAddress(ma: Multiaddr): PeerId {
   const tuples = ma.tuples() as [code: number, addr: Uint8Array][]
 
-  if (tuples.length != 3 || tuples[0][0] != CODE_P2P || tuples[1][0] != CODE_CIRCUIT || tuples[2][0] != CODE_P2P) {
+  if (tuples.length < 2 || tuples[0][0] != CODE_P2P || tuples[1][0] != CODE_CIRCUIT) {
     throw Error(`Cannot extract relay from non-relay address. Given address ${ma.toString()}`)
   }
 

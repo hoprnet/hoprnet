@@ -324,20 +324,15 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       }
 
       this.addrs.external = [
-        nodeToMultiaddr(
-          {
-            address: natSituation.externalAddress,
-            port: natSituation.externalPort,
-            family: 'IPv4'
-          },
-          this.components.getPeerId()
-        )
+        nodeToMultiaddr({
+          address: natSituation.externalAddress,
+          port: natSituation.externalPort,
+          family: 'IPv4'
+        })
       ]
     }
 
-    this.addrs.interface = internalInterfaces.map((internalInterface) =>
-      nodeToMultiaddr(internalInterface, this.components.getPeerId())
-    )
+    this.addrs.interface = internalInterfaces.map((internalInterface) => nodeToMultiaddr(internalInterface))
 
     this.attachSocketHandlers()
 
@@ -431,7 +426,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     let maConn: TCPConnection | undefined
 
     try {
-      maConn = TCPConnection.fromSocket(socket, this.components.getPeerId())
+      maConn = TCPConnection.fromSocket(socket)
     } catch (err: any) {
       error(`inbound connection failed. ${err.message}`)
     }

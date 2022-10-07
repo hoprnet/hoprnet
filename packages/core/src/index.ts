@@ -43,6 +43,7 @@ import {
   convertPubKeyFromPeerId,
   getBackoffRetryTimeout,
   getBackoffRetries,
+  pickVersion,
   type LibP2PHandlerFunction,
   type AcknowledgedTicket,
   type ChannelEntry,
@@ -53,6 +54,12 @@ import {
   type Ticket
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { type Indexer } from '@hoprnet/hopr-core-ethereum'
+
+// Do not type-check JSON files
+// @ts-ignore
+import pkg from '../package.json' assert { type: 'json' }
+
+const NORMALIZED_VERSION = pickVersion(pkg.version)
 
 import {
   type StrategyTickResult,
@@ -368,8 +375,8 @@ class Hopr extends EventEmitter {
       this.networkPeers.register(event.detail.remotePeer, NetworkPeersOrigin.INCOMING_CONNECTION)
     })
 
-    const protocolMsg = `/hopr/${this.environment.id}/msg`
-    const protocolAck = `/hopr/${this.environment.id}/ack`
+    const protocolMsg = `/hopr/${this.environment.id}/msg/${NORMALIZED_VERSION}`
+    const protocolAck = `/hopr/${this.environment.id}/ack/${NORMALIZED_VERSION}`
 
     // Attach mixnet functionality
     await subscribeToAcknowledgements(
@@ -407,7 +414,6 @@ class Hopr extends EventEmitter {
     // Add all entry nodes that were announced during startup
     this.connector.indexer.off('peer', pushToRecentlyAnnouncedNodes)
     for (const announcedNode of recentlyAnnouncedNodes) {
-      await setImmediate()
       await this.onPeerAnnouncement(announcedNode)
     }
 
@@ -556,22 +562,26 @@ class Hopr extends EventEmitter {
       return tuples.length > 1 && tuples[0][0] != protocols('p2p').code
     })
 
+    const pubKey = convertPubKeyFromPeerId(peer.id)
     try {
-      const pubKey = convertPubKeyFromPeerId(peer.id)
       await this.libp2pComponents.getPeerStore().keyBook.set(peer.id, pubKey.bytes)
-
-      if (dialables.length > 0) {
-        this.publicNodesEmitter.emit('addPublicNode', { id: peer.id, multiaddrs: dialables })
-
-        await this.libp2pComponents.getPeerStore().addressBook.add(peer.id, dialables)
-      }
-
-      // Mark the corresponding entry as public & recalculate network health indicator
-      this.knownPublicNodesCache.add(peer.id.toString())
-      this.heartbeat.recalculateNetworkHealth()
     } catch (err) {
-      log(`Failed to update peer-store with new peer ${peer.id.toString()} info`, err)
+      log(`Failed to update key peer-store with new peer ${peer.id.toString()} info`, err)
     }
+
+    if (dialables.length > 0) {
+      this.publicNodesEmitter.emit('addPublicNode', { id: peer.id, multiaddrs: dialables })
+
+      try {
+        await this.libp2pComponents.getPeerStore().addressBook.add(peer.id, dialables)
+      } catch (err) {
+        log(`Failed to update address peer-store with new peer ${peer.id.toString()} info`, err)
+      }
+    }
+
+    // Mark the corresponding entry as public & recalculate network health indicator
+    this.knownPublicNodesCache.add(peer.id.toString())
+    this.heartbeat.recalculateNetworkHealth()
   }
 
   // On the strategy interval, poll the strategy to see what channel changes
@@ -740,7 +750,7 @@ class Hopr extends EventEmitter {
       try {
         // @TODO add abort controller
         for await (const relayer of this.libp2pComponents.getContentRouting().findProviders(createRelayerKey(peer))) {
-          const relayAddress = createCircuitAddress(relayer.id, peer)
+          const relayAddress = createCircuitAddress(relayer.id)
           if (addrs.findIndex((ma) => ma.equals(relayAddress)) < 0) {
             addrs.push(relayAddress)
           }
@@ -908,15 +918,18 @@ class Hopr extends EventEmitter {
    * Similar to `libp2p.hangUp` but catching all errors.
    * @param peer PeerId of the peer from whom we want to disconnect
    */
-  private async closeConnectionsTo(peer: PeerId): Promise<void> {
+  private closeConnectionsTo(peer: PeerId): void {
     const connections = this.libp2pComponents.getConnectionManager().getConnections(peer)
 
     for (const conn of connections) {
-      try {
-        await conn.close()
-      } catch (err: any) {
-        error(`Error while intentionally closing connection to ${peer.toString()}`, err)
-      }
+      // Don't block event loop
+      ;(async function () {
+        try {
+          await conn.close()
+        } catch (err: any) {
+          error(`Error while intentionally closing connection to ${peer.toString()}`, err)
+        }
+      })()
     }
   }
 

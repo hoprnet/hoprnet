@@ -13,7 +13,7 @@ export default class AccessControl {
   constructor(
     private networkPeers: NetworkPeers,
     private isAllowedAccessToNetwork: (peerId: PeerId) => Promise<boolean>,
-    private closeConnectionsTo: (peerId: PeerId) => Promise<void>
+    private closeConnectionsTo: (peerId: PeerId) => void
   ) {}
 
   private allowConnectionWithPeer(peerId: PeerId, origin: NetworkPeersOrigin): void {
@@ -22,8 +22,8 @@ export default class AccessControl {
   }
 
   private async denyConnectionWithPeer(peerId: PeerId, origin: NetworkPeersOrigin): Promise<void> {
+    this.closeConnectionsTo(peerId)
     this.networkPeers.addPeerToDenied(peerId, origin)
-    await this.closeConnectionsTo(peerId)
   }
 
   /**
@@ -40,7 +40,7 @@ export default class AccessControl {
       if (allowed) {
         this.allowConnectionWithPeer(peerId, origin)
       } else {
-        await this.denyConnectionWithPeer(peerId, origin)
+        this.denyConnectionWithPeer(peerId, origin)
       }
     } catch (error) {
       logError(`unexpected error when reviewing connection ${peerId.toString()} from ${origin}`, error)

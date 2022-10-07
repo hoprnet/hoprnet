@@ -4,14 +4,12 @@ import { setTimeout } from 'timers/promises'
 import { SOCKET_CLOSE_TIMEOUT, TCPConnection } from './tcp.js'
 import { once } from 'events'
 import { Multiaddr } from '@multiformats/multiaddr'
-import { u8aEquals, defer, privKeyToPeerId } from '@hoprnet/hopr-utils'
+import { u8aEquals, defer } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import type { EventEmitter } from 'events'
 
 import { waitUntilListening, stopNode } from './utils.spec.js'
 import { Writable } from 'stream'
-
-const peerId = privKeyToPeerId('0xe89695ba0c247b14fc552367d9f92f598b4308782e2ce09396fcd0f1bafcc397')
 
 describe('test TCP connection', function () {
   it('should test TCPConnection against Node.js APIs', async function () {
@@ -32,8 +30,7 @@ describe('test TCP connection', function () {
     await waitUntilListening<undefined | number>(server, undefined)
 
     const conn = await TCPConnection.create(
-      new Multiaddr(`/ip4/127.0.0.1/tcp/${(server.address() as AddressInfo).port}`),
-      peerId
+      new Multiaddr(`/ip4/127.0.0.1/tcp/${(server.address() as AddressInfo).port}`)
     )
 
     await conn.sink(
@@ -79,8 +76,7 @@ describe('test TCP connection', function () {
     await waitUntilListening(server, undefined)
 
     const conn = await TCPConnection.create(
-      new Multiaddr(`/ip4/127.0.0.1/tcp/${(server.address() as AddressInfo).port}`),
-      peerId
+      new Multiaddr(`/ip4/127.0.0.1/tcp/${(server.address() as AddressInfo).port}`)
     )
 
     await conn.sink(
@@ -124,7 +120,7 @@ describe('test TCP connection', function () {
 
     await assert.rejects(
       async () => {
-        await TCPConnection.create(new Multiaddr(`/ip4/127.0.0.1/tcp/${INVALID_PORT}`), peerId)
+        await TCPConnection.create(new Multiaddr(`/ip4/127.0.0.1/tcp/${INVALID_PORT}`))
       },
       {
         name: 'Error',
@@ -154,7 +150,6 @@ describe('test TCP connection', function () {
 
     const conn = await TCPConnection.create(
       new Multiaddr(`/ip4/127.0.0.1/tcp/${(server.address() as AddressInfo).port}`),
-      peerId,
       {
         signal: abort.signal,
         upgrader: undefined as any
@@ -205,7 +200,7 @@ describe('test TCP connection - socket errors', function () {
       })
     })
 
-    const conn = TCPConnection.fromSocket(socket as Socket, peerId)
+    const conn = TCPConnection.fromSocket(socket as Socket)
 
     await conn.sink(
       (async function* (): AsyncIterable<Uint8Array> {
