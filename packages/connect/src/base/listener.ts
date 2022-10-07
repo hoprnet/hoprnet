@@ -461,7 +461,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     }
 
     if (conn.tags) {
-      conn.tags = [PeerConnectionType.DIRECT, ...conn.tags]
+      conn.tags.push(PeerConnectionType.DIRECT)
     } else {
       conn.tags = [PeerConnectionType.DIRECT]
     }

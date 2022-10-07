@@ -320,7 +320,7 @@ class HoprConnect implements Transport, Initializable, Startable {
 
     verbose(`Direct connection to ${maConn.remoteAddr.toString()} has been established successfully!`)
     if (conn.tags) {
-      conn.tags = [PeerConnectionType.DIRECT, ...conn.tags]
+      conn.tags.push(PeerConnectionType.DIRECT)
     } else {
       conn.tags = [PeerConnectionType.DIRECT]
     }
