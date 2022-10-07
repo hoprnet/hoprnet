@@ -1,5 +1,9 @@
 # Changelog
 
+<a name="1.91"></a>
+
+---
+
 <a name="1.90"></a>
 
 ## [1.90](https://github.com/hoprnet/hoprnet/compare/release/paleochora...hoprnet:release/valencia)
@@ -57,6 +61,7 @@
 - Changed `release/paleochora` default environment to `monte_rosa` in preparation of next release
 - Fix broken package link in Avado ([#4082](https://github.com/hoprnet/hoprnet/pull/4082))
 - Automate contract verification on Gnosis chain and Goerli testnet.
+- Add support for communication between different releases within the same environment
 
 # Breaking changes
 

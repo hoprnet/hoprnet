@@ -1,7 +1,7 @@
 # Run HOPRd  within a single container using npm
 
 # use slim version of node on Debian buster for smaller image sizes
-FROM node:16-bullseye-slim@sha256:8265ac132f720998222008355e11535caf53d6bccecbb562a055605138975b4e as build
+FROM node:16-bullseye-slim@sha256:95d4fdef5e12916a89f7d56dca6d8099de61df875c3c61106cb53e0ba1a48d44 as build
 
 # use bash to have source command and persistent environment
 SHELL ["/bin/bash", "-lc"]
@@ -69,7 +69,7 @@ RUN rm -R packages/avado packages/cover-traffic-daemon
 RUN rm -R packages/ethereum/contracts packages/ethereum/deploy packages/ethereum/hardhat packages/ethereum/tasks packages/ethereum/test
 
 # use slim version of node on Debian buster for smaller image sizes
-FROM node:16-bullseye-slim@sha256:8265ac132f720998222008355e11535caf53d6bccecbb562a055605138975b4e as runtime
+FROM node:16-bullseye-slim@sha256:95d4fdef5e12916a89f7d56dca6d8099de61df875c3c61106cb53e0ba1a48d44 as runtime
 
 # making sure some standard environment variables are set for production use
 ENV NODE_ENV production

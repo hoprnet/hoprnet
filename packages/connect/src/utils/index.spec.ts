@@ -229,4 +229,146 @@ describe(`test util functions`, function () {
       }
     }
   })
+
+  it('toU8aStream - string', async function () {
+    const firstMessage = 'first message'
+    const secondMessage = 'second message'
+
+    const stringStream = (async function* () {
+      yield firstMessage
+      yield secondMessage
+    })()
+
+    let i = 0
+    for await (const chunk of toU8aStream(stringStream)) {
+      if (i++ == 0) {
+        assert(new TextDecoder().decode(chunk) === firstMessage)
+      } else {
+        assert(new TextDecoder().decode(chunk) === secondMessage)
+      }
+    }
+
+    const stringStreamSync = (function* () {
+      yield firstMessage
+      yield secondMessage
+    })()
+
+    i = 0
+    for (const chunk of toU8aStream(stringStreamSync)) {
+      if (i++ == 0) {
+        assert(new TextDecoder().decode(chunk) === firstMessage)
+      } else {
+        assert(new TextDecoder().decode(chunk) === secondMessage)
+      }
+    }
+  })
+
+  it('toU8aStream - Buffer', async function () {
+    const firstMessage = Buffer.from([0, 1, 2, 3, 4])
+    const secondMessage = Buffer.from([1, 2, 3, 4, 5])
+
+    const stringStream = (async function* () {
+      yield firstMessage
+      yield secondMessage
+    })()
+
+    let i = 0
+    for await (const chunk of toU8aStream(stringStream)) {
+      assert(!Buffer.isBuffer(chunk))
+
+      if (i++ == 0) {
+        assert(u8aEquals(chunk, firstMessage))
+      } else {
+        assert(u8aEquals(chunk, secondMessage))
+      }
+    }
+
+    const stringStreamSync = (function* () {
+      yield firstMessage
+      yield secondMessage
+    })()
+
+    i = 0
+    for (const chunk of toU8aStream(stringStreamSync)) {
+      assert(!Buffer.isBuffer(chunk))
+      if (i++ == 0) {
+        assert(u8aEquals(chunk, firstMessage))
+      } else {
+        assert(u8aEquals(chunk, secondMessage))
+      }
+    }
+  })
+
+  it('toU8aStream - Uint8ArrayList', async function () {
+    const firstMessage = new Uint8ArrayList(new Uint8Array([0, 1, 2]), new Uint8Array([3, 4]))
+    const secondMessage = new Uint8ArrayList(new Uint8Array([1, 2, 3]), new Uint8Array([4, 5]))
+
+    const stringStream = (async function* () {
+      yield firstMessage
+      yield secondMessage
+    })()
+
+    let i = 0
+    for await (const chunk of toU8aStream(stringStream)) {
+      if (i++ == 0) {
+        assert(chunk.length == firstMessage.length)
+        assert(u8aEquals(chunk.slice(), firstMessage.slice()))
+      } else {
+        assert(chunk.length == secondMessage.length)
+        assert(u8aEquals(chunk.slice(), secondMessage.slice()))
+      }
+    }
+
+    const stringStreamSync = (function* () {
+      yield firstMessage
+      yield secondMessage
+    })()
+
+    i = 0
+    for (const chunk of toU8aStream(stringStreamSync)) {
+      if (i++ == 0) {
+        assert(chunk.length == firstMessage.length)
+        assert(u8aEquals(chunk.slice(), firstMessage.slice()))
+      } else {
+        assert(chunk.length == secondMessage.length)
+        assert(u8aEquals(chunk.slice(), secondMessage.slice()))
+      }
+    }
+  })
+
+  it('toU8aStream - Uint8Array', async function () {
+    const firstMessage = Uint8Array.from([0, 1, 2, 3, 4])
+    const secondMessage = Uint8Array.from([1, 2, 3, 4, 5])
+
+    const stringStream = (async function* () {
+      yield firstMessage
+      yield secondMessage
+    })()
+
+    let i = 0
+    for await (const chunk of toU8aStream(stringStream)) {
+      assert(!Buffer.isBuffer(chunk))
+
+      if (i++ == 0) {
+        assert(u8aEquals(chunk, firstMessage))
+      } else {
+        assert(u8aEquals(chunk, secondMessage))
+      }
+    }
+
+    const stringStreamSync = (function* () {
+      yield firstMessage
+      yield secondMessage
+    })()
+
+    i = 0
+    for (const chunk of toU8aStream(stringStreamSync)) {
+      assert(!Buffer.isBuffer(chunk))
+      if (i++ == 0) {
+        assert(u8aEquals(chunk, firstMessage))
+      } else {
+        assert(u8aEquals(chunk, secondMessage))
+      }
+    }
+  })
 })
