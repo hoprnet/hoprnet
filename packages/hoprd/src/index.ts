@@ -1,4 +1,3 @@
-import { passwordStrength } from 'check-password-strength'
 import path from 'path'
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
@@ -371,13 +370,7 @@ async function main() {
     if (argv.apiToken == null) {
       throw Error(`Must provide --apiToken when --api is specified`)
     }
-    const { contains: hasSymbolTypes, length }: { contains: string[]; length: number } = passwordStrength(argv.apiToken)
-    for (const requiredSymbolType of ['uppercase', 'lowercase', 'symbol', 'number']) {
-      if (!hasSymbolTypes.includes(requiredSymbolType)) {
-        throw new Error(`API token must include a ${requiredSymbolType}`)
-      }
-    }
-    if (length < 8) {
+    if (argv.apiToken.length < 8) {
       throw new Error(`API token must be at least 8 characters long`)
     }
   }
