@@ -1095,7 +1095,7 @@ ___
 
 ### createCircuitAddress
 
-▸ **createCircuitAddress**(`relay`, `destination`): `Multiaddr`
+▸ **createCircuitAddress**(`relay`): `Multiaddr`
 
 Create a multiaddress that is a circuit address using given relay to the given destination.
 
@@ -1104,7 +1104,6 @@ Create a multiaddress that is a circuit address using given relay to the given d
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `relay` | `PeerId` | Relay peer ID |
-| `destination` | `PeerId` | Destination peer ID |
 
 #### Returns
 

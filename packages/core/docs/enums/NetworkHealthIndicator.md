@@ -23,7 +23,7 @@ based on the different node types we can ping.
 
 #### Defined in
 
-[packages/core/src/network/heartbeat.ts:44](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/network/heartbeat.ts#L44)
+[packages/core/src/network/heartbeat.ts:50](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/network/heartbeat.ts#L50)
 
 ___
 
@@ -33,7 +33,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/network/heartbeat.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/network/heartbeat.ts#L42)
+[packages/core/src/network/heartbeat.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/network/heartbeat.ts#L48)
 
 ___
 
@@ -43,7 +43,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/network/heartbeat.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/network/heartbeat.ts#L41)
+[packages/core/src/network/heartbeat.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/network/heartbeat.ts#L47)
 
 ___
 
@@ -53,7 +53,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/network/heartbeat.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/network/heartbeat.ts#L40)
+[packages/core/src/network/heartbeat.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/network/heartbeat.ts#L46)
 
 ___
 
@@ -63,4 +63,4 @@ ___
 
 #### Defined in
 
-[packages/core/src/network/heartbeat.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/network/heartbeat.ts#L43)
+[packages/core/src/network/heartbeat.ts:49](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/network/heartbeat.ts#L49)
