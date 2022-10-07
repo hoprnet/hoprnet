@@ -257,13 +257,20 @@ class HoprConnect implements Transport, Initializable, Startable {
       throw err
     }
 
-    const _tags = conn.tags ?? []
-    conn.tags = new Proxy(_tags, {
-      get: (target) => {
-        // Always get *latest* tags from maConn object
-        return [...target, ...((maConn as any).tags ?? [])]
-      }
-    })
+    const existingTags = conn.tags ?? []
+    Object.assign(
+      conn,
+      new Proxy(conn, {
+        get: (...args) => {
+          if (args[1] === 'tags') {
+            // Always get *latest* tags from maConn object as it could
+            // get upgraded to a direct connection
+            return [...existingTags, ...((maConn as any).tags ?? [])]
+          }
+          return Reflect.get(...args)
+        }
+      })
+    )
 
     verbose(`Relayed connection to ${maConn.remoteAddr.toString()} has been established successfully!`)
     return conn

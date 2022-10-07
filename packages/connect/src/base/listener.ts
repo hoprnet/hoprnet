@@ -20,7 +20,12 @@ import { Multiaddr } from '@multiformats/multiaddr'
 import { isAnyAddress, u8aEquals, defer } from '@hoprnet/hopr-utils'
 
 import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP } from '../constants.js'
-import type { PeerStoreType, HoprConnectOptions, HoprConnectTestingOptions } from '../types.js'
+import {
+  type PeerStoreType,
+  type HoprConnectOptions,
+  type HoprConnectTestingOptions,
+  PeerConnectionType
+} from '../types.js'
 import { handleStunRequest, getExternalIp } from './stun.js'
 import { getAddrs } from './addrs.js'
 import { TCPConnection } from './tcp.js'
@@ -453,6 +458,12 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       }
 
       return
+    }
+
+    if (conn.tags) {
+      conn.tags = [PeerConnectionType.DIRECT, ...conn.tags]
+    } else {
+      conn.tags = [PeerConnectionType.DIRECT]
     }
 
     for (const peer of this.connectComponents.getEntryNodes().getUsedRelayPeerIds()) {

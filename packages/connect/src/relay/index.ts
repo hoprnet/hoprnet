@@ -388,14 +388,29 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       handShakeResult.stream
     )
 
+    let upgradedConn: Connection
     try {
       // Will call internal libp2p event handler, so no further action required
-      await this.getComponents().getUpgrader().upgradeInbound(newConn)
+      upgradedConn = await this.getComponents().getUpgrader().upgradeInbound(newConn)
     } catch (err) {
       error(`Could not upgrade relayed connection. Error was: ${err}`)
       return
     }
 
+    const existingTags = upgradedConn.tags ?? []
+    Object.assign(
+      upgradedConn,
+      new Proxy(upgradedConn, {
+        get: (...args) => {
+          if (args[1] === 'tags') {
+            // Always get *latest* tags from maConn object as it could
+            // get upgraded to a direct connection
+            return [...existingTags, ...((newConn as any).tags ?? [])]
+          }
+          return Reflect.get(...args)
+        }
+      })
+    )
     // @TODO
     // this.discovery._peerDiscovered(newConn.remotePeer, [newConn.remoteAddr])
   }
