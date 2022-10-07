@@ -2997,7 +2997,7 @@ __metadata:
     "@libp2p/interface-peer-store": 1.0.0
     "@libp2p/interface-transport": 1.0.0
     "@libp2p/interfaces": 2.0.4
-    "@libp2p/mplex": 1.2.1
+    "@libp2p/mplex": 1.2.2
     "@libp2p/peer-id": 1.1.13
     "@multiformats/multiaddr": 10.3.3
     "@types/bl": 5.0.2
@@ -3084,7 +3084,7 @@ __metadata:
     "@libp2p/interface-registrar": 1.1.0
     "@libp2p/interfaces": 2.0.4
     "@libp2p/kad-dht": 1.0.16
-    "@libp2p/mplex": 1.2.1
+    "@libp2p/mplex": 1.2.2
     "@libp2p/peer-id": 1.1.13
     "@libp2p/peer-id-factory": 1.0.18
     "@libp2p/tcp": 1.0.11
@@ -3205,7 +3205,7 @@ __metadata:
     "@libp2p/interface-peer-id": 1.0.4
     "@libp2p/interface-peer-store": 1.0.0
     "@libp2p/kad-dht": 1.0.16
-    "@libp2p/mplex": 1.2.1
+    "@libp2p/mplex": 1.2.2
     "@libp2p/peer-id": 1.1.13
     "@libp2p/peer-id-factory": 1.0.18
     "@libp2p/tcp": 1.0.11
@@ -3674,9 +3674,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@libp2p/mplex@npm:1.2.1":
-  version: 1.2.1
-  resolution: "@libp2p/mplex@npm:1.2.1"
+"@libp2p/mplex@npm:1.2.2":
+  version: 1.2.2
+  resolution: "@libp2p/mplex@npm:1.2.2"
   dependencies:
     "@libp2p/logger": ^1.1.3
     "@libp2p/tracked-map": ^1.0.5
@@ -3689,7 +3689,7 @@ __metadata:
     uint8arraylist: ^1.4.0
     uint8arrays: ^3.0.0
     varint: ^6.0.0
-  checksum: f21d6191ca7e415788784555770ab39665517e772f715f186a8075457e0ced83603d260633ee14076c9c3cbc8692e10f22c8180cce3ce179e5dc6dc4575f643a
+  checksum: 532deae8985efb91a33c3b8d8db0b2bfd4ec1eb60ce06d11222c05c6627de294fdd2b06f963d7bccdc96e02a3597e520cbe1acd730c13e1a5cbbb3656c848bf7
   languageName: node
   linkType: hard
 
