@@ -23297,16 +23297,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"uint8arraylist@npm:2.3.2, uint8arraylist@npm:^2.0.0, uint8arraylist@npm:^2.1.1":
-  version: 2.3.2
-  resolution: "uint8arraylist@npm:2.3.2"
-  dependencies:
-    uint8arrays: ^3.1.0
-  checksum: 468bb198a34be14fb061f40ef0d9f6703412a07a05d4f01223ece546b76ed578e8cb5696ecf2132dc6303b4d97a2c2d937b0c75e7517ed7c7cb135f3d8bbd280
-  languageName: node
-  linkType: hard
-
-"uint8arraylist@npm:2.3.2, uint8arraylist@npm:^2.0.0, uint8arraylist@npm:^2.3.2":
+"uint8arraylist@npm:2.3.2, uint8arraylist@npm:^2.0.0, uint8arraylist@npm:^2.1.1, uint8arraylist@npm:^2.3.2":
   version: 2.3.2
   resolution: "uint8arraylist@npm:2.3.2"
   dependencies:
