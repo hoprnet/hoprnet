@@ -74,7 +74,6 @@ export async function createLibp2pInstance(
 
     // Make libp2p aware of environments
     const protocolPrefix = `hopr/${options.environment.id}`
-    const protocolDHTPrefix = `/hopr/${options.environment.id}`
 
     // Collect supported environments and versions to be passed to HoprConnect
     // because hopr-connect doesn't have access to the protocol config file
@@ -118,7 +117,12 @@ export async function createLibp2pInstance(
       ],
       streamMuxers: [new Mplex()],
       connectionEncryption: [new Noise()],
-      dht: new KadDHT({ protocolPrefix: protocolDHTPrefix, pingTimeout: 2000 }),
+      dht: new KadDHT({
+        // Protocol prefixes require a trailing slash
+        protocolPrefix: `/${protocolPrefix}`,
+        // Limit size of ping queue by using smaller timeouts
+        pingTimeout: 2000
+      }),
       connectionManager: {
         autoDial: true,
         // Use custom sorting to prevent from problems with libp2p
