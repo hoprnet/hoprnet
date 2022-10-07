@@ -158,7 +158,7 @@ export type Subscribe = ((
   errHandler: (err: any) => void
 ) => void) &
   ((
-    protocol: string,
+    protocol: string | string[],
     handler: LibP2PHandlerFunction<Promise<void> | void>,
     includeReply: false,
     errHandler: (err: any) => void
@@ -375,8 +375,19 @@ class Hopr extends EventEmitter {
       this.networkPeers.register(event.detail.remotePeer, NetworkPeersOrigin.INCOMING_CONNECTION)
     })
 
-    const protocolMsg = `/hopr/${this.environment.id}/msg/${NORMALIZED_VERSION}`
-    const protocolAck = `/hopr/${this.environment.id}/ack/${NORMALIZED_VERSION}`
+    const protocolMsg = [
+      // current
+      `/hopr/${this.environment.id}/msg/${NORMALIZED_VERSION}`,
+      // deprecated
+      `/hopr/${this.environment.id}/msg`
+    ]
+
+    const protocolAck = [
+      // current
+      `/hopr/${this.environment.id}/ack/${NORMALIZED_VERSION}`,
+      // deprecated
+      `/hopr/${this.environment.id}/ack`
+    ]
 
     // Attach mixnet functionality
     await subscribeToAcknowledgements(
