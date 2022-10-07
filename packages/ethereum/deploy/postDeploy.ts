@@ -98,7 +98,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       console.log('check if contract has been verified', result)
     } catch (error) {
       console.error(`  >> Error when checking verified contract with API ${error}`)
-      continue;
+      continue
     }
 
     if ((result as any).status === '0') {
