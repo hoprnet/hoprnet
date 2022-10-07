@@ -232,7 +232,7 @@ class HoprConnect implements Transport, Initializable, Startable {
    * @param options optional dial options
    */
   private async dialWithRelay(relay: PeerId, destination: PeerId, options: DialOptions): Promise<Connection> {
-    log(`Attempting to dial ${chalk.yellow(`/p2p/${relay.toString()}/p2p-circuit/p2p/${destination.toString()}`)}`)
+    log(`Dialing ${chalk.yellow(`/p2p/${relay.toString()}/p2p-circuit/p2p/${destination.toString()}`)}`)
 
     let maConn = await this.getConnectComponents().getRelay().connect(relay, destination, options)
 
@@ -264,7 +264,7 @@ class HoprConnect implements Transport, Initializable, Startable {
     ma: Multiaddr,
     options: DialOptions & { onDisconnect?: (ma: Multiaddr) => void }
   ): Promise<Connection> {
-    log(`Attempting to dial ${chalk.yellow(ma.toString())}`)
+    log(`Dialing ${chalk.yellow(ma.toString())}`)
 
     const maConn = await TCPConnection.create(ma, options)
 
