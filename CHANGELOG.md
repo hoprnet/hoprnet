@@ -9,6 +9,7 @@
 - Add support for communication between different releases within the same environment
 - Avado: limit Docker container memory to maximum 1GB
 - Reduce memory copy operations by reusing underlying memory pages ([#4168](https://github.com/hoprnet/hoprnet/pull/4168))
+- Fix public node resolution for connectivity indicator ([#4205]https://github.com/hoprnet/hoprnet/pull/4205)
 
 ---
 
