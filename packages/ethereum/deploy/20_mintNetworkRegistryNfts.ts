@@ -133,9 +133,9 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     console.log(`Deployer is not minter. Skip minting NFTs, although ${dummyNftTypesToBeMinted} need to be minted.`)
   }
 
-  // Add special NFTs in staging environment (for both staging and production environments)
-  if (network.tags.staging || network.tags.production) {
-    // add special NFT types (dev NFTs) in network registry for both staging and production envionment
+  // Add special NFTs in staging environment (for staging environment)
+  if (network.tags.staging) {
+    // add special NFT types (dev NFTs) in network registry for staging
     const registryProxy = (await ethers.getContractFactory('HoprStakingProxyForNetworkRegistry')).attach(
       registryProxyDeployment.address
     ) as HoprStakingProxyForNetworkRegistry
