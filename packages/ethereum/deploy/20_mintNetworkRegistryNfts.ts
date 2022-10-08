@@ -29,7 +29,7 @@ const getToCreateDummyNftIndexes = async (
   // loop through the array storage and record the length and dev nft index, if any
   while (mintedIndex < shouldHaveIndexesBefore) {
     try {
-      const createdNftTypes = await hoprBoost.typeAt(mintedIndex + 1, { gasLimit: 400e3 }) // array of types are 1-based
+      const createdNftTypes = await hoprBoost.typeAt(mintedIndex + 1) // array of types are 1-based
       console.log(`createdNftTypes ${createdNftTypes}`)
     } catch (error) {
       // reaching the end of nft index array storage: panic code 0x32 (Array accessed at an out-of-bounds or negative index
@@ -94,9 +94,8 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       for (const dummyNftIndex of dummyNftTypesToBeMinted) {
         console.log(`... minting 1 ${DUMMY_NFT_TYPE} NFTs type of rank ${DUMMY_NFT_TYPE}`)
         await awaitTxConfirmation(
-          hoprBoost.mint(admin, `${DUMMY_NFT_TYPE}_${dummyNftIndex}`, DUMMY_NFT_TYPE, DUMMY_NFT_BOOST, 0, {
-            gasLimit: 4e6
-          }),
+          hoprBoost.mint(admin, `${DUMMY_NFT_TYPE}_${dummyNftIndex}`, DUMMY_NFT_TYPE, DUMMY_NFT_BOOST, 0)
+          ),
           environment,
           hre.ethers
         )
@@ -118,10 +117,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
           NR_NFT_TYPE,
           networkRegistryNftRank,
           NR_NFT_BOOST,
-          0,
-          {
-            gasLimit: 4e6
-          }
+          0
         ),
         environment,
         ethers
@@ -144,10 +140,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       registryProxy.ownerBatchAddSpecialNftTypeAndRank(
         [NR_NFT_TYPE_INDEX, NR_NFT_TYPE_INDEX],
         [NR_NFT_RANK_TECH, NR_NFT_RANK_COM],
-        [NR_NFT_MAX_REGISTRATION_TECH, NR_NFT_MAX_REGISTRATION_COM],
-        {
-          gasLimit: 4e6
-        }
+        [NR_NFT_MAX_REGISTRATION_TECH, NR_NFT_MAX_REGISTRATION_COM]
       ),
       environment,
       ethers
