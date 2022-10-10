@@ -5,7 +5,7 @@ import { decode, Digest } from 'multiformats/hashes/digest'
 // @ts-ignore untyped library
 import { identity } from 'multiformats/hashes/identity'
 
-import { u8aEquals, u8aToNumber, u8aCompare } from '@hoprnet/hopr-utils'
+import { u8aToNumber, u8aCompare } from '@hoprnet/hopr-utils'
 import Debug from 'debug'
 
 const MULTIHASH_LENGTH = 37
@@ -21,13 +21,11 @@ export type DirectAddress = {
   type: AddressType.IPv4 | AddressType.IPv6
   address: Uint8Array
   port: number
-  node?: Uint8Array
 }
 
 export type CircuitAddress = {
   type: AddressType.P2P
   relayer: Uint8Array
-  node: Uint8Array
 }
 
 export type ValidAddress = DirectAddress | CircuitAddress
@@ -74,42 +72,31 @@ function parseMultihash(mh: Uint8Array): { valid: false } | { valid: true; resul
  */
 function parseCircuitAddress(maTuples: [code: number, addr: Uint8Array][]): ParseResult<CircuitAddress> {
   if (
-    maTuples.length != 3 ||
+    maTuples.length < 2 ||
     maTuples[0].length < 2 ||
     maTuples[0][0] != CODE_P2P ||
     maTuples[1].length < 1 ||
-    maTuples[1][0] != CODE_CIRCUIT ||
-    maTuples[2].length < 2 ||
-    maTuples[2][0] != CODE_P2P
+    maTuples[1][0] != CODE_CIRCUIT
   ) {
     return { valid: false }
   }
 
-  // first address and second address WITHOUT length prefix
-  const pubKeys = [maTuples[0][1].slice(1), maTuples[2][1].slice(1)]
+  // relayer address without length prefix
+  const relayerRaw = maTuples[0][1].slice(1)
 
-  const decoded = []
-  for (const pubKey of pubKeys) {
-    let tmp = parseMultihash(pubKey)
+  let tmp = parseMultihash(relayerRaw)
 
-    if (!tmp.valid) {
-      return { valid: false }
-    }
-
-    decoded.push(tmp.result.digest)
-  }
-
-  if (u8aEquals(decoded[0], decoded[1])) {
-    log(`first and second address must not be the same`)
+  if (!tmp.valid) {
     return { valid: false }
   }
+
+  const relayer = tmp.result.digest
 
   return {
     valid: true,
     address: {
       type: AddressType.P2P,
-      relayer: decoded[0],
-      node: decoded[1]
+      relayer
     }
   }
 }
@@ -147,20 +134,6 @@ function parseDirectAddress(maTuples: [code: number, addr: Uint8Array][]): Parse
     port: u8aToNumber(maTuples[1][1]),
     address: maTuples[0][1],
     type: family
-  }
-
-  if (maTuples.length == 3) {
-    if (maTuples[2].length < 2 || maTuples[2][0] != CODE_P2P || maTuples[2][1].length == 0) {
-      return { valid: false }
-    }
-
-    const decoded = parseMultihash(maTuples[2][1].slice(1))
-
-    if (!decoded.valid) {
-      return { valid: false }
-    }
-
-    result.node = decoded.result.digest
   }
 
   return { valid: true, address: result }

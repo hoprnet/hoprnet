@@ -21,7 +21,7 @@ const checkIfContractIsVerified = async (
     hre.config.etherscan.apiKey[hre.network.name] &&
     hre.config.etherscan.apiKey[hre.network.name].length > 0
   ) {
-    // if the contract is deployed on mainnet or goerlie, contracts should be verified on etherscan
+    // if the contract is deployed on mainnet or goerli, contracts should be verified on etherscan
     // use hardhat-etherscan to verify: https://hardhat.org/hardhat-runner/plugins/nomiclabs-hardhat-etherscan
     verificationApiKey = `&apikey=${hre.config.etherscan.apiKey[hre.network.name]}`
   } else {
@@ -90,10 +90,16 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
     console.log('contractName', contractName)
     console.log('contractAddress', contractAddress)
-    console.log('data', data)
 
-    const result = await checkIfContractIsVerified(contractName, contractAddress, hre)
-    console.log('is verified', result)
+    let result
+    try {
+      // call explorer API. TODO: add throttle
+      result = await checkIfContractIsVerified(contractName, contractAddress, hre)
+      console.log('check if contract has been verified', result)
+    } catch (error) {
+      console.error(`  >> Error when checking verified contract with API ${error}`)
+      continue
+    }
 
     if ((result as any).status === '0') {
       // When {"message": "Contract source code not verified", "status": "0"} continue with the verification
@@ -116,7 +122,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       // When {"status": "1"} skip the verification
       console.log(`  Contract ${contractName} is already verified.`)
     } else {
-      console.error(`  >> Error when checking verified contract ABI`)
+      console.error(`  >> Unexpected status code ${(result as any).status} when verifying contract`)
     }
   }
 }

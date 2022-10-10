@@ -297,8 +297,8 @@ export function getLocalHosts(_iface?: string): Network[] {
 /**
  * Create a multiaddress that is a circuit address using given relay to the given destination.
  * @param relay Relay peer ID
- * @param destination Destination peer ID
  */
-export function createCircuitAddress(relay: PeerId, destination: PeerId) {
-  return new Multiaddr(`/p2p/${relay.toString()}/p2p-circuit/p2p/${destination.toString()}`)
+export function createCircuitAddress(relay: PeerId): Multiaddr {
+  // equivalent to `return new Multiaddr(`/p2p/${relay.toString()}/p2p-circuit`)`
+  return new Multiaddr(Uint8Array.from([165, 3, 39, ...relay.toBytes(), 162, 2]))
 }

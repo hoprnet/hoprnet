@@ -21,7 +21,8 @@ import {
   PublicKey,
   debug,
   loadJson,
-  get_package_version
+  get_package_version,
+  setupPromiseRejectionFilter
 } from '@hoprnet/hopr-utils'
 
 import { PersistedState } from './state.js'
@@ -232,6 +233,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   process.once('exit', stopGracefully)
   process.on('SIGINT', stopGracefully)
   process.on('SIGTERM', stopGracefully)
+
+  // Filter specific known promise rejection that cannot be handled for
+  // one reason or the other
+  setupPromiseRejectionFilter()
 
   process.on('uncaughtExceptionMonitor', (err, origin) => {
     // Make sure we get a log.

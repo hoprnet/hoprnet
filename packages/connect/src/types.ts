@@ -60,6 +60,15 @@ export type Environment = {
   versionRange: string
 }
 
+export enum PeerConnectionType {
+  DIRECT = 'DIRECT',
+  // @TODO to be implemented in https://github.com/hoprnet/hoprnet/pull/4171
+  DIRECT_TO_ENTRY = 'DIRECT_TO_ENTRY',
+  RELAYED = 'RELAYED',
+  WEBRTC_RELAYED = 'WEBRTC_RELAYED',
+  WEBRTC_DIRECT = 'WEBRTC_DIRECT'
+}
+
 export type HoprConnectOptions = {
   publicNodes?: PublicNodesEmitter
   allowLocalConnections?: boolean

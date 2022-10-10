@@ -1,15 +1,16 @@
 import type { MultiaddrConnection } from '@libp2p/interface-connection'
-import type {
-  Stream,
-  StreamSink,
-  StreamSource,
-  StreamSourceAsync,
-  StreamResult,
-  StreamType,
-  HoprConnectTestingOptions
+import {
+  type Stream,
+  type StreamSink,
+  type StreamSource,
+  type StreamSourceAsync,
+  type StreamResult,
+  type StreamType,
+  type HoprConnectTestingOptions,
+  PeerConnectionType
 } from '../types.js'
 import { randomBytes } from 'crypto'
-import { RelayPrefix, ConnectionStatusMessages, StatusMessages } from '../constants.js'
+import { RelayPrefix, ConnectionStatusMessages, StatusMessages, CODE_P2P } from '../constants.js'
 import { u8aEquals, u8aToHex, defer, createCircuitAddress, type DeferType } from '@hoprnet/hopr-utils'
 import HeapPkg, { type Heap as HeapType } from 'heap-js'
 
@@ -198,6 +199,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
   public readonly timeline: MultiaddrConnection['timeline']
 
+  public tags: PeerConnectionType[]
+
   constructor(
     private _stream: Stream,
     relay: PeerId,
@@ -230,10 +233,14 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
     this._counterparty = counterparty
 
-    this.remoteAddr = createCircuitAddress(relay, counterparty)
+    this.remoteAddr = createCircuitAddress(relay)
+      .decapsulateCode(CODE_P2P)
+      .encapsulate(`/p2p/${counterparty.toString()}`)
 
     // Pre-generate object to attach to function pointers
     this.state = {} as RelayConnection['state']
+
+    this.tags = [PeerConnectionType.RELAYED]
 
     this._queueStatusMessage = this.queueStatusMessage.bind({
       state: this.state
@@ -340,7 +347,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
             yield* toU8aStream(source) as StreamSourceAsync
           } else {
             // No need to convert it twice since we're using WebRTCConnection class
-            yield* source
+            yield* source as AsyncIterable<Uint8Array>
           }
           deferred.resolve()
         } catch (err: any) {

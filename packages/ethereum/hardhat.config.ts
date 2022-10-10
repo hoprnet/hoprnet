@@ -227,6 +227,12 @@ task<FaucetCLIOPts>('faucet', 'Faucets a local development HOPR node account wit
     types.string
   )
   .addOptionalParam<string>('identityPrefix', `only use identity files with prefix`, undefined, types.string)
+  .addOptionalParam<string>(
+    'tokenType',
+    `specify the type of token to be sent ('hopr' or 'native'), if needed. Defaut value means sending both tokens`,
+    undefined,
+    types.string
+  )
 
 task('accounts', 'View unlocked accounts', getAccounts)
 
