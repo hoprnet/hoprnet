@@ -94,7 +94,7 @@ sed -E "s/%AVADO_VERSION%/${avado_version}/g ; s/%TOKEN%/${api_token}/g ; \
 # Copy sections between *_JSON_EXPORT of docker-compose.yaml to dappnode_package.json
 # and also set dappnode version
 sed -n '/BEGIN_JSON_EXPORT/,/END_JSON_EXPORT/{//!p}' ./docker-compose.yml \
-  | sed -E "s/]/],/ ; s/'/\"/g ; s/#([{}])/\1/" \
+  | sed -E "s/([^#](]|}))$/\1,/ ; s/'/\"/g ; s/#([{}])/\1/" \
   | jq -s ".[0].image += .[1] | .[0] | .version = \"${avado_version}\"" ./dappnode_package.json /dev/stdin \
   > ./dappnode_package.json.tmp && mv ./dappnode_package.json.tmp ./dappnode_package.json
 
