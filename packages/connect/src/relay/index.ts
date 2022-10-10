@@ -1,5 +1,5 @@
 import type { PeerId } from '@libp2p/interface-peer-id'
-import type { Connection, MultiaddrConnection } from '@libp2p/interface-connection'
+import type { Connection } from '@libp2p/interface-connection'
 import type { IncomingStreamData } from '@libp2p/interfaces/registrar'
 import type { Initializable, Components } from '@libp2p/interfaces/components'
 import type { Startable } from '@libp2p/interfaces/startable'
@@ -187,7 +187,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     relay: PeerId,
     destination: PeerId,
     options?: DialOptions
-  ): Promise<MultiaddrConnection | undefined> {
+  ): Promise<RelayConnection | WebRTCConnection | undefined> {
     const response = await dial(
       this.getComponents(),
       relay,
