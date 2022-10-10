@@ -442,7 +442,7 @@ class WebRTCConnection implements MultiaddrConnection {
           // Update state object once source *and* sink are migrated
           this.conn = this.relayConn.state.channel as SimplePeer
           if (!this.tags.includes(PeerConnectionType.WEBRTC_DIRECT)) {
-            this.tags = [PeerConnectionType.WEBRTC_DIRECT]
+            this.tags.push(PeerConnectionType.WEBRTC_DIRECT)
           }
         }
         await toIterable.sink(this.relayConn.state.channel as SimplePeer)(
@@ -566,7 +566,7 @@ class WebRTCConnection implements MultiaddrConnection {
           // Update state object once sink *and* source are migrated
           this.conn = this.relayConn.state.channel as SimplePeer
           if (!this.tags.includes(PeerConnectionType.WEBRTC_DIRECT)) {
-            this.tags = [PeerConnectionType.WEBRTC_DIRECT]
+            this.tags.push(PeerConnectionType.WEBRTC_DIRECT)
           }
         }
 
