@@ -1,4 +1,4 @@
-import type { Stream } from '../types.js'
+import type { HoprConnectOptions, Stream } from '../types.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { unmarshalPublicKey } from '@libp2p/crypto/keys'
 
@@ -22,7 +22,7 @@ type RelayConnections = {
 class RelayState {
   private relayedConnections: Map<string, RelayConnections>
 
-  constructor() {
+  constructor(public options: HoprConnectOptions) {
     this.relayedConnections = new Map()
   }
 
@@ -99,13 +99,26 @@ class RelayState {
   }
 
   /**
+   * Returns an iterator over all stored relayed connections
+   */
+  *[Symbol.iterator]() {
+    const it = this.relayedConnections.values()
+
+    let chunk = it.next()
+
+    for (; !chunk.done; chunk = it.next()) {
+      yield* Object.entries(chunk.value)
+    }
+  }
+
+  /**
    * Performs an operation for each relay context in the current set.
    * @param action
    */
   async forEach(action: (dst: string, ctx: RelayContext) => Promise<void>) {
     await nAtATime(
-      (objEntries) => action(objEntries[0], objEntries[1]),
-      Array.from(this.relayedConnections.values()).map((s) => Object.entries(s)),
+      action,
+      this,
       10 // TODO: Make this configurable or use an existing constant
     )
   }
@@ -126,8 +139,19 @@ class RelayState {
     toDestination: Stream,
     __relayFreeTimeout?: number
   ): Promise<void> {
-    const toSourceContext = new RelayContext(toSource, __relayFreeTimeout)
-    const toDestinationContext = new RelayContext(toDestination, __relayFreeTimeout)
+    const toSourceContext = new RelayContext(
+      toSource,
+      { onClose: this.cleanListener(source, destination), onUpgrade: this.cleanListener(source, destination) },
+      this.options
+    )
+    const toDestinationContext = new RelayContext(
+      toDestination,
+      {
+        onClose: this.cleanListener(destination, source),
+        onUpgrade: this.cleanListener(destination, source)
+      },
+      this.options
+    )
 
     let sourcePromise = toSourceContext.sink(toDestinationContext.source)
     let destinationPromise = toDestinationContext.sink(toSourceContext.source)
@@ -136,12 +160,6 @@ class RelayState {
       [source.toString()]: toSourceContext,
       [destination.toString()]: toDestinationContext
     }
-
-    toSourceContext.once('close', this.cleanListener(source, destination))
-    toSourceContext.once('close', this.cleanListener(destination, source))
-
-    toSourceContext.once('upgrade', this.cleanListener(source, destination))
-    toSourceContext.once('upgrade', this.cleanListener(destination, source))
 
     this.relayedConnections.set(RelayState.getId(source, destination), relayedConnection)
 
