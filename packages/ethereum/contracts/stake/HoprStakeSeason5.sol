@@ -13,7 +13,18 @@ contract HoprStakeSeason5 is HoprStakeBase {
    * Basic APY is 2.5 % and the boost cap is 200k xHOPR
    * It blocks HODLr, DAO_v2, Surveyor, Wildhorn_v2, PuzzleHunt_v1, PuzzleHunt_v2, PuzzleHunt_v3, ETH_Denver and Lucky NFTs at start
    */
-  constructor() HoprStakeBase(0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05, 1666785600, 1674738000, 793, 2e23) {
+  constructor()
+    HoprStakeBase(
+      0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05,
+      1666785600,
+      1674738000,
+      793,
+      2e23,
+      0xD057604A14982FE8D88c5fC25Aac3267eA142a08,
+      0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1,
+      0x43d13D7B83607F14335cF2cB75E87dA369D056c7
+    )
+  {
     // block a selection of HoprBoost NFTs
     _ownerBlockNftType(2); // HODLr
     _ownerBlockNftType(3); // Wildhorn_v1
