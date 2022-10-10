@@ -798,8 +798,16 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdated'>, lastSnapshot: Snapshot): Promise<void> {
-    log('channel-updated for hash %s', event.transactionHash)
-    const channel = await ChannelEntry.fromSCEvent(event, this.getPublicKeyOf.bind(this))
+
+    let channel: ChannelEntry;
+    try {
+      log('channel-updated for hash %s', event.transactionHash)
+      channel = await ChannelEntry.fromSCEvent(event, this.getPublicKeyOf.bind(this))
+    }
+    catch (err) {
+      log(`fatal error: failed to construct new ChannelEntry from the SC event`, err)
+      return
+    }
 
     let prevState: ChannelEntry
     try {
