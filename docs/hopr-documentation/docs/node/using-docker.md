@@ -146,13 +146,13 @@ Otherwise, the installation process is complete! You can proceed to our [hopr-ad
 - 9091 on TCP: main P2P port used for HOPR protocol
 - 9091 on UDP: used for STUN requests by other non-public nodes reaching out to you to see what their IP address is
 
-In general, you will only want to change these port numbers if you intend to run multiple nodes simultaneously. Otherwise, use the Docker command with the default mapping. 
+In general, you will only want to change these port numbers if you intend to run multiple nodes simultaneously. Otherwise, use the Docker command with the default mapping.
 
 **Note:** For the initial Monte Rosa release, you will only be allowed to register a single node at a time.
 
 ## Collecting Logs
 
-If your node crashes, you will want to collect the logs and pass them on to our ambassadors on telegram or create an issue on GitHub. 
+If your node crashes, you will want to collect the logs and pass them on to our ambassadors on telegram or create an issue on GitHub.
 
 To collect the logs:
 
@@ -176,9 +176,5 @@ docker logs -t <CONTAINER_ID>
 
 This should output your logs, copy them and either:
 
-- Save them in a .txt file and send them to an ambassador on our [telegram](https://t.me/hoprnet) for assistance. 
-- Or, create an issue using our bug template on [GitHub.](https://github.com/hoprnet/hoprnet/issues) 
-
-
-
-
+- Save them in a .txt file and send them to an ambassador on our [telegram](https://t.me/hoprnet) for assistance.
+- Or, create an issue using our bug template on [GitHub.](https://github.com/hoprnet/hoprnet/issues)
