@@ -535,8 +535,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     try {
       await this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot, blocking)
-    }
-    catch (err) {
+    } catch (err) {
       log(`error while processing unconfirmed events`, err)
     }
 
