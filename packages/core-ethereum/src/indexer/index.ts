@@ -123,7 +123,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     // and feeds them to the event listener
     ;(async function (this: Indexer) {
       for await (const block of orderedBlocks.iterator()) {
-        await this.onNewBlock(block.value, true, true) // exceptions are handled
+        await this.onNewBlock(block.value, true, true) // exceptions are handled (for real)
       }
     }.call(this))
 
@@ -533,7 +533,12 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       }
     }
 
-    await this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot, blocking)
+    try {
+      await this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot, blocking)
+    }
+    catch (err) {
+      log(`error while processing unconfirmed events`, err)
+    }
 
     // resend queuing transactions, when there are transactions (in queue) that haven't been accepted by the RPC
     // and resend transactions if the current balance is sufficient.
