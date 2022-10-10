@@ -141,7 +141,7 @@ export async function setupRestApi(
 
         const authEncoded = (req.get('authorization') || '').replace('Basic ', '')
         // We only expect a single value here, instead of the usual user:password, so we take the user part as token
-        let apiTokenFromUser = encodeURIComponent(Buffer.from(authEncoded, 'base64').toString('binary')).split(':')[0] // The colon ':' does not get encoded by encodeURI
+        let apiTokenFromUser = encodeURIComponent(Buffer.from(authEncoded, 'base64').toString('binary').split(':')[0])
 
         if (
           !this.options.testNoAuthentication &&
