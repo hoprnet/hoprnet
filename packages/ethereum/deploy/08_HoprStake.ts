@@ -15,8 +15,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // check the lastest block timestamp
   const latestBlockTimestamp = (await ethers.provider.getBlock('latest')).timestamp
   console.log(`Latest block timestamp is ${latestBlockTimestamp}`)
-// TODO: change me! FIXME:
-  const stakeContractName = 'HoprStakeSeason5' // getHoprStakeContractName(latestBlockTimestamp)
+  const stakeContractName = getHoprStakeContractName(latestBlockTimestamp)
   const deployOptions = {
     log: true
   }
@@ -38,5 +37,6 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 main.tags = ['HoprStake']
 main.dependencies = ['preDeploy', 'HoprBoost', 'HoprToken']
+main.skip = async (env: HardhatRuntimeEnvironment) => !!env.network.tags.production
 
 export default main
