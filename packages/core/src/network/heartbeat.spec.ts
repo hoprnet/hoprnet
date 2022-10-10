@@ -75,11 +75,11 @@ function createFakeNetwork() {
     protocols: string | string[],
     handler: (msg: Uint8Array, remotePeer: PeerId) => Promise<Uint8Array>
   ) => {
-    let protocol
-    if (typeof protocols === 'string') {
-      protocol = protocols
+    let protocol: string
+    if (Array.isArray(protocols)) {
+      protocol = protocols[0]
     } else {
-      protocol = protocol[0]
+      protocol = protocols
     }
 
     network.on(reqEventName(self, protocol), async (from: PeerId, request: Uint8Array) => {
@@ -93,11 +93,11 @@ function createFakeNetwork() {
 
   // mocks libp2p.dialProtocol
   const sendMessage = async (self: PeerId, dest: PeerId, protocols: string | string[], msg: Uint8Array) => {
-    let protocol
-    if (typeof protocols === 'string') {
-      protocol = protocols
+    let protocol: string
+    if (Array.isArray(protocols)) {
+      protocol = protocols[0]
     } else {
-      protocol = protocol[0]
+      protocol = protocols
     }
 
     if (network.listenerCount(reqEventName(dest, protocol)) > 0) {
@@ -162,7 +162,7 @@ async function getPeer(
   return { heartbeat, peers }
 }
 
-describe('unit test heartbeat', async () => {
+describe.only('unit test heartbeat', async () => {
   it('check nodes is noop with empty store & health indicator is red', async () => {
     let netHealth = new NetworkHealth()
     const heartbeat = new TestingHeartbeat(

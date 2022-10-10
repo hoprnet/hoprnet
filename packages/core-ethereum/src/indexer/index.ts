@@ -510,7 +510,12 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       let res: Awaited<ReturnType<Indexer['getEvents']>>
 
       for (let i = 0; i < RETRIES; i++) {
-        if (currentBlock > this.startupBlock + this.maxConfirmations) {
+        log(
+          `fetchEvents at currentBlock ${currentBlock} startupBlock ${this.startupBlock} maxConfirmations ${
+            this.maxConfirmations
+          }. ${currentBlock > this.startupBlock + this.maxConfirmations}`
+        )
+        if (currentBlock > this.startupBlock) {
           // between starting block "Latest on-chain block" and finality + 1 to prevent double processing of events in blocks ["Latest on-chain block" - maxConfirmations, "Latest on-chain block"]
           res = await this.getEvents(currentBlock, currentBlock, true)
         } else {

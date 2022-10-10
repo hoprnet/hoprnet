@@ -17,7 +17,12 @@ import { TCPConnection, Listener } from './base/index.js'
 // @ts-ignore
 import pkg from '../package.json' assert { type: 'json' }
 
-import type { PublicNodesEmitter, HoprConnectOptions, HoprConnectTestingOptions } from './types.js'
+import {
+  type PublicNodesEmitter,
+  type HoprConnectOptions,
+  type HoprConnectTestingOptions,
+  PeerConnectionType
+} from './types.js'
 
 import { Relay } from './relay/index.js'
 import { Filter } from './filter.js'
@@ -227,7 +232,7 @@ class HoprConnect implements Transport, Initializable, Startable {
    * @param options optional dial options
    */
   private async dialWithRelay(relay: PeerId, destination: PeerId, options: DialOptions): Promise<Connection> {
-    log(`Attempting to dial ${chalk.yellow(`/p2p/${relay.toString()}/p2p-circuit/p2p/${destination.toString()}`)}`)
+    log(`Dialing ${chalk.yellow(`/p2p/${relay.toString()}/p2p-circuit/p2p/${destination.toString()}`)}`)
 
     let maConn = await this.getConnectComponents().getRelay().connect(relay, destination, options)
 
@@ -247,6 +252,19 @@ class HoprConnect implements Transport, Initializable, Startable {
       throw err
     }
 
+    // Merges all tags from `maConn` into `conn` and then make both objects
+    // use the *same* array
+    // This is necessary to dynamically change the connection tags once
+    // a connection gets upgraded from WEBRTC_RELAYED to WEBRTC_DIRECT
+    if (conn.tags == undefined) {
+      conn.tags = []
+    }
+    conn.tags.push(...maConn.tags)
+
+    // assign the array *by value* and its entries *by reference*
+    maConn.tags = conn.tags as any
+
+    verbose(`Relayed connection to ${maConn.remoteAddr.toString()} has been established successfully!`)
     return conn
   }
 
@@ -259,7 +277,7 @@ class HoprConnect implements Transport, Initializable, Startable {
     ma: Multiaddr,
     options: DialOptions & { onDisconnect?: (ma: Multiaddr) => void }
   ): Promise<Connection> {
-    log(`Attempting to dial ${chalk.yellow(ma.toString())}`)
+    log(`Dialing ${chalk.yellow(ma.toString())}`)
 
     const maConn = await TCPConnection.create(ma, options)
 
@@ -296,6 +314,11 @@ class HoprConnect implements Transport, Initializable, Startable {
     })
 
     verbose(`Direct connection to ${maConn.remoteAddr.toString()} has been established successfully!`)
+    if (conn.tags) {
+      conn.tags.push(PeerConnectionType.DIRECT)
+    } else {
+      conn.tags = [PeerConnectionType.DIRECT]
+    }
 
     return conn
   }
@@ -304,4 +327,4 @@ class HoprConnect implements Transport, Initializable, Startable {
 export type { PublicNodesEmitter, HoprConnectConfig }
 export { compareAddressesLocalMode, compareAddressesPublicMode } from './utils/index.js'
 
-export { HoprConnect }
+export { HoprConnect, PeerConnectionType }

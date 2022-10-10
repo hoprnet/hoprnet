@@ -139,7 +139,7 @@ EventEmitter.constructor
 
 #### Defined in
 
-[packages/core/src/index.ts:181](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L181)
+[packages/core/src/index.ts:189](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L189)
 
 ___
 
@@ -149,7 +149,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:175](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L175)
+[packages/core/src/index.ts:183](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L183)
 
 ___
 
@@ -159,7 +159,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:174](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L174)
+[packages/core/src/index.ts:182](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L182)
 
 ___
 
@@ -169,7 +169,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:183](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L183)
+[packages/core/src/index.ts:191](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L191)
 
 ___
 
@@ -179,7 +179,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:179](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L179)
+[packages/core/src/index.ts:187](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L187)
 
 ___
 
@@ -189,7 +189,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:176](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L176)
+[packages/core/src/index.ts:184](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L184)
 
 ___
 
@@ -199,7 +199,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:173](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L173)
+[packages/core/src/index.ts:181](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L181)
 
 ___
 
@@ -209,7 +209,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:178](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L178)
+[packages/core/src/index.ts:186](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L186)
 
 ___
 
@@ -219,7 +219,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:169](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L169)
+[packages/core/src/index.ts:177](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L177)
 
 ___
 
@@ -241,7 +241,7 @@ It should not assume any other components are running when it is called.
 
 #### Defined in
 
-[packages/core/src/index.ts:177](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L177)
+[packages/core/src/index.ts:185](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L185)
 
 ___
 
@@ -259,7 +259,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:171](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L171)
+[packages/core/src/index.ts:179](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L179)
 
 ___
 
@@ -269,7 +269,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:172](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L172)
+[packages/core/src/index.ts:180](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L180)
 
 ___
 
@@ -405,7 +405,7 @@ ___
 
 ### closeConnectionsTo
 
-▸ `Private` **closeConnectionsTo**(`peer`): `Promise`<`void`\>
+▸ `Private` **closeConnectionsTo**(`peer`): `void`
 
 Closes all open connections to a peer. Used to temporarily or permanently
 disconnect from a peer.
@@ -419,7 +419,7 @@ Similar to `libp2p.hangUp` but catching all errors.
 
 #### Returns
 
-`Promise`<`void`\>
+`void`
 
 ___
 

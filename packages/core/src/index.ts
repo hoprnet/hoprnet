@@ -76,6 +76,7 @@ import { Packet } from './messages/index.js'
 import type { ResolvedEnvironment } from './environment.js'
 import { createLibp2pInstance } from './main.js'
 import type { EventEmitter as Libp2pEmitter } from '@libp2p/interfaces/events'
+import { PeerConnectionType } from '@hoprnet/hopr-connect'
 
 const DEBUG_PREFIX = `hopr-core`
 const log = debug(DEBUG_PREFIX)
@@ -157,7 +158,7 @@ export type Subscribe = ((
   errHandler: (err: any) => void
 ) => void) &
   ((
-    protocol: string,
+    protocol: string | string[],
     handler: LibP2PHandlerFunction<Promise<void> | void>,
     includeReply: false,
     errHandler: (err: any) => void
@@ -350,7 +351,22 @@ class Hopr extends EventEmitter {
       this.closeConnectionsTo.bind(this),
       accessControl.reviewConnection.bind(accessControl),
       this,
-      (peerId: PeerId) => this.knownPublicNodesCache.has(peerId.toString()),
+      (peerId: PeerId) => {
+        if (this.knownPublicNodesCache.has(peerId.toString())) return true
+
+        // If we have a direct connection to this peer ID, declare it a public node
+        if (
+          libp2p.connectionManager
+            .getConnections(peerId)
+            .flatMap((c) => c.tags ?? [])
+            .includes(PeerConnectionType.DIRECT)
+        ) {
+          this.knownPublicNodesCache.add(peerId)
+          return true
+        }
+
+        return false
+      },
       this.environment.id,
       this.options
     )
@@ -359,8 +375,19 @@ class Hopr extends EventEmitter {
       this.networkPeers.register(event.detail.remotePeer, NetworkPeersOrigin.INCOMING_CONNECTION)
     })
 
-    const protocolMsg = `/hopr/${this.environment.id}/msg/${NORMALIZED_VERSION}`
-    const protocolAck = `/hopr/${this.environment.id}/ack/${NORMALIZED_VERSION}`
+    const protocolMsg = [
+      // current
+      `/hopr/${this.environment.id}/msg/${NORMALIZED_VERSION}`,
+      // deprecated
+      `/hopr/${this.environment.id}/msg`
+    ]
+
+    const protocolAck = [
+      // current
+      `/hopr/${this.environment.id}/ack/${NORMALIZED_VERSION}`,
+      // deprecated
+      `/hopr/${this.environment.id}/ack`
+    ]
 
     // Attach mixnet functionality
     await subscribeToAcknowledgements(
@@ -553,9 +580,7 @@ class Hopr extends EventEmitter {
       log(`Failed to update key peer-store with new peer ${peer.id.toString()} info`, err)
     }
 
-    console.log(`dialables`, dialables)
     if (dialables.length > 0) {
-      console.log(`emitting addPublicNode`)
       this.publicNodesEmitter.emit('addPublicNode', { id: peer.id, multiaddrs: dialables })
 
       try {

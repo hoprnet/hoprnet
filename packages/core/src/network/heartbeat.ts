@@ -52,7 +52,7 @@ export enum NetworkHealthIndicator {
 
 export default class Heartbeat {
   private stopHeartbeatInterval: (() => void) | undefined
-  private protocolHeartbeat: string
+  private protocolHeartbeat: string | string[]
 
   private _pingNode: Heartbeat['pingNode'] | undefined
 
@@ -81,7 +81,12 @@ export default class Heartbeat {
       networkQualityThreshold: config?.networkQualityThreshold,
       maxParallelHeartbeats: config?.maxParallelHeartbeats ?? MAX_PARALLEL_HEARTBEATS
     }
-    this.protocolHeartbeat = `/hopr/${environmentId}/heartbeat/${NORMALIZED_VERSION}`
+    this.protocolHeartbeat = [
+      // current
+      `/hopr/${environmentId}/heartbeat/${NORMALIZED_VERSION}`,
+      // deprecated
+      `/hopr/${environmentId}/heartbeat`
+    ]
   }
 
   private errHandler(err: any) {
@@ -154,6 +159,7 @@ export default class Heartbeat {
     if (pingResponse == null || pingResponse.length != 1 || !u8aEquals(expectedResponse, pingResponse[0])) {
       log(`Mismatched challenge. Got ${u8aToHex(pingResponse[0])} but expected ${u8aToHex(expectedResponse)}`)
 
+      // Eventually close the connections, all errors are handled
       this.closeConnectionsTo(destination)
 
       return {

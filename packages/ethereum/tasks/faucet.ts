@@ -80,6 +80,7 @@ async function getIdentities(directory: string, password: string, prefix?: strin
  * @param amountEth how many ETH
  * @param amountHopr how many HOPR
  * @param networkName which network to use
+ * @param tokenType type of token to be sent by the faucet, be 'hopr' or 'native' or undefined
  * @returns
  */
 async function createTransaction(
@@ -87,7 +88,8 @@ async function createTransaction(
   address: string,
   amountEth: BigNumber,
   amountHopr: BigNumber,
-  networkName: string
+  networkName: string,
+  tokenType?: string
 ): Promise<UnsignedTransaction[]> {
   const txs: UnsignedTransaction[] = [
     await token.populateTransaction.mint(address.toString(), amountHopr, constants.HashZero, constants.HashZero, {
@@ -99,8 +101,19 @@ async function createTransaction(
     }
   ]
 
-  console.log(`💧💰 Sending ${utils.formatEther(amountEth)} ETH to ${address} on network ${networkName}`)
-  console.log(`💧🟡 Sending ${utils.formatEther(amountHopr)} HOPR to ${address} on network ${networkName}`)
+  // include tokenType to reproduce error reported in #4198
+  if (tokenType === 'hopr') {
+    txs.pop()
+  } else if (tokenType === 'native') {
+    txs.shift()
+  }
+
+  if (!tokenType || tokenType === 'native') {
+    console.log(`💧💰 Sending ${utils.formatEther(amountEth)} ETH to ${address} on network ${networkName}`)
+  }
+  if (!tokenType || tokenType === 'hopr') {
+    console.log(`💧🟡 Sending ${utils.formatEther(amountHopr)} HOPR to ${address} on network ${networkName}`)
+  }
 
   return txs
 }
@@ -112,6 +125,7 @@ export type FaucetCLIOPts = {
   amount: string
   identityDirectory?: string
   identityPrefix?: string
+  tokenType?: 'hopr' | 'native'
 }
 
 /**
@@ -181,7 +195,8 @@ async function main(
       identity,
       utils.parseEther('10.0'),
       utils.parseEther('20000.0'),
-      network.name
+      network.name,
+      opts.tokenType
     )
     for (const tx of newTxs) {
       let txSend = send(signer, tx)

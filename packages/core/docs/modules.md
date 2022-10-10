@@ -97,7 +97,7 @@
 
 #### Defined in
 
-[packages/core/src/index.ts:93](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L93)
+[packages/core/src/index.ts:101](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L101)
 
 ___
 
@@ -107,7 +107,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:144](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L144)
+[packages/core/src/index.ts:152](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L152)
 
 ___
 
@@ -143,7 +143,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:159](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L159)
+[packages/core/src/index.ts:167](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L167)
 
 ___
 
@@ -166,11 +166,11 @@ ___
 
 ### Subscribe
 
-Ƭ **Subscribe**: (`protocols`: `string` \| `string`[], `handler`: `LibP2PHandlerFunction`<`Promise`<`Uint8Array`\>\>, `includeReply`: ``true``, `errHandler`: (`err`: `any`) => `void`) => `void` & (`protocol`: `string`, `handler`: `LibP2PHandlerFunction`<`Promise`<`void`\> \| `void`\>, `includeReply`: ``false``, `errHandler`: (`err`: `any`) => `void`) => `void`
+Ƭ **Subscribe**: (`protocols`: `string` \| `string`[], `handler`: `LibP2PHandlerFunction`<`Promise`<`Uint8Array`\>\>, `includeReply`: ``true``, `errHandler`: (`err`: `any`) => `void`) => `void` & (`protocol`: `string` \| `string`[], `handler`: `LibP2PHandlerFunction`<`Promise`<`void`\> \| `void`\>, `includeReply`: ``false``, `errHandler`: (`err`: `any`) => `void`) => `void`
 
 #### Defined in
 
-[packages/core/src/index.ts:146](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L146)
+[packages/core/src/index.ts:154](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L154)
 
 ## Variables
 

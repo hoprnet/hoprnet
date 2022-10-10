@@ -3261,7 +3261,6 @@ __metadata:
     body-parser: 1.19.2
     chai: 4.3.6
     chai-openapi-response-validator: ^0.14.2
-    check-password-strength: 2.0.4
     cookie: 0.4.2
     cors: 2.8.5
     debug: 4.3.4
@@ -4021,8 +4020,8 @@ __metadata:
   linkType: hard
 
 "@multiformats/multiaddr@npm:^11.0.0":
-  version: 11.0.0
-  resolution: "@multiformats/multiaddr@npm:11.0.0"
+  version: 11.0.3
+  resolution: "@multiformats/multiaddr@npm:11.0.3"
   dependencies:
     dns-over-http-resolver: ^2.1.0
     err-code: ^3.0.1
@@ -4030,7 +4029,7 @@ __metadata:
     multiformats: ^9.4.5
     uint8arrays: ^3.0.0
     varint: ^6.0.0
-  checksum: 2f2650dd11fc2d732b1665ad819fc46ee8fbab9330243dc5096a85feacf1fb5cbe1c653676e24e7d17e7b6fa46c167b62c5087064c6a6539183987a8fd5b8431
+  checksum: b59568a9d227594c1926374637e9d436273e8d0edd6ad230a387484bef3d8934da5fe80a0809dfda2f424b774505ddac1c4473cf9f353ada5f830396cdce8379
   languageName: node
   linkType: hard
 
@@ -8020,13 +8019,6 @@ __metadata:
   version: 1.0.2
   resolution: "check-error@npm:1.0.2"
   checksum: d9d106504404b8addd1ee3f63f8c0eaa7cd962a1a28eb9c519b1c4a1dc7098be38007fc0060f045ee00f075fbb7a2a4f42abcf61d68323677e11ab98dc16042e
-  languageName: node
-  linkType: hard
-
-"check-password-strength@npm:2.0.4":
-  version: 2.0.4
-  resolution: "check-password-strength@npm:2.0.4"
-  checksum: e6797f2b8b94fbe1a5bcab2153fb213b0436c223328377bb5dd2ff93a34d09891479702e1b64108b303c317d89ed9e48be2895285ac23389903365204a6a1fcf
   languageName: node
   linkType: hard
 
