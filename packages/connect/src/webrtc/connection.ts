@@ -9,7 +9,6 @@ import { randomBytes } from 'crypto'
 import { toU8aStream, encodeWithLengthPrefix, decodeWithLengthPrefix, eagerIterator } from '../utils/index.js'
 import { abortableSource } from 'abortable-iterator'
 import {
-  type StreamSink,
   type StreamResult,
   type StreamType,
   type StreamSource,
