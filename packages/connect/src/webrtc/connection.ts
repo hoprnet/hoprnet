@@ -510,7 +510,7 @@ class WebRTCConnection implements MultiaddrConnection {
           )
         } catch (err) {
           this.error(`WebRTC sink err`, err)
-          // Initiates Connection object tear down
+          // Initiates Connection object teardown
           // by using meta programming
           this.timeline.close = Date.now()
         }
