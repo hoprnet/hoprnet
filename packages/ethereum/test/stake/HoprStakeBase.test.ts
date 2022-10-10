@@ -19,56 +19,55 @@ describe('HoprStakeBase', function () {
   let erc777: Contract
 
   const BASE_URI = 'https://stake.hoprnet.org/'
-// const FACTOR_DENOMINATOR = 1e12; //
-// const LOCK_TOKEN_ADDRESS = "0xD057604A14982FE8D88c5fC25Aac3267eA142a08";
-// const REWARD_TOKEN_ADDRESS = "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1";
-// const NFT_CONTRACT_ADDRESS = "0x43d13D7B83607F14335cF2cB75E87dA369D056c7";
-// const DEFAULT_OWNER_ADDRESS = "0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05"
+  // const FACTOR_DENOMINATOR = 1e12; //
+  // const LOCK_TOKEN_ADDRESS = "0xD057604A14982FE8D88c5fC25Aac3267eA142a08";
+  // const REWARD_TOKEN_ADDRESS = "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1";
+  // const NFT_CONTRACT_ADDRESS = "0x43d13D7B83607F14335cF2cB75E87dA369D056c7";
+  // const DEFAULT_OWNER_ADDRESS = "0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05"
 
-const BADGES = [
-{
-    type: 'demo',
-    rank: 'demo',
-    deadline: 0,
-    nominator: '158' // 0.5% APY
-},
-{
-    type: 'HODLr',
-    rank: 'silver',
-    deadline: 0,
-    nominator: '158' // 0.5% APY
-},
-{
-    type: 'HODLr',
-    rank: 'platinum',
-    deadline: 0,
-    nominator: '317' // 1% APY
-},
-{
-    type: 'Past',
-    rank: 'gold',
-    deadline: 0, // sometime long long ago
-    nominator: '100'
-},
-{
-    type: 'HODLr',
-    rank: 'bronze extra',
-    deadline: 0,
-    nominator: '79' // 0.25% APY
-},
-{
-    type: 'Testnet participant',
-    rank: 'gold',
-    deadline: 0,
-    nominator: '317' // 0.25% APY
-}
-]
+  const BADGES = [
+    {
+      type: 'demo',
+      rank: 'demo',
+      deadline: 0,
+      nominator: '158' // 0.5% APY
+    },
+    {
+      type: 'HODLr',
+      rank: 'silver',
+      deadline: 0,
+      nominator: '158' // 0.5% APY
+    },
+    {
+      type: 'HODLr',
+      rank: 'platinum',
+      deadline: 0,
+      nominator: '317' // 1% APY
+    },
+    {
+      type: 'Past',
+      rank: 'gold',
+      deadline: 0, // sometime long long ago
+      nominator: '100'
+    },
+    {
+      type: 'HODLr',
+      rank: 'bronze extra',
+      deadline: 0,
+      nominator: '79' // 0.25% APY
+    },
+    {
+      type: 'Testnet participant',
+      rank: 'gold',
+      deadline: 0,
+      nominator: '317' // 0.25% APY
+    }
+  ]
 
-    const programStart = 1666785600 // 2pm CEST 26th October 2022
-    const programEnd = 1674738000 // 2pm CET 26th January 2023
-    const basicFactorNumerator = 793
-    const boostCap = utils.parseUnits('200000', 'ether') // 200k
-
+  const programStart = 1666785600 // 2pm CEST 26th October 2022
+  const programEnd = 1674738000 // 2pm CET 26th January 2023
+  const basicFactorNumerator = 793
+  const boostCap = utils.parseUnits('200000', 'ether') // 200k
 
   const reset = async () => {
     let signers: Signer[]
@@ -95,14 +94,14 @@ const BADGES = [
     // create NFT and stake contract
     nftContract = await deployContractFromFactory(deployer, 'HoprBoost', [adminAddress, BASE_URI])
     stakeContract = await deployContractFromFactory(deployer, 'HoprStakeBase', [
-        adminAddress,
-        programStart,
-        programEnd,
-        basicFactorNumerator,
-        boostCap,
-        nftContract.address,
-        erc677.address,
-        erc777.address
+      adminAddress,
+      programStart,
+      programEnd,
+      basicFactorNumerator,
+      boostCap,
+      nftContract.address,
+      erc677.address,
+      erc777.address
     ])
 
     // airdrop some NFTs (0,1,2,3,4) to participants

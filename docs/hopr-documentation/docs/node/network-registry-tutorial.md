@@ -2,6 +2,7 @@
 id: network-registry-tutorial
 title: Network Registry
 ---
+
 ## What is the Network Registry?
 
 The Network Registry is a list of nodes allowed to interact with others on the network. This is a utility used by HOPR to scale and test the network at a controlled pace.
