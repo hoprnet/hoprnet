@@ -320,9 +320,6 @@ endif
 ifeq ($(api_token),)
 	echo "parameter <api_token> missing" >&2 && exit 1
 endif
-ifeq ($(api_token),)
-	echo "parameter <api_token> missing" >&2 && exit 1
-endif
 ifeq ($(nftrank),)
 	echo "parameter <nftrank> missing, it can be either 'developer' or 'community'" >&2 && exit 1
 endif

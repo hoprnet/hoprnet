@@ -20,7 +20,12 @@ import { Multiaddr } from '@multiformats/multiaddr'
 import { isAnyAddress, u8aEquals, defer } from '@hoprnet/hopr-utils'
 
 import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP } from '../constants.js'
-import type { PeerStoreType, HoprConnectOptions, HoprConnectTestingOptions } from '../types.js'
+import {
+  type PeerStoreType,
+  type HoprConnectOptions,
+  type HoprConnectTestingOptions,
+  PeerConnectionType
+} from '../types.js'
 import { handleStunRequest, getExternalIp } from './stun.js'
 import { getAddrs } from './addrs.js'
 import { TCPConnection } from './tcp.js'
@@ -324,20 +329,15 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       }
 
       this.addrs.external = [
-        nodeToMultiaddr(
-          {
-            address: natSituation.externalAddress,
-            port: natSituation.externalPort,
-            family: 'IPv4'
-          },
-          this.components.getPeerId()
-        )
+        nodeToMultiaddr({
+          address: natSituation.externalAddress,
+          port: natSituation.externalPort,
+          family: 'IPv4'
+        })
       ]
     }
 
-    this.addrs.interface = internalInterfaces.map((internalInterface) =>
-      nodeToMultiaddr(internalInterface, this.components.getPeerId())
-    )
+    this.addrs.interface = internalInterfaces.map((internalInterface) => nodeToMultiaddr(internalInterface))
 
     this.attachSocketHandlers()
 
@@ -431,7 +431,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     let maConn: TCPConnection | undefined
 
     try {
-      maConn = TCPConnection.fromSocket(socket, this.components.getPeerId())
+      maConn = TCPConnection.fromSocket(socket)
     } catch (err: any) {
       error(`inbound connection failed. ${err.message}`)
     }
@@ -458,6 +458,12 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       }
 
       return
+    }
+
+    if (conn.tags) {
+      conn.tags.push(PeerConnectionType.DIRECT)
+    } else {
+      conn.tags = [PeerConnectionType.DIRECT]
     }
 
     for (const peer of this.connectComponents.getEntryNodes().getUsedRelayPeerIds()) {

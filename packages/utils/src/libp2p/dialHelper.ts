@@ -335,7 +335,7 @@ async function doDial(
 
   // Filter out the circuit addresses that were tried using the previous attempt
   const circuitsNotTriedYet = dhtResult
-    .map((relay) => createCircuitAddress(relay, destination))
+    .map((relay) => createCircuitAddress(relay))
     .filter((circuitAddr) => !knownCircuitAddressSet.has(circuitAddr.toString()))
 
   for (const circuitAddress of circuitsNotTriedYet) {

@@ -57,7 +57,7 @@ export async function setupRestApi(
   const apiBaseSpecPath = path.join(relPath, 'rest-api-v2-spec.yaml')
   const apiFullSpecPath = path.join(relPath, 'rest-api-v2-full-spec.json')
   const apiPathsPath = path.join(relPath, 'lib/api/v2/paths')
-  const encodedApiToken = encodeURI(options.apiToken)
+  const encodedApiToken = encodeURIComponent(options.apiToken)
 
   // useful documentation for the configuration of express-openapi can be found at:
   // https://github.com/kogosoftwarellc/open-api/tree/master/packages/express-openapi
@@ -120,7 +120,7 @@ export async function setupRestApi(
         if (this.options.testNoAuthentication) return true
 
         // Applying multiple URI encoding is an identity
-        let apiTokenFromUser = encodeURI(req.get('x-auth-token') || '')
+        let apiTokenFromUser = encodeURIComponent(req.get('x-auth-token') || '')
 
         if (
           !this.options.testNoAuthentication &&
@@ -141,7 +141,7 @@ export async function setupRestApi(
 
         const authEncoded = (req.get('authorization') || '').replace('Basic ', '')
         // We only expect a single value here, instead of the usual user:password, so we take the user part as token
-        let apiTokenFromUser = encodeURI(Buffer.from(authEncoded, 'base64').toString('binary')).split(':')[0] // The colon ':' does not get encoded by encodeURI
+        let apiTokenFromUser = encodeURIComponent(Buffer.from(authEncoded, 'base64').toString('binary')).split(':')[0] // The colon ':' does not get encoded by encodeURI
 
         if (
           !this.options.testNoAuthentication &&

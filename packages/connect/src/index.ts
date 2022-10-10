@@ -237,7 +237,7 @@ class HoprConnect implements Transport, Initializable, Startable {
    * @param options optional dial options
    */
   private async dialWithRelay(relay: PeerId, destination: PeerId, options: DialOptions): Promise<Connection> {
-    log(`Attempting to dial ${chalk.yellow(`/p2p/${relay.toString()}/p2p-circuit/p2p/${destination.toString()}`)}`)
+    log(`Dialing ${chalk.yellow(`/p2p/${relay.toString()}/p2p-circuit/p2p/${destination.toString()}`)}`)
 
     let maConn = await this.getConnectComponents().getRelay().connect(relay, destination, options)
 
@@ -257,13 +257,17 @@ class HoprConnect implements Transport, Initializable, Startable {
       throw err
     }
 
-    const _tags = conn.tags ?? []
-    conn.tags = new Proxy(_tags, {
-      get: (target) => {
-        // Always get *latest* tags from maConn object
-        return [...target, ...((maConn as any).tags ?? [])]
-      }
-    })
+    // Merges all tags from `maConn` into `conn` and then make both objects
+    // use the *same* array
+    // This is necessary to dynamically change the connection tags once
+    // a connection gets upgraded from WEBRTC_RELAYED to WEBRTC_DIRECT
+    if (conn.tags == undefined) {
+      conn.tags = []
+    }
+    conn.tags.push(...maConn.tags)
+
+    // assign the array *by value* and its entries *by reference*
+    maConn.tags = conn.tags as any
 
     verbose(`Relayed connection to ${maConn.remoteAddr.toString()} has been established successfully!`)
     return conn
@@ -278,9 +282,9 @@ class HoprConnect implements Transport, Initializable, Startable {
     ma: Multiaddr,
     options: DialOptions & { onDisconnect?: (ma: Multiaddr) => void }
   ): Promise<Connection> {
-    log(`Attempting to dial ${chalk.yellow(ma.toString())}`)
+    log(`Dialing ${chalk.yellow(ma.toString())}`)
 
-    const maConn = await TCPConnection.create(ma, this.getComponents().getPeerId(), options)
+    const maConn = await TCPConnection.create(ma, options)
 
     verbose(
       `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshake.`
@@ -316,7 +320,7 @@ class HoprConnect implements Transport, Initializable, Startable {
 
     verbose(`Direct connection to ${maConn.remoteAddr.toString()} has been established successfully!`)
     if (conn.tags) {
-      conn.tags = [PeerConnectionType.DIRECT, ...conn.tags]
+      conn.tags.push(PeerConnectionType.DIRECT)
     } else {
       conn.tags = [PeerConnectionType.DIRECT]
     }

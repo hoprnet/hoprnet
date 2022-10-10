@@ -64,7 +64,7 @@ const useWebsocket = (config: Configuration, apiPath: ApiPath, onMessage: (e: Me
     const wsUrl = new URL(apiPath, config.apiEndpoint)
     wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss' : 'ws'
     if (config.apiToken) {
-      wsUrl.search = `?apiToken=${config.apiToken}`
+      wsUrl.search = `?apiToken=${encodeURIComponent(config.apiToken)}`
     }
     console.info('WS Connecting..')
     socketRef.current = new WebSocket(wsUrl)

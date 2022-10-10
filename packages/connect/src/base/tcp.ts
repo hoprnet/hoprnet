@@ -14,7 +14,6 @@ import type { MultiaddrConnection } from '@libp2p/interface-connection'
 
 import type { Multiaddr } from '@multiformats/multiaddr'
 import toIterable from 'stream-to-it'
-import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Stream, StreamSink, StreamSource, StreamSourceAsync } from '../types.js'
 import type { DialOptions } from '@libp2p/interface-transport'
 
@@ -36,8 +35,8 @@ class TCPConnection implements MultiaddrConnection {
     close?: number
   }
 
-  constructor(public remoteAddr: Multiaddr, self: PeerId, public conn: Socket, options?: DialOptions) {
-    this.localAddr = nodeToMultiaddr(this.conn.address() as AddressInfo, self)
+  constructor(public remoteAddr: Multiaddr, public conn: Socket, options?: DialOptions) {
+    this.localAddr = nodeToMultiaddr(this.conn.address() as AddressInfo)
 
     this.closed = false
     this.timeline = {
@@ -155,7 +154,7 @@ class TCPConnection implements MultiaddrConnection {
    * @param options
    * @returns Resolves a TCP Socket
    */
-  public static create(ma: Multiaddr, self: PeerId, options?: DialOptions): Promise<TCPConnection> {
+  public static create(ma: Multiaddr, options?: DialOptions): Promise<TCPConnection> {
     return new Promise<TCPConnection>((resolve, reject) => {
       const start = Date.now()
       const cOpts = ma.toOptions()
@@ -199,7 +198,7 @@ class TCPConnection implements MultiaddrConnection {
           return reject(err)
         }
 
-        resolve(new TCPConnection(ma, self, rawSocket, options))
+        resolve(new TCPConnection(ma, rawSocket, options))
       }
 
       rawSocket = net
@@ -214,7 +213,7 @@ class TCPConnection implements MultiaddrConnection {
     })
   }
 
-  public static fromSocket(socket: Socket, self: PeerId) {
+  public static fromSocket(socket: Socket) {
     if (socket.remoteAddress == undefined || socket.remoteFamily == undefined || socket.remotePort == undefined) {
       throw Error(`Could not determine remote address`)
     }
@@ -231,16 +230,13 @@ class TCPConnection implements MultiaddrConnection {
 
     // PeerId of remote peer is not yet known,
     // will be available after encryption is set up
-    const remoteAddr = nodeToMultiaddr(
-      {
-        address: socket.remoteAddress,
-        port: socket.remotePort,
-        family: socket.remoteFamily
-      },
-      undefined
-    )
+    const remoteAddr = nodeToMultiaddr({
+      address: socket.remoteAddress,
+      port: socket.remotePort,
+      family: socket.remoteFamily
+    })
 
-    return new TCPConnection(remoteAddr, self, socket)
+    return new TCPConnection(remoteAddr, socket)
   }
 }
 
