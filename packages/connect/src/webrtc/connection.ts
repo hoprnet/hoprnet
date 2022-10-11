@@ -171,6 +171,11 @@ class WebRTCConnection implements MultiaddrConnection {
       this.onWebRTCConnect.bind(this)
     )
 
+    this.relayConn.state.channel?.once('close', () => {
+      this.destroyed = true
+      this.timeline.close ??= Date.now()
+    })
+
     // Attach a listener to WebRTC to cleanup state
     // and remove stale connection from internal libp2p state
     // once there is a disconnect, set magic *close* property in
@@ -178,7 +183,7 @@ class WebRTCConnection implements MultiaddrConnection {
     this.relayConn.state.channel?.on('iceStateChange', (iceConnectionState: string, iceGatheringState: string) => {
       if (iceConnectionState === 'disconnected' && iceGatheringState === 'complete') {
         this.destroyed = true
-        this.timeline.close = this.timeline.close ?? Date.now()
+        this.timeline.close ??= Date.now()
       }
     })
 
@@ -507,11 +512,14 @@ class WebRTCConnection implements MultiaddrConnection {
               }
             }.call(this)
           )
+
+          // End the stream
+          this.relayConn.state.channel?.end()
         } catch (err) {
           this.error(`WebRTC sink err`, err)
           // Initiates Connection object teardown
           // by using meta programming
-          this.timeline.close = Date.now()
+          this.timeline.close ??= Date.now()
         }
     }
   }
