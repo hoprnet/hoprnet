@@ -174,9 +174,7 @@ class TCPConnection implements MultiaddrConnection {
     }
 
     // End the socket (= send FIN packet) unless otherwise requested
-    if (!this.keepAlive) {
-      this.conn.end()
-    }
+    this.socket.end()
   }
 
   /**
