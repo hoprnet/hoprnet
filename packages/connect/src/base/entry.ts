@@ -275,7 +275,6 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
   private _onNewRelay: ((peer: PeerStoreType) => void) | undefined
   private _onRemoveRelay: ((peer: PeerId) => void) | undefined
-  private _connectToRelay: EntryNodes['connectToRelay'] | undefined
 
   private disconnectListener: ((conn: CustomEvent<Connection>) => void) | undefined
 
@@ -317,8 +316,15 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     this.offlineEntryNodes = []
 
     this.usedRelays = []
+
+    this.connectToRelay = this.connectToRelay.bind(this)
   }
 
+  /**
+   * Enables entry node functionality. Called by listener once
+   * it determines that node *does not* have a publicly available
+   * address.
+   */
   public enable() {
     this.enabled = true
   }
@@ -337,8 +343,6 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    */
   public async afterStart() {
     if (this.enabled) {
-      this._connectToRelay = this.connectToRelay.bind(this)
-
       if (this.options.publicNodes != undefined) {
         this._onNewRelay = function (this: EntryNodes, peer: PeerStoreType) {
           this.addToUpdateQueue(async () => {
@@ -458,11 +462,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       await retryWithBackoffThenThrow(
         async () => {
           attempt++
-          const results = await nAtATime(
-            this._connectToRelay as EntryNodes['connectToRelay'],
-            addrToContact,
-            this.maxParallelDials
-          )
+          const results = await nAtATime(this.connectToRelay, addrToContact, this.maxParallelDials)
 
           log(
             printGroupedConnectionResults(
@@ -534,10 +534,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       }
     }
 
-    const results = groupConnectionResults(
-      work,
-      await nAtATime(this._connectToRelay as EntryNodes['connectToRelay'], work, this.maxParallelDials)
-    )
+    const results = groupConnectionResults(work, await nAtATime(this.connectToRelay, work, this.maxParallelDials))
 
     log(printGroupedConnectionResults(results, `Connection results to entry nodes at DHT renewal:`))
 
@@ -920,7 +917,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     const results = groupConnectionResults(
       addrsToContact,
       await nAtATime(
-        this._connectToRelay as EntryNodes['connectToRelay'],
+        this.connectToRelay,
         addrsToContact,
         this.maxParallelDials,
         (results: (Awaited<ReturnType<EntryNodes['connectToRelay']>> | Error | undefined)[]) => {
