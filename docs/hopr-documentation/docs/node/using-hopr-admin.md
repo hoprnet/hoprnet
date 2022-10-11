@@ -122,7 +122,7 @@ From here, scroll down to the file manager and enter `/app/hoprd-db` in the fiel
 
 **_Note:_** Make sure you enter `/app/hoprd-db` and not `/app/hoprd-db/`.
 
-Now that you’ve backed up your identity file and have noted your password, you will always be able to access your private key and node (as long as you keep them safe).
+Now that you’ve backed up your identity file and have noted your password, you will always be able to access your private key and node (as long as you keep them safe). You can also use this file to [import your funds to your MetaMask wallet.](using-hopr-admin#importing-wallet-to-metamask)
 
 ### ETH address & peerID
 
@@ -665,3 +665,38 @@ withdraw 0.01 HOPR 0xc8Aa5a085c23dfEa903312a73EfC30888bB61f0B
 This will withdraw 0.01 wxHOPR or mHOPR from your balance and send it to **0xc8Aa5a085c23dfEa903312a73EfC30888bB61f0B**
 
 **Please use your own ETH address to withdraw funds and not the example address**
+
+### Importing wallet to MetaMask
+
+If you have backed up your identity file, you can convert it to a `.json` file and import it as an account to your MetaMask to access your funds.
+
+#### For Avado/Dappnode
+
+If you have [downloaded the db folder,](using-hopr-admin#backing-up-your-identity-file), follow these steps to import your wallet into MetaMask:
+
+(**1**) Locate the `.hopr-identity` file inside the db folder
+
+(**2**) Rename the file to `hopr-identity.json`
+
+#### For local or VPS users
+
+(**1**) find the folder `.hoprd-db-valencia` on your machine or VPS
+
+(**2**) locate the file `.hopr-id-valencia`
+
+(**3**) Rename the file to `hopr-id-valencia.json`
+
+#### Importing the JSON file
+
+(**1**) Open Metamask and click on the accounts icon
+
+(**2**) Go to import accounts
+
+(**3**) Select `JSON file` on the dropdown list
+
+(**4**) Browse through your files and select the renamed `.json` identity file.
+
+(**5**) Click import, and you are all done!
+
+You should now have your funds accessible in your new MetaMask account.
+
