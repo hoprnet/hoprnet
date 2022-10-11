@@ -220,9 +220,7 @@ async function establishNewConnection(
  * @param components Libp2p components
  * @param destination which peer to look for
  */
-async function queryDHT(components: Components, destination: PeerId): Promise<PeerId[]> {
-  const relayers: PeerId[] = []
-
+async function* queryDHT(components: Components, destination: PeerId): AsyncIterable<PeerId> {
   const key = createRelayerKey(destination)
   log(`fetching relay keys for node ${destination.toString()} from DHT.`, key)
 
@@ -240,26 +238,16 @@ async function queryDHT(components: Components, destination: PeerId): Promise<Pe
   }, DEFAULT_DHT_QUERY_TIMEOUT).unref()
 
   try {
-    // libp2p type clash
-    for await (const relayer of components.getContentRouting().findProviders(key as any, { signal: abort.signal })) {
-      relayers.push(relayer.id)
+    for await (const dhtResult of components.getContentRouting().findProviders(key as any, { signal: abort.signal })) {
+      yield dhtResult.id
     }
-    done = true
-  } catch (err: any) {
-    done = true
+  } catch (err) {
     error(`Error while querying the DHT for ${destination.toString()}.`)
     if (err?.message) {
       error(`DHT error: ${err.message}`)
     }
   }
-
-  if (relayers.length > 0) {
-    log(`found ${relayers.map((relayer) => relayer.toString()).join(', ')} for node ${destination.toString()}.`)
-  } else {
-    log(`could not find any relayer for ${destination.toString()}`)
-  }
-
-  return relayers
+  done = true
 }
 
 async function doDirectDial(
@@ -336,29 +324,18 @@ async function fetchCircuitAddressesAndDial(
 
   // Try to get some fresh addresses from the DHT
   log(`Could not reach ${destination.toString()} using known addresses, querying DHT for more addresses...`)
-  const dhtResult = await queryDHT(components, destination)
 
-  if (dhtResult.length == 0) {
-    error(
-      await printPeerStoreAddresses(
-        `Direct dial attempt to ${destination.toString()} failed and DHT query has not brought any new addresses. Giving up`,
-        destination,
-        components
-      )
-    )
-    return { status: DialStatus.DHT_ERROR, query: destination.toString() }
-  }
-
-  // Take all the known circuit addresses from the existing set of known addresses
   const knownCircuitAddressSet = new Set<string>()
 
   for (const knownAddressForPeer of knownAddressesForPeer) {
     const tuples = knownAddressForPeer.multiaddr.tuples()
 
     if (tuples.length > 0 && tuples[0].length > 0 && tuples[0][0] == CODE_P2P) {
-      knownCircuitAddressSet.add(knownAddressForPeer.multiaddr.toString())
+      knownCircuitAddressSet.add(knownAddressForPeer.multiaddr.decapsulateCode(CODE_P2P).toString())
     }
   }
+
+  // Take all the known circuit addresses from the existing set of known addresses
 
   let relayStruct:
     | void
@@ -366,7 +343,7 @@ async function fetchCircuitAddressesAndDial(
         conn: Connection
       })
 
-  for (const relay of dhtResult) {
+  for await (const relay of queryDHT(components, destination)) {
     // Make sure we don't use self as relay
     if (relay.equals(components.getPeerId())) {
       continue
