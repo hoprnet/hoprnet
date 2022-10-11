@@ -361,7 +361,7 @@ class Hopr extends EventEmitter {
             .flatMap((c) => c.tags ?? [])
             .includes(PeerConnectionType.DIRECT)
         ) {
-          this.knownPublicNodesCache.add(peerId)
+          this.knownPublicNodesCache.add(peerId.toString())
           return true
         }
 
