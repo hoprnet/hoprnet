@@ -800,9 +800,6 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
         break
       }
 
-      // hack - mark socket to not get closed
-      ;((results[0] as Required<ConnectionResult>).conn.stat.timeline as any).keepAlive = true
-
       this.usedRelays.push({
         // @TODO take the address that really got used
         relayDirectAddress: (results[0] as ConnectionResult).entry.multiaddrs[0],
