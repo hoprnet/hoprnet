@@ -73,7 +73,7 @@ export async function createLibp2pInstance(
     log(`using peerstore at ${datastorePath}`)
 
     // Make libp2p aware of environments
-    const protocolPrefix = `hopr/${options.environment.id}`
+    const protocolPrefix = `/hopr/${options.environment.id}`
 
     // Collect supported environments and versions to be passed to HoprConnect
     // because hopr-connect doesn't have access to the protocol config file
