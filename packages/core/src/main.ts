@@ -119,7 +119,9 @@ export async function createLibp2pInstance(
       connectionEncryption: [new Noise()],
       dht: new KadDHT({
         // Protocol prefixes require a trailing slash
-        protocolPrefix: `/${protocolPrefix}`,
+        // @TODO disabled for compatibility reasons
+        // protocolPrefix: `/${protocolPrefix}`,
+        protocolPrefix,
         // Limit size of ping queue by using smaller timeouts
         pingTimeout: 2000
       }),
