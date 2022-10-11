@@ -19,7 +19,9 @@ export function setupPromiseRejectionFilter() {
         msgString.match(/write ECONNRESET/) ||
         msgString.match(/write EPIPE/) ||
         // Requires changes in libp2p, tbd in upstream PRs to libp2p
-        msgString.match(/The operation was aborted/)
+        msgString.match(/The operation was aborted/) ||
+        // issues with WebRTC socket and `stream-to-it`
+        msgString.match(/ERR_DATA_CHANNEL/)
       ) {
         console.error('Unhandled promise rejection silenced')
         return
