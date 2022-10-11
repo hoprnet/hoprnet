@@ -23,6 +23,7 @@ const error = debug(DEBUG_PREFIX.concat(`:error`))
 
 const DEFAULT_DHT_QUERY_TIMEOUT = 20000
 
+// Current types do not expose `dialer` property
 type MyConnectionManager = ConnectionManager & { dialer: Dialer }
 
 export enum DialStatus {

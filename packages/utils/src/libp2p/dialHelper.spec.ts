@@ -26,6 +26,10 @@ const Alice = privKeyToPeerId(stringToU8a('0xcf0b158c5f9d83dabf81a43391cce6cced6
 const Bob = privKeyToPeerId(stringToU8a('0x801f499e287fa0e5ac546a86d7f1e3ca766249f62759e6a1f2c90de6090cc4c0'))
 const Chris = privKeyToPeerId(stringToU8a('0x1bbb9a915ddd6e19d0f533da6c0fbe8820541a370110728f647829cd2c91bc79'))
 
+/**
+ * Annotates libp2p's TCP module to work similarly as `hopr-connect`
+ * by using an oracle that knows how to connect to hidden nodes
+ */
 class MyTCP extends TCP {
   constructor(private oracle?: Map<string, Components>) {
     super()
@@ -137,7 +141,7 @@ function getConnectionManager(): ConnectionManager {
   } as any // dialer is not part of interface
 }
 
-describe.only('test dialHelper', function () {
+describe('test dialHelper', function () {
   it('call non-existing', async function () {
     const peerA = await getNode(Alice)
 
