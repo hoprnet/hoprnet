@@ -1,10 +1,11 @@
-import type { HoprConnectOptions, PeerStoreType } from '../types.js'
+import type { HoprConnectOptions, PeerStoreType, StreamType } from '../types.js'
 import type { Connection } from '@libp2p/interface-connection'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Initializable, Components } from '@libp2p/interfaces/components'
 import type { Startable } from '@libp2p/interfaces/startable'
 import { Multiaddr } from '@multiformats/multiaddr'
 import { peerIdFromString } from '@libp2p/peer-id'
+import { handshake } from 'it-handshake'
 
 import errCode from 'err-code'
 import { EventEmitter } from 'events'
@@ -40,7 +41,6 @@ import { attemptClose, relayFromRelayAddress } from '../utils/index.js'
 const DEBUG_PREFIX = 'hopr-connect:entry'
 const log = Debug(DEBUG_PREFIX)
 const error = Debug(DEBUG_PREFIX.concat(':error'))
-const verbose = Debug(DEBUG_PREFIX.concat(':verbose'))
 
 const ENTRY_NODE_CONTACT_TIMEOUT = 5e3
 const ENTRY_NODES_MAX_PARALLEL_DIALS = 14
@@ -1020,44 +1020,41 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       }
     }
 
-    let done = false
-
     const start = Date.now()
 
-    // calls the iterator, thereby starts the stream and
-    // consumes the first messages, afterwards closes the stream
-    for await (const msg of result.resp.stream.source as AsyncIterable<Uint8Array>) {
-      verbose(`can relay received ${new TextDecoder().decode(msg.slice())} from ${id.toString()}`)
-      if (u8aEquals(msg.subarray(), OK)) {
-        done = true
-      }
-      // End receive stream after first message
-      break
-    }
+    // Only reads from socket once but keeps socket open
+    // to eventually use it to exchange signalling information
+    const shaker = handshake(result.resp.stream)
 
+    let chunk: StreamType | undefined
     try {
-      // End the send stream by sending nothing
-      result.resp.stream.sink((async function* () {})()).catch(error)
+      chunk = await shaker.read()
     } catch (err) {
       error(err)
-    }
-
-    if (done) {
-      return {
-        conn: result.resp.conn,
-        entry: {
-          id,
-          multiaddrs: [relay],
-          latency: Date.now() - start
-        }
-      }
-    } else {
       return {
         entry: {
           id,
           multiaddrs: [relay],
           latency: -1
         }
+      }
+    }
+
+    if (chunk == undefined || !u8aEquals(chunk.subarray(), OK)) {
+      return {
+        entry: {
+          id,
+          multiaddrs: [relay],
+          latency: -1
+        }
+      }
+    }
+
+    return {
+      entry: {
+        id,
+        multiaddrs: [relay],
+        latency: Date.now() - start
       }
     }
   }

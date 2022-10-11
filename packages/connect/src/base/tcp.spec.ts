@@ -47,9 +47,9 @@ describe('test TCP connection', function () {
 
     conn.close()
 
-    await once(conn.conn as EventEmitter, 'close')
+    await once(conn.socket as EventEmitter, 'close')
 
-    assert(conn.conn.destroyed)
+    assert(conn.socket.destroyed)
 
     assert(
       conn.timeline.close != undefined &&
@@ -98,13 +98,13 @@ describe('test TCP connection', function () {
       })()
     )
 
-    const destroy = conn.conn.destroy.bind(conn.conn)
-    Object.assign(conn.conn, {
+    const destroy = conn.socket.destroy.bind(conn.socket)
+    Object.assign(conn.socket, {
       destroy: () => {}
     })
 
     const start = Date.now()
-    const closePromise = once(conn.conn, 'close')
+    const closePromise = once(conn.socket, 'close')
 
     // @dev produces a half-open socket on the other side
     conn.close()
@@ -114,7 +114,7 @@ describe('test TCP connection', function () {
     // Wait some time before restoring `destroy()` method
     await setTimeout(SOCKET_CLOSE_TIMEOUT / 2)
 
-    Object.assign(conn.conn, {
+    Object.assign(conn.socket, {
       destroy
     })
 

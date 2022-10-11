@@ -801,7 +801,10 @@ describe('entry node functionality - automatic reconnect', function () {
     await updated
 
     // Should eventually remove relay from list
+    // intermediate solution
     network.close(relay.multiaddrs[0])
+    network.events.removeAllListeners(connectEvent(relay.multiaddrs[0]))
+
     await secondAttempt.promise
 
     // Wait for end of event loop
@@ -1054,8 +1057,10 @@ describe('entry node functionality - min relays per node', function () {
     await relayListUpdated
 
     const secondRelayListUpdate = once(entryNodes, RELAY_CHANGED_EVENT)
-    // // Should eventually remove relay from list
+
+    // intermediate solution
     network.close(firstPeerStoreEntry.multiaddrs[0])
+    network.events.removeAllListeners(connectEvent(firstPeerStoreEntry.multiaddrs[0]))
 
     await secondRelayListUpdate
 

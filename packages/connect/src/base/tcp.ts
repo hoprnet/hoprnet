@@ -14,11 +14,10 @@ import type { MultiaddrConnection } from '@libp2p/interface-connection'
 
 import type { Multiaddr } from '@multiformats/multiaddr'
 import toIterable from 'stream-to-it'
-import type { Stream, StreamSink, StreamSource, StreamSourceAsync } from '../types.js'
+import type { Stream, StreamSource, StreamSourceAsync } from '../types.js'
 
 type SocketOptions = {
   signal?: AbortSignal
-  keepAlive?: boolean
   closeTimeout?: number
 }
 
@@ -28,13 +27,11 @@ type SocketOptions = {
 class TCPConnection implements MultiaddrConnection {
   public localAddr: Multiaddr
 
-  public sink: StreamSink
   public source: StreamSourceAsync
   public closed: boolean
 
   private _signal?: AbortSignal
 
-  private keepAlive: boolean
   private closeTimeout: number
 
   public timeline: {
@@ -42,40 +39,32 @@ class TCPConnection implements MultiaddrConnection {
     close?: number
   }
 
-  constructor(public remoteAddr: Multiaddr, public conn: Socket, options?: SocketOptions) {
-    this.localAddr = nodeToMultiaddr(this.conn.address() as AddressInfo)
+  constructor(public remoteAddr: Multiaddr, public socket: Socket, options?: SocketOptions) {
+    this.localAddr = nodeToMultiaddr(this.socket.address() as AddressInfo)
 
     this.closed = false
-    this.keepAlive = options?.keepAlive ?? false
     this._signal = options?.signal
     this.closeTimeout = options?.closeTimeout ?? SOCKET_CLOSE_TIMEOUT
 
-    this.timeline = new Proxy(
-      {
-        open: Date.now()
-      },
-      {
-        set: (...args) => {
-          if (args[1] === 'keepAlive' && args[2] == true) {
-            this.keepAlive = true
-          }
-          return Reflect.set(...args)
-        }
-      }
-    )
-    this.conn.once('close', () => {
+    this.timeline = {
+      open: Date.now()
+    }
+
+    this.socket.once('close', () => {
       // Whenever the socket gets closed, mark the
       // connection closed to cleanup data structures in
       // ConnectionManager
       this.timeline.close ??= Date.now()
     })
 
-    this.source = this.createSource(this.conn)
-    this.sink = this._sink.bind(this)
+    this.source = this.createSource(this.socket)
+
+    // Sink is passed as a function, so we need to explicitly bind it
+    this.sink = this.sink.bind(this)
   }
 
   public close(): Promise<void> {
-    if (this.conn.destroyed || this.closed) {
+    if (this.socket.destroyed || this.closed) {
       return Promise.resolve()
     }
     this.closed = true
@@ -99,17 +88,17 @@ class TCPConnection implements MultiaddrConnection {
           Date.now() - start
         )
 
-        if (this.conn.destroyed) {
+        if (this.socket.destroyed) {
           log('%s:%s is already destroyed', cOptions.host, cOptions.port)
         } else {
           log(`destroying connection ${cOptions.host}:${cOptions.port}`)
-          this.conn.destroy()
+          this.socket.destroy()
         }
       }, this.closeTimeout).unref()
 
       // Resolve once closed
       // Could take place after timeout or as a result of `.end()` call
-      this.conn.once('close', () => {
+      this.socket.once('close', () => {
         if (done) {
           return
         }
@@ -118,33 +107,33 @@ class TCPConnection implements MultiaddrConnection {
         resolve()
       })
 
-      this.conn.once('error', (err: Error) => {
+      this.socket.once('error', (err: Error) => {
         log('socket error', err)
 
         // error closing socket
         this.timeline.close ??= Date.now()
 
-        if (this.conn.destroyed) {
+        if (this.socket.destroyed) {
           done = true
         }
 
         reject(err)
       })
 
-      this.conn.end()
+      // Send the FIN packet
+      this.socket.end()
 
-      if (this.conn.writableLength > 0) {
-        console.log(`here`)
+      if (this.socket.writableLength > 0) {
         // there are outgoing bytes waiting to be sent
-        this.conn.once('drain', () => {
+        this.socket.once('drain', () => {
           log('socket drained')
 
           // all bytes have been sent we can destroy the socket (maybe) before the timeout
-          this.conn.destroy()
+          this.socket.destroy()
         })
       } else {
         // nothing to send, destroy immediately
-        this.conn.destroy()
+        this.socket.destroy()
       }
     })
   }
@@ -159,12 +148,12 @@ class TCPConnection implements MultiaddrConnection {
     }
   }
 
-  private async _sink(source: StreamSource): Promise<void> {
+  public async sink(source: StreamSource): Promise<void> {
     const u8aStream = toU8aStream(source)
 
     let iterableSink: Stream['sink']
     try {
-      iterableSink = toIterable.sink<Uint8Array>(this.conn)
+      iterableSink = toIterable.sink<Uint8Array>(this.socket)
 
       try {
         await iterableSink(
@@ -191,9 +180,11 @@ class TCPConnection implements MultiaddrConnection {
   }
 
   /**
+   * Tries to establish a TCP connection to the given address.
+   *
    * @param ma Multiaddr to connect to
    * @param options
-   * @returns Resolves a TCP Socket
+   * @returns Resolves to a TCP Socket, if successful
    */
   public static create(ma: Multiaddr, options?: SocketOptions): Promise<TCPConnection> {
     return new Promise<TCPConnection>((resolve, reject) => {
