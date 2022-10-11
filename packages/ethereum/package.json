@@ -37,7 +37,7 @@
     "@openzeppelin/contracts-v3-0-1": "npm:@openzeppelin/contracts@3.4.2"
   },
   "devDependencies": {
-    "@defi-wonderland/smock": "^2.0.7",
+    "@defi-wonderland/smock": "^2.3.0",
     "@ethersproject/wallet": "5.7.0",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "@multiformats/multiaddr": "10.3.3",
