@@ -668,13 +668,11 @@ This will withdraw 0.01 wxHOPR or mHOPR from your balance and send it to **0xc8A
 
 ### Importing wallet to MetaMask
 
-If you have backed up your identity file, you can convert it to a `.json` file and import it as an account to your MetaMask to access your funds.
+If you have [backed up your identity file,](using-hopr-admin#backing-up-your-identity-file) you can convert it to a `.json` file and import it as an account to your MetaMask to access your funds.
 
 **Note:** If you are using macOS or Windows, then you should make sure you can see hidden files. Otherwise, the identity file will not be visible to you.
 
 #### For Avado/Dappnode
-
-If you have [downloaded the db folder,](using-hopr-admin#backing-up-your-identity-file), follow these steps to import your wallet into MetaMask:
 
 (**1**) Locate the `.hopr-identity` file inside the db folder
 
