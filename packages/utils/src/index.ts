@@ -14,6 +14,9 @@ export * from './db/index.js'
 export * from './ethereum/index.js'
 export * from './utils.js'
 
-// WASM functions must be migrated from cjs to esm explicitely to be importable by other packags
+// WASM functions must be migrated from cjs to esm explicitly to be importable by other packags
 import utilsMisc from '../lib/utils_misc.cjs'
 export const { get_package_version } = utilsMisc
+
+import utilsMetrics from '../lib/utils_metrics.cjs'
+export const { } = utilsMetrics // TODO: export symbols
