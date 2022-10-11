@@ -1,8 +1,12 @@
 [package]
 name = "utils-metrics"
 version = "0.1.0"
-authors = ["NumberFour8 <lukas.pohanka@inina.net>"]
-edition = "2018"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+description = "Rust WASM module containing support for general metrics collection"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "LGPL-3.0-only"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -11,7 +15,8 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook"]
 
 [dependencies]
-wasm-bindgen = "0.2.63"
+prometheus = "0.13.2"
+wasm-bindgen = "0.2.80"
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires
@@ -25,7 +30,7 @@ console_error_panic_hook = { version = "0.1.6", optional = true }
 wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
-wasm-bindgen-test = "0.3.13"
+wasm-bindgen-test = "0.3.30"
 
 [profile.release]
 # Tell `rustc` to optimize for small code size.
