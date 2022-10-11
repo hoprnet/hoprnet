@@ -1005,8 +1005,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       this.getComponents(),
       id,
       CAN_RELAY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments),
-      false,
-      true
+      false
     )
 
     if (result.status != DialStatus.SUCCESS) {
