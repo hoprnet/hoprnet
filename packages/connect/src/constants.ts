@@ -92,7 +92,7 @@ export function DELIVERY_PROTOCOLS(environment?: string, environments?: Environm
   return determine_protocols('delivery', environment, environments)
 }
 
-/*
+/**
  * @param tag protocol tag which should be used
  * @param environment [optional] isolate from nodes running in other environments
  * @param environments [optional] supported environments which can be considered

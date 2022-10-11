@@ -1,5 +1,5 @@
 import type { PeerId } from '@libp2p/interface-peer-id'
-import type { Connection, ProtocolStream, MultiaddrConnection } from '@libp2p/interface-connection'
+import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
 import type { Multiaddr } from '@multiformats/multiaddr'
 import type { Address } from '@libp2p/interface-peer-store'
 import type { IncomingStreamData } from '@libp2p/interfaces/registrar'
@@ -212,7 +212,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     relay: PeerId,
     destination: PeerId,
     options?: DialOptions
-  ): Promise<MultiaddrConnection | undefined> {
+  ): Promise<RelayConnection | WebRTCConnection | undefined> {
     const protocolsRelay = RELAY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
     const baseConnection = await this.dialNodeDirectly(relay, protocolsRelay, {
       signal: options?.signal,
@@ -256,7 +256,12 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     return conn
   }
 
-  private upgradeOutbound(relay: PeerId, destination: PeerId, stream: Stream, opts?: DialOptions): MultiaddrConnection {
+  private upgradeOutbound(
+    relay: PeerId,
+    destination: PeerId,
+    stream: Stream,
+    opts?: DialOptions
+  ): RelayConnection | WebRTCConnection {
     const conn = new RelayConnection(
       stream,
       relay,
@@ -279,7 +284,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     }
   }
 
-  private upgradeInbound(initiator: PeerId, relay: PeerId, stream: Stream) {
+  private upgradeInbound(initiator: PeerId, relay: PeerId, stream: Stream): RelayConnection | WebRTCConnection {
     const conn = new RelayConnection(
       stream,
       relay,
@@ -388,13 +393,25 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       handShakeResult.stream
     )
 
+    let upgradedConn: Connection
     try {
       // Will call internal libp2p event handler, so no further action required
-      await this.getComponents().getUpgrader().upgradeInbound(newConn)
+      upgradedConn = await this.getComponents().getUpgrader().upgradeInbound(newConn)
     } catch (err) {
       error(`Could not upgrade relayed connection. Error was: ${err}`)
       return
     }
+
+    // Merges all tags from `maConn` into `conn` and then make both objects
+    // use the *same* array
+    // This is necessary to dynamically change the connection tags once
+    // a connection gets upgraded from WEBRTC_RELAYED to WEBRTC_DIRECT
+    if (upgradedConn.tags == undefined) {
+      upgradedConn.tags = []
+    }
+    upgradedConn.tags.push(...(newConn.tags as any))
+    // assign the array *by value* and its entries *by reference*
+    newConn.tags = upgradedConn.tags as any
 
     // @TODO
     // this.discovery._peerDiscovered(newConn.remotePeer, [newConn.remoteAddr])

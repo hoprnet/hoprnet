@@ -57,7 +57,7 @@ export async function setupRestApi(
   const apiBaseSpecPath = path.join(relPath, 'rest-api-v2-spec.yaml')
   const apiFullSpecPath = path.join(relPath, 'rest-api-v2-full-spec.json')
   const apiPathsPath = path.join(relPath, 'lib/api/v2/paths')
-  const encodedApiToken = encodeURI(options.apiToken)
+  const encodedApiToken = encodeURIComponent(options.apiToken)
 
   // useful documentation for the configuration of express-openapi can be found at:
   // https://github.com/kogosoftwarellc/open-api/tree/master/packages/express-openapi

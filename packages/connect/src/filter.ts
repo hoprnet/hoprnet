@@ -117,14 +117,6 @@ export class Filter implements Initializable {
     switch (parsed.address.type) {
       case AddressType.IPv4:
       case AddressType.IPv6:
-        if (
-          parsed.address.node != undefined &&
-          !u8aEquals(parsed.address.node, this.getComponents().getPeerId().publicKey)
-        ) {
-          log(`Cannot listen to multiaddrs with other peerId than our own. Given addr: ${ma.toString()}`)
-          return false
-        }
-
         return true
       case AddressType.P2P:
         log(`Can only listen to IP addresses: Given addr: ${ma.toString()}`)
@@ -160,11 +152,6 @@ export class Filter implements Initializable {
    * @returns
    */
   private filterCircuitDial(address: CircuitAddress, ma: Multiaddr): boolean {
-    if (u8aEquals(address.node, this.getComponents().getPeerId().publicKey)) {
-      log(`Prevented self-dial using circuit addr. Used addr: ${ma.toString()}`)
-      return false
-    }
-
     if (u8aEquals(address.relayer, this.getComponents().getPeerId().publicKey)) {
       log(`Prevented dial using self as relay node. Used addr: ${ma.toString()}`)
       return false
@@ -180,11 +167,6 @@ export class Filter implements Initializable {
    * @returns
    */
   private filterDirectDial(address: DirectAddress, ma: Multiaddr): boolean {
-    if (address.node != undefined && u8aEquals(address.node, this.getComponents().getPeerId().publicKey)) {
-      log(`Prevented self-dial. Used addr: ${ma.toString()}`)
-      return false
-    }
-
     if (!this.listeningFamilies!.includes(address.type)) {
       // Prevent dialing IPv6 addresses when only listening to IPv4 and vice versa
       log(`Tried to dial ${address.type} address but listening to ${this.listeningFamilies!.join(', ')}`)
