@@ -163,7 +163,7 @@ export async function tryExistingConnections(
  */
 async function establishNewConnection(
   components: Components,
-  destination: PeerId | Multiaddr,
+  destination: PeerId,
   protocols: string | string[],
   noRelay: boolean = false
 ): Promise<
@@ -182,7 +182,7 @@ async function establishNewConnection(
     })) as any as Connection
   } catch (err: any) {
     error(`Error while establishing connection to ${destination.toString()}.`)
-    if (err?.message) {
+    if (err?.message && (err?.code == undefined || err?.code !== 'ERR_NO_VALID_ADDRESSES')) {
       error(`Dial error:`, err)
     }
   }
@@ -256,7 +256,6 @@ async function* queryDHT(components: Components, destination: PeerId): AsyncIter
 async function doDirectDial(
   components: Components,
   id: PeerId,
-  maDest: Multiaddr | undefined,
   protocols: string | string[],
   noRelay: boolean = false
 ): Promise<DialResponse> {
@@ -268,26 +267,21 @@ async function doDirectDial(
     return { status: DialStatus.SUCCESS, resp: struct }
   }
 
-  // Caller already provided an address
-  if (maDest) {
-    struct = await establishNewConnection(components, maDest, protocols, noRelay)
-  } else {
-    // Fetch known addresses for the given destination peer
-    const knownAddressesForPeer = await components.getPeerStore().addressBook.get(id)
-    if (knownAddressesForPeer.length > 0) {
-      // Let's try using the known addresses by connecting directly
-      log(
-        `There ${knownAddressesForPeer.length == 1 ? 'is' : 'are'} ${
-          knownAddressesForPeer.length
-        } already known address${knownAddressesForPeer.length == 1 ? '' : 'es'} for ${id.toString()}:`
-      )
-      for (const address of knownAddressesForPeer) {
-        log(`- ${address.multiaddr.toString()}`)
-      }
-      struct = await establishNewConnection(components, id, protocols, noRelay)
-    } else {
-      log(`No currently known addresses for peer ${id.toString()}`)
+  // Fetch known addresses for the given destination peer
+  const knownAddressesForPeer = await components.getPeerStore().addressBook.get(id)
+  if (knownAddressesForPeer.length > 0) {
+    // Let's try using the known addresses by connecting directly
+    log(
+      `There ${knownAddressesForPeer.length == 1 ? 'is' : 'are'} ${knownAddressesForPeer.length} already known address${
+        knownAddressesForPeer.length == 1 ? '' : 'es'
+      } for ${id.toString()}:`
+    )
+    for (const address of knownAddressesForPeer) {
+      log(`- ${address.multiaddr.toString()}`)
     }
+    struct = await establishNewConnection(components, id, protocols, noRelay)
+  } else {
+    log(`No currently known addresses for peer ${id.toString()}`)
   }
 
   if (struct) {
@@ -353,7 +347,7 @@ async function fetchCircuitAddressesAndDial(
       continue
     }
 
-    const circuitAddress = createCircuitAddress(relay).encapsulate(`/p2p/${destination.toString()}`)
+    const circuitAddress = createCircuitAddress(relay)
 
     // Filter out the circuit addresses that were tried using the previous attempt
     if (knownCircuitAddressSet.has(circuitAddress.toString())) {
@@ -361,11 +355,11 @@ async function fetchCircuitAddressesAndDial(
     }
 
     // Share new knowledge about peer with Libp2p's peerStore, dropping `/p2p/<DESTINATION>`
-    await components.getPeerStore().addressBook.add(destination, [createCircuitAddress(relay) as any])
+    await components.getPeerStore().addressBook.add(destination, [circuitAddress as any])
 
     log(`Trying to reach ${destination.toString()} via circuit ${circuitAddress}...`)
 
-    relayStruct = await establishNewConnection(components, circuitAddress, protocols)
+    relayStruct = await establishNewConnection(components, destination, protocols)
 
     // Return if we were successful
     if (relayStruct) {
@@ -397,7 +391,6 @@ export async function dial(
   noRelay: boolean = false
 ): Promise<DialResponse> {
   let id: PeerId
-  let maDest: Multiaddr | undefined
   if (isPeerId(destination)) {
     id = destination
   } else {
@@ -411,10 +404,10 @@ export async function dial(
       }
     }
     id = peerIdFromString(idStr)
-    maDest = destination
+    await components.getPeerStore().addressBook.add(id, [destination.decapsulateCode(CODE_P2P)])
   }
 
-  const res = await doDirectDial(components, id, maDest, protocols, noRelay)
+  const res = await doDirectDial(components, id, protocols, noRelay)
 
   if (noRelay == true || withDHT == false || (withDHT == true && res.status == DialStatus.SUCCESS)) {
     // Take first result and don't do any further steps

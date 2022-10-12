@@ -147,7 +147,7 @@ class WebRTCConnection implements MultiaddrConnection {
     this._sourceMigrated = false
     this._sinkMigrated = false
 
-    this.remoteAddr = this.conn.remoteAddr
+    this.remoteAddr = this.relayConn.remoteAddr
 
     this.timeline = {
       open: Date.now()
@@ -583,7 +583,9 @@ class WebRTCConnection implements MultiaddrConnection {
           }
         }
 
-        this.log(`webRTC source handover done. Using direct connection to peer ${this.remoteAddr.getPeerId()}`)
+        this.log(
+          `webRTC source handover done. Using direct connection to peer ${this.relayConn._counterparty.toString()}`
+        )
 
         let done = false
         for await (const msg of this.relayConn.state.channel as SimplePeer) {
