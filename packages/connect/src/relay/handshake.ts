@@ -96,7 +96,7 @@ class RelayHandshake {
     }
   }
 
-  private shakerWrite(msg: any) {
+  private shakerWrite(msg: RelayHandshakeMessage) {
     try {
       this.shaker.write(Uint8Array.of(msg))
       this.shaker.rest()
@@ -252,8 +252,8 @@ class RelayHandshake {
     }
 
     const destinationShaker = handshake({
-      source: toU8aStream(result.resp.stream.source as any),
-      sink: result.resp.stream.sink as any
+      source: toU8aStream(result.resp.stream.source),
+      sink: result.resp.stream.sink
     })
 
     let errThrown = false
@@ -265,6 +265,7 @@ class RelayHandshake {
     }
 
     if (errThrown) {
+      this.shakerWrite(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY)
       destinationShaker.rest()
       try {
         await result.resp.conn.close()
