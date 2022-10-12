@@ -29,7 +29,7 @@ struct SimpleCounter {
 
 impl SimpleCounter {
     pub fn new(name: &str, description: &str) -> Result<Self, String> {
-        register_metric(name, description, |opts| IntCounter::with_opts(opts))
+        register_metric(name, description, IntCounter::with_opts)
             .map(|m| Self {
                 name: name.to_string(),
                 ctr: m
@@ -53,7 +53,7 @@ struct SimpleGauge {
 
 impl SimpleGauge {
     pub fn new(name: &str, description: &str) -> Result<Self, String> {
-        register_metric(name, description, |opts| Gauge::with_opts(opts))
+        register_metric(name, description, Gauge::with_opts)
             .map(|m| Self {
                 name: name.to_string(),
                 gg: m
