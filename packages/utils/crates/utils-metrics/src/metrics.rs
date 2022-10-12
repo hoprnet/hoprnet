@@ -1,5 +1,5 @@
 use std::fmt::Display;
-use prometheus::{Encoder, Gauge, Histogram, HistogramOpts, HistogramTimer, IntCounter, Opts, TextEncoder};
+use prometheus::{Gauge, Histogram, HistogramOpts, HistogramTimer, IntCounter, Opts, TextEncoder};
 use prometheus::core::{Collector, Metric};
 use wasm_bindgen::JsValue;
 
@@ -36,8 +36,8 @@ impl SimpleCounter {
             })
     }
 
-    pub fn increment(&self) {
-        self.ctr.inc()
+    pub fn increment(&self, by: u64) {
+        self.ctr.inc_by(by)
     }
 
     pub fn name(&self) -> &str {
@@ -60,12 +60,16 @@ impl SimpleGauge {
             })
     }
 
-    pub fn increment(&self) {
-        self.gg.inc()
+    pub fn increment(&self, by: f64) {
+        self.gg.add(by)
     }
 
-    pub fn decrement(&self) {
-        self.gg.dec()
+    pub fn decrement(&self, by: f64) {
+        self.gg.sub(by)
+    }
+
+    pub fn set(&self, value: f64) {
+        self.gg.set(value)
     }
 
     pub fn name(&self) -> &str {
@@ -118,17 +122,14 @@ impl SimpleHistogram {
 }
 
 /// Gathers all the global Prometheus metrics.
-fn gather_all_metrics() -> Result<Box<[u8]>, String> {
-
-    let mut buffer = vec![];
-    let encoder = TextEncoder::new();
-
-    // Simply gather all global metric families and encode them
+fn gather_all_metrics() -> Result<String, String> {
+    // Simply gather all global metric families
     let metric_families = prometheus::gather();
-    encoder.encode(&metric_families, &mut buffer)
-        .map_err(|e| e.to_string())?;
 
-    Ok(buffer.into_boxed_slice())
+    // ... and encode them
+    let encoder = TextEncoder::new();
+    encoder.encode_to_string(&metric_families)
+        .map_err(|e| e.to_string())
 }
 
 /// Bindings for JS/TS
@@ -151,8 +152,8 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl Counter {
-        pub fn increment(&self) {
-            self.w.increment();
+        pub fn increment(&self, by: u64) {
+            self.w.increment(by);
         }
 
         pub fn name(&self) -> String {
@@ -174,12 +175,16 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl SimpleGauge {
-        pub fn increment(&self) {
-            self.w.increment();
+        pub fn increment(&self, by: f64) {
+            self.w.increment(by);
         }
 
-        pub fn decrement(&self) {
-            self.w.decrement();
+        pub fn decrement(&self, by: f64) {
+            self.w.decrement(by);
+        }
+
+        pub fn set(&self, value: f64) {
+            self.w.set(value)
         }
 
         pub fn name(&self) -> String {
@@ -228,7 +233,7 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub fn gather_all_metrics() -> Result<Box<[u8]>, JsValue> {
+    pub fn gather_all_metrics() -> Result<String, JsValue> {
         super::gather_all_metrics()
             .map_err(as_jsvalue)
     }

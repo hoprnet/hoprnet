@@ -19,4 +19,4 @@ import utilsMisc from '../lib/utils_misc.cjs'
 export const { get_package_version } = utilsMisc
 
 import utilsMetrics from '../lib/utils_metrics.cjs'
-export const { create_gauge, create_counter, create_histogram } = utilsMetrics
+export const { create_gauge, create_counter, create_histogram, gather_all_metrics } = utilsMetrics
