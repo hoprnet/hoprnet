@@ -5,7 +5,7 @@ import { gather_all_metrics } from '@hoprnet/hopr-utils'
 const GET: Operation = [
   (_, res, _next) => {
     try {
-      const metrics = gather_all_metrics();
+      const metrics = gather_all_metrics()
       return res.status(200).send(metrics)
     } catch (err) {
       return res
