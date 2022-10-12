@@ -74,7 +74,7 @@ class TCPConnection implements MultiaddrConnection {
 
       const start = Date.now()
 
-      setTimeout(() => {
+      const timeout = setTimeout(() => {
         if (done) {
           return
         }
@@ -103,6 +103,7 @@ class TCPConnection implements MultiaddrConnection {
           return
         }
         done = true
+        clearTimeout(timeout)
 
         resolve()
       })
@@ -115,6 +116,7 @@ class TCPConnection implements MultiaddrConnection {
 
         if (this.socket.destroyed) {
           done = true
+          clearTimeout(timeout)
         }
 
         reject(err)

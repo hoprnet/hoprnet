@@ -31,10 +31,12 @@ export function abortableTimeout<Result, AbortMsg, TimeoutMsg>(
 
     let done = false
 
+    let timeout: NodeJS.Timeout
     // forward outer abort
     const innerAbort = abort.abort.bind(abort)
 
     const cleanUp = () => {
+      clearTimeout(timeout)
       done = true
       abort.signal.removeEventListener('abort', onInnerAbort)
       opts.signal?.removeEventListener('abort', innerAbort)
@@ -64,7 +66,7 @@ export function abortableTimeout<Result, AbortMsg, TimeoutMsg>(
     // Let the timeout run through and let the handler do nothing, i.e. `done = true`
     // instead of clearing the timeout with `clearTimeout` which becomes an expensive
     // operation when using many timeouts
-    setTimeout(onTimeout, opts.timeout)
+    timeout = setTimeout(onTimeout, opts.timeout)
 
     try {
       result = await fn({

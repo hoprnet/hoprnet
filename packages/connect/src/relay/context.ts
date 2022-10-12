@@ -158,8 +158,9 @@ class RelayContext extends EventEmitter {
 
     this.queueStatusMessage(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PING))
 
-    const pingTimeoutPromise = new Promise<PingTimeoutEvent>((resolve) =>
-      setTimeout(() => {
+    let timeout: NodeJS.Timeout | undefined
+    const pingTimeoutPromise = new Promise<PingTimeoutEvent>((resolve) => {
+      timeout = setTimeout(() => {
         if (timeoutDone) {
           return
         }
@@ -170,8 +171,10 @@ class RelayContext extends EventEmitter {
           type: ConnectionEventTypes.PING_TIMEOUT
         })
       }, ms)
-    )
+    })
     const result = await Promise.race([pingTimeoutPromise, this._pingResponsePromise.promise])
+
+    clearTimeout(timeout as NodeJS.Timeout)
 
     switch (result.type) {
       case ConnectionEventTypes.PING_RESPONE:

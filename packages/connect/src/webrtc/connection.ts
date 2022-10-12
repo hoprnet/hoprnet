@@ -131,6 +131,8 @@ class WebRTCConnection implements MultiaddrConnection {
   // @dev this is done using meta programming in libp2p
   public timeline: MultiaddrConnection['timeline']
 
+  private webRTCTimeout: NodeJS.Timeout | undefined
+
   constructor(
     private relayConn: RelayConnection,
     private testingOptions: HoprConnectTestingOptions,
@@ -207,7 +209,7 @@ class WebRTCConnection implements MultiaddrConnection {
    * @returns
    */
   public sink(source: StreamSource) {
-    setTimeout(this.onWebRTCError.bind(this), WEBRTC_UPGRADE_TIMEOUT).unref()
+    this.webRTCTimeout = setTimeout(this.onWebRTCError.bind(this), WEBRTC_UPGRADE_TIMEOUT).unref()
 
     let deferred = defer<void>()
     this.sinkCreator.catch(deferred.reject)
@@ -267,6 +269,7 @@ class WebRTCConnection implements MultiaddrConnection {
       // Already handled, so nothing to do
       return
     }
+    clearTimeout(this.webRTCTimeout as NodeJS.Timeout)
     this._webRTCHandshakeFinished = true
 
     if (err) {
@@ -292,6 +295,7 @@ class WebRTCConnection implements MultiaddrConnection {
       // Already handled, so nothing to do
       return
     }
+    clearTimeout(this.webRTCTimeout as NodeJS.Timeout)
     this._webRTCHandshakeFinished = true
 
     // For testing, disable WebRTC upgrade

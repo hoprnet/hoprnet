@@ -226,7 +226,7 @@ export default class Heartbeat {
 
     let finished = false
 
-    setTimeout(() => {
+    const timeout = setTimeout(() => {
       if (!finished) {
         abort.abort()
       }
@@ -237,6 +237,8 @@ export default class Heartbeat {
     const pingWork = this.networkPeers
       .pingSince(thresholdTime)
       .map<[destination: PeerId, signal: AbortSignal]>((peerToPing: PeerId) => [peerToPing, abort.signal])
+
+    clearTimeout(timeout)
 
     const start = Date.now()
     const pingResults = await nAtATime(this._pingNode, pingWork, this.config.maxParallelHeartbeats)

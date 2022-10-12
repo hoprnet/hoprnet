@@ -65,7 +65,7 @@ export async function createChainWrapper(
   },
   privateKey: Uint8Array,
   checkDuplicate: Boolean = true,
-  timeout = TX_CONFIRMATION_WAIT
+  txTimeout = TX_CONFIRMATION_WAIT
 ) {
   const provider = networkInfo.provider.startsWith('http')
     ? new providers.StaticJsonRpcProvider(networkInfo.provider)
@@ -197,10 +197,12 @@ export async function createChainWrapper(
   const waitForTransaction = (txHash: string, removeListener: () => void) => {
     return new Promise<void>((resolve, reject) => {
       let done = false
+      let timeout: NodeJS.Timeout
       const cleanUp = (err?: string) => {
         if (done) {
           return
         }
+        clearTimeout(timeout)
         done = true
 
         provider.off(txHash, onTransaction)
@@ -225,7 +227,7 @@ export async function createChainWrapper(
           cleanUp()
         }
       }
-      setTimeout(cleanUp, timeout, `Timeout while waiting for transaction ${txHash}`)
+      timeout = setTimeout(cleanUp, txTimeout, `Timeout while waiting for transaction ${txHash}`)
 
       // Immediately stops polling once the transaction hash appeared
       // in the mempool

@@ -4,7 +4,7 @@
  * @param work function that returns a Promise that resolves once the work is done
  * @returns a Promise that resolves once the timeout is due or the work is done
  */
-export function timeout<T>(timeout: number, work: () => Promise<T>): Promise<T> {
+export function timeout<T>(ms: number, work: () => Promise<T>): Promise<T> {
   let resolve: any
   let reject: any
 
@@ -15,11 +15,14 @@ export function timeout<T>(timeout: number, work: () => Promise<T>): Promise<T> 
     reject = rej
   })
 
+  let timeout: NodeJS.Timeout
+
   const onReject = (err?: any) => {
     if (done) {
       return
     }
     done = true
+    clearTimeout(timeout)
 
     reject(err)
   }
@@ -29,11 +32,12 @@ export function timeout<T>(timeout: number, work: () => Promise<T>): Promise<T> 
       return
     }
     done = true
+    clearTimeout(timeout)
 
     resolve(res)
   }
 
-  setTimeout(onReject, timeout, Error('Timeout'))
+  timeout = setTimeout(onReject, ms, Error('Timeout'))
 
   try {
     work().then(onResolve, onReject)

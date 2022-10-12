@@ -231,7 +231,7 @@ async function* queryDHT(components: Components, destination: PeerId): AsyncIter
 
   let done = false
 
-  setTimeout(() => {
+  const timeout = setTimeout(() => {
     if (done) {
       return
     }
@@ -250,6 +250,7 @@ async function* queryDHT(components: Components, destination: PeerId): AsyncIter
       error(`DHT error: ${err.message}`)
     }
   }
+  clearTimeout(timeout)
   done = true
 }
 
