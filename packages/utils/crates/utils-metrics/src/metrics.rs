@@ -1,8 +1,6 @@
-use std::error::Error;
 use std::fmt::Display;
-use prometheus::{Encoder, Gauge, IntCounter, Opts, TextEncoder};
+use prometheus::{Encoder, Gauge, Histogram, HistogramOpts, HistogramTimer, IntCounter, Opts, TextEncoder};
 use prometheus::core::{Collector, Metric};
-use thiserror::Error;
 use wasm_bindgen::JsValue;
 
 pub fn as_jsvalue<T>(v: T) -> JsValue where T: Display {
@@ -75,6 +73,50 @@ impl SimpleGauge {
     }
 }
 
+struct SimpleHistogram {
+    name: String,
+    hh: Histogram
+}
+
+struct SimpleTimer {
+    histogram_timer: HistogramTimer
+}
+
+impl SimpleHistogram {
+    pub fn new(name: &str, description: &str) -> Result<Self, String> {
+        let metric = Histogram::with_opts(HistogramOpts::new(name, description))
+            .map_err(|e| e.to_string())?;
+
+        prometheus::register(Box::new(metric.clone()))
+            .map_err(|e| e.to_string())?;
+
+        Ok(Self {
+            name: name.to_string(),
+            hh: metric
+        })
+    }
+
+    pub fn observe(&self, value: f64) {
+        self.hh.observe(value)
+    }
+
+    pub fn start_measure(&self) -> SimpleTimer {
+        SimpleTimer { histogram_timer: self.hh.start_timer() }
+    }
+
+    pub fn record_measure(&self, timer: SimpleTimer) {
+        timer.histogram_timer.observe_duration()
+    }
+
+    pub fn cancel_measure(&self, timer: SimpleTimer) -> f64 {
+        timer.histogram_timer.stop_and_discard()
+    }
+
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+}
+
 /// Gathers all the global Prometheus metrics.
 fn gather_all_metrics() -> Result<Box<[u8]>, String> {
 
@@ -91,7 +133,6 @@ fn gather_all_metrics() -> Result<Box<[u8]>, String> {
 
 /// Bindings for JS/TS
 pub mod wasm {
-    use prometheus::Gauge;
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
     use crate::metrics::as_jsvalue;
@@ -115,7 +156,7 @@ pub mod wasm {
         }
 
         pub fn name(&self) -> String {
-            self.name()
+            self.w.name().into()
         }
     }
 
@@ -142,7 +183,47 @@ pub mod wasm {
         }
 
         pub fn name(&self) -> String {
-            self.name()
+            self.w.name().into()
+        }
+    }
+
+    #[wasm_bindgen]
+    pub struct SimpleHistogram {
+        w: super::SimpleHistogram
+    }
+
+    #[wasm_bindgen]
+    pub fn create_histogram(name: &str, description: &str) -> Result<SimpleHistogram, JsValue> {
+        super::SimpleHistogram::new(name, description)
+            .map(|c| SimpleHistogram { w: c })
+            .map_err(as_jsvalue)
+    }
+
+    #[wasm_bindgen]
+    pub struct SimpleTimer {
+        w: super::SimpleTimer
+    }
+
+    #[wasm_bindgen]
+    impl SimpleHistogram {
+        pub fn observe(&self, value: f64) {
+            self.w.observe(value)
+        }
+
+        pub fn start_measure(&self) -> SimpleTimer {
+          SimpleTimer { w: self.w.start_measure() }
+        }
+
+        pub fn record_measure(&self, timer: SimpleTimer) {
+          self.w.record_measure(timer.w)
+        }
+
+        pub fn cancel_measure(&self, timer: SimpleTimer) -> f64 {
+            self.w.cancel_measure(timer.w)
+        }
+
+        pub fn name(&self) -> String {
+            self.w.name().into()
         }
     }
 
