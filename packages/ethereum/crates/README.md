@@ -11,6 +11,7 @@ Draft readme, for rust migration
 
 1. Three solc versions are needed
 
-- 0.4: Permittable token, implementation of xHOPR
+- 0.4: Permittable token, implementation of xHOPR. The permittable token implementation is extracted from the deployed xHOPR token. The only alternative done on the contract is to keep `pragma solidity` with the least version
 - 0.6: Deployed Hoprtoken
 - 0.8: More recent contracts
+
