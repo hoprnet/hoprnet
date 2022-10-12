@@ -28,3 +28,6 @@ clean:
 ifneq ($(PACKAGES),)
 	rm -rf $(PKG_DIRS)
 endif
+
+sc-build:
+    forge build --root "./contracts"

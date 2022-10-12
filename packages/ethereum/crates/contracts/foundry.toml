@@ -1,13 +1,6 @@
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
 
-## defaults for _all_ profiles
-[profile.default]
-src = 'src'
-out = 'out'
-libs = ['lib']
-verbosity = 1
-
-[profile.development]
+[default]
 src = 'src'
 out = 'out'
 libs = ['lib']
