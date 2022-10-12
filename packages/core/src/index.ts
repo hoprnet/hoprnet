@@ -464,34 +464,34 @@ class Hopr extends EventEmitter {
     await this.maybeLogProfilingToGCloud()
     this.heartbeat.recalculateNetworkHealth()
 
-    this.startMemoryFreeInterval()
+    // this.startMemoryFreeInterval()
   }
 
   /**
    * Total hack
    Mannually wipes DHT's ping queues as they get unnecessarily populated
    */
-  private freeMemory() {
-    console.log(
-      // @ts-ignore
-      `Freeing memory, size wan ${this.libp2pComponents.getDHT().wan.routingTable.pingQueue.size} lan ${
-        // @ts-ignore
+  // private freeMemory() {
+  //   console.log(
+  //     // @ts-ignore
+  //     `Freeing memory, size wan ${this.libp2pComponents.getDHT().wan.routingTable.pingQueue.size} lan ${
+  //       // @ts-ignore
 
-        this.libp2pComponents.getDHT().lan.routingTable.pingQueue.size
-      }`
-    )
-    // @ts-ignore
-    this.libp2pComponents.getDHT().wan.routingTable.pingQueue.clear()
-    // @ts-ignore
-    this.libp2pComponents.getDHT().lan.routingTable.pingQueue.clear()
-  }
+  //       this.libp2pComponents.getDHT().lan.routingTable.pingQueue.size
+  //     }`
+  //   )
+  //   // @ts-ignore
+  //   this.libp2pComponents.getDHT().wan.routingTable.pingQueue.clear()
+  //   // @ts-ignore
+  //   this.libp2pComponents.getDHT().lan.routingTable.pingQueue.clear()
+  // }
 
   /**
    * Total hack
    */
-  private startMemoryFreeInterval() {
-    retimer(this.freeMemory.bind(this), () => durations.minutes(1))
-  }
+  // private startMemoryFreeInterval() {
+  //   retimer(this.freeMemory.bind(this), () => durations.minutes(1))
+  // }
 
   private async maybeLogProfilingToGCloud() {
     if (process.env.GCLOUD) {
