@@ -4,3 +4,6 @@
 [submodule "packages/ethereum/crates/contracts/lib/openzeppelin-contracts"]
 	path = packages/ethereum/crates/contracts/lib/openzeppelin-contracts
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "packages/ethereum/crates/contracts/lib/openzeppelin-contracts-v3-0-1"]
+	path = packages/ethereum/crates/contracts/lib/openzeppelin-contracts-v3-0-1
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
