@@ -239,7 +239,8 @@ class RelayHandshake {
       components,
       destination,
       DELIVERY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments),
-      false
+      false,
+      true
     )
 
     // Anything can happen while attempting to connect

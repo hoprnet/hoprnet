@@ -191,6 +191,9 @@ class HoprConnect implements Transport, Initializable, Startable {
       case CODE_IP6:
         return this.dialDirectly(ma, options)
       case CODE_P2P:
+        if ((options as any).noRelay === true) {
+          throw new Error(`Cannot extend already relayed connections`)
+        }
         const relay = peerIdFromBytes((maTuples[0][1] as Uint8Array).slice(1))
 
         return this.dialWithRelay(relay, destination, options)
