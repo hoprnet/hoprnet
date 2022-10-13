@@ -111,9 +111,9 @@ export async function libp2pSendMessage<T extends boolean>(
   protocols: string | string[],
   message: Uint8Array,
   includeReply: T,
-  opts?: {
+  opts: {
     timeout?: number
-  }
+  } = {}
 ): Promise<T extends true ? Uint8Array[] : void> {
   // Components is not part of interface
   const r = await dial(components, destination, protocols)

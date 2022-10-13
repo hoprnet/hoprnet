@@ -169,9 +169,9 @@ export type SendMessage = ((
   protocols: string | string[],
   msg: Uint8Array,
   includeReply: true,
-  opts: DialOpts
+  opts?: DialOpts
 ) => Promise<Uint8Array[]>) &
-  ((dest: PeerId, protocols: string | string[], msg: Uint8Array, includeReply: false, opts: DialOpts) => Promise<void>)
+  ((dest: PeerId, protocols: string | string[], msg: Uint8Array, includeReply: false, opts?: DialOpts) => Promise<void>)
 
 class Hopr extends EventEmitter {
   public status: NodeStatus = 'UNINITIALIZED'
