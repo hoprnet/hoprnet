@@ -51,7 +51,9 @@ import {
   type DialOpts,
   type Hash,
   type HalfKeyChallenge,
-  type Ticket
+  type Ticket,
+  create_gauge,
+  create_counter
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { type Indexer } from '@hoprnet/hopr-core-ethereum'
 
@@ -82,6 +84,10 @@ const DEBUG_PREFIX = `hopr-core`
 const log = debug(DEBUG_PREFIX)
 const verbose = debug(DEBUG_PREFIX.concat(`:verbose`))
 const error = debug(DEBUG_PREFIX.concat(`:error`))
+
+// Metrics
+const metric_outChannelCount = create_gauge('core_gauge_num_outgoing_channels', 'Number of outgoing channels')
+const metric_sentMessageCount = create_counter('core_counter_num_sent_messages', 'Number of sent messages')
 
 // Using libp2p components directly because it allows us
 // to bypass the API layer
@@ -860,6 +866,7 @@ class Hopr extends EventEmitter {
       throw Error(`Error while trying to send final packet ${JSON.stringify(err)}`)
     }
 
+    metric_sentMessageCount.increment(1n)
     return packet.ackChallenge.toHex()
   }
 
@@ -1119,7 +1126,9 @@ class Hopr extends EventEmitter {
     }
 
     try {
-      return this.connector.openChannel(counterpartyPubKey, new Balance(amountToFund))
+      let channel = this.connector.openChannel(counterpartyPubKey, new Balance(amountToFund))
+      metric_outChannelCount.increment(1)
+      return channel
     } catch (err) {
       this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to openChannel: ${err}`)
@@ -1181,6 +1190,10 @@ class Hopr extends EventEmitter {
       if (channel.status === ChannelStatus.Open || channel.status == ChannelStatus.WaitingForCommitment) {
         log('initiating closure of channel', channel.getId().toHex())
         txHash = await this.connector.initializeClosure(counterpartyPubKey)
+
+        if (direction === 'outgoing') {
+          metric_outChannelCount.decrement(1)
+        }
       } else {
         // verify that we passed the closure waiting period to prevent failing
         // on-chain transactions

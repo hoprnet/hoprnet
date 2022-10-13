@@ -1,15 +1,24 @@
 import type NetworkPeers from './network-peers.js'
 import type AccessControl from './access-control.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import { randomInteger, u8aEquals, debug, retimer, nAtATime, u8aToHex, pickVersion } from '@hoprnet/hopr-utils'
+import {
+  randomInteger,
+  u8aEquals,
+  debug,
+  retimer,
+  nAtATime,
+  u8aToHex,
+  pickVersion,
+  create_gauge,
+  create_histogram,
+  create_counter
+} from '@hoprnet/hopr-utils'
 import { HEARTBEAT_TIMEOUT } from '../constants.js'
 import { createHash, randomBytes } from 'crypto'
 
 import type { Subscribe, SendMessage } from '../index.js'
 import EventEmitter from 'events'
 import { NetworkPeersOrigin } from './network-peers.js'
-
-import {create_gauge} from '@hoprnet/hopr-utils'
 
 
 const log = debug('hopr-core:heartbeat')
@@ -27,6 +36,9 @@ const MAX_PARALLEL_HEARTBEATS = 14
 const HEARTBEAT_RUN_TIMEOUT = 2 * 60 * 1000 // 2 minutes
 
 const metric_networkHealth = create_gauge('core_gauge_network_health', 'Connectivity health indicator')
+const metric_timeToHeartbeat = create_histogram('core_histogram_heartbeat_time', 'Measures total time it takes to probe other nodes')
+const metric_pingSuccessCount = create_counter('core_counter_heartbeat_successful_pings', 'Total number of successful pings')
+const metric_pingFailureCount = create_counter('core_counter_heartbeat_failed_pings', 'Total number of failed pings')
 
 export type HeartbeatPingResult = {
   destination: PeerId
@@ -148,6 +160,8 @@ export default class Heartbeat {
       })
     } catch (err) {
       log(`Connection to ${destination.toString()} failed: ${err?.message}`)
+
+      metric_pingFailureCount.increment(1n)
       return {
         destination,
         lastSeen: -1
@@ -162,12 +176,14 @@ export default class Heartbeat {
       // Eventually close the connections, all errors are handled
       this.closeConnectionsTo(destination)
 
+      metric_pingFailureCount.increment(1n)
       return {
         destination,
         lastSeen: -1
       }
     }
 
+    metric_pingSuccessCount.increment(1n)
     return {
       destination,
       lastSeen: Date.now()
@@ -246,12 +262,14 @@ export default class Heartbeat {
 
     // Create an object that describes which work has to be done
     // by the workers, i.e. the pingNode code
+    const metric_timer = metric_timeToHeartbeat.start_measure()
     const pingWork = this.networkPeers
       .pingSince(thresholdTime)
       .map<[destination: PeerId, signal: AbortSignal]>((peerToPing: PeerId) => [peerToPing, abort.signal])
 
     const start = Date.now()
     const pingResults = await nAtATime(this._pingNode, pingWork, this.config.maxParallelHeartbeats)
+    metric_timeToHeartbeat.record_measure(metric_timer)
 
     finished = true
 
