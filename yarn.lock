@@ -3025,6 +3025,7 @@ __metadata:
     mocha: 9.2.2
     multiformats: 9.6.5
     nat-api: 0.3.1
+    retimer: 3.0.0
     simple-peer: 9.11.1
     stream-to-it: 0.2.4
     typescript: 4.7.4
@@ -20512,7 +20513,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"retimer@npm:^3.0.0":
+"retimer@npm:3.0.0, retimer@npm:^3.0.0":
   version: 3.0.0
   resolution: "retimer@npm:3.0.0"
   checksum: f88309196e9d4f2d4be0c76eafc27a9f102c74b40b391ce730785b052c345d7bd59c3e4411a4c422f89f19a42b97b28034639e2f06c63133a06ec8958e9e7516
