@@ -493,7 +493,7 @@ class Hopr extends EventEmitter {
    * Total hack
    */
   private startMemoryFreeInterval() {
-    retimer(this.freeMemory.bind(this), () => durations.minutes(1))
+    intervalTimer(this.freeMemory.bind(this), () => durations.minutes(1))
   }
 
   private async maybeLogProfilingToGCloud() {
