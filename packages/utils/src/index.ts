@@ -15,4 +15,13 @@ export * from './ethereum/index.js'
 export * from './utils.js'
 
 export { get_package_version } from '../lib/utils_misc.js'
-export {create_counter, SimpleCounter, create_gauge, SimpleGauge, create_histogram, SimpleHistogram, SimpleTimer, gather_all_metrics } from '../lib/utils_metrics.js'
+export {
+  create_counter,
+  SimpleCounter,
+  create_gauge,
+  SimpleGauge,
+  create_histogram,
+  SimpleHistogram,
+  SimpleTimer,
+  gather_all_metrics
+} from '../lib/utils_metrics.js'
