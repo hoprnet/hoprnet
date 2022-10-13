@@ -89,7 +89,11 @@ const error = debug(DEBUG_PREFIX.concat(`:error`))
 // Metrics
 const metric_outChannelCount = create_gauge('core_gauge_num_outgoing_channels', 'Number of outgoing channels')
 const metric_sentMessageCount = create_counter('core_counter_sent_messages', 'Number of sent messages')
-const metric_pathLength = create_histogram_with_buckets('core_histogram_path_length', 'Histogram of path lengths', new Float64Array([0,1,2,3,4]))
+const metric_pathLength = create_histogram_with_buckets(
+  'core_histogram_path_length',
+  'Histogram of path lengths',
+  new Float64Array([0, 1, 2, 3, 4])
+)
 
 // Using libp2p components directly because it allows us
 // to bypass the API layer
