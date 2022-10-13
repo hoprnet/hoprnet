@@ -38,7 +38,7 @@ export const MAX_BACKOFF = MAX_DELAY / MIN_DELAY
 const BAD_QUALITY = 0.2 // Default quality for nodes we don't know about or which are considered offline.
 const IGNORE_TIMEFRAME = 10 * 60 * 1000 // 10mins
 
-// PROMETHEUS METRICS
+// Metrics
 const metric_hiqh_quality_peers = create_gauge('core_gauge_num_high_quality_peers', 'Number of hiqh quality peers')
 const metric_low_quality_peers = create_gauge('core_gauge_num_low_quality_peers', 'Number of low quality peers')
 const metric_peers = create_gauge('core_gauge_num_peers', 'Number of all peers')

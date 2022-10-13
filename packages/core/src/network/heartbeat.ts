@@ -34,6 +34,7 @@ const PING_HASH_ALGORITHM = 'blake2s256'
 const MAX_PARALLEL_HEARTBEATS = 14
 const HEARTBEAT_RUN_TIMEOUT = 2 * 60 * 1000 // 2 minutes
 
+// Metrics
 const metric_networkHealth = create_gauge('core_gauge_network_health', 'Connectivity health indicator')
 const metric_timeToHeartbeat = create_histogram(
   'core_histogram_heartbeat_time',

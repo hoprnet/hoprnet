@@ -6,7 +6,7 @@ import { NetworkPeersOrigin } from './network-peers.js'
 // const log = debug('hopr-core:access-control')
 const logError = debug('hopr-core:access-control:error')
 
-// Metric
+// Metrics
 const metric_rejectedConnections = create_counter('core_counter_nr_rejected_conns', 'Number of rejected connections due to NR')
 
 /**
