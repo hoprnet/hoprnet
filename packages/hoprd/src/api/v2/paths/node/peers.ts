@@ -68,23 +68,27 @@ export async function getPeers(
       }, new Map<string, PeerInfo>())
     })
 
-    const connected = node.getConnectedPeers().reduce<PeerInfo[]>((result, peerId) => {
-      const peerIdStr = peerId.toString()
+    const connected = [
+      ...(function* () {
+        for (const peerId of node.getConnectedPeers()) {
+          const peerIdStr = peerId.toString()
 
-      // already exists in announced, we use this because it contains multiaddr already
-      if (announced.has(peerIdStr)) {
-        result.push(announced.get(peerIdStr))
-      } else {
-        try {
-          const info = node.getConnectionInfo(peerId)
-          // exclude if quality is lesser than the one wanted
-          if (info.quality < quality) return result
-          result.push(toPeerInfoFormat(info))
-        } catch {}
-      }
-
-      return result
-    }, [])
+          // already exists in announced, we use this because it contains multiaddr already
+          if (announced.has(peerIdStr)) {
+            yield announced.get(peerIdStr)
+          } else {
+            try {
+              const info = node.getConnectionInfo(peerId)
+              // exclude if quality is less than the one wanted
+              if (info.quality < quality) {
+                continue
+              }
+              yield toPeerInfoFormat(info)
+            } catch {}
+          }
+        }
+      })()
+    ]
 
     return {
       connected,

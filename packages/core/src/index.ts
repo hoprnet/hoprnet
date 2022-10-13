@@ -903,11 +903,17 @@ class Hopr extends EventEmitter {
   /**
    * @returns a list connected peerIds
    */
-  public getConnectedPeers(): PeerId[] {
+  public getConnectedPeers(): Iterable<PeerId> {
     if (!this.networkPeers) {
       return []
     }
-    return this.networkPeers.all()
+
+    const entries = this.networkPeers.getAllEntries()
+    return (function* () {
+      for (const entry of entries) {
+        yield entry.id
+      }
+    })()
   }
 
   /**
@@ -915,7 +921,7 @@ class Hopr extends EventEmitter {
    * @returns a list of announced multi addresses
    */
   public async getAddressesAnnouncedOnChain(): Promise<Multiaddr[]> {
-    return this.indexer.getAddressesAnnouncedOnChain()
+    return await this.indexer.getAddressesAnnouncedOnChain()
   }
 
   /**
