@@ -21,6 +21,7 @@ export {
   create_gauge,
   SimpleGauge,
   create_histogram,
+  create_histogram_with_buckets,
   SimpleHistogram,
   SimpleTimer,
   gather_all_metrics
