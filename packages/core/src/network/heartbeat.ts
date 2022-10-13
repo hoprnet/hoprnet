@@ -9,8 +9,7 @@ import type { Subscribe, SendMessage } from '../index.js'
 import EventEmitter from 'events'
 import { NetworkPeersOrigin } from './network-peers.js'
 
-import {create_gauge} from '@hoprnet/hopr-utils'
-
+import { create_gauge } from '@hoprnet/hopr-utils'
 
 const log = debug('hopr-core:heartbeat')
 const error = debug('hopr-core:heartbeat:error')
@@ -213,14 +212,18 @@ export default class Heartbeat {
 
       // Map network state to integers
       switch (newHealthValue as NetworkHealthIndicator) {
-        case NetworkHealthIndicator.UNKNOWN: metric_networkHealth.set(0)
-          break;
-        case NetworkHealthIndicator.RED: metric_networkHealth.set(1)
-          break;
-        case NetworkHealthIndicator.ORANGE: metric_networkHealth.set(2)
-          break;
-        case NetworkHealthIndicator.GREEN: metric_networkHealth.set(4);
-          break;
+        case NetworkHealthIndicator.UNKNOWN:
+          metric_networkHealth.set(0)
+          break
+        case NetworkHealthIndicator.RED:
+          metric_networkHealth.set(1)
+          break
+        case NetworkHealthIndicator.ORANGE:
+          metric_networkHealth.set(2)
+          break
+        case NetworkHealthIndicator.GREEN:
+          metric_networkHealth.set(4)
+          break
       }
     }
 
