@@ -45,11 +45,26 @@ const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
 const metric_countUsedRelays = create_gauge('connect_gauge_used_relays', 'Number of used relays')
 const metric_countConnsToRelays = create_gauge('connect_gauge_conns_to_relays', 'Number of connections to relays')
 const metric_countRelayedConns = create_gauge('connect_gauge_relayed_conns', 'Number of currently relayed connections')
-const metric_countSuccessfulIncomingRelayReqs = create_counter('connect_counter_successful_relay_reqs', 'Number of successful incoming relay requests')
-const metric_countFailedIncomingRelayReqs = create_counter('connect_counter_failed_relay_reqs', 'Number of failed incoming relay requests')
-const metric_countRelayReconnects = create_counter('connect_counter_relay_reconnects', 'Number of re-established relayed connections')
-const metric_countSuccessfulConnects = create_counter('connect_counter_successful_conns', 'Number of successful connection attempts')
-const metric_countFailedConnects = create_counter('connect_counter_failed_conns', 'Number of failed connection attempts')
+const metric_countSuccessfulIncomingRelayReqs = create_counter(
+  'connect_counter_successful_relay_reqs',
+  'Number of successful incoming relay requests'
+)
+const metric_countFailedIncomingRelayReqs = create_counter(
+  'connect_counter_failed_relay_reqs',
+  'Number of failed incoming relay requests'
+)
+const metric_countRelayReconnects = create_counter(
+  'connect_counter_relay_reconnects',
+  'Number of re-established relayed connections'
+)
+const metric_countSuccessfulConnects = create_counter(
+  'connect_counter_successful_conns',
+  'Number of successful connection attempts'
+)
+const metric_countFailedConnects = create_counter(
+  'connect_counter_failed_conns',
+  'Number of failed connection attempts'
+)
 
 type ConnResult = ProtocolStream & {
   conn: Connection
