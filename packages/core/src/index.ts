@@ -14,6 +14,9 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Components } from '@libp2p/interfaces/components'
 import { compareAddressesLocalMode, compareAddressesPublicMode, type HoprConnectConfig } from '@hoprnet/hopr-connect'
 
+// @ts-ignore untyped library
+import retimer from 'retimer'
+
 import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants.js'
 
 import AccessControl from './network/access-control.js'
@@ -37,7 +40,7 @@ import {
   durations,
   isErrorOutOfFunds,
   debug,
-  retimer,
+  retimer as intervalTimer,
   createRelayerKey,
   createCircuitAddress,
   convertPubKeyFromPeerId,
@@ -973,7 +976,7 @@ class Hopr extends EventEmitter {
       if (this.status != 'RUNNING') {
         return
       }
-      const logTimeout = setTimeout(() => {
+      const timer = retimer(() => {
         log('strategy tick took longer than 10 secs')
       }, 10000)
       try {
@@ -983,13 +986,13 @@ class Hopr extends EventEmitter {
         log('error in periodic check', e)
       }
       log('Clearing out logging timeout.')
-      clearTimeout(logTimeout)
+      timer.clear()
       log(`Setting up timeout for ${this.strategy.tickInterval}ms`)
     }.bind(this)
 
     log(`Starting periodicCheck interval with ${this.strategy.tickInterval}ms`)
 
-    this.stopPeriodicCheck = retimer(periodicCheck, () => this.strategy.tickInterval)
+    this.stopPeriodicCheck = intervalTimer(periodicCheck, () => this.strategy.tickInterval)
   }
 
   /**

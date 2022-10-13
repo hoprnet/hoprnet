@@ -3110,6 +3110,7 @@ __metadata:
     memdown: 6.1.1
     mocha: 9.2.2
     nyc: 15.1.0
+    retimer: 3.0.0
     secp256k1: 4.0.3
     semver: 7.3.7
     sinon: 12.0.1

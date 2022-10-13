@@ -247,21 +247,14 @@ async function* queryDHT(components: Components, destination: PeerId): AsyncIter
   const key = createRelayerKey(destination)
   log(`fetching relay keys for node ${destination.toString()} from DHT.`, key)
 
-  const abort = new AbortController()
+  const timeoutController = new TimeoutController(DEFAULT_DHT_QUERY_TIMEOUT)
 
-  let done = false
-
-  const timeout = setTimeout(() => {
-    if (done) {
-      return
-    }
-    done = true
-
-    abort.abort()
-  }, DEFAULT_DHT_QUERY_TIMEOUT).unref()
+  const options = {
+    signal: timeoutController.signal
+  }
 
   try {
-    for await (const dhtResult of components.getContentRouting().findProviders(key as any, { signal: abort.signal })) {
+    for await (const dhtResult of components.getContentRouting().findProviders(key as any, options)) {
       yield dhtResult.id
     }
   } catch (err) {
@@ -270,8 +263,7 @@ async function* queryDHT(components: Components, destination: PeerId): AsyncIter
       error(`DHT error: ${err.message}`)
     }
   }
-  clearTimeout(timeout)
-  done = true
+  timeoutController.clear()
 }
 
 async function doDirectDial(

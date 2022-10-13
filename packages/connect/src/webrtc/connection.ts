@@ -19,6 +19,9 @@ import {
 import assert from 'assert'
 import type { DialOptions } from '@libp2p/interface-transport'
 
+// @ts-ignore untyped library
+import retimer from 'retimer'
+
 const DEBUG_PREFIX = `hopr-connect`
 
 const _log = Debug(DEBUG_PREFIX)
@@ -131,7 +134,7 @@ class WebRTCConnection implements MultiaddrConnection {
   // @dev this is done using meta programming in libp2p
   public timeline: MultiaddrConnection['timeline']
 
-  private webRTCTimeout: NodeJS.Timeout | undefined
+  private webRTCTimeout: any // untyped library
 
   constructor(
     private relayConn: RelayConnection,
@@ -209,7 +212,7 @@ class WebRTCConnection implements MultiaddrConnection {
    * @returns
    */
   public sink(source: StreamSource) {
-    this.webRTCTimeout = setTimeout(this.onWebRTCError.bind(this), WEBRTC_UPGRADE_TIMEOUT).unref()
+    this.webRTCTimeout = retimer(this.onWebRTCError.bind(this), WEBRTC_UPGRADE_TIMEOUT)
 
     let deferred = defer<void>()
     this.sinkCreator.catch(deferred.reject)
@@ -269,7 +272,7 @@ class WebRTCConnection implements MultiaddrConnection {
       // Already handled, so nothing to do
       return
     }
-    clearTimeout(this.webRTCTimeout as NodeJS.Timeout)
+    this.webRTCTimeout.clear()
     this._webRTCHandshakeFinished = true
 
     if (err) {
@@ -295,7 +298,7 @@ class WebRTCConnection implements MultiaddrConnection {
       // Already handled, so nothing to do
       return
     }
-    clearTimeout(this.webRTCTimeout as NodeJS.Timeout)
+    this.webRTCTimeout.clear()
     this._webRTCHandshakeFinished = true
 
     // For testing, disable WebRTC upgrade

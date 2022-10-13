@@ -1,6 +1,9 @@
+// @ts-ignore untyped library
+import retimer from 'retimer'
+
 /**
  * Races a timeout against some work
- * @param timeout return after timeout in ms
+ * @param ms return after timeout in ms
  * @param work function that returns a Promise that resolves once the work is done
  * @returns a Promise that resolves once the timeout is due or the work is done
  */
@@ -15,14 +18,14 @@ export function timeout<T>(ms: number, work: () => Promise<T>): Promise<T> {
     reject = rej
   })
 
-  let timeout: NodeJS.Timeout
+  let timeout: any // untyped library
 
   const onReject = (err?: any) => {
     if (done) {
       return
     }
     done = true
-    clearTimeout(timeout)
+    timeout.clear()
 
     reject(err)
   }
@@ -32,12 +35,12 @@ export function timeout<T>(ms: number, work: () => Promise<T>): Promise<T> {
       return
     }
     done = true
-    clearTimeout(timeout)
+    timeout.clear()
 
     resolve(res)
   }
 
-  timeout = setTimeout(onReject, ms, Error('Timeout'))
+  timeout = retimer(onReject, ms, Error('Timeout'))
 
   try {
     work().then(onResolve, onReject)
