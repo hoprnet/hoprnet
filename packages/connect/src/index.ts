@@ -40,10 +40,19 @@ const warn = Debug(DEBUG_PREFIX.concat(':warn'))
 const error = Debug(DEBUG_PREFIX.concat(':error'))
 
 // Metrics
-const metric_successfulDirectDials = create_counter('connect_counter_successful_direct_dials', 'Number of successful direct dials')
+const metric_successfulDirectDials = create_counter(
+  'connect_counter_successful_direct_dials',
+  'Number of successful direct dials'
+)
 const metric_failedDirectDials = create_counter('connect_counter_failed_direct_dials', 'Number of failed direct dials')
-const metric_successfulRelayedDials = create_counter('connect_counter_successful_relayed_dials', 'Number of successful direct dials')
-const metric_failedRelayedDials = create_counter('connect_counter_failed_relayed_dials', 'Number of failed direct dials')
+const metric_successfulRelayedDials = create_counter(
+  'connect_counter_successful_relayed_dials',
+  'Number of successful direct dials'
+)
+const metric_failedRelayedDials = create_counter(
+  'connect_counter_failed_relayed_dials',
+  'Number of failed direct dials'
+)
 
 const DEFAULT_CONNECTION_UPGRADE_TIMEOUT = 2000
 
@@ -204,8 +213,7 @@ class HoprConnect implements Transport, Initializable, Startable {
           let conn = this.dialDirectly(ma, options)
           metric_successfulDirectDials.increment()
           return conn
-        }
-        catch (e) {
+        } catch (e) {
           metric_failedDirectDials.increment()
           throw e
         }
@@ -216,8 +224,7 @@ class HoprConnect implements Transport, Initializable, Startable {
           let conn = this.dialWithRelay(relay, destination, options)
           metric_successfulRelayedDials.increment()
           return conn
-        }
-        catch (e) {
+        } catch (e) {
           metric_failedRelayedDials.increment()
           throw e
         }

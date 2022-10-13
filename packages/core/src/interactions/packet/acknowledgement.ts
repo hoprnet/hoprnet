@@ -12,8 +12,14 @@ type OnWinningTicket = (ackMessage: AcknowledgedTicket) => void
 type OnOutOfCommitments = (channelId: Hash) => void
 
 // Metrics
-const metric_receivedSuccessfulAcks = create_counter('core_counter_received_successful_acks', 'Number of received successful message acknowledgements')
-const metric_receivedFailedAcks = create_counter('core_counter_received_failed_acks', 'Number of received successful message acknowledgements')
+const metric_receivedSuccessfulAcks = create_counter(
+  'core_counter_received_successful_acks',
+  'Number of received successful message acknowledgements'
+)
+const metric_receivedFailedAcks = create_counter(
+  'core_counter_received_failed_acks',
+  'Number of received successful message acknowledgements'
+)
 const metric_sentAcks = create_counter('core_counter_sent_acks', 'Number of sent message acknowledgements')
 
 const metric_winningTickets = create_counter('core_counter_winning_tickets', 'Number of winning tickets')

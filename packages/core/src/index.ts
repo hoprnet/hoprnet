@@ -53,7 +53,8 @@ import {
   type HalfKeyChallenge,
   type Ticket,
   create_gauge,
-  create_counter, create_histogram
+  create_counter,
+  create_histogram
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { type Indexer } from '@hoprnet/hopr-core-ethereum'
 

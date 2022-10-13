@@ -18,7 +18,8 @@ import {
   ChannelStatus,
   Balance,
   PRICE_PER_PACKET,
-  INVERSE_TICKET_WIN_PROB, create_counter
+  INVERSE_TICKET_WIN_PROB,
+  create_counter
 } from '@hoprnet/hopr-utils'
 import type { HalfKey, HalfKeyChallenge, ChannelEntry, Challenge, Hash } from '@hoprnet/hopr-utils'
 import { AcknowledgementChallenge } from './acknowledgementChallenge.js'
