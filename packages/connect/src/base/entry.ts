@@ -424,7 +424,6 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     }
     this.disconnectListener = (event: CustomEvent<Connection>) => {
       const remotePeer = event.detail.remotePeer
-      console.log(`disconnected`)
 
       if (usedRelays.has(remotePeer.toString())) {
         log(`Disconnected from entry node ${remotePeer.toString()}, trying to reconnect ...`)
