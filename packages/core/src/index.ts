@@ -53,7 +53,7 @@ import {
   type HalfKeyChallenge,
   type Ticket,
   create_gauge,
-  create_counter
+  create_counter, create_histogram
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { type Indexer } from '@hoprnet/hopr-core-ethereum'
 
@@ -87,7 +87,8 @@ const error = debug(DEBUG_PREFIX.concat(`:error`))
 
 // Metrics
 const metric_outChannelCount = create_gauge('core_gauge_num_outgoing_channels', 'Number of outgoing channels')
-const metric_sentMessageCount = create_counter('core_counter_num_sent_messages', 'Number of sent messages')
+const metric_sentMessageCount = create_counter('core_counter_sent_messages', 'Number of sent messages')
+const metric_pathLength = create_histogram('core_histogram_path_length', 'Histogram of path lengths')
 
 // Using libp2p components directly because it allows us
 // to bypass the API layer
@@ -845,6 +846,7 @@ class Hopr extends EventEmitter {
     }
 
     const path: PublicKey[] = [].concat(intermediatePath, [PublicKey.fromPeerId(destination)])
+    metric_pathLength.observe(path.length)
 
     let packet: Packet
     try {
@@ -866,7 +868,7 @@ class Hopr extends EventEmitter {
       throw Error(`Error while trying to send final packet ${JSON.stringify(err)}`)
     }
 
-    metric_sentMessageCount.increment(1n)
+    metric_sentMessageCount.increment()
     return packet.ackChallenge.toHex()
   }
 
@@ -1127,7 +1129,7 @@ class Hopr extends EventEmitter {
 
     try {
       let channel = this.connector.openChannel(counterpartyPubKey, new Balance(amountToFund))
-      metric_outChannelCount.increment(1)
+      metric_outChannelCount.increment()
       return channel
     } catch (err) {
       this.maybeEmitFundsEmptyEvent(err)
@@ -1192,7 +1194,7 @@ class Hopr extends EventEmitter {
         txHash = await this.connector.initializeClosure(counterpartyPubKey)
 
         if (direction === 'outgoing') {
-          metric_outChannelCount.decrement(1)
+          metric_outChannelCount.decrement()
         }
       } else {
         // verify that we passed the closure waiting period to prevent failing

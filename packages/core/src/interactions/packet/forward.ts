@@ -16,8 +16,8 @@ const error = debug('hopr-core:packet:forward:error')
 const FORWARD_TIMEOUT = durations.seconds(6)
 
 // Metrics
-const metric_fwdMessageCount = create_counter('core_counter_num_fwd_messages', 'Number of forwarded messages')
-const metric_recvMessageCount = create_counter('core_counter_num_recv_messages', 'Number of received messages')
+const metric_fwdMessageCount = create_counter('core_counter_forwarded_messages', 'Number of forwarded messages')
+const metric_recvMessageCount = create_counter('core_counter_received_messages', 'Number of received messages')
 
 export class PacketForwardInteraction {
   protected mixer: Mixer
@@ -63,7 +63,7 @@ export class PacketForwardInteraction {
       // network operation
       await setImmediate()
       await sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey, this.protocolAck)
-      metric_recvMessageCount.increment(1n)
+      metric_recvMessageCount.increment()
       // Nothing else to do
       return
     }
@@ -96,6 +96,6 @@ export class PacketForwardInteraction {
     // network operation
     await setImmediate()
     await sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey, this.protocolAck)
-    metric_fwdMessageCount.increment(1n)
+    metric_fwdMessageCount.increment()
   }
 }

@@ -1,4 +1,4 @@
-import { oneAtATime, debug, AcknowledgedTicket, HoprDB } from '@hoprnet/hopr-utils'
+import { oneAtATime, debug, AcknowledgedTicket, HoprDB, create_counter } from '@hoprnet/hopr-utils'
 import type { PendingAckowledgement, HalfKeyChallenge, Hash } from '@hoprnet/hopr-utils'
 import { findCommitmentPreImage, bumpCommitment } from '@hoprnet/hopr-core-ethereum'
 import type { SendMessage, Subscribe } from '../../index.js'
@@ -10,6 +10,14 @@ const log = debug('hopr-core:acknowledgement')
 type OnAcknowledgement = (halfKey: HalfKeyChallenge) => void
 type OnWinningTicket = (ackMessage: AcknowledgedTicket) => void
 type OnOutOfCommitments = (channelId: Hash) => void
+
+// Metrics
+const metric_receivedSuccessfulAcks = create_counter('core_counter_received_acks', 'Number of received successful message acknowledgements')
+const metric_receivedFailedAcks = create_counter('core_counter_received_acks', 'Number of received successful message acknowledgements')
+const metric_sentAcks = create_counter('core_counter_sent_acks', 'Number of sent message acknowledgements')
+
+const metric_winningTickets = create_counter('core_counter_winning_tickets', 'Number of winning tickets')
+const metric_losingTickets = create_counter('core_counter_losing_tickets', 'Number of losing tickets')
 
 /**
  * Reserve a preImage for the given ticket if it is a winning ticket.
@@ -42,6 +50,7 @@ async function handleAcknowledgement(
         `Received unexpected acknowledgement for half key challenge ${acknowledgement.ackChallenge.toHex()} - half key ${acknowledgement.ackKeyShare.toHex()}`
       )
     }
+    metric_receivedFailedAcks.increment()
     throw err
   }
 
@@ -50,6 +59,7 @@ async function handleAcknowledgement(
     log(`Received acknowledgement as sender. First relayer has processed the packet.`)
     // Resolves `sendMessage()` promise
     onAcknowledgement(acknowledgement.ackChallenge)
+    metric_receivedSuccessfulAcks.increment()
     // nothing else to do
     return
   }
@@ -58,6 +68,7 @@ async function handleAcknowledgement(
   const unacknowledged = pending.ticket
 
   if (!unacknowledged.verifyChallenge(acknowledgement.ackKeyShare)) {
+    metric_receivedFailedAcks.increment()
     throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
   }
 
@@ -70,6 +81,7 @@ async function handleAcknowledgement(
     // Something clearly screwy here. This is bad enough to be a fatal error
     // we should kill the node and debug.
     log('Error, acknowledgement received for channel that does not exist')
+    metric_receivedFailedAcks.increment()
     throw e
   }
   const response = unacknowledged.getResponse(acknowledgement.ackKeyShare)
@@ -87,6 +99,7 @@ async function handleAcknowledgement(
   if (!ticket.isWinningTicket(opening, response, ticket.winProb)) {
     log(`Got a ticket that is not a win. Dropping ticket.`)
     await db.markLosing(unacknowledged)
+    metric_losingTickets.increment()
     return
   }
 
@@ -104,6 +117,7 @@ async function handleAcknowledgement(
   // store commitment in db
   await bumpCommitment(db, channelId, opening)
 
+  metric_winningTickets.increment()
   onWinningTicket(ack)
 }
 
@@ -144,6 +158,7 @@ export async function sendAcknowledgement(
     await sendMessage(destination, protocolAck, ack.serialize(), false, {
       timeout: ACKNOWLEDGEMENT_TIMEOUT
     })
+    metric_sentAcks.increment()
   } catch (err) {
     // Currently unclear how to proceed if sending acknowledgements
     // fails

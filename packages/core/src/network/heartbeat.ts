@@ -166,7 +166,7 @@ export default class Heartbeat {
     } catch (err) {
       log(`Connection to ${destination.toString()} failed: ${err?.message}`)
 
-      metric_pingFailureCount.increment(1n)
+      metric_pingFailureCount.increment()
       return {
         destination,
         lastSeen: -1
@@ -181,14 +181,14 @@ export default class Heartbeat {
       // Eventually close the connections, all errors are handled
       this.closeConnectionsTo(destination)
 
-      metric_pingFailureCount.increment(1n)
+      metric_pingFailureCount.increment()
       return {
         destination,
         lastSeen: -1
       }
     }
 
-    metric_pingSuccessCount.increment(1n)
+    metric_pingSuccessCount.increment()
     return {
       destination,
       lastSeen: Date.now()

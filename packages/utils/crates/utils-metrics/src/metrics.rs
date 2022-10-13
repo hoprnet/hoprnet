@@ -152,9 +152,11 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl SimpleCounter {
-        pub fn increment(&self, by: u64) {
+        pub fn increment_by(&self, by: u64) {
             self.w.increment(by);
         }
+
+        pub fn increment(&self) { self.w.increment(1) }
 
         pub fn name(&self) -> String {
             self.w.name().into()
@@ -175,12 +177,20 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl SimpleGauge {
-        pub fn increment(&self, by: f64) {
+        pub fn increment_by(&self, by: f64) {
             self.w.increment(by);
         }
 
-        pub fn decrement(&self, by: f64) {
+        pub fn increment(&self) {
+            self.w.increment(1.0);
+        }
+
+        pub fn decrement_by(&self, by: f64) {
             self.w.decrement(by);
+        }
+
+        pub fn decrement(&self) {
+            self.w.decrement(1.0);
         }
 
         pub fn set(&self, value: f64) {
