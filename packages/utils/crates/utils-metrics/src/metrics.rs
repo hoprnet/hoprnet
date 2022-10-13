@@ -87,8 +87,13 @@ struct SimpleTimer {
 }
 
 impl SimpleHistogram {
-    pub fn new(name: &str, description: &str) -> Result<Self, String> {
-        let metric = Histogram::with_opts(HistogramOpts::new(name, description))
+    pub fn new(name: &str, description: &str, buckets: Vec<f64>) -> Result<Self, String> {
+        let mut opts = HistogramOpts::new(name, description);
+        if !buckets.is_empty() {
+            opts = opts.buckets(buckets);
+        }
+
+        let metric = Histogram::with_opts(opts)
             .map_err(|e| e.to_string())?;
 
         prometheus::register(Box::new(metric.clone()))
@@ -209,7 +214,12 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub fn create_histogram(name: &str, description: &str) -> Result<SimpleHistogram, JsValue> {
-        super::SimpleHistogram::new(name, description)
+        create_histogram_with_buckets(name, description, &[] as &[f64; 0])
+    }
+
+    #[wasm_bindgen]
+    pub fn create_histogram_with_buckets(name: &str, description: &str, buckets: &[f64]) -> Result<SimpleHistogram, JsValue> {
+        super::SimpleHistogram::new(name, description, buckets.into())
             .map(|c| SimpleHistogram { w: c })
             .map_err(as_jsvalue)
     }
