@@ -7,12 +7,14 @@ import type { ConnectionManager, Dialer } from '@libp2p/interface-connection-man
 import type { Components } from '@libp2p/interfaces/components'
 import { type Multiaddr, protocols as maProtocols } from '@multiformats/multiaddr'
 
-import { timeout, type TimeoutOpts } from '../async/index.js'
+import { type TimeoutOpts } from '../async/index.js'
 
 import { debug } from '../process/index.js'
 import { createRelayerKey } from './relayCode.js'
 import { createCircuitAddress } from '../network/index.js'
 import { peerIdFromString } from '@libp2p/peer-id'
+
+import { TimeoutController } from 'timeout-abort-controller'
 
 const DEBUG_PREFIX = `hopr-core:libp2p`
 
@@ -116,9 +118,19 @@ export async function tryExistingConnections(
   const deadConnections: Connection[] = []
 
   for (const existingConnection of existingConnections) {
+    let timeoutController = new TimeoutController(PROTOCOL_SELECTION_TIMEOUT)
+
+    const options = {
+      signal: timeoutController.signal
+    }
+
     try {
-      stream = await timeout(PROTOCOL_SELECTION_TIMEOUT, () => existingConnection.newStream(protocols))
-    } catch (err) {}
+      stream = await existingConnection.newStream(protocols, options)
+    } catch (err) {
+      console.log(`newStream error`, err)
+    } finally {
+      timeoutController.clear()
+    }
 
     if (stream == undefined) {
       deadConnections.push(existingConnection)
@@ -193,14 +205,22 @@ async function establishNewConnection(
 
   log(`Connection ${destination.toString()} established !`)
 
+  const timeoutController = new TimeoutController(PROTOCOL_SELECTION_TIMEOUT)
+
+  const options = {
+    signal: timeoutController.signal
+  }
+
   let stream: ProtocolStream | undefined
   let errThrown = false
   try {
     // Timeout protocol selection to prevent from irresponsive nodes
-    stream = await timeout(PROTOCOL_SELECTION_TIMEOUT, () => (conn as Connection).newStream(protocols))
+    stream = await conn.newStream(protocols, options)
   } catch (err) {
     error(`error while trying to establish protocol ${protocols} with ${destination.toString()}`, err)
     errThrown = true
+  } finally {
+    timeoutController.clear()
   }
 
   if (stream == undefined || errThrown) {

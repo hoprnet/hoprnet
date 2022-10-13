@@ -3213,7 +3213,7 @@ __metadata:
     "@multiformats/multiaddr": 10.3.3
     "@types/chai": 4.3.3
     "@types/mocha": 9.1.1
-    abort-controller: ~3.0.0
+    abortable-iterator: 4.0.2
     bignumber.js: 9.0.2
     bl: 5.0.0
     bn.js: 5.2.0
@@ -3234,6 +3234,7 @@ __metadata:
     rewiremock: 3.14.3
     secp256k1: 4.0.3
     sinon: 12.0.1
+    timeout-abort-controller: 3.0.0
     typedoc: 0.23.2
     typedoc-plugin-markdown: 3.13.1
     typescript: 4.7.4
@@ -6185,7 +6186,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"abort-controller@npm:3.0.0, abort-controller@npm:^3.0.0, abort-controller@npm:~3.0.0":
+"abort-controller@npm:3.0.0, abort-controller@npm:^3.0.0":
   version: 3.0.0
   resolution: "abort-controller@npm:3.0.0"
   dependencies:
@@ -22635,7 +22636,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"timeout-abort-controller@npm:^3.0.0":
+"timeout-abort-controller@npm:3.0.0, timeout-abort-controller@npm:^3.0.0":
   version: 3.0.0
   resolution: "timeout-abort-controller@npm:3.0.0"
   dependencies:

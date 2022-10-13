@@ -12,7 +12,8 @@ import { peerIdFromString } from '@libp2p/peer-id'
 import { debug } from '../process/index.js'
 import { pipe } from 'it-pipe'
 import { dial } from './dialHelper.js'
-import { timeout } from '../index.js'
+import { abortableSource } from 'abortable-iterator'
+import { TimeoutController } from 'timeout-abort-controller'
 
 export * from './addressSorters.js'
 export * from './dialHelper.js'
@@ -122,11 +123,13 @@ export async function libp2pSendMessage<T extends boolean>(
     throw new Error(r.status)
   }
 
+  const timeoutController = new TimeoutController(opts.timeout ?? DEFAULT_SEND_TIMEOUT)
+
   if (includeReply) {
-    const result = await timeout(opts?.timeout ?? DEFAULT_SEND_TIMEOUT, () =>
-      pipe(
+    try {
+      const result = await pipe(
         // prettier-ignore
-        [message],
+        abortableSource([message], timeoutController.signal),
         r.resp.stream,
         async function collect(source: AsyncIterable<Uint8Array>) {
           const vals: Uint8Array[] = []
@@ -137,17 +140,26 @@ export async function libp2pSendMessage<T extends boolean>(
           return vals
         }
       )
-    )
+      return result as any
+    } catch (err) {
+      // @TODO filter aborts
+    } finally {
+      timeoutController.clear()
+    }
 
-    return result as any // Limitation of Typescript
+    return [] as any // limitation of Typescript
   } else {
-    await timeout(opts?.timeout ?? DEFAULT_SEND_TIMEOUT, () =>
-      pipe(
+    try {
+      await pipe(
         // prettier-ignore
-        [message],
+        abortableSource([message], timeoutController.signal),
         r.resp.stream
       )
-    )
+    } catch (err) {
+      // @TODO filter aborts
+    } finally {
+      timeoutController.clear()
+    }
   }
 }
 
