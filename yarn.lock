@@ -3278,7 +3278,6 @@ __metadata:
     react: 17.0.2
     react-dom: 17.0.2
     rlp: 3.0.0
-    run-queue: 2.0.1
     semver: 7.3.7
     sinon: 12.0.1
     supertest: ^6.2.2
@@ -6654,7 +6653,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"aproba@npm:^1.0.3 || ^2.0.0, aproba@npm:^2.0.0":
+"aproba@npm:^1.0.3 || ^2.0.0":
   version: 2.0.0
   resolution: "aproba@npm:2.0.0"
   checksum: 5615cadcfb45289eea63f8afd064ab656006361020e1735112e346593856f87435e02d8dcc7ff0d11928bc7d425f27bc7c2a84f6c0b35ab0ff659c814c138a24
@@ -20681,15 +20680,6 @@ __metadata:
   dependencies:
     queue-microtask: ^1.2.2
   checksum: cb4f97ad25a75ebc11a8ef4e33bb962f8af8516bb2001082ceabd8902e15b98f4b84b4f8a9b222e5d57fc3bd1379c483886ed4619367a7680dad65316993021d
-  languageName: node
-  linkType: hard
-
-"run-queue@npm:2.0.1":
-  version: 2.0.1
-  resolution: "run-queue@npm:2.0.1"
-  dependencies:
-    aproba: ^2.0.0
-  checksum: ce79d8099629c215620c545060c6a7ba5cf9b0166e011a56c6173775d86e117349418dd2e55d35584d920d1670d51ec9961752831fa0fddeec8a745c60b89ba3
   languageName: node
   linkType: hard
 
