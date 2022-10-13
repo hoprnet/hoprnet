@@ -31,7 +31,7 @@
     "test": "yarn test:wasm && mocha --reporter=tap --full-trace --exit . test && yarn testAdmin",
     "testAdmin": "cd hopr-admin && mocha --require ts-node/register ./**/*.spec.ts",
     "prebuild": "next telemetry disable",
-    "start": "node lib/main.cjs --admin --init --api",
+    "start": "node --experimental-wasm-modules lib/main.cjs --admin --init --api",
     "dev": "NODE_ENV=development yarn start --environment hardhat-localhost --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses --testPreferLocalAddresses --testNoAuthentication",
     "devAdmin": "next dev hopr-admin",
     "docs:generate": "typedoc",

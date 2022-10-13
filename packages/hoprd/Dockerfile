@@ -75,7 +75,7 @@ FROM node:16-bullseye-slim@sha256:95d4fdef5e12916a89f7d56dca6d8099de61df875c3c61
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
 ENV DEBUG 'hopr*'
-ENV NODE_OPTIONS=--max_old_space_size=4096
+ENV NODE_OPTIONS="--max_old_space_size=4096 --experimental-wasm-modules"
 
 # Admin web server
 EXPOSE 3000

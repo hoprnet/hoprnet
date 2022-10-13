@@ -139,19 +139,19 @@ pub mod wasm {
     use crate::metrics::as_jsvalue;
 
     #[wasm_bindgen]
-    pub struct Counter {
+    pub struct SimpleCounter {
         w: super::SimpleCounter
     }
 
     #[wasm_bindgen]
-    pub fn create_counter(name: &str, description: &str) -> Result<Counter, JsValue> {
+    pub fn create_counter(name: &str, description: &str) -> Result<SimpleCounter, JsValue> {
         super::SimpleCounter::new(name, description)
-            .map(|c| Counter { w: c })
+            .map(|c| SimpleCounter { w: c })
             .map_err(as_jsvalue)
     }
 
     #[wasm_bindgen]
-    impl Counter {
+    impl SimpleCounter {
         pub fn increment(&self, by: u64) {
             self.w.increment(by);
         }

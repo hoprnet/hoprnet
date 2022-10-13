@@ -26,8 +26,8 @@ GET.apiDoc = {
         'text/plain; version=0.0.4': {
           schema: {
             type: 'string',
-            description: 'Prometheus metrics',
-            example: '1.83.5'
+            description: 'Prometheus metrics text format',
+            example: 'basic_counter 30'
           }
         }
       }
