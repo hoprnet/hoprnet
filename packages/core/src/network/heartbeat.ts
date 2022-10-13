@@ -20,7 +20,6 @@ import type { Subscribe, SendMessage } from '../index.js'
 import EventEmitter from 'events'
 import { NetworkPeersOrigin } from './network-peers.js'
 
-
 const log = debug('hopr-core:heartbeat')
 const error = debug('hopr-core:heartbeat:error')
 
@@ -36,8 +35,14 @@ const MAX_PARALLEL_HEARTBEATS = 14
 const HEARTBEAT_RUN_TIMEOUT = 2 * 60 * 1000 // 2 minutes
 
 const metric_networkHealth = create_gauge('core_gauge_network_health', 'Connectivity health indicator')
-const metric_timeToHeartbeat = create_histogram('core_histogram_heartbeat_time', 'Measures total time it takes to probe other nodes')
-const metric_pingSuccessCount = create_counter('core_counter_heartbeat_successful_pings', 'Total number of successful pings')
+const metric_timeToHeartbeat = create_histogram(
+  'core_histogram_heartbeat_time',
+  'Measures total time it takes to probe other nodes'
+)
+const metric_pingSuccessCount = create_counter(
+  'core_counter_heartbeat_successful_pings',
+  'Total number of successful pings'
+)
 const metric_pingFailureCount = create_counter('core_counter_heartbeat_failed_pings', 'Total number of failed pings')
 
 export type HeartbeatPingResult = {
