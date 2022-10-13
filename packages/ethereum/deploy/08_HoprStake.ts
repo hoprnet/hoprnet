@@ -24,12 +24,13 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     deployOptions['waitConfirmations'] = 2
   }
 
+  const isStakingSeasonFiveAndAbove = parseInt([...stakeContractName.matchAll(/HoprStakeSeason(\d+)/g)][0][1], 10) > 4
+
   await deploy('HoprStake', {
     contract: stakeContractName,
     from: deployer,
     // beyond staking season 4 (from S5 on, no need to pass constructor parameters)
-    args:
-      parseInt([...stakeContractName.matchAll(/HoprStakeSeason(\d+)/g)][0][1], 10) > 4
+    args: isStakingSeasonFiveAndAbove
         ? []
         : [HoprBoost.address, admin, xHOPR.address, wxHOPR.address],
     maxFeePerGas,
