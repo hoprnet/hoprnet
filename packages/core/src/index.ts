@@ -14,6 +14,9 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Components } from '@libp2p/interfaces/components'
 import { compareAddressesLocalMode, compareAddressesPublicMode, type HoprConnectConfig } from '@hoprnet/hopr-connect'
 
+// @ts-ignore untyped library
+import retimer from 'retimer'
+
 import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants.js'
 
 import AccessControl from './network/access-control.js'
@@ -37,7 +40,7 @@ import {
   durations,
   isErrorOutOfFunds,
   debug,
-  retimer,
+  retimer as intervalTimer,
   createRelayerKey,
   createCircuitAddress,
   convertPubKeyFromPeerId,
@@ -169,9 +172,9 @@ export type SendMessage = ((
   protocols: string | string[],
   msg: Uint8Array,
   includeReply: true,
-  opts: DialOpts
+  opts?: DialOpts
 ) => Promise<Uint8Array[]>) &
-  ((dest: PeerId, protocols: string | string[], msg: Uint8Array, includeReply: false, opts: DialOpts) => Promise<void>)
+  ((dest: PeerId, protocols: string | string[], msg: Uint8Array, includeReply: false, opts?: DialOpts) => Promise<void>)
 
 class Hopr extends EventEmitter {
   public status: NodeStatus = 'UNINITIALIZED'
@@ -900,11 +903,17 @@ class Hopr extends EventEmitter {
   /**
    * @returns a list connected peerIds
    */
-  public getConnectedPeers(): PeerId[] {
+  public getConnectedPeers(): Iterable<PeerId> {
     if (!this.networkPeers) {
       return []
     }
-    return this.networkPeers.all()
+
+    const entries = this.networkPeers.getAllEntries()
+    return (function* () {
+      for (const entry of entries) {
+        yield entry.id
+      }
+    })()
   }
 
   /**
@@ -973,7 +982,7 @@ class Hopr extends EventEmitter {
       if (this.status != 'RUNNING') {
         return
       }
-      const logTimeout = setTimeout(() => {
+      const timer = retimer(() => {
         log('strategy tick took longer than 10 secs')
       }, 10000)
       try {
@@ -983,13 +992,13 @@ class Hopr extends EventEmitter {
         log('error in periodic check', e)
       }
       log('Clearing out logging timeout.')
-      clearTimeout(logTimeout)
+      timer.clear()
       log(`Setting up timeout for ${this.strategy.tickInterval}ms`)
     }.bind(this)
 
     log(`Starting periodicCheck interval with ${this.strategy.tickInterval}ms`)
 
-    this.stopPeriodicCheck = retimer(periodicCheck, () => this.strategy.tickInterval)
+    this.stopPeriodicCheck = intervalTimer(periodicCheck, () => this.strategy.tickInterval)
   }
 
   /**
