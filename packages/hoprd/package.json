@@ -28,7 +28,7 @@
     "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo ./build ./rest-api-v2-full-spec.json",
     "build": "yarn clean && yarn build:wasm && tsc -p . && yarn buildAdmin && chmod u+x lib/*.js",
     "buildAdmin": "HOPRD_GIT_COMMIT=$(git rev-parse --short HEAD) next build hopr-admin",
-    "test": "yarn test:wasm && mocha --reporter=tap --full-trace --exit . test && yarn testAdmin",
+    "test": "yarn test:wasm && NODE_OPTIONS=--experimental-wasm-modules mocha --reporter=tap --full-trace --exit . test && yarn testAdmin",
     "testAdmin": "cd hopr-admin && mocha --require ts-node/register ./**/*.spec.ts",
     "prebuild": "next telemetry disable",
     "start": "node --experimental-wasm-modules lib/main.cjs --admin --init --api",
