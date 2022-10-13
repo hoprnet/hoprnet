@@ -229,7 +229,7 @@ export const sendCTMessage = async (
   }
   try {
     await sendMessage(message, path)
-    log(`success sending ${path.map((pub) => pub.toString()).join(',')} message ${message}`)
+    log(`success sending ${path.map((pub) => pub.toString()).join(',')} message '${new TextDecoder().decode(message)}'`)
     return true
   } catch (e) {
     log(`error ${e} sending to ${startNode.toString()}`)

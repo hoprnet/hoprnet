@@ -464,23 +464,6 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       conn.tags = [PeerConnectionType.DIRECT]
     }
 
-    for (const peer of this.connectComponents.getEntryNodes().getUsedRelayPeerIds()) {
-      if (peer.equals(conn.remotePeer)) {
-        // Make sure that Multiaddr contains a PeerId
-        const maWithPeerId = maConn.remoteAddr
-          .decapsulateCode(CODE_P2P)
-          .encapsulate(`/p2p/${conn.remotePeer.toString()}`)
-
-        ;(maConn.socket as TCPSocket).on('close', () => {
-          if (maConn!.closed) {
-            return
-          }
-
-          this.connectComponents.getEntryNodes()._onEntryNodeDisconnect!(maWithPeerId)
-        })
-      }
-    }
-
     log('inbound connection %s upgraded', maConn.remoteAddr)
 
     socket.once('close', this.trackConn(conn))

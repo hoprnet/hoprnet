@@ -23,6 +23,7 @@ import { RelayConnection } from './connection.js'
 import { RelayHandshake, RelayHandshakeMessage } from './handshake.js'
 import { RelayState } from './state.js'
 import { createRelayerKey, randomInteger, retimer, tryExistingConnections } from '@hoprnet/hopr-utils'
+import { handshake } from 'it-handshake'
 
 import { attemptClose } from '../utils/index.js'
 import { type ConnectComponents, ConnectInitializable } from '../components.js'
@@ -60,17 +61,38 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
   private _isStarted: boolean
 
-  private _onReconnect: Relay['onReconnect'] | undefined
-  private _onDelivery: Relay['onDelivery'] | undefined
-  private _onRelay: Relay['onRelay'] | undefined
-  private _onCanRelay: Relay['onCanRelay'] | undefined
-  private _dialNodeDirectly: Relay['dialNodeDirectly'] | undefined
-
   private stopKeepAlive: (() => void) | undefined
   private connectedToRelays: Set<string>
 
   private components: Components | undefined
   private connectComponents: ConnectComponents | undefined
+
+  constructor(
+    private dialDirectly: HoprConnect['dialDirectly'],
+    private filter: HoprConnect['filter'],
+    private options: HoprConnectOptions,
+    private testingOptions: HoprConnectTestingOptions
+  ) {
+    this._isStarted = false
+
+    log(`relay testing options`, testingOptions)
+    this.relayState = new RelayState()
+
+    this.options.maxRelayedConnections ??= DEFAULT_MAX_RELAYED_CONNECTIONS
+
+    // Stores all relays that we announce to other nodes
+    // to make sure we don't close these connections
+    this.usedRelays = []
+
+    // Gathers relay peer IDs the node connected
+    this.connectedToRelays = new Set()
+
+    this.onReconnect = this.onReconnect.bind(this)
+    this.onDelivery = this.onDelivery.bind(this)
+    this.onRelay = this.onRelay.bind(this)
+    this.onCanRelay = this.onCanRelay.bind(this)
+    this.dialNodeDirectly = this.dialNodeDirectly.bind(this)
+  }
 
   public init(components: Components) {
     this.components = components
@@ -96,27 +118,6 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     return this.connectComponents
   }
 
-  constructor(
-    private dialDirectly: HoprConnect['dialDirectly'],
-    private filter: HoprConnect['filter'],
-    private options: HoprConnectOptions,
-    private testingOptions: HoprConnectTestingOptions
-  ) {
-    this._isStarted = false
-
-    log(`relay testing options`, testingOptions)
-    this.relayState = new RelayState()
-
-    this.options.maxRelayedConnections ??= DEFAULT_MAX_RELAYED_CONNECTIONS
-
-    // Stores all relays that we announce to other nodes
-    // to make sure we don't close these connections
-    this.usedRelays = []
-
-    // Gathers relay peer IDs the node connected
-    this.connectedToRelays = new Set()
-  }
-
   public isStarted(): boolean {
     return this._isStarted
   }
@@ -133,20 +134,13 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       throw Error(`Module has to be initialized first`)
     }
 
-    this._onReconnect = this.onReconnect.bind(this)
-    this._onRelay = this.onRelay.bind(this)
-    this._onDelivery = this.onDelivery.bind(this)
-    this._onCanRelay = this.onCanRelay.bind(this)
-
-    this._dialNodeDirectly = this.dialNodeDirectly.bind(this)
-
     // Requires registrar to be started first
     const protocolsDelivery = DELIVERY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
     const protocolsRelay = RELAY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
     const protocolsCanRelay = CAN_RELAY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
-    await this.components.getRegistrar().handle(protocolsDelivery, this._onDelivery)
-    await this.components.getRegistrar().handle(protocolsRelay, this._onRelay)
-    await this.components.getRegistrar().handle(protocolsCanRelay, this._onCanRelay)
+    await this.components.getRegistrar().handle(protocolsDelivery, this.onDelivery)
+    await this.components.getRegistrar().handle(protocolsRelay, this.onRelay)
+    await this.components.getRegistrar().handle(protocolsCanRelay, this.onCanRelay)
 
     // Periodic function that prints relay connections (and will also do pings in future)
     const periodicKeepAlive = async function (this: Relay) {
@@ -269,7 +263,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       'outbound',
       this.getConnectComponents(),
       this.testingOptions,
-      this._onReconnect as Relay['onReconnect']
+      this.onReconnect as Relay['onReconnect']
     )
 
     if (!this.testingOptions.__noWebRTCUpgrade) {
@@ -292,7 +286,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       'inbound',
       this.getConnectComponents(),
       this.testingOptions,
-      this._onReconnect as Relay['onReconnect']
+      this.onReconnect as Relay['onReconnect']
     )
 
     if (!this.testingOptions.__noWebRTCUpgrade) {
@@ -305,33 +299,45 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     }
   }
 
-  private async onCanRelay(conn: IncomingStreamData) {
-    // Only called if protocol is supported which
-    // means that environments match
+  /**
+   * Announces to the DHT that this node is acting as a relay for the
+   * given node.
+   * @param node node to announce
+   */
+  private async announceRelayerKey(node: PeerId) {
     try {
-      await conn.stream.sink(
-        async function* (this: Relay) {
-          // @TODO check if there is a relay slot available
+      const key = createRelayerKey(node)
 
-          // Initiate the DHT query but does not await the result which easily
-          // takes more than 10 seconds
-          ;(async function (this: Relay) {
-            try {
-              const key = createRelayerKey(conn.connection.remotePeer)
+      await this.getComponents().getContentRouting().provide(key)
 
-              await this.getComponents().getContentRouting().provide(key)
-
-              log(`announced in the DHT as relayer for node ${conn.connection.remotePeer.toString()}`, key)
-            } catch (err) {
-              error(`error while attempting to provide relayer key for ${conn.connection.remotePeer.toString()}`)
-            }
-          }.call(this))
-
-          yield OK
-        }.call(this)
-      )
+      log(`announced in the DHT as relayer for node ${node.toString()}`, key)
     } catch (err) {
-      error(`Error in CAN_RELAY protocol`, err)
+      error(`error while attempting to provide relayer key for ${node.toString()}`)
+    }
+  }
+
+  /**
+   * Handles a request by a node to act as a relay.
+   *
+   * It creates a hanging open connection, unless the peer closes the connection
+   * because the relay service is no longer needed.
+   *
+   * @param conn incoming connection
+   */
+  private async onCanRelay(conn: IncomingStreamData) {
+    const shaker = handshake(conn.stream)
+
+    try {
+      // Do both operations indedepently from each other
+      await Promise.all([
+        // Send answer, but don't end the stream
+        shaker.write(OK),
+        this.announceRelayerKey(conn.connection.remotePeer)
+      ])
+    } catch (err) {
+      error(`error in can relay protocol`, err)
+      // Close the connection because it led to an error
+      attemptClose(conn.connection, error)
     }
   }
 
@@ -355,7 +361,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
         // be handled downstream to avoid unhandled promise rejection crashes
         shaker.negotiate(
           conn.connection.remotePeer,
-          this._dialNodeDirectly as Relay['dialNodeDirectly'],
+          this.dialNodeDirectly,
           this.relayState,
           this.getComponents().getUpgrader()
         )
