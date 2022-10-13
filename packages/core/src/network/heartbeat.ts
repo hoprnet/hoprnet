@@ -9,6 +9,9 @@ import type { Subscribe, SendMessage } from '../index.js'
 import EventEmitter from 'events'
 import { NetworkPeersOrigin } from './network-peers.js'
 
+import {create_gauge} from '@hoprnet/hopr-utils'
+
+
 const log = debug('hopr-core:heartbeat')
 const error = debug('hopr-core:heartbeat:error')
 
@@ -22,6 +25,8 @@ const PING_HASH_ALGORITHM = 'blake2s256'
 
 const MAX_PARALLEL_HEARTBEATS = 14
 const HEARTBEAT_RUN_TIMEOUT = 2 * 60 * 1000 // 2 minutes
+
+const metric_networkHealth = create_gauge('core_gauge_network_health', 'Connectivity health indicator')
 
 export type HeartbeatPingResult = {
   destination: PeerId
@@ -175,7 +180,7 @@ export default class Heartbeat {
    * @returns Value of the current network health indicator (possibly updated).
    */
   public recalculateNetworkHealth(): NetworkHealthIndicator {
-    let newHealthValue = NetworkHealthIndicator.RED
+    let newHealthValue: NetworkHealthIndicator = NetworkHealthIndicator.RED
     let lowQualityPublic = 0
     let lowQualityNonPublic = 0
     let highQualityPublic = 0
@@ -205,6 +210,18 @@ export default class Heartbeat {
       let oldValue = this.currentHealth
       this.currentHealth = newHealthValue
       this.stateChangeEmitter.emit('hopr:network-health-changed', oldValue, this.currentHealth)
+
+      // Map network state to integers
+      switch (newHealthValue as NetworkHealthIndicator) {
+        case NetworkHealthIndicator.UNKNOWN: metric_networkHealth.set(0)
+          break;
+        case NetworkHealthIndicator.RED: metric_networkHealth.set(1)
+          break;
+        case NetworkHealthIndicator.ORANGE: metric_networkHealth.set(2)
+          break;
+        case NetworkHealthIndicator.GREEN: metric_networkHealth.set(4);
+          break;
+      }
     }
 
     return this.currentHealth

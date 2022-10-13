@@ -2,6 +2,8 @@ import { type HeartbeatPingResult } from './heartbeat.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { randomSubset, debug } from '@hoprnet/hopr-utils'
 
+import {create_gauge} from '@hoprnet/hopr-utils'
+
 const DEBUG_PREFIX = 'hopr-core:network-peers'
 const log = debug(DEBUG_PREFIX)
 //const verbose = debug(DEBUG_PREFIX.concat(`:verbose`))
@@ -35,6 +37,11 @@ const BACKOFF_EXPONENT = 1.5
 export const MAX_BACKOFF = MAX_DELAY / MIN_DELAY
 const BAD_QUALITY = 0.2 // Default quality for nodes we don't know about or which are considered offline.
 const IGNORE_TIMEFRAME = 10 * 60 * 1000 // 10mins
+
+// PROMETHEUS METRICS
+const metric_hiqh_quality_peers = create_gauge('core_gauge_num_high_quality_peers', 'Number of hiqh quality peers')
+const metric_low_quality_peers = create_gauge('core_gauge_num_low_quality_peers', 'Number of low quality peers')
+const metric_peers = create_gauge('core_gauge_num_peers', 'Number of all peers')
 
 function compareQualities(a: Entry, b: Entry, qualityOf: (id: PeerId) => number): number {
   const result = qualityOf(b.id) - qualityOf(a.id)
@@ -123,6 +130,10 @@ function printEntries(
     badAvailabilityNodes == 1 ? '' : 's'
   } with quality below ${networkQualityThreshold}`
   out += `network peers status: ${msgTotalNodes}, ${msgBestNodes}, ${msgBadNodes}\n`
+
+  metric_hiqh_quality_peers.set(bestAvailabilityNodes)
+  metric_low_quality_peers.set(badAvailabilityNodes)
+  metric_peers.set(length)
 
   return out
 }

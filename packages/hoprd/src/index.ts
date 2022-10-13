@@ -3,25 +3,25 @@ import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 
 import {
+  get_package_version,
   loadJson,
   NativeBalance,
-  SUGGESTED_NATIVE_BALANCE,
-  get_package_version,
-  setupPromiseRejectionFilter
+  setupPromiseRejectionFilter,
+  SUGGESTED_NATIVE_BALANCE
 } from '@hoprnet/hopr-utils'
 import {
-  default as Hopr,
-  type HoprOptions,
-  type NetworkHealthIndicator,
+  CONFIRMATIONS,
   createHoprNode,
-  resolveEnvironment,
-  supportedEnvironments,
-  ResolvedEnvironment,
+  default as Hopr,
   HEARTBEAT_INTERVAL,
-  HEARTBEAT_THRESHOLD,
   HEARTBEAT_INTERVAL_VARIANCE,
+  HEARTBEAT_THRESHOLD,
+  type HoprOptions,
   NETWORK_QUALITY_THRESHOLD,
-  CONFIRMATIONS
+  NetworkHealthIndicator,
+  ResolvedEnvironment,
+  resolveEnvironment,
+  supportedEnvironments
 } from '@hoprnet/hopr-core'
 
 import type { State } from './types.js'
