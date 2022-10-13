@@ -2,7 +2,7 @@ import { type HeartbeatPingResult } from './heartbeat.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { randomSubset, debug } from '@hoprnet/hopr-utils'
 
-import {create_gauge} from '@hoprnet/hopr-utils'
+import { create_gauge } from '@hoprnet/hopr-utils'
 
 const DEBUG_PREFIX = 'hopr-core:network-peers'
 const log = debug(DEBUG_PREFIX)
