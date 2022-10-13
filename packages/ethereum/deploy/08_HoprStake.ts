@@ -30,9 +30,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     contract: stakeContractName,
     from: deployer,
     // beyond staking season 4 (from S5 on, no need to pass constructor parameters)
-    args: isStakingSeasonFiveAndAbove
-        ? []
-        : [HoprBoost.address, admin, xHOPR.address, wxHOPR.address],
+    args: isStakingSeasonFiveAndAbove ? [] : [HoprBoost.address, admin, xHOPR.address, wxHOPR.address],
     maxFeePerGas,
     maxPriorityFeePerGas,
     ...deployOptions
