@@ -582,13 +582,13 @@ ___
 
 ### getAddressesAnnouncedOnChain
 
-▸ **getAddressesAnnouncedOnChain**(): `Promise`<`Multiaddr`[]\>
+▸ **getAddressesAnnouncedOnChain**(): `AsyncGenerator`<`Multiaddr`, `void`, `unknown`\>
 
 Takes a look into the indexer.
 
 #### Returns
 
-`Promise`<`Multiaddr`[]\>
+`AsyncGenerator`<`Multiaddr`, `void`, `unknown`\>
 
 a list of announced multi addresses
 
@@ -617,11 +617,11 @@ ___
 
 ### getAllChannels
 
-▸ `Private` **getAllChannels**(): `Promise`<`ChannelEntry`[]\>
+▸ `Private` **getAllChannels**(): `AsyncIterable`<`ChannelEntry`\>
 
 #### Returns
 
-`Promise`<`ChannelEntry`[]\>
+`AsyncIterable`<`ChannelEntry`\>
 
 ___
 

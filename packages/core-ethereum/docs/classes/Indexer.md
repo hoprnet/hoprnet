@@ -573,11 +573,11 @@ ___
 
 ### getAddressesAnnouncedOnChain
 
-▸ **getAddressesAnnouncedOnChain**(): `Promise`<`Multiaddr`[]\>
+▸ **getAddressesAnnouncedOnChain**(): `AsyncGenerator`<`Multiaddr`, `void`, `unknown`\>
 
 #### Returns
 
-`Promise`<`Multiaddr`[]\>
+`AsyncGenerator`<`Multiaddr`, `void`, `unknown`\>
 
 ___
 
