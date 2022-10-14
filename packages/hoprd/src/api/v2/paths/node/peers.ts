@@ -55,18 +55,19 @@ export async function getPeers(
   }
 
   try {
-    const announced = await node.getAddressesAnnouncedOnChain().then((addrs) => {
-      return addrs.reduce((result: Map<string, PeerInfo>, addr: Multiaddr) => {
-        const peerId = peerIdFromString(addr.getPeerId())
-        try {
-          const info = node.getConnectionInfo(peerId)
-          // exclude if quality is lesser than the one wanted
-          if (info.quality < quality) return result
-          result.set(peerId.toString(), toPeerInfoFormat(info, addr))
-        } catch {}
-        return result
-      }, new Map<string, PeerInfo>())
-    })
+    const announcedMap = new Map<string, PeerInfo>()
+
+    for await (const addr of node.getAddressesAnnouncedOnChain()) {
+      const peerId = peerIdFromString(addr.getPeerId())
+      try {
+        const info = node.getConnectionInfo(peerId)
+        // exclude if quality is lesser than the one wanted
+        if (info.quality < quality) {
+          continue
+        }
+        announcedMap.set(peerId.toString(), toPeerInfoFormat(info, addr))
+      } catch {}
+    }
 
     const connected = [
       ...(function* () {
@@ -74,8 +75,8 @@ export async function getPeers(
           const peerIdStr = peerId.toString()
 
           // already exists in announced, we use this because it contains multiaddr already
-          if (announced.has(peerIdStr)) {
-            yield announced.get(peerIdStr)
+          if (announcedMap.has(peerIdStr)) {
+            yield announcedMap.get(peerIdStr)
           } else {
             try {
               const info = node.getConnectionInfo(peerId)
@@ -92,7 +93,7 @@ export async function getPeers(
 
     return {
       connected,
-      announced: Array.from(announced.values())
+      announced: [...announcedMap.values()]
     }
   } catch (err) {
     // Makes sure this doesn't throw

@@ -1,4 +1,3 @@
-import { setImmediate } from 'timers/promises'
 import type { Multiaddr } from '@multiformats/multiaddr'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { ChainWrapper, createChainWrapper, Receipt } from './ethereum.js'
@@ -257,16 +256,8 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   private async redeemAllTicketsInternalLoop(): Promise<void> {
     try {
-      const channels = await this.db.getChannelsTo(this.publicKey.toAddress())
-
-      for (let i = 0; i < channels.length; i++) {
-        await this.redeemTicketsInChannel(channels[i])
-
-        if (i + 1 < channels.length) {
-          // Give other tasks CPU time to happen
-          // Push next loop iteration to end of next event loop iteration
-          await setImmediate()
-        }
+      for await (const channel of this.db.getChannelsToIterable(this.publicKey.toAddress())) {
+        await this.redeemTicketsInChannel(channel)
       }
     } catch (err) {
       log(`error during redeeming all tickets`, err)
@@ -318,53 +309,51 @@ export default class HoprCoreEthereum extends EventEmitter {
     // those tickets.
     let tickets = await this.db.getAcknowledgedTickets({ channel })
 
-    let ticket: AcknowledgedTicket
-    while (tickets.length > 0) {
-      if (ticket != undefined && ticket.ticket.index.eq(tickets[0].ticket.index)) {
-        // @TODO handle errors
+    const boundRedeemTicket = this.redeemTicket.bind(this)
+
+    // Use an async iterator to make execution interruptable and allow
+    // Node.JS to schedule iterations at any time
+    const ticketRedeemIterator = async function* () {
+      for (const ticket of tickets) {
+        if (ticket != undefined && ticket.ticket.index.eq(tickets[0].ticket.index)) {
+          // @TODO handle errors
+          log(
+            `Could not redeem ticket with index ${ticket.ticket.index
+              .toBN()
+              .toString()} in channel ${channelId}. Giving up.`
+          )
+          break
+        }
         log(
-          `Could not redeem ticket with index ${ticket.ticket.index
-            .toBN()
-            .toString()} in channel ${channelId}. Giving up.`
+          `redeeming ticket ${ticket.response.toHex()} in channel from ${channel.source} to ${
+            channel.destination
+          }, preImage ${ticket.preImage.toHex()}, porSecret ${ticket.response.toHex()}`
         )
-        break
-      }
-      ticket = tickets[0]
+        log(ticket.ticket.toString())
+        const result = await boundRedeemTicket(channel.source, ticket)
 
-      log(
-        `redeeming ticket ${ticket.response.toHex()} in channel from ${channel.source} to ${
-          channel.destination
-        }, preImage ${ticket.preImage.toHex()}, porSecret ${ticket.response.toHex()}`
-      )
-      log(ticket.ticket.toString())
-      const result = await this.redeemTicket(channel.source, ticket)
+        if (result.status !== 'SUCCESS') {
+          if (result.status === 'ERROR') {
+            // We need to abort as tickets require ordered redemption.
+            // delete operation before returning
+            throw result.error
+          }
+        }
 
-      if (result.status !== 'SUCCESS') {
-        log('Error redeeming ticket', result)
-        // We need to abort as tickets require ordered redemption.
-        // delete operation before returning
-        delete this.ticketRedemtionInChannelOperations[channelId]
-        if (result.status === 'ERROR') throw result.error
-        return
-      }
-      log(`ticket ${ticket.response.toHex()} was redeemed`)
-
-      // Give other tasks CPU time to happen
-      // Push database query to end of next event loop iteration
-      await setImmediate()
-
-      tickets = await this.db.getAcknowledgedTickets({ channel })
-
-      if (tickets.length > 0) {
-        // Give other tasks CPU time to happen
-        // Push next loop iteration to end of next event loop iteration
-        await setImmediate()
+        yield ticket.response
       }
     }
 
-    log(`redemption of tickets from ${channel.source.toString()} is complete`)
-    // delete operation before returning
-    delete this.ticketRedemtionInChannelOperations[channelId]
+    try {
+      for await (const ticketResponse of ticketRedeemIterator()) {
+        log(`ticket ${ticketResponse.toHex()} was redeemed`)
+      }
+      log(`redemption of tickets from ${channel.source.toString()} is complete`)
+    } catch (err) {
+      log(`redemption of tickets from ${channel.source.toString()} failed`, err)
+    } finally {
+      delete this.ticketRedemtionInChannelOperations[channelId]
+    }
   }
 
   // Private as out of order redemption will break things - redeem all at once.
