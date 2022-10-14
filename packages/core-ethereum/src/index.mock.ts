@@ -45,7 +45,8 @@ function createConnectorMock(peer: PeerId): HoprCoreEthereum {
     },
     indexer: {
       on: (event: string) => connectorLogger(`Indexer on handler top of chain called with event "${event}"`),
-      off: (event: string) => connectorLogger(`Indexer off handler top of chain called with event "${event}`)
+      off: (event: string) => connectorLogger(`Indexer off handler top of chain called with event "${event}`),
+      getPublicNodes: () => Promise.resolve([])
     }
   } as unknown as HoprCoreEthereum
 }

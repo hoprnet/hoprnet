@@ -28,15 +28,20 @@
 - [getAccount](HoprDB.md#getaccount)
 - [getAccountFromNetworkRegistry](HoprDB.md#getaccountfromnetworkregistry)
 - [getAccounts](HoprDB.md#getaccounts)
+- [getAccountsIterable](HoprDB.md#getaccountsiterable)
 - [getAcknowledgedTickets](HoprDB.md#getacknowledgedtickets)
 - [getAll](HoprDB.md#getall)
+- [getAllIterable](HoprDB.md#getalliterable)
 - [getChannel](HoprDB.md#getchannel)
 - [getChannelFrom](HoprDB.md#getchannelfrom)
 - [getChannelTo](HoprDB.md#getchannelto)
 - [getChannelX](HoprDB.md#getchannelx)
 - [getChannels](HoprDB.md#getchannels)
 - [getChannelsFrom](HoprDB.md#getchannelsfrom)
+- [getChannelsFromIterable](HoprDB.md#getchannelsfromiterable)
+- [getChannelsIterable](HoprDB.md#getchannelsiterable)
 - [getChannelsTo](HoprDB.md#getchannelsto)
+- [getChannelsToIterable](HoprDB.md#getchannelstoiterable)
 - [getCoerced](HoprDB.md#getcoerced)
 - [getCoercedOrDefault](HoprDB.md#getcoercedordefault)
 - [getCommitment](HoprDB.md#getcommitment)
@@ -360,6 +365,22 @@ ___
 
 ___
 
+### getAccountsIterable
+
+▸ **getAccountsIterable**(`filter?`): `AsyncGenerator`<[`AccountEntry`](AccountEntry.md), `void`, `undefined`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `filter?` | (`account`: [`AccountEntry`](AccountEntry.md)) => `boolean` |
+
+#### Returns
+
+`AsyncGenerator`<[`AccountEntry`](AccountEntry.md), `void`, `undefined`\>
+
+___
+
 ### getAcknowledgedTickets
 
 ▸ **getAcknowledgedTickets**(`filter?`): `Promise`<[`AcknowledgedTicket`](AcknowledgedTicket.md)[]\>
@@ -413,6 +434,34 @@ Optionally applies `filter`then `map` then `sort` to the result.
 `Promise`<`TransformedElement`[]\>
 
 a Promises that resolves with the found elements
+
+___
+
+### getAllIterable
+
+▸ `Protected` **getAllIterable**<`Element`, `TransformedElement`\>(`range`, `deserialize`, `filter?`, `map?`): `AsyncIterable`<`TransformedElement`\>
+
+#### Type parameters
+
+| Name | Type |
+| :------ | :------ |
+| `Element` | `Element` |
+| `TransformedElement` | `Element` |
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `range` | `Object` |
+| `range.prefix` | `Uint8Array` |
+| `range.suffixLength` | `number` |
+| `deserialize` | (`u`: `Uint8Array`) => `Element` |
+| `filter?` | (`o`: `Element`) => `boolean` |
+| `map?` | (`i`: `Element`) => `TransformedElement` |
+
+#### Returns
+
+`AsyncIterable`<`TransformedElement`\>
 
 ___
 
@@ -513,6 +562,38 @@ ___
 
 ___
 
+### getChannelsFromIterable
+
+▸ **getChannelsFromIterable**(`address`): `AsyncGenerator`<[`ChannelEntry`](ChannelEntry.md), `void`, `unknown`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `address` | [`Address`](Address.md) |
+
+#### Returns
+
+`AsyncGenerator`<[`ChannelEntry`](ChannelEntry.md), `void`, `unknown`\>
+
+___
+
+### getChannelsIterable
+
+▸ **getChannelsIterable**(`filter?`): `AsyncIterable`<[`ChannelEntry`](ChannelEntry.md)\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `filter?` | (`channel`: [`ChannelEntry`](ChannelEntry.md)) => `boolean` |
+
+#### Returns
+
+`AsyncIterable`<[`ChannelEntry`](ChannelEntry.md)\>
+
+___
+
 ### getChannelsTo
 
 ▸ **getChannelsTo**(`address`): `Promise`<[`ChannelEntry`](ChannelEntry.md)[]\>
@@ -526,6 +607,22 @@ ___
 #### Returns
 
 `Promise`<[`ChannelEntry`](ChannelEntry.md)[]\>
+
+___
+
+### getChannelsToIterable
+
+▸ **getChannelsToIterable**(`address`): `AsyncGenerator`<[`ChannelEntry`](ChannelEntry.md), `void`, `unknown`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `address` | [`Address`](Address.md) |
+
+#### Returns
+
+`AsyncGenerator`<[`ChannelEntry`](ChannelEntry.md), `void`, `unknown`\>
 
 ___
 

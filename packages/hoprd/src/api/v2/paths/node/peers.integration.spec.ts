@@ -82,7 +82,11 @@ const CHARLIE_PEER_INFO = {
 
 let node = sinon.fake() as any as Hopr
 node.getConnectedPeers = sinon.fake.returns([ALICE_PEER_ID, BOB_PEER_ID, CHARLIE_PEER_ID])
-node.getAddressesAnnouncedOnChain = sinon.fake.resolves([ALICE_MULTI_ADDR, BOB_MULTI_ADDR])
+node.getAddressesAnnouncedOnChain = async function* () {
+  yield ALICE_MULTI_ADDR
+  yield BOB_MULTI_ADDR
+}
+
 node.getConnectionInfo = (peer: PeerId) => {
   switch (peer.toString()) {
     case ALICE_PEER_ID.toString():

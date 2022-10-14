@@ -963,23 +963,26 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     throw new Error('Could not find public key for address - have they announced? -' + address.toHex())
   }
 
-  public async getAddressesAnnouncedOnChain(): Promise<Multiaddr[]> {
-    return (await this.db.getAccounts()).map((account: AccountEntry) => account.multiAddr)
+  public async *getAddressesAnnouncedOnChain() {
+    for await (const account of this.db.getAccountsIterable()) {
+      yield account.multiAddr
+    }
   }
 
   public async getPublicNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
-    const accounts = await this.db.getAccounts((account: AccountEntry) => account.containsRouting)
+    const result: { id: PeerId; multiaddrs: Multiaddr[] }[] = []
+    let out = `Known public nodes:\n`
 
-    const result: { id: PeerId; multiaddrs: Multiaddr[] }[] = Array.from({ length: accounts.length })
-
-    log(`Known public nodes:`)
-    for (const [index, account] of accounts.entries()) {
-      result[index] = {
+    for await (const account of this.db.getAccountsIterable((account: AccountEntry) => account.containsRouting)) {
+      out += `  - ${account.getPeerId().toString()} ${account.multiAddr.toString()}\n`
+      result.push({
         id: account.getPeerId(),
         multiaddrs: [account.multiAddr]
-      }
-      log(`\t${account.getPeerId().toString()} ${account.multiAddr.toString()}`)
+      })
     }
+
+    // Remove last `\n`
+    log(out.substring(0, out.length - 1))
 
     return result
   }
