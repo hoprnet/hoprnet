@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-utils",
   "description": "HOPR-based utilities to process multiple data structures",
-  "version": "1.90.41",
+  "version": "1.91.0-next.0",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
@@ -49,15 +49,15 @@
     "timeout-abort-controller": "3.0.0"
   },
   "devDependencies": {
-    "@chainsafe/libp2p-noise": "7.0.0",
+    "@chainsafe/libp2p-noise": "7.0.3",
     "@libp2p/interface-connection": "1.0.1",
     "@libp2p/interface-connection-manager": "1.1.0",
     "@libp2p/interface-keys": "1.0.3",
-    "@libp2p/interface-peer-id": "1.0.2",
+    "@libp2p/interface-peer-id": "1.0.4",
     "@libp2p/interface-peer-store": "1.0.0",
     "@libp2p/kad-dht": "1.0.16",
-    "@libp2p/mplex": "1.2.1",
-    "@libp2p/peer-id-factory": "1.0.15",
+    "@libp2p/mplex": "1.2.2",
+    "@libp2p/peer-id-factory": "1.0.18",
     "@libp2p/tcp": "1.0.11",
     "@types/chai": "4.3.3",
     "@types/mocha": "9.1.1",
