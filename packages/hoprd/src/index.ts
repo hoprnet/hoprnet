@@ -51,10 +51,22 @@ function defaultEnvironment(): string {
 }
 
 // Metrics
-const metric_processStartTime = create_gauge('hoprd_gauge_startup_unix_time_seconds', 'The unix timestamp at which the process was started')
-const metric_nodeStartupTime = create_histogram('hoprd_histogram_startup_time_seconds', 'Time it takes for a node to start up')
-const metric_timeToGreen = create_histogram('hoprd_histogram_time_to_green_seconds', 'Time it takes for a node to transition to the GREEN network state')
-const metric_latency = create_histogram('hoprd_histogram_message_latency_ms', 'Histogram of measured received message latencies')
+const metric_processStartTime = create_gauge(
+  'hoprd_gauge_startup_unix_time_seconds',
+  'The unix timestamp at which the process was started'
+)
+const metric_nodeStartupTime = create_histogram(
+  'hoprd_histogram_startup_time_seconds',
+  'Time it takes for a node to start up'
+)
+const metric_timeToGreen = create_histogram(
+  'hoprd_histogram_time_to_green_seconds',
+  'Time it takes for a node to transition to the GREEN network state'
+)
+const metric_latency = create_histogram(
+  'hoprd_histogram_message_latency_ms',
+  'Histogram of measured received message latencies'
+)
 
 // Use environment-specific default data path
 const defaultDataPath = path.join(process.cwd(), 'hoprd-db', defaultEnvironment())
