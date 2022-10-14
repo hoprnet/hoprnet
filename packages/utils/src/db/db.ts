@@ -538,7 +538,7 @@ export class HoprDB {
       .batch()
       .del(Buffer.from(unAcknowledgedDbKey.buffer, unAcknowledgedDbKey.byteOffset, unAcknowledgedDbKey.byteLength))
       .put(
-        Buffer.from(acknowledgedDbKey.buffer, unAcknowledgedDbKey.byteOffset, unAcknowledgedDbKey.byteLength),
+        Buffer.from(acknowledgedDbKey.buffer, acknowledgedDbKey.byteOffset, acknowledgedDbKey.byteLength),
         Buffer.from(serializedTicket.buffer, serializedTicket.byteOffset, serializedTicket.byteLength)
       )
       .write()
