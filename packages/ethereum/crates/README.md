@@ -16,6 +16,7 @@ Draft readme, for rust migration
 - 0.8: More recent contracts
 
 2. Dependencies are vendored directly into the repo. Some of them are locked to a specific version
+
 ```
 forge install foundry-rs/forge-std \
 openzeppelin-contracts=OpenZeppelin/openzeppelin-contracts@v4.4.2 \
