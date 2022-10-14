@@ -139,7 +139,7 @@ EventEmitter.constructor
 
 #### Defined in
 
-[packages/core/src/index.ts:189](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L189)
+[packages/core/src/index.ts:192](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L192)
 
 ___
 
@@ -149,7 +149,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:183](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L183)
+[packages/core/src/index.ts:186](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L186)
 
 ___
 
@@ -159,7 +159,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:182](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L182)
+[packages/core/src/index.ts:185](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L185)
 
 ___
 
@@ -169,7 +169,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:191](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L191)
+[packages/core/src/index.ts:194](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L194)
 
 ___
 
@@ -179,7 +179,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:187](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L187)
+[packages/core/src/index.ts:190](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L190)
 
 ___
 
@@ -189,7 +189,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:184](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L184)
+[packages/core/src/index.ts:187](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L187)
 
 ___
 
@@ -199,7 +199,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:181](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L181)
+[packages/core/src/index.ts:184](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L184)
 
 ___
 
@@ -209,7 +209,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:186](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L186)
+[packages/core/src/index.ts:189](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L189)
 
 ___
 
@@ -219,7 +219,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:177](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L177)
+[packages/core/src/index.ts:180](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L180)
 
 ___
 
@@ -241,7 +241,7 @@ It should not assume any other components are running when it is called.
 
 #### Defined in
 
-[packages/core/src/index.ts:185](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L185)
+[packages/core/src/index.ts:188](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L188)
 
 ___
 
@@ -259,7 +259,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:179](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L179)
+[packages/core/src/index.ts:182](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L182)
 
 ___
 
@@ -269,7 +269,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:180](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L180)
+[packages/core/src/index.ts:183](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L183)
 
 ___
 
@@ -710,11 +710,11 @@ ___
 
 ### getConnectedPeers
 
-▸ **getConnectedPeers**(): `PeerId`[]
+▸ **getConnectedPeers**(): `Iterable`<`PeerId`\>
 
 #### Returns
 
-`PeerId`[]
+`Iterable`<`PeerId`\>
 
 a list connected peerIds
 
