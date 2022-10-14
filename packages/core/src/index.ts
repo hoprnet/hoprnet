@@ -613,6 +613,7 @@ class Hopr extends EventEmitter {
     for await (const channel of this.getAllChannels()) {
       out += `${channel.toString()}\n`
       currentChannels.push(channel)
+      this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_EXISTING_CHANNEL) // Make sure current channels are 'interesting'
     }
 
     // Remove last `\n`
