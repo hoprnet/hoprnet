@@ -99,13 +99,26 @@ class RelayState {
   }
 
   /**
+   * Returns an iterator over all stored relayed connections
+   */
+  *[Symbol.iterator]() {
+    const it = this.relayedConnections.values()
+
+    let chunk = it.next()
+
+    for (; !chunk.done; chunk = it.next()) {
+      yield* Object.entries(chunk.value)
+    }
+  }
+
+  /**
    * Performs an operation for each relay context in the current set.
    * @param action
    */
   async forEach(action: (dst: string, ctx: RelayContext) => Promise<void>) {
     await nAtATime(
-      (objEntries) => action(objEntries[0], objEntries[1]),
-      Array.from(this.relayedConnections.values()).map((s) => Object.entries(s)),
+      action,
+      this,
       10 // TODO: Make this configurable or use an existing constant
     )
   }

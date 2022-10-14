@@ -82,12 +82,12 @@ describe('test TCP connection', function () {
     // make testServer listen at a random port
     await waitUntilListening<Socket>(testServer, undefined as any)
 
-    const conn = (await TCPConnection.create(
+    const conn = await TCPConnection.create(
       new Multiaddr(`/ip4/127.0.0.1/tcp/${(testServer.address() as AddressInfo).port}`),
       {
         closeTimeout: 1000
       }
-    )) as TCPConnection
+    )
 
     conn.sink(
       (async function* () {

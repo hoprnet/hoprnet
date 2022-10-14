@@ -2,6 +2,8 @@ import net, { type Socket, type AddressInfo } from 'net'
 import { abortableSource } from 'abortable-iterator'
 import Debug from 'debug'
 import { nodeToMultiaddr, toU8aStream } from '../utils/index.js'
+// @ts-ignore untyped module
+import retimer from 'retimer'
 
 const log = Debug('hopr-connect:tcp')
 const error = Debug('hopr-connect:tcp:error')
@@ -74,7 +76,7 @@ class TCPConnection implements MultiaddrConnection {
 
       const start = Date.now()
 
-      setTimeout(() => {
+      const timer = retimer(() => {
         if (done) {
           return
         }
@@ -94,7 +96,7 @@ class TCPConnection implements MultiaddrConnection {
           log(`destroying connection ${cOptions.host}:${cOptions.port}`)
           this.socket.destroy()
         }
-      }, this.closeTimeout).unref()
+      }, this.closeTimeout)
 
       // Resolve once closed
       // Could take place after timeout or as a result of `.end()` call
@@ -103,6 +105,7 @@ class TCPConnection implements MultiaddrConnection {
           return
         }
         done = true
+        timer.clear()
 
         resolve()
       })
@@ -115,6 +118,7 @@ class TCPConnection implements MultiaddrConnection {
 
         if (this.socket.destroyed) {
           done = true
+          timer.clear()
         }
 
         reject(err)
@@ -172,6 +176,9 @@ class TCPConnection implements MultiaddrConnection {
       error(`TCP sink error`, err)
       return
     }
+
+    // End the socket (= send FIN packet) unless otherwise requested
+    this.socket.end()
   }
 
   /**

@@ -36,16 +36,19 @@ async function runTask<ArgType, Return, Args extends Array<ArgType>>(
  */
 export function nAtATime<ArgType, Return, Args extends Array<ArgType>>(
   fn: (...args: Args) => Promise<Return>,
-  args: Args[],
+  args: Iterable<Args>,
   concurrency: number,
   done?: (results: (Return | Error | undefined)[]) => boolean
 ): Promise<(Return | Error)[]> {
-  if (concurrency <= 0 || args.length == 0) {
+  const it = args[Symbol.iterator]()
+
+  let chunk = it.next()
+  if (concurrency <= 0 || chunk.done) {
     return Promise.resolve([])
   }
 
   return new Promise<(Return | Error)[]>((resolve) => {
-    const results = new Array<Return | Error | undefined>(args.length)
+    const results = []
 
     let currentIndex = 0
     let activeWorkers = 0
@@ -62,8 +65,11 @@ export function nAtATime<ArgType, Return, Args extends Array<ArgType>>(
         ending = ending || done(results)
       }
 
-      if (!ending && currentIndex < args.length) {
-        runTask(fn, args[currentIndex], currentIndex, update)
+      if (!ending && !chunk.done) {
+        // Create an array entry for the result
+        results.push()
+        runTask(fn, chunk.value, currentIndex, update)
+        chunk = it.next()
         currentIndex++
       } else {
         if (activeWorkers == 1) {
@@ -74,9 +80,13 @@ export function nAtATime<ArgType, Return, Args extends Array<ArgType>>(
       }
     }
 
-    for (; currentIndex < Math.min(concurrency, args.length); currentIndex++) {
+    while (!chunk.done && currentIndex < concurrency) {
       activeWorkers++
-      runTask(fn, args[currentIndex], currentIndex, update)
+      // Create an array entry for the result
+      results.push()
+      runTask(fn, chunk.value, currentIndex, update)
+      currentIndex++
+      chunk = it.next()
     }
   })
 }
