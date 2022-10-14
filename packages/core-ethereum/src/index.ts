@@ -348,13 +348,12 @@ export default class HoprCoreEthereum extends EventEmitter {
       for await (const ticketResponse of ticketRedeemIterator()) {
         log(`ticket ${ticketResponse.toHex()} was redeemed`)
       }
+      log(`redemption of tickets from ${channel.source.toString()} is complete`)
     } catch (err) {
-      log('Error redeeming ticket', err)
+      log(`redemption of tickets from ${channel.source.toString()} failed`, err)
     } finally {
       delete this.ticketRedemtionInChannelOperations[channelId]
     }
-
-    log(`redemption of tickets from ${channel.source.toString()} is complete`)
   }
 
   // Private as out of order redemption will break things - redeem all at once.
