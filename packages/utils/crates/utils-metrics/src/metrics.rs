@@ -1,6 +1,6 @@
 use std::fmt::Display;
 use prometheus::{Gauge, GaugeVec, Histogram, HistogramOpts, HistogramTimer, IntCounter, IntCounterVec, Opts, TextEncoder};
-use prometheus::core::{Collector, Metric};
+use prometheus::core::Collector;
 use wasm_bindgen::JsValue;
 
 pub fn as_jsvalue<T>(v: T) -> JsValue where T: Display {
@@ -213,7 +213,41 @@ fn gather_all_metrics() -> Result<String, String> {
 pub mod wasm {
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
+    use js_sys::JsString;
     use crate::metrics::as_jsvalue;
+
+    #[wasm_bindgen]
+    pub struct MultiCounter {
+        w: super::MultiCounter
+    }
+
+    #[wasm_bindgen]
+    pub fn create_multi_counter(name: &str, description: &str, labels: Vec<JsString>) -> Result<MultiCounter, JsValue> {
+        let aux: Vec<String> = labels.iter().map(String::from).collect();
+        let bind: Vec<&str> = aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
+        super::MultiCounter::new(name, description, bind.as_slice())
+            .map(|c| MultiCounter { w: c })
+            .map_err(as_jsvalue)
+    }
+
+    #[wasm_bindgen]
+    impl MultiCounter {
+        pub fn increment_by(&self, label_values: Vec<JsString>, by: u64) {
+            let aux: Vec<String> = label_values.iter().map(String::from).collect();
+            let bind: Vec<&str> = aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
+            self.w.increment(bind.as_slice(), by);
+        }
+
+        pub fn increment(&self, label_values: Vec<JsString>) {
+            let aux: Vec<String> = label_values.iter().map(String::from).collect();
+            let bind: Vec<&str> = aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
+            self.w.increment(bind.as_slice(), 1)
+        }
+
+        pub fn name(&self) -> String {
+            self.w.name().into()
+        }
+    }
 
     #[wasm_bindgen]
     pub struct SimpleCounter {
@@ -272,6 +306,57 @@ pub mod wasm {
 
         pub fn set(&self, value: f64) {
             self.w.set(value)
+        }
+
+        pub fn name(&self) -> String {
+            self.w.name().into()
+        }
+    }
+
+    #[wasm_bindgen]
+    pub struct MultiGauge {
+        w: super::MultiGauge
+    }
+
+    #[wasm_bindgen]
+    pub fn create_multi_gauge(name: &str, description: &str, labels: Vec<JsString>) -> Result<MultiGauge, JsValue> {
+        let aux: Vec<String> = labels.iter().map(String::from).collect();
+        let bind: Vec<&str> = aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
+        super::MultiGauge::new(name, description, bind.as_slice())
+            .map(|c| MultiGauge { w: c })
+            .map_err(as_jsvalue)
+    }
+
+    #[wasm_bindgen]
+    impl MultiGauge {
+        pub fn increment_by(&self, label_values: Vec<JsString>, by: f64) {
+            let aux: Vec<String> = label_values.iter().map(String::from).collect();
+            let bind: Vec<&str> = aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
+            self.w.increment(bind.as_slice(), by);
+        }
+
+        pub fn increment(&self, label_values: Vec<JsString>) {
+            let aux: Vec<String> = label_values.iter().map(String::from).collect();
+            let bind: Vec<&str> = aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
+            self.w.increment(bind.as_slice(), 1.0)
+        }
+
+        pub fn decrement_by(&self, label_values: Vec<JsString>, by: f64) {
+            let aux: Vec<String> = label_values.iter().map(String::from).collect();
+            let bind: Vec<&str> = aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
+            self.w.decrement(bind.as_slice(), by);
+        }
+
+        pub fn decrement(&self, label_values: Vec<JsString>) {
+            let aux: Vec<String> = label_values.iter().map(String::from).collect();
+            let bind: Vec<&str> = aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
+            self.w.decrement(bind.as_slice(), 1.0)
+        }
+
+        pub fn set(&self, label_values: Vec<JsString>, value: f64) {
+            let aux: Vec<String> = label_values.iter().map(String::from).collect();
+            let bind: Vec<&str> = aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
+            self.w.set(bind.as_slice(), value);
         }
 
         pub fn name(&self) -> String {

@@ -298,6 +298,7 @@ name = "utils-metrics"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
+ "js-sys",
  "prometheus",
  "wasm-bindgen",
  "wasm-bindgen-test",
