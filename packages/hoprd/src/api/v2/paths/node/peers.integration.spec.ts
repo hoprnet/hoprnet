@@ -87,7 +87,6 @@ node.getAddressesAnnouncedOnChain = async function* () {
   yield BOB_MULTI_ADDR
 }
 
-sinon.fake.resolves([ALICE_MULTI_ADDR, BOB_MULTI_ADDR])
 node.getConnectionInfo = (peer: PeerId) => {
   switch (peer.toString()) {
     case ALICE_PEER_ID.toString():
