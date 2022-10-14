@@ -311,6 +311,8 @@ export default class HoprCoreEthereum extends EventEmitter {
 
     const boundRedeemTicket = this.redeemTicket.bind(this)
 
+    // Use an async iterator to make execution interruptable and allow
+    // Node.JS to schedule iterations at any time
     const ticketRedeemIterator = async function* () {
       for (const ticket of tickets) {
         if (ticket != undefined && ticket.ticket.index.eq(tickets[0].ticket.index)) {
@@ -320,7 +322,7 @@ export default class HoprCoreEthereum extends EventEmitter {
               .toBN()
               .toString()} in channel ${channelId}. Giving up.`
           )
-          // break
+          break
         }
         log(
           `redeeming ticket ${ticket.response.toHex()} in channel from ${channel.source} to ${

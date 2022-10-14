@@ -921,7 +921,7 @@ class Hopr extends EventEmitter {
    * Takes a look into the indexer.
    * @returns a list of announced multi addresses
    */
-  public async *getAddressesAnnouncedOnChain(): AsyncIterable<Multiaddr> {
+  public async *getAddressesAnnouncedOnChain() {
     yield* this.indexer.getAddressesAnnouncedOnChain()
   }
 

@@ -96,6 +96,8 @@ export async function retryWithBackoffThenThrow<T>(
 
   let delay = options.minDelay
 
+  // Use an async iterator to make execution interruptable and allow
+  // Node.JS to schedule iterations at any time
   const retryIterator = (async function* () {
     while (true) {
       try {
