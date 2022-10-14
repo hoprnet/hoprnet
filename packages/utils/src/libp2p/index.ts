@@ -142,7 +142,7 @@ export async function libp2pSendMessage<T extends boolean>(
       )
       return result as any
     } catch (err) {
-      // @TODO filter aborts
+      logError(`Could not send message to ${destination.toString()} due to "${err?.message}".`)
     } finally {
       timeoutController.clear()
     }
@@ -156,7 +156,7 @@ export async function libp2pSendMessage<T extends boolean>(
         r.resp.stream
       )
     } catch (err) {
-      // @TODO filter aborts
+      logError(`Could not send message to ${destination.toString()} due to "${err?.message}".`)
     } finally {
       timeoutController.clear()
     }

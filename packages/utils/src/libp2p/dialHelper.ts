@@ -127,7 +127,7 @@ export async function tryExistingConnections(
     try {
       stream = await existingConnection.newStream(protocols, options)
     } catch (err: any) {
-      console.log(`newStream error`, err.message)
+      error(`Could not open stream to ${destination.toString()} due to "${err?.message}".`)
     } finally {
       timeoutController.clear()
     }

@@ -273,7 +273,7 @@ ___
 
 #### Defined in
 
-[libp2p/dialHelper.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L33)
+[libp2p/dialHelper.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L40)
 
 ___
 
@@ -308,7 +308,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:150](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L150)
+[libp2p/index.ts:171](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L171)
 
 ___
 
@@ -339,7 +339,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:151](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L151)
+[libp2p/index.ts:172](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L172)
 
 ___
 
@@ -897,7 +897,7 @@ Regular expresion used to match b58Strings
 
 #### Defined in
 
-[libp2p/index.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L28)
+[libp2p/index.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L30)
 
 ___
 
@@ -1345,20 +1345,23 @@ ___
 
 ### dial
 
-▸ **dial**(`components`, `destination`, `protocols`, `opts?`): `Promise`<[`DialResponse`](modules.md#dialresponse)\>
+▸ **dial**(`components`, `destination`, `protocols`, `withDHT?`, `noRelay?`): `Promise`<[`DialResponse`](modules.md#dialresponse)\>
 
-Performs a dial strategy using libp2p.dialProtocol and libp2p.findPeer
-to establish a connection.
-Contains a baseline protection against dialing same addresses twice.
+Runs through the dial strategy and handles possible errors
+
+1. Use already known addresses
+2. Check the DHT (if available) for additional addresses
+3. Try new addresses
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `components` | `Components` | components of a libp2p instance |
-| `destination` | `PeerId` | PeerId of the destination |
-| `protocols` | `string` \| `string`[] | protocols to use |
-| `opts?` | [`TimeoutOpts`](modules.md#timeoutopts) |  |
+| Name | Type | Default value | Description |
+| :------ | :------ | :------ | :------ |
+| `components` | `Components` | `undefined` | components of libp2p instance |
+| `destination` | `PeerId` \| `Multiaddr` | `undefined` | which peer to connect to |
+| `protocols` | `string` \| `string`[] | `undefined` | which protocol to use |
+| `withDHT` | `boolean` | `true` | - |
+| `noRelay` | `boolean` | `false` | - |
 
 #### Returns
 
@@ -1966,7 +1969,8 @@ send message. If `includeReply` is set, wait for a response
 | `protocols` | `string` \| `string`[] | protocols to speak |
 | `message` | `Uint8Array` | message to send |
 | `includeReply` | `T` | try to receive a reply |
-| `opts?` | [`TimeoutOpts`](modules.md#timeoutopts) | [optional] timeout |
+| `opts` | `Object` | [optional] timeout |
+| `opts.timeout?` | `number` | - |
 
 #### Returns
 
@@ -2071,7 +2075,7 @@ const result = await nAtaTime(setTimeout, [[300, 'one'], [200, 'two'], [100, 'th
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `fn` | (...`args`: `Args`) => `Promise`<`Return`\> | worker function |
-| `args` | `Args`[] | arguments passed to worker function |
+| `args` | `Iterable`<`Args`\> | arguments passed to worker function |
 | `concurrency` | `number` | number of parallel jobs |
 | `done?` | (`results`: (`Error` \| `Return`)[]) => `boolean` | - |
 
@@ -2663,7 +2667,7 @@ ___
 
 ### timeout
 
-▸ **timeout**<`T`\>(`timeout`, `work`): `Promise`<`T`\>
+▸ **timeout**<`T`\>(`ms`, `work`): `Promise`<`T`\>
 
 Races a timeout against some work
 
@@ -2677,7 +2681,7 @@ Races a timeout against some work
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `timeout` | `number` | return after timeout in ms |
+| `ms` | `number` | return after timeout in ms |
 | `work` | () => `Promise`<`T`\> | function that returns a Promise that resolves once the work is done |
 
 #### Returns
@@ -2744,13 +2748,20 @@ ___
 
 ▸ **tryExistingConnections**(`components`, `destination`, `protocols`): `Promise`<`void` \| `ProtocolStream` & { `conn`: `Connection`  }\>
 
+Tries to use existing connection to connect to the given peer.
+Closes all connection that could not be used to speak the desired
+protocols.
+
+**`dev`** if used with unsupported protocol, this function might close
+connections unintendedly
+
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `components` | `Components` |
-| `destination` | `PeerId` |
-| `protocols` | `string` \| `string`[] |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `components` | `Components` | libp2p components |
+| `destination` | `PeerId` | peer to connect to |
+| `protocols` | `string` \| `string`[] | desired protocol |
 
 #### Returns
 

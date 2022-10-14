@@ -48,8 +48,6 @@ class MyTCP extends TCP {
           continue
         }
 
-        console.log(conn)
-
         if (conn != undefined) {
           return conn
         }

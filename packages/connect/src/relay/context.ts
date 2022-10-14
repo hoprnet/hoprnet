@@ -8,6 +8,9 @@ import type { Stream, StreamResult, StreamType, StreamSourceAsync, StreamSink } 
 
 import Debug from 'debug'
 
+// @ts-ignore untyped library
+import retimer from 'retimer'
+
 const DEBUG_PREFIX = `hopr-connect`
 
 const _log = Debug(DEBUG_PREFIX)
@@ -158,9 +161,9 @@ class RelayContext extends EventEmitter {
 
     this.queueStatusMessage(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PING))
 
-    let timeout: NodeJS.Timeout | undefined
+    let timer: any
     const pingTimeoutPromise = new Promise<PingTimeoutEvent>((resolve) => {
-      timeout = setTimeout(() => {
+      timer = retimer(() => {
         if (timeoutDone) {
           return
         }
@@ -173,8 +176,7 @@ class RelayContext extends EventEmitter {
       }, ms)
     })
     const result = await Promise.race([pingTimeoutPromise, this._pingResponsePromise.promise])
-
-    clearTimeout(timeout as NodeJS.Timeout)
+    timer.clear()
 
     switch (result.type) {
       case ConnectionEventTypes.PING_RESPONE:

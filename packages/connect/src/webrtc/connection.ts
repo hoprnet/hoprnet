@@ -134,7 +134,7 @@ class WebRTCConnection implements MultiaddrConnection {
   // @dev this is done using meta programming in libp2p
   public timeline: MultiaddrConnection['timeline']
 
-  private webRTCTimeout: any // untyped library
+  private webRTCTimeout: any | undefined // untyped library
 
   constructor(
     private relayConn: RelayConnection,
@@ -272,7 +272,7 @@ class WebRTCConnection implements MultiaddrConnection {
       // Already handled, so nothing to do
       return
     }
-    this.webRTCTimeout.clear()
+    this.webRTCTimeout?.clear()
     this._webRTCHandshakeFinished = true
 
     if (err) {
@@ -298,7 +298,7 @@ class WebRTCConnection implements MultiaddrConnection {
       // Already handled, so nothing to do
       return
     }
-    this.webRTCTimeout.clear()
+    this.webRTCTimeout?.clear()
     this._webRTCHandshakeFinished = true
 
     // For testing, disable WebRTC upgrade

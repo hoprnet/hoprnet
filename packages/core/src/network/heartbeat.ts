@@ -2,7 +2,6 @@ import type NetworkPeers from './network-peers.js'
 import type AccessControl from './access-control.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { randomInteger, u8aEquals, debug, retimer, nAtATime, u8aToHex, pickVersion } from '@hoprnet/hopr-utils'
-import { HEARTBEAT_TIMEOUT } from '../constants.js'
 import { createHash, randomBytes } from 'crypto'
 
 import type { Subscribe, SendMessage } from '../index.js'
@@ -21,7 +20,6 @@ const NORMALIZED_VERSION = pickVersion(pkg.version)
 const PING_HASH_ALGORITHM = 'blake2s256'
 
 const MAX_PARALLEL_HEARTBEATS = 14
-const HEARTBEAT_RUN_TIMEOUT = 2 * 60 * 1000 // 2 minutes
 
 export type HeartbeatPingResult = {
   destination: PeerId
@@ -29,8 +27,6 @@ export type HeartbeatPingResult = {
 }
 
 export type HeartbeatConfig = {
-  heartbeatDialTimeout: number
-  heartbeatRunTimeout: number
   maxParallelHeartbeats: number
   heartbeatVariance: number
   heartbeatInterval: number
@@ -71,8 +67,6 @@ export default class Heartbeat {
     config?: Partial<HeartbeatConfig>
   ) {
     this.config = {
-      heartbeatDialTimeout: config?.heartbeatDialTimeout ?? HEARTBEAT_TIMEOUT,
-      heartbeatRunTimeout: config?.heartbeatRunTimeout ?? HEARTBEAT_RUN_TIMEOUT,
       heartbeatInterval: config?.heartbeatInterval,
       heartbeatThreshold: config?.heartbeatThreshold,
       heartbeatVariance: config?.heartbeatVariance,
@@ -124,11 +118,10 @@ export default class Heartbeat {
   /**
    * Attempts to ping another peer.
    * @param destination id of the node to ping
-   * @param signal [optional] abort controller to prematurely end request
    * @returns a Promise of a pingResult object with property `lastSeen < 0` if there were a timeout
    */
   public async pingNode(destination: PeerId): Promise<HeartbeatPingResult> {
-    log(`ping ${destination.toString()} (timeout ${this.config.heartbeatDialTimeout})`)
+    log(`ping ${destination.toString()}`)
 
     const origin = this.networkPeers.has(destination)
       ? this.networkPeers.getConnectionInfo(destination).origin
