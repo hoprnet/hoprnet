@@ -78,7 +78,9 @@ impl MultiCounter {
     }
 
     pub fn increment(&self, label_values: &[&str], by: u64) {
-        self.ctr.with_label_values(label_values).inc_by(by)
+        if let Ok(c) = self.ctr.get_metric_with_label_values(label_values) {
+            c.inc_by(by)
+        }
     }
 
     pub fn name(&self) -> &str {
@@ -133,15 +135,21 @@ impl MultiGauge {
     }
 
     pub fn increment(&self, label_values: &[&str], by: f64) {
-        self.ctr.with_label_values(label_values).add(by)
+        if let Ok(c) = self.ctr.get_metric_with_label_values(label_values) {
+            c.add(by)
+        }
     }
 
     pub fn decrement(&self, label_values: &[&str], by: f64) {
-        self.ctr.with_label_values(label_values).sub(by)
+        if let Ok(c) = self.ctr.get_metric_with_label_values(label_values) {
+            c.sub(by)
+        }
     }
 
     pub fn set(&self, label_values: &[&str], value: f64) {
-        self.ctr.with_label_values(label_values).set(value)
+        if let Ok(c) = self.ctr.get_metric_with_label_values(label_values) {
+            c.set(value)
+        }
     }
 
     pub fn name(&self) -> &str {
