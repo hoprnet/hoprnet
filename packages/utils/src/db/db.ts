@@ -472,47 +472,6 @@ export class HoprDB {
     // sort in ascending order by ticket index: 1,2,3,4,...
     const sortFunc = (t1: AcknowledgedTicket, t2: AcknowledgedTicket): number => t1.ticket.index.cmp(t2.ticket.index)
 
-    return this.getAll<AcknowledgedTicket>(
-      {
-        prefix: ACKNOWLEDGED_TICKETS_PREFIX,
-        suffixLength: EthereumChallenge.SIZE
-      },
-      AcknowledgedTicket.deserialize,
-      filterFunc,
-      undefined,
-      sortFunc
-    )
-  }
-
-  /**
-   * Get acknowledged tickets sorted by ticket index in ascending order.
-   * @param filter optionally filter by signer
-   * @returns an array of all acknowledged tickets
-   */
-  public async getAcknowledgedTicketsIterable(filter?: {
-    signer?: PublicKey
-    channel?: ChannelEntry
-  }): Promise<AcknowledgedTicket[]> {
-    const filterFunc = (a: AcknowledgedTicket): boolean => {
-      // if signer provided doesn't match our ticket's signer dont add it to the list
-      if (filter?.signer && !a.signer.eq(filter.signer)) {
-        return false
-      }
-
-      if (
-        filter?.channel &&
-        (!a.signer.eq(filter.channel.source) ||
-          !filter.channel.destination.eq(this.id) ||
-          !a.ticket.channelEpoch.eq(filter.channel.channelEpoch))
-      ) {
-        return false
-      }
-
-      return true
-    }
-    // sort in ascending order by ticket index: 1,2,3,4,...
-    const sortFunc = (t1: AcknowledgedTicket, t2: AcknowledgedTicket): number => t1.ticket.index.cmp(t2.ticket.index)
-
     const tickets: AcknowledgedTicket[] = []
 
     for await (const ticket of this.getAllIterable<AcknowledgedTicket>(
