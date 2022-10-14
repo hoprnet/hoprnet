@@ -606,19 +606,20 @@ class Hopr extends EventEmitter {
       throw new Error('node is not RUNNING')
     }
 
-    const currentChannels: ChannelEntry[] = (await this.getAllChannels()) ?? []
+    let out = 'Channels obtained:\n'
 
-    verbose(`Channels obtained:`)
-    for (const currentChannel of currentChannels) {
-      verbose(currentChannel.toString())
+    const currentChannels: ChannelEntry[] = []
+
+    for await (const channel of this.getAllChannels()) {
+      out += `${channel.toString()}\n`
+      currentChannels.push(channel)
     }
+
+    // Remove last `\n`
+    verbose(out.substring(0, out.length - 1))
 
     if (currentChannels === undefined) {
       throw new Error('invalid channels retrieved from database')
-    }
-
-    for (const channel of currentChannels) {
-      this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_EXISTING_CHANNEL) // Make sure current channels are 'interesting'
     }
 
     let balance: Balance
@@ -693,8 +694,8 @@ class Hopr extends EventEmitter {
     }
   }
 
-  private async getAllChannels(): Promise<ChannelEntry[]> {
-    return this.db.getChannelsFrom(PublicKey.fromPeerId(this.getId()).toAddress())
+  private async *getAllChannels(): AsyncIterable<ChannelEntry> {
+    yield* this.db.getChannelsFromIterable(PublicKey.fromPeerId(this.getId()).toAddress())
   }
 
   /**
@@ -920,8 +921,8 @@ class Hopr extends EventEmitter {
    * Takes a look into the indexer.
    * @returns a list of announced multi addresses
    */
-  public async getAddressesAnnouncedOnChain(): Promise<Multiaddr[]> {
-    return this.indexer.getAddressesAnnouncedOnChain()
+  public async *getAddressesAnnouncedOnChain(): AsyncIterable<Multiaddr> {
+    yield* this.indexer.getAddressesAnnouncedOnChain()
   }
 
   /**
@@ -963,10 +964,15 @@ class Hopr extends EventEmitter {
       return 'Node has not started yet'
     }
     const connected = this.networkPeers.debugLog()
-    const announced = await this.connector.indexer.getAddressesAnnouncedOnChain()
+
+    let announced: string[] = []
+    for await (const announcement of this.connector.indexer.getAddressesAnnouncedOnChain()) {
+      announced.push(announcement.toString())
+    }
+
     return `${connected}
     \n${announced.length} peers have announced themselves on chain:
-    \n${announced.map((ma: Multiaddr) => ma.toString()).join('\n')}`
+    \n${announced.join('\n')}`
   }
 
   public subscribeOnConnector(event: string, callback: () => void): void {

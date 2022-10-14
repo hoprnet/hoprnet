@@ -338,6 +338,36 @@ export class HoprDB {
     return results
   }
 
+  protected async *getAllIterable<Element, TransformedElement = Element>(
+    range: {
+      prefix: Uint8Array
+      suffixLength: number
+    },
+    deserialize: (u: Uint8Array) => Element,
+    filter?: ((o: Element) => boolean) | undefined,
+    map?: (i: Element) => TransformedElement
+  ): AsyncIterable<TransformedElement> {
+    const firstPrefixed = this.keyOf(range.prefix, new Uint8Array(range.suffixLength).fill(0x00))
+    const lastPrefixed = this.keyOf(range.prefix, new Uint8Array(range.suffixLength).fill(0xff))
+
+    // @TODO fix types in @types/levelup package
+    for await (const [_key, chunk] of this.db.iterator({
+      gte: Buffer.from(firstPrefixed),
+      lte: Buffer.from(lastPrefixed),
+      keys: false
+    }) as any) {
+      const obj: Element = deserialize(Uint8Array.from(chunk))
+
+      if (!filter || filter(obj)) {
+        if (map) {
+          yield map(obj)
+        } else {
+          yield obj as unknown as TransformedElement
+        }
+      }
+    }
+  }
+
   private async del(key: Uint8Array): Promise<void> {
     await this.db.del(Buffer.from(this.keyOf(key)))
   }
@@ -452,6 +482,51 @@ export class HoprDB {
       undefined,
       sortFunc
     )
+  }
+
+  /**
+   * Get acknowledged tickets sorted by ticket index in ascending order.
+   * @param filter optionally filter by signer
+   * @returns an array of all acknowledged tickets
+   */
+  public async getAcknowledgedTicketsIterable(filter?: {
+    signer?: PublicKey
+    channel?: ChannelEntry
+  }): Promise<AcknowledgedTicket[]> {
+    const filterFunc = (a: AcknowledgedTicket): boolean => {
+      // if signer provided doesn't match our ticket's signer dont add it to the list
+      if (filter?.signer && !a.signer.eq(filter.signer)) {
+        return false
+      }
+
+      if (
+        filter?.channel &&
+        (!a.signer.eq(filter.channel.source) ||
+          !filter.channel.destination.eq(this.id) ||
+          !a.ticket.channelEpoch.eq(filter.channel.channelEpoch))
+      ) {
+        return false
+      }
+
+      return true
+    }
+    // sort in ascending order by ticket index: 1,2,3,4,...
+    const sortFunc = (t1: AcknowledgedTicket, t2: AcknowledgedTicket): number => t1.ticket.index.cmp(t2.ticket.index)
+
+    const tickets: AcknowledgedTicket[] = []
+
+    for await (const ticket of this.getAllIterable<AcknowledgedTicket>(
+      {
+        prefix: ACKNOWLEDGED_TICKETS_PREFIX,
+        suffixLength: EthereumChallenge.SIZE
+      },
+      AcknowledgedTicket.deserialize,
+      filterFunc
+    )) {
+      tickets.push(ticket)
+    }
+
+    return tickets.sort(sortFunc)
   }
 
   /**
@@ -598,6 +673,17 @@ export class HoprDB {
     return await this.getCoerced<ChannelEntry>(createChannelKey(channelId), ChannelEntry.deserialize)
   }
 
+  async *getChannelsIterable(filter?: (channel: ChannelEntry) => boolean): AsyncIterable<ChannelEntry> {
+    yield* this.getAllIterable<ChannelEntry>(
+      {
+        prefix: CHANNEL_PREFIX,
+        suffixLength: Hash.SIZE
+      },
+      ChannelEntry.deserialize,
+      filter
+    )
+  }
+
   async getChannels(filter?: (channel: ChannelEntry) => boolean): Promise<ChannelEntry[]> {
     return this.getAll<ChannelEntry>(
       {
@@ -631,6 +717,17 @@ export class HoprDB {
 
   async getAccounts(filter?: (account: AccountEntry) => boolean) {
     return this.getAll<AccountEntry>(
+      {
+        prefix: ACCOUNT_PREFIX,
+        suffixLength: Address.SIZE
+      },
+      AccountEntry.deserialize,
+      filter
+    )
+  }
+
+  async *getAccountsIterable(filter?: (account: AccountEntry) => boolean) {
+    yield* this.getAllIterable<AccountEntry>(
       {
         prefix: ACCOUNT_PREFIX,
         suffixLength: Address.SIZE
@@ -730,10 +827,26 @@ export class HoprDB {
     })
   }
 
+  public async *getChannelsFromIterable(address: Address) {
+    for await (const channel of this.getChannelsIterable()) {
+      if (address.eq(channel.source.toAddress())) {
+        yield channel
+      }
+    }
+  }
+
   public async getChannelsTo(address: Address) {
     return this.getChannels((channel) => {
       return address.eq(channel.destination.toAddress())
     })
+  }
+
+  public async *getChannelsToIterable(address: Address) {
+    for await (const channel of this.getChannelsIterable()) {
+      if (address.eq(channel.destination.toAddress())) {
+        yield channel
+      }
+    }
   }
 
   public async setEnvironmentId(environment_id: string): Promise<void> {
