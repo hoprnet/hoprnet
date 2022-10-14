@@ -15,7 +15,6 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // check the lastest block timestamp
   const latestBlockTimestamp = (await ethers.provider.getBlock('latest')).timestamp
   console.log(`Latest block timestamp is ${latestBlockTimestamp}`)
-
   const stakeContractName = getHoprStakeContractName(latestBlockTimestamp)
   const deployOptions = {
     log: true
@@ -25,10 +24,13 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     deployOptions['waitConfirmations'] = 2
   }
 
+  const isStakingSeasonFiveAndAbove = parseInt([...stakeContractName.matchAll(/HoprStakeSeason(\d+)/g)][0][1], 10) > 4
+
   await deploy('HoprStake', {
     contract: stakeContractName,
     from: deployer,
-    args: [HoprBoost.address, admin, xHOPR.address, wxHOPR.address],
+    // beyond staking season 4 (from S5 on, no need to pass constructor parameters)
+    args: isStakingSeasonFiveAndAbove ? [] : [HoprBoost.address, admin, xHOPR.address, wxHOPR.address],
     maxFeePerGas,
     maxPriorityFeePerGas,
     ...deployOptions
