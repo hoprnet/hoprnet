@@ -1,5 +1,5 @@
 use std::fmt::Display;
-use prometheus::{Gauge, Histogram, HistogramOpts, HistogramTimer, IntCounter, Opts, TextEncoder};
+use prometheus::{Gauge, GaugeVec, Histogram, HistogramOpts, HistogramTimer, IntCounter, IntCounterVec, Opts, TextEncoder};
 use prometheus::core::{Collector, Metric};
 use wasm_bindgen::JsValue;
 
@@ -9,10 +9,28 @@ pub fn as_jsvalue<T>(v: T) -> JsValue where T: Display {
 
 fn register_metric<M, C>(name: &str, desc: &str, creator: C) -> Result<M, String>
 where
-    M: Metric + Collector + 'static,
+    M: Clone + Collector + 'static,
     C: Fn(Opts) -> prometheus::Result<M>
 {
     let metric = creator(Opts::new(name, desc))
+        .map_err(|e| e.to_string())?;
+
+    prometheus::register(Box::new(metric.clone()))
+        .map_err(|e| e.to_string())?;
+
+    Ok(metric)
+}
+
+fn register_metric_vec<M, C>(name: &str, desc: &str, labels: &[&str], creator: C) -> Result<M, String>
+    where
+        M: Clone + Collector + 'static,
+        C: Fn(Opts,&[&str]) -> prometheus::Result<M>
+{
+    if labels.len() == 0 {
+        return Err("at least a single label must be specified".into());
+    }
+
+    let metric = creator(Opts::new(name, desc), labels)
         .map_err(|e| e.to_string())?;
 
     prometheus::register(Box::new(metric.clone()))
@@ -45,6 +63,29 @@ impl SimpleCounter {
     }
 }
 
+struct MultiCounter {
+    name: String,
+    ctr: IntCounterVec
+}
+
+impl MultiCounter {
+    pub fn new(name: &str, description: &str, labels: &[&str]) -> Result<Self, String> {
+        register_metric_vec(name, description, labels, IntCounterVec::new)
+            .map(|m| Self {
+                name: name.to_string(),
+                ctr: m
+            })
+    }
+
+    pub fn increment(&self, label_values: &[&str], by: u64) {
+        self.ctr.with_label_values(label_values).inc_by(by)
+    }
+
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+}
+
 /// Wrapper for Gauge metrics type
 struct SimpleGauge {
     name: String,
@@ -70,6 +111,37 @@ impl SimpleGauge {
 
     pub fn set(&self, value: f64) {
         self.gg.set(value)
+    }
+
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+}
+
+struct MultiGauge {
+    name: String,
+    ctr: GaugeVec
+}
+
+impl MultiGauge {
+    pub fn new(name: &str, description: &str, labels: &[&str]) -> Result<Self, String> {
+        register_metric_vec(name, description, labels, GaugeVec::new)
+            .map(|m| Self {
+                name: name.to_string(),
+                ctr: m
+            })
+    }
+
+    pub fn increment(&self, label_values: &[&str], by: f64) {
+        self.ctr.with_label_values(label_values).add(by)
+    }
+
+    pub fn decrement(&self, label_values: &[&str], by: f64) {
+        self.ctr.with_label_values(label_values).sub(by)
+    }
+
+    pub fn set(&self, label_values: &[&str], value: f64) {
+        self.ctr.with_label_values(label_values).set(value)
     }
 
     pub fn name(&self) -> &str {
