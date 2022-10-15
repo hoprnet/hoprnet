@@ -28,4 +28,12 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixture, AccountsFixture {
         emit Announcement(accountA.accountAddr, accountA.publicKey, multiAddress);
         hoprChannel.announce(accountA.publicKey, multiAddress);
     }
+
+    function testFailAnnounceAddressForDifferentPublicKey() public {
+        bytes memory multiAddress = hex"1234";
+        vm.prank(accountB.accountAddr);
+        vm.expectEmit(true, false, false, true, address(hoprChannel));
+        emit Announcement(accountA.accountAddr, accountA.publicKey, multiAddress);
+        hoprChannel.announce(accountA.publicKey, multiAddress);
+    }
 }
