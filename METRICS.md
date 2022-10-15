@@ -1,5 +1,4 @@
-Metrics
-===
+# Metrics
 
 This file is documenting and tracking all the metrics which can be collected
 by a Prometheus server. The metrics can be scraped by Prometheus from
@@ -10,7 +9,7 @@ The following sections document the metrics per package:
 ### connect
 
 | Name                                     | Type    | Description                                  | Note |
-|------------------------------------------|---------|----------------------------------------------|:-----|
+| ---------------------------------------- | ------- | -------------------------------------------- | :--- |
 | connect_counter_successful_direct_dials  | counter | Number of successful direct dials.           |      |
 | connect_counter_failed_direct_dials      | counter | Number of failed direct dials                |      |
 | connect_counter_successful_relayed_dials | counter | Number of successful relayed dials           |      |
@@ -27,7 +26,7 @@ The following sections document the metrics per package:
 ### core
 
 | Name                                    | Type      | Description                                                    | Note                   |
-|-----------------------------------------|-----------|----------------------------------------------------------------|------------------------|
+| --------------------------------------- | --------- | -------------------------------------------------------------- | ---------------------- |
 | core_gauge_num_outgoing_channels        | gauge     | Number of outgoing channels                                    |                        |
 | core_counter_sent_messages              | counter   | Number of sent messages                                        |                        |
 | core_histogram_path_length              | histogram | Distribution of number of hops of sent messages                | buckets: 0-4           |
@@ -58,7 +57,7 @@ The following sections document the metrics per package:
 ### hoprd
 
 | Name                                  | Type      | Description                                                       | Note                |
-|---------------------------------------|-----------|-------------------------------------------------------------------|---------------------|
+| ------------------------------------- | --------- | ----------------------------------------------------------------- | ------------------- |
 | hoprd_gauge_startup_unix_time_seconds | gauge     | The unix timestamp at which the process was started               | seconds since Epoch |
 | hoprd_histogram_startup_time_seconds  | histogram | Time it takes for a node to start up                              | unit: seconds       |
 | hoprd_histogram_time_to_green_seconds | histogram | Time it takes for a node to transition to the GREEN network state | unit: seconds       |
