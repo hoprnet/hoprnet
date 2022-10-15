@@ -39,13 +39,16 @@ fn register_metric_vec<M, C>(name: &str, desc: &str, labels: &[&str], creator: C
     Ok(metric)
 }
 
-/// Wrapper for IntCounter metrics type
+/// Represents a simple monotonic unsigned integer counter.
+/// Wrapper for IntCounter type
 struct SimpleCounter {
     name: String,
     ctr: IntCounter
 }
 
 impl SimpleCounter {
+
+    /// Creates a new integer counter with given name and description
     pub fn new(name: &str, description: &str) -> Result<Self, String> {
         register_metric(name, description, IntCounter::with_opts)
             .map(|m| Self {
@@ -54,47 +57,65 @@ impl SimpleCounter {
             })
     }
 
+    /// Increments the counter by the given number.
     pub fn increment(&self, by: u64) {
         self.ctr.inc_by(by)
     }
 
+    /// Returns the name of the counter given at construction.
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
 }
 
+/// Represents a vector of named monotonic unsigned integer counters.
+/// Wrapper for IntCounterVec type
 struct MultiCounter {
     name: String,
+    labels: Vec<String>,
     ctr: IntCounterVec
 }
 
 impl MultiCounter {
+
+    /// Creates a new vector of integer counters with given name, description and counter labels.
     pub fn new(name: &str, description: &str, labels: &[&str]) -> Result<Self, String> {
         register_metric_vec(name, description, labels, IntCounterVec::new)
             .map(|m| Self {
                 name: name.to_string(),
+                labels: Vec::from(labels).iter().map(|s| String::from(*s)).collect(),
                 ctr: m
             })
     }
 
+    /// Increments counter with given labels by the given number.
     pub fn increment(&self, label_values: &[&str], by: u64) {
         if let Ok(c) = self.ctr.get_metric_with_label_values(label_values) {
             c.inc_by(by)
         }
     }
 
+    /// Returns the name of the counter vector given at construction.
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
+
+    /// Returns the labels of the counters given at construction.
+    pub fn labels(&self) -> Vec<&str> {
+        self.labels.iter().map(String::as_str).collect()
+    }
 }
 
-/// Wrapper for Gauge metrics type
+/// Represents a simple gauge with floating point values.
+/// Wrapper for Gauge type
 struct SimpleGauge {
     name: String,
     gg: Gauge
 }
 
 impl SimpleGauge {
+
+    /// Creates a new gauge with given name and description.
     pub fn new(name: &str, description: &str) -> Result<Self, String> {
         register_metric(name, description, Gauge::with_opts)
             .map(|m| Self {
@@ -103,70 +124,95 @@ impl SimpleGauge {
             })
     }
 
+    /// Increments the gauge by the given value.
     pub fn increment(&self, by: f64) {
         self.gg.add(by)
     }
 
+    /// Decrements the gauge by the given value.
     pub fn decrement(&self, by: f64) {
         self.gg.sub(by)
     }
 
+    /// Sets the gauge to the given value.
     pub fn set(&self, value: f64) {
         self.gg.set(value)
     }
 
+    /// Returns the name of the gauge given at construction.
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
 }
 
+/// Represents a vector of gauges with floating point values.
+/// Wrapper for GaugeVec type
 struct MultiGauge {
     name: String,
+    labels: Vec<Strimg>,
     ctr: GaugeVec
 }
 
 impl MultiGauge {
+
+    /// Creates a new vector of gauges with given name, description and counter labels.
     pub fn new(name: &str, description: &str, labels: &[&str]) -> Result<Self, String> {
         register_metric_vec(name, description, labels, GaugeVec::new)
             .map(|m| Self {
                 name: name.to_string(),
+                labels: Vec::from(labels).iter().map(|s| String::from(*s)).collect(),
                 ctr: m
             })
     }
 
+    /// Increments gauge with given labels by the given number.
     pub fn increment(&self, label_values: &[&str], by: f64) {
         if let Ok(c) = self.ctr.get_metric_with_label_values(label_values) {
             c.add(by)
         }
     }
 
+    /// Decrements gauge with given labels by the given number.
     pub fn decrement(&self, label_values: &[&str], by: f64) {
         if let Ok(c) = self.ctr.get_metric_with_label_values(label_values) {
             c.sub(by)
         }
     }
 
+    /// Sets gauge with given labels to the given value.
     pub fn set(&self, label_values: &[&str], value: f64) {
         if let Ok(c) = self.ctr.get_metric_with_label_values(label_values) {
             c.set(value)
         }
     }
 
+    /// Returns the name of the gauge vector given at construction.
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
+
+    /// Returns the labels of the counters given at construction.
+    pub fn labels(&self) -> Vec<&str> {
+        self.labels.iter().map(String::as_str).collect()
+    }
 }
 
+/// Represents a histogram with floating point values.
+/// Wrapper for Histogram type
 struct SimpleHistogram {
     name: String,
     hh: Histogram
 }
 
+/// Represents a timer handle.
 struct SimpleTimer {
     histogram_timer: HistogramTimer
 }
 
 impl SimpleHistogram {
+
+    /// Creates a new histogram with the given name, description and buckets.
+    /// If no buckets are specified, they will be defined automatically.
     pub fn new(name: &str, description: &str, buckets: Vec<f64>) -> Result<Self, String> {
         let mut opts = HistogramOpts::new(name, description);
         if !buckets.is_empty() {
@@ -185,22 +231,27 @@ impl SimpleHistogram {
         })
     }
 
+    /// Records a value observation to the histogram.
     pub fn observe(&self, value: f64) {
         self.hh.observe(value)
     }
 
+    /// Starts a timer.
     pub fn start_measure(&self) -> SimpleTimer {
         SimpleTimer { histogram_timer: self.hh.start_timer() }
     }
 
+    /// Stops the given timer and records the elapsed duration in seconds to the histogram.
     pub fn record_measure(&self, timer: SimpleTimer) {
         timer.histogram_timer.observe_duration()
     }
 
+    /// Stops the given timer and discards the measured duration in seconds and returns it.
     pub fn cancel_measure(&self, timer: SimpleTimer) -> f64 {
         timer.histogram_timer.stop_and_discard()
     }
 
+    /// Returns the name of the histogram given at construction.
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
