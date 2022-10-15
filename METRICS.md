@@ -1,0 +1,65 @@
+Metrics
+===
+
+This file is documenting and tracking all the metrics which can be collected
+by a Prometheus server. The metrics can be scraped by Prometheus from
+the `api/v2/node/metrics` API endpoint.
+
+The following sections document the metrics per package:
+
+### connect
+
+| Name                                     | Type    | Description                                  | Note |
+|------------------------------------------|---------|----------------------------------------------|:-----|
+| connect_counter_successful_direct_dials  | counter | Number of successful direct dials.           |      |
+| connect_counter_failed_direct_dials      | counter | Number of failed direct dials                |      |
+| connect_counter_successful_relayed_dials | counter | Number of successful relayed dials           |      |
+| connect_counter_failed_relayed_dials     | counter | Number of failed relayed dials               |      |
+| connect_gauge_used_relays                | gauge   | Number of used relays                        |      |
+| connect_gauge_conns_to_relays            | gauge   | Number of connections to relays              |      |
+| connect_gauge_relayed_conns              | gauge   | Number of currently relayed connections      |      |
+| connect_counter_successful_relay_reqs    | counter | Number of successful incoming relay requests |      |
+| connect_counter_failed_relay_reqs        | counter | Number of failed incoming relay requests     |      |
+| connect_counter_relay_reconnects         | counter | Number of re-established relayed connections |      |
+| connect_counter_successful_conns         | counter | Number of successful connection attempts     |      |
+| connect_counter_failed_conns             | counter | Number of failed connection attempts         |      |
+
+### core
+
+| Name                                    | Type      | Description                                                    | Note                   |
+|-----------------------------------------|-----------|----------------------------------------------------------------|------------------------|
+| core_gauge_num_outgoing_channels        | gauge     | Number of outgoing channels                                    |                        |
+| core_counter_sent_messages              | counter   | Number of sent messages                                        |                        |
+| core_histogram_path_length              | histogram | Distribution of number of hops of sent messages                | buckets: 0-4           |
+| core_counter_received_successful_acks   | counter   | Number of received successful message acknowledgements         |                        |
+| core_counter_received_failed_acks       | counter   | Number of received failed message acknowledgements             |                        |
+| core_counter_sent_acks                  | counter   | Number of sent message acknowledgements                        |                        |
+| core_counter_winning_tickets            | counter   | Number of winning tickets                                      |                        |
+| core_counter_losing_tickets             | counter   | Number of losing tickets                                       |                        |
+| core_counter_forwarded_messages         | counter   | Number of forwarded messages                                   |                        |
+| core_counter_received_messages          | counter   | Number of received messages                                    |                        |
+| core_counter_created_tickets            | counter   | Number of created tickets                                      |                        |
+| core_counter_packets                    | counter   | Number of created packets                                      |                        |
+| core_counter_nr_rejected_conns          | counter   | Number of rejected connections due to NR                       |                        |
+| core_gauge_network_health               | gauge     | Connectivity health indicator                                  | 0 = UNKNOWN, 4 = GREEN |
+| core_histogram_heartbeat_time_seconds   | histogram | Measures total time it takes to probe other nodes (in seconds) | unit: seconds          |
+| core_counter_heartbeat_successful_pings | counter   | Total number of successful pings                               |                        |
+| core_counter_heartbeat_failed_pings     | counter   | Total number of failed pings                                   |                        |
+| core_gauge_num_high_quality_peers       | gauge     | Number of hiqh quality peers                                   | quality > 0.5          |
+| core_gauge_num_low_quality_peers        | gauge     | Number of low quality peers                                    | quality <= 0.5         |
+| core_gauge_num_peers                    | gauge     | Number of all peers                                            |                        |
+
+### core-ethereum
+
+### cover-traffic-daemon
+
+### ethereum
+
+### hoprd
+
+| Name                                  | Type      | Description                                                       | Note                |
+|---------------------------------------|-----------|-------------------------------------------------------------------|---------------------|
+| hoprd_gauge_startup_unix_time_seconds | gauge     | The unix timestamp at which the process was started               | seconds since Epoch |
+| hoprd_histogram_startup_time_seconds  | histogram | Time it takes for a node to start up                              | unit: seconds       |
+| hoprd_histogram_time_to_green_seconds | histogram | Time it takes for a node to transition to the GREEN network state | unit: seconds       |
+| hoprd_histogram_message_latency_ms    | histogram | Histogram of measured received message latencies                  | unit: milliseconds  |

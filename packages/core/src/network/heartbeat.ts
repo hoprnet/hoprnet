@@ -38,7 +38,7 @@ const HEARTBEAT_RUN_TIMEOUT = 2 * 60 * 1000 // 2 minutes
 const metric_networkHealth = create_gauge('core_gauge_network_health', 'Connectivity health indicator')
 const metric_timeToHeartbeat = create_histogram(
   'core_histogram_heartbeat_time_seconds',
-  'Measures total time it takes to probe other nodes'
+  'Measures total time it takes to probe other nodes (in seconds)'
 )
 const metric_pingSuccessCount = create_counter(
   'core_counter_heartbeat_successful_pings',

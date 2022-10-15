@@ -44,14 +44,18 @@ const metric_successfulDirectDials = create_counter(
   'connect_counter_successful_direct_dials',
   'Number of successful direct dials'
 )
-const metric_failedDirectDials = create_counter('connect_counter_failed_direct_dials', 'Number of failed direct dials')
+const metric_failedDirectDials = create_counter(
+  'connect_counter_failed_direct_dials',
+  'Number of failed direct dials')
+
 const metric_successfulRelayedDials = create_counter(
   'connect_counter_successful_relayed_dials',
-  'Number of successful direct dials'
+  'Number of successful relayed dials'
 )
+
 const metric_failedRelayedDials = create_counter(
   'connect_counter_failed_relayed_dials',
-  'Number of failed direct dials'
+  'Number of failed relayed dials'
 )
 
 const DEFAULT_CONNECTION_UPGRADE_TIMEOUT = 2000

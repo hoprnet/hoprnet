@@ -18,7 +18,7 @@ const metric_receivedSuccessfulAcks = create_counter(
 )
 const metric_receivedFailedAcks = create_counter(
   'core_counter_received_failed_acks',
-  'Number of received successful message acknowledgements'
+  'Number of received failed message acknowledgements'
 )
 const metric_sentAcks = create_counter('core_counter_sent_acks', 'Number of sent message acknowledgements')
 
