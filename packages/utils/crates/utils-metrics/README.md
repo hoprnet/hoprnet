@@ -1,87 +1,88 @@
-<div align="center">
+HOPR Metrics Collection
+===
 
-  <h1><code>wasm-pack-template</code></h1>
+The purpose of the `utils-metrics` Rust crate is create a thin Rust WASM-compatible wrapper 
+over the [Prometheus Metrics Rust API](https://docs.rs/prometheus/latest/prometheus/).
 
-<strong>A template for kick starting a Rust and WebAssembly project using <a href="https://github.com/rustwasm/wasm-pack">wasm-pack</a>.</strong>
+This wrapper merely simplifies the 3 basic Metric Types:
 
-  <p>
-    <a href="https://travis-ci.org/rustwasm/wasm-pack-template"><img src="https://img.shields.io/travis/rustwasm/wasm-pack-template.svg?style=flat-square" alt="Build Status" /></a>
-  </p>
+- Integer Counter
+- Float Gauge
+- Float Histogram
 
-  <h3>
-    <a href="https://rustwasm.github.io/docs/wasm-pack/tutorials/npm-browser-packages/index.html">Tutorial</a>
-    <span> | </span>
-    <a href="https://discordapp.com/channels/442252698964721669/443151097398296587">Chat</a>
-  </h3>
+The above 3 types are wrapped using the following classes:
 
-<sub>Built with 🦀🕸 by <a href="https://rustwasm.github.io/">The Rust and WebAssembly Working Group</a></sub>
+- `SimpleCounter`
+- `SimpleGauge`
+- `SimpleHistogram`
 
-</div>
+Also vector extensions of the above metric types are available and wrapped
+as :
 
-## About
+- `MultiCounter`
+- `MultiGauge`
+- `MultiHistogram`
 
-[**📚 Read this template tutorial! 📚**][template-docs]
+The vector extensions basically maintain multiple labelled metrics in a single 
+entity.
 
-This template is designed for compiling Rust libraries into WebAssembly and
-publishing the resulting package to NPM.
+The crate only supports global metrics registry (singleton) and cannot 
+create other standalone registries.
 
-Be sure to check out [other `wasm-pack` tutorials online][tutorials] for other
-templates and usages of `wasm-pack`.
+### JS/TS bindings
 
-[tutorials]: https://rustwasm.github.io/docs/wasm-pack/tutorials/index.html
-[template-docs]: https://rustwasm.github.io/docs/wasm-pack/tutorials/npm-browser-packages/index.html
+Because the crate is WASM compatible, it contains also TS/JS bindings for
+`wasm-bindgen`.
+Once a metric is created, it lives in a global registry. Values of all
+created metrics can be gathered in a serialized text for at any time.
 
-## 🚴 Usage
+See the example below for details.
 
-### 🐑 Use `cargo generate` to Clone this Template
+#### Example use in JS/TS
 
-[Learn more about `cargo generate` here.](https://github.com/ashleygwilliams/cargo-generate)
+```js
+const metric_counter = create_counter(
+  'test_counter',
+  'Some testing counter'
+)
 
+// Counter can be only incremented by integeres only
+metric_counter.increment_by(10)
+
+const metric_gauge = create_counter(
+        'test_gauge',
+        'Some testing gauge'
+)
+
+// Gauges can be incremented and decrements and support floats
+metric_gauge.increment_by(5)
+metric_gauge.decrement_by(3.2)
+
+const metric_histogram = create_histogram(
+        'test_histogram',
+        'Some testing histogram'
+)
+
+// Histograms can observe floating point values
+metric_histogram.observe(10.1)
+
+// ... and also can be used to measure time durations in seconds
+const timer = metric_gauge.start_measure()
+foo()
+metric_gauge.record_measure(timer)
+
+
+// Multi-metrics are labeled extensions
+const metric_countsPerVersion = create_multi_counter(
+    'test_multi_counter',
+    'Testing labeled counter',
+    ['version']
+)
+
+// Tracks counters per different versions
+metric_countsPerVersion.increment_by('1.0.0', 2)
+metric_countsPerVersion.increment_by('1.0.1', 1)
+
+// All metrics live in a global state and can be serialized at any time
+let gathered_metrics = gather_all_metrics()
 ```
-cargo generate --git https://github.com/rustwasm/wasm-pack-template.git --name my-project
-cd my-project
-```
-
-### 🛠️ Build with `wasm-pack build`
-
-```
-wasm-pack build
-```
-
-### 🔬 Test in Headless Browsers with `wasm-pack test`
-
-```
-wasm-pack test --headless --firefox
-```
-
-### 🎁 Publish to NPM with `wasm-pack publish`
-
-```
-wasm-pack publish
-```
-
-## 🔋 Batteries Included
-
-- [`wasm-bindgen`](https://github.com/rustwasm/wasm-bindgen) for communicating
-  between WebAssembly and JavaScript.
-- [`console_error_panic_hook`](https://github.com/rustwasm/console_error_panic_hook)
-  for logging panic messages to the developer console.
-- [`wee_alloc`](https://github.com/rustwasm/wee_alloc), an allocator optimized
-  for small code size.
-- `LICENSE-APACHE` and `LICENSE-MIT`: most Rust projects are licensed this way, so these are included for you
-
-## License
-
-Licensed under either of
-
-- Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
-- MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
-
-at your option.
-
-### Contribution
-
-Unless you explicitly state otherwise, any contribution intentionally
-submitted for inclusion in the work by you, as defined in the Apache-2.0
-license, shall be dual licensed as above, without any additional terms or
-conditions.
