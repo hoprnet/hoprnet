@@ -1,5 +1,5 @@
 use std::fmt::Display;
-use prometheus::{Gauge, GaugeVec, Histogram, HistogramOpts, HistogramTimer, IntCounter, IntCounterVec, Opts, TextEncoder};
+use prometheus::{Error, Gauge, GaugeVec, Histogram, HistogramOpts, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, Opts, TextEncoder};
 use prometheus::core::Collector;
 use wasm_bindgen::JsValue;
 
@@ -149,7 +149,7 @@ impl SimpleGauge {
 /// Wrapper for GaugeVec type
 struct MultiGauge {
     name: String,
-    labels: Vec<Strimg>,
+    labels: Vec<String>,
     ctr: GaugeVec
 }
 
@@ -254,6 +254,71 @@ impl SimpleHistogram {
     /// Returns the name of the histogram given at construction.
     pub fn name(&self) -> &str {
         self.name.as_str()
+    }
+}
+
+/// Represents a vector of histograms with floating point values.
+/// Wrapper for HistogramVec type
+struct MultiHistogram {
+    name: String,
+    labels: Vec<String>,
+    hh: HistogramVec
+}
+
+impl MultiHistogram {
+
+    /// Creates a new histogram with the given name, description and buckets.
+    /// If no buckets are specified, they will be defined automatically.
+    pub fn new(name: &str, description: &str, buckets: Vec<f64>, labels: &[&str]) -> Result<Self, String> {
+        let mut opts = HistogramOpts::new(name, description);
+        if !buckets.is_empty() {
+            opts = opts.buckets(buckets);
+        }
+
+        let metric = HistogramVec::new(opts, labels)
+            .map_err(|e| e.to_string())?;
+
+        prometheus::register(Box::new(metric.clone()))
+            .map_err(|e| e.to_string())?;
+
+        Ok(Self {
+            name: name.to_string(),
+            labels: Vec::from(labels).iter().map(|s| String::from(*s)).collect(),
+            hh: metric
+        })
+    }
+
+    /// Records a value observation to the histogram with the given labels.
+    pub fn observe(&self, label_values: &[&str], value: f64) {
+        if let Ok(c) = self.hh.get_metric_with_label_values(label_values) {
+            c.observe(value)
+        }
+    }
+
+    /// Starts a timer for a histogram with the given labels.
+    pub fn start_measure(&self, label_values: &[&str]) -> Result<SimpleTimer, Error> {
+        self.hh.get_metric_with_label_values(label_values)
+            .map(|h| SimpleTimer { histogram_timer: h.start_timer() })
+    }
+
+    /// Stops the given timer and records the elapsed duration in seconds to the histogram.
+    pub fn record_measure(&self, timer: SimpleTimer) {
+        timer.histogram_timer.observe_duration()
+    }
+
+    /// Stops the given timer and discards the measured duration in seconds and returns it.
+    pub fn cancel_measure(&self, timer: SimpleTimer) -> f64 {
+        timer.histogram_timer.stop_and_discard()
+    }
+
+    /// Returns the name of the histogram given at construction.
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    /// Returns the labels of the histogram given at construction.
+    pub fn labels(&self) -> Vec<&str> {
+        self.labels.iter().map(String::as_str).collect()
     }
 }
 
