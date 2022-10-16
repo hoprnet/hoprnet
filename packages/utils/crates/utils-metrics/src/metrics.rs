@@ -1,11 +1,5 @@
-use std::fmt::Display;
 use prometheus::{Error, Gauge, GaugeVec, Histogram, HistogramOpts, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, Opts, TextEncoder};
 use prometheus::core::Collector;
-use wasm_bindgen::JsValue;
-
-pub fn as_jsvalue<T>(v: T) -> JsValue where T: Display {
-    JsValue::from(v.to_string())
-}
 
 fn register_metric<M, C>(name: &str, desc: &str, creator: C) -> Result<M, String>
 where
@@ -335,43 +329,23 @@ fn gather_all_metrics() -> Result<String, String> {
 
 /// Bindings for JS/TS
 pub mod wasm {
+    use std::fmt::Display;
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
     use js_sys::JsString;
-    use crate::metrics::as_jsvalue;
 
-    #[wasm_bindgen]
-    pub struct MultiCounter {
-        w: super::MultiCounter
+    fn as_jsvalue<T>(v: T) -> JsValue where T: Display {
+        JsValue::from(v.to_string())
     }
 
-    #[wasm_bindgen]
-    pub fn create_multi_counter(name: &str, description: &str, labels: Vec<JsString>) -> Result<MultiCounter, JsValue> {
-        let aux: Vec<String> = labels.iter().map(String::from).collect();
-        let bind: Vec<&str> = aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
-        super::MultiCounter::new(name, description, bind.as_slice())
-            .map(|c| MultiCounter { w: c })
-            .map_err(as_jsvalue)
+    macro_rules! convert_jstrvec {
+        ($v:ident,$r:ident) => {
+            let _aux: Vec<String> = $v.iter().map(String::from).collect();
+            let $r = _aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
+        };
     }
 
-    #[wasm_bindgen]
-    impl MultiCounter {
-        pub fn increment_by(&self, label_values: Vec<JsString>, by: u64) {
-            let aux: Vec<String> = label_values.iter().map(String::from).collect();
-            let bind: Vec<&str> = aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
-            self.w.increment(bind.as_slice(), by);
-        }
-
-        pub fn increment(&self, label_values: Vec<JsString>) {
-            let aux: Vec<String> = label_values.iter().map(String::from).collect();
-            let bind: Vec<&str> = aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
-            self.w.increment(bind.as_slice(), 1)
-        }
-
-        pub fn name(&self) -> String {
-            self.w.name().into()
-        }
-    }
+    //// SimpleCounter
 
     #[wasm_bindgen]
     pub struct SimpleCounter {
@@ -397,6 +371,44 @@ pub mod wasm {
             self.w.name().into()
         }
     }
+
+    //// MultiCounter
+
+    #[wasm_bindgen]
+    pub struct MultiCounter {
+        w: super::MultiCounter
+    }
+
+    #[wasm_bindgen]
+    pub fn create_multi_counter(name: &str, description: &str, labels: Vec<JsString>) -> Result<MultiCounter, JsValue> {
+        convert_jstrvec!(labels, bind);
+        super::MultiCounter::new(name, description, bind.as_slice())
+            .map(|c| MultiCounter { w: c })
+            .map_err(as_jsvalue)
+    }
+
+    #[wasm_bindgen]
+    impl MultiCounter {
+        pub fn increment_by(&self, label_values: Vec<JsString>, by: u64) {
+            convert_jstrvec!(label_values, bind);
+            self.w.increment(bind.as_slice(), by);
+        }
+
+        pub fn increment(&self, label_values: Vec<JsString>) {
+            convert_jstrvec!(label_values, bind);
+            self.w.increment(bind.as_slice(), 1)
+        }
+
+        pub fn name(&self) -> String {
+            self.w.name().into()
+        }
+
+        pub fn labels(&self) -> Vec<JsString> {
+            self.w.labels().iter().map(|e| JsString::from(e.as_ref())).collect()
+        }
+    }
+
+    //// SimpleGauge
 
     #[wasm_bindgen]
     pub struct SimpleGauge {
@@ -437,6 +449,8 @@ pub mod wasm {
         }
     }
 
+    //// MultiGauge
+
     #[wasm_bindgen]
     pub struct MultiGauge {
         w: super::MultiGauge
@@ -444,8 +458,7 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub fn create_multi_gauge(name: &str, description: &str, labels: Vec<JsString>) -> Result<MultiGauge, JsValue> {
-        let aux: Vec<String> = labels.iter().map(String::from).collect();
-        let bind: Vec<&str> = aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
+        convert_jstrvec!(labels, bind);
         super::MultiGauge::new(name, description, bind.as_slice())
             .map(|c| MultiGauge { w: c })
             .map_err(as_jsvalue)
@@ -454,39 +467,40 @@ pub mod wasm {
     #[wasm_bindgen]
     impl MultiGauge {
         pub fn increment_by(&self, label_values: Vec<JsString>, by: f64) {
-            let aux: Vec<String> = label_values.iter().map(String::from).collect();
-            let bind: Vec<&str> = aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
+            convert_jstrvec!(label_values, bind);
             self.w.increment(bind.as_slice(), by);
         }
 
         pub fn increment(&self, label_values: Vec<JsString>) {
-            let aux: Vec<String> = label_values.iter().map(String::from).collect();
-            let bind: Vec<&str> = aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
+            convert_jstrvec!(label_values, bind);
             self.w.increment(bind.as_slice(), 1.0)
         }
 
         pub fn decrement_by(&self, label_values: Vec<JsString>, by: f64) {
-            let aux: Vec<String> = label_values.iter().map(String::from).collect();
-            let bind: Vec<&str> = aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
+            convert_jstrvec!(label_values, bind);
             self.w.decrement(bind.as_slice(), by);
         }
 
         pub fn decrement(&self, label_values: Vec<JsString>) {
-            let aux: Vec<String> = label_values.iter().map(String::from).collect();
-            let bind: Vec<&str> = aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
+            convert_jstrvec!(label_values, bind);
             self.w.decrement(bind.as_slice(), 1.0)
         }
 
         pub fn set(&self, label_values: Vec<JsString>, value: f64) {
-            let aux: Vec<String> = label_values.iter().map(String::from).collect();
-            let bind: Vec<&str> = aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
+            convert_jstrvec!(label_values, bind);
             self.w.set(bind.as_slice(), value);
         }
 
         pub fn name(&self) -> String {
             self.w.name().into()
         }
+
+        pub fn labels(&self) -> Vec<JsString> {
+            self.w.labels().iter().map(|e| JsString::from(e.as_ref())).collect()
+        }
     }
+
+    //// SimpleHistogram
 
     #[wasm_bindgen]
     pub struct SimpleHistogram {
@@ -530,6 +544,57 @@ pub mod wasm {
 
         pub fn name(&self) -> String {
             self.w.name().into()
+        }
+    }
+
+    //// MultiHistogram
+
+    #[wasm_bindgen]
+    pub struct MultiHistogram {
+        w: super::MultiHistogram
+    }
+
+    #[wasm_bindgen]
+    pub fn create_multi_histogram(name: &str, description: &str, labels: Vec<JsString>) -> Result<MultiHistogram, JsValue> {
+        create_multi_histogram_with_buckets(name, description, &[] as &[f64; 0], labels)
+    }
+
+    #[wasm_bindgen]
+    pub fn create_multi_histogram_with_buckets(name: &str, description: &str, buckets: &[f64], labels: Vec<JsString>) -> Result<MultiHistogram, JsValue> {
+        convert_jstrvec!(labels, bind);
+        super::MultiHistogram::new(name, description, buckets.into(), bind.as_slice())
+            .map(|c| MultiHistogram { w: c })
+            .map_err(as_jsvalue)
+    }
+
+    #[wasm_bindgen]
+    impl MultiHistogram {
+        pub fn observe(&self, label_values: Vec<JsString>, value: f64) {
+            convert_jstrvec!(label_values, bind);
+            self.w.observe(bind.as_slice(), value)
+        }
+
+        pub fn start_measure(&self, label_values: Vec<JsString>) -> Result<SimpleTimer, JsValue> {
+            convert_jstrvec!(label_values, bind);
+            self.w.start_measure(bind.as_slice())
+                .map(|t| SimpleTimer {w: t })
+                .map_err(|e| as_jsvalue(e.to_string()))
+        }
+
+        pub fn record_measure(&self, timer: SimpleTimer) {
+            self.w.record_measure(timer.w)
+        }
+
+        pub fn cancel_measure(&self, timer: SimpleTimer) -> f64 {
+            self.w.cancel_measure(timer.w)
+        }
+
+        pub fn name(&self) -> String {
+            self.w.name().into()
+        }
+
+        pub fn labels(&self) -> Vec<JsString> {
+            self.w.labels().iter().map(|e| JsString::from(e.as_ref())).collect()
         }
     }
 

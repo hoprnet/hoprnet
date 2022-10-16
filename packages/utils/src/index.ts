@@ -18,6 +18,7 @@ export { get_package_version } from '../lib/utils_misc.js'
 export {
   create_counter,
   SimpleCounter,
+  MultiCounter,
   create_gauge,
   SimpleGauge,
   create_histogram,

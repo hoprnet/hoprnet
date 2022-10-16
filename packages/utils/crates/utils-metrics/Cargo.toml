@@ -1,6 +1,6 @@
 [package]
 name = "utils-metrics"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Rust WASM module containing support for general metrics collection"
