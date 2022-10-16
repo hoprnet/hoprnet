@@ -3,11 +3,14 @@
 The purpose of the `utils-metrics` Rust crate is create a thin Rust WASM-compatible wrapper
 over the [Prometheus Metrics Rust API](https://docs.rs/prometheus/latest/prometheus/).
 
+The reason for making this wrapper is to make it suitable for `wasm-bindgen` bindings to JS/TS. The
+`prometheus` crate API is not suitable for `wasm-bindgen` as it is.
+
 This wrapper merely simplifies the 3 basic Metric Types:
 
-- Integer Counter
-- Float Gauge
-- Float Histogram
+- Counter (integer only)
+- Gauge (floating point only)
+- Histogram (floating point only)
 
 The above 3 types are wrapped using the following classes:
 
@@ -23,7 +26,7 @@ as :
 - `MultiHistogram`
 
 The vector extensions basically maintain multiple labelled metrics in a single
-entity.
+entity. This makes it possible to have categorized metric values within a single metric.
 
 The crate only supports global metrics registry (singleton) and cannot
 create other standalone registries.
