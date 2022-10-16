@@ -1,7 +1,6 @@
-HOPR Metrics Collection
-===
+# HOPR Metrics Collection
 
-The purpose of the `utils-metrics` Rust crate is create a thin Rust WASM-compatible wrapper 
+The purpose of the `utils-metrics` Rust crate is create a thin Rust WASM-compatible wrapper
 over the [Prometheus Metrics Rust API](https://docs.rs/prometheus/latest/prometheus/).
 
 This wrapper merely simplifies the 3 basic Metric Types:
@@ -23,10 +22,10 @@ as :
 - `MultiGauge`
 - `MultiHistogram`
 
-The vector extensions basically maintain multiple labelled metrics in a single 
+The vector extensions basically maintain multiple labelled metrics in a single
 entity.
 
-The crate only supports global metrics registry (singleton) and cannot 
+The crate only supports global metrics registry (singleton) and cannot
 create other standalone registries.
 
 ### JS/TS bindings
@@ -41,27 +40,18 @@ See the example below for details.
 #### Example use in JS/TS
 
 ```js
-const metric_counter = create_counter(
-  'test_counter',
-  'Some testing counter'
-)
+const metric_counter = create_counter('test_counter', 'Some testing counter')
 
 // Counter can be only incremented by integeres only
 metric_counter.increment_by(10)
 
-const metric_gauge = create_counter(
-        'test_gauge',
-        'Some testing gauge'
-)
+const metric_gauge = create_counter('test_gauge', 'Some testing gauge')
 
 // Gauges can be incremented and decrements and support floats
 metric_gauge.increment_by(5)
 metric_gauge.decrement_by(3.2)
 
-const metric_histogram = create_histogram(
-        'test_histogram',
-        'Some testing histogram'
-)
+const metric_histogram = create_histogram('test_histogram', 'Some testing histogram')
 
 // Histograms can observe floating point values
 metric_histogram.observe(10.1)
@@ -71,13 +61,8 @@ const timer = metric_gauge.start_measure()
 foo()
 metric_gauge.record_measure(timer)
 
-
 // Multi-metrics are labeled extensions
-const metric_countsPerVersion = create_multi_counter(
-    'test_multi_counter',
-    'Testing labeled counter',
-    ['version']
-)
+const metric_countsPerVersion = create_multi_counter('test_multi_counter', 'Testing labeled counter', ['version'])
 
 // Tracks counters per different versions
 metric_countsPerVersion.increment_by('1.0.0', 2)
