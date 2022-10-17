@@ -12,7 +12,7 @@ import { keysPBM } from '@libp2p/crypto/keys'
 import type { AddressSorter, Address } from '@libp2p/interfaces/peer-store'
 
 import { HoprConnect, compareAddressesLocalMode, type PublicNodesEmitter } from '@hoprnet/hopr-connect'
-import { HoprDB, PublicKey, debug } from '@hoprnet/hopr-utils'
+import { HoprDB, PublicKey, debug, isAddressWithPeerId } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
 import Hopr, { type HoprOptions } from './index.js'
@@ -162,6 +162,15 @@ export async function createLibp2pInstance(
       },
       identify: {
         protocolPrefix
+      },
+      peerStore: {
+        // Prevents peer-store from storing addresses twice, e.g.
+        // /ip4/1.2.3.4/tcp/23/p2p/16Uiu2HAmQBZA4TzjKjU5fpCSprGuM2y8mpepNwMS6ZKFATiKg68h
+        // /ip4/1.2.3.4/tcp/23
+        // same for
+        // /p2p/16Uiu2HAkzEnkW3xGJbvpXSXmvVR177LcR4Sw7z5S1ijuBcnbVFsV/p2p-circuit
+        // /p2p/16Uiu2HAkzEnkW3xGJbvpXSXmvVR177LcR4Sw7z5S1ijuBcnbVFsV/p2p-circuit/p2p/16Uiu2HAmQBZA4TzjKjU5fpCSprGuM2y8mpepNwMS6ZKFATiKg68h
+        addressFilter: async (_peerId: PeerId, multiaddr: Multiaddr) => !isAddressWithPeerId(multiaddr)
       },
       datastore
     })
