@@ -4,8 +4,10 @@ import { duplexPair } from 'it-pair/duplex'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import assert from 'assert'
 import type { Stream, StreamType } from '../types.js'
-import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
 import { unmarshalPublicKey } from '@libp2p/crypto/keys'
+import { createFakeComponents, createFakeNetwork } from '../utils/libp2p.mock.spec.js'
+import { getPeerStoreEntry } from '../base/utils.spec.js'
+import { DELIVERY_PROTOCOLS } from '../constants.js'
 
 const initiator = privKeyToPeerId('0x695a1ad048d12a1a82f827a38815ab33aa4464194fa0bdb99f78d9c66ec21505')
 const relay = privKeyToPeerId('0xf0b8e814c3594d0c552d72fb3dfda7f0d9063458a7792369e7c044eda10f3b52')
@@ -27,53 +29,77 @@ function getRelayState(existing: boolean = false): Parameters<RelayHandshake['ne
 
 describe('test relay handshake', function () {
   it('check initiating sequence', async function () {
+    const network = createFakeNetwork()
     const [relayToInitiator, initiatorToRelay] = duplexPair<StreamType>()
 
     const initiatorReceived = defer<void>()
+    const relayEntry = getPeerStoreEntry('/ip4/127.0.0.1/tcp/1', destination)
+    const destinationEntry = getPeerStoreEntry('/ip4/127.0.0.1/tcp/2', destination)
+
+    const relayComponents = await createFakeComponents(relay, network, {
+      listeningAddrs: relayEntry.multiaddrs
+    })
+
+    const destinationComponents = await createFakeComponents(destination, network, {
+      listeningAddrs: destinationEntry.multiaddrs,
+      protocols: [
+        [
+          DELIVERY_PROTOCOLS(),
+          async ({ stream }) => {
+            stream.sink(
+              (async function* () {
+                console.log(`sent`)
+                yield Uint8Array.from([RelayHandshakeMessage.OK])
+              })()
+            )
+            for await (const msg of stream.source) {
+              if (u8aEquals(msg.slice(), unmarshalPublicKey(initiator.publicKey as Uint8Array).marshal())) {
+                initiatorReceived.resolve()
+              }
+            }
+          }
+        ]
+      ]
+    })
+
+    await relayComponents
+      .getPeerStore()
+      .addressBook.add(destinationComponents.getPeerId(), destinationComponents.getTransportManager().getAddrs())
 
     const initiatorHandshake = new RelayHandshake(relayToInitiator)
     const relayHandshake = new RelayHandshake(initiatorToRelay)
 
     initiatorHandshake.initiate(relay, destination)
 
-    await relayHandshake.negotiate(
-      initiator,
-      async (pId: PeerId) => {
-        if (!pId.equals(destination)) {
-          throw Error(`Invalid destination`)
-        }
-
-        return {
-          stream: {
-            source: (async function* () {
-              yield Uint8Array.from([RelayHandshakeMessage.OK])
-            })() as AsyncIterable<Uint8Array>,
-            sink: async function (source: Stream['source']) {
-              for await (const msg of source) {
-                if (u8aEquals(msg.slice(), unmarshalPublicKey(initiator.publicKey as Uint8Array).marshal())) {
-                  initiatorReceived.resolve()
-                }
-              }
-            }
-          } as ProtocolStream['stream'],
-          conn: {
-            close: async () => {}
-          } as Connection,
-          protocol: 'test'
-        }
-      },
-      getRelayState(),
-      {
-        // We don't need the upgrader for this purpose
-        upgrader: undefined as any
-      }
-    )
+    await relayHandshake.negotiate(initiator, relayComponents, getRelayState())
 
     await initiatorReceived.promise
+    network.stop()
   })
 
   it('check forwarding sequence', async function () {
+    const network = createFakeNetwork()
     const [destinationToRelay, relayToDestination] = duplexPair<StreamType>()
+
+    const relayEntry = getPeerStoreEntry('/ip4/127.0.0.1/tcp/1', destination)
+    const destinationEntry = getPeerStoreEntry('/ip4/127.0.0.1/tcp/2', destination)
+
+    const relayComponents = await createFakeComponents(relay, network, {
+      listeningAddrs: relayEntry.multiaddrs
+    })
+
+    const destinationComponents = await createFakeComponents(destination, network, {
+      listeningAddrs: destinationEntry.multiaddrs,
+      protocols: [
+        [
+          DELIVERY_PROTOCOLS(),
+          async ({ stream }) => {
+            stream.sink(destinationToRelay.source)
+            destinationToRelay.sink(stream.source)
+          }
+        ]
+      ]
+    })
 
     const okReceived = defer<void>()
 
@@ -92,23 +118,11 @@ describe('test relay handshake', function () {
 
     const destinationHandshake = new RelayHandshake(relayToDestination).handle(relay)
 
-    const handshakePromise = relayHandshake.negotiate(
-      initiator,
-      async () => {
-        return {
-          stream: destinationToRelay as ProtocolStream['stream'],
-          conn: {
-            close: async () => {}
-          } as Connection,
-          protocol: 'test'
-        }
-      },
-      getRelayState(),
-      {
-        // We don't need the upgrader for this purpose
-        upgrader: undefined as any
-      }
-    )
+    await relayComponents
+      .getPeerStore()
+      .addressBook.add(destinationComponents.getPeerId(), destinationComponents.getTransportManager().getAddrs())
+
+    const handshakePromise = relayHandshake.negotiate(initiator, relayComponents, getRelayState())
 
     await Promise.all([handshakePromise, destinationHandshake])
 
@@ -116,31 +130,40 @@ describe('test relay handshake', function () {
   })
 
   it('should send messages after handshake', async function () {
+    const network = createFakeNetwork()
     const [relayToInitiator, initiatorToRelay] = duplexPair<StreamType>()
     const [destinationToRelay, relayToDestination] = duplexPair<StreamType>()
+
+    const relayEntry = getPeerStoreEntry('/ip4/127.0.0.1/tcp/1', destination)
+    const destinationEntry = getPeerStoreEntry('/ip4/127.0.0.1/tcp/2', destination)
+
+    const relayComponents = await createFakeComponents(relay, network, {
+      listeningAddrs: relayEntry.multiaddrs
+    })
+
+    const destinationComponents = await createFakeComponents(destination, network, {
+      listeningAddrs: destinationEntry.multiaddrs,
+      protocols: [
+        [
+          DELIVERY_PROTOCOLS(),
+          async ({ stream }) => {
+            stream.sink(destinationToRelay.source)
+            destinationToRelay.sink(stream.source)
+          }
+        ]
+      ]
+    })
 
     const initiatorHandshake = new RelayHandshake(relayToInitiator)
     const relayHandshake = new RelayHandshake(initiatorToRelay)
 
     const destinationHandshake = new RelayHandshake(relayToDestination)
 
-    relayHandshake.negotiate(
-      initiator,
-      async () => {
-        return {
-          stream: destinationToRelay as ProtocolStream['stream'],
-          conn: {
-            close: async () => {}
-          } as Connection,
-          protocol: 'test'
-        }
-      },
-      getRelayState(true),
-      {
-        // We don't need the upgrader for this purpose
-        upgrader: undefined as any
-      }
-    )
+    await relayComponents
+      .getPeerStore()
+      .addressBook.add(destinationComponents.getPeerId(), destinationComponents.getTransportManager().getAddrs())
+
+    relayHandshake.negotiate(initiator, relayComponents, getRelayState(true))
 
     const [initiatorResult, destinationResult] = await Promise.all([
       initiatorHandshake.initiate(relay, destination),
@@ -177,5 +200,6 @@ describe('test relay handshake', function () {
     }
 
     assert(msgReceivedDestination && msgReceivedInitiator)
+    network.stop()
   })
 })
