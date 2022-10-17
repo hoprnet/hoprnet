@@ -332,12 +332,10 @@ export function isAddressWithPeerId(ma: Multiaddr) {
       switch (tuples[1][0]) {
         case CODE_TCP:
         case CODE_CIRCUIT:
-          if (tuples.length == 3 && tuples[2][0] == CODE_P2P) {
-            return true
-          }
+          return tuples.length == 3 && tuples[2][0] == CODE_P2P
       }
 
     default:
-      return ma.getPeerId() == undefined
+      return ma.getPeerId() != undefined
   }
 }
