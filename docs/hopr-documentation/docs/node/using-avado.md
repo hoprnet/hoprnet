@@ -34,7 +34,7 @@ Otherwise, the installation process is complete! You can proceed to our [hopr-ad
 
 If you have previously installed a node and have the [identity file downloaded](using-hopr-admin#backing-up-your-identity-file), you can use it to restore your old node.
 
-**Note:** The backup you downloaded will be a zipped folder. If you haven't already, you need to extract this folder to [find the identity file](using-hopr-admin#how-to-view-your-dappnode-identity-file).
+**Note:** The backup you downloaded will be a zipped folder. If you haven't already, you need to extract this folder to [find the identity file](using-hopr-admin#how-to-view-your-avado-identity-file).
 
 (**1**) Locate your HOPR package and click on the manage icon. From there, scroll down to the file manager.
 
