@@ -96,7 +96,7 @@
 
 #### Defined in
 
-[packages/core/src/index.ts:104](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L104)
+[packages/core/src/index.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L97)
 
 ___
 
@@ -106,7 +106,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:155](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L155)
+[packages/core/src/index.ts:148](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L148)
 
 ___
 
@@ -142,7 +142,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:170](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L170)
+[packages/core/src/index.ts:163](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L163)
 
 ___
 
@@ -169,7 +169,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:157](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L157)
+[packages/core/src/index.ts:150](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L150)
 
 ## Variables
 

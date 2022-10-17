@@ -16,6 +16,7 @@
 
 ### Properties
 
+- [acknowledgements](default.md#acknowledgements)
 - [environment](default.md#environment)
 - [forward](default.md#forward)
 - [heartbeat](default.md#heartbeat)
@@ -133,13 +134,23 @@ EventEmitter.constructor
 
 ## Properties
 
+### acknowledgements
+
+• `Private` **acknowledgements**: `AcknowledgementInteraction`
+
+#### Defined in
+
+[packages/core/src/index.ts:180](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L180)
+
+___
+
 ### environment
 
 • **environment**: [`ResolvedEnvironment`](../modules.md#resolvedenvironment)
 
 #### Defined in
 
-[packages/core/src/index.ts:192](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L192)
+[packages/core/src/index.ts:186](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L186)
 
 ___
 
@@ -149,7 +160,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:186](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L186)
+[packages/core/src/index.ts:179](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L179)
 
 ___
 
@@ -159,7 +170,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:185](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L185)
+[packages/core/src/index.ts:178](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L178)
 
 ___
 
@@ -169,7 +180,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:194](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L194)
+[packages/core/src/index.ts:188](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L188)
 
 ___
 
@@ -179,7 +190,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:190](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L190)
+[packages/core/src/index.ts:184](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L184)
 
 ___
 
@@ -189,7 +200,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:187](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L187)
+[packages/core/src/index.ts:181](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L181)
 
 ___
 
@@ -199,7 +210,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:184](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L184)
+[packages/core/src/index.ts:177](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L177)
 
 ___
 
@@ -209,7 +220,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:189](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L189)
+[packages/core/src/index.ts:183](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L183)
 
 ___
 
@@ -219,7 +230,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:180](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L180)
+[packages/core/src/index.ts:173](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L173)
 
 ___
 
@@ -241,7 +252,7 @@ It should not assume any other components are running when it is called.
 
 #### Defined in
 
-[packages/core/src/index.ts:188](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L188)
+[packages/core/src/index.ts:182](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L182)
 
 ___
 
@@ -259,7 +270,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:182](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L182)
+[packages/core/src/index.ts:175](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L175)
 
 ___
 
@@ -269,7 +280,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:183](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L183)
+[packages/core/src/index.ts:176](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L176)
 
 ___
 
