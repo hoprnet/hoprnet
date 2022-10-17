@@ -262,6 +262,9 @@ describe('packet acknowledgement', function () {
     )
 
     await ackReceived.promise
+
+    ackInteration.stop()
+    ackInterationCounterparty.stop()
   })
 
   // We receive a packet, run the transformation, extract keys
@@ -334,6 +337,10 @@ describe('packet acknowledgement', function () {
     await interaction.handleMixedPacket(Packet.deserialize(packet.serialize(), RELAY0, SELF))
 
     await ackReceived.promise
+
+    interaction.stop()
+    ackCounterpartyInteraction.stop()
+    ackRelay0Interaction.stop()
   })
 })
 
@@ -367,6 +374,9 @@ describe('packet relaying interaction', function () {
 
     const packet = await Packet.create(TEST_MESSAGE, nodes, SELF, dbs[0])
     await packet.storePendingAcknowledgement(dbs[0])
+
+    const forwardInteractions: PacketForwardInteraction[] = []
+    const ackInteractions: AcknowledgementInteraction[] = []
 
     for (const [index, pId] of allNodes.entries()) {
       const { subscribe, send } = createFakeSendReceive(events, pId)
@@ -413,6 +423,9 @@ describe('packet relaying interaction', function () {
       if (pId.equals(SELF)) {
         senderInteraction = interaction
       }
+
+      forwardInteractions.push(interaction)
+      ackInteractions.push(acknowledgementInteraction)
     }
 
     // Sending packet from self to relay0, which should further forward until counterparty
@@ -420,5 +433,8 @@ describe('packet relaying interaction', function () {
 
     // The counterparty will resolve this once the message has been received
     await msgDefer.promise
+
+    forwardInteractions.forEach((interaction) => interaction.stop())
+    ackInteractions.forEach((interaction) => interaction.stop())
   })
 })

@@ -73,6 +73,12 @@ export class AcknowledgementInteraction {
     this.startSendAcknowledgements()
   }
 
+  stop() {
+    // End the streams to avoid handing promises
+    this.incomingAcks.end()
+    this.outgoingAcks.end()
+  }
+
   async startHandleIncoming() {
     for await (const incomingAck of this.incomingAcks) {
       await this.handleAcknowledgement(incomingAck[0], incomingAck[1])
