@@ -108,7 +108,7 @@ If you are using Dappnode or Avado, you can download your identity file on their
 
 **_Note:_** You should download your identity file as soon as possible. As downloading the backup or DB folder will also download the database, which can get quite large in size if you’ve been running your node for a while.
 
-**_Dappnode –_** Find HOPR in your packages and navigate to the backup section. From there, all you have to do is click 'Download backup'.
+**_Dappnode –_** Find HOPR in your packages and navigate to the backup section. From there, all you have to do is click 'Download backup'. This will downlaod a `.zip` file that needs to be extracted to find the identity file.
 
 ![dappnode backup](./images/dappnode-backup.png)
 
