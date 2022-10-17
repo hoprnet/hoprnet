@@ -16,14 +16,21 @@ export * from './utils.js'
 
 export { get_package_version } from '../lib/utils_misc.js'
 export {
+  set_panic_hook,
   create_counter,
   SimpleCounter,
+  create_multi_counter,
   MultiCounter,
   create_gauge,
   SimpleGauge,
+  create_multi_gauge,
+  MultiGauge,
   create_histogram,
   create_histogram_with_buckets,
   SimpleHistogram,
+  create_multi_histogram,
+  create_multi_histogram_with_buckets,
+  MultiHistogram,
   SimpleTimer,
   gather_all_metrics
 } from '../lib/utils_metrics.js'

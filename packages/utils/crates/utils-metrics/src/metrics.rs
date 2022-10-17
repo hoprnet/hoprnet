@@ -231,16 +231,19 @@ impl SimpleHistogram {
     }
 
     /// Starts a timer.
+    #[allow(dead_code)]
     pub fn start_measure(&self) -> SimpleTimer {
         SimpleTimer { histogram_timer: self.hh.start_timer() }
     }
 
     /// Stops the given timer and records the elapsed duration in seconds to the histogram.
+    #[allow(dead_code)]
     pub fn record_measure(&self, timer: SimpleTimer) {
         timer.histogram_timer.observe_duration()
     }
 
     /// Stops the given timer and discards the measured duration in seconds and returns it.
+    #[allow(dead_code)]
     pub fn cancel_measure(&self, timer: SimpleTimer) -> f64 {
         timer.histogram_timer.stop_and_discard()
     }
@@ -290,17 +293,20 @@ impl MultiHistogram {
     }
 
     /// Starts a timer for a histogram with the given labels.
+    #[allow(dead_code)]
     pub fn start_measure(&self, label_values: &[&str]) -> Result<SimpleTimer, Error> {
         self.hh.get_metric_with_label_values(label_values)
             .map(|h| SimpleTimer { histogram_timer: h.start_timer() })
     }
 
     /// Stops the given timer and records the elapsed duration in seconds to the histogram.
+    #[allow(dead_code)]
     pub fn record_measure(&self, timer: SimpleTimer) {
         timer.histogram_timer.observe_duration()
     }
 
     /// Stops the given timer and discards the measured duration in seconds and returns it.
+    #[allow(dead_code)]
     pub fn cancel_measure(&self, timer: SimpleTimer) -> f64 {
         timer.histogram_timer.stop_and_discard()
     }
@@ -332,14 +338,14 @@ pub mod wasm {
     use std::fmt::Display;
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
-    use js_sys::JsString;
+    use js_sys::{Date, JsString};
 
     fn as_jsvalue<T>(v: T) -> JsValue where T: Display {
         JsValue::from(v.to_string())
     }
 
     macro_rules! convert_jstrvec {
-        ($v:ident,$r:ident) => {
+        ($v:expr,$r:ident) => {
             let _aux: Vec<String> = $v.iter().map(String::from).collect();
             let $r = _aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
         };
@@ -519,9 +525,33 @@ pub mod wasm {
             .map_err(as_jsvalue)
     }
 
+    /// Currently the SimpleTimer is NOT a wrapper for HistogramTimer,
+    /// but rather implements the timer logic using js_sys::Date to achieve a similar functionality.
+    /// This is because WASM does not support system time functionality from the Rust stdlib.
     #[wasm_bindgen]
     pub struct SimpleTimer {
-        w: super::SimpleTimer
+        start: f64,
+        labels: Vec<String>
+    }
+
+    impl SimpleTimer {
+
+        fn new(label_values: Vec<JsString>) -> Self {
+            SimpleTimer {
+                start: Self::now(),
+                labels: label_values.iter().map(String::from).collect()
+            }
+        }
+
+        /// Current Unix timestamp (in seconds) using js_sys::Date
+        fn now() -> f64 {
+            Date::now()/1000.0
+        }
+
+        /// Computes the time elapsed since the creation of this timer.
+        fn diff(&self) -> f64 {
+            Self::now() - self.start
+        }
     }
 
     #[wasm_bindgen]
@@ -531,15 +561,15 @@ pub mod wasm {
         }
 
         pub fn start_measure(&self) -> SimpleTimer {
-          SimpleTimer { w: self.w.start_measure() }
+          SimpleTimer::new(vec![])
         }
 
         pub fn record_measure(&self, timer: SimpleTimer) {
-          self.w.record_measure(timer.w)
+          self.w.observe(timer.diff() )
         }
 
         pub fn cancel_measure(&self, timer: SimpleTimer) -> f64 {
-            self.w.cancel_measure(timer.w)
+            timer.diff()
         }
 
         pub fn name(&self) -> String {
@@ -574,19 +604,17 @@ pub mod wasm {
             self.w.observe(bind.as_slice(), value)
         }
 
-        pub fn start_measure(&self, label_values: Vec<JsString>) -> Result<SimpleTimer, JsValue> {
-            convert_jstrvec!(label_values, bind);
-            self.w.start_measure(bind.as_slice())
-                .map(|t| SimpleTimer {w: t })
-                .map_err(|e| as_jsvalue(e.to_string()))
+        pub fn start_measure(&self, label_values: Vec<JsString>) -> SimpleTimer {
+            SimpleTimer::new(label_values)
         }
 
         pub fn record_measure(&self, timer: SimpleTimer) {
-            self.w.record_measure(timer.w)
+            convert_jstrvec!(timer.labels, bind);
+            self.w.observe(bind.as_slice(), timer.diff())
         }
 
         pub fn cancel_measure(&self, timer: SimpleTimer) -> f64 {
-            self.w.cancel_measure(timer.w)
+            timer.diff()
         }
 
         pub fn name(&self) -> String {
