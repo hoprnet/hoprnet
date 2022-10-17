@@ -3102,6 +3102,7 @@ __metadata:
     debug: 4.3.4
     err-code: 3.0.1
     heap-js: 2.2.0
+    it-pushable: 3.0.0
     leveldown: 6.1.1
     levelup: 5.1.1
     libp2p: 0.37.3
