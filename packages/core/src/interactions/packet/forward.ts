@@ -1,20 +1,29 @@
 import type { PeerId } from '@libp2p/interface-peer-id'
 
-import { durations, pubKeyToPeerId, HoprDB } from '@hoprnet/hopr-utils'
+import { durations, pickVersion, pubKeyToPeerId, type HoprDB } from '@hoprnet/hopr-utils'
 import { debug } from '@hoprnet/hopr-utils'
 
 import { Packet } from '../../messages/index.js'
 import { Mixer } from '../../mixer.js'
-import { sendAcknowledgement } from './acknowledgement.js'
+import type { AcknowledgementInteraction } from './acknowledgement.js'
 import type { SendMessage, Subscribe } from '../../index.js'
+import type { ResolvedEnvironment } from '../../environment.js'
 
 const log = debug('hopr-core:packet:forward')
 const error = debug('hopr-core:packet:forward:error')
 
 const FORWARD_TIMEOUT = durations.seconds(6)
 
+// Do not type-check JSON files
+// @ts-ignore
+import pkg from '../../../package.json' assert { type: 'json' }
+
+const NORMALIZED_VERSION = pickVersion(pkg.version)
+
 export class PacketForwardInteraction {
   protected mixer: Mixer
+
+  public readonly protocols: string | string[]
 
   constructor(
     private subscribe: Subscribe,
@@ -22,11 +31,20 @@ export class PacketForwardInteraction {
     private privKey: PeerId,
     private emitMessage: (msg: Uint8Array) => void,
     private db: HoprDB,
-    private protocolMsg: string | string[],
-    private protocolAck: string | string[]
+    private environment: ResolvedEnvironment,
+    private acknowledgements: AcknowledgementInteraction,
+    // used for testing
+    nextRandomInt?: () => number
   ) {
-    this.mixer = new Mixer()
+    this.mixer = new Mixer(nextRandomInt)
     this.handlePacket = this.handlePacket.bind(this)
+
+    this.protocols = [
+      // current
+      `/hopr/${this.environment.id}/msg/${NORMALIZED_VERSION}`,
+      // deprecated
+      `/hopr/${this.environment.id}/msg`
+    ]
   }
 
   private errHandler(err: any) {
@@ -34,7 +52,7 @@ export class PacketForwardInteraction {
   }
 
   async start() {
-    await this.subscribe(this.protocolMsg, this.handlePacket, false, this.errHandler)
+    await this.subscribe(this.protocols, this.handlePacket, false, this.errHandler)
 
     this.handleMixedPackets()
   }
@@ -51,7 +69,7 @@ export class PacketForwardInteraction {
   }
 
   async interact(counterparty: PeerId, packet: Packet): Promise<void> {
-    await this.sendMessage(counterparty, this.protocolMsg, packet.serialize(), false, {
+    await this.sendMessage(counterparty, this.protocols, packet.serialize(), false, {
       timeout: FORWARD_TIMEOUT
     })
   }
@@ -68,7 +86,7 @@ export class PacketForwardInteraction {
     if (packet.isReceiver) {
       this.emitMessage(packet.plaintext)
       // Send acknowledgements independently
-      sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey, this.protocolAck)
+      this.acknowledgements.sendAcknowledgement(packet, packet.previousHop.toPeerId())
       // Nothing else to do
       return
     }
@@ -98,6 +116,6 @@ export class PacketForwardInteraction {
     }
 
     // Send acknowledgements independently
-    sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey, this.protocolAck)
+    this.acknowledgements.sendAcknowledgement(packet, packet.previousHop.toPeerId())
   }
 }
