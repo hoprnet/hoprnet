@@ -33,6 +33,16 @@ If you are in the process of registering your node on the network registry, plea
 
 Otherwise, the installation process is complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).
 
+### Alternative method: using your identity file
+
+If you have previously installed a node and have the [identity file downloaded](using-hopr-admin#backing-up-your-identity-file), you can use it to restore your old node. 
+
+Find HOPR in your packages and navigate to the backup section. From there, all you have to do is click 'Restore' and open your identity file when prompted.
+
+**Note:** The backup you downloaded will be a zipped folder. If you haven't already, you will need to extract this folder to [find the identity file](using-hopr-admin#how-to-view-your-dappnode-identity-file).
+
+![dappnode restore](./images/dappnode-backup.png)
+
 ## Collecting Logs
 
 If your node crashes, you will want to collect the logs and pass them on to our ambassadors on telegram or create an issue on GitHub.
