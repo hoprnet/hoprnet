@@ -9,6 +9,7 @@ import {
   loadJson,
   NativeBalance,
   setupPromiseRejectionFilter,
+  set_panic_hook,
   SUGGESTED_NATIVE_BALANCE
 } from '@hoprnet/hopr-utils'
 import {
@@ -347,6 +348,8 @@ async function main() {
   addUnhandledPromiseRejectionHandler()
   // Increase the default maximum number of event listeners
   ;(await import('events')).EventEmitter.defaultMaxListeners = 20
+
+  set_panic_hook()
 
   metric_processStartTime.set(Date.now() / 1000)
   const metric_startupTimer = metric_nodeStartupTime.start_measure()
