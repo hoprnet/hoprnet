@@ -1,22 +1,30 @@
-import HeapPackage, { type default as HeapType } from 'heap-js'
+import HeapPackage from 'heap-js'
+// Issues with ESM;
+// Code and types are loaded differently
+import type { Heap as HeapType } from 'heap-js'
+
 import { randomInteger } from '@hoprnet/hopr-utils'
 import type { Packet } from './messages/index.js'
 import { MAX_PACKET_DELAY } from './constants.js'
+
+// @ts-ignore untyped package
+import retimer from 'retimer'
+
 //import debug from 'debug'
 //const log = debug('hopr-core:mixer')
 
-type HeapElement = [number, Packet]
+type MixerEntry = [number, Packet]
 
-const comparator = (a: HeapElement, b: HeapElement): number => {
-  if (b[0] < a[0]) {
-    return 1
-  } else if (b[0] > a[0]) {
-    return -1
-  }
-  return 0
+const comparator = (a: MixerEntry, b: MixerEntry): number => {
+  return a[0] - b[0]
 }
 
 const { Heap } = HeapPackage
+
+enum Result {
+  Packet,
+  End
+}
 
 /**
  * Mix packets.
@@ -25,40 +33,79 @@ const { Heap } = HeapPackage
  * priority.
  */
 export class Mixer {
-  private queue: HeapType<HeapElement>
-  private next: NodeJS.Timeout
+  protected queue: HeapType<MixerEntry>
 
-  public WAIT_TIME = MAX_PACKET_DELAY
+  protected timer: any | undefined
+  private nextPacket: (msg: Result) => void
+  private nextPromise: Promise<Result>
 
-  constructor(private onMessage: (m: Packet) => void, private clock = Date.now) {
+  constructor(private nextRandomInt: (start: number, end: number) => number = randomInteger) {
     this.queue = new Heap(comparator)
+    this.nextPromise = new Promise<Result>((resolve) => {
+      this.nextPacket = resolve
+    })
+
+    this.push = this.push.bind(this)
+    this.end = this.end.bind(this)
   }
 
-  public push(p: Packet) {
-    this.queue.push([this.getPriority(), p])
-    this.addTimeout()
-  }
+  async *[Symbol.asyncIterator](): AsyncIterableIterator<Packet> {
+    while (true) {
+      const result = await this.nextPromise
 
-  private addTimeout() {
-    if (!this.next && this.queue.length > 0) {
-      this.next = setTimeout(this.tick.bind(this), this.intervalUntilNextMessage())
+      switch (result) {
+        case Result.Packet:
+          const latest = this.queue.pop()[1]
+
+          this.nextPromise = new Promise((resolve) => {
+            this.nextPacket = resolve
+          })
+
+          if (this.queue.length > 0) {
+            const nextPriority = this.queue.top()[0][0]
+
+            this.timer = retimer(() => this.nextPacket(Result.Packet), Math.max(nextPriority - Date.now(), 0))
+          } else {
+            this.timer = undefined
+          }
+
+          yield latest
+          break
+        case Result.End:
+          return
+      }
     }
   }
 
-  private tick() {
-    //log(`Mixer has ${this.queue.length} elements`)
-    while (this.queue.length > 0 && this.queue.peek()[0] < this.clock()) {
-      this.onMessage(this.queue.pop()[1])
+  public push(packet: Packet) {
+    const packetPriority = this.getPriority()
+    this.queue.push([packetPriority, packet])
+
+    if (this.timer == undefined || this.queue.length == 1) {
+      this.timer = retimer(() => {
+        this.nextPacket(Result.Packet)
+      }, Math.max(packetPriority - Date.now(), 0))
+
+      return
     }
-    this.next = null
-    this.addTimeout()
+
+    const mostRecentPriority = this.queue.top(1)[0][0]
+
+    if (packetPriority < mostRecentPriority) {
+      this.timer.reschedule(Math.max(packetPriority - Date.now(), 0))
+    }
   }
 
-  private intervalUntilNextMessage(): number {
-    return Math.max(this.queue.peek()[0] - this.clock(), 1)
+  public end() {
+    this.timer?.reschedule(1)
+    this.nextPacket(Result.End)
   }
 
   private getPriority(): number {
-    return this.clock() + randomInteger(1, MAX_PACKET_DELAY)
+    return Date.now() + this.nextRandomInt(1, MAX_PACKET_DELAY)
+  }
+
+  public get pending(): number {
+    return this.queue.length
   }
 }

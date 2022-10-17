@@ -1,5 +1,3 @@
-import { setImmediate } from 'timers/promises'
-
 import type { PeerId } from '@libp2p/interface-peer-id'
 
 import { durations, pubKeyToPeerId, HoprDB } from '@hoprnet/hopr-utils'
@@ -27,7 +25,8 @@ export class PacketForwardInteraction {
     private protocolMsg: string | string[],
     private protocolAck: string | string[]
   ) {
-    this.mixer = new Mixer(this.handleMixedPacket.bind(this))
+    this.mixer = new Mixer()
+    this.handlePacket = this.handlePacket.bind(this)
   }
 
   private errHandler(err: any) {
@@ -35,7 +34,20 @@ export class PacketForwardInteraction {
   }
 
   async start() {
-    await this.subscribe(this.protocolMsg, this.handlePacket.bind(this), false, this.errHandler)
+    await this.subscribe(this.protocolMsg, this.handlePacket, false, this.errHandler)
+
+    this.handleMixedPackets()
+  }
+
+  stop() {
+    // Clear mixer timeouts
+    this.mixer.end()
+  }
+
+  async handleMixedPackets() {
+    for await (const packet of this.mixer) {
+      await this.handleMixedPacket(packet)
+    }
   }
 
   async interact(counterparty: PeerId, packet: Packet): Promise<void> {
@@ -55,10 +67,8 @@ export class PacketForwardInteraction {
 
     if (packet.isReceiver) {
       this.emitMessage(packet.plaintext)
-      // defer processing to end of event loop since we are making another
-      // network operation
-      await setImmediate()
-      await sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey, this.protocolAck)
+      // Send acknowledgements independently
+      sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey, this.protocolAck)
       // Nothing else to do
       return
     }
@@ -87,9 +97,7 @@ export class PacketForwardInteraction {
       return
     }
 
-    // defer processing to end of event loop since we are making another
-    // network operation
-    await setImmediate()
-    await sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey, this.protocolAck)
+    // Send acknowledgements independently
+    sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey, this.protocolAck)
   }
 }
