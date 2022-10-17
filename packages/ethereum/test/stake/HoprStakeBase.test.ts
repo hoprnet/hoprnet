@@ -4,7 +4,7 @@ import { expect } from 'chai'
 import deployERC1820Registry from '../../deploy/01_ERC1820Registry'
 import { advanceTimeForNextBlock, deployContractFromFactory, latestBlockTime } from '../utils'
 
-describe('HoprStakeSeason4', function () {
+describe('HoprStakeBase', function () {
   let deployer: Signer
   let admin: Signer
   let participants: Signer[]
@@ -19,46 +19,55 @@ describe('HoprStakeSeason4', function () {
   let erc777: Contract
 
   const BASE_URI = 'https://stake.hoprnet.org/'
-  const PROGRAM_S4_START = 1658836800 // July 26th 2022 14:00 CET.
-  const PROGRAM_S4_END = 1666785600 // Oct 26th 2022 14:00 CET.
+  // const FACTOR_DENOMINATOR = 1e12; //
+  // const LOCK_TOKEN_ADDRESS = "0xD057604A14982FE8D88c5fC25Aac3267eA142a08";
+  // const REWARD_TOKEN_ADDRESS = "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1";
+  // const NFT_CONTRACT_ADDRESS = "0x43d13D7B83607F14335cF2cB75E87dA369D056c7";
+  // const DEFAULT_OWNER_ADDRESS = "0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05"
+
   const BADGES = [
     {
       type: 'demo',
       rank: 'demo',
-      deadline: PROGRAM_S4_START,
+      deadline: 0,
       nominator: '158' // 0.5% APY
     },
     {
       type: 'HODLr',
       rank: 'silver',
-      deadline: PROGRAM_S4_START,
+      deadline: 0,
       nominator: '158' // 0.5% APY
     },
     {
       type: 'HODLr',
       rank: 'platinum',
-      deadline: PROGRAM_S4_END,
+      deadline: 0,
       nominator: '317' // 1% APY
     },
     {
       type: 'Past',
       rank: 'gold',
-      deadline: 123456, // sometime long long ago
+      deadline: 0, // sometime long long ago
       nominator: '100'
     },
     {
       type: 'HODLr',
       rank: 'bronze extra',
-      deadline: PROGRAM_S4_END,
+      deadline: 0,
       nominator: '79' // 0.25% APY
     },
     {
       type: 'Testnet participant',
       rank: 'gold',
-      deadline: PROGRAM_S4_END,
+      deadline: 0,
       nominator: '317' // 0.25% APY
     }
   ]
+
+  const programStart = 1666785600 // 2pm CEST 26th October 2022
+  const programEnd = 1674738000 // 2pm CET 26th January 2023
+  const basicFactorNumerator = 793
+  const boostCap = utils.parseUnits('200000', 'ether') // 200k
 
   const reset = async () => {
     let signers: Signer[]
@@ -84,9 +93,13 @@ describe('HoprStakeSeason4', function () {
 
     // create NFT and stake contract
     nftContract = await deployContractFromFactory(deployer, 'HoprBoost', [adminAddress, BASE_URI])
-    stakeContract = await deployContractFromFactory(deployer, 'HoprStakeSeason4', [
-      nftContract.address,
+    stakeContract = await deployContractFromFactory(deployer, 'HoprStakeBase', [
       adminAddress,
+      programStart,
+      programEnd,
+      basicFactorNumerator,
+      boostCap,
+      nftContract.address,
       erc677.address,
       erc777.address
     ])
@@ -131,42 +144,11 @@ describe('HoprStakeSeason4', function () {
 
   describe('unit tests', function () {
     const hodlrNftTokenId = 2
-    const hodlrNftTokenIndex = 2
     beforeEach(async function () {
       await reset()
     })
     describe('Can redeem allowed NFT', function () {
-      it(`checks that nfts nr ${hodlrNftTokenId} is blocked`, async function () {
-        const nftTypeStringById = await nftContract.typeOf(hodlrNftTokenId)
-        const nftTypeStringByIndex = await nftContract.typeAt(hodlrNftTokenIndex)
-        const nftTypeIndexOf = await nftContract.typeIndexOf(hodlrNftTokenId)
-        expect(nftTypeStringById).to.equal('HODLr')
-        expect(nftTypeStringByIndex).to.equal('HODLr')
-        const isNftBlocked = await stakeContract.isBlockedNft(hodlrNftTokenIndex)
-        expect(isNftBlocked).to.equal(true)
-        expect(nftTypeIndexOf).to.equal(hodlrNftTokenIndex)
-      })
-      it(`fail to redeem nfts nr ${hodlrNftTokenId}`, async () => {
-        await expect(
-          nftContract
-            .connect(participants[0])
-            .functions['safeTransferFrom(address,address,uint256)'](
-              participantAddresses[0],
-              stakeContract.address,
-              hodlrNftTokenId
-            )
-        ).to.be.revertedWith('HoprStake: Can only redeem NFTs of allowed types.')
-      })
-      it(`can unblock NFT`, async function () {
-        await expect(stakeContract.connect(admin).ownerUnblockNftType(hodlrNftTokenIndex))
-          .to.emit(stakeContract, 'NftAllowed')
-          .withArgs(hodlrNftTokenIndex)
-
-        const isNftBlocked = await stakeContract.isBlockedNft(hodlrNftTokenIndex)
-        expect(isNftBlocked).to.equal(false)
-      })
       it(`succeed to redeem nfts nr ${hodlrNftTokenId}`, async () => {
-        await stakeContract.connect(admin).ownerUnblockNftType(hodlrNftTokenIndex)
         await expect(
           nftContract
             .connect(participants[0])
@@ -312,7 +294,7 @@ describe('HoprStakeSeason4', function () {
     })
   })
 
-  describe('After PROGRAM_S4_END', function () {
+  describe('After programEnd', function () {
     before(async function () {
       await reset()
 
@@ -326,9 +308,9 @@ describe('HoprStakeSeason4', function () {
       ])
     })
     it('succeeds in advancing block to PROGRAM_S3_END + 1', async function () {
-      await advanceTimeForNextBlock(hre.ethers.provider, PROGRAM_S4_END + 1)
+      await advanceTimeForNextBlock(hre.ethers.provider, programEnd + 1)
       const blockTime = await latestBlockTime(hre.ethers.provider)
-      expect(blockTime.toString()).to.equal((PROGRAM_S4_END + 1).toString())
+      expect(blockTime.toString()).to.equal((programEnd + 1).toString())
     })
 
     it('cannot receive random 677 with `transferAndCall()`', async () => {

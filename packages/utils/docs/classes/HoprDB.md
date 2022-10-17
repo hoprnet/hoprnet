@@ -111,7 +111,7 @@
 
 ### db
 
-• `Private` **db**: `LevelUp`<`AbstractLevelDOWN`<`any`, `any`\>, `AbstractIterator`<`any`, `any`\>\>
+• `Private` **db**: `LevelUp`
 
 #### Defined in
 
@@ -198,11 +198,11 @@ ___
 
 ### close
 
-▸ **close**(): `Promise`<`void`\>
+▸ **close**(): `Promise`<`any`\>
 
 #### Returns
 
-`Promise`<`void`\>
+`Promise`<`any`\>
 
 ___
 

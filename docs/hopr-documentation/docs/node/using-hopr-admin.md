@@ -700,4 +700,3 @@ If you have [backed up your identity file,](using-hopr-admin#backing-up-your-ide
 (**5**) Click import, and you are all done!
 
 You should now have your funds accessible in your new MetaMask account.
-

@@ -2,6 +2,7 @@
 id: intro
 title: Developing HOPR apps
 ---
+
 The HOPR network is only useful if data is being transferred through it. In fact, the more data transported
 through HOPR nodes, the more private the whole network becomes. The HOPR network is designed to have constant
 traffic, making it impossible for malicious actors to subtract meaningful information from it.
