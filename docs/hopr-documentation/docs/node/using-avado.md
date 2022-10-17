@@ -30,6 +30,22 @@ If you are in the process of registering your node on the network registry, plea
 
 Otherwise, the installation process is complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).
 
+### Alternative method: using your identity file
+
+If you have previously installed a node and have the [identity file downloaded](using-hopr-admin#backing-up-your-identity-file), you can use it to restore your old node.
+
+**Note:** The backup you downloaded will be a zipped folder. If you haven't already, you need to extract this folder to [find the identity file](using-hopr-admin#how-to-view-your-dappnode-identity-file).
+
+(**1**) Locate your HOPR package and click on the manage icon. From there, scroll down to the file manager.
+
+![avado upload](./images/avado-db.png)
+
+(**2**) Click on `Browse` button to the right of the first text field under `Upload to DNP`.
+
+(**3**) Open your identity file when prompted.
+
+(**4**) In the second text field, paste `/app/hoprd-db`, then click `Upload` to the right of the text field.
+
 ## Collecting Logs
 
 If your node crashes, you will want to collect the logs and pass them on to our ambassadors on telegram or create an issue on GitHub.

@@ -38,7 +38,7 @@ If you have previously installed a node and have the [identity file downloaded](
 
 Find HOPR in your packages and navigate to the backup section. From there, all you have to do is click 'Restore' and open your identity file when prompted.
 
-**Note:** The backup you downloaded will be a zipped folder. You will need to extract this folder to find the identity file if you haven't already.
+**Note:** The backup you downloaded will be a zipped folder. If you haven't already, you will need to extract this folder to [find the identity file](using-hopr-admin#how-to-view-your-dappnode-identity-file).
 
 ![dappnode restore](./images/dappnode-backup.png)
 

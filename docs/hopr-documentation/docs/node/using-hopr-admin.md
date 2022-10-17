@@ -108,17 +108,41 @@ If you are using Dappnode or Avado, you can download your identity file on their
 
 **_Note:_** You should download your identity file as soon as possible. As downloading the backup or DB folder will also download the database, which can get quite large in size if you’ve been running your node for a while.
 
-**_Dappnode –_** Find HOPR in your packages and navigate to the backup section. From there, all you have to do is click 'Download backup'. This will downlaod a `.zip` file that needs to be extracted to find the identity file.
+**_Dappnode –_** Find HOPR in your packages and navigate to the backup section. From there, all you have to do is click 'Download backup'. This will download a `.zip` file containing your identity file.
 
 ![dappnode backup](./images/dappnode-backup.png)
+
+#### How to view your DAppNode identity file:
+
+(**1**) Extract the zipped file downloaded to see the DB folder and identity file.
+
+(**2**) Once extracted, open the folder: `db`.
+
+![dappnode db folder](./images/Dappnode-DB-folder.png)
+
+(**3**) If hidden files are visible, you will see the file `identity`. Use this file [restore your node](using-dappnode#alternative-method-using-your-identity-file) if needed.
 
 **_Avado –_** For Avado, you have to specify you want to download /app/hoprd-db in the Avado UI. Locate your HOPR package and click on the 'manage' icon.
 
 ![avado manage](./images/avado-manage.png)
 
-From here, scroll down to the file manager and enter `/app/hoprd-db` in the field under `Download from DNP`. Then click 'Download'.
+From here, scroll down to the file manager and enter `/app/hoprd-db` in the field under `Download from DNP`. Then click 'Download'. This will download a `.zip` file.
 
 ![avado download](./images/avado-db.png)
+
+#### How to view your Avado identity file
+
+(**1**) Make sure hidden files are visible on your OS.
+
+(**2**) Extract the zipped folder you just downloaded.
+
+![Avado db folder](./images/Avado-DB-folder.png)
+
+(**3**) Once extracted, open the folder `hoprd-db`.
+
+![Avado identity file](./images/Avado-identity-file.png)
+
+(**4**) If hidden files are visible on your OS, you should see a file named `.hopr-identity`. Use this to [restore your node](using-avado#alternative-method-using-your-identity-file) if needed.
 
 **_Note:_** Make sure you enter `/app/hoprd-db` and not `/app/hoprd-db/`.
 
@@ -699,4 +723,3 @@ If you have [backed up your identity file,](using-hopr-admin#backing-up-your-ide
 (**5**) Click import, and you are all done!
 
 You should now have your funds accessible in your new MetaMask account.
-
