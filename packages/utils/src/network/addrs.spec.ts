@@ -12,7 +12,8 @@ import {
   getPublicAddresses,
   prefixLength,
   u8aAddressToCIDR,
-  createCircuitAddress
+  createCircuitAddress,
+  isAddressWithPeerId
 } from './addrs.js'
 import { type Network, PRIVATE_V4_CLASS_B, PRIVATE_V4_CLASS_C } from './constants.js'
 import { u8aEquals, u8aToHex } from '../u8a/index.js'
@@ -229,5 +230,28 @@ describe('test utils', function () {
     const ma = new Multiaddr(`/p2p/16Uiu2HAmQBZA4TzjKjU5fpCSprGuM2y8mpepNwMS6ZKFATiKg68h/p2p-circuit`)
 
     assert(u8aEquals(createCircuitAddress(peerIdFromString(peerId)).bytes, ma.bytes))
+  })
+
+  it('should filter p2p addrs', function () {
+    assert(
+      isAddressWithPeerId(new Multiaddr(`/p2p/16Uiu2HAmQBZA4TzjKjU5fpCSprGuM2y8mpepNwMS6ZKFATiKg68h/p2p-circuit`)) ===
+        false
+    )
+
+    assert(
+      isAddressWithPeerId(
+        new Multiaddr(
+          `/p2p/16Uiu2HAmQBZA4TzjKjU5fpCSprGuM2y8mpepNwMS6ZKFATiKg68h/p2p-circuit/p2p/16Uiu2HAmQBZA4TzjKjU5fpCSprGuM2y8mpepNwMS6ZKFATiKg68h`
+        )
+      ) === true
+    )
+
+    assert(isAddressWithPeerId(new Multiaddr(`/ip4/1.2.3.4/tcp/23`)) === false)
+
+    assert(
+      isAddressWithPeerId(
+        new Multiaddr(`/ip4/1.2.3.4/tcp/23/p2p/16Uiu2HAmQBZA4TzjKjU5fpCSprGuM2y8mpepNwMS6ZKFATiKg68h`)
+      ) === true
+    )
   })
 })
