@@ -844,9 +844,27 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    */
   protected updateRecords(groupedResults: Iterable<Grouped>) {
     // @TODO replace this by a more efficient data structure
-    const availableOnes = new Set<string>(this.availableEntryNodes.map((nodeData) => nodeData.id.toString()))
-    const uncheckedOnes = new Set<string>(this.uncheckedEntryNodes.map((nodeData) => nodeData.id.toString()))
-    const offlineOnes = new Set<string>(this.offlineEntryNodes.map((nodeData) => nodeData.id.toString()))
+    const availableOnes = new Set<string>(
+      function* (this: EntryNodes) {
+        for (const nodeData of this.availableEntryNodes) {
+          yield nodeData.id.toString()
+        }
+      }.call(this)
+    )
+    const uncheckedOnes = new Set<string>(
+      function* (this: EntryNodes) {
+        for (const nodeData of this.uncheckedEntryNodes) {
+          yield nodeData.id.toString()
+        }
+      }.call(this)
+    )
+    const offlineOnes = new Set<string>(
+      function* (this: EntryNodes) {
+        for (const nodeData of this.offlineEntryNodes) {
+          yield nodeData.id.toString()
+        }
+      }.call(this)
+    )
 
     for (const [id, results] of groupedResults) {
       if (results.every((result) => result == undefined)) {
