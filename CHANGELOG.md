@@ -15,6 +15,7 @@
 - Refactor timeouts for more throughput and increase usage of iterables ([#4238](https://github.com/hoprnet/hoprnet/pull/4238))
 - Refactor packet forward interaction for less locking ([#4232](https://github.com/hoprnet/hoprnet/pull/4243))
 - Refactor mixer to migitate backpressure ([#4232](https://github.com/hoprnet/hoprnet/pull/4243))
+- Reuse existing connections to establish relayed connections over public relay ([#2545](https://github.com/hoprnet/hoprnet/pull/4245))
 
 ---
 
