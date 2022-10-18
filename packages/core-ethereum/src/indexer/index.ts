@@ -1021,8 +1021,6 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   public resolvePendingTransaction(eventType: IndexerEvents, tx: string): DeferType<string> {
     const deferred = {} as DeferType<string>
 
-    let timeout: NodeJS.Timeout
-
     deferred.promise = new Promise<string>((resolve, reject) => {
       let done = false
       let timer: any
