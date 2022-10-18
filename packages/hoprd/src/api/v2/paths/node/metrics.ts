@@ -4,11 +4,23 @@ import { getHeapStatistics } from 'v8'
 import { create_gauge, gather_all_metrics } from '@hoprnet/hopr-utils'
 
 // Metrics
-const metric_totalAllocHeap = create_gauge('hoprd_gauge_nodejs_total_alloc_heap_bytes', 'V8 allocated total heap size in bytes')
+const metric_totalAllocHeap = create_gauge(
+  'hoprd_gauge_nodejs_total_alloc_heap_bytes',
+  'V8 allocated total heap size in bytes'
+)
 const metric_totalUsedHeap = create_gauge('hoprd_gauge_nodejs_total_used_heap_bytes', 'V8 used heap size in bytes')
-const metric_totalAvailHeap = create_gauge('hoprd_gauge_nodejs_total_available_heap_bytes', 'V8 total available heap size in bytes')
-const metric_activeCtxs = create_gauge('hoprd_gauge_nodejs_num_native_contexts', 'V8 number of active top-level native contexts')
-const metric_detachedCtxs = create_gauge('hoprd_gauge_nodejs_num_detached_contexts', 'V8 number of detached contexts which are not GCd')
+const metric_totalAvailHeap = create_gauge(
+  'hoprd_gauge_nodejs_total_available_heap_bytes',
+  'V8 total available heap size in bytes'
+)
+const metric_activeCtxs = create_gauge(
+  'hoprd_gauge_nodejs_num_native_contexts',
+  'V8 number of active top-level native contexts'
+)
+const metric_detachedCtxs = create_gauge(
+  'hoprd_gauge_nodejs_num_detached_contexts',
+  'V8 number of detached contexts which are not GCd'
+)
 
 function recordNodeHeapStats() {
   const heapStats = getHeapStatistics()
