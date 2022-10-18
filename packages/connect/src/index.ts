@@ -86,11 +86,9 @@ class HoprConnect implements Transport, Initializable, Startable {
   public init(components: Components) {
     this.components = components
 
-    const dialDirectly = this.dialDirectly.bind(this)
-
     this.connectComponents = new ConnectComponents({
       addressFilter: new Filter(this.options),
-      entryNodes: new EntryNodes(dialDirectly, this.options),
+      entryNodes: new EntryNodes(this.options),
       relay: new Relay(this.options, this.testingOptions),
       upnpManager: new UpnpManager(),
       webRTCUpgrader: new WebRTCUpgrader(this.options)
