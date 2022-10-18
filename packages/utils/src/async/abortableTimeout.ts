@@ -1,5 +1,8 @@
 import { debug } from '../process/index.js'
 
+// @ts-ignore untyped library
+import retimer from 'retimer'
+
 const logError = debug('hopr:lateTimeout')
 
 export type TimeoutOpts = {
@@ -28,6 +31,7 @@ export function abortableTimeout<Result, AbortMsg, TimeoutMsg>(
     const abort = new AbortController()
 
     let result: Result
+    let timer: any
 
     let done = false
 
@@ -36,6 +40,7 @@ export function abortableTimeout<Result, AbortMsg, TimeoutMsg>(
 
     const cleanUp = () => {
       done = true
+      timer?.clear()
       abort.signal.removeEventListener('abort', onInnerAbort)
       opts.signal?.removeEventListener('abort', innerAbort)
     }
@@ -64,7 +69,7 @@ export function abortableTimeout<Result, AbortMsg, TimeoutMsg>(
     // Let the timeout run through and let the handler do nothing, i.e. `done = true`
     // instead of clearing the timeout with `clearTimeout` which becomes an expensive
     // operation when using many timeouts
-    setTimeout(onTimeout, opts.timeout)
+    timer = retimer(onTimeout, opts.timeout)
 
     try {
       result = await fn({

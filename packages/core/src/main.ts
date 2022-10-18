@@ -117,7 +117,17 @@ export async function createLibp2pInstance(
       ],
       streamMuxers: [new Mplex()],
       connectionEncryption: [new Noise()],
-      dht: new KadDHT({ protocolPrefix, pingTimeout: 2000 }),
+      dht: new KadDHT({
+        // Protocol prefixes require a trailing slash
+        // @TODO disabled for compatibility reasons
+        // protocolPrefix: `/${protocolPrefix}`,
+        protocolPrefix,
+        // Make entry nodes Kad-DHT servers
+        // A network requires at least on Kad-DHT server otherwise nodes
+        // will flood each other forever with Kad-DHT ping attempts
+        clientMode: !options.announce
+        // Limit size of ping queue by using smaller timeouts
+      }),
       connectionManager: {
         autoDial: true,
         // Use custom sorting to prevent from problems with libp2p
