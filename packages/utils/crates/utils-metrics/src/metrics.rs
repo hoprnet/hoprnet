@@ -333,6 +333,71 @@ fn gather_all_metrics() -> Result<String, String> {
         .map_err(|e| e.to_string())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_counter() {
+        let counter = SimpleCounter::new("my_ctr", "test counter")
+            .unwrap();
+
+        assert_eq!("my_ctr", counter.name());
+
+        counter.increment(1);
+
+        let metrics = gather_all_metrics().unwrap();
+        assert!(metrics.contains("my_ctr 1"));
+    }
+
+    #[test]
+    fn test_multi_counter() {
+        let counter = MultiCounter::new("my_mctr", "test multicounter", &["version"])
+            .unwrap();
+
+
+    }
+
+    #[test]
+    fn test_gauge() {
+        let gauge = SimpleGauge::new("my_gauge", "test gauge")
+            .unwrap();
+
+        assert_eq!("my_gauge", gauge.name());
+
+        gauge.increment(10.0);
+
+        let metrics = gather_all_metrics().unwrap();
+        assert!(metrics.contains("my_gauge 10"));
+
+        gauge.decrement(5.1);
+
+        let metrics2 = gather_all_metrics().unwrap();
+        assert!(metrics2.contains("my_gauge 4.9"));
+    }
+
+    #[test]
+    fn test_histogram() {
+        let histogram = SimpleHistogram::new("my_histogram", "test histogram", vec![1.0,2.0,3.0,4.0,5.0])
+            .unwrap();
+
+        assert_eq!("my_histogram", histogram.name());
+
+        histogram.observe(2.0);
+        histogram.observe(2.0);
+        histogram.observe(1.0);
+        histogram.observe(5.0);
+
+        let metrics = gather_all_metrics().unwrap();
+        assert!(metrics.contains("my_histogram_bucket{le=\"1\"} 1"));
+        assert!(metrics.contains("my_histogram_bucket{le=\"2\"} 3"));
+        assert!(metrics.contains("my_histogram_bucket{le=\"3\"} 3"));
+        assert!(metrics.contains("my_histogram_bucket{le=\"4\"} 3"));
+        assert!(metrics.contains("my_histogram_bucket{le=\"5\"} 4"));
+    }
+}
+
+
 /// Bindings for JS/TS
 pub mod wasm {
     use std::fmt::Display;
@@ -344,10 +409,18 @@ pub mod wasm {
         JsValue::from(v.to_string())
     }
 
-    macro_rules! convert_jstrvec {
+    /// Macro used to convert Vec<JString> to Vec<&str>
+    macro_rules! convert_from_jstrvec {
         ($v:expr,$r:ident) => {
             let _aux: Vec<String> = $v.iter().map(String::from).collect();
             let $r = _aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
+        };
+    }
+
+    /// Macro used to convert Vec<&str> or Vec<String> to Vec<JString>
+    macro_rules! convert_to_jstrvec {
+        ($v:expr) => {
+            $v.iter().map(|e| JsString::from(e.as_ref())).collect()
         };
     }
 
@@ -387,7 +460,7 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub fn create_multi_counter(name: &str, description: &str, labels: Vec<JsString>) -> Result<MultiCounter, JsValue> {
-        convert_jstrvec!(labels, bind);
+        convert_from_jstrvec!(labels, bind);
         super::MultiCounter::new(name, description, bind.as_slice())
             .map(|c| MultiCounter { w: c })
             .map_err(as_jsvalue)
@@ -396,12 +469,12 @@ pub mod wasm {
     #[wasm_bindgen]
     impl MultiCounter {
         pub fn increment_by(&self, label_values: Vec<JsString>, by: u64) {
-            convert_jstrvec!(label_values, bind);
+            convert_from_jstrvec!(label_values, bind);
             self.w.increment(bind.as_slice(), by);
         }
 
         pub fn increment(&self, label_values: Vec<JsString>) {
-            convert_jstrvec!(label_values, bind);
+            convert_from_jstrvec!(label_values, bind);
             self.w.increment(bind.as_slice(), 1)
         }
 
@@ -410,7 +483,7 @@ pub mod wasm {
         }
 
         pub fn labels(&self) -> Vec<JsString> {
-            self.w.labels().iter().map(|e| JsString::from(e.as_ref())).collect()
+            convert_to_jstrvec!(self.w.labels)
         }
     }
 
@@ -464,7 +537,7 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub fn create_multi_gauge(name: &str, description: &str, labels: Vec<JsString>) -> Result<MultiGauge, JsValue> {
-        convert_jstrvec!(labels, bind);
+        convert_from_jstrvec!(labels, bind);
         super::MultiGauge::new(name, description, bind.as_slice())
             .map(|c| MultiGauge { w: c })
             .map_err(as_jsvalue)
@@ -473,27 +546,27 @@ pub mod wasm {
     #[wasm_bindgen]
     impl MultiGauge {
         pub fn increment_by(&self, label_values: Vec<JsString>, by: f64) {
-            convert_jstrvec!(label_values, bind);
+            convert_from_jstrvec!(label_values, bind);
             self.w.increment(bind.as_slice(), by);
         }
 
         pub fn increment(&self, label_values: Vec<JsString>) {
-            convert_jstrvec!(label_values, bind);
+            convert_from_jstrvec!(label_values, bind);
             self.w.increment(bind.as_slice(), 1.0)
         }
 
         pub fn decrement_by(&self, label_values: Vec<JsString>, by: f64) {
-            convert_jstrvec!(label_values, bind);
+            convert_from_jstrvec!(label_values, bind);
             self.w.decrement(bind.as_slice(), by);
         }
 
         pub fn decrement(&self, label_values: Vec<JsString>) {
-            convert_jstrvec!(label_values, bind);
+            convert_from_jstrvec!(label_values, bind);
             self.w.decrement(bind.as_slice(), 1.0)
         }
 
         pub fn set(&self, label_values: Vec<JsString>, value: f64) {
-            convert_jstrvec!(label_values, bind);
+            convert_from_jstrvec!(label_values, bind);
             self.w.set(bind.as_slice(), value);
         }
 
@@ -502,7 +575,7 @@ pub mod wasm {
         }
 
         pub fn labels(&self) -> Vec<JsString> {
-            self.w.labels().iter().map(|e| JsString::from(e.as_ref())).collect()
+            convert_to_jstrvec!(self.w.labels)
         }
     }
 
@@ -591,7 +664,7 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub fn create_multi_histogram_with_buckets(name: &str, description: &str, buckets: &[f64], labels: Vec<JsString>) -> Result<MultiHistogram, JsValue> {
-        convert_jstrvec!(labels, bind);
+        convert_from_jstrvec!(labels, bind);
         super::MultiHistogram::new(name, description, buckets.into(), bind.as_slice())
             .map(|c| MultiHistogram { w: c })
             .map_err(as_jsvalue)
@@ -600,7 +673,7 @@ pub mod wasm {
     #[wasm_bindgen]
     impl MultiHistogram {
         pub fn observe(&self, label_values: Vec<JsString>, value: f64) {
-            convert_jstrvec!(label_values, bind);
+            convert_from_jstrvec!(label_values, bind);
             self.w.observe(bind.as_slice(), value)
         }
 
@@ -609,7 +682,7 @@ pub mod wasm {
         }
 
         pub fn record_measure(&self, timer: SimpleTimer) {
-            convert_jstrvec!(timer.labels, bind);
+            convert_from_jstrvec!(timer.labels, bind);
             self.w.observe(bind.as_slice(), timer.diff())
         }
 
@@ -622,7 +695,7 @@ pub mod wasm {
         }
 
         pub fn labels(&self) -> Vec<JsString> {
-            self.w.labels().iter().map(|e| JsString::from(e.as_ref())).collect()
+            convert_to_jstrvec!(self.w.labels)
         }
     }
 
