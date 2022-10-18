@@ -19,6 +19,7 @@
 - Reuse existing connections to establish relayed connections over public relay ([#4245](https://github.com/hoprnet/hoprnet/pull/4245))
 - Reuse existing connections to connections to entry nodes ([#4250](https://github.com/hoprnet/hoprnet/pull/4250))
 - Remove recurring DHT ping queue cleanup and turn all public relay nodes into DHT servers ([#4247](https://github.com/hoprnet/hoprnet/pull/4247))
+- Various enhancements regarding memory consumption and overall efficiency, spread over multiple PRs
 
 ---
 
