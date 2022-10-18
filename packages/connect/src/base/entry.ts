@@ -326,9 +326,11 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
   }
 
   /**
-   * Enables entry node functionality. Called by listener once
-   * it determines that node *does not* have a publicly available
-   * address.
+   * Enables monitoring of entry nodes. Called by Listener
+   * once it is clear that nodes requires relayed connections.
+   *
+   * If not called, node won't contact any entry nodes or
+   * monitor their availability.
    */
   public enable() {
     this.enabled = true
@@ -795,6 +797,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
           if (result == undefined || result instanceof Error) {
             break
           }
+          // Includes a catch-all block and swallows, but
+          // logs all exceptions
           attemptClose((result as ConnectionResult).conn, error)
         }
 
