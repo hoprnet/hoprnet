@@ -1,6 +1,6 @@
 use wasm_bindgen::prelude::wasm_bindgen;
 
-mod metrics;
+pub mod metrics;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
