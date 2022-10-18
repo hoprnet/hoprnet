@@ -36,7 +36,7 @@ const GET: Operation = [
     try {
       recordNodeHeapStats()
       const metrics = gather_all_metrics()
-      return res.status(200).send(metrics)
+      return res.status(200).type('text/plain; version=0.0.4').send(metrics)
     } catch (err) {
       return res
         .status(422)
