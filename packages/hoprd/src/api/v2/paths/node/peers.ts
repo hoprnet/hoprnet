@@ -55,40 +55,45 @@ export async function getPeers(
   }
 
   try {
-    const announced = await node.getAddressesAnnouncedOnChain().then((addrs) => {
-      return addrs.reduce((result: Map<string, PeerInfo>, addr: Multiaddr) => {
-        const peerId = peerIdFromString(addr.getPeerId())
-        try {
-          const info = node.getConnectionInfo(peerId)
-          // exclude if quality is lesser than the one wanted
-          if (info.quality < quality) return result
-          result.set(peerId.toString(), toPeerInfoFormat(info, addr))
-        } catch {}
-        return result
-      }, new Map<string, PeerInfo>())
-    })
+    const announcedMap = new Map<string, PeerInfo>()
 
-    const connected = node.getConnectedPeers().reduce<PeerInfo[]>((result, peerId) => {
-      const peerIdStr = peerId.toString()
+    for await (const addr of node.getAddressesAnnouncedOnChain()) {
+      const peerId = peerIdFromString(addr.getPeerId())
+      try {
+        const info = node.getConnectionInfo(peerId)
+        // exclude if quality is lesser than the one wanted
+        if (info.quality < quality) {
+          continue
+        }
+        announcedMap.set(peerId.toString(), toPeerInfoFormat(info, addr))
+      } catch {}
+    }
 
-      // already exists in announced, we use this because it contains multiaddr already
-      if (announced.has(peerIdStr)) {
-        result.push(announced.get(peerIdStr))
-      } else {
-        try {
-          const info = node.getConnectionInfo(peerId)
-          // exclude if quality is lesser than the one wanted
-          if (info.quality < quality) return result
-          result.push(toPeerInfoFormat(info))
-        } catch {}
-      }
+    const connected = [
+      ...(function* () {
+        for (const peerId of node.getConnectedPeers()) {
+          const peerIdStr = peerId.toString()
 
-      return result
-    }, [])
+          // already exists in announced, we use this because it contains multiaddr already
+          if (announcedMap.has(peerIdStr)) {
+            yield announcedMap.get(peerIdStr)
+          } else {
+            try {
+              const info = node.getConnectionInfo(peerId)
+              // exclude if quality is less than the one wanted
+              if (info.quality < quality) {
+                continue
+              }
+              yield toPeerInfoFormat(info)
+            } catch {}
+          }
+        }
+      })()
+    ]
 
     return {
       connected,
-      announced: Array.from(announced.values())
+      announced: [...announcedMap.values()]
     }
   } catch (err) {
     // Makes sure this doesn't throw

@@ -182,7 +182,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   }
 
   function logMessageToNode(msg: Uint8Array) {
-    log(`Received message ${msg.toString()}`)
+    log(`Received message ${new TextDecoder().decode(msg)}`)
   }
 
   const peerUpdate = (peer: PeerData) => {

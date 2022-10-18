@@ -1,13 +1,15 @@
 import { Noise } from '@chainsafe/libp2p-noise'
 import { Mplex } from '@libp2p/mplex'
 import { createLibp2p, type Libp2p } from 'libp2p'
-import { TCP } from '@libp2p/tcp'
 import { KadDHT } from '@libp2p/kad-dht'
 import { Multiaddr } from '@multiformats/multiaddr'
+import { TCP } from '@libp2p/tcp'
+import type { DialOptions } from '@libp2p/interfaces/transport'
 import type { Address, AddressBook, PeerStore } from '@libp2p/interface-peer-store'
 import type { Connection } from '@libp2p/interface-connection'
-import { isPeerId, type PeerId } from '@libp2p/interface-peer-id'
+import type { PeerId } from '@libp2p/interface-peer-id'
 import type { ConnectionManager } from '@libp2p/interface-connection-manager'
+import type { Components } from '@libp2p/interfaces/components'
 
 import assert from 'assert'
 import { pipe } from 'it-pipe'
@@ -24,13 +26,47 @@ const Alice = privKeyToPeerId(stringToU8a('0xcf0b158c5f9d83dabf81a43391cce6cced6
 const Bob = privKeyToPeerId(stringToU8a('0x801f499e287fa0e5ac546a86d7f1e3ca766249f62759e6a1f2c90de6090cc4c0'))
 const Chris = privKeyToPeerId(stringToU8a('0x1bbb9a915ddd6e19d0f533da6c0fbe8820541a370110728f647829cd2c91bc79'))
 
-async function getNode(id: PeerId, withDht = false, maDestination?: Multiaddr): Promise<Libp2p> {
+/**
+ * Annotates libp2p's TCP module to work similarly as `hopr-connect`
+ * by using an oracle that knows how to connect to hidden nodes
+ */
+class MyTCP extends TCP {
+  constructor(private oracle?: Map<string, Components>) {
+    super()
+  }
+
+  async dial(ma: Multiaddr, options: DialOptions): Promise<Connection> {
+    if (ma.toString().startsWith('/ip4')) {
+      return super.dial(ma, options)
+    } else if (this.oracle != undefined) {
+      const destination = ma.getPeerId() as string
+      for (const address of this.oracle.get(destination.toString())?.getTransportManager().getAddrs()) {
+        let conn: Connection
+        try {
+          conn = await super.dial(address, options)
+        } catch (err) {
+          continue
+        }
+
+        if (conn != undefined) {
+          return conn
+        }
+      }
+    }
+  }
+
+  filter(multiaddrs: Multiaddr[]): Multiaddr[] {
+    return multiaddrs
+  }
+}
+
+async function getNode(id: PeerId, withDht = false, oracle?: Map<string, Components>): Promise<Libp2p> {
   const node = await createLibp2p({
     addresses: {
       listen: [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${id.toString()}`).toString()]
     },
     peerId: id,
-    transports: [new TCP()],
+    transports: [new MyTCP(oracle)],
     streamMuxers: [new Mplex()],
     connectionEncryption: [new Noise()],
     dht: withDht ? new KadDHT({ protocolPrefix: '/hopr', clientMode: false }) : undefined,
@@ -51,16 +87,7 @@ async function getNode(id: PeerId, withDht = false, maDestination?: Multiaddr): 
     }
   })
 
-  const dial = node.dial.bind(node)
-
-  // libp2p type clash
-  node.dial = (async (peer: PeerId | Multiaddr, options: any) => {
-    if (isPeerId(peer)) {
-      return dial(peer, options)
-    }
-    return dial(maDestination, options)
-  }) as any
-
+  // Loopback
   node.handle([TEST_PROTOCOL], async ({ stream }) => {
     await pipe(stream.source, stream.sink)
   })
@@ -152,7 +179,7 @@ describe('test dialHelper', function () {
     // components not part of interface
     const result = await dialHelper((peerA as any).components, Bob, [TEST_PROTOCOL])
 
-    assert(result.status === DialStatus.DHT_ERROR, `Must return dht error`)
+    assert(result.status === DialStatus.DIAL_ERROR, `Must return dht error`)
 
     // Shutdown node
     await peerA.stop()
@@ -161,12 +188,16 @@ describe('test dialHelper', function () {
   it('regular dial with DHT', async function () {
     this.timeout(5e3)
 
+    const oracle = new Map<string, Components>()
+
     const peerB = await getNode(Bob, true)
     const peerC = await getNode(Chris, true)
 
     // Secretly tell peerA the address of peerC
     // libp2p type clash
-    const peerA = await getNode(Alice, true, peerC.getMultiaddrs()[0] as any)
+    const peerA = await getNode(Alice, true, oracle)
+
+    oracle.set(Chris.toString(), (peerC as any).components)
 
     await peerB.peerStore.addressBook.add(peerA.peerId, peerA.getMultiaddrs())
     await peerA.peerStore.addressBook.add(peerB.peerId, peerB.getMultiaddrs())
@@ -225,7 +256,7 @@ describe('test dialHelper', function () {
 
     // Must fail with a DHT error because we obviously can't find
     // Bob's relay address in the DHT
-    assert(result.status === DialStatus.DHT_ERROR)
+    assert(result.status === DialStatus.DIAL_ERROR)
   })
 
   it('DHT throws an error', async function () {
@@ -250,6 +281,6 @@ describe('test dialHelper', function () {
 
     const result = await dialHelper(peerAComponents as any, Bob, [TEST_PROTOCOL])
 
-    assert(result.status === DialStatus.DHT_ERROR)
+    assert(result.status === DialStatus.DIAL_ERROR)
   })
 })

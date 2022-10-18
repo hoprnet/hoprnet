@@ -11,7 +11,9 @@ import { peerIdFromString } from '@libp2p/peer-id'
 
 import { debug } from '../process/index.js'
 import { pipe } from 'it-pipe'
-import { dial, type DialOpts } from './dialHelper.js'
+import { dial } from './dialHelper.js'
+import { abortableSource } from 'abortable-iterator'
+import { TimeoutController } from 'timeout-abort-controller'
 
 export * from './addressSorters.js'
 export * from './dialHelper.js'
@@ -91,6 +93,8 @@ export function isSecp256k1PeerId(peer: PeerId): boolean {
 
 const logError = debug(`hopr-core:libp2p:error`)
 
+const DEFAULT_SEND_TIMEOUT = 10_000
+
 /**
  * Asks libp2p to establish a connection to another node and
  * send message. If `includeReply` is set, wait for a response
@@ -107,38 +111,55 @@ export async function libp2pSendMessage<T extends boolean>(
   protocols: string | string[],
   message: Uint8Array,
   includeReply: T,
-  opts?: DialOpts
+  opts: {
+    timeout?: number
+  } = {}
 ): Promise<T extends true ? Uint8Array[] : void> {
   // Components is not part of interface
-  const r = await dial(components, destination, protocols, opts)
+  const r = await dial(components, destination, protocols)
 
   if (r.status !== 'SUCCESS') {
     logError(r)
     throw new Error(r.status)
   }
 
-  if (includeReply) {
-    const result = await pipe(
-      // prettier-ignore
-      [message],
-      r.resp.stream,
-      async function collect(source: AsyncIterable<Uint8Array>) {
-        const vals: Uint8Array[] = []
-        for await (const val of source) {
-          // Convert from potential BufferList to Uint8Array
-          vals.push(Uint8Array.from(val.slice()))
-        }
-        return vals
-      }
-    )
+  const timeoutController = new TimeoutController(opts.timeout ?? DEFAULT_SEND_TIMEOUT)
 
-    return result as any // Limitation of Typescript
+  if (includeReply) {
+    try {
+      const result = await pipe(
+        // prettier-ignore
+        abortableSource([message], timeoutController.signal),
+        r.resp.stream,
+        async function collect(source: AsyncIterable<Uint8Array>) {
+          const vals: Uint8Array[] = []
+          for await (const val of source) {
+            // Convert from potential BufferList to Uint8Array
+            vals.push(Uint8Array.from(val.slice()))
+          }
+          return vals
+        }
+      )
+      return result as any
+    } catch (err) {
+      logError(`Could not send message to ${destination.toString()} due to "${err?.message}".`)
+    } finally {
+      timeoutController.clear()
+    }
+
+    return [] as any // limitation of Typescript
   } else {
-    await pipe(
-      // prettier-ignore
-      [message],
-      r.resp.stream
-    )
+    try {
+      await pipe(
+        // prettier-ignore
+        abortableSource([message], timeoutController.signal),
+        r.resp.stream
+      )
+    } catch (err) {
+      logError(`Could not send message to ${destination.toString()} due to "${err?.message}".`)
+    } finally {
+      timeoutController.clear()
+    }
   }
 }
 
