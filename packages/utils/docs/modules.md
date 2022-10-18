@@ -147,6 +147,7 @@
 - [hasB58String](modules.md#hasb58string)
 - [inSameNetwork](modules.md#insamenetwork)
 - [ipToU8aAddress](modules.md#iptou8aaddress)
+- [isAddressWithPeerId](modules.md#isaddresswithpeerid)
 - [isAnyAddress](modules.md#isanyaddress)
 - [isErrorOutOfFunds](modules.md#iserroroutoffunds)
 - [isErrorOutOfHoprFunds](modules.md#iserroroutofhoprfunds)
@@ -1711,6 +1712,28 @@ Converts ip address string to Uint8Arrays
 `Uint8Array`
 
 Byte representation of the given ip address
+
+___
+
+### isAddressWithPeerId
+
+▸ **isAddressWithPeerId**(`ma`): `boolean`
+
+Checks known direct and circuit addresses if they end with `/p2p/<PEER_ID>`
+
+If not a known address, use generic but expensive Multiaddr function
+
+Used to filter addresses that get stored into libp2p's peer-store
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `ma` | `Multiaddr` | Multiaddr to check |
+
+#### Returns
+
+`boolean`
 
 ___
 
