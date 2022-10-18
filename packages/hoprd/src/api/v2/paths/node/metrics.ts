@@ -1,10 +1,28 @@
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
-import { gather_all_metrics } from '@hoprnet/hopr-utils'
+import { getHeapStatistics } from 'v8'
+import { create_gauge, gather_all_metrics } from '@hoprnet/hopr-utils'
+
+// Metrics
+const metric_totalAllocHeap = create_gauge('hoprd_gauge_nodejs_total_alloc_heap_bytes', 'V8 allocated total heap size in bytes')
+const metric_totalUsedHeap = create_gauge('hoprd_gauge_nodejs_total_used_heap_bytes', 'V8 used heap size in bytes')
+const metric_totalAvailHeap = create_gauge('hoprd_gauge_nodejs_total_available_heap_bytes', 'V8 total available heap size in bytes')
+const metric_activeCtxs = create_gauge('hoprd_gauge_nodejs_num_native_contexts', 'V8 number of active top-level native contexts')
+const metric_detachedCtxs = create_gauge('hoprd_gauge_nodejs_num_detached_contexts', 'V8 number of detached contexts which are not GCd')
+
+function recordNodeHeapStats() {
+  const heapStats = getHeapStatistics()
+  metric_totalAllocHeap.set(heapStats.total_heap_size)
+  metric_totalUsedHeap.set(heapStats.used_heap_size)
+  metric_totalAvailHeap.set(heapStats.total_available_size)
+  metric_activeCtxs.set(heapStats.number_of_native_contexts)
+  metric_detachedCtxs.set(heapStats.number_of_detached_contexts)
+}
 
 const GET: Operation = [
   (_, res, _next) => {
     try {
+      recordNodeHeapStats()
       const metrics = gather_all_metrics()
       return res.status(200).send(metrics)
     } catch (err) {

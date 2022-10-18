@@ -14,9 +14,14 @@ export * from './db/index.js'
 export * from './ethereum/index.js'
 export * from './utils.js'
 
+// Load `utils-misc` crate
 export { get_package_version } from '../lib/utils_misc.js'
+
+// Load `utils-metrics` crate
+import * as utils_metrics  from '../lib/utils_metrics.js'
+utils_metrics.set_panic_hook()
+
 export {
-  set_panic_hook,
   create_counter,
   SimpleCounter,
   create_multi_counter,

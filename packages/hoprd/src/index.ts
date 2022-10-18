@@ -4,12 +4,12 @@ import { hideBin } from 'yargs/helpers'
 
 import {
   create_gauge,
+  create_multi_gauge,
   get_package_version,
   loadJson,
   NativeBalance,
   setupPromiseRejectionFilter,
-  set_panic_hook,
-  SUGGESTED_NATIVE_BALANCE, create_histogram_with_buckets
+  SUGGESTED_NATIVE_BALANCE, create_histogram_with_buckets, pickVersion
 } from '@hoprnet/hopr-utils'
 import {
   CONFIRMATIONS,
@@ -70,6 +70,7 @@ const metric_latency = create_histogram_with_buckets(
   'Histogram of measured received message latencies',
   new Float64Array([10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0, 20000.0])
 )
+const metric_version = create_multi_gauge('hoprd_mgauge_version', 'Executed version of HOPRd', ['version'])
 
 // Use environment-specific default data path
 const defaultDataPath = path.join(process.cwd(), 'hoprd-db', defaultEnvironment())
@@ -351,8 +352,6 @@ async function main() {
   // Increase the default maximum number of event listeners
   ;(await import('events')).EventEmitter.defaultMaxListeners = 20
 
-  set_panic_hook()
-
   metric_processStartTime.set(Date.now() / 1000)
   const metric_startupTimer = metric_nodeStartupTime.start_measure()
 
@@ -433,6 +432,8 @@ async function main() {
 
   try {
     logs.log(`This is HOPRd version ${version}`)
+    metric_version.set([pickVersion(version)], 1.0)
+
     if (on_avado) {
       logs.log('This node appears to be running on an AVADO/Dappnode')
     }
