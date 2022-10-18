@@ -15,7 +15,7 @@ import {
   type HoprToken,
   type HoprChannels,
   type HoprNetworkRegistry,
-  ContractData
+  type ContractData
 } from '@hoprnet/hopr-ethereum'
 import {
   Address,
@@ -34,6 +34,9 @@ import { debug } from '@hoprnet/hopr-utils'
 import { TX_CONFIRMATION_WAIT } from './constants.js'
 import type { Block } from '@ethersproject/abstract-provider'
 import type { Deployment } from 'hardhat-deploy/dist/types.js'
+
+// @ts-ignore untyped library
+import retimer from 'retimer'
 
 const log = debug('hopr:core-ethereum:ethereum')
 const abiCoder = new utils.AbiCoder()
@@ -197,13 +200,13 @@ export async function createChainWrapper(
   const waitForTransaction = (txHash: string, removeListener: () => void) => {
     return new Promise<void>((resolve, reject) => {
       let done = false
-      let timeout: NodeJS.Timeout
+      let timer: any
       const cleanUp = (err?: string) => {
         if (done) {
           return
         }
-        clearTimeout(timeout)
         done = true
+        timer?.clear()
 
         provider.off(txHash, onTransaction)
         // Give other tasks time to get scheduled before
@@ -227,7 +230,7 @@ export async function createChainWrapper(
           cleanUp()
         }
       }
-      timeout = setTimeout(cleanUp, txTimeout, `Timeout while waiting for transaction ${txHash}`)
+      timer = retimer(cleanUp, txTimeout, `Timeout while waiting for transaction ${txHash}`)
 
       // Immediately stops polling once the transaction hash appeared
       // in the mempool

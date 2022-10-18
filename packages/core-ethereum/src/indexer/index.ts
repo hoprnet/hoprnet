@@ -43,6 +43,9 @@ import { BigNumber, type Contract, errors } from 'ethers'
 import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants.js'
 import type { TypedEvent, TypedEventFilter } from '@hoprnet/hopr-ethereum'
 
+// @ts-ignore untyped library
+import retimer from 'retimer'
+
 const log = debug('hopr-core-ethereum:indexer')
 const verbose = debug('hopr-core-ethereum:verbose:indexer')
 
@@ -1022,34 +1025,43 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     deferred.promise = new Promise<string>((resolve, reject) => {
       let done = false
+      let timer: any
+
       deferred.reject = () => {
         if (done) {
           return
         }
-        clearTimeout(timeout)
+        timer?.clear()
         done = true
+
         this.removeListener(eventType, deferred.resolve)
         log('listener %s on %s is removed due to error', eventType, tx)
         setImmediate(resolve, tx)
       }
 
-      timeout = setTimeout(() => {
-        if (done) {
-          return
-        }
-        clearTimeout(timeout)
-        done = true
-        // remove listener but throw now error
-        this.removeListener(eventType, deferred.resolve)
-        log('listener %s on %s timed out and thus removed', eventType, tx)
-        setImmediate(reject, tx)
-      }, INDEXER_TIMEOUT)
+      timer = retimer(
+        () => {
+          if (done) {
+            return
+          }
+          timer?.clear()
+          done = true
+          // remove listener but throw now error
+          this.removeListener(eventType, deferred.resolve)
+          log('listener %s on %s timed out and thus removed', eventType, tx)
+          setImmediate(reject, tx)
+        },
+        INDEXER_TIMEOUT,
+        `Timeout while indexer waiting for confirming transaction ${tx}`
+      )
 
       deferred.resolve = () => {
         if (done) {
           return
         }
+        timer?.clear()
         done = true
+
         this.removeListener(eventType, deferred.resolve)
         log('listener %s on %s is resolved and thus removed', eventType, tx)
 

@@ -145,27 +145,36 @@ function isUsableRelay(ma: Multiaddr): boolean {
  * @returns
  */
 function groupConnectionResults(
-  args: Parameters<EntryNodes['connectToRelay']>[],
-  results: (ConnectionResult | Error | undefined)[]
+  args: Iterable<Parameters<EntryNodes['connectToRelay']>>,
+  results: Iterable<ConnectionResult | Error | undefined>
 ): Grouped[] {
   const grouped: { [index: string]: (ConnectionResult | Error | undefined)[] } = {}
 
-  for (const [index, result] of results.entries()) {
-    const address = args[index][0].toString()
+  const argIterator = args[Symbol.iterator]()
+  const resultsIterator = results[Symbol.iterator]()
+
+  let arg = argIterator.next()
+  let result = resultsIterator.next()
+
+  while (!arg.done && !result.done) {
+    const address = arg.value[0].toString()
 
     if (grouped[address] == undefined) {
-      grouped[address] = [result]
+      grouped[address] = [result.value]
     } else {
-      grouped[address].push(result)
+      grouped[address].push(result.value)
     }
+
+    arg = argIterator.next()
+    result = resultsIterator.next()
   }
 
   // Sort each list of results and sort the entire list of lists after lowest latency of the first result
-  const result: Grouped[] = Object.entries(grouped)
+  const sorted: Grouped[] = Object.entries(grouped)
     .map<Grouped>((value) => [value[0], value[1].sort(compareConnectionResults)])
     .sort((a: Grouped, b: Grouped) => compareConnectionResults(a[1][0], b[1][0]))
 
-  return result
+  return sorted
 }
 
 /**
@@ -175,7 +184,7 @@ function groupConnectionResults(
  * @param prefix string to print before listing the results
  * @returns string to log
  */
-function printGroupedConnectionResults(grouped: Grouped[], prefix: string = ''): string {
+function printGroupedConnectionResults(grouped: Iterable<Grouped>, prefix: string = ''): string {
   let out = `${prefix}\n`
 
   for (const [id, results] of grouped) {
@@ -184,19 +193,17 @@ function printGroupedConnectionResults(grouped: Grouped[], prefix: string = ''):
       continue
     }
 
-    if (out.length > prefix.length + 1) {
-      out += '\n'
-    }
     out += `  - ${id}: ${
       results[0] instanceof Error
         ? 'Error'
         : results[0].entry.latency < 0
         ? 'Timeout'
-        : `${results[0].entry.latency} ms`
+        : `${results[0].entry.latency} ms\n`
     }`
   }
 
-  return out
+  // Remove last occurence of `/n`
+  return out.substring(0, out.length - 1)
 }
 
 /**
@@ -206,17 +213,15 @@ function printGroupedConnectionResults(grouped: Grouped[], prefix: string = ''):
  * @param prefix string to print before listing the results
  * @returns
  */
-function printListOfUsedRelays(relays: UsedRelay[], prefix: string = ''): string {
+function printListOfUsedRelays(relays: Iterable<UsedRelay>, prefix: string = ''): string {
   let out = `${prefix}\n`
 
   for (const relay of relays) {
-    if (out.length > prefix.length + 1) {
-      out += '\n'
-    }
-    out += `  - ${relayFromRelayAddress(relay.ourCircuitAddress).toString()}`
+    out += `  - ${relayFromRelayAddress(relay.ourCircuitAddress).toString()}\n`
   }
 
-  return out
+  // Remove last occurence of `/n`
+  return out.substring(0, out.length - 1)
 }
 
 type UsedRelay = {
@@ -321,9 +326,11 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
   }
 
   /**
-   * Enables entry node functionality. Called by listener once
-   * it determines that node *does not* have a publicly available
-   * address.
+   * Enables monitoring of entry nodes. Called by Listener
+   * once it is clear that nodes requires relayed connections.
+   *
+   * If not called, node won't contact any entry nodes or
+   * monitor their availability.
    */
   public enable() {
     this.enabled = true
@@ -776,7 +783,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    * of entry nodes.
    * @param groupedResults results from concurrent connect attempt
    */
-  private rebuildUsedRelays(groupedResults: Grouped[]) {
+  private rebuildUsedRelays(groupedResults: Iterable<Grouped>) {
     this.usedRelays = []
 
     // Assuming groupedResults is sorted
@@ -790,6 +797,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
           if (result == undefined || result instanceof Error) {
             break
           }
+          // Includes a catch-all block and swallows, but
+          // logs all exceptions
           attemptClose((result as ConnectionResult).conn, error)
         }
 
@@ -809,7 +818,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    * Updates specific entries of the list of used entry nodes
    * @param groupedResults results from concurrent connect attempt
    */
-  private updateUsedRelays(groupedResults: Grouped[]) {
+  private updateUsedRelays(groupedResults: Iterable<Grouped>) {
     for (const [id, results] of groupedResults) {
       if (results[0] == undefined || results[0] instanceof Error || results[0].entry.latency < 0) {
         // Mark offline
@@ -837,11 +846,29 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    * Updates knowledge about offline, available and unchecked entry nodes
    * @param groupedResults results from concurrent connect attempt
    */
-  protected updateRecords(groupedResults: Grouped[]) {
+  protected updateRecords(groupedResults: Iterable<Grouped>) {
     // @TODO replace this by a more efficient data structure
-    const availableOnes = new Set<string>(this.availableEntryNodes.map((nodeData) => nodeData.id.toString()))
-    const uncheckedOnes = new Set<string>(this.uncheckedEntryNodes.map((nodeData) => nodeData.id.toString()))
-    const offlineOnes = new Set<string>(this.offlineEntryNodes.map((nodeData) => nodeData.id.toString()))
+    const availableOnes = new Set<string>(
+      function* (this: EntryNodes) {
+        for (const nodeData of this.availableEntryNodes) {
+          yield nodeData.id.toString()
+        }
+      }.call(this)
+    )
+    const uncheckedOnes = new Set<string>(
+      function* (this: EntryNodes) {
+        for (const nodeData of this.uncheckedEntryNodes) {
+          yield nodeData.id.toString()
+        }
+      }.call(this)
+    )
+    const offlineOnes = new Set<string>(
+      function* (this: EntryNodes) {
+        for (const nodeData of this.offlineEntryNodes) {
+          yield nodeData.id.toString()
+        }
+      }.call(this)
+    )
 
     for (const [id, results] of groupedResults) {
       if (results.every((result) => result == undefined)) {

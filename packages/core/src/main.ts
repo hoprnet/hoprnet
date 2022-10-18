@@ -123,9 +123,10 @@ export async function createLibp2pInstance(
         // protocolPrefix: `/${protocolPrefix}`,
         protocolPrefix,
         // Make entry nodes Kad-DHT servers
-        clientMode: !options.announce,
+        // A network requires at least on Kad-DHT server otherwise nodes
+        // will flood each other forever with Kad-DHT ping attempts
+        clientMode: !options.announce
         // Limit size of ping queue by using smaller timeouts
-        pingTimeout: 2000
       }),
       connectionManager: {
         autoDial: true,
