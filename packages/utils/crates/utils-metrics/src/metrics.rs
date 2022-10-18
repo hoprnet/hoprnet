@@ -207,6 +207,7 @@ impl SimpleHistogram {
 
     /// Creates a new histogram with the given name, description and buckets.
     /// If no buckets are specified, they will be defined automatically.
+    /// The +Inf bucket is always added automatically.
     pub fn new(name: &str, description: &str, buckets: Vec<f64>) -> Result<Self, String> {
         let mut opts = HistogramOpts::new(name, description);
         if !buckets.is_empty() {
@@ -266,6 +267,7 @@ impl MultiHistogram {
 
     /// Creates a new histogram with the given name, description and buckets.
     /// If no buckets are specified, they will be defined automatically.
+    /// The +Inf bucket is always added automatically.
     pub fn new(name: &str, description: &str, buckets: Vec<f64>, labels: &[&str]) -> Result<Self, String> {
         let mut opts = HistogramOpts::new(name, description);
         if !buckets.is_empty() {
@@ -355,7 +357,16 @@ mod tests {
         let counter = MultiCounter::new("my_mctr", "test multicounter", &["version"])
             .unwrap();
 
+        assert_eq!("my_mctr", counter.name());
+        assert!(counter.labels().contains(&"version"));
 
+        counter.increment(&["1.90.1"], 10);
+        counter.increment(&["1.89.20"], 1);
+        counter.increment(&["1.90.1"], 15);
+
+        let metrics = gather_all_metrics().unwrap();
+        assert!(metrics.contains("my_mctr{version=\"1.90.1\"} 25"));
+        assert!(metrics.contains("my_mctr{version=\"1.89.20\"} 1"));
     }
 
     #[test]
@@ -377,6 +388,24 @@ mod tests {
     }
 
     #[test]
+    fn test_multi_gauge() {
+        let gauge = MultiGauge::new("my_mgauge", "test multicounter", &["version"])
+            .unwrap();
+
+        assert_eq!("my_mgauge", gauge.name());
+        assert!(gauge.labels().contains(&"version"));
+
+        gauge.increment(&["1.90.1"], 10.0);
+        gauge.increment(&["1.89.20"], 5.0);
+        gauge.increment(&["1.90.1"], 15.0);
+        gauge.decrement(&["1.89.20"], 2.0);
+
+        let metrics = gather_all_metrics().unwrap();
+        assert!(metrics.contains("my_mgauge{version=\"1.90.1\"} 25"));
+        assert!(metrics.contains("my_mgauge{version=\"1.89.20\"} 3"));
+    }
+
+    #[test]
     fn test_histogram() {
         let histogram = SimpleHistogram::new("my_histogram", "test histogram", vec![1.0,2.0,3.0,4.0,5.0])
             .unwrap();
@@ -394,6 +423,29 @@ mod tests {
         assert!(metrics.contains("my_histogram_bucket{le=\"3\"} 3"));
         assert!(metrics.contains("my_histogram_bucket{le=\"4\"} 3"));
         assert!(metrics.contains("my_histogram_bucket{le=\"5\"} 4"));
+    }
+
+    #[test]
+    fn test_multi_histogram() {
+        let histogram = MultiHistogram::new("my_mhistogram", "test histogram", vec![1.0,2.0,3.0,4.0,5.0], &["version"])
+            .unwrap();
+
+        assert_eq!("my_mhistogram", histogram.name());
+
+        histogram.observe(&["1.90.0"],2.0);
+        histogram.observe(&["1.90.0"],2.0);
+        histogram.observe(&["1.90.0"],1.0);
+        histogram.observe(&["1.90.0"],5.0);
+        histogram.observe(&["1.89.20"], 10.0);
+
+        let metrics = gather_all_metrics().unwrap();
+        assert!(metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"1\"} 1"));
+        assert!(metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"2\"} 3"));
+        assert!(metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"3\"} 3"));
+        assert!(metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"4\"} 3"));
+        assert!(metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"5\"} 4"));
+
+        assert!(metrics.contains("my_mhistogram_bucket{version=\"1.89.20\",le=\"+Inf\"} 1"));
     }
 }
 
