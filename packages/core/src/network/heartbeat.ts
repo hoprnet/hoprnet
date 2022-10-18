@@ -14,7 +14,6 @@ import {
   create_histogram,
   create_counter
 } from '@hoprnet/hopr-utils'
-import { HEARTBEAT_TIMEOUT } from '../constants.js'
 
 import { createHash, randomBytes } from 'crypto'
 
@@ -264,11 +263,11 @@ export default class Heartbeat {
       .map<[destination: PeerId]>((peerToPing: PeerId) => [peerToPing])
 
     const start = Date.now()
-    const pingResults = await nAtATime(this._pingNode, pingWork, this.config.maxParallelHeartbeats)
-    metric_timeToHeartbeat.record_measure(metric_timer)
 
     // Will handle timeouts automatically
     const pingResults = await nAtATime(this.pingNode, pingWork, this.config.maxParallelHeartbeats)
+
+    metric_timeToHeartbeat.record_measure(metric_timer)
 
     for (const [resultIndex, pingResult] of pingResults.entries()) {
       if (pingResult instanceof Error) {

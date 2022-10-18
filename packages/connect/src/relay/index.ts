@@ -34,6 +34,7 @@ import {
 
 import { attemptClose } from '../utils/index.js'
 import { type ConnectComponents, ConnectInitializable } from '../components.js'
+import { handshake } from 'it-handshake'
 
 const DEBUG_PREFIX = 'hopr-connect:relay'
 const DEFAULT_MAX_RELAYED_CONNECTIONS = 10
