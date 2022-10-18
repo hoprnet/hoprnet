@@ -18,7 +18,7 @@ export * from './utils.js'
 export { get_package_version } from '../lib/utils_misc.js'
 
 // Load `utils-metrics` crate
-import * as utils_metrics  from '../lib/utils_metrics.js'
+import * as utils_metrics from '../lib/utils_metrics.js'
 utils_metrics.set_panic_hook()
 
 export {

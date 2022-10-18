@@ -10,7 +10,8 @@ import {
   NativeBalance,
   setupPromiseRejectionFilter,
   SUGGESTED_NATIVE_BALANCE,
-  create_histogram_with_buckets, pickVersion
+  create_histogram_with_buckets,
+  pickVersion
 } from '@hoprnet/hopr-utils'
 import {
   CONFIRMATIONS,
