@@ -552,10 +552,8 @@ class Hopr extends EventEmitter {
   private async onOwnChannelUpdated(channel: ChannelEntry): Promise<void> {
     // Determine which counter (incoming/outgoing) we need to increment
     const selfAddr = this.getEthereumAddress()
-    if (selfAddr.eq(channel.destination.toAddress()))
-      metric_inChannelCount.increment()
-    else if (selfAddr.eq(channel.source.toAddress()))
-      metric_outChannelCount.increment()
+    if (selfAddr.eq(channel.destination.toAddress())) metric_inChannelCount.increment()
+    else if (selfAddr.eq(channel.source.toAddress())) metric_outChannelCount.increment()
 
     if (channel.status === ChannelStatus.PendingToClose) {
       await this.strategy.onChannelWillClose(channel, this.connector)
