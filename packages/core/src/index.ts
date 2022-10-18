@@ -74,6 +74,8 @@ import { createLibp2pInstance } from './main.js'
 import type { EventEmitter as Libp2pEmitter } from '@libp2p/interfaces/events'
 import { PeerConnectionType } from '@hoprnet/hopr-connect'
 
+const CODE_P2P = protocols('p2p').code
+
 const DEBUG_PREFIX = `hopr-core`
 const log = debug(DEBUG_PREFIX)
 const verbose = debug(DEBUG_PREFIX.concat(`:verbose`))
@@ -527,10 +529,19 @@ class Hopr extends EventEmitter {
       return
     }
 
-    const dialables = peer.multiaddrs.filter((ma: Multiaddr) => {
-      const tuples = ma.tuples()
-      return tuples.length > 1 && tuples[0][0] != protocols('p2p').code
-    })
+    const addrsToAdd: Multiaddr[] = []
+    for (const addr of peer.multiaddrs) {
+      const tuples = addr.tuples()
+
+      if (tuples.length <= 1 && tuples[0][0] == CODE_P2P) {
+        // No routable address
+        continue
+      }
+
+      // Remove /p2p/<PEER_ID> from Multiaddr to prevent from duplicates
+      // in peer store
+      addrsToAdd.push(addr.decapsulateCode(CODE_P2P))
+    }
 
     const pubKey = convertPubKeyFromPeerId(peer.id)
     try {
@@ -539,11 +550,11 @@ class Hopr extends EventEmitter {
       log(`Failed to update key peer-store with new peer ${peer.id.toString()} info`, err)
     }
 
-    if (dialables.length > 0) {
-      this.publicNodesEmitter.emit('addPublicNode', { id: peer.id, multiaddrs: dialables })
+    if (addrsToAdd.length > 0) {
+      this.publicNodesEmitter.emit('addPublicNode', { id: peer.id, multiaddrs: addrsToAdd })
 
       try {
-        await this.libp2pComponents.getPeerStore().addressBook.add(peer.id, dialables)
+        await this.libp2pComponents.getPeerStore().addressBook.add(peer.id, addrsToAdd)
       } catch (err) {
         log(`Failed to update address peer-store with new peer ${peer.id.toString()} info`, err)
       }
