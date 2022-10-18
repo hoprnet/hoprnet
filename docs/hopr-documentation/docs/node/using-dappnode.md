@@ -11,7 +11,7 @@ Please withdraw all your funds and delete the old package before installing a ne
 
 ## Installing the HOPR Client
 
-(**1**) Open the DAppStore using the sidebar to the left. Then at the top of the DAppStore, toggle on the public repository bar. 
+(**1**) Open the DAppStore using the sidebar to the left. Then at the top of the DAppStore, toggle on the public repository bar.
 
 (**2**) A warning prompt will appear. Press `I understand, take me to the public repo` to continue.
 
@@ -19,7 +19,7 @@ Please withdraw all your funds and delete the old package before installing a ne
 
 ![DappStore](./images/DappStore-NR.png)
 
-(**3**) You should see the latest version of the HOPR client now. Just click `Get` and wait for it to install 
+(**3**) You should see the latest version of the HOPR client now. Just click `Get` and wait for it to install
 
 That's all! You should now be able to find the HOPR client in your 'Packages'.
 
@@ -35,7 +35,7 @@ Otherwise, the installation process is complete! You can proceed to our [hopr-ad
 
 ### Restoring an old node
 
-If you have previously installed a node and have the [identity file downloaded](using-hopr-admin#backing-up-your-identity-file), you can use it to restore your old node. 
+If you have previously installed a node and have the [identity file downloaded](using-hopr-admin#backing-up-your-identity-file), you can use it to restore your old node.
 
 **Note:** For DAppNode, you should download the latest version of HOPR before trying to restore your node.
 

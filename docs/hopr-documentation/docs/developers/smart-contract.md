@@ -213,14 +213,14 @@ Emitted once a ticket is redeemed.
 
 #### Parameters:
 
-| Name                 | Type    | Indexed | Description                                                                |
-| -------------------- | ------- | ------- | -------------------------------------------------------------------------- |
-| `source`             | address | true    | Address of the source node of a payment channel.                           |
-| `destination`        | address | true    | Address of the destination node of a payment channel.                      |
-| `nextCommitment`     | bytes32 | false   | Commitment that hashes to the redeemers previous commitment.               |
-| `ticketEpoch`        | uint256 | false   | Current ticket epoch of the channel.                                       |
-| `ticketIndex`        | uint256 | false   | Current ticket index of the channel.                                       |
-| `proofOfRelaySecret` | bytes32 | false   | The Proof-of-Relay secret.                                                 |
-| `amount`             | uint256 | false   | Amount of HOPR token embedded in the ticket.                               |
-| `winProb`            | uint256 | false   | The ticket's probability of winning. The sender sets this value. |
-| `signature`          | bytes   | false   | Signature associated with the ticket, which is signed by the source node.  |
+| Name                 | Type    | Indexed | Description                                                               |
+| -------------------- | ------- | ------- | ------------------------------------------------------------------------- |
+| `source`             | address | true    | Address of the source node of a payment channel.                          |
+| `destination`        | address | true    | Address of the destination node of a payment channel.                     |
+| `nextCommitment`     | bytes32 | false   | Commitment that hashes to the redeemers previous commitment.              |
+| `ticketEpoch`        | uint256 | false   | Current ticket epoch of the channel.                                      |
+| `ticketIndex`        | uint256 | false   | Current ticket index of the channel.                                      |
+| `proofOfRelaySecret` | bytes32 | false   | The Proof-of-Relay secret.                                                |
+| `amount`             | uint256 | false   | Amount of HOPR token embedded in the ticket.                              |
+| `winProb`            | uint256 | false   | The ticket's probability of winning. The sender sets this value.          |
+| `signature`          | bytes   | false   | Signature associated with the ticket, which is signed by the source node. |

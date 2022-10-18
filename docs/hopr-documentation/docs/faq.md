@@ -15,7 +15,7 @@ Coming soon.
 
 ### What is metadata privacy?
 
-Metadata is data about data. E.g. who sent the data? Who received it? When was it sent? Where was it sent from and received? Metadata leaks are highly exploitable and a primary infrastructural concern for web3. 
+Metadata is data about data. E.g. who sent the data? Who received it? When was it sent? Where was it sent from and received? Metadata leaks are highly exploitable and a primary infrastructural concern for web3.
 
 ### What’s so special about HOPR?
 
