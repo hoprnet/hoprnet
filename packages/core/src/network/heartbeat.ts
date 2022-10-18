@@ -11,8 +11,8 @@ import {
   u8aToHex,
   pickVersion,
   create_gauge,
-  create_histogram,
-  create_counter
+  create_counter,
+  create_histogram_with_buckets
 } from '@hoprnet/hopr-utils'
 
 import { createHash, randomBytes } from 'crypto'
@@ -36,9 +36,11 @@ const MAX_PARALLEL_HEARTBEATS = 14
 
 // Metrics
 const metric_networkHealth = create_gauge('core_gauge_network_health', 'Connectivity health indicator')
-const metric_timeToHeartbeat = create_histogram(
+const metric_timeToHeartbeat = create_histogram_with_buckets(
   'core_histogram_heartbeat_time_seconds',
-  'Measures total time it takes to probe other nodes (in seconds)'
+  'Measures total time it takes to probe other nodes (in seconds)',
+  new Float64Array([0.5, 1.0, 2.5, 5, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0])
+
 )
 const metric_pingSuccessCount = create_counter(
   'core_counter_heartbeat_successful_pings',

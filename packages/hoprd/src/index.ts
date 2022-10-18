@@ -4,13 +4,12 @@ import { hideBin } from 'yargs/helpers'
 
 import {
   create_gauge,
-  create_histogram,
   get_package_version,
   loadJson,
   NativeBalance,
   setupPromiseRejectionFilter,
   set_panic_hook,
-  SUGGESTED_NATIVE_BALANCE
+  SUGGESTED_NATIVE_BALANCE, create_histogram_with_buckets
 } from '@hoprnet/hopr-utils'
 import {
   CONFIRMATIONS,
@@ -56,17 +55,20 @@ const metric_processStartTime = create_gauge(
   'hoprd_gauge_startup_unix_time_seconds',
   'The unix timestamp at which the process was started'
 )
-const metric_nodeStartupTime = create_histogram(
+const metric_nodeStartupTime = create_histogram_with_buckets(
   'hoprd_histogram_startup_time_seconds',
-  'Time it takes for a node to start up'
+  'Time it takes for a node to start up',
+  new Float64Array([5.0, 10.0, 30.0, 60.0, 120.0, 180.0, 300.0, 600.0, 1200.0])
 )
-const metric_timeToGreen = create_histogram(
+const metric_timeToGreen = create_histogram_with_buckets(
   'hoprd_histogram_time_to_green_seconds',
-  'Time it takes for a node to transition to the GREEN network state'
+  'Time it takes for a node to transition to the GREEN network state',
+  new Float64Array([30.0, 60.0, 90.0, 120.0, 180.0, 240.0, 300.0, 420.0, 600.0, 900.0, 1200.0])
 )
-const metric_latency = create_histogram(
+const metric_latency = create_histogram_with_buckets(
   'hoprd_histogram_message_latency_ms',
-  'Histogram of measured received message latencies'
+  'Histogram of measured received message latencies',
+  new Float64Array([10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0, 20000.0])
 )
 
 // Use environment-specific default data path

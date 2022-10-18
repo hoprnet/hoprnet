@@ -91,6 +91,7 @@ const error = debug(DEBUG_PREFIX.concat(`:error`))
 
 // Metrics
 const metric_outChannelCount = create_gauge('core_gauge_num_outgoing_channels', 'Number of outgoing channels')
+const metric_inChannelCount = create_gauge('core_gauge_num_incoming_channels', 'Number of incoming channels')
 const metric_sentMessageCount = create_counter('core_counter_sent_messages', 'Number of sent messages')
 const metric_pathLength = create_histogram_with_buckets(
   'core_histogram_path_length',
@@ -549,6 +550,13 @@ class Hopr extends EventEmitter {
    * @param channel object
    */
   private async onOwnChannelUpdated(channel: ChannelEntry): Promise<void> {
+    // Determine which counter (incoming/outgoing) we need to increment
+    const selfAddr = this.getEthereumAddress()
+    if (selfAddr.eq(channel.destination.toAddress()))
+      metric_inChannelCount.increment()
+    else if (selfAddr.eq(channel.source.toAddress()))
+      metric_outChannelCount.increment()
+
     if (channel.status === ChannelStatus.PendingToClose) {
       await this.strategy.onChannelWillClose(channel, this.connector)
     }
@@ -1161,7 +1169,6 @@ class Hopr extends EventEmitter {
 
     try {
       let channel = this.connector.openChannel(counterpartyPubKey, new Balance(amountToFund))
-      metric_outChannelCount.increment()
       return channel
     } catch (err) {
       this.maybeEmitFundsEmptyEvent(err)
@@ -1224,10 +1231,6 @@ class Hopr extends EventEmitter {
       if (channel.status === ChannelStatus.Open || channel.status == ChannelStatus.WaitingForCommitment) {
         log('initiating closure of channel', channel.getId().toHex())
         txHash = await this.connector.initializeClosure(counterpartyPubKey)
-
-        if (direction === 'outgoing') {
-          metric_outChannelCount.decrement()
-        }
       } else {
         // verify that we passed the closure waiting period to prevent failing
         // on-chain transactions

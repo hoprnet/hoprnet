@@ -26,8 +26,9 @@ The following sections document the metrics per package:
 ### core
 
 | Name                                    | Type      | Description                                                    | Note                   |
-| --------------------------------------- | --------- | -------------------------------------------------------------- | ---------------------- |
+|-----------------------------------------|-----------|----------------------------------------------------------------|------------------------|
 | core_gauge_num_outgoing_channels        | gauge     | Number of outgoing channels                                    |                        |
+| core_gauge_num_incoming_channels        | gauge     | Number of incoming channels                                    |                        |
 | core_counter_sent_messages              | counter   | Number of sent messages                                        |                        |
 | core_histogram_path_length              | histogram | Distribution of number of hops of sent messages                | buckets: 0-4           |
 | core_counter_received_successful_acks   | counter   | Number of received successful message acknowledgements         |                        |
@@ -49,6 +50,15 @@ The following sections document the metrics per package:
 | core_gauge_num_peers                    | gauge     | Number of all peers                                            |                        |
 
 ### core-ethereum
+
+| Name                                                       | Type          | Description                                 | Note                                                                |
+|------------------------------------------------------------|---------------|---------------------------------------------|---------------------------------------------------------------------|
+| core_ethereum_mcounter_indexer_provider_errors             | multi counter | Multicounter for provider errors in Indexer |                                                                     |
+| core_ethereum_counter_indexer_processed_unconfirmed_blocks | counter       | Number of processed unconfirmed blocks      |                                                                     |
+| core_ethereum_counter_indexer_announcements                | counter       | Number of processed announcements           |                                                                     |
+| core_ethereum_gauge_indexer_block_number                   | gauge         | Current block number                        |                                                                     |
+| core_ethereum_gauge_indexer_channel_status                 | multi gauge   | Status of different channels                | 0 = closed, 1 = waiting for commitment, 2 = open, 3 = pending close |
+| core_ethereum_counter_indexer_tickets_redeemed             | counter       | Number of redeemed tickets                  |                                                                     |
 
 ### cover-traffic-daemon
 
