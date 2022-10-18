@@ -66,15 +66,15 @@ The following sections document the metrics per package:
 
 ### hoprd
 
-| Name                                          | Type        | Description                                                       | Note                |
-|-----------------------------------------------|-------------|-------------------------------------------------------------------|---------------------|
-| hoprd_gauge_startup_unix_time_seconds         | gauge       | The unix timestamp at which the process was started               | seconds since Epoch |
-| hoprd_histogram_startup_time_seconds          | histogram   | Time it takes for a node to start up                              | unit: seconds       |
-| hoprd_histogram_time_to_green_seconds         | histogram   | Time it takes for a node to transition to the GREEN network state | unit: seconds       |
-| hoprd_histogram_message_latency_ms            | histogram   | Histogram of measured received message latencies                  | unit: milliseconds  |
-| hoprd_mgauge_version                          | multi gauge | Executed version of HOPRd                                         |                     |
-| hoprd_gauge_nodejs_total_alloc_heap_bytes     | gauge       | V8 allocated total heap size in bytes                             | unit: bytes         |
-| hoprd_gauge_nodejs_total_used_heap_bytes      | gauge       | V8 used heap size in bytes                                        | unit: bytes         |
-| hoprd_gauge_nodejs_total_available_heap_bytes | gauge       | V8 total available heap size in bytes                             | unit: bytes         |
-| hoprd_gauge_nodejs_num_native_contexts        | gauge       | V8 number of active top-level native contexts                     | unit: bytes         |
-| hoprd_gauge_nodejs_num_detached_contexts      | gauge       | V8 number of detached contexts which are not GCd                  | unit: bytes         |
+| Name                                          | Type        | Description                                                       | Note                                     |
+|-----------------------------------------------|-------------|-------------------------------------------------------------------|------------------------------------------|
+| hoprd_gauge_startup_unix_time_seconds         | gauge       | The unix timestamp at which the process was started               | seconds since Epoch                      |
+| hoprd_histogram_startup_time_seconds          | histogram   | Time it takes for a node to start up                              | unit: seconds                            |
+| hoprd_histogram_time_to_green_seconds         | histogram   | Time it takes for a node to transition to the GREEN network state | unit: seconds                            |
+| hoprd_histogram_message_latency_ms            | histogram   | Histogram of measured received message latencies                  | unit: milliseconds                       |
+| hoprd_mgauge_version                          | multi gauge | Executed version of HOPRd                                         |                                          |
+| hoprd_gauge_nodejs_total_alloc_heap_bytes     | gauge       | V8 allocated total heap size in bytes                             | unit: bytes                              |
+| hoprd_gauge_nodejs_total_used_heap_bytes      | gauge       | V8 used heap size in bytes                                        | unit: bytes                              |
+| hoprd_gauge_nodejs_total_available_heap_bytes | gauge       | V8 total available heap size in bytes                             | unit: bytes                              |
+| hoprd_gauge_nodejs_num_native_contexts        | gauge       | V8 number of active top-level native contexts                     | unit: bytes, increase indicates mem leak |
+| hoprd_gauge_nodejs_num_detached_contexts      | gauge       | V8 number of detached contexts which are not GCd                  | unit: bytes, non-zero indicates mem leak |
