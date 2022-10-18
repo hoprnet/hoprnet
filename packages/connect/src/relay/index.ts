@@ -167,17 +167,27 @@ class Relay implements Initializable, ConnectInitializable, Startable {
   protected async keepAliveRelayConnection(): Promise<void> {
     // TODO: perform ping as well, right now just prints out connection info
     if (this.relayState.relayedConnectionCount() > 0) {
-      log(`Current relay connections: `)
-      await this.relayState.forEach(async (dst) => log(`- ${dst}`))
+      let outConns = `Current relay connections:\n`
+
+      await this.relayState.forEach(async (dst) => {
+        outConns += `- ${dst}\n`
+      })
+
+      // Remove occurence of last `\n`
+      log(outConns.substring(0, outConns.length - 1))
     }
 
-    log(`Currently tracked connections to relays: `)
-    this.connectedToRelays.forEach((relayPeerId) => {
+    let outRelays = `Currently tracked connections to relays:\n`
+    for (const relayPeerId of this.connectedToRelays) {
       const countConns = this.getComponents()
         .getConnectionManager()
         .getConnections(peerIdFromString(relayPeerId)).length
-      log(`- ${relayPeerId}: ${countConns} connection${countConns == 1 ? '' : 's'}`)
-    })
+
+      outRelays += `- ${relayPeerId}: ${countConns} connection${countConns == 1 ? '' : 's'}\n`
+    }
+
+    // Remove occurence of last `\n`
+    log(outRelays.substring(0, outRelays.length - 1))
   }
 
   /**

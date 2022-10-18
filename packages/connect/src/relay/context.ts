@@ -175,7 +175,6 @@ class RelayContext extends EventEmitter {
         })
       }, ms)
     })
-
     const result = await Promise.race([pingTimeoutPromise, this._pingResponsePromise.promise])
     timer.clear()
 

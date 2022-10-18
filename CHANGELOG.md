@@ -100,7 +100,7 @@ Bump `libp2p@0.37` which came with many bugfixes, plenty of internal API changes
 - Automatically cleanup stale connections to correctly handle reconnects ([#3688](https://github.com/hoprnet/hoprnet/pull/3688))
 - Add `--provider` flag for setting a custom blockchain RPC provider
 - Use a default address sorter for all address classes ([#3731](https://github.com/hoprnet/hoprnet/pull/3731))
-- Enhance TCP socket listening logic and cleanup keepAlice interval ([#3750](https://github.com/hoprnet/hoprnet/pull/3750))
+- Enhance TCP socket listening logic and cleanup keepAlive interval ([#3750](https://github.com/hoprnet/hoprnet/pull/3750))
 - Try to reconnect to entry nodes after connection has been dropped ([#3751](https://github.com/hoprnet/hoprnet/pull/3751))
 - Unhandled rejection in relay requests ([#3779](https://github.com/hoprnet/hoprnet/pull/3779))
 - Ping & DHT query timeout increased ([#3780](https://github.com/hoprnet/hoprnet/pull/3780))
