@@ -11,27 +11,37 @@ Please withdraw all your funds and delete the old package before installing a ne
 
 ## Installing the HOPR Client
 
-(**1**) Open the DAppStore using the sidebar to the left and enter the following hash into the search bar:
+(**1**) Open the DAppStore using the sidebar to the left. Then at the top of the DAppStore, toggle on the public repository bar.
 
-```
-/ipfs/QmQAFRxPwzdry3tjfwUxfqmx4JAWoLWQRRU7kZsSNxdjXi
-```
+(**2**) A warning prompt will appear. Press `I understand, take me to the public repo` to continue.
+
+**Note:** You may see an empty directory after going to the public repository, just refresh the page if this happens. You may need to refresh several times until you see several packages in your directory, one of them being `Hopr`.
 
 ![DappStore](./images/DappStore-NR.png)
 
-(**2**) It should bring up the latest version of the HOPR client. Click **Get** and wait for the download to complete.
+(**3**) You should see the latest version of the HOPR client now. Just click `Get` and wait for it to install
 
 That's all! You should now be able to find the HOPR client in your 'Packages'.
 
 ![MyDapps](./images/Dappnode-2.png)
 
-Simply, open the client and you should be greeted with the hopr-admin interface.
+Simply open the client, and you should be greeted with the hopr-admin interface.
 
 Your **security token** is set to `!5qxc9Lp1BE7IFQ-nrtttU`. You will need this to access hopr-admin.
 
 If you are in the process of registering your node on the network registry, please complete the process [here](./network-registry-tutorial.md) before continuing.
 
 Otherwise, the installation process is complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).
+
+### Restoring an old node
+
+If you have previously installed a node and have the [identity file downloaded](using-hopr-admin#backing-up-your-identity-file), you can use it to restore your old node.
+
+**Note:** For DAppNode, you should download the latest version of HOPR before trying to restore your node.
+
+Find HOPR in your packages and navigate to the backup section. From there, all you have to do is click 'Restore' and open your [zipped backup file](using-hopr-admin#backing-up-your-identity-file) when prompted.
+
+![dappnode restore](./images/dappnode-backup.png)
 
 ## Collecting Logs
 

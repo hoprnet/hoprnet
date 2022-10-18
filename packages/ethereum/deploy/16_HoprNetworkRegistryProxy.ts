@@ -71,5 +71,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 main.dependencies = ['preDeploy', 'HoprStake']
 main.tags = ['HoprNetworkRegistryProxy']
+// Not necessary need to deploy a new contract when the staking contract changes
+main.skip = async (env: HardhatRuntimeEnvironment) => !!env.network.tags.production
 
 export default main

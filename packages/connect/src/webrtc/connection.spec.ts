@@ -3,7 +3,6 @@ import type { Instance as SimplePeerInstance } from 'simple-peer'
 import type { RelayConnection } from '../relay/connection.js'
 
 import { handshake } from 'it-handshake'
-import { pair } from 'it-pair'
 import { duplexPair } from 'it-pair/duplex'
 import { Multiaddr } from '@multiformats/multiaddr'
 import { pushable } from 'it-pushable'
@@ -20,8 +19,7 @@ const Bob = privKeyToPeerId(stringToU8a(`0xf8860ccb336f4aad751f55765b4adbefc538f
 
 describe('test webrtc connection', function () {
   it('exchange messages without upgrade', async function () {
-    const AliceBob = pair<StreamType>()
-    const BobAlice = pair<StreamType>()
+    const [AliceBob, BobAlice] = duplexPair<StreamType>()
 
     const fakedWebRTCInstance = new EventEmitter() as SimplePeerInstance
 
@@ -31,8 +29,8 @@ describe('test webrtc connection', function () {
 
     const conn = new WebRTCConnection(
       {
-        source: BobAlice.source,
-        sink: AliceBob.sink,
+        _counterparty: Bob,
+        ...BobAlice,
         sendUpgraded: () => {},
         state: {
           channel: fakedWebRTCInstance
@@ -42,10 +40,7 @@ describe('test webrtc connection', function () {
     )
 
     const AliceShaker = handshake(conn)
-    const BobShaker = handshake({
-      source: AliceBob.source,
-      sink: BobAlice.sink
-    })
+    const BobShaker = handshake(AliceBob)
 
     const ATTEMPTS = 5
 
@@ -68,16 +63,15 @@ describe('test webrtc connection', function () {
   })
 
   it('sends UPGRADED to the relayed connection', async function () {
-    const AliceBob = pair<StreamType>()
-    const BobAlice = pair<StreamType>()
+    const [AliceBob, BobAlice] = duplexPair<StreamType>()
 
     const webRTCInstance = new EventEmitter() as SimplePeerInstance
 
     let upgradeCalls = 0
     new WebRTCConnection(
       {
-        source: BobAlice.source,
-        sink: AliceBob.sink,
+        _counterparty: Bob,
+        ...BobAlice,
         sendUpgraded: () => {
           upgradeCalls++
         },
@@ -88,10 +82,7 @@ describe('test webrtc connection', function () {
       {}
     )
 
-    const BobShaker = handshake({
-      source: AliceBob.source,
-      sink: BobAlice.sink
-    })
+    const BobShaker = handshake(AliceBob)
 
     webRTCInstance.emit(`connect`)
 
@@ -101,15 +92,14 @@ describe('test webrtc connection', function () {
   })
 
   it('send DONE after webRTC connect event', async function () {
-    const AliceBob = pair<StreamType>()
-    const BobAlice = pair<StreamType>()
+    const [AliceBob, BobAlice] = duplexPair<StreamType>()
 
     const webRTCInstance = new EventEmitter() as SimplePeerInstance
 
     new WebRTCConnection(
       {
-        source: BobAlice.source,
-        sink: AliceBob.sink,
+        _counterparty: Bob,
+        ...BobAlice,
         sendUpgraded: () => {},
         state: {
           channel: webRTCInstance
@@ -118,10 +108,7 @@ describe('test webrtc connection', function () {
       {}
     )
 
-    const BobShaker = handshake({
-      source: AliceBob.source,
-      sink: BobAlice.sink
-    })
+    const BobShaker = handshake(AliceBob)
 
     webRTCInstance.emit(`connect`)
 
@@ -129,8 +116,7 @@ describe('test webrtc connection', function () {
   })
 
   it('sending messages after webRTC error event', async function () {
-    const AliceBob = pair<StreamType>()
-    const BobAlice = pair<StreamType>()
+    const [AliceBob, BobAlice] = duplexPair<StreamType>()
 
     const webRTCInstance = new EventEmitter() as SimplePeerInstance
 
@@ -140,8 +126,8 @@ describe('test webrtc connection', function () {
 
     const conn = new WebRTCConnection(
       {
-        source: BobAlice.source,
-        sink: AliceBob.sink,
+        _counterparty: Bob,
+        ...BobAlice,
         state: {
           channel: webRTCInstance
         }
@@ -150,10 +136,7 @@ describe('test webrtc connection', function () {
     )
 
     const AliceShaker = handshake(conn)
-    const BobShaker = handshake({
-      source: AliceBob.source,
-      sink: BobAlice.sink
-    })
+    const BobShaker = handshake(AliceBob)
 
     webRTCInstance.emit(`error`)
 
@@ -183,7 +166,8 @@ describe('test webrtc connection', function () {
 
     const conn = new WebRTCConnection(
       {
-        ...AliceBob,
+        _counterparty: Bob,
+        ...BobAlice,
         sendUpgraded: () => {},
         state: {
           channel: webRTCInstance
@@ -193,7 +177,7 @@ describe('test webrtc connection', function () {
     )
 
     const AliceShaker = handshake(conn)
-    const BobShaker = handshake(BobAlice)
+    const BobShaker = handshake(AliceBob)
 
     const firstMessage = new TextEncoder().encode(`first message`)
     AliceShaker.write(firstMessage)
@@ -243,7 +227,8 @@ describe('test webrtc connection', function () {
 
     const conn = new WebRTCConnection(
       {
-        ...AliceBob,
+        _counterparty: Bob,
+        ...BobAlice,
         remoteAddr: new Multiaddr(`/p2p/${Bob.toString()}`),
         sendUpgraded: () => {},
         state: {
@@ -254,7 +239,7 @@ describe('test webrtc connection', function () {
     )
 
     const AliceShaker = handshake(conn)
-    const BobShaker = handshake(BobAlice)
+    const BobShaker = handshake(AliceBob)
 
     const firstMessage = new TextEncoder().encode(`first message`)
     AliceShaker.write(firstMessage)
@@ -295,7 +280,7 @@ describe('test webrtc connection', function () {
   })
 
   it('use abortController to end stream', async function () {
-    const [AliceBob, _BobAlice] = duplexPair<StreamType>()
+    const [_AliceBob, BobAlice] = duplexPair<StreamType>()
 
     const webRTCInstance = new EventEmitter() as SimplePeerInstance
 
@@ -307,7 +292,7 @@ describe('test webrtc connection', function () {
 
     const conn = new WebRTCConnection(
       {
-        ...AliceBob,
+        ...BobAlice,
         state: {
           channel: webRTCInstance
         }
@@ -333,7 +318,7 @@ describe('test webrtc connection', function () {
 
 describe('webrtc connection - stream error propagation', function () {
   it('falsy sink', async function () {
-    const BobAlice = pair<StreamType>()
+    const [_AliceBob, BobAlice] = duplexPair<StreamType>()
 
     const falsySinkError = 'falsy sink error'
 
@@ -369,7 +354,7 @@ describe('webrtc connection - stream error propagation', function () {
   })
 
   it('falsy sink before sink source attach', async function () {
-    const BobAlice = pair<StreamType>()
+    const [_AliceBob, BobAlice] = duplexPair<StreamType>()
 
     const falsySinkError = 'falsy sink error'
 
@@ -432,7 +417,7 @@ describe('webrtc connection - stream error propagation', function () {
   })
 
   it('falsy source', async function () {
-    const AliceBob = pair<StreamType>()
+    const [AliceBob, _BobAlice] = duplexPair<StreamType>()
 
     const fakedWebRTCInstance = new EventEmitter() as SimplePeerInstance
 

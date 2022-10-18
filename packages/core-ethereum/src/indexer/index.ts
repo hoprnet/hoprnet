@@ -123,7 +123,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     // and feeds them to the event listener
     ;(async function (this: Indexer) {
       for await (const block of orderedBlocks.iterator()) {
-        await this.onNewBlock(block.value, true, true) // exceptions are handled
+        await this.onNewBlock(block.value, true, true) // exceptions are handled (for real)
       }
     }.call(this))
 
@@ -533,7 +533,11 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       }
     }
 
-    await this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot, blocking)
+    try {
+      await this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot, blocking)
+    } catch (err) {
+      log(`error while processing unconfirmed events`, err)
+    }
 
     // resend queuing transactions, when there are transactions (in queue) that haven't been accepted by the RPC
     // and resend transactions if the current balance is sufficient.
@@ -794,8 +798,14 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdated'>, lastSnapshot: Snapshot): Promise<void> {
-    log('channel-updated for hash %s', event.transactionHash)
-    const channel = await ChannelEntry.fromSCEvent(event, this.getPublicKeyOf.bind(this))
+    let channel: ChannelEntry
+    try {
+      log('channel-updated for hash %s', event.transactionHash)
+      channel = await ChannelEntry.fromSCEvent(event, this.getPublicKeyOf.bind(this))
+    } catch (err) {
+      log(`fatal error: failed to construct new ChannelEntry from the SC event`, err)
+      return
+    }
 
     let prevState: ChannelEntry
     try {
@@ -953,23 +963,26 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     throw new Error('Could not find public key for address - have they announced? -' + address.toHex())
   }
 
-  public async getAddressesAnnouncedOnChain(): Promise<Multiaddr[]> {
-    return (await this.db.getAccounts()).map((account: AccountEntry) => account.multiAddr)
+  public async *getAddressesAnnouncedOnChain() {
+    for await (const account of this.db.getAccountsIterable()) {
+      yield account.multiAddr
+    }
   }
 
   public async getPublicNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
-    const accounts = await this.db.getAccounts((account: AccountEntry) => account.containsRouting)
+    const result: { id: PeerId; multiaddrs: Multiaddr[] }[] = []
+    let out = `Known public nodes:\n`
 
-    const result: { id: PeerId; multiaddrs: Multiaddr[] }[] = Array.from({ length: accounts.length })
-
-    log(`Known public nodes:`)
-    for (const [index, account] of accounts.entries()) {
-      result[index] = {
+    for await (const account of this.db.getAccountsIterable((account: AccountEntry) => account.containsRouting)) {
+      out += `  - ${account.getPeerId().toString()} ${account.multiAddr.toString()}\n`
+      result.push({
         id: account.getPeerId(),
         multiaddrs: [account.multiAddr]
-      }
-      log(`\t${account.getPeerId().toString()} ${account.multiAddr.toString()}`)
+      })
     }
+
+    // Remove last `\n`
+    log(out.substring(0, out.length - 1))
 
     return result
   }

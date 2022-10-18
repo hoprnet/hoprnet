@@ -1,11 +1,13 @@
-import type { HoprConnectOptions, PeerStoreType } from '../types.js'
+import type { HoprConnectOptions, PeerStoreType, StreamType } from '../types.js'
 import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Initializable, Components } from '@libp2p/interfaces/components'
 import type { Startable } from '@libp2p/interfaces/startable'
 import { Multiaddr } from '@multiformats/multiaddr'
+import { peerIdFromString } from '@libp2p/peer-id'
+import { handshake } from 'it-handshake'
+
 import type { HoprConnect } from '../index.js'
-import { peerIdFromBytes, peerIdFromString } from '@libp2p/peer-id'
 
 import errCode from 'err-code'
 import { EventEmitter } from 'events'
@@ -40,7 +42,6 @@ import { attemptClose, relayFromRelayAddress } from '../utils/index.js'
 const DEBUG_PREFIX = 'hopr-connect:entry'
 const log = Debug(DEBUG_PREFIX)
 const error = Debug(DEBUG_PREFIX.concat(':error'))
-const verbose = Debug(DEBUG_PREFIX.concat(':verbose'))
 
 const ENTRY_NODE_CONTACT_TIMEOUT = 5e3
 const ENTRY_NODES_MAX_PARALLEL_DIALS = 14
@@ -279,7 +280,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
   private _onNewRelay: ((peer: PeerStoreType) => void) | undefined
   private _onRemoveRelay: ((peer: PeerId) => void) | undefined
   private _connectToRelay: EntryNodes['connectToRelay'] | undefined
-  public _onEntryNodeDisconnect: EntryNodes['onEntryDisconnect'] | undefined
+
+  private disconnectListener: ((conn: CustomEvent<Connection>) => void) | undefined
 
   private addToUpdateQueue: ReturnType<typeof oneAtATime>
 
@@ -330,7 +332,6 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    */
   public start() {
     this._connectToRelay = this.connectToRelay.bind(this)
-    this._onEntryNodeDisconnect = this.onEntryDisconnect.bind(this)
 
     if (this.options.publicNodes != undefined) {
       this._onNewRelay = (peer: PeerStoreType) => {
@@ -413,16 +414,24 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
   }
 
   /**
-   * Called once connection to an entry node gets closed.
-   * @param ma disconnected Multiaddr
+   * Used to track once a connection to a selected entry node got closed.
    */
-  // @TODO add this call to "global" queue
-  private async onEntryDisconnect(ma: Multiaddr) {
-    const tuples = ma.tuples() as [code: number, addr: Uint8Array][]
-    const peer = peerIdFromBytes(tuples[2][1].slice(1))
+  private trackEntryNodeConnections(): void {
+    const usedRelays = new Set(this.getUsedRelayPeerIds().map((p: PeerId) => p.toString()))
 
-    log(`Disconnected from entry node ${peer.toString()}, trying to reconnect ...`)
-    this.addToUpdateQueue(() => this.reconnectToEntryNode(peer))
+    if (this.disconnectListener != undefined) {
+      this.getComponents().getConnectionManager().removeEventListener('peer:disconnect', this.disconnectListener)
+    }
+    this.disconnectListener = (event: CustomEvent<Connection>) => {
+      const remotePeer = event.detail.remotePeer
+
+      if (usedRelays.has(remotePeer.toString())) {
+        log(`Disconnected from entry node ${remotePeer.toString()}, trying to reconnect ...`)
+        this.addToUpdateQueue(() => this.reconnectToEntryNode(remotePeer))
+      }
+    }
+
+    this.getComponents().getConnectionManager().addEventListener('peer:disconnect', this.disconnectListener)
   }
 
   private async reconnectToEntryNode(peer: PeerId) {
@@ -719,6 +728,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
         await this.updatePublicNodes()
       } else {
         this.updateUsedRelays([[peer.toString(), [undefined]]])
+        this.trackEntryNodeConnections()
         this.emit(RELAY_CHANGED_EVENT)
       }
     }
@@ -959,6 +969,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     if (isDifferent) {
       log(printListOfUsedRelays(this.usedRelays, `Updated list of entry nodes:`))
 
+      this.trackEntryNodeConnections()
       this.emit(RELAY_CHANGED_EVENT)
     }
   }
@@ -969,14 +980,12 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    * @param destination peer to connect to
    * @param destinationAddress address to use for connect attempt
    * @param timeout when to timeout
-   * @param onDisconnect called once connection gets closed
    * @returns either a connection result or nothing, if there was an error
    */
   private async establishNewConnection(
     destination: PeerId,
     destinationAddress: Multiaddr,
-    timeout: number,
-    onDisconnect: (ma: Multiaddr) => void
+    timeout: number
   ): Promise<ConnResult | void> {
     const abort = new AbortController()
     let done = false
@@ -993,8 +1002,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       conn = await this.dialDirectly(destinationAddress, {
         signal: abort.signal,
         // libp2p interface type clash
-        upgrader: this.getComponents().getUpgrader() as any,
-        onDisconnect
+        upgrader: this.getComponents().getUpgrader() as any
       })
     } catch (err: any) {
       error(`error while contacting entry node ${destination.toString()}.`, err?.message)
@@ -1046,12 +1054,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     let conn = await tryExistingConnections(this.getComponents(), id, protocolsCanRelay)
 
     if (conn == null) {
-      conn = await this.establishNewConnection(
-        id,
-        relay,
-        timeout,
-        this._onEntryNodeDisconnect as EntryNodes['onEntryDisconnect']
-      )
+      conn = await this.establishNewConnection(id, relay, timeout)
     }
 
     if (conn == null) {
@@ -1064,42 +1067,39 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       }
     }
 
-    let done = false
+    // Only reads from socket once but keeps socket open
+    // to eventually use it to exchange signalling information
+    const shaker = handshake(conn.stream)
 
-    // calls the iterator, thereby starts the stream and
-    // consumes the first messages, afterwards closes the stream
-    for await (const msg of conn.stream.source as AsyncIterable<Uint8Array>) {
-      verbose(`can relay received ${new TextDecoder().decode(msg.subarray())} from ${id.toString()}`)
-      if (u8aEquals(msg.subarray(), OK)) {
-        done = true
-      }
-      // End receive stream after first message
-      break
-    }
-
+    let chunk: StreamType | undefined
     try {
-      // End the send stream by sending nothing
-      conn.stream.sink((async function* () {})()).catch(error)
+      chunk = await shaker.read()
     } catch (err) {
       error(err)
-    }
-
-    if (done) {
-      return {
-        conn: conn.conn,
-        entry: {
-          id,
-          multiaddrs: [relay],
-          latency: Date.now() - start
-        }
-      }
-    } else {
       return {
         entry: {
           id,
           multiaddrs: [relay],
           latency: -1
         }
+      }
+    }
+
+    if (chunk == undefined || !u8aEquals(chunk.subarray(), OK)) {
+      return {
+        entry: {
+          id,
+          multiaddrs: [relay],
+          latency: -1
+        }
+      }
+    }
+
+    return {
+      entry: {
+        id,
+        multiaddrs: [relay],
+        latency: Date.now() - start
       }
     }
   }

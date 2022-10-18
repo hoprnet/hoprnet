@@ -14,7 +14,8 @@ import {
   SUGGESTED_BALANCE,
   SUGGESTED_NATIVE_BALANCE,
   debug,
-  startResourceUsageLogger
+  startResourceUsageLogger,
+  retimer
 } from '@hoprnet/hopr-utils'
 import type { WebSocket } from 'ws'
 
@@ -156,8 +157,16 @@ export function showDisclaimer(logs: LogStream) {
 }
 
 export async function startConnectionReports(node: Hopr, logs: LogStream) {
-  logs.logConnectedPeers(node.getConnectedPeers().map((p) => p.toString()))
-  setInterval(() => {
-    logs.logConnectedPeers(node.getConnectedPeers().map((p) => p.toString()))
-  }, 60 * 1000)
+  const printConnectedPeers = () => {
+    const peers = node.getConnectedPeers()
+    logs.logConnectedPeers(
+      (function* () {
+        for (const peerId of peers) {
+          yield peerId.toString()
+        }
+      })()
+    )
+  }
+
+  retimer(printConnectedPeers, () => 60 * 1000)
 }

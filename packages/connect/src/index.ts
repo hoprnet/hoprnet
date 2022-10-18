@@ -327,21 +327,21 @@ class HoprConnect implements Transport, Initializable, Startable {
     // i.e. dialed node == desired destination
 
     // Set the SO_KEEPALIVE flag on socket to tell kernel to be more aggressive on keeping the connection up
-    maConn.conn.setKeepAlive(true, 1000)
+    maConn.socket.setKeepAlive(true, 1000)
 
-    maConn.conn.on('end', function () {
+    maConn.socket.on('end', function () {
       log(`SOCKET END on connection to ${maConn.remoteAddr.toString()}: other end of the socket sent a FIN packet`)
     })
 
-    maConn.conn.on('timeout', function () {
+    maConn.socket.on('timeout', function () {
       warn(`SOCKET TIMEOUT on connection to ${maConn.remoteAddr.toString()}`)
     })
 
-    maConn.conn.on('error', function (e) {
+    maConn.socket.on('error', function (e) {
       error(`SOCKET ERROR on connection to ${maConn.remoteAddr.toString()}: ' ${JSON.stringify(e)}`)
     })
 
-    maConn.conn.on('close', (had_error) => {
+    maConn.socket.on('close', (had_error) => {
       log(`SOCKET CLOSE on connection to ${maConn.remoteAddr.toString()}: error flag is ${had_error}`)
       // Don't call the disconnect handler if connection has been closed intentionally
       if (!maConn.closed && options && options.onDisconnect) {

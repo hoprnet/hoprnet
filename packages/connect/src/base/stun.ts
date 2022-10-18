@@ -5,6 +5,8 @@ import { Multiaddr } from '@multiformats/multiaddr'
 import debug from 'debug'
 import { randomSubset, ipToU8aAddress, isLocalhost, isPrivateAddress } from '@hoprnet/hopr-utils'
 import { CODE_IP4, CODE_IP6, CODE_DNS4, CODE_DNS6 } from '../constants.js'
+// @ts-ignore untyped module
+import retimer from 'retimer'
 
 const log = debug('hopr-connect:stun:error')
 const error = debug('hopr-connect:stun:error')
@@ -233,19 +235,19 @@ function decodeIncomingSTUNResponses(addrs: Request[], socket: Socket, ms: numbe
 
       socket.removeListener('message', listener)
 
-      clearTimeout(timeout)
+      timer.clear()
 
       resolve(addrs)
     }
 
-    const timeout = setTimeout(() => {
+    const timer = retimer(() => {
       log(
         `STUN timeout. ${addrs.filter((addr) => addr.response).length} of ${
           addrs.length
         } selected STUN servers replied.`
       )
       done()
-    }, ms).unref()
+    }, ms)
 
     // Receiving a Buffer, not a Uint8Array
     listener = (msg: Buffer) => {

@@ -33,8 +33,6 @@ const TESTING_ENVIRONMENT = 'unit-testing'
 
 // Overwrite default timeouts with shorter ones for unit testing
 const SHORT_TIMEOUTS: Partial<HeartbeatConfig> = {
-  heartbeatDialTimeout: 50,
-  heartbeatRunTimeout: 100,
   heartbeatInterval: 200,
   heartbeatVariance: 1,
   networkQualityThreshold: 0.5
@@ -75,11 +73,11 @@ function createFakeNetwork() {
     protocols: string | string[],
     handler: (msg: Uint8Array, remotePeer: PeerId) => Promise<Uint8Array>
   ) => {
-    let protocol
-    if (typeof protocols === 'string') {
-      protocol = protocols
+    let protocol: string
+    if (Array.isArray(protocols)) {
+      protocol = protocols[0]
     } else {
-      protocol = protocol[0]
+      protocol = protocols
     }
 
     network.on(reqEventName(self, protocol), async (from: PeerId, request: Uint8Array) => {
@@ -93,11 +91,11 @@ function createFakeNetwork() {
 
   // mocks libp2p.dialProtocol
   const sendMessage = async (self: PeerId, dest: PeerId, protocols: string | string[], msg: Uint8Array) => {
-    let protocol
-    if (typeof protocols === 'string') {
-      protocol = protocols
+    let protocol: string
+    if (Array.isArray(protocols)) {
+      protocol = protocols[0]
     } else {
-      protocol = protocol[0]
+      protocol = protocols
     }
 
     if (network.listenerCount(reqEventName(dest, protocol)) > 0) {

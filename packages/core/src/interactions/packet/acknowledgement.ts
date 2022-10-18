@@ -134,7 +134,7 @@ export async function subscribeToAcknowledgements(
   onAcknowledgement: OnAcknowledgement,
   onWinningTicket: OnWinningTicket,
   onOutOfCommitments: OnOutOfCommitments,
-  protocolAck: string
+  protocolAck: string | string[]
 ) {
   const limitConcurrency = oneAtATime<void>()
   await subscribe(
@@ -156,7 +156,7 @@ export async function sendAcknowledgement(
   destination: PeerId,
   sendMessage: SendMessage,
   privKey: PeerId,
-  protocolAck: string
+  protocolAck: string | string[]
 ): Promise<void> {
   const ack = packet.createAcknowledgement(privKey)
 

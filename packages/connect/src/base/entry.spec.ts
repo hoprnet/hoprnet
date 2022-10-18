@@ -13,7 +13,13 @@ import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
 import type { Components } from '@libp2p/interfaces/components'
 import type { AbortOptions } from '@libp2p/interfaces'
 import { privKeyToPeerId, defer, createCircuitAddress } from '@hoprnet/hopr-utils'
+import { CustomEvent, EventEmitter as TypedEventEmitter } from '@libp2p/interfaces/events'
 
+class MyConnectionManager extends TypedEventEmitter<any> {
+  public getConnections(_peer: PeerId | undefined, _options?: AbortOptions): Connection[] {
+    return []
+  }
+}
 /**
  * Decorated EntryNodes class that allows direct access
  * to protected class elements
@@ -47,14 +53,7 @@ class TestingEntryNodes extends EntryNodes {
 }
 
 function createFakeComponents(peerId: PeerId) {
-  const getPeerId = () => peerId
-
-  const getConnectionManager = () =>
-    ({
-      getConnections(_peer: PeerId | undefined, _options?: AbortOptions): Connection[] {
-        return []
-      }
-    } as Components['connectionManager'])
+  const connectionManager = new MyConnectionManager()
 
   const getUpgrader = () =>
     ({
@@ -63,8 +62,8 @@ function createFakeComponents(peerId: PeerId) {
     } as Components['upgrader'])
 
   return {
-    getPeerId,
-    getConnectionManager,
+    getPeerId: () => peerId,
+    getConnectionManager: () => connectionManager,
     getUpgrader
   } as Components
 }
@@ -648,6 +647,7 @@ describe('entry node functionality - event propagation', function () {
       }
     )
 
+    const components = createFakeComponents(peerId)
     entryNodes.init(createFakeComponents(peerId))
     entryNodes.start()
 
@@ -655,6 +655,14 @@ describe('entry node functionality - event propagation', function () {
 
     await once(entryNodes, RELAY_CHANGED_EVENT)
 
+    // intermediate solution
+    components.getConnectionManager().dispatchEvent(
+      new CustomEvent('peer:disconnect', {
+        detail: {
+          remotePeer: relay.id
+        }
+      })
+    )
     network.events.removeAllListeners(connectEvent(relay.multiaddrs[0].toString()))
 
     // "Shutdown" network connection to node
@@ -747,7 +755,9 @@ describe('entry node functionality - automatic reconnect', function () {
       }
     )
 
-    entryNodes.init(createFakeComponents(peerId))
+    const components = createFakeComponents(peerId)
+
+    entryNodes.init(components)
     entryNodes.start()
 
     const updated = once(entryNodes, RELAY_CHANGED_EVENT)
@@ -755,7 +765,16 @@ describe('entry node functionality - automatic reconnect', function () {
     await updated
 
     // Should eventually remove relay from list
-    network.close(relay.multiaddrs[0])
+    // intermediate solution
+    components.getConnectionManager().dispatchEvent(
+      new CustomEvent('peer:disconnect', {
+        detail: {
+          remotePeer: relay.id
+        }
+      })
+    )
+    network.events.removeAllListeners(connectEvent(relay.multiaddrs[0].toString()))
+
     await secondAttempt.promise
 
     // Wait for end of event loop
@@ -795,7 +814,8 @@ describe('entry node functionality - automatic reconnect', function () {
       }
     )
 
-    entryNodes.init(createFakeComponents(peerId))
+    const components = createFakeComponents(peerId)
+    entryNodes.init(components)
     entryNodes.start()
 
     const entryNodeAdded = once(entryNodes, RELAY_CHANGED_EVENT)
@@ -807,6 +827,13 @@ describe('entry node functionality - automatic reconnect', function () {
     const entryNodeRemoved = once(entryNodes, RELAY_CHANGED_EVENT)
 
     // "Shutdown" node
+    components.getConnectionManager().dispatchEvent(
+      new CustomEvent('peer:disconnect', {
+        detail: {
+          remotePeer: relay.id
+        }
+      })
+    )
     network.events.removeAllListeners(connectEvent(relay.multiaddrs[0].toString()))
     network.close(relay.multiaddrs[0])
 
@@ -927,7 +954,8 @@ describe('entry node functionality - min relays per node', function () {
       }
     )
 
-    entryNodes.init(createFakeComponents(peerId))
+    const components = createFakeComponents(peerId)
+    entryNodes.init(components)
     entryNodes.start()
 
     entryNodes.availableEntryNodes.push(
@@ -943,8 +971,16 @@ describe('entry node functionality - min relays per node', function () {
     await relayListUpdated
 
     const secondRelayListUpdate = once(entryNodes, RELAY_CHANGED_EVENT)
-    // // Should eventually remove relay from list
-    network.close(firstPeerStoreEntry.multiaddrs[0])
+
+    // intermediate solution
+    components.getConnectionManager().dispatchEvent(
+      new CustomEvent('peer:disconnect', {
+        detail: {
+          remotePeer: firstPeerStoreEntry.id
+        }
+      })
+    )
+    network.events.removeAllListeners(connectEvent(firstPeerStoreEntry.multiaddrs[0].toString()))
 
     await secondRelayListUpdate
 

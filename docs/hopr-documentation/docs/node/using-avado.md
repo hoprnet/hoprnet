@@ -11,12 +11,12 @@ Please withdraw all your funds and delete the old package before installing a ne
 
 ## Installing the HOPR Client
 
-While connected to your AVADO's network or via a VPN, go to the following [link](http://my.ava.do/#/installer/%2Fipfs%2FQmPhSZTZbM6kd9VizvZpKDN3fQe5bqvCDooCBPYEUXdTcy). Just click the install button and wait until the download completes.
+While connected to your AVADO's network or via a VPN, go to the following [link](http://my.ava.do/#/installer/%2Fipfs%2FQmQQY78ivW7R1KGM27kyrDtpKhK7xktQoC6ZRTebBVGrnA). Just click the install button and wait until the download completes.
 
 If you are unable to use the link above, search for this hash in the AVADO DappStore:
 
 ```
-/ipfs/QmUAQUZ5zmN3te6kKg42cmRnRTV8trCeaHrdFNU1tTbSub
+/ipfs/QmQQY78ivW7R1KGM27kyrDtpKhK7xktQoC6ZRTebBVGrnA
 ```
 
 ![DappStore](/img/node/avado-1.png)
@@ -30,6 +30,22 @@ Your **security token** is set to `!5qxc9Lp1BE7IFQ-nrtttU`. You will need this t
 If you are in the process of registering your node on the network registry, please complete the process [here](./network-registry-tutorial.md) before continuing.
 
 Otherwise, the installation process is complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).
+
+### Alternative method: using your identity file
+
+If you have previously installed a node and have the [identity file downloaded](using-hopr-admin#backing-up-your-identity-file), you can use it to restore your old node.
+
+**Note:** The backup you downloaded will be a zipped folder. If you haven't already, you need to extract this folder to [find the identity file](using-hopr-admin#how-to-view-your-avado-identity-file).
+
+(**1**) Locate your HOPR package and click on the manage icon. From there, scroll down to the file manager.
+
+![avado upload](./images/avado-db.png)
+
+(**2**) Click on `Browse` button to the right of the first text field under `Upload to DNP`.
+
+(**3**) Open your identity file when prompted.
+
+(**4**) In the second text field, paste `/app/hoprd-db`, then click `Upload` to the right of the text field.
 
 ## Collecting Logs
 

@@ -1,6 +1,7 @@
 import type NetworkPeers from './network-peers.js'
 import type AccessControl from './access-control.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
+
 import {
   randomInteger,
   u8aEquals,
@@ -14,6 +15,7 @@ import {
   create_counter
 } from '@hoprnet/hopr-utils'
 import { HEARTBEAT_TIMEOUT } from '../constants.js'
+
 import { createHash, randomBytes } from 'crypto'
 
 import type { Subscribe, SendMessage } from '../index.js'
@@ -32,7 +34,6 @@ const NORMALIZED_VERSION = pickVersion(pkg.version)
 const PING_HASH_ALGORITHM = 'blake2s256'
 
 const MAX_PARALLEL_HEARTBEATS = 14
-const HEARTBEAT_RUN_TIMEOUT = 2 * 60 * 1000 // 2 minutes
 
 // Metrics
 const metric_networkHealth = create_gauge('core_gauge_network_health', 'Connectivity health indicator')
@@ -52,8 +53,6 @@ export type HeartbeatPingResult = {
 }
 
 export type HeartbeatConfig = {
-  heartbeatDialTimeout: number
-  heartbeatRunTimeout: number
   maxParallelHeartbeats: number
   heartbeatVariance: number
   heartbeatInterval: number
@@ -75,9 +74,7 @@ export enum NetworkHealthIndicator {
 
 export default class Heartbeat {
   private stopHeartbeatInterval: (() => void) | undefined
-  private protocolHeartbeat: string
-
-  private _pingNode: Heartbeat['pingNode'] | undefined
+  private protocolHeartbeat: string | string[]
 
   // Initial network health is always RED
   private currentHealth: NetworkHealthIndicator = NetworkHealthIndicator.UNKNOWN
@@ -96,15 +93,18 @@ export default class Heartbeat {
     config?: Partial<HeartbeatConfig>
   ) {
     this.config = {
-      heartbeatDialTimeout: config?.heartbeatDialTimeout ?? HEARTBEAT_TIMEOUT,
-      heartbeatRunTimeout: config?.heartbeatRunTimeout ?? HEARTBEAT_RUN_TIMEOUT,
       heartbeatInterval: config?.heartbeatInterval,
       heartbeatThreshold: config?.heartbeatThreshold,
       heartbeatVariance: config?.heartbeatVariance,
       networkQualityThreshold: config?.networkQualityThreshold,
       maxParallelHeartbeats: config?.maxParallelHeartbeats ?? MAX_PARALLEL_HEARTBEATS
     }
-    this.protocolHeartbeat = `/hopr/${environmentId}/heartbeat/${NORMALIZED_VERSION}`
+    this.protocolHeartbeat = [
+      // current
+      `/hopr/${environmentId}/heartbeat/${NORMALIZED_VERSION}`,
+      // deprecated
+      `/hopr/${environmentId}/heartbeat`
+    ]
   }
 
   private errHandler(err: any) {
@@ -114,7 +114,7 @@ export default class Heartbeat {
   public async start() {
     await this.subscribe(this.protocolHeartbeat, this.handleHeartbeatRequest.bind(this), true, this.errHandler)
 
-    this._pingNode = this.pingNode.bind(this)
+    this.pingNode = this.pingNode.bind(this)
     this.startHeartbeatInterval()
     log(`Heartbeat started`)
   }
@@ -144,11 +144,10 @@ export default class Heartbeat {
   /**
    * Attempts to ping another peer.
    * @param destination id of the node to ping
-   * @param signal [optional] abort controller to prematurely end request
    * @returns a Promise of a pingResult object with property `lastSeen < 0` if there were a timeout
    */
-  public async pingNode(destination: PeerId, signal?: AbortSignal): Promise<HeartbeatPingResult> {
-    log(`ping ${destination.toString()} (timeout ${this.config.heartbeatDialTimeout})`)
+  public async pingNode(destination: PeerId): Promise<HeartbeatPingResult> {
+    log(`ping ${destination.toString()}`)
 
     const origin = this.networkPeers.has(destination)
       ? this.networkPeers.getConnectionInfo(destination).origin
@@ -160,10 +159,7 @@ export default class Heartbeat {
     let pingResponse: Uint8Array[] | undefined
 
     try {
-      pingResponse = await this.sendMessage(destination, this.protocolHeartbeat, challenge, true, {
-        timeout: this.config.heartbeatDialTimeout,
-        signal
-      })
+      pingResponse = await this.sendMessage(destination, this.protocolHeartbeat, challenge, true)
     } catch (err) {
       log(`Connection to ${destination.toString()} failed: ${err?.message}`)
 
@@ -260,33 +256,24 @@ export default class Heartbeat {
     const thresholdTime = Date.now() - this.config.heartbeatThreshold
     log(`Checking nodes since ${thresholdTime} (${new Date(thresholdTime).toLocaleString()})`)
 
-    const abort = new AbortController()
-
-    let finished = false
-
-    setTimeout(() => {
-      if (!finished) {
-        abort.abort()
-      }
-    }, this.config.heartbeatRunTimeout).unref()
-
     // Create an object that describes which work has to be done
     // by the workers, i.e. the pingNode code
     const metric_timer = metric_timeToHeartbeat.start_measure()
     const pingWork = this.networkPeers
       .pingSince(thresholdTime)
-      .map<[destination: PeerId, signal: AbortSignal]>((peerToPing: PeerId) => [peerToPing, abort.signal])
+      .map<[destination: PeerId]>((peerToPing: PeerId) => [peerToPing])
 
     const start = Date.now()
     const pingResults = await nAtATime(this._pingNode, pingWork, this.config.maxParallelHeartbeats)
     metric_timeToHeartbeat.record_measure(metric_timer)
 
-    finished = true
+    // Will handle timeouts automatically
+    const pingResults = await nAtATime(this.pingNode, pingWork, this.config.maxParallelHeartbeats)
 
     for (const [resultIndex, pingResult] of pingResults.entries()) {
       if (pingResult instanceof Error) {
         // we need to get the destination so we can map a ping error properly
-        const [destination, _abortSignal] = pingWork[resultIndex]
+        const [destination] = pingWork[resultIndex]
         const failedPingResult = {
           destination,
           lastSeen: -1
