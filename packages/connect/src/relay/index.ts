@@ -62,7 +62,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     this._isStarted = false
 
     log(`relay testing options`, testingOptions)
-    this.relayState = new RelayState()
+    this.relayState = new RelayState(options)
 
     this.options.maxRelayedConnections ??= DEFAULT_MAX_RELAYED_CONNECTIONS
 

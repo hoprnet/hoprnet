@@ -184,15 +184,7 @@ class RelayState {
     return function (this: RelayState) {
       const id = RelayState.getId(source, destination)
 
-      let found = this.relayedConnections.get(id)
-
-      if (found) {
-        delete found[source.toString()]
-
-        if (!found.hasOwnProperty(destination.toString())) {
-          this.relayedConnections.delete(id)
-        }
-      }
+      this.relayedConnections.delete(id)
     }.bind(this)
   }
 
