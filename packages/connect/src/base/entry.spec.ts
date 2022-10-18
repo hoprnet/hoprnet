@@ -1,23 +1,30 @@
 import { EntryNodes, RELAY_CHANGED_EVENT } from './entry.js'
-import { createPeerId, getPeerStoreEntry } from './utils.spec.js'
-import { OK } from '../constants.js'
-import type { PeerStoreType, PublicNodesEmitter } from '../types.js'
+import { getPeerStoreEntry } from './utils.spec.js'
+import { CAN_RELAY_PROTOCOLS, OK } from '../constants.js'
+import type { PeerStoreType, PublicNodesEmitter, Stream } from '../types.js'
+import {} from '@libp2p/peer-store'
 
 import assert from 'assert'
 import { once, EventEmitter } from 'events'
 
 import type { PeerId } from '@libp2p/interface-peer-id'
-import type { DialOptions } from '@libp2p/interface-transport'
 import { Multiaddr } from '@multiformats/multiaddr'
-import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
-import type { Components } from '@libp2p/interfaces/components'
-import type { AbortOptions } from '@libp2p/interfaces'
-import { privKeyToPeerId, defer, createCircuitAddress } from '@hoprnet/hopr-utils'
-import { CustomEvent, EventEmitter as TypedEventEmitter } from '@libp2p/interfaces/events'
 
-class MyConnectionManager extends TypedEventEmitter<any> {
-  public getConnections(_peer: PeerId | undefined, _options?: AbortOptions): Connection[] {
-    return []
+import { privKeyToPeerId, defer, createCircuitAddress } from '@hoprnet/hopr-utils'
+import { peerIdFromString } from '@libp2p/peer-id'
+import { createFakeComponents, createFakeNetwork, connectEvent } from '../utils/libp2p.mock.spec.js'
+
+async function handleDefaultStream(stream: Stream, throwError: boolean = false) {
+  stream.sink(
+    (async function* () {
+      if (throwError) {
+        throw Error(`boom - protocol error`)
+      } else {
+        yield OK
+      }
+    })()
+  )
+  for await (const _msg of stream.source) {
   }
 }
 /**
@@ -52,101 +59,14 @@ class TestingEntryNodes extends EntryNodes {
   }
 }
 
-function createFakeComponents(peerId: PeerId) {
-  const connectionManager = new MyConnectionManager()
-
-  const getUpgrader = () =>
-    ({
-      upgradeInbound: (x: any) => x,
-      upgradeOutbound: (x: any) => x
-    } as Components['upgrader'])
-
-  return {
-    getPeerId: () => peerId,
-    getConnectionManager: () => connectionManager,
-    getUpgrader
-  } as Components
-}
-
-function connectEvent(addr: string): string {
-  return `connect:${addr}`
-}
-
-function disconnectEvent(addr: string) {
-  return `disconnect:${addr}`
-}
-
-function fakeConnection(throwError: boolean = false): Connection {
-  const conn = {
-    _closed: false,
-    close: async () => {
-      // @ts-ignore
-      conn._closed = true
-    },
-    newStream: (_protocols: string[]) =>
-      Promise.resolve({
-        stream: {
-          source: (async function* () {
-            if (throwError) {
-              throw Error(`boom - protocol error`)
-            } else {
-              yield OK
-            }
-          })() as AsyncIterable<Uint8Array>,
-          sink: async (source: AsyncIterableIterator<any>) => {
-            // consume the send stream
-            for await (const _sth of source) {
-            }
-          }
-        } as ProtocolStream['stream']
-      })
-  } as unknown as Connection
-
-  return conn as Connection
-}
-
-function createFakeNetwork() {
-  const network = new EventEmitter()
-
-  const listen = (addr: string) => {
-    const emitter = new EventEmitter()
-    network.on(connectEvent(addr), () => emitter.emit('connected'))
-
-    return emitter
-  }
-
-  const connect = (ma: Multiaddr, _opts: DialOptions) => {
-    const addr = ma.toString()
-
-    if (network.listeners(connectEvent(addr)).length >= 1) {
-      network.emit(connectEvent(addr))
-
-      return Promise.resolve(fakeConnection())
-    } else {
-      return Promise.resolve(undefined)
-    }
-  }
-
-  const close = (ma: Multiaddr) => {
-    network.emit(disconnectEvent(ma.toString()), ma)
-  }
-
-  return {
-    events: network,
-    listen,
-    connect,
-    close,
-    stop: network.removeAllListeners.bind(network)
-  }
-}
-
-const peerId = createPeerId()
+const peerId = peerIdFromString(`16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit`)
+const secondPeer = peerIdFromString(`16Uiu2HAmLpqczAGfgmJchVgVk233rmB2T3DSn2gPG6JMa5brEHZ1`)
 
 describe('entry node functionality - basic functionality', function () {
-  it('add public nodes', function () {
+  it('add public nodes', async function () {
+    const network = createFakeNetwork()
     const maxRelaysPerNode = 2
     const entryNodes = new TestingEntryNodes(
-      undefined as any,
       {},
       {
         maxRelaysPerNode,
@@ -154,7 +74,7 @@ describe('entry node functionality - basic functionality', function () {
       }
     )
 
-    entryNodes.init(createFakeComponents(peerId))
+    entryNodes.init(await createFakeComponents(peerId, network))
     entryNodes.start()
 
     const peerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/0`)
@@ -173,12 +93,12 @@ describe('entry node functionality - basic functionality', function () {
     assert(uncheckedNodes[0].multiaddrs.length == peerStoreEntry.multiaddrs.length, `must not contain more multiaddrs`)
 
     entryNodes.stop()
+    network.stop()
   })
 
   it('remove an offline node', function () {
     const maxRelaysPerNode = 2
     const entryNodes = new TestingEntryNodes(
-      undefined as any,
       {},
       {
         maxRelaysPerNode,
@@ -206,10 +126,10 @@ describe('entry node functionality - basic functionality', function () {
     entryNodes.stop()
   })
 
-  it('update existing unchecked nodes', function () {
+  it('update existing unchecked nodes', async function () {
+    const network = createFakeNetwork()
     const maxRelaysPerNode = 2
     const entryNodes = new TestingEntryNodes(
-      undefined as any,
       {},
       {
         maxRelaysPerNode,
@@ -217,13 +137,11 @@ describe('entry node functionality - basic functionality', function () {
       }
     )
 
-    entryNodes.init(createFakeComponents(peerId))
+    entryNodes.init(await createFakeComponents(peerId, network))
     entryNodes.start()
 
-    const newPeer = createPeerId()
-
-    const firstPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/123`, newPeer)
-    const secondPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/456`, newPeer)
+    const firstPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/123`, secondPeer)
+    const secondPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/456`, secondPeer)
 
     // Don't contact any nodes
     entryNodes.usedRelays = Array.from({ length: maxRelaysPerNode }) as any
@@ -233,25 +151,25 @@ describe('entry node functionality - basic functionality', function () {
 
     assert(entryNodes.uncheckedEntryNodes.length == 1)
     assert(entryNodes.uncheckedEntryNodes[0].multiaddrs.length == 2)
+    network.stop()
   })
 
-  it('update addresses of available public nodes', function () {
+  it('update addresses of available public nodes', async function () {
+    const network = createFakeNetwork()
     const maxRelaysPerNode = 2
-    const entryNodes = new TestingEntryNodes(undefined as any, {})
+    const entryNodes = new TestingEntryNodes({})
 
-    entryNodes.init(createFakeComponents(peerId))
+    entryNodes.init(await createFakeComponents(peerId, network))
     entryNodes.start()
 
-    const newPeer = createPeerId()
-
-    const firstPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/123`, newPeer)
-    const secondPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/456`, newPeer)
+    const firstPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/123`, secondPeer)
+    const secondPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/456`, secondPeer)
 
     // Don't contact any nodes
     entryNodes.usedRelays = Array.from({ length: maxRelaysPerNode }) as any
 
     entryNodes.availableEntryNodes.push({
-      id: newPeer,
+      id: secondPeer,
       multiaddrs: [],
       latency: 23
     })
@@ -264,12 +182,13 @@ describe('entry node functionality - basic functionality', function () {
     assert(entryNodes.availableEntryNodes[0].multiaddrs.length == 2)
 
     entryNodes.stop()
+    network.stop()
   })
 
-  it('update addresses of offline public nodes', function () {
+  it('update addresses of offline public nodes', async function () {
+    const network = createFakeNetwork()
     const maxRelaysPerNode = 2
     const entryNodes = new TestingEntryNodes(
-      undefined as any,
       {},
       {
         maxRelaysPerNode,
@@ -277,19 +196,17 @@ describe('entry node functionality - basic functionality', function () {
       }
     )
 
-    entryNodes.init(createFakeComponents(peerId))
+    entryNodes.init(await createFakeComponents(peerId, network))
     entryNodes.start()
 
-    const newPeer = createPeerId()
-
-    const firstPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/123`, newPeer)
-    const secondPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/456`, newPeer)
+    const firstPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/123`, secondPeer)
+    const secondPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/456`, secondPeer)
 
     // Don't contact any nodes
     entryNodes.usedRelays = Array.from({ length: maxRelaysPerNode }) as any
 
     entryNodes.offlineEntryNodes.push({
-      id: newPeer,
+      id: secondPeer,
       multiaddrs: []
     })
 
@@ -301,6 +218,7 @@ describe('entry node functionality - basic functionality', function () {
     assert(entryNodes.offlineEntryNodes[0].multiaddrs.length == 2)
 
     entryNodes.stop()
+    network.stop()
   })
 })
 
@@ -310,19 +228,27 @@ describe('entry node functionality', function () {
 
     const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/12345`)
 
-    const relayListener = network.listen(relay.multiaddrs[0].toString())
+    await createFakeComponents(relay.id, network, {
+      protocols: [
+        [
+          CAN_RELAY_PROTOCOLS(),
+          ({ stream }) => {
+            return handleDefaultStream(stream)
+          }
+        ]
+      ],
+      listeningAddrs: relay.multiaddrs
+    })
 
-    const connectPromise = once(relayListener, 'connected')
+    const entryNodes = new TestingEntryNodes({ initialNodes: [relay] })
 
-    const entryNodes = new TestingEntryNodes(network.connect as any, { initialNodes: [relay] })
+    entryNodes.init(await createFakeComponents(peerId, network))
 
-    entryNodes.init(createFakeComponents(peerId))
+    // activate NAT functionalities
+    entryNodes.enable()
 
-    entryNodes.start()
-
-    await entryNodes.updatePublicNodes()
-
-    await connectPromise
+    // Automatically contacts entryNodes (as part of Node startup)
+    await entryNodes.afterStart()
 
     const availableEntryNodes = entryNodes.getAvailabeEntryNodes()
     assert(availableEntryNodes.length == 1, `must contain exactly one public node`)
@@ -332,18 +258,20 @@ describe('entry node functionality', function () {
     const usedRelays = entryNodes.getUsedRelayAddresses()
     assert(usedRelays != undefined, `must expose relay addrs`)
     assert(usedRelays.length == 1, `must expose exactly one relay addrs`)
-    assert(
-      usedRelays[0].toString() === `/p2p/${relay.id.toString()}/p2p-circuit`,
-      `must expose the right relay address`
-    )
+    assert(usedRelays[0].equals(createCircuitAddress(relay.id)), `must expose the right relay address`)
 
-    relayListener.removeAllListeners()
+    const usedRelayPeerIds = entryNodes.getUsedRelayPeerIds()
+    assert(usedRelayPeerIds != undefined, `must expose at least one peerId`)
+    assert(usedRelayPeerIds.length == 1, `must expose exactly one peerId`)
+    assert(usedRelayPeerIds[0].equals(relay.id))
+
     network.stop()
     entryNodes.stop()
   })
 
   it('respond with positive latencies, negative latencies, errors and undefined', async function () {
     // Should be all different from each other
+    const network = createFakeNetwork()
     const Alice = privKeyToPeerId('0xa544c6684d500b63f96bb6b4196b90a77e71da74f481578fb6e952422189f2bb')
     const Bob = privKeyToPeerId('0xbfdd91247bc19340fe6fc5e91358372ae15cc39a377e163167cfee3f48264fa1')
     const Chris = privKeyToPeerId('0xb0f7016efb37ecefedd7f26274870701adc607320e7ca4467af35ae35470e4ce')
@@ -354,21 +282,32 @@ describe('entry node functionality', function () {
     const thirdPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/3`, Chris)
     const fourthPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/4`, Dave)
 
+    await createFakeComponents(firstPeerStoreEntry.id, network, {
+      protocols: [
+        [
+          CAN_RELAY_PROTOCOLS(),
+          ({ stream }) => {
+            return handleDefaultStream(stream)
+          }
+        ]
+      ],
+      listeningAddrs: firstPeerStoreEntry.multiaddrs
+    })
+    await createFakeComponents(secondPeerStoreEntry.id, network, {
+      protocols: [
+        [
+          CAN_RELAY_PROTOCOLS(),
+          ({ stream }) => {
+            return handleDefaultStream(stream)
+          }
+        ]
+      ],
+      listeningAddrs: secondPeerStoreEntry.multiaddrs
+    })
+
     const entryNodeContactTimeout = 1e3
 
     const entryNodes = new TestingEntryNodes(
-      async (ma: Multiaddr) => {
-        switch (ma.toString()) {
-          case firstPeerStoreEntry.multiaddrs[0].toString():
-            return fakeConnection()
-          case secondPeerStoreEntry.multiaddrs[0].toString():
-            return fakeConnection()
-          case fourthPeerStoreEntry.multiaddrs[0].toString():
-            return fakeConnection(true)
-          default:
-            throw Error(`boom - connection error`)
-        }
-      },
       { initialNodes: [] },
       {
         maxRelaysPerNode: 1,
@@ -385,10 +324,27 @@ describe('entry node functionality', function () {
       firstPeerStoreEntry
     )
 
-    entryNodes.init(createFakeComponents(peerId))
-    entryNodes.start()
+    entryNodes.init(
+      await createFakeComponents(peerId, network, {
+        outerDial: (self: PeerId, ma: Multiaddr) => {
+          switch (ma.toString()) {
+            case firstPeerStoreEntry.multiaddrs[0].toString():
+              return network.connect(self, ma)
+            case secondPeerStoreEntry.multiaddrs[0].toString():
+              return network.connect(self, ma)
+            case fourthPeerStoreEntry.multiaddrs[0].toString():
+              return network.connect(self, ma, true)
+            default:
+              throw Error(`boom - connection error`)
+          }
+        }
+      })
+    )
 
-    await entryNodes.updatePublicNodes()
+    // activate NAT functionalities
+    entryNodes.enable()
+
+    await entryNodes.afterStart()
 
     assert(entryNodes.getUsedRelayPeerIds().length == 1)
     assert(entryNodes.getUsedRelayPeerIds()[0].equals(Bob))
@@ -401,6 +357,7 @@ describe('entry node functionality', function () {
     assert(entryNodes.offlineEntryNodes.some((node) => node.id.equals(Dave)))
 
     entryNodes.stop()
+    network.stop()
   })
 
   it('expose limited number of relay addresses', async function () {
@@ -409,38 +366,46 @@ describe('entry node functionality', function () {
     const maxParallelDials = 3
     const maxRelaysPerNode = maxParallelDials + 1
 
-    const relayNodes = Array.from<undefined, [Promise<any>, PeerStoreType, EventEmitter]>(
-      { length: maxRelaysPerNode },
-      (_value: undefined, index: number) => {
-        const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/${index}`)
+    const relayNodes = await Promise.all(
+      Array.from<undefined, Promise<PeerStoreType>>(
+        { length: maxRelaysPerNode },
+        async (_value: undefined, index: number) => {
+          const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/${index}`)
 
-        const relayListener = network.listen(relay.multiaddrs[0].toString())
+          await createFakeComponents(relay.id, network, {
+            protocols: [
+              [
+                CAN_RELAY_PROTOCOLS(),
+                ({ stream }) => {
+                  return handleDefaultStream(stream)
+                }
+              ]
+            ],
+            listeningAddrs: relay.multiaddrs
+          })
 
-        const connectPromise = once(relayListener, 'connected')
-
-        return [connectPromise, relay, relayListener]
-      }
+          return relay
+        }
+      )
     )
 
     const additionalOfflineNodes = [getPeerStoreEntry(`/ip4/127.0.0.1/tcp/23`)]
 
     const entryNodes = new TestingEntryNodes(
-      network.connect as any,
       {
-        initialNodes: relayNodes.map((relayNode) => relayNode[1]).concat(additionalOfflineNodes)
+        initialNodes: relayNodes.concat(additionalOfflineNodes)
       },
       {
         maxParallelDials
       }
     )
 
-    entryNodes.init(createFakeComponents(peerId))
+    entryNodes.init(await createFakeComponents(peerId, network))
 
-    entryNodes.start()
+    // activate NAT functionalities
+    entryNodes.enable()
 
-    await entryNodes.updatePublicNodes()
-
-    await Promise.all(relayNodes.map((relayNode) => relayNode[0]))
+    await entryNodes.afterStart()
 
     const usedRelays = entryNodes.getUsedRelayAddresses()
     assert(usedRelays != undefined, `must expose relay addresses`)
@@ -450,13 +415,12 @@ describe('entry node functionality', function () {
     assert(availableEntryNodes.length == maxParallelDials + 1)
     assert(
       relayNodes.every((relayNode) =>
-        availableEntryNodes.some((availableEntryNode) => availableEntryNode.id.equals(relayNode[1].id))
+        availableEntryNodes.some((availableEntryNode) => availableEntryNode.id.equals(relayNode.id))
       ),
       `must contain all relay nodes`
     )
 
     // cleanup
-    relayNodes.forEach((relayNode) => relayNode[2].removeAllListeners())
     network.stop()
     entryNodes.stop()
   })
@@ -467,13 +431,26 @@ describe('entry node functionality', function () {
     const newNode = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
     const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/2`)
 
-    const newNodeListener = network.listen(newNode.multiaddrs[0].toString())
+    await createFakeComponents(newNode.id, network, {
+      protocols: [
+        [
+          CAN_RELAY_PROTOCOLS(),
+          ({ stream }) => {
+            return handleDefaultStream(stream)
+          }
+        ]
+      ],
+      listeningAddrs: newNode.multiaddrs
+    })
 
-    const entryNodes = new TestingEntryNodes(network.connect as any, {})
+    const entryNodes = new TestingEntryNodes({})
 
-    entryNodes.init(createFakeComponents(peerId))
-    entryNodes.start()
+    entryNodes.init(await createFakeComponents(peerId, network))
 
+    // activate NAT functionalities
+    entryNodes.enable()
+
+    await entryNodes.afterStart()
     entryNodes.uncheckedEntryNodes.push(newNode)
 
     let usedRelay = {
@@ -487,22 +464,19 @@ describe('entry node functionality', function () {
     assert(entryNodes.getUsedRelayAddresses().length == 1)
     assert(entryNodes.getUncheckedEntryNodes().length == 1)
 
-    const connectPromise = once(newNodeListener, 'connected')
-
     const updatePromise = once(entryNodes, RELAY_CHANGED_EVENT)
 
-    entryNodes.onRemoveRelay(relay.id)
+    await entryNodes.onRemoveRelay(relay.id)
 
-    await Promise.all([connectPromise, updatePromise])
+    await updatePromise
 
     assert(entryNodes.getAvailabeEntryNodes().length == 1)
 
     const usedRelays = entryNodes.getUsedRelayAddresses()
     assert(entryNodes.getUsedRelayAddresses().length == 1)
 
-    assert(usedRelays[0].equals(new Multiaddr(`/p2p/${newNode.id.toString()}/p2p-circuit`)))
+    assert(usedRelays[0].equals(createCircuitAddress(newNode.id)))
 
-    newNodeListener.removeAllListeners()
     network.stop()
     entryNodes.stop()
   })
@@ -511,14 +485,27 @@ describe('entry node functionality', function () {
     const network = createFakeNetwork()
 
     const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
-    const relayListener = network.listen(relay.multiaddrs[0].toString())
 
-    const connectPromise = once(relayListener, 'connected')
+    await createFakeComponents(relay.id, network, {
+      protocols: [
+        [
+          CAN_RELAY_PROTOCOLS(),
+          ({ stream }) => {
+            return handleDefaultStream(stream)
+          }
+        ]
+      ],
+      listeningAddrs: relay.multiaddrs
+    })
 
-    const entryNodes = new TestingEntryNodes(network.connect as any, {})
+    const entryNodes = new TestingEntryNodes({})
 
-    entryNodes.init(createFakeComponents(peerId))
-    entryNodes.start()
+    entryNodes.init(await createFakeComponents(peerId, network))
+
+    // activate NAT functionalities
+    entryNodes.enable()
+
+    await entryNodes.afterStart()
 
     const fakeNode = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/2`)
 
@@ -527,18 +514,15 @@ describe('entry node functionality', function () {
 
     await entryNodes.updatePublicNodes()
 
-    await connectPromise
-
     const availableEntryNodes = entryNodes.getAvailabeEntryNodes()
     assert(availableEntryNodes.length == 1)
     assert(availableEntryNodes[0].id.equals(relay.id))
 
     const usedRelays = entryNodes.getUsedRelayAddresses()
     assert(usedRelays.length == 1)
-    assert(usedRelays[0].equals(new Multiaddr(`/p2p/${relay.id.toString()}/p2p-circuit`)))
+    assert(usedRelays[0].equals(createCircuitAddress(relay.id)))
 
     network.stop()
-    relayListener.removeAllListeners()
     entryNodes.stop()
   })
 
@@ -547,10 +531,14 @@ describe('entry node functionality', function () {
 
     const offlineRelay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
 
-    const entryNodes = new TestingEntryNodes(network.connect as any, {})
+    const entryNodes = new TestingEntryNodes({})
 
-    entryNodes.init(createFakeComponents(peerId))
-    entryNodes.start()
+    entryNodes.init(await createFakeComponents(peerId, network))
+
+    // activate NAT functionalities
+    entryNodes.enable()
+
+    await entryNodes.afterStart()
 
     entryNodes.uncheckedEntryNodes.push(offlineRelay)
 
@@ -564,12 +552,29 @@ describe('entry node functionality', function () {
   })
 
   it('do not emit listening event if nothing has changed', async function () {
-    const entryNodes = new TestingEntryNodes((async () => {}) as any, {})
-
-    entryNodes.init(createFakeComponents(peerId))
-    entryNodes.start()
+    const network = createFakeNetwork()
+    const entryNodes = new TestingEntryNodes({})
 
     const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
+
+    await createFakeComponents(relay.id, network, {
+      protocols: [
+        [
+          CAN_RELAY_PROTOCOLS(),
+          ({ stream }) => {
+            return handleDefaultStream(stream)
+          }
+        ]
+      ],
+      listeningAddrs: relay.multiaddrs
+    })
+
+    entryNodes.init(await createFakeComponents(peerId, network))
+
+    // activate NAT functionalities
+    entryNodes.enable()
+
+    await entryNodes.afterStart()
 
     let usedRelay = {
       relayDirectAddress: new Multiaddr(`/ip4/127.0.0.1/tcp/1`),
@@ -586,47 +591,49 @@ describe('entry node functionality', function () {
     await entryNodes.updatePublicNodes()
 
     const availableEntryNodes = entryNodes.getAvailabeEntryNodes()
-    assert(availableEntryNodes.length == 0)
+    assert(availableEntryNodes.length == 1)
+    assert(availableEntryNodes[0].id.equals(relay.id))
 
     const usedRelays = entryNodes.getUsedRelayAddresses()
-    assert(usedRelays.length == 0)
+    assert(usedRelays.length == 1)
+    assert(usedRelays[0].equals(createCircuitAddress(relay.id)))
 
     entryNodes.stop()
+    network.stop()
   })
 
-  it('do not contact nodes we are already connected to', async function () {
-    const entryNodes = new TestingEntryNodes(
-      // Make sure that call is indeed asynchronous
-      (async () => new Promise((resolve) => setImmediate(resolve))) as any,
-      {}
-    )
+  // @TODO to be fixed
+  // it('do not contact nodes we are already connected to', async function () {
+  //   const entryNodes = new TestingEntryNodes({})
 
-    entryNodes.init(createFakeComponents(peerId))
+  //   entryNodes.init(createFakeComponents(peerId))
 
-    const ma = new Multiaddr('/ip4/8.8.8.8/tcp/9091')
+  //   const ma = new Multiaddr('/ip4/8.8.8.8/tcp/9091')
 
-    const peerStoreEntry = getPeerStoreEntry(ma.toString())
+  //   const peerStoreEntry = getPeerStoreEntry(ma.toString())
 
-    entryNodes.usedRelays.push({
-      relayDirectAddress: ma,
-      ourCircuitAddress: new Multiaddr(`/p2p/${peerStoreEntry.id.toString()}/p2p-circuit`)
-    })
+  //   entryNodes.usedRelays.push({
+  //     relayDirectAddress: ma,
+  //     ourCircuitAddress: new Multiaddr(`/p2p/${peerStoreEntry.id.toString()}/p2p-circuit/p2p/${peerId.toString()}`)
+  //   })
 
-    entryNodes.start()
+  //   // activate NAT functionalities
+  //   entryNodes.enable()
 
-    entryNodes.onNewRelay(peerStoreEntry)
+  //   await entryNodes.afterStart()
 
-    const uncheckedNodes = entryNodes.getUncheckedEntryNodes()
+  //   await entryNodes.onNewRelay(peerStoreEntry)
 
-    assert(uncheckedNodes.length == 1, `Unchecked nodes must contain one entry`)
-    assert(uncheckedNodes[0].id.equals(peerStoreEntry.id), `id must match the generated one`)
-    assert(uncheckedNodes[0].multiaddrs.length == peerStoreEntry.multiaddrs.length, `must not contain more multiaddrs`)
+  //   const uncheckedNodes = entryNodes.getUncheckedEntryNodes()
 
-    const usedRelays = entryNodes.getUsedRelayAddresses()
-    assert(usedRelays.length == 1, `must not expose any relay addrs`)
+  //   assert(uncheckedNodes.length == 0, `Unchecked nodes must be gone`)
 
-    entryNodes.stop()
-  })
+  //   const usedRelays = entryNodes.getUsedRelayAddresses()
+  //   assert(usedRelays.length == 0, `must not expose any relay addrs`)
+  //   assert(usedRelays[0].equals(createCircuitAddress(peerStoreEntry.id)))
+
+  //   entryNodes.stop()
+  // })
 })
 
 describe('entry node functionality - event propagation', function () {
@@ -634,11 +641,21 @@ describe('entry node functionality - event propagation', function () {
     const network = createFakeNetwork()
 
     const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
-    const relayListener = network.listen(relay.multiaddrs[0].toString())
+
+    await createFakeComponents(relay.id, network, {
+      protocols: [
+        [
+          CAN_RELAY_PROTOCOLS(),
+          ({ stream }) => {
+            return handleDefaultStream(stream)
+          }
+        ]
+      ],
+      listeningAddrs: relay.multiaddrs
+    })
 
     const publicNodes = new EventEmitter() as PublicNodesEmitter
     const entryNodes = new TestingEntryNodes(
-      network.connect as any,
       {
         publicNodes
       },
@@ -647,34 +664,30 @@ describe('entry node functionality - event propagation', function () {
       }
     )
 
-    const components = createFakeComponents(peerId)
-    entryNodes.init(createFakeComponents(peerId))
-    entryNodes.start()
+    entryNodes.init(await createFakeComponents(peerId, network))
+
+    // activate NAT functionalities
+    entryNodes.enable()
+
+    await entryNodes.afterStart()
 
     publicNodes.emit('addPublicNode', relay)
 
     await once(entryNodes, RELAY_CHANGED_EVENT)
 
-    // intermediate solution
-    components.getConnectionManager().dispatchEvent(
-      new CustomEvent('peer:disconnect', {
-        detail: {
-          remotePeer: relay.id
-        }
-      })
-    )
-    network.events.removeAllListeners(connectEvent(relay.multiaddrs[0].toString()))
+    network.close(relay.multiaddrs[0], false)
 
     // "Shutdown" network connection to node
     publicNodes.emit('removePublicNode', relay.id)
 
     await once(entryNodes, RELAY_CHANGED_EVENT)
 
+    console.log(`before second event`)
+
     entryNodes.once(RELAY_CHANGED_EVENT, () => assert.fail('Must not throw the relay:changed event'))
 
     await entryNodes.updatePublicNodes()
 
-    relayListener.removeAllListeners()
     entryNodes.stop()
     network.stop()
   })
@@ -686,18 +699,25 @@ describe('entry node functionality - dht functionality', function () {
 
     const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
 
-    const connectEmitter = network.listen(relay.multiaddrs[0].toString())
-
-    let renews = 0
-
-    connectEmitter.on('connected', () => renews++)
+    let connectAttempts = 0
+    await createFakeComponents(relay.id, network, {
+      protocols: [
+        [
+          CAN_RELAY_PROTOCOLS(),
+          ({ stream }) => {
+            connectAttempts++
+            return handleDefaultStream(stream)
+          }
+        ]
+      ],
+      listeningAddrs: relay.multiaddrs
+    })
 
     const publicNodes: PublicNodesEmitter = new EventEmitter()
 
     const CUSTOM_DHT_RENEWAL_TIMEOUT = 100 // very short timeout
 
     const entryNodes = new TestingEntryNodes(
-      network.connect as any,
       {
         dhtRenewalTimeout: CUSTOM_DHT_RENEWAL_TIMEOUT,
         publicNodes
@@ -708,17 +728,21 @@ describe('entry node functionality - dht functionality', function () {
       }
     )
 
-    entryNodes.init(createFakeComponents(peerId))
-    entryNodes.start()
+    entryNodes.init(await createFakeComponents(peerId, network))
+
+    // activate NAT functionalities
+    entryNodes.enable()
+
+    await entryNodes.afterStart()
 
     publicNodes.emit('addPublicNode', relay)
 
     await new Promise((resolve) => setTimeout(resolve, 1e3))
 
     // depends on scheduler
-    assert([9, 10].includes(renews), `Should capture at least 9 renews but not more than 10`)
+    assert([9, 10].includes(connectAttempts), `Should capture at least 9 renews but not more than 10`)
 
-    connectEmitter.removeAllListeners()
+    network.close(relay.multiaddrs[0], false)
     entryNodes.stop()
     network.stop()
   })
@@ -728,26 +752,20 @@ describe('entry node functionality - automatic reconnect', function () {
   it('reconnect on disconnect - temporarily offline', async function () {
     const network = createFakeNetwork()
     const relay = getPeerStoreEntry(`/ip4/1.2.3.4/tcp/1`)
-    const relayListener = network.listen(relay.multiaddrs[0].toString())
+    await createFakeComponents(relay.id, network, {
+      protocols: [
+        [
+          CAN_RELAY_PROTOCOLS(),
+          ({ stream }) => {
+            return handleDefaultStream(stream)
+          }
+        ]
+      ],
+      listeningAddrs: relay.multiaddrs
+    })
     let secondAttempt = defer<void>()
     let connectAttempt = 0
     const entryNodes = new TestingEntryNodes(
-      (async (ma: Multiaddr, opts: any) => {
-        if (opts.onDisconnect) {
-          network.events.on(disconnectEvent(relay.multiaddrs[0].toString()), opts.onDisconnect)
-        }
-        switch (connectAttempt++) {
-          case 0:
-            return network.connect(ma, opts)
-          case 1:
-            return
-          case 2:
-            secondAttempt.resolve()
-            return network.connect(ma, opts)
-          default:
-            return
-        }
-      }) as any,
       // Should be successful after second try
       {
         entryNodeReconnectBaseTimeout: 1,
@@ -755,10 +773,28 @@ describe('entry node functionality - automatic reconnect', function () {
       }
     )
 
-    const components = createFakeComponents(peerId)
+    entryNodes.init(
+      await createFakeComponents(peerId, network, {
+        outerDial: (self: PeerId, ma: Multiaddr, opts: any) => {
+          switch (connectAttempt++) {
+            case 0:
+              return network.connect(self, ma, opts)
+            case 1:
+              throw Error(`boom`)
+            case 2:
+              secondAttempt.resolve()
+              return network.connect(self, ma, opts)
+            default:
+              throw Error(`boom`)
+          }
+        }
+      })
+    )
 
-    entryNodes.init(components)
-    entryNodes.start()
+    // activate NAT functionalities
+    entryNodes.enable()
+
+    await entryNodes.afterStart()
 
     const updated = once(entryNodes, RELAY_CHANGED_EVENT)
     entryNodes.onNewRelay(relay)
@@ -766,14 +802,8 @@ describe('entry node functionality - automatic reconnect', function () {
 
     // Should eventually remove relay from list
     // intermediate solution
-    components.getConnectionManager().dispatchEvent(
-      new CustomEvent('peer:disconnect', {
-        detail: {
-          remotePeer: relay.id
-        }
-      })
-    )
-    network.events.removeAllListeners(connectEvent(relay.multiaddrs[0].toString()))
+    network.close(relay.multiaddrs[0])
+    network.events.removeAllListeners(connectEvent(relay.multiaddrs[0]))
 
     await secondAttempt.promise
 
@@ -785,7 +815,6 @@ describe('entry node functionality - automatic reconnect', function () {
     const usedRelays = entryNodes.getUsedRelayAddresses()
     assert(usedRelays.length == 1, `must keep relay address after reconnect`)
 
-    relayListener.removeAllListeners()
     network.stop()
     entryNodes.stop()
   })
@@ -793,30 +822,41 @@ describe('entry node functionality - automatic reconnect', function () {
   it('reconnect on disconnect - permanently offline', async function () {
     const network = createFakeNetwork()
     const relay = getPeerStoreEntry(`/ip4/1.2.3.4/tcp/1`)
-    const relayListener = network.listen(relay.multiaddrs[0].toString())
+
+    await createFakeComponents(relay.id, network, {
+      protocols: [
+        [
+          CAN_RELAY_PROTOCOLS(),
+          ({ stream }) => {
+            return handleDefaultStream(stream)
+          }
+        ]
+      ],
+      listeningAddrs: relay.multiaddrs
+    })
     let connectAttempt = 0
-    const entryNodes = new TestingEntryNodes(
-      (async (ma: Multiaddr, opts: any) => {
-        if (opts.onDisconnect) {
-          network.events.on(disconnectEvent(relay.multiaddrs[0].toString()), opts.onDisconnect)
+    const entryNodes = new TestingEntryNodes({
+      entryNodeReconnectBaseTimeout: 1,
+      entryNodeReconnectBackoff: 5
+    })
+
+    entryNodes.init(
+      await createFakeComponents(peerId, network, {
+        outerDial: (self: PeerId, ma: Multiaddr, opts: any) => {
+          switch (connectAttempt++) {
+            case 0:
+              return network.connect(self, ma, opts)
+            default:
+              throw Error(`boom - connection error`)
+          }
         }
-        switch (connectAttempt++) {
-          case 0:
-            return network.connect(ma, opts)
-          default:
-            throw Error(`boom - connection error`)
-        }
-      }) as any,
-      // Should fail after second try
-      {
-        entryNodeReconnectBaseTimeout: 1,
-        entryNodeReconnectBackoff: 5
-      }
+      })
     )
 
-    const components = createFakeComponents(peerId)
-    entryNodes.init(components)
-    entryNodes.start()
+    // activate NAT functionalities
+    entryNodes.enable()
+
+    await entryNodes.afterStart()
 
     const entryNodeAdded = once(entryNodes, RELAY_CHANGED_EVENT)
 
@@ -827,14 +867,7 @@ describe('entry node functionality - automatic reconnect', function () {
     const entryNodeRemoved = once(entryNodes, RELAY_CHANGED_EVENT)
 
     // "Shutdown" node
-    components.getConnectionManager().dispatchEvent(
-      new CustomEvent('peer:disconnect', {
-        detail: {
-          remotePeer: relay.id
-        }
-      })
-    )
-    network.events.removeAllListeners(connectEvent(relay.multiaddrs[0].toString()))
+    network.events.removeAllListeners(connectEvent(relay.multiaddrs[0]))
     network.close(relay.multiaddrs[0])
 
     await entryNodeRemoved
@@ -845,7 +878,6 @@ describe('entry node functionality - automatic reconnect', function () {
 
     assert(entryNodes.getUsedRelayAddresses().length == 0, `must not expose any relay addrs`)
 
-    relayListener.removeAllListeners()
     network.stop()
     entryNodes.stop()
   })
@@ -861,19 +893,50 @@ describe('entry node functionality - min relays per node', function () {
     const firstPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`, Alice)
     const secondPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/2`, Bob)
 
+    await createFakeComponents(firstPeerStoreEntry.id, network, {
+      protocols: [
+        [
+          CAN_RELAY_PROTOCOLS(),
+          ({ stream }) => {
+            return handleDefaultStream(stream)
+          }
+        ]
+      ],
+      listeningAddrs: firstPeerStoreEntry.multiaddrs
+    })
+    await createFakeComponents(secondPeerStoreEntry.id, network, {
+      protocols: [
+        [
+          CAN_RELAY_PROTOCOLS(),
+          ({ stream }) => {
+            return handleDefaultStream(stream)
+          }
+        ]
+      ],
+      listeningAddrs: secondPeerStoreEntry.multiaddrs
+    })
+
     let connectionAttempt = false
 
     const entryNodes = new TestingEntryNodes(
-      (async (_ma: Multiaddr, _opts: any) => {
-        connectionAttempt = true
-      }) as any,
       // Should fail after second try
       {},
       { maxParallelDials: 5, maxRelaysPerNode: 2, minRelaysPerNode: 0 }
     )
 
-    entryNodes.init(createFakeComponents(peerId))
-    entryNodes.start()
+    entryNodes.init(
+      await createFakeComponents(peerId, network, {
+        outerDial: (self: PeerId, ma: Multiaddr, opts: any) => {
+          connectionAttempt = true
+          return network.connect(self, ma, opts)
+        }
+      })
+    )
+
+    // activate NAT functionalities
+    entryNodes.enable()
+
+    await entryNodes.afterStart()
 
     entryNodes.availableEntryNodes.push(
       { ...firstPeerStoreEntry, latency: 23 },
@@ -918,31 +981,33 @@ describe('entry node functionality - min relays per node', function () {
     const firstPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`, Alice)
     const secondPeerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/2`, Bob)
 
-    const AliceListener = network.listen(firstPeerStoreEntry.multiaddrs[0].toString())
-    const BobListener = network.listen(secondPeerStoreEntry.multiaddrs[0].toString())
+    await createFakeComponents(firstPeerStoreEntry.id, network, {
+      protocols: [
+        [
+          CAN_RELAY_PROTOCOLS(),
+          ({ stream }) => {
+            return handleDefaultStream(stream)
+          }
+        ]
+      ],
+      listeningAddrs: firstPeerStoreEntry.multiaddrs
+    })
+    await createFakeComponents(secondPeerStoreEntry.id, network, {
+      protocols: [
+        [
+          CAN_RELAY_PROTOCOLS(),
+          ({ stream }) => {
+            return handleDefaultStream(stream)
+          }
+        ]
+      ],
+      listeningAddrs: secondPeerStoreEntry.multiaddrs
+    })
 
     let connectedMoreThanOnce = false
     const connectionAttempts = new Map<string, number>()
     // let secondAttempt = defer<void>()
     const entryNodes = new TestingEntryNodes(
-      (async (ma: Multiaddr, opts: any) => {
-        if (opts.onDisconnect) {
-          network.events.on(disconnectEvent(ma.toString()), opts.onDisconnect)
-        }
-        const connectionAttempt = connectionAttempts.get(ma.getPeerId() as string)
-
-        // Allow 2 reconnect attempt but no additional attempt
-        if (connectionAttempt == undefined) {
-          connectionAttempts.set(ma.getPeerId() as string, 1)
-          return network.connect(ma, opts)
-        } else if (connectionAttempt == 1) {
-          connectionAttempts.set(ma.getPeerId() as string, 2)
-        } else if (connectionAttempt == 2) {
-          connectionAttempts.set(ma.getPeerId() as string, 3)
-        } else {
-          connectedMoreThanOnce = true
-        }
-      }) as any,
       // Should be successful after second try
       {
         entryNodeReconnectBaseTimeout: 2,
@@ -954,9 +1019,30 @@ describe('entry node functionality - min relays per node', function () {
       }
     )
 
-    const components = createFakeComponents(peerId)
-    entryNodes.init(components)
-    entryNodes.start()
+    entryNodes.init(
+      await createFakeComponents(peerId, network, {
+        outerDial: ((self: PeerId, ma: Multiaddr) => {
+          const connectionAttempt = connectionAttempts.get(ma.getPeerId() as string)
+
+          // Allow 2 reconnect attempt but no additional attempt
+          if (connectionAttempt == undefined) {
+            connectionAttempts.set(ma.getPeerId() as string, 1)
+            return network.connect(self, ma)
+          } else if (connectionAttempt == 1) {
+            connectionAttempts.set(ma.getPeerId() as string, 2)
+          } else if (connectionAttempt == 2) {
+            connectionAttempts.set(ma.getPeerId() as string, 3)
+          } else {
+            connectedMoreThanOnce = true
+          }
+        }) as any
+      })
+    )
+
+    // activate NAT functionalities
+    entryNodes.enable()
+
+    await entryNodes.afterStart()
 
     entryNodes.availableEntryNodes.push(
       { ...firstPeerStoreEntry, latency: 23 },
@@ -973,14 +1059,8 @@ describe('entry node functionality - min relays per node', function () {
     const secondRelayListUpdate = once(entryNodes, RELAY_CHANGED_EVENT)
 
     // intermediate solution
-    components.getConnectionManager().dispatchEvent(
-      new CustomEvent('peer:disconnect', {
-        detail: {
-          remotePeer: firstPeerStoreEntry.id
-        }
-      })
-    )
-    network.events.removeAllListeners(connectEvent(firstPeerStoreEntry.multiaddrs[0].toString()))
+    network.close(firstPeerStoreEntry.multiaddrs[0])
+    network.events.removeAllListeners(connectEvent(firstPeerStoreEntry.multiaddrs[0]))
 
     await secondRelayListUpdate
 
@@ -992,9 +1072,6 @@ describe('entry node functionality - min relays per node', function () {
     assert(availablePublicNodes.length == 1, `must keep entry node after reconnect`)
     const usedRelays = entryNodes.getUsedRelayAddresses()
     assert(usedRelays.length == 1, `must keep relay address after reconnect`)
-
-    AliceListener.removeAllListeners()
-    BobListener.removeAllListeners()
 
     network.stop()
     entryNodes.stop()

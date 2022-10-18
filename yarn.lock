@@ -2989,11 +2989,13 @@ __metadata:
     "@chainsafe/libp2p-noise": 7.0.0
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@libp2p/crypto": 1.0.0
-    "@libp2p/interface-address-manager": ^1.0.1
+    "@libp2p/interface-address-manager": 1.0.1
     "@libp2p/interface-connection": 1.0.1
+    "@libp2p/interface-connection-manager": 1.1.0
     "@libp2p/interface-peer-discovery": 1.0.0
     "@libp2p/interface-peer-id": 1.0.2
     "@libp2p/interface-peer-store": 1.0.0
+    "@libp2p/interface-registrar": 1.1.0
     "@libp2p/interface-transport": 1.0.0
     "@libp2p/interfaces": 2.0.4
     "@libp2p/mplex": 1.2.1
@@ -3456,13 +3458,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@libp2p/interface-address-manager@npm:^1.0.1":
-  version: 1.0.2
-  resolution: "@libp2p/interface-address-manager@npm:1.0.2"
+"@libp2p/interface-address-manager@npm:1.0.1":
+  version: 1.0.1
+  resolution: "@libp2p/interface-address-manager@npm:1.0.1"
   dependencies:
     "@libp2p/interfaces": ^3.0.0
     "@multiformats/multiaddr": ^10.2.0
-  checksum: 4dfb72e02ab030909eb3f10ca6335aea975ee72f5169c92ad1c6bbfb3ac684fb6c33de8c01037809dffcc96e7d7f59e50d68fe21d4978d6d713172419e4d5f2a
+  checksum: 8249ee9c18a467e9c0159efb20a27ac074165100f9de63a39fe6616758dd06517eb390876163ecdca36cc00da4a100ca4ab965061f14db7cc0979f25d7083c59
   languageName: node
   linkType: hard
 
