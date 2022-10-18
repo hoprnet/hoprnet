@@ -443,10 +443,19 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     try {
       conn = await this.components.getUpgrader().upgradeInbound(maConn)
     } catch (err: any) {
-      if (err.code === 'ERR_ENCRYPTION_FAILED') {
-        error(`inbound connection failed because encryption failed. Maybe connected to the wrong node?`)
+      if (!err) {
+        error('inbound connection failed. empty error')
       } else {
-        error('inbound connection failed', err)
+        switch (err.code) {
+          case 'ERR_CONNECTION_INTERCEPTED':
+            error(`inbound connection failed. Node is not registered.`)
+            break
+          case 'ERR_ENCRYPTION_FAILED':
+            error(`inbound connection failed because encryption failed. Maybe connected to the wrong node?`)
+            break
+          default:
+            error('inbound connection failed', err)
+        }
       }
 
       if (maConn != undefined) {
