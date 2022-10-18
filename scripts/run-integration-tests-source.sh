@@ -245,7 +245,7 @@ function setup_ct_node() {
   HOPR_CTD_HEARTBEAT_INTERVAL=2500 \
   HOPR_CTD_HEARTBEAT_THRESHOLD=2500 \
   HOPR_CTD_HEARTBEAT_VARIANCE=1000 \
-  DEBUG="hopr*" NODE_ENV=development node packages/cover-traffic-daemon/lib/index.js \
+  DEBUG="hopr*" NODE_ENV=development node --experimental-wasm-modules packages/cover-traffic-daemon/lib/index.js \
     --privateKey "${private_key}" \
     --dbFile "${ct_db_file}" \
     --data="${dir}" \
