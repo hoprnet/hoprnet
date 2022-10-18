@@ -418,7 +418,7 @@ ___
 
 #### Defined in
 
-[async/abortableTimeout.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/abortableTimeout.ts#L5)
+[async/abortableTimeout.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/abortableTimeout.ts#L8)
 
 ___
 

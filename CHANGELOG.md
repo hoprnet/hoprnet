@@ -16,6 +16,7 @@
 - Refactor packet forward interaction for less locking ([#4232](https://github.com/hoprnet/hoprnet/pull/4243))
 - Refactor mixer to migitate backpressure ([#4232](https://github.com/hoprnet/hoprnet/pull/4243))
 - Remove recurring DHT ping queue cleanup and turn all public relay nodes into DHT servers ([#4247](https://github.com/hoprnet/hoprnet/pull/4247))
+- Reuse existing connections to establish relayed connections over public relay ([#2545](https://github.com/hoprnet/hoprnet/pull/4245))
 
 ---
 
