@@ -19,6 +19,9 @@ import {
 import assert from 'assert'
 import type { DialOptions } from '@libp2p/interface-transport'
 
+// @ts-ignore untyped library
+import retimer from 'retimer'
+
 const DEBUG_PREFIX = `hopr-connect`
 
 const _log = Debug(DEBUG_PREFIX)
@@ -131,6 +134,8 @@ class WebRTCConnection implements MultiaddrConnection {
   // @dev this is done using meta programming in libp2p
   public timeline: MultiaddrConnection['timeline']
 
+  private webRTCTimeout: any | undefined // untyped library
+
   constructor(
     private relayConn: RelayConnection,
     private testingOptions: HoprConnectTestingOptions,
@@ -147,7 +152,7 @@ class WebRTCConnection implements MultiaddrConnection {
     this._sourceMigrated = false
     this._sinkMigrated = false
 
-    this.remoteAddr = this.conn.remoteAddr
+    this.remoteAddr = this.relayConn.remoteAddr
 
     this.timeline = {
       open: Date.now()
@@ -171,6 +176,11 @@ class WebRTCConnection implements MultiaddrConnection {
       this.onWebRTCConnect.bind(this)
     )
 
+    this.relayConn.state.channel?.once('close', () => {
+      this.destroyed = true
+      this.timeline.close ??= Date.now()
+    })
+
     // Attach a listener to WebRTC to cleanup state
     // and remove stale connection from internal libp2p state
     // once there is a disconnect, set magic *close* property in
@@ -178,7 +188,7 @@ class WebRTCConnection implements MultiaddrConnection {
     this.relayConn.state.channel?.on('iceStateChange', (iceConnectionState: string, iceGatheringState: string) => {
       if (iceConnectionState === 'disconnected' && iceGatheringState === 'complete') {
         this.destroyed = true
-        this.timeline.close = this.timeline.close ?? Date.now()
+        this.timeline.close ??= Date.now()
       }
     })
 
@@ -202,7 +212,7 @@ class WebRTCConnection implements MultiaddrConnection {
    * @returns
    */
   public sink(source: StreamSource) {
-    setTimeout(this.onWebRTCError.bind(this), WEBRTC_UPGRADE_TIMEOUT).unref()
+    this.webRTCTimeout = retimer(this.onWebRTCError.bind(this), WEBRTC_UPGRADE_TIMEOUT)
 
     let deferred = defer<void>()
     this.sinkCreator.catch(deferred.reject)
@@ -262,6 +272,7 @@ class WebRTCConnection implements MultiaddrConnection {
       // Already handled, so nothing to do
       return
     }
+    this.webRTCTimeout?.clear()
     this._webRTCHandshakeFinished = true
 
     if (err) {
@@ -287,6 +298,7 @@ class WebRTCConnection implements MultiaddrConnection {
       // Already handled, so nothing to do
       return
     }
+    this.webRTCTimeout?.clear()
     this._webRTCHandshakeFinished = true
 
     // For testing, disable WebRTC upgrade
@@ -440,7 +452,7 @@ class WebRTCConnection implements MultiaddrConnection {
           // Update state object once source *and* sink are migrated
           this.conn = this.relayConn.state.channel as SimplePeer
           if (!this.tags.includes(PeerConnectionType.WEBRTC_DIRECT)) {
-            this.tags = [PeerConnectionType.WEBRTC_DIRECT]
+            this.tags.push(PeerConnectionType.WEBRTC_DIRECT)
           }
         }
         try {
@@ -507,11 +519,14 @@ class WebRTCConnection implements MultiaddrConnection {
               }
             }.call(this)
           )
+
+          // End the stream
+          this.relayConn.state.channel?.end()
         } catch (err) {
           this.error(`WebRTC sink err`, err)
           // Initiates Connection object teardown
           // by using meta programming
-          this.timeline.close = Date.now()
+          this.timeline.close ??= Date.now()
         }
     }
   }
@@ -571,11 +586,13 @@ class WebRTCConnection implements MultiaddrConnection {
           // Update state object once sink *and* source are migrated
           this.conn = this.relayConn.state.channel as SimplePeer
           if (!this.tags.includes(PeerConnectionType.WEBRTC_DIRECT)) {
-            this.tags = [PeerConnectionType.WEBRTC_DIRECT]
+            this.tags.push(PeerConnectionType.WEBRTC_DIRECT)
           }
         }
 
-        this.log(`webRTC source handover done. Using direct connection to peer ${this.remoteAddr.getPeerId()}`)
+        this.log(
+          `webRTC source handover done. Using direct connection to peer ${this.relayConn._counterparty.toString()}`
+        )
 
         let done = false
         for await (const msg of this.relayConn.state.channel as SimplePeer) {

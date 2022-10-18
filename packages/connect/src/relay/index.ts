@@ -1,31 +1,27 @@
 import type { PeerId } from '@libp2p/interface-peer-id'
-import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
-import type { Multiaddr } from '@multiformats/multiaddr'
-import type { Address } from '@libp2p/interface-peer-store'
+import type { Connection } from '@libp2p/interface-connection'
 import type { IncomingStreamData } from '@libp2p/interfaces/registrar'
 import type { Initializable, Components } from '@libp2p/interfaces/components'
 import type { Startable } from '@libp2p/interfaces/startable'
 import type { DialOptions } from '@libp2p/interface-transport'
+import type { Stream, HoprConnectOptions, HoprConnectTestingOptions } from '../types.js'
+import type { ConnectComponents, ConnectInitializable } from '../components.js'
 
 import { peerIdFromString } from '@libp2p/peer-id'
-
-import type { HoprConnect } from '../index.js'
-
-import type { Stream, HoprConnectOptions, HoprConnectTestingOptions } from '../types.js'
 
 import errCode from 'err-code'
 import debug from 'debug'
 import chalk from 'chalk'
 
 import { WebRTCConnection } from '../webrtc/index.js'
-import { RELAY_PROTOCOLS, DELIVERY_PROTOCOLS, CODE_P2P, OK, CAN_RELAY_PROTOCOLS } from '../constants.js'
+import { RELAY_PROTOCOLS, DELIVERY_PROTOCOLS, OK, CAN_RELAY_PROTOCOLS } from '../constants.js'
 import { RelayConnection } from './connection.js'
 import { RelayHandshake, RelayHandshakeMessage } from './handshake.js'
 import { RelayState } from './state.js'
-import { createRelayerKey, randomInteger, retimer, tryExistingConnections } from '@hoprnet/hopr-utils'
+import { createRelayerKey, dial, DialStatus, randomInteger, retimer } from '@hoprnet/hopr-utils'
+import { handshake } from 'it-handshake'
 
 import { attemptClose } from '../utils/index.js'
-import { type ConnectComponents, ConnectInitializable } from '../components.js'
 
 const DEBUG_PREFIX = 'hopr-connect:relay'
 const DEFAULT_MAX_RELAYED_CONNECTIONS = 10
@@ -33,10 +29,6 @@ const DEFAULT_MAX_RELAYED_CONNECTIONS = 10
 const log = debug(DEBUG_PREFIX)
 const error = debug(DEBUG_PREFIX.concat(':error'))
 const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
-
-type ConnResult = ProtocolStream & {
-  conn: Connection
-}
 
 function printUsedRelays(peers: PeerId[], prefix = '') {
   let out = `${prefix}\n`
@@ -60,17 +52,32 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
   private _isStarted: boolean
 
-  private _onReconnect: Relay['onReconnect'] | undefined
-  private _onDelivery: Relay['onDelivery'] | undefined
-  private _onRelay: Relay['onRelay'] | undefined
-  private _onCanRelay: Relay['onCanRelay'] | undefined
-  private _dialNodeDirectly: Relay['dialNodeDirectly'] | undefined
-
   private stopKeepAlive: (() => void) | undefined
   private connectedToRelays: Set<string>
 
   private components: Components | undefined
   private connectComponents: ConnectComponents | undefined
+
+  constructor(private options: HoprConnectOptions, private testingOptions: HoprConnectTestingOptions) {
+    this._isStarted = false
+
+    log(`relay testing options`, testingOptions)
+    this.relayState = new RelayState()
+
+    this.options.maxRelayedConnections ??= DEFAULT_MAX_RELAYED_CONNECTIONS
+
+    // Stores all relays that we announce to other nodes
+    // to make sure we don't close these connections
+    this.usedRelays = []
+
+    // Gathers relay peer IDs the node connected
+    this.connectedToRelays = new Set()
+
+    this.onReconnect = this.onReconnect.bind(this)
+    this.onDelivery = this.onDelivery.bind(this)
+    this.onRelay = this.onRelay.bind(this)
+    this.onCanRelay = this.onCanRelay.bind(this)
+  }
 
   public init(components: Components) {
     this.components = components
@@ -96,27 +103,6 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     return this.connectComponents
   }
 
-  constructor(
-    private dialDirectly: HoprConnect['dialDirectly'],
-    private filter: HoprConnect['filter'],
-    private options: HoprConnectOptions,
-    private testingOptions: HoprConnectTestingOptions
-  ) {
-    this._isStarted = false
-
-    log(`relay testing options`, testingOptions)
-    this.relayState = new RelayState()
-
-    this.options.maxRelayedConnections ??= DEFAULT_MAX_RELAYED_CONNECTIONS
-
-    // Stores all relays that we announce to other nodes
-    // to make sure we don't close these connections
-    this.usedRelays = []
-
-    // Gathers relay peer IDs the node connected
-    this.connectedToRelays = new Set()
-  }
-
   public isStarted(): boolean {
     return this._isStarted
   }
@@ -133,20 +119,13 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       throw Error(`Module has to be initialized first`)
     }
 
-    this._onReconnect = this.onReconnect.bind(this)
-    this._onRelay = this.onRelay.bind(this)
-    this._onDelivery = this.onDelivery.bind(this)
-    this._onCanRelay = this.onCanRelay.bind(this)
-
-    this._dialNodeDirectly = this.dialNodeDirectly.bind(this)
-
     // Requires registrar to be started first
     const protocolsDelivery = DELIVERY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
     const protocolsRelay = RELAY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
     const protocolsCanRelay = CAN_RELAY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
-    await this.components.getRegistrar().handle(protocolsDelivery, this._onDelivery)
-    await this.components.getRegistrar().handle(protocolsRelay, this._onRelay)
-    await this.components.getRegistrar().handle(protocolsCanRelay, this._onCanRelay)
+    await this.components.getRegistrar().handle(protocolsDelivery, this.onDelivery)
+    await this.components.getRegistrar().handle(protocolsRelay, this.onRelay)
+    await this.components.getRegistrar().handle(protocolsCanRelay, this.onCanRelay)
 
     // Periodic function that prints relay connections (and will also do pings in future)
     const periodicKeepAlive = async function (this: Relay) {
@@ -213,14 +192,14 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     destination: PeerId,
     options?: DialOptions
   ): Promise<RelayConnection | WebRTCConnection | undefined> {
-    const protocolsRelay = RELAY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
-    const baseConnection = await this.dialNodeDirectly(relay, protocolsRelay, {
-      signal: options?.signal,
-      // libp2p interface type clash
-      upgrader: this.getComponents().getUpgrader() as any
-    }).catch(error)
+    const response = await dial(
+      this.getComponents(),
+      relay,
+      RELAY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments),
+      false
+    )
 
-    if (baseConnection == undefined) {
+    if (response.status != DialStatus.SUCCESS) {
       error(
         `Cannot establish a connection to ${chalk.green(destination.toString())} because relay ${chalk.green(
           relay.toString()
@@ -229,7 +208,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       return
     }
 
-    const shaker = new RelayHandshake(baseConnection.stream, this.options)
+    const shaker = new RelayHandshake(response.resp.stream, this.options)
 
     const handshakeResult = await shaker.initiate(relay, destination)
 
@@ -239,7 +218,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       // for us.
       if (this.usedRelays.findIndex((usedRelay: PeerId) => usedRelay.equals(relay)) < 0) {
         try {
-          await baseConnection.conn.close()
+          await response.resp.conn.close()
         } catch (err) {
           error(`Error while closing unused connection to relay ${relay.toString()}`, err)
         }
@@ -269,14 +248,12 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       'outbound',
       this.getConnectComponents(),
       this.testingOptions,
-      this._onReconnect as Relay['onReconnect']
+      this.onReconnect as Relay['onReconnect']
     )
 
     if (!this.testingOptions.__noWebRTCUpgrade) {
       return new WebRTCConnection(conn, {
         __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade,
-        // libp2p interface type clash
-        upgrader: this.getComponents().getUpgrader() as any,
         ...opts
       })
     } else {
@@ -292,46 +269,55 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       'inbound',
       this.getConnectComponents(),
       this.testingOptions,
-      this._onReconnect as Relay['onReconnect']
+      this.onReconnect as Relay['onReconnect']
     )
 
     if (!this.testingOptions.__noWebRTCUpgrade) {
-      return new WebRTCConnection(conn, this.testingOptions, {
-        // libp2p interface type clash
-        upgrader: this.getComponents().getUpgrader() as any
-      })
+      return new WebRTCConnection(conn, this.testingOptions)
     } else {
       return conn
     }
   }
 
-  private async onCanRelay(conn: IncomingStreamData) {
-    // Only called if protocol is supported which
-    // means that environments match
+  /**
+   * Announces to the DHT that this node is acting as a relay for the
+   * given node.
+   * @param node node to announce
+   */
+  private async announceRelayerKey(node: PeerId) {
     try {
-      await conn.stream.sink(
-        async function* (this: Relay) {
-          // @TODO check if there is a relay slot available
+      const key = createRelayerKey(node)
 
-          // Initiate the DHT query but does not await the result which easily
-          // takes more than 10 seconds
-          ;(async function (this: Relay) {
-            try {
-              const key = createRelayerKey(conn.connection.remotePeer)
+      await this.getComponents().getContentRouting().provide(key)
 
-              await this.getComponents().getContentRouting().provide(key)
-
-              log(`announced in the DHT as relayer for node ${conn.connection.remotePeer.toString()}`, key)
-            } catch (err) {
-              error(`error while attempting to provide relayer key for ${conn.connection.remotePeer.toString()}`)
-            }
-          }.call(this))
-
-          yield OK
-        }.call(this)
-      )
+      log(`announced in the DHT as relayer for node ${node.toString()}`, key)
     } catch (err) {
-      error(`Error in CAN_RELAY protocol`, err)
+      error(`error while attempting to provide relayer key for ${node.toString()}`)
+    }
+  }
+
+  /**
+   * Handles a request by a node to act as a relay.
+   *
+   * It creates a hanging open connection, unless the peer closes the connection
+   * because the relay service is no longer needed.
+   *
+   * @param conn incoming connection
+   */
+  private async onCanRelay(conn: IncomingStreamData) {
+    const shaker = handshake(conn.stream)
+
+    try {
+      // Do both operations indedepently from each other
+      await Promise.all([
+        // Send answer, but don't end the stream
+        shaker.write(OK),
+        this.announceRelayerKey(conn.connection.remotePeer)
+      ])
+    } catch (err) {
+      error(`error in can relay protocol`, err)
+      // Close the connection because it led to an error
+      attemptClose(conn.connection, error)
     }
   }
 
@@ -353,12 +339,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       } else {
         // NOTE: This cannot be awaited, otherwise it stalls the relay loop. Therefore, promise rejections must
         // be handled downstream to avoid unhandled promise rejection crashes
-        shaker.negotiate(
-          conn.connection.remotePeer,
-          this._dialNodeDirectly as Relay['dialNodeDirectly'],
-          this.relayState,
-          this.getComponents().getUpgrader()
-        )
+        await shaker.negotiate(conn.connection.remotePeer, this.getComponents(), this.relayState)
       }
     } catch (e) {
       error(`Error while processing relay request from ${conn.connection.remotePeer.toString()}: ${e}`)
@@ -427,7 +408,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
     let newConn: Connection
 
-    log(`Handling reconnection to ${counterparty.toString()}`)
+    log(`Handling reconnect attempt to ${counterparty.toString()}`)
 
     try {
       if (!this.testingOptions.__noWebRTCUpgrade) {
@@ -465,90 +446,6 @@ class Relay implements Initializable, ConnectInitializable, Startable {
         error(`Error while closing dead connection`, err)
       }
     }
-  }
-
-  /**
-   * Attempts to establish a direct connection to the destination
-   * @param destination peer to connect to
-   * @param protocols
-   * @param opts
-   * @returns a stream to the given peer
-   */
-  private async dialNodeDirectly(
-    destination: PeerId,
-    protocols: string[],
-    opts: DialOptions
-  ): Promise<ConnResult | void> {
-    let connResult = await tryExistingConnections(this.getComponents(), destination, protocols)
-
-    // Only establish a new connection if we don't have any.
-    // Don't establish a new direct connection to the recipient when using
-    // simulated NAT
-    if (connResult == undefined) {
-      connResult = await this.establishDirectConnection(destination, protocols, opts)
-    }
-
-    return connResult
-  }
-
-  /**
-   * Establishes a new connection to the given by using a direct
-   * TCP connection.
-   * @param destination peer to connect to
-   * @param protocols desired protocols
-   * @param opts additional options such as timeout
-   * @returns a stream to the given peer
-   */
-  private async establishDirectConnection(
-    destination: PeerId,
-    protocols: string[],
-    opts: DialOptions
-  ): Promise<ConnResult | undefined> {
-    const usableAddresses: Multiaddr[] = []
-
-    const knownAddresses: Address[] = await this.getComponents().getPeerStore().addressBook.get(destination)
-    for (const knownAddress of knownAddresses) {
-      // Check that the address:
-      // - matches the format (PeerStore might include addresses of other transport modules)
-      // - is a direct address (PeerStore might include relay addresses)
-      if (this.filter([knownAddress.multiaddr]).length > 0 && knownAddress.multiaddr.tuples()[0][0] != CODE_P2P) {
-        usableAddresses.push(knownAddress.multiaddr)
-      }
-    }
-
-    if (usableAddresses.length == 0) {
-      return
-    }
-
-    let stream: ProtocolStream | undefined
-    let conn: Connection | undefined
-
-    for (const usable of usableAddresses) {
-      try {
-        conn = await this.dialDirectly(usable, opts)
-      } catch (err) {
-        await attemptClose(conn, error)
-        continue
-      }
-
-      if (conn != undefined) {
-        try {
-          stream = await conn.newStream(protocols)
-        } catch (err) {
-          await attemptClose(conn, error)
-          continue
-        }
-
-        if (
-          stream == undefined &&
-          // Only close the connection if we are not using this peer as a relay
-          this.usedRelays.findIndex((usedRelay: PeerId) => usedRelay.equals(destination)) < 0
-        ) {
-          await attemptClose(conn, error)
-        }
-      }
-    }
-    return conn != undefined && stream != undefined ? { conn, ...stream } : undefined
   }
 }
 

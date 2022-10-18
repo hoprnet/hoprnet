@@ -33,8 +33,6 @@ const TESTING_ENVIRONMENT = 'unit-testing'
 
 // Overwrite default timeouts with shorter ones for unit testing
 const SHORT_TIMEOUTS: Partial<HeartbeatConfig> = {
-  heartbeatDialTimeout: 50,
-  heartbeatRunTimeout: 100,
   heartbeatInterval: 200,
   heartbeatVariance: 1,
   networkQualityThreshold: 0.5
@@ -162,7 +160,7 @@ async function getPeer(
   return { heartbeat, peers }
 }
 
-describe.only('unit test heartbeat', async () => {
+describe('unit test heartbeat', async () => {
   it('check nodes is noop with empty store & health indicator is red', async () => {
     let netHealth = new NetworkHealth()
     const heartbeat = new TestingHeartbeat(

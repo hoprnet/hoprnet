@@ -11,7 +11,7 @@ import {
 } from '../types.js'
 import { randomBytes } from 'crypto'
 import { RelayPrefix, ConnectionStatusMessages, StatusMessages, CODE_P2P } from '../constants.js'
-import { u8aEquals, u8aToHex, defer, createCircuitAddress, type DeferType } from '@hoprnet/hopr-utils'
+import { u8aEquals, u8aToHex, defer, createCircuitAddress, type DeferType, timeout } from '@hoprnet/hopr-utils'
 import HeapPkg, { type Heap as HeapType } from 'heap-js'
 
 import SimplePeer from 'simple-peer'
@@ -392,7 +392,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
     this.flow(`FLOW: awaiting destroyed promise / timeout`)
     // @TODO remove timeout once issue with destroyPromise is solved
-    await Promise.race([new Promise((resolve) => setTimeout(resolve, 100)), this.state._destroyedPromise.promise])
+    await timeout(100, () => this.state._destroyedPromise.promise)
     this.flow(`FLOW: close complete, finish`)
   }
 

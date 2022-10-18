@@ -43,6 +43,9 @@ import { BigNumber, type Contract, errors } from 'ethers'
 import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants.js'
 import type { TypedEvent, TypedEventFilter } from '@hoprnet/hopr-ethereum'
 
+// @ts-ignore untyped library
+import retimer from 'retimer'
+
 const log = debug('hopr-core-ethereum:indexer')
 const verbose = debug('hopr-core-ethereum:verbose:indexer')
 
@@ -963,23 +966,26 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     throw new Error('Could not find public key for address - have they announced? -' + address.toHex())
   }
 
-  public async getAddressesAnnouncedOnChain(): Promise<Multiaddr[]> {
-    return (await this.db.getAccounts()).map((account: AccountEntry) => account.multiAddr)
+  public async *getAddressesAnnouncedOnChain() {
+    for await (const account of this.db.getAccountsIterable()) {
+      yield account.multiAddr
+    }
   }
 
   public async getPublicNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
-    const accounts = await this.db.getAccounts((account: AccountEntry) => account.containsRouting)
+    const result: { id: PeerId; multiaddrs: Multiaddr[] }[] = []
+    let out = `Known public nodes:\n`
 
-    const result: { id: PeerId; multiaddrs: Multiaddr[] }[] = Array.from({ length: accounts.length })
-
-    log(`Known public nodes:`)
-    for (const [index, account] of accounts.entries()) {
-      result[index] = {
+    for await (const account of this.db.getAccountsIterable((account: AccountEntry) => account.containsRouting)) {
+      out += `  - ${account.getPeerId().toString()} ${account.multiAddr.toString()}\n`
+      result.push({
         id: account.getPeerId(),
         multiaddrs: [account.multiAddr]
-      }
-      log(`\t${account.getPeerId().toString()} ${account.multiAddr.toString()}`)
+      })
     }
+
+    // Remove last `\n`
+    log(out.substring(0, out.length - 1))
 
     return result
   }
@@ -1017,21 +1023,26 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     deferred.promise = new Promise<string>((resolve, reject) => {
       let done = false
+      let timer: any
+
       deferred.reject = () => {
         if (done) {
           return
         }
+        timer?.clear()
         done = true
+
         this.removeListener(eventType, deferred.resolve)
         log('listener %s on %s is removed due to error', eventType, tx)
         setImmediate(resolve, tx)
       }
 
-      setTimeout(
+      timer = retimer(
         () => {
           if (done) {
             return
           }
+          timer?.clear()
           done = true
           // remove listener but throw now error
           this.removeListener(eventType, deferred.resolve)
@@ -1046,7 +1057,9 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         if (done) {
           return
         }
+        timer?.clear()
         done = true
+
         this.removeListener(eventType, deferred.resolve)
         log('listener %s on %s is resolved and thus removed', eventType, tx)
 

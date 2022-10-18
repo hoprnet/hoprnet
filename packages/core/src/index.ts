@@ -14,6 +14,9 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Components } from '@libp2p/interfaces/components'
 import { compareAddressesLocalMode, compareAddressesPublicMode, type HoprConnectConfig } from '@hoprnet/hopr-connect'
 
+// @ts-ignore untyped library
+import retimer from 'retimer'
+
 import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants.js'
 
 import AccessControl from './network/access-control.js'
@@ -26,7 +29,6 @@ import {
   PublicKey,
   Balance,
   NativeBalance,
-  HoprDB,
   libp2pSubscribe,
   libp2pSendMessage,
   isSecp256k1PeerId,
@@ -37,13 +39,12 @@ import {
   durations,
   isErrorOutOfFunds,
   debug,
-  retimer,
+  retimer as intervalTimer,
   createRelayerKey,
   createCircuitAddress,
   convertPubKeyFromPeerId,
   getBackoffRetryTimeout,
   getBackoffRetries,
-  pickVersion,
   type LibP2PHandlerFunction,
   type AcknowledgedTicket,
   type ChannelEntry,
@@ -51,15 +52,10 @@ import {
   type DialOpts,
   type Hash,
   type HalfKeyChallenge,
-  type Ticket
+  type Ticket,
+  type HoprDB
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { type Indexer } from '@hoprnet/hopr-core-ethereum'
-
-// Do not type-check JSON files
-// @ts-ignore
-import pkg from '../package.json' assert { type: 'json' }
-
-const NORMALIZED_VERSION = pickVersion(pkg.version)
 
 import {
   type StrategyTickResult,
@@ -69,7 +65,7 @@ import {
   SaneDefaults
 } from './channel-strategy.js'
 
-import { subscribeToAcknowledgements } from './interactions/packet/acknowledgement.js'
+import { AcknowledgementInteraction } from './interactions/packet/acknowledgement.js'
 import { PacketForwardInteraction } from './interactions/packet/forward.js'
 
 import { Packet } from './messages/index.js'
@@ -169,9 +165,9 @@ export type SendMessage = ((
   protocols: string | string[],
   msg: Uint8Array,
   includeReply: true,
-  opts: DialOpts
+  opts?: DialOpts
 ) => Promise<Uint8Array[]>) &
-  ((dest: PeerId, protocols: string | string[], msg: Uint8Array, includeReply: false, opts: DialOpts) => Promise<void>)
+  ((dest: PeerId, protocols: string | string[], msg: Uint8Array, includeReply: false, opts?: DialOpts) => Promise<void>)
 
 class Hopr extends EventEmitter {
   public status: NodeStatus = 'UNINITIALIZED'
@@ -181,6 +177,7 @@ class Hopr extends EventEmitter {
   private networkPeers: NetworkPeers
   private heartbeat: Heartbeat
   private forward: PacketForwardInteraction
+  private acknowledgements: AcknowledgementInteraction
   private libp2pComponents: Components
   private stopLibp2p: Libp2p['stop']
   private pubKey: PublicKey
@@ -361,7 +358,7 @@ class Hopr extends EventEmitter {
             .flatMap((c) => c.tags ?? [])
             .includes(PeerConnectionType.DIRECT)
         ) {
-          this.knownPublicNodesCache.add(peerId)
+          this.knownPublicNodesCache.add(peerId.toString())
           return true
         }
 
@@ -375,35 +372,21 @@ class Hopr extends EventEmitter {
       this.networkPeers.register(event.detail.remotePeer, NetworkPeersOrigin.INCOMING_CONNECTION)
     })
 
-    const protocolMsg = [
-      // current
-      `/hopr/${this.environment.id}/msg/${NORMALIZED_VERSION}`,
-      // deprecated
-      `/hopr/${this.environment.id}/msg`
-    ]
-
-    const protocolAck = [
-      // current
-      `/hopr/${this.environment.id}/ack/${NORMALIZED_VERSION}`,
-      // deprecated
-      `/hopr/${this.environment.id}/ack`
-    ]
-
-    // Attach mixnet functionality
-    await subscribeToAcknowledgements(
+    this.acknowledgements = new AcknowledgementInteraction(
+      sendMessage,
       subscribe,
-      this.db,
       this.getId(),
+      this.db,
       (ackChallenge: HalfKeyChallenge) => {
         // Can subscribe to both: per specific message or all message acknowledgments
         this.emit(`hopr:message-acknowledged:${ackChallenge.toHex()}`)
         this.emit('hopr:message-acknowledged', ackChallenge.toHex())
       },
       (ack: AcknowledgedTicket) => this.connector.emit('ticket:win', ack),
-      // TODO: automatically reinitialize commitments
       () => {},
-      protocolAck
+      this.environment
     )
+
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
     this.forward = new PacketForwardInteraction(
       subscribe,
@@ -411,13 +394,17 @@ class Hopr extends EventEmitter {
       this.getId(),
       onMessage,
       this.db,
-      protocolMsg,
-      protocolAck
+      this.environment,
+      this.acknowledgements
     )
-    await this.forward.start()
 
     // Attach socket listener and check availability of entry nodes
     await libp2p.start()
+
+    // Register protocols
+    await this.acknowledgements.start()
+    await this.forward.start()
+
     log('libp2p started')
 
     this.connector.indexer.on('peer', this.onPeerAnnouncement.bind(this))
@@ -490,7 +477,7 @@ class Hopr extends EventEmitter {
    * Total hack
    */
   private startMemoryFreeInterval() {
-    retimer(this.freeMemory.bind(this), () => durations.minutes(1))
+    intervalTimer(this.freeMemory.bind(this), () => durations.minutes(1))
   }
 
   private async maybeLogProfilingToGCloud() {
@@ -603,19 +590,21 @@ class Hopr extends EventEmitter {
       throw new Error('node is not RUNNING')
     }
 
-    const currentChannels: ChannelEntry[] = (await this.getAllChannels()) ?? []
+    let out = 'Channels obtained:\n'
 
-    verbose(`Channels obtained:`)
-    for (const currentChannel of currentChannels) {
-      verbose(currentChannel.toString())
+    const currentChannels: ChannelEntry[] = []
+
+    for await (const channel of this.getAllChannels()) {
+      out += `${channel.toString()}\n`
+      currentChannels.push(channel)
+      this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_EXISTING_CHANNEL) // Make sure current channels are 'interesting'
     }
+
+    // Remove last `\n`
+    verbose(out.substring(0, out.length - 1))
 
     if (currentChannels === undefined) {
       throw new Error('invalid channels retrieved from database')
-    }
-
-    for (const channel of currentChannels) {
-      this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_EXISTING_CHANNEL) // Make sure current channels are 'interesting'
     }
 
     let balance: Balance
@@ -690,8 +679,8 @@ class Hopr extends EventEmitter {
     }
   }
 
-  private async getAllChannels(): Promise<ChannelEntry[]> {
-    return this.db.getChannelsFrom(PublicKey.fromPeerId(this.getId()).toAddress())
+  private async *getAllChannels(): AsyncIterable<ChannelEntry> {
+    yield* this.db.getChannelsFromIterable(PublicKey.fromPeerId(this.getId()).toAddress())
   }
 
   /**
@@ -717,6 +706,8 @@ class Hopr extends EventEmitter {
       throw Error(`Hopr instance already destroyed.`)
     }
     this.status = 'DESTROYED'
+    this.forward?.stop()
+    this.acknowledgements?.stop()
     verbose('Stopping checking timeout')
     this.stopPeriodicCheck?.()
     verbose('Stopping heartbeat & indexer')
@@ -900,19 +891,25 @@ class Hopr extends EventEmitter {
   /**
    * @returns a list connected peerIds
    */
-  public getConnectedPeers(): PeerId[] {
+  public getConnectedPeers(): Iterable<PeerId> {
     if (!this.networkPeers) {
       return []
     }
-    return this.networkPeers.all()
+
+    const entries = this.networkPeers.getAllEntries()
+    return (function* () {
+      for (const entry of entries) {
+        yield entry.id
+      }
+    })()
   }
 
   /**
    * Takes a look into the indexer.
    * @returns a list of announced multi addresses
    */
-  public async getAddressesAnnouncedOnChain(): Promise<Multiaddr[]> {
-    return this.indexer.getAddressesAnnouncedOnChain()
+  public async *getAddressesAnnouncedOnChain() {
+    yield* this.indexer.getAddressesAnnouncedOnChain()
   }
 
   /**
@@ -954,10 +951,15 @@ class Hopr extends EventEmitter {
       return 'Node has not started yet'
     }
     const connected = this.networkPeers.debugLog()
-    const announced = await this.connector.indexer.getAddressesAnnouncedOnChain()
+
+    let announced: string[] = []
+    for await (const announcement of this.connector.indexer.getAddressesAnnouncedOnChain()) {
+      announced.push(announcement.toString())
+    }
+
     return `${connected}
     \n${announced.length} peers have announced themselves on chain:
-    \n${announced.map((ma: Multiaddr) => ma.toString()).join('\n')}`
+    \n${announced.join('\n')}`
   }
 
   public subscribeOnConnector(event: string, callback: () => void): void {
@@ -973,7 +975,7 @@ class Hopr extends EventEmitter {
       if (this.status != 'RUNNING') {
         return
       }
-      const logTimeout = setTimeout(() => {
+      const timer = retimer(() => {
         log('strategy tick took longer than 10 secs')
       }, 10000)
       try {
@@ -983,13 +985,13 @@ class Hopr extends EventEmitter {
         log('error in periodic check', e)
       }
       log('Clearing out logging timeout.')
-      clearTimeout(logTimeout)
+      timer.clear()
       log(`Setting up timeout for ${this.strategy.tickInterval}ms`)
     }.bind(this)
 
     log(`Starting periodicCheck interval with ${this.strategy.tickInterval}ms`)
 
-    this.stopPeriodicCheck = retimer(periodicCheck, () => this.strategy.tickInterval)
+    this.stopPeriodicCheck = intervalTimer(periodicCheck, () => this.strategy.tickInterval)
   }
 
   /**
