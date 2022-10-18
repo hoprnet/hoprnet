@@ -26,7 +26,7 @@ The following sections document the metrics per package:
 ### core
 
 | Name                                    | Type      | Description                                                    | Note                   |
-|-----------------------------------------|-----------|----------------------------------------------------------------|------------------------|
+| --------------------------------------- | --------- | -------------------------------------------------------------- | ---------------------- |
 | core_gauge_num_outgoing_channels        | gauge     | Number of outgoing channels                                    |                        |
 | core_gauge_num_incoming_channels        | gauge     | Number of incoming channels                                    |                        |
 | core_counter_sent_messages              | counter   | Number of sent messages                                        |                        |
@@ -52,7 +52,7 @@ The following sections document the metrics per package:
 ### core-ethereum
 
 | Name                                                       | Type          | Description                                 | Note                                                                |
-|------------------------------------------------------------|---------------|---------------------------------------------|---------------------------------------------------------------------|
+| ---------------------------------------------------------- | ------------- | ------------------------------------------- | ------------------------------------------------------------------- |
 | core_ethereum_mcounter_indexer_provider_errors             | multi counter | Multicounter for provider errors in Indexer |                                                                     |
 | core_ethereum_counter_indexer_processed_unconfirmed_blocks | counter       | Number of processed unconfirmed blocks      |                                                                     |
 | core_ethereum_counter_indexer_announcements                | counter       | Number of processed announcements           |                                                                     |

@@ -55,12 +55,29 @@ const getSyncPercentage = (start: number, current: number, end: number) =>
 const backoffOption: Parameters<typeof retryWithBackoffThenThrow>[1] = { maxDelay: MAX_TRANSACTION_BACKOFF }
 
 // Metrics
-const metric_indexerErrors = create_multi_counter('core_ethereum_mcounter_indexer_provider_errors','Multicounter for provider errors in Indexer', ['type'])
-const metric_unconfirmedBlocks = create_counter('core_ethereum_counter_indexer_processed_unconfirmed_blocks', 'Number of processed unconfirmed blocks')
-const metric_numAnnouncements = create_counter('core_ethereum_counter_indexer_announcements', 'Number of processed announcements')
+const metric_indexerErrors = create_multi_counter(
+  'core_ethereum_mcounter_indexer_provider_errors',
+  'Multicounter for provider errors in Indexer',
+  ['type']
+)
+const metric_unconfirmedBlocks = create_counter(
+  'core_ethereum_counter_indexer_processed_unconfirmed_blocks',
+  'Number of processed unconfirmed blocks'
+)
+const metric_numAnnouncements = create_counter(
+  'core_ethereum_counter_indexer_announcements',
+  'Number of processed announcements'
+)
 const metric_blockNumber = create_gauge('core_ethereum_gauge_indexer_block_number', 'Current block number')
-const metric_channelStatus = create_multi_gauge('core_ethereum_gauge_indexer_channel_status', 'Status of different channels', ['channel']);
-const metric_ticketsRedeemed = create_counter('core_ethereum_counter_indexer_tickets_redeemed', 'Number of redeemed tickets')
+const metric_channelStatus = create_multi_gauge(
+  'core_ethereum_gauge_indexer_channel_status',
+  'Status of different channels',
+  ['channel']
+)
+const metric_ticketsRedeemed = create_counter(
+  'core_ethereum_counter_indexer_tickets_redeemed',
+  'Number of redeemed tickets'
+)
 
 /**
  * Indexes HoprChannels smart contract and stores to the DB,
@@ -401,13 +418,13 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     log(chalk.red(`etherjs error: ${error}`))
 
     try {
-
-      const errorType = [errors.SERVER_ERROR, errors.TIMEOUT, 'ECONNRESET', 'ECONNREFUSED']
-        .filter((err) => [error?.code, String(error)].includes(err));
+      const errorType = [errors.SERVER_ERROR, errors.TIMEOUT, 'ECONNRESET', 'ECONNREFUSED'].filter((err) =>
+        [error?.code, String(error)].includes(err)
+      )
 
       // if provider connection issue
       if (errorType.length != 0) {
-        metric_indexerErrors.increment([errorType[0]]);
+        metric_indexerErrors.increment([errorType[0]])
 
         log(chalk.blue('code error falls here', this.chain.getAllQueuingTransactionRequests().length))
         // allow the indexer to restart even there is no transaction in queue
