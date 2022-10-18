@@ -67,7 +67,7 @@ The following sections document the metrics per package:
 ### hoprd
 
 | Name                                          | Type        | Description                                                       | Note                                     |
-|-----------------------------------------------|-------------|-------------------------------------------------------------------|------------------------------------------|
+| --------------------------------------------- | ----------- | ----------------------------------------------------------------- | ---------------------------------------- |
 | hoprd_gauge_startup_unix_time_seconds         | gauge       | The unix timestamp at which the process was started               | seconds since Epoch                      |
 | hoprd_histogram_startup_time_seconds          | histogram   | Time it takes for a node to start up                              | unit: seconds                            |
 | hoprd_histogram_time_to_green_seconds         | histogram   | Time it takes for a node to transition to the GREEN network state | unit: seconds                            |
