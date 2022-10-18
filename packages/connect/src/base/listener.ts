@@ -350,11 +350,9 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     if (this.testingOptions.__runningLocally || natSituation.bidirectionalNAT || !natSituation.isExposed) {
       this.connectComponents.getEntryNodes().on(RELAY_CHANGED_EVENT, this._emitListening)
 
-      // Finish startup
-      this.connectComponents.getEntryNodes().start()
-
-      // Initiate update but don't await its result
-      this.connectComponents.getEntryNodes().updatePublicNodes()
+      // Instructs entry node manager to assign to available
+      // entry once startup has finished
+      this.connectComponents.getEntryNodes().enable()
     }
 
     this.state = ListenerState.LISTENING
