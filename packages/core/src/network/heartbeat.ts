@@ -275,10 +275,11 @@ export default class Heartbeat {
           break
       }
 
-      metric_hiqh_quality_peers.set(highQuality)
-      metric_low_quality_peers.set(lowQuality)
-      metric_peers.set(highQuality + lowQuality)
     }
+
+    metric_hiqh_quality_peers.set(highQuality)
+    metric_low_quality_peers.set(lowQuality)
+    metric_peers.set(highQuality + lowQuality)
 
     return this.currentHealth
   }
