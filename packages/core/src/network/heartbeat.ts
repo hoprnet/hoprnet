@@ -240,6 +240,9 @@ export default class Heartbeat {
         case NetworkHealthIndicator.ORANGE:
           metric_networkHealth.set(2)
           break
+        case NetworkHealthIndicator.YELLOW:
+          metric_networkHealth.set(3)
+          break
         case NetworkHealthIndicator.GREEN:
           metric_networkHealth.set(4)
           break
