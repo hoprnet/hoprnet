@@ -47,6 +47,11 @@ const metric_pingSuccessCount = create_counter(
 )
 const metric_pingFailureCount = create_counter('core_counter_heartbeat_failed_pings', 'Total number of failed pings')
 
+const metric_hiqh_quality_peers = create_gauge('core_gauge_num_high_quality_peers', 'Number of hiqh quality peers')
+const metric_low_quality_peers = create_gauge('core_gauge_num_low_quality_peers', 'Number of low quality peers')
+const metric_peers = create_gauge('core_gauge_num_peers', 'Number of all peers')
+
+
 export type HeartbeatPingResult = {
   destination: PeerId
   lastSeen: number
@@ -200,17 +205,39 @@ export default class Heartbeat {
   public recalculateNetworkHealth(): NetworkHealthIndicator {
     let newHealthValue: NetworkHealthIndicator = NetworkHealthIndicator.RED
     let lowQualityPublic = 0
-    let lowQualityNonPublic = 0
+    //let lowQualityNonPublic = 0
     let highQualityPublic = 0
     let highQualityNonPublic = 0
+
+    let highQuality = 0
+    let lowQuality = 0
 
     // Count quality of public/non-public nodes
     for (let entry of this.networkPeers.getAllEntries()) {
       let quality = this.networkPeers.qualityOf(entry.id)
       if (this.isPublicNode(entry.id)) {
-        quality > this.config.networkQualityThreshold ? ++highQualityPublic : ++lowQualityPublic
+        if (quality > this.config.networkQualityThreshold)
+        {
+          ++highQualityPublic
+          ++highQuality
+        }
+        else
+        {
+          ++lowQualityPublic
+          ++lowQuality
+        }
       } else {
-        quality > this.config.networkQualityThreshold ? ++highQualityNonPublic : ++lowQualityNonPublic
+
+        if (quality > this.config.networkQualityThreshold)
+        {
+          ++highQualityNonPublic
+          ++highQuality
+        }
+        else
+        {
+          //++lowQualityNonPublic
+          ++lowQuality
+        }
       }
     }
 
@@ -247,6 +274,10 @@ export default class Heartbeat {
           metric_networkHealth.set(4)
           break
       }
+
+      metric_hiqh_quality_peers.set(highQuality)
+      metric_low_quality_peers.set(lowQuality)
+      metric_peers.set(highQuality + lowQuality)
     }
 
     return this.currentHealth
