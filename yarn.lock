@@ -2931,7 +2931,7 @@ __metadata:
     "@chainsafe/libp2p-noise": 7.0.3
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@libp2p/crypto": 1.0.0
-    "@libp2p/interface-address-manager": 1.0.1
+    "@libp2p/interface-address-manager": 1.0.3
     "@libp2p/interface-connection": 1.0.1
     "@libp2p/interface-connection-manager": 1.1.0
     "@libp2p/interface-peer-discovery": 1.0.0
@@ -3400,13 +3400,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@libp2p/interface-address-manager@npm:1.0.1":
-  version: 1.0.1
-  resolution: "@libp2p/interface-address-manager@npm:1.0.1"
+"@libp2p/interface-address-manager@npm:1.0.3":
+  version: 1.0.3
+  resolution: "@libp2p/interface-address-manager@npm:1.0.3"
   dependencies:
     "@libp2p/interfaces": ^3.0.0
-    "@multiformats/multiaddr": ^10.2.0
-  checksum: 8249ee9c18a467e9c0159efb20a27ac074165100f9de63a39fe6616758dd06517eb390876163ecdca36cc00da4a100ca4ab965061f14db7cc0979f25d7083c59
+    "@multiformats/multiaddr": ^11.0.0
+  checksum: 7c37f60fb6a46db37e387f8fe1678552484b99cbb9e71c49f870711a937282895b1d7cdf59b96783545703a189d180691938a66ed30f903844d15fe4c2c62ca1
   languageName: node
   linkType: hard
 
