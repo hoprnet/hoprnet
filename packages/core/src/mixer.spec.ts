@@ -1,88 +1,139 @@
 import type { Packet } from './messages/index.js'
 import { Mixer } from './mixer.js'
 import assert from 'assert'
-import { MAX_PACKET_DELAY } from './constants.js'
-import sinon from 'sinon'
 
+class TestingMixer extends Mixer {
+  addPacket(priority: number, packet: Packet) {
+    this.queue.push([priority, packet])
+  }
+
+  emitPacket() {
+    this.timer.reschedule(1)
+  }
+}
 let i = 0
 let fakePacket = () => {
   return i++ as unknown as Packet
 }
 
 describe('test mixer ', async function () {
-  let clock: any
+  it('add one packet and emit one packet', async function () {
+    const mixer = new TestingMixer()
 
-  beforeEach(async () => {
-    clock = sinon.useFakeTimers(Date.now())
+    const firstPacket = fakePacket()
+    mixer.push(firstPacket)
+
+    mixer.emitPacket()
+
+    const packets = []
+
+    const it = mixer[Symbol.asyncIterator]()
+    packets.push((await it.next()).value)
+
+    assert(packets.length == 1)
+    assert(packets[0] == firstPacket)
   })
 
-  afterEach(() => {
-    clock.restore()
+  it('add packets then drain them', async function () {
+    const mixer = new TestingMixer(() => 50)
+
+    const firstPacket = fakePacket()
+    mixer.push(firstPacket)
+    const secondPacket = fakePacket()
+    mixer.push(secondPacket)
+
+    mixer.emitPacket()
+
+    const packets = []
+
+    const it = mixer[Symbol.asyncIterator]()
+
+    packets.push((await it.next()).value)
+    mixer.emitPacket()
+
+    packets.push((await it.next()).value)
+
+    assert(packets.length == 2)
+    assert(packets[0] == firstPacket)
+    assert(packets[1] == secondPacket)
   })
 
-  it('should push and pop a single element', async function () {
-    let calls = 0
-    let lastCall = null
-    const m = new Mixer((p) => {
-      calls++
-      lastCall = p
-    })
-    const p1 = fakePacket()
-    assert.equal(calls, 0, 'empty mixer not delivered')
-    m.push(p1)
-    assert.equal(calls, 0, 'empty mixer not delivered immediately')
-    await clock.tickAsync(MAX_PACKET_DELAY + 1)
-    assert.equal(calls, 1, 'packets pop after max delay')
-    assert(p1 === lastCall)
+  it('add and drain packets interleaved', async function () {
+    const mixer = new TestingMixer(() => 50)
+
+    const firstPacket = fakePacket()
+    mixer.push(firstPacket)
+
+    mixer.emitPacket()
+
+    const it = mixer[Symbol.asyncIterator]()
+    const packets = []
+
+    packets.push((await it.next()).value)
+
+    const secondPacket = fakePacket()
+    mixer.push(secondPacket)
+
+    packets.push((await it.next()).value)
+
+    assert(packets.length == 2)
+    assert(packets[0] == firstPacket)
+    assert(packets[1] == secondPacket)
   })
 
-  it('should push and pop multiple element', async function () {
-    var calls = 0
-    let lastCall = null
-    const m = new Mixer((p) => {
-      calls++
-      lastCall = p
-    })
-    const p1 = fakePacket()
-    const p2 = fakePacket()
-    const p3 = fakePacket()
-    const p4 = fakePacket()
-
-    assert(calls === 0, 'empty mixer not delivered')
-    m.push(p1)
-    m.push(p2)
-    m.push(p3)
-    assert(calls === 0, 'empty mixer not delivered immediately')
-    await clock.tickAsync(MAX_PACKET_DELAY + 1)
-    m.push(p4)
-    assert.equal(calls, 3, 'packets pop after max delay')
-    await clock.tickAsync(MAX_PACKET_DELAY + 1)
-    assert.equal(calls, 4, 'final packet poppable')
-    assert(lastCall === p4, 'final packet is p4')
-  })
-
-  it('probabilistic test, packet ordering', async function () {
-    var calls = 0
-    let out: any[] = []
-    const m = new Mixer((p) => {
-      calls = calls + 1
-      out.push(p)
-    })
-    for (let x = 0; x < 1000; x++) {
-      m.push(fakePacket())
-    }
-    assert(calls === 0, 'empty mixer not delivered')
-    await clock.tickAsync(MAX_PACKET_DELAY + 1)
-    assert.equal(calls, 1000, '1000 messages delivered')
-    let ordered = true
-    let prev = 0
-    for (let x = 0; x < 1000; x++) {
-      let next = out.pop() as unknown as number // cast back to fake
-      if (next <= prev) {
-        ordered = false
+  it('reorder packets', async function () {
+    let callCount = 0
+    const mixer = new TestingMixer(() => {
+      switch (callCount++) {
+        case 0:
+          return 100
+        case 1:
+          return 1
+        default:
+          throw Error(`should not happen`)
       }
-      prev = next
+    })
+
+    const firstPacket = fakePacket()
+    mixer.push(firstPacket)
+    const secondPacket = fakePacket()
+    mixer.push(secondPacket)
+
+    const it = mixer[Symbol.asyncIterator]()
+    const packets = []
+
+    packets.push((await it.next()).value)
+    packets.push((await it.next()).value)
+
+    assert(packets.length == 2)
+    assert(packets[0] == secondPacket)
+    assert(packets[1] == firstPacket)
+  })
+
+  it('end empty mixer', async function () {
+    const mixer = new TestingMixer()
+
+    setTimeout(mixer.end, 100)
+
+    for await (const _msg of mixer) {
+      assert.fail(`Must not emit a msg`)
     }
-    assert(!ordered, 'packets should be shuffled')
+
+    // Produces a timeout if not succesful
+  })
+
+  it('end filled mixer', async function () {
+    const mixer = new TestingMixer(() => 100)
+
+    const firstPacket = fakePacket()
+    mixer.push(firstPacket)
+
+    setTimeout(mixer.end, 50)
+
+    for await (const _msg of mixer) {
+      assert.fail(`Must not emit a msg`)
+    }
+
+    // Produces a timeout if not succesful
   })
 })

@@ -3,7 +3,7 @@ import { randomBytes } from 'crypto'
 import { EventEmitter } from 'events'
 import BN from 'bn.js'
 
-import { subscribeToAcknowledgements, sendAcknowledgement } from './acknowledgement.js'
+import { AcknowledgementInteraction } from './acknowledgement.js'
 import {
   Balance,
   defer,
@@ -27,6 +27,7 @@ import { AcknowledgementChallenge, Packet, Acknowledgement } from '../../message
 import { PacketForwardInteraction } from './forward.js'
 import { initializeCommitment } from '@hoprnet/hopr-core-ethereum'
 import { ChannelCommitmentInfo } from '@hoprnet/hopr-core-ethereum'
+import type { ResolvedEnvironment } from '../../environment.js'
 
 const SECRET_LENGTH = 32
 
@@ -54,15 +55,44 @@ const TestingSnapshot = new Snapshot(new BN(0), new BN(0), new BN(0))
  * @param self our own identity to know which messages are destined for us
  */
 function createFakeSendReceive(events: EventEmitter, self: PeerId) {
-  const send = (destination: PeerId, protocol: any, msg: Uint8Array) => {
+  const send = (destination: PeerId, protocol: string | string[], msg: Uint8Array) => {
     events.emit('msg', msg, self, destination, protocol)
   }
 
-  const subscribe = async (protocol: string, onPacket: (msg: Uint8Array, sender: PeerId) => any) => {
-    events.on('msg', (msg: Uint8Array, sender: PeerId, destination: PeerId, protocolSubscription: string) => {
-      if (self.equals(destination) && protocol === protocolSubscription) {
-        onPacket(msg, sender)
+  const subscribe = async (
+    subscribedProtocols: string | string[],
+    onPacket: (msg: Uint8Array, sender: PeerId) => any
+  ) => {
+    if (!Array.isArray(subscribedProtocols)) {
+      subscribedProtocols = [subscribedProtocols]
+    }
+    subscribedProtocols.sort()
+
+    events.on('msg', (msg: Uint8Array, sender: PeerId, destination: PeerId, incomingProtocols: string | string[]) => {
+      if (!self.equals(destination)) {
+        return
       }
+
+      if (!Array.isArray(incomingProtocols)) {
+        incomingProtocols = [incomingProtocols]
+      }
+
+      incomingProtocols.sort()
+
+      let found = false
+      for (const subscribedProtocol of subscribedProtocols) {
+        for (const incomingProtocol of incomingProtocols) {
+          if (incomingProtocol === subscribedProtocol) {
+            found = true
+          }
+        }
+      }
+
+      if (!found) {
+        return
+      }
+
+      onPacket(msg, sender)
     })
   }
 
@@ -142,20 +172,6 @@ async function createMinimalChannelTopology(dbs: HoprDB[], nodes: PeerId[]): Pro
   }
 }
 
-class TestingForwardInteraction extends PacketForwardInteraction {
-  /**
-   * Disable probablistic mixing
-   */
-  useMockMixer() {
-    const push = (p: Packet) => {
-      this.handleMixedPacket(p)
-    }
-    this.mixer = {
-      push
-    } as any
-  }
-}
-
 // Tests two different packet acknowledgement settings
 // - Acknowledgement for packet sender
 // - Acknowledgement for relayer, unlocking a ticket
@@ -195,10 +211,11 @@ describe('packet acknowledgement', function () {
 
     await dbs[0].storePendingAcknowledgement(ackChallenge, true)
 
-    await subscribeToAcknowledgements(
+    const ackInteration = new AcknowledgementInteraction(
+      libp2pSelf.send as any,
       libp2pSelf.subscribe,
-      dbs[0],
       SELF,
+      dbs[0],
       (receivedAckChallenge: HalfKeyChallenge) => {
         if (receivedAckChallenge.eq(ackChallenge)) {
           ackReceived.resolve()
@@ -206,8 +223,26 @@ describe('packet acknowledgement', function () {
       },
       () => {},
       () => {},
-      'protocolAck'
+      {
+        id: 'testing'
+      } as ResolvedEnvironment
     )
+
+    const ackInterationCounterparty = new AcknowledgementInteraction(
+      libp2pCounterparty.send as any,
+      libp2pCounterparty.subscribe,
+      COUNTERPARTY,
+      dbs[1],
+      () => {},
+      () => {},
+      () => {},
+      {
+        id: 'testing'
+      } as ResolvedEnvironment
+    )
+
+    await ackInteration.start()
+    await ackInterationCounterparty.start()
 
     const ackKey = deriveAckKeyShare(secrets[0])
     const ackMessage = AcknowledgementChallenge.create(ackChallenge, SELF)
@@ -217,19 +252,19 @@ describe('packet acknowledgement', function () {
       `acknowledgement key must be sufficient to solve acknowledgement challenge`
     )
 
-    await sendAcknowledgement(
+    ackInterationCounterparty.sendAcknowledgement(
       {
         createAcknowledgement: (privKey: PeerId) => {
           return Acknowledgement.create(ackMessage, ackKey, privKey)
         }
       } as any,
-      SELF,
-      libp2pCounterparty.send as any,
-      COUNTERPARTY,
-      'protocolAck'
+      SELF
     )
 
     await ackReceived.promise
+
+    ackInteration.stop()
+    ackInterationCounterparty.stop()
   })
 
   // We receive a packet, run the transformation, extract keys
@@ -244,22 +279,42 @@ describe('packet acknowledgement', function () {
     const packet = await Packet.create(TEST_MESSAGE, nodes, SELF, dbs[0])
 
     const libp2pRelay0 = createFakeSendReceive(events, RELAY0)
+    const libp2pCounterparty = createFakeSendReceive(events, COUNTERPARTY)
 
     const ackReceived = defer<void>()
 
-    await subscribeToAcknowledgements(
+    const ackRelay0Interaction = new AcknowledgementInteraction(
+      libp2pRelay0.send as any,
       libp2pRelay0.subscribe,
-      dbs[1],
       RELAY0,
+      dbs[1],
       () => {},
       () => {
         ackReceived.resolve()
       },
       () => {},
-      'protocolAck'
+      {
+        id: 'testing'
+      } as ResolvedEnvironment
     )
 
-    const interaction = new TestingForwardInteraction(
+    const ackCounterpartyInteraction = new AcknowledgementInteraction(
+      libp2pCounterparty.send as any,
+      libp2pCounterparty.subscribe,
+      COUNTERPARTY,
+      dbs[2],
+      () => {},
+      () => {},
+      () => {},
+      {
+        id: 'testing'
+      } as ResolvedEnvironment
+    )
+
+    await ackCounterpartyInteraction.start()
+    await ackRelay0Interaction.start()
+
+    const interaction = new PacketForwardInteraction(
       libp2pRelay0.subscribe,
       libp2pRelay0.send as any,
       RELAY0,
@@ -267,27 +322,25 @@ describe('packet acknowledgement', function () {
         throw Error(`Node is not supposed to receive message`)
       },
       dbs[1],
-      'protocolMsg',
-      'protocolAck'
+      {
+        id: 'testing'
+      } as ResolvedEnvironment,
+      ackRelay0Interaction,
+      () => 1
     )
+    await interaction.start()
 
-    interaction.useMockMixer()
-
-    const libp2pCounterparty = createFakeSendReceive(events, COUNTERPARTY)
-
-    await libp2pCounterparty.subscribe('protocolMsg', async (msg: Uint8Array) => {
-      await sendAcknowledgement(
-        Packet.deserialize(msg, COUNTERPARTY, RELAY0),
-        RELAY0,
-        libp2pCounterparty.send as any,
-        COUNTERPARTY,
-        'protocolAck'
-      )
+    await libp2pCounterparty.subscribe(interaction.protocols, async (msg: Uint8Array) => {
+      ackCounterpartyInteraction.sendAcknowledgement(Packet.deserialize(msg, COUNTERPARTY, RELAY0), RELAY0)
     })
 
     await interaction.handleMixedPacket(Packet.deserialize(packet.serialize(), RELAY0, SELF))
 
     await ackReceived.promise
+
+    interaction.stop()
+    ackCounterpartyInteraction.stop()
+    ackRelay0Interaction.stop()
   })
 })
 
@@ -317,10 +370,13 @@ describe('packet relaying interaction', function () {
     const msgDefer = defer<void>()
     const nodes: PeerId[] = [RELAY0, RELAY1, RELAY2, COUNTERPARTY]
     const allNodes: PeerId[] = [SELF].concat(nodes)
-    let senderInteraction: TestingForwardInteraction
+    let senderInteraction: PacketForwardInteraction
 
     const packet = await Packet.create(TEST_MESSAGE, nodes, SELF, dbs[0])
     await packet.storePendingAcknowledgement(dbs[0])
+
+    const forwardInteractions: PacketForwardInteraction[] = []
+    const ackInteractions: AcknowledgementInteraction[] = []
 
     for (const [index, pId] of allNodes.entries()) {
       const { subscribe, send } = createFakeSendReceive(events, pId)
@@ -337,21 +393,39 @@ describe('packet relaying interaction', function () {
         }
       }
 
-      const interaction = new TestingForwardInteraction(
+      const acknowledgementInteraction = new AcknowledgementInteraction(
+        send as any,
+        subscribe,
+        pId,
+        dbs[index],
+        () => {},
+        () => {},
+        () => {},
+        {
+          id: 'testing'
+        } as ResolvedEnvironment
+      )
+
+      const interaction = new PacketForwardInteraction(
         subscribe,
         send as any,
         pId,
         receiveHandler,
         dbs[index],
-        'protocolMsg',
-        'protocolAck'
+        {
+          id: 'testing'
+        } as ResolvedEnvironment,
+        acknowledgementInteraction,
+        () => 1
       )
-      interaction.useMockMixer()
       await interaction.start()
 
       if (pId.equals(SELF)) {
         senderInteraction = interaction
       }
+
+      forwardInteractions.push(interaction)
+      ackInteractions.push(acknowledgementInteraction)
     }
 
     // Sending packet from self to relay0, which should further forward until counterparty
@@ -359,5 +433,8 @@ describe('packet relaying interaction', function () {
 
     // The counterparty will resolve this once the message has been received
     await msgDefer.promise
+
+    forwardInteractions.forEach((interaction) => interaction.stop())
+    ackInteractions.forEach((interaction) => interaction.stop())
   })
 })

@@ -6,10 +6,9 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { unmarshalPublicKey } from '@libp2p/crypto/keys'
 
 import chalk from 'chalk'
-import { pubKeyToPeerId } from '@hoprnet/hopr-utils'
+import { dial, DialStatus, pubKeyToPeerId } from '@hoprnet/hopr-utils'
 
 import { RelayState } from './state.js'
-import type { Relay } from './index.js'
 
 import debug from 'debug'
 import { DELIVERY_PROTOCOLS } from '../constants.js'
@@ -97,7 +96,7 @@ class RelayHandshake {
     }
   }
 
-  private shakerWrite(msg: any) {
+  private shakerWrite(msg: RelayHandshakeMessage) {
     try {
       this.shaker.write(Uint8Array.of(msg))
       this.shaker.rest()
@@ -165,7 +164,7 @@ class RelayHandshake {
    * Negotiates between initiator and destination whether they can establish
    * a relayed connection.
    * @param source peerId of the initiator
-   * @param getStreamToCounterparty used to connect to counterparty
+   * @param components libp2p instance components
    * @param state.exists to check if relay state exists
    * @param state.isActive to check if existing relay state can be used
    * @param state.updateExisting to update existing connection with new stream if not active
@@ -173,9 +172,8 @@ class RelayHandshake {
    */
   async negotiate(
     source: PeerId,
-    getStreamToCounterparty: InstanceType<typeof Relay>['dialNodeDirectly'],
+    components: Components,
     state: Pick<RelayState, 'exists' | 'isActive' | 'updateExisting' | 'createNew'>,
-    upgrader: Components['upgrader'],
     __relayFreeTimeout?: number
   ): Promise<void> {
     log(`handling relay request`)
@@ -237,18 +235,16 @@ class RelayHandshake {
       }
     }
 
-    let toDestinationStruct: Awaited<ReturnType<typeof getStreamToCounterparty>>
-    try {
-      const protocolsDelivery = DELIVERY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
-      toDestinationStruct = await getStreamToCounterparty(destination, protocolsDelivery, {
-        upgrader
-      })
-    } catch (err) {
-      error(err)
-    }
+    const result = await dial(
+      components,
+      destination,
+      DELIVERY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments),
+      false,
+      true
+    )
 
     // Anything can happen while attempting to connect
-    if (toDestinationStruct == null) {
+    if (result.status != DialStatus.SUCCESS) {
       error(
         `Failed to create circuit from ${source.toString()} to ${destination.toString()} because destination is not reachable`
       )
@@ -257,11 +253,28 @@ class RelayHandshake {
     }
 
     const destinationShaker = handshake({
-      source: toU8aStream(toDestinationStruct.stream.source as any),
-      sink: toDestinationStruct.stream.sink as any
+      source: toU8aStream(result.resp.stream.source),
+      sink: result.resp.stream.sink
     })
 
-    destinationShaker.write(unmarshalPublicKey(source.publicKey as Uint8Array).marshal())
+    let errThrown = false
+    try {
+      destinationShaker.write(unmarshalPublicKey(source.publicKey as Uint8Array).marshal())
+    } catch (err) {
+      error(`Error while writing to destination ${destination.toString()}`)
+      errThrown = true
+    }
+
+    if (errThrown) {
+      this.shakerWrite(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY)
+      destinationShaker.rest()
+      try {
+        await result.resp.conn.close()
+      } catch (err) {
+        error(`Error while closing connection to destination ${destination.toString()}.`, err)
+      }
+      return
+    }
 
     let destinationChunk: StreamType | undefined
 
@@ -276,7 +289,7 @@ class RelayHandshake {
 
       destinationShaker.rest()
       try {
-        await toDestinationStruct.conn.close()
+        await result.resp.conn.close()
       } catch (err) {
         error(`Error while closing connection to destination ${destination.toString()}.`, err)
       }

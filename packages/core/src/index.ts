@@ -29,7 +29,6 @@ import {
   PublicKey,
   Balance,
   NativeBalance,
-  HoprDB,
   libp2pSubscribe,
   libp2pSendMessage,
   isSecp256k1PeerId,
@@ -46,7 +45,6 @@ import {
   convertPubKeyFromPeerId,
   getBackoffRetryTimeout,
   getBackoffRetries,
-  pickVersion,
   type LibP2PHandlerFunction,
   type AcknowledgedTicket,
   type ChannelEntry,
@@ -54,15 +52,10 @@ import {
   type DialOpts,
   type Hash,
   type HalfKeyChallenge,
-  type Ticket
+  type Ticket,
+  type HoprDB
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { type Indexer } from '@hoprnet/hopr-core-ethereum'
-
-// Do not type-check JSON files
-// @ts-ignore
-import pkg from '../package.json' assert { type: 'json' }
-
-const NORMALIZED_VERSION = pickVersion(pkg.version)
 
 import {
   type StrategyTickResult,
@@ -72,7 +65,7 @@ import {
   SaneDefaults
 } from './channel-strategy.js'
 
-import { subscribeToAcknowledgements } from './interactions/packet/acknowledgement.js'
+import { AcknowledgementInteraction } from './interactions/packet/acknowledgement.js'
 import { PacketForwardInteraction } from './interactions/packet/forward.js'
 
 import { Packet } from './messages/index.js'
@@ -80,6 +73,8 @@ import type { ResolvedEnvironment } from './environment.js'
 import { createLibp2pInstance } from './main.js'
 import type { EventEmitter as Libp2pEmitter } from '@libp2p/interfaces/events'
 import { PeerConnectionType } from '@hoprnet/hopr-connect'
+
+const CODE_P2P = protocols('p2p').code
 
 const DEBUG_PREFIX = `hopr-core`
 const log = debug(DEBUG_PREFIX)
@@ -184,6 +179,7 @@ class Hopr extends EventEmitter {
   private networkPeers: NetworkPeers
   private heartbeat: Heartbeat
   private forward: PacketForwardInteraction
+  private acknowledgements: AcknowledgementInteraction
   private libp2pComponents: Components
   private stopLibp2p: Libp2p['stop']
   private pubKey: PublicKey
@@ -378,35 +374,21 @@ class Hopr extends EventEmitter {
       this.networkPeers.register(event.detail.remotePeer, NetworkPeersOrigin.INCOMING_CONNECTION)
     })
 
-    const protocolMsg = [
-      // current
-      `/hopr/${this.environment.id}/msg/${NORMALIZED_VERSION}`,
-      // deprecated
-      `/hopr/${this.environment.id}/msg`
-    ]
-
-    const protocolAck = [
-      // current
-      `/hopr/${this.environment.id}/ack/${NORMALIZED_VERSION}`,
-      // deprecated
-      `/hopr/${this.environment.id}/ack`
-    ]
-
-    // Attach mixnet functionality
-    await subscribeToAcknowledgements(
+    this.acknowledgements = new AcknowledgementInteraction(
+      sendMessage,
       subscribe,
-      this.db,
       this.getId(),
+      this.db,
       (ackChallenge: HalfKeyChallenge) => {
         // Can subscribe to both: per specific message or all message acknowledgments
         this.emit(`hopr:message-acknowledged:${ackChallenge.toHex()}`)
         this.emit('hopr:message-acknowledged', ackChallenge.toHex())
       },
       (ack: AcknowledgedTicket) => this.connector.emit('ticket:win', ack),
-      // TODO: automatically reinitialize commitments
       () => {},
-      protocolAck
+      this.environment
     )
+
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
     this.forward = new PacketForwardInteraction(
       subscribe,
@@ -414,13 +396,17 @@ class Hopr extends EventEmitter {
       this.getId(),
       onMessage,
       this.db,
-      protocolMsg,
-      protocolAck
+      this.environment,
+      this.acknowledgements
     )
-    await this.forward.start()
 
     // Attach socket listener and check availability of entry nodes
     await libp2p.start()
+
+    // Register protocols
+    await this.acknowledgements.start()
+    await this.forward.start()
+
     log('libp2p started')
 
     this.connector.indexer.on('peer', this.onPeerAnnouncement.bind(this))
@@ -466,34 +452,6 @@ class Hopr extends EventEmitter {
     }
     await this.maybeLogProfilingToGCloud()
     this.heartbeat.recalculateNetworkHealth()
-
-    this.startMemoryFreeInterval()
-  }
-
-  /**
-   * Total hack
-   Mannually wipes DHT's ping queues as they get unnecessarily populated
-   */
-  private freeMemory() {
-    console.log(
-      // @ts-ignore
-      `Freeing memory, size wan ${this.libp2pComponents.getDHT().wan.routingTable.pingQueue.size} lan ${
-        // @ts-ignore
-
-        this.libp2pComponents.getDHT().lan.routingTable.pingQueue.size
-      }`
-    )
-    // @ts-ignore
-    this.libp2pComponents.getDHT().wan.routingTable.pingQueue.clear()
-    // @ts-ignore
-    this.libp2pComponents.getDHT().lan.routingTable.pingQueue.clear()
-  }
-
-  /**
-   * Total hack
-   */
-  private startMemoryFreeInterval() {
-    intervalTimer(this.freeMemory.bind(this), () => durations.minutes(1))
   }
 
   private async maybeLogProfilingToGCloud() {
@@ -571,10 +529,19 @@ class Hopr extends EventEmitter {
       return
     }
 
-    const dialables = peer.multiaddrs.filter((ma: Multiaddr) => {
-      const tuples = ma.tuples()
-      return tuples.length > 1 && tuples[0][0] != protocols('p2p').code
-    })
+    const addrsToAdd: Multiaddr[] = []
+    for (const addr of peer.multiaddrs) {
+      const tuples = addr.tuples()
+
+      if (tuples.length <= 1 && tuples[0][0] == CODE_P2P) {
+        // No routable address
+        continue
+      }
+
+      // Remove /p2p/<PEER_ID> from Multiaddr to prevent from duplicates
+      // in peer store
+      addrsToAdd.push(addr.decapsulateCode(CODE_P2P))
+    }
 
     const pubKey = convertPubKeyFromPeerId(peer.id)
     try {
@@ -583,11 +550,11 @@ class Hopr extends EventEmitter {
       log(`Failed to update key peer-store with new peer ${peer.id.toString()} info`, err)
     }
 
-    if (dialables.length > 0) {
-      this.publicNodesEmitter.emit('addPublicNode', { id: peer.id, multiaddrs: dialables })
+    if (addrsToAdd.length > 0) {
+      this.publicNodesEmitter.emit('addPublicNode', { id: peer.id, multiaddrs: addrsToAdd })
 
       try {
-        await this.libp2pComponents.getPeerStore().addressBook.add(peer.id, dialables)
+        await this.libp2pComponents.getPeerStore().addressBook.add(peer.id, addrsToAdd)
       } catch (err) {
         log(`Failed to update address peer-store with new peer ${peer.id.toString()} info`, err)
       }
@@ -722,6 +689,8 @@ class Hopr extends EventEmitter {
       throw Error(`Hopr instance already destroyed.`)
     }
     this.status = 'DESTROYED'
+    this.forward?.stop()
+    this.acknowledgements?.stop()
     verbose('Stopping checking timeout')
     this.stopPeriodicCheck?.()
     verbose('Stopping heartbeat & indexer')
