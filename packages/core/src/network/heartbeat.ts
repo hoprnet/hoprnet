@@ -51,7 +51,6 @@ const metric_hiqh_quality_peers = create_gauge('core_gauge_num_high_quality_peer
 const metric_low_quality_peers = create_gauge('core_gauge_num_low_quality_peers', 'Number of low quality peers')
 const metric_peers = create_gauge('core_gauge_num_peers', 'Number of all peers')
 
-
 export type HeartbeatPingResult = {
   destination: PeerId
   lastSeen: number
@@ -216,25 +215,18 @@ export default class Heartbeat {
     for (let entry of this.networkPeers.getAllEntries()) {
       let quality = this.networkPeers.qualityOf(entry.id)
       if (this.isPublicNode(entry.id)) {
-        if (quality > this.config.networkQualityThreshold)
-        {
+        if (quality > this.config.networkQualityThreshold) {
           ++highQualityPublic
           ++highQuality
-        }
-        else
-        {
+        } else {
           ++lowQualityPublic
           ++lowQuality
         }
       } else {
-
-        if (quality > this.config.networkQualityThreshold)
-        {
+        if (quality > this.config.networkQualityThreshold) {
           ++highQualityNonPublic
           ++highQuality
-        }
-        else
-        {
+        } else {
           //++lowQualityNonPublic
           ++lowQuality
         }
