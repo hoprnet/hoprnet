@@ -182,16 +182,6 @@ ___
 
 ___
 
-### startupBlock
-
-• **startupBlock**: `number` = `0`
-
-#### Defined in
-
-[packages/core-ethereum/src/indexer/index.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L61)
-
-___
-
 ### status
 
 • **status**: `IndexerStatus` = `IndexerStatus.STOPPED`
