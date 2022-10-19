@@ -281,7 +281,7 @@ class RelayContext {
           deferred.reject(err)
         }
       }.call({
-        queueStatusMessage: this.queueStatusMessage.bind(this)
+        queueStatusMessage: this.queueStatusMessage
       })
     })
 
