@@ -1,0 +1,79 @@
+{
+  "tutorialSidebar": [
+    {
+      "type": "category",
+      "label": "What is HOPR?",
+      "items": [
+        "core/what-is-hopr",
+        "core/what-is-metadata",
+        "core/anonymous-routing",
+        "core/mixnets",
+        "core/incentives",
+        "core/proof-of-relay",
+        "core/tickets-and-payment-channels",
+        "core/probabilistic-payments",
+        "core/cover-traffic",
+        "core/cover-traffic-nodes",
+        "core/balancing-cover-traffic",
+        "version-v1.90/faq"
+      ]
+    },
+
+    {
+      "type": "category",
+      "label": "Run a HOPR node",
+      "items": [
+        "version-v1.90/node/start-here",
+        "version-v1.90/node/using-avado",
+        "version-v1.90/node/using-dappnode",
+        "version-v1.90/node/using-docker",
+        "version-v1.90/node/using-hopr-admin",
+        "version-v1.90/node/hoprd-commands",
+        "version-v1.90/node/network-registry-tutorial"
+      ]
+    },
+
+    {
+      "type": "category",
+      "label": "Developers",
+      "link": { "type": "doc", "id": "developers/intro" },
+      "items": [
+        "version-v1.90/developers/starting-local-cluster",
+        "version-v1.90/developers/connecting-node",
+        "version-v1.90/developers/tutorial-hello-world",
+        "version-v1.90/developers/demo-boomerang-chat",
+        "version-v1.90/developers/demo-rps-game",
+        "version-v1.90/developers/rest-api",
+        "version-v1.90/developers/smart-contract",
+        "version-v1.90/developers/snippets",
+        "version-v1.90/developers/visualising-hopr-network-topology"
+      ]
+    },
+
+    {
+      "type": "category",
+      "label": "HOPR dApps",
+      "items": [
+        "version-v1.90/dapps/visualizer",
+        "version-v1.90/dapps/hopr-admin",
+        "version-v1.90/dapps/cockpit",
+        "version-v1.90/dapps/chess",
+        "version-v1.90/dapps/myne-chat-playground",
+        "version-v1.90/dapps/playground",
+        "version-v1.90/dapps/boomerang"
+      ]
+    },
+
+    {
+      "type": "category",
+      "label": "Ecosystem",
+      "items": [
+        "version-v1.90/ecosystem/hopr-token",
+        "version-v1.90/ecosystem/gnosis-hopr-tokens",
+        "version-v1.90/staking/how-to-get-hopr",
+        "version-v1.90/staking/convert-hopr",
+        "version-v1.90/staking/how-to-stake"
+      ]
+    }
+  ]
+}
