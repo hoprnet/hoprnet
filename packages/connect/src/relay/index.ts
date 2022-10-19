@@ -23,7 +23,9 @@ import {
   create_counter,
   create_gauge,
   createRelayerKey,
- dial, DialStatus, randomInteger,
+  dial,
+  DialStatus,
+  randomInteger,
   retimer
 } from '@hoprnet/hopr-utils'
 

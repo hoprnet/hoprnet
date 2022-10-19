@@ -119,7 +119,7 @@ export class AcknowledgementInteraction {
     this.outgoingAcks.push([ack.serialize(), destination])
   }
 
-/**
+  /**
    * Reserve a preImage for the given ticket if it is a winning ticket.
    */
   async handleAcknowledgement(msg: Uint8Array, remotePeer: PeerId): Promise<void> {
@@ -143,8 +143,8 @@ export class AcknowledgementInteraction {
         )
       }
       metric_receivedFailedAcks.increment()
-    throw err
-  }
+      throw err
+    }
 
     // No pending ticket, nothing to do.
     if (pending.isMessageSender == true) {
@@ -152,17 +152,17 @@ export class AcknowledgementInteraction {
       // Resolves `sendMessage()` promise
       this.onAcknowledgement(acknowledgement.ackChallenge)
       metric_receivedSuccessfulAcks.increment()
-    // nothing else to do
-    return
-  }
+      // nothing else to do
+      return
+    }
 
     // Try to unlock our incentive
     const unacknowledged = pending.ticket
 
     if (!unacknowledged.verifyChallenge(acknowledgement.ackKeyShare)) {
       metric_receivedFailedAcks.increment()
-    throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
-  }
+      throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
+    }
 
     let channelId: Hash
     try {
@@ -174,13 +174,13 @@ export class AcknowledgementInteraction {
       // we should kill the node and debug.
       log('Error, acknowledgement received for channel that does not exist')
       metric_receivedFailedAcks.increment()
-    throw e
-  }
-  const response = unacknowledged.getResponse(acknowledgement.ackKeyShare)
-  const ticket = unacknowledged.ticket
-  let opening: Hash
-  try {
-    opening = await findCommitmentPreImage(this.db, channelId)
+      throw e
+    }
+    const response = unacknowledged.getResponse(acknowledgement.ackKeyShare)
+    const ticket = unacknowledged.ticket
+    let opening: Hash
+    try {
+      opening = await findCommitmentPreImage(this.db, channelId)
     } catch (err) {
       log(`Channel ${channelId.toHex()} is out of commitments`)
       this.onOutOfCommitments(channelId)
@@ -192,8 +192,8 @@ export class AcknowledgementInteraction {
       log(`Got a ticket that is not a win. Dropping ticket.`)
       await this.db.markLosing(unacknowledged)
       metric_losingTickets.increment()
-    return
-  }
+      return
+    }
 
     // Ticket is a win, let's store it
     const ack = new AcknowledgedTicket(ticket, response, opening, unacknowledged.signer)
