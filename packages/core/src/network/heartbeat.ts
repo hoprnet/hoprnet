@@ -266,7 +266,6 @@ export default class Heartbeat {
           metric_networkHealth.set(4)
           break
       }
-
     }
 
     metric_hiqh_quality_peers.set(highQuality)
