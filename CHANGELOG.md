@@ -20,6 +20,13 @@
 - Properly encode API token passed from the Admin UI ([#4210](https://github.com/hoprnet/hoprnet/pull/4210))
 - Refactor timeouts for more throughput and increase usage of iterables ([#4238](https://github.com/hoprnet/hoprnet/pull/4238))
 - Fix incoming channels being listed as outgoing and vice versa in API ([#4236](https://github.com/hoprnet/hoprnet/pull/4236))
+- Refactor packet forward interaction for less locking ([#4232](https://github.com/hoprnet/hoprnet/pull/4243))
+- Refactor mixer to migitate backpressure ([#4232](https://github.com/hoprnet/hoprnet/pull/4243))
+- Filter addresses before adding them to libp2p's PeerStore ([#4246](https://github.com/hoprnet/hoprnet/pull/4246))
+- Reuse existing connections to establish relayed connections over public relay ([#4245](https://github.com/hoprnet/hoprnet/pull/4245))
+- Reuse existing connections to connections to entry nodes ([#4250](https://github.com/hoprnet/hoprnet/pull/4250))
+- Remove recurring DHT ping queue cleanup and turn all public relay nodes into DHT servers ([#4247](https://github.com/hoprnet/hoprnet/pull/4247))
+- Various enhancements regarding memory consumption and overall efficiency, spread over multiple PRs
 
 ---
 
@@ -102,7 +109,7 @@ Bump `libp2p@0.37` which came with many bugfixes, plenty of internal API changes
 - Automatically cleanup stale connections to correctly handle reconnects ([#3688](https://github.com/hoprnet/hoprnet/pull/3688))
 - Add `--provider` flag for setting a custom blockchain RPC provider
 - Use a default address sorter for all address classes ([#3731](https://github.com/hoprnet/hoprnet/pull/3731))
-- Enhance TCP socket listening logic and cleanup keepAlice interval ([#3750](https://github.com/hoprnet/hoprnet/pull/3750))
+- Enhance TCP socket listening logic and cleanup keepAlive interval ([#3750](https://github.com/hoprnet/hoprnet/pull/3750))
 - Try to reconnect to entry nodes after connection has been dropped ([#3751](https://github.com/hoprnet/hoprnet/pull/3751))
 - Unhandled rejection in relay requests ([#3779](https://github.com/hoprnet/hoprnet/pull/3779))
 - Ping & DHT query timeout increased ([#3780](https://github.com/hoprnet/hoprnet/pull/3780))

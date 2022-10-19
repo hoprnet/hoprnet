@@ -1,14 +1,13 @@
-import { setImmediate } from 'timers/promises'
-
 import type { PeerId } from '@libp2p/interface-peer-id'
 
-import { durations, pubKeyToPeerId, HoprDB, create_counter } from '@hoprnet/hopr-utils'
+import { durations, pickVersion, pubKeyToPeerId, type HoprDB, create_counter } from '@hoprnet/hopr-utils'
 import { debug } from '@hoprnet/hopr-utils'
 
 import { Packet } from '../../messages/index.js'
 import { Mixer } from '../../mixer.js'
-import { sendAcknowledgement } from './acknowledgement.js'
+import type { AcknowledgementInteraction } from './acknowledgement.js'
 import type { SendMessage, Subscribe } from '../../index.js'
+import type { ResolvedEnvironment } from '../../environment.js'
 
 const log = debug('hopr-core:packet:forward')
 const error = debug('hopr-core:packet:forward:error')
@@ -19,8 +18,16 @@ const FORWARD_TIMEOUT = durations.seconds(6)
 const metric_fwdMessageCount = create_counter('core_counter_forwarded_messages', 'Number of forwarded messages')
 const metric_recvMessageCount = create_counter('core_counter_received_messages', 'Number of received messages')
 
+// Do not type-check JSON files
+// @ts-ignore
+import pkg from '../../../package.json' assert { type: 'json' }
+
+const NORMALIZED_VERSION = pickVersion(pkg.version)
+
 export class PacketForwardInteraction {
   protected mixer: Mixer
+
+  public readonly protocols: string | string[]
 
   constructor(
     private subscribe: Subscribe,
@@ -28,10 +35,20 @@ export class PacketForwardInteraction {
     private privKey: PeerId,
     private emitMessage: (msg: Uint8Array) => void,
     private db: HoprDB,
-    private protocolMsg: string | string[],
-    private protocolAck: string | string[]
+    private environment: ResolvedEnvironment,
+    private acknowledgements: AcknowledgementInteraction,
+    // used for testing
+    nextRandomInt?: () => number
   ) {
-    this.mixer = new Mixer(this.handleMixedPacket.bind(this))
+    this.mixer = new Mixer(nextRandomInt)
+    this.handlePacket = this.handlePacket.bind(this)
+
+    this.protocols = [
+      // current
+      `/hopr/${this.environment.id}/msg/${NORMALIZED_VERSION}`,
+      // deprecated
+      `/hopr/${this.environment.id}/msg`
+    ]
   }
 
   private errHandler(err: any) {
@@ -39,11 +56,24 @@ export class PacketForwardInteraction {
   }
 
   async start() {
-    await this.subscribe(this.protocolMsg, this.handlePacket.bind(this), false, this.errHandler)
+    await this.subscribe(this.protocols, this.handlePacket, false, this.errHandler)
+
+    this.handleMixedPackets()
+  }
+
+  stop() {
+    // Clear mixer timeouts
+    this.mixer.end()
+  }
+
+  async handleMixedPackets() {
+    for await (const packet of this.mixer) {
+      await this.handleMixedPacket(packet)
+    }
   }
 
   async interact(counterparty: PeerId, packet: Packet): Promise<void> {
-    await this.sendMessage(counterparty, this.protocolMsg, packet.serialize(), false, {
+    await this.sendMessage(counterparty, this.protocols, packet.serialize(), false, {
       timeout: FORWARD_TIMEOUT
     })
   }
@@ -59,10 +89,8 @@ export class PacketForwardInteraction {
 
     if (packet.isReceiver) {
       this.emitMessage(packet.plaintext)
-      // defer processing to end of event loop since we are making another
-      // network operation
-      await setImmediate()
-      await sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey, this.protocolAck)
+      // Send acknowledgements independently
+      this.acknowledgements.sendAcknowledgement(packet, packet.previousHop.toPeerId())
       metric_recvMessageCount.increment()
       // Nothing else to do
       return
@@ -92,10 +120,8 @@ export class PacketForwardInteraction {
       return
     }
 
-    // defer processing to end of event loop since we are making another
-    // network operation
-    await setImmediate()
-    await sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey, this.protocolAck)
+    // Send acknowledgements independently
+    this.acknowledgements.sendAcknowledgement(packet, packet.previousHop.toPeerId())
     metric_fwdMessageCount.increment()
   }
 }
