@@ -1,10 +1,4 @@
 {
-<<<<<<< HEAD
-  "address": "0xd80fbbfe9d057254d80eebb49f17aca66a238e2d",
-  "abi": [
-    {
-      "inputs": [],
-=======
   "address": "0x5Bb7e435aDa333A6714e27962e4Bb6aFDE1cECd4",
   "abi": [
     {
@@ -30,7 +24,6 @@
           "type": "address"
         }
       ],
->>>>>>> bb9bb19678d3b8c7f78a39be3a67c48dcb087212
       "stateMutability": "nonpayable",
       "type": "constructor"
     },
