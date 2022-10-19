@@ -2,9 +2,8 @@ import { u8aToHex, defer } from '@hoprnet/hopr-utils'
 import type { DeferType } from '@hoprnet/hopr-utils'
 
 import { randomBytes } from 'crypto'
-import EventEmitter from 'events'
 
-import type { Stream, StreamResult, StreamType, StreamSourceAsync, StreamSink } from '../types.js'
+import type { Stream, StreamResult, StreamType, StreamSourceAsync, StreamSink, HoprConnectOptions } from '../types.js'
 
 import Debug from 'debug'
 
@@ -22,6 +21,7 @@ import { RelayPrefix, StatusMessages, ConnectionStatusMessages } from '../consta
 import { eagerIterator } from '../utils/index.js'
 
 export const DEFAULT_PING_TIMEOUT = 300
+const DEFAULT_RELAY_FREE_TIMEOUT = 0
 
 enum ConnectionEventTypes {
   STREAM_SOURCE_SWITCH,
@@ -32,7 +32,7 @@ enum ConnectionEventTypes {
   STREAM_ENDED,
   STREAM_SINK_SWITCH,
   PING_TIMEOUT,
-  PING_RESPONE
+  PING_RESPONSE
 }
 
 type StreamSourceSwitchEvent = {
@@ -73,7 +73,7 @@ type PingTimeoutEvent = {
 }
 
 type PingResponseEvent = {
-  type: ConnectionEventTypes.PING_RESPONE
+  type: ConnectionEventTypes.PING_RESPONSE
 }
 
 type SinkEvent = EndedEvent | SinkSourceAttachedEvent | StatusMessageEvent | PayloadEvent
@@ -98,42 +98,53 @@ type SourceEvent = StreamSourceSwitchEvent | PayloadEvent
  * can reinitialize the connection, i.e. it will redo the
  * TLS-alike handshake
  */
-class RelayContext extends EventEmitter {
-  private _streamSourceSwitchPromise: DeferType<StreamSourceSwitchEvent>
-  private _streamSinkSwitchPromise: DeferType<StreamSinkSwitchEvent>
+class RelayContext {
+  public state: {
+    _streamSourceSwitchPromise: DeferType<StreamSourceSwitchEvent>
+    _streamSinkSwitchPromise: DeferType<StreamSinkSwitchEvent>
+    _sinkSourceAttachedPromise: DeferType<SinkSourceAttachedEvent>
+
+    _statusMessagePromise: DeferType<StatusMessageEvent>
+    _statusMessages: Uint8Array[]
+    _pingResponsePromise?: DeferType<PingResponseEvent>
+  }
 
   private _id: string
 
-  private _sinkSourceAttachedPromise: DeferType<SinkSourceAttachedEvent>
-
-  private _statusMessagePromise: DeferType<StatusMessageEvent>
-  private _statusMessages: Uint8Array[] = []
-  private _pingResponsePromise?: DeferType<PingResponseEvent>
   private _stream: Stream
 
   private sinkCreator: Promise<void>
 
   public source: Stream['source']
-  public sink: Stream['sink']
+  // public sink: Stream['sink']
 
-  constructor(stream: Stream, private relayFreeTimeout: number = 0) {
-    super()
-
+  constructor(
+    stream: Stream,
+    public signals: {
+      onClose: () => void
+      onUpgrade: () => void
+    },
+    public options: HoprConnectOptions
+  ) {
     // Assign a unique id to distinguish instances
     this._id = u8aToHex(randomBytes(4), false)
 
-    // Internal status message buffer, promise resolves once
-    // there is a new status message
-    this._statusMessagePromise = defer<StatusMessageEvent>()
-    this._statusMessages = []
+    this.state = {
+      _sinkSourceAttachedPromise: defer<SinkSourceAttachedEvent>(),
+
+      // Resolves once there is a new stream
+      _streamSourceSwitchPromise: defer<StreamSourceSwitchEvent>(),
+      _streamSinkSwitchPromise: defer<StreamSinkSwitchEvent>(),
+      // Internal status message buffer, promise resolves once
+      // there is a new status message
+      _statusMessagePromise: defer<StatusMessageEvent>(),
+      _statusMessages: []
+    }
 
     this._stream = stream
 
-    this._sinkSourceAttachedPromise = defer<SinkSourceAttachedEvent>()
-
-    // Resolves once there is a new stream
-    this._streamSourceSwitchPromise = defer<StreamSourceSwitchEvent>()
-    this._streamSinkSwitchPromise = defer<StreamSinkSwitchEvent>()
+    this.queueStatusMessage = this.queueStatusMessage.bind(this)
+    this.unqueueStatusMessage = this.unqueueStatusMessage.bind(this)
 
     this.source = this.createSource()
 
@@ -144,8 +155,15 @@ class RelayContext extends EventEmitter {
     // Make sure that we catch all errors, even before a sink source has been attached
     this.sinkCreator.catch((err) => this.error(`Sink has thrown error before attaching source`, err.message))
 
+    this.flow = this.flow.bind(this)
+    this.log = this.log.bind(this)
+    this.verbose = this.verbose.bind(this)
+    this.error = this.error.bind(this)
+
     // Passed as a function handle so we need to bind it explicitly
-    this.sink = this._sink.bind(this)
+    this.sink = this.sink.bind(this)
+
+    this.ping = this.ping.bind(this)
   }
 
   /**
@@ -156,7 +174,7 @@ class RelayContext extends EventEmitter {
    */
   public async ping(ms = DEFAULT_PING_TIMEOUT): Promise<number> {
     let start = Date.now()
-    this._pingResponsePromise = defer<PingResponseEvent>()
+    this.state._pingResponsePromise = defer<PingResponseEvent>()
     let timeoutDone = false
 
     this.queueStatusMessage(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PING))
@@ -175,18 +193,19 @@ class RelayContext extends EventEmitter {
         })
       }, ms)
     })
-    const result = await Promise.race([pingTimeoutPromise, this._pingResponsePromise.promise])
+
+    const result = await Promise.race([pingTimeoutPromise, this.state._pingResponsePromise.promise])
     timer.clear()
 
     switch (result.type) {
-      case ConnectionEventTypes.PING_RESPONE:
+      case ConnectionEventTypes.PING_RESPONSE:
         timeoutDone = true
 
         return Date.now() - start
       case ConnectionEventTypes.PING_TIMEOUT:
         // Make sure we don't produce any hanging promises
-        this._pingResponsePromise.resolve(undefined as any)
-        this._pingResponsePromise = undefined
+        this.state._pingResponsePromise.resolve(undefined as any)
+        this.state._pingResponsePromise = undefined
 
         return -1
     }
@@ -198,11 +217,11 @@ class RelayContext extends EventEmitter {
    * @param newStream the new stream to use
    */
   public update(newStream: Stream) {
-    this._streamSourceSwitchPromise.resolve({
+    this.state._streamSourceSwitchPromise.resolve({
       type: ConnectionEventTypes.STREAM_SOURCE_SWITCH,
       value: newStream.source as StreamSourceAsync
     })
-    this._streamSinkSwitchPromise.resolve({
+    this.state._streamSinkSwitchPromise.resolve({
       type: ConnectionEventTypes.STREAM_SINK_SWITCH,
       value: newStream.sink
     })
@@ -213,28 +232,28 @@ class RelayContext extends EventEmitter {
   /**
    * Log messages and add identity tag to distinguish multiple instances
    */
-  private log(..._: any[]) {
+  public log(..._: any[]) {
     _log(`RX [${this._id}]`, ...arguments)
   }
 
   /**
    * Log verbose messages and add identity tag to distinguish multiple instances
    */
-  private verbose(..._: any[]) {
+  public verbose(..._: any[]) {
     _verbose(`RX [${this._id}]`, ...arguments)
   }
 
   /**
    * Log errors and add identity tag to distinguish multiple instances
    */
-  private error(..._: any[]) {
+  public error(..._: any[]) {
     _error(`RX [${this._id}]`, ...arguments)
   }
 
   /**
    * Log control flow and add identity tag to distinguish multiple instances
    */
-  private flow(..._: any[]) {
+  public flow(..._: any[]) {
     _flow(`RX [${this._id}]`, ...arguments)
   }
 
@@ -246,13 +265,13 @@ class RelayContext extends EventEmitter {
    * @param source stream of messages to be sent
    * @returns a Promise that resovles once the source stream ends
    */
-  public async _sink(source: Stream['source']): Promise<void> {
+  public async sink(source: Stream['source']): Promise<void> {
     let deferred = defer<void>()
     // forward sink stream errors
     this.sinkCreator.catch(deferred.reject)
-    this._sinkSourceAttachedPromise.resolve({
+    this.state._sinkSourceAttachedPromise.resolve({
       type: ConnectionEventTypes.SINK_SOURCE_ATTACHED,
-      value: async function* (this: RelayContext) {
+      value: async function* (this: Pick<RelayContext, 'queueStatusMessage'>) {
         try {
           yield* source
           deferred.resolve()
@@ -261,7 +280,9 @@ class RelayContext extends EventEmitter {
           this.queueStatusMessage(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP))
           deferred.reject(err)
         }
-      }.call(this)
+      }.call({
+        queueStatusMessage: this.queueStatusMessage
+      })
     })
 
     return deferred.promise
@@ -295,7 +316,9 @@ class RelayContext extends EventEmitter {
       }))
     }
 
-    const iterator: Stream['source'] = async function* (this: RelayContext) {
+    const iterator: Stream['source'] = async function* (
+      this: Pick<RelayContext, 'flow' | 'log' | 'verbose' | 'state' | 'signals' | 'options' | 'queueStatusMessage'>
+    ) {
       this.log(`source called`)
 
       let leave = false
@@ -307,7 +330,7 @@ class RelayContext extends EventEmitter {
 
         // Wait for stream switches
         this.flow(`FLOW: relay_incoming: waiting for streamSourceSwitch`)
-        promises.push(this._streamSourceSwitchPromise.promise)
+        promises.push(this.state._streamSourceSwitchPromise.promise)
 
         // Wait for payload messages
         if (sourceIterator != undefined) {
@@ -328,7 +351,7 @@ class RelayContext extends EventEmitter {
           case ConnectionEventTypes.STREAM_SOURCE_SWITCH:
             sourceIterator = result.value[Symbol.asyncIterator]()
 
-            this._streamSourceSwitchPromise = defer<StreamSourceSwitchEvent>()
+            this.state._streamSourceSwitchPromise = defer<StreamSourceSwitchEvent>()
             advanceIterator()
 
             this.flow(`FLOW: relay_incoming: source switched continue`)
@@ -368,8 +391,8 @@ class RelayContext extends EventEmitter {
                   case StatusMessages.PONG:
                     this.verbose(`PONG received`)
 
-                    this._pingResponsePromise?.resolve({
-                      type: ConnectionEventTypes.PING_RESPONE
+                    this.state._pingResponsePromise?.resolve({
+                      type: ConnectionEventTypes.PING_RESPONSE
                     })
                     // Don't forward pong message
                     break
@@ -384,7 +407,7 @@ class RelayContext extends EventEmitter {
                   case ConnectionStatusMessages.STOP:
                     this.verbose(`STOP relayed`)
 
-                    this.emit('close')
+                    this.signals.onClose()
 
                     this.flow(`FLOW: relay_incoming: STOP relayed, break`)
                     // forward STOP message
@@ -404,14 +427,18 @@ class RelayContext extends EventEmitter {
                   // WebRTC upgrade has happened
                   case ConnectionStatusMessages.UPGRADED:
                     // this is an artificial timeout to test the relay slot being properly freed during the integration test
-                    this.flow(`FLOW: waiting ${this.relayFreeTimeout}ms before freeing relay`)
+                    this.flow(
+                      `FLOW: waiting ${
+                        this.options.relayFreeTimeout ?? DEFAULT_RELAY_FREE_TIMEOUT
+                      }ms before freeing relay`
+                    )
                     // @TODO remove this
-                    if (this.relayFreeTimeout > 0) {
-                      await new Promise((resolve) => setTimeout(resolve, this.relayFreeTimeout))
+                    if ((this.options.relayFreeTimeout ?? DEFAULT_RELAY_FREE_TIMEOUT) > 0) {
+                      await new Promise((resolve) => setTimeout(resolve, this.options.relayFreeTimeout))
                     }
                     this.flow(`FLOW: freeing relay`)
 
-                    this.emit('upgrade')
+                    this.signals.onUpgrade()
                     advanceIterator()
                     break
                   default:
@@ -441,7 +468,15 @@ class RelayContext extends EventEmitter {
       }
 
       this.flow(`FLOW: relay_incoming: loop ended`)
-    }.call(this)
+    }.call({
+      flow: this.flow,
+      log: this.log,
+      verbose: this.verbose,
+      state: this.state,
+      queueStatusMessage: this.queueStatusMessage,
+      signals: this.signals,
+      options: this.options
+    })
 
     return eagerIterator(iterator)
   }
@@ -463,7 +498,7 @@ class RelayContext extends EventEmitter {
 
     // On every reconnect, create a new asyncIterable to pass into
     async function* drain(
-      this: RelayContext,
+      this: Pick<RelayContext, 'flow' | 'unqueueStatusMessage' | 'state'>,
       internalIteration: number,
       endPromise: DeferType<SinkEndedEvent | EndedEvent>
     ) {
@@ -489,10 +524,10 @@ class RelayContext extends EventEmitter {
         const promises: Promise<SinkEvent>[] = []
 
         if (currentSource == undefined) {
-          promises.push(this._sinkSourceAttachedPromise.promise)
+          promises.push(this.state._sinkSourceAttachedPromise.promise)
         }
 
-        promises.push(this._statusMessagePromise.promise)
+        promises.push(this.state._statusMessagePromise.promise)
 
         if (currentSource != undefined) {
           nextMessagePromise =
@@ -524,10 +559,9 @@ class RelayContext extends EventEmitter {
           // There is a status message, i.e. PING / PONG
           // ready to be sent.
           case ConnectionEventTypes.STATUS_MESSAGE:
-            if (this._statusMessages.length > 0) {
-              toYield = this.unqueueStatusMessage()
-              this.flow(`FLOW: relay_outgoing: unqueuedStatusMsg, continue`)
-            }
+            toYield = this.unqueueStatusMessage()
+            this.flow(`FLOW: relay_outgoing: unqueuedStatusMsg, continue`)
+
             break
           // There is a payload message to be forwarded
           case ConnectionEventTypes.PAYLOAD:
@@ -595,7 +629,17 @@ class RelayContext extends EventEmitter {
       const endPromise = defer<SinkEndedEvent | EndedEvent>()
 
       try {
-        await currentSink(drain.call(this, iteration, endPromise))
+        await currentSink(
+          drain.call(
+            {
+              flow: this.flow,
+              state: this.state,
+              unqueueStatusMessage: this.unqueueStatusMessage
+            },
+            iteration,
+            endPromise
+          )
+        )
       } catch (err) {
         endPromise.resolve({
           type: ConnectionEventTypes.STREAM_ENDED,
@@ -603,7 +647,7 @@ class RelayContext extends EventEmitter {
         })
       }
 
-      const result = await Promise.race([endPromise.promise, this._streamSinkSwitchPromise.promise])
+      const result = await Promise.race([endPromise.promise, this.state._streamSinkSwitchPromise.promise])
 
       switch (result.type) {
         case ConnectionEventTypes.STREAM_ENDED:
@@ -611,10 +655,10 @@ class RelayContext extends EventEmitter {
           if (result.err) {
             // be bit more verbose to enhance debugging
             this.error(`Sink threw error`, result.err)
-            currentSink = (await this._streamSinkSwitchPromise.promise).value
+            currentSink = (await this.state._streamSinkSwitchPromise.promise).value
             iteration++
           } else {
-            currentSink = (await this._streamSinkSwitchPromise.promise).value
+            currentSink = (await this.state._streamSinkSwitchPromise.promise).value
             iteration++
           }
           // sink call might return earlier, so wait for new stream
@@ -632,7 +676,7 @@ class RelayContext extends EventEmitter {
           throw Error(`Invalid return type. Received ${result}`)
       }
 
-      this._streamSinkSwitchPromise = defer<StreamSinkSwitchEvent>()
+      this.state._streamSinkSwitchPromise = defer<StreamSinkSwitchEvent>()
     }
   }
 
@@ -640,10 +684,10 @@ class RelayContext extends EventEmitter {
    * Add status and control messages to queue
    * @param msg msg to add
    */
-  private queueStatusMessage(msg: Uint8Array) {
-    this._statusMessages.push(msg)
+  public queueStatusMessage(msg: Uint8Array) {
+    this.state._statusMessages.push(msg)
 
-    this._statusMessagePromise.resolve({
+    this.state._statusMessagePromise.resolve({
       type: ConnectionEventTypes.STATUS_MESSAGE
     })
   }
@@ -653,15 +697,15 @@ class RelayContext extends EventEmitter {
    * Resets the waiting mutex if queue is empty.
    * @returns latest status or control message
    */
-  private unqueueStatusMessage(): Uint8Array {
-    switch (this._statusMessages.length) {
+  public unqueueStatusMessage(): Uint8Array {
+    switch (this.state._statusMessages.length) {
       case 0:
         throw Error(`Trying to unqueue empty status message queue`)
       case 1:
-        this._statusMessagePromise = defer<StatusMessageEvent>()
-        return this._statusMessages.pop() as Uint8Array
+        this.state._statusMessagePromise = defer<StatusMessageEvent>()
+        return this.state._statusMessages.pop() as Uint8Array
       default:
-        return this._statusMessages.shift() as Uint8Array
+        return this.state._statusMessages.shift() as Uint8Array
     }
   }
 }
