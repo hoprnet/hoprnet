@@ -146,6 +146,9 @@ function parseDirectAddress(maTuples: [code: number, addr: Uint8Array][]): Parse
 export function parseAddress(ma: Multiaddr): ParseResult<ValidAddress> {
   const tuples = ma.tuples() as [code: number, addr: Uint8Array][]
 
+  if (tuples.length == 0) {
+    return { valid: false }
+  }
   switch (tuples[0][0]) {
     case CODE_IP4:
     case CODE_IP6:

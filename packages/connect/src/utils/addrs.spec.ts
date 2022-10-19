@@ -21,6 +21,8 @@ describe('test address parsing', function () {
   })
 
   it('bad examples', function () {
+    assert(parseAddress(new Multiaddr()).valid === false)
+
     assert(parseAddress(new Multiaddr('/tcp/0')).valid === false)
 
     assert(parseAddress(new Multiaddr('/ip4/127.0.0.1/udp/0')).valid === false)
