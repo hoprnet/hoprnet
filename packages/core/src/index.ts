@@ -1135,8 +1135,7 @@ class Hopr extends EventEmitter {
     }
 
     try {
-      let channel = this.connector.openChannel(counterpartyPubKey, new Balance(amountToFund))
-      return channel
+      return this.connector.openChannel(counterpartyPubKey, new Balance(amountToFund))
     } catch (err) {
       this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to openChannel: ${err}`)
