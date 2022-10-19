@@ -1,4 +1,4 @@
-import type { Stream } from '../types.js'
+import type { HoprConnectOptions, Stream } from '../types.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { unmarshalPublicKey } from '@libp2p/crypto/keys'
 
@@ -22,7 +22,7 @@ type RelayConnections = {
 class RelayState {
   private relayedConnections: Map<string, RelayConnections>
 
-  constructor() {
+  constructor(public options: HoprConnectOptions) {
     this.relayedConnections = new Map()
   }
 
@@ -139,8 +139,19 @@ class RelayState {
     toDestination: Stream,
     __relayFreeTimeout?: number
   ): Promise<void> {
-    const toSourceContext = new RelayContext(toSource, __relayFreeTimeout)
-    const toDestinationContext = new RelayContext(toDestination, __relayFreeTimeout)
+    const toSourceContext = new RelayContext(
+      toSource,
+      { onClose: this.cleanListener(source, destination), onUpgrade: this.cleanListener(source, destination) },
+      this.options
+    )
+    const toDestinationContext = new RelayContext(
+      toDestination,
+      {
+        onClose: this.cleanListener(destination, source),
+        onUpgrade: this.cleanListener(destination, source)
+      },
+      this.options
+    )
 
     let sourcePromise = toSourceContext.sink(toDestinationContext.source)
     let destinationPromise = toDestinationContext.sink(toSourceContext.source)
@@ -149,12 +160,6 @@ class RelayState {
       [source.toString()]: toSourceContext,
       [destination.toString()]: toDestinationContext
     }
-
-    toSourceContext.once('close', this.cleanListener(source, destination))
-    toSourceContext.once('close', this.cleanListener(destination, source))
-
-    toSourceContext.once('upgrade', this.cleanListener(source, destination))
-    toSourceContext.once('upgrade', this.cleanListener(destination, source))
 
     this.relayedConnections.set(RelayState.getId(source, destination), relayedConnection)
 
@@ -179,15 +184,7 @@ class RelayState {
     return function (this: RelayState) {
       const id = RelayState.getId(source, destination)
 
-      let found = this.relayedConnections.get(id)
-
-      if (found) {
-        delete found[source.toString()]
-
-        if (!found.hasOwnProperty(destination.toString())) {
-          this.relayedConnections.delete(id)
-        }
-      }
+      this.relayedConnections.delete(id)
     }.bind(this)
   }
 
