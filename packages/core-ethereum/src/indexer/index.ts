@@ -154,8 +154,10 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       await this.onProviderError(error) // exceptions are handled
     })
 
+    const start = Date.now()
     // get past events
     fromBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, this.blockRange)
+    console.log(`Indexing took ${Date.now() - start}ms`)
 
     // Feed new blocks to the ordered queue
     ;(async function (this: Indexer) {
