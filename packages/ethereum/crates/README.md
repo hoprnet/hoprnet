@@ -6,6 +6,20 @@ Draft readme, for rust migration
 
 1. `rustup`
 2. `foundryup`
+3. `brew install lcov` (to install lcov for viewing coverage report)
+
+## Contracts
+```
+cd contracts
+```
+### Test
+```
+make sc-test
+```
+### Run Coverage
+```
+make sc-coverage
+```
 
 ### Note
 
@@ -25,3 +39,5 @@ openzeppelin-contracts-v3-0-1=OpenZeppelin/openzeppelin-contracts@v3.0.1 \
 ```
 
 3. If `forge coverage` is not found in as a command, update `foundryup` to the [latest nightly release](https://github.com/foundry-rs/foundry/releases) may solve the issue.
+
+4. `forge coverage` may run into `Error: Function has no kind` when compiler has multiple versions. Opened an issue https://github.com/foundry-rs/foundry/issues/3519
