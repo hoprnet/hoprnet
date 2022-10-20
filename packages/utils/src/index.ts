@@ -14,6 +14,7 @@ export * from './db/index.js'
 export * from './ethereum/index.js'
 export * from './utils.js'
 
-// WASM functions must be migrated from cjs to esm explicitely to be importable by other packags
-import utilsMisc from '../lib/utils_misc.cjs'
-export const { get_package_version } = utilsMisc
+// Load `utils-misc` crate
+import * as utils_misc from '../lib/utils_misc.js'
+utils_misc.set_panic_hook()
+export { get_package_version } from '../lib/utils_misc.js'

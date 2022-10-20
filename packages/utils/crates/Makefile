@@ -14,13 +14,12 @@ test: $(JS_FILES)
 
 $(JS_FILES):
 	mkdir -p $(@D)
-	npx wasm-pack build --target=nodejs `pwd`/$(@D)/..
-	mv $@ $(subst .js,.cjs,$@)
+	npx wasm-pack build --target=bundler `pwd`/$(@D)/..
 
 install:
 ifneq ($(PACKAGES),)
 	@mkdir -p ../lib
-	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.cjs) ../lib/
+	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.js) ../lib/
 	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.ts) ../lib/
 	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.wasm) ../lib/
 endif

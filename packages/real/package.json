@@ -6,12 +6,12 @@
   "license": "GPL-3.0-only",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
-  "type": "commonjs",
+  "type": "module",
   "files": [
     "lib"
   ],
   "engines": {
-    "node": "16"
+    "node": ">=16.15"
   },
   "scripts": {
     "clean:wasm": "make -C crates clean",
