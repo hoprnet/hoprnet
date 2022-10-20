@@ -38,9 +38,15 @@ const MAX_PARALLEL_HEARTBEATS = 14
 const metric_networkHealth = create_gauge('core_gauge_network_health', 'Connectivity health indicator')
 const metric_timeToHeartbeat = create_histogram_with_buckets(
   'core_histogram_heartbeat_time_seconds',
-  'Measures total time it takes to probe other nodes (in seconds)',
+  'Measures total time it takes to probe all other nodes (in seconds)',
   new Float64Array([0.5, 1.0, 2.5, 5, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0])
 )
+const metric_timeToPing = create_histogram_with_buckets(
+  'core_histogram_ping_time_seconds',
+  'Measures total time it takes to ping a single node (seconds)',
+  new Float64Array([0.5, 1.0, 2.5, 5, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0])
+)
+
 const metric_pingSuccessCount = create_counter(
   'core_counter_heartbeat_successful_pings',
   'Total number of successful pings'
@@ -50,6 +56,7 @@ const metric_pingFailureCount = create_counter('core_counter_heartbeat_failed_pi
 const metric_hiqh_quality_peers = create_gauge('core_gauge_num_high_quality_peers', 'Number of hiqh quality peers')
 const metric_low_quality_peers = create_gauge('core_gauge_num_low_quality_peers', 'Number of low quality peers')
 const metric_peers = create_gauge('core_gauge_num_peers', 'Number of all peers')
+
 
 export type HeartbeatPingResult = {
   destination: PeerId
@@ -162,6 +169,7 @@ export default class Heartbeat {
     const challenge = randomBytes(16)
     let pingResponse: Uint8Array[] | undefined
 
+    const ping_timer = metric_timeToPing.start_measure()
     try {
       pingResponse = await this.sendMessage(destination, this.protocolHeartbeat, challenge, true)
     } catch (err) {
@@ -189,6 +197,7 @@ export default class Heartbeat {
       }
     }
 
+    metric_timeToPing.record_measure(ping_timer)
     metric_pingSuccessCount.increment()
     return {
       destination,
@@ -204,7 +213,7 @@ export default class Heartbeat {
   public recalculateNetworkHealth(): NetworkHealthIndicator {
     let newHealthValue: NetworkHealthIndicator = NetworkHealthIndicator.RED
     let lowQualityPublic = 0
-    //let lowQualityNonPublic = 0
+    let lowQualityNonPublic = 0
     let highQualityPublic = 0
     let highQualityNonPublic = 0
 
@@ -241,6 +250,8 @@ export default class Heartbeat {
 
     // GREEN = hiqh-quality connection to a public and a non-public node
     if (highQualityPublic > 0 && highQualityNonPublic > 0) newHealthValue = NetworkHealthIndicator.GREEN
+
+    log(`network health details: ${lowQualityPublic} LQ public, ${lowQualityNonPublic} LQ non-public, ${highQualityPublic} HQ public, ${highQualityNonPublic} HQ non-public`)
 
     // Emit network health change event if needed
     if (newHealthValue != this.currentHealth) {
