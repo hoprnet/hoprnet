@@ -17,9 +17,9 @@ During build, all the Rust crates are build first using `make all` (see `Makefil
 Add dependency to `@hoprnet/hopr-real` to your `package.json`
 
 ```typescript
-import * as wasm from '@hoprnet/hopr-real'
+import { dummy_get_one } from '@hoprnet/hopr-real'
 
-if (wasm.common.dummy_get_one() === '1') {
+if (dummy_get_one() === '1') {
   console.log('It works!!')
 }
 ```
