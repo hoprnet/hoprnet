@@ -382,6 +382,35 @@ export class HoprDB {
     return results
   }
 
+  protected async *getAllIterableWithKeys<Element, TransformedElement = Element>(
+    range: {
+      prefix: Uint8Array
+      suffixLength: number
+    },
+    deserialize: (u: Uint8Array) => Element,
+    filter?: ((o: Element) => boolean) | undefined,
+    map?: (i: Element) => TransformedElement
+  ): AsyncIterable<[Uint8Array, TransformedElement]> {
+    const firstPrefixed = this.keyOf(range.prefix, new Uint8Array(range.suffixLength).fill(0x00))
+    const lastPrefixed = this.keyOf(range.prefix, new Uint8Array(range.suffixLength).fill(0xff))
+
+    // @TODO fix types in @types/levelup package
+    for await (const [key, chunk] of this.db.iterator({
+      gte: Buffer.from(firstPrefixed),
+      lte: Buffer.from(lastPrefixed),
+      keys: true
+    }) as any) {
+      const obj: Element = deserialize(Uint8Array.from(chunk))
+
+      if (!filter || filter(obj)) {
+        if (map) {
+          yield [Uint8Array.from(key), map(obj)]
+        } else {
+          yield [Uint8Array.from(key), obj as unknown as TransformedElement]
+        }
+      }
+    }
+  }
   protected async *getAllIterable<Element, TransformedElement = Element>(
     range: {
       prefix: Uint8Array
@@ -523,9 +552,9 @@ export class HoprDB {
     // sort in ascending order by ticket index: 1,2,3,4,...
     const sortFunc = (t1: AcknowledgedTicket, t2: AcknowledgedTicket): number => t1.ticket.index.cmp(t2.ticket.index)
 
-    const tickets: AcknowledgedTicket[] = []
+    const tickets: [key: Uint8Array, ticket: AcknowledgedTicket][] = []
 
-    for await (const ticket of this.getAllIterable<AcknowledgedTicket>(
+    for await (const ticket of this.getAllIterableWithKeys<AcknowledgedTicket>(
       {
         prefix: ACKNOWLEDGED_TICKETS_PREFIX,
         suffixLength: EthereumChallenge.SIZE
@@ -537,8 +566,6 @@ export class HoprDB {
     }
 
     if (batchQuery != undefined) {
-      const ticketQueries = []
-
       for (const query of batchQuery) {
         if (
           query.key.length >= ACKNOWLEDGED_TICKETS_PREFIX.length + EthereumChallenge.SIZE &&
@@ -546,15 +573,25 @@ export class HoprDB {
         ) {
           switch (query.type) {
             case 'del':
-              for (const ticket of tickets) {
-                if (ticket.response.toChallenge())
+              for (let i = 0; i < tickets.length; i++) {
+                const [key, _ticket] = tickets[i]
+                if (u8aEquals(key, query.key)) {
+                  tickets.splice(i, 1)
+                  break
+                }
+              }
+              break
+            case 'put':
+              const ackedTicket = AcknowledgedTicket.deserialize(query.value)
+              if (filterFunc(ackedTicket)) {
+                tickets.push([query.key, ackedTicket])
               }
           }
         }
       }
     }
 
-    return tickets.sort(sortFunc)
+    return tickets.map((ticket) => ticket[1]).sort(sortFunc)
   }
 
   /**
@@ -566,7 +603,7 @@ export class HoprDB {
     channel: ChannelEntry,
     batchQuery: BatchQuery
   ): Promise<BatchQuery> {
-    const tickets = await this.getAcknowledgedTickets({ signer: channel.source })
+    const tickets = await this.getAcknowledgedTickets({ signer: channel.source }, batchQuery)
 
     const neglectedTicketsCount = await this.getCoercedOrDefault<number>(
       NEGLECTED_TICKET_COUNT,
