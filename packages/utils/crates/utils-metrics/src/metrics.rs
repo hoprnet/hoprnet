@@ -51,6 +51,11 @@ impl SimpleCounter {
             })
     }
 
+    /// Retrieves the value of the counter
+    pub fn get(&self) -> u64 {
+        self.ctr.get()
+    }
+
     /// Increments the counter by the given number.
     pub fn increment(&self, by: u64) {
         self.ctr.inc_by(by)
@@ -88,6 +93,14 @@ impl MultiCounter {
             c.inc_by(by)
         }
     }
+
+    /// Retrieves the value of the specified counter
+    pub fn get(&self, label_values: &[&str]) -> Option<u64> {
+        self.ctr.get_metric_with_label_values(label_values)
+            .map(|c| c.get())
+            .ok()
+    }
+
 
     /// Returns the name of the counter vector given at construction.
     pub fn name(&self) -> &str {
@@ -131,6 +144,11 @@ impl SimpleGauge {
     /// Sets the gauge to the given value.
     pub fn set(&self, value: f64) {
         self.gg.set(value)
+    }
+
+    /// Retrieves the value of the gauge
+    pub fn get(&self) -> f64 {
+        self.gg.get()
     }
 
     /// Returns the name of the gauge given at construction.
@@ -178,6 +196,13 @@ impl MultiGauge {
         if let Ok(c) = self.ctr.get_metric_with_label_values(label_values) {
             c.set(value)
         }
+    }
+
+    /// Retrieves the value of the specified counter
+    pub fn get(&self, label_values: &[&str]) -> Option<f64> {
+        self.ctr.get_metric_with_label_values(label_values)
+            .map(|c| c.get())
+            .ok()
     }
 
     /// Returns the name of the gauge vector given at construction.
@@ -249,6 +274,16 @@ impl SimpleHistogram {
         timer.histogram_timer.stop_and_discard()
     }
 
+    /// Get all samples count
+    pub fn get_sample_count(&self) -> u64 {
+        self.hh.get_sample_count()
+    }
+
+    /// Get all samples sum
+    pub fn get_sample_sum(&self) -> f64 {
+        self.hh.get_sample_sum()
+    }
+
     /// Returns the name of the histogram given at construction.
     pub fn name(&self) -> &str {
         self.name.as_str()
@@ -311,6 +346,20 @@ impl MultiHistogram {
     #[allow(dead_code)]
     pub fn cancel_measure(&self, timer: SimpleTimer) -> f64 {
         timer.histogram_timer.stop_and_discard()
+    }
+
+    /// Get all samples count with given labels
+    pub fn get_sample_count(&self, label_values: &[&str]) -> Option<u64> {
+        self.hh.get_metric_with_label_values(label_values)
+            .map(|c| c.get_sample_count())
+            .ok()
+    }
+
+    /// Get all samples sum with given labels
+    pub fn get_sample_sum(&self, label_values: &[&str]) -> Option<f64> {
+        self.hh.get_metric_with_label_values(label_values)
+            .map(|c| c.get_sample_sum())
+            .ok()
     }
 
     /// Returns the name of the histogram given at construction.
@@ -498,6 +547,8 @@ pub mod wasm {
 
         pub fn increment(&self) { self.w.increment(1) }
 
+        pub fn get(&self) -> u64 { self.w.get() }
+
         pub fn name(&self) -> String {
             self.w.name().into()
         }
@@ -528,6 +579,12 @@ pub mod wasm {
         pub fn increment(&self, label_values: Vec<JsString>) {
             convert_from_jstrvec!(label_values, bind);
             self.w.increment(bind.as_slice(), 1)
+        }
+
+        pub fn get(&self, label_values: Vec<JsString>) -> Result<u64, JsValue> {
+            convert_from_jstrvec!(label_values, bind);
+            self.w.get(bind.as_slice())
+                .ok_or(JsValue::from_str("label value does not exist"))
         }
 
         pub fn name(&self) -> String {
@@ -575,6 +632,10 @@ pub mod wasm {
             self.w.set(value)
         }
 
+        pub fn get(&self) -> f64 {
+            self.w.get()
+        }
+
         pub fn name(&self) -> String {
             self.w.name().into()
         }
@@ -620,6 +681,12 @@ pub mod wasm {
         pub fn set(&self, label_values: Vec<JsString>, value: f64) {
             convert_from_jstrvec!(label_values, bind);
             self.w.set(bind.as_slice(), value);
+        }
+
+        pub fn get(&self, label_values: Vec<JsString>) -> Result<f64, JsValue> {
+            convert_from_jstrvec!(label_values, bind);
+            self.w.get(bind.as_slice())
+                .ok_or(JsValue::from_str("label value does not exist"))
         }
 
         pub fn name(&self) -> String {
@@ -697,6 +764,10 @@ pub mod wasm {
             timer.diff()
         }
 
+        pub fn get_sample_count(&self) -> u64 { self.w.get_sample_count() }
+
+        pub fn get_sample_sum(&self) -> f64 { self.w.get_sample_sum() }
+
         pub fn name(&self) -> String {
             self.w.name().into()
         }
@@ -740,6 +811,18 @@ pub mod wasm {
 
         pub fn cancel_measure(&self, timer: SimpleTimer) -> f64 {
             timer.diff()
+        }
+
+        pub fn get_sample_count(&self, label_values: Vec<JsString>) -> Result<u64, JsValue> {
+            convert_from_jstrvec!(label_values, bind);
+            self.w.get_sample_count(bind.as_slice())
+                .ok_or(JsValue::from_str("label value does not exist"))
+        }
+
+        pub fn get_sample_sum(&self, label_values: Vec<JsString>) -> Result<f64, JsValue> {
+            convert_from_jstrvec!(label_values, bind);
+            self.w.get_sample_sum(bind.as_slice())
+                .ok_or(JsValue::from_str("label value does not exist"))
         }
 
         pub fn name(&self) -> String {
