@@ -20,8 +20,8 @@ utils_misc_panic_hook()
 export { get_package_version } from '../lib/utils_misc.js'
 
 // Load `utils-metrics` crate
-import * as utils_metrics from '../lib/utils_metrics.js'
-utils_metrics.set_panic_hook()
+import { set_panic_hook as utils_metrics_panic_hook } from '../lib/utils_metrics.js'
+utils_metrics_panic_hook()
 
 export {
   create_counter,
