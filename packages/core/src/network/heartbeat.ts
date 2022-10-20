@@ -12,7 +12,7 @@ import {
   pickVersion,
   create_gauge,
   create_counter,
-  create_histogram_with_buckets
+  create_histogram_with_buckets, create_multi_gauge
 } from '@hoprnet/hopr-utils'
 
 import { createHash, randomBytes } from 'crypto'
@@ -53,8 +53,9 @@ const metric_pingSuccessCount = create_counter(
 )
 const metric_pingFailureCount = create_counter('core_counter_heartbeat_failed_pings', 'Total number of failed pings')
 
-const metric_hiqh_quality_peers = create_gauge('core_gauge_num_high_quality_peers', 'Number of hiqh quality peers')
-const metric_low_quality_peers = create_gauge('core_gauge_num_low_quality_peers', 'Number of low quality peers')
+const metric_peersByQuality = create_multi_gauge('core_mgauge_peers_by_quality',
+  'Number different peer types by quality',
+  ['type', 'quality'])
 const metric_peers = create_gauge('core_gauge_num_peers', 'Number of all peers')
 
 export type HeartbeatPingResult = {
@@ -216,27 +217,20 @@ export default class Heartbeat {
     let highQualityPublic = 0
     let highQualityNonPublic = 0
 
-    let highQuality = 0
-    let lowQuality = 0
-
     // Count quality of public/non-public nodes
     for (let entry of this.networkPeers.getAllEntries()) {
       let quality = this.networkPeers.qualityOf(entry.id)
       if (this.isPublicNode(entry.id)) {
         if (quality > this.config.networkQualityThreshold) {
           ++highQualityPublic
-          ++highQuality
         } else {
           ++lowQualityPublic
-          ++lowQuality
         }
       } else {
         if (quality > this.config.networkQualityThreshold) {
           ++highQualityNonPublic
-          ++highQuality
         } else {
-          //++lowQualityNonPublic
-          ++lowQuality
+          ++lowQualityNonPublic
         }
       }
     }
@@ -253,6 +247,11 @@ export default class Heartbeat {
     log(
       `network health details: ${lowQualityPublic} LQ public, ${lowQualityNonPublic} LQ non-public, ${highQualityPublic} HQ public, ${highQualityNonPublic} HQ non-public`
     )
+
+    metric_peersByQuality.set(['public', 'low'], lowQualityPublic)
+    metric_peersByQuality.set(['public', 'high'], highQualityPublic)
+    metric_peersByQuality.set(['nonPublic', 'low'], lowQualityNonPublic)
+    metric_peersByQuality.set(['nonPublic', 'high'], highQualityNonPublic)
 
     // Emit network health change event if needed
     if (newHealthValue != this.currentHealth) {
@@ -280,9 +279,7 @@ export default class Heartbeat {
       }
     }
 
-    metric_hiqh_quality_peers.set(highQuality)
-    metric_low_quality_peers.set(lowQuality)
-    metric_peers.set(highQuality + lowQuality)
+    metric_peers.set(highQualityPublic + lowQualityPublic + highQualityNonPublic + highQualityPublic)
 
     return this.currentHealth
   }
