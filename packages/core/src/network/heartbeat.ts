@@ -12,7 +12,8 @@ import {
   pickVersion,
   create_gauge,
   create_counter,
-  create_histogram_with_buckets, create_multi_gauge
+  create_histogram_with_buckets,
+  create_multi_gauge
 } from '@hoprnet/hopr-utils'
 
 import { createHash, randomBytes } from 'crypto'
@@ -53,9 +54,11 @@ const metric_pingSuccessCount = create_counter(
 )
 const metric_pingFailureCount = create_counter('core_counter_heartbeat_failed_pings', 'Total number of failed pings')
 
-const metric_peersByQuality = create_multi_gauge('core_mgauge_peers_by_quality',
+const metric_peersByQuality = create_multi_gauge(
+  'core_mgauge_peers_by_quality',
   'Number different peer types by quality',
-  ['type', 'quality'])
+  ['type', 'quality']
+)
 const metric_peers = create_gauge('core_gauge_num_peers', 'Number of all peers')
 
 export type HeartbeatPingResult = {
