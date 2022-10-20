@@ -204,6 +204,8 @@ async function establishNewConnection(
           // We currently don't know any addresses to dial, but after after running
           // a DHT query we might known more addresses
           return
+        default:
+          error(`Dial error:`, err)
       }
     }
   }
