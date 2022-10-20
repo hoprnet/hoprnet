@@ -9,14 +9,19 @@ Draft readme, for rust migration
 3. `brew install lcov` (to install lcov for viewing coverage report)
 
 ## Contracts
+
 ```
 cd contracts
 ```
+
 ### Test
+
 ```
 make sc-test
 ```
+
 ### Run Coverage
+
 ```
 make sc-coverage
 ```
