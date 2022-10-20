@@ -359,7 +359,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
       if (res.success) {
         this.onNewEvents(res.events)
-        await this.onNewBlock(toBlock, false, false, true)
+        await this.onNewBlock(toBlock, false, false)
       } else {
         failedCount++
 
@@ -436,12 +436,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
    * @param blockNumber latest on-chain block number
    * @param fetchEvents [optional] if true, query provider for events in block
    */
-  private async onNewBlock(
-    blockNumber: number,
-    fetchEvents = false,
-    fetchNativeTxs = false,
-    blocking = false
-  ): Promise<void> {
+  private async onNewBlock(blockNumber: number, fetchEvents = false, fetchNativeTxs = false): Promise<void> {
     // NOTE: This function is also used in event handlers
     // where it cannot be 'awaited', so all exceptions need to be caught.
 
@@ -541,7 +536,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     }
 
     try {
-      await this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot, blocking)
+      await this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot)
     } catch (err) {
       log(`error while processing unconfirmed events`, err)
     }
@@ -655,7 +650,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
    * @param blockNumber latest on-chain block number
    * @param lastDatabaseSnapshot latest snapshot in database
    */
-  async processUnconfirmedEvents(blockNumber: number, lastDatabaseSnapshot: Snapshot | undefined, blocking: boolean) {
+  async processUnconfirmedEvents(blockNumber: number, lastDatabaseSnapshot: Snapshot | undefined) {
+    const start = Date.now()
     log(
       'At the new block %d, there are %i unconfirmed events and ready to process %s, because the event was mined at %i (with finality %i)',
       blockNumber,
@@ -779,16 +775,6 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         default:
           log(`ignoring event '${String(eventName)}'`)
       }
-
-      if (
-        !blocking &&
-        this.unconfirmedEvents.size() > 0 &&
-        isConfirmedBlock(this.unconfirmedEvents.peek().blockNumber, blockNumber, this.maxConfirmations)
-      ) {
-        // Give other tasks CPU time to happen
-        // Wait until end of next event loop iteration before starting next db write-back
-        await setImmediatePromise()
-      }
     }
 
     await this.db.runBatch(batchQuery)
@@ -796,6 +782,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     for (const event of batchEvents) {
       this.emit.apply(this, event)
     }
+
+    log(`Processing events took ${Date.now() - start}ms`)
   }
 
   private onAnnouncement(
@@ -865,8 +853,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     }
 
     batchEvents.push(['channel-update', channel])
-    verbose('channel-update for channel')
-    verbose(channel.toString())
+    // verbose('channel-update for channel')
+    // verbose(channel.toString())
 
     if (channel.source.toAddress().eq(this.address) || channel.destination.toAddress().eq(this.address)) {
       batchEvents.push(['own-channel-updated', channel])
