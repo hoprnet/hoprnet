@@ -23,7 +23,8 @@ import {
   u8aToHex,
   FIFO,
   type DeferType,
-  type Ticket
+  type Ticket,
+  BatchQuery
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum.js'
@@ -53,6 +54,7 @@ const getSyncPercentage = (start: number, current: number, end: number) =>
   (((current - start) / (end - start)) * 100).toFixed(2)
 const backoffOption: Parameters<typeof retryWithBackoffThenThrow>[1] = { maxDelay: MAX_TRANSACTION_BACKOFF }
 
+type BatchEvent = [eventName: string, ...rest: any[]][]
 /**
  * Indexes HoprChannels smart contract and stores to the DB,
  * all channels in the network.
@@ -84,6 +86,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     super()
 
     this.unconfirmedEvents = FIFO<TypedEvent<any, any>>()
+
+    this.getPublicKeyOf = this.getPublicKeyOf.bind(this)
   }
 
   /**
@@ -663,6 +667,9 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       this.maxConfirmations
     )
 
+    const batchQuery: BatchQuery = []
+    const batchEvents: BatchEvent = []
+
     // check unconfirmed events and process them if found
     // to be within a confirmed block
     while (
@@ -709,29 +716,36 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       switch (eventName) {
         case 'Announcement':
         case 'Announcement(address,bytes,bytes)':
-          await this.onAnnouncement(
+          this.onAnnouncement(
             event as Event<'Announcement'>,
             new BN(blockNumber.toPrecision()),
-            lastDatabaseSnapshot
+            lastDatabaseSnapshot,
+            batchQuery,
+            batchEvents
           )
           break
         case 'ChannelUpdated':
         case 'ChannelUpdated(address,address,tuple)':
-          await this.onChannelUpdated(event as Event<'ChannelUpdated'>, lastDatabaseSnapshot)
+          await this.onChannelUpdated(event as Event<'ChannelUpdated'>, lastDatabaseSnapshot, batchQuery, batchEvents)
           break
         case 'Transfer':
         case 'Transfer(address,address,uint256)':
           // handle HOPR token transfer
-          await this.onTransfer(event as TokenEvent<'Transfer'>, lastDatabaseSnapshot)
+          await this.onTransfer(event as TokenEvent<'Transfer'>, lastDatabaseSnapshot, batchQuery)
           break
         case 'TicketRedeemed':
         case 'TicketRedeemed(address,address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)':
           // if unlock `outstandingTicketBalance`, if applicable
-          await this.onTicketRedeemed(event as Event<'TicketRedeemed'>, lastDatabaseSnapshot)
+          await this.onTicketRedeemed(event as Event<'TicketRedeemed'>, lastDatabaseSnapshot, batchQuery)
           break
         case 'EligibilityUpdated':
         case 'EligibilityUpdated(address,bool)':
-          await this.onEligibilityUpdated(event as RegistryEvent<'EligibilityUpdated'>, lastDatabaseSnapshot)
+          await this.onEligibilityUpdated(
+            event as RegistryEvent<'EligibilityUpdated'>,
+            lastDatabaseSnapshot,
+            batchQuery,
+            batchEvents
+          )
           break
         case 'Registered':
         case 'Registered(address,string)':
@@ -739,7 +753,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         case 'RegisteredByOwner(address,string)':
           await this.onRegistered(
             event as RegistryEvent<'Registered'> | RegistryEvent<'RegisteredByOwner'>,
-            lastDatabaseSnapshot
+            lastDatabaseSnapshot,
+            batchQuery
           )
           break
         case 'Deregistered':
@@ -748,12 +763,18 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         case 'DeregisteredByOwner(address,string)':
           await this.onDeregistered(
             event as RegistryEvent<'Deregistered'> | RegistryEvent<'DeregisteredByOwner'>,
-            lastDatabaseSnapshot
+            lastDatabaseSnapshot,
+            batchQuery
           )
           break
         case 'EnabledNetworkRegistry':
         case 'EnabledNetworkRegistry(bool)':
-          await this.onEnabledNetworkRegistry(event as RegistryEvent<'EnabledNetworkRegistry'>, lastDatabaseSnapshot)
+          await this.onEnabledNetworkRegistry(
+            event as RegistryEvent<'EnabledNetworkRegistry'>,
+            lastDatabaseSnapshot,
+            batchQuery,
+            batchEvents
+          )
           break
         default:
           log(`ignoring event '${String(eventName)}'`)
@@ -769,9 +790,21 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         await setImmediatePromise()
       }
     }
+
+    await this.db.runBatch(batchQuery)
+
+    for (const event of batchEvents) {
+      this.emit.apply(this, event)
+    }
   }
 
-  private async onAnnouncement(event: Event<'Announcement'>, blockNumber: BN, lastSnapshot: Snapshot): Promise<void> {
+  private onAnnouncement(
+    event: Event<'Announcement'>,
+    blockNumber: BN,
+    lastSnapshot: Snapshot,
+    dbQuery: BatchQuery,
+    batchEvents: BatchEvent
+  ): void {
     // publicKey given by the SC is verified
     const publicKey = PublicKey.fromString(event.args.publicKey)
 
@@ -792,19 +825,26 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     log('New node announced', account.getAddress().toHex(), account.multiAddr.toString())
 
-    await this.db.updateAccountAndSnapshot(account, lastSnapshot)
-
-    this.emit('peer', {
-      id: account.getPeerId(),
-      multiaddrs: [account.multiAddr]
-    })
+    dbQuery.push(...this.db.updateAccountAndSnapshot(account, lastSnapshot))
+    batchEvents.push([
+      'peer',
+      {
+        id: account.getPeerId(),
+        multiaddrs: [account.multiAddr]
+      }
+    ])
   }
 
-  private async onChannelUpdated(event: Event<'ChannelUpdated'>, lastSnapshot: Snapshot): Promise<void> {
+  private async onChannelUpdated(
+    event: Event<'ChannelUpdated'>,
+    lastSnapshot: Snapshot,
+    dbQuery: BatchQuery,
+    batchEvents: BatchEvent
+  ): Promise<void> {
     let channel: ChannelEntry
     try {
       log('channel-updated for hash %s', event.transactionHash)
-      channel = await ChannelEntry.fromSCEvent(event, this.getPublicKeyOf.bind(this))
+      channel = await ChannelEntry.fromSCEvent(event, (addr: Address) => this.getPublicKeyOf(addr, dbQuery))
     } catch (err) {
       log(`fatal error: failed to construct new ChannelEntry from the SC event`, err)
       return
@@ -812,37 +852,41 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     let prevState: ChannelEntry
     try {
-      prevState = await this.db.getChannel(channel.getId())
+      prevState = await this.db.getChannel(channel.getId(), dbQuery)
     } catch (e) {
       // Channel is new
     }
 
-    await this.db.updateChannelAndSnapshot(channel.getId(), channel, lastSnapshot)
+    dbQuery.push(...this.db.updateChannelAndSnapshot(channel.getId(), channel, lastSnapshot))
 
     if (prevState && channel.status == ChannelStatus.Closed && prevState.status != ChannelStatus.Closed) {
       log('channel was closed')
-      await this.onChannelClosed(channel)
+      await this.onChannelClosed(channel, dbQuery, batchEvents)
     }
 
-    this.emit('channel-update', channel)
+    batchEvents.push(['channel-update', channel])
     verbose('channel-update for channel')
     verbose(channel.toString())
 
     if (channel.source.toAddress().eq(this.address) || channel.destination.toAddress().eq(this.address)) {
-      this.emit('own-channel-updated', channel)
+      batchEvents.push(['own-channel-updated', channel])
 
       if (channel.destination.toAddress().eq(this.address)) {
         // Channel _to_ us
         if (channel.status === ChannelStatus.WaitingForCommitment) {
           log('channel to us waiting for commitment')
           log(channel.toString())
-          this.emit('channel-waiting-for-commitment', channel)
+          batchEvents.push(['channel-waiting-for-commitment', channel])
         }
       }
     }
   }
 
-  private async onTicketRedeemed(event: Event<'TicketRedeemed'>, lastSnapshot: Snapshot) {
+  private async onTicketRedeemed(
+    event: Event<'TicketRedeemed'>,
+    lastSnapshot: Snapshot,
+    batchQuery: BatchQuery
+  ): Promise<BatchQuery> {
     if (Address.fromString(event.args.source).eq(this.address)) {
       // the node used to lock outstandingTicketBalance
       // rebuild part of the Ticket
@@ -850,18 +894,21 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         counterparty: Address.fromString(event.args.destination),
         amount: new Balance(new BN(event.args.amount.toString()))
       }
-      const outstandingBalance = await this.db.getPendingBalanceTo(partialTicket.counterparty)
+      const outstandingBalance = await this.db.getPendingBalanceTo(partialTicket.counterparty, batchQuery)
 
       try {
         if (!outstandingBalance.toBN().gte(new BN('0'))) {
-          await this.db.resolvePending(partialTicket, lastSnapshot)
+          batchQuery.push(...(await this.db.resolvePending(partialTicket, lastSnapshot, batchQuery)))
         } else {
-          await this.db.resolvePending(
-            {
-              ...partialTicket,
-              amount: outstandingBalance
-            },
-            lastSnapshot
+          batchQuery.push(
+            ...(await this.db.resolvePending(
+              {
+                ...partialTicket,
+                amount: outstandingBalance
+              },
+              lastSnapshot,
+              batchQuery
+            ))
           )
           // It falls into this case when db of sender gets erased while having tickets pending.
           // TODO: handle this may allow sender to send arbitrary amount of tickets through open
@@ -872,30 +919,35 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         throw new Error(`error in onTicketRedeemed ${error}`)
       }
     }
+
+    return batchQuery
   }
 
-  private async onChannelClosed(channel: ChannelEntry) {
-    await this.db.deleteAcknowledgedTicketsFromChannel(channel)
-    this.emit('channel-closed', channel)
+  private async onChannelClosed(channel: ChannelEntry, dbQuery: BatchQuery, batchEvent: BatchEvent) {
+    dbQuery.push(...(await this.db.deleteAcknowledgedTicketsFromChannel(channel, dbQuery)))
+    batchEvent.push(['channel-closed', channel])
   }
 
   private async onEligibilityUpdated(
     event: RegistryEvent<'EligibilityUpdated'>,
-    lastSnapshot: Snapshot
+    lastSnapshot: Snapshot,
+    dbQuery: BatchQuery,
+    batchEvents: BatchEvent
   ): Promise<void> {
     const account = Address.fromString(event.args.account)
-    await this.db.setEligible(account, event.args.eligibility, lastSnapshot)
+    dbQuery.push(...this.db.setEligible(account, event.args.eligibility, lastSnapshot))
     verbose(`network-registry: account ${account} is ${event.args.eligibility ? 'eligible' : 'not eligible'}`)
     // emit event only when eligibility changes on accounts with a HoprNode associated
     try {
-      const hoprNodes = await this.db.findHoprNodesUsingAccountInNetworkRegistry(account)
-      this.emit('network-registry-eligibility-changed', account, hoprNodes, event.args.eligibility)
+      const hoprNodes = await this.db.findHoprNodesUsingAccountInNetworkRegistry(account, dbQuery)
+      batchEvents.push(['network-registry-eligibility-changed', account, hoprNodes, event.args.eligibility])
     } catch {}
   }
 
   private async onRegistered(
     event: RegistryEvent<'Registered'> | RegistryEvent<'RegisteredByOwner'>,
-    lastSnapshot: Snapshot
+    lastSnapshot: Snapshot,
+    dbQuery: BatchQuery
   ): Promise<void> {
     let hoprNode: PeerId
     try {
@@ -906,13 +958,16 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       return
     }
     const account = Address.fromString(event.args.account)
-    await this.db.addToNetworkRegistry(PublicKey.fromPeerId(hoprNode), account, lastSnapshot)
+    dbQuery.push(
+      ...(await this.db.addToNetworkRegistry(PublicKey.fromPeerId(hoprNode), account, lastSnapshot, dbQuery))
+    )
     verbose(`network-registry: node ${event.args.hoprPeerId} is allowed to connect`)
   }
 
   private async onDeregistered(
     event: RegistryEvent<'Deregistered'> | RegistryEvent<'DeregisteredByOwner'>,
-    lastSnapshot: Snapshot
+    lastSnapshot: Snapshot,
+    dbQuery: BatchQuery
   ): Promise<void> {
     let hoprNode: PeerId
     try {
@@ -922,30 +977,35 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       log(error)
       return
     }
-    await this.db.removeFromNetworkRegistry(
-      PublicKey.fromPeerId(hoprNode),
-      Address.fromString(event.args.account),
-      lastSnapshot
+    dbQuery.push(
+      ...(await this.db.removeFromNetworkRegistry(
+        PublicKey.fromPeerId(hoprNode),
+        Address.fromString(event.args.account),
+        lastSnapshot,
+        dbQuery
+      ))
     )
     verbose(`network-registry: node ${event.args.hoprPeerId} is not allowed to connect`)
   }
 
   private async onEnabledNetworkRegistry(
     event: RegistryEvent<'EnabledNetworkRegistry'>,
-    lastSnapshot: Snapshot
+    lastSnapshot: Snapshot,
+    dbQuery: BatchQuery,
+    batchEvent: BatchEvent
   ): Promise<void> {
-    this.emit('network-registry-status-changed', event.args.isEnabled)
-    await this.db.setNetworkRegistryEnabled(event.args.isEnabled, lastSnapshot)
+    batchEvent.push(['network-registry-status-changed', event.args.isEnabled])
+    dbQuery.push(...this.db.setNetworkRegistryEnabled(event.args.isEnabled, lastSnapshot))
   }
 
-  private async onTransfer(event: TokenEvent<'Transfer'>, lastSnapshot: Snapshot) {
+  private async onTransfer(event: TokenEvent<'Transfer'>, lastSnapshot: Snapshot, dbQuery: BatchQuery) {
     const isIncoming = Address.fromString(event.args.to).eq(this.address)
     const amount = new Balance(new BN(event.args.value.toString()))
 
     if (isIncoming) {
-      await this.db.addHoprBalance(amount, lastSnapshot)
+      dbQuery.push(...(await this.db.addHoprBalance(amount, lastSnapshot, dbQuery)))
     } else {
-      await this.db.subHoprBalance(amount, lastSnapshot)
+      dbQuery.push(...(await this.db.subHoprBalance(amount, lastSnapshot, dbQuery)))
     }
   }
 
@@ -958,8 +1018,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     return this.db.getAccount(address)
   }
 
-  public async getPublicKeyOf(address: Address): Promise<PublicKey> {
-    const account = await this.db.getAccount(address)
+  public async getPublicKeyOf(address: Address, batchQuery?: BatchQuery): Promise<PublicKey> {
+    const account = await this.db.getAccount(address, batchQuery)
     if (account) {
       return account.publicKey
     }

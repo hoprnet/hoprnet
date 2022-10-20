@@ -21,7 +21,7 @@ import {
   generateChannelId
 } from '../types/index.js'
 import BN from 'bn.js'
-import { u8aToNumber, u8aConcat, toU8a } from '../u8a/index.js'
+import { u8aToNumber, u8aConcat, toU8a, u8aEquals } from '../u8a/index.js'
 import fs from 'fs'
 
 const log = debug(`hopr-core:db`)
@@ -117,6 +117,18 @@ export type WaitingAsRelayer = {
 }
 
 export type PendingAckowledgement = WaitingAsSender | WaitingAsRelayer
+
+export type BatchQuery = (
+  | {
+      type: 'put'
+      key: Uint8Array
+      value: Uint8Array
+    }
+  | {
+      type: 'del'
+      key: Uint8Array
+    }
+)[]
 
 function serializePendingAcknowledgement(isMessageSender: boolean, unackTicket?: UnacknowledgedTicket) {
   if (isMessageSender) {
@@ -274,13 +286,45 @@ export class HoprDB {
     }
   }
 
-  private async getCoerced<T>(key: Uint8Array, coerce: (u: Uint8Array) => T) {
-    let u8a = await this.get(key)
+  private getFromBatchQuery(batchQuery: BatchQuery, key: Uint8Array) {
+    for (let i = batchQuery.length; i > 0; i--) {
+      const query = batchQuery[i - 1]
+
+      if (u8aEquals(query.key, this.keyOf(key))) {
+        if (query.type === 'del') {
+          return
+        } else {
+          return Uint8Array.from(query.value)
+        }
+      }
+    }
+  }
+
+  private async getCoerced<T>(key: Uint8Array, coerce: (u: Uint8Array) => T, batchQuery?: BatchQuery) {
+    let u8a: Uint8Array
+
+    if (batchQuery != undefined) {
+      u8a = this.getFromBatchQuery(batchQuery, key) ?? (await this.get(key))
+    } else {
+      u8a = await this.get(key)
+    }
+
     return coerce(u8a)
   }
 
-  private async getCoercedOrDefault<T>(key: Uint8Array, coerce: (u: Uint8Array) => T, defaultVal: T) {
-    let u8a = await this.maybeGet(key)
+  private async getCoercedOrDefault<T>(
+    key: Uint8Array,
+    coerce: (u: Uint8Array) => T,
+    defaultVal: T,
+    batchQuery?: BatchQuery
+  ) {
+    let u8a: Uint8Array
+    if (batchQuery != undefined) {
+      u8a = this.getFromBatchQuery(batchQuery, key) ?? (await this.maybeGet(key))
+    } else {
+      u8a = await this.maybeGet(key)
+    }
+
     if (u8a === undefined) {
       return defaultVal
     }
@@ -372,6 +416,10 @@ export class HoprDB {
     await this.db.del(Buffer.from(this.keyOf(key)))
   }
 
+  public async runBatch(queries: BatchQuery) {
+    await this.db.batch(queries)
+  }
+
   private async increment(key: Uint8Array): Promise<number> {
     let val = await this.getCoercedOrDefault<number>(key, u8aToNumber, 0)
     // Always store using 4 bytes, max value 2**32 - 1
@@ -448,10 +496,13 @@ export class HoprDB {
    * @param filter optionally filter by signer
    * @returns an array of all acknowledged tickets
    */
-  public async getAcknowledgedTickets(filter?: {
-    signer?: PublicKey
-    channel?: ChannelEntry
-  }): Promise<AcknowledgedTicket[]> {
+  public async getAcknowledgedTickets(
+    filter?: {
+      signer?: PublicKey
+      channel?: ChannelEntry
+    },
+    batchQuery?: BatchQuery
+  ): Promise<AcknowledgedTicket[]> {
     const filterFunc = (a: AcknowledgedTicket): boolean => {
       // if signer provided doesn't match our ticket's signer dont add it to the list
       if (filter?.signer && !a.signer.eq(filter.signer)) {
@@ -485,6 +536,24 @@ export class HoprDB {
       tickets.push(ticket)
     }
 
+    if (batchQuery != undefined) {
+      const ticketQueries = []
+
+      for (const query of batchQuery) {
+        if (
+          query.key.length >= ACKNOWLEDGED_TICKETS_PREFIX.length + EthereumChallenge.SIZE &&
+          u8aEquals(query.key.subarray(0, ACKNOWLEDGED_TICKETS_PREFIX.length), ACKNOWLEDGED_TICKETS_PREFIX)
+        ) {
+          switch (query.type) {
+            case 'del':
+              for (const ticket of tickets) {
+                if (ticket.response.toChallenge())
+              }
+          }
+        }
+      }
+    }
+
     return tickets.sort(sortFunc)
   }
 
@@ -493,27 +562,37 @@ export class HoprDB {
    * neglected tickets counter.
    * @param channel in which channel to delete tickets
    */
-  public async deleteAcknowledgedTicketsFromChannel(channel: ChannelEntry): Promise<void> {
+  public async deleteAcknowledgedTicketsFromChannel(
+    channel: ChannelEntry,
+    batchQuery: BatchQuery
+  ): Promise<BatchQuery> {
     const tickets = await this.getAcknowledgedTickets({ signer: channel.source })
 
-    const neglectedTicketsCount = await this.getCoercedOrDefault<number>(NEGLECTED_TICKET_COUNT, u8aToNumber, 0)
+    const neglectedTicketsCount = await this.getCoercedOrDefault<number>(
+      NEGLECTED_TICKET_COUNT,
+      u8aToNumber,
+      0,
+      batchQuery
+    )
 
-    const batch = this.db.batch()
-
+    const batch: BatchQuery = []
     for (const ack of tickets) {
-      batch.del(Buffer.from(this.keyOf(createAcknowledgedTicketKey(ack.ticket.challenge, ack.ticket.channelEpoch))))
+      batch.push({
+        type: 'del',
+        key: Buffer.from(this.keyOf(createAcknowledgedTicketKey(ack.ticket.challenge, ack.ticket.channelEpoch)))
+      })
     }
 
     // only update count if there has been a change
     if (tickets.length > 0) {
-      batch.put(
-        Buffer.from(this.keyOf(NEGLECTED_TICKET_COUNT)),
-        // store updated number in 4 bytes
-        Buffer.from(toU8a(neglectedTicketsCount + tickets.length, 4))
-      )
+      batch.push({
+        type: 'put',
+        key: Buffer.from(this.keyOf(NEGLECTED_TICKET_COUNT)),
+        value: Buffer.from(toU8a(neglectedTicketsCount + tickets.length, 4))
+      })
     }
 
-    await batch.write()
+    return batch
   }
 
   /**
@@ -628,8 +707,8 @@ export class HoprDB {
     await this.put(LATEST_CONFIRMED_SNAPSHOT_KEY, snapshot.serialize())
   }
 
-  async getChannel(channelId: Hash): Promise<ChannelEntry> {
-    return await this.getCoerced<ChannelEntry>(createChannelKey(channelId), ChannelEntry.deserialize)
+  async getChannel(channelId: Hash, batchQuery?: BatchQuery): Promise<ChannelEntry> {
+    return await this.getCoerced<ChannelEntry>(createChannelKey(channelId), ChannelEntry.deserialize, batchQuery)
   }
 
   async *getChannelsIterable(filter?: (channel: ChannelEntry) => boolean): AsyncIterable<ChannelEntry> {
@@ -654,24 +733,43 @@ export class HoprDB {
     )
   }
 
-  async updateChannelAndSnapshot(channelId: Hash, channel: ChannelEntry, snapshot: Snapshot): Promise<void> {
-    await this.db
-      .batch()
-      .put(Buffer.from(this.keyOf(createChannelKey(channelId))), Buffer.from(channel.serialize()))
-      .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
-      .write()
+  updateChannelAndSnapshot(channelId: Hash, channel: ChannelEntry, snapshot: Snapshot): BatchQuery {
+    return [
+      {
+        type: 'put',
+        key: Buffer.from(this.keyOf(createChannelKey(channelId))),
+        value: Buffer.from(channel.serialize())
+      },
+      {
+        type: 'put',
+        key: Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
+        value: Buffer.from(snapshot.serialize())
+      }
+    ]
   }
 
-  async getAccount(address: Address): Promise<AccountEntry | undefined> {
-    return await this.getCoercedOrDefault<AccountEntry>(createAccountKey(address), AccountEntry.deserialize, undefined)
+  async getAccount(address: Address, batchQuery?: BatchQuery): Promise<AccountEntry | undefined> {
+    return await this.getCoercedOrDefault<AccountEntry>(
+      createAccountKey(address),
+      AccountEntry.deserialize,
+      undefined,
+      batchQuery
+    )
   }
 
-  async updateAccountAndSnapshot(account: AccountEntry, snapshot: Snapshot): Promise<void> {
-    await this.db
-      .batch()
-      .put(Buffer.from(this.keyOf(createAccountKey(account.getAddress()))), Buffer.from(account.serialize()))
-      .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
-      .write()
+  updateAccountAndSnapshot(account: AccountEntry, snapshot: Snapshot): BatchQuery {
+    return [
+      {
+        type: 'put',
+        key: Buffer.from(this.keyOf(createAccountKey(account.getAddress()))),
+        value: Buffer.from(account.serialize())
+      },
+      {
+        type: 'put',
+        key: Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
+        value: Buffer.from(snapshot.serialize())
+      }
+    ]
   }
 
   async getAccounts(filter?: (account: AccountEntry) => boolean) {
@@ -711,11 +809,12 @@ export class HoprDB {
     return (await this.getUnacknowledgedTickets()).length
   }
 
-  public async getPendingBalanceTo(counterparty: Address): Promise<Balance> {
+  public async getPendingBalanceTo(counterparty: Address, batchQuery?: BatchQuery): Promise<Balance> {
     return await this.getCoercedOrDefault<Balance>(
       createPendingTicketsCountKey(counterparty),
       Balance.deserialize,
-      Balance.ZERO
+      Balance.ZERO,
+      batchQuery
     )
   }
 
@@ -727,21 +826,30 @@ export class HoprDB {
     return await this.addBalance(createPendingTicketsCountKey(ticket.counterparty), ticket.amount)
   }
 
-  public async resolvePending(ticket: Partial<Ticket>, snapshot: Snapshot) {
+  public async resolvePending(
+    ticket: Partial<Ticket>,
+    snapshot: Snapshot,
+    batchQuery?: BatchQuery
+  ): Promise<BatchQuery> {
     let val = await this.getCoercedOrDefault<Balance>(
       createPendingTicketsCountKey(ticket.counterparty),
       Balance.deserialize,
-      Balance.ZERO
+      Balance.ZERO,
+      batchQuery
     )
 
-    await this.db
-      .batch()
-      .put(
-        Buffer.from(this.keyOf(createPendingTicketsCountKey(ticket.counterparty))),
-        Buffer.from(val.sub(val).serialize())
-      )
-      .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
-      .write()
+    return [
+      {
+        type: 'put',
+        key: Buffer.from(this.keyOf(createAccountKey(ticket.counterparty))),
+        value: Buffer.from(val.sub(val).serialize())
+      },
+      {
+        type: 'put',
+        key: Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
+        value: Buffer.from(snapshot.serialize())
+      }
+    ]
   }
 
   public async markRedeemeed(a: AcknowledgedTicket): Promise<void> {
@@ -834,24 +942,38 @@ export class HoprDB {
     return this.put(HOPR_BALANCE_KEY, value.serialize())
   }
 
-  public async addHoprBalance(value: Balance, snapshot: Snapshot): Promise<void> {
-    let val = await this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, Balance.deserialize, Balance.ZERO)
+  public async addHoprBalance(value: Balance, snapshot: Snapshot, batchQuery?: BatchQuery): Promise<BatchQuery> {
+    let val = await this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, Balance.deserialize, Balance.ZERO, batchQuery)
 
-    await this.db
-      .batch()
-      .put(Buffer.from(this.keyOf(HOPR_BALANCE_KEY)), Buffer.from(val.add(value).serialize()))
-      .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
-      .write()
+    return [
+      {
+        type: 'put',
+        key: Buffer.from(this.keyOf(HOPR_BALANCE_KEY)),
+        value: Buffer.from(val.add(value).serialize())
+      },
+      {
+        type: 'put',
+        key: Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
+        value: Buffer.from(snapshot.serialize())
+      }
+    ]
   }
 
-  public async subHoprBalance(value: Balance, snapshot: Snapshot): Promise<void> {
-    let val = await this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, Balance.deserialize, Balance.ZERO)
+  public async subHoprBalance(value: Balance, snapshot: Snapshot, batchQuery?: BatchQuery): Promise<BatchQuery> {
+    let val = await this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, Balance.deserialize, Balance.ZERO, batchQuery)
 
-    await this.db
-      .batch()
-      .put(Buffer.from(this.keyOf(HOPR_BALANCE_KEY)), Buffer.from(val.sub(value).serialize()))
-      .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
-      .write()
+    return [
+      {
+        type: 'put',
+        key: Buffer.from(this.keyOf(HOPR_BALANCE_KEY)),
+        value: Buffer.from(val.sub(value).serialize())
+      },
+      {
+        type: 'put',
+        key: Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
+        value: Buffer.from(snapshot.serialize())
+      }
+    ]
   }
 
   /**
@@ -861,26 +983,37 @@ export class HoprDB {
    * @param account the account that made the transaction
    * @param snapshot
    */
-  public async addToNetworkRegistry(pubKey: PublicKey, account: Address, snapshot: Snapshot): Promise<void> {
+  public async addToNetworkRegistry(
+    pubKey: PublicKey,
+    account: Address,
+    snapshot: Snapshot,
+    batchQuery?: BatchQuery
+  ): Promise<BatchQuery> {
     let registeredNodes = []
     try {
-      registeredNodes = await this.findHoprNodesUsingAccountInNetworkRegistry(account)
+      registeredNodes = await this.findHoprNodesUsingAccountInNetworkRegistry(account, batchQuery)
     } catch (error) {}
 
     // add new node to the list
     registeredNodes.push(pubKey)
 
-    await this.db
-      .batch()
-      // node public key to address (M->1)
-      .put(Buffer.from(this.keyOf(createNetworkRegistryEntryKey(pubKey))), Buffer.from(account.serialize()))
-      // address to node public keys (1->M) in the format of key -> PublicKey[]
-      .put(
-        Buffer.from(this.keyOf(createNetworkRegistryAddressToPublicKeyKey(account))),
-        Buffer.from(PublicKey.serializeArray(registeredNodes))
-      )
-      .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
-      .write()
+    return [
+      {
+        type: 'put',
+        key: Buffer.from(this.keyOf(createNetworkRegistryEntryKey(pubKey))),
+        value: Buffer.from(account.serialize())
+      },
+      {
+        type: 'put',
+        key: Buffer.from(this.keyOf(createNetworkRegistryAddressToPublicKeyKey(account))),
+        value: Buffer.from(PublicKey.serializeArray(registeredNodes))
+      },
+      {
+        type: 'put',
+        key: Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
+        value: Buffer.from(snapshot.serialize())
+      }
+    ]
   }
 
   /**
@@ -889,11 +1022,15 @@ export class HoprDB {
    * @param account
    * @returns array of PublicKey of the associated HOPR nodes
    */
-  public async findHoprNodesUsingAccountInNetworkRegistry(account: Address): Promise<PublicKey[]> {
-    const pubKeys = await this.getCoercedOrDefault<PublicKey[]>(
+  public async findHoprNodesUsingAccountInNetworkRegistry(
+    account: Address,
+    batchQuery?: BatchQuery
+  ): Promise<PublicKey[]> {
+    let pubKeys: PublicKey[] = await this.getCoercedOrDefault<PublicKey[]>(
       createNetworkRegistryAddressToPublicKeyKey(account),
       PublicKey.deserializeArray,
-      undefined
+      undefined,
+      batchQuery
     )
 
     if (!pubKeys) {
@@ -910,10 +1047,15 @@ export class HoprDB {
    * @param account the account to use so we can search for the key in the database
    * @param snapshot
    */
-  public async removeFromNetworkRegistry(pubKey: PublicKey, account: Address, snapshot: Snapshot): Promise<void> {
-    let registeredNodes = []
+  public async removeFromNetworkRegistry(
+    pubKey: PublicKey,
+    account: Address,
+    snapshot: Snapshot,
+    batchQuery?: BatchQuery
+  ): Promise<BatchQuery> {
+    let registeredNodes: PublicKey[]
     try {
-      registeredNodes = await this.findHoprNodesUsingAccountInNetworkRegistry(account)
+      registeredNodes = await this.findHoprNodesUsingAccountInNetworkRegistry(account, batchQuery)
     } catch (error) {
       log(`cannot remove node from network registry due to ${error}`)
       throw Error('HoprNode not registered to the account')
@@ -933,16 +1075,22 @@ export class HoprDB {
     const entryKey = createNetworkRegistryEntryKey(pubKey)
 
     if (entryKey) {
-      await this.db
-        .batch()
-        .del(Buffer.from(this.keyOf(entryKey)))
-        // address to node public keys (1->M) in the format of key -> PublicKey[]
-        .put(
-          Buffer.from(this.keyOf(createNetworkRegistryAddressToPublicKeyKey(account))),
-          Buffer.from(PublicKey.serializeArray(registeredNodes))
-        )
-        .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
-        .write()
+      return [
+        {
+          type: 'del',
+          key: Buffer.from(this.keyOf(entryKey))
+        },
+        {
+          type: 'put',
+          key: Buffer.from(this.keyOf(createNetworkRegistryAddressToPublicKeyKey(account))),
+          value: Buffer.from(PublicKey.serializeArray(registeredNodes))
+        },
+        {
+          type: 'put',
+          key: Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
+          value: Buffer.from(snapshot.serialize())
+        }
+      ]
     }
   }
 
@@ -962,21 +1110,34 @@ export class HoprDB {
    * @param account the account that made the transaction
    * @param snapshot
    */
-  public async setEligible(account: Address, eligible: boolean, snapshot: Snapshot): Promise<void> {
+  public setEligible(account: Address, eligible: boolean, snapshot: Snapshot): BatchQuery {
     const key = Buffer.from(this.keyOf(createNetworkRegistryAddressEligibleKey(account)))
 
     if (eligible) {
-      await this.db
-        .batch()
-        .put(key, Buffer.from([]))
-        .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
-        .write()
+      return [
+        {
+          type: 'put',
+          key,
+          value: Buffer.from([])
+        },
+        {
+          type: 'put',
+          key: Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
+          value: Buffer.from(snapshot.serialize())
+        }
+      ]
     } else {
-      await this.db
-        .batch()
-        .del(key)
-        .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
-        .write()
+      return [
+        {
+          type: 'del',
+          key
+        },
+        {
+          type: 'put',
+          key: Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
+          value: Buffer.from(snapshot.serialize())
+        }
+      ]
     }
   }
 
@@ -993,12 +1154,19 @@ export class HoprDB {
    * Hopr Network Registry
    * @param enabled whether register is enabled
    */
-  public async setNetworkRegistryEnabled(enabled: boolean, snapshot: Snapshot): Promise<void> {
-    await this.db
-      .batch()
-      .put(Buffer.from(this.keyOf(NETWORK_REGISTRY_ENABLED_PREFIX)), Buffer.from([Number(enabled)]))
-      .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
-      .write()
+  public setNetworkRegistryEnabled(enabled: boolean, snapshot: Snapshot): BatchQuery {
+    return [
+      {
+        type: 'put',
+        key: Buffer.from(this.keyOf(NETWORK_REGISTRY_ENABLED_PREFIX)),
+        value: Buffer.from([Number(enabled)])
+      },
+      {
+        type: 'put',
+        key: Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
+        value: Buffer.from(snapshot.serialize())
+      }
+    ]
   }
 
   /**
