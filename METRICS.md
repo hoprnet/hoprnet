@@ -7,9 +7,9 @@ the `api/v2/node/metrics` API endpoint.
 ## Example Prometheus configuration
 
 An example scrape config for Prometheus to collect HOPRd metrics:
+
 ```yaml
 scrape_configs:
-
   - job_name: 'hoprd'
     scrape_interval: 5s
     static_configs:
@@ -17,7 +17,7 @@ scrape_configs:
     metrics_path: /api/v2/node/metrics
     basic_auth:
       username: ^MYtoken4testing^
-      password: ""
+      password: ''
 ```
 
 ## Package metrics
@@ -27,7 +27,7 @@ The following sections document the metrics per package:
 ### connect
 
 | Name                                       | Type    | Description                                  | Note |
-|--------------------------------------------|---------|----------------------------------------------|:-----|
+| ------------------------------------------ | ------- | -------------------------------------------- | :--- |
 | `connect_counter_successful_direct_dials`  | counter | Number of successful direct dials.           |      |
 | `connect_counter_failed_direct_dials`      | counter | Number of failed direct dials                |      |
 | `connect_counter_successful_relayed_dials` | counter | Number of successful relayed dials           |      |
@@ -44,7 +44,7 @@ The following sections document the metrics per package:
 ### core
 
 | Name                                      | Type      | Description                                                    | Note                   |
-|-------------------------------------------|-----------|----------------------------------------------------------------|------------------------|
+| ----------------------------------------- | --------- | -------------------------------------------------------------- | ---------------------- |
 | `core_gauge_num_outgoing_channels`        | gauge     | Number of outgoing channels                                    |                        |
 | `core_gauge_num_incoming_channels`        | gauge     | Number of incoming channels                                    |                        |
 | `core_counter_sent_messages`              | counter   | Number of sent messages                                        |                        |
@@ -71,7 +71,7 @@ The following sections document the metrics per package:
 ### core-ethereum
 
 | Name                                                         | Type          | Description                                 | Note                                                                |
-|--------------------------------------------------------------|---------------|---------------------------------------------|---------------------------------------------------------------------|
+| ------------------------------------------------------------ | ------------- | ------------------------------------------- | ------------------------------------------------------------------- |
 | `core_ethereum_mcounter_indexer_provider_errors`             | multi counter | Multicounter for provider errors in Indexer |                                                                     |
 | `core_ethereum_counter_indexer_processed_unconfirmed_blocks` | counter       | Number of processed unconfirmed blocks      |                                                                     |
 | `core_ethereum_counter_indexer_announcements`                | counter       | Number of processed announcements           |                                                                     |
@@ -86,7 +86,7 @@ The following sections document the metrics per package:
 ### hoprd
 
 | Name                                            | Type        | Description                                                       | Note                                     |
-|-------------------------------------------------|-------------|-------------------------------------------------------------------|------------------------------------------|
+| ----------------------------------------------- | ----------- | ----------------------------------------------------------------- | ---------------------------------------- |
 | `hoprd_gauge_startup_unix_time_seconds`         | gauge       | The unix timestamp at which the process was started               | seconds since Epoch                      |
 | `hoprd_histogram_startup_time_seconds`          | histogram   | Time it takes for a node to start up                              | unit: seconds                            |
 | `hoprd_histogram_time_to_green_seconds`         | histogram   | Time it takes for a node to transition to the GREEN network state | unit: seconds                            |

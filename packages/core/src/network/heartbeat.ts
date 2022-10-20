@@ -57,7 +57,6 @@ const metric_hiqh_quality_peers = create_gauge('core_gauge_num_high_quality_peer
 const metric_low_quality_peers = create_gauge('core_gauge_num_low_quality_peers', 'Number of low quality peers')
 const metric_peers = create_gauge('core_gauge_num_peers', 'Number of all peers')
 
-
 export type HeartbeatPingResult = {
   destination: PeerId
   lastSeen: number
@@ -251,7 +250,9 @@ export default class Heartbeat {
     // GREEN = hiqh-quality connection to a public and a non-public node
     if (highQualityPublic > 0 && highQualityNonPublic > 0) newHealthValue = NetworkHealthIndicator.GREEN
 
-    log(`network health details: ${lowQualityPublic} LQ public, ${lowQualityNonPublic} LQ non-public, ${highQualityPublic} HQ public, ${highQualityNonPublic} HQ non-public`)
+    log(
+      `network health details: ${lowQualityPublic} LQ public, ${lowQualityNonPublic} LQ non-public, ${highQualityPublic} HQ public, ${highQualityNonPublic} HQ non-public`
+    )
 
     // Emit network health change event if needed
     if (newHealthValue != this.currentHealth) {
