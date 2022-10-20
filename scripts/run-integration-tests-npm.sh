@@ -203,6 +203,7 @@ function setup_node() {
     HOPRD_HEARTBEAT_VARIANCE=1000 \
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
     HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
+    NODE_OPTIONS="--experimental-wasm-modules" \
     npx hoprd \
       --admin \
       --adminHost "127.0.0.1" \
