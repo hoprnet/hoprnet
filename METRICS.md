@@ -71,13 +71,14 @@ The following sections document the metrics per package:
 ### core-ethereum
 
 | Name                                                         | Type          | Description                                 | Note                                                                |
-| ------------------------------------------------------------ | ------------- | ------------------------------------------- | ------------------------------------------------------------------- |
+|--------------------------------------------------------------|---------------|---------------------------------------------| ------------------------------------------------------------------- |
 | `core_ethereum_mcounter_indexer_provider_errors`             | multi counter | Multicounter for provider errors in Indexer |                                                                     |
 | `core_ethereum_counter_indexer_processed_unconfirmed_blocks` | counter       | Number of processed unconfirmed blocks      |                                                                     |
 | `core_ethereum_counter_indexer_announcements`                | counter       | Number of processed announcements           |                                                                     |
 | `core_ethereum_gauge_indexer_block_number`                   | gauge         | Current block number                        |                                                                     |
 | `core_ethereum_gauge_indexer_channel_status`                 | multi gauge   | Status of different channels                | 0 = closed, 1 = waiting for commitment, 2 = open, 3 = pending close |
 | `core_ethereum_counter_indexer_tickets_redeemed`             | counter       | Number of redeemed tickets                  |                                                                     |
+| `core_ethereum_counter_num_send_transactions`                | counter       | The number of sendTransaction calls         |                                                                     |
 
 ### cover-traffic-daemon
 

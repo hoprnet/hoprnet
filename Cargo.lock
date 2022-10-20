@@ -52,10 +52,10 @@ checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 name = "hoprd-misc"
 version = "0.1.0"
 dependencies = [
+ "console_error_panic_hook",
  "real-base",
  "wasm-bindgen",
  "wasm-bindgen-test",
- "wee_alloc",
 ]
 
 [[package]]
@@ -309,12 +309,12 @@ dependencies = [
 name = "utils-misc"
 version = "0.1.0"
 dependencies = [
+ "console_error_panic_hook",
  "real-base",
  "serde",
  "serde_json",
  "wasm-bindgen",
  "wasm-bindgen-test",
- "wee_alloc",
 ]
 
 [[package]]
