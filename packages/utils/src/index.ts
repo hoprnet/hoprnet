@@ -15,6 +15,6 @@ export * from './ethereum/index.js'
 export * from './utils.js'
 
 // Load `utils-misc` crate
-import * as utils_misc from '../lib/utils_misc.js'
-utils_misc.set_panic_hook()
+import { set_panic_hook } from '../lib/utils_misc.js'
+set_panic_hook()
 export { get_package_version } from '../lib/utils_misc.js'
