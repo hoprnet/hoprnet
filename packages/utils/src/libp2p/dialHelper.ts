@@ -193,9 +193,18 @@ async function establishNewConnection(
       noRelay
     })) as any as Connection
   } catch (err: any) {
-    error(`Error while establishing connection to ${destination.toString()}.`)
-    if (err?.message && (err?.code == undefined || err?.code !== 'ERR_NO_VALID_ADDRESSES')) {
+    if (err == undefined || err.code == undefined) {
       error(`Dial error:`, err)
+    } else {
+      switch (err.code) {
+        case 'ERR_PEER_DIAL_INTERCEPTED':
+          error(`Cannot dial ${destination.toString()}. Node has not been registered.`)
+          return
+        case 'ERR_NO_VALID_ADDRESSES':
+          // We currently don't know any addresses to dial, but after after running
+          // a DHT query we might known more addresses
+          return
+      }
     }
   }
 
