@@ -1,11 +1,11 @@
-import type { HoprConnectOptions, PeerStoreType } from '../types.js'
-import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
+import type { HoprConnectOptions, PeerStoreType, StreamType } from '../types.js'
+import type { Connection } from '@libp2p/interface-connection'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Initializable, Components } from '@libp2p/interfaces/components'
 import type { Startable } from '@libp2p/interfaces/startable'
 import { Multiaddr } from '@multiformats/multiaddr'
-import type { HoprConnect } from '../index.js'
-import { peerIdFromBytes, peerIdFromString } from '@libp2p/peer-id'
+import { peerIdFromString } from '@libp2p/peer-id'
+import { handshake } from 'it-handshake'
 
 import errCode from 'err-code'
 import { EventEmitter } from 'events'
@@ -18,29 +18,29 @@ import {
   CODE_UDP,
   MAX_RELAYS_PER_NODE,
   MIN_RELAYS_PER_NODE,
-  CAN_RELAY_PROTCOL,
+  CAN_RELAY_PROTOCOLS,
   OK,
   DEFAULT_DHT_ENTRY_RENEWAL,
   CODE_P2P
 } from '../constants.js'
 
 import {
+  dial,
   createCircuitAddress,
   nAtATime,
   oneAtATime,
   retimer,
   u8aEquals,
-  tryExistingConnections,
   retryWithBackoffThenThrow,
   durations,
-  defer
+  defer,
+  DialStatus
 } from '@hoprnet/hopr-utils'
 import { attemptClose, relayFromRelayAddress } from '../utils/index.js'
 
 const DEBUG_PREFIX = 'hopr-connect:entry'
 const log = Debug(DEBUG_PREFIX)
 const error = Debug(DEBUG_PREFIX.concat(':error'))
-const verbose = Debug(DEBUG_PREFIX.concat(':verbose'))
 
 const ENTRY_NODE_CONTACT_TIMEOUT = 5e3
 const ENTRY_NODES_MAX_PARALLEL_DIALS = 14
@@ -57,10 +57,6 @@ type EntryNodeData = PeerStoreType & {
 type ConnectionResult = {
   entry: EntryNodeData
   conn?: Connection
-}
-
-type ConnResult = ProtocolStream & {
-  conn: Connection
 }
 
 type Grouped = [id: string, results: (ConnectionResult | Error | undefined)[]]
@@ -149,27 +145,36 @@ function isUsableRelay(ma: Multiaddr): boolean {
  * @returns
  */
 function groupConnectionResults(
-  args: [id: PeerId, ma: Multiaddr, timeout: number][],
-  results: (ConnectionResult | Error | undefined)[]
+  args: Iterable<Parameters<EntryNodes['connectToRelay']>>,
+  results: Iterable<ConnectionResult | Error | undefined>
 ): Grouped[] {
   const grouped: { [index: string]: (ConnectionResult | Error | undefined)[] } = {}
 
-  for (const [index, result] of results.entries()) {
-    const address = args[index][0].toString()
+  const argIterator = args[Symbol.iterator]()
+  const resultsIterator = results[Symbol.iterator]()
+
+  let arg = argIterator.next()
+  let result = resultsIterator.next()
+
+  while (!arg.done && !result.done) {
+    const address = arg.value[0].toString()
 
     if (grouped[address] == undefined) {
-      grouped[address] = [result]
+      grouped[address] = [result.value]
     } else {
-      grouped[address].push(result)
+      grouped[address].push(result.value)
     }
+
+    arg = argIterator.next()
+    result = resultsIterator.next()
   }
 
   // Sort each list of results and sort the entire list of lists after lowest latency of the first result
-  const result: Grouped[] = Object.entries(grouped)
+  const sorted: Grouped[] = Object.entries(grouped)
     .map<Grouped>((value) => [value[0], value[1].sort(compareConnectionResults)])
     .sort((a: Grouped, b: Grouped) => compareConnectionResults(a[1][0], b[1][0]))
 
-  return result
+  return sorted
 }
 
 /**
@@ -179,7 +184,7 @@ function groupConnectionResults(
  * @param prefix string to print before listing the results
  * @returns string to log
  */
-function printGroupedConnectionResults(grouped: Grouped[], prefix: string = ''): string {
+function printGroupedConnectionResults(grouped: Iterable<Grouped>, prefix: string = ''): string {
   let out = `${prefix}\n`
 
   for (const [id, results] of grouped) {
@@ -188,19 +193,17 @@ function printGroupedConnectionResults(grouped: Grouped[], prefix: string = ''):
       continue
     }
 
-    if (out.length > prefix.length + 1) {
-      out += '\n'
-    }
     out += `  - ${id}: ${
       results[0] instanceof Error
         ? 'Error'
         : results[0].entry.latency < 0
         ? 'Timeout'
-        : `${results[0].entry.latency} ms`
+        : `${results[0].entry.latency} ms\n`
     }`
   }
 
-  return out
+  // Remove last occurence of `/n`
+  return out.substring(0, out.length - 1)
 }
 
 /**
@@ -210,17 +213,15 @@ function printGroupedConnectionResults(grouped: Grouped[], prefix: string = ''):
  * @param prefix string to print before listing the results
  * @returns
  */
-function printListOfUsedRelays(relays: UsedRelay[], prefix: string = ''): string {
+function printListOfUsedRelays(relays: Iterable<UsedRelay>, prefix: string = ''): string {
   let out = `${prefix}\n`
 
   for (const relay of relays) {
-    if (out.length > prefix.length + 1) {
-      out += '\n'
-    }
-    out += `  - ${relayFromRelayAddress(relay.ourCircuitAddress).toString()}`
+    out += `  - ${relayFromRelayAddress(relay.ourCircuitAddress).toString()}\n`
   }
 
-  return out
+  // Remove last occurence of `/n`
+  return out.substring(0, out.length - 1)
 }
 
 type UsedRelay = {
@@ -273,18 +274,18 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
   protected usedRelays: UsedRelay[]
 
   private _isStarted: boolean
+  private enabled: boolean
 
   private components: Components | undefined
 
   private _onNewRelay: ((peer: PeerStoreType) => void) | undefined
   private _onRemoveRelay: ((peer: PeerId) => void) | undefined
-  private _connectToRelay: EntryNodes['connectToRelay'] | undefined
-  public _onEntryNodeDisconnect: EntryNodes['onEntryDisconnect'] | undefined
+
+  private disconnectListener: ((conn: CustomEvent<Connection>) => void) | undefined
 
   private addToUpdateQueue: ReturnType<typeof oneAtATime>
 
   constructor(
-    private dialDirectly: HoprConnect['dialDirectly'],
     private options: HoprConnectOptions,
     overwrites?: {
       maxRelaysPerNode?: number
@@ -294,6 +295,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     }
   ) {
     super()
+
+    this.enabled = false
 
     this.maxRelaysPerNode = overwrites?.maxRelaysPerNode ?? MAX_RELAYS_PER_NODE
     this.minRelaysPerNode = overwrites?.minRelaysPerNode ?? MIN_RELAYS_PER_NODE
@@ -318,40 +321,59 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     this.offlineEntryNodes = []
 
     this.usedRelays = []
+
+    this.connectToRelay = this.connectToRelay.bind(this)
+  }
+
+  /**
+   * Enables monitoring of entry nodes. Called by Listener
+   * once it is clear that nodes requires relayed connections.
+   *
+   * If not called, node won't contact any entry nodes or
+   * monitor their availability.
+   */
+  public enable() {
+    this.enabled = true
   }
 
   public isStarted() {
     return this._isStarted
   }
 
+  public start() {
+    this._isStarted = true
+  }
+
   /**
    * Attaches listeners that handle addition and removal of
    * entry nodes
    */
-  public start() {
-    this._connectToRelay = this.connectToRelay.bind(this)
-    this._onEntryNodeDisconnect = this.onEntryDisconnect.bind(this)
+  public async afterStart() {
+    if (this.enabled) {
+      if (this.options.publicNodes != undefined) {
+        this._onNewRelay = function (this: EntryNodes, peer: PeerStoreType) {
+          this.addToUpdateQueue(async () => {
+            log(`peer online`, peer.id.toString())
+            await this.onNewRelay(peer)
+          })
+        }.bind(this)
+        this._onRemoveRelay = function (this: EntryNodes, peer: PeerId) {
+          this.addToUpdateQueue(async () => {
+            log(`peer offline`, peer.toString())
+            await this.onRemoveRelay(peer)
+          })
+        }.bind(this)
 
-    if (this.options.publicNodes != undefined) {
-      this._onNewRelay = (peer: PeerStoreType) => {
-        this.addToUpdateQueue(async () => {
-          log(`peer online`, peer.id.toString())
-          await this.onNewRelay(peer)
-        })
-      }
-      this._onRemoveRelay = (peer: PeerId) => {
-        this.addToUpdateQueue(async () => {
-          log(`peer offline`, peer.toString())
-          await this.onRemoveRelay(peer)
-        })
+        this.options.publicNodes.on('addPublicNode', this._onNewRelay)
+        this.options.publicNodes.on('removePublicNode', this._onRemoveRelay)
       }
 
-      this.options.publicNodes.on('addPublicNode', this._onNewRelay)
-      this.options.publicNodes.on('removePublicNode', this._onRemoveRelay)
+      this.startDHTRenewInterval()
+
+      await new Promise((resolve, reject) => {
+        this.addToUpdateQueue(() => this.updatePublicNodes().then(resolve, reject))
+      })
     }
-
-    this.startDHTRenewInterval()
-    this._isStarted = true
   }
 
   /**
@@ -362,14 +384,17 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       return
     }
 
-    if (this.options.publicNodes != undefined && this._onNewRelay != undefined && this._onRemoveRelay != undefined) {
-      this.options.publicNodes.removeListener('addPublicNode', this._onNewRelay)
+    if (this.enabled) {
+      if (this.options.publicNodes != undefined && this._onNewRelay != undefined && this._onRemoveRelay != undefined) {
+        this.options.publicNodes.removeListener('addPublicNode', this._onNewRelay)
 
-      this.options.publicNodes.removeListener('removePublicNode', this._onRemoveRelay)
+        this.options.publicNodes.removeListener('removePublicNode', this._onRemoveRelay)
+      }
+
+      this.stopReconnectAttempts?.()
+      this.stopDHTRenewal?.()
     }
 
-    this.stopReconnectAttempts?.()
-    this.stopDHTRenewal?.()
     this._isStarted = false
   }
 
@@ -413,22 +438,30 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
   }
 
   /**
-   * Called once connection to an entry node gets closed.
-   * @param ma disconnected Multiaddr
+   * Used to track once a connection to a selected entry node got closed.
    */
-  // @TODO add this call to "global" queue
-  private async onEntryDisconnect(ma: Multiaddr) {
-    const tuples = ma.tuples() as [code: number, addr: Uint8Array][]
-    const peer = peerIdFromBytes(tuples[2][1].slice(1))
+  private trackEntryNodeConnections(): void {
+    const usedRelays = new Set(this.getUsedRelayPeerIds().map((p: PeerId) => p.toString()))
 
-    log(`Disconnected from entry node ${peer.toString()}, trying to reconnect ...`)
-    this.addToUpdateQueue(() => this.reconnectToEntryNode(peer))
+    if (this.disconnectListener != undefined) {
+      this.getComponents().getConnectionManager().removeEventListener('peer:disconnect', this.disconnectListener)
+    }
+    this.disconnectListener = (event: CustomEvent<Connection>) => {
+      const remotePeer = event.detail.remotePeer
+
+      if (usedRelays.has(remotePeer.toString())) {
+        log(`Disconnected from entry node ${remotePeer.toString()}, trying to reconnect ...`)
+        this.addToUpdateQueue(() => this.reconnectToEntryNode(remotePeer))
+      }
+    }
+
+    this.getComponents().getConnectionManager().addEventListener('peer:disconnect', this.disconnectListener)
   }
 
   private async reconnectToEntryNode(peer: PeerId) {
     const addrToContact = (
       this.someNode(peer, (addrs: EntryNodeData | PeerStoreType) => addrs.multiaddrs) as Multiaddr[]
-    ).map<[id: PeerId, ma: Multiaddr, timeout: number]>((entry) => [peer, entry, this.contactTimeout])
+    ).map<[id: PeerId, ma: Multiaddr]>((entry) => [peer, entry])
 
     let attempt = 0
 
@@ -436,11 +469,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       await retryWithBackoffThenThrow(
         async () => {
           attempt++
-          const results = await nAtATime(
-            this._connectToRelay as EntryNodes['connectToRelay'],
-            addrToContact,
-            this.maxParallelDials
-          )
+          const results = await nAtATime(this.connectToRelay, addrToContact, this.maxParallelDials)
 
           log(
             printGroupedConnectionResults(
@@ -484,6 +513,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
           await this.updatePublicNodes()
         } else {
           this.updateUsedRelays([[peer.toString(), [undefined]]])
+          this.trackEntryNodeConnections()
           // Publish a new DHT entry
           this.emit(RELAY_CHANGED_EVENT)
         }
@@ -507,14 +537,11 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       const addrsToContact = this.someNode(relay, (addrs) => addrs.multiaddrs, true) as Multiaddr[]
 
       for (const ma of addrsToContact) {
-        work.push([relay, ma, this.contactTimeout])
+        work.push([relay, ma])
       }
     }
 
-    const results = groupConnectionResults(
-      work,
-      await nAtATime(this._connectToRelay as EntryNodes['connectToRelay'], work, this.maxParallelDials)
-    )
+    const results = groupConnectionResults(work, await nAtATime(this.connectToRelay, work, this.maxParallelDials))
 
     log(printGroupedConnectionResults(results, `Connection results to entry nodes at DHT renewal:`))
 
@@ -577,7 +604,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       },
       () => {
         if (!allowed) {
-          return durations.minutes(1)
+          return durations.seconds(30)
         }
 
         return (initialDelay *= 1.5)
@@ -719,6 +746,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
         await this.updatePublicNodes()
       } else {
         this.updateUsedRelays([[peer.toString(), [undefined]]])
+        this.trackEntryNodeConnections()
         this.emit(RELAY_CHANGED_EVENT)
       }
     }
@@ -733,13 +761,15 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    *
    * @returns array of arguments to probe nodes
    */
-  private getAddrsToContact(): Parameters<EntryNodes['connectToRelay']>[] {
+  private async getAddrsToContact(): Promise<Parameters<EntryNodes['connectToRelay']>[]> {
     const args: Parameters<EntryNodes['connectToRelay']>[] = []
 
     for (const nodeList of [this.uncheckedEntryNodes, this.availableEntryNodes, this.offlineEntryNodes]) {
       for (const node of nodeList) {
+        // In case the addrs are not known to libp2p
+        await this.getComponents().getPeerStore().addressBook.add(node.id, node.multiaddrs)
         for (const ma of node.multiaddrs) {
-          args.push([node.id, ma, this.contactTimeout])
+          args.push([node.id, ma])
         }
       }
     }
@@ -753,9 +783,10 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    * of entry nodes.
    * @param groupedResults results from concurrent connect attempt
    */
-  private rebuildUsedRelays(groupedResults: Grouped[]) {
+  private rebuildUsedRelays(groupedResults: Iterable<Grouped>) {
     this.usedRelays = []
 
+    // Assuming groupedResults is sorted
     for (const [_id, results] of groupedResults) {
       if (results[0] == undefined || results[0] instanceof Error) {
         break
@@ -766,6 +797,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
           if (result == undefined || result instanceof Error) {
             break
           }
+          // Includes a catch-all block and swallows, but
+          // logs all exceptions
           attemptClose((result as ConnectionResult).conn, error)
         }
 
@@ -776,10 +809,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       this.usedRelays.push({
         // @TODO take the address that really got used
         relayDirectAddress: (results[0] as ConnectionResult).entry.multiaddrs[0],
-        ourCircuitAddress: createCircuitAddress(
-          (results[0] as ConnectionResult).entry.id,
-          this.getComponents().getPeerId()
-        )
+        ourCircuitAddress: createCircuitAddress((results[0] as ConnectionResult).entry.id)
       })
     }
   }
@@ -788,7 +818,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    * Updates specific entries of the list of used entry nodes
    * @param groupedResults results from concurrent connect attempt
    */
-  private updateUsedRelays(groupedResults: Grouped[]) {
+  private updateUsedRelays(groupedResults: Iterable<Grouped>) {
     for (const [id, results] of groupedResults) {
       if (results[0] == undefined || results[0] instanceof Error || results[0].entry.latency < 0) {
         // Mark offline
@@ -816,11 +846,29 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    * Updates knowledge about offline, available and unchecked entry nodes
    * @param groupedResults results from concurrent connect attempt
    */
-  protected updateRecords(groupedResults: Grouped[]) {
+  protected updateRecords(groupedResults: Iterable<Grouped>) {
     // @TODO replace this by a more efficient data structure
-    const availableOnes = new Set<string>(this.availableEntryNodes.map((nodeData) => nodeData.id.toString()))
-    const uncheckedOnes = new Set<string>(this.uncheckedEntryNodes.map((nodeData) => nodeData.id.toString()))
-    const offlineOnes = new Set<string>(this.offlineEntryNodes.map((nodeData) => nodeData.id.toString()))
+    const availableOnes = new Set<string>(
+      function* (this: EntryNodes) {
+        for (const nodeData of this.availableEntryNodes) {
+          yield nodeData.id.toString()
+        }
+      }.call(this)
+    )
+    const uncheckedOnes = new Set<string>(
+      function* (this: EntryNodes) {
+        for (const nodeData of this.uncheckedEntryNodes) {
+          yield nodeData.id.toString()
+        }
+      }.call(this)
+    )
+    const offlineOnes = new Set<string>(
+      function* (this: EntryNodes) {
+        for (const nodeData of this.offlineEntryNodes) {
+          yield nodeData.id.toString()
+        }
+      }.call(this)
+    )
 
     for (const [id, results] of groupedResults) {
       if (results.every((result) => result == undefined)) {
@@ -890,13 +938,13 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
   async updatePublicNodes(): Promise<void> {
     log(`Updating list of used relay nodes ...`)
 
-    const addrsToContact = this.getAddrsToContact()
+    const addrsToContact = await this.getAddrsToContact()
 
     const start = Date.now()
     const results = groupConnectionResults(
       addrsToContact,
       await nAtATime(
-        this._connectToRelay as EntryNodes['connectToRelay'],
+        this.connectToRelay,
         addrsToContact,
         this.maxParallelDials,
         (results: (Awaited<ReturnType<EntryNodes['connectToRelay']>> | Error | undefined)[]) => {
@@ -962,73 +1010,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     if (isDifferent) {
       log(printListOfUsedRelays(this.usedRelays, `Updated list of entry nodes:`))
 
+      this.trackEntryNodeConnections()
       this.emit(RELAY_CHANGED_EVENT)
-    }
-  }
-
-  /**
-   * Establishes a brand-new connection to the given peer using the given
-   * address.
-   * @param destination peer to connect to
-   * @param destinationAddress address to use for connect attempt
-   * @param timeout when to timeout
-   * @param onDisconnect called once connection gets closed
-   * @returns either a connection result or nothing, if there was an error
-   */
-  private async establishNewConnection(
-    destination: PeerId,
-    destinationAddress: Multiaddr,
-    timeout: number,
-    onDisconnect: (ma: Multiaddr) => void
-  ): Promise<ConnResult | void> {
-    const abort = new AbortController()
-    let done = false
-
-    // Abort (direct) connection attempt once timeout is due
-    setTimeout(() => {
-      if (!done) {
-        abort.abort()
-      }
-    }, timeout).unref()
-
-    let conn: Connection | undefined
-    try {
-      conn = await this.dialDirectly(destinationAddress, {
-        signal: abort.signal,
-        // libp2p interface type clash
-        upgrader: this.getComponents().getUpgrader() as any,
-        onDisconnect
-      })
-    } catch (err: any) {
-      error(`error while contacting entry node ${destination.toString()}.`, err?.message)
-      attemptClose(conn, error)
-      return
-    }
-
-    // Prevent timeout from doing anything
-    done = true
-
-    if (conn == undefined) {
-      return
-    }
-
-    const protocol = CAN_RELAY_PROTCOL(this.options.environment)
-
-    let stream: ProtocolStream['stream'] | undefined
-    try {
-      stream = (await conn.newStream([protocol]))?.stream
-    } catch (err) {
-      await attemptClose(conn, error)
-      log(`Cannot use entry node ${destination.toString()} because protocol selection failed`)
-      return
-    }
-
-    if (conn != undefined && stream != undefined) {
-      return {
-        conn,
-        stream,
-        protocol
-      }
     }
   }
 
@@ -1036,73 +1019,63 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    * Attempts to connect to a relay node
    * @param id peerId of the node to dial
    * @param relay multiaddr to perform the dial
-   * @param timeout when to timeout on unsuccessful dial attempts
    * @returns a PeerStoreEntry containing the measured latency
    */
-  private async connectToRelay(
-    id: PeerId,
-    relay: Multiaddr,
-    timeout: number
-  ): Promise<{ entry: EntryNodeData; conn?: Connection }> {
+  private async connectToRelay(id: PeerId, relay: Multiaddr): Promise<{ entry: EntryNodeData; conn?: Connection }> {
+    const result = await dial(
+      this.getComponents(),
+      id,
+      CAN_RELAY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments),
+      false,
+      true
+    )
+
+    if (result.status != DialStatus.SUCCESS) {
+      // Dial error
+      return {
+        entry: {
+          id,
+          multiaddrs: [relay],
+          latency: -1
+        }
+      }
+    }
+
     const start = Date.now()
 
-    let conn = await tryExistingConnections(this.getComponents(), id, CAN_RELAY_PROTCOL(this.options.environment))
+    // Only reads from socket once but keeps socket open
+    // to eventually use it to exchange signalling information
+    const shaker = handshake(result.resp.stream)
 
-    if (conn == null) {
-      conn = await this.establishNewConnection(
-        id,
-        relay,
-        timeout,
-        this._onEntryNodeDisconnect as EntryNodes['onEntryDisconnect']
-      )
-    }
-
-    if (conn == null) {
-      return {
-        entry: {
-          id,
-          multiaddrs: [relay],
-          latency: -1
-        }
-      }
-    }
-
-    let done = false
-
-    // calls the iterator, thereby starts the stream and
-    // consumes the first messages, afterwards closes the stream
-    for await (const msg of conn.stream.source as AsyncIterable<Uint8Array>) {
-      verbose(`can relay received ${new TextDecoder().decode(msg.slice())} from ${id.toString()}`)
-      if (u8aEquals(msg.slice(), OK)) {
-        done = true
-      }
-      // End receive stream after first message
-      break
-    }
-
+    let chunk: StreamType | undefined
     try {
-      // End the send stream by sending nothing
-      conn.stream.sink((async function* () {})()).catch(error)
+      chunk = await shaker.read()
     } catch (err) {
       error(err)
-    }
-
-    if (done) {
-      return {
-        conn: conn.conn,
-        entry: {
-          id,
-          multiaddrs: [relay],
-          latency: Date.now() - start
-        }
-      }
-    } else {
       return {
         entry: {
           id,
           multiaddrs: [relay],
           latency: -1
         }
+      }
+    }
+
+    if (chunk == undefined || !u8aEquals(chunk.subarray(), OK)) {
+      return {
+        entry: {
+          id,
+          multiaddrs: [relay],
+          latency: -1
+        }
+      }
+    }
+
+    return {
+      entry: {
+        id,
+        multiaddrs: [relay],
+        latency: Date.now() - start
       }
     }
   }

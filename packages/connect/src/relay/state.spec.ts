@@ -64,7 +64,9 @@ describe('relay state management', function () {
   })
 
   it('check if active, create new and exchange messages', async function () {
-    const state = new RelayState()
+    const state = new RelayState({
+      relayFreeTimeout: 1
+    })
 
     assert(!state.exists(initiator, destination))
 
@@ -150,7 +152,9 @@ describe('relay state management', function () {
   })
 
   it('check cleanup', async function () {
-    const state = new RelayState()
+    const state = new RelayState({
+      relayFreeTimeout: 1
+    })
 
     assert(!state.exists(initiator, destination))
     const [initiatorToRelay, relayToInitiator] = duplexPair<StreamType>()
@@ -173,7 +177,7 @@ describe('relay state management', function () {
     )
 
     // Let I/O operations happen
-    await new Promise((resolve) => setTimeout(resolve))
+    await new Promise((resolve) => setTimeout(resolve, 100))
 
     assert(!state.exists(initiator, destination))
   })
@@ -181,7 +185,9 @@ describe('relay state management', function () {
 
 describe('relay state management - errors', function () {
   it('new stream throws synchronously - source ended', async function () {
-    const state = new RelayState()
+    const state = new RelayState({
+      relayFreeTimeout: 1
+    })
 
     assert(!state.exists(initiator, destination))
 
@@ -217,7 +223,9 @@ describe('relay state management - errors', function () {
   })
 
   it('new stream throws synchronously - source undefined', async function () {
-    const state = new RelayState()
+    const state = new RelayState({
+      relayFreeTimeout: 1
+    })
 
     assert(!state.exists(initiator, destination))
 
@@ -253,7 +261,9 @@ describe('relay state management - errors', function () {
   })
 
   it('new stream throws asynchronously', async function () {
-    const state = new RelayState()
+    const state = new RelayState({
+      relayFreeTimeout: 1
+    })
 
     assert(!state.exists(initiator, destination))
 

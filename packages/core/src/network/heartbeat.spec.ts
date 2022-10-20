@@ -33,8 +33,6 @@ const TESTING_ENVIRONMENT = 'unit-testing'
 
 // Overwrite default timeouts with shorter ones for unit testing
 const SHORT_TIMEOUTS: Partial<HeartbeatConfig> = {
-  heartbeatDialTimeout: 50,
-  heartbeatRunTimeout: 100,
   heartbeatInterval: 200,
   heartbeatVariance: 1,
   networkQualityThreshold: 0.5
@@ -72,9 +70,16 @@ function createFakeNetwork() {
   // mocks libp2p.handle(protocol)
   const subscribe = (
     self: PeerId,
-    protocol: string,
+    protocols: string | string[],
     handler: (msg: Uint8Array, remotePeer: PeerId) => Promise<Uint8Array>
   ) => {
+    let protocol: string
+    if (Array.isArray(protocols)) {
+      protocol = protocols[0]
+    } else {
+      protocol = protocols
+    }
+
     network.on(reqEventName(self, protocol), async (from: PeerId, request: Uint8Array) => {
       const response = await handler(request, from)
 
@@ -85,7 +90,14 @@ function createFakeNetwork() {
   }
 
   // mocks libp2p.dialProtocol
-  const sendMessage = async (self: PeerId, dest: PeerId, protocol: string, msg: Uint8Array) => {
+  const sendMessage = async (self: PeerId, dest: PeerId, protocols: string | string[], msg: Uint8Array) => {
+    let protocol: string
+    if (Array.isArray(protocols)) {
+      protocol = protocols[0]
+    } else {
+      protocol = protocols
+    }
+
     if (network.listenerCount(reqEventName(dest, protocol)) > 0) {
       const recvPromise = once(network, resEventName(dest, self, protocol))
 
@@ -125,8 +137,9 @@ async function getPeer(
 
   const heartbeat = new TestingHeartbeat(
     peers,
-    (protocol: string, handler: LibP2PHandlerFunction<any>) => network.subscribe(self, protocol, handler),
-    ((dest: PeerId, protocol: string, msg: Uint8Array) => network.sendMessage(self, dest, protocol, msg)) as any,
+    (protocols: string | string[], handler: LibP2PHandlerFunction<any>) => network.subscribe(self, protocols, handler),
+    ((dest: PeerId, protocols: string | string[], msg: Uint8Array) =>
+      network.sendMessage(self, dest, protocols, msg)) as any,
     (async () => {
       assert.fail(`must not call hangUp`)
     }) as any,

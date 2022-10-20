@@ -109,21 +109,47 @@ If you are using Dappnode or Avado, you can download your identity file on their
 
 **_Note:_** You should download your identity file as soon as possible. As downloading the backup or DB folder will also download the database, which can get quite large in size if you’ve been running your node for a while.
 
-**_Dappnode –_** Find HOPR in your packages and navigate to the backup section. From there, all you have to do is click 'Download backup'.
+**_DAppNode –_** Find HOPR in your packages and navigate to the backup section. From there, all you have to do is click 'Download backup'. This will download a `.zip` file containing your identity file. For DAppNode, you should use this zipped file to [restore your node](using-dappnode#restoring-an-old-node) if needed.
 
 ![dappnode backup](./images/dappnode-backup.png)
+
+#### How to view your DAppNode identity file:
+
+You will not be able to use the identity file alone to [restore your old node](using-dappnode#restoring-an-old-node) on DAppNode and should use the entire zipped backup file. The instructions below are simply to view your identity file.
+
+(**1**) Extract the zipped file downloaded to see the DB folder and identity file.
+
+(**2**) Once extracted, open the folder: `db`.
+
+![dappnode db folder](./images/Dappnode-DB-folder.png)
+
+(**3**) You will see the file `identity` if hidden files are visible.
 
 **_Avado –_** For Avado, you have to specify you want to download /app/hoprd-db in the Avado UI. Locate your HOPR package and click on the 'manage' icon.
 
 ![avado manage](./images/avado-manage.png)
 
-From here, scroll down to the file manager and enter `/app/hoprd-db` in the field under `Download from DNP`. Then click 'Download'.
+From here, scroll down to the file manager and enter `/app/hoprd-db` in the field under `Download from DNP`. Then click 'Download'. This will download a `.zip` file.
 
 ![avado download](./images/avado-db.png)
 
+#### How to view your Avado identity file
+
+(**1**) Make sure hidden files are visible on your OS.
+
+(**2**) Extract the zipped folder you just downloaded.
+
+![Avado db folder](./images/Avado-DB-folder.png)
+
+(**3**) Once extracted, open the folder `hoprd-db`.
+
+![Avado identity file](./images/Avado-identity-file.png)
+
+(**4**) If hidden files are visible on your OS, you should see a file named `.hopr-identity`. Use this to [restore your node](using-avado#alternative-method-using-your-identity-file) if needed.
+
 **_Note:_** Make sure you enter `/app/hoprd-db` and not `/app/hoprd-db/`.
 
-Now that you’ve backed up your identity file and have noted your password, you will always be able to access your private key and node (as long as you keep them safe).
+Now that you’ve backed up your identity file and have noted your password, you will always be able to access your private key and node (as long as you keep them safe). You can also use this file to [import your funds to your MetaMask wallet.](using-hopr-admin#importing-wallet-to-metamask)
 
 ### ETH address & peerID
 
@@ -623,15 +649,15 @@ You should have earned tickets if your node was used as an intermediary to relay
 
 Tickets are redeemed automatically, so the tickets which contain value will be converted to HOPR tokens and added to the balance of the node used for that relay. The rest are discarded with no trace left on the blockchain.
 
-If a channel exists in both directions between consecutive nodes on the relay, the ticket is redeemed into the following nodes channel instead of it's balance.
+If a channel exists in both directions between consecutive nodes on the relay, the ticket is redeemed into the following nodes channel instead of its balance.
 
-![tickets-channels](./images/tickets-channels-2.png)
+![tickets-channels](./images/tickets-channels-3.png)
 
-In the above example, you as the sender will create a ticket of value 0.02 HOPR to pay for the entire relay. Since no channel exists from Betty -> me the ticket is redeemed into Betty's node. Betty now generates a ticket of value 0.01 HOPR to pay for the remaining relay and since a channel does exist from Chāo -> Betty, the ticket is redeemed into this channel instead of Chāo's balance.
+In the above example, you, as the sender, will create two tickets of value 0.02 HOPR to pay for the entire relay. Since no channel exists from Betty -> me, the tickets are redeemed into Betty's node. Betty now generates a ticket of value 0.01 HOPR to pay for the remaining relay, and since a channel does exist from Chāo -> Betty, the ticket is redeemed into this channel instead of Chāo's balance.
 
 Chāo then sends the message to Zoë and does not generate a ticket for the last HOP of the relay.
 
-By redeeming tickets into channels nodes are keeping healthy connections funded. In the long run this means your node will be more active on the network earning more HOPR!
+By redeeming tickets into channels, nodes are keeping healthy connections funded. In the long run, this means your node will be more active on the network earning more HOPR!
 
 When channels are closed, all staked tokens are added to your balance and from there can be withdrawn to an external wallet.
 
@@ -666,3 +692,37 @@ withdraw 0.01 HOPR 0xc8Aa5a085c23dfEa903312a73EfC30888bB61f0B
 This will withdraw 0.01 wxHOPR or mHOPR from your balance and send it to **0xc8Aa5a085c23dfEa903312a73EfC30888bB61f0B**
 
 **Please use your own ETH address to withdraw funds and not the example address**
+
+### Importing wallet to MetaMask
+
+If you have [backed up your identity file,](using-hopr-admin#backing-up-your-identity-file) you can convert it to a `.json` file and import it as an account to your MetaMask to access your funds.
+
+**Note:** If you are using macOS or Windows, then you should make sure you can see hidden files. Otherwise, the identity file will not be visible to you.
+
+#### For Avado/Dappnode
+
+(**1**) Locate the `.hopr-identity` file inside the db folder
+
+(**2**) Rename the file to `hopr-identity.json`
+
+#### For local or VPS users
+
+(**1**) find the folder `.hoprd-db-valencia` on your machine or VPS
+
+(**2**) locate the file `.hopr-id-valencia`
+
+(**3**) Rename the file to `hopr-id-valencia.json`
+
+#### Importing the JSON file
+
+(**1**) Open Metamask and click on the accounts icon
+
+(**2**) Go to import accounts
+
+(**3**) Select `JSON file` on the dropdown list
+
+(**4**) Browse through your files and select the renamed `.json` identity file.
+
+(**5**) Click import, and you are all done!
+
+You should now have your funds accessible in your new MetaMask account.

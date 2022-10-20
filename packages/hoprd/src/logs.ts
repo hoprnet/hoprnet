@@ -1,6 +1,5 @@
 import ws from 'ws'
 import { debug } from '@hoprnet/hopr-utils'
-import RunQueue from 'run-queue'
 
 export type Socket = ws
 
@@ -10,30 +9,7 @@ const debugLog = (msg) => debugBase('%o', msg)
 
 const MAX_MESSAGES_CACHED = 100
 
-class Queue {
-  private queue: RunQueue = undefined
-  private completed: boolean = false
-  private opts: {
-    maxConcurrency: number
-  } = undefined
-
-  constructor(opts) {
-    this.opts = opts
-    this.queue = new RunQueue(opts)
-  }
-  add(priority, job) {
-    if (this.completed) {
-      this.queue = new RunQueue(this.opts)
-      this.completed = false
-    }
-    this.queue.add(priority, job)
-  }
-  async run() {
-    this.queue.run().then(() => (this.completed = true))
-  }
-}
-
-const queue = new Queue({ maxConcurrency: 1 })
+// const queue = FIFO<any>()
 
 type Message = {
   type: 'log' | 'fatal-error' | 'status' | 'connected' | 'message'
@@ -92,17 +68,26 @@ export class LogStream {
     this._log(msg)
   }
 
-  logConnectedPeers(peers: string[]) {
-    const msg: Message = { type: 'connected', msg: peers.join(','), ts: new Date().toISOString() }
-    this._log(msg)
+  logConnectedPeers(peers: Iterable<string>) {
+    const it = peers[Symbol.iterator]()
+    let chunk = it.next()
+    let msg = ''
+
+    while (!chunk.done) {
+      msg += chunk.value
+      chunk = it.next()
+      if (!chunk.done) {
+        msg += ', '
+      }
+    }
+
+    this._log({ type: 'connected', msg, ts: new Date().toISOString() })
   }
 
   logMessage(...args: string[]) {
     const msg: Message = { type: 'message', msg: args.join(' '), ts: new Date().toISOString() }
     this._log(msg)
   }
-
-  startLoggingQueue = () => setInterval(() => queue.run(), 5000)
 
   _log(msg: Message) {
     debugLog(msg)

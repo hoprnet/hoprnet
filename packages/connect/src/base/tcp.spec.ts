@@ -1,17 +1,15 @@
 import { createServer, type Socket, type AddressInfo } from 'net'
 import { setTimeout } from 'timers/promises'
 
-import { SOCKET_CLOSE_TIMEOUT, TCPConnection } from './tcp.js'
+import { TCPConnection } from './tcp.js'
 import { once } from 'events'
 import { Multiaddr } from '@multiformats/multiaddr'
-import { u8aEquals, defer, privKeyToPeerId } from '@hoprnet/hopr-utils'
+import { u8aEquals, defer } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import type { EventEmitter } from 'events'
 
 import { waitUntilListening, stopNode } from './utils.spec.js'
 import { Writable } from 'stream'
-
-const peerId = privKeyToPeerId('0xe89695ba0c247b14fc552367d9f92f598b4308782e2ce09396fcd0f1bafcc397')
 
 describe('test TCP connection', function () {
   it('should test TCPConnection against Node.js APIs', async function () {
@@ -32,8 +30,7 @@ describe('test TCP connection', function () {
     await waitUntilListening<undefined | number>(server, undefined)
 
     const conn = await TCPConnection.create(
-      new Multiaddr(`/ip4/127.0.0.1/tcp/${(server.address() as AddressInfo).port}`),
-      peerId
+      new Multiaddr(`/ip4/127.0.0.1/tcp/${(server.address() as AddressInfo).port}`)
     )
 
     await conn.sink(
@@ -50,9 +47,9 @@ describe('test TCP connection', function () {
 
     conn.close()
 
-    await once(conn.conn as EventEmitter, 'close')
+    await once(conn.socket as EventEmitter, 'close')
 
-    assert(conn.conn.destroyed)
+    assert(conn.socket.destroyed)
 
     assert(
       conn.timeline.close != undefined &&
@@ -65,51 +62,73 @@ describe('test TCP connection', function () {
   })
 
   it('trigger a socket close timeout', async function () {
+    const SOCKET_CLOSE_TIMEOUT = 1000
+
     this.timeout(SOCKET_CLOSE_TIMEOUT + 2e3)
 
-    const testMessage = new TextEncoder().encode('test')
+    // test server with tweaked behavior
+    const testServer = createServer()
+    const testMessage = new TextEncoder().encode('test message')
 
-    const server = createServer()
-
-    server.on('close', console.log)
-    server.on('error', console.log)
     const sockets: Socket[] = []
-    server.on('connection', sockets.push.bind(sockets))
+    testServer.on('connection', (socket: Socket) => {
+      // Handle incoming data
+      socket.on('data', (data) => {
+        assert(u8aEquals(data, testMessage))
+      })
+      sockets.push(socket)
+    })
 
-    await waitUntilListening(server, undefined)
+    // make testServer listen at a random port
+    await waitUntilListening<Socket>(testServer, undefined as any)
 
     const conn = await TCPConnection.create(
-      new Multiaddr(`/ip4/127.0.0.1/tcp/${(server.address() as AddressInfo).port}`),
-      peerId
+      new Multiaddr(`/ip4/127.0.0.1/tcp/${(testServer.address() as AddressInfo).port}`),
+      {
+        closeTimeout: 1000
+      }
     )
 
-    await conn.sink(
+    conn.sink(
       (async function* () {
-        yield testMessage
+        while (true) {
+          yield testMessage
+          await setTimeout(10)
+        }
       })()
     )
 
-    const start = Date.now()
-    const closePromise = once(conn.conn, 'close')
-
-    // Overwrite end method to mimic half-open stream
-    Object.assign(conn.conn, {
-      end: () => {}
+    const destroy = conn.socket.destroy.bind(conn.socket)
+    Object.assign(conn.socket, {
+      destroy: () => {}
     })
+
+    const start = Date.now()
+    const closePromise = once(conn.socket, 'close')
 
     // @dev produces a half-open socket on the other side
     conn.close()
 
+    assert(conn.closed === true, `Connection must be marked closed`)
+
+    // Wait some time before restoring `destroy()` method
+    await setTimeout(SOCKET_CLOSE_TIMEOUT / 2)
+
+    Object.assign(conn.socket, {
+      destroy
+    })
+
+    // Now that `destroy()` method has been restored, await `close` event
     await closePromise
 
-    // Destroy half-open sockets.
+    // Destroy all sockets of testServer
     for (const socket of sockets) {
       socket.destroy()
     }
 
-    await stopNode(server)
+    await stopNode(testServer)
 
-    assert(Date.now() - start >= SOCKET_CLOSE_TIMEOUT)
+    assert(Date.now() - start >= SOCKET_CLOSE_TIMEOUT, `should not timeout earlier than configured timeout`)
 
     assert(
       conn.timeline.close != undefined &&
@@ -124,7 +143,7 @@ describe('test TCP connection', function () {
 
     await assert.rejects(
       async () => {
-        await TCPConnection.create(new Multiaddr(`/ip4/127.0.0.1/tcp/${INVALID_PORT}`), peerId)
+        await TCPConnection.create(new Multiaddr(`/ip4/127.0.0.1/tcp/${INVALID_PORT}`))
       },
       {
         name: 'Error',
@@ -154,10 +173,8 @@ describe('test TCP connection', function () {
 
     const conn = await TCPConnection.create(
       new Multiaddr(`/ip4/127.0.0.1/tcp/${(server.address() as AddressInfo).port}`),
-      peerId,
       {
-        signal: abort.signal,
-        upgrader: undefined as any
+        signal: abort.signal
       }
     )
 
@@ -205,7 +222,7 @@ describe('test TCP connection - socket errors', function () {
       })
     })
 
-    const conn = TCPConnection.fromSocket(socket as Socket, peerId)
+    const conn = TCPConnection.fromSocket(socket as Socket)
 
     await conn.sink(
       (async function* (): AsyncIterable<Uint8Array> {

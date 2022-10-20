@@ -10,8 +10,15 @@ import {
 
 import { networkInterfaces, type NetworkInterfaceInfo } from 'os'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import { Multiaddr } from '@multiformats/multiaddr'
+import { Multiaddr, protocols } from '@multiformats/multiaddr'
 
+const CODE_P2P = protocols('p2p').code
+const CODE_IP4 = protocols('ip4').code
+const CODE_IP6 = protocols('ip6').code
+const CODE_DNS4 = protocols('dns4').code
+const CODE_DNS6 = protocols('dns6').code
+const CODE_CIRCUIT = protocols('p2p-circuit').code
+const CODE_TCP = protocols('tcp').code
 /**
  * Checks if given address is any address
  * @param address ip address to check
@@ -297,8 +304,38 @@ export function getLocalHosts(_iface?: string): Network[] {
 /**
  * Create a multiaddress that is a circuit address using given relay to the given destination.
  * @param relay Relay peer ID
- * @param destination Destination peer ID
  */
-export function createCircuitAddress(relay: PeerId, destination: PeerId) {
-  return new Multiaddr(`/p2p/${relay.toString()}/p2p-circuit/p2p/${destination.toString()}`)
+export function createCircuitAddress(relay: PeerId): Multiaddr {
+  // equivalent to `return new Multiaddr(`/p2p/${relay.toString()}/p2p-circuit`)`
+  return new Multiaddr(Uint8Array.from([165, 3, 39, ...relay.toBytes(), 162, 2]))
+}
+
+/**
+ * Checks known direct and circuit addresses if they end with `/p2p/<PEER_ID>`
+ *
+ * If not a known address, use generic but expensive Multiaddr function
+ *
+ * Used to filter addresses that get stored into libp2p's peer-store
+ *
+ * @param ma Multiaddr to check
+ * @returns
+ */
+export function isAddressWithPeerId(ma: Multiaddr) {
+  const tuples = ma.tuples()
+
+  switch (tuples[0][0]) {
+    case CODE_IP4:
+    case CODE_IP6:
+    case CODE_DNS4:
+    case CODE_DNS6:
+    case CODE_P2P:
+      switch (tuples[1][0]) {
+        case CODE_TCP:
+        case CODE_CIRCUIT:
+          return tuples.length == 3 && tuples[2][0] == CODE_P2P
+      }
+
+    default:
+      return ma.getPeerId() != undefined
+  }
 }

@@ -43,6 +43,9 @@ import { BigNumber, type Contract, errors } from 'ethers'
 import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants.js'
 import type { TypedEvent, TypedEventFilter } from '@hoprnet/hopr-ethereum'
 
+// @ts-ignore untyped library
+import retimer from 'retimer'
+
 const log = debug('hopr-core-ethereum:indexer')
 const verbose = debug('hopr-core-ethereum:verbose:indexer')
 
@@ -58,6 +61,7 @@ const backoffOption: Parameters<typeof retryWithBackoffThenThrow>[1] = { maxDela
 class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   public status: IndexerStatus = IndexerStatus.STOPPED
   public latestBlock: number = 0 // latest known on-chain block number
+  public startupBlock: number = 0 // blocknumber at which the indexer starts
 
   // Use FIFO + sliding window for many events
   private unconfirmedEvents: FIFO<TypedEvent<any, any>>
@@ -101,6 +105,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     ])
 
     this.latestBlock = latestOnChainBlock
+    this.startupBlock = latestOnChainBlock
 
     log('Latest saved block %d', latestSavedBlock)
     log('Latest on-chain block %d', latestOnChainBlock)
@@ -110,7 +115,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     if (fromBlock - this.maxConfirmations > 0) {
       fromBlock = fromBlock - this.maxConfirmations
     }
-    // no need to query before HoprChannels existed
+    // no need to query before HoprChannels or HoprNetworkRegistry existed
     fromBlock = Math.max(fromBlock, this.genesisBlock)
 
     log('Starting to index from block %d, sync progress 0%%', fromBlock)
@@ -121,7 +126,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     // and feeds them to the event listener
     ;(async function (this: Indexer) {
       for await (const block of orderedBlocks.iterator()) {
-        await this.onNewBlock(block.value, true, true) // exceptions are handled
+        await this.onNewBlock(block.value, true, true) // exceptions are handled (for real)
       }
     }.call(this))
 
@@ -508,7 +513,17 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       let res: Awaited<ReturnType<Indexer['getEvents']>>
 
       for (let i = 0; i < RETRIES; i++) {
-        res = await this.getEvents(currentBlock, currentBlock, true)
+        log(
+          `fetchEvents at currentBlock ${currentBlock} startupBlock ${this.startupBlock} maxConfirmations ${
+            this.maxConfirmations
+          }. ${currentBlock > this.startupBlock + this.maxConfirmations}`
+        )
+        if (currentBlock > this.startupBlock) {
+          // between starting block "Latest on-chain block" and finality + 1 to prevent double processing of events in blocks ["Latest on-chain block" - maxConfirmations, "Latest on-chain block"]
+          res = await this.getEvents(currentBlock, currentBlock, true)
+        } else {
+          res = await this.getEvents(currentBlock, currentBlock, false)
+        }
 
         if (res.success) {
           this.onNewEvents(res.events)
@@ -521,7 +536,11 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       }
     }
 
-    await this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot, blocking)
+    try {
+      await this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot, blocking)
+    } catch (err) {
+      log(`error while processing unconfirmed events`, err)
+    }
 
     // resend queuing transactions, when there are transactions (in queue) that haven't been accepted by the RPC
     // and resend transactions if the current balance is sufficient.
@@ -782,8 +801,14 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdated'>, lastSnapshot: Snapshot): Promise<void> {
-    log('channel-updated for hash %s', event.transactionHash)
-    const channel = await ChannelEntry.fromSCEvent(event, this.getPublicKeyOf.bind(this))
+    let channel: ChannelEntry
+    try {
+      log('channel-updated for hash %s', event.transactionHash)
+      channel = await ChannelEntry.fromSCEvent(event, this.getPublicKeyOf.bind(this))
+    } catch (err) {
+      log(`fatal error: failed to construct new ChannelEntry from the SC event`, err)
+      return
+    }
 
     let prevState: ChannelEntry
     try {
@@ -941,23 +966,26 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     throw new Error('Could not find public key for address - have they announced? -' + address.toHex())
   }
 
-  public async getAddressesAnnouncedOnChain(): Promise<Multiaddr[]> {
-    return (await this.db.getAccounts()).map((account: AccountEntry) => account.multiAddr)
+  public async *getAddressesAnnouncedOnChain() {
+    for await (const account of this.db.getAccountsIterable()) {
+      yield account.multiAddr
+    }
   }
 
   public async getPublicNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
-    const accounts = await this.db.getAccounts((account: AccountEntry) => account.containsRouting)
+    const result: { id: PeerId; multiaddrs: Multiaddr[] }[] = []
+    let out = `Known public nodes:\n`
 
-    const result: { id: PeerId; multiaddrs: Multiaddr[] }[] = Array.from({ length: accounts.length })
-
-    log(`Known public nodes:`)
-    for (const [index, account] of accounts.entries()) {
-      result[index] = {
+    for await (const account of this.db.getAccountsIterable((account: AccountEntry) => account.containsRouting)) {
+      out += `  - ${account.getPeerId().toString()} ${account.multiAddr.toString()}\n`
+      result.push({
         id: account.getPeerId(),
         multiaddrs: [account.multiAddr]
-      }
-      log(`\t${account.getPeerId().toString()} ${account.multiAddr.toString()}`)
+      })
     }
+
+    // Remove last `\n`
+    log(out.substring(0, out.length - 1))
 
     return result
   }
@@ -995,34 +1023,45 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     deferred.promise = new Promise<string>((resolve, reject) => {
       let done = false
+      let timer: any
+
       deferred.reject = () => {
         if (done) {
           return
         }
+        timer?.clear()
         done = true
+
         this.removeListener(eventType, deferred.resolve)
         log('listener %s on %s is removed due to error', eventType, tx)
         setImmediate(resolve, tx)
       }
 
-      setTimeout(() => {
-        if (done) {
-          return
-        }
-        done = true
-        // remove listener but throw now error
-        this.removeListener(eventType, deferred.resolve)
-        log('listener %s on %s timed out and thus removed', eventType, tx)
-        setImmediate(reject, tx)
-      }, INDEXER_TIMEOUT)
+      timer = retimer(
+        () => {
+          if (done) {
+            return
+          }
+          timer?.clear()
+          done = true
+          // remove listener but throw now error
+          this.removeListener(eventType, deferred.resolve)
+          log('listener %s on %s timed out and thus removed', eventType, tx)
+          setImmediate(reject, tx)
+        },
+        INDEXER_TIMEOUT,
+        `Timeout while indexer waiting for confirming transaction ${tx}`
+      )
 
       deferred.resolve = () => {
         if (done) {
           return
         }
+        timer?.clear()
         done = true
+
         this.removeListener(eventType, deferred.resolve)
-        log('listener %s on %s is removed', eventType, tx)
+        log('listener %s on %s is resolved and thus removed', eventType, tx)
 
         setImmediate(resolve, tx)
       }

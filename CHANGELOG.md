@@ -2,6 +2,9 @@
 
 <a name="1.91"></a>
 
+- Include HOPR Staking Season 5 smart contracts ([#4221](https://github.com/hoprnet/hoprnet/pull/4221))
+- Various optimizations of Rust crates ([#4221](https://github.com/hoprnet/hoprnet/pull/4260))
+
 ---
 
 <a name="1.90"></a>
@@ -9,6 +12,22 @@
 ## [1.90](https://github.com/hoprnet/hoprnet/compare/release/paleochora...hoprnet:release/valencia)
 
 - Improve Network Registry smart contract to allow 1-to-many node registration, add enable/disable make targets ([#4008](https://github.com/hoprnet/hoprnet/pull/4091))
+- Replace `yarn` with `npx` in `pluto` Docker image to run `hoprd` to fix binary discoverability issue
+- Add support for communication between different releases within the same environment
+- Avado: limit Docker container memory to maximum 1GB
+- Reduce memory copy operations by reusing underlying memory pages ([#4168](https://github.com/hoprnet/hoprnet/pull/4168))
+- Fix public node resolution for connectivity indicator ([#4205]https://github.com/hoprnet/hoprnet/pull/4205)
+- Remove charset complexity validation on API token ([#4210](https://github.com/hoprnet/hoprnet/pull/4210))
+- Properly encode API token passed from the Admin UI ([#4210](https://github.com/hoprnet/hoprnet/pull/4210))
+- Refactor timeouts for more throughput and increase usage of iterables ([#4238](https://github.com/hoprnet/hoprnet/pull/4238))
+- Fix incoming channels being listed as outgoing and vice versa in API ([#4236](https://github.com/hoprnet/hoprnet/pull/4236))
+- Refactor packet forward interaction for less locking ([#4232](https://github.com/hoprnet/hoprnet/pull/4243))
+- Refactor mixer to migitate backpressure ([#4232](https://github.com/hoprnet/hoprnet/pull/4243))
+- Filter addresses before adding them to libp2p's PeerStore ([#4246](https://github.com/hoprnet/hoprnet/pull/4246))
+- Reuse existing connections to establish relayed connections over public relay ([#4245](https://github.com/hoprnet/hoprnet/pull/4245))
+- Reuse existing connections to connections to entry nodes ([#4250](https://github.com/hoprnet/hoprnet/pull/4250))
+- Remove recurring DHT ping queue cleanup and turn all public relay nodes into DHT servers ([#4247](https://github.com/hoprnet/hoprnet/pull/4247))
+- Various enhancements regarding memory consumption and overall efficiency, spread over multiple PRs
 
 ---
 
@@ -54,6 +73,7 @@
 - Changed `release/paleochora` default environment to `monte_rosa` in preparation of next release
 - Fix broken package link in Avado ([#4082](https://github.com/hoprnet/hoprnet/pull/4082))
 - Automate contract verification on Gnosis chain and Goerli testnet.
+- Add support for communication between different releases within the same environment
 
 # Breaking changes
 
@@ -90,7 +110,7 @@ Bump `libp2p@0.37` which came with many bugfixes, plenty of internal API changes
 - Automatically cleanup stale connections to correctly handle reconnects ([#3688](https://github.com/hoprnet/hoprnet/pull/3688))
 - Add `--provider` flag for setting a custom blockchain RPC provider
 - Use a default address sorter for all address classes ([#3731](https://github.com/hoprnet/hoprnet/pull/3731))
-- Enhance TCP socket listening logic and cleanup keepAlice interval ([#3750](https://github.com/hoprnet/hoprnet/pull/3750))
+- Enhance TCP socket listening logic and cleanup keepAlive interval ([#3750](https://github.com/hoprnet/hoprnet/pull/3750))
 - Try to reconnect to entry nodes after connection has been dropped ([#3751](https://github.com/hoprnet/hoprnet/pull/3751))
 - Unhandled rejection in relay requests ([#3779](https://github.com/hoprnet/hoprnet/pull/3779))
 - Ping & DHT query timeout increased ([#3780](https://github.com/hoprnet/hoprnet/pull/3780))

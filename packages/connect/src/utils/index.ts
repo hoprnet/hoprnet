@@ -1,4 +1,4 @@
-import type { Stream, StreamType } from '../types.js'
+import type { StreamType } from '../types.js'
 import type { AddressInfo, Server as TCPServer } from 'net'
 import type { Socket as UDPSocket } from 'dgram'
 import type { Connection, MultiaddrConnection } from '@libp2p/interface-connection'
@@ -9,6 +9,7 @@ import { isAnyAddress } from '@hoprnet/hopr-utils'
 
 import { Multiaddr } from '@multiformats/multiaddr'
 import { CODE_CIRCUIT, CODE_P2P } from '../constants.js'
+import { type Uint8ArrayList, isUint8ArrayList } from 'uint8arraylist'
 
 export * from './addrs.js'
 export * from './addressSorters.js'
@@ -20,40 +21,45 @@ function isAsyncStream<T>(iterator: AsyncIterable<T> | Iterable<T>): iterator is
   }
   return false
 }
+
+type SourceType = StreamType | Uint8ArrayList | Buffer | string
+
 /**
  * Converts messages of a stream into Uint8Arrays.
  * @param source a stream
  * @returns a stream of Uint8Arrays
  */
-type SourceType = StreamType | string
-export type toU8aStream = ((source: AsyncIterator<SourceType>) => AsyncIterable<StreamType>) &
-  ((source: Iterable<SourceType>) => Iterable<StreamType>)
-
-export function toU8aStream(source: Stream<StreamType | string>['source']): Stream['source'] {
-  if (isAsyncStream(source)) {
+export function toU8aStream<K extends AsyncIterable<SourceType> | Iterable<SourceType>>(
+  source: K
+): K extends Iterable<any> ? Iterable<Uint8Array> : AsyncIterable<Uint8Array> {
+  if (isAsyncStream<SourceType>(source)) {
     return (async function* () {
       for await (const msg of source) {
         if (typeof msg === 'string') {
           yield new TextEncoder().encode(msg)
         } else if (Buffer.isBuffer(msg)) {
-          yield msg
-        } else {
+          yield new Uint8Array(msg.buffer, msg.byteOffset, msg.byteLength)
+        } else if (isUint8ArrayList(msg)) {
           yield msg.slice()
+        } else {
+          yield msg
         }
       }
-    })()
+    })() as any // Typescript limitation
   } else {
     return (function* () {
-      for (const msg of source) {
+      for (const msg of source as Iterable<SourceType>) {
         if (typeof msg === 'string') {
           yield new TextEncoder().encode(msg)
         } else if (Buffer.isBuffer(msg)) {
-          yield msg
-        } else {
+          yield new Uint8Array(msg.buffer, msg.byteOffset, msg.byteLength)
+        } else if (isUint8ArrayList(msg)) {
           yield msg.slice()
+        } else {
+          yield msg
         }
       }
-    })()
+    })() as any // Typescript limitation
   }
 }
 
@@ -64,9 +70,9 @@ export function toU8aStream(source: Stream<StreamType | string>['source']): Stre
  * @param iterator an async iterator
  * @returns given iterator that eagerly fetches messages
  */
-export type eagerIterator<T> = ((iterator: AsyncIterable<T>) => AsyncIterable<T>) &
-  ((iterator: Iterable<T>) => Iterable<T>)
-export function eagerIterator<T>(iterator: AsyncIterable<T> | Iterable<T>): AsyncIterable<T> | Iterable<T> {
+export function eagerIterator<T, K extends Iterable<T> | AsyncIterable<T>>(
+  iterator: K
+): K extends Iterable<any> ? Iterable<T> : AsyncIterable<T> {
   let _iterator: Iterator<T> | AsyncIterator<T>
 
   let received: IteratorResult<T>
@@ -85,7 +91,7 @@ export function eagerIterator<T>(iterator: AsyncIterable<T> | Iterable<T>): Asyn
         result = _iterator.next()
         yield received.value
       }
-    })()
+    })() as any // Typescript limitation
   } else {
     _iterator = (iterator as Iterable<T>)[Symbol.iterator]()
 
@@ -100,7 +106,7 @@ export function eagerIterator<T>(iterator: AsyncIterable<T> | Iterable<T>): Asyn
         result = _iterator.next()
         yield received.value
       }
-    })()
+    })() as any // Typescript limitation
   }
 }
 
@@ -110,7 +116,7 @@ export function eagerIterator<T>(iterator: AsyncIterable<T> | Iterable<T>): Asyn
  * @param addr a Node.js address instance
  * @returns
  */
-export function nodeToMultiaddr(addr: AddressInfo, peerId: PeerId | undefined): Multiaddr {
+export function nodeToMultiaddr(addr: AddressInfo): Multiaddr {
   let address: string
   let family: 4 | 6
   switch (addr.family) {
@@ -147,10 +153,6 @@ export function nodeToMultiaddr(addr: AddressInfo, peerId: PeerId | undefined): 
     'tcp'
   )
 
-  if (peerId != undefined) {
-    ma = ma.encapsulate(`/p2p/${peerId.toString()}`)
-  }
-
   return ma
 }
 
@@ -162,21 +164,9 @@ export function nodeToMultiaddr(addr: AddressInfo, peerId: PeerId | undefined): 
  * @param opts host and port to bind to
  * @returns a Promise that resolves once the socket is bound
  */
-export type bindToPort = ((
-  protocol: 'TCP',
-  socket: TCPServer,
-  logError: (...args: any[]) => void,
-  opts?: { host?: string; port: number }
-) => Promise<void>) &
-  ((
-    protocol: 'UDP',
-    socket: UDPSocket,
-    logError: (...args: any[]) => void,
-    opts?: { host?: string; port: number }
-  ) => Promise<void>)
-export function bindToPort(
-  protocol: 'UDP' | 'TCP',
-  socket: TCPServer | UDPSocket,
+export function bindToPort<T extends 'UDP' | 'TCP'>(
+  protocol: T,
+  socket: T extends 'TCP' ? TCPServer : UDPSocket,
   logError: (...args: any[]) => void,
   opts?: { host?: string; port: number }
 ): Promise<void> {
@@ -253,7 +243,7 @@ export async function attemptClose(
 export function relayFromRelayAddress(ma: Multiaddr): PeerId {
   const tuples = ma.tuples() as [code: number, addr: Uint8Array][]
 
-  if (tuples.length != 3 || tuples[0][0] != CODE_P2P || tuples[1][0] != CODE_CIRCUIT || tuples[2][0] != CODE_P2P) {
+  if (tuples.length < 2 || tuples[0][0] != CODE_P2P || tuples[1][0] != CODE_CIRCUIT) {
     throw Error(`Cannot extract relay from non-relay address. Given address ${ma.toString()}`)
   }
 

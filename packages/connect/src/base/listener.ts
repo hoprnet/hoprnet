@@ -20,7 +20,12 @@ import { Multiaddr } from '@multiformats/multiaddr'
 import { isAnyAddress, u8aEquals, defer } from '@hoprnet/hopr-utils'
 
 import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP } from '../constants.js'
-import type { PeerStoreType, HoprConnectOptions, HoprConnectTestingOptions } from '../types.js'
+import {
+  type PeerStoreType,
+  type HoprConnectOptions,
+  type HoprConnectTestingOptions,
+  PeerConnectionType
+} from '../types.js'
 import { handleStunRequest, getExternalIp } from './stun.js'
 import { getAddrs } from './addrs.js'
 import { TCPConnection } from './tcp.js'
@@ -100,9 +105,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       // hopr-connect does not enable IPv6 connections right now, therefore we can set `listeningAddrs` statically
       // to `/ip4/0.0.0.0/tcp/0`, meaning listening on IPv4 using a canonical port
       // TODO check IPv6
-      this.connectComponents
-        .getAddressFilter()
-        .setAddrs(this.getAddrs(), [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${this.components.getPeerId().toString()}`)])
+      this.connectComponents.getAddressFilter().setAddrs(this.getAddrs(), [new Multiaddr(`/ip4/0.0.0.0/tcp/0`)])
 
       const usedRelays = this.connectComponents.getEntryNodes().getUsedRelayAddresses()
 
@@ -324,20 +327,15 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       }
 
       this.addrs.external = [
-        nodeToMultiaddr(
-          {
-            address: natSituation.externalAddress,
-            port: natSituation.externalPort,
-            family: 'IPv4'
-          },
-          this.components.getPeerId()
-        )
+        nodeToMultiaddr({
+          address: natSituation.externalAddress,
+          port: natSituation.externalPort,
+          family: 'IPv4'
+        })
       ]
     }
 
-    this.addrs.interface = internalInterfaces.map((internalInterface) =>
-      nodeToMultiaddr(internalInterface, this.components.getPeerId())
-    )
+    this.addrs.interface = internalInterfaces.map(nodeToMultiaddr)
 
     this.attachSocketHandlers()
 
@@ -352,11 +350,9 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     if (this.testingOptions.__runningLocally || natSituation.bidirectionalNAT || !natSituation.isExposed) {
       this.connectComponents.getEntryNodes().on(RELAY_CHANGED_EVENT, this._emitListening)
 
-      // Finish startup
-      this.connectComponents.getEntryNodes().start()
-
-      // Initiate update but don't await its result
-      this.connectComponents.getEntryNodes().updatePublicNodes()
+      // Instructs entry node manager to assign to available
+      // entry once startup has finished
+      this.connectComponents.getEntryNodes().enable()
     }
 
     this.state = ListenerState.LISTENING
@@ -431,7 +427,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     let maConn: TCPConnection | undefined
 
     try {
-      maConn = TCPConnection.fromSocket(socket, this.components.getPeerId())
+      maConn = TCPConnection.fromSocket(socket)
     } catch (err: any) {
       error(`inbound connection failed. ${err.message}`)
     }
@@ -447,10 +443,19 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     try {
       conn = await this.components.getUpgrader().upgradeInbound(maConn)
     } catch (err: any) {
-      if (err.code === 'ERR_ENCRYPTION_FAILED') {
-        error(`inbound connection failed because encryption failed. Maybe connected to the wrong node?`)
+      if (!err) {
+        error('inbound connection failed. empty error')
       } else {
-        error('inbound connection failed', err)
+        switch (err.code) {
+          case 'ERR_CONNECTION_INTERCEPTED':
+            error(`inbound connection failed. Node is not registered.`)
+            break
+          case 'ERR_ENCRYPTION_FAILED':
+            error(`inbound connection failed because encryption failed. Maybe connected to the wrong node?`)
+            break
+          default:
+            error('inbound connection failed', err)
+        }
       }
 
       if (maConn != undefined) {
@@ -460,21 +465,10 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       return
     }
 
-    for (const peer of this.connectComponents.getEntryNodes().getUsedRelayPeerIds()) {
-      if (peer.equals(conn.remotePeer)) {
-        // Make sure that Multiaddr contains a PeerId
-        const maWithPeerId = maConn.remoteAddr
-          .decapsulateCode(CODE_P2P)
-          .encapsulate(`/p2p/${conn.remotePeer.toString()}`)
-
-        ;(maConn.conn as TCPSocket).on('close', () => {
-          if (maConn!.closed) {
-            return
-          }
-
-          this.connectComponents.getEntryNodes()._onEntryNodeDisconnect!(maWithPeerId)
-        })
-      }
+    if (conn.tags) {
+      conn.tags.push(PeerConnectionType.DIRECT)
+    } else {
+      conn.tags = [PeerConnectionType.DIRECT]
     }
 
     log('inbound connection %s upgraded', maConn.remoteAddr)

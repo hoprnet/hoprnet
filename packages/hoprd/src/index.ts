@@ -1,9 +1,14 @@
-import { passwordStrength } from 'check-password-strength'
 import path from 'path'
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 
-import { loadJson, NativeBalance, SUGGESTED_NATIVE_BALANCE, get_package_version } from '@hoprnet/hopr-utils'
+import {
+  loadJson,
+  NativeBalance,
+  SUGGESTED_NATIVE_BALANCE,
+  get_package_version,
+  setupPromiseRejectionFilter
+} from '@hoprnet/hopr-utils'
 import {
   default as Hopr,
   type HoprOptions,
@@ -309,33 +314,9 @@ async function addUnhandledPromiseRejectionHandler() {
     })
   }
 
-  // See https://github.com/hoprnet/hoprnet/issues/3755
-  process.on('unhandledRejection', (reason: any, _promise: Promise<any>) => {
-    if (reason && reason.message && reason.message.toString) {
-      const msgString = reason.toString()
-
-      // Only silence very specific errors
-      if (
-        // HOPR uses the `stream-to-it` library to convert streams from Node.js sockets
-        // to async iterables. This library has shown to have issues with runtime errors,
-        // mainly ECONNRESET and EPIPE
-        msgString.match(/read ETIMEDOUT/) ||
-        msgString.match(/read ECONNRESET/) ||
-        msgString.match(/write ETIMEDOUT/) ||
-        msgString.match(/write ECONNRESET/) ||
-        msgString.match(/write EPIPE/) ||
-        // Requires changes in libp2p, tbd in upstream PRs to libp2p
-        msgString.match(/The operation was aborted/)
-      ) {
-        console.error('Unhandled promise rejection silenced')
-        return
-      }
-    }
-
-    console.warn('UnhandledPromiseRejectionWarning')
-    console.log(reason)
-    process.exit(1)
-  })
+  // Filter specific known promise rejection that cannot be handled for
+  // one reason or the other
+  setupPromiseRejectionFilter()
 }
 
 async function main() {
@@ -389,13 +370,7 @@ async function main() {
     if (argv.apiToken == null) {
       throw Error(`Must provide --apiToken when --api is specified`)
     }
-    const { contains: hasSymbolTypes, length }: { contains: string[]; length: number } = passwordStrength(argv.apiToken)
-    for (const requiredSymbolType of ['uppercase', 'lowercase', 'symbol', 'number']) {
-      if (!hasSymbolTypes.includes(requiredSymbolType)) {
-        throw new Error(`API token must include a ${requiredSymbolType}`)
-      }
-    }
-    if (length < 8) {
+    if (argv.apiToken.length < 8) {
       throw new Error(`API token must be at least 8 characters long`)
     }
   }

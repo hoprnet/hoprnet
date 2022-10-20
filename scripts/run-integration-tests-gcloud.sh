@@ -98,7 +98,7 @@ fi
 
 # create test specific instance template
 # announce on-chain with routable address
-gcloud_create_or_update_instance_template "${test_id}" \
+gcloud_create_instance_template "${test_id}" \
   "${docker_image}" \
   "${environment}" \
   "${api_token}" \
@@ -106,7 +106,7 @@ gcloud_create_or_update_instance_template "${test_id}" \
   "true"
 
 # create test specific instance template for NAT nodes
-gcloud_create_or_update_instance_template "${test_id}-nat" \
+gcloud_create_instance_template "${test_id}-nat" \
   "${docker_image_nat}" \
   "${environment}" \
   "${api_token}" \

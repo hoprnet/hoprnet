@@ -8,16 +8,19 @@ import type { RelayConnection } from '../relay/connection.js'
 import { randomBytes } from 'crypto'
 import { toU8aStream, encodeWithLengthPrefix, decodeWithLengthPrefix, eagerIterator } from '../utils/index.js'
 import { abortableSource } from 'abortable-iterator'
-import type {
-  StreamSink,
-  StreamResult,
-  StreamType,
-  StreamSource,
-  StreamSourceAsync,
-  HoprConnectTestingOptions
+import {
+  type StreamResult,
+  type StreamType,
+  type StreamSource,
+  type StreamSourceAsync,
+  type HoprConnectTestingOptions,
+  PeerConnectionType
 } from '../types.js'
 import assert from 'assert'
 import type { DialOptions } from '@libp2p/interface-transport'
+
+// @ts-ignore untyped library
+import retimer from 'retimer'
 
 const DEBUG_PREFIX = `hopr-connect`
 
@@ -97,32 +100,36 @@ type SinkEvent = PayloadEvent | SinkSourceAttachedEvent | WebRTCInitFinishedEven
  * @dev the handover happens transparently for libp2p
  */
 class WebRTCConnection implements MultiaddrConnection {
-  // mutexes
-  private _switchPromise: DeferType<WebRTCInitFinishedEvent>
-  private _sinkSourceAttachedPromise: DeferType<SinkSourceAttachedEvent>
+  public state: {
+    // mutexes
+    _switchPromise: DeferType<WebRTCInitFinishedEvent>
+    _sinkSourceAttachedPromise: DeferType<SinkSourceAttachedEvent>
 
-  // ICE signalling is done, either with no direct
-  // connection possible or new direct connection is ready
-  // to take over
-  private _webRTCHandshakeFinished: boolean
+    // ICE signalling is done, either with no direct
+    // connection possible or new direct connection is ready
+    // to take over
+    _webRTCHandshakeFinished: boolean
 
-  private _sourceMigrated: boolean
-  private _sinkMigrated: boolean
+    _sourceMigrated: boolean
+    _sinkMigrated: boolean
 
-  public destroyed: boolean
+    destroyed: boolean
+    tags: PeerConnectionType[]
+
+    conn: RelayConnection | SimplePeer
+  }
+
   public remoteAddr: MultiaddrConnection['remoteAddr']
 
   private sinkCreator: Promise<void>
 
   // Endpoint for libp2p
-  public sink: StreamSink
   public source: StreamSourceAsync
 
   // Underlying connection. Always points the connection that
   // is currently used.
   // At start, this is a relayed connection. Once WebRTC connection
   // is ready, it points to the WebRTC instance
-  public conn: RelayConnection | SimplePeer
 
   private _id: string
 
@@ -130,50 +137,66 @@ class WebRTCConnection implements MultiaddrConnection {
   // @dev this is done using meta programming in libp2p
   public timeline: MultiaddrConnection['timeline']
 
+  private webRTCTimeout: any | undefined // untyped library
+
   constructor(
-    private relayConn: RelayConnection,
+    public relayConn: RelayConnection,
     private testingOptions: HoprConnectTestingOptions,
-    private options?: DialOptions
+    public options?: DialOptions
   ) {
-    this.conn = relayConn
+    this.state = {
+      destroyed: false,
+      _switchPromise: defer<WebRTCInitFinishedEvent>(),
+      _sinkSourceAttachedPromise: defer<SinkSourceAttachedEvent>(),
+      _webRTCHandshakeFinished: false,
 
-    this.destroyed = false
-    this._switchPromise = defer<WebRTCInitFinishedEvent>()
-    this._sinkSourceAttachedPromise = defer<SinkSourceAttachedEvent>()
-    this._webRTCHandshakeFinished = false
+      // Sink and source get migrated individually
+      _sourceMigrated: false,
+      _sinkMigrated: false,
+      // Initial state + fallback if WebRTC failed
+      tags: [PeerConnectionType.WEBRTC_RELAYED],
+      conn: relayConn
+    }
 
-    // Sink and source get migrated individually
-    this._sourceMigrated = false
-    this._sinkMigrated = false
-
-    this.remoteAddr = this.conn.remoteAddr
+    this.remoteAddr = this.relayConn.remoteAddr
 
     this.timeline = {
       open: Date.now()
     }
 
+    this.flow = this.flow.bind(this)
+    this.error = this.error.bind(this)
     // Give each WebRTC connection instance a unique identifier
     this._id = u8aToHex(randomBytes(4), false)
 
-    this.relayConn.getWebRTCInstance().on(
+    this.onWebRTCConnect = this.onWebRTCConnect.bind(this)
+    this.onWebRTCError = this.onWebRTCError.bind(this)
+
+    // @TODO fail if no WebRTC
+    this.relayConn.state.channel?.on(
       'error',
       // not supposed to produce any errors
-      this.onWebRTCError.bind(this)
+      this.onWebRTCError
     )
-    this.relayConn.getWebRTCInstance().once(
+    this.relayConn.state.channel?.once(
       'connect',
       // not supposed to produce any errors
-      this.onWebRTCConnect.bind(this)
+      this.onWebRTCConnect
     )
+
+    this.relayConn.state.channel?.once('close', () => {
+      this.state.destroyed = true
+      this.timeline.close ??= Date.now()
+    })
 
     // Attach a listener to WebRTC to cleanup state
     // and remove stale connection from internal libp2p state
     // once there is a disconnect, set magic *close* property in
     // timeline object
-    this.relayConn.getWebRTCInstance().on('iceStateChange', (iceConnectionState: string, iceGatheringState: string) => {
+    this.relayConn.state.channel?.on('iceStateChange', (iceConnectionState: string, iceGatheringState: string) => {
       if (iceConnectionState === 'disconnected' && iceGatheringState === 'complete') {
-        this.destroyed = true
-        this.timeline.close = this.timeline.close ?? Date.now()
+        this.state.destroyed = true
+        this.timeline.close ??= Date.now()
       }
     })
 
@@ -186,7 +209,19 @@ class WebRTCConnection implements MultiaddrConnection {
 
     // Sink is passed as function handle, so we need to explicitly bind
     // an environment to it.
-    this.sink = this._sink.bind(this)
+    this.sink = this.sink.bind(this)
+  }
+
+  public get tags() {
+    return this.state.tags
+  }
+
+  public set tags(value: PeerConnectionType[]) {
+    this.state.tags = value
+  }
+
+  public get conn() {
+    return this.state.conn
   }
 
   /**
@@ -196,14 +231,14 @@ class WebRTCConnection implements MultiaddrConnection {
    * @param source stream with messages to be sent to counterparty
    * @returns
    */
-  public _sink(source: StreamSource) {
-    setTimeout(this.onWebRTCError.bind(this), WEBRTC_UPGRADE_TIMEOUT).unref()
+  public sink(source: StreamSource) {
+    this.webRTCTimeout = retimer(this.onWebRTCError.bind(this), WEBRTC_UPGRADE_TIMEOUT)
 
     let deferred = defer<void>()
     this.sinkCreator.catch(deferred.reject)
-    this._sinkSourceAttachedPromise.resolve({
+    this.state._sinkSourceAttachedPromise.resolve({
       type: ConnectionEventTypes.SINK_SOURCE_ATTACHED,
-      value: async function* (this: WebRTCConnection) {
+      value: async function* (this: Pick<WebRTCConnection, 'options' | 'error'>) {
         try {
           yield* getAbortableSource(toU8aStream(source), this.options?.signal)
           deferred.resolve()
@@ -216,7 +251,10 @@ class WebRTCConnection implements MultiaddrConnection {
             deferred.reject(err)
           }
         }
-      }.call(this)
+      }.call({
+        options: this.options,
+        error: this.error
+      })
     })
 
     return deferred.promise
@@ -225,7 +263,7 @@ class WebRTCConnection implements MultiaddrConnection {
   /**
    * Log messages and add identity tag to distinguish multiple instances
    */
-  private log(..._: any[]) {
+  public log(..._: any[]) {
     _log(`WRTC [${this._id}]`, ...arguments)
   }
 
@@ -233,18 +271,18 @@ class WebRTCConnection implements MultiaddrConnection {
    * Log verbose messages and add identity tag to distinguish multiple instances
    */
   // @ts-ignore temporarily unused
-  private verbose(..._: any[]) {
+  public verbose(..._: any[]) {
     _verbose(`WRTC [${this._id}]`, ...arguments)
   }
 
   /**
    * Log errors and add identity tag to distinguish multiple instances
    */
-  private error(..._: any[]) {
+  public error(..._: any[]) {
     _error(`WRTC [${this._id}]`, ...arguments)
   }
 
-  private flow(..._: any[]) {
+  public flow(..._: any[]) {
     _flow(`WRTC [${this._id}]`, ...arguments)
   }
 
@@ -253,44 +291,49 @@ class WebRTCConnection implements MultiaddrConnection {
    * @param err pass error during WebRTC upgrade
    */
   private onWebRTCError(err?: any) {
-    if (this._webRTCHandshakeFinished) {
+    if (this.state._webRTCHandshakeFinished) {
       // Already handled, so nothing to do
       return
     }
-    this._webRTCHandshakeFinished = true
+    this.webRTCTimeout?.clear()
+    this.state._webRTCHandshakeFinished = true
 
     if (err) {
       this.error(`ending WebRTC upgrade due error: ${err}`)
     }
 
-    this._switchPromise.resolve({
+    this.state._switchPromise.resolve({
       type: ConnectionEventTypes.WEBRTC_INIT_FINISHED,
       value: WebRTCResult.UNAVAILABLE
     })
 
-    setImmediate(this.relayConn.getWebRTCInstance().destroy.bind(this.relayConn.getWebRTCInstance()))
+    // @TODO fail if no WebRTC instance
+    if (this.relayConn.state.channel) {
+      setImmediate(this.relayConn.state.channel.destroy.bind(this.relayConn.state.channel))
+    }
   }
 
   /**
    * Called once WebRTC was able to connect *directly* to counterparty
    */
   private async onWebRTCConnect() {
-    if (this._webRTCHandshakeFinished) {
+    if (this.state._webRTCHandshakeFinished) {
       // Already handled, so nothing to do
       return
     }
-    this._webRTCHandshakeFinished = true
+    this.webRTCTimeout?.clear()
+    this.state._webRTCHandshakeFinished = true
 
     // For testing, disable WebRTC upgrade
     // to test fallback connection in case of e.g.
     // bidirectional NATs
     if (this.testingOptions.__noWebRTCUpgrade) {
-      this._switchPromise.resolve({
+      this.state._switchPromise.resolve({
         type: ConnectionEventTypes.WEBRTC_INIT_FINISHED,
         value: WebRTCResult.UNAVAILABLE
       })
     } else {
-      this._switchPromise.resolve({
+      this.state._switchPromise.resolve({
         type: ConnectionEventTypes.WEBRTC_INIT_FINISHED,
         value: WebRTCResult.AVAILABLE
       })
@@ -326,7 +369,7 @@ class WebRTCConnection implements MultiaddrConnection {
           // this is important for sending webrtc signalling messages
           // even before payload messages are ready to send
           eagerIterator(
-            async function* (this: WebRTCConnection): StreamSource {
+            async function* (this: Pick<WebRTCConnection, 'state' | 'flow'>): StreamSource {
               let webRTCFinished = false
 
               let leave = false
@@ -339,12 +382,12 @@ class WebRTCConnection implements MultiaddrConnection {
 
                 // No source available, need to wait for it
                 if (source == undefined) {
-                  promises.push(this._sinkSourceAttachedPromise.promise)
+                  promises.push(this.state._sinkSourceAttachedPromise.promise)
                 }
 
                 // WebRTC handshake is not completed yet
                 if (!webRTCFinished) {
-                  promises.push(this._switchPromise.promise)
+                  promises.push(this.state._switchPromise.promise)
                 }
 
                 // Source already attached, wait for incoming messages
@@ -403,13 +446,16 @@ class WebRTCConnection implements MultiaddrConnection {
                 }
 
                 if (toYield != undefined) {
-                  //this.log(`sinking ${toYield.length} bytes into relayed connection`)
+                  // this.log(`sinking ${toYield.length} bytes into relayed connection`)
                   yield toYield
                 }
               }
               this.flow(`FLOW: webrtc sink: loop ended`)
               resolve(reasonToLeave as MigrationEvent | StreamEndedEvent)
-            }.call(this)
+            }.call({
+              flow: this.flow,
+              state: this.state
+            })
           )
         )
         // catch stream errors and forward them
@@ -427,74 +473,90 @@ class WebRTCConnection implements MultiaddrConnection {
         this.relayConn.sendUpgraded()
 
         // WebRTC handshake was successful, now using direct connection
-        this._sinkMigrated = true
-        if (this._sourceMigrated) {
+        this.state._sinkMigrated = true
+        if (this.state._sourceMigrated) {
           // Update state object once source *and* sink are migrated
-          this.conn = this.relayConn.getWebRTCInstance()
+          this.state.conn = this.relayConn.state.channel as SimplePeer
+          if (!this.tags.includes(PeerConnectionType.WEBRTC_DIRECT)) {
+            this.tags.push(PeerConnectionType.WEBRTC_DIRECT)
+          }
         }
-        await toIterable.sink(this.relayConn.getWebRTCInstance())(
-          async function* (this: WebRTCConnection): StreamSource {
-            let webRTCresult: PayloadEvent | SinkSourceAttachedEvent
-            let toYield: Uint8Array | undefined
-            let leave = false
+        try {
+          await toIterable.sink(this.relayConn.state.channel as SimplePeer)(
+            async function* (this: Pick<WebRTCConnection, 'state' | 'relayConn'>): StreamSource {
+              let webRTCresult: PayloadEvent | SinkSourceAttachedEvent
+              let toYield: Uint8Array | undefined
+              let leave = false
 
-            while (!leave) {
-              // If no source attached, wait until there is one,
-              // otherwise wait for messages
-              if (source == undefined) {
-                webRTCresult = await this._sinkSourceAttachedPromise.promise
-              } else {
-                if (sourcePromise == undefined) {
-                  advanceIterator()
-                }
-                webRTCresult = await (sourcePromise as Promise<PayloadEvent>)
-              }
-
-              switch (webRTCresult.type) {
-                case ConnectionEventTypes.SINK_SOURCE_ATTACHED:
-                  // Libp2p has started to send messages through this connection,
-                  // so forward these messages
-                  // @dev this can happen *before* or *after* WebRTC upgrade -
-                  //      or never!
-                  source = webRTCresult.value[Symbol.asyncIterator]()
-                  break
-                case ConnectionEventTypes.PAYLOAD:
-                  const received = webRTCresult.value
-
-                  // Anything can happen
-                  if (received.done || this.destroyed || this.relayConn.getWebRTCInstance().destroyed) {
-                    leave = true
-
-                    // WebRTC uses UDP, so we need to explicitly end the connection
-                    toYield = encodeWithLengthPrefix(Uint8Array.of(MigrationStatus.DONE))
-                    break
+              while (!leave) {
+                // If no source attached, wait until there is one,
+                // otherwise wait for messages
+                if (source == undefined) {
+                  webRTCresult = await this.state._sinkSourceAttachedPromise.promise
+                } else {
+                  if (sourcePromise == undefined) {
+                    advanceIterator()
                   }
+                  webRTCresult = await (sourcePromise as Promise<PayloadEvent>)
+                }
 
-                  /*this.log(
-                    `sinking ${received.value.slice().length} bytes into webrtc[${
-                      (this.relayConn.getWebRTCInstance() as any)._id
-                    }]`
-                  )*/
+                switch (webRTCresult.type) {
+                  case ConnectionEventTypes.SINK_SOURCE_ATTACHED:
+                    // Libp2p has started to send messages through this connection,
+                    // so forward these messages
+                    // @dev this can happen *before* or *after* WebRTC upgrade -
+                    //      or never!
+                    source = webRTCresult.value[Symbol.asyncIterator]()
+                    break
+                  case ConnectionEventTypes.PAYLOAD:
+                    const received = webRTCresult.value
 
-                  // WebRTC tends to send multiple messages in one chunk, so add a
-                  // length prefix to split messages when receiving them
-                  toYield = encodeWithLengthPrefix(
-                    Uint8Array.from([MigrationStatus.NOT_DONE, ...received.value.slice()])
-                  )
+                    // Anything can happen
+                    if (received.done || this.state.destroyed || this.relayConn.state.channel?.destroyed) {
+                      leave = true
 
-                  advanceIterator()
+                      // WebRTC uses UDP, so we need to explicitly end the connection
+                      toYield = encodeWithLengthPrefix(Uint8Array.of(MigrationStatus.DONE))
+                      break
+                    }
 
-                  break
-                default:
-                  throw Error(`Received invalid result. Got ${JSON.stringify(result)}`)
+                    // this.log(
+                    //   `sinking ${received.value.slice().length} bytes into webrtc[${
+                    //     (this.relayConn.state.channel as any)._id
+                    //   }]`
+                    // )
+
+                    // WebRTC tends to send multiple messages in one chunk, so add a
+                    // length prefix to split messages when receiving them
+                    toYield = encodeWithLengthPrefix(
+                      Uint8Array.from([MigrationStatus.NOT_DONE, ...received.value.subarray()])
+                    )
+
+                    advanceIterator()
+
+                    break
+                  default:
+                    throw Error(`Received invalid result. Got ${JSON.stringify(result)}`)
+                }
+
+                if (toYield != undefined) {
+                  yield toYield
+                }
               }
+            }.call({
+              state: this.state,
+              relayConn: this.relayConn
+            })
+          )
 
-              if (toYield != undefined) {
-                yield toYield
-              }
-            }
-          }.call(this)
-        )
+          // End the stream
+          this.relayConn.state.channel?.end()
+        } catch (err) {
+          this.error(`WebRTC sink err`, err)
+          // Initiates Connection object teardown
+          // by using meta programming
+          this.timeline.close ??= Date.now()
+        }
     }
   }
 
@@ -505,7 +567,7 @@ class WebRTCConnection implements MultiaddrConnection {
    * migration happenend, forward messages coming from WebRTC
    * instance.
    */
-  private async *createSource(): StreamSource {
+  private async *createSource(this: Pick<WebRTCConnection, 'state' | 'relayConn' | 'log'>): StreamSource {
     let migrated = false
 
     for await (const msg of this.relayConn.source) {
@@ -513,7 +575,7 @@ class WebRTCConnection implements MultiaddrConnection {
         continue
       }
 
-      const [migrationStatus, payload] = [msg.slice(0, 1), msg.slice(1)]
+      const [migrationStatus, payload] = [msg.subarray(0, 1), msg.subarray(1)]
 
       // Handle sub-protocol
       switch (migrationStatus[0] as MigrationStatus) {
@@ -521,7 +583,7 @@ class WebRTCConnection implements MultiaddrConnection {
           migrated = true
           break
         case MigrationStatus.NOT_DONE:
-          //this.log(`getting ${payload.length} bytes from relayed connection`)
+          // this.log(`getting ${payload.length} bytes from relayed connection`)
           yield payload
           break
         default:
@@ -539,7 +601,7 @@ class WebRTCConnection implements MultiaddrConnection {
     }
 
     // Wait for finish of WebRTC handshake
-    const result = await this._switchPromise.promise
+    const result = await this.state._switchPromise.promise
 
     switch (result.value) {
       // Anything can happen
@@ -547,24 +609,29 @@ class WebRTCConnection implements MultiaddrConnection {
         throw Error(`Fatal error: Counterparty migrated stream but WebRTC is not avaialable`)
       // Forward messages from WebRTC instance
       case WebRTCResult.AVAILABLE:
-        this._sourceMigrated = true
+        this.state._sourceMigrated = true
 
-        if (this._sinkMigrated) {
+        if (this.state._sinkMigrated) {
           // Update state object once sink *and* source are migrated
-          this.conn = this.relayConn.getWebRTCInstance()
+          this.state.conn = this.relayConn.state.channel as SimplePeer
+          if (!this.state.tags.includes(PeerConnectionType.WEBRTC_DIRECT)) {
+            this.state.tags.push(PeerConnectionType.WEBRTC_DIRECT)
+          }
         }
 
-        this.log(`webRTC source handover done. Using direct connection to peer ${this.remoteAddr.getPeerId()}`)
+        this.log(
+          `webRTC source handover done. Using direct connection to peer ${this.relayConn._counterparty.toString()}`
+        )
 
         let done = false
-        for await (const msg of this.relayConn.getWebRTCInstance()) {
+        for await (const msg of this.relayConn.state.channel as SimplePeer) {
           // WebRTC tends to bundle multiple message into one chunk,
           // so we need to encode messages and decode them before passing
           // to libp2p
-          const decoded = decodeWithLengthPrefix(msg.slice())
+          const decoded = decodeWithLengthPrefix(msg.subarray())
 
           for (const decodedMsg of decoded) {
-            const [finished, payload] = [decodedMsg.slice(0, 1), decodedMsg.slice(1)]
+            const [finished, payload] = [decodedMsg.subarray(0, 1), decodedMsg.subarray(1)]
 
             // WebRTC is based on UDP, so we need to explicitly end the connection
             if (finished[0] == MigrationStatus.DONE) {
@@ -573,7 +640,7 @@ class WebRTCConnection implements MultiaddrConnection {
               break
             }
 
-            //this.log(`Getting NOT_DONE from WebRTC - ${msg.length} bytes`)
+            // this.log(`Getting NOT_DONE from WebRTC - ${msg.length} bytes`)
             yield payload
           }
 
@@ -597,16 +664,17 @@ class WebRTCConnection implements MultiaddrConnection {
     if (err) {
       this.error(`Error while attempting to close stream to ${this.remoteAddr}: ${err}`)
     }
-    if (this.destroyed) {
+    if (this.state.destroyed) {
       return
     }
 
     // Tell libp2p that connection is closed
     this.timeline.close = Date.now()
-    this.destroyed = true
+    this.state.destroyed = true
 
     try {
-      this.relayConn.getWebRTCInstance().destroy()
+      // @TODO check if already closed
+      this.relayConn.state.channel?.destroy()
     } catch (e) {
       this.error(`Error while destroying WebRTC instance to ${this.remoteAddr}: ${e}`)
     }

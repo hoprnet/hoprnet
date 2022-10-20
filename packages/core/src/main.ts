@@ -12,7 +12,7 @@ import { keysPBM } from '@libp2p/crypto/keys'
 import type { AddressSorter, Address } from '@libp2p/interfaces/peer-store'
 
 import { HoprConnect, compareAddressesLocalMode, type PublicNodesEmitter } from '@hoprnet/hopr-connect'
-import { HoprDB, PublicKey, debug } from '@hoprnet/hopr-utils'
+import { HoprDB, PublicKey, debug, isAddressWithPeerId } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
 import Hopr, { type HoprOptions } from './index.js'
@@ -20,6 +20,7 @@ import { getAddrs } from './identity.js'
 import type AccessControl from './network/access-control.js'
 import { createLibp2pMock } from './libp2p.mock.js'
 import { NetworkPeersOrigin } from './network/network-peers.js'
+import { supportedEnvironments } from './environment.js'
 
 const log = debug(`hopr-core:create-hopr`)
 
@@ -74,6 +75,12 @@ export async function createLibp2pInstance(
     // Make libp2p aware of environments
     const protocolPrefix = `/hopr/${options.environment.id}`
 
+    // Collect supported environments and versions to be passed to HoprConnect
+    // because hopr-connect doesn't have access to the protocol config file
+    const supportedEnvironmentsInfo = supportedEnvironments().map((env) => {
+      return { id: env.id, versionRange: env.version_range }
+    })
+
     libp2p = await createLibp2p({
       peerId,
       addresses: { listen: getAddrs(peerId, options).map((x: Multiaddr) => x.toString()) },
@@ -84,6 +91,7 @@ export async function createLibp2pInstance(
             initialNodes,
             publicNodes,
             environment: options.environment.id,
+            supportedEnvironments: supportedEnvironmentsInfo,
             allowLocalConnections: options.allowLocalConnections,
             allowPrivateConnections: options.allowPrivateConnections,
             // Amount of nodes for which we are willing to act as a relay
@@ -109,7 +117,17 @@ export async function createLibp2pInstance(
       ],
       streamMuxers: [new Mplex()],
       connectionEncryption: [new Noise()],
-      dht: new KadDHT({ protocolPrefix }),
+      dht: new KadDHT({
+        // Protocol prefixes require a trailing slash
+        // @TODO disabled for compatibility reasons
+        // protocolPrefix: `/${protocolPrefix}`,
+        protocolPrefix,
+        // Make entry nodes Kad-DHT servers
+        // A network requires at least on Kad-DHT server otherwise nodes
+        // will flood each other forever with Kad-DHT ping attempts
+        clientMode: !options.announce
+        // Limit size of ping queue by using smaller timeouts
+      }),
       connectionManager: {
         autoDial: true,
         // Use custom sorting to prevent from problems with libp2p
@@ -154,6 +172,15 @@ export async function createLibp2pInstance(
       },
       identify: {
         protocolPrefix
+      },
+      peerStore: {
+        // Prevents peer-store from storing addresses twice, e.g.
+        // /ip4/1.2.3.4/tcp/23/p2p/16Uiu2HAmQBZA4TzjKjU5fpCSprGuM2y8mpepNwMS6ZKFATiKg68h
+        // /ip4/1.2.3.4/tcp/23
+        // same for
+        // /p2p/16Uiu2HAkzEnkW3xGJbvpXSXmvVR177LcR4Sw7z5S1ijuBcnbVFsV/p2p-circuit
+        // /p2p/16Uiu2HAkzEnkW3xGJbvpXSXmvVR177LcR4Sw7z5S1ijuBcnbVFsV/p2p-circuit/p2p/16Uiu2HAmQBZA4TzjKjU5fpCSprGuM2y8mpepNwMS6ZKFATiKg68h
+        addressFilter: async (_peerId: PeerId, multiaddr: Multiaddr) => !isAddressWithPeerId(multiaddr)
       },
       datastore
     })

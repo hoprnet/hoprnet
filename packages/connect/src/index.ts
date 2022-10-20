@@ -17,7 +17,12 @@ import { TCPConnection, Listener } from './base/index.js'
 // @ts-ignore
 import pkg from '../package.json' assert { type: 'json' }
 
-import type { PublicNodesEmitter, HoprConnectOptions, HoprConnectTestingOptions } from './types.js'
+import {
+  type PublicNodesEmitter,
+  type HoprConnectOptions,
+  type HoprConnectTestingOptions,
+  PeerConnectionType
+} from './types.js'
 
 import { Relay } from './relay/index.js'
 import { Filter } from './filter.js'
@@ -81,13 +86,10 @@ class HoprConnect implements Transport, Initializable, Startable {
   public init(components: Components) {
     this.components = components
 
-    const dialDirectly = this.dialDirectly.bind(this)
-    const filter = this.filter.bind(this)
-
     this.connectComponents = new ConnectComponents({
       addressFilter: new Filter(this.options),
-      entryNodes: new EntryNodes(dialDirectly, this.options),
-      relay: new Relay(dialDirectly, filter, this.options, this.testingOptions),
+      entryNodes: new EntryNodes(this.options),
+      relay: new Relay(this.options, this.testingOptions),
       upnpManager: new UpnpManager(),
       webRTCUpgrader: new WebRTCUpgrader(this.options)
     })
@@ -122,27 +124,25 @@ class HoprConnect implements Transport, Initializable, Startable {
   // we populate the address mapping of the router.
   // Or, if we get contacted by a relay to which we already have an *outgoing*
   // connection that gets reused.
-  // @TODO
   private setupSimulatedNAT(): void {
     // Simulated NAT using connection gater
     const denyInboundConnection = this.getComponents().getConnectionGater().denyInboundConnection
     this.getComponents().getConnectionGater().denyInboundConnection = async (maConn: MultiaddrConnection) => {
-      log(`New connection:`)
-      log(`remoteAddr: ${maConn.remoteAddr.toString()}`)
+      if (await denyInboundConnection(maConn)) {
+        // Blocked by e.g. Network Registry
+        return true
+      }
+
+      if (maConn.remoteAddr.toString().startsWith(`/p2p/`)) {
+        return false
+      }
+
+      log(`closing due to simulated NAT`)
       // log(`remotePeer ${maConn.remotePeer.toB58String()}`)
       // log(`localAddr: ${conn.localAddr?.toString()}`)
       // log(`remotePeer ${conn.localPeer.toB58String()}`)
-      if (await denyInboundConnection(maConn)) {
-        log(`closing due to simulated NAT`)
-        return true
-      } else if (maConn.remoteAddr.toString().startsWith(`/p2p/`)) {
-        return false
-      }
-      log(`closing due to simulated NAT`)
       return true
     }
-    // @TODO only allow connections to entry nodes
-    // this.getComponents().getConnectionGater().denyDialMultiaddr
   }
 
   public async beforeStart() {
@@ -191,6 +191,9 @@ class HoprConnect implements Transport, Initializable, Startable {
       case CODE_IP6:
         return this.dialDirectly(ma, options)
       case CODE_P2P:
+        if ((options as any).noRelay === true) {
+          throw new Error(`Cannot extend already relayed connections`)
+        }
         const relay = peerIdFromBytes((maTuples[0][1] as Uint8Array).slice(1))
 
         return this.dialWithRelay(relay, destination, options)
@@ -232,7 +235,7 @@ class HoprConnect implements Transport, Initializable, Startable {
    * @param options optional dial options
    */
   private async dialWithRelay(relay: PeerId, destination: PeerId, options: DialOptions): Promise<Connection> {
-    log(`Attempting to dial ${chalk.yellow(`/p2p/${relay.toString()}/p2p-circuit/p2p/${destination.toString()}`)}`)
+    log(`Dialing ${chalk.yellow(`/p2p/${relay.toString()}/p2p-circuit/p2p/${destination.toString()}`)}`)
 
     let maConn = await this.getConnectComponents().getRelay().connect(relay, destination, options)
 
@@ -252,6 +255,19 @@ class HoprConnect implements Transport, Initializable, Startable {
       throw err
     }
 
+    // Merges all tags from `maConn` into `conn` and then make both objects
+    // use the *same* array
+    // This is necessary to dynamically change the connection tags once
+    // a connection gets upgraded from WEBRTC_RELAYED to WEBRTC_DIRECT
+    if (conn.tags == undefined) {
+      conn.tags = []
+    }
+    conn.tags.push(...maConn.tags)
+
+    // assign the array *by value* and its entries *by reference*
+    maConn.tags = conn.tags as any
+
+    verbose(`Relayed connection to ${maConn.remoteAddr.toString()} has been established successfully!`)
     return conn
   }
 
@@ -264,9 +280,9 @@ class HoprConnect implements Transport, Initializable, Startable {
     ma: Multiaddr,
     options: DialOptions & { onDisconnect?: (ma: Multiaddr) => void }
   ): Promise<Connection> {
-    log(`Attempting to dial ${chalk.yellow(ma.toString())}`)
+    log(`Dialing ${chalk.yellow(ma.toString())}`)
 
-    const maConn = await TCPConnection.create(ma, this.getComponents().getPeerId(), options)
+    const maConn = await TCPConnection.create(ma, options)
 
     verbose(
       `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshake.`
@@ -278,21 +294,21 @@ class HoprConnect implements Transport, Initializable, Startable {
     // i.e. dialed node == desired destination
 
     // Set the SO_KEEPALIVE flag on socket to tell kernel to be more aggressive on keeping the connection up
-    maConn.conn.setKeepAlive(true, 1000)
+    maConn.socket.setKeepAlive(true, 1000)
 
-    maConn.conn.on('end', function () {
+    maConn.socket.on('end', function () {
       log(`SOCKET END on connection to ${maConn.remoteAddr.toString()}: other end of the socket sent a FIN packet`)
     })
 
-    maConn.conn.on('timeout', function () {
+    maConn.socket.on('timeout', function () {
       warn(`SOCKET TIMEOUT on connection to ${maConn.remoteAddr.toString()}`)
     })
 
-    maConn.conn.on('error', function (e) {
+    maConn.socket.on('error', function (e) {
       error(`SOCKET ERROR on connection to ${maConn.remoteAddr.toString()}: ' ${JSON.stringify(e)}`)
     })
 
-    maConn.conn.on('close', (had_error) => {
+    maConn.socket.on('close', (had_error) => {
       log(`SOCKET CLOSE on connection to ${maConn.remoteAddr.toString()}: error flag is ${had_error}`)
       // Don't call the disconnect handler if connection has been closed intentionally
       if (!maConn.closed && options && options.onDisconnect) {
@@ -301,6 +317,11 @@ class HoprConnect implements Transport, Initializable, Startable {
     })
 
     verbose(`Direct connection to ${maConn.remoteAddr.toString()} has been established successfully!`)
+    if (conn.tags) {
+      conn.tags.push(PeerConnectionType.DIRECT)
+    } else {
+      conn.tags = [PeerConnectionType.DIRECT]
+    }
 
     return conn
   }
@@ -309,4 +330,4 @@ class HoprConnect implements Transport, Initializable, Startable {
 export type { PublicNodesEmitter, HoprConnectConfig }
 export { compareAddressesLocalMode, compareAddressesPublicMode } from './utils/index.js'
 
-export { HoprConnect }
+export { HoprConnect, PeerConnectionType }

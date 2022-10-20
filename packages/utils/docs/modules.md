@@ -60,8 +60,6 @@
 - [U8aAndSize](modules.md#u8aandsize)
 - [WaitingAsRelayer](modules.md#waitingasrelayer)
 - [WaitingAsSender](modules.md#waitingassender)
-- [libp2pSendMessage](modules.md#libp2psendmessage)
-- [libp2pSubscribe](modules.md#libp2psubscribe)
 
 ### Variables
 
@@ -108,7 +106,6 @@
 - [b58StringRegex](modules.md#b58stringregex)
 - [dbMock](modules.md#dbmock)
 - [durations](modules.md#durations)
-- [get\_package\_version](modules.md#get_package_version)
 
 ### Functions
 
@@ -146,9 +143,11 @@
 - [getPacketLength](modules.md#getpacketlength)
 - [getPrivateAddresses](modules.md#getprivateaddresses)
 - [getPublicAddresses](modules.md#getpublicaddresses)
+- [get\_package\_version](modules.md#get_package_version)
 - [hasB58String](modules.md#hasb58string)
 - [inSameNetwork](modules.md#insamenetwork)
 - [ipToU8aAddress](modules.md#iptou8aaddress)
+- [isAddressWithPeerId](modules.md#isaddresswithpeerid)
 - [isAnyAddress](modules.md#isanyaddress)
 - [isErrorOutOfFunds](modules.md#iserroroutoffunds)
 - [isErrorOutOfHoprFunds](modules.md#iserroroutofhoprfunds)
@@ -161,8 +160,8 @@
 - [isReservedAddress](modules.md#isreservedaddress)
 - [isSecp256k1PeerId](modules.md#issecp256k1peerid)
 - [iterateHash](modules.md#iteratehash)
-- [libp2pSendMessage](modules.md#libp2psendmessage-1)
-- [libp2pSubscribe](modules.md#libp2psubscribe-1)
+- [libp2pSendMessage](modules.md#libp2psendmessage)
+- [libp2pSubscribe](modules.md#libp2psubscribe)
 - [loadJson](modules.md#loadjson)
 - [moveDecimalPoint](modules.md#movedecimalpoint)
 - [nAtATime](modules.md#natatime)
@@ -187,6 +186,7 @@
 - [sampleGroupElement](modules.md#samplegroupelement)
 - [serializeKeyPair](modules.md#serializekeypair)
 - [serializeToU8a](modules.md#serializetou8a)
+- [setupPromiseRejectionFilter](modules.md#setuppromiserejectionfilter)
 - [startResourceUsageLogger](modules.md#startresourceusagelogger)
 - [stringToU8a](modules.md#stringtou8a)
 - [timeout](modules.md#timeout)
@@ -240,7 +240,7 @@ Renames and re-exports [TimeoutOpts](modules.md#timeoutopts)
 
 #### Defined in
 
-[libp2p/addressSorters.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L35)
+[src/libp2p/addressSorters.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L35)
 
 ___
 
@@ -264,7 +264,7 @@ ___
 
 #### Defined in
 
-[async/defer.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/defer.ts#L1)
+[src/async/defer.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/defer.ts#L1)
 
 ___
 
@@ -274,7 +274,7 @@ ___
 
 #### Defined in
 
-[libp2p/dialHelper.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L31)
+[src/libp2p/dialHelper.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L40)
 
 ___
 
@@ -291,7 +291,7 @@ ___
 
 #### Defined in
 
-[network/hosts.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/hosts.ts#L6)
+[src/network/hosts.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/hosts.ts#L6)
 
 ___
 
@@ -309,7 +309,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:168](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L168)
+[src/libp2p/index.ts:171](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L171)
 
 ___
 
@@ -340,7 +340,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:169](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L169)
+[src/libp2p/index.ts:172](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L172)
 
 ___
 
@@ -358,7 +358,7 @@ ___
 
 #### Defined in
 
-[network/constants.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L3)
+[src/network/constants.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L3)
 
 ___
 
@@ -375,7 +375,7 @@ ___
 
 #### Defined in
 
-[crypto/prg.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L11)
+[src/crypto/prg.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L11)
 
 ___
 
@@ -392,7 +392,7 @@ ___
 
 #### Defined in
 
-[crypto/prp.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L16)
+[src/crypto/prp.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L16)
 
 ___
 
@@ -402,7 +402,7 @@ ___
 
 #### Defined in
 
-[db/db.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L119)
+[src/db/db.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L119)
 
 ___
 
@@ -419,7 +419,7 @@ ___
 
 #### Defined in
 
-[async/abortableTimeout.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/abortableTimeout.ts#L5)
+[src/async/abortableTimeout.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/abortableTimeout.ts#L8)
 
 ___
 
@@ -429,7 +429,7 @@ ___
 
 #### Defined in
 
-[u8a/index.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L17)
+[src/u8a/index.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L17)
 
 ___
 
@@ -446,7 +446,7 @@ ___
 
 #### Defined in
 
-[db/db.ts:114](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L114)
+[src/db/db.ts:114](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L114)
 
 ___
 
@@ -462,59 +462,7 @@ ___
 
 #### Defined in
 
-[db/db.ts:110](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L110)
-
-___
-
-### libp2pSendMessage
-
-Ƭ **libp2pSendMessage**: (`components`: `Components`, `destination`: `PeerId`, `protocol`: `string`, `message`: `Uint8Array`, `includeReply`: ``false``, `opts?`: [`TimeoutOpts`](modules.md#timeoutopts)) => `Promise`<`void`\> & (`components`: `Components`, `destination`: `PeerId`, `protocol`: `string`, `message`: `Uint8Array`, `includeReply`: ``true``, `opts?`: [`TimeoutOpts`](modules.md#timeoutopts)) => `Promise`<`Uint8Array`[]\>
-
-Asks libp2p to establish a connection to another node and
-send message. If `includeReply` is set, wait for a response
-
-**`param`** libp2p instance
-
-**`param`** peer to connect to
-
-**`param`** protocol to speak
-
-**`param`** message to send
-
-**`param`** try to receive a reply
-
-**`param`** [optional] timeout
-
-#### Defined in
-
-[libp2p/index.ts:122](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L122)
-
-[libp2p/index.ts:105](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L105)
-
-___
-
-### libp2pSubscribe
-
-Ƭ **libp2pSubscribe**: (`components`: `Components`, `protocol`: `string`, `handler`: [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`Promise`<`void`\> \| `void`\>, `errHandler`: `ErrHandler`, `includeReply`: ``false``) => `void` & (`components`: `Components`, `protocol`: `string`, `handler`: [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`Promise`<`Uint8Array`\>\>, `errHandler`: `ErrHandler`, `includeReply`: ``true``) => `void`
-
-Generates a handler that pulls messages out of a stream
-and feeds them to the given handler.
-
-**`param`** libp2p instance
-
-**`param`** protocol to dial
-
-**`param`** called once another node requests that protocol
-
-**`param`** handle stream pipeline errors
-
-**`param`** try to receive a reply
-
-#### Defined in
-
-[libp2p/index.ts:261](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L261)
-
-[libp2p/index.ts:246](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L246)
+[src/db/db.ts:110](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L110)
 
 ## Variables
 
@@ -524,7 +472,7 @@ and feeds them to the given handler.
 
 #### Defined in
 
-[constants.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L6)
+[src/constants.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L6)
 
 ___
 
@@ -534,7 +482,7 @@ ___
 
 #### Defined in
 
-[u8a/u8aCompare.ts:2](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aCompare.ts#L2)
+[src/u8a/u8aCompare.ts:2](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aCompare.ts#L2)
 
 ___
 
@@ -544,7 +492,7 @@ ___
 
 #### Defined in
 
-[u8a/u8aCompare.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aCompare.ts#L1)
+[src/u8a/u8aCompare.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aCompare.ts#L1)
 
 ___
 
@@ -554,7 +502,7 @@ ___
 
 #### Defined in
 
-[u8a/u8aCompare.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aCompare.ts#L3)
+[src/u8a/u8aCompare.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aCompare.ts#L3)
 
 ___
 
@@ -564,7 +512,7 @@ ___
 
 #### Defined in
 
-[network/constants.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L34)
+[src/network/constants.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L34)
 
 ___
 
@@ -582,7 +530,7 @@ ___
 
 #### Defined in
 
-[async/backoff.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/backoff.ts#L9)
+[src/async/backoff.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/backoff.ts#L9)
 
 ___
 
@@ -592,7 +540,7 @@ ___
 
 #### Defined in
 
-[constants.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L7)
+[src/constants.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L7)
 
 ___
 
@@ -602,7 +550,7 @@ ___
 
 #### Defined in
 
-[constants.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L16)
+[src/constants.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L16)
 
 ___
 
@@ -612,7 +560,7 @@ ___
 
 #### Defined in
 
-[u8a/constants.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/constants.ts#L1)
+[src/u8a/constants.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/constants.ts#L1)
 
 ___
 
@@ -622,7 +570,7 @@ ___
 
 #### Defined in
 
-[network/constants.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L55)
+[src/network/constants.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L55)
 
 ___
 
@@ -632,7 +580,7 @@ ___
 
 #### Defined in
 
-[network/constants.ts:69](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L69)
+[src/network/constants.ts:69](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L69)
 
 ___
 
@@ -642,7 +590,7 @@ ___
 
 #### Defined in
 
-[constants.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L20)
+[src/constants.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L20)
 
 ___
 
@@ -654,7 +602,7 @@ Maximum random big integer that can be generated using randomInteger function.
 
 #### Defined in
 
-[crypto/randomInteger.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomInteger.ts#L18)
+[src/crypto/randomInteger.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomInteger.ts#L18)
 
 ___
 
@@ -666,7 +614,7 @@ Maximum random integer that can be generated using randomInteger function.
 
 #### Defined in
 
-[crypto/randomInteger.ts:144](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomInteger.ts#L144)
+[src/crypto/randomInteger.ts:144](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomInteger.ts#L144)
 
 ___
 
@@ -676,7 +624,7 @@ ___
 
 #### Defined in
 
-[constants.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L18)
+[src/constants.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L18)
 
 ___
 
@@ -686,7 +634,7 @@ ___
 
 #### Defined in
 
-[constants.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L23)
+[src/constants.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L23)
 
 ___
 
@@ -696,7 +644,7 @@ ___
 
 #### Defined in
 
-[constants.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L12)
+[src/constants.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L12)
 
 ___
 
@@ -706,7 +654,7 @@ ___
 
 #### Defined in
 
-[crypto/por/index.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L8)
+[src/crypto/por/index.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L8)
 
 ___
 
@@ -716,7 +664,7 @@ ___
 
 #### Defined in
 
-[crypto/prg.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L7)
+[src/crypto/prg.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L7)
 
 ___
 
@@ -726,7 +674,7 @@ ___
 
 #### Defined in
 
-[crypto/prg.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L6)
+[src/crypto/prg.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L6)
 
 ___
 
@@ -736,7 +684,7 @@ ___
 
 #### Defined in
 
-[crypto/prg.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L5)
+[src/crypto/prg.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L5)
 
 ___
 
@@ -746,7 +694,7 @@ ___
 
 #### Defined in
 
-[constants.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L14)
+[src/constants.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L14)
 
 ___
 
@@ -756,7 +704,7 @@ ___
 
 #### Defined in
 
-[constants.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L3)
+[src/constants.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L3)
 
 ___
 
@@ -766,7 +714,7 @@ ___
 
 #### Defined in
 
-[network/constants.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L41)
+[src/network/constants.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L41)
 
 ___
 
@@ -776,7 +724,7 @@ ___
 
 #### Defined in
 
-[network/constants.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L9)
+[src/network/constants.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L9)
 
 ___
 
@@ -786,7 +734,7 @@ ___
 
 #### Defined in
 
-[network/constants.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L22)
+[src/network/constants.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L22)
 
 ___
 
@@ -796,7 +744,7 @@ ___
 
 #### Defined in
 
-[network/constants.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L15)
+[src/network/constants.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L15)
 
 ___
 
@@ -806,7 +754,7 @@ ___
 
 #### Defined in
 
-[network/constants.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L28)
+[src/network/constants.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L28)
 
 ___
 
@@ -816,7 +764,7 @@ ___
 
 #### Defined in
 
-[crypto/prp.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L13)
+[src/crypto/prp.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L13)
 
 ___
 
@@ -826,7 +774,7 @@ ___
 
 #### Defined in
 
-[crypto/prp.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L12)
+[src/crypto/prp.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L12)
 
 ___
 
@@ -836,7 +784,7 @@ ___
 
 #### Defined in
 
-[crypto/prp.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L14)
+[src/crypto/prp.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L14)
 
 ___
 
@@ -846,7 +794,7 @@ ___
 
 #### Defined in
 
-[constants.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L4)
+[src/constants.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L4)
 
 ___
 
@@ -856,7 +804,7 @@ ___
 
 #### Defined in
 
-[network/constants.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L82)
+[src/network/constants.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L82)
 
 ___
 
@@ -878,7 +826,7 @@ Several ECDSA on secp256k1 related constants
 
 #### Defined in
 
-[crypto/constants.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/constants.ts#L4)
+[src/crypto/constants.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/constants.ts#L4)
 
 ___
 
@@ -888,7 +836,7 @@ ___
 
 #### Defined in
 
-[constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L8)
+[src/constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L8)
 
 ___
 
@@ -898,7 +846,7 @@ ___
 
 #### Defined in
 
-[constants.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L9)
+[src/constants.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L9)
 
 ___
 
@@ -908,7 +856,7 @@ ___
 
 #### Defined in
 
-[constants.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L10)
+[src/constants.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L10)
 
 ___
 
@@ -918,7 +866,7 @@ ___
 
 #### Defined in
 
-[constants.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L27)
+[src/constants.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L27)
 
 ___
 
@@ -928,7 +876,7 @@ ___
 
 #### Defined in
 
-[constants.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L24)
+[src/constants.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L24)
 
 ___
 
@@ -938,7 +886,7 @@ ___
 
 #### Defined in
 
-[constants.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L5)
+[src/constants.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L5)
 
 ___
 
@@ -950,7 +898,7 @@ Regular expresion used to match b58Strings
 
 #### Defined in
 
-[libp2p/index.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L28)
+[src/libp2p/index.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L30)
 
 ___
 
@@ -960,7 +908,7 @@ ___
 
 #### Defined in
 
-[db/db.mock.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.mock.ts#L13)
+[src/db/db.mock.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.mock.ts#L13)
 
 ___
 
@@ -979,17 +927,7 @@ ___
 
 #### Defined in
 
-[time.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/time.ts#L1)
-
-___
-
-### get\_package\_version
-
-• **get\_package\_version**: `any`
-
-#### Defined in
-
-[index.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/index.ts#L19)
+[src/time.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/time.ts#L1)
 
 ## Functions
 
@@ -1148,7 +1086,7 @@ ___
 
 ### createCircuitAddress
 
-▸ **createCircuitAddress**(`relay`, `destination`): `Multiaddr`
+▸ **createCircuitAddress**(`relay`): `Multiaddr`
 
 Create a multiaddress that is a circuit address using given relay to the given destination.
 
@@ -1157,7 +1095,6 @@ Create a multiaddress that is a circuit address using given relay to the given d
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `relay` | `PeerId` | Relay peer ID |
-| `destination` | `PeerId` | Destination peer ID |
 
 #### Returns
 
@@ -1399,20 +1336,23 @@ ___
 
 ### dial
 
-▸ **dial**(`components`, `destination`, `protocol`, `opts?`): `Promise`<[`DialResponse`](modules.md#dialresponse)\>
+▸ **dial**(`components`, `destination`, `protocols`, `withDHT?`, `noRelay?`): `Promise`<[`DialResponse`](modules.md#dialresponse)\>
 
-Performs a dial strategy using libp2p.dialProtocol and libp2p.findPeer
-to establish a connection.
-Contains a baseline protection against dialing same addresses twice.
+Runs through the dial strategy and handles possible errors
+
+1. Use already known addresses
+2. Check the DHT (if available) for additional addresses
+3. Try new addresses
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `components` | `Components` | components of a libp2p instance |
-| `destination` | `PeerId` | PeerId of the destination |
-| `protocol` | `string` | protocols to use |
-| `opts?` | [`TimeoutOpts`](modules.md#timeoutopts) |  |
+| Name | Type | Default value | Description |
+| :------ | :------ | :------ | :------ |
+| `components` | `Components` | `undefined` | components of libp2p instance |
+| `destination` | `PeerId` \| `Multiaddr` | `undefined` | which peer to connect to |
+| `protocols` | `string` \| `string`[] | `undefined` | which protocol to use |
+| `withDHT` | `boolean` | `true` | - |
+| `noRelay` | `boolean` | `false` | - |
 
 #### Returns
 
@@ -1707,6 +1647,24 @@ ___
 
 ___
 
+### get\_package\_version
+
+▸ **get_package_version**(`package_file`): `string`
+
+Reads the given package.json file and determines its version.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `package_file` | `string` |
+
+#### Returns
+
+`string`
+
+___
+
 ### hasB58String
 
 ▸ **hasB58String**(`content`): `Boolean`
@@ -1762,6 +1720,28 @@ Converts ip address string to Uint8Arrays
 `Uint8Array`
 
 Byte representation of the given ip address
+
+___
+
+### isAddressWithPeerId
+
+▸ **isAddressWithPeerId**(`ma`): `boolean`
+
+Checks known direct and circuit addresses if they end with `/p2p/<PEER_ID>`
+
+If not a known address, use generic but expensive Multiaddr function
+
+Used to filter addresses that get stored into libp2p's peer-store
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `ma` | `Multiaddr` | Multiaddr to check |
+
+#### Returns
+
+`boolean`
 
 ___
 
@@ -2000,38 +1980,57 @@ ___
 
 ### libp2pSendMessage
 
-▸ **libp2pSendMessage**(`components`, `destination`, `protocol`, `message`, `includeReply`, `opts?`): `Promise`<`void` \| `Uint8Array`[]\>
+▸ **libp2pSendMessage**<`T`\>(`components`, `destination`, `protocols`, `message`, `includeReply`, `opts?`): `Promise`<`T` extends ``true`` ? `Uint8Array`[] : `void`\>
 
-#### Parameters
+Asks libp2p to establish a connection to another node and
+send message. If `includeReply` is set, wait for a response
+
+#### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `components` | `Components` |
-| `destination` | `PeerId` |
-| `protocol` | `string` |
-| `message` | `Uint8Array` |
-| `includeReply` | `boolean` |
-| `opts?` | [`TimeoutOpts`](modules.md#timeoutopts) |
+| `T` | extends `boolean` |
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `components` | `Components` | libp2p components |
+| `destination` | `PeerId` | peer to connect to |
+| `protocols` | `string` \| `string`[] | protocols to speak |
+| `message` | `Uint8Array` | message to send |
+| `includeReply` | `T` | try to receive a reply |
+| `opts` | `Object` | [optional] timeout |
+| `opts.timeout?` | `number` | - |
 
 #### Returns
 
-`Promise`<`void` \| `Uint8Array`[]\>
+`Promise`<`T` extends ``true`` ? `Uint8Array`[] : `void`\>
 
 ___
 
 ### libp2pSubscribe
 
-▸ **libp2pSubscribe**(`components`, `protocol`, `handler`, `errHandler`, `includeReply?`): `Promise`<`void`\>
+▸ **libp2pSubscribe**<`T`\>(`components`, `protocols`, `handler`, `errHandler`, `includeReply`): `Promise`<`void`\>
+
+Generates a handler that pulls messages out of a stream
+and feeds them to the given handler.
+
+#### Type parameters
+
+| Name | Type |
+| :------ | :------ |
+| `T` | extends `boolean` |
 
 #### Parameters
 
-| Name | Type | Default value |
+| Name | Type | Description |
 | :------ | :------ | :------ |
-| `components` | `Components` | `undefined` |
-| `protocol` | `string` | `undefined` |
-| `handler` | [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`void` \| `Promise`<`void` \| `Uint8Array`\>\> | `undefined` |
-| `errHandler` | `ErrHandler` | `undefined` |
-| `includeReply` | `boolean` | `false` |
+| `components` | `Components` | libp2p components |
+| `protocols` | `string` \| `string`[] | protocol to dial |
+| `handler` | [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`T` extends ``true`` ? `Promise`<`Uint8Array`\> : `void` \| `Promise`<`void`\>\> | called once another node requests that protocol |
+| `errHandler` | `ErrHandler` | handle stream pipeline errors |
+| `includeReply` | `T` | try to receive a reply |
 
 #### Returns
 
@@ -2107,7 +2106,7 @@ const result = await nAtaTime(setTimeout, [[300, 'one'], [200, 'two'], [100, 'th
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `fn` | (...`args`: `Args`) => `Promise`<`Return`\> | worker function |
-| `args` | `Args`[] | arguments passed to worker function |
+| `args` | `Iterable`<`Args`\> | arguments passed to worker function |
 | `concurrency` | `number` | number of parallel jobs |
 | `done?` | (`results`: (`Error` \| `Return`)[]) => `boolean` | - |
 
@@ -2631,6 +2630,19 @@ ___
 
 ___
 
+### setupPromiseRejectionFilter
+
+▸ **setupPromiseRejectionFilter**(): `void`
+
+Sets a custom promise rejection handler to filter out known promise rejections
+that are harmless but couldn't be handled for some reason.
+
+#### Returns
+
+`void`
+
+___
+
 ### startResourceUsageLogger
 
 ▸ **startResourceUsageLogger**(`log`, `ms?`): () => `void`
@@ -2686,7 +2698,7 @@ ___
 
 ### timeout
 
-▸ **timeout**<`T`\>(`timeout`, `work`): `Promise`<`T`\>
+▸ **timeout**<`T`\>(`ms`, `work`): `Promise`<`T`\>
 
 Races a timeout against some work
 
@@ -2700,7 +2712,7 @@ Races a timeout against some work
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `timeout` | `number` | return after timeout in ms |
+| `ms` | `number` | return after timeout in ms |
 | `work` | () => `Promise`<`T`\> | function that returns a Promise that resolves once the work is done |
 
 #### Returns
@@ -2765,15 +2777,22 @@ ___
 
 ### tryExistingConnections
 
-▸ **tryExistingConnections**(`components`, `destination`, `protocol`): `Promise`<`void` \| `ProtocolStream` & { `conn`: `Connection`  }\>
+▸ **tryExistingConnections**(`components`, `destination`, `protocols`): `Promise`<`void` \| `ProtocolStream` & { `conn`: `Connection`  }\>
+
+Tries to use existing connection to connect to the given peer.
+Closes all connection that could not be used to speak the desired
+protocols.
+
+**`dev`** if used with unsupported protocol, this function might close
+connections unintendedly
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `components` | `Components` |
-| `destination` | `PeerId` |
-| `protocol` | `string` |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `components` | `Components` | libp2p components |
+| `destination` | `PeerId` | peer to connect to |
+| `protocols` | `string` \| `string`[] | desired protocol |
 
 #### Returns
 
