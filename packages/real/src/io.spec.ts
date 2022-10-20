@@ -1,5 +1,5 @@
 import fs from 'fs'
-import { read_file } from './io'
+import { read_file } from './io.js'
 import * as assert from 'assert'
 
 describe('test io abstraction for real', async function () {

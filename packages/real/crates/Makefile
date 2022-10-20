@@ -14,7 +14,7 @@ test: $(JS_FILES)
 
 $(JS_FILES):
 	mkdir -p $(@D)
-	npx wasm-pack build --target=nodejs `pwd`/$(@D)/..
+	npx wasm-pack build --target=bundler `pwd`/$(@D)/..
 
 install:
 ifneq ($(PACKAGES),)

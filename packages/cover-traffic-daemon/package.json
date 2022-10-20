@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-cover-traffic-daemon",
   "description": "Generate chaffing traffic",
-  "version": "1.91.0-next.0",
+  "version": "1.91.0-next.2",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
@@ -18,7 +18,7 @@
     "coverage": "nyc --reporter=html mocha",
     "dev": "yarn clean && yarn build:wasm && tsc -w",
     "build": "yarn clean && yarn build:wasm && tsc -p .",
-    "start": "ts-node src/index",
+    "start": "NODE_OPTIONS=\"--experimental-wasm-modules\" ts-node src/index",
     "docs:generate": "yarn typedoc",
     "docs:watch": "yarn typedoc --watch"
   },
