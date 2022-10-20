@@ -35,4 +35,14 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixture, AccountsFixture {
         vm.expectRevert("publicKey's address does not match senders");
         hoprChannel.announce(accountA.publicKey, multiAddress);
     }
+
+    function testRevert_AnnouceRandomPublicKey(bytes calldata randomPublicKey) public {
+        vm.assume(keccak256(randomPublicKey) != keccak256(accountB.publicKey));
+        bytes memory multiAddress = hex"1234";
+        vm.prank(accountB.accountAddr);
+        vm.expectRevert("publicKey's address does not match senders");
+        hoprChannel.announce(randomPublicKey, multiAddress);
+    }
+
+    // function testFundChannelMulti()
 }

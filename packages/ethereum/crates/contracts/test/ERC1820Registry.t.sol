@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity >=0.6.0 <0.9.0;
 
 import "./utils/Deploy.sol";
 import "forge-std/Test.sol";
@@ -11,6 +11,6 @@ contract ERC1820RegistryTest is Test, ERC1820RegistryFixture {
 
     function testERC1820IsDeployed() public {
         // ERC1820_REGISTRY_CONTRACT contains the exact deployed code
-        assertEq0(address(ERC1820_REGISTRY_CONTRACT).code, ERC1820_REGISTRY_DEPLOYED_CODE);
+        assertEq0(ERC1820_REGISTRY_ADDRESS.code, ERC1820_REGISTRY_DEPLOYED_CODE);
     }
 }
