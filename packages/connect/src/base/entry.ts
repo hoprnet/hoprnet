@@ -198,8 +198,8 @@ function printGroupedConnectionResults(grouped: Iterable<Grouped>, prefix: strin
         ? 'Error'
         : results[0].entry.latency < 0
         ? 'Timeout'
-        : `${results[0].entry.latency} ms\n`
-    }`
+        : `${results[0].entry.latency} ms`
+    }\n`
   }
 
   // Remove last occurence of `/n`
