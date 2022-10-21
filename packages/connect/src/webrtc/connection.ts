@@ -6,7 +6,7 @@ import toIterable from 'stream-to-it'
 import Debug from 'debug'
 import type { RelayConnection } from '../relay/connection.js'
 import { randomBytes } from 'crypto'
-import { toU8aStream, encodeWithLengthPrefix, decodeWithLengthPrefix, eagerIterator } from '../utils/index.js'
+import { encodeWithLengthPrefix, decodeWithLengthPrefix, eagerIterator } from '../utils/index.js'
 import { abortableSource } from 'abortable-iterator'
 import {
   type StreamResult,
@@ -240,7 +240,7 @@ class WebRTCConnection implements MultiaddrConnection {
       type: ConnectionEventTypes.SINK_SOURCE_ATTACHED,
       value: async function* (this: Pick<WebRTCConnection, 'options' | 'error'>) {
         try {
-          yield* getAbortableSource(toU8aStream(source), this.options?.signal)
+          yield* getAbortableSource(source, this.options?.signal)
           deferred.resolve()
         } catch (err: any) {
           if (err.type === 'aborted' || err.code === 'ABORT_ERR') {
