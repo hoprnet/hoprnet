@@ -2,7 +2,7 @@
 
 members = [
     "packages/real/crates/real-base",
-    "packages/utils/crates/utils-metrics"
+    "packages/utils/crates/utils-metrics",
     "packages/utils/crates/utils-misc",
     "packages/core/crates/core-crypto"
 ]
