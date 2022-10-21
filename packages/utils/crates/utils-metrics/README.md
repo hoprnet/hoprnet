@@ -22,7 +22,7 @@ The above 3 types are wrapped using the following structs:
 - `SimpleHistogram`
 - `MultiHistogram`
 
-The "simple" types represent a singular named metrics, whereas the "multi" metrics represent a 
+The "simple" types represent a singular named metrics, whereas the "multi" metrics represent a
 vector extension.
 
 The vector extensions basically maintain multiple labelled metrics in a single
