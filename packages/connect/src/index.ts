@@ -257,7 +257,7 @@ class HoprConnect implements Transport, Initializable, Startable {
     }
 
     // Not supposed to throw any exception
-    cleanExistingConnections(this.components, conn.remotePeer, conn.id, error)
+    cleanExistingConnections(this.components as Components, conn.remotePeer, conn.id, error)
 
     // Merges all tags from `maConn` into `conn` and then make both objects
     // use the *same* array
@@ -295,7 +295,7 @@ class HoprConnect implements Transport, Initializable, Startable {
     const conn = await timeout(DEFAULT_CONNECTION_UPGRADE_TIMEOUT, () => options.upgrader.upgradeOutbound(maConn))
 
     // Not supposed to throw any exception
-    cleanExistingConnections(this.components, conn.remotePeer, conn.id, error)
+    cleanExistingConnections(this.components as Components, conn.remotePeer, conn.id, error)
 
     // Assign various connection properties once we're sure that public keys match,
     // i.e. dialed node == desired destination
