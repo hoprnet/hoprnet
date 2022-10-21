@@ -495,6 +495,7 @@ mod tests {
             .unwrap();
 
         assert_eq!("my_mhistogram", histogram.name());
+        assert!(histogram.labels().contains(&"version"));
 
         histogram.observe(&["1.90.0"],2.0);
         histogram.observe(&["1.90.0"],2.0);
