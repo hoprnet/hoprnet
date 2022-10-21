@@ -27,12 +27,19 @@
 - [HalfKeyChallenge](classes/HalfKeyChallenge.md)
 - [Hash](classes/Hash.md)
 - [HoprDB](classes/HoprDB.md)
+- [MultiCounter](classes/MultiCounter.md)
+- [MultiGauge](classes/MultiGauge.md)
+- [MultiHistogram](classes/MultiHistogram.md)
 - [NativeBalance](classes/NativeBalance.md)
 - [PRG](classes/PRG.md)
 - [PRP](classes/PRP.md)
 - [PublicKey](classes/PublicKey.md)
 - [Response](classes/Response.md)
 - [Signature](classes/Signature.md)
+- [SimpleCounter](classes/SimpleCounter.md)
+- [SimpleGauge](classes/SimpleGauge.md)
+- [SimpleHistogram](classes/SimpleHistogram.md)
+- [SimpleTimer](classes/SimpleTimer.md)
 - [Snapshot](classes/Snapshot.md)
 - [Ticket](classes/Ticket.md)
 - [UINT256](classes/UINT256.md)
@@ -121,6 +128,14 @@
 - [createPoRString](modules.md#createporstring)
 - [createPoRValuesForSender](modules.md#createporvaluesforsender)
 - [createRelayerKey](modules.md#createrelayerkey)
+- [create\_counter](modules.md#create_counter)
+- [create\_gauge](modules.md#create_gauge)
+- [create\_histogram](modules.md#create_histogram)
+- [create\_histogram\_with\_buckets](modules.md#create_histogram_with_buckets)
+- [create\_multi\_counter](modules.md#create_multi_counter)
+- [create\_multi\_gauge](modules.md#create_multi_gauge)
+- [create\_multi\_histogram](modules.md#create_multi_histogram)
+- [create\_multi\_histogram\_with\_buckets](modules.md#create_multi_histogram_with_buckets)
 - [debug](modules.md#debug)
 - [decodePoRBytes](modules.md#decodeporbytes)
 - [defer](modules.md#defer)
@@ -130,6 +145,7 @@
 - [dial](modules.md#dial)
 - [expandVars](modules.md#expandvars)
 - [forwardTransform](modules.md#forwardtransform)
+- [gather\_all\_metrics](modules.md#gather_all_metrics)
 - [gcd](modules.md#gcd)
 - [generateChannelId](modules.md#generatechannelid)
 - [generateKeyShares](modules.md#generatekeyshares)
@@ -1204,6 +1220,148 @@ the DHT entry key
 
 ___
 
+### create\_counter
+
+▸ **create_counter**(`name`, `description`): [`SimpleCounter`](classes/SimpleCounter.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `name` | `string` |
+| `description` | `string` |
+
+#### Returns
+
+[`SimpleCounter`](classes/SimpleCounter.md)
+
+___
+
+### create\_gauge
+
+▸ **create_gauge**(`name`, `description`): [`SimpleGauge`](classes/SimpleGauge.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `name` | `string` |
+| `description` | `string` |
+
+#### Returns
+
+[`SimpleGauge`](classes/SimpleGauge.md)
+
+___
+
+### create\_histogram
+
+▸ **create_histogram**(`name`, `description`): [`SimpleHistogram`](classes/SimpleHistogram.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `name` | `string` |
+| `description` | `string` |
+
+#### Returns
+
+[`SimpleHistogram`](classes/SimpleHistogram.md)
+
+___
+
+### create\_histogram\_with\_buckets
+
+▸ **create_histogram_with_buckets**(`name`, `description`, `buckets`): [`SimpleHistogram`](classes/SimpleHistogram.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `name` | `string` |
+| `description` | `string` |
+| `buckets` | `Float64Array` |
+
+#### Returns
+
+[`SimpleHistogram`](classes/SimpleHistogram.md)
+
+___
+
+### create\_multi\_counter
+
+▸ **create_multi_counter**(`name`, `description`, `labels`): [`MultiCounter`](classes/MultiCounter.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `name` | `string` |
+| `description` | `string` |
+| `labels` | `string`[] |
+
+#### Returns
+
+[`MultiCounter`](classes/MultiCounter.md)
+
+___
+
+### create\_multi\_gauge
+
+▸ **create_multi_gauge**(`name`, `description`, `labels`): [`MultiGauge`](classes/MultiGauge.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `name` | `string` |
+| `description` | `string` |
+| `labels` | `string`[] |
+
+#### Returns
+
+[`MultiGauge`](classes/MultiGauge.md)
+
+___
+
+### create\_multi\_histogram
+
+▸ **create_multi_histogram**(`name`, `description`, `labels`): [`MultiHistogram`](classes/MultiHistogram.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `name` | `string` |
+| `description` | `string` |
+| `labels` | `string`[] |
+
+#### Returns
+
+[`MultiHistogram`](classes/MultiHistogram.md)
+
+___
+
+### create\_multi\_histogram\_with\_buckets
+
+▸ **create_multi_histogram_with_buckets**(`name`, `description`, `buckets`, `labels`): [`MultiHistogram`](classes/MultiHistogram.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `name` | `string` |
+| `description` | `string` |
+| `buckets` | `Float64Array` |
+| `labels` | `string`[] |
+
+#### Returns
+
+[`MultiHistogram`](classes/MultiHistogram.md)
+
+___
+
 ### debug
 
 ▸ **debug**(`namespace`): (`message`: `any`, ...`parameters`: `any`[]) => `void`
@@ -1404,6 +1562,16 @@ whether the packet is valid, if yes returns
 the transformed packet, the public key of the next hop
 and the data next to the routing information. If current
 hop is the final recipient, it returns the plaintext
+
+___
+
+### gather\_all\_metrics
+
+▸ **gather_all_metrics**(): `string`
+
+#### Returns
+
+`string`
 
 ___
 
