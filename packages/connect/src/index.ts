@@ -207,7 +207,7 @@ class HoprConnect implements Transport, Initializable, Startable {
       case CODE_IP4:
       case CODE_IP6:
         try {
-          let conn = this.dialDirectly(ma, options)
+          let conn = await this.dialDirectly(ma, options)
           metric_successfulDirectDials.increment()
           return conn
         } catch (e) {
