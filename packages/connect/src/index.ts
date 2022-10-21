@@ -221,7 +221,7 @@ class HoprConnect implements Transport, Initializable, Startable {
         const relay = peerIdFromBytes((maTuples[0][1] as Uint8Array).slice(1))
 
         try {
-          let conn = this.dialWithRelay(relay, destination, options)
+          let conn = await this.dialWithRelay(relay, destination, options)
           metric_successfulRelayedDials.increment()
           return conn
         } catch (e) {
