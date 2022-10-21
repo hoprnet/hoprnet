@@ -21,7 +21,7 @@ import { RelayState } from './state.js'
 import { createRelayerKey, dial, DialStatus, randomInteger, retimer } from '@hoprnet/hopr-utils'
 import { handshake } from 'it-handshake'
 
-import { attemptClose } from '../utils/index.js'
+import { attemptClose, cleanExistingConnections } from '../utils/index.js'
 
 const DEBUG_PREFIX = 'hopr-connect:relay'
 const DEFAULT_MAX_RELAYED_CONNECTIONS = 10
@@ -399,6 +399,8 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       error(`Could not upgrade relayed connection. Error was: ${err}`)
       return
     }
+
+    cleanExistingConnections(this.components as Components, upgradedConn.remotePeer, upgradedConn.id, error)
 
     // Merges all tags from `maConn` into `conn` and then make both objects
     // use the *same* array

@@ -32,7 +32,7 @@ import { EntryNodes } from './base/entry.js'
 import { WebRTCUpgrader } from './webrtc/upgrader.js'
 import { UpnpManager } from './base/upnp.js'
 import { timeout } from '@hoprnet/hopr-utils'
-import { attemptClose } from './utils/index.js'
+import { cleanExistingConnections } from './utils/index.js'
 
 const DEBUG_PREFIX = 'hopr-connect'
 const log = Debug(DEBUG_PREFIX)
@@ -257,7 +257,7 @@ class HoprConnect implements Transport, Initializable, Startable {
     }
 
     // Not supposed to throw any exception
-    this.cleanExistingConnections(conn.remotePeer, conn.id)
+    cleanExistingConnections(this.components, conn.remotePeer, conn.id, error)
 
     // Merges all tags from `maConn` into `conn` and then make both objects
     // use the *same* array
@@ -295,7 +295,7 @@ class HoprConnect implements Transport, Initializable, Startable {
     const conn = await timeout(DEFAULT_CONNECTION_UPGRADE_TIMEOUT, () => options.upgrader.upgradeOutbound(maConn))
 
     // Not supposed to throw any exception
-    this.cleanExistingConnections(conn.remotePeer, conn.id)
+    cleanExistingConnections(this.components, conn.remotePeer, conn.id, error)
 
     // Assign various connection properties once we're sure that public keys match,
     // i.e. dialed node == desired destination
@@ -331,20 +331,6 @@ class HoprConnect implements Transport, Initializable, Startable {
     }
 
     return conn
-  }
-
-  cleanExistingConnections(peer: PeerId, id: string) {
-    if (this.components == undefined) {
-      return
-    }
-
-    for (const conn of this.components?.getConnectionManager().getConnections(peer)) {
-      if (conn.id === id) {
-        continue
-      }
-
-      attemptClose(conn, error)
-    }
   }
 }
 

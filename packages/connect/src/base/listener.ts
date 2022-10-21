@@ -30,7 +30,7 @@ import { handleStunRequest, getExternalIp } from './stun.js'
 import { getAddrs } from './addrs.js'
 import { TCPConnection } from './tcp.js'
 import { RELAY_CHANGED_EVENT } from './entry.js'
-import { bindToPort, attemptClose, nodeToMultiaddr } from '../utils/index.js'
+import { bindToPort, attemptClose, nodeToMultiaddr, cleanExistingConnections } from '../utils/index.js'
 
 import type { Components } from '@libp2p/interfaces/components'
 import type { ConnectComponents } from '../components.js'
@@ -400,7 +400,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
 
     return () => {
       verbose(`currently tracking ${this.__connections.length} connections --`)
-      let index = this.__connections.findIndex((c: Connection) => c === maConn)
+      let index = this.__connections.findIndex((c: Connection) => c.id === maConn.id)
 
       if (index < 0) {
         // connection not found
@@ -464,6 +464,8 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
 
       return
     }
+
+    cleanExistingConnections(this.components, conn.remotePeer, conn.id, error)
 
     if (conn.tags) {
       conn.tags.push(PeerConnectionType.DIRECT)
