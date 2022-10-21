@@ -18,10 +18,19 @@ import { RELAY_PROTOCOLS, DELIVERY_PROTOCOLS, OK, CAN_RELAY_PROTOCOLS } from '..
 import { RelayConnection } from './connection.js'
 import { RelayHandshake, RelayHandshakeMessage } from './handshake.js'
 import { RelayState } from './state.js'
-import { createRelayerKey, dial, DialStatus, randomInteger, retimer } from '@hoprnet/hopr-utils'
-import { handshake } from 'it-handshake'
+
+import {
+  create_counter,
+  create_gauge,
+  createRelayerKey,
+  dial,
+  DialStatus,
+  randomInteger,
+  retimer
+} from '@hoprnet/hopr-utils'
 
 import { attemptClose } from '../utils/index.js'
+import { handshake } from 'it-handshake'
 
 const DEBUG_PREFIX = 'hopr-connect:relay'
 const DEFAULT_MAX_RELAYED_CONNECTIONS = 10
@@ -29,6 +38,31 @@ const DEFAULT_MAX_RELAYED_CONNECTIONS = 10
 const log = debug(DEBUG_PREFIX)
 const error = debug(DEBUG_PREFIX.concat(':error'))
 const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
+
+// Metrics
+const metric_countUsedRelays = create_gauge('connect_gauge_used_relays', 'Number of used relays')
+const metric_countConnsToRelays = create_gauge('connect_gauge_conns_to_relays', 'Number of connections to relays')
+const metric_countRelayedConns = create_gauge('connect_gauge_relayed_conns', 'Number of currently relayed connections')
+const metric_countSuccessfulIncomingRelayReqs = create_counter(
+  'connect_counter_successful_relay_reqs',
+  'Number of successful incoming relay requests'
+)
+const metric_countFailedIncomingRelayReqs = create_counter(
+  'connect_counter_failed_relay_reqs',
+  'Number of failed incoming relay requests'
+)
+const metric_countRelayReconnects = create_counter(
+  'connect_counter_relay_reconnects',
+  'Number of re-established relayed connections'
+)
+const metric_countSuccessfulConnects = create_counter(
+  'connect_counter_successful_conns',
+  'Number of successful connection attempts'
+)
+const metric_countFailedConnects = create_counter(
+  'connect_counter_failed_conns',
+  'Number of failed connection attempts'
+)
 
 function printUsedRelays(peers: PeerId[], prefix = '') {
   let out = `${prefix}\n`
@@ -161,6 +195,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
   public setUsedRelays(peers: PeerId[]) {
     log(printUsedRelays(peers, `set used relays:`))
+    metric_countUsedRelays.set(peers.length)
     this.usedRelays = peers
   }
 
@@ -176,6 +211,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       // Remove occurence of last `\n`
       log(outConns.substring(0, outConns.length - 1))
     }
+    metric_countRelayedConns.set(this.relayState.relayedConnectionCount())
 
     let outRelays = `Currently tracked connections to relays:\n`
     for (const relayPeerId of this.connectedToRelays) {
@@ -188,6 +224,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
     // Remove occurence of last `\n`
     log(outRelays.substring(0, outRelays.length - 1))
+    metric_countConnsToRelays.set(this.connectedToRelays.size)
   }
 
   /**
@@ -215,6 +252,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
           relay.toString()
         )} is not reachable`
       )
+      metric_countFailedConnects.increment()
       return
     }
 
@@ -233,6 +271,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
           error(`Error while closing unused connection to relay ${relay.toString()}`, err)
         }
       }
+      metric_countFailedConnects.increment()
       return
     }
 
@@ -241,6 +280,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     const conn = this.upgradeOutbound(relay, destination, handshakeResult.stream, options)
 
     log(`successfully established relay connection to ${relay.toString()}`)
+    metric_countSuccessfulConnects.increment()
 
     return conn
   }
@@ -367,12 +407,14 @@ class Relay implements Initializable, ConnectInitializable, Startable {
           conn.stream == undefined ? 'no stream was given' : ''
         }`
       )
+      metric_countFailedIncomingRelayReqs.increment()
       return
     }
 
     const handShakeResult = await new RelayHandshake(conn.stream, this.options).handle(conn.connection.remotePeer)
 
     if (!handShakeResult.success) {
+      metric_countFailedIncomingRelayReqs.increment()
       return
     }
 
@@ -388,8 +430,10 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     try {
       // Will call internal libp2p event handler, so no further action required
       upgradedConn = await this.getComponents().getUpgrader().upgradeInbound(newConn)
+      metric_countSuccessfulIncomingRelayReqs.increment()
     } catch (err) {
       error(`Could not upgrade relayed connection. Error was: ${err}`)
+      metric_countFailedIncomingRelayReqs.increment()
       return
     }
 
@@ -456,6 +500,8 @@ class Relay implements Initializable, ConnectInitializable, Startable {
         error(`Error while closing dead connection`, err)
       }
     }
+
+    metric_countRelayReconnects.increment()
   }
 }
 
