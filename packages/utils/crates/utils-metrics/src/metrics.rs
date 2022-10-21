@@ -397,6 +397,8 @@ mod tests {
 
         counter.increment(1);
 
+        assert_eq!(1, counter.get());
+
         let metrics = gather_all_metrics().unwrap();
         assert!(metrics.contains("my_ctr 1"));
     }
@@ -413,6 +415,9 @@ mod tests {
         counter.increment(&["1.89.20"], 1);
         counter.increment(&["1.90.1"], 15);
 
+        assert_eq!(25, counter.get(&["1.90.1"]).unwrap());
+        assert_eq!(1, counter.get(&["1.89.20"]).unwrap());
+
         let metrics = gather_all_metrics().unwrap();
         assert!(metrics.contains("my_mctr{version=\"1.90.1\"} 25"));
         assert!(metrics.contains("my_mctr{version=\"1.89.20\"} 1"));
@@ -427,10 +432,14 @@ mod tests {
 
         gauge.increment(10.0);
 
+        assert_eq!(10.0, gauge.get());
+
         let metrics = gather_all_metrics().unwrap();
         assert!(metrics.contains("my_gauge 10"));
 
         gauge.decrement(5.1);
+
+        assert_eq!(4.9, gauge.get());
 
         let metrics2 = gather_all_metrics().unwrap();
         assert!(metrics2.contains("my_gauge 4.9"));
@@ -449,6 +458,9 @@ mod tests {
         gauge.increment(&["1.90.1"], 15.0);
         gauge.decrement(&["1.89.20"], 2.0);
 
+        assert_eq!(25.0, gauge.get(&["1.90.1"]).unwrap());
+        assert_eq!(3.0, gauge.get(&["1.89.20"]).unwrap());
+
         let metrics = gather_all_metrics().unwrap();
         assert!(metrics.contains("my_mgauge{version=\"1.90.1\"} 25"));
         assert!(metrics.contains("my_mgauge{version=\"1.89.20\"} 3"));
@@ -465,6 +477,9 @@ mod tests {
         histogram.observe(2.0);
         histogram.observe(1.0);
         histogram.observe(5.0);
+
+        assert_eq!(4, histogram.get_sample_count());
+        assert_eq!(10.0, histogram.get_sample_sum());
 
         let metrics = gather_all_metrics().unwrap();
         assert!(metrics.contains("my_histogram_bucket{le=\"1\"} 1"));
@@ -486,6 +501,12 @@ mod tests {
         histogram.observe(&["1.90.0"],1.0);
         histogram.observe(&["1.90.0"],5.0);
         histogram.observe(&["1.89.20"], 10.0);
+
+        assert_eq!(1, histogram.get_sample_count(&["1.89.20"]).unwrap());
+        assert_eq!(10.0, histogram.get_sample_sum(&["1.89.20"]).unwrap());
+
+        assert_eq!(4, histogram.get_sample_count(&["1.90.0"]).unwrap());
+        assert_eq!(10.0, histogram.get_sample_sum(&["1.90.0"]).unwrap());
 
         let metrics = gather_all_metrics().unwrap();
         assert!(metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"1\"} 1"));
