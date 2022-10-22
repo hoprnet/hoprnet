@@ -306,8 +306,6 @@ export default class Heartbeat {
     // Will handle timeouts automatically
     const pingResults = await nAtATime(this.pingNode, pingWork, this.config.maxParallelHeartbeats)
 
-    metric_timeToHeartbeat.record_measure(metric_timer)
-
     for (const [resultIndex, pingResult] of pingResults.entries()) {
       if (pingResult instanceof Error) {
         // we need to get the destination so we can map a ping error properly
@@ -321,6 +319,8 @@ export default class Heartbeat {
         this.networkPeers.updateRecord(pingResult)
       }
     }
+
+    metric_timeToHeartbeat.record_measure(metric_timer)
 
     // Recalculate the network health indicator state after checking nodes
     this.recalculateNetworkHealth()
