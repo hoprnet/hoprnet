@@ -1,4 +1,4 @@
-import type { Connection } from '@libp2p/interface-connection'
+import type { Connection, MultiaddrConnection } from '@libp2p/interface-connection'
 import type { Listener as InterfaceListener, ListenerEvents } from '@libp2p/interface-transport'
 import { EventEmitter, CustomEvent } from '@libp2p/interfaces/events'
 
@@ -28,7 +28,7 @@ import {
 } from '../types.js'
 import { handleStunRequest, getExternalIp } from './stun.js'
 import { getAddrs } from './addrs.js'
-import { TCPConnection } from './tcp.js'
+import { fromSocket } from './tcp.js'
 import { RELAY_CHANGED_EVENT } from './entry.js'
 import { bindToPort, attemptClose, nodeToMultiaddr, cleanExistingConnections } from '../utils/index.js'
 
@@ -424,10 +424,10 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     // Avoid uncaught errors caused by unstable connections
     socket.on('error', (err) => error('socket error', err))
 
-    let maConn: TCPConnection | undefined
+    let maConn: MultiaddrConnection | undefined
 
     try {
-      maConn = TCPConnection.fromSocket(socket)
+      maConn = fromSocket(socket) as any
     } catch (err: any) {
       error(`inbound connection failed. ${err.message}`)
     }
