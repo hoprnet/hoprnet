@@ -248,6 +248,7 @@ pub mod wasm {
                 .map_err(as_jsvalue)
         }
 
+        /// Generate shared keys given the peer public keys
         pub fn generate(peer_pubkeys: Vec<Uint8Array>) -> Result<SharedKeys, JsValue> {
             super::SharedKeys::generate(&mut OsRng, peer_pubkeys.iter().map(|v| v.to_vec().into_boxed_slice()).collect())
                 .map(|m| SharedKeys { w: m})

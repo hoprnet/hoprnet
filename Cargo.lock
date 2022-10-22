@@ -288,6 +288,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "hoprd-misc"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "real-base",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+]
+
+[[package]]
 name = "inout"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
