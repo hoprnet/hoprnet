@@ -311,8 +311,10 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
           }
           deferred.resolve()
         } catch (err: any) {
-          this.queueStatusMessage(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP))
           deferred.reject(err)
+        } finally {
+          // end connection
+          this.queueStatusMessage(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP))
         }
       }.call({
         queueStatusMessage: this.queueStatusMessage,
