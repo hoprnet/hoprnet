@@ -26,15 +26,8 @@ type SocketOptions = {
 /**
  * Class to encapsulate TCP sockets
  */
-export function TCPConnection(remoteAddr: Multiaddr, socket: Socket, options?: SocketOptions) {
+export function TCPConnection(remoteAddr: Multiaddr, socket: Socket, options?: SocketOptions): MultiaddrConnection {
   const closeTimeout = options?.closeTimeout ?? SOCKET_CLOSE_TIMEOUT
-
-  const timeline: {
-    open: number
-    close?: number
-  } = {
-    open: Date.now()
-  }
 
   let closed = false
 
@@ -42,7 +35,7 @@ export function TCPConnection(remoteAddr: Multiaddr, socket: Socket, options?: S
     // Whenever the socket gets closed, mark the
     // connection closed to cleanup data structures in
     // ConnectionManager
-    timeline.close ??= Date.now()
+    maConn.timeline.close ??= Date.now()
   })
 
   // Assign various connection properties once we're sure that public keys match,
@@ -67,105 +60,112 @@ export function TCPConnection(remoteAddr: Multiaddr, socket: Socket, options?: S
     log(`SOCKET CLOSE on connection to ${remoteAddr.toString()}: error flag is ${had_error}`)
   })
 
-  const { sink, source } = toIterable.duplex(socket)
-  return {
-    localAddr: nodeToMultiaddr(socket.address() as AddressInfo),
-    remoteAddr,
-    timeline,
-    close(): Promise<void> {
-      if (socket.destroyed || closed) {
-        return Promise.resolve()
-      }
-      closed = true
+  const close = (): Promise<void> => {
+    if (socket.destroyed || closed) {
+      return Promise.resolve()
+    }
+    closed = true
 
-      return new Promise<void>((resolve, reject) => {
-        let done = false
+    return new Promise<void>((resolve, reject) => {
+      let done = false
 
-        const start = Date.now()
+      const start = Date.now()
 
-        const timer = retimer(() => {
-          if (done) {
-            return
-          }
-          done = true
+      const timer = retimer(() => {
+        if (done) {
+          return
+        }
+        done = true
 
-          const cOptions = remoteAddr.toOptions()
-          log(
-            'timeout closing socket to %s:%s after %dms, destroying it manually',
-            cOptions.host,
-            cOptions.port,
-            Date.now() - start
-          )
+        const cOptions = remoteAddr.toOptions()
+        log(
+          'timeout closing socket to %s:%s after %dms, destroying it manually',
+          cOptions.host,
+          cOptions.port,
+          Date.now() - start
+        )
 
-          if (socket.destroyed) {
-            log('%s:%s is already destroyed', cOptions.host, cOptions.port)
-          } else {
-            log(`destroying connection ${cOptions.host}:${cOptions.port}`)
-            socket.destroy()
-          }
-        }, closeTimeout)
-
-        // Resolve once closed
-        // Could take place after timeout or as a result of `.end()` call
-        socket.once('close', () => {
-          if (done) {
-            return
-          }
-          done = true
-          timer.clear()
-
-          resolve()
-        })
-
-        socket.once('error', (err: Error) => {
-          log('socket error', err)
-
-          // error closing socket
-          timeline.close ??= Date.now()
-
-          if (socket.destroyed) {
-            done = true
-            timer.clear()
-          }
-
-          reject(err)
-        })
-
-        // Send the FIN packet
-        socket.end()
-
-        if (socket.writableLength > 0) {
-          // there are outgoing bytes waiting to be sent
-          socket.once('drain', () => {
-            log('socket drained')
-
-            // all bytes have been sent we can destroy the socket (maybe) before the timeout
-            socket.destroy()
-          })
+        if (socket.destroyed) {
+          log('%s:%s is already destroyed', cOptions.host, cOptions.port)
         } else {
-          // nothing to send, destroy immediately
+          log(`destroying connection ${cOptions.host}:${cOptions.port}`)
           socket.destroy()
         }
-      })
-    },
-    source: options?.signal != undefined ? abortableSource(source, options.signal) : source,
-    async sink(source: StreamSource): Promise<void> {
-      try {
-        await sink(options?.signal != undefined ? (abortableSource(source, options.signal) as StreamSource) : source)
-      } catch (err: any) {
-        // If aborted we can safely ignore
-        if (err.code !== 'ABORT_ERR' && err.type !== 'aborted') {
-          // If the source errored the socket will already have been destroyed by
-          // toIterable.duplex(). If the socket errored it will already be
-          // destroyed. There's nothing to do here except log the error & return.
-          error(`unexpected error in TCP sink function`, err)
-        }
-      }
+      }, closeTimeout)
 
-      // End the socket (= send FIN packet) unless otherwise requested
+      // Resolve once closed
+      // Could take place after timeout or as a result of `.end()` call
+      socket.once('close', () => {
+        if (done) {
+          return
+        }
+        done = true
+        timer.clear()
+
+        resolve()
+      })
+
+      socket.once('error', (err: Error) => {
+        log('socket error', err)
+
+        // error closing socket
+        maConn.timeline.close ??= Date.now()
+
+        if (socket.destroyed) {
+          done = true
+          timer.clear()
+        }
+
+        reject(err)
+      })
+
+      // Send the FIN packet
       socket.end()
-    }
+
+      if (socket.writableLength > 0) {
+        // there are outgoing bytes waiting to be sent
+        socket.once('drain', () => {
+          log('socket drained')
+
+          // all bytes have been sent we can destroy the socket (maybe) before the timeout
+          socket.destroy()
+        })
+      } else {
+        // nothing to send, destroy immediately
+        socket.destroy()
+      }
+    })
   }
+
+  const sinkEndpoint = async (source: StreamSource): Promise<void> => {
+    try {
+      await sink(options?.signal != undefined ? (abortableSource(source, options.signal) as StreamSource) : source)
+    } catch (err: any) {
+      // If aborted we can safely ignore
+      if (err.code !== 'ABORT_ERR' && err.type !== 'aborted') {
+        // If the source errored the socket will already have been destroyed by
+        // toIterable.duplex(). If the socket errored it will already be
+        // destroyed. There's nothing to do here except log the error & return.
+        error(`unexpected error in TCP sink function`, err)
+      }
+    }
+
+    // End the socket (= send FIN packet) unless otherwise requested
+    socket.end()
+  }
+  const { sink, source } = toIterable.duplex<Uint8Array>(socket)
+  const maConn = {
+    localAddr: nodeToMultiaddr(socket.address() as AddressInfo),
+    remoteAddr,
+    timeline: {
+      open: Date.now()
+    } as MultiaddrConnection['timeline'],
+    close,
+    source: options?.signal != undefined ? abortableSource(source, options.signal) : source,
+    sink: sinkEndpoint
+  }
+
+  return maConn
 }
 
 export async function createTCPConnection(ma: Multiaddr, options?: SocketOptions): Promise<MultiaddrConnection> {
