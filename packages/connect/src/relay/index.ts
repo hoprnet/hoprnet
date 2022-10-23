@@ -13,9 +13,9 @@ import errCode from 'err-code'
 import debug from 'debug'
 import chalk from 'chalk'
 
-import { WebRTCConnection } from '../webrtc/index.js'
+import { WebRTCConnection, type WebRTCConnectionInterface } from '../webrtc/index.js'
 import { RELAY_PROTOCOLS, DELIVERY_PROTOCOLS, OK, CAN_RELAY_PROTOCOLS } from '../constants.js'
-import { RelayConnection } from './connection.js'
+import { RelayConnection, type RelayConnectionInterface } from './connection.js'
 import { RelayHandshake, RelayHandshakeMessage } from './handshake.js'
 import { RelayState } from './state.js'
 import { createRelayerKey, dial, DialStatus, randomInteger, retimer } from '@hoprnet/hopr-utils'
@@ -208,7 +208,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     relay: PeerId,
     destination: PeerId,
     options?: DialOptions
-  ): Promise<RelayConnection | WebRTCConnection | undefined> {
+  ): Promise<RelayConnectionInterface | WebRTCConnectionInterface | undefined> {
     const response = await dial(
       this.getComponents(),
       relay,
@@ -257,8 +257,8 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     destination: PeerId,
     stream: Stream,
     opts?: DialOptions
-  ): RelayConnection | WebRTCConnection {
-    const conn = new RelayConnection(
+  ): RelayConnectionInterface | WebRTCConnectionInterface {
+    const conn = RelayConnection(
       stream,
       relay,
       destination,
@@ -269,7 +269,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     )
 
     if (!this.testingOptions.__noWebRTCUpgrade) {
-      return new WebRTCConnection(conn, {
+      return WebRTCConnection(conn, {
         __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade,
         ...opts
       })
@@ -278,8 +278,12 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     }
   }
 
-  private upgradeInbound(initiator: PeerId, relay: PeerId, stream: Stream): RelayConnection | WebRTCConnection {
-    const conn = new RelayConnection(
+  private upgradeInbound(
+    initiator: PeerId,
+    relay: PeerId,
+    stream: Stream
+  ): RelayConnectionInterface | WebRTCConnectionInterface {
+    const conn = RelayConnection(
       stream,
       relay,
       initiator,
@@ -290,7 +294,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     )
 
     if (!this.testingOptions.__noWebRTCUpgrade) {
-      return new WebRTCConnection(conn, this.testingOptions)
+      return WebRTCConnection(conn, this.testingOptions)
     } else {
       return conn
     }
@@ -422,7 +426,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
    * @param relayConn new relayed connection
    * @param counterparty counterparty of the relayed connection
    */
-  private async onReconnect(relayConn: RelayConnection, counterparty: PeerId): Promise<void> {
+  private async onReconnect(relayConn: RelayConnectionInterface, counterparty: PeerId): Promise<void> {
     log(`####### inside reconnect #######`)
 
     let newConn: Connection
@@ -434,7 +438,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
         newConn = await this.getComponents()
           .getUpgrader()
           .upgradeInbound(
-            new WebRTCConnection(relayConn, this.testingOptions, {
+            WebRTCConnection(relayConn, this.testingOptions, {
               // libp2p interface type clash
               upgrader: this.getComponents().getUpgrader() as any
             })

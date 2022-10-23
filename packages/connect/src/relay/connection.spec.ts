@@ -1,6 +1,6 @@
-import { RelayConnection, statusMessagesCompare } from './connection.js'
+import { RelayConnection, RelayConnectionInterface, statusMessagesCompare } from './connection.js'
 import assert from 'assert'
-import { u8aEquals } from '@hoprnet/hopr-utils'
+import { defer, u8aEquals } from '@hoprnet/hopr-utils'
 
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { EventEmitter, once } from 'events'
@@ -42,7 +42,7 @@ describe('relay connection', function () {
   it('ping message', async function () {
     const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
 
-    new RelayConnection(
+    RelayConnection(
       AliceRelay,
       Relay,
       Bob,
@@ -66,7 +66,7 @@ describe('relay connection', function () {
   it('forward payload', async function () {
     const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
 
-    const alice = new RelayConnection(
+    const alice = RelayConnection(
       AliceRelay,
       Relay,
       Bob,
@@ -107,7 +107,7 @@ describe('relay connection', function () {
   it('stop a relayed connection from the relay', async function () {
     const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
 
-    const alice = new RelayConnection(
+    const alice = RelayConnection(
       AliceRelay,
       Relay,
       Bob,
@@ -133,7 +133,7 @@ describe('relay connection', function () {
       assert.fail(`Stream should be closed`)
     }
 
-    assert(alice.state.destroyed, `Stream must be destroyed`)
+    assert(alice.isDestroyed(), `Stream must be destroyed`)
 
     assert(
       alice.timeline.close != undefined && Date.now() >= alice.timeline.close,
@@ -144,7 +144,7 @@ describe('relay connection', function () {
   it('stop a relayed connection from the client', async function () {
     const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
 
-    const alice = new RelayConnection(
+    const alice = RelayConnection(
       AliceRelay,
       Relay,
       Bob,
@@ -177,7 +177,7 @@ describe('relay connection', function () {
       assert.fail(`Stream must have ended`)
     }
 
-    assert(alice.state.destroyed, `Stream must be destroyed`)
+    assert(alice.isDestroyed(), `Stream must be destroyed`)
 
     assert(
       alice.timeline.close != undefined && Date.now() >= alice.timeline.close,
@@ -188,9 +188,11 @@ describe('relay connection', function () {
   it('reconnect before using stream and use new stream', async function () {
     const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
 
-    let aliceAfterReconnect: RelayConnection | undefined
+    let aliceAfterReconnect: RelayConnectionInterface | undefined
 
-    const alice = new RelayConnection(
+    const restarted = defer<void>()
+
+    const alice = RelayConnection(
       AliceRelay,
       Relay,
       Bob,
@@ -199,8 +201,9 @@ describe('relay connection', function () {
       {
         __noWebRTCUpgrade: true
       },
-      async (newStream: RelayConnection) => {
+      async (newStream: RelayConnectionInterface) => {
         aliceAfterReconnect = newStream
+        restarted.resolve()
       }
     )
 
@@ -216,7 +219,7 @@ describe('relay connection', function () {
 
     relayShaker.write(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.RESTART))
 
-    await once(alice, 'restart')
+    await restarted.promise
 
     aliceShakerBeforeReconnect.write(new TextEncoder().encode('Hello from Alice before reconnect'))
 
@@ -246,9 +249,11 @@ describe('relay connection', function () {
   it('reconnect before using stream and use new stream', async function () {
     const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
 
-    let aliceAfterReconnect: RelayConnection | undefined
+    let aliceAfterReconnect: RelayConnectionInterface | undefined
 
-    const alice = new RelayConnection(
+    let restarted = defer<void>()
+
+    const alice = RelayConnection(
       AliceRelay,
       Relay,
       Bob,
@@ -257,7 +262,9 @@ describe('relay connection', function () {
       {
         __noWebRTCUpgrade: true
       },
-      async (newStream: RelayConnection) => {
+      async (newStream: RelayConnectionInterface) => {
+        restarted.resolve()
+        restarted = defer<void>()
         aliceAfterReconnect = newStream
       }
     )
@@ -288,7 +295,7 @@ describe('relay connection', function () {
     for (let i = 0; i < ATTEMPTS; i++) {
       relayShaker.write(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.RESTART))
 
-      await once(alice, 'restart')
+      await restarted.promise
 
       aliceShakerBeforeReconnect.write(new TextEncoder().encode('Hello from Alice before reconnect'))
 
@@ -321,7 +328,7 @@ describe('relay connection', function () {
 
     const [AliceRelay, RelayAlice] = duplexPair<StreamType>()
 
-    new RelayConnection(
+    RelayConnection(
       AliceRelay,
       Relay,
       Bob,
@@ -381,7 +388,9 @@ describe('relay connection', function () {
     let webRTCAfterReconnect: WebRTC | undefined
     let secondAttempt = false
 
-    const alice = new RelayConnection(
+    let restarted = defer<void>()
+
+    RelayConnection(
       AliceRelay,
       Relay,
       Bob,
@@ -413,7 +422,10 @@ describe('relay connection', function () {
       {
         __noWebRTCUpgrade: false
       },
-      async () => {}
+      async () => {
+        restarted.resolve()
+        restarted = defer<void>()
+      }
     )
 
     const relayShaker = handshake(RelayAlice)
@@ -448,7 +460,7 @@ describe('relay connection', function () {
     for (let i = 0; i < ATTEMPTS; i++) {
       relayShaker.write(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.RESTART))
 
-      await once(alice, 'restart')
+      await restarted.promise
 
       webRTC.emit('signal', {
         message: webRTCResponse
@@ -480,7 +492,7 @@ describe('relay connection - stream error propagation', function () {
 
     const errorInSource = 'error in source'
 
-    const alice = new RelayConnection(
+    const alice = RelayConnection(
       RelayAlice,
       Relay,
       Bob,
@@ -511,7 +523,7 @@ describe('relay connection - stream error propagation', function () {
 
     const errorInSinkFunction = 'error in sink function'
 
-    const alice = new RelayConnection(
+    const alice = RelayConnection(
       {
         sink: () => Promise.reject(Error(errorInSinkFunction)),
         source: RelayAlice.source
@@ -541,7 +553,7 @@ describe('relay connection - stream error propagation', function () {
 
     const errorInSource = 'error in source'
 
-    const alice = new RelayConnection(
+    const alice = RelayConnection(
       {
         sink: AliceRelay.sink,
         source: (async function* () {

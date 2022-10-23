@@ -255,6 +255,10 @@ function RelayContext(
     log(`updating`)
   }
 
+  let onSinkError = (err: any) => {
+    error(`sink threw error before source attach`, err)
+  }
+
   /**
    * Called with a stream of messages to be sent. This resolves
    * the sinkSourcePromise such that the sinkFunction can fetch
@@ -263,29 +267,24 @@ function RelayContext(
    * @param source stream of messages to be sent
    * @returns a Promise that resovles once the source stream ends
    */
-  const sink = (): ((source: Stream['source']) => Promise<void>) => {
-    let deferred = defer<void>()
+  const sink = (source: Stream['source']): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      onSinkError = reject
 
-    // forward sink stream errors
-    createSink().catch(deferred.reject)
-
-    return async (source: Stream['source']) => {
       state._sinkSourceAttachedPromise.resolve({
         type: ConnectionEventTypes.SINK_SOURCE_ATTACHED,
         value: (async function* () {
           try {
             yield* source
-            deferred.resolve()
+            resolve()
           } catch (err) {
             // Close stream
             queueStatusMessage(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP))
-            deferred.reject(err)
+            reject(err)
           }
         })()
       })
-
-      return deferred.promise
-    }
+    })
   }
 
   /**
@@ -654,10 +653,13 @@ function RelayContext(
     }
   }
 
+  // forward sink stream errors
+  createSink().catch(onSinkError)
+
   return {
     ping,
     source: createSource(),
-    sink: sink(),
+    sink,
     update
   }
 }
