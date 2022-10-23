@@ -138,29 +138,29 @@ function RelayContext(
   /**
    * Log messages and add identity tag to distinguish multiple instances
    */
-  const log = (..._: any[]) => {
-    _log(`RX [${_id}]`, ...arguments)
+  const log = (...args: any[]) => {
+    _log(`RX [${_id}]`, ...args)
   }
 
   /**
    * Log verbose messages and add identity tag to distinguish multiple instances
    */
-  const verbose = (..._: any[]) => {
-    _verbose(`RX [${_id}]`, ...arguments)
+  const verbose = (...args: any[]) => {
+    _verbose(`RX [${_id}]`, ...args)
   }
 
   /**
    * Log errors and add identity tag to distinguish multiple instances
    */
-  const error = (..._: any[]) => {
-    _error(`RX [${_id}]`, ...arguments)
+  const error = (...args: any[]) => {
+    _error(`RX [${_id}]`, ...args)
   }
 
   /**
    * Log control flow and add identity tag to distinguish multiple instances
    */
-  const flow = (..._: any[]) => {
-    _flow(`RX [${_id}]`, ...arguments)
+  const flow = (...args: any[]) => {
+    _flow(`RX [${_id}]`, ...args)
   }
 
   /**
