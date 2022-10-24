@@ -120,4 +120,44 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixture, AccountsFixture {
         );
         hoprChannels.fundChannelMulti(accountA.accountAddr, accountB.accountAddr, amount1, amount2);
     }
+    function testFailFundChannelMulti_SameSourceAndDestination(uint256 amount1, uint256 amount2) public {
+        amount1 = bound(amount1, 1, 1e36);
+        amount2 = bound(amount2, 1, 1e36);
+        // accountA is announced
+        bytes memory multiAddress = hex"1234";
+        vm.prank(accountA.accountAddr);
+        hoprChannels.announce(accountA.publicKey, multiAddress);
+        vm.prank(address(1));
+        hoprChannels.fundChannelMulti(accountA.accountAddr, accountA.accountAddr, amount1, amount2);
+    }
+    function testFailFundChannelMulti_FromSourceZero(uint256 amount1, uint256 amount2) public {
+        amount1 = bound(amount1, 1, 1e36);
+        amount2 = bound(amount2, 1, 1e36);
+        // accountA is announced
+        bytes memory multiAddress = hex"1234";
+        vm.prank(accountA.accountAddr);
+        hoprChannels.announce(accountA.publicKey, multiAddress);
+        vm.prank(address(1));
+        hoprChannels.fundChannelMulti(address(0), accountA.accountAddr, amount1, amount2);
+    }
+    function testFailFundChannelMulti_ToDestinationZero(uint256 amount1, uint256 amount2) public {
+        amount1 = bound(amount1, 1, 1e36);
+        amount2 = bound(amount2, 1, 1e36);
+        // accountA is announced
+        bytes memory multiAddress = hex"1234";
+        vm.prank(accountA.accountAddr);
+        hoprChannels.announce(accountA.publicKey, multiAddress);
+        vm.prank(address(1));
+        hoprChannels.fundChannelMulti(accountA.accountAddr, address(0), amount1, amount2);
+    }
+    function testFailFundChannelMulti_AmountZero() public {
+        // both accountA and accountB are announced
+        bytes memory multiAddress = hex"1234";
+        vm.prank(accountA.accountAddr);
+        hoprChannels.announce(accountA.publicKey, multiAddress);
+        vm.prank(accountB.accountAddr);
+        hoprChannels.announce(accountB.publicKey, multiAddress);
+        vm.prank(address(1));
+        hoprChannels.fundChannelMulti(accountA.accountAddr, address(0), 0, 0);
+    }
 }
