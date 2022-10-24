@@ -117,6 +117,7 @@ export async function createLibp2pInstance(
       ],
       streamMuxers: [new Mplex()],
       connectionEncryption: [new Noise()],
+      // @ts-ignore forked DHT
       dht: new KadDHT({
         // Protocol prefixes require a trailing slash
         // @TODO disabled for compatibility reasons
