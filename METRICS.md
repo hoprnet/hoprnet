@@ -98,3 +98,9 @@ The following sections document the metrics per package:
 | `hoprd_gauge_nodejs_total_available_heap_bytes` | gauge       | V8 total available heap size in bytes                             | unit: bytes                              |
 | `hoprd_gauge_nodejs_num_native_contexts`        | gauge       | V8 number of active top-level native contexts                     | unit: bytes, increase indicates mem leak |
 | `hoprd_gauge_nodejs_num_detached_contexts`      | gauge       | V8 number of detached contexts which are not GCd                  | unit: bytes, non-zero indicates mem leak |
+
+### utils
+
+| Name                                                    | Type    | Description                                        | Note |
+| ------------------------------------------------------- | ------- | -------------------------------------------------- | ---- |
+| `utils_counter_suppressed_unhandled_promise_rejections` | counter | Counter of suppressed unhandled promise rejections |      |
