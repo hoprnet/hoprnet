@@ -14413,15 +14413,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"it-length-prefixed@npm:^7.0.0, it-length-prefixed@npm:^7.0.1":
+"it-length-prefixed@https://github.com/hoprnet/it-length-prefixed/archive/refs/tags/v7.0.3.tar.gz":
   version: 7.0.1
-  resolution: "it-length-prefixed@npm:7.0.1"
+  resolution: "it-length-prefixed@https://github.com/hoprnet/it-length-prefixed/archive/refs/tags/v7.0.3.tar.gz"
   dependencies:
     err-code: ^3.0.1
     it-stream-types: ^1.0.4
     uint8arraylist: ^1.2.0
     varint: ^6.0.0
-  checksum: 74edf7192fc72e03942c4d84e614f703e3edaa84aa49e03403259ce6bd7d7609ba81bb71b92bb2a355a447d087c7e25579d324e58383a05119e99cf623c9b5c3
+  checksum: 59b18102205576b72043c3bfdd7216fba6e45525757c84c78bc629c3d101eab9dcb20fa532a490575660f0ef8f6d5b1b9cd5cce48237e1ba8923f130fc1fcb8d
   languageName: node
   linkType: hard
 
