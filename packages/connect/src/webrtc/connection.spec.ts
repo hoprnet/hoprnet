@@ -34,7 +34,8 @@ describe('test webrtc connection', function () {
         sendUpgraded: () => {},
         getCurrentChannel: () => fakedWebRTCInstance
       } as RelayConnectionInterface,
-      {}
+      {},
+      () => {}
     )
 
     const AliceShaker = handshake(conn)
@@ -75,7 +76,8 @@ describe('test webrtc connection', function () {
         },
         getCurrentChannel: () => webRTCInstance
       } as RelayConnectionInterface,
-      {}
+      {},
+      () => {}
     )
 
     const BobShaker = handshake(AliceBob)
@@ -99,7 +101,8 @@ describe('test webrtc connection', function () {
         sendUpgraded: () => {},
         getCurrentChannel: () => webRTCInstance
       } as RelayConnectionInterface,
-      {}
+      {},
+      () => {}
     )
 
     const BobShaker = handshake(AliceBob)
@@ -124,7 +127,8 @@ describe('test webrtc connection', function () {
         ...BobAlice,
         getCurrentChannel: () => webRTCInstance
       } as RelayConnectionInterface,
-      {}
+      {},
+      () => {}
     )
 
     const AliceShaker = handshake(conn)
@@ -163,7 +167,8 @@ describe('test webrtc connection', function () {
         sendUpgraded: () => {},
         getCurrentChannel: () => webRTCInstance
       } as RelayConnectionInterface,
-      {}
+      {},
+      () => {}
     )
 
     const AliceShaker = handshake(conn)
@@ -223,7 +228,8 @@ describe('test webrtc connection', function () {
         sendUpgraded: () => {},
         getCurrentChannel: () => webRTCInstance
       } as RelayConnectionInterface,
-      {}
+      {},
+      () => {}
     )
 
     const AliceShaker = handshake(conn)
@@ -284,6 +290,7 @@ describe('test webrtc connection', function () {
         getCurrentChannel: () => webRTCInstance
       } as RelayConnectionInterface,
       {},
+      () => {},
       {
         signal: abort.signal,
         upgrader: undefined as any
@@ -323,7 +330,8 @@ describe('webrtc connection - stream error propagation', function () {
         sendUpgraded: () => {},
         getCurrentChannel: () => fakedWebRTCInstance
       } as RelayConnectionInterface,
-      {}
+      {},
+      () => {}
     )
 
     await assert.rejects(
@@ -360,7 +368,8 @@ describe('webrtc connection - stream error propagation', function () {
         sendUpgraded: () => {},
         getCurrentChannel: () => fakedWebRTCInstance
       } as RelayConnectionInterface,
-      {}
+      {},
+      () => {}
     )
 
     await waitForError.promise
@@ -383,7 +392,8 @@ describe('webrtc connection - stream error propagation', function () {
         sendUpgraded: () => {},
         getCurrentChannel: () => fakedWebRTCInstance
       } as RelayConnectionInterface,
-      {}
+      {},
+      () => {}
     )
 
     await assert.rejects(
@@ -415,7 +425,8 @@ describe('webrtc connection - stream error propagation', function () {
         sendUpgraded: () => {},
         getCurrentChannel: () => fakedWebRTCInstance
       } as RelayConnectionInterface,
-      {}
+      {},
+      () => {}
     )
 
     await assert.rejects(

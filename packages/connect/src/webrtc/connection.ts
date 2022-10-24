@@ -76,6 +76,7 @@ type SinkEvent = PayloadEvent | SinkSourceAttachedEvent | WebRTCInitFinishedEven
 
 export interface WebRTCConnectionInterface extends MultiaddrConnection {
   tags: PeerConnectionType[]
+  setOnClose: (closeHandler: () => void) => void
 }
 /**
  * Encapsulate state management and upgrade from relayed connection to
@@ -98,6 +99,7 @@ export interface WebRTCConnectionInterface extends MultiaddrConnection {
 export function WebRTCConnection(
   relayConn: RelayConnectionInterface,
   testingOptions: HoprConnectTestingOptions,
+  onClose: (() => void) | undefined,
   options?: DialOptions
 ): WebRTCConnectionInterface {
   const state: {
@@ -129,6 +131,10 @@ export function WebRTCConnection(
     conn: relayConn
   }
 
+  const timeline: MultiaddrConnection['timeline'] = {
+    open: Date.now()
+  }
+
   const tags = [PeerConnectionType.WEBRTC_RELAYED]
 
   const _id = u8aToHex(randomBytes(4), false)
@@ -144,7 +150,7 @@ export function WebRTCConnection(
 
   relayConn.getCurrentChannel()?.once('close', () => {
     state.destroyed = true
-    maConn.timeline.close ??= Date.now()
+    timeline.close ??= Date.now()
   })
 
   // Attach a listener to WebRTC to cleanup state
@@ -154,7 +160,8 @@ export function WebRTCConnection(
   relayConn.getCurrentChannel()?.on('iceStateChange', (iceConnectionState: string, iceGatheringState: string) => {
     if (iceConnectionState === 'disconnected' && iceGatheringState === 'complete') {
       state.destroyed = true
-      maConn.timeline.close ??= Date.now()
+      timeline.close ??= Date.now()
+      onClose?.()
     }
   })
   /**
@@ -185,6 +192,10 @@ export function WebRTCConnection(
 
   let onSinkError = (err: any) => {
     error(`sink threw error before source attach`, err)
+  }
+
+  const setOnClose = (closeHandler: () => void) => {
+    onClose = closeHandler
   }
 
   /**
@@ -483,7 +494,8 @@ export function WebRTCConnection(
           error(`WebRTC sink err`, err)
           // Initiates Connection object teardown
           // by using meta programming
-          maConn.timeline.close ??= Date.now()
+          timeline.close ??= Date.now()
+          onClose?.()
         }
     }
   }
@@ -609,7 +621,8 @@ export function WebRTCConnection(
     }
 
     // Tell libp2p that connection is closed
-    maConn.timeline.close = Date.now()
+    timeline.close = Date.now()
+    onClose?.()
     state.destroyed = true
 
     try {
@@ -628,7 +641,7 @@ export function WebRTCConnection(
     log(`Connection to ${remoteAddr} has been destroyed`)
   }
 
-  const maConn = {
+  return {
     sink,
     source: options?.signal != undefined ? abortableSource(createSource(), options.signal) : createSource(),
     close,
@@ -636,10 +649,7 @@ export function WebRTCConnection(
     remoteAddr,
     // Set magic *close* property to end connection
     // @dev this is done using meta programming in libp2p
-    timeline: {
-      open: Date.now()
-    } as MultiaddrConnection['timeline']
+    timeline,
+    setOnClose
   }
-
-  return maConn
 }

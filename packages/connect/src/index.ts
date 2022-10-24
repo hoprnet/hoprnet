@@ -3,6 +3,7 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Initializable, Components } from '@libp2p/interfaces/components'
 import type { Startable } from '@libp2p/interfaces/startable'
 import type { Connection, MultiaddrConnection } from '@libp2p/interface-connection'
+import { CustomEvent } from '@libp2p/interfaces/events'
 
 import errCode from 'err-code'
 import Debug from 'debug'
@@ -237,13 +238,28 @@ class HoprConnect implements Transport, Initializable, Startable {
   private async dialWithRelay(relay: PeerId, destination: PeerId, options: DialOptions): Promise<Connection> {
     log(`Dialing ${chalk.yellow(`/p2p/${relay.toString()}/p2p-circuit/p2p/${destination.toString()}`)}`)
 
-    let maConn = await this.getConnectComponents().getRelay().connect(relay, destination, options)
+    let conn: Connection | undefined
+
+    let maConn = await this.getConnectComponents()
+      .getRelay()
+      .connect(
+        relay,
+        destination,
+        () => {
+          if (conn) {
+            ;(this.components as Components).getUpgrader().dispatchEvent(
+              new CustomEvent(`connectionEnd`, {
+                detail: conn
+              })
+            )
+          }
+        },
+        options
+      )
 
     if (maConn == undefined) {
       throw Error(`Could not establish relayed connection.`)
     }
-
-    let conn: Connection
 
     try {
       conn = await options.upgrader.upgradeOutbound(maConn)
@@ -282,13 +298,26 @@ class HoprConnect implements Transport, Initializable, Startable {
   public async dialDirectly(ma: Multiaddr, options: DialOptions): Promise<Connection> {
     log(`Dialing ${chalk.yellow(ma.toString())}`)
 
-    const maConn = await createTCPConnection(ma, options)
+    let conn: Connection | undefined
+    const maConn = await createTCPConnection(
+      ma,
+      () => {
+        if (conn) {
+          ;(this.components as Components).getUpgrader().dispatchEvent(
+            new CustomEvent(`connectionEnd`, {
+              detail: conn
+            })
+          )
+        }
+      },
+      options
+    )
 
     verbose(
       `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshake.`
     )
 
-    const conn = await timeout(DEFAULT_CONNECTION_UPGRADE_TIMEOUT, () => options.upgrader.upgradeOutbound(maConn))
+    conn = await timeout(DEFAULT_CONNECTION_UPGRADE_TIMEOUT, () => options.upgrader.upgradeOutbound(maConn))
 
     // Not supposed to throw any exception
     cleanExistingConnections(this.components as Components, conn.remotePeer, conn.id, error)

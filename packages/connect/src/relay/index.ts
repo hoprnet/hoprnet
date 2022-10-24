@@ -207,6 +207,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
   public async connect(
     relay: PeerId,
     destination: PeerId,
+    onClose: () => void,
     options?: DialOptions
   ): Promise<RelayConnectionInterface | WebRTCConnectionInterface | undefined> {
     const response = await dial(
@@ -245,7 +246,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
     this.connectedToRelays.add(relay.toString())
 
-    const conn = this.upgradeOutbound(relay, destination, handshakeResult.stream, options)
+    const conn = this.upgradeOutbound(relay, destination, handshakeResult.stream, onClose, options)
 
     log(`successfully established relay connection to ${relay.toString()}`)
 
@@ -256,6 +257,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     relay: PeerId,
     destination: PeerId,
     stream: Stream,
+    onClose: () => void,
     opts?: DialOptions
   ): RelayConnectionInterface | WebRTCConnectionInterface {
     const conn = RelayConnection(
@@ -263,16 +265,21 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       relay,
       destination,
       'outbound',
+      this.testingOptions.__noWebRTCUpgrade ? undefined : onClose,
       this.getConnectComponents(),
       this.testingOptions,
       this.onReconnect as Relay['onReconnect']
     )
 
     if (!this.testingOptions.__noWebRTCUpgrade) {
-      return WebRTCConnection(conn, {
-        __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade,
-        ...opts
-      })
+      return WebRTCConnection(
+        conn,
+        {
+          __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade,
+          ...opts
+        },
+        onClose
+      )
     } else {
       return conn
     }
@@ -281,20 +288,22 @@ class Relay implements Initializable, ConnectInitializable, Startable {
   private upgradeInbound(
     initiator: PeerId,
     relay: PeerId,
-    stream: Stream
+    stream: Stream,
+    onClose: () => void
   ): RelayConnectionInterface | WebRTCConnectionInterface {
     const conn = RelayConnection(
       stream,
       relay,
       initiator,
       'inbound',
+      this.testingOptions.__noWebRTCUpgrade ? undefined : onClose,
       this.getConnectComponents(),
       this.testingOptions,
       this.onReconnect as Relay['onReconnect']
     )
 
     if (!this.testingOptions.__noWebRTCUpgrade) {
-      return WebRTCConnection(conn, this.testingOptions)
+      return WebRTCConnection(conn, this.testingOptions, onClose)
     } else {
       return conn
     }
@@ -389,13 +398,23 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
     log(`incoming connection from ${handShakeResult.counterparty.toString()}`)
 
+    let upgradedConn: Connection | undefined
+
     const newConn = this.upgradeInbound(
       handShakeResult.counterparty,
       conn.connection.remotePeer,
-      handShakeResult.stream
+      handShakeResult.stream,
+      () => {
+        if (upgradedConn) {
+          ;(this.components as Components).getUpgrader().dispatchEvent(
+            new CustomEvent(`connectionEnd`, {
+              detail: upgradedConn
+            })
+          )
+        }
+      }
     )
 
-    let upgradedConn: Connection
     try {
       // Will call internal libp2p event handler, so no further action required
       upgradedConn = await this.getComponents().getUpgrader().upgradeInbound(newConn)
@@ -431,20 +450,26 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
     let newConn: Connection
 
+    const onClose = () => {
+      if (newConn) {
+        ;(this.components as Components).getUpgrader().dispatchEvent(
+          new CustomEvent(`connectionEnd`, {
+            detail: newConn
+          })
+        )
+      }
+    }
+
     log(`Handling reconnect attempt to ${counterparty.toString()}`)
 
     try {
       if (!this.testingOptions.__noWebRTCUpgrade) {
         newConn = await this.getComponents()
           .getUpgrader()
-          .upgradeInbound(
-            WebRTCConnection(relayConn, this.testingOptions, {
-              // libp2p interface type clash
-              upgrader: this.getComponents().getUpgrader() as any
-            })
-          )
+          .upgradeInbound(WebRTCConnection(relayConn, this.testingOptions, onClose))
       } else {
         newConn = await this.getComponents().getUpgrader().upgradeInbound(relayConn)
+        relayConn.setOnClose(onClose)
       }
     } catch (err) {
       error(err)

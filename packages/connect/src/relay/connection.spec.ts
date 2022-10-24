@@ -47,6 +47,7 @@ describe('relay connection', function () {
       Relay,
       Bob,
       'outbound',
+      undefined,
       {} as ConnectComponents,
       {
         __noWebRTCUpgrade: true
@@ -71,6 +72,7 @@ describe('relay connection', function () {
       Relay,
       Bob,
       'outbound',
+      undefined,
       {} as ConnectComponents,
       {
         __noWebRTCUpgrade: true
@@ -112,6 +114,7 @@ describe('relay connection', function () {
       Relay,
       Bob,
       'outbound',
+      undefined,
       {} as ConnectComponents,
       {
         __noWebRTCUpgrade: true
@@ -149,6 +152,7 @@ describe('relay connection', function () {
       Relay,
       Bob,
       'outbound',
+      undefined,
       {} as ConnectComponents,
       {
         __noWebRTCUpgrade: true
@@ -197,6 +201,7 @@ describe('relay connection', function () {
       Relay,
       Bob,
       'outbound',
+      undefined,
       {} as ConnectComponents,
       {
         __noWebRTCUpgrade: true
@@ -258,6 +263,7 @@ describe('relay connection', function () {
       Relay,
       Bob,
       'outbound',
+      undefined,
       {} as ConnectComponents,
       {
         __noWebRTCUpgrade: true
@@ -333,6 +339,7 @@ describe('relay connection', function () {
       Relay,
       Bob,
       'outbound',
+      undefined,
       {
         getWebRTCUpgrader() {
           return {
@@ -395,6 +402,7 @@ describe('relay connection', function () {
       Relay,
       Bob,
       'outbound',
+      undefined,
       {
         getWebRTCUpgrader() {
           return {
@@ -497,6 +505,7 @@ describe('relay connection - stream error propagation', function () {
       Relay,
       Bob,
       'outbound',
+      undefined,
       {} as ConnectComponents,
       {
         __noWebRTCUpgrade: true
@@ -531,6 +540,7 @@ describe('relay connection - stream error propagation', function () {
       Relay,
       Bob,
       'outbound',
+      undefined,
       {} as ConnectComponents,
       {
         __noWebRTCUpgrade: true
@@ -563,6 +573,7 @@ describe('relay connection - stream error propagation', function () {
       Relay,
       Bob,
       'outbound',
+      undefined,
       {} as ConnectComponents,
       {
         __noWebRTCUpgrade: true

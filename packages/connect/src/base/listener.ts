@@ -425,9 +425,18 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     socket.on('error', (err) => error('socket error', err))
 
     let maConn: MultiaddrConnection | undefined
+    let conn: Connection | undefined
 
     try {
-      maConn = fromSocket(socket) as any
+      maConn = fromSocket(socket, () => {
+        if (conn) {
+          this.components.getUpgrader().dispatchEvent(
+            new CustomEvent(`connectionEnd`, {
+              detail: conn
+            })
+          )
+        }
+      }) as any
     } catch (err: any) {
       error(`inbound connection failed. ${err.message}`)
     }
@@ -439,7 +448,6 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
 
     log('new inbound connection %s', maConn.remoteAddr)
 
-    let conn: Connection
     try {
       conn = await this.components.getUpgrader().upgradeInbound(maConn)
     } catch (err: any) {

@@ -125,6 +125,7 @@ export interface RelayConnectionInterface extends MultiaddrConnection {
   tags: PeerConnectionType[]
   conn: Stream
   counterparty: PeerId
+  setOnClose: (closeHandler: () => void) => void
 }
 
 /**
@@ -159,6 +160,7 @@ export function RelayConnection(
   relay: PeerId,
   counterparty: PeerId,
   direction: 'inbound' | 'outbound',
+  onClose: (() => void) | undefined,
   connectComponents: ConnectComponents,
   testingOptions: HoprConnectTestingOptions,
   _onReconnect: (newStream: RelayConnectionInterface, counterparty: PeerId) => Promise<void>
@@ -194,6 +196,10 @@ export function RelayConnection(
     _migrationDone: undefined,
     _sourceIterator: (conn.source as AsyncIterable<Uint8Array>)[Symbol.asyncIterator](),
     statusMessages: new Heap(statusMessagesCompare)
+  }
+
+  const timeline: MultiaddrConnection['timeline'] = {
+    open: Date.now()
   }
 
   const remoteAddr = createCircuitAddress(relay)
@@ -244,6 +250,10 @@ export function RelayConnection(
     _flow(`RC [${_id}]`, ...args)
   }
 
+  const setOnClose = (closeHandler: () => void) => {
+    onClose = closeHandler
+  }
+
   /**
    * Adds a message to the message queue and notifies source
    * that a message is available
@@ -291,7 +301,8 @@ export function RelayConnection(
     // Sets the magic *close* property that makes libp2p forget
     // about the connection.
     // @dev this is done implicitly by using meta programming
-    maConn.timeline.close = Date.now()
+    timeline.close = Date.now()
+    onClose?.()
   }
 
   const isDestroyed = () => state.destroyed
@@ -335,14 +346,23 @@ export function RelayConnection(
     // this case easily.
     source = createSource()
 
-    maConn.timeline = {
-      open: Date.now()
+    return {
+      sendUpgraded,
+      direction,
+      tags,
+      // Set *close* property to notify libp2p that
+      // stream was closed
+      timeline,
+      remoteAddr,
+      conn,
+      close: close(state._iteration),
+      source,
+      sink: sink(state._iteration),
+      isDestroyed,
+      getCurrentChannel,
+      counterparty,
+      setOnClose
     }
-    maConn.source = source
-    maConn.close = close(state._iteration)
-    maConn.sink = sink(state._iteration)
-
-    return maConn
   }
 
   let onSinkError = (err: any) => {
@@ -795,15 +815,13 @@ export function RelayConnection(
   let source = createSource()
   conn.sink(sinkFunction()).catch(onSinkError)
 
-  const maConn = {
+  return {
     sendUpgraded,
     direction,
     tags,
     // Set *close* property to notify libp2p that
     // stream was closed
-    timeline: {
-      open: Date.now()
-    } as MultiaddrConnection['timeline'],
+    timeline,
     remoteAddr,
     conn,
     close: close(state._iteration),
@@ -811,46 +829,7 @@ export function RelayConnection(
     sink: sink(state._iteration),
     isDestroyed,
     getCurrentChannel,
-    counterparty
+    counterparty,
+    setOnClose
   }
-
-  return maConn
 }
-
-// class RelayConnection extends EventEmitter implements MultiaddrConnection {
-//   public _upgradeInbound: WebRTCUpgrader['upgradeInbound'] | undefined
-//   public _emitRestart: () => void
-
-//   public readonly _counterparty: PeerId
-
-//   public readonly conn: Stream
-
-//   public tags: PeerConnectionType[]
-
-//   public sinkCreator: Promise<void>
-
-//   constructor(
-//     private _stream: Stream,
-//     relay: PeerId,
-//     counterparty: PeerId,
-//     direction: 'inbound' | 'outbound',
-//     public connectComponents: ConnectComponents,
-//     public testingOptions: HoprConnectTestingOptions,
-//     public _onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>
-//   ) {
-//     super()
-
-//     // Internal status message buffer
-//     this.conn = _stream
-
-//     this._counterparty = counterparty
-
-//     // For testing fallback relayed connection, disable WebRTC upgrade attempts
-
-//     this._emitRestart = () => this.emit(RELAYED_CONNECTION_RESTART)
-//   }
-
-//   public get source(): AsyncIterable<Uint8Array> {
-//     return this.state.source
-//   }
-// }

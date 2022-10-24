@@ -1,4 +1,4 @@
-import net, { type Socket, type AddressInfo } from 'net'
+import net, { type Socket } from 'net'
 import { abortableSource } from 'abortable-iterator'
 import Debug from 'debug'
 import { nodeToMultiaddr } from '../utils/index.js'
@@ -26,16 +26,26 @@ type SocketOptions = {
 /**
  * Class to encapsulate TCP sockets
  */
-export function TCPConnection(remoteAddr: Multiaddr, socket: Socket, options?: SocketOptions): MultiaddrConnection {
+export function TCPConnection(
+  remoteAddr: Multiaddr,
+  socket: Socket,
+  onClose: () => void,
+  options?: SocketOptions
+): MultiaddrConnection {
   const closeTimeout = options?.closeTimeout ?? SOCKET_CLOSE_TIMEOUT
 
   let closed = false
+
+  const timeline = {
+    open: Date.now()
+  } as MultiaddrConnection['timeline']
 
   socket.once('close', () => {
     // Whenever the socket gets closed, mark the
     // connection closed to cleanup data structures in
     // ConnectionManager
-    maConn.timeline.close ??= Date.now()
+    timeline.close ??= Date.now()
+    onClose()
   })
 
   // Assign various connection properties once we're sure that public keys match,
@@ -109,7 +119,8 @@ export function TCPConnection(remoteAddr: Multiaddr, socket: Socket, options?: S
         log('socket error', err)
 
         // error closing socket
-        maConn.timeline.close ??= Date.now()
+        timeline.close ??= Date.now()
+        onClose()
 
         if (socket.destroyed) {
           done = true
@@ -154,21 +165,21 @@ export function TCPConnection(remoteAddr: Multiaddr, socket: Socket, options?: S
     socket.end()
   }
   const { sink, source } = toIterable.duplex<Uint8Array>(socket)
-  const maConn = {
-    localAddr: nodeToMultiaddr(socket.address() as AddressInfo),
+
+  return {
     remoteAddr,
-    timeline: {
-      open: Date.now()
-    } as MultiaddrConnection['timeline'],
+    timeline,
     close,
     source: options?.signal != undefined ? abortableSource(source, options.signal) : source,
     sink: sinkEndpoint
   }
-
-  return maConn
 }
 
-export async function createTCPConnection(ma: Multiaddr, options?: SocketOptions): Promise<MultiaddrConnection> {
+export async function createTCPConnection(
+  ma: Multiaddr,
+  onClose: () => void,
+  options?: SocketOptions
+): Promise<MultiaddrConnection> {
   return new Promise<MultiaddrConnection>((resolve, reject) => {
     const start = Date.now()
     const cOpts = ma.toOptions()
@@ -212,7 +223,7 @@ export async function createTCPConnection(ma: Multiaddr, options?: SocketOptions
         return reject(err)
       }
 
-      resolve(TCPConnection(ma, rawSocket, options) as any)
+      resolve(TCPConnection(ma, rawSocket, onClose, options) as any)
     }
 
     rawSocket = net
@@ -227,7 +238,7 @@ export async function createTCPConnection(ma: Multiaddr, options?: SocketOptions
   })
 }
 
-export function fromSocket(socket: Socket) {
+export function fromSocket(socket: Socket, onClose: () => void) {
   if (socket.remoteAddress == undefined || socket.remoteFamily == undefined || socket.remotePort == undefined) {
     throw Error(`Could not determine remote address`)
   }
@@ -250,5 +261,5 @@ export function fromSocket(socket: Socket) {
     family: socket.remoteFamily
   })
 
-  return TCPConnection(remoteAddr, socket)
+  return TCPConnection(remoteAddr, socket, onClose)
 }
