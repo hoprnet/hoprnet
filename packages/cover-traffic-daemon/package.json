@@ -23,7 +23,7 @@
     "docs:watch": "yarn typedoc --watch"
   },
   "engines": {
-    "node": "16.15"
+    "node": ">=16.15"
   },
   "files": [
     "lib",
