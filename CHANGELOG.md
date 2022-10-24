@@ -21,6 +21,7 @@
 - Remove recurring DHT ping queue cleanup and turn all public relay nodes into DHT servers ([#4247](https://github.com/hoprnet/hoprnet/pull/4247))
 - Various enhancements regarding memory consumption and overall efficiency, spread over multiple PRs
 - Allow `info` command before node startup has finished ([#4273](https://github.com/hoprnet/hoprnet/pull/4273))
+- Turn libp2p dual DHT into single DHT by forking DHT package in order to avoid a memory leak https://github.com/hoprnet/hoprnet/pull/4288
 
 ---
 
