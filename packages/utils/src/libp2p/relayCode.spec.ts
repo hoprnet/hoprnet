@@ -29,7 +29,7 @@ async function getNode(id: PeerId): Promise<Libp2p> {
     streamMuxers: [new Mplex()],
     connectionEncryption: [new Noise()],
     // @ts-ignore
-    dht: new KadDHT({ clientMode: false, protocolPrefix: '/hopr' }),
+    dht: new KadDHT({ clientMode: false, protocolPrefix: '/hopr', lan: true, pingTimeout: 1e3 }),
     metrics: {
       enabled: false
     },
