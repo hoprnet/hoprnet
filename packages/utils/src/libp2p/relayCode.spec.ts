@@ -28,6 +28,7 @@ async function getNode(id: PeerId): Promise<Libp2p> {
     transports: [new TCP()],
     streamMuxers: [new Mplex()],
     connectionEncryption: [new Noise()],
+    // @ts-ignore
     dht: new KadDHT({ clientMode: false, protocolPrefix: '/hopr' }),
     metrics: {
       enabled: false
