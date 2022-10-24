@@ -3636,9 +3636,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@libp2p/kad-dht@npm:1.0.16":
+"@libp2p/kad-dht@https://github.com/hoprnet/js-libp2p-kad-dht/archive/refs/tags/v1.0.17.tar.gz":
   version: 1.0.16
-  resolution: "@libp2p/kad-dht@npm:1.0.16"
+  resolution: "@libp2p/kad-dht@https://github.com/hoprnet/js-libp2p-kad-dht/archive/refs/tags/v1.0.17.tar.gz"
   dependencies:
     "@libp2p/crypto": ^0.22.12
     "@libp2p/interfaces": ^2.0.2
@@ -3673,7 +3673,7 @@ __metadata:
     timeout-abort-controller: ^3.0.0
     uint8arrays: ^3.0.0
     varint: ^6.0.0
-  checksum: 1f2a4f28894528236361fe632aa854ca7dcb44ded10bef55a1353396e04dca473d9262bb61bf774e0e4119b5988e61e0dd7195cabd51ccc35cc17ec969b4424f
+  checksum: 24146db665dd796efd72aa0e005dc81afc7dec5355f7c64cb26d757fac96b3bc7b7191971a8562a4d2dc0bdcd9d9892e7fadf6f94be42b69eefb74a2673f97bf
   languageName: node
   linkType: hard
 
