@@ -3,10 +3,11 @@ pragma solidity >=0.6.0 <0.9.0;
 
 import "./utils/Deploy.sol";
 import "./utils/Accounts.sol";
+import "./utils/Channels.sol";
 import "../src/HoprChannels.sol";
 import "forge-std/Test.sol";
 
-contract HoprChannelsTest is Test, ERC1820RegistryFixture, AccountsFixture {
+contract HoprChannelsTest is Test, ERC1820RegistryFixture, AccountsFixture, ChannelsUtils {
     HoprChannels public hoprChannels;
 
     /**
@@ -103,13 +104,17 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixture, AccountsFixture {
         hoprChannels.announce(accountB.publicKey, multiAddress);
         vm.prank(address(1));
 
+        // channels
+        HoprChannels.Channel memory channelAB = HoprChannels.Channel(amount1, bytes32(0), 0, 0, HoprChannels.ChannelStatus.WAITING_FOR_COMMITMENT, 1, 0);
+        HoprChannels.Channel memory channelBA = HoprChannels.Channel(amount2, bytes32(0), 0, 0, HoprChannels.ChannelStatus.WAITING_FOR_COMMITMENT, 1, 0);
+
         // fund channel for two parties triggers 
-        vm.expectEmit(true, true, false, false, address(hoprChannels));
-        emit ChannelUpdated(accountA.accountAddr, accountB.accountAddr, HoprChannels.Channel(amount1, bytes32(0), 0, 0, HoprChannels.ChannelStatus.WAITING_FOR_COMMITMENT, 1, 15));
+        vm.expectEmit(true, true, false, true, address(hoprChannels));
+        emit ChannelUpdated(accountA.accountAddr, accountB.accountAddr, channelAB);
         vm.expectEmit(true, true, true, true, address(hoprChannels));
         emit ChannelFunded(address(1), accountA.accountAddr, accountB.accountAddr, amount1);
-        vm.expectEmit(true, true, false, false, address(hoprChannels));
-        emit ChannelUpdated(accountB.accountAddr, accountA.accountAddr, HoprChannels.Channel(amount2, bytes32(0), 0, 0, HoprChannels.ChannelStatus.WAITING_FOR_COMMITMENT, 1, 15));
+        vm.expectEmit(true, true, false, true, address(hoprChannels));
+        emit ChannelUpdated(accountB.accountAddr, accountA.accountAddr, channelBA);
         vm.expectEmit(true, true, true, true, address(hoprChannels));
         emit ChannelFunded(address(1), accountB.accountAddr, accountA.accountAddr, amount2);
         // fund channel multi calls token transfer under the hood
@@ -119,6 +124,11 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixture, AccountsFixture {
             abi.encode(address(1), address(hoprChannels), amount1 + amount2)
         );
         hoprChannels.fundChannelMulti(accountA.accountAddr, accountB.accountAddr, amount1, amount2);
+        bytes32 channelIdAB = getChannelId(accountA.accountAddr, accountB.accountAddr);
+        bytes32 channelIdBA = getChannelId(accountB.accountAddr, accountA.accountAddr);
+        // check vallidate from channels()
+        assertEqChannels(getChannelFromTuple(hoprChannels, channelIdAB), channelAB);
+        assertEqChannels(getChannelFromTuple(hoprChannels, channelIdBA), channelBA);
     }
     function testFailFundChannelMulti_SameSourceAndDestination(uint256 amount1, uint256 amount2) public {
         amount1 = bound(amount1, 1, 1e36);
