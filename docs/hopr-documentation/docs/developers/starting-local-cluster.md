@@ -43,9 +43,8 @@ cd hoprnet-release-valencia
 
 In order to install and build the required packages and project modules, make sure you have installed:
 
-(**1**) `nodejs@16` (we suggest installing it via [nvm](https://github.com/nvm-sh/nvm), i.e., `nvm install lts/gallium`), and `yarn` (included in `nodejs@16` by running `corepack enable`)
-
-(**2**) [Rust toolchain](https://www.rust-lang.org/tools/install) (at least 1.60)
+- `nodejs@16` (we suggest installing it via [nvm](https://github.com/nvm-sh/nvm), i.e., `nvm install lts/gallium`), and `yarn` (included in `nodejs@16` by running `corepack enable`)
+- [Rust toolchain](https://www.rust-lang.org/tools/install) (at least 1.60)
 
 Ideally you will also have basic development toolsets[^2] set up on your computer. If you have installed the above, run the following command. Please bear in mind that this process will take at least 5-10 minutes depending on your computer.
 
@@ -57,9 +56,8 @@ make -j deps && make -j build
 
 Before running the script make sure you have:
 
-(**1**) Both `curl` and `jq` installed
-
-(**2**) A version of `bash` running that is `5.x` or higher, which for most macOS devices will require an upgrade. The easiest way to do this is via `brew bash`
+- Both `curl` and `jq` installed
+- A version of `bash` running that is `5.x` or higher, which for most macOS devices will require an upgrade. The easiest way to do this is via `brew bash`
 
 Run the following script:
 
