@@ -2,7 +2,7 @@ import { create_counter } from '../../lib/utils_metrics.js'
 
 // Metrics
 const metric_countSuppresedRejections = create_counter(
-  'hoprd_counter_suppressed_unhandled_promise_rejections',
+  'utils_counter_suppressed_unhandled_promise_rejections',
   'Counter of suppressed unhandled promise rejections'
 )
 
