@@ -1,4 +1,4 @@
-import { create_counter } from '@hoprnet/hopr-utils'
+import { create_counter } from '../../lib/utils_metrics.js'
 
 // Metrics
 const metric_countSuppresedRejections = create_counter(
