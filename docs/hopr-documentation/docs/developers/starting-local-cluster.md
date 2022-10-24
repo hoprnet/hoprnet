@@ -18,7 +18,7 @@ Node.js should be compiled under x64 architecute.
 
 :::
 
-You can run a HOPR cluster locally or use Playground without any installations. A local setup has only been tested for Linux and macOS, if you are using Windows it is recommended to either use Playground or a VM.
+You can run a HOPR cluster locally or use [Playground](https://playground.hoprnet.org/) without any installations. A local setup has only been tested for Linux and macOS, if you are using Windows it is recommended to either use Playground or a VM.
 
 ## Use the latest release
 
