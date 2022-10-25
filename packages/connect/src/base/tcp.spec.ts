@@ -30,7 +30,8 @@ describe('test TCP connection', function () {
     await waitUntilListening<undefined | number>(server, undefined)
 
     const conn = await TCPConnection.create(
-      new Multiaddr(`/ip4/127.0.0.1/tcp/${(server.address() as AddressInfo).port}`)
+      new Multiaddr(`/ip4/127.0.0.1/tcp/${(server.address() as AddressInfo).port}`),
+      () => {}
     )
 
     await conn.sink(
@@ -84,6 +85,7 @@ describe('test TCP connection', function () {
 
     const conn = await TCPConnection.create(
       new Multiaddr(`/ip4/127.0.0.1/tcp/${(testServer.address() as AddressInfo).port}`),
+      () => {},
       {
         closeTimeout: 1000
       }
@@ -143,7 +145,7 @@ describe('test TCP connection', function () {
 
     await assert.rejects(
       async () => {
-        await TCPConnection.create(new Multiaddr(`/ip4/127.0.0.1/tcp/${INVALID_PORT}`))
+        await TCPConnection.create(new Multiaddr(`/ip4/127.0.0.1/tcp/${INVALID_PORT}`), () => {})
       },
       {
         name: 'Error',
@@ -173,6 +175,7 @@ describe('test TCP connection', function () {
 
     const conn = await TCPConnection.create(
       new Multiaddr(`/ip4/127.0.0.1/tcp/${(server.address() as AddressInfo).port}`),
+      () => {},
       {
         signal: abort.signal
       }
@@ -222,7 +225,7 @@ describe('test TCP connection - socket errors', function () {
       })
     })
 
-    const conn = TCPConnection.fromSocket(socket as Socket)
+    const conn = TCPConnection.fromSocket(socket as Socket, () => {})
 
     await conn.sink(
       (async function* (): AsyncIterable<Uint8Array> {
