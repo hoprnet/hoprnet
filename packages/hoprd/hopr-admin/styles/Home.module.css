@@ -29,10 +29,16 @@
   cursor: pointer;
 }
 
-.healtStatusIndicator {
-  font-size: 16px;
-  margin-left: 16px;
+.healthIndicator {
+  font-size: 0.90rem;
+  margin-left: 1rem;
+  cursor: default;
   vertical-align: middle;
+}
+
+.healthIndicatorTooltip {
+  font-size: 11px;
+  margin-left: 0.5rem;
 }
 
 .configuration {
