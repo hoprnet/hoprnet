@@ -427,7 +427,15 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     let maConn: TCPConnection | undefined
 
     try {
-      maConn = TCPConnection.fromSocket(socket)
+      maConn = TCPConnection.fromSocket(socket, () => {
+        if (conn) {
+          this.components.getUpgrader().dispatchEvent(
+            new CustomEvent(`connectionEnd`, {
+              detail: conn
+            })
+          )
+        }
+      })
     } catch (err: any) {
       error(`inbound connection failed. ${err.message}`)
     }
