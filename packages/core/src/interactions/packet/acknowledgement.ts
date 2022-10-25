@@ -44,7 +44,6 @@ const metric_sentAcks = create_counter('core_counter_sent_acks', 'Number of sent
 const metric_winningTickets = create_counter('core_counter_winning_tickets', 'Number of winning tickets')
 const metric_losingTickets = create_counter('core_counter_losing_tickets', 'Number of losing tickets')
 
-
 export class AcknowledgementInteraction {
   private incomingAcks: Pushable<Incoming>
   private outgoingAcks: Pushable<Outgoing>
