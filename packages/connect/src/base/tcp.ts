@@ -144,9 +144,9 @@ class TCPConnection implements MultiaddrConnection {
 
   private createSource(socket: net.Socket): AsyncIterable<Uint8Array> {
     const iterableSource = (async function* () {
-      // Node.js emits Buffer instance, so turn them into
+      // Node.js emits Buffer instances, so turn them into
       // proper Uint8Arrays
-      for await (const chunk of toIterable.source<Uint8Array>(socket)) {
+      for await (const chunk of toIterable.source<Uint8Array>(socket) as AsyncIterable<Uint8Array>) {
         yield new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength)
       }
     })()
