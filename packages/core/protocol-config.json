@@ -182,7 +182,7 @@
       "description": "Görli Testnet is the first proof-of-authority cross-client testnet, synching Parity Ethereum, Geth, Nethermind, Hyperledger Besu (formerly Pantheon), and EthereumJS",
       "chain_id": 5,
       "live": true,
-      "max_fee_per_gas": "20 gwei",
+      "max_fee_per_gas": "200 gwei",
       "max_priority_fee_per_gas": "2 gwei",
       "default_provider": "https://provider-proxy.hoprnet.workers.dev/eth_goerli",
       "etherscan_api_url": "http://api-goerli.etherscan.io/api",
