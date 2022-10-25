@@ -534,15 +534,18 @@ export class HoprDB {
   }
 
   public async replaceUnAckWithAck(halfKeyChallenge: HalfKeyChallenge, ackTicket: AcknowledgedTicket): Promise<void> {
-    const unAcknowledgedDbKey = createPendingAcknowledgement(halfKeyChallenge)
-    const acknowledgedDbKey = createAcknowledgedTicketKey(ackTicket.ticket.challenge, ackTicket.ticket.channelEpoch)
+    const unAcknowledgedDbKey = this.keyOf(createPendingAcknowledgement(halfKeyChallenge))
+    const acknowledgedDbKey = this.keyOf(
+      createAcknowledgedTicketKey(ackTicket.ticket.challenge, ackTicket.ticket.channelEpoch)
+    )
 
     const serializedTicket = ackTicket.serialize()
+
     await this.db
       .batch()
-      .del(Buffer.from(this.keyOf(unAcknowledgedDbKey)))
+      .del(Buffer.from(unAcknowledgedDbKey.buffer, unAcknowledgedDbKey.byteOffset, unAcknowledgedDbKey.byteLength))
       .put(
-        Buffer.from(this.keyOf(acknowledgedDbKey)),
+        Buffer.from(acknowledgedDbKey.buffer, unAcknowledgedDbKey.byteOffset, unAcknowledgedDbKey.byteLength),
         Buffer.from(serializedTicket.buffer, serializedTicket.byteOffset, serializedTicket.byteLength)
       )
       .write()
