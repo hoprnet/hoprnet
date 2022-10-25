@@ -1,3 +1,11 @@
+import { create_counter } from '../../lib/utils_metrics.js'
+
+// Metrics
+const metric_countSuppresedRejections = create_counter(
+  'utils_counter_suppressed_unhandled_promise_rejections',
+  'Counter of suppressed unhandled promise rejections'
+)
+
 /**
  * Sets a custom promise rejection handler to filter out known promise rejections
  * that are harmless but couldn't be handled for some reason.
@@ -25,6 +33,7 @@ export function setupPromiseRejectionFilter() {
         msgString.match(/ERR_ICE_CONNECTION_FAILURE/)
       ) {
         console.error('Unhandled promise rejection silenced')
+        metric_countSuppresedRejections.increment()
         return
       }
     }

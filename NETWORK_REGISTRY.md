@@ -156,6 +156,7 @@ source .env
 ### [DEPRECATED] Production (with dummy proxy)
 
 Before "Network_registry" NFT gets minted in production environment, "Dummy proxy" is used to faciliate the process.
+
 Deployer wallet in the CI/CD registers node and its peerId when calling `make register-nodes` (followed by more flags and arguments). Developers must follow these steps to register their node in the registry:
 
 1. Create a MetaMask wallet (note as “account”)

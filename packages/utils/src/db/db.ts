@@ -734,6 +734,17 @@ export class HoprDB {
     )
   }
 
+  async *getAccountsIterable(filter?: (account: AccountEntry) => boolean) {
+    yield* this.getAllIterable<AccountEntry>(
+      {
+        prefix: ACCOUNT_PREFIX,
+        suffixLength: Address.SIZE
+      },
+      AccountEntry.deserialize,
+      filter
+    )
+  }
+
   public async getRedeemedTicketsValue(): Promise<Balance> {
     return await this.getCoercedOrDefault<Balance>(REDEEMED_TICKETS_VALUE, Balance.deserialize, Balance.ZERO)
   }

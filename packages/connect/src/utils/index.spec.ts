@@ -1,8 +1,9 @@
 import { Multiaddr } from '@multiformats/multiaddr'
 import assert from 'assert'
 
-import { privKeyToPeerId } from '@hoprnet/hopr-utils'
-import { relayFromRelayAddress, nodeToMultiaddr } from './index.js'
+import { privKeyToPeerId, u8aEquals } from '@hoprnet/hopr-utils'
+import { relayFromRelayAddress, nodeToMultiaddr, toU8aStream } from './index.js'
+import { Uint8ArrayList } from 'uint8arraylist'
 
 const SELF = privKeyToPeerId('0x7519c19fd624599c0f97c89913b277a7d1b932d77100f4bbb2bc01969249add3')
 const RELAY = privKeyToPeerId('0x152c95bd36e6ada51309558756d5f901853d45ab94336a0bd7bae1453e98ffd6')
