@@ -3636,9 +3636,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@libp2p/kad-dht@npm:1.0.16":
+"@libp2p/kad-dht@https://github.com/hoprnet/js-libp2p-kad-dht/archive/refs/tags/v1.0.17.tar.gz":
   version: 1.0.16
-  resolution: "@libp2p/kad-dht@npm:1.0.16"
+  resolution: "@libp2p/kad-dht@https://github.com/hoprnet/js-libp2p-kad-dht/archive/refs/tags/v1.0.17.tar.gz"
   dependencies:
     "@libp2p/crypto": ^0.22.12
     "@libp2p/interfaces": ^2.0.2
@@ -3673,7 +3673,7 @@ __metadata:
     timeout-abort-controller: ^3.0.0
     uint8arrays: ^3.0.0
     varint: ^6.0.0
-  checksum: 1f2a4f28894528236361fe632aa854ca7dcb44ded10bef55a1353396e04dca473d9262bb61bf774e0e4119b5988e61e0dd7195cabd51ccc35cc17ec969b4424f
+  checksum: 24146db665dd796efd72aa0e005dc81afc7dec5355f7c64cb26d757fac96b3bc7b7191971a8562a4d2dc0bdcd9d9892e7fadf6f94be42b69eefb74a2673f97bf
   languageName: node
   linkType: hard
 
@@ -5336,14 +5336,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/chai@npm:*":
-  version: 4.3.1
-  resolution: "@types/chai@npm:4.3.1"
-  checksum: 2ee246b76c469cd620a7a1876a73bc597074361b67d547b4bd96a0c1adb43597ede2d8589ab626192e14349d83cbb646cc11e2c179eeeb43ff11596de94d82c4
-  languageName: node
-  linkType: hard
-
-"@types/chai@npm:4.3.3":
+"@types/chai@npm:*, @types/chai@npm:4.3.3":
   version: 4.3.3
   resolution: "@types/chai@npm:4.3.3"
   checksum: 20cd094753e137cfc35939cae7f0ed78ecda7861e5c94704efab6979b9121a63807e9b631bdcf3a2792d6c6dba44050b13387262f9e63ebb040741c01c345f0a
@@ -5878,17 +5871,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/semver@npm:^7":
+"@types/semver@npm:^7, @types/semver@npm:^7.0.0":
   version: 7.3.12
   resolution: "@types/semver@npm:7.3.12"
   checksum: 35536b2fc5602904f21cae681f6c9498e177dab3f54ae37c92f9a1b7e43c35f18bcd81e1c98c1cf0d33ee046bb06c771e9928c1c00a401d56a03f56549252a15
-  languageName: node
-  linkType: hard
-
-"@types/semver@npm:^7.0.0":
-  version: 7.3.10
-  resolution: "@types/semver@npm:7.3.10"
-  checksum: 7047c2822b1759b2b950f39cfcf261f2b9dca47b4b55bdebba0905a8553631f1531eb0f59264ffe4834d1198c8331c8e0010a4cd742f4e0b60abbf399d134364
   languageName: node
   linkType: hard
 
