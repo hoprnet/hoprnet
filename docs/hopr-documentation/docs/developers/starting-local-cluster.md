@@ -39,7 +39,7 @@ unzip valencia.zip
 cd hoprnet-release-valencia
 ```
 
-2. **Install the dependencies of the project and build it**: 
+2. **Install the dependencies of the project and build it**:
 
 In order to install and build the required packages and project modules, make sure you have installed:
 
@@ -52,7 +52,7 @@ Ideally you will also have basic development toolsets[^2] set up on your compute
 make deps build
 ```
 
-3. **Run the one-line setup script**: 
+3. **Run the one-line setup script**:
 
 Before running the script make sure you have:
 
@@ -66,7 +66,7 @@ Run the following script:
 ```
 
 Please wait while this script creates
-the local blockchain network and deploys the project contracts. On average, the process can take between 2-6 minutes, depending on your computer. 
+the local blockchain network and deploys the project contracts. On average, the process can take between 2-6 minutes, depending on your computer.
 
 If you are planning to run [MyneChat](http://app.myne.chat/)
 alongside your cluster, then make sure to pass the `-m` flag with your MyneChat instance URL, i.e.:
@@ -86,8 +86,9 @@ Alternatively, you can copy and paste these URLs and `export` them to your termi
 export apiToken=^^LOCAL-testing-123^^ HOPR_NODE_1_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_1_WS_URL=ws://127.0.0.1:19501 HOPR_NODE_2_HTTP_URL=http://127.0.0.1:13302 HOPR_NODE_2_WS_URL=ws://127.0.0.1:19502 HOPR_NODE_3_HTTP_URL=http://127.0.0.1:13303 HOPR_NODE_3_WS_URL=ws://127.0.0.1:19503 HOPR_NODE_4_HTTP_URL=http://127.0.0.1:13304 HOPR_NODE_4_WS_URL=ws://127.0.0.1:19504 HOPR_NODE_5_HTTP_URL=http://127.0.0.1:13305 HOPR_NODE_5_WS_URL=ws://127.0.0.1:19505
 ```
 
-[^1]: The demo application [MyneChat](https://github.com/hoprnet/myne-chat) uses a
+[^1]:
+    The demo application [MyneChat](https://github.com/hoprnet/myne-chat) uses a
     [mock server](https://github.com/hoprnet/myne-chat/blob/cf6501b2ffa24502834f567ab575630e302e3d34/mocks/index.js#L47-L79)
     to simplify its development workflow. However, to fully experience the extent of its features, you will need either a local or public HOPR cluster.
-    
+
 [^2]: If you have installed and built another `node.js` application from your computer in the past, you likely will not need to do anything else. However, in the case your are only starting to develop in `node.js`, there's a high chance you might need to install a few extra tools. For instance, in `Linux`-based OS, you will likely also need to install `build-essentials` (e.g. in Ubuntu do `apt-get install build-essentials`), whereas in `macOS` you need Xcode developer tools, installable via `xcode-select --install`.
