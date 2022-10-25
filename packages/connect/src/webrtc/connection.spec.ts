@@ -36,7 +36,8 @@ describe('test webrtc connection', function () {
           channel: fakedWebRTCInstance
         }
       } as RelayConnection,
-      {}
+      {},
+      () => {}
     )
 
     const AliceShaker = handshake(conn)
@@ -79,7 +80,8 @@ describe('test webrtc connection', function () {
           channel: webRTCInstance
         }
       } as RelayConnection,
-      {}
+      {},
+      () => {}
     )
 
     const BobShaker = handshake(AliceBob)
@@ -105,7 +107,8 @@ describe('test webrtc connection', function () {
           channel: webRTCInstance
         }
       } as RelayConnection,
-      {}
+      {},
+      () => {}
     )
 
     const BobShaker = handshake(AliceBob)
@@ -132,7 +135,8 @@ describe('test webrtc connection', function () {
           channel: webRTCInstance
         }
       } as RelayConnection,
-      {}
+      {},
+      () => {}
     )
 
     const AliceShaker = handshake(conn)
@@ -173,7 +177,8 @@ describe('test webrtc connection', function () {
           channel: webRTCInstance
         }
       } as RelayConnection,
-      {}
+      {},
+      () => {}
     )
 
     const AliceShaker = handshake(conn)
@@ -235,7 +240,8 @@ describe('test webrtc connection', function () {
           channel: webRTCInstance
         }
       } as RelayConnection,
-      {}
+      {},
+      () => {}
     )
 
     const AliceShaker = handshake(conn)
@@ -298,6 +304,7 @@ describe('test webrtc connection', function () {
         }
       } as RelayConnection,
       {},
+      () => {},
       {
         signal: abort.signal,
         upgrader: undefined as any
@@ -339,7 +346,8 @@ describe('webrtc connection - stream error propagation', function () {
           channel: fakedWebRTCInstance
         }
       } as RelayConnection,
-      {}
+      {},
+      () => {}
     )
 
     await assert.rejects(
@@ -378,7 +386,8 @@ describe('webrtc connection - stream error propagation', function () {
           channel: fakedWebRTCInstance
         }
       } as RelayConnection,
-      {}
+      {},
+      () => {}
     )
 
     await waitForError.promise
@@ -403,7 +412,8 @@ describe('webrtc connection - stream error propagation', function () {
           channel: fakedWebRTCInstance
         }
       } as RelayConnection,
-      {}
+      {},
+      () => {}
     )
 
     await assert.rejects(
@@ -437,7 +447,8 @@ describe('webrtc connection - stream error propagation', function () {
           channel: fakedWebRTCInstance
         }
       } as RelayConnection,
-      {}
+      {},
+      () => {}
     )
 
     await assert.rejects(

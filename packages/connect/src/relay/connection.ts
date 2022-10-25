@@ -194,6 +194,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     relay: PeerId,
     counterparty: PeerId,
     direction: 'inbound' | 'outbound',
+    public onClose: (() => void) | undefined,
     public connectComponents: ConnectComponents,
     public testingOptions: HoprConnectTestingOptions,
     public _onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>
@@ -430,6 +431,11 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     // about the connection.
     // @dev this is done implicitly by using meta programming
     this.timeline.close = Date.now()
+    this.onClose?.()
+  }
+
+  public setOnClose(closeHandler: () => void) {
+    this.onClose = closeHandler
   }
 
   /**

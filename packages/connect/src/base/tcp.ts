@@ -41,7 +41,12 @@ class TCPConnection implements MultiaddrConnection {
     close?: number
   }
 
-  constructor(public remoteAddr: Multiaddr, public socket: Socket, options?: SocketOptions) {
+  constructor(
+    public remoteAddr: Multiaddr,
+    public socket: Socket,
+    public onClose: () => void,
+    options?: SocketOptions
+  ) {
     this.localAddr = nodeToMultiaddr(this.socket.address() as AddressInfo)
 
     this.closed = false
@@ -57,6 +62,7 @@ class TCPConnection implements MultiaddrConnection {
       // connection closed to cleanup data structures in
       // ConnectionManager
       this.timeline.close ??= Date.now()
+      this.onClose()
     })
 
     this.source = this.createSource(this.socket)
@@ -115,6 +121,7 @@ class TCPConnection implements MultiaddrConnection {
 
         // error closing socket
         this.timeline.close ??= Date.now()
+        this.onClose()
 
         if (this.socket.destroyed) {
           done = true
@@ -190,7 +197,7 @@ class TCPConnection implements MultiaddrConnection {
    * @param options
    * @returns Resolves to a TCP Socket, if successful
    */
-  public static create(ma: Multiaddr, options?: SocketOptions): Promise<TCPConnection> {
+  public static create(ma: Multiaddr, onClose: () => void, options?: SocketOptions): Promise<TCPConnection> {
     return new Promise<TCPConnection>((resolve, reject) => {
       const start = Date.now()
       const cOpts = ma.toOptions()
@@ -234,7 +241,7 @@ class TCPConnection implements MultiaddrConnection {
           return reject(err)
         }
 
-        resolve(new TCPConnection(ma, rawSocket, options))
+        resolve(new TCPConnection(ma, rawSocket, onClose, options))
       }
 
       rawSocket = net
@@ -249,7 +256,7 @@ class TCPConnection implements MultiaddrConnection {
     })
   }
 
-  public static fromSocket(socket: Socket) {
+  public static fromSocket(socket: Socket, onClose: () => void) {
     if (socket.remoteAddress == undefined || socket.remoteFamily == undefined || socket.remotePort == undefined) {
       throw Error(`Could not determine remote address`)
     }
@@ -272,7 +279,7 @@ class TCPConnection implements MultiaddrConnection {
       family: socket.remoteFamily
     })
 
-    return new TCPConnection(remoteAddr, socket)
+    return new TCPConnection(remoteAddr, socket, onClose)
   }
 }
 

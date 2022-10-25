@@ -142,6 +142,7 @@ class WebRTCConnection implements MultiaddrConnection {
   constructor(
     public relayConn: RelayConnection,
     private testingOptions: HoprConnectTestingOptions,
+    public onClose: () => void,
     public options?: DialOptions
   ) {
     this.state = {
@@ -187,6 +188,7 @@ class WebRTCConnection implements MultiaddrConnection {
     this.relayConn.state.channel?.once('close', () => {
       this.state.destroyed = true
       this.timeline.close ??= Date.now()
+      this.onClose()
     })
 
     // Attach a listener to WebRTC to cleanup state
@@ -197,6 +199,7 @@ class WebRTCConnection implements MultiaddrConnection {
       if (iceConnectionState === 'disconnected' && iceGatheringState === 'complete') {
         this.state.destroyed = true
         this.timeline.close ??= Date.now()
+        this.onClose()
       }
     })
 
@@ -556,6 +559,7 @@ class WebRTCConnection implements MultiaddrConnection {
           // Initiates Connection object teardown
           // by using meta programming
           this.timeline.close ??= Date.now()
+          this.onClose()
         }
     }
   }
@@ -672,6 +676,7 @@ class WebRTCConnection implements MultiaddrConnection {
 
     // Tell libp2p that connection is closed
     this.timeline.close = Date.now()
+    this.onClose()
     this.state.destroyed = true
 
     try {

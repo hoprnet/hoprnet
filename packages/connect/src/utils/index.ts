@@ -8,6 +8,7 @@ import { isAnyAddress } from '@hoprnet/hopr-utils'
 
 import { Multiaddr } from '@multiformats/multiaddr'
 import { CODE_CIRCUIT, CODE_P2P } from '../constants.js'
+import type { Components } from '@libp2p/interfaces/components'
 
 export * from './addrs.js'
 export * from './addressSorters.js'
@@ -206,4 +207,19 @@ export function relayFromRelayAddress(ma: Multiaddr): PeerId {
 
   // Remove length prefix
   return peerIdFromBytes(tuples[0][1].slice(1))
+}
+
+export function cleanExistingConnections(
+  components: Components,
+  peer: PeerId,
+  id: string,
+  error: (...args: any[]) => void
+) {
+  for (const conn of components.getConnectionManager().getConnections(peer)) {
+    if (conn.id === id) {
+      continue
+    }
+
+    attemptClose(conn, error)
+  }
 }
