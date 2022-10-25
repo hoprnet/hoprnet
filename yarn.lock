@@ -3201,7 +3201,7 @@ __metadata:
     "@types/cors": 2.8.12
     "@types/js-cookie": ^3.0.1
     "@types/mocha": 9.1.1
-    "@types/react": ^17.0.2
+    "@types/react": 17.0.51
     "@types/supertest": ^2.0.11
     "@types/yargs": 17.0.10
     bn.js: 5.2.0
@@ -5931,14 +5931,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/react@npm:^17.0.2":
-  version: 17.0.48
-  resolution: "@types/react@npm:17.0.48"
+"@types/react@npm:17.0.51":
+  version: 17.0.51
+  resolution: "@types/react@npm:17.0.51"
   dependencies:
     "@types/prop-types": "*"
     "@types/scheduler": "*"
     csstype: ^3.0.2
-  checksum: b683fa33f751ced0b8c8715df9f40de15513c1d7ce66064a75cdfb8805cc913b0b214a2e7022ef0b724bd62a1e8651d040cd265dd0452bde03cca9b8e495742d
+  checksum: a9680a17444df4edf89e91acb66fbe1eb8c3397ece0f279f67f3fd7f17c60460834e3be721947a7cddc916b76f7c62df3dbd1f6da1057643c5620e32a7a32ec5
   languageName: node
   linkType: hard
 
