@@ -2,7 +2,6 @@ name: HOPR Lint fix
 
 env:
   HOPR_GITHUB_REF: ${{ github.ref }}
-  HOPR_GITHUB_BASE_REF: ${{ github.base_ref }}
 
 on:
   push:
@@ -13,7 +12,7 @@ on:
 
 jobs:
   lint:
-    name: Lint & additional pre-merge checks
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -47,15 +46,3 @@ jobs:
         continue-on-error: true
         run:
           shellcheck -a --norc -s bash -x scripts/*.sh
-
-  deployment_check:
-    name: Upstream deployment status check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Check deployment status of the upstream branch
-        if: ${{ (github.base_ref == 'refs/heads/master' || startsWith(github.base_ref, 'refs/heads/debug-deploy/') || startsWith(github.base_ref, 'refs/heads/release/')) && !env.ACT }}
-        run:
-          ./scripts/deployment-status.sh check ${{ github.ref_name }}
-
