@@ -2474,5 +2474,12 @@
     "uploadedTo": {
       "http://80.208.229.228:5001": "Tue, 25 Oct 2022 09:51:13 GMT"
     }
+  },
+  "1.90.58": {
+    "hash": "/ipfs/QmRVRQG4EzJgabAENJRCfHDnqckz4Kd8CreoEoQC715R33",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Tue, 25 Oct 2022 10:26:36 GMT"
+    }
   }
 }
