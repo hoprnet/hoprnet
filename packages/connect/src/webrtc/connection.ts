@@ -624,11 +624,13 @@ class WebRTCConnection implements MultiaddrConnection {
         )
 
         let done = false
-        for await (const msg of this.relayConn.state.channel as SimplePeer) {
+        for await (const chunkBuffer of this.relayConn.state.channel as SimplePeer) {
+          // Node.js emits Buffer instances, so turn them into Uint8Arrays.
+          const chunk = new Uint8Array(chunkBuffer.buffer, chunkBuffer.byteOffset, chunkBuffer.byteLength)
           // WebRTC tends to bundle multiple message into one chunk,
           // so we need to encode messages and decode them before passing
           // to libp2p
-          const decoded = decodeWithLengthPrefix(msg.subarray())
+          const decoded = decodeWithLengthPrefix(chunk)
 
           for (const decodedMsg of decoded) {
             const [finished, payload] = [decodedMsg.subarray(0, 1), decodedMsg.subarray(1)]
