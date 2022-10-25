@@ -4,6 +4,7 @@ import type { IncomingStreamData } from '@libp2p/interfaces/registrar'
 import type { Initializable, Components } from '@libp2p/interfaces/components'
 import type { Startable } from '@libp2p/interfaces/startable'
 import type { DialOptions } from '@libp2p/interface-transport'
+import { CustomEvent } from '@libp2p/interfaces/events'
 import type { Stream, HoprConnectOptions, HoprConnectTestingOptions } from '../types.js'
 import type { ConnectComponents, ConnectInitializable } from '../components.js'
 
@@ -461,6 +462,16 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     }
 
     log(`Handling reconnect attempt to ${counterparty.toString()}`)
+
+    const onClose = () => {
+      if (newConn) {
+        ;(this.components as Components).getUpgrader().dispatchEvent(
+          new CustomEvent(`connectionEnd`, {
+            detail: newConn
+          })
+        )
+      }
+    }
 
     try {
       if (!this.testingOptions.__noWebRTCUpgrade) {

@@ -10,6 +10,7 @@ import { isAnyAddress } from '@hoprnet/hopr-utils'
 
 import { Multiaddr } from '@multiformats/multiaddr'
 import { CODE_CIRCUIT, CODE_P2P } from '../constants.js'
+import type { Components } from '@libp2p/interfaces/components'
 
 export * from './addrs.js'
 export * from './addressSorters.js'
