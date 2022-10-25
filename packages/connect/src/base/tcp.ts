@@ -1,7 +1,7 @@
 import net, { type Socket, type AddressInfo } from 'net'
 import { abortableSource } from 'abortable-iterator'
 import Debug from 'debug'
-import { nodeToMultiaddr, toU8aStream } from '../utils/index.js'
+import { nodeToMultiaddr } from '../utils/index.js'
 // @ts-ignore untyped module
 import retimer from 'retimer'
 
@@ -143,7 +143,13 @@ class TCPConnection implements MultiaddrConnection {
   }
 
   private createSource(socket: net.Socket): AsyncIterable<Uint8Array> {
-    const iterableSource = toU8aStream(toIterable.source<Uint8Array>(socket)) as AsyncIterable<Uint8Array>
+    const iterableSource = (async function* () {
+      // Node.js emits Buffer instances, so turn them into
+      // proper Uint8Arrays
+      for await (const chunk of toIterable.source<Uint8Array>(socket) as AsyncIterable<Uint8Array>) {
+        yield new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength)
+      }
+    })()
 
     if (this._signal != undefined) {
       return abortableSource(iterableSource, this._signal)
@@ -153,16 +159,12 @@ class TCPConnection implements MultiaddrConnection {
   }
 
   public async sink(source: StreamSource): Promise<void> {
-    const u8aStream = toU8aStream(source)
-
     let iterableSink: Stream['sink']
     try {
       iterableSink = toIterable.sink<Uint8Array>(this.socket)
 
       try {
-        await iterableSink(
-          this._signal != undefined ? (abortableSource(u8aStream, this._signal) as StreamSource) : u8aStream
-        )
+        await iterableSink(this._signal != undefined ? (abortableSource(source, this._signal) as StreamSource) : source)
       } catch (err: any) {
         // If aborted we can safely ignore
         if (err.code !== 'ABORT_ERR' && err.type !== 'aborted') {

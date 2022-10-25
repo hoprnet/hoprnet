@@ -169,9 +169,16 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     if (this.relayState.relayedConnectionCount() > 0) {
       let outConns = `Current relay connections:\n`
 
+      let outConnIds: string[] = []
       await this.relayState.forEach(async (dst) => {
-        outConns += `- ${dst}\n`
+        outConnIds.push(dst)
       })
+
+      outConnIds.sort()
+
+      for (const outConnId of outConnIds) {
+        outConns += `- ${outConnId}\n`
+      }
 
       // Remove occurence of last `\n`
       log(outConns.substring(0, outConns.length - 1))
