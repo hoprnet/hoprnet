@@ -18,7 +18,7 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 
 import Debug from 'debug'
 import { EventEmitter } from 'events'
-import { toU8aStream, eagerIterator } from '../utils/index.js'
+import { eagerIterator } from '../utils/index.js'
 import assert from 'assert'
 import type { ConnectComponents } from '../components.js'
 import type { WebRTCUpgrader } from '../webrtc/upgrader.js'
@@ -303,12 +303,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       type: ConnectionEventTypes.SINK_SOURCE_ATTACHED,
       value: async function* (this: Pick<RelayConnection, 'queueStatusMessage' | 'testingOptions'>) {
         try {
-          if (this.testingOptions.__noWebRTCUpgrade) {
-            yield* toU8aStream(source) as StreamSourceAsync
-          } else {
-            // No need to convert it twice since we're using WebRTCConnection class
-            yield* source as AsyncIterable<Uint8Array>
-          }
+          yield* source
           deferred.resolve()
         } catch (err: any) {
           this.queueStatusMessage(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP))
