@@ -1,12 +1,10 @@
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
-import type { HoprBoost, HoprStakingProxyForNetworkRegistry } from '../src/types'
+import type { HoprBoost } from '../src/types'
 import { type ContractTransaction, utils } from 'ethers'
 import {
   CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES,
   NR_NFT_BOOST,
-  NR_NFT_MAX_REGISTRATION_COM,
-  NR_NFT_MAX_REGISTRATION_TECH,
   NR_NFT_RANK_COM,
   NR_NFT_RANK_TECH,
   NR_NFT_TYPE,
@@ -78,7 +76,6 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   // check boost types being created
   const boostDeployment = await deployments.get('HoprBoost')
-  const registryProxyDeployment = await deployments.get('HoprNetworkRegistryProxy')
   const hoprBoost = (await ethers.getContractFactory('HoprBoost')).attach(boostDeployment.address) as HoprBoost
 
   // check type index of HoprBoost NFTs
@@ -185,7 +182,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     //     `Cannot mint txHOPR to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0] and CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[2] due to ${error}`
     //   )
     // }
-  }
+  // }
 
   const isDeployerAdmin = await hoprBoost.hasRole(DEFAULT_ADMIN_ROLE, deployer)
   if (isDeployerAdmin && deployer !== admin) {
