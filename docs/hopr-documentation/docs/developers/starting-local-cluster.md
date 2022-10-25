@@ -49,7 +49,7 @@ In order to install and build the required packages and project modules, make su
 Ideally you will also have basic development toolsets[^2] set up on your computer. If you have installed the above, run the following command. Please bear in mind that this process will take at least 5-10 minutes depending on your computer.
 
 ```bash
-make -j deps && make -j build
+make deps build
 ```
 
 3. **Run the one-line setup script**: 
