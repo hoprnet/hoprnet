@@ -47,3 +47,14 @@ jobs:
         run:
           shellcheck -a --norc -s bash -x scripts/*.sh
 
+  deployment_check:
+    name: Upstream deployment status check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Check deployment status of the upstream branch
+        if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/') || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+        run:
+          ./scripts/deployment-status.sh check ${{ github.ref_name }}
+
