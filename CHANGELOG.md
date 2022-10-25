@@ -11,6 +11,7 @@
 <a name="1.90"></a>
 
 ## [1.90](https://github.com/hoprnet/hoprnet/compare/release/paleochora...hoprnet:release/Valencia)
+
 - Add Health Status Indicator in the Admin UI ([#4197](https://github.com/hoprnet/hoprnet/pull/4197))
 - Improve Network Registry smart contract to allow 1-to-many node registration, add enable/disable make targets ([#4008](https://github.com/hoprnet/hoprnet/pull/4091))
 - Replace `yarn` with `npx` in `pluto` Docker image to run `hoprd` to fix binary discoverability issue

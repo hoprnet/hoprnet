@@ -82,8 +82,8 @@ export default function Home() {
     }
   }
   // health status indicator
-  const [healthStatus, setHealthStatus] = useState<HealthStatus>(HealthStatus.Unknown);
-  const [showTooltip, setShowTooltip] = useState(false);
+  const [healthStatus, setHealthStatus] = useState<HealthStatus>(HealthStatus.Unknown)
+  const [showTooltip, setShowTooltip] = useState(false)
   // update aliases once and every 5 seconds
   // update health status once and every 10 seconds
   useEffect(() => {
@@ -217,9 +217,11 @@ export default function Home() {
           <span className={styles.cogwheelIcon} onClick={() => setShowConfigPanel(!showConfigPanel)}>
             ⚙️
           </span>
-          <span className={styles.healthIndicator}
+          <span
+            className={styles.healthIndicator}
             onMouseEnter={() => setTimeout(() => setShowTooltip(true), 300)}
-            onMouseLeave={() => setTimeout(() => setShowTooltip(false), 300)}>
+            onMouseLeave={() => setTimeout(() => setShowTooltip(false), 300)}
+          >
             {healthStatus}
           </span>
           {showTooltip && <span className={styles.healthIndicatorTooltip}>network health indicator</span>}
