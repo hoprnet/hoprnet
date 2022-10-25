@@ -17,7 +17,7 @@ import SimplePeer from 'simple-peer'
 import type { PeerId } from '@libp2p/interface-peer-id'
 
 import Debug from 'debug'
-import { toU8aStream, eagerIterator } from '../utils/index.js'
+import { eagerIterator } from '../utils/index.js'
 import assert from 'assert'
 import type { ConnectComponents } from '../components.js'
 
@@ -380,12 +380,7 @@ export function RelayConnection(
         type: ConnectionEventTypes.SINK_SOURCE_ATTACHED,
         value: (async function* () {
           try {
-            if (testingOptions.__noWebRTCUpgrade) {
-              yield* toU8aStream(source) as StreamSourceAsync
-            } else {
-              // No need to convert it twice since we're using WebRTCConnection class
-              yield* source as AsyncIterable<Uint8Array>
-            }
+            yield* source
             resolve()
           } catch (err: any) {
             reject(err)

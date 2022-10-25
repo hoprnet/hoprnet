@@ -6,7 +6,7 @@ import toIterable from 'stream-to-it'
 import Debug from 'debug'
 import type { RelayConnectionInterface } from '../relay/connection.js'
 import { randomBytes } from 'crypto'
-import { toU8aStream, encodeWithLengthPrefix, decodeWithLengthPrefix, eagerIterator } from '../utils/index.js'
+import { encodeWithLengthPrefix, decodeWithLengthPrefix, eagerIterator } from '../utils/index.js'
 import { abortableSource } from 'abortable-iterator'
 import {
   type StreamResult,
@@ -269,7 +269,7 @@ export function WebRTCConnection(
         type: ConnectionEventTypes.SINK_SOURCE_ATTACHED,
         value: (async function* () {
           try {
-            yield* options?.signal != undefined ? abortableSource(toU8aStream(source), options.signal) : source
+            yield* options?.signal != undefined ? abortableSource(source, options.signal) : source
             resolve()
           } catch (err: any) {
             if (err.type === 'aborted' || err.code === 'ABORT_ERR') {
@@ -562,11 +562,13 @@ export function WebRTCConnection(
         log(`webRTC source handover done. Using direct connection to peer ${relayConn.counterparty.toString()}`)
 
         let done = false
-        for await (const msg of relayConn.getCurrentChannel() as SimplePeer) {
+        for await (const chunkBuffer of relayConn.getCurrentChannel() as SimplePeer) {
+          // Node.js emits Buffer instances, so turn them into Uint8Arrays.
+          const chunk = new Uint8Array(chunkBuffer.buffer, chunkBuffer.byteOffset, chunkBuffer.byteLength)
           // WebRTC tends to bundle multiple message into one chunk,
           // so we need to encode messages and decode them before passing
           // to libp2p
-          const decoded = decodeWithLengthPrefix(msg.subarray())
+          const decoded = decodeWithLengthPrefix(chunk)
 
           for (const decodedMsg of decoded) {
             const [finished, payload] = [decodedMsg.subarray(0, 1), decodedMsg.subarray(1)]

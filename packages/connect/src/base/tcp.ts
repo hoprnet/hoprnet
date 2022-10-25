@@ -166,11 +166,19 @@ export function TCPConnection(
   }
   const { sink, source } = toIterable.duplex<Uint8Array>(socket)
 
+  const iterableSource = (async function* () {
+    // Node.js emits Buffer instances, so turn them into
+    // proper Uint8Arrays
+    for await (const chunk of source) {
+      yield new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength)
+    }
+  })()
+
   return {
     remoteAddr,
     timeline,
     close,
-    source: options?.signal != undefined ? abortableSource(source, options.signal) : source,
+    source: options?.signal != undefined ? abortableSource(iterableSource, options.signal) : iterableSource,
     sink: sinkEndpoint
   }
 }
