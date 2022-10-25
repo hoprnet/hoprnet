@@ -21,7 +21,12 @@ describe('HoprStakeSeason5', function () {
   describe('unit tests', function () {
     beforeEach(async function () {
       ;[deployer] = await hre.ethers.getSigners()
-      stakeContract = await deployContractFromFactory(deployer, 'HoprStakeSeason5', ["0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05", "0x43d13D7B83607F14335cF2cB75E87dA369D056c7", "0xD057604A14982FE8D88c5fC25Aac3267eA142a08", "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1"])
+      stakeContract = await deployContractFromFactory(deployer, 'HoprStakeSeason5', [
+        '0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05',
+        '0x43d13D7B83607F14335cF2cB75E87dA369D056c7',
+        '0xD057604A14982FE8D88c5fC25Aac3267eA142a08',
+        '0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1'
+      ])
     })
     describe('A list of Indexes are blocked', function () {
       for (const index of blockedIndexes) {
