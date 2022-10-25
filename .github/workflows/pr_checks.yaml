@@ -1,4 +1,4 @@
-name: HOPR Pre-merge Checks
+name: HOPR Pre-merge checks
 
 env:
   HOPR_GITHUB_REF: ${{ github.ref }}
@@ -10,7 +10,7 @@ on:
 
 jobs:
   deployment_check:
-    name: Check upstream deployment status
+    name: Upstream deployment status
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
