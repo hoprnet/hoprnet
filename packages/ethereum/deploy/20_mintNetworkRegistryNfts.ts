@@ -138,7 +138,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   //   const registryProxy = (await ethers.getContractFactory('HoprStakingProxyForNetworkRegistry')).attach(
   //     registryProxyDeployment.address
   //     ) as HoprStakingProxyForNetworkRegistry
-      
+
   //   await awaitTxConfirmation(
   //     registryProxy.ownerBatchAddSpecialNftTypeAndRank(
   //       [NR_NFT_TYPE_INDEX, NR_NFT_TYPE_INDEX],
@@ -152,36 +152,36 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   //     ethers
   //   )
 
-    // // currently we don't use funds, only NFTs
-    // await awaitTxConfirmation(
-    //   registryProxy.ownerBatchAddNftTypeAndRank(
-    //     [NR_NFT_TYPE_INDEX, NR_NFT_TYPE_INDEX],
-    //     [NR_NFT_RANK_TECH, NR_NFT_RANK_COM]
-    //   ),
-    //   environment,
-    //   ethers
-    // )
-    // try {
-    //   // mint minimum stake to addresses that will stake and are binded to nodes in NR
-    //   const tokenContract = await deployments.get('xHoprToken')
-    //   const hoprToken = (await ethers.getContractFactory('ERC677Mock')).attach(tokenContract.address) as ERC677Mock
+  // // currently we don't use funds, only NFTs
+  // await awaitTxConfirmation(
+  //   registryProxy.ownerBatchAddNftTypeAndRank(
+  //     [NR_NFT_TYPE_INDEX, NR_NFT_TYPE_INDEX],
+  //     [NR_NFT_RANK_TECH, NR_NFT_RANK_COM]
+  //   ),
+  //   environment,
+  //   ethers
+  // )
+  // try {
+  //   // mint minimum stake to addresses that will stake and are binded to nodes in NR
+  //   const tokenContract = await deployments.get('xHoprToken')
+  //   const hoprToken = (await ethers.getContractFactory('ERC677Mock')).attach(tokenContract.address) as ERC677Mock
 
-    //   await awaitTxConfirmation(
-    //     hoprToken.batchMintInternal([CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0]], MIN_STAKE),
-    //     environment,
-    //     ethers
-    //   )
-    //   await awaitTxConfirmation(
-    //     hoprToken.batchMintInternal([CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[2]], MIN_STAKE),
-    //     environment,
-    //     ethers
-    //   )
-    //   console.log(`... minting ${MIN_STAKE} txHOPR to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0] and [2]`)
-    // } catch (error) {
-    //   console.error(
-    //     `Cannot mint txHOPR to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0] and CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[2] due to ${error}`
-    //   )
-    // }
+  //   await awaitTxConfirmation(
+  //     hoprToken.batchMintInternal([CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0]], MIN_STAKE),
+  //     environment,
+  //     ethers
+  //   )
+  //   await awaitTxConfirmation(
+  //     hoprToken.batchMintInternal([CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[2]], MIN_STAKE),
+  //     environment,
+  //     ethers
+  //   )
+  //   console.log(`... minting ${MIN_STAKE} txHOPR to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0] and [2]`)
+  // } catch (error) {
+  //   console.error(
+  //     `Cannot mint txHOPR to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[0] and CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[2] due to ${error}`
+  //   )
+  // }
   // }
 
   const isDeployerAdmin = await hoprBoost.hasRole(DEFAULT_ADMIN_ROLE, deployer)
