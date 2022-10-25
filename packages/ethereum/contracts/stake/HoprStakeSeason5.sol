@@ -12,17 +12,26 @@ contract HoprStakeSeason5 is HoprStakeBase {
    * Staking season 5 starts at 1666785600 2pm CEST 26th October 2022 and ends at 1674738000 2pm CET 26th January 2023
    * Basic APY is 2.5 % and the boost cap is 200k xHOPR
    * It blocks HODLr, DAO_v2, Surveyor, Wildhorn_v2, PuzzleHunt_v1, PuzzleHunt_v2, PuzzleHunt_v3, ETH_Denver and Lucky NFTs at start
+   * @param _newOwner address Address of the new owner. This new owner can reclaim any ERC20 and ERC721 token being accidentally sent to the lock contract.
+   * @param _nftAddress address Address of the NFT contract.
+   * @param _lockToken address Address of the stake token xHOPR.
+   * @param _rewardToken address Address of the reward token wxHOPR.
    */
-  constructor()
+  constructor(
+    address _newOwner,
+    address _nftAddress,
+    address _lockToken,
+    address _rewardToken
+  )
     HoprStakeBase(
-      0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05,
+      block.chainid == 100 ? 0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05 : _newOwner,
       1666785600,
       1674738000,
       793,
       2e23,
-      0xD057604A14982FE8D88c5fC25Aac3267eA142a08,
-      0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1,
-      0x43d13D7B83607F14335cF2cB75E87dA369D056c7
+      _nftAddress,
+      _lockToken,
+      _rewardToken
     )
   {
     // block a selection of HoprBoost NFTs
