@@ -593,8 +593,10 @@ export class HoprDB {
     let dbBatch = this.db.batch()
 
     for (const intermediate of intermediates) {
+      const u8aKey = this.keyOf(createCommitmentKey(channelId, intermediate.iteration))
+
       dbBatch = dbBatch.put(
-        Buffer.from(this.keyOf(createCommitmentKey(channelId, intermediate.iteration))),
+        Buffer.from(u8aKey.buffer, u8aKey.byteOffset, u8aKey.byteLength),
         Buffer.from(intermediate.preImage.buffer, intermediate.preImage.byteOffset, intermediate.preImage.byteLength)
       )
     }
@@ -771,11 +773,12 @@ export class HoprDB {
     )
 
     const serializedSnapshot = snapshot.serialize()
+    const u8aPendingKey = this.keyOf(createPendingTicketsCountKey(ticket.counterparty))
 
     await this.db
       .batch()
       .put(
-        Buffer.from(this.keyOf(createPendingTicketsCountKey(ticket.counterparty))),
+        Buffer.from(u8aPendingKey.buffer, u8aPendingKey.byteOffset, u8aPendingKey.byteLength),
         Buffer.from(val.sub(val).serialize())
       )
       .put(
@@ -923,11 +926,15 @@ export class HoprDB {
 
     const serializedRegisteredNodes = PublicKey.serializeArray(registeredNodes)
     const serializedSnapshot = snapshot.serialize()
+    const serializedAccount = account.serialize()
 
     await this.db
       .batch()
       // node public key to address (M->1)
-      .put(Buffer.from(this.keyOf(createNetworkRegistryEntryKey(pubKey))), Buffer.from(account.serialize()))
+      .put(
+        Buffer.from(this.keyOf(createNetworkRegistryEntryKey(pubKey))),
+        Buffer.from(serializedAccount.buffer, serializedAccount.byteOffset, serializedAccount.byteLength)
+      )
       // address to node public keys (1->M) in the format of key -> PublicKey[]
       .put(
         Buffer.from(this.keyOf(createNetworkRegistryAddressToPublicKeyKey(account))),
