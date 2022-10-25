@@ -9,7 +9,7 @@ env:
 
 on:
   push:
-    branches: ['integration/**', 'master', 'release/**', 'avado', 'debug-deploy/**']
+    branches: ['integration/**', 'master', 'release/**', 'staging/**', 'avado', 'debug-deploy/**']
     paths-ignore:
       - '.processes/**/*'
       - 'docs/**/*'
@@ -96,7 +96,7 @@ jobs:
           HOPR_GIT_MSG: 'chore(release): update smart contract deployments'
 
       - name: '[NPM] Publish prerelease version (On pushes to master and debug-deploy/*)'
-        if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/') }}
+        if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/')  || startsWith(github.ref, 'refs/heads/staging/') }}
         run: ./scripts/publish-version.sh prerelease
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -110,7 +110,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: '[NPM] Wait for packages to be accessible'
-        if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/') || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+        if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/') || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: |
           ./scripts/wait-for-npm-package.sh hoprd
           ./scripts/wait-for-npm-package.sh core
@@ -121,7 +121,7 @@ jobs:
           ./scripts/wait-for-npm-package.sh connect
 
       - name: '[FINISH] Send notification if anything failed on master or release branches'
-        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: |
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
             "${{ github.workflow }}" "${{ github.run_id }}"
@@ -154,7 +154,7 @@ jobs:
           prerelease: false
 
       - name: Send notification if anything failed on master or release branches
-        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: |
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
             "${{ github.workflow }}" "${{ github.run_id }}"
@@ -195,7 +195,7 @@ jobs:
         run: ./scripts/build-docker.sh
 
       - name: Send notification if anything failed on master or release branches
-        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: |
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
             "${{ github.workflow }}" "${{ github.run_id }}"
@@ -250,7 +250,7 @@ jobs:
         run: ./scripts/commit-and-push-all-changes.sh
 
       - name: Send notification if anything failed on master or release branches
-        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: |
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
             "${{ github.workflow }}" "${{ github.run_id }}"
@@ -332,7 +332,7 @@ jobs:
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
 
       - name: Send notification if anything failed on master or release branches
-        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: |
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
             "${{ github.workflow }}" "${{ github.run_id }}"
@@ -415,7 +415,7 @@ jobs:
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
 
       - name: Send notification if anything failed on master or release branches
-        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: |
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
             "${{ github.workflow }}" "${{ github.run_id }}"
