@@ -2,6 +2,7 @@ name: HOPR Lint fix
 
 env:
   HOPR_GITHUB_REF: ${{ github.ref }}
+  HOPR_GITHUB_BASE_REF: ${{ github.base_ref }}
 
 on:
   push:
