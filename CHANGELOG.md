@@ -23,6 +23,7 @@
 - Remove obsolete stream compatibility layer ([#4276](https://github.com/hoprnet/hoprnet/pull/4276))
 - Allow `info` command before node startup has finished ([#4273](https://github.com/hoprnet/hoprnet/pull/4273))
 - Turn libp2p dual DHT into single DHT by forking DHT package in order to avoid a memory leak https://github.com/hoprnet/hoprnet/pull/4288
+- Turn db operations into `zero-copy` operations ([#4293](https://github.com/hoprnet/hoprnet/pull/4293))
 
 ---
 

@@ -1087,7 +1087,7 @@ export class HoprDB {
    * @returns true if register is enabled or if key is not preset in the dababase
    */
   public async isNetworkRegistryEnabled(): Promise<boolean> {
-    return this.getCoercedOrDefault<boolean>(NETWORK_REGISTRY_ENABLED_PREFIX, (v) => v[0] == 1, true)
+    return this.getCoercedOrDefault<boolean>(NETWORK_REGISTRY_ENABLED_PREFIX, (v) => v[0] != 0, true)
   }
 
   static createMock(id?: PublicKey): HoprDB {
