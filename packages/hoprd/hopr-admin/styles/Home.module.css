@@ -29,15 +29,19 @@
   cursor: pointer;
 }
 
+.titleIcons {
+  display: inline-flex;
+  align-items: center;
+}
+
 .healthIndicator {
-  font-size: 0.90rem;
+  font-size: 1rem;
   margin-left: 1rem;
   cursor: default;
-  vertical-align: middle;
 }
 
 .healthIndicatorTooltip {
-  font-size: 11px;
+  font-size: 0.7rem;
   margin-left: 0.5rem;
 }
 

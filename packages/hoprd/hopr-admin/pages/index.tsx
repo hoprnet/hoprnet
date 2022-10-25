@@ -213,18 +213,17 @@ export default function Home() {
       <Logo onClick={() => setShowConnectedPanel(!showConnectedPanel)} />
       <h1>
         HOPR Logs - {GIT_HASH ? GIT_HASH : '*'}{' '}
-        <span className={styles.cogwheelIcon} onClick={() => setShowConfigPanel(!showConfigPanel)}>
-          ⚙️
-        </span>
-        <span
-          className={styles.healthIndicator}
-          onMouseEnter={() => setTimeout(() => setShowTooltip(true), 300)}
-          onMouseLeave={() => setTimeout(() => setShowTooltip(false), 300)}
-        >
-          {healthStatus}
-          {showTooltip &&
-            <span className={styles.healthIndicatorTooltip}>network health indicator</span>}
-        </span>
+        <div className={styles.titleIcons}>
+          <span className={styles.cogwheelIcon} onClick={() => setShowConfigPanel(!showConfigPanel)}>
+            ⚙️
+          </span>
+          <span className={styles.healthIndicator}
+            onMouseEnter={() => setTimeout(() => setShowTooltip(true), 300)}
+            onMouseLeave={() => setTimeout(() => setShowTooltip(false), 300)}>
+            {healthStatus}
+          </span>
+          {showTooltip && <span className={styles.healthIndicatorTooltip}>network health indicator</span>}
+        </div>
       </h1>
 
       <Logs messages={logs} isConnected={app.streamWS.state.status === 'CONNECTED'} />
