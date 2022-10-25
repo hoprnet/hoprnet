@@ -103,29 +103,31 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       }
     }
 
-    // mint NR NFTs
-    for (const networkRegistryNftRank of [NR_NFT_RANK_TECH, NR_NFT_RANK_COM]) {
-      console.log(
-        `... minting ${NUM_NR_NFT} ${NR_NFT_TYPE} NFTs type of index ${NR_NFT_TYPE_INDEX} to ${admin}\n...minting 1 ${NR_NFT_TYPE} NFTs to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES\n...minting 10 ${NR_NFT_TYPE} NFTs to dev bank ${DEV_BANK_ADDRESS}`
-      )
-      await awaitTxConfirmation(
-        hoprBoost.batchMint(
-          [
-            ...new Array(NUM_NR_NFT).fill(admin),
-            ...CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES,
-            ...Array(10).fill(DEV_BANK_ADDRESS)
-          ],
-          NR_NFT_TYPE,
-          networkRegistryNftRank,
-          NR_NFT_BOOST,
-          0,
-          {
-            gasLimit: 4e6
-          }
-        ),
-        environment,
-        ethers
-      )
+    // mint NR NFTs (skip this when in staging to reduce transactions)
+    if (!network.tags.staging) {
+      for (const networkRegistryNftRank of [NR_NFT_RANK_TECH, NR_NFT_RANK_COM]) {
+        console.log(
+          `... minting ${NUM_NR_NFT} ${NR_NFT_TYPE} NFTs type of index ${NR_NFT_TYPE_INDEX} to ${admin}\n...minting 1 ${NR_NFT_TYPE} NFTs to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES\n...minting 10 ${NR_NFT_TYPE} NFTs to dev bank ${DEV_BANK_ADDRESS}`
+        )
+        await awaitTxConfirmation(
+          hoprBoost.batchMint(
+            [
+              ...new Array(NUM_NR_NFT).fill(admin),
+              ...CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES,
+              ...Array(10).fill(DEV_BANK_ADDRESS)
+            ],
+            NR_NFT_TYPE,
+            networkRegistryNftRank,
+            NR_NFT_BOOST,
+            0,
+            {
+              gasLimit: 4e6
+            }
+          ),
+          environment,
+          ethers
+        )
+      }
     }
 
     console.log(`Admin ${admin} has ${await hoprBoost.balanceOf(admin)} Boost NFTs`)
@@ -133,25 +135,25 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     console.log(`Deployer is not minter. Skip minting NFTs, although ${dummyNftTypesToBeMinted} need to be minted.`)
   }
 
-  // Add special NFTs in staging environment (for staging environment)
-  if (network.tags.staging) {
-    // add special NFT types (dev NFTs) in network registry for staging
-    const registryProxy = (await ethers.getContractFactory('HoprStakingProxyForNetworkRegistry')).attach(
-      registryProxyDeployment.address
-    ) as HoprStakingProxyForNetworkRegistry
-
-    await awaitTxConfirmation(
-      registryProxy.ownerBatchAddSpecialNftTypeAndRank(
-        [NR_NFT_TYPE_INDEX, NR_NFT_TYPE_INDEX],
-        [NR_NFT_RANK_TECH, NR_NFT_RANK_COM],
-        [NR_NFT_MAX_REGISTRATION_TECH, NR_NFT_MAX_REGISTRATION_COM],
-        {
-          gasLimit: 4e6
-        }
-      ),
-      environment,
-      ethers
-    )
+  // // Add special NFTs in staging environment (skip for staging environment)
+  // if (network.tags.staging) {
+  //   // add special NFT types (dev NFTs) in network registry for staging
+  //   const registryProxy = (await ethers.getContractFactory('HoprStakingProxyForNetworkRegistry')).attach(
+  //     registryProxyDeployment.address
+  //     ) as HoprStakingProxyForNetworkRegistry
+      
+  //   await awaitTxConfirmation(
+  //     registryProxy.ownerBatchAddSpecialNftTypeAndRank(
+  //       [NR_NFT_TYPE_INDEX, NR_NFT_TYPE_INDEX],
+  //       [NR_NFT_RANK_TECH, NR_NFT_RANK_COM],
+  //       [NR_NFT_MAX_REGISTRATION_TECH, NR_NFT_MAX_REGISTRATION_COM],
+  //       {
+  //         gasLimit: 4e6
+  //       }
+  //     ),
+  //     environment,
+  //     ethers
+  //   )
 
     // // currently we don't use funds, only NFTs
     // await awaitTxConfirmation(
