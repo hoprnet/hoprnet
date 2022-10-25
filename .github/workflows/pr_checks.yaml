@@ -18,4 +18,4 @@ jobs:
       - name: Check deployment status of the upstream branch
         if: ${{ (github.base_ref == 'master' || startsWith(github.base_ref, 'debug-deploy/') || startsWith(github.base_ref, 'release/')) && !env.ACT }}
         run:
-          ./scripts/deployment-status.sh check ${{ github.ref_name }}
+          ./scripts/deployment-status.sh check ${{ github.base_ref }}
