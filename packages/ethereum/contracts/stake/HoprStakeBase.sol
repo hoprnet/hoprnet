@@ -95,11 +95,7 @@ contract HoprStakeBase is Ownable, IERC777Recipient, IERC721Receiver, Reentrancy
     transferOwnership(_newOwner);
     ERC1820_REGISTRY.setInterfaceImplementer(address(this), TOKENS_RECIPIENT_INTERFACE_HASH, address(this));
     // implement in favor of testing
-    uint256 chainId;
-    assembly {
-      chainId := chainid()
-    }
-    if (chainId != 100) {
+    if (block.chainid != 100) {
       LOCK_TOKEN = _lockToken;
       REWARD_TOKEN = _rewardToken;
       NFT_CONTRACT = IHoprBoost(_nftAddress);
