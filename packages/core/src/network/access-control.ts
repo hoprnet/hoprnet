@@ -27,7 +27,7 @@ export default class AccessControl {
     this.networkPeers.register(peerId, origin)
   }
 
-  private denyConnectionWithPeer(peerId: PeerId, origin: NetworkPeersOrigin): Promise<void> {
+  private denyConnectionWithPeer(peerId: PeerId, origin: NetworkPeersOrigin): void {
     this.closeConnectionsTo(peerId)
     this.networkPeers.addPeerToDenied(peerId, origin)
   }

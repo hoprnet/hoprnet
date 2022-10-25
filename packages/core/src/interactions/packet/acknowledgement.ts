@@ -161,7 +161,8 @@ export class AcknowledgementInteraction {
     const unacknowledged = pending.ticket
 
     if (!unacknowledged.verifyChallenge(acknowledgement.ackKeyShare)) {
-      metric_receivedFailedAcks.increment()throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
+      metric_receivedFailedAcks.increment()
+      throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
     }
 
     let channelId: Hash
@@ -173,7 +174,8 @@ export class AcknowledgementInteraction {
       // Something clearly screwy here. This is bad enough to be a fatal error
       // we should kill the node and debug.
       log('Error, acknowledgement received for channel that does not exist')
-      metric_receivedFailedAcks.increment()throw e
+      metric_receivedFailedAcks.increment()
+      throw e
     }
     const response = unacknowledged.getResponse(acknowledgement.ackKeyShare)
     const ticket = unacknowledged.ticket

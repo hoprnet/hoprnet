@@ -441,8 +441,6 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
     log(`incoming connection from ${handShakeResult.counterparty.toString()}`)
 
-    let upgradedConn: Connection | undefined
-
     const newConn = this.upgradeInbound(
       handShakeResult.counterparty,
       conn.connection.remotePeer,
@@ -462,6 +460,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     try {
       // Will call internal libp2p event handler, so no further action required
       upgradedConn = await this.getComponents().getUpgrader().upgradeInbound(newConn)
+      metric_countSuccessfulIncomingRelayReqs.increment()
     } catch (err) {
       error(`Could not upgrade relayed connection. Error was: ${err}`)
       metric_countFailedIncomingRelayReqs.increment()
