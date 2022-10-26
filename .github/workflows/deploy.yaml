@@ -264,6 +264,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Google Cloud Credentials
+        uses: google-github-actions/auth@v0
+        with:
+          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v0
+        with:
+          project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+          install_components: beta
+
       - name: Unset flag for deployment
         if: ${{ !env.ACT }}
         run: |
@@ -442,6 +453,17 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+
+      - name: Set up Google Cloud Credentials
+        uses: google-github-actions/auth@v0
+        with:
+          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v0
+        with:
+          project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+          install_components: beta
 
       - name: Set flag for deployment
         if: ${{ !env.ACT }}

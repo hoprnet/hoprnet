@@ -24,10 +24,11 @@ msg "Deployment flag name for the branch \"${used_branch}\": ${current_deploymen
 
 usage() {
    msg
-   msg "Usage: $0 [-h|--help] [-a|--activate] [-d|--deactivate] [-c|--check] [branch]"
+   msg "Usage: $0 <activate|deactivate|check> [branch]"
    msg
    msg "This script can check or manipulate the status flag of the Google Cloud nodes deployment"
-   msg "from the current Git branch. When the flag is set, the deployment is considered active."
+   msg "from the given Git branch. When the flag is set, the deployment is considered active."
+   msg "If no branch argument is given, the current active branch is used."
 }
 
 activate() {
