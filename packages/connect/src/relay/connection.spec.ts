@@ -548,13 +548,11 @@ describe('relay connection - stream error propagation', function () {
       async () => {}
     )
 
-    await assert.rejects(
-      alice.sink(
-        (async function* () {
-          yield new Uint8Array()
-        })()
-      ),
-      Error(errorInSinkFunction)
+    // Should log exception but not throw it
+    alice.sink(
+      (async function* () {
+        yield new Uint8Array()
+      })()
     )
   })
 

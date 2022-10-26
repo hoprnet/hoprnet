@@ -334,14 +334,12 @@ describe('webrtc connection - stream error propagation', function () {
       () => {}
     )
 
-    await assert.rejects(
-      conn.sink(
-        (async function* () {
-          waitForSinkAttach.reject(Error(falsySinkError))
-          yield new Uint8Array()
-        })()
-      ),
-      Error(falsySinkError)
+    // Should not throw an exception but log the error
+    conn.sink(
+      (async function* () {
+        waitForSinkAttach.reject(Error(falsySinkError))
+        yield new Uint8Array()
+      })()
     )
   })
 
