@@ -13,43 +13,43 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare -x HOPR_LOG_ID="deployment-status"
 source "${mydir}/gcloud.sh"
 
-readonly flag_prefix="DEPLOYMENT_ACTIVE"
+readonly flag_prefix="DEPLOYMENT_FAILED"
 
 # Use current branch if not specified as argument
 current_branch=$(git rev-parse --abbrev-ref HEAD)
 used_branch=${2:-$current_branch}
 current_deployment=$(echo "${used_branch}" | sed 's|/|_|g' | tr '[:lower:]' '[:upper:]')
 
-msg "Deployment flag name for the branch \"${used_branch}\": ${current_deployment}"
+msg "Use flag name for the branch \"${used_branch}\": ${flag_prefix}_${current_deployment}"
 
 usage() {
    msg
-   msg "Usage: $0 <activate|deactivate|check> [branch]"
+   msg "Usage: $0 <set|unset|check> [branch]"
    msg
-   msg "This script can check or manipulate the status flag of the Google Cloud nodes deployment"
-   msg "from the given Git branch. When the flag is set, the deployment is considered active."
+   msg "This script can check or manipulate the failure flag of the Google Cloud nodes deployment"
+   msg "from the given Git branch. When the flag is set, the deployment is considered in a failed state."
    msg "If no branch argument is given, the current active branch is used."
 }
 
-activate() {
+set_fail_flag() {
   local ts="$(date +%s)"
   gcloud_set_project_flag "${flag_prefix}_${current_deployment}" "${ts}"
-  msg "Set active deployment flag ${current_deployment}"
+  msg "Set deployment failure flag ${current_deployment}"
 }
 
-deactivate() {
+unset_fail_flag() {
   gcloud_unset_project_flag "${flag_prefix}_${current_deployment}"
-  msg "Removed active deployment flag ${current_deployment}"
+  msg "Removed deployment failure flag ${current_deployment}"
 }
 
 check() {
   local is_set="$(gcloud_isset_project_flag "${flag_prefix}_${current_deployment}")"
   local ec=0
   if [ "${is_set,,}" = "true" ]; then
-    msg "✅ Active deployment flag ${current_deployment} IS set"
-  else
-    msg "❌ Active deployment flag ${current_deployment} IS NOT set"
+    msg "❌ Deployment failure flag ${current_deployment} IS set"
     ec=1
+  else
+    msg "✅ Deployment failure flag ${current_deployment} NOT set"
   fi
 
   return ${ec}
@@ -60,12 +60,12 @@ if [ $# -le 1 ]; then
   exit 1
 fi
 
-if [ "${1}" = "activate" ]; then
-  activate
+if [ "${1}" = "set" ]; then
+  set_fail_flag
 fi
 
-if [ "${1}" = "deactivate" ]; then
-  deactivate
+if [ "${1}" = "unset" ]; then
+  unset_fail_flag
 fi
 
 if [ "${1}" = "check" ]; then

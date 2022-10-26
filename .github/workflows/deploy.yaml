@@ -275,10 +275,10 @@ jobs:
           project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           install_components: beta
 
-      - name: Unset flag for deployment
+      - name: Set deployment failure flag
         if: ${{ !env.ACT }}
         run: |
-          ./scripts/deployment-status.sh deactivate
+          ./scripts/deployment-gater.sh set
 
   deploy_public_instances:
     name: 'Continuous Deployment: Deploy public instances'
@@ -465,7 +465,7 @@ jobs:
           project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           install_components: beta
 
-      - name: Set flag for deployment
+      - name: Unset deployment failure flag
         if: ${{ !env.ACT }}
         run: |
-          ./scripts/deployment-status.sh activate
+          ./scripts/deployment-gater.sh unset
