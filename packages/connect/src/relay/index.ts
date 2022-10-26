@@ -17,7 +17,13 @@ import chalk from 'chalk'
 import { WebRTCConnection, type WebRTCConnectionInterface } from '../webrtc/index.js'
 import { RELAY_PROTOCOLS, DELIVERY_PROTOCOLS, OK, CAN_RELAY_PROTOCOLS } from '../constants.js'
 import { RelayConnection, type RelayConnectionInterface } from './connection.js'
-import { RelayHandshake, RelayHandshakeMessage } from './handshake.js'
+import {
+  abortRelayHandshake,
+  handleRelayHandshake,
+  initiateRelayHandshake,
+  negotiateRelayHandshake,
+  RelayHandshakeMessage
+} from './handshake.js'
 import { RelayState } from './state.js'
 import { createRelayerKey, dial, DialStatus, randomInteger, retimer } from '@hoprnet/hopr-utils'
 import { handshake } from 'it-handshake'
@@ -227,9 +233,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       return
     }
 
-    const shaker = new RelayHandshake(response.resp.stream, this.options)
-
-    const handshakeResult = await shaker.initiate(relay, destination)
+    const handshakeResult = await initiateRelayHandshake(response.resp.stream, relay, destination)
 
     if (!handshakeResult.success) {
       error(`Handshake with ${relay.toString()} led to empty stream. Giving up.`)
@@ -358,19 +362,23 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       return
     }
 
-    const shaker = new RelayHandshake(conn.stream, this.options)
-
     log(`handling relay request from ${conn.connection.remotePeer.toString()}`)
     log(`relayed connection count: ${this.relayState.relayedConnectionCount()}`)
 
     try {
       if (this.relayState.relayedConnectionCount() >= (this.options.maxRelayedConnections as number)) {
         log(`relayed request rejected, already at max capacity (${this.options.maxRelayedConnections as number})`)
-        await shaker.reject(RelayHandshakeMessage.FAIL_RELAY_FULL)
+        await abortRelayHandshake(conn.stream, RelayHandshakeMessage.FAIL_RELAY_FULL)
       } else {
         // NOTE: This cannot be awaited, otherwise it stalls the relay loop. Therefore, promise rejections must
         // be handled downstream to avoid unhandled promise rejection crashes
-        await shaker.negotiate(conn.connection.remotePeer, this.getComponents(), this.relayState)
+        await negotiateRelayHandshake(
+          conn.stream,
+          conn.connection.remotePeer,
+          this.getComponents(),
+          this.relayState,
+          this.options
+        )
       }
     } catch (e) {
       error(`Error while processing relay request from ${conn.connection.remotePeer.toString()}: ${e}`)
@@ -391,7 +399,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       return
     }
 
-    const handShakeResult = await new RelayHandshake(conn.stream, this.options).handle(conn.connection.remotePeer)
+    const handShakeResult = await handleRelayHandshake(conn.stream, conn.connection.remotePeer)
 
     if (!handShakeResult.success) {
       return
