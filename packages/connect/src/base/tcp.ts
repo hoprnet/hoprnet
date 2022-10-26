@@ -169,7 +169,7 @@ export function TCPConnection(
   const iterableSource = (async function* () {
     // Node.js emits Buffer instances, so turn them into
     // proper Uint8Arrays
-    for await (const chunk of source) {
+    for await (const chunk of source as AsyncIterable<Uint8Array>) {
       yield new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength)
     }
   })()

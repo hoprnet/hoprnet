@@ -451,16 +451,6 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
     let newConn: Connection
 
-    const onClose = () => {
-      if (newConn) {
-        ;(this.components as Components).getUpgrader().dispatchEvent(
-          new CustomEvent(`connectionEnd`, {
-            detail: newConn
-          })
-        )
-      }
-    }
-
     log(`Handling reconnect attempt to ${counterparty.toString()}`)
 
     const onClose = () => {

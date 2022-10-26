@@ -580,7 +580,7 @@ export function WebRTCConnection(
               break
             }
 
-            log(`Getting NOT_DONE from WebRTC - ${msg.length} bytes`)
+            log(`Getting NOT_DONE from WebRTC - ${chunk.length} bytes`)
             yield payload
           }
 
