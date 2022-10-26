@@ -380,7 +380,7 @@ export function RelayConnection(
         type: ConnectionEventTypes.SINK_SOURCE_ATTACHED,
         value: (async function* () {
           try {
-            yield* source
+            yield* source as AsyncIterable<Uint8Array>
             resolve()
           } catch (err: any) {
             reject(err)
