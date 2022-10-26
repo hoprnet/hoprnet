@@ -86,7 +86,13 @@ const sidebars = {
     {
       type: 'category',
       label: 'Ecosystem',
-      items: ['ecosystem/hopr-token', 'ecosystem/gnosis-hopr-tokens', 'staking/how-to-get-hopr', 'staking/convert-hopr']
+      items: [
+        'ecosystem/hopr-token',
+        'ecosystem/gnosis-hopr-tokens',
+        'staking/how-to-get-hopr',
+        'staking/convert-hopr',
+        'staking/how-to-stake'
+      ]
     }
 
     /*
