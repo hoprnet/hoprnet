@@ -71,7 +71,7 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
           .setXorMappedAddressAttribute(__fakeRInfo ?? rinfo)
           .setFingerprintAttribute()
 
-        socket.send(res.toBuffer(), rinfo.port, rinfo.address)
+        socket.send(res.toBuffer(), rinfo.port, `::ffff:${rinfo.address}`)
       } else if (!req.isBindingResponseSuccess()) {
         error(`Received a STUN message that is not a binding request. Dropping message.`)
       }
