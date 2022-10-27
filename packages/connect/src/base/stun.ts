@@ -64,7 +64,7 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
     if (req.loadBuffer(data)) {
       // if STUN message is BINDING_REQUEST and valid content
       if (req.isBindingRequest({ fingerprint: true })) {
-        verbose(`Received STUN request from ${rinfo.address}:${rinfo.port}`)
+        console.log(`Received STUN request from ${rinfo.address}:${rinfo.port}`)
 
         const res = req
           .createBindingResponse(true)
