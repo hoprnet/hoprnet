@@ -61,3 +61,26 @@ openzeppelin-contracts-v3-0-1=OpenZeppelin/openzeppelin-contracts@v3.0.1 \
 - lib/openzeppelin-contracts-v3-0-1/contracts/token/ERC777/IERC777Sender.sol (^0.6.0)
 - lib/openzeppelin-contracts-v3-0-1/contracts/utils/EnumerableSet.sol (^0.6.0)
 - lib/openzeppelin-contracts-v3-0-1/contracts/utils/Address.sol (^0.6.2) -->
+
+6. Remove "PermittableToken.sol" from source code as it prevents coverage engine from working. Possibly because its required compiler version is 0.4.x This contract is only used when testing "HoprWrapper" contract. TODO: use a different approach to test "HoprWrapper"
+7. Moved `src/mock` to `test/mock` folder, and adapt the relative path used in "HoprWhitehat.sol"
+8. To move faster on the rest of toolchain upgrade, only tests for "HoprToken" contract is fully migrated. Tests for "HoprChannels" is halfway through. TODO: complete tests for the following contracts:
+```
+|____stake
+| |____HoprStake.t.sol
+| |____HoprStake2.t.sol
+| |____HoprStakeSeason3.t.sol
+| |____HoprStakeSeason4.t.sol
+| |____HoprBoost.t.sol
+| |____HoprWhitehat.t.sol
+|____proxy
+| |____HoprStakingProxyForNetworkRegistry.t.sol
+| |____HoprDummyProxyForNetworkRegistry.t.sol
+|____ERC777
+| |____ERC777Snapshot.test.ts
+|____HoprChannels.t.sol (the other half)
+|____HoprDistributor.t.sol
+|____HoprForwarder.t.sol
+|____HoprWrapper.t.sol
+|____HoprNetworkRegistry.t.sol
+```

@@ -298,17 +298,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixture, AccountsFixture, Chan
         assertEqChannels(getChannelFromTuple(hoprChannels, channelIdBA), channelBAAfter);
     }
 
-    function testTransfer() public {
-        vm.clearMockedCalls();
-        vm.prank(address(hoprChannels));
-        vm.mockCall(
-            vm.addr(1),
-            abi.encodeWithSignature("transfer(address,uint256)"),
-            abi.encode(accountB.accountAddr, TICKET_AB_WIN.amount)
-        );
-        vm.addr(1).call(abi.encodeWithSignature("transfer(address,uint256)", accountB.accountAddr, TICKET_AB_WIN.amount));
-    }
-
     /**
      *@dev Helper function to announce account A and B
      */

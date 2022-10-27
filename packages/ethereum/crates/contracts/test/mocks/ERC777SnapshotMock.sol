@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.6.0;
 
-import "../ERC777/ERC777Snapshot.sol";
+import "../../src/ERC777/ERC777Snapshot.sol";
 
 contract ERC777SnapshotMock is ERC777Snapshot {
     constructor(

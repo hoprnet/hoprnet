@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8;
 
-import "../HoprChannels.sol";
+import "../../src/HoprChannels.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 contract ChannelsMock is HoprChannels {

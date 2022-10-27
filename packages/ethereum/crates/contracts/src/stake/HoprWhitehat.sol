@@ -9,8 +9,8 @@ import '@openzeppelin/contracts/utils/introspection/ERC1820Implementer.sol';
 import '@openzeppelin/contracts/security/ReentrancyGuard.sol';
 import './HoprStake.sol';
 import './HoprBoost.sol';
-import '../mocks/ERC777Mock.sol';
-import '../mocks/ERC677Mock.sol';
+import '../../test/mocks/ERC777Mock.sol';
+import '../../test/mocks/ERC677Mock.sol';
 
 /*
   CHECKLIST:
