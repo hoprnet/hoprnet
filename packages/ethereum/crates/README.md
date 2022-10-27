@@ -71,13 +71,15 @@ openzeppelin-contracts-v3-0-1=OpenZeppelin/openzeppelin-contracts@v3.0.1 \
 | |____HoprStake2.t.sol
 | |____HoprStakeSeason3.t.sol
 | |____HoprStakeSeason4.t.sol
+| |____HoprStakeSeason5.t.sol
+| |____HoprStakeBase.t.sol
 | |____HoprBoost.t.sol
 | |____HoprWhitehat.t.sol
 |____proxy
 | |____HoprStakingProxyForNetworkRegistry.t.sol
 | |____HoprDummyProxyForNetworkRegistry.t.sol
 |____ERC777
-| |____ERC777Snapshot.test.ts
+| |____ERC777Snapshot.t.sol
 |____HoprChannels.t.sol (the other half)
 |____HoprDistributor.t.sol
 |____HoprForwarder.t.sol
