@@ -85,10 +85,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
 
     this.tcpSocket = createServer()
     this.udpSocket = createSocket({
-      // @TODO
-      // `udp6` does not seem to work in Node 12.x
-      // can receive IPv6 packet and IPv4 after reconnecting the socket
-      type: 'udp4',
+      type: 'udp6',
       // set to true to reuse port that is bound
       // to TCP socket
       reuseAddr: true
