@@ -767,7 +767,12 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     for (const nodeList of [this.uncheckedEntryNodes, this.availableEntryNodes, this.offlineEntryNodes]) {
       for (const node of nodeList) {
         // In case the addrs are not known to libp2p
-        await this.getComponents().getPeerStore().addressBook.add(node.id, node.multiaddrs)
+        await this.getComponents()
+          .getPeerStore()
+          .addressBook.add(
+            node.id,
+            node.multiaddrs.map((ma) => ma.decapsulateCode(CODE_P2P))
+          )
         for (const ma of node.multiaddrs) {
           args.push([node.id, ma])
         }

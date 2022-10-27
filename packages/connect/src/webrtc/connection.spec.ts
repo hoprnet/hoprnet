@@ -1,6 +1,6 @@
 import type { StreamType } from '../types.js'
 import type { Instance as SimplePeerInstance } from 'simple-peer'
-import type { RelayConnection } from '../relay/connection.js'
+import type { RelayConnectionInterface } from '../relay/connection.js'
 
 import { handshake } from 'it-handshake'
 import { duplexPair } from 'it-pair/duplex'
@@ -27,15 +27,13 @@ describe('test webrtc connection', function () {
       destroy: () => {}
     })
 
-    const conn = new WebRTCConnection(
+    const conn = WebRTCConnection(
       {
-        _counterparty: Bob,
+        counterparty: Bob,
         ...BobAlice,
         sendUpgraded: () => {},
-        state: {
-          channel: fakedWebRTCInstance
-        }
-      } as RelayConnection,
+        getCurrentChannel: () => fakedWebRTCInstance
+      } as RelayConnectionInterface,
       {},
       () => {}
     )
@@ -69,17 +67,15 @@ describe('test webrtc connection', function () {
     const webRTCInstance = new EventEmitter() as SimplePeerInstance
 
     let upgradeCalls = 0
-    new WebRTCConnection(
+    WebRTCConnection(
       {
-        _counterparty: Bob,
+        counterparty: Bob,
         ...BobAlice,
         sendUpgraded: () => {
           upgradeCalls++
         },
-        state: {
-          channel: webRTCInstance
-        }
-      } as RelayConnection,
+        getCurrentChannel: () => webRTCInstance
+      } as RelayConnectionInterface,
       {},
       () => {}
     )
@@ -98,15 +94,13 @@ describe('test webrtc connection', function () {
 
     const webRTCInstance = new EventEmitter() as SimplePeerInstance
 
-    new WebRTCConnection(
+    WebRTCConnection(
       {
-        _counterparty: Bob,
+        counterparty: Bob,
         ...BobAlice,
         sendUpgraded: () => {},
-        state: {
-          channel: webRTCInstance
-        }
-      } as RelayConnection,
+        getCurrentChannel: () => webRTCInstance
+      } as RelayConnectionInterface,
       {},
       () => {}
     )
@@ -127,14 +121,12 @@ describe('test webrtc connection', function () {
       destroy: () => {}
     })
 
-    const conn = new WebRTCConnection(
+    const conn = WebRTCConnection(
       {
-        _counterparty: Bob,
+        counterparty: Bob,
         ...BobAlice,
-        state: {
-          channel: webRTCInstance
-        }
-      } as RelayConnection,
+        getCurrentChannel: () => webRTCInstance
+      } as RelayConnectionInterface,
       {},
       () => {}
     )
@@ -168,15 +160,13 @@ describe('test webrtc connection', function () {
       _id: 'testing'
     })
 
-    const conn = new WebRTCConnection(
+    const conn = WebRTCConnection(
       {
-        _counterparty: Bob,
+        counterparty: Bob,
         ...BobAlice,
         sendUpgraded: () => {},
-        state: {
-          channel: webRTCInstance
-        }
-      } as RelayConnection,
+        getCurrentChannel: () => webRTCInstance
+      } as RelayConnectionInterface,
       {},
       () => {}
     )
@@ -230,16 +220,14 @@ describe('test webrtc connection', function () {
       }
     })
 
-    const conn = new WebRTCConnection(
+    const conn = WebRTCConnection(
       {
-        _counterparty: Bob,
+        counterparty: Bob,
         ...BobAlice,
         remoteAddr: new Multiaddr(`/p2p/${Bob.toString()}`),
         sendUpgraded: () => {},
-        state: {
-          channel: webRTCInstance
-        }
-      } as RelayConnection,
+        getCurrentChannel: () => webRTCInstance
+      } as RelayConnectionInterface,
       {},
       () => {}
     )
@@ -296,13 +284,11 @@ describe('test webrtc connection', function () {
 
     const abort = new AbortController()
 
-    const conn = new WebRTCConnection(
+    const conn = WebRTCConnection(
       {
         ...BobAlice,
-        state: {
-          channel: webRTCInstance
-        }
-      } as RelayConnection,
+        getCurrentChannel: () => webRTCInstance
+      } as RelayConnectionInterface,
       {},
       () => {},
       {
@@ -337,27 +323,23 @@ describe('webrtc connection - stream error propagation', function () {
       destroy: () => {}
     })
 
-    const conn = new WebRTCConnection(
+    const conn = WebRTCConnection(
       {
         source: BobAlice.source,
         sink: (_source: AsyncIterable<Uint8Array>) => waitForSinkAttach.promise,
         sendUpgraded: () => {},
-        state: {
-          channel: fakedWebRTCInstance
-        }
-      } as RelayConnection,
+        getCurrentChannel: () => fakedWebRTCInstance
+      } as RelayConnectionInterface,
       {},
       () => {}
     )
 
-    await assert.rejects(
-      conn.sink(
-        (async function* () {
-          waitForSinkAttach.reject(Error(falsySinkError))
-          yield new Uint8Array()
-        })()
-      ),
-      Error(falsySinkError)
+    // Should not throw an exception but log the error
+    conn.sink(
+      (async function* () {
+        waitForSinkAttach.reject(Error(falsySinkError))
+        yield new Uint8Array()
+      })()
     )
   })
 
@@ -374,7 +356,7 @@ describe('webrtc connection - stream error propagation', function () {
       destroy: () => {}
     })
 
-    new WebRTCConnection(
+    WebRTCConnection(
       {
         source: BobAlice.source,
         sink: (_source: AsyncIterable<Uint8Array>) => {
@@ -382,10 +364,8 @@ describe('webrtc connection - stream error propagation', function () {
           return Promise.reject(Error(falsySinkError))
         },
         sendUpgraded: () => {},
-        state: {
-          channel: fakedWebRTCInstance
-        }
-      } as RelayConnection,
+        getCurrentChannel: () => fakedWebRTCInstance
+      } as RelayConnectionInterface,
       {},
       () => {}
     )
@@ -404,14 +384,12 @@ describe('webrtc connection - stream error propagation', function () {
     })
 
     const errorInSinkSource = 'error in sink source'
-    const conn = new WebRTCConnection(
+    const conn = WebRTCConnection(
       {
         ...AliceBob,
         sendUpgraded: () => {},
-        state: {
-          channel: fakedWebRTCInstance
-        }
-      } as RelayConnection,
+        getCurrentChannel: () => fakedWebRTCInstance
+      } as RelayConnectionInterface,
       {},
       () => {}
     )
@@ -436,17 +414,15 @@ describe('webrtc connection - stream error propagation', function () {
     })
 
     const errorInSource = 'error in source'
-    const conn = new WebRTCConnection(
+    const conn = WebRTCConnection(
       {
         source: (async function* () {
           throw Error(errorInSource)
         })() as AsyncIterable<Uint8Array>,
         sink: AliceBob.sink,
         sendUpgraded: () => {},
-        state: {
-          channel: fakedWebRTCInstance
-        }
-      } as RelayConnection,
+        getCurrentChannel: () => fakedWebRTCInstance
+      } as RelayConnectionInterface,
       {},
       () => {}
     )
