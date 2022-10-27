@@ -64,7 +64,7 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
     if (req.loadBuffer(data)) {
       // if STUN message is BINDING_REQUEST and valid content
       if (req.isBindingRequest({ fingerprint: true })) {
-        console.log(`Received STUN request from ${rinfo.address}:${rinfo.port}`)
+        consoleBackup(`Received STUN request from ${rinfo.address}:${rinfo.port}`)
 
         const res = req
           .createBindingResponse(true)
@@ -73,10 +73,10 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
 
         socket.send(res.toBuffer(), rinfo.port, `::ffff:${rinfo.address}`)
       } else if (!req.isBindingResponseSuccess()) {
-        error(`Received a STUN message that is not a binding request. Dropping message.`)
+        consoleBackup(`Received a STUN message that is not a binding request. Dropping message.`)
       }
     } else {
-      error(`Received a message that is not a STUN message. Dropping message.`)
+      consoleBackup(`Received a message that is not a STUN message. Dropping message.`)
     }
   } catch (err) {
     consoleBackup(err)
