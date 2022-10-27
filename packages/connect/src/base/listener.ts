@@ -147,7 +147,10 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
         error(`network error`, err)
       }
     })
-    this.udpSocket.on('message', (msg: Buffer, rinfo: RemoteInfo) => handleStunRequest(this.udpSocket, msg, rinfo))
+    this.udpSocket.on('message', (msg: Buffer, rinfo: RemoteInfo) => {
+      console.log(msg, rinfo)
+      // handleStunRequest(this.udpSocket, msg, rinfo)
+    })
   }
 
   async bind(ma: Multiaddr): Promise<void> {
