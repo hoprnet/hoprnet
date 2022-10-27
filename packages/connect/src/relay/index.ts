@@ -14,10 +14,16 @@ import errCode from 'err-code'
 import debug from 'debug'
 import chalk from 'chalk'
 
-import { WebRTCConnection } from '../webrtc/index.js'
+import { WebRTCConnection, type WebRTCConnectionInterface } from '../webrtc/index.js'
 import { RELAY_PROTOCOLS, DELIVERY_PROTOCOLS, OK, CAN_RELAY_PROTOCOLS } from '../constants.js'
-import { RelayConnection } from './connection.js'
-import { RelayHandshake, RelayHandshakeMessage } from './handshake.js'
+import { RelayConnection, type RelayConnectionInterface } from './connection.js'
+import {
+  abortRelayHandshake,
+  handleRelayHandshake,
+  initiateRelayHandshake,
+  negotiateRelayHandshake,
+  RelayHandshakeMessage
+} from './handshake.js'
 import { RelayState } from './state.js'
 
 import {
@@ -247,7 +253,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     destination: PeerId,
     onClose: () => void,
     options?: DialOptions
-  ): Promise<RelayConnection | WebRTCConnection | undefined> {
+  ): Promise<RelayConnectionInterface | WebRTCConnectionInterface | undefined> {
     const response = await dial(
       this.getComponents(),
       relay,
@@ -265,9 +271,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       return
     }
 
-    const shaker = new RelayHandshake(response.resp.stream, this.options)
-
-    const handshakeResult = await shaker.initiate(relay, destination)
+    const handshakeResult = await initiateRelayHandshake(response.resp.stream, relay, destination)
 
     if (!handshakeResult.success) {
       error(`Handshake with ${relay.toString()} led to empty stream. Giving up.`)
@@ -300,8 +304,8 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     stream: Stream,
     onClose: () => void,
     opts?: DialOptions
-  ): RelayConnection | WebRTCConnection {
-    const conn = new RelayConnection(
+  ): RelayConnectionInterface | WebRTCConnectionInterface {
+    const conn = RelayConnection(
       stream,
       relay,
       destination,
@@ -313,7 +317,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     )
 
     if (!this.testingOptions.__noWebRTCUpgrade) {
-      return new WebRTCConnection(
+      return WebRTCConnection(
         conn,
         {
           __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade,
@@ -331,8 +335,8 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     relay: PeerId,
     stream: Stream,
     onClose: () => void
-  ): RelayConnection | WebRTCConnection {
-    const conn = new RelayConnection(
+  ): RelayConnectionInterface | WebRTCConnectionInterface {
+    const conn = RelayConnection(
       stream,
       relay,
       initiator,
@@ -344,7 +348,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     )
 
     if (!this.testingOptions.__noWebRTCUpgrade) {
-      return new WebRTCConnection(conn, this.testingOptions, onClose)
+      return WebRTCConnection(conn, this.testingOptions, onClose)
     } else {
       return conn
     }
@@ -398,19 +402,23 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       return
     }
 
-    const shaker = new RelayHandshake(conn.stream, this.options)
-
     log(`handling relay request from ${conn.connection.remotePeer.toString()}`)
     log(`relayed connection count: ${this.relayState.relayedConnectionCount()}`)
 
     try {
       if (this.relayState.relayedConnectionCount() >= (this.options.maxRelayedConnections as number)) {
         log(`relayed request rejected, already at max capacity (${this.options.maxRelayedConnections as number})`)
-        await shaker.reject(RelayHandshakeMessage.FAIL_RELAY_FULL)
+        await abortRelayHandshake(conn.stream, RelayHandshakeMessage.FAIL_RELAY_FULL)
       } else {
         // NOTE: This cannot be awaited, otherwise it stalls the relay loop. Therefore, promise rejections must
         // be handled downstream to avoid unhandled promise rejection crashes
-        await shaker.negotiate(conn.connection.remotePeer, this.getComponents(), this.relayState)
+        await negotiateRelayHandshake(
+          conn.stream,
+          conn.connection.remotePeer,
+          this.getComponents(),
+          this.relayState,
+          this.options
+        )
       }
     } catch (e) {
       error(`Error while processing relay request from ${conn.connection.remotePeer.toString()}: ${e}`)
@@ -432,7 +440,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       return
     }
 
-    const handShakeResult = await new RelayHandshake(conn.stream, this.options).handle(conn.connection.remotePeer)
+    const handShakeResult = await handleRelayHandshake(conn.stream, conn.connection.remotePeer)
 
     if (!handShakeResult.success) {
       metric_countFailedIncomingRelayReqs.increment()
@@ -489,7 +497,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
    * @param relayConn new relayed connection
    * @param counterparty counterparty of the relayed connection
    */
-  private async onReconnect(relayConn: RelayConnection, counterparty: PeerId): Promise<void> {
+  private async onReconnect(relayConn: RelayConnectionInterface, counterparty: PeerId): Promise<void> {
     log(`####### inside reconnect #######`)
 
     let newConn: Connection
@@ -510,7 +518,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       if (!this.testingOptions.__noWebRTCUpgrade) {
         newConn = await this.getComponents()
           .getUpgrader()
-          .upgradeInbound(new WebRTCConnection(relayConn, this.testingOptions, onClose))
+          .upgradeInbound(WebRTCConnection(relayConn, this.testingOptions, onClose))
       } else {
         newConn = await this.getComponents().getUpgrader().upgradeInbound(relayConn)
         relayConn.setOnClose(onClose)

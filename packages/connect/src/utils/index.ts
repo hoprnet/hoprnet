@@ -2,13 +2,14 @@ import type { AddressInfo, Server as TCPServer } from 'net'
 import type { Socket as UDPSocket } from 'dgram'
 import type { Connection, MultiaddrConnection } from '@libp2p/interface-connection'
 import type { PeerId } from '@libp2p/interface-peer-id'
+import type { Components } from '@libp2p/interfaces/components'
+
 import { peerIdFromBytes } from '@libp2p/peer-id'
 
 import { isAnyAddress } from '@hoprnet/hopr-utils'
 
 import { Multiaddr } from '@multiformats/multiaddr'
 import { CODE_CIRCUIT, CODE_P2P } from '../constants.js'
-import type { Components } from '@libp2p/interfaces/components'
 
 export * from './addrs.js'
 export * from './addressSorters.js'

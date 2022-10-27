@@ -67,18 +67,18 @@ async function printPeerStoreAddresses(prefix: string, destination: PeerId, comp
 
   let out = `${prefix}\n${SUFFIX}`
 
+  let length = 0
   for (const address of await components.getPeerStore().addressBook.get(destination)) {
-    if (out.length > prefix.length + 1 + SUFFIX.length) {
-      out += '  \n'
-    }
-    out += `  ${address.multiaddr.toString()}`
+    length++
+    out += `  ${address.multiaddr.toString()}\n`
   }
 
-  if (out.length == prefix.length + 1 + SUFFIX.length) {
-    out += `  No addresses known for peer ${destination.toString()}`
+  if (length == 0) {
+    out += `  No addresses known for peer ${destination.toString()}\n`
   }
 
-  return out
+  // Remove last `\n`
+  return out.substring(0, out.length - 1)
 }
 
 // Timeout protocol selection to prevent from irresponsive nodes
@@ -101,7 +101,7 @@ export async function tryExistingConnections(
   destination: PeerId,
   protocols: string | string[]
 ): Promise<
-  | void
+  | undefined
   | (ProtocolStream & {
       conn: Connection
     })
@@ -117,7 +117,7 @@ export async function tryExistingConnections(
 
   const deadConnections: Connection[] = []
 
-  for (const existingConnection of existingConnections) {
+  for (conn of existingConnections) {
     let timeoutController = new TimeoutController(PROTOCOL_SELECTION_TIMEOUT)
 
     const options = {
@@ -125,7 +125,7 @@ export async function tryExistingConnections(
     }
 
     try {
-      stream = await existingConnection.newStream(protocols, options)
+      stream = await conn.newStream(protocols, options)
     } catch (err: any) {
       error(`Could not open stream to ${destination.toString()} due to "${err?.message}".`)
     } finally {
@@ -133,9 +133,8 @@ export async function tryExistingConnections(
     }
 
     if (stream == undefined) {
-      deadConnections.push(existingConnection)
+      deadConnections.push(conn)
     } else {
-      conn = existingConnection
       break
     }
   }
@@ -159,7 +158,7 @@ export async function tryExistingConnections(
     }
   })()
 
-  if (stream != undefined && conn != undefined) {
+  if (stream != undefined) {
     return { conn, ...stream }
   }
 }
@@ -179,7 +178,7 @@ async function establishNewConnection(
   protocols: string | string[],
   noRelay: boolean = false
 ): Promise<
-  | void
+  | undefined
   | (ProtocolStream & {
       conn: Connection
     })
@@ -210,7 +209,7 @@ async function establishNewConnection(
     }
   }
 
-  if (!conn) {
+  if (conn == undefined) {
     return
   }
 
@@ -273,8 +272,9 @@ async function* queryDHT(components: Components, destination: PeerId): AsyncIter
     if (err?.message) {
       error(`DHT error: ${err.message}`)
     }
+  } finally {
+    timeoutController.clear()
   }
-  timeoutController.clear()
 }
 
 async function doDirectDial(
@@ -294,21 +294,22 @@ async function doDirectDial(
   // Fetch known addresses for the given destination peer
   const knownAddressesForPeer = await components.getPeerStore().addressBook.get(id)
   if (knownAddressesForPeer.length > 0) {
+    let out = `There ${knownAddressesForPeer.length == 1 ? 'is' : 'are'} ${
+      knownAddressesForPeer.length
+    } already known address${knownAddressesForPeer.length == 1 ? '' : 'es'} for ${id.toString()}:\n`
     // Let's try using the known addresses by connecting directly
-    log(
-      `There ${knownAddressesForPeer.length == 1 ? 'is' : 'are'} ${knownAddressesForPeer.length} already known address${
-        knownAddressesForPeer.length == 1 ? '' : 'es'
-      } for ${id.toString()}:`
-    )
+
     for (const address of knownAddressesForPeer) {
-      log(`- ${address.multiaddr.toString()}`)
+      out += `- ${address.multiaddr.toString()}\n`
     }
+    // Remove last `\n`
+    log(out.substring(0, out.length - 1))
     struct = await establishNewConnection(components, id, protocols, noRelay)
   } else {
     log(`No currently known addresses for peer ${id.toString()}`)
   }
 
-  if (struct) {
+  if (struct != undefined) {
     log(`Successfully reached ${id.toString()} via already known addresses !`)
     return { status: DialStatus.SUCCESS, resp: struct }
   }
