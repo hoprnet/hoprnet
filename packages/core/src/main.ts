@@ -185,7 +185,12 @@ export async function createLibp2pInstance(
         // same for
         // /p2p/16Uiu2HAkzEnkW3xGJbvpXSXmvVR177LcR4Sw7z5S1ijuBcnbVFsV/p2p-circuit
         // /p2p/16Uiu2HAkzEnkW3xGJbvpXSXmvVR177LcR4Sw7z5S1ijuBcnbVFsV/p2p-circuit/p2p/16Uiu2HAmQBZA4TzjKjU5fpCSprGuM2y8mpepNwMS6ZKFATiKg68h
-        addressFilter: async (_peerId: PeerId, multiaddr: Multiaddr) => !isAddressWithPeerId(multiaddr)
+        addressFilter: async (_peerId: PeerId, multiaddr: Multiaddr) => {
+          const result = !isAddressWithPeerId(multiaddr)
+          log(`Address filter ${multiaddr.toString()}`, result)
+          console.trace()
+          return result
+        }
       },
       datastore
     })
