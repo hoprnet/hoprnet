@@ -250,6 +250,12 @@ export function RelayConnection(
     _flow(`RC [${_id}]`, ...args)
   }
 
+  /**
+   * Used to set a handler that is gets called once the connection is closed
+   * *after* function got constructed
+   * @dev used by reconnect handler
+   * @param closeHandler new close handler
+   */
   const setOnClose = (closeHandler: () => void) => {
     onClose = closeHandler
   }
