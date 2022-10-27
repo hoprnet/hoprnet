@@ -192,11 +192,8 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       // bind the UDP socket and bind to same port
       await this.listenTCP().then((tcpPort) => this.listenUDP(tcpPort))
     } else {
-      await Promise.all([
-        // prettier-ignore
-        this.listenTCP(options),
-        this.listenUDP(options.port)
-      ])
+      await this.listenTCP(options)
+      await this.listenUDP(options.port)
     }
   }
 
