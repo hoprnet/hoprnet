@@ -71,9 +71,10 @@ make -j -C "${mydir}/.." deps && make -j -C "${mydir}/.." build
 
 declare current_version
 current_version="$("${mydir}/get-package-version.sh")"
-if [[ "${version_type}" = "prerelease" ]]; then
+if [[ "${version_type}" = "prerelease" && "${branch}" != "staging/"* ]]; then
   # turn prerelease into preminor if the current version is not a prerelease
   # already, thus update from a patch version to a new minor prerelease
+  # This applies only to non-staging branches
   if [[ "${current_version}" != *"-next."* ]]; then
     version_type="preminor"
   fi

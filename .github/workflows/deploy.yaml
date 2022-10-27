@@ -95,7 +95,7 @@ jobs:
         env:
           HOPR_GIT_MSG: 'chore(release): update smart contract deployments'
 
-      - name: '[NPM] Publish prerelease version (On pushes to master and debug-deploy/*)'
+      - name: '[NPM] Publish prerelease version (On pushes to master, debug-deploy/* or staging/*)'
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/')  || startsWith(github.ref, 'refs/heads/staging/') }}
         run: ./scripts/publish-version.sh prerelease
         env:
@@ -120,7 +120,7 @@ jobs:
           ./scripts/wait-for-npm-package.sh cover-traffic-daemon
           ./scripts/wait-for-npm-package.sh connect
 
-      - name: '[FINISH] Send notification if anything failed on master or release branches'
+      - name: '[FINISH] Send notification if anything failed on master or release/staging branches'
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: |
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
@@ -153,7 +153,7 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Send notification if anything failed on master or release branches
+      - name: Send notification if anything failed on master or release/staging branches
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: |
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
@@ -194,7 +194,7 @@ jobs:
       - name: Build Docker images
         run: ./scripts/build-docker.sh
 
-      - name: Send notification if anything failed on master or release branches
+      - name: Send notification if anything failed on master or release/staging branches
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: |
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
@@ -227,7 +227,7 @@ jobs:
           # Set this to an arbitrary number less than 1
           declare version="0.100.0"
           if [[ "${HOPR_GITHUB_REF}" == refs/heads/release/* ]]; then
-             # only assing the proper version only on release branches because
+             # assign the proper version only on release branches because
              # only there we have simple semver versions
             version="$(scripts/get-package-version.sh)"
           fi
@@ -249,7 +249,7 @@ jobs:
           HOPR_GITHUB_REF: ${{ github.ref }}
         run: ./scripts/commit-and-push-all-changes.sh
 
-      - name: Send notification if anything failed on master or release branches
+      - name: Send notification if anything failed on master or release/staging branches
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: |
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
@@ -356,7 +356,7 @@ jobs:
           MATRIX_ROOM: ${{ env.MATRIX_CLUSTER_INFO_ROOM }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
 
-      - name: Send notification if anything failed on master or release branches
+      - name: Send notification if anything failed on master or release/staging branches
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: |
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
@@ -439,7 +439,7 @@ jobs:
           MATRIX_ROOM: ${{ env.MATRIX_CLUSTER_INFO_ROOM }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
 
-      - name: Send notification if anything failed on master or release branches
+      - name: Send notification if anything failed on master or release/staging branches
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: |
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
