@@ -26,7 +26,7 @@ import {
   type HoprConnectTestingOptions,
   PeerConnectionType
 } from '../types.js'
-import { getExternalIp } from './stun.js'
+import { handleStunRequest, getExternalIp } from './stun.js'
 import { getAddrs } from './addrs.js'
 import { fromSocket } from './tcp.js'
 import { RELAY_CHANGED_EVENT } from './entry.js'
@@ -149,7 +149,10 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     })
     this.udpSocket.on('message', (msg: Buffer, rinfo: RemoteInfo) => {
       console.log(msg, rinfo)
-      // handleStunRequest(this.udpSocket, msg, rinfo)
+      return handleStunRequest(this.udpSocket, msg, {
+        ...rinfo,
+        address: rinfo.address.match(/[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/)?.[0] ?? ''
+      })
     })
   }
 
