@@ -26,7 +26,7 @@ import {
   type HoprConnectTestingOptions,
   PeerConnectionType
 } from '../types.js'
-import { handleStunRequest, getExternalIp } from './stun.js'
+import { getExternalIp } from './stun.js'
 import { getAddrs } from './addrs.js'
 import { fromSocket } from './tcp.js'
 import { RELAY_CHANGED_EVENT } from './entry.js'
