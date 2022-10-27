@@ -2769,7 +2769,7 @@ ___
 
 ### tryExistingConnections
 
-▸ **tryExistingConnections**(`components`, `destination`, `protocols`): `Promise`<`void` \| `ProtocolStream` & { `conn`: `Connection`  }\>
+▸ **tryExistingConnections**(`components`, `destination`, `protocols`): `Promise`<`undefined` \| `ProtocolStream` & { `conn`: `Connection`  }\>
 
 Tries to use existing connection to connect to the given peer.
 Closes all connection that could not be used to speak the desired
@@ -2788,7 +2788,7 @@ connections unintendedly
 
 #### Returns
 
-`Promise`<`void` \| `ProtocolStream` & { `conn`: `Connection`  }\>
+`Promise`<`undefined` \| `ProtocolStream` & { `conn`: `Connection`  }\>
 
 ___
 
