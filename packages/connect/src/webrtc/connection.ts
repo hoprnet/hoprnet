@@ -116,7 +116,6 @@ export function WebRTCConnection(
     _sinkMigrated: boolean
 
     destroyed: boolean
-    conn: RelayConnectionInterface | SimplePeer
   } = {
     destroyed: false,
     _switchPromise: defer<WebRTCInitFinishedEvent>(),
@@ -125,10 +124,8 @@ export function WebRTCConnection(
 
     // Sink and source get migrated individually
     _sourceMigrated: false,
-    _sinkMigrated: false,
+    _sinkMigrated: false
     // Initial state + fallback if WebRTC failed
-
-    conn: relayConn
   }
 
   const timeline: MultiaddrConnection['timeline'] = {
@@ -418,7 +415,6 @@ export function WebRTCConnection(
         state._sinkMigrated = true
         if (state._sourceMigrated) {
           // Update state object once source *and* sink are migrated
-          state.conn = relayConn.getCurrentChannel() as SimplePeer
           if (!tags.includes(PeerConnectionType.WEBRTC_DIRECT)) {
             tags.push(PeerConnectionType.WEBRTC_DIRECT)
           }
@@ -462,11 +458,11 @@ export function WebRTCConnection(
                       break
                     }
 
-                    log(
-                      `sinking ${received.value.slice().length} bytes into webrtc[${
-                        (relayConn.getCurrentChannel() as any)._id
-                      }]`
-                    )
+                    // log(
+                    //   `sinking ${received.value.slice().length} bytes into webrtc[${
+                    //     (relayConn.getCurrentChannel() as any)._id
+                    //   }]`
+                    // )
 
                     // WebRTC tends to send multiple messages in one chunk, so add a
                     // length prefix to split messages when receiving them
@@ -553,7 +549,6 @@ export function WebRTCConnection(
 
         if (state._sinkMigrated) {
           // Update state object once sink *and* source are migrated
-          state.conn = relayConn.getCurrentChannel() as SimplePeer
           if (!tags.includes(PeerConnectionType.WEBRTC_DIRECT)) {
             tags.push(PeerConnectionType.WEBRTC_DIRECT)
           }
@@ -580,7 +575,7 @@ export function WebRTCConnection(
               break
             }
 
-            log(`Getting NOT_DONE from WebRTC - ${chunk.length} bytes`)
+            // log(`Getting NOT_DONE from WebRTC - ${chunk.length} bytes`)
             yield payload
           }
 
