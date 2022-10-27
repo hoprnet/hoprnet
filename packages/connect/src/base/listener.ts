@@ -1,4 +1,4 @@
-import type { Connection } from '@libp2p/interface-connection'
+import type { Connection, MultiaddrConnection } from '@libp2p/interface-connection'
 import type { Listener as InterfaceListener, ListenerEvents } from '@libp2p/interface-transport'
 import { EventEmitter, CustomEvent } from '@libp2p/interfaces/events'
 
@@ -28,9 +28,9 @@ import {
 } from '../types.js'
 import { handleStunRequest, getExternalIp } from './stun.js'
 import { getAddrs } from './addrs.js'
-import { TCPConnection } from './tcp.js'
+import { fromSocket } from './tcp.js'
 import { RELAY_CHANGED_EVENT } from './entry.js'
-import { bindToPort, attemptClose, nodeToMultiaddr } from '../utils/index.js'
+import { bindToPort, attemptClose, nodeToMultiaddr, cleanExistingConnections } from '../utils/index.js'
 
 import type { Components } from '@libp2p/interfaces/components'
 import type { ConnectComponents } from '../components.js'
@@ -400,7 +400,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
 
     return () => {
       verbose(`currently tracking ${this.__connections.length} connections --`)
-      let index = this.__connections.findIndex((c: Connection) => c === maConn)
+      let index = this.__connections.findIndex((c: Connection) => c.id === maConn.id)
 
       if (index < 0) {
         // connection not found
@@ -424,10 +424,19 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     // Avoid uncaught errors caused by unstable connections
     socket.on('error', (err) => error('socket error', err))
 
-    let maConn: TCPConnection | undefined
+    let maConn: MultiaddrConnection | undefined
+    let conn: Connection | undefined
 
     try {
-      maConn = TCPConnection.fromSocket(socket)
+      maConn = fromSocket(socket, () => {
+        if (conn) {
+          this.components.getUpgrader().dispatchEvent(
+            new CustomEvent(`connectionEnd`, {
+              detail: conn
+            })
+          )
+        }
+      }) as any
     } catch (err: any) {
       error(`inbound connection failed. ${err.message}`)
     }
@@ -439,7 +448,6 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
 
     log('new inbound connection %s', maConn.remoteAddr)
 
-    let conn: Connection
     try {
       conn = await this.components.getUpgrader().upgradeInbound(maConn)
     } catch (err: any) {
@@ -464,6 +472,8 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
 
       return
     }
+
+    cleanExistingConnections(this.components, conn.remotePeer, conn.id, error)
 
     if (conn.tags) {
       conn.tags.push(PeerConnectionType.DIRECT)
