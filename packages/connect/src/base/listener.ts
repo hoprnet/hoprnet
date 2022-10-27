@@ -151,6 +151,8 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       console.log(msg, rinfo)
       return handleStunRequest(this.udpSocket, msg, {
         ...rinfo,
+        family: 'IPv4',
+        // Turn addresses such as ::ffff:<IPv4 address>
         address: rinfo.address.match(/[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/)?.[0] ?? ''
       })
     })
