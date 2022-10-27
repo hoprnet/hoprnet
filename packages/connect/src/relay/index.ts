@@ -441,6 +441,8 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
     log(`incoming connection from ${handShakeResult.counterparty.toString()}`)
 
+    let upgradedConn: Connection | undefined
+
     const newConn = this.upgradeInbound(
       handShakeResult.counterparty,
       conn.connection.remotePeer,
@@ -455,8 +457,6 @@ class Relay implements Initializable, ConnectInitializable, Startable {
         }
       }
     )
-
-    let upgradedConn: Connection
     try {
       // Will call internal libp2p event handler, so no further action required
       upgradedConn = await this.getComponents().getUpgrader().upgradeInbound(newConn)
