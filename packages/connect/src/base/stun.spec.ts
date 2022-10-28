@@ -56,7 +56,7 @@ function getState(amount: number): StateType[] {
   return Array.from({ length: amount }, (_) => ({ msgReceived: defer<void>(), contactCount: 0 }))
 }
 
-describe.only('test STUN helper functions', function () {
+describe('test STUN helper functions', function () {
   it('iteratively contact STUN servers', async function () {
     this.timeout(3 * STUN_TIMEOUT + 2e3)
     const AMOUNT = 2 * DEFAULT_PARALLEL_STUN_CALLS + 1
