@@ -403,9 +403,7 @@ export async function getExternalIp(
       if (socketAddress == null) {
         throw Error(`Socket is not listening`)
       }
-      if (socketAddress.family === 'IPv6') {
-        throw Error(`IPv6 is not supported`)
-      }
+
       log(
         `Running in local-mode without any given STUN server, assuming that socket address 127.0.0.1:${socketAddress.port} is public address`
       )
