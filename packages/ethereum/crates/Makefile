@@ -29,5 +29,5 @@ ifneq ($(PACKAGES),)
 	rm -rf $(PKG_DIRS)
 endif
 
-sc-build:
-    forge build --root "./contracts"
+check-sc-bindings:
+	forge bind --bindings-path ./bindings --root ./contracts --crate-name bindings
