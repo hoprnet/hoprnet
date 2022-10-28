@@ -93,6 +93,4 @@ Instead of setting up a cluster locally, you can launch a cluster without any in
 Clusters launched through Playground are fully interconnected and prefunded similar to the described local setup.
 But will only run for 20 minutes at a time before closing. This is a good alternative for testing and devloping dApps. Simply use the nodes API URL and key when connecting to a node.
 
-
 [^1]: If you have installed and built another `node.js` application from your computer in the past, you likely will not need to do anything else. However, in the case your are only starting to develop in `node.js`, there's a high chance you might need to install a few extra tools. For instance, in `Linux`-based OS, you will likely also need to install `build-essentials` (e.g. in Ubuntu do `apt-get install build-essentials`), whereas in `macOS` you need Xcode developer tools, installable via `xcode-select --install`.
-
