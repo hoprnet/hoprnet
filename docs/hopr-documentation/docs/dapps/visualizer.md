@@ -5,7 +5,7 @@ title: Visualizer
 
 Visualizer draws a graphical representation of the HOPR network showing all the nodes and connections between them.
 
-**Disclaimer: **The data in this app is from a previous internal testnet (Paleochera) and does not represent the Playground state.
+**Note:** The data in this app is from the Monte Rosa environment
 
 (**1**) You can open any URL to see a graph of every node and connection on the Paleochera testnet.
 
