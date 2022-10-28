@@ -59,7 +59,7 @@ export async function startStunServer(
  * @returns a bound socket
  */
 export function bindToUdpSocket(port?: number): Promise<Socket> {
-  const socket = createSocket('udp4')
+  const socket = createSocket('udp6')
 
   return new Promise<Socket>((resolve, reject) => {
     socket.once('error', (err: any) => {

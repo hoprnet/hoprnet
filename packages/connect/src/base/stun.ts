@@ -1,4 +1,8 @@
-import { createBlank, createBindingRequest, generateTransactionId } from 'webrtc-stun'
+// @ts-ignore untyped module
+import { decode, constants, createMessage, createTransaction, validateFingerprint } from 'stun'
+
+// @ts-ignore untyped module
+import isStun from 'is-stun'
 
 import type { Socket, RemoteInfo } from 'dgram'
 import { Multiaddr } from '@multiformats/multiaddr'
@@ -18,18 +22,6 @@ export type Interface = {
   address: string
 }
 
-function isInterface(obj: any): obj is Interface {
-  if (obj.family == undefined || obj.port == undefined || obj.address == undefined) {
-    return false
-  }
-
-  if (!['IPv4', 'IPv6'].includes(obj.family)) {
-    return false
-  }
-
-  return true
-}
-
 export const STUN_TIMEOUT = 1000
 
 // Only used to determine the external address of the bootstrap server
@@ -45,6 +37,13 @@ export const PUBLIC_STUN_SERVERS = [
 
 export const DEFAULT_PARALLEL_STUN_CALLS = 4
 
+// STUN server constants
+const isStunRequest = 0x0000
+// const isStunIndication = 0x0010
+const isStunSuccessResponse = 0x0100
+// const isStunErrorResponse = 0x0110
+const kStunTypeMask = 0x0110
+
 /**
  * Handles STUN requests
  * @param socket Node.JS socket to use
@@ -53,41 +52,56 @@ export const DEFAULT_PARALLEL_STUN_CALLS = 4
  * @param __fakeRInfo [testing] overwrite incoming information to intentionally send misleading STUN response
  */
 export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInfo, __fakeRInfo?: RemoteInfo): void {
-  const req = createBlank()
+  let replyAddress = rinfo.address
 
-  // Overwrite console.log because 'webrtc-stun' package
-  // pollutes console output
-  const consoleBackup = console.log
-  console.log = log
+  if (rinfo.family === 'IPv6') {
+    const match = rinfo.address.match(/(?<=::ffff:)[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/)
 
-  try {
-    if (req.loadBuffer(data)) {
-      // if STUN message is BINDING_REQUEST and valid content
-      if (req.isBindingRequest({ fingerprint: true })) {
-        verbose(`Received STUN request from ${rinfo.address}:${rinfo.port}`)
-
-        const res = req
-          .createBindingResponse(true)
-          .setXorMappedAddressAttribute(__fakeRInfo ?? rinfo)
-          .setFingerprintAttribute()
-
-        socket.send(res.toBuffer(), rinfo.port, rinfo.address)
-      } else if (!req.isBindingResponseSuccess()) {
-        error(`Received a STUN message that is not a binding request. Dropping message.`)
-      }
-    } else {
-      error(`Received a message that is not a STUN message. Dropping message.`)
+    if (match) {
+      rinfo.family = 'IPv4'
+      rinfo.address = match[0]
     }
-  } catch (err) {
-    consoleBackup(err)
-  } finally {
-    console.log = consoleBackup
+  }
+
+  if (!isStun(data)) {
+    return
+  }
+
+  const stunMessage = decode(data)
+
+  switch (stunMessage.type & kStunTypeMask) {
+    case isStunRequest:
+      const message = createMessage(constants.STUN_BINDING_RESPONSE, stunMessage.transactionId)
+
+      if (__fakeRInfo) {
+        if (__fakeRInfo.family === 'IPv6') {
+          const match = __fakeRInfo.address.match(/(?<=::ffff:)[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/)
+
+          if (match) {
+            __fakeRInfo.family = 'IPv4'
+            __fakeRInfo.address = match[0]
+          }
+        }
+
+        message.addXorAddress(__fakeRInfo.address, __fakeRInfo.port)
+      } else {
+        message.addXorAddress(rinfo.address, rinfo.port)
+      }
+      message.addFingerprint()
+
+      verbose(`Received STUN request from ${rinfo.address}:${rinfo.port}`)
+
+      socket.send(message.toBuffer(), rinfo.port, replyAddress)
+
+      break
+    default:
+      break
   }
 }
 
 export type Request = {
   multiaddr: Multiaddr
-  tId: string
+  tId: Buffer
   response?: Interface
 }
 
@@ -173,7 +187,7 @@ export async function performSTUNRequests(
   for (const multiaddr of multiAddrs) {
     requests.push({
       multiaddr,
-      tId: generateTransactionId()
+      tId: createTransaction()
     })
   }
   // Assign the event handler before sending the requests
@@ -208,9 +222,18 @@ function sendStunRequests(addrs: Request[], socket: Socket): void {
       continue
     }
 
-    const res = createBindingRequest(addr.tId).setFingerprintAttribute()
+    const message = createMessage(constants.STUN_BINDING_REQUEST, addr.tId)
 
-    socket.send(res.toBuffer(), nodeAddress.port, nodeAddress.address, (err?: any) => {
+    message.addFingerprint()
+
+    let address: string
+    if (nodeAddress.family == 4) {
+      address = `::ffff:${nodeAddress.address}`
+    } else {
+      address = nodeAddress.address
+    }
+
+    socket.send(message.toBuffer(), nodeAddress.port, address, (err?: any) => {
       if (err) {
         error(err.message)
       } else {
@@ -223,18 +246,51 @@ function sendStunRequests(addrs: Request[], socket: Socket): void {
 function decodeIncomingSTUNResponses(addrs: Request[], socket: Socket, ms: number = STUN_TIMEOUT): Promise<Request[]> {
   return new Promise<Request[]>((resolve) => {
     let responsesReceived = 0
-
-    let listener: (msg: Buffer) => void
     let finished = false
 
-    let done = () => {
+    const listener = (data: Buffer) => {
+      if (!isStun(data)) {
+        return
+      }
+      const response = decode(data.slice())
+
+      if (!validateFingerprint(response)) {
+        return
+      }
+
+      switch (response.type & kStunTypeMask) {
+        case isStunSuccessResponse:
+          for (const addr of addrs) {
+            if (Buffer.compare(addr.tId, response.transactionId) === 0) {
+              if (addr.response != undefined) {
+                continue
+              }
+
+              addr.response = response.getXorAddress() ?? response.getAddress()
+              // If we have filled an entry, increase response counter
+              if (addr.response != undefined) {
+                responsesReceived++
+              }
+              break
+            }
+          }
+
+          if (responsesReceived == addrs.length) {
+            done()
+          }
+          break
+        default:
+          break
+      }
+    }
+
+    const done = () => {
       if (finished) {
         return
       }
       finished = true
 
       socket.removeListener('message', listener)
-
       timer.clear()
 
       resolve(addrs)
@@ -250,65 +306,6 @@ function decodeIncomingSTUNResponses(addrs: Request[], socket: Socket, ms: numbe
     }, ms)
 
     // Receiving a Buffer, not a Uint8Array
-    listener = (msg: Buffer) => {
-      const res = createBlank()
-
-      // Overwrite console.log because 'webrtc-stun' package
-      // pollutes console output
-      const consoleBackup = console.log
-      console.log = log
-
-      try {
-        if (!res.loadBuffer(msg)) {
-          error(`Could not decode STUN response`)
-          console.log = consoleBackup
-          return
-        }
-
-        const index: number = addrs.findIndex((addr: Request) =>
-          res.isBindingResponseSuccess({ transactionId: addr.tId })
-        )
-
-        if (index < 0) {
-          error(`Received STUN response with invalid transactionId. Dropping response.`)
-          console.log = consoleBackup
-          return
-        }
-
-        const attr = res.getXorMappedAddressAttribute() ?? res.getMappedAddressAttribute()
-
-        if (!isInterface(attr)) {
-          error(`Invalid STUN response. Got ${attr}`)
-          return
-        }
-
-        console.log = consoleBackup
-
-        if (attr == null) {
-          error(`STUN response seems to have neither MappedAddress nor XORMappedAddress set. Dropping message`)
-          return
-        }
-
-        verbose(`Received STUN response. External address seems to be: ${attr.address}:${attr.port}`)
-
-        if (addrs[index].response != undefined) {
-          verbose(`Recieved duplicate response. Dropping message`)
-          return
-        }
-
-        addrs[index].response = attr
-        responsesReceived++
-
-        if (responsesReceived == addrs.length) {
-          done()
-        }
-      } catch (err) {
-        consoleBackup(err)
-      } finally {
-        console.log = consoleBackup
-      }
-    }
-
     socket.on('message', listener)
   })
 }
@@ -406,9 +403,7 @@ export async function getExternalIp(
       if (socketAddress == null) {
         throw Error(`Socket is not listening`)
       }
-      if (socketAddress.family === 'IPv6') {
-        throw Error(`IPv6 is not supported`)
-      }
+
       log(
         `Running in local-mode without any given STUN server, assuming that socket address 127.0.0.1:${socketAddress.port} is public address`
       )
