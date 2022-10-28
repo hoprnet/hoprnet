@@ -39,7 +39,7 @@ const getToCreateDummyNftIndexes = async (
     }
     mintedIndex++
   }
-// To have HoprBoost NFT of Network_registry type at index 26, 27 type(s) of dummy NFTs of indexes 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26 should be minted.
+  // To have HoprBoost NFT of Network_registry type at index 26, 27 type(s) of dummy NFTs of indexes 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26 should be minted.
   const dummyNftIndexsToMint =
     mintedIndex >= shouldHaveIndexesBefore - 1
       ? []
