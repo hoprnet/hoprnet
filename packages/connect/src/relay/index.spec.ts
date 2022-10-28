@@ -86,7 +86,7 @@ describe('test relay', function () {
       .addressBook.add(Charly.getComponents().getPeerId(), Charly.getComponents().getTransportManager().getAddrs())
 
     for (let i = 0; i < 5; i++) {
-      const conn = await Alice.connect(Bob.getComponents().getPeerId(), Charly.getComponents().getPeerId())
+      const conn = await Alice.connect(Bob.getComponents().getPeerId(), Charly.getComponents().getPeerId(), () => {})
 
       assert(conn != undefined, `Should be able to connect`)
       const shaker = handshake(conn as any)
@@ -127,7 +127,7 @@ describe('test relay', function () {
       .addressBook.add(Charly.getComponents().getPeerId(), Charly.getComponents().getTransportManager().getAddrs())
 
     for (let i = 0; i < 3; i++) {
-      const conn = await Alice.connect(Bob.getComponents().getPeerId(), Charly.getComponents().getPeerId())
+      const conn = await Alice.connect(Bob.getComponents().getPeerId(), Charly.getComponents().getPeerId(), () => {})
 
       assert(conn != undefined, `Should be able to connect`)
       const shaker = handshake(conn as any)

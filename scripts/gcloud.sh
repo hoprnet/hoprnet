@@ -362,3 +362,19 @@ gcloud_execute_command_instance() {
 
   ${gssh} "${name}" --command "${command}"
 }
+
+# $1=flag name
+gcloud_isset_project_flag() {
+  gcloud compute project-info describe --format=json | jq "any(.commonInstanceMetadata.items[]; .key ==\"${1}\")"
+}
+
+# $1=flag name
+# $2=flag value
+gcloud_set_project_flag() {
+  gcloud compute project-info add-metadata --metadata="${1}=${2}" 2> /dev/null
+}
+
+# $1=flag name
+gcloud_unset_project_flag() {
+  gcloud compute project-info remove-metadata --keys="${1}" 2> /dev/null
+}

@@ -9,7 +9,7 @@ To start a conversation, both you and your friend both have to complete a few st
 
 ### Your Perspective (the host):
 
-![Myne Chat two nodes](./images-dApps/mynechat-two-nodes-2.png)
+![Myne Chat two nodes](./images-dApps/playground-two%20nodes.png)
 
 (**1**) Pick two nodes to use, open one, and send the other to your friend.
 
@@ -17,7 +17,7 @@ To start a conversation, both you and your friend both have to complete a few st
 
 (**2**) Click the "+" icon on the top left.
 
-![Myne Chat start conversation](./images-dApps/chess-connect-pop-up-2.png)
+![Myne Chat start conversation](./images-dApps/myne-chat-pop-up.png)
 
 (**3**) Copy your friend's peerID and enter it into the pop-up, then click send.
 

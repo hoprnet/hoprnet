@@ -4,6 +4,7 @@ import type { IncomingStreamData } from '@libp2p/interfaces/registrar'
 import type { Initializable, Components } from '@libp2p/interfaces/components'
 import type { Startable } from '@libp2p/interfaces/startable'
 import type { DialOptions } from '@libp2p/interface-transport'
+import { CustomEvent } from '@libp2p/interfaces/events'
 import type { Stream, HoprConnectOptions, HoprConnectTestingOptions } from '../types.js'
 import type { ConnectComponents, ConnectInitializable } from '../components.js'
 
@@ -13,10 +14,16 @@ import errCode from 'err-code'
 import debug from 'debug'
 import chalk from 'chalk'
 
-import { WebRTCConnection } from '../webrtc/index.js'
+import { WebRTCConnection, type WebRTCConnectionInterface } from '../webrtc/index.js'
 import { RELAY_PROTOCOLS, DELIVERY_PROTOCOLS, OK, CAN_RELAY_PROTOCOLS } from '../constants.js'
-import { RelayConnection } from './connection.js'
-import { RelayHandshake, RelayHandshakeMessage } from './handshake.js'
+import { RelayConnection, type RelayConnectionInterface } from './connection.js'
+import {
+  abortRelayHandshake,
+  handleRelayHandshake,
+  initiateRelayHandshake,
+  negotiateRelayHandshake,
+  RelayHandshakeMessage
+} from './handshake.js'
 import { RelayState } from './state.js'
 
 import {
@@ -29,8 +36,8 @@ import {
   retimer
 } from '@hoprnet/hopr-utils'
 
-import { attemptClose } from '../utils/index.js'
 import { handshake } from 'it-handshake'
+import { attemptClose, cleanExistingConnections } from '../utils/index.js'
 
 const DEBUG_PREFIX = 'hopr-connect:relay'
 const DEFAULT_MAX_RELAYED_CONNECTIONS = 10
@@ -204,9 +211,16 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     if (this.relayState.relayedConnectionCount() > 0) {
       let outConns = `Current relay connections:\n`
 
+      let outConnIds: string[] = []
       await this.relayState.forEach(async (dst) => {
-        outConns += `- ${dst}\n`
+        outConnIds.push(dst)
       })
+
+      outConnIds.sort()
+
+      for (const outConnId of outConnIds) {
+        outConns += `- ${outConnId}\n`
+      }
 
       // Remove occurence of last `\n`
       log(outConns.substring(0, outConns.length - 1))
@@ -237,8 +251,9 @@ class Relay implements Initializable, ConnectInitializable, Startable {
   public async connect(
     relay: PeerId,
     destination: PeerId,
+    onClose: () => void,
     options?: DialOptions
-  ): Promise<RelayConnection | WebRTCConnection | undefined> {
+  ): Promise<RelayConnectionInterface | WebRTCConnectionInterface | undefined> {
     const response = await dial(
       this.getComponents(),
       relay,
@@ -256,9 +271,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       return
     }
 
-    const shaker = new RelayHandshake(response.resp.stream, this.options)
-
-    const handshakeResult = await shaker.initiate(relay, destination)
+    const handshakeResult = await initiateRelayHandshake(response.resp.stream, relay, destination)
 
     if (!handshakeResult.success) {
       error(`Handshake with ${relay.toString()} led to empty stream. Giving up.`)
@@ -277,7 +290,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
     this.connectedToRelays.add(relay.toString())
 
-    const conn = this.upgradeOutbound(relay, destination, handshakeResult.stream, options)
+    const conn = this.upgradeOutbound(relay, destination, handshakeResult.stream, onClose, options)
 
     log(`successfully established relay connection to ${relay.toString()}`)
     metric_countSuccessfulConnects.increment()
@@ -289,41 +302,53 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     relay: PeerId,
     destination: PeerId,
     stream: Stream,
+    onClose: () => void,
     opts?: DialOptions
-  ): RelayConnection | WebRTCConnection {
-    const conn = new RelayConnection(
+  ): RelayConnectionInterface | WebRTCConnectionInterface {
+    const conn = RelayConnection(
       stream,
       relay,
       destination,
       'outbound',
+      this.testingOptions.__noWebRTCUpgrade ? undefined : onClose,
       this.getConnectComponents(),
       this.testingOptions,
       this.onReconnect as Relay['onReconnect']
     )
 
     if (!this.testingOptions.__noWebRTCUpgrade) {
-      return new WebRTCConnection(conn, {
-        __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade,
-        ...opts
-      })
+      return WebRTCConnection(
+        conn,
+        {
+          __noWebRTCUpgrade: this.testingOptions.__noWebRTCUpgrade,
+          ...opts
+        },
+        onClose
+      )
     } else {
       return conn
     }
   }
 
-  private upgradeInbound(initiator: PeerId, relay: PeerId, stream: Stream): RelayConnection | WebRTCConnection {
-    const conn = new RelayConnection(
+  private upgradeInbound(
+    initiator: PeerId,
+    relay: PeerId,
+    stream: Stream,
+    onClose: () => void
+  ): RelayConnectionInterface | WebRTCConnectionInterface {
+    const conn = RelayConnection(
       stream,
       relay,
       initiator,
       'inbound',
+      this.testingOptions.__noWebRTCUpgrade ? undefined : onClose,
       this.getConnectComponents(),
       this.testingOptions,
       this.onReconnect as Relay['onReconnect']
     )
 
     if (!this.testingOptions.__noWebRTCUpgrade) {
-      return new WebRTCConnection(conn, this.testingOptions)
+      return WebRTCConnection(conn, this.testingOptions, onClose)
     } else {
       return conn
     }
@@ -377,19 +402,23 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       return
     }
 
-    const shaker = new RelayHandshake(conn.stream, this.options)
-
     log(`handling relay request from ${conn.connection.remotePeer.toString()}`)
     log(`relayed connection count: ${this.relayState.relayedConnectionCount()}`)
 
     try {
       if (this.relayState.relayedConnectionCount() >= (this.options.maxRelayedConnections as number)) {
         log(`relayed request rejected, already at max capacity (${this.options.maxRelayedConnections as number})`)
-        await shaker.reject(RelayHandshakeMessage.FAIL_RELAY_FULL)
+        await abortRelayHandshake(conn.stream, RelayHandshakeMessage.FAIL_RELAY_FULL)
       } else {
         // NOTE: This cannot be awaited, otherwise it stalls the relay loop. Therefore, promise rejections must
         // be handled downstream to avoid unhandled promise rejection crashes
-        await shaker.negotiate(conn.connection.remotePeer, this.getComponents(), this.relayState)
+        await negotiateRelayHandshake(
+          conn.stream,
+          conn.connection.remotePeer,
+          this.getComponents(),
+          this.relayState,
+          this.options
+        )
       }
     } catch (e) {
       error(`Error while processing relay request from ${conn.connection.remotePeer.toString()}: ${e}`)
@@ -411,7 +440,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       return
     }
 
-    const handShakeResult = await new RelayHandshake(conn.stream, this.options).handle(conn.connection.remotePeer)
+    const handShakeResult = await handleRelayHandshake(conn.stream, conn.connection.remotePeer)
 
     if (!handShakeResult.success) {
       metric_countFailedIncomingRelayReqs.increment()
@@ -420,13 +449,22 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
     log(`incoming connection from ${handShakeResult.counterparty.toString()}`)
 
+    let upgradedConn: Connection | undefined
+
     const newConn = this.upgradeInbound(
       handShakeResult.counterparty,
       conn.connection.remotePeer,
-      handShakeResult.stream
+      handShakeResult.stream,
+      () => {
+        if (upgradedConn) {
+          ;(this.components as Components).getUpgrader().dispatchEvent(
+            new CustomEvent(`connectionEnd`, {
+              detail: upgradedConn
+            })
+          )
+        }
+      }
     )
-
-    let upgradedConn: Connection
     try {
       // Will call internal libp2p event handler, so no further action required
       upgradedConn = await this.getComponents().getUpgrader().upgradeInbound(newConn)
@@ -436,6 +474,8 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       metric_countFailedIncomingRelayReqs.increment()
       return
     }
+
+    cleanExistingConnections(this.components as Components, upgradedConn.remotePeer, upgradedConn.id, error)
 
     // Merges all tags from `maConn` into `conn` and then make both objects
     // use the *same* array
@@ -457,25 +497,31 @@ class Relay implements Initializable, ConnectInitializable, Startable {
    * @param relayConn new relayed connection
    * @param counterparty counterparty of the relayed connection
    */
-  private async onReconnect(relayConn: RelayConnection, counterparty: PeerId): Promise<void> {
+  private async onReconnect(relayConn: RelayConnectionInterface, counterparty: PeerId): Promise<void> {
     log(`####### inside reconnect #######`)
 
     let newConn: Connection
 
     log(`Handling reconnect attempt to ${counterparty.toString()}`)
 
+    const onClose = () => {
+      if (newConn) {
+        ;(this.components as Components).getUpgrader().dispatchEvent(
+          new CustomEvent(`connectionEnd`, {
+            detail: newConn
+          })
+        )
+      }
+    }
+
     try {
       if (!this.testingOptions.__noWebRTCUpgrade) {
         newConn = await this.getComponents()
           .getUpgrader()
-          .upgradeInbound(
-            new WebRTCConnection(relayConn, this.testingOptions, {
-              // libp2p interface type clash
-              upgrader: this.getComponents().getUpgrader() as any
-            })
-          )
+          .upgradeInbound(WebRTCConnection(relayConn, this.testingOptions, onClose))
       } else {
         newConn = await this.getComponents().getUpgrader().upgradeInbound(relayConn)
+        relayConn.setOnClose(onClose)
       }
     } catch (err) {
       error(err)
@@ -489,18 +535,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       .dialer._pendingDials?.get(counterparty.toString())
       ?.destroy()
 
-    const existingConnections = this.getComponents().getConnectionManager().getConnections(counterparty)
-    for (const existingConnection of existingConnections) {
-      if (existingConnection.id === newConn.id) {
-        continue
-      }
-      try {
-        await existingConnection.close()
-      } catch (err) {
-        error(`Error while closing dead connection`, err)
-      }
-    }
-
+    cleanExistingConnections(this.components as Components, newConn.remotePeer, newConn.id, error)
     metric_countRelayReconnects.increment()
   }
 }

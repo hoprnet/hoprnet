@@ -772,6 +772,10 @@ class Hopr extends EventEmitter {
    * List the addresses on which the node is listening
    */
   public getListeningAddresses(): Multiaddr[] {
+    if (this.status !== 'RUNNING') {
+      // Not listening to any address unless `hopr` is running
+      return []
+    }
     // @TODO find a better way to do this
     // @ts-ignore undocumented method
     return this.libp2pComponents.getAddressManager().getListenAddrs()
