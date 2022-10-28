@@ -195,6 +195,7 @@ function setup_node() {
     HOPRD_HEARTBEAT_VARIANCE=1000 \
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
     HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
+    NODE_OPTIONS="--experimental-wasm-modules" \
     node packages/hoprd/lib/main.cjs \
       --admin \
       --adminHost "127.0.0.1" \
@@ -245,6 +246,7 @@ function setup_ct_node() {
   HOPR_CTD_HEARTBEAT_INTERVAL=2500 \
   HOPR_CTD_HEARTBEAT_THRESHOLD=2500 \
   HOPR_CTD_HEARTBEAT_VARIANCE=1000 \
+  NODE_OPTIONS="--experimental-wasm-modules" \
   DEBUG="hopr*" NODE_ENV=development node packages/cover-traffic-daemon/lib/index.js \
     --privateKey "${private_key}" \
     --dbFile "${ct_db_file}" \

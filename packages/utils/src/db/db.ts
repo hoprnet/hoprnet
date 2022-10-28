@@ -220,7 +220,11 @@ export class HoprDB {
   }
 
   protected async put(key: Uint8Array, value: Uint8Array): Promise<void> {
-    await this.db.put(Buffer.from(this.keyOf(key)), Buffer.from(value))
+    const keyU8a = this.keyOf(key)
+    await this.db.put(
+      Buffer.from(keyU8a.buffer, keyU8a.byteOffset, keyU8a.byteLength),
+      Buffer.from(value.buffer, value.byteOffset, value.byteLength)
+    )
   }
 
   public dumpDatabase(destFile: string) {
@@ -260,7 +264,10 @@ export class HoprDB {
   }
 
   protected async get(key: Uint8Array): Promise<Uint8Array> {
-    return Uint8Array.from(await this.db.get(Buffer.from(this.keyOf(key))))
+    const keyU8a = this.keyOf(key)
+    const value = await this.db.get(Buffer.from(keyU8a.buffer, keyU8a.byteOffset, keyU8a.byteLength))
+
+    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
   }
 
   private async maybeGet(key: Uint8Array): Promise<Uint8Array | undefined> {
@@ -315,11 +322,11 @@ export class HoprDB {
 
     // @TODO fix types in @types/levelup package
     for await (const [_key, chunk] of this.db.iterator({
-      gte: Buffer.from(firstPrefixed),
-      lte: Buffer.from(lastPrefixed),
+      gte: Buffer.from(firstPrefixed.buffer, firstPrefixed.byteOffset, firstPrefixed.byteLength),
+      lte: Buffer.from(lastPrefixed.buffer, lastPrefixed.byteOffset, lastPrefixed.byteLength),
       keys: false
     }) as any) {
-      const obj: Element = deserialize(Uint8Array.from(chunk))
+      const obj: Element = deserialize(new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength))
 
       if (!filter || filter(obj)) {
         if (map) {
@@ -352,11 +359,11 @@ export class HoprDB {
 
     // @TODO fix types in @types/levelup package
     for await (const [_key, chunk] of this.db.iterator({
-      gte: Buffer.from(firstPrefixed),
-      lte: Buffer.from(lastPrefixed),
+      gte: Buffer.from(firstPrefixed.buffer, firstPrefixed.byteOffset, firstPrefixed.byteLength),
+      lte: Buffer.from(lastPrefixed.buffer, lastPrefixed.byteOffset, lastPrefixed.byteLength),
       keys: false
     }) as any) {
-      const obj: Element = deserialize(Uint8Array.from(chunk))
+      const obj: Element = deserialize(new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength))
 
       if (!filter || filter(obj)) {
         if (map) {
@@ -369,7 +376,8 @@ export class HoprDB {
   }
 
   private async del(key: Uint8Array): Promise<void> {
-    await this.db.del(Buffer.from(this.keyOf(key)))
+    const keyU8a = this.keyOf(key)
+    await this.db.del(Buffer.from(keyU8a.buffer, keyU8a.byteOffset, keyU8a.byteLength))
   }
 
   private async increment(key: Uint8Array): Promise<number> {
@@ -501,7 +509,8 @@ export class HoprDB {
     const batch = this.db.batch()
 
     for (const ack of tickets) {
-      batch.del(Buffer.from(this.keyOf(createAcknowledgedTicketKey(ack.ticket.challenge, ack.ticket.channelEpoch))))
+      const keyU8a = this.keyOf(createAcknowledgedTicketKey(ack.ticket.challenge, ack.ticket.channelEpoch))
+      batch.del(Buffer.from(keyU8a.buffer, keyU8a.byteOffset, keyU8a.byteLength))
     }
 
     // only update count if there has been a change
@@ -525,13 +534,20 @@ export class HoprDB {
   }
 
   public async replaceUnAckWithAck(halfKeyChallenge: HalfKeyChallenge, ackTicket: AcknowledgedTicket): Promise<void> {
-    const unAcknowledgedDbKey = createPendingAcknowledgement(halfKeyChallenge)
-    const acknowledgedDbKey = createAcknowledgedTicketKey(ackTicket.ticket.challenge, ackTicket.ticket.channelEpoch)
+    const unAcknowledgedDbKey = this.keyOf(createPendingAcknowledgement(halfKeyChallenge))
+    const acknowledgedDbKey = this.keyOf(
+      createAcknowledgedTicketKey(ackTicket.ticket.challenge, ackTicket.ticket.channelEpoch)
+    )
+
+    const serializedTicket = ackTicket.serialize()
 
     await this.db
       .batch()
-      .del(Buffer.from(this.keyOf(unAcknowledgedDbKey)))
-      .put(Buffer.from(this.keyOf(acknowledgedDbKey)), Buffer.from(ackTicket.serialize()))
+      .del(Buffer.from(unAcknowledgedDbKey.buffer, unAcknowledgedDbKey.byteOffset, unAcknowledgedDbKey.byteLength))
+      .put(
+        Buffer.from(acknowledgedDbKey.buffer, unAcknowledgedDbKey.byteOffset, unAcknowledgedDbKey.byteLength),
+        Buffer.from(serializedTicket.buffer, serializedTicket.byteOffset, serializedTicket.byteLength)
+      )
       .write()
   }
 
@@ -577,9 +593,11 @@ export class HoprDB {
     let dbBatch = this.db.batch()
 
     for (const intermediate of intermediates) {
+      const u8aKey = this.keyOf(createCommitmentKey(channelId, intermediate.iteration))
+
       dbBatch = dbBatch.put(
-        Buffer.from(this.keyOf(createCommitmentKey(channelId, intermediate.iteration))),
-        Buffer.from(intermediate.preImage)
+        Buffer.from(u8aKey.buffer, u8aKey.byteOffset, u8aKey.byteLength),
+        Buffer.from(intermediate.preImage.buffer, intermediate.preImage.byteOffset, intermediate.preImage.byteLength)
       )
     }
     await dbBatch.write()
@@ -655,10 +673,21 @@ export class HoprDB {
   }
 
   async updateChannelAndSnapshot(channelId: Hash, channel: ChannelEntry, snapshot: Snapshot): Promise<void> {
+    const serializedChannel = channel.serialize()
+    const keyU8a = this.keyOf(createChannelKey(channelId))
+
+    const serializedSnapshot = snapshot.serialize()
+
     await this.db
       .batch()
-      .put(Buffer.from(this.keyOf(createChannelKey(channelId))), Buffer.from(channel.serialize()))
-      .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
+      .put(
+        Buffer.from(keyU8a.buffer, keyU8a.byteOffset, keyU8a.byteLength),
+        Buffer.from(serializedChannel.buffer, serializedChannel.byteOffset, serializedChannel.byteLength)
+      )
+      .put(
+        Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
+        Buffer.from(serializedSnapshot.buffer, serializedSnapshot.byteOffset, serializedSnapshot.byteLength)
+      )
       .write()
   }
 
@@ -667,10 +696,19 @@ export class HoprDB {
   }
 
   async updateAccountAndSnapshot(account: AccountEntry, snapshot: Snapshot): Promise<void> {
+    const serializedAccount = account.serialize()
+    const serializedSnapshot = snapshot.serialize()
+
     await this.db
       .batch()
-      .put(Buffer.from(this.keyOf(createAccountKey(account.getAddress()))), Buffer.from(account.serialize()))
-      .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
+      .put(
+        Buffer.from(this.keyOf(createAccountKey(account.getAddress()))),
+        Buffer.from(serializedAccount.buffer, serializedAccount.byteOffset, serializedAccount.byteLength)
+      )
+      .put(
+        Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
+        Buffer.from(serializedSnapshot.buffer, serializedSnapshot.byteOffset, serializedSnapshot.byteLength)
+      )
       .write()
   }
 
@@ -734,13 +772,19 @@ export class HoprDB {
       Balance.ZERO
     )
 
+    const serializedSnapshot = snapshot.serialize()
+    const u8aPendingKey = this.keyOf(createPendingTicketsCountKey(ticket.counterparty))
+
     await this.db
       .batch()
       .put(
-        Buffer.from(this.keyOf(createPendingTicketsCountKey(ticket.counterparty))),
+        Buffer.from(u8aPendingKey.buffer, u8aPendingKey.byteOffset, u8aPendingKey.byteLength),
         Buffer.from(val.sub(val).serialize())
       )
-      .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
+      .put(
+        Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
+        Buffer.from(serializedSnapshot.buffer, serializedSnapshot.byteOffset, serializedSnapshot.byteLength)
+      )
       .write()
   }
 
@@ -835,22 +879,32 @@ export class HoprDB {
   }
 
   public async addHoprBalance(value: Balance, snapshot: Snapshot): Promise<void> {
-    let val = await this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, Balance.deserialize, Balance.ZERO)
+    const val = await this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, Balance.deserialize, Balance.ZERO)
+
+    const serializedSnapshot = snapshot.serialize()
 
     await this.db
       .batch()
       .put(Buffer.from(this.keyOf(HOPR_BALANCE_KEY)), Buffer.from(val.add(value).serialize()))
-      .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
+      .put(
+        Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
+        Buffer.from(serializedSnapshot.buffer, serializedSnapshot.byteOffset, serializedSnapshot.byteLength)
+      )
       .write()
   }
 
   public async subHoprBalance(value: Balance, snapshot: Snapshot): Promise<void> {
-    let val = await this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, Balance.deserialize, Balance.ZERO)
+    const val = await this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, Balance.deserialize, Balance.ZERO)
+
+    const serializedSnapshot = snapshot.serialize()
 
     await this.db
       .batch()
       .put(Buffer.from(this.keyOf(HOPR_BALANCE_KEY)), Buffer.from(val.sub(value).serialize()))
-      .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
+      .put(
+        Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
+        Buffer.from(serializedSnapshot.buffer, serializedSnapshot.byteOffset, serializedSnapshot.byteLength)
+      )
       .write()
   }
 
@@ -870,16 +924,30 @@ export class HoprDB {
     // add new node to the list
     registeredNodes.push(pubKey)
 
+    const serializedRegisteredNodes = PublicKey.serializeArray(registeredNodes)
+    const serializedSnapshot = snapshot.serialize()
+    const serializedAccount = account.serialize()
+
     await this.db
       .batch()
       // node public key to address (M->1)
-      .put(Buffer.from(this.keyOf(createNetworkRegistryEntryKey(pubKey))), Buffer.from(account.serialize()))
+      .put(
+        Buffer.from(this.keyOf(createNetworkRegistryEntryKey(pubKey))),
+        Buffer.from(serializedAccount.buffer, serializedAccount.byteOffset, serializedAccount.byteLength)
+      )
       // address to node public keys (1->M) in the format of key -> PublicKey[]
       .put(
         Buffer.from(this.keyOf(createNetworkRegistryAddressToPublicKeyKey(account))),
-        Buffer.from(PublicKey.serializeArray(registeredNodes))
+        Buffer.from(
+          serializedRegisteredNodes.buffer,
+          serializedRegisteredNodes.byteOffset,
+          serializedRegisteredNodes.byteLength
+        )
       )
-      .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
+      .put(
+        Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
+        Buffer.from(serializedSnapshot.buffer, serializedSnapshot.byteOffset, serializedSnapshot.byteLength)
+      )
       .write()
   }
 
@@ -933,15 +1001,25 @@ export class HoprDB {
     const entryKey = createNetworkRegistryEntryKey(pubKey)
 
     if (entryKey) {
+      const serializedRegisteredNodes = PublicKey.serializeArray(registeredNodes)
+      const serializedSnapshot = snapshot.serialize()
+
       await this.db
         .batch()
         .del(Buffer.from(this.keyOf(entryKey)))
         // address to node public keys (1->M) in the format of key -> PublicKey[]
         .put(
           Buffer.from(this.keyOf(createNetworkRegistryAddressToPublicKeyKey(account))),
-          Buffer.from(PublicKey.serializeArray(registeredNodes))
+          Buffer.from(
+            serializedRegisteredNodes.buffer,
+            serializedRegisteredNodes.byteOffset,
+            serializedRegisteredNodes.byteLength
+          )
         )
-        .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
+        .put(
+          Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
+          Buffer.from(serializedSnapshot.buffer, serializedSnapshot.byteOffset, serializedSnapshot.byteLength)
+        )
         .write()
     }
   }
@@ -965,17 +1043,25 @@ export class HoprDB {
   public async setEligible(account: Address, eligible: boolean, snapshot: Snapshot): Promise<void> {
     const key = Buffer.from(this.keyOf(createNetworkRegistryAddressEligibleKey(account)))
 
+    const serializedSnapshot = snapshot.serialize()
+
     if (eligible) {
       await this.db
         .batch()
         .put(key, Buffer.from([]))
-        .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
+        .put(
+          Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
+          Buffer.from(serializedSnapshot.buffer, serializedSnapshot.byteOffset, serializedSnapshot.byteLength)
+        )
         .write()
     } else {
       await this.db
         .batch()
         .del(key)
-        .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
+        .put(
+          Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
+          Buffer.from(serializedSnapshot.buffer, serializedSnapshot.byteOffset, serializedSnapshot.byteLength)
+        )
         .write()
     }
   }
@@ -994,10 +1080,15 @@ export class HoprDB {
    * @param enabled whether register is enabled
    */
   public async setNetworkRegistryEnabled(enabled: boolean, snapshot: Snapshot): Promise<void> {
+    const serializedSnapshot = snapshot.serialize()
+
     await this.db
       .batch()
-      .put(Buffer.from(this.keyOf(NETWORK_REGISTRY_ENABLED_PREFIX)), Buffer.from([Number(enabled)]))
-      .put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
+      .put(Buffer.from(this.keyOf(NETWORK_REGISTRY_ENABLED_PREFIX)), Buffer.from([enabled ? 1 : 0]))
+      .put(
+        Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
+        Buffer.from(serializedSnapshot.buffer, serializedSnapshot.byteOffset, serializedSnapshot.byteLength)
+      )
       .write()
   }
 
@@ -1006,7 +1097,7 @@ export class HoprDB {
    * @returns true if register is enabled or if key is not preset in the dababase
    */
   public async isNetworkRegistryEnabled(): Promise<boolean> {
-    return this.getCoercedOrDefault<boolean>(NETWORK_REGISTRY_ENABLED_PREFIX, (v) => Boolean(v[0]), true)
+    return this.getCoercedOrDefault<boolean>(NETWORK_REGISTRY_ENABLED_PREFIX, (v) => v[0] != 0, true)
   }
 
   static createMock(id?: PublicKey): HoprDB {

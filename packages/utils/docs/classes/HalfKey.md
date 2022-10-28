@@ -41,7 +41,7 @@
 
 #### Defined in
 
-[types/halfKey.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L41)
+[src/types/halfKey.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L41)
 
 ## Methods
 
