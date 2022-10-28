@@ -13,7 +13,7 @@ To start a game, both you and your opponent have to complete a few steps:
 
 #### Your Perspective (the host):
 
-![chess two nodes](./images-dApps/chess-two-nodes-2.png)
+![chess two nodes](./images-dApps/chess-nodes.png)
 
 (**1**) Pick two nodes to use, open one, and send the other to your opponent.
 
@@ -23,7 +23,7 @@ To start a game, both you and your opponent have to complete a few steps:
 
 (**3**) You should see an interface similar to the one below once you click on your node's URL (node 0). Click on "NEW GAME" on the top right of the page. This should open a pop-up.
 
-![new game pop-up](./images-dApps/chess-start-pop-up-2.png)
+![new game pop-up](./images-dApps/chess-start-pop-up.png)
 
 (**4**) Enter the peerID of your opponent's node (node 1 in this example).
 
@@ -37,7 +37,7 @@ To start a game, both you and your opponent have to complete a few steps:
 
 (**1**) Open the URL for your node and click "CONNECT" on the top right of the page. This should open a pop-up.
 
-![chess two nodes](./images-dApps/chess-connect-pop-up-2.png)
+![chess two nodes](./images-dApps/chess-playground-connect-node.png)
 
 (**2**) Enter the peerID of the host's node.
 
