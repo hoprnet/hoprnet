@@ -1,4 +1,3 @@
-use std::cmp::min;
 use crate::primitives::{calculate_mac, SimpleStreamCipher};
 
 const INTERMEDIATE_KEY_LENGTH: usize = 32;
@@ -79,7 +78,8 @@ impl PRP {
     }
 
     fn xor_inplace(a: &mut [u8], b: &[u8]) {
-        for i in 0..min(a.len(),b.len()) {
+        let bound = if a.len() > b.len() { b.len() } else { a.len() };
+        for i in 0..bound {
             a[i] = a[i] ^ b[i];
         }
     }
