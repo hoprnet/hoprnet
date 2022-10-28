@@ -2,6 +2,8 @@
 
 <a name="1.91"></a>
 
+## [1.91](https://github.com/hoprnet/hoprnet/compare/release/valencia...hoprnet:release/bogota)
+
 - Include HOPR Staking Season 5 smart contracts ([#4221](https://github.com/hoprnet/hoprnet/pull/4221))
 - Various optimizations of Rust crates ([#4221](https://github.com/hoprnet/hoprnet/pull/4260))
 - Add Metrics API for Prometheus, `metrics` API endpoint and collection of various metrics ([#4233](https://github.com/hoprnet/hoprnet/pull/4233))
