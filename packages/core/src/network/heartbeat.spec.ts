@@ -146,7 +146,7 @@ async function getPeer(
     }) as any,
     () => Promise.resolve(true),
     netStatEvents,
-    (peerId) => !peerId.equals(Charly),
+    (peerId) => !peerId.equals(Charly) && !peerId.equals(Me),
     TESTING_ENVIRONMENT,
     {
       ...SHORT_TIMEOUTS,
