@@ -136,7 +136,8 @@ async function getPeer(
 ): Promise<{ heartbeat: TestingHeartbeat; peers: NetworkPeers }> {
   const peers = new NetworkPeers([], [self], 0.3)
 
-  const heartbeat = new TestingHeartbeat(Me,
+  const heartbeat = new TestingHeartbeat(
+    Me,
     peers,
     (protocols: string | string[], handler: LibP2PHandlerFunction<any>) => network.subscribe(self, protocols, handler),
     ((dest: PeerId, protocols: string | string[], msg: Uint8Array) =>
@@ -164,7 +165,8 @@ async function getPeer(
 describe('unit test heartbeat', async () => {
   it('check nodes is noop with empty store & health indicator is red', async () => {
     let netHealth = new NetworkHealth()
-    const heartbeat = new TestingHeartbeat(Me,
+    const heartbeat = new TestingHeartbeat(
+      Me,
       new NetworkPeers([], [Alice], 0.3),
       (() => {}) as any,
       (async () => {
