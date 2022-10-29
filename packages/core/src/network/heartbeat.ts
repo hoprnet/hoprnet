@@ -246,7 +246,8 @@ export default class Heartbeat {
     if (highQualityPublic > 0) newHealthValue = NetworkHealthIndicator.YELLOW
 
     // GREEN = hiqh-quality connection to a public and a non-public node OR we're public node
-    if (highQualityPublic > 0 && (this.isPublicNode(this.me) || highQualityNonPublic > 0)) newHealthValue = NetworkHealthIndicator.GREEN
+    if (highQualityPublic > 0 && (this.isPublicNode(this.me) || highQualityNonPublic > 0))
+      newHealthValue = NetworkHealthIndicator.GREEN
 
     log(
       `network health details: ${lowQualityPublic} LQ public, ${lowQualityNonPublic} LQ non-public, ${highQualityPublic} HQ public, ${highQualityNonPublic} HQ non-public`
