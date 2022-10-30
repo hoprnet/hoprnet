@@ -11,12 +11,12 @@ Please withdraw all your funds and delete the old package before installing a ne
 
 ## Installing the HOPR Client
 
-While connected to your AVADO's network or via a VPN, go to the following [link](http://my.ava.do/#/installer/%2Fipfs%2FQmQQY78ivW7R1KGM27kyrDtpKhK7xktQoC6ZRTebBVGrnA). Just click the install button and wait until the download completes.
+While connected to your AVADO's network or via a VPN, go to the following [link](http://my.ava.do/#/installer/%2Fipfs%2FQmcDkbkH4TdjSnqXpUYya4FRscHHhTq1Q5FQZMBwsVy1gt). Just click the install button and wait until the download completes.
 
 If you are unable to use the link above, search for this hash in the AVADO DappStore:
 
 ```
-/ipfs/QmQQY78ivW7R1KGM27kyrDtpKhK7xktQoC6ZRTebBVGrnA
+/ipfs/QmcDkbkH4TdjSnqXpUYya4FRscHHhTq1Q5FQZMBwsVy1gt
 ```
 
 ![DappStore](/img/node/avado-1.png)
