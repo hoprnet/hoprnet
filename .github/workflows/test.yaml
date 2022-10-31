@@ -51,7 +51,7 @@ jobs:
       - name: Build
         run: make -j build
 
-      # - name: Test
-      #   run: make -j test
-      #   env:
-      #     HOPR_ENVIRONMENT_ID: hardhat-localhost
+      - name: Test
+        run: make -j test
+        env:
+          HOPR_ENVIRONMENT_ID: hardhat-localhost

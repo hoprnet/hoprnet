@@ -20,6 +20,17 @@ jobs:
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
 
+      - name: restore cargo cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
+
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
@@ -27,9 +38,10 @@ jobs:
           registry-url: https://registry.npmjs.org/
           cache: yarn
 
+
       - name: Run linter
         run: |
-          make deps
+          make toolchain
           make lint-fix
 
       - name: Commit and push changes
