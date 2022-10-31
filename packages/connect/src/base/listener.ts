@@ -87,10 +87,13 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
 
     this.tcpSocket = createServer()
     this.udpSocket = createSocket({
+      // `udp4` seems to have binding issues
       type: 'udp6',
-      // set to true to reuse port that is bound
-      // to TCP socket
+      // set to true to use same port for TCP and UDP
       reuseAddr: true,
+      // We use IPv4 traffic on udp6 sockets, so DNS queries
+      // must return the A record (IPv4) not the AAAA record (IPv6)
+      // - unless we explicitly check for a IPv6 address
       lookup: (...args: any[]) => {
         if (isIPv6(args[0])) {
           // @ts-ignore

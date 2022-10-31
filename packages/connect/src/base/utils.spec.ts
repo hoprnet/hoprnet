@@ -62,7 +62,11 @@ export async function startStunServer(
  */
 export function bindToUdpSocket(port?: number): Promise<Socket> {
   const socket = createSocket({
+    // `udp4` seems to have binding issues
     type: 'udp6',
+    // We use IPv4 traffic on udp6 sockets, so DNS queries
+    // must return the A record (IPv4) not the AAAA record (IPv6)
+    // - unless we explicitly check for a IPv6 address
     lookup: (...args: any[]) => {
       if (isIPv6(args[0])) {
         // @ts-ignore
