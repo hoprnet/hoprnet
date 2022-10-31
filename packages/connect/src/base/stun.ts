@@ -231,13 +231,13 @@ function sendStunRequests(addrs: Request[], socket: Socket): void {
     switch (tuples[0][0]) {
       case CODE_DNS4:
       case CODE_DNS6:
-        address = new TextDecoder().decode(tuples[0][1]?.subarray(1) as Uint8Array)
+        address = new TextDecoder().decode(tuples[0][1] as Uint8Array)
         break
       case CODE_IP6:
-        address = u8aAddrToString(tuples[0][1]?.subarray(1) as Uint8Array, 'IPv6')
+        address = u8aAddrToString(tuples[0][1] as Uint8Array, 'IPv6')
         break
       case CODE_IP4:
-        address = `::ffff:${u8aAddrToString(tuples[0][1]?.subarray(1) as Uint8Array, 'IPv4')}`
+        address = `::ffff:${u8aAddrToString(tuples[0][1] as Uint8Array, 'IPv4')}`
         break
       default:
         throw Error(`Invalid address: ${addr.multiaddr.toString()}`)
