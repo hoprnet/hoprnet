@@ -17,7 +17,7 @@ toolchain: ## install toolchain
 	command -v wasm-opt || cargo install wasm-opt
 
 .PHONY: deps
-deps-ctd: ## install dependencies
+deps: ## install dependencies
 	CI=true yarn install
 	cargo build --release --target wasm32-unknown-unknown
 
