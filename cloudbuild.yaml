@@ -38,7 +38,7 @@ steps:
       - --destination=gcr.io/${PROJECT_ID}/hopr-hardhat:${_IMAGE_VERSION}
       - --cache=true
       - --cache-ttl=96h
-    timeout: 1800s
+    timeout: 3600s
     waitFor: ['-']
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: testImages
@@ -97,4 +97,4 @@ options:
   logStreamingOption: STREAM_ON
   substitutionOption: MUST_MATCH
   machineType: N1_HIGHCPU_32
-timeout: 1800s
+timeout: 3600s
