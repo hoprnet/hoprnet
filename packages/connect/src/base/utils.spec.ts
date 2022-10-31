@@ -8,6 +8,8 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { peerIdFromBytes } from '@libp2p/peer-id'
 import { Multiaddr } from '@multiformats/multiaddr'
 import { CODE_P2P } from '../constants.js'
+import { isIPv6 } from 'net'
+import { lookup } from 'dns'
 
 interface Listening<ListenOpts> extends EventEmitter {
   listen: (opts: ListenOpts) => void
@@ -59,7 +61,18 @@ export async function startStunServer(
  * @returns a bound socket
  */
 export function bindToUdpSocket(port?: number): Promise<Socket> {
-  const socket = createSocket('udp6')
+  const socket = createSocket({
+    type: 'udp6',
+    lookup: (...args: any[]) => {
+      if (isIPv6(args[0])) {
+        // @ts-ignore
+        return lookup(...args)
+      }
+      return lookup(args[0], 4, (...innerArgs: any) => {
+        args[2](innerArgs[0], `::ffff:${innerArgs[1]}`, innerArgs[2])
+      })
+    }
+  })
 
   return new Promise<Socket>((resolve, reject) => {
     socket.once('error', (err: any) => {

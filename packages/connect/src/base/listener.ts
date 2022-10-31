@@ -12,6 +12,8 @@ import {
 } from 'net'
 import { createSocket, type RemoteInfo, type Socket as UDPSocket } from 'dgram'
 import { once } from 'events'
+import { lookup } from 'dns'
+import { isIPv6 } from 'net'
 
 import Debug from 'debug'
 import { peerIdFromBytes } from '@libp2p/peer-id'
@@ -88,7 +90,16 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       type: 'udp6',
       // set to true to reuse port that is bound
       // to TCP socket
-      reuseAddr: true
+      reuseAddr: true,
+      lookup: (...args: any[]) => {
+        if (isIPv6(args[0])) {
+          // @ts-ignore
+          return lookup(...args)
+        }
+        return lookup(args[0], 4, (...innerArgs: any) => {
+          args[2](innerArgs[0], `::ffff:${innerArgs[1]}`, innerArgs[2])
+        })
+      }
     })
 
     this.state = ListenerState.UNINITIALIZED

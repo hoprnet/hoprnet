@@ -300,7 +300,7 @@ describe('test getExternalIp', function () {
 
     assert(result != undefined, `local-mode should lead to a valid external IP`)
 
-    await Promise.all(servers.concat(socket).map(stopNode))
+    await Promise.all([...servers, socket].map(stopNode))
   })
 
   it(`return no address in local-mode if results are ambiguous`, async function () {
@@ -319,7 +319,7 @@ describe('test getExternalIp', function () {
 
     assert(result == undefined, `ambiguos results in local-mode should not lead to an address`)
 
-    await Promise.all(servers.concat(socket).map(stopNode))
+    await Promise.all([...servers, socket].map(stopNode))
   })
 
   it(`return no address in local-mode if only one STUN server answers`, async function () {
@@ -340,7 +340,7 @@ describe('test getExternalIp', function () {
 
     assert(result == undefined, `ambiguos results in local-mode should not lead to an address`)
 
-    await Promise.all(servers.concat(socket).map(stopNode))
+    await Promise.all([...servers, socket].map(stopNode))
   })
 
   it(`get the external IP`, async function () {
@@ -352,6 +352,7 @@ describe('test getExternalIp', function () {
     if (results.length == 0) {
       console.log(`Node cannot reach more than one external STUN servers. Has the node access to the internet?`)
       // Cannot proceed without access to internet
+      await stopNode(socket)
       return
     }
 
@@ -359,6 +360,7 @@ describe('test getExternalIp', function () {
 
     if (interpreted.ambiguous) {
       console.log(`Node seems to run behind a bidirectional NAT. External IP address is ambigous`)
+      await stopNode(socket)
       return
     }
 

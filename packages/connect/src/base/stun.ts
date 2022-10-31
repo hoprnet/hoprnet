@@ -7,7 +7,14 @@ import isStun from 'is-stun'
 import type { Socket, RemoteInfo } from 'dgram'
 import { Multiaddr } from '@multiformats/multiaddr'
 import debug from 'debug'
-import { randomSubset, ipToU8aAddress, isLocalhost, isPrivateAddress } from '@hoprnet/hopr-utils'
+import {
+  randomSubset,
+  ipToU8aAddress,
+  isLocalhost,
+  isPrivateAddress,
+  u8aAddrToString,
+  u8aToNumber
+} from '@hoprnet/hopr-utils'
 import { CODE_IP4, CODE_IP6, CODE_DNS4, CODE_DNS6 } from '../constants.js'
 // @ts-ignore untyped module
 import retimer from 'retimer'
@@ -202,8 +209,7 @@ export async function performSTUNRequests(
 
 /**
  * Send requests to given STUN servers
- * @param usableMultiaddrs multiaddrs to use for STUN requests
- * @param tIds transaction IDs to use, necessary to link requests and responses
+ * @param addrs requests with addr and transaction id
  * @param socket the socket to send the STUN requests
  * @returns usable transaction IDs and the corresponding multiaddrs
  */
@@ -214,30 +220,40 @@ function sendStunRequests(addrs: Request[], socket: Socket): void {
       continue
     }
 
-    let nodeAddress: ReturnType<Multiaddr['nodeAddress']>
-    try {
-      nodeAddress = addr.multiaddr.nodeAddress()
-    } catch (err) {
-      error(err)
-      continue
+    const tuples = addr.multiaddr.tuples()
+
+    if (tuples.length == 0) {
+      throw Error(`Cannot perform STUN request: empty Multiaddr`)
     }
+
+    let address: string
+
+    switch (tuples[0][0]) {
+      case CODE_DNS4:
+      case CODE_DNS6:
+        address = new TextDecoder().decode(tuples[0][1]?.subarray(1) as Uint8Array)
+        break
+      case CODE_IP6:
+        address = u8aAddrToString(tuples[0][1]?.subarray(1) as Uint8Array, 'IPv6')
+        break
+      case CODE_IP4:
+        address = `::ffff:${u8aAddrToString(tuples[0][1]?.subarray(1) as Uint8Array, 'IPv4')}`
+        break
+      default:
+        throw Error(`Invalid address: ${addr.multiaddr.toString()}`)
+    }
+
+    const port: number | undefined = tuples.length >= 2 ? u8aToNumber(tuples[1][1] as Uint8Array) : undefined
 
     const message = createMessage(constants.STUN_BINDING_REQUEST, addr.tId)
 
     message.addFingerprint()
 
-    let address: string
-    if (nodeAddress.family == 4) {
-      address = `::ffff:${nodeAddress.address}`
-    } else {
-      address = nodeAddress.address
-    }
-
-    socket.send(message.toBuffer(), nodeAddress.port, address, (err?: any) => {
+    socket.send(message.toBuffer(), port, address, (err?: any) => {
       if (err) {
         error(err.message)
       } else {
-        verbose(`STUN request successfully sent to ${nodeAddress.address}:${nodeAddress.port}`)
+        verbose(`STUN request successfully sent to ${address}:${port}`)
       }
     })
   }
@@ -252,11 +268,11 @@ function decodeIncomingSTUNResponses(addrs: Request[], socket: Socket, ms: numbe
       if (!isStun(data)) {
         return
       }
-      const response = decode(data.slice())
 
-      if (!validateFingerprint(response)) {
-        return
-      }
+      const response = decode(data)
+
+      // Don't check for STUN FINGERPRINT since external
+      // STUN servers might not support this feature
 
       switch (response.type & kStunTypeMask) {
         case isStunSuccessResponse:
@@ -276,6 +292,7 @@ function decodeIncomingSTUNResponses(addrs: Request[], socket: Socket, ms: numbe
           }
 
           if (responsesReceived == addrs.length) {
+            log(`STUN success. ${responsesReceived} of ${addrs.length} servers replied.`)
             done()
           }
           break
