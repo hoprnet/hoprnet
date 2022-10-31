@@ -275,7 +275,9 @@ class Hopr extends EventEmitter {
     verbose('Started HoprEthereum. Waiting for indexer to find connected nodes.')
 
     // Add us as public node if announced
-    if (this.options.announce) this.knownPublicNodesCache.add(this.id.toString())
+    if (this.options.announce) {
+      this.knownPublicNodesCache.add(this.id.toString())
+    }
 
     // Fetch previous announcements from database
     const initialNodes = await this.connector.waitForPublicNodes()
