@@ -14,6 +14,7 @@ deps: ## install dependencies
 	[ -n "${NIX_PATH}" ] || corepack enable
 	yarn
 	command -v rustup && rustup update || echo "No rustup installed, ignoring"
+	command -v wasm-pack || cargo install wasm-pack
 
 .PHONY: build
 build: ## build all packages
