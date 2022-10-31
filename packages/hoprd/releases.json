@@ -52,7 +52,7 @@
     "version_minor": "90"
   },
   "bogota": {
-    "git_ref": "^release/bogota$",
+    "git_ref": "^(release|staging)/bogota$",
     "environment_id": "monte_rosa",
     "version_major": "1",
     "version_minor": "91"

@@ -230,6 +230,9 @@ jobs:
              # assign the proper version only on release branches because
              # only there we have simple semver versions
             version="$(scripts/get-package-version.sh)"
+          elif [[ "${HOPR_GITHUB_REF}" == refs/heads/staging/* ]]; then
+            # staging releases get different special version
+            version="0.200.0"
           fi
           echo "::set-output name=vsn::${version}"
         env:
