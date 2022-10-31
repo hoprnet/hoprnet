@@ -8,12 +8,29 @@ all: help
 $(WORKSPACES_WITH_RUST_MODULES):
 	$(MAKE) -j 1 -C $@ all install
 
+.PHONY: toolchain
+toolchain: ## install toolchain
+	command -v yarn || corepack enable
+	yarn workspaces focus hoprnet 
+	(command -v rustup || curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh) && rustup update
+	command -v wasm-pack || cargo install wasm-pack
+	command -v wasm-opt || cargo install wasm-opt
+
 .PHONY: deps
-deps: ## install dependencies
-	# only use corepack on non-nix systems
-	[ -n "${NIX_PATH}" ] || corepack enable
-	yarn
-	command -v rustup && rustup update || echo "No rustup installed, ignoring"
+deps-ctd: ## install dependencies
+	CI=true yarn install
+	cargo build --release --target wasm32-unknown-unknown
+
+.PHONY: deps-hoprd
+deps-hoprd: ## install dependencies
+	CI=true yarn workspaces focus @hoprnet/hoprd
+	cargo build --release --target wasm32-unknown-unknown
+
+.PHONY: deps-ctd
+deps-ctd: ## install dependencies
+	CI=true yarn workspaces focus @hoprnet/hopr-cover-traffic-daemon
+	cargo build --release --target wasm32-unknown-unknown
+
 
 .PHONY: build
 build: ## build all packages
@@ -39,7 +56,6 @@ build-yarn-watch: build-solidity-types build-cargo
 
 .PHONY: build-cargo
 build-cargo: ## build cargo packages and create boilerplate JS code
-	cargo build --release --target wasm32-unknown-unknown
 	$(MAKE) -j 1 $(WORKSPACES_WITH_RUST_MODULES)
 
 .PHONY: build-yellowpaper
