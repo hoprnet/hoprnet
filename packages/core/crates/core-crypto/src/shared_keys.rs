@@ -70,7 +70,7 @@ impl SharedKeys {
     /// Generates shared secrets given the peer public keys array.
     /// The order of the peer public keys is preserved for resulting shared keys.
     /// The specified random number generator will be used.
-    pub fn generate(rng: impl CryptoRng + RngCore, peer_pubkeys: Vec<Box<[u8]>>) -> Result<SharedKeys, String> {
+    pub fn generate(rng: impl CryptoRng + RngCore, peer_public_keys: Vec<Box<[u8]>>) -> Result<SharedKeys, String> {
 
         let mut shared_keys = Vec::new();
 
@@ -83,7 +83,7 @@ impl SharedKeys {
         let alpha = alpha_prev.to_encoded_point(true);
 
         // Iterate through all the given peer public keys
-        for (i, pk) in peer_pubkeys.iter().enumerate() {
+        for (i, pk) in peer_public_keys.iter().enumerate() {
             // Try to decode the given public key point & multiply by the current coefficient
             let decoded_proj_point = decode_public_key_to_point(pk)?;
             let shared_secret = (decoded_proj_point * coeff_prev.as_ref()).to_affine();
@@ -93,7 +93,7 @@ impl SharedKeys {
             shared_keys.push(shared_pk.to_vec());
 
             // Stop here, we don't need to compute anything more
-            if i == peer_pubkeys.len() - 1 {
+            if i == peer_public_keys.len() - 1 {
                 break;
             }
 
@@ -249,8 +249,8 @@ pub mod wasm {
         }
 
         /// Generate shared keys given the peer public keys
-        pub fn generate(peer_pubkeys: Vec<Uint8Array>) -> Result<SharedKeys, JsValue> {
-            super::SharedKeys::generate(&mut OsRng, peer_pubkeys.iter().map(|v| v.to_vec().into_boxed_slice()).collect())
+        pub fn generate(peer_public_keys: Vec<Uint8Array>) -> Result<SharedKeys, JsValue> {
+            super::SharedKeys::generate(&mut OsRng, peer_public_keys.iter().map(|v| v.to_vec().into_boxed_slice()).collect())
                 .map(|m| SharedKeys { w: m})
                 .map_err(as_jsvalue)
         }
