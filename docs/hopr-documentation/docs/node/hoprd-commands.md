@@ -206,7 +206,12 @@ Connectivity Status                    Yellow
 
 The `connection`, in this case, means a node's ability to complete a ping/pong regardless of whether they are sending or receiving the ping.
 
-You can not transition to the state `unknown`, only from. All other states can be transitioned to/from in both directions.
+And connection quality is measured from 0 to 1 based on the ratio of successful pings to the total number of pings. E.g. a node that responds to half of all pings it receives from node A will have a connection quality of 0.5 to node A.
+
+Low-quality connection: <= 0.5
+High-quality connection: > 0.5
+
+**Note:** You can not transition to the state `unknown`, only from. All other states can be transitioned to/from in both directions.
 
 ## open
 
