@@ -198,11 +198,11 @@ Connectivity Status                    Yellow
 
 **Connectivity Status** - Unknown, Red, Orange, Yellow or Green. Depending on the health of your connection to the network.
 
-- ❔ `unknown`: Initial value when the node is started. It means the connectivity could not be assessed.
-- 🔴 `Red`: No connection to any nodes at all.
-- 🟠 `Orange`: Low-quality (<= 0.5) connection to at least one public node.
-- 🟡 `Yellow`: High-quality connection to at least one public node.
-- 🟢 `Green`: High-quality connection to at least one public node and at least one non-public node.
+- `unknown`: Initial value when the node is started. It means the connectivity could not be assessed.
+- `Red`: No connection to any nodes at all.
+- `Orange`: Low-quality (<= 0.5) connection to at least one public node.
+- `Yellow`: High-quality connection to at least one public node.
+- `Green`: High-quality connection to at least one public node and at least one non-public node.
 
 The `connection`, in this case, means a node's ability to complete a ping/pong regardless of whether they are sending or receiving the ping.
 
