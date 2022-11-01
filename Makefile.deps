@@ -1,0 +1,22 @@
+YARNFLAGS :=
+CARGOFLAGS :=
+
+ifeq ($(package),)
+	YARNFLAGS := ${YARNFLAGS} -A
+else
+	YARNFLAGS := ${YARNFLAGS} ${package}
+endif
+
+ifdef ($(origin PRODUCTION),)
+	YARNFLAGS := ${YARNFLAGS} --production
+	CARGOFLAGS += ${YARNFLAGS} --release
+endif
+
+ifneq ($(origin CI),)
+	CARGOFLAGS = --frozen
+endif
+
+.PHONY: deps
+deps: ## install dependencies in CI
+	yarn workspaces focus ${YARNFLAGS}
+	cargo fetch --target wasm32-unknown-unknown ${CARGOFLAGS}

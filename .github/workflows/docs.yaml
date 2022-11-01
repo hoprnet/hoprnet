@@ -35,9 +35,13 @@ jobs:
           apt update
           apt install --no-install-recommends yarn
 
+      - name: Install toolchain
+        run: |
+          make -j toolchain
+
       - name: Generate docs
         run: |
-          make -j deps
+          CI=true make -j deps
           make -j build-docs
 
       - name: Format newly created files

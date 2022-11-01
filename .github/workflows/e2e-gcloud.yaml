@@ -40,7 +40,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
 
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
@@ -49,9 +49,13 @@ jobs:
           registry-url: https://registry.npmjs.org/
           cache: yarn
 
+      - name: Install toolchain
+        run: |
+          make -j toolchain
+
       - name: Build
         run: |
-          make -j deps
+          CI=true make -j deps
           make -j build
 
       - name: Install websocat

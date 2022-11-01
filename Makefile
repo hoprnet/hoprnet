@@ -1,3 +1,4 @@
+include Makefile.deps
 WORKSPACES_WITH_RUST_MODULES := $(wildcard $(addsuffix /crates, $(wildcard ./packages/*)))
 
 .POSIX:
@@ -15,22 +16,6 @@ toolchain: ## install toolchain
 	(command -v rustup || curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh) && rustup update
 	command -v wasm-pack || cargo install wasm-pack
 	command -v wasm-opt || cargo install wasm-opt
-
-.PHONY: deps
-deps: ## install dependencies
-	CI=true yarn install
-	cargo build --release --target wasm32-unknown-unknown
-
-.PHONY: deps-hoprd
-deps-hoprd: ## install dependencies
-	CI=true yarn workspaces focus @hoprnet/hoprd
-	cargo build --release --target wasm32-unknown-unknown
-
-.PHONY: deps-ctd
-deps-ctd: ## install dependencies
-	CI=true yarn workspaces focus @hoprnet/hopr-cover-traffic-daemon
-	cargo build --release --target wasm32-unknown-unknown
-
 
 .PHONY: build
 build: ## build all packages
