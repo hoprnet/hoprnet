@@ -17,9 +17,9 @@ During build, all the Rust crates are build first using `make all` (see `Makefil
 Add dependency to `@hoprnet/hopr-real` to your `package.json`
 
 ```typescript
-import * as wasm from '@hoprnet/hopr-real'
+import { dummy_get_one } from '@hoprnet/hopr-real'
 
-if (wasm.common.dummy_get_one() === '1') {
+if (dummy_get_one() === '1') {
   console.log('It works!!')
 }
 ```
@@ -31,8 +31,9 @@ To add a new Rust WASM module (crate) into the existing `real` package:
 1. `cd packages/real/crates`
 2. `wasm-pack new my-module`, this will create a new Rust crate for WASM.
 3. add `my-module` to `PACKAGES` space separated list in `Makefile`
-4. run `make all && make install` for the first time
-5. export your WASM Rust crate under its alias in `packages/real/src/index.ts`, e.g.: `export * as my-modules from '../lib/my-module'`
+4. add `my-module` to `workspace.members` in `Cargo.toml` in the root of the Monorepo
+5. run `make all && make install` for the first time
+6. export your WASM Rust crate under its alias in `packages/real/src/index.ts`, e.g.: `export * as my-modules from '../lib/my-module'`
 
 Optionally if you want to make your crate available to other crates within the HOPR monorepo,
 add a path to it into the `members` section in `Cargo.toml` in the root of the monorepo.

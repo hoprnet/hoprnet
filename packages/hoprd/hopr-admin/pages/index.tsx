@@ -6,7 +6,7 @@ import Logs from '../src/components/logs'
 import styles from '../styles/Home.module.css'
 import Commands from '../src/commands'
 import useAppState from '../src/state'
-import { type Log, type Configuration, createLog } from '../src/utils'
+import { type Log, type Configuration, createLog, HealthStatus } from '../src/utils'
 
 // TODO: fix type in refactor
 const Jazzicon = dynamic(() => import('../src/components/jazzicon'), { ssr: false }) as any
@@ -64,12 +64,38 @@ export default function Home() {
     }
   }
 
+  const updateHealthStatus = async () => {
+    const api = app.api.apiRef.current
+    if (api && app.streamWS.state.status === 'CONNECTED') {
+      try {
+        const infoResp = await api.getInfo()
+        if (infoResp.ok) {
+          const info = await infoResp.json()
+          const status = info.connectivityStatus
+          setHealthStatus(HealthStatus[status])
+        } else {
+          console.error(`failed to get info with HTTP status: ${infoResp.status}`)
+        }
+      } catch (error) {
+        console.error(error)
+      }
+    }
+  }
+  // health status indicator
+  const [healthStatus, setHealthStatus] = useState<HealthStatus>(HealthStatus.Unknown)
+  const [showTooltip, setShowTooltip] = useState(false)
   // update aliases once and every 5 seconds
+  // update health status once and every 10 seconds
   useEffect(() => {
     updateAliases()
+    updateHealthStatus()
 
-    const interval = setInterval(updateAliases, 5e3)
-    return () => clearInterval(interval)
+    const aliasesInterval = setInterval(updateAliases, 5e3)
+    const healthStatusInterval = setInterval(updateHealthStatus, 10e3)
+    return () => {
+      clearInterval(aliasesInterval)
+      clearInterval(healthStatusInterval)
+    }
   }, [app.api.apiRef.current, app.streamWS.state.status === 'CONNECTED'])
 
   // toggles connected panel
@@ -187,9 +213,19 @@ export default function Home() {
       <Logo onClick={() => setShowConnectedPanel(!showConnectedPanel)} />
       <h1>
         HOPR Logs - {GIT_HASH ? GIT_HASH : '*'}{' '}
-        <span className={styles.cogwheelIcon} onClick={() => setShowConfigPanel(!showConfigPanel)}>
-          ⚙️
-        </span>
+        <div className={styles.titleIcons}>
+          <span className={styles.cogwheelIcon} onClick={() => setShowConfigPanel(!showConfigPanel)}>
+            ⚙️
+          </span>
+          <span
+            className={styles.healthIndicator}
+            onMouseEnter={() => setTimeout(() => setShowTooltip(true), 300)}
+            onMouseLeave={() => setTimeout(() => setShowTooltip(false), 300)}
+          >
+            {healthStatus}
+          </span>
+          {showTooltip && <span className={styles.healthIndicatorTooltip}>network health indicator</span>}
+        </div>
       </h1>
 
       <Logs messages={logs} isConnected={app.streamWS.state.status === 'CONNECTED'} />

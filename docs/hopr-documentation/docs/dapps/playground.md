@@ -2,6 +2,7 @@
 id: playground
 title: Playground
 ---
+
 HOPR Playground lets you launch and interact with a fully interconnected cluster of five hoprd nodes. The nodes and connecting channels are all pre-funded, allowing you to use or test dApps costlessly.
 
 ![Playground Cluster](./images-dApps//playground-full-graph.png)

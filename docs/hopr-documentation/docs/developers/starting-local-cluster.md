@@ -39,7 +39,7 @@ unzip valencia.zip
 cd hoprnet-release-valencia
 ```
 
-2. **Install the dependencies of the project and build it**: 
+2. **Install the dependencies of the project and build it**:
 
 In order to install and build the required packages and project modules, make sure you have installed:
 
@@ -52,7 +52,7 @@ Ideally you will also have basic development toolsets[^1] set up on your compute
 make deps build
 ```
 
-3. **Run the one-line setup script**: 
+3. **Run the one-line setup script**:
 
 Before running the script make sure you have:
 
@@ -66,7 +66,7 @@ Run the following script:
 ```
 
 Please wait while this script creates
-the local blockchain network and deploys the project contracts. On average, the process can take between 2-6 minutes, depending on your computer. 
+the local blockchain network and deploys the project contracts. On average, the process can take between 2-6 minutes, depending on your computer.
 
 If you are planning to run [MyneChat](http://app.myne.chat/)
 alongside your cluster, then make sure to pass the `-m` flag with your MyneChat instance URL, i.e.:
@@ -93,5 +93,4 @@ Instead of setting up a cluster locally, you can launch a cluster without any in
 Clusters launched through Playground are fully interconnected and prefunded similar to the described local setup.
 But will only run for 20 minutes at a time before closing. This is a good alternative for testing and devloping dApps. Simply use the nodes API URL and key when connecting to a node.
 
-    
 [^1]: If you have installed and built another `node.js` application from your computer in the past, you likely will not need to do anything else. However, in the case your are only starting to develop in `node.js`, there's a high chance you might need to install a few extra tools. For instance, in `Linux`-based OS, you will likely also need to install `build-essentials` (e.g. in Ubuntu do `apt-get install build-essentials`), whereas in `macOS` you need Xcode developer tools, installable via `xcode-select --install`.

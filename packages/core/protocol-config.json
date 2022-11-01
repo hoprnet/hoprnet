@@ -40,8 +40,8 @@
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
       "xhopr_contract_address": "0xe8aD2ac347dA7549Aaca8F5B1c5Bf979d85bC78F",
       "boost_contract_address": "0x1C0C4EFb9a2ccE18d66eaFFc585876d8CA768013",
-      "stake_contract_address": "0xAbf5Faf9A4b310c3ABc79dA94298e0d646818F62",
-      "network_registry_proxy_contract_address": "0xBe1067041246D5EcE9B18b2cc5674C6E724b75c3",
+      "stake_contract_address": "0x3EB3e9f5E2F9C348d29506A950f1cb7030B7df0D",
+      "network_registry_proxy_contract_address": "0xB85e0972BA068032cfe07d41885dfD5eD5b96ae9",
       "network_registry_contract_address": "0xf3374666487A58aa424BF9dB9bCf74250393a757",
       "tags": ["etherscan"]
     },
@@ -145,7 +145,7 @@
     "monte_rosa": {
       "network_id": "xdai",
       "environment_type": "production",
-      "version_range": "1.89||1.90",
+      "version_range": "1.89||1.90||1.91",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0x66225dE86Cac02b32f34992eb3410F59DE416698",
       "channels_contract_address": "0xFaBeE463f31E39eC8952bBfB4490C41103bf573e",
@@ -182,7 +182,7 @@
       "description": "Görli Testnet is the first proof-of-authority cross-client testnet, synching Parity Ethereum, Geth, Nethermind, Hyperledger Besu (formerly Pantheon), and EthereumJS",
       "chain_id": 5,
       "live": true,
-      "max_fee_per_gas": "20 gwei",
+      "max_fee_per_gas": "200 gwei",
       "max_priority_fee_per_gas": "2 gwei",
       "default_provider": "https://provider-proxy.hoprnet.workers.dev/eth_goerli",
       "etherscan_api_url": "http://api-goerli.etherscan.io/api",

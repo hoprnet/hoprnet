@@ -5,7 +5,8 @@ import {
   type HoprDB,
   type PendingAckowledgement,
   type HalfKeyChallenge,
-  type Hash
+  type Hash,
+  create_counter
 } from '@hoprnet/hopr-utils'
 import { findCommitmentPreImage, bumpCommitment } from '@hoprnet/hopr-core-ethereum'
 import type { SendMessage, Subscribe } from '../../index.js'
@@ -28,6 +29,20 @@ type Outgoing = [ack: Uint8Array, destination: PeerId]
 import pkg from '../../../package.json' assert { type: 'json' }
 
 const NORMALIZED_VERSION = pickVersion(pkg.version)
+
+// Metrics
+const metric_receivedSuccessfulAcks = create_counter(
+  'core_counter_received_successful_acks',
+  'Number of received successful message acknowledgements'
+)
+const metric_receivedFailedAcks = create_counter(
+  'core_counter_received_failed_acks',
+  'Number of received failed message acknowledgements'
+)
+const metric_sentAcks = create_counter('core_counter_sent_acks', 'Number of sent message acknowledgements')
+
+const metric_winningTickets = create_counter('core_counter_winning_tickets', 'Number of winning tickets')
+const metric_losingTickets = create_counter('core_counter_losing_tickets', 'Number of losing tickets')
 
 export class AcknowledgementInteraction {
   private incomingAcks: Pushable<Incoming>
@@ -100,7 +115,7 @@ export class AcknowledgementInteraction {
   }
   sendAcknowledgement(packet: Packet, destination: PeerId): void {
     const ack = packet.createAcknowledgement(this.privKey)
-
+    metric_sentAcks.increment()
     this.outgoingAcks.push([ack.serialize(), destination])
   }
 
@@ -127,6 +142,7 @@ export class AcknowledgementInteraction {
           `Received unexpected acknowledgement for half key challenge ${acknowledgement.ackChallenge.toHex()} - half key ${acknowledgement.ackKeyShare.toHex()}`
         )
       }
+      metric_receivedFailedAcks.increment()
       throw err
     }
 
@@ -135,6 +151,7 @@ export class AcknowledgementInteraction {
       log(`Received acknowledgement as sender. First relayer has processed the packet.`)
       // Resolves `sendMessage()` promise
       this.onAcknowledgement(acknowledgement.ackChallenge)
+      metric_receivedSuccessfulAcks.increment()
       // nothing else to do
       return
     }
@@ -143,6 +160,7 @@ export class AcknowledgementInteraction {
     const unacknowledged = pending.ticket
 
     if (!unacknowledged.verifyChallenge(acknowledgement.ackKeyShare)) {
+      metric_receivedFailedAcks.increment()
       throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
     }
 
@@ -155,6 +173,7 @@ export class AcknowledgementInteraction {
       // Something clearly screwy here. This is bad enough to be a fatal error
       // we should kill the node and debug.
       log('Error, acknowledgement received for channel that does not exist')
+      metric_receivedFailedAcks.increment()
       throw e
     }
     const response = unacknowledged.getResponse(acknowledgement.ackKeyShare)
@@ -172,6 +191,7 @@ export class AcknowledgementInteraction {
     if (!ticket.isWinningTicket(opening, response, ticket.winProb)) {
       log(`Got a ticket that is not a win. Dropping ticket.`)
       await this.db.markLosing(unacknowledged)
+      metric_losingTickets.increment()
       return
     }
 
@@ -188,7 +208,7 @@ export class AcknowledgementInteraction {
 
     // store commitment in db
     await bumpCommitment(this.db, channelId, opening)
-
+    metric_winningTickets.increment()
     this.onWinningTicket(ack)
   }
 }

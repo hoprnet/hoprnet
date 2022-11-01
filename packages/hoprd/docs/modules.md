@@ -22,4 +22,4 @@
 
 #### Defined in
 
-[index.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/hoprd/src/index.ts#L37)
+[index.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/hoprd/src/index.ts#L41)
