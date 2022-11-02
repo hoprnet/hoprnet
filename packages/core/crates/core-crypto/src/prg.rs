@@ -39,7 +39,7 @@ impl PRG {
         let last_block_end = to % AES_BLOCK_SIZE;
         let last_block = to / AES_BLOCK_SIZE + if last_block_end != 0 { 1 } else { 0 };
         let count_blocks = last_block - first_block;
-        let end = count_blocks - if last_block_end > 0 { AES_BLOCK_SIZE - last_block_end } else { 0 };
+        let end = AES_BLOCK_SIZE * count_blocks - if last_block_end > 0 { AES_BLOCK_SIZE - last_block_end } else { 0 };
 
         // Allocate required memory
         let mut key_stream = vec![0u8; count_blocks * AES_BLOCK_SIZE];
@@ -49,7 +49,7 @@ impl PRG {
         let mut new_iv = [0u8; AES_BLOCK_SIZE];
         let (prefix, counter) = new_iv.split_at_mut(PRG_IV_LENGTH);
         prefix.copy_from_slice(&self.iv);
-        counter.copy_from_slice(&first_block.to_be_bytes());
+        counter.copy_from_slice(&(first_block as u32).to_be_bytes());
 
         // Create key stream
         let mut cipher = Aes128Ctr32BE::new(&self.key.into(), &new_iv.into());
@@ -63,7 +63,20 @@ impl PRG {
 
 #[cfg(test)]
 mod tests {
+    use crate::prg::PRG;
 
+    #[test]
+    fn test_prg() {
+        let key = [0u8; 16];
+        let iv = [0u8; 12];
+
+        let out = PRG::new(&key, &iv)
+            .unwrap()
+            .digest(5,10)
+            .unwrap();
+
+        assert_eq!(5, out.len());
+    }
 }
 
 pub mod wasm {
