@@ -195,9 +195,24 @@ Connectivity Status                    Yellow
 
 **Channel closure period** - The amount of time you have to wait after sending the close command before the channel officially closes.
 
-**Connectivity Status** - Either Unknown, Red, Orange, Yellow or Green. Depending on the health of your connection to the network.
-
 **NetworkRegistry Eligibility** - True or false, tells you whether or not you are registered on the Network Registry for this network.
+
+**Connectivity Status** - Unknown, Red, Orange, Yellow or Green. Depending on the health of your connection to the network.
+
+- `unknown`: Initial value when the node is started. It means the connectivity could not be assessed.
+- `Red`: No connection to any nodes at all.
+- `Orange`: Low-quality (<= 0.5) connection to at least one public node.
+- `Yellow`: High-quality connection to at least one public node.
+- `Green`: High-quality connection to at least one public node and at least one non-public node.
+
+The `connection`, in this case, means a node's ability to complete a ping/pong regardless of whether they are sending or receiving the ping.
+
+And connection quality is measured from 0 to 1 based on the ratio of successful pings to the total number of pings. E.g. a node that responds to half of all pings it receives from node A will have a connection quality of 0.5 to node A.
+
+Low-quality connection: <= 0.5
+High-quality connection: > 0.5
+
+**Note:** You can not transition to the state `unknown`, only from. All other states can be transitioned to/from in both directions.
 
 ## open
 
