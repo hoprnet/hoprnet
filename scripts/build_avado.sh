@@ -80,7 +80,7 @@ if [[ "${avado_version}" = "0.100.0" && "${release_id}" = "master-goerli" ]]; th
   upstream_version="master-goerli"
 fi
 
-msg "Building Avado v. ${avado_version} for release ${release_id} using environment ${environment_id} with default provider ${provider_url}"
+msg "Building Avado v. ${avado_version} for release ${release_id} (upstream v. ${upstream_version}) using environment ${environment_id} with default provider ${provider_url}"
 
 # Create backups
 cp ./docker-compose.yml ./docker-compose.bak
