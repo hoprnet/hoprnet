@@ -31,12 +31,12 @@ steps:
       - --build-arg=PACKAGE_VERSION=${_PACKAGE_VERSION}
     timeout: 600s
     waitFor: ['-']
-  - name: 'gcr.io/kaniko-project/executor:latest'
+  - name: 'gcr.io/kaniko-project/executor@sha256:3490eaf2abf8cee03224c89ce2307099cdee292b1720864b9af70eb01747525f'
     id: buildHardhat
     args:
       - --dockerfile=Dockerfile.hardhat
       - --destination=gcr.io/${PROJECT_ID}/hopr-hardhat:${_IMAGE_VERSION}
-      - --cache=true
+      - --cache=false
       - --cache-ttl=96h
     timeout: 3600s
     waitFor: ['-']
