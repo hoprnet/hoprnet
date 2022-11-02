@@ -132,3 +132,34 @@ mod tests {
         assert_eq!(&data, pt.as_ref());
     }
 }
+
+pub mod wasm {
+    use wasm_bindgen::JsValue;
+    use wasm_bindgen::prelude::wasm_bindgen;
+    use crate::utils::as_jsvalue;
+
+    #[wasm_bindgen]
+    pub struct PRP {
+        w: super::PRP
+    }
+
+    #[wasm_bindgen]
+    impl PRP {
+        #[wasm_bindgen(constructor)]
+        pub fn new(key: &[u8], iv: &[u8]) -> PRP {
+            Self {
+                w: super::PRP::new(key, iv)
+            }
+        }
+
+        pub fn forward(&self, plaintext: &[u8]) -> Result<Box<[u8]>, JsValue> {
+            self.w.forward(plaintext)
+                .map_err(as_jsvalue)
+        }
+
+        pub fn inverse(&self, ciphertext: &[u8]) -> Result<Box<[u8]>, JsValue> {
+            self.w.inverse(ciphertext)
+                .map_err(as_jsvalue)
+        }
+    }
+}

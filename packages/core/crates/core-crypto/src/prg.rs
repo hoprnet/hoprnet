@@ -59,5 +59,35 @@ impl PRG {
         let result = &key_stream.as_slice()[start..end];
         Ok(Box::from(result))
     }
+}
+
+#[cfg(test)]
+mod tests {
+
+}
+
+pub mod wasm {
+    use wasm_bindgen::JsValue;
+    use wasm_bindgen::prelude::wasm_bindgen;
+    use crate::utils::as_jsvalue;
+
+    #[wasm_bindgen]
+    pub struct PRG {
+        w: super::PRG
+    }
+
+    #[wasm_bindgen]
+    impl PRG {
+        #[wasm_bindgen(constructor)]
+        pub fn new(key: &[u8], iv: &[u8]) -> Result<PRG, JsValue> {
+            Ok(Self {
+                w: super::PRG::new(key,iv).map_err(as_jsvalue)?
+            })
+        }
+
+        pub fn digest(&self, from: usize, to: usize) -> Result<Box<[u8]>, JsValue> {
+            self.w.digest(from, to).map_err(as_jsvalue)
+        }
+    }
 
 }
