@@ -17,8 +17,6 @@ declare profile=$(sed -En 's/^profile = "([a-z]*)"$/\1/p' ${mydir}/../rust-toolc
 # Always install the version specified in `rust-toolchain.toml`
 rustup toolchain install ${rust_version} --profile ${profile} --target ${target}
 
-echo ${rust_version} ${target} ${profile}
-
 # Downloads Node.js version specified in `.nvmrc` file
 
 declare node_js_version=$(sed -En 's/^v*([0-9.])/\1/p' ${mydir}/../.nvmrc) 
@@ -49,6 +47,7 @@ cd ${mydir}
 
 rm -R ${download_dir}
 
+cargo --version
 node --version
 wasm-pack --version
 wasm-opt --version
