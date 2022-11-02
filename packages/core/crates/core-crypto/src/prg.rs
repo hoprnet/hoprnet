@@ -45,6 +45,7 @@ impl PRG {
         let mut key_stream = vec![0u8; count_blocks * AES_BLOCK_SIZE];
 
         // Set correct counter value to the IV
+        // NOTE: We are using Big Endian ordering for the counter
         let mut new_iv = [0u8; AES_BLOCK_SIZE];
         let (prefix, counter) = new_iv.split_at_mut(PRG_IV_LENGTH);
         prefix.copy_from_slice(&self.iv);
@@ -54,7 +55,7 @@ impl PRG {
         let mut cipher = Aes128Ctr32BE::new(&self.key.into(), &new_iv.into());
         cipher.apply_keystream(&mut key_stream);
 
-        // Take the result as slice
+        // Slice the result accordingly
         let result = &key_stream.as_slice()[start..end];
         Ok(Box::from(result))
     }
