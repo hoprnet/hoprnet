@@ -63,10 +63,10 @@ impl PRG {
 
 #[cfg(test)]
 mod tests {
-    use crate::prg::PRG;
+    use crate::prg::{AES_BLOCK_SIZE, AES_KEY_SIZE, PRG};
 
     #[test]
-    fn test_prg() {
+    fn test_prg_single_block() {
         let key = [0u8; 16];
         let iv = [0u8; 12];
 
@@ -76,6 +76,32 @@ mod tests {
             .unwrap();
 
         assert_eq!(5, out.len());
+    }
+
+    #[test]
+    fn test_prg_more_blocks() {
+        let key = [0u8; 16];
+        let iv = [0u8; 12];
+
+        let out = PRG::new(&key, &iv)
+            .unwrap()
+            .digest(0,AES_BLOCK_SIZE * 2)
+            .unwrap();
+
+        assert_eq!(32, out.len());
+    }
+
+    #[test]
+    fn test_prg_across_blocks() {
+        let key = [0u8; 16];
+        let iv = [0u8; 12];
+
+        let out = PRG::new(&key, &iv)
+            .unwrap()
+            .digest(5,AES_KEY_SIZE * 2 + 10)
+            .unwrap();
+
+        assert_eq!(AES_BLOCK_SIZE * 2 + 5, out.len());
     }
 }
 
