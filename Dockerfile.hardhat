@@ -62,6 +62,12 @@ RUN make -j build \
 # use alpine version of node for smallest image sizes
 FROM node:16-alpine as runtime
 
+# install tools required within our scripts
+RUN apk add --no-cache libc6-compat
+
+# symlink to ensure any files relying on the presence of the library keep working
+RUN ln -s /lib/libc.musl-x86_64.so.1 /lib/ld-linux-x86-64.so.2
+
 RUN mkdir /core
 
 WORKDIR /hardhat

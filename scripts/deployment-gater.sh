@@ -55,7 +55,7 @@ check() {
   return ${ec}
 }
 
-if [ $# -le 1 ]; then
+if [ $# -lt 1 ]; then
   usage
   exit 1
 fi
