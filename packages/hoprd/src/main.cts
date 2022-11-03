@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env -S DEBUG=${DEBUG} NODE_OPTIONS=${NODE_OPTIONS} node
 
 // File must be a CommonJS script to make sure it does not include any ESM syntax,
 // such as `export` or `import`, which causes incomprensive syntax errors when

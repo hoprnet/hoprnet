@@ -128,4 +128,4 @@ ENV HOPRD_DATA=/app/hoprd-db
 # finally set the non-root user so the process also run un-privilidged
 # USER node
 
-ENTRYPOINT ["/usr/bin/tini", "--", "yarn", "hoprd"]
+ENTRYPOINT ["/usr/bin/tini", "--", "node", "./lib/main.cjs"]
