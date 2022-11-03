@@ -27,6 +27,7 @@ make sc-coverage
 ```
 
 ### Deployment
+
 #### Local
 
 ```
@@ -97,8 +98,9 @@ openzeppelin-contracts-v3-0-1=OpenZeppelin/openzeppelin-contracts@v3.0.1 \
 |____HoprNetworkRegistry.t.sol
 ```
 
-5. Temporarily skipped deployment scripts for 
- - HoprDistributor
- - HoprWrapper
+5. Temporarily skipped deployment scripts for
+
+- HoprDistributor
+- HoprWrapper
 
 6. writeJson is next inline https://github.com/foundry-rs/foundry/pull/3595, to save deployed addressed used in function `writeEnvironment()` in `contracts/script/utils/EnvironmentConfig.s.sol`
