@@ -9,7 +9,6 @@ endif
 
 ifneq ($(origin PRODUCTION),undefined)
 	YARNFLAGS := ${YARNFLAGS} --production
-	CARGOFLAGS += ${CARGOFLAGS} --release
 endif
 
 ifneq ($(origin CI),undefined)
