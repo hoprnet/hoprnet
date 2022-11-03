@@ -1,4 +1,5 @@
 YARNFLAGS :=
+YARN_ENVIRONMENT :=
 CARGOFLAGS :=
 
 ifeq ($(package),)
@@ -9,6 +10,7 @@ endif
 
 ifneq ($(origin PRODUCTION),undefined)
 	YARNFLAGS := ${YARNFLAGS} --production
+	YARN_ENVIRONMENT := ${YARN_ENVIRONMENT} DEBUG=
 endif
 
 ifneq ($(origin CI),undefined)
@@ -17,5 +19,7 @@ endif
 
 .PHONY: deps
 deps: ## install dependencies in CI
-	yarn workspaces focus ${YARNFLAGS}
+	${YARN_ENVIRONMENT} yarn workspaces focus ${YARNFLAGS}
+ifeq ($(origin NO_CARGO),undefined)
 	cargo fetch --target wasm32-unknown-unknown ${CARGOFLAGS}
+endif

@@ -37,7 +37,7 @@ RUN find ./packages -type f -name '*.ts' -delete
 # # No need for these packages
 RUN rm -R packages/avado packages/cover-traffic-daemon
 
-# # Everything that we don't need in ethereum package
+# Everything that we don't need in ethereum package
 RUN rm -R packages/ethereum/contracts packages/ethereum/deploy packages/ethereum/hardhat packages/ethereum/tasks packages/ethereum/test
 
 RUN rm -R node_modules
@@ -45,7 +45,7 @@ RUN rm -R node_modules
 # As we are on *nix, use hardlinks in node_modules to save some space
 RUN yarn config set nmMode hardlinks-local
 
-RUN DEBUG= CI=true PRODUCTION=true make deps package=@hoprnet/hoprd
+RUN DEBUG= CI=true NO_CARGO=true PRODUCTION=true make deps package=@hoprnet/hoprd
 
 # # use slim version of node on Debian buster for smaller image sizes
 FROM node:16-alpine as runtime
@@ -72,14 +72,9 @@ RUN ln -s /lib/libc.musl-x86_64.so.1 /lib/ld-linux-x86-64.so.2
 
 WORKDIR /app/hoprnet
 
-COPY .yarn .yarn
-COPY package.json .yarnrc.yml Makefile Makefile.deps yarn.lock Cargo.toml Cargo.lock ./
+COPY package.json Makefile Makefile.deps yarn.lock Cargo.toml Cargo.lock ./
 COPY --from=build /app/hoprnet/packages ./packages
 COPY --from=build /app/hoprnet/node_modules ./node_modules
-
-
-# Remove yarn cache globally
-RUN yarn cache clean --all
 
 WORKDIR /app/hoprnet/packages/hoprd
 
@@ -93,20 +88,12 @@ VOLUME ["/app/hoprd-db"]
 # set data directory to user-mountable directory
 ENV HOPRD_DATA=/app/hoprd-db
 
-# # Install without devDependencies, and using WebRTC Release builds (`DEBUG=`)
-# # see https://github.com/node-webrtc/node-webrtc/blob/685aa433623b9bf98e8c7c0124e7864e01b883e6/scripts/download-prebuilt.js#L11
-# RUN DEBUG= CI=true yarn workspaces focus --production @hoprnet/hoprd
-RUN ls
-RUN yarn hoprd
-ENTRYPOINT ["/usr/bin/tini", "--", "yarn", "hoprd"]
+# DISABLED temporarily until a migration path has been tested
+# switch to normal user, to prevent dangerous root access
+# RUN chown -R node:node .
 
-# # DISABLED temporarily until a migration path has been tested
-# # switch to normal user, to prevent dangerous root access
-# # RUN chown -R node:node .
+# DISABLED temporarily until a migration path has been tested
+# finally set the non-root user so the process also run un-privilidged
+# USER node
 
-
-
-# # DISABLED temporarily until a migration path has been tested
-# # finally set the non-root user so the process also run un-privilidged
-# # USER node
-
+ENTRYPOINT ["/usr/bin/tini", "--", "node", "./lib/main.js"]
