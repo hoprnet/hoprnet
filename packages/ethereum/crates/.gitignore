@@ -7,3 +7,5 @@ contracts/out/
 
 # Ignore all vscode settings
 .vscode/
+
+test.txt

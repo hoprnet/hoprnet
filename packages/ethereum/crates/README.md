@@ -26,6 +26,15 @@ make sc-test
 make sc-coverage
 ```
 
+### Deployment
+#### Local
+
+```
+anvil
+make anvil-deploy-erc1820
+FOUNDRY_PROFILE=development ENVIRONMENT_NAME=localhost forge script script/HoprToken.s.sol:DeployHoprTokenScript --broadcast
+```
+
 ### Note
 
 1. Three solc versions are needed
@@ -87,3 +96,9 @@ openzeppelin-contracts-v3-0-1=OpenZeppelin/openzeppelin-contracts@v3.0.1 \
 |____HoprWrapper.t.sol
 |____HoprNetworkRegistry.t.sol
 ```
+
+5. Temporarily skipped deployment scripts for 
+ - HoprDistributor
+ - HoprWrapper
+
+6. writeJson is next inline https://github.com/foundry-rs/foundry/pull/3595, to save deployed addressed used in function `writeEnvironment()` in `contracts/script/utils/EnvironmentConfig.s.sol`

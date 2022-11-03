@@ -6,3 +6,21 @@ test = 'test'
 out = 'out'
 libs = ['lib']
 verbosity = 3
+
+[rpc_endpoints]
+local = "http://localhost:8545"
+xdai = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
+goerli = "https://provider-proxy.hoprnet.workers.dev/eth_goerli"
+
+# testing and local network
+[profile.development]
+fs_permissions = [{ access = "read-write", path = "./"}] # to write logs into a local `./test.txt` file
+eth_rpc_url = "http://localhost:8545" # cannot directly use profile.default.rpc_endpoints.local
+
+# staging environment
+[profile.staging]
+eth_rpc_url = "https://provider-proxy.hoprnet.workers.dev/eth_goerli"
+
+# production environment environment
+[profile.production]
+eth_rpc_url = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
