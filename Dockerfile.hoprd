@@ -1,0 +1,112 @@
+# Run HOPRd  within a single container using npm
+FROM hopr-toolchain as build
+
+WORKDIR /app/hoprnet
+
+COPY .yarn .yarn
+COPY Makefile Makefile.deps Cargo.toml Cargo.lock yarn.lock tsconfig.build.json tsconfig.json tsconfig.scripts.json yarn.lock rust-toolchain.toml ./
+COPY packages/ ./packages
+
+RUN CI=true make deps package=@hoprnet/hoprd
+
+# enable to pass the version to Docker using either --build-arg or an
+# environment variable
+# if its not given, yarn will install the latest version of the package
+ARG PACKAGE_VERSION
+RUN echo "ARG PACKAGE_VERSION=${PACKAGE_VERSION}"
+ENV PACKAGE_VERSION=${PACKAGE_VERSION:-}
+RUN echo "ENV PACKAGE_VERSION=${PACKAGE_VERSION}"
+
+# # making sure some standard environment variables are set for production use
+ENV NODE_ENV production
+ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_OPTIONS=--max_old_space_size=4096
+ENV npm_config_build_from_source false
+
+# Remove all tests
+RUN find ./packages -type f -name '*.spec.ts' -delete 
+
+RUN make -j build
+
+# Remove all typescript files
+RUN find ./packages -type f -name '*.ts' -delete
+
+# # Remove all other directories and files that we don't need
+# RUN rm -R target packages/*/src packages/*/docs test docs .github .processes .vscode *.md tsconfig* flake* shell.nix scripts cloudbuild.yaml Makefile Dockerfile.hardhat Cargo.* rust-toolchain.toml Brewfile .actrc .editorconfig .gitpod* .nvmrc .prettierignore .readthedocs.yml .snyk .gitignore .envrc
+
+# # No need for these packages
+RUN rm -R packages/avado packages/cover-traffic-daemon
+
+# # Everything that we don't need in ethereum package
+RUN rm -R packages/ethereum/contracts packages/ethereum/deploy packages/ethereum/hardhat packages/ethereum/tasks packages/ethereum/test
+
+RUN rm -R node_modules
+
+# As we are on *nix, use hardlinks in node_modules to save some space
+RUN yarn config set nmMode hardlinks-local
+
+RUN DEBUG= CI=true PRODUCTION=true make deps package=@hoprnet/hoprd
+
+# # use slim version of node on Debian buster for smaller image sizes
+FROM node:16-alpine as runtime
+
+# # making sure some standard environment variables are set for production use
+ENV NODE_ENV production
+ENV NEXT_TELEMETRY_DISABLED 1
+ENV DEBUG 'hopr*'
+ENV NODE_OPTIONS="--max_old_space_size=4096 --experimental-wasm-modules"
+
+# Admin web server
+EXPOSE 3000
+# REST API
+EXPOSE 3001
+# Healthcheck server
+EXPOSE 8080
+# p2p
+EXPOSE 9091
+
+RUN apk add --no-cache tini libc6-compat
+
+# symlink required to get WRTC to work
+RUN ln -s /lib/libc.musl-x86_64.so.1 /lib/ld-linux-x86-64.so.2
+
+WORKDIR /app/hoprnet
+
+COPY .yarn .yarn
+COPY package.json .yarnrc.yml Makefile Makefile.deps yarn.lock Cargo.toml Cargo.lock ./
+COPY --from=build /app/hoprnet/packages ./packages
+COPY --from=build /app/hoprnet/node_modules ./node_modules
+
+
+# Remove yarn cache globally
+RUN yarn cache clean --all
+
+WORKDIR /app/hoprnet/packages/hoprd
+
+# create directory which is later used for the database, so that it inherits
+# permissions when mapped to a volume
+RUN mkdir -p hoprd-db
+
+# set volume which can be mapped by users on the host system
+VOLUME ["/app/hoprd-db"]
+
+# set data directory to user-mountable directory
+ENV HOPRD_DATA=/app/hoprd-db
+
+# # Install without devDependencies, and using WebRTC Release builds (`DEBUG=`)
+# # see https://github.com/node-webrtc/node-webrtc/blob/685aa433623b9bf98e8c7c0124e7864e01b883e6/scripts/download-prebuilt.js#L11
+# RUN DEBUG= CI=true yarn workspaces focus --production @hoprnet/hoprd
+RUN ls
+RUN yarn hoprd
+ENTRYPOINT ["/usr/bin/tini", "--", "yarn", "hoprd"]
+
+# # DISABLED temporarily until a migration path has been tested
+# # switch to normal user, to prevent dangerous root access
+# # RUN chown -R node:node .
+
+
+
+# # DISABLED temporarily until a migration path has been tested
+# # finally set the non-root user so the process also run un-privilidged
+# # USER node
+
