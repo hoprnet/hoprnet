@@ -1,4 +1,3 @@
-include Makefile.deps
 WORKSPACES_WITH_RUST_MODULES := $(wildcard $(addsuffix /crates, $(wildcard ./packages/*)))
 
 .POSIX:
@@ -11,11 +10,11 @@ $(WORKSPACES_WITH_RUST_MODULES):
 
 .PHONY: toolchain
 toolchain: ## install toolchain
-	command -v yarn || corepack enable
-	yarn workspaces focus hoprnet 
-	(command -v rustup || curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh) && rustup update
-	command -v wasm-pack || cargo install wasm-pack
-	command -v wasm-opt || cargo install wasm-opt
+	scripts/install-toolchain.sh
+
+.PHONY: deps
+deps: ## install dependencies
+	$(MAKE) -f Makefile.deps deps
 
 .PHONY: build
 build: ## build all packages

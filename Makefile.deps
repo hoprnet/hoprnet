@@ -7,13 +7,13 @@ else
 	YARNFLAGS := ${YARNFLAGS} ${package}
 endif
 
-ifdef ($(origin PRODUCTION),)
+ifneq ($(origin PRODUCTION),undefined)
 	YARNFLAGS := ${YARNFLAGS} --production
-	CARGOFLAGS += ${YARNFLAGS} --release
+	CARGOFLAGS += ${CARGOFLAGS} --release
 endif
 
-ifneq ($(origin CI),)
-	CARGOFLAGS = --frozen
+ifneq ($(origin CI),undefined)
+	CARGOFLAGS := ${CARGOFLAGS} --locked
 endif
 
 .PHONY: deps
