@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env node --max_old_space_size=4096 --experimental-wasm-modules
 
 // File must be a CommonJS script to make sure it does not include any ESM syntax,
 // such as `export` or `import`, which causes incomprensive syntax errors when
