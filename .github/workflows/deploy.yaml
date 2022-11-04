@@ -79,7 +79,6 @@ jobs:
       - name: '[BUILD] Install dependencies / link / build'
         run: |
           # Deploying with hardhat requires built hopr-utils package
-          make -j toolchain
           CI=true make -j deps
           make -j build
 
