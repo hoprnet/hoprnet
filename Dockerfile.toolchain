@@ -11,7 +11,7 @@ SHELL ["/bin/bash", "-lc"]
 
 ## Get toolchain utilities
 
-ADD .yarn .yarn/
+COPY .yarn .yarn/
 COPY package.json .yarnrc.yml rust-toolchain.toml .nvmrc yarn.lock ./
 COPY scripts/install-toolchain.sh ./scripts/
 

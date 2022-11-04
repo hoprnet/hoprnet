@@ -4,8 +4,8 @@ FROM hopr-toolchain as build
 WORKDIR /app/hoprnet
 
 COPY .yarn .yarn
-COPY Makefile Makefile.deps Cargo.toml Cargo.lock yarn.lock tsconfig.build.json tsconfig.json tsconfig.scripts.json yarn.lock rust-toolchain.toml ./
 COPY packages/ ./packages
+COPY Makefile Makefile.deps Cargo.toml Cargo.lock yarn.lock tsconfig.build.json tsconfig.json tsconfig.scripts.json yarn.lock rust-toolchain.toml ./
 
 RUN CI=true make deps package=hoprd
 

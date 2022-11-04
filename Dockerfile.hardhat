@@ -3,8 +3,8 @@ FROM hopr-toolchain as build
 
 WORKDIR /app/hoprnet
 
-ADD .yarn .yarn/
-ADD packages packages/
+COPY .yarn .yarn/
+COPY packages packages/
 COPY package.json .yarnrc.yml yarn.lock tsconfig.json Makefile Makefile.deps Cargo.toml Cargo.lock ./
 
 LABEL description="This image launches a hardhat node running a local network with the HOPR contracts deployed and available."
