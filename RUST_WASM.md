@@ -106,6 +106,10 @@ export { foo } from '../lib/my_crate.js'
 
 Note, that the panic hook needs to be installed for each crate separately (each crate run in separate execution environment).
 
+Triggering the build of the entire monorepo (`make deps build`) should now also build
+and integrate your new Rust crate. Similarly `make test` in the root of the monorepo
+will trigger your Rust unit tests and WASM integration tests.
+
 ## Other guidelines or tips
 
 TBD
