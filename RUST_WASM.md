@@ -1,6 +1,12 @@
-# Adding WASM-compatible Rust crates
+Documentation of our usage of Rust & WASM
+=====
 
-This guide describes the process of adding a new Rust crate to a package in our monorepo.
+This file documents how we're using our Rust toolchain to build WASM compatible crates that are used in
+our monorepo.
+
+It is also meant as place that can contain various tips that make development of WASM-compatible creates easier,
+including tips related to `wasm-bindgen`.
+
 
 ## Structure
 
@@ -75,3 +81,31 @@ They are pure-Rust and are easy to debug with IDE.
 
 The integration tests, that run in WASM runtime are currently not possible to be debugged
 and are located in the `test` directory of a crate.
+
+
+## Adding a new crate
+
+To add a new Rust WASM module (crate) into an existing package:
+
+1. `cd packages/<package>/crates`
+2. `wasm-pack new my-crate --template https://github.com/hoprnet/hopr-wasm-template`, this will create a new Rust crate `my-crate` from a template.
+3. remove the cloned Git repo: `rm -rf my-crate/.git`
+4. add `my-crate` to `PACKAGES` space separated list in `Makefile`
+5. add `my-crate` to `workspace.members` in `Cargo.toml` in the root of the Monorepo
+6. run `make all && make install` for the first time
+7. commit all changes: `git add my-crate && git commit -a`
+
+You can use the following pattern in TS to export Rust types or functions:
+
+```typescript
+// Load `my-crate` crate
+import { set_panic_hook as my_crate_panic_hook } from '../lib/my_crate.js'
+my_crate_panic_hook()
+export { foo } from '../lib/my_crate.js'
+```
+
+Note, that the panic hook needs to be installed for each crate separately (each crate run in separate execution environment).
+
+## Other guidelines or tips
+
+TBD
