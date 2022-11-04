@@ -32,13 +32,30 @@ import { ConnectComponents } from './components.js'
 import { EntryNodes } from './base/entry.js'
 import { WebRTCUpgrader } from './webrtc/upgrader.js'
 import { UpnpManager } from './base/upnp.js'
-import { timeout } from '@hoprnet/hopr-utils'
+import { create_counter, timeout } from '@hoprnet/hopr-utils'
 import { cleanExistingConnections } from './utils/index.js'
 
 const DEBUG_PREFIX = 'hopr-connect'
 const log = Debug(DEBUG_PREFIX)
 const verbose = Debug(DEBUG_PREFIX.concat(':verbose'))
 const error = Debug(DEBUG_PREFIX.concat(':error'))
+
+// Metrics
+const metric_successfulDirectDials = create_counter(
+  'connect_counter_successful_direct_dials',
+  'Number of successful direct dials'
+)
+const metric_failedDirectDials = create_counter('connect_counter_failed_direct_dials', 'Number of failed direct dials')
+
+const metric_successfulRelayedDials = create_counter(
+  'connect_counter_successful_relayed_dials',
+  'Number of successful relayed dials'
+)
+
+const metric_failedRelayedDials = create_counter(
+  'connect_counter_failed_relayed_dials',
+  'Number of failed relayed dials'
+)
 
 const DEFAULT_CONNECTION_UPGRADE_TIMEOUT = 2000
 
@@ -190,14 +207,28 @@ class HoprConnect implements Transport, Initializable, Startable {
       case CODE_DNS6:
       case CODE_IP4:
       case CODE_IP6:
-        return this.dialDirectly(ma, options)
+        try {
+          let conn = await this.dialDirectly(ma, options)
+          metric_successfulDirectDials.increment()
+          return conn
+        } catch (e) {
+          metric_failedDirectDials.increment()
+          throw e
+        }
       case CODE_P2P:
         if ((options as any).noRelay === true) {
           throw new Error(`Cannot extend already relayed connections`)
         }
         const relay = peerIdFromBytes((maTuples[0][1] as Uint8Array).slice(1))
 
-        return this.dialWithRelay(relay, destination, options)
+        try {
+          let conn = await this.dialWithRelay(relay, destination, options)
+          metric_successfulRelayedDials.increment()
+          return conn
+        } catch (e) {
+          metric_failedRelayedDials.increment()
+          throw e
+        }
       default:
         throw new Error(`Protocol not supported. Given address: ${ma.toString()}`)
     }

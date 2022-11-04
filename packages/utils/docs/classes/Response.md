@@ -41,7 +41,7 @@
 
 #### Defined in
 
-[types/response.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L45)
+[src/types/response.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L45)
 
 ## Methods
 

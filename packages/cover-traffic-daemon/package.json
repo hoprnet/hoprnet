@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-cover-traffic-daemon",
   "description": "Generate chaffing traffic",
-  "version": "1.90.63",
+  "version": "1.91.0-next.18",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
@@ -14,16 +14,16 @@
     "build:wasm": "make -C crates all && make -C crates install",
     "test:wasm": "make -C crates test",
     "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo ./db ./ct.json",
-    "test": "yarn test:wasm && NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
+    "test": "yarn test:wasm && NODE_OPTIONS=\"--experimental-wasm-modules --trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
     "coverage": "nyc --reporter=html mocha",
     "dev": "yarn clean && yarn build:wasm && tsc -w",
     "build": "yarn clean && yarn build:wasm && tsc -p .",
-    "start": "ts-node src/index",
+    "start": "NODE_OPTIONS=\"--experimental-wasm-modules\" ts-node src/index",
     "docs:generate": "yarn typedoc",
     "docs:watch": "yarn typedoc --watch"
   },
   "engines": {
-    "node": "16.15"
+    "node": ">=16.15"
   },
   "files": [
     "lib",
@@ -33,8 +33,8 @@
   "dependencies": {
     "@hoprnet/hopr-core": "workspace:packages/core",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
-    "@libp2p/interface-peer-id": "1.0.2",
-    "@libp2p/peer-id": "1.1.13",
+    "@libp2p/interface-peer-id": "1.0.5",
+    "@libp2p/peer-id": "1.1.16",
     "@multiformats/multiaddr": "10.3.3",
     "bignumber.js": "9.0.2",
     "bn.js": "5.2.0",

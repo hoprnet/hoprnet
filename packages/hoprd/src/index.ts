@@ -3,25 +3,29 @@ import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 
 import {
+  create_gauge,
+  create_multi_gauge,
+  get_package_version,
   loadJson,
   NativeBalance,
+  setupPromiseRejectionFilter,
   SUGGESTED_NATIVE_BALANCE,
-  get_package_version,
-  setupPromiseRejectionFilter
+  create_histogram_with_buckets,
+  pickVersion
 } from '@hoprnet/hopr-utils'
 import {
-  default as Hopr,
-  type HoprOptions,
-  type NetworkHealthIndicator,
+  CONFIRMATIONS,
   createHoprNode,
-  resolveEnvironment,
-  supportedEnvironments,
-  ResolvedEnvironment,
+  default as Hopr,
   HEARTBEAT_INTERVAL,
-  HEARTBEAT_THRESHOLD,
   HEARTBEAT_INTERVAL_VARIANCE,
+  HEARTBEAT_THRESHOLD,
+  type HoprOptions,
   NETWORK_QUALITY_THRESHOLD,
-  CONFIRMATIONS
+  NetworkHealthIndicator,
+  ResolvedEnvironment,
+  resolveEnvironment,
+  supportedEnvironments
 } from '@hoprnet/hopr-core'
 
 import type { State } from './types.js'
@@ -47,6 +51,28 @@ function defaultEnvironment(): string {
     return ''
   }
 }
+
+// Metrics
+const metric_processStartTime = create_gauge(
+  'hoprd_gauge_startup_unix_time_seconds',
+  'The unix timestamp at which the process was started'
+)
+const metric_nodeStartupTime = create_histogram_with_buckets(
+  'hoprd_histogram_startup_time_seconds',
+  'Time it takes for a node to start up',
+  new Float64Array([5.0, 10.0, 30.0, 60.0, 120.0, 180.0, 300.0, 600.0, 1200.0])
+)
+const metric_timeToGreen = create_histogram_with_buckets(
+  'hoprd_histogram_time_to_green_seconds',
+  'Time it takes for a node to transition to the GREEN network state',
+  new Float64Array([30.0, 60.0, 90.0, 120.0, 180.0, 240.0, 300.0, 420.0, 600.0, 900.0, 1200.0])
+)
+const metric_latency = create_histogram_with_buckets(
+  'hoprd_histogram_message_latency_ms',
+  'Histogram of measured received message latencies',
+  new Float64Array([10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0, 20000.0])
+)
+const metric_version = create_multi_gauge('hoprd_mgauge_version', 'Executed version of HOPRd', ['version'])
 
 // Use environment-specific default data path
 const defaultDataPath = path.join(process.cwd(), 'hoprd-db', defaultEnvironment())
@@ -328,6 +354,9 @@ async function main() {
   // Increase the default maximum number of event listeners
   ;(await import('events')).EventEmitter.defaultMaxListeners = 20
 
+  metric_processStartTime.set(Date.now() / 1000)
+  const metric_startupTimer = metric_nodeStartupTime.start_measure()
+
   let node: Hopr
   let logs = new LogStream()
   let adminServer: AdminServer = undefined
@@ -345,10 +374,16 @@ async function main() {
     return state
   }
 
+  let metric_timerToGreen = metric_timeToGreen.start_measure()
+
   const networkHealthChanged = (oldState: NetworkHealthIndicator, newState: NetworkHealthIndicator): void => {
     // Log the network health indicator state change (goes over the WS as well)
     logs.log(`Network health indicator changed: ${oldState} -> ${newState}`)
     logs.log(`NETWORK HEALTH: ${newState}`)
+    if (metric_timerToGreen && newState == NetworkHealthIndicator.GREEN) {
+      metric_timeToGreen.record_measure(metric_timerToGreen)
+      metric_timerToGreen = undefined
+    }
   }
 
   const logMessageToNode = (msg: Uint8Array): void => {
@@ -357,6 +392,7 @@ async function main() {
       let decodedMsg = decodeMessage(msg)
       logs.log(`Message: ${decodedMsg.msg}`)
       logs.log(`Latency: ${decodedMsg.latency} ms`)
+      metric_latency.observe(decodedMsg.latency)
 
       // also send it tagged as message for apps to use
       logs.logMessage(decodedMsg.msg)
@@ -398,6 +434,8 @@ async function main() {
 
   try {
     logs.log(`This is HOPRd version ${version}`)
+    metric_version.set([pickVersion(version)], 1.0)
+
     if (on_avado) {
       logs.log('This node appears to be running on an AVADO/Dappnode')
     }
@@ -468,6 +506,7 @@ async function main() {
 
       logs.logStatus('READY')
       logs.log('Node has started!')
+      metric_nodeStartupTime.record_measure(metric_startupTimer)
     })
 
     // 2.a - Setup connector listener to bubble up to node. Emit connector creation.

@@ -64,7 +64,7 @@
 
 #### Defined in
 
-[types/ticket.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L54)
+[src/types/ticket.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L54)
 
 ___
 
@@ -74,7 +74,7 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L51)
+[src/types/ticket.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L51)
 
 ___
 
@@ -84,7 +84,7 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:56](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L56)
+[src/types/ticket.ts:56](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L56)
 
 ___
 
@@ -94,7 +94,7 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:50](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L50)
+[src/types/ticket.ts:50](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L50)
 
 ___
 
@@ -104,7 +104,7 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L52)
+[src/types/ticket.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L52)
 
 ___
 
@@ -114,7 +114,7 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:53](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L53)
+[src/types/ticket.ts:53](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L53)
 
 ___
 
@@ -124,7 +124,7 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:57](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L57)
+[src/types/ticket.ts:57](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L57)
 
 ___
 
@@ -134,7 +134,7 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L55)
+[src/types/ticket.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L55)
 
 ## Accessors
 

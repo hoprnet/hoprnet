@@ -12,6 +12,7 @@ export type {
   HoprStake2,
   HoprStakeSeason3,
   HoprStakeSeason4,
+  HoprStakeSeason5,
   HoprWhitehat,
   // used by libraries that want to interact with xHOPR
   ERC677 as xHoprToken
