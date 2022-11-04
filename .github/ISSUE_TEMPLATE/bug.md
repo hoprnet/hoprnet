@@ -37,6 +37,8 @@ assignees: ''
 3.
 4.
 
+*Were you able to reproduce the bug using the above steps consistently each time?* **YES**/**NO**
+
 ## Context (Environment)
 
 <!--- How has this issue affected you? What are you trying to accomplish? -->
