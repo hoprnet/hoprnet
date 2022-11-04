@@ -362,14 +362,6 @@ gcloud_execute_command_instance() {
 
   ${gssh} "${name}" --command "${command}"
 }
-# $1=instance name
-# $2=command to execute
-gcloud_execute_command_instance() {
-  local name="${1}"
-  local command="${2}"
-
-  ${gssh} "${name}" --command "${command}"
-}
 
 # $1=flag name
 gcloud_isset_project_flag() {
