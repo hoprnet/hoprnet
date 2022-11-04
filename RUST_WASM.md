@@ -1,12 +1,10 @@
-Documentation of our usage of Rust & WASM
-=====
+# Documentation of our usage of Rust & WASM
 
 This file documents how we're using our Rust toolchain to build WASM compatible crates that are used in
 our monorepo.
 
 It is also meant as place that can contain various tips that make development of WASM-compatible creates easier,
 including tips related to `wasm-bindgen`.
-
 
 ## Structure
 
@@ -81,7 +79,6 @@ They are pure-Rust and are easy to debug with IDE.
 
 The integration tests, that run in WASM runtime are currently not possible to be debugged
 and are located in the `test` directory of a crate.
-
 
 ## Adding a new crate
 

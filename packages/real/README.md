@@ -28,4 +28,3 @@ Each WASM module can have its own unit tests and integration tests.
 
 - Unit tests are placed within the module file
 - Integration tests are placed in `tests/` directory next to `src/`
-
