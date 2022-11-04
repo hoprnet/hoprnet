@@ -272,7 +272,7 @@ ifeq ($(origin PRIVATE_KEY),undefined)
 	  yarn workspace @hoprnet/hopr-ethereum run hardhat register:self \
    --network $(network) \
    --task add \
-   --peer-ids "$(peer_ids)" \
+   --peer-ids "$(peer_ids)"
 else
 	TS_NODE_PROJECT=./tsconfig.hardhat.json \
 	HOPR_ENVIRONMENT_ID="$(environment)" \
