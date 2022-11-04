@@ -220,7 +220,7 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
   ip_addrs+=( "${node_ip}" )
 
   # Build an array of hopr_addrs to be staked
-  if [[ "${staking_addr}" != "unstaked" ]]; then
+  if [[ "${staking_status}" != "unstaked" ]]; then
     hopr_addrs+=( "${api_peer_id}" )
   fi
 
