@@ -7332,17 +7332,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"binary-install@npm:^0.1.0":
-  version: 0.1.1
-  resolution: "binary-install@npm:0.1.1"
-  dependencies:
-    axios: ^0.21.1
-    rimraf: ^3.0.2
-    tar: ^6.1.0
-  checksum: a3df9c07a3ab81533cff610527263181c4c34a44efb115555be910b6011ac047bf875ad57469cc2259dfaba58e971c7ba2958038e9d222c546eef7b58b826ecc
-  languageName: node
-  linkType: hard
-
 "bindings@npm:^1.2.1":
   version: 1.5.0
   resolution: "bindings@npm:1.5.0"
@@ -13025,7 +13014,6 @@ __metadata:
     prettier: 2.7.1
     ts-node: 10.8.1
     typescript: 4.7.4
-    wasm-pack: 0.10.3
     yargs: 17.5.1
   languageName: unknown
   linkType: soft
@@ -22378,7 +22366,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"tar@npm:^6.1.0, tar@npm:^6.1.11, tar@npm:^6.1.2":
+"tar@npm:^6.1.11, tar@npm:^6.1.2":
   version: 6.1.11
   resolution: "tar@npm:6.1.11"
   dependencies:
@@ -23862,17 +23850,6 @@ __metadata:
   bin:
     wait-on: bin/wait-on
   checksum: e4d62aa4145d99fe34747ccf7506d4b4d6e60dd677c0eb18a51e316d38116ace2d194e4b22a9eb7b767b0282f39878ddcc4ae9440dcb0c005c9150668747cf5b
-  languageName: node
-  linkType: hard
-
-"wasm-pack@npm:0.10.3":
-  version: 0.10.3
-  resolution: "wasm-pack@npm:0.10.3"
-  dependencies:
-    binary-install: ^0.1.0
-  bin:
-    wasm-pack: run.js
-  checksum: b980b33fc8adcd208556a1f5c4656b02d1ae584792259874f09ab5647dd52d0cdd3179d970ba99eed72ac1a422445c3c81122a3e9d7c05ebb2a3ff83bd7ec7db
   languageName: node
   linkType: hard
 
