@@ -105,11 +105,12 @@ export function DELIVERY_PROTOCOLS(environment?: string, environments?: Environm
  *   /hopr-connect/{TAG}/1.90
  *
  * When an environment is given, multiple protocols are returned. To illustrate
- * this the environment 'monte_rosa' and releases 'paleochora' and 'valencia'
+ * this the environment 'monte_rosa' and releases 'paleochora', 'valencia' and 'bogota'
  * are used here:
  *
  *   /hopr-connect/monte_rosa/{TAG}/1.89
  *   /hopr-connect/monte_rosa/{TAG}/1.90
+ *   /hopr-connect/monte_rosa/{TAG}/1.91
  */
 function determine_protocols(tag: string, environment?: string, environments?: Environment[]): string[] {
   const supportedEnvironmentIds = environments?.map((env) => env.id)
