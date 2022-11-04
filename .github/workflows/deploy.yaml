@@ -82,10 +82,10 @@ jobs:
           CI=true make -j deps
           make -j build
 
-      - name: Cache built artifacts (for later use)
+      - name: 'Cache built artifacts (for later use)'
         uses: actions/cache@v3
-        path: |
-            packages/
+        with:
+          path: packages/
           key: hoprnet-build-${{ github.run_id }}
 
       - name: '[SMART-CONTRACTS] Deploy for known environments'
@@ -344,8 +344,8 @@ jobs:
 
       - name: Restore built artifacts
         uses: actions/cache@v3
-          path: |
-            packages/
+        with:
+          path: packages/
           key: hoprnet-build-${{ github.run_id }}
 
       - name: Run deploy script for public nodes
@@ -432,8 +432,8 @@ jobs:
 
       - name: Restore built artifacts
         uses: actions/cache@v3
-          path: |
-            packages/
+        with:
+          path: packages/
           key: hoprnet-build-${{ github.run_id }}
 
       - name: Run deploy script for nodes behind NAT
