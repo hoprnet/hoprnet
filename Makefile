@@ -166,7 +166,7 @@ ifeq ($(origin PRIVATE_KEY),undefined)
 		yarn workspace @hoprnet/hopr-ethereum run hardhat stake \
 		--network $(network) \
 		--type nrnft \
-		--nftrank $(nftrank) \
+		--nftrank $(nftrank)
 else
 	@TS_NODE_PROJECT=./tsconfig.hardhat.json \
 	HOPR_ENVIRONMENT_ID="$(environment)" \
