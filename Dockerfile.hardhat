@@ -1,110 +1,53 @@
-# Run HOPRd  within a single container using npm
-FROM node:16-bullseye-slim@sha256:95d4fdef5e12916a89f7d56dca6d8099de61df875c3c61106cb53e0ba1a48d44 as toolchain
+# Run HOPRd  within a single container using yarn
+FROM hopr-toolchain as build
 
 WORKDIR /app/hoprnet
 
-# use bash to have source command and persistent environment
-SHELL ["/bin/bash", "-lc"]
+ADD .yarn .yarn/
+ADD packages packages/
+COPY package.json .yarnrc.yml yarn.lock tsconfig.json Makefile Makefile.deps Cargo.toml Cargo.lock ./
 
-# python is used by some nodejs dependencies as an installation requirement
-RUN apt-get update && \
-    apt-get install -y \
-    git \
-    python3 \
-    unzip \
-    curl \
-    build-essential \
-    ca-certificates \
-  && rm -rf /var/lib/apt/lists/* \
-  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
-## Get toolchain utilities
+LABEL description="This image launches a hardhat node running a local network with the HOPR contracts deployed and available."
+
+WORKDIR /app/hoprnet/packages/ethereum
+
+# Turn Ethereum package into hardhat package
+RUN mv package.hardhat.json package.json && mv tsconfig.hardhat.json tsconfig.json 
+
+WORKDIR /app/hoprnet
+
+RUN CI=true make deps package=hopr-ethereum
+
+RUN NO_NEXT=true make build package=ethereum
+
+# Remove all unused packages
+RUN rm -R packages/avado packages/connect packages/core packages/cover-traffic-daemon packages/core-ethereum packages/hoprd
+
+WORKDIR /app/hoprnet/ethereum/
+
+RUN yarn run network --network hardhat
+# # use alpine version of node for smallest image sizes
+FROM node:16-alpine as runtime
+
+RUN mkdir /core
+
+WORKDIR /hardhat
+
+COPY --from=build /app/hoprnet/node_modules node_modules/
+COPY --from=build /app/hoprnet/packages/ packages/
 
 ADD .yarn .yarn/
-COPY package.json .yarnrc.yml Makefile.toolchain ./
+COPY .yarnrc.yml yarn.lock .
 
-RUN make -j -f Makefile.toolchain toolchain
+# pre-compile as much as we can to reduce startup time
+RUN rm package.json \
+ && mv package.hardhat.json package.json \
+ && yarn run compile
 
-# # use slim version of node on Debian bullseye for smaller image sizes during build
-# FROM node:16-bullseye-slim@sha256:95d4fdef5e12916a89f7d56dca6d8099de61df875c3c61106cb53e0ba1a48d44 as build
+COPY --from=build /app/scripts scripts
 
-# LABEL description="This image launches a hardhat node running a local network with the HOPR contracts deployed and available."
+EXPOSE 8545
 
-# # python is used by some nodejs dependencies as an installation requirement
-# RUN apt-get update \
-#   && apt-get install -y --no-install-recommends \
-#      build-essential \
-#      ca-certificates \
-#      git \
-#      jq \
-#      libssl-dev \
-#      openssl \
-#      pkg-config \
-#      python3 \
-#      wget \
-#   && rm -rf /var/lib/apt/lists/* \
-#   && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
+ENV NODE_OPTIONS=--max_old_space_size=1024
 
-# # taken from
-# # https://github.com/rust-lang/docker-rust/blob/186e4d580b5581861907c015d6b58919c809e375/1.61.0/bullseye/Dockerfile
-# ENV RUSTUP_HOME=/usr/local/rustup \
-#     CARGO_HOME=/usr/local/cargo \
-#     PATH=/usr/local/cargo/bin:$PATH \
-#     RUST_VERSION=1.61.0 \
-#     RUSTUP_VERSION=1.24.3
-
-# # taken from
-# # https://github.com/rust-lang/docker-rust/blob/186e4d580b5581861907c015d6b58919c809e375/1.61.0/bullseye/Dockerfile
-# RUN set -eux; \
-#     dpkgArch="$(dpkg --print-architecture)"; \
-#       case "${dpkgArch}" in \
-#         amd64) rustArch='x86_64-unknown-linux-gnu'; rustupSha256='3dc5ef50861ee18657f9db2eeb7392f9c2a6c95c90ab41e45ab4ca71476b4338' ;; \
-#         armhf) rustArch='armv7-unknown-linux-gnueabihf'; rustupSha256='67777ac3bc17277102f2ed73fd5f14c51f4ca5963adadf7f174adf4ebc38747b' ;; \
-#         arm64) rustArch='aarch64-unknown-linux-gnu'; rustupSha256='32a1532f7cef072a667bac53f1a5542c99666c4071af0c9549795bbdb2069ec1' ;; \
-#         i386) rustArch='i686-unknown-linux-gnu'; rustupSha256='e50d1deb99048bc5782a0200aa33e4eea70747d49dffdc9d06812fd22a372515' ;; \
-#         *) echo >&2 "unsupported architecture: ${dpkgArch}"; exit 1 ;; \
-#       esac; \
-#     url="https://static.rust-lang.org/rustup/archive/${RUSTUP_VERSION}/${rustArch}/rustup-init"; \
-#     wget "${url}"; \
-#     echo "${rustupSha256} *rustup-init" | sha256sum -c -; \
-#     chmod +x rustup-init; \
-#     ./rustup-init -y --no-modify-path --profile minimal --default-toolchain ${RUST_VERSION} --default-host ${rustArch}; \
-#     rm rustup-init; \
-#     chmod -R a+w ${RUSTUP_HOME} ${CARGO_HOME}; \
-#     rustup --version; \
-#     cargo --version; \
-#     rustc --version;
-
-# WORKDIR /app
-
-# COPY . /app
-
-# RUN CI=true make -j deps
-# RUN make -j build \
-#  && cp tsconfig.json packages/ethereum/tsconfig.base.json \
-#  && cd packages/ethereum \
-#  && cat tsconfig.hardhat.json | jq '.extends = "./tsconfig.base.json" | del(.references)' > tsconfig.hardhat.json.new \
-#  && mv tsconfig.hardhat.json.new tsconfig.hardhat.json
-
-# # use alpine version of node for smallest image sizes
-# FROM node:16-alpine as runtime
-
-# RUN mkdir /core
-
-# WORKDIR /hardhat
-
-# COPY --from=build /app/packages/ethereum .
-# COPY --from=build /app/packages/core/protocol-config.json /core/
-
-# # pre-compile as much as we can to reduce startup time
-# RUN rm package.json \
-#  && mv package.hardhat.json package.json \
-#  && yarn \
-#  && yarn run compile
-
-# COPY --from=build /app/scripts scripts
-
-# EXPOSE 8545
-
-# ENV NODE_OPTIONS=--max_old_space_size=1024
-
-# ENTRYPOINT ["yarn", "run", "network", "--network", "hardhat", "--show-stack-traces"]
+ENTRYPOINT ["yarn", "run", "network", "--network", "hardhat", "--show-stack-traces"]

@@ -7,7 +7,7 @@ COPY .yarn .yarn
 COPY Makefile Makefile.deps Cargo.toml Cargo.lock yarn.lock tsconfig.build.json tsconfig.json tsconfig.scripts.json yarn.lock rust-toolchain.toml ./
 COPY packages/ ./packages
 
-RUN CI=true make deps package=@hoprnet/hoprd
+RUN CI=true make deps package=hoprd
 
 # enable to pass the version to Docker using either --build-arg or an
 # environment variable
@@ -17,22 +17,13 @@ RUN echo "ARG PACKAGE_VERSION=${PACKAGE_VERSION}"
 ENV PACKAGE_VERSION=${PACKAGE_VERSION:-}
 RUN echo "ENV PACKAGE_VERSION=${PACKAGE_VERSION}"
 
-# # making sure some standard environment variables are set for production use
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
-ENV NODE_OPTIONS=--max_old_space_size=4096
-ENV npm_config_build_from_source false
-
 # Remove all tests
 RUN find ./packages -type f -name '*.spec.ts' -delete 
 
-RUN make -j build
+RUN make -j build package=hoprd
 
 # Remove all typescript files
 RUN find ./packages -type f -name '*.ts' -delete
-
-# # Remove all other directories and files that we don't need
-# RUN rm -R target packages/*/src packages/*/docs test docs .github .processes .vscode *.md tsconfig* flake* shell.nix scripts cloudbuild.yaml Makefile Dockerfile.hardhat Cargo.* rust-toolchain.toml Brewfile .actrc .editorconfig .gitpod* .nvmrc .prettierignore .readthedocs.yml .snyk .gitignore .envrc
 
 # # No need for these packages
 RUN rm -R packages/avado packages/cover-traffic-daemon
@@ -45,7 +36,7 @@ RUN rm -R node_modules
 # As we are on *nix, use hardlinks in node_modules to save some space
 RUN yarn config set nmMode hardlinks-local
 
-RUN DEBUG= CI=true NO_CARGO=true PRODUCTION=true make deps package=@hoprnet/hoprd
+RUN DEBUG= CI=true NO_CARGO=true PRODUCTION=true make deps package=hoprd
 
 # # use slim version of node on Debian buster for smaller image sizes
 FROM node:16-alpine as runtime
@@ -72,11 +63,9 @@ RUN ln -s /lib/libc.musl-x86_64.so.1 /lib/ld-linux-x86-64.so.2
 
 WORKDIR /app/hoprnet
 
-COPY package.json Makefile Makefile.deps yarn.lock Cargo.toml Cargo.lock ./
+COPY package.json ./
 COPY --from=build /app/hoprnet/packages ./packages
 COPY --from=build /app/hoprnet/node_modules ./node_modules
-
-WORKDIR /app/hoprnet/packages/hoprd
 
 # create directory which is later used for the database, so that it inherits
 # permissions when mapped to a volume
@@ -88,6 +77,8 @@ VOLUME ["/app/hoprd-db"]
 # set data directory to user-mountable directory
 ENV HOPRD_DATA=/app/hoprd-db
 
+WORKDIR /app/hoprnet/packages/hoprd
+
 # DISABLED temporarily until a migration path has been tested
 # switch to normal user, to prevent dangerous root access
 # RUN chown -R node:node .
@@ -96,4 +87,4 @@ ENV HOPRD_DATA=/app/hoprd-db
 # finally set the non-root user so the process also run un-privilidged
 # USER node
 
-ENTRYPOINT ["/usr/bin/tini", "--", "node", "./lib/main.js"]
+ENTRYPOINT ["/sbin/tini", "--", "node", "./lib/main.js"]

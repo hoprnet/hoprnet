@@ -22,7 +22,9 @@ build: build-hopr-admin build-yarn
 
 .PHONY: build-hopr-admin
 build-hopr-admin: ## build hopr admin React frontend
+ifeq ($(origin NO_NEXT),undefined)	
 	yarn workspace @hoprnet/hoprd run buildAdmin
+endif
 
 .PHONY: build-solidity-types
 build-solidity-types: ## generate Solidity typings
@@ -31,7 +33,11 @@ build-solidity-types: ## generate Solidity typings
 .PHONY: build-yarn
 build-yarn: ## build yarn packages
 build-yarn: build-solidity-types build-cargo
+ifeq ($(package),)
 	npx tsc --build tsconfig.build.json
+else
+	npx tsc --build packages/${package}/tsconfig.json
+endif
 
 .PHONY: build-yarn-watch
 build-yarn-watch: ## build yarn packages (in watch mode)
@@ -40,7 +46,9 @@ build-yarn-watch: build-solidity-types build-cargo
 
 .PHONY: build-cargo
 build-cargo: ## build cargo packages and create boilerplate JS code
+ifeq ($(origin NO_CARGO),undefined)
 	$(MAKE) -j 1 $(WORKSPACES_WITH_RUST_MODULES)
+endif
 
 .PHONY: build-yellowpaper
 build-yellowpaper: ## build the yellowpaper in docs/yellowpaper

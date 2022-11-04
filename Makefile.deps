@@ -5,7 +5,7 @@ CARGOFLAGS :=
 ifeq ($(package),)
 	YARNFLAGS := ${YARNFLAGS} -A
 else
-	YARNFLAGS := ${YARNFLAGS} ${package}
+	YARNFLAGS := ${YARNFLAGS} @hoprnet/${package}
 endif
 
 ifneq ($(origin PRODUCTION),undefined)
