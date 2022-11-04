@@ -1,5 +1,5 @@
 steps:
-  - name: 'gcr.io/kaniko-project/executor:latest'
+  - name: 'gcr.io/kaniko-project/executor:v1.9.1'
     id: buildHoprd
     args:
       - --context=dir://packages/hoprd
@@ -9,7 +9,7 @@ steps:
       - --build-arg=PACKAGE_VERSION=${_PACKAGE_VERSION}
     timeout: 1200s
     waitFor: ['-']
-  - name: 'gcr.io/kaniko-project/executor:latest'
+  - name: 'gcr.io/kaniko-project/executor:v1.9.1'
     id: buildHoprdNat
     args:
       - --context=dir://scripts/nat
@@ -21,7 +21,7 @@ steps:
     timeout: 600s
     waitFor:
       - buildHoprd
-  - name: 'gcr.io/kaniko-project/executor:latest'
+  - name: 'gcr.io/kaniko-project/executor:v1.9.1'
     id: buildCoverTrafficDaemon
     args:
       - --context=dir://packages/cover-traffic-daemon
@@ -31,14 +31,14 @@ steps:
       - --build-arg=PACKAGE_VERSION=${_PACKAGE_VERSION}
     timeout: 600s
     waitFor: ['-']
-  - name: 'gcr.io/kaniko-project/executor:latest'
+  - name: 'gcr.io/kaniko-project/executor:v1.9.1'
     id: buildHardhat
     args:
       - --dockerfile=Dockerfile.hardhat
       - --destination=gcr.io/${PROJECT_ID}/hopr-hardhat:${_IMAGE_VERSION}
       - --cache=true
       - --cache-ttl=96h
-    timeout: 600s
+    timeout: 1200s
     waitFor: ['-']
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: testImages
@@ -57,7 +57,7 @@ steps:
       - buildHoprdNat
       - buildCoverTrafficDaemon
       - buildHardhat
-  - name: 'gcr.io/kaniko-project/executor:latest'
+  - name: 'gcr.io/kaniko-project/executor:v1.9.1'
     id: buildPluto
     args:
       - --context=dir://scripts/pluto
@@ -97,4 +97,4 @@ options:
   logStreamingOption: STREAM_ON
   substitutionOption: MUST_MATCH
   machineType: N1_HIGHCPU_32
-timeout: 1200s
+timeout: 1800s
