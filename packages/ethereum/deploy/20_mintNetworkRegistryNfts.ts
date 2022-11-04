@@ -3,7 +3,6 @@ import type { DeployFunction } from 'hardhat-deploy/types'
 import type { HoprBoost } from '../src/types'
 import { type ContractTransaction, utils } from 'ethers'
 import {
-  CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES,
   NR_NFT_BOOST,
   NR_NFT_RANK_COM,
   NR_NFT_RANK_TECH,
@@ -104,13 +103,13 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (!network.tags.staging) {
       for (const networkRegistryNftRank of [NR_NFT_RANK_TECH, NR_NFT_RANK_COM]) {
         console.log(
-          `... minting ${NUM_NR_NFT} ${NR_NFT_TYPE} NFTs type of index ${NR_NFT_TYPE_INDEX} to ${admin}\n...minting 1 ${NR_NFT_TYPE} NFTs to CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES\n...minting 10 ${NR_NFT_TYPE} NFTs to dev bank ${DEV_BANK_ADDRESS}`
+          `... minting ${NUM_NR_NFT} ${NR_NFT_TYPE} NFTs type of index ${NR_NFT_TYPE_INDEX} to ${admin}\n...minting 1 ${NR_NFT_TYPE} NFTs to deployer ${deployer}\n...minting 10 ${NR_NFT_TYPE} NFTs to dev bank ${DEV_BANK_ADDRESS}`
         )
         await awaitTxConfirmation(
           hoprBoost.batchMint(
             [
               ...new Array(NUM_NR_NFT).fill(admin),
-              ...CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES,
+              deployer,
               ...Array(10).fill(DEV_BANK_ADDRESS)
             ],
             NR_NFT_TYPE,
