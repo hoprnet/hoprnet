@@ -3,6 +3,7 @@ FROM hopr-toolchain as build
 
 WORKDIR /app/hoprnet
 
+# Get all we need from the monorepo
 COPY .yarn .yarn/
 COPY packages packages/
 COPY package.json .yarnrc.yml yarn.lock tsconfig.json Makefile Makefile.deps Cargo.toml Cargo.lock ./
@@ -21,11 +22,12 @@ RUN CI=true make deps package=hopr-ethereum
 RUN NO_NEXT=true make build package=ethereum
 
 # Remove all unused packages
-RUN rm -R packages/avado packages/connect packages/core packages/cover-traffic-daemon packages/core-ethereum packages/hoprd
+RUN rm -R packages/avado packages/connect packages/cover-traffic-daemon packages/core-ethereum packages/hoprd
 
 WORKDIR /app/hoprnet/ethereum/
 
-RUN yarn run network --network hardhat
+RUN apk add --no-cache tini
+RUN /sbin/tini yarn run:network --network hardhat
 # # use alpine version of node for smallest image sizes
 FROM node:16-alpine as runtime
 

@@ -64,6 +64,4 @@ ENV HOPRD_DATA=/app/hoprd-db
 
 WORKDIR /app/hoprnet/packages/cover-traffic-daemon
 
-RUN node lib/main.cjs
-
 ENTRYPOINT ["/sbin/tini", "--", "node", "lib/main.cjs"]
