@@ -2,13 +2,7 @@ import { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
 import type { HoprBoost } from '../src/types'
 import { type ContractTransaction, utils } from 'ethers'
-import {
-  NR_NFT_BOOST,
-  NR_NFT_RANK_COM,
-  NR_NFT_RANK_TECH,
-  NR_NFT_TYPE,
-  NR_NFT_TYPE_INDEX
-} from '../utils/constants'
+import { NR_NFT_BOOST, NR_NFT_RANK_COM, NR_NFT_RANK_TECH, NR_NFT_TYPE, NR_NFT_TYPE_INDEX } from '../utils/constants'
 
 const NUM_NR_NFT = 3
 const DUMMY_NFT_TYPE = 'Dummy'
@@ -107,11 +101,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
         )
         await awaitTxConfirmation(
           hoprBoost.batchMint(
-            [
-              ...new Array(NUM_NR_NFT).fill(admin),
-              deployer,
-              ...Array(10).fill(DEV_BANK_ADDRESS)
-            ],
+            [...new Array(NUM_NR_NFT).fill(admin), deployer, ...Array(10).fill(DEV_BANK_ADDRESS)],
             NR_NFT_TYPE,
             networkRegistryNftRank,
             NR_NFT_BOOST,
