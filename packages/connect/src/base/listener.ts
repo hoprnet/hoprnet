@@ -12,6 +12,8 @@ import {
 } from 'net'
 import { createSocket, type RemoteInfo, type Socket as UDPSocket } from 'dgram'
 import { once } from 'events'
+import { lookup } from 'dns'
+import { isIPv6 } from 'net'
 
 import Debug from 'debug'
 import { peerIdFromBytes } from '@libp2p/peer-id'
@@ -85,13 +87,27 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
 
     this.tcpSocket = createServer()
     this.udpSocket = createSocket({
-      // @TODO
-      // `udp6` does not seem to work in Node 12.x
-      // can receive IPv6 packet and IPv4 after reconnecting the socket
-      type: 'udp4',
-      // set to true to reuse port that is bound
-      // to TCP socket
-      reuseAddr: true
+      // `udp4` seems to have binding issues
+      type: 'udp6',
+      // set to true to use same port for TCP and UDP
+      reuseAddr: true,
+      // We use IPv4 traffic on udp6 sockets, so DNS queries
+      // must return the A record (IPv4) not the AAAA record (IPv6)
+      // - unless we explicitly check for a IPv6 address
+      lookup: (...requestArgs: any[]) => {
+        if (isIPv6(requestArgs[0])) {
+          // @ts-ignore
+          return lookup(...requestArgs)
+        }
+        return lookup(requestArgs[0], 4, (...responseArgs: any[]) => {
+          const callback = requestArgs.length == 3 ? requestArgs[2] : requestArgs[1]
+          // Error | null
+          if (responseArgs[0] != null) {
+            return callback(responseArgs[0])
+          }
+          callback(responseArgs[0], `::ffff:${responseArgs[1]}`, responseArgs[2])
+        })
+      }
     })
 
     this.state = ListenerState.UNINITIALIZED
@@ -195,11 +211,8 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       // bind the UDP socket and bind to same port
       await this.listenTCP().then((tcpPort) => this.listenUDP(tcpPort))
     } else {
-      await Promise.all([
-        // prettier-ignore
-        this.listenTCP(options),
-        this.listenUDP(options.port)
-      ])
+      await this.listenTCP(options)
+      await this.listenUDP(options.port)
     }
   }
 
