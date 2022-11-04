@@ -7,15 +7,9 @@ COPY .yarn .yarn
 COPY packages/ ./packages
 COPY Makefile Makefile.deps Cargo.toml Cargo.lock yarn.lock tsconfig.build.json tsconfig.json tsconfig.scripts.json yarn.lock rust-toolchain.toml ./
 
-RUN CI=true make deps package=hoprd
+LABEL description="Launches a hoprd node"
 
-# enable to pass the version to Docker using either --build-arg or an
-# environment variable
-# if its not given, yarn will install the latest version of the package
-ARG PACKAGE_VERSION
-RUN echo "ARG PACKAGE_VERSION=${PACKAGE_VERSION}"
-ENV PACKAGE_VERSION=${PACKAGE_VERSION:-}
-RUN echo "ENV PACKAGE_VERSION=${PACKAGE_VERSION}"
+RUN CI=true make deps package=hoprd
 
 # Remove all tests
 RUN find ./packages -type f -name '*.spec.ts' -delete 

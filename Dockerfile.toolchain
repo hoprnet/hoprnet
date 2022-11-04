@@ -1,5 +1,6 @@
-# Run HOPRd  within a single container using npm
 FROM alpine
+
+LABEL description="Image that contains all utilities necessary to build hopr monorepo, including Rust and Yarn"
 
 # python, perl are used by some nodejs dependencies as an installation requirement
 RUN apk add --no-cache bash build-base ca-certificates jq curl git

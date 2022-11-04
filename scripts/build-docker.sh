@@ -78,14 +78,14 @@ build_and_tag_images() {
       log "Building Docker image hoprd-local"
       docker build -q -t hoprd-local \
         --build-arg=PACKAGE_VERSION="${package_version}" \
-        packages/hoprd &
+        -f Dockerfile.hoprd . &
     fi
 
     if [ -z "${image_name}" ] || [ "${image_name}" = "cover-traffic-daemon" ]; then
       log "Building Docker image hopr-cover-traffic-daemon-local"
       docker build -q -t hopr-cover-traffic-daemon-local \
         --build-arg=PACKAGE_VERSION="${package_version}" \
-        packages/cover-traffic-daemon &
+        -f Dockerfile.ctd . &
     fi
 
     if [ -z "${image_name}" ] || [ "${image_name}" = "hoprd-nat" ]; then

@@ -7,6 +7,8 @@ COPY .yarn .yarn
 COPY Makefile Makefile.deps Cargo.toml Cargo.lock yarn.lock tsconfig.build.json tsconfig.json tsconfig.scripts.json yarn.lock rust-toolchain.toml ./
 COPY packages/ ./packages
 
+LABEL description="Launches a cover-traffic node which keeps sending cover-traffic through the hopr network"
+
 # making sure some standard environment variables are set for production use
 ENV NODE_ENV production
 ENV NODE_OPTIONS=--max_old_space_size=4096
