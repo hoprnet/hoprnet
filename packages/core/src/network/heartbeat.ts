@@ -90,12 +90,13 @@ export default class Heartbeat {
   private stopHeartbeatInterval: (() => void) | undefined
   private protocolHeartbeat: string | string[]
 
-  // Initial network health is always RED
+  // Initial network health is UNKNOWN
   private currentHealth: NetworkHealthIndicator = NetworkHealthIndicator.UNKNOWN
 
   private config: HeartbeatConfig
 
   constructor(
+    private me: PeerId,
     private networkPeers: NetworkPeers,
     private subscribe: Subscribe,
     protected sendMessage: SendMessage,
@@ -244,8 +245,9 @@ export default class Heartbeat {
     // YELLOW = high-quality connection to a public node
     if (highQualityPublic > 0) newHealthValue = NetworkHealthIndicator.YELLOW
 
-    // GREEN = hiqh-quality connection to a public and a non-public node
-    if (highQualityPublic > 0 && highQualityNonPublic > 0) newHealthValue = NetworkHealthIndicator.GREEN
+    // GREEN = hiqh-quality connection to a public and a non-public node OR we're public node
+    if (highQualityPublic > 0 && (this.isPublicNode(this.me) || highQualityNonPublic > 0))
+      newHealthValue = NetworkHealthIndicator.GREEN
 
     log(
       `network health details: ${lowQualityPublic} LQ public, ${lowQualityNonPublic} LQ non-public, ${highQualityPublic} HQ public, ${highQualityNonPublic} HQ non-public`
