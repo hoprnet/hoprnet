@@ -52,7 +52,7 @@ as this makes interop with the underlying ECDSA library simpler.
 
 #### Defined in
 
-[types/primitives.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L119)
+[src/types/primitives.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L119)
 
 ___
 
@@ -62,7 +62,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L119)
+[src/types/primitives.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L119)
 
 ___
 
@@ -72,7 +72,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:162](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L162)
+[src/types/primitives.ts:162](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L162)
 
 ## Methods
 

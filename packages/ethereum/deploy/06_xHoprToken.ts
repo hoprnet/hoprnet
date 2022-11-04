@@ -29,17 +29,25 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const xhoprToken = (await ethers.getContractFactory('ERC677Mock')).attach(xHoprContract.address) as ERC677Mock
 
+  // skip minting tx if admin account has enough  xHoprToken (mock)
+  const adminXHoprBalance = await xhoprToken.balanceOf(admin)
   const amount = ethers.utils.parseUnits(MINTED_AMOUNT, 'ether')
-  console.log(`Minting ${amount} xHoprToken (mock) tokens to account ${admin}`)
-  const mintTx = await xhoprToken.batchMintInternal([admin], amount)
+  if (adminXHoprBalance.lt(amount)) {
+    console.log(`Minting ${amount} xHoprToken (mock) tokens to account ${admin}`)
+    const mintTx = await xhoprToken.batchMintInternal([admin], amount)
 
-  // don't wait when using local hardhat because its using auto-mine
-  if (!environment.match('hardhat')) {
-    console.log(`Wait for minting tx on chain`)
-    await ethers.provider.waitForTransaction(mintTx.hash, 2)
+    // don't wait when using local hardhat because its using auto-mine
+    if (!environment.match('hardhat')) {
+      console.log(`Wait for minting tx on chain`)
+      await ethers.provider.waitForTransaction(mintTx.hash, 2)
+    }
+
+    console.log(`Minted ${amount} xHoprToken (mock) tokens to account ${admin}`)
+  } else {
+    console.log(
+      `Account ${admin} has enough (${adminXHoprBalance.toString()}) xHoprToken (mock) tokens. Skip minting xHoprToken (mock).`
+    )
   }
-
-  console.log(`Minted ${amount} xHoprToken (mock) tokens to account ${admin}`)
 }
 
 main.tags = ['xHoprToken']

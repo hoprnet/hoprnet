@@ -1,7 +1,21 @@
 import type NetworkPeers from './network-peers.js'
 import type AccessControl from './access-control.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import { randomInteger, u8aEquals, debug, retimer, nAtATime, u8aToHex, pickVersion } from '@hoprnet/hopr-utils'
+
+import {
+  randomInteger,
+  u8aEquals,
+  debug,
+  retimer,
+  nAtATime,
+  u8aToHex,
+  pickVersion,
+  create_gauge,
+  create_counter,
+  create_histogram_with_buckets,
+  create_multi_gauge
+} from '@hoprnet/hopr-utils'
+
 import { createHash, randomBytes } from 'crypto'
 
 import type { Subscribe, SendMessage } from '../index.js'
@@ -20,6 +34,32 @@ const NORMALIZED_VERSION = pickVersion(pkg.version)
 const PING_HASH_ALGORITHM = 'blake2s256'
 
 const MAX_PARALLEL_HEARTBEATS = 14
+
+// Metrics
+const metric_networkHealth = create_gauge('core_gauge_network_health', 'Connectivity health indicator')
+const metric_timeToHeartbeat = create_histogram_with_buckets(
+  'core_histogram_heartbeat_time_seconds',
+  'Measures total time it takes to probe all other nodes (in seconds)',
+  new Float64Array([0.5, 1.0, 2.5, 5, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0])
+)
+const metric_timeToPing = create_histogram_with_buckets(
+  'core_histogram_ping_time_seconds',
+  'Measures total time it takes to ping a single node (seconds)',
+  new Float64Array([0.5, 1.0, 2.5, 5, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0])
+)
+
+const metric_pingSuccessCount = create_counter(
+  'core_counter_heartbeat_successful_pings',
+  'Total number of successful pings'
+)
+const metric_pingFailureCount = create_counter('core_counter_heartbeat_failed_pings', 'Total number of failed pings')
+
+const metric_peersByQuality = create_multi_gauge(
+  'core_mgauge_peers_by_quality',
+  'Number different peer types by quality',
+  ['type', 'quality']
+)
+const metric_peers = create_gauge('core_gauge_num_peers', 'Number of all peers')
 
 export type HeartbeatPingResult = {
   destination: PeerId
@@ -132,10 +172,13 @@ export default class Heartbeat {
     const challenge = randomBytes(16)
     let pingResponse: Uint8Array[] | undefined
 
+    const ping_timer = metric_timeToPing.start_measure()
     try {
       pingResponse = await this.sendMessage(destination, this.protocolHeartbeat, challenge, true)
     } catch (err) {
       log(`Connection to ${destination.toString()} failed: ${err?.message}`)
+
+      metric_pingFailureCount.increment()
       return {
         destination,
         lastSeen: -1
@@ -150,12 +193,15 @@ export default class Heartbeat {
       // Eventually close the connections, all errors are handled
       this.closeConnectionsTo(destination)
 
+      metric_pingFailureCount.increment()
       return {
         destination,
         lastSeen: -1
       }
     }
 
+    metric_timeToPing.record_measure(ping_timer)
+    metric_pingSuccessCount.increment()
     return {
       destination,
       lastSeen: Date.now()
@@ -168,7 +214,7 @@ export default class Heartbeat {
    * @returns Value of the current network health indicator (possibly updated).
    */
   public recalculateNetworkHealth(): NetworkHealthIndicator {
-    let newHealthValue = NetworkHealthIndicator.RED
+    let newHealthValue: NetworkHealthIndicator = NetworkHealthIndicator.RED
     let lowQualityPublic = 0
     let lowQualityNonPublic = 0
     let highQualityPublic = 0
@@ -178,9 +224,17 @@ export default class Heartbeat {
     for (let entry of this.networkPeers.getAllEntries()) {
       let quality = this.networkPeers.qualityOf(entry.id)
       if (this.isPublicNode(entry.id)) {
-        quality > this.config.networkQualityThreshold ? ++highQualityPublic : ++lowQualityPublic
+        if (quality > this.config.networkQualityThreshold) {
+          ++highQualityPublic
+        } else {
+          ++lowQualityPublic
+        }
       } else {
-        quality > this.config.networkQualityThreshold ? ++highQualityNonPublic : ++lowQualityNonPublic
+        if (quality > this.config.networkQualityThreshold) {
+          ++highQualityNonPublic
+        } else {
+          ++lowQualityNonPublic
+        }
       }
     }
 
@@ -193,12 +247,42 @@ export default class Heartbeat {
     // GREEN = hiqh-quality connection to a public and a non-public node
     if (highQualityPublic > 0 && highQualityNonPublic > 0) newHealthValue = NetworkHealthIndicator.GREEN
 
+    log(
+      `network health details: ${lowQualityPublic} LQ public, ${lowQualityNonPublic} LQ non-public, ${highQualityPublic} HQ public, ${highQualityNonPublic} HQ non-public`
+    )
+
+    metric_peersByQuality.set(['public', 'low'], lowQualityPublic)
+    metric_peersByQuality.set(['public', 'high'], highQualityPublic)
+    metric_peersByQuality.set(['nonPublic', 'low'], lowQualityNonPublic)
+    metric_peersByQuality.set(['nonPublic', 'high'], highQualityNonPublic)
+
     // Emit network health change event if needed
     if (newHealthValue != this.currentHealth) {
       let oldValue = this.currentHealth
       this.currentHealth = newHealthValue
       this.stateChangeEmitter.emit('hopr:network-health-changed', oldValue, this.currentHealth)
+
+      // Map network state to integers
+      switch (newHealthValue as NetworkHealthIndicator) {
+        case NetworkHealthIndicator.UNKNOWN:
+          metric_networkHealth.set(0)
+          break
+        case NetworkHealthIndicator.RED:
+          metric_networkHealth.set(1)
+          break
+        case NetworkHealthIndicator.ORANGE:
+          metric_networkHealth.set(2)
+          break
+        case NetworkHealthIndicator.YELLOW:
+          metric_networkHealth.set(3)
+          break
+        case NetworkHealthIndicator.GREEN:
+          metric_networkHealth.set(4)
+          break
+      }
     }
+
+    metric_peers.set(highQualityPublic + lowQualityPublic + highQualityNonPublic + highQualityPublic)
 
     return this.currentHealth
   }
@@ -212,6 +296,7 @@ export default class Heartbeat {
 
     // Create an object that describes which work has to be done
     // by the workers, i.e. the pingNode code
+    const metric_timer = metric_timeToHeartbeat.start_measure()
     const pingWork = this.networkPeers
       .pingSince(thresholdTime)
       .map<[destination: PeerId]>((peerToPing: PeerId) => [peerToPing])
@@ -234,6 +319,8 @@ export default class Heartbeat {
         this.networkPeers.updateRecord(pingResult)
       }
     }
+
+    metric_timeToHeartbeat.record_measure(metric_timer)
 
     // Recalculate the network health indicator state after checking nodes
     this.recalculateNetworkHealth()

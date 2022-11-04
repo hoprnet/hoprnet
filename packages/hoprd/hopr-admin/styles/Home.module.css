@@ -19,6 +19,7 @@
   justify-content: space-around;
   align-items: center;
 }
+
 .peerIcon {
   display: block;
   padding: 0.1rem;
@@ -26,6 +27,22 @@
 
 .cogwheelIcon:hover {
   cursor: pointer;
+}
+
+.titleIcons {
+  display: inline-flex;
+  align-items: center;
+}
+
+.healthIndicator {
+  font-size: 1rem;
+  margin-left: 1rem;
+  cursor: default;
+}
+
+.healthIndicatorTooltip {
+  font-size: 0.7rem;
+  margin-left: 0.5rem;
 }
 
 .configuration {

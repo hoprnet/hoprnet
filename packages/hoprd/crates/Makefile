@@ -10,17 +10,16 @@ JS_FILES = $(foreach package,$(PACKAGES),$(package)/pkg/$(subst -,_,$(package)).
 all: $(JS_FILES)
 
 test: $(JS_FILES)
-	$(foreach pkg,$(PACKAGES),npx wasm-pack test --node `pwd`/$(pkg))
+	$(foreach pkg,$(PACKAGES),cargo test -p $(pkg) && wasm-pack test --node `pwd`/$(pkg) && ) true
 
 $(JS_FILES):
 	mkdir -p $(@D)
-	npx wasm-pack build --target=nodejs `pwd`/$(@D)/..
-	mv $@ $(subst .js,.cjs,$@)
+	wasm-pack build --target=bundler `pwd`/$(@D)/..
 
 install:
 ifneq ($(PACKAGES),)
 	@mkdir -p ../lib
-	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.cjs) ../lib/
+	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.js) ../lib/
 	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.ts) ../lib/
 	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.wasm) ../lib/
 endif
