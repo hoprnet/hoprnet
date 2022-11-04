@@ -48,22 +48,25 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: '[SETUP] Print additional information'
-        run: |
-          node --version
-          npm --version
-          yarn --version
-          rustc --version
-
-      - name: '[SETUP] Configure Git info'
-        run: ./scripts/configure-git-info.sh
-
       - name: '[SETUP] Use Node.js'
         uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
           registry-url: https://registry.npmjs.org/
           cache: yarn
+
+
+      - name: '[SETUP] Print additional information'
+        run: |
+          node --version
+          npm --version
+          yarn --version
+          rustc --version
+          cargo --version
+
+      - name: '[SETUP] Configure Git info'
+        run: ./scripts/configure-git-info.sh
+
 
       - name: '[SETUP] Install Yarn (only when using ACT)'
         if: ${{ env.ACT == 'true' }}
@@ -76,8 +79,15 @@ jobs:
       - name: '[BUILD] Install dependencies / link / build'
         run: |
           # Deploying with hardhat requires built hopr-utils package
-          make -j deps
+          make -j toolchain
+          CI=true make -j deps
           make -j build
+
+      - name: Cache built artifacts (for later use)
+        uses: actions/cache@v3
+        path: |
+            packages/
+          key: hoprnet-build-${{ github.run_id }}
 
       - name: '[SMART-CONTRACTS] Deploy for known environments'
         if: ${{ !env.ACT }}
@@ -161,7 +171,7 @@ jobs:
 
   build_docker:
     name: Build Docker Images
-    timeout-minutes: 30
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     needs: [build_deploy_sc_npm]
     steps:
@@ -331,8 +341,13 @@ jobs:
           # get latest version
           git pull
           # need to build our packages which might by used by the scripts, such as the fund script
-          make -j deps
-          make -j build
+          CI=true make -j deps
+
+      - name: Restore built artifacts
+        uses: actions/cache@v3
+          path: |
+            packages/
+          key: hoprnet-build-${{ github.run_id }}
 
       - name: Run deploy script for public nodes
         if: ${{ !env.ACT }}
@@ -414,8 +429,13 @@ jobs:
           # get latest version
           git pull
           # need to build our packages which might by used by the scripts, such as the fund script
-          make -j deps
-          make -j build
+          CI=true make -j deps
+
+      - name: Restore built artifacts
+        uses: actions/cache@v3
+          path: |
+            packages/
+          key: hoprnet-build-${{ github.run_id }}
 
       - name: Run deploy script for nodes behind NAT
         if: ${{ !env.ACT }}
