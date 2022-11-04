@@ -136,6 +136,7 @@ gcloud_create_instance_template() {
   fi
 
   metadata_value="google-logging-enabled=true"
+  metadata_value="HOPRD_HEALTH_CHECK=true,HOPRD_HEALTH_CHECK_HOST=0.0.0.0"
   metadata_value="${metadata_value},google-monitoring-enabled=true"
   metadata_value="${metadata_value},enable-oslogin=true"
   metadata_value="${metadata_value},startup-script='/opt/hoprd/startup-script.sh > /tmp/startup-script-`date +%Y%m%d-%H%M%S`.log'"
