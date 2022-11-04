@@ -42,7 +42,7 @@ If there's not enough xHOPR token, please use "Dev Bank" account to transfer som
 
 #### Stake Network_registry NFT in staging environment
 
-<mark>When not in production</mark>, CI/CD will mint "Network_registry" NFTs to `CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[1]` and `CLUSTER_NETWORK_REGISTERY_LINKED_ADDRESSES[3]` on deployment.
+<mark>When not in production</mark>, CI/CD will mint "Network_registry" NFTs to its own wallet on deployment.
 
 There are 6 "Network_registry" NFTs (3 "developer" rank and 3 of "community" rank) being minted to the "Dev Bank" account per deployment, where you can transfer some tokens from.
 
