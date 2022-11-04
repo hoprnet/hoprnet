@@ -1,10 +1,5 @@
+use crate::parameters::{PRP_INTERMEDIATE_IV_LENGTH, PRP_INTERMEDIATE_KEY_LENGTH, PRP_MIN_LENGTH};
 use crate::primitives::{calculate_mac, SimpleStreamCipher};
-
-const INTERMEDIATE_KEY_LENGTH: usize = 32;
-const INTERMEDIATE_IV_LENGTH: usize = 16;
-
-// The minimum input length must be at least size of the key, which is XORed with plaintext/ciphertext
-const PRP_MIN_LENGTH: usize = INTERMEDIATE_KEY_LENGTH;
 
 /// Implementation of Pseudo-Random Permutation (PRP).
 /// Currently based on Lioness wide-block cipher
@@ -19,16 +14,16 @@ impl PRP {
     pub fn new(key: &[u8], iv: &[u8]) -> Self {
         Self {
             keys: [
-                key[0*INTERMEDIATE_KEY_LENGTH..1*INTERMEDIATE_KEY_LENGTH].to_vec(),
-                key[1*INTERMEDIATE_KEY_LENGTH..2*INTERMEDIATE_KEY_LENGTH].to_vec(),
-                key[2*INTERMEDIATE_KEY_LENGTH..3*INTERMEDIATE_KEY_LENGTH].to_vec(),
-                key[3*INTERMEDIATE_KEY_LENGTH..4*INTERMEDIATE_KEY_LENGTH].to_vec()
+                key[0* PRP_INTERMEDIATE_KEY_LENGTH..1* PRP_INTERMEDIATE_KEY_LENGTH].to_vec(),
+                key[1* PRP_INTERMEDIATE_KEY_LENGTH..2* PRP_INTERMEDIATE_KEY_LENGTH].to_vec(),
+                key[2* PRP_INTERMEDIATE_KEY_LENGTH..3* PRP_INTERMEDIATE_KEY_LENGTH].to_vec(),
+                key[3* PRP_INTERMEDIATE_KEY_LENGTH..4* PRP_INTERMEDIATE_KEY_LENGTH].to_vec()
             ],
             ivs: [ // NOTE: ChaCha20 takes only 12 byte IV
-                iv[0*INTERMEDIATE_IV_LENGTH..1*INTERMEDIATE_IV_LENGTH].to_vec(),
-                iv[1*INTERMEDIATE_IV_LENGTH..2*INTERMEDIATE_IV_LENGTH].to_vec(),
-                iv[2*INTERMEDIATE_IV_LENGTH..3*INTERMEDIATE_IV_LENGTH].to_vec(),
-                iv[3*INTERMEDIATE_IV_LENGTH..4*INTERMEDIATE_IV_LENGTH].to_vec()
+                iv[0* PRP_INTERMEDIATE_IV_LENGTH..1* PRP_INTERMEDIATE_IV_LENGTH].to_vec(),
+                iv[1* PRP_INTERMEDIATE_IV_LENGTH..2* PRP_INTERMEDIATE_IV_LENGTH].to_vec(),
+                iv[2* PRP_INTERMEDIATE_IV_LENGTH..3* PRP_INTERMEDIATE_IV_LENGTH].to_vec(),
+                iv[3* PRP_INTERMEDIATE_IV_LENGTH..4* PRP_INTERMEDIATE_IV_LENGTH].to_vec()
             ]
         }
     }

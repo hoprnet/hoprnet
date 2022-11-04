@@ -1,12 +1,7 @@
 use aes::cipher::{KeyIvInit, StreamCipher};
+use crate::parameters::{AES_BLOCK_SIZE, AES_KEY_SIZE, PRG_IV_LENGTH, PRG_KEY_LENGTH};
 
 type Aes128Ctr32BE = ctr::Ctr32BE<aes::Aes128>;
-const AES_BLOCK_SIZE: usize = 16;
-const AES_KEY_SIZE: usize = 16;
-
-const PRG_KEY_LENGTH: usize = AES_KEY_SIZE;
-const PRG_COUNTER_LENGTH: usize = 4;
-const PRG_IV_LENGTH: usize = AES_BLOCK_SIZE - PRG_COUNTER_LENGTH;
 
 #[derive(Default)]
 pub struct PRG {
@@ -63,7 +58,8 @@ impl PRG {
 
 #[cfg(test)]
 mod tests {
-    use crate::prg::{AES_BLOCK_SIZE, AES_KEY_SIZE, PRG};
+    use crate::parameters::{AES_BLOCK_SIZE, AES_KEY_SIZE};
+    use crate::prg::PRG;
 
     #[test]
     fn test_prg_single_block() {
