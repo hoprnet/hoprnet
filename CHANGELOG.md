@@ -7,6 +7,7 @@
 - Add Metrics API for Prometheus, `metrics` API endpoint and collection of various metrics ([#4233](https://github.com/hoprnet/hoprnet/pull/4233))
 - Improve pre-merge check to prevent PR from merging when the upstream deployment is in the failed state ([#4294](https://github.com/hoprnet/hoprnet/pull/4294))
 - Add Health Status Indicator in the Admin UI ([#4197](https://github.com/hoprnet/hoprnet/pull/4197))
+
 ---
 
 <a name="1.90"></a>
