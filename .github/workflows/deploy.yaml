@@ -82,7 +82,7 @@ jobs:
           CI=true make -j deps
           make -j build
           
-      - name: 'Cache built artifacts (for later use)''
+      - name: 'Cache built artifacts (for later use)'
         uses: actions/cache@v3
         path: |
             packages/
