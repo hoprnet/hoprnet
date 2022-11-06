@@ -68,14 +68,8 @@ contract EnvironmentConfig is Script {
             networkRegistryProxyContractAddress: networkRegistryProxyAddr
         });
 
-        // FIXME: remove temporary logs
-        vm.writeLine("test.txt", string(abi.encodePacked("tokenAddr: ", vm.toString(tokenAddr), vm.toString(isValidAddress(tokenAddr)))));
-        vm.writeLine("test.txt", string(abi.encodePacked("channelAddr: ", vm.toString(channelAddr))));
-        vm.writeLine("test.txt", string(abi.encodePacked("xhoprAddr: ", vm.toString(xhoprAddr))));
-        vm.writeLine("test.txt", string(abi.encodePacked("boostAddr: ", vm.toString(boostAddr))));
-        vm.writeLine("test.txt", string(abi.encodePacked("stakeAddr: ", vm.toString(stakeAddr))));
-        vm.writeLine("test.txt", string(abi.encodePacked("networkRegistryAddr: ", vm.toString(networkRegistryAddr))));
-        vm.writeLine("test.txt", string(abi.encodePacked("networkRegistryProxyAddr: ", vm.toString(networkRegistryProxyAddr))));
+        // FIXME: remove this temporary method
+        displayCurrentEnvironmentDetail();
     }
 
     function readCurrentEnvironment() internal {
@@ -84,6 +78,17 @@ contract EnvironmentConfig is Script {
 
     // use writeJson
     function writeEnvironment() internal {
+    }
+
+    // FIXME: remove this temporary method
+    function displayCurrentEnvironmentDetail() internal {
+        vm.writeLine("test.txt", string(abi.encodePacked("tokenAddr: ", vm.toString(currentEnvironmentDetail.hoprTokenContractAddress), vm.toString(isValidAddress(currentEnvironmentDetail.hoprTokenContractAddress)))));
+        vm.writeLine("test.txt", string(abi.encodePacked("channelAddr: ", vm.toString(currentEnvironmentDetail.hoprChannelsContractAddress))));
+        vm.writeLine("test.txt", string(abi.encodePacked("xhoprAddr: ", vm.toString(currentEnvironmentDetail.xhoprTokenContractAddress))));
+        vm.writeLine("test.txt", string(abi.encodePacked("boostAddr: ", vm.toString(currentEnvironmentDetail.hoprBoostContractAddress))));
+        vm.writeLine("test.txt", string(abi.encodePacked("stakeAddr: ", vm.toString(currentEnvironmentDetail.stakeContractAddress))));
+        vm.writeLine("test.txt", string(abi.encodePacked("networkRegistryAddr: ", vm.toString(currentEnvironmentDetail.networkRegistryContractAddress))));
+        vm.writeLine("test.txt", string(abi.encodePacked("networkRegistryProxyAddr: ", vm.toString(currentEnvironmentDetail.networkRegistryProxyContractAddress))));
     }
 
     function isValidAddress(address addr) public pure returns (bool) {

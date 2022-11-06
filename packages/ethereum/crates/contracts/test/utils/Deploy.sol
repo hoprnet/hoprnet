@@ -16,4 +16,16 @@ abstract contract ERC1820RegistryFixture is Test {
             ERC1820_REGISTRY_DEPLOYED_CODE
         );
     }
+
+    function hasErc1820Registry() internal view returns (bool) {
+        uint256 registryCodeSize = 0;
+        assembly {
+            registryCodeSize := extcodesize(ERC1820_REGISTRY_ADDRESS)
+        }
+        return registryCodeSize > 0;
+    }
+
+    function mustHaveErc1820Registry() internal {
+        require(hasErc1820Registry(), "No ERC1820Registry deployed");
+    }
 }
