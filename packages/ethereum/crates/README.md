@@ -106,6 +106,7 @@ openzeppelin-contracts-v3-0-1=OpenZeppelin/openzeppelin-contracts@v3.0.1 \
 6. writeJson is next inline https://github.com/foundry-rs/foundry/pull/3595, to save deployed addressed used in function `writeEnvironment()` in `contracts/script/utils/EnvironmentConfig.s.sol`
 
 7. Deployment dependencies graph is like the following:
+
 ```
               +-----------------+
               | ERC1820Registry |
@@ -143,5 +144,5 @@ openzeppelin-contracts-v3-0-1=OpenZeppelin/openzeppelin-contracts@v3.0.1 \
                                   | HoprNetworkRegistry |
                                   +---------------------+
 ```
-Note that deployment for `HoprDistributor` and `HoprWrapper` are skipped; ERC1820Registry is not deployed in production envirionment.
 
+Note that deployment for `HoprDistributor` and `HoprWrapper` are skipped; ERC1820Registry is not deployed in production envirionment.
