@@ -6,15 +6,19 @@ test = 'test'
 out = 'out'
 libs = ['lib']
 verbosity = 3
+fs_permissions = [{ access = "read-write", path = "./"}] # to write logs into a local `./test.txt` file
 
 [rpc_endpoints]
 local = "http://localhost:8545"
-xdai = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
+gnosis = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
 goerli = "https://provider-proxy.hoprnet.workers.dev/eth_goerli"
+
+[etherscan]
+goerli = { key = "${ETHERSCAN_API_KEY}" }
+gnosis = { key = "${GNOSISSCAN_API_KEY}", url = "https://gnosisscan.io" }
 
 # testing and local network
 [profile.development]
-fs_permissions = [{ access = "read-write", path = "./"}] # to write logs into a local `./test.txt` file
 eth_rpc_url = "http://localhost:8545" # cannot directly use profile.default.rpc_endpoints.local
 
 # staging environment

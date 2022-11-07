@@ -26,14 +26,34 @@ make sc-test
 make sc-coverage
 ```
 
-### Deployment
+### Deployment and verfy deployed contracts
 
 #### Local
 
 ```
 anvil
 make anvil-deploy-erc1820
-FOUNDRY_PROFILE=development ENVIRONMENT_NAME=localhost forge script script/AllContracts.s.sol:DeployAllContractsScript --broadcast
+FOUNDRY_PROFILE=development ENVIRONMENT_NAME=localhost forge script --broadcast script/AllContracts.s.sol:DeployAllContractsScript
+```
+
+#### Staging
+
+Apply for api keys for goerli etherscan and enter in `.env` file
+
+```
+source .env
+```
+
+```
+// This verifies contract on sourcify
+FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-goerli forge script --broadcast --verify --verifier sourcify script/AllContracts.s.sol:DeployAllContractsScript
+
+// This deploys contract to goerli testnet and verifies contracts on etherscan
+FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-goerli forge script --broadcast --verify --verifier etherscan --chain 5 script/AllContracts.s.sol:DeployAllContractsScript
+```
+#### Production
+```
+FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-goerli forge script --broadcast --verify --verifier sourcify script/AllContracts.s.sol:DeployAllContractsScript
 ```
 
 ### Note
@@ -145,3 +165,16 @@ openzeppelin-contracts-v3-0-1=OpenZeppelin/openzeppelin-contracts@v3.0.1 \
 ```
 Note that deployment for `HoprDistributor` and `HoprWrapper` are skipped; ERC1820Registry is not deployed in production envirionment.
 
+8. The temporary `contract=address.json` has the following differences compared with `protocol-config.json`
+- It does not need "networks" attribute
+- In "environment" attribute: 
+        ```
+        - "network_id": "goerli",
+        - "version_range": "*",
+        - "channel_contract_deploy_block": 0,
+        + "stake_season": 5,
+        ```
+
+9. Contract verification:
+- Production (Gnosis Chain): Sourcify or Gnosisscan
+- Staging (Goerli): Etherscan. However it's been reported (in foundry support TG) that goerli etherscan verification doesn't work since roughly a week ago.

@@ -17,6 +17,7 @@ contract EnvironmentConfig is Script {
     }
     
     struct EnvironmentDetail {
+        EnvironmentType environmentType;
         uint256 stakeSeason;
         address hoprTokenContractAddress;
         address hoprChannelsContractAddress;
@@ -40,32 +41,29 @@ contract EnvironmentConfig is Script {
          // get envirionment of the script
         string memory profile = vm.envString("FOUNDRY_PROFILE");
         currentEnvironmentName = vm.envString("ENVIRONMENT_NAME");
-        
-        if (keccak256(bytes(profile)) == keccak256(bytes("production"))) {
-            currentEnvironmentType = EnvironmentType.PRODUCTION;
-        } else if (keccak256(bytes(profile)) == keccak256(bytes("staging"))) {
-            currentEnvironmentType = EnvironmentType.STAGING;
-        } else {
-            currentEnvironmentType = EnvironmentType.DEVELOPMENT;
-        }
+        currentEnvironmentType = parseEnvironmentTypeFromString(profile);
     }
 
     function readEnvironment(string memory _environmentName) internal {
         string memory root = vm.projectRoot();
+        // TODO: Check path to protocol-config.json
         string memory path = string(abi.encodePacked(root, "/contracts-addresses.json"));
         string memory json = vm.readFile(path);
+        bytes memory levelToEnvironmentConfig = abi.encodePacked(".environments.", _environmentName);
 
         // read all the contract addresses from contracts-addresses.json
-        uint256 stakeSeasonNum = json.readUint(string(abi.encodePacked(".", _environmentName, ".stakeSeason")));
-        address tokenAddr = json.readAddress(string(abi.encodePacked(".", _environmentName, ".hoprTokenContractAddress")));
-        address channelAddr = json.readAddress(string(abi.encodePacked(".", _environmentName, ".hoprChannelsContractAddress")));
-        address xhoprAddr = json.readAddress(string(abi.encodePacked(".", _environmentName, ".xhoprTokenContractAddress")));
-        address boostAddr = json.readAddress(string(abi.encodePacked(".", _environmentName, ".hoprBoostContractAddress")));
-        address stakeAddr = json.readAddress(string(abi.encodePacked(".", _environmentName, ".stakeContractAddress")));
-        address networkRegistryAddr = json.readAddress(string(abi.encodePacked(".", _environmentName, ".networkRegistryContractAddress")));
-        address networkRegistryProxyAddr = json.readAddress(string(abi.encodePacked(".", _environmentName, ".networkRegistryProxyContractAddress")));
+        EnvironmentType envType = parseEnvironmentTypeFromString(json.readString(string(abi.encodePacked(levelToEnvironmentConfig, ".environment_type"))));
+        uint256 stakeSeasonNum = json.readUint(string(abi.encodePacked(levelToEnvironmentConfig, ".stake_season")));
+        address tokenAddr = json.readAddress(string(abi.encodePacked(levelToEnvironmentConfig, ".token_contract_address")));
+        address channelAddr = json.readAddress(string(abi.encodePacked(levelToEnvironmentConfig, ".channels_contract_address")));
+        address xhoprAddr = json.readAddress(string(abi.encodePacked(levelToEnvironmentConfig, ".xhopr_contract_address")));
+        address boostAddr = json.readAddress(string(abi.encodePacked(levelToEnvironmentConfig, ".boost_contract_address")));
+        address stakeAddr = json.readAddress(string(abi.encodePacked(levelToEnvironmentConfig, ".stake_contract_address")));
+        address networkRegistryProxyAddr = json.readAddress(string(abi.encodePacked(levelToEnvironmentConfig, ".network_registry_proxy_contract_address")));
+        address networkRegistryAddr = json.readAddress(string(abi.encodePacked(levelToEnvironmentConfig, ".network_registry_contract_address")));
 
         currentEnvironmentDetail = EnvironmentDetail({
+            environmentType: envType,
             stakeSeason: stakeSeasonNum,
             hoprTokenContractAddress: tokenAddr,
             hoprChannelsContractAddress: channelAddr,
@@ -89,18 +87,48 @@ contract EnvironmentConfig is Script {
     }
 
     // FIXME: remove this temporary method
+    function displayEnvironmentDetail(string memory filePath, EnvironmentDetail memory envDetail) internal {
+        // FIXME: write additional RPC url
+        uint256 chainId; 
+        assembly { chainId := chainid() }
+        vm.writeLine(filePath, string(abi.encodePacked('"chainid": "', vm.toString(chainId))));
+
+        vm.writeLine(filePath, string(abi.encodePacked('"environment_type": "', parseEnvironmentTypeToString(envDetail.environmentType), '",')));
+        vm.writeLine(filePath, string(abi.encodePacked('"stake_season": "', vm.toString(envDetail.stakeSeason), '",')));
+        vm.writeLine(filePath, string(abi.encodePacked('"token_contract_address": "', vm.toString(envDetail.hoprTokenContractAddress), '",')));
+        vm.writeLine(filePath, string(abi.encodePacked('"channels_contract_address": "', vm.toString(envDetail.hoprChannelsContractAddress), '",')));
+        vm.writeLine(filePath, string(abi.encodePacked('"xhopr_contract_address": "', vm.toString(envDetail.xhoprTokenContractAddress), '",')));
+        vm.writeLine(filePath, string(abi.encodePacked('"boost_contract_address": "', vm.toString(envDetail.hoprBoostContractAddress), '",')));
+        vm.writeLine(filePath, string(abi.encodePacked('"stake_contract_address": "', vm.toString(envDetail.stakeContractAddress), '",')));
+        vm.writeLine(filePath, string(abi.encodePacked('"network_registry_proxy_contract_address": "', vm.toString(envDetail.networkRegistryProxyContractAddress), '",')));
+        vm.writeLine(filePath, string(abi.encodePacked('"network_registry_contract_address": "', vm.toString(envDetail.networkRegistryContractAddress), '"')));
+    }
+    // FIXME: remove this temporary method
     function displayCurrentEnvironmentDetail() internal {
-        vm.writeLine("test.txt", string(abi.encodePacked("stakeSeasonNum: ", vm.toString(currentEnvironmentDetail.stakeSeason))));
-        vm.writeLine("test.txt", string(abi.encodePacked("tokenAddr: ", vm.toString(currentEnvironmentDetail.hoprTokenContractAddress), vm.toString(isValidAddress(currentEnvironmentDetail.hoprTokenContractAddress)))));
-        vm.writeLine("test.txt", string(abi.encodePacked("channelAddr: ", vm.toString(currentEnvironmentDetail.hoprChannelsContractAddress))));
-        vm.writeLine("test.txt", string(abi.encodePacked("xhoprAddr: ", vm.toString(currentEnvironmentDetail.xhoprTokenContractAddress))));
-        vm.writeLine("test.txt", string(abi.encodePacked("boostAddr: ", vm.toString(currentEnvironmentDetail.hoprBoostContractAddress))));
-        vm.writeLine("test.txt", string(abi.encodePacked("stakeAddr: ", vm.toString(currentEnvironmentDetail.stakeContractAddress))));
-        vm.writeLine("test.txt", string(abi.encodePacked("networkRegistryAddr: ", vm.toString(currentEnvironmentDetail.networkRegistryContractAddress))));
-        vm.writeLine("test.txt", string(abi.encodePacked("networkRegistryProxyAddr: ", vm.toString(currentEnvironmentDetail.networkRegistryProxyContractAddress))));
+        displayEnvironmentDetail("test.txt", currentEnvironmentDetail);
     }
 
     function isValidAddress(address addr) public pure returns (bool) {
         return addr == address(32) || addr == address(0) ? false : true;
+    }
+
+    function parseEnvironmentTypeFromString(string memory environmentType) public pure returns (EnvironmentType) {
+        if (keccak256(bytes(environmentType)) == keccak256(bytes("production"))) {
+            return EnvironmentType.PRODUCTION;
+        } else if (keccak256(bytes(environmentType)) == keccak256(bytes("staging"))) {
+            return EnvironmentType.STAGING;
+        } else {
+            return EnvironmentType.DEVELOPMENT;
+        }
+    }
+
+    function parseEnvironmentTypeToString(EnvironmentType environmentType) public pure returns (string memory) {
+        if (environmentType == EnvironmentType.PRODUCTION) {
+            return "production";
+        } else if (environmentType == EnvironmentType.STAGING) {
+            return "staging";
+        } else {
+            return "development";
+        }
     }
 }

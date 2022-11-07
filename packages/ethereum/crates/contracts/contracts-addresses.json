@@ -1,13 +1,27 @@
 {
-  "localhost": {
-    "environmentType": 0,
-    "stakeSeason": 5,
-    "hoprTokenContractAddress": "",
-    "hoprChannelsContractAddress": "",
-    "xhoprTokenContractAddress": "",
-    "hoprBoostContractAddress": "",
-    "stakeContractAddress": "",
-    "networkRegistryContractAddress": "",
-    "networkRegistryProxyContractAddress": ""
+  "environments": {
+    "localhost": {
+      "environment_type": "development",
+      "stake_season": 5,
+      "token_contract_address": "",
+      "channels_contract_address": "",
+      "xhopr_contract_address": "",
+      "boost_contract_address": "",
+      "stake_contract_address": "",
+      "network_registry_proxy_contract_address": "",
+      "network_registry_contract_address": ""
+    },
+    "debug-goerli": {
+      "environment_type": "staging",
+      "stake_season": 5,
+      "minted_token_receiver_address": "",
+      "token_contract_address": "",
+      "channels_contract_address": "",
+      "xhopr_contract_address": "",
+      "boost_contract_address": "",
+      "stake_contract_address": "",
+      "network_registry_proxy_contract_address": "",
+      "network_registry_contract_address": ""
+    }
   }
 }

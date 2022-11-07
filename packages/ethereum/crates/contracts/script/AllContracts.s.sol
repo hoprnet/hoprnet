@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.6.0 <0.9.0;
+pragma abicoder v2;
 
 import "forge-std/Script.sol";
 import "../test/utils/Deploy.sol";
@@ -75,30 +76,32 @@ contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryF
         } else if (!isValidAddress(currentEnvironmentDetail.networkRegistryProxyContractAddress)) {
             // deploy StakingProxy in other envrionment types, if no proxy contract is given.
             currentEnvironmentDetail.networkRegistryProxyContractAddress = deployCode("HoprStakingProxyForNetworkRegistry.sol", abi.encode(currentEnvironmentDetail.stakeContractAddress, deployerAddress, 1000 ether));
-            // If needed, add `eligibleNftTypeAndRank` TODO: Only execute this transaction when NR accepts accounts with staking amount above certain threshold
-            // If needed, add `specialNftTypeAndRank` besides `Network_registry` NFT (index. 26) (`developer` and `community`) TODO: extend this array if more NR NFTs are issued
-            (bool successOwnerBatchAddSpecialNftTypeAndRank, ) = currentEnvironmentDetail.networkRegistryProxyContractAddress.call(abi.encodeWithSignature("ownerBatchAddSpecialNftTypeAndRank(uint256[],string[],uint256[])", [26, 26], ["developer", "community"], [type(uint256).max, 1]));
+            // TODO: If needed, add `eligibleNftTypeAndRank`. Only execute this transaction when NR accepts accounts with staking amount above certain threshold
+            // Add `Network_registry` NFT (index. 26) (`developer` and `community`) into `specialNftTypeAndRank` TODO: extend this array if more NR NFTs are to be included
+            bytes memory builtPayload = buildBatchRegisterSpecialNrNft(); // This payload is built because default abi.encode returns different value (no size info) when array is static.
+            (bool successOwnerBatchAddSpecialNftTypeAndRank, ) = currentEnvironmentDetail.networkRegistryProxyContractAddress.call(builtPayload);
             if (!successOwnerBatchAddSpecialNftTypeAndRank) {
-                revert("Cannot ownerBatchAddSpecialNftTypeAndRank");
+                emit log_string("Cannot ownerBatchAddSpecialNftTypeAndRank");
+                emit log_bytes(builtPayload);
             }
         } else {
             // When a NetworkRegistryProxy contract is provided, check if its `stakeContract` matches with the latest stakeContractAddress. 
             (bool successReadStakeContract, bytes memory returndataStakeContract) = currentEnvironmentDetail.networkRegistryProxyContractAddress.staticcall(abi.encodeWithSignature("stakeContract()"));
             if (!successReadStakeContract) {
-                revert("Cannot read stakeContract");
+                emit log_string("Cannot read stakeContract");
             }
             address linkedStakeContract = abi.decode(returndataStakeContract, (address));
             // Check if the current sender is NetworkRegistryProxy owner. 
             (bool successReadProxyOwner, bytes memory returndataProxyOwner) = currentEnvironmentDetail.networkRegistryProxyContractAddress.staticcall(abi.encodeWithSignature("owner()"));
             if (!successReadProxyOwner) {
-                revert("Cannot read owner");
+                emit log_string("Cannot read owner");
             }
             address proxyOwner = abi.decode(returndataProxyOwner, (address));
             // When a mismatch is deteced and the deployer (transaction sender) is the owner, update the `stakeContract` with the latest staking contract address
             if (linkedStakeContract != currentEnvironmentDetail.stakeContractAddress && proxyOwner == deployerAddress) {
                 (bool successUpdateStakeContract, ) = currentEnvironmentDetail.networkRegistryProxyContractAddress.call(abi.encodeWithSignature("updateStakeContract(address)", currentEnvironmentDetail.stakeContractAddress));
                 if (!successUpdateStakeContract) {
-                    revert("Cannot updateStakeContract");
+                    emit log_string("Cannot updateStakeContract");
                 }
             }
         }
@@ -106,34 +109,34 @@ contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryF
         // 3.7. NetworkRegistry Contract
         // Only deploy NetworkRegistrycontract when no deployed one is detected.
         // E.g. Always in development environment, or should a new NetworkRegistryProxy contract be introduced in staging/production
-        if (currentEnvironmentType == EnvironmentType.DEVELOPMENT || !isValidAddress(currentEnvironmentDetail.networkRegistryProxyContractAddress)) {
+        if (currentEnvironmentType == EnvironmentType.DEVELOPMENT || !isValidAddress(currentEnvironmentDetail.networkRegistryContractAddress)) {
             // deploy NetworkRegistry contract
             currentEnvironmentDetail.networkRegistryContractAddress = deployCode("HoprNetworkRegistry.sol", abi.encode(currentEnvironmentDetail.networkRegistryProxyContractAddress, deployerAddress));
             // NetworkRegistry should be enabled (default behavior) in staging/production, and disabled in development
             if (currentEnvironmentType == EnvironmentType.DEVELOPMENT) {
                 (bool successDisableRegistry, ) = currentEnvironmentDetail.networkRegistryContractAddress.call(abi.encodeWithSignature("disableRegistry()"));
                 if (!successDisableRegistry) {
-                    revert("Cannot disableRegistry");
+                    emit log_string("Cannot disableRegistry");
                 }
             }
         } else {
             // When a NetworkRegistry contract is provided, check if its `requirementImplementation` matches with the latest NetworkRegistryProxy. 
             (bool successReadRequirementImplementation, bytes memory returndataRequirementImplementation) = currentEnvironmentDetail.networkRegistryContractAddress.staticcall(abi.encodeWithSignature("requirementImplementation()"));
             if (!successReadRequirementImplementation) {
-                revert("Cannot read RequirementImplementation");
+                emit log_string("Cannot read RequirementImplementation");
             }
             address requirementImplementation = abi.decode(returndataRequirementImplementation, (address));
             // Check if the current sender is NetworkRegistry owner. 
             (bool successReadOwner, bytes memory returndataOwner) = currentEnvironmentDetail.networkRegistryContractAddress.staticcall(abi.encodeWithSignature("owner()"));
             if (!successReadOwner) {
-                revert("Cannot read NetworkRegistry contract owner");
+                emit log_string("Cannot read NetworkRegistry contract owner");
             }
             address networkRegistryOwner = abi.decode(returndataOwner, (address));
             // When a mismatch is deteced and the deployer (transaction sender) is the owner, update the `requirementImplementation` with the latest NetworkRegistryProxy address
             if (requirementImplementation != currentEnvironmentDetail.networkRegistryProxyContractAddress && networkRegistryOwner == deployerAddress) {
                 (bool successUpdateImplementation, ) = currentEnvironmentDetail.networkRegistryContractAddress.call(abi.encodeWithSignature("updateRequirementImplementation(address)", currentEnvironmentDetail.networkRegistryProxyContractAddress));
                 if (!successUpdateImplementation) {
-                    revert("Cannot updateRequirementImplementation");
+                    emit log_string("Cannot updateRequirementImplementation");
                 }
             }
         }
@@ -143,5 +146,27 @@ contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryF
 
         // FIXME: to write to a json file
         displayCurrentEnvironmentDetail();
+    }
+
+    /**
+     * @dev Helper function to build payload for "ownerBatchAddSpecialNftTypeAndRank(uint256[],string[],uint256[])"
+     * By default, it adds `Network_registry` NFT (index. 26) (`developer` and `community`) 
+     * It's possible to extend this array if more NR NFTs are issued
+     */
+    function buildBatchRegisterSpecialNrNft() private returns(bytes memory) {
+        // "Network_registry" type
+        uint256[] memory typeIndex = new uint256[](2);
+        typeIndex[0] = 26;
+        typeIndex[1] = 26;
+        // "developer" and "community" rank
+        string[] memory ranks = new string[](2);
+        ranks[0] = "developer";
+        ranks[1] = "community";
+        // max. number of allowed registration
+        uint256[] memory maxAllowedReg = new uint256[](2);
+        maxAllowedReg[0] = type(uint256).max;
+        maxAllowedReg[1] = 1;
+
+        return abi.encodeWithSignature("ownerBatchAddSpecialNftTypeAndRank(uint256[],string[],uint256[])", typeIndex, ranks, maxAllowedReg);
     }
 }
