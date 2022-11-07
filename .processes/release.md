@@ -131,11 +131,11 @@ particular branch to deploy on every change.
          x                   x                       x  create new release  x
          x                   x                       x◄─────────────────────x 1.91.0-next.44
          x                   x   create new staging  x 1.91.0               x
-         x                   │ ◄─────────────────────│                      x 
+         x                   │ ◄─────────────────────│                      x
          x                   │                       │   first merge-back   x
          x                   │                       │ ──────────────────►  x 1.92.0-next.0
          x                   │ 1.91.0-next.0         │                      x
-         x                   │                       │                      x                      
+         x                   │                       │                      x
          x  start hotfix     ▼                       │                      x
          ┌◄──────────────────x                       │                      x
          │                   x                       │                      x
@@ -193,8 +193,9 @@ particular branch to deploy on every change.
 Once the release testing has concluded, or if any significant amount of patches has been applied to the release branch, the release branch should be merged back into `master` again.
 
 #### Release patching
+
 Whenever a patch to a release `${RELEASE_NAME}` is needed, it first needs to be tested in the Staging deployment. The Staging deployment
-is specific per each release and runs within the same network environment as the Release. Once the fix is 
+is specific per each release and runs within the same network environment as the Release. Once the fix is
 considered stable enough (after testing in the Staging deployment), it can be merged into the Release branch (this is called Release upgrade).
 The developers are encourage to batch the hotfixes in the Staging branch and minimize the number of Release upgrades.
 
@@ -210,6 +211,7 @@ To create a hotfix:
 3. Once the fix needs to be tested, create a PR of `hotfix/fix-bug` to `staging/${RELEASE_NAME}` and merge once peer-reviewed & approved.
 
 #### Release upgrade
+
 The Release upgrade is done, when the Staging deployment is considered stable, so it can be merged back to the Release.
 Once the upgraded release is deployed, the Staging deployment must be updated as well from the Release branch (this is called Staging upgrade).
 
@@ -217,8 +219,8 @@ Once the upgraded release is deployed, the Staging deployment must be updated as
 2. (on `release-upgrade-${RELEASE_NAME}`) merge `release/${RELEASE_NAME}` into the branch: `git merge release/${RELEASE_NAME}`.
    In case of a merge conflict, the changes from the `release-upgrade-${RELEASE_NAME}` branch take precedence.
 3. Create a PR of `release-upgrade-${RELEASE_NAME}` and ask for a peer review.
-4. Wait for the CI to deploy upgraded Release. Then perform the following steps for Staging upgrade. 
-5. (on `staging/${RELEASE_NAME}`) create branch `staging-upgrade-${RELEASE_NAME}`: `git checkout -b staging-upgrade-${RELEASE_NAME}` 
+4. Wait for the CI to deploy upgraded Release. Then perform the following steps for Staging upgrade.
+5. (on `staging/${RELEASE_NAME}`) create branch `staging-upgrade-${RELEASE_NAME}`: `git checkout -b staging-upgrade-${RELEASE_NAME}`
 6. (on `staging-upgrade-${RELEASE_NAME}`) merge `release/${RELEASE_NAME}` into the branch: `git merge release/${RELEASE_NAME}`.
    In case of a merge conflict, the changes from `release/${RELEASE_NAME}` take precedence.
 7. Create a PR of `staging-upgrade-${RELEASE_NAME}` and ask for a peer review (should be straight-forward).
