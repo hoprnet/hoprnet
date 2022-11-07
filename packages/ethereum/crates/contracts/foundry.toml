@@ -11,7 +11,7 @@ fs_permissions = [{ access = "read-write", path = "./"}] # to write logs into a 
 [rpc_endpoints]
 local = "http://localhost:8545"
 gnosis = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
-goerli = "https://provider-proxy.hoprnet.workers.dev/eth_goerli"
+goerli = "https://provider-proxy.hoprnet.workers.dev/eth_goerli" # alternative can be "https://goerli.infura.io/v3/${INFURA_API_KEY}"
 
 [etherscan]
 goerli = { key = "${ETHERSCAN_API_KEY}" }
@@ -23,7 +23,7 @@ eth_rpc_url = "http://localhost:8545" # cannot directly use profile.default.rpc_
 
 # staging environment
 [profile.staging]
-eth_rpc_url = "https://provider-proxy.hoprnet.workers.dev/eth_goerli"
+eth_rpc_url = "https://provider-proxy.hoprnet.workers.dev/eth_goerli" # alternative can be "https://goerli.infura.io/v3/${INFURA_API_KEY}"
 
 # production environment environment
 [profile.production]

@@ -33,7 +33,7 @@ make sc-coverage
 ```
 anvil
 make anvil-deploy-erc1820
-FOUNDRY_PROFILE=development ENVIRONMENT_NAME=localhost forge script --broadcast script/AllContracts.s.sol:DeployAllContractsScript
+FOUNDRY_PROFILE=development ENVIRONMENT_NAME=localhost forge script --broadcast script/DeployAll.s.sol:DeployAllContractsScript
 ```
 
 #### Staging
@@ -46,14 +46,14 @@ source .env
 
 ```
 // This verifies contract on sourcify
-FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-goerli forge script --broadcast --verify --verifier sourcify script/AllContracts.s.sol:DeployAllContractsScript
+FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-goerli forge script --broadcast --verify --verifier sourcify script/DeployAll.s.sol:DeployAllContractsScript
 
 // This deploys contract to goerli testnet and verifies contracts on etherscan
-FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-goerli forge script --broadcast --verify --verifier etherscan --chain 5 script/AllContracts.s.sol:DeployAllContractsScript
+FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-goerli forge script --broadcast --verify --verifier etherscan --chain 5 script/DeployAll.s.sol:DeployAllContractsScript
 ```
 #### Production
 ```
-FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-goerli forge script --broadcast --verify --verifier sourcify script/AllContracts.s.sol:DeployAllContractsScript
+FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-goerli forge script --broadcast --verify --verifier sourcify script/DeployAll.s.sol:DeployAllContractsScript
 ```
 
 ### Note
