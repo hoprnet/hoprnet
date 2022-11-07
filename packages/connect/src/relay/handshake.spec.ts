@@ -53,7 +53,6 @@ describe('test relay handshake', function () {
           async ({ stream }) => {
             stream.sink(
               (async function* () {
-                console.log(`sent`)
                 yield Uint8Array.from([RelayHandshakeMessage.OK])
               })()
             )

@@ -1,4 +1,4 @@
-#!/usr/bin/env -S DEBUG=hopr* NODE_OPTIONS='--max_old_space_size=4096 --experimental-wasm-modules'
+#!/usr/bin/env -S DEBUG=${DEBUG} NODE_OPTIONS=${NODE_OPTIONS} node
 
 // File must be a CommonJS script to make sure it does not include any ESM syntax,
 // such as `export` or `import`, which causes incomprensive syntax errors when

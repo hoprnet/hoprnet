@@ -82,6 +82,12 @@ jobs:
           make -j toolchain
           CI=true make -j deps
           make -j build
+          
+      - name: 'Cache built artifacts (for later use)'
+        uses: actions/cache@v3
+        with:
+          path: packages/
+          key: hoprnet-build-${{ github.run_id }}
 
       - name: Cache built artifacts (for later use)
         uses: actions/cache@v3
@@ -171,7 +177,7 @@ jobs:
 
   build_docker:
     name: Build Docker Images
-    timeout-minutes: 20
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     needs: [build_deploy_sc_npm]
     steps:
@@ -345,8 +351,8 @@ jobs:
 
       - name: Restore built artifacts
         uses: actions/cache@v3
-          path: |
-            packages/
+        with:
+          path: packages/
           key: hoprnet-build-${{ github.run_id }}
 
       - name: Run deploy script for public nodes
@@ -433,8 +439,8 @@ jobs:
 
       - name: Restore built artifacts
         uses: actions/cache@v3
-          path: |
-            packages/
+        with:
+          path: packages/
           key: hoprnet-build-${{ github.run_id }}
 
       - name: Run deploy script for nodes behind NAT

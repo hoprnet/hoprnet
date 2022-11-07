@@ -2,10 +2,15 @@
 
 <a name="1.91"></a>
 
+## [1.91](https://github.com/hoprnet/hoprnet/compare/release/valencia...hoprnet:release/bogota)
+
 - Include HOPR Staking Season 5 smart contracts ([#4221](https://github.com/hoprnet/hoprnet/pull/4221))
 - Various optimizations of Rust crates ([#4221](https://github.com/hoprnet/hoprnet/pull/4260))
 - Add Metrics API for Prometheus, `metrics` API endpoint and collection of various metrics ([#4233](https://github.com/hoprnet/hoprnet/pull/4233))
 - Improve pre-merge check to prevent PR from merging when the upstream deployment is in the failed state ([#4294](https://github.com/hoprnet/hoprnet/pull/4294))
+- Restore STUN functionality ([#4312](https://github.com/hoprnet/hoprnet/pull/4312))
+- Add Health Status Indicator in the Admin UI ([#4197](https://github.com/hoprnet/hoprnet/pull/4197))
+- Allow connectivity indicator to be GREEN on public nodes too ([#4314](https://github.com/hoprnet/hoprnet/pull/4314))
 
 ---
 
@@ -13,7 +18,6 @@
 
 ## [1.90](https://github.com/hoprnet/hoprnet/compare/release/paleochora...hoprnet:release/valencia)
 
-- Add Health Status Indicator in the Admin UI ([#4197](https://github.com/hoprnet/hoprnet/pull/4197))
 - Improve Network Registry smart contract to allow 1-to-many node registration, add enable/disable make targets ([#4008](https://github.com/hoprnet/hoprnet/pull/4091))
 - Replace `yarn` with `npx` in `pluto` Docker image to run `hoprd` to fix binary discoverability issue
 - Add support for communication between different releases within the same environment

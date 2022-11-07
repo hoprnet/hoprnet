@@ -39,9 +39,9 @@
       "channels_contract_address": "0xc81E2Bf738f8018202c8Bd9dA85a12D5D7291d08",
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
       "xhopr_contract_address": "0xe8aD2ac347dA7549Aaca8F5B1c5Bf979d85bC78F",
-      "boost_contract_address": "0x1C0C4EFb9a2ccE18d66eaFFc585876d8CA768013",
-      "stake_contract_address": "0x3EB3e9f5E2F9C348d29506A950f1cb7030B7df0D",
-      "network_registry_proxy_contract_address": "0xB85e0972BA068032cfe07d41885dfD5eD5b96ae9",
+      "boost_contract_address": "0xDA335D985710b80e5BfC697C6Fba0A906Dd4a1CE",
+      "stake_contract_address": "0xab231873246daaff05c99b3682ea649e6C80AB68",
+      "network_registry_proxy_contract_address": "0xb311239b46feCde9D68d70Ae4bA8733C3dBC7023",
       "network_registry_contract_address": "0xf3374666487A58aa424BF9dB9bCf74250393a757",
       "tags": ["etherscan"]
     },
@@ -151,7 +151,7 @@
       "channels_contract_address": "0xFaBeE463f31E39eC8952bBfB4490C41103bf573e",
       "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
       "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
-      "stake_contract_address": "0x5Bb7e435aDa333A6714e27962e4Bb6aFDE1cECd4",
+      "stake_contract_address": "0xd80fbbfe9d057254d80eebb49f17aca66a238e2d",
       "network_registry_contract_address": "0x819E6a81e1e3f96CF1ac9200477C2d09c676959D",
       "network_registry_proxy_contract_address": "0x1C0C4EFb9a2ccE18d66eaFFc585876d8CA768013",
       "tags": ["etherscan"]
