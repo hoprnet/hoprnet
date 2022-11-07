@@ -91,10 +91,10 @@ contract EnvironmentConfig is Script {
         // FIXME: write additional RPC url
         uint256 chainId; 
         assembly { chainId := chainid() }
-        vm.writeLine(filePath, string(abi.encodePacked('"chainid": "', vm.toString(chainId))));
+        vm.writeLine(filePath, string(abi.encodePacked('"chainid": ', vm.toString(chainId))));
 
         vm.writeLine(filePath, string(abi.encodePacked('"environment_type": "', parseEnvironmentTypeToString(envDetail.environmentType), '",')));
-        vm.writeLine(filePath, string(abi.encodePacked('"stake_season": "', vm.toString(envDetail.stakeSeason), '",')));
+        vm.writeLine(filePath, string(abi.encodePacked('"stake_season": ', vm.toString(envDetail.stakeSeason), ',')));
         vm.writeLine(filePath, string(abi.encodePacked('"token_contract_address": "', vm.toString(envDetail.hoprTokenContractAddress), '",')));
         vm.writeLine(filePath, string(abi.encodePacked('"channels_contract_address": "', vm.toString(envDetail.hoprChannelsContractAddress), '",')));
         vm.writeLine(filePath, string(abi.encodePacked('"xhopr_contract_address": "', vm.toString(envDetail.xhoprTokenContractAddress), '",')));
