@@ -1,6 +1,7 @@
 {
   "localhost": {
     "environmentType": 0,
+    "stakeSeason": 5,
     "hoprTokenContractAddress": "",
     "hoprChannelsContractAddress": "",
     "xhoprTokenContractAddress": "",

@@ -33,7 +33,7 @@ make sc-coverage
 ```
 anvil
 make anvil-deploy-erc1820
-FOUNDRY_PROFILE=development ENVIRONMENT_NAME=localhost forge script script/HoprToken.s.sol:DeployHoprTokenScript --broadcast
+FOUNDRY_PROFILE=development ENVIRONMENT_NAME=localhost forge script script/AllContracts.s.sol:DeployAllContractsScript --broadcast
 ```
 
 ### Note

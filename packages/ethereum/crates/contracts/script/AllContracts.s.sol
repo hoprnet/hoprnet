@@ -55,6 +55,89 @@ contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryF
             // deploy boost contract
             currentEnvironmentDetail.hoprBoostContractAddress = deployCode("HoprBoost.sol", abi.encode(deployerAddress, ""));
         }
+
+        // 3.5. HoprStake Contract
+        // Only deply HoprStake contract (of the latest season) when no deployed one is detected.
+        // E.g. always in development environment, or should a new stake contract be introduced in staging.
+        if (currentEnvironmentType == EnvironmentType.DEVELOPMENT || !isValidAddress(currentEnvironmentDetail.stakeContractAddress)) {
+            // build the staking season artifact name, based on the stake season number specified in the contract-addresses.json
+            string memory stakeArtifactName = string(abi.encodePacked("HoprStakeSeason", vm.toString(currentEnvironmentDetail.stakeSeason), ".sol"));
+            // deploy stake contract
+            currentEnvironmentDetail.stakeContractAddress = deployCode(stakeArtifactName, abi.encode(deployerAddress, currentEnvironmentDetail.hoprBoostContractAddress, currentEnvironmentDetail.xhoprTokenContractAddress, currentEnvironmentDetail.hoprTokenContractAddress));
+        }
+
+        // 3.6. NetworkRegistryProxy Contract
+        // Only deploy NetworkRegistryProxy contract when no deployed one is detected.
+        // E.g. Always in development environment, or should a new NetworkRegistryProxy contract be introduced in staging/production
+        if (currentEnvironmentType == EnvironmentType.DEVELOPMENT) {
+            // deploy DummyProxy in DEVELOPMENT envirionment
+            currentEnvironmentDetail.networkRegistryProxyContractAddress = deployCode("HoprDummyProxyForNetworkRegistry.sol", abi.encode(deployerAddress));
+        } else if (!isValidAddress(currentEnvironmentDetail.networkRegistryProxyContractAddress)) {
+            // deploy StakingProxy in other envrionment types, if no proxy contract is given.
+            currentEnvironmentDetail.networkRegistryProxyContractAddress = deployCode("HoprStakingProxyForNetworkRegistry.sol", abi.encode(currentEnvironmentDetail.stakeContractAddress, deployerAddress, 1000 ether));
+            // If needed, add `eligibleNftTypeAndRank` TODO: Only execute this transaction when NR accepts accounts with staking amount above certain threshold
+            // If needed, add `specialNftTypeAndRank` besides `Network_registry` NFT (index. 26) (`developer` and `community`) TODO: extend this array if more NR NFTs are issued
+            (bool successOwnerBatchAddSpecialNftTypeAndRank, ) = currentEnvironmentDetail.networkRegistryProxyContractAddress.call(abi.encodeWithSignature("ownerBatchAddSpecialNftTypeAndRank(uint256[],string[],uint256[])", [26, 26], ["developer", "community"], [type(uint256).max, 1]));
+            if (!successOwnerBatchAddSpecialNftTypeAndRank) {
+                revert("Cannot ownerBatchAddSpecialNftTypeAndRank");
+            }
+        } else {
+            // When a NetworkRegistryProxy contract is provided, check if its `stakeContract` matches with the latest stakeContractAddress. 
+            (bool successReadStakeContract, bytes memory returndataStakeContract) = currentEnvironmentDetail.networkRegistryProxyContractAddress.staticcall(abi.encodeWithSignature("stakeContract()"));
+            if (!successReadStakeContract) {
+                revert("Cannot read stakeContract");
+            }
+            address linkedStakeContract = abi.decode(returndataStakeContract, (address));
+            // Check if the current sender is NetworkRegistryProxy owner. 
+            (bool successReadProxyOwner, bytes memory returndataProxyOwner) = currentEnvironmentDetail.networkRegistryProxyContractAddress.staticcall(abi.encodeWithSignature("owner()"));
+            if (!successReadProxyOwner) {
+                revert("Cannot read owner");
+            }
+            address proxyOwner = abi.decode(returndataProxyOwner, (address));
+            // When a mismatch is deteced and the deployer (transaction sender) is the owner, update the `stakeContract` with the latest staking contract address
+            if (linkedStakeContract != currentEnvironmentDetail.stakeContractAddress && proxyOwner == deployerAddress) {
+                (bool successUpdateStakeContract, ) = currentEnvironmentDetail.networkRegistryProxyContractAddress.call(abi.encodeWithSignature("updateStakeContract(address)", currentEnvironmentDetail.stakeContractAddress));
+                if (!successUpdateStakeContract) {
+                    revert("Cannot updateStakeContract");
+                }
+            }
+        }
+
+        // 3.7. NetworkRegistry Contract
+        // Only deploy NetworkRegistrycontract when no deployed one is detected.
+        // E.g. Always in development environment, or should a new NetworkRegistryProxy contract be introduced in staging/production
+        if (currentEnvironmentType == EnvironmentType.DEVELOPMENT || !isValidAddress(currentEnvironmentDetail.networkRegistryProxyContractAddress)) {
+            // deploy NetworkRegistry contract
+            currentEnvironmentDetail.networkRegistryContractAddress = deployCode("HoprNetworkRegistry.sol", abi.encode(currentEnvironmentDetail.networkRegistryProxyContractAddress, deployerAddress));
+            // NetworkRegistry should be enabled (default behavior) in staging/production, and disabled in development
+            if (currentEnvironmentType == EnvironmentType.DEVELOPMENT) {
+                (bool successDisableRegistry, ) = currentEnvironmentDetail.networkRegistryContractAddress.call(abi.encodeWithSignature("disableRegistry()"));
+                if (!successDisableRegistry) {
+                    revert("Cannot disableRegistry");
+                }
+            }
+        } else {
+            // When a NetworkRegistry contract is provided, check if its `requirementImplementation` matches with the latest NetworkRegistryProxy. 
+            (bool successReadRequirementImplementation, bytes memory returndataRequirementImplementation) = currentEnvironmentDetail.networkRegistryContractAddress.staticcall(abi.encodeWithSignature("requirementImplementation()"));
+            if (!successReadRequirementImplementation) {
+                revert("Cannot read RequirementImplementation");
+            }
+            address requirementImplementation = abi.decode(returndataRequirementImplementation, (address));
+            // Check if the current sender is NetworkRegistry owner. 
+            (bool successReadOwner, bytes memory returndataOwner) = currentEnvironmentDetail.networkRegistryContractAddress.staticcall(abi.encodeWithSignature("owner()"));
+            if (!successReadOwner) {
+                revert("Cannot read NetworkRegistry contract owner");
+            }
+            address networkRegistryOwner = abi.decode(returndataOwner, (address));
+            // When a mismatch is deteced and the deployer (transaction sender) is the owner, update the `requirementImplementation` with the latest NetworkRegistryProxy address
+            if (requirementImplementation != currentEnvironmentDetail.networkRegistryProxyContractAddress && networkRegistryOwner == deployerAddress) {
+                (bool successUpdateImplementation, ) = currentEnvironmentDetail.networkRegistryContractAddress.call(abi.encodeWithSignature("updateRequirementImplementation(address)", currentEnvironmentDetail.networkRegistryProxyContractAddress));
+                if (!successUpdateImplementation) {
+                    revert("Cannot updateRequirementImplementation");
+                }
+            }
+        }
+
         // write to file
         vm.stopBroadcast();
 

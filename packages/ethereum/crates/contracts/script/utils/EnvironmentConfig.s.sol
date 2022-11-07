@@ -17,6 +17,7 @@ contract EnvironmentConfig is Script {
     }
     
     struct EnvironmentDetail {
+        uint256 stakeSeason;
         address hoprTokenContractAddress;
         address hoprChannelsContractAddress;
         address xhoprTokenContractAddress;
@@ -25,6 +26,11 @@ contract EnvironmentConfig is Script {
         address networkRegistryContractAddress;
         address networkRegistryProxyContractAddress;
     }
+
+    // Deployed contract addresses
+    // address constant PROD_WXHOPR_TOKEN_CONTRACT_ADDRESS = 0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1; // TODO: this contract is not necessarily the "HoprToken" contract used in releases
+    address constant PROD_XHOPR_TOKEN_CONTRACT_ADDRESS = 0xD057604A14982FE8D88c5fC25Aac3267eA142a08;
+    address constant PROD_HOPR_BOOST_CONTRACT_ADDRESS = 0x43d13D7B83607F14335cF2cB75E87dA369D056c7;
 
     string public currentEnvironmentName;
     EnvironmentType public currentEnvironmentType;
@@ -50,6 +56,7 @@ contract EnvironmentConfig is Script {
         string memory json = vm.readFile(path);
 
         // read all the contract addresses from contracts-addresses.json
+        uint256 stakeSeasonNum = json.readUint(string(abi.encodePacked(".", _environmentName, ".stakeSeason")));
         address tokenAddr = json.readAddress(string(abi.encodePacked(".", _environmentName, ".hoprTokenContractAddress")));
         address channelAddr = json.readAddress(string(abi.encodePacked(".", _environmentName, ".hoprChannelsContractAddress")));
         address xhoprAddr = json.readAddress(string(abi.encodePacked(".", _environmentName, ".xhoprTokenContractAddress")));
@@ -59,6 +66,7 @@ contract EnvironmentConfig is Script {
         address networkRegistryProxyAddr = json.readAddress(string(abi.encodePacked(".", _environmentName, ".networkRegistryProxyContractAddress")));
 
         currentEnvironmentDetail = EnvironmentDetail({
+            stakeSeason: stakeSeasonNum,
             hoprTokenContractAddress: tokenAddr,
             hoprChannelsContractAddress: channelAddr,
             xhoprTokenContractAddress: xhoprAddr,
@@ -76,12 +84,13 @@ contract EnvironmentConfig is Script {
         readEnvironment(currentEnvironmentName);
     }
 
-    // use writeJson
+    // TODO: use writeJson when https://github.com/foundry-rs/foundry/pull/3595 is merged
     function writeEnvironment() internal {
     }
 
     // FIXME: remove this temporary method
     function displayCurrentEnvironmentDetail() internal {
+        vm.writeLine("test.txt", string(abi.encodePacked("stakeSeasonNum: ", vm.toString(currentEnvironmentDetail.stakeSeason))));
         vm.writeLine("test.txt", string(abi.encodePacked("tokenAddr: ", vm.toString(currentEnvironmentDetail.hoprTokenContractAddress), vm.toString(isValidAddress(currentEnvironmentDetail.hoprTokenContractAddress)))));
         vm.writeLine("test.txt", string(abi.encodePacked("channelAddr: ", vm.toString(currentEnvironmentDetail.hoprChannelsContractAddress))));
         vm.writeLine("test.txt", string(abi.encodePacked("xhoprAddr: ", vm.toString(currentEnvironmentDetail.xhoprTokenContractAddress))));
