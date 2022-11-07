@@ -7,12 +7,12 @@ This dashboard lets you see status information about your node at a glance, incl
 
 You should see your current node; click on "open" to expand its overview,
 
-![cockpit single node](./images-dApps/cockpit-playground-single%20node.png)
+![cockpit single node](/img/dapps/cockpit-playground-single%20node.png)
 
 This overview is also expandable; clicking on the individual fields will give you a more detailed overview.
 
-![cockpit overview](./images-dApps/cockpit-overvview-playgrouund.png)
+![cockpit overview](/img/dapps/cockpit-overvview-playgrouund.png)
 
 Here you can view detailed information about the tickets your node has collected, its open payment channels, messages, balance and general info.
 
-![cockpit overview](./images-dApps/cockpit-details.png)
+![cockpit overview](/img/dapps/cockpit-details.png)
