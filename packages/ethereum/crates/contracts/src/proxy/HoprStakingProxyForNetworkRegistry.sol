@@ -234,15 +234,18 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
       ) {
         // already exist, overwrite maxRegistration
         maxRegistrationsPerSpecialNft[i] = maxRegistration;
+        emit SpecialNftTypeAndRankAdded(nftType, nftRank, maxRegistration);
+        return;
       }
     }
+    // did not exist, add to the list
     specialNftTypeAndRank.push(NftTypeAndRank({nftType: nftType, nftRank: nftRank}));
     maxRegistrationsPerSpecialNft.push(maxRegistration);
     emit SpecialNftTypeAndRankAdded(nftType, nftRank, maxRegistration);
   }
 
   /**
-   * @dev Remove from list of special NFTs
+   * @dev Remove one matching record from list of special NFTs
    * @param nftType Type index of the special HoprBoost NFT
    * @param nftRank HoprBoost rank which is associated to the special NFT, in string
    */
@@ -259,6 +262,7 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
         maxRegistrationsPerSpecialNft[i] = maxRegistrationsPerSpecialNft[maxRegistrationsPerSpecialNft.length - 1];
         maxRegistrationsPerSpecialNft.pop();
         emit SpecialNftTypeAndRankRemoved(nftType, nftRank);
+        return;
       }
     }
   }
@@ -285,7 +289,7 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   }
 
   /**
-   * @dev Remove from list of eligible NFTs
+   * @dev Remove one matching record from list of eligible NFTs
    * @param nftType Type index of the eligible HoprBoost NFT
    * @param nftRank HoprBoost rank which is associated to the eligible NFT, in string
    */
@@ -300,6 +304,7 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
         eligibleNftTypeAndRank[i] = eligibleNftTypeAndRank[eligibleNftTypeAndRank.length - 1];
         eligibleNftTypeAndRank.pop();
         emit NftTypeAndRankRemoved(nftType, nftRank);
+        return;
       }
     }
   }
