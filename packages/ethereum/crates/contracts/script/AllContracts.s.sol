@@ -29,22 +29,22 @@ contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryF
             currentEnvironmentDetail.hoprTokenContractAddress = deployCode("HoprToken.sol");
         }
 
-        // 3.2. xHoprToken Contract
-        // Only deploy Token contract when no deployed one is detected. 
-        // E.g. always in development envirionment, or should a new token contract be introduced in staging. 
-        // Production contract should remain 0xD057604A14982FE8D88c5fC25Aac3267eA142a08 TODO: Consider force check on this address
-        if (currentEnvironmentType == EnvironmentType.DEVELOPMENT || !isValidAddress(currentEnvironmentDetail.xhoprTokenContractAddress)) {
-            // deploy xtoken contract
-            currentEnvironmentDetail.xhoprTokenContractAddress = deployCode("ERC677Mock.sol");
-        }
-
-        // 3.3. HoprChannels Contract
+        // 3.2. HoprChannels Contract
         // Only deploy Channels contract when no deployed one is detected. 
         // E.g. always in development envirionment, or should a new channel contract be introduced in staging/production per meta environment. 
         if (currentEnvironmentType == EnvironmentType.DEVELOPMENT || !isValidAddress(currentEnvironmentDetail.hoprChannelsContractAddress)) {
             // deploy channels contract
             uint256 closure = currentEnvironmentType == EnvironmentType.DEVELOPMENT ? 15 : 5 * 60;
             currentEnvironmentDetail.hoprChannelsContractAddress = deployCode("HoprChannels.sol", abi.encode(currentEnvironmentDetail.hoprTokenContractAddress, closure));
+        }
+
+        // 3.3. xHoprToken Contract
+        // Only deploy Token contract when no deployed one is detected. 
+        // E.g. always in development envirionment, or should a new token contract be introduced in staging. 
+        // Production contract should remain 0xD057604A14982FE8D88c5fC25Aac3267eA142a08 TODO: Consider force check on this address
+        if (currentEnvironmentType == EnvironmentType.DEVELOPMENT || !isValidAddress(currentEnvironmentDetail.xhoprTokenContractAddress)) {
+            // deploy xtoken contract
+            currentEnvironmentDetail.xhoprTokenContractAddress = deployCode("ERC677Mock.sol");
         }
         
         // 3.4. HoprBoost Contract
