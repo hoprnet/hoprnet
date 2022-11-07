@@ -26,6 +26,12 @@ packages/ethereum/hardhat
 packages/ethereum/src/types
 packages/ethereum/deployments
 
+# Compiled rust code cache
+target/
+
+# Ignore WebAssembly
+*.wasm
+
 # prettier breaks scss
 *.scss
 
