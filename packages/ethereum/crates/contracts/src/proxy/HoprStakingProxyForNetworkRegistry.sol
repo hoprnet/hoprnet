@@ -210,7 +210,7 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
    * @dev update linked stake contract
    * @param _stakeContract address of the staking contract from which registration info is obtained.
    */
-  function updateStakeContract(address _stakeContract) external {
+  function updateStakeContract(address _stakeContract) external onlyOwner {
     _updateStakeContract(_stakeContract);
   }
 
