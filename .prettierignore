@@ -26,6 +26,9 @@ packages/ethereum/hardhat
 packages/ethereum/src/types
 packages/ethereum/deployments
 
+# Compiled rust code
+target/
+
 # prettier breaks scss
 *.scss
 
