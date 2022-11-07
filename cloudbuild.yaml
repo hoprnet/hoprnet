@@ -1,8 +1,17 @@
 steps:
   - name: 'gcr.io/kaniko-project/executor:v1.9.1'
+    id: buildHoprToolchain
+    args:
+      - --dockerfile=scripts/toolchain/Dockerfile
+      - --destination=gcr.io/${PROJECT_ID}/hoprd:${_IMAGE_VERSION}
+      - --cache=true
+      - --cache-ttl=2w
+    timeout: 1200s
+    waitFor: ['-']
+  - name: 'gcr.io/kaniko-project/executor:v1.9.1'
     id: buildHoprd
     args:
-      - --context=dir://packages/hoprd
+      - --dockerfile=packages/hoprd/Dockerfile
       - --destination=gcr.io/${PROJECT_ID}/hoprd:${_IMAGE_VERSION}
       - --cache=true
       - --cache-ttl=96h
@@ -24,7 +33,7 @@ steps:
   - name: 'gcr.io/kaniko-project/executor:v1.9.1'
     id: buildCoverTrafficDaemon
     args:
-      - --context=dir://packages/cover-traffic-daemon
+      - --dockerfile=packages/cover-traffic-daemon/Dockerfile
       - --destination=gcr.io/${PROJECT_ID}/hopr-cover-traffic-daemon:${_IMAGE_VERSION}
       - --cache=true
       - --cache-ttl=96h
@@ -34,7 +43,7 @@ steps:
   - name: 'gcr.io/kaniko-project/executor:v1.9.1'
     id: buildHardhat
     args:
-      - --dockerfile=Dockerfile.hardhat
+      - --dockerfile=packages/ethereum/Dockerfile.hardhat
       - --destination=gcr.io/${PROJECT_ID}/hopr-hardhat:${_IMAGE_VERSION}
       - --cache=true
       - --cache-ttl=96h
@@ -53,6 +62,7 @@ steps:
       - 'IMAGE_VERSION=$_IMAGE_VERSION'
     timeout: 1200s
     waitFor:
+      - buildHoprToolchain
       - buildHoprd
       - buildHoprdNat
       - buildCoverTrafficDaemon

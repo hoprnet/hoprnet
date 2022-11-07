@@ -74,18 +74,25 @@ build_and_tag_images() {
   cd "${mydir}/.."
 
   if [ "${local_build:-}" = "true" ]; then
+    log "Building Docker toolchain image"
+    docker build -q -t hopr-toolchain \
+      -f scripts/toolchain/Dockerfile . &
+
+    log "Waiting for toolchain image to finish"
+    wait
+
     if [ -z "${image_name}" ] || [ "${image_name}" = "hoprd" ] || [ "${image_name}" = "pluto-complete" ]; then
       log "Building Docker image hoprd-local"
       docker build -q -t hoprd-local \
         --build-arg=PACKAGE_VERSION="${package_version}" \
-        packages/hoprd &
+        -f packages/hoprd/Dockerfile . &
     fi
 
     if [ -z "${image_name}" ] || [ "${image_name}" = "cover-traffic-daemon" ]; then
       log "Building Docker image hopr-cover-traffic-daemon-local"
       docker build -q -t hopr-cover-traffic-daemon-local \
         --build-arg=PACKAGE_VERSION="${package_version}" \
-        packages/cover-traffic-daemon &
+        -f packages/cover-traffic-daemon/Dockerfile . &
     fi
 
     if [ -z "${image_name}" ] || [ "${image_name}" = "hoprd-nat" ]; then
@@ -96,10 +103,10 @@ build_and_tag_images() {
         scripts/nat &
     fi
 
-    if [ -z "${image_name}" ] || [ "${image_name}" = "hardhat" ] || [ "${image_name}" = "pluto-complete" ]; then
+    if [ -z "${image_name}" ] ||  [ "${image_name}" = "pluto-complete" ]; then
       log "Building Docker image hopr-hardhat-local"
       docker build -t hopr-hardhat-local \
-       -f Dockerfile.hardhat . &
+        -f packages/ethereum/Dockerfile.hardhat . &
     fi
 
     log "Waiting for Docker builds (part 1) to finish"

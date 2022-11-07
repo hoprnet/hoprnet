@@ -1,0 +1,19 @@
+FROM alpine
+
+LABEL description="Image that contains all utilities necessary to build hopr monorepo, including Rust and Yarn"
+
+# python, perl are used by some nodejs dependencies as an installation requirement
+RUN apk add --no-cache bash build-base ca-certificates jq curl git
+
+WORKDIR /app/hoprnet
+
+# use bash to have source command and persistent environment
+SHELL ["/bin/bash", "-lc"]
+
+## Get toolchain utilities
+
+COPY .yarn .yarn/
+COPY package.json .yarnrc.yml rust-toolchain.toml .nvmrc yarn.lock ./
+COPY scripts/install-toolchain.sh ./scripts/
+
+RUN ./scripts/install-toolchain.sh

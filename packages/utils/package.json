@@ -55,6 +55,7 @@
     "@libp2p/interface-connection-manager": "1.1.0",
     "@libp2p/interface-keys": "1.0.3",
     "@libp2p/interface-peer-store": "1.0.0",
+    "@libp2p/interface-registrar": "1.1.0",
     "@libp2p/kad-dht": "1.0.16",
     "@libp2p/mplex": "1.2.2",
     "@libp2p/peer-id-factory": "1.0.18",

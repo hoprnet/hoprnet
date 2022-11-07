@@ -67,7 +67,7 @@
     "@types/chai-spies": "1.0.3",
     "@types/debug": "4.1.7",
     "@types/mocha": "9.1.1",
-    "@types/node": "16.11.26",
+    "@types/node": "16",
     "@types/simple-peer": "9.11.4",
     "@types/yargs": "17.0.10",
     "chai": "4.3.6",

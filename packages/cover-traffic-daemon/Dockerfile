@@ -1,56 +1,58 @@
-# Run hopr-cover-traffic-daemon within a single container using npm
+# Run hopr-cover-traffic-daemon within a single container using yarn
 
 # use slim version of node on Debian for smaller image sizes
-FROM node:16-bullseye-slim@sha256:95d4fdef5e12916a89f7d56dca6d8099de61df875c3c61106cb53e0ba1a48d44 as build
+FROM hopr-toolchain as build
 
-# python is used by some nodejs dependencies as an installation requirement
-RUN apt-get update && \
-    apt-get install -y \
-    git \
-    python3 \
-    build-essential
+COPY .yarn .yarn
+COPY Makefile Makefile.deps Cargo.toml Cargo.lock yarn.lock tsconfig.build.json tsconfig.json tsconfig.scripts.json yarn.lock rust-toolchain.toml ./
+COPY packages/ ./packages
 
-# enable to pass the version to Docker using either --build-arg or an
-# environment variable
-# if its not given, yarn will install the latest version of the package
-ARG PACKAGE_VERSION
-RUN echo "ARG PACKAGE_VERSION=${PACKAGE_VERSION}"
-ENV PACKAGE_VERSION=${PACKAGE_VERSION:-}
-RUN echo "ENV PACKAGE_VERSION=${PACKAGE_VERSION}"
+LABEL description="Launches a cover-traffic node which keeps sending cover-traffic through the hopr network"
 
 # making sure some standard environment variables are set for production use
 ENV NODE_ENV production
 ENV NODE_OPTIONS=--max_old_space_size=4096
 ENV npm_config_build_from_source false
 
-WORKDIR /app
+WORKDIR /app/hoprnet
 
-# install hoprd as a local module
-RUN yarn add @hoprnet/hopr-cover-traffic-daemon@${PACKAGE_VERSION}
+RUN CI=true make deps package=hopr-cover-traffic-daemon
 
-# use slim version of node on Debian for smaller image sizes
-FROM node:16-bullseye-slim@sha256:95d4fdef5e12916a89f7d56dca6d8099de61df875c3c61106cb53e0ba1a48d44 as runtime
+RUN NO_NEXT=true make -j build package=cover-traffic-daemon
+
+# Remove node_modules as they contain devDependencies
+RUN rm -R node_modules
+
+# No need for hoprd or AVADO
+RUN rm -R packages/hoprd packages/avado
+
+# Rebuild node_modules directory without devDependencies
+RUN CI=true NO_CARGO=true PRODUCTION=true make deps package=hopr-cover-traffic-daemon
+
+# Remove all typescript files
+RUN find ./packages -type f -name '*.ts' -delete
+
+FROM node:16-alpine as runtime
 
 # making sure some standard environment variables are set for production use
 ENV NODE_ENV production
 ENV DEBUG 'hopr*'
-ENV NODE_OPTIONS="--max_old_space_size=4096 --experimental-wasm-modules"
+ENV NODE_OPTIONS='--max_old_space_size=4096 --experimental-wasm-modules'
 
 # p2p
 EXPOSE 9091
 
-# we use tini as process 1 to catch signals properly, which is also built into
-# D<Plug>_ocker by default
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends \
-     tini \
-  && rm -rf /var/lib/apt/lists/* \
-  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
+RUN apk add --no-cache tini libc6-compat
 
-WORKDIR /app
+# symlink required to get WRTC to work
+RUN ln -s /lib/libc.musl-x86_64.so.1 /lib/ld-linux-x86-64.so.2
+
+WORKDIR /app/hoprnet
 
 # copy over the contents of node_modules etc
-COPY --from=build /app .
+COPY package.json .
+COPY --from=build /app/hoprnet/node_modules node_modules/
+COPY --from=build /app/hoprnet/packages packages/
 
 # create directory which is later used for the database, so that it inherits
 # permissions when mapped to a volume
@@ -59,4 +61,9 @@ RUN mkdir -p hoprd-db
 # set volume which can be mapped by users on the host system
 VOLUME ["/app/hoprd-db"]
 
-ENTRYPOINT ["/usr/bin/tini", "--", "yarn", "hopr-cover-traffic-daemon"]
+# set data directory to user-mountable directory
+ENV HOPRD_DATA=/app/hoprd-db
+
+WORKDIR /app/hoprnet/packages/cover-traffic-daemon
+
+ENTRYPOINT ["/sbin/tini", "--", "node", "lib/main.cjs"]
