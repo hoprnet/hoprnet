@@ -1,7 +1,7 @@
 # Phase 1 testing
 
 This document describes the process of Phase 1 testing in detail.
-For the overall overview of individual testing phases, please refer to the 
+For the overall overview of individual testing phases, please refer to the
 [release process](./release.md#testing-phases).
 
 ## Basic overview

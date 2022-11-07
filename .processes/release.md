@@ -70,7 +70,7 @@ Testing phases occur only when a release is queued and prioritized during [epic 
 For every phase completed, release owner must update the release's PR with the current testing phase status.
 
 | Phase name         | Description                                                                           |
-|--------------------|---------------------------------------------------------------------------------------|
+| ------------------ | ------------------------------------------------------------------------------------- |
 | CORE team testing  | First phase, testing by CORE team members only (see [Phase 1 testing](./testing.md) ) |
 | HOPR team testing  | Second phase, testing by available HOPR team members                                  |
 | ambassador testing | Third (optional) phase, testing with the help of ambassadors                          |
