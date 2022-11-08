@@ -75,7 +75,11 @@ openzeppelin-contracts-v3-0-1=OpenZeppelin/openzeppelin-contracts@v3.0.1 \
 --no-git --no-commit
 ```
 
-3. If `forge coverage` is not found in as a command, update `foundryup` to the [latest nightly release](https://github.com/foundry-rs/foundry/releases) may solve the issue.
+3. If `forge coverage` is not found in as a command, or error in using `writeJson`, update `foundryup` to the [latest nightly release](https://github.com/foundry-rs/foundry/releases) may solve the issue. 
+E.g.
+```
+foundryup --version nightly-64cbdd183e0aae99eb1be507196b6b5d640b3801
+```
 
 4. `forge coverage` may run into `Error: Function has no kind` when compiler has multiple versions. Opened an issue https://github.com/foundry-rs/foundry/issues/3519
 
