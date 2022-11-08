@@ -24,13 +24,13 @@ const FeatureList = [
     title: 'Run a hoprd node',
     Svg: <img class="svg_icon" src={'/img/front_icons/hopr-node.svg'} />,
     description: <>Start here to install and run a hoprd node.</>,
-    docName: 'node/start-here'
+    docName: 'v1.90/node/start-here'
   },
   {
     title: 'HOPR core concepts',
     Svg: <img class="svg_icon" src={'/img/front_icons/hopr-core-concepts.svg'} />,
     description: <>Broader educational material for understanding HOPR</>,
-    docName: 'core/what-is-hopr'
+    docName: 'v1.90/core/what-is-hopr'
   },
   /*{
     title: 'Staking',
@@ -42,13 +42,13 @@ const FeatureList = [
     title: 'Developers',
     Svg: <img class="svg_icon" src={'/img/front_icons/hopr-development.svg'} />,
     description: <>Learn how to build apps on top of the HOPR network.</>,
-    docName: 'developers/intro'
+    docName: 'v1.90/developers/intro'
   },
   {
     title: 'dApps',
     Svg: <img class="svg_icon" src={'/img/front_icons/hopr-dapps.svg'} />,
     description: <>Documentations and guides of dApps built on HOPR.</>,
-    docName: 'dapps/playground'
+    docName: 'v1.90/dapps/playground'
   }
   /*{
     title: 'Ecosystem',
