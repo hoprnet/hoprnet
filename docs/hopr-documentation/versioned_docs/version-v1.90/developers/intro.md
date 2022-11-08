@@ -15,7 +15,7 @@ There are two ways to build applications with the HOPR protocol:
 
 - dApps built on top of the [REST API](/developers/rest-api)
 - protocol applications built directly with the TypeScript source code
-  ![HOPR protocol stack](./image/HOPR_Protocol_Architecture.png)
+  ![HOPR protocol stack](/img/developer/HOPR_Protocol_Architecture.png)
 
 ### Use cases
 
