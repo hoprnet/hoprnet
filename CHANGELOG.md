@@ -11,6 +11,7 @@
 - Restore STUN functionality ([#4312](https://github.com/hoprnet/hoprnet/pull/4312))
 - Add Health Status Indicator in the Admin UI ([#4197](https://github.com/hoprnet/hoprnet/pull/4197))
 - Allow connectivity indicator to be GREEN on public nodes too ([#4314](https://github.com/hoprnet/hoprnet/pull/4314))
+- Show correct counterparty in the `channels` command output ([#4370](https://github.com/hoprnet/hoprnet/pull/4370))
 
 ---
 
