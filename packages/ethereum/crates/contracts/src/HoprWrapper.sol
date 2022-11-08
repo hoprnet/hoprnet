@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.6.0;
+pragma solidity >=0.6.0 <0.9.0;
 
-import "@openzeppelin/contracts-v3-0-1/access/Ownable.sol";
-import "@openzeppelin/contracts-v3-0-1/introspection/IERC1820Registry.sol";
-import "@openzeppelin/contracts-v3-0-1/introspection/ERC1820Implementer.sol";
-import "@openzeppelin/contracts-v3-0-1/token/ERC777/IERC777Recipient.sol";
-import "@openzeppelin/contracts-v3-0-1/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts-v3-0-1/token/ERC20/SafeERC20.sol";
-import "@openzeppelin/contracts-v3-0-1/math/SafeMath.sol";
-import "@openzeppelin/contracts-v3-0-1/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/introspection/IERC1820Registry.sol";
+import "@openzeppelin/contracts/utils/introspection/ERC1820Implementer.sol";
+import "@openzeppelin/contracts/token/ERC777/IERC777Recipient.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./HoprToken.sol";
 
 /**

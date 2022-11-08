@@ -1,4 +1,4 @@
-pragma solidity >=0.6.0 <0.9.0;
+pragma solidity >=0.8.0 <0.9.0;
 
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
@@ -44,14 +44,18 @@ contract EnvironmentConfig is Script {
         currentEnvironmentType = parseEnvironmentTypeFromString(profile);
     }
 
-    function readEnvironment(string memory _environmentName) internal {
+    function readProtocolConfig() internal view returns (string memory json) {
         string memory root = vm.projectRoot();
         // TODO: Check path to protocol-config.json
         string memory path = string(abi.encodePacked(root, "/contracts-addresses.json"));
-        string memory json = vm.readFile(path);
+        json = vm.readFile(path);
+    }
+
+    function readEnvironment(string memory _environmentName) internal {
+        string memory json = readProtocolConfig();
         bytes memory levelToEnvironmentConfig = abi.encodePacked(".environments.", _environmentName);
 
-        // read all the contract addresses from contracts-addresses.json
+        // read all the contract addresses from contracts-addresses.json. This way ensures that the order of attributes does not affect parsing
         EnvironmentType envType = parseEnvironmentTypeFromString(json.readString(string(abi.encodePacked(levelToEnvironmentConfig, ".environment_type"))));
         uint256 stakeSeasonNum = json.readUint(string(abi.encodePacked(levelToEnvironmentConfig, ".stake_season")));
         address tokenAddr = json.readAddress(string(abi.encodePacked(levelToEnvironmentConfig, ".token_contract_address")));
@@ -88,11 +92,6 @@ contract EnvironmentConfig is Script {
 
     // FIXME: remove this temporary method
     function displayEnvironmentDetail(string memory filePath, EnvironmentDetail memory envDetail) internal {
-        // FIXME: write additional RPC url
-        uint256 chainId; 
-        assembly { chainId := chainid() }
-        vm.writeLine(filePath, string(abi.encodePacked('"chainid": ', vm.toString(chainId))));
-
         vm.writeLine(filePath, string(abi.encodePacked('"environment_type": "', parseEnvironmentTypeToString(envDetail.environmentType), '",')));
         vm.writeLine(filePath, string(abi.encodePacked('"stake_season": ', vm.toString(envDetail.stakeSeason), ',')));
         vm.writeLine(filePath, string(abi.encodePacked('"token_contract_address": "', vm.toString(envDetail.hoprTokenContractAddress), '",')));

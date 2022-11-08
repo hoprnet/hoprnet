@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity >=0.6.0 <0.9.0;
+pragma solidity >=0.8.0 <0.9.0;
 pragma abicoder v2;
 
 import "forge-std/Script.sol";

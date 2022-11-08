@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.6.0;
+pragma solidity >=0.6.0 <0.9.0;
 
-import "@openzeppelin/contracts-v3-0-1/math/SafeMath.sol";
 import "../openzeppelin-contracts/ERC777.sol";
 
 /**
@@ -128,7 +127,7 @@ abstract contract ERC777Snapshot is ERC777 {
      * @param _value The new number of tokens
      */
     function updateValueAtNow(Snapshot[] storage snapshots, uint256 _value) internal {
-        require(_value <= uint128(-1), "casting overflow");
+        require(_value <= type(uint128).max, "casting overflow");
         uint256 lenSnapshots = snapshots.length;
 
         if (

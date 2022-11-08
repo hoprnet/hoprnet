@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.6.0;
+pragma solidity >=0.6.0 <0.9.0;
 
 import "../src/HoprToken.sol";
 import "./utils/Deploy.sol";
