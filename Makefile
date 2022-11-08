@@ -89,6 +89,23 @@ lint-check: ## run linter in check mode
 lint-fix: ## run linter in fix mode
 	npx prettier --write .
 
+.PHONY: run-hardhat
+run-hardhat: ## run local hardhat environment
+	cd packages/ethereum && \
+		env NODE_OPTIONS="--experimental-wasm-modules" NODE_ENV=development \
+		TS_NODE_PROJECT=./tsconfig.hardhat.json \
+		HOPR_ENVIRONMENT_ID=hardhat-localhost yarn run hardhat node \
+		--network hardhat --show-stack-traces
+
+.PHONY: run-local
+run-local: ## run HOPRd from local repo
+	env NODE_OPTIONS="--experimental-wasm-modules" NODE_ENV=development node \
+		packages/hoprd/lib/main.cjs --admin --init --api \
+		--password="local" --identity=`pwd`/.identity-local \
+		--environment hardhat-localhost --announce \
+		--testUseWeakCrypto --testAnnounceLocalAddresses \
+		--testPreferLocalAddresses --testNoAuthentication
+
 .PHONY: docker-build-local
 docker-build-local: ## build Docker images locally, or single image if image= is set
 ifeq ($(image),)

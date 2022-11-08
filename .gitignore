@@ -34,3 +34,4 @@ logs.txt
 **/*.tsbuildinfo
 
 .env
+.identity-local
