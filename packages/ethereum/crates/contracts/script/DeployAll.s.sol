@@ -151,11 +151,11 @@ contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryF
             }
         }
 
-        // write to file
+        // broadcast transaction bundle
         vm.stopBroadcast();
 
-        // FIXME: to write to a json file
-        displayCurrentEnvironmentDetail();
+        // write to file
+        writeCurrentEnvironment();
     }
 
     /**

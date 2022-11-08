@@ -37,6 +37,8 @@ contract EnvironmentConfig is Script {
     EnvironmentType public currentEnvironmentType;
     EnvironmentDetail public currentEnvironmentDetail;
 
+    string public pathToDeploymentFile = string(abi.encodePacked(vm.projectRoot(), "/contracts-addresses.json"));
+
     function getEnvrionment() public {
          // get envirionment of the script
         string memory profile = vm.envString("FOUNDRY_PROFILE");
@@ -44,15 +46,8 @@ contract EnvironmentConfig is Script {
         currentEnvironmentType = parseEnvironmentTypeFromString(profile);
     }
 
-    function readProtocolConfig() internal view returns (string memory json) {
-        string memory root = vm.projectRoot();
-        // TODO: Check path to protocol-config.json
-        string memory path = string(abi.encodePacked(root, "/contracts-addresses.json"));
-        json = vm.readFile(path);
-    }
-
-    function readEnvironment(string memory _environmentName) internal {
-        string memory json = readProtocolConfig();
+    function readEnvironment(string memory _environmentName) internal returns (EnvironmentDetail memory envDetail) {
+        string memory json = vm.readFile(pathToDeploymentFile);
         bytes memory levelToEnvironmentConfig = abi.encodePacked(".environments.", _environmentName);
 
         // read all the contract addresses from contracts-addresses.json. This way ensures that the order of attributes does not affect parsing
@@ -66,7 +61,7 @@ contract EnvironmentConfig is Script {
         address networkRegistryProxyAddr = json.readAddress(string(abi.encodePacked(levelToEnvironmentConfig, ".network_registry_proxy_contract_address")));
         address networkRegistryAddr = json.readAddress(string(abi.encodePacked(levelToEnvironmentConfig, ".network_registry_contract_address")));
 
-        currentEnvironmentDetail = EnvironmentDetail({
+        envDetail = EnvironmentDetail({
             environmentType: envType,
             stakeSeason: stakeSeasonNum,
             hoprTokenContractAddress: tokenAddr,
@@ -77,17 +72,24 @@ contract EnvironmentConfig is Script {
             networkRegistryContractAddress: networkRegistryAddr,
             networkRegistryProxyContractAddress: networkRegistryProxyAddr
         });
-
-        // FIXME: remove this temporary method
-        displayCurrentEnvironmentDetail();
     }
 
     function readCurrentEnvironment() internal {
-        readEnvironment(currentEnvironmentName);
+        currentEnvironmentDetail = readEnvironment(currentEnvironmentName);
     }
 
-    // TODO: use writeJson when https://github.com/foundry-rs/foundry/pull/3595 is merged
-    function writeEnvironment() internal {
+    function writeEnvironment(string memory _environmentName, EnvironmentDetail memory envDetail) internal {
+        string memory parsedNewEnvDetail = parseEnvironmentDetailToString(envDetail);
+
+        // write parsedNewEnvDetail to corresponding key
+        string memory configKey = string(abi.encodePacked(".environments.", _environmentName));
+
+        // write to file;
+        vm.writeJson(parsedNewEnvDetail, pathToDeploymentFile, configKey);
+    }
+
+    function writeCurrentEnvironment() internal {
+        writeEnvironment(currentEnvironmentName, currentEnvironmentDetail);
     }
 
     // FIXME: remove this temporary method
@@ -129,5 +131,19 @@ contract EnvironmentConfig is Script {
         } else {
             return "development";
         }
+    }
+
+    function parseEnvironmentDetailToString(EnvironmentDetail memory envDetail) internal returns (string memory) {
+        string memory json;
+        vm.serializeString(json, "environment_type", parseEnvironmentTypeToString(envDetail.environmentType));
+        vm.serializeUint(json, "stake_season", envDetail.stakeSeason);
+        vm.serializeAddress(json, "token_contract_address", envDetail.hoprTokenContractAddress);
+        vm.serializeAddress(json, "channels_contract_address", envDetail.hoprChannelsContractAddress);
+        vm.serializeAddress(json, "xhopr_contract_address", envDetail.xhoprTokenContractAddress);
+        vm.serializeAddress(json, "boost_contract_address", envDetail.hoprBoostContractAddress);
+        vm.serializeAddress(json, "stake_contract_address", envDetail.stakeContractAddress);
+        vm.serializeAddress(json, "network_registry_proxy_contract_address", envDetail.networkRegistryProxyContractAddress);
+        vm.serializeAddress(json, "network_registry_contract_address", envDetail.networkRegistryContractAddress);
+        return json;
     }
 }
