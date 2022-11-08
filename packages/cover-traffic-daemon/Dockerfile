@@ -1,7 +1,7 @@
 # Run hopr-cover-traffic-daemon within a single container using npm
 
 # use slim version of node on Debian for smaller image sizes
-FROM node:16-bullseye-slim@sha256:95d4fdef5e12916a89f7d56dca6d8099de61df875c3c61106cb53e0ba1a48d44 as build
+FROM node:16-bullseye-slim@sha256:8265ac132f720998222008355e11535caf53d6bccecbb562a055605138975b4e as build
 
 # python is used by some nodejs dependencies as an installation requirement
 RUN apt-get update && \
@@ -29,12 +29,12 @@ WORKDIR /app
 RUN yarn add @hoprnet/hopr-cover-traffic-daemon@${PACKAGE_VERSION}
 
 # use slim version of node on Debian for smaller image sizes
-FROM node:16-bullseye-slim@sha256:95d4fdef5e12916a89f7d56dca6d8099de61df875c3c61106cb53e0ba1a48d44 as runtime
+FROM node:16-bullseye-slim@sha256:8265ac132f720998222008355e11535caf53d6bccecbb562a055605138975b4e as runtime
 
 # making sure some standard environment variables are set for production use
 ENV NODE_ENV production
 ENV DEBUG 'hopr*'
-ENV NODE_OPTIONS="--max_old_space_size=4096 --experimental-wasm-modules"
+ENV NODE_OPTIONS=--max_old_space_size=4096
 
 # p2p
 EXPOSE 9091

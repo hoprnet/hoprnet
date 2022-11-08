@@ -3,17 +3,17 @@ id: smart-contract
 title: Smart Contract Overview
 ---
 
-**HoprChannels** is the main smart contract of the HOPR protocol. It manages the payment channel between HOPR nodes and the announcement of public nodes.
+**HoprChannels** is the main smart contract of HOPR protocol. It manages the payment channel between HOPR nodes and the announcement of public nodes.
 
 ### Lifecycle of payment channel
 
-A payment channel runs through multiple states during its lifecycle, as shown in the figure below.
+A payment channel runs throug multiple states during its lifecycle, as shown in the figure below.
 
 1. Initially, each payment channel is **Closed**.
-2. Node can lock some assets to payment channels, which leads to the status of **Wait for commitment**.
+2. Node can lock some assets to payment channels, which leads to the status of **Wait for commitement**.
 3. When the destination channel sets a commitment, the payment channel is considered as **Open**. If the counterparty has already set commitment, then funding immediately changes the state to **Open**.
-4. When closing a payment channel, the payment channel first goes into **Pending to close**. Channels need to wait for a timeout for nodes to redeem tickets and thus retrieve the assets. In rare cases, it can happen that the counterparty does not submit an on-chain commit after a node intends to open a payment channel. Under this circumstance, the channel can be turned immediately into **Pending to close**.
-5. Once the timeout is done, any of the involved nodes can finalize the closure and turn the payment channel state into **Closed**.
+4. When closing a payment channel, the payment channel first goes into **Pending to close**. Channels need to wait for a timeout for nodes to redeem tickets and thus retrieve the assets. In rare cases it can happen that the counterparty does not submit an on-chain commit after a node intends to open a payment channel. Under this circumstance, the channel can be turned immediately into **Pending to close**.
+5. Once the timeout is done, any of the involving nodes can finalize the closure and turn the payment channel state into **Closed**.
 
 ![Payment channel states and possible state transitions.](/img/developer/channel_lifecycle.png)
 
@@ -98,7 +98,7 @@ event ChannelFunded(
 );
 ```
 
-Emitted once a channel is funded.
+Emitted once a channel if funded.
 
 #### Parameters:
 
@@ -171,7 +171,7 @@ Emitted once a channel closure is initialized.
 | `destination`           | address | true    | Address of the destination node of a payment channel.        |
 | `closureInitiationTime` | uint32  | false   | Block timestamp at which the channel closure is initialized. |
 
-#### ChannelClosureFinalized
+#### ChannelClosureInitiated
 
 ```solidity
 event ChannelClosureFinalized(
@@ -213,14 +213,14 @@ Emitted once a ticket is redeemed.
 
 #### Parameters:
 
-| Name                 | Type    | Indexed | Description                                                               |
-| -------------------- | ------- | ------- | ------------------------------------------------------------------------- |
-| `source`             | address | true    | Address of the source node of a payment channel.                          |
-| `destination`        | address | true    | Address of the destination node of a payment channel.                     |
-| `nextCommitment`     | bytes32 | false   | Commitment that hashes to the redeemers previous commitment.              |
-| `ticketEpoch`        | uint256 | false   | Current ticket epoch of the channel.                                      |
-| `ticketIndex`        | uint256 | false   | Current ticket index of the channel.                                      |
-| `proofOfRelaySecret` | bytes32 | false   | The Proof-of-Relay secret.                                                |
-| `amount`             | uint256 | false   | Amount of HOPR token embedded in the ticket.                              |
-| `winProb`            | uint256 | false   | The ticket's probability of winning. The sender sets this value.          |
-| `signature`          | bytes   | false   | Signature associated with the ticket, which is signed by the source node. |
+| Name                 | Type    | Indexed | Description                                                                |
+| -------------------- | ------- | ------- | -------------------------------------------------------------------------- |
+| `source`             | address | true    | Address of the source node of a payment channel.                           |
+| `destination`        | address | true    | Address of the destination node of a payment channel.                      |
+| `nextCommitment`     | bytes32 | false   | Commitment that hashes to the redeemers previous commitment.               |
+| `ticketEpoch`        | uint256 | false   | Current ticket epoch of the channel.                                       |
+| `ticketIndex`        | uint256 | false   | Current ticket index of the channel.                                       |
+| `proofOfRelaySecret` | bytes32 | false   | The Proof-of-Relay secret.                                                 |
+| `amount`             | uint256 | false   | Amount of HOPR token embedded in the ticket.                               |
+| `winProb`            | uint256 | false   | The probability of which the ticket wins. This value is set by the sender. |
+| `signature`          | bytes   | false   | Signature associated with the ticket, which is signed by the source node.  |

@@ -98,7 +98,7 @@ gcloud_get_logs() {
 
   # Docker sucks and gives us warnings in stdout.
   local id=$(${gssh} ${vm_name} --command "docker ps -q --filter ancestor='${docker_image}' | xargs docker inspect --format='{{.Id}}'" | grep -v 'warning')
-  ${gssh} ${vm_name} --command "docker logs $id"
+  ${gssh} ${vm_name} --command "docker logs $id"  
 }
 
 # $1 - vm name
@@ -125,7 +125,7 @@ gcloud_create_instance_template() {
   local password="${5:-}"
   # if set, let the node announce with a routable address on-chain
   local announce="${6:-}"
-  # this parameter is mostly used on by CT nodes, although hoprd nodes also support it
+  # this parameter is mostly used on by CT nodes, although hoprd nodes also support it  
   local private_key="${7:-}"
   local metadata_value=""
 
@@ -361,20 +361,4 @@ gcloud_execute_command_instance() {
   local command="${2}"
 
   ${gssh} "${name}" --command "${command}"
-}
-
-# $1=flag name
-gcloud_isset_project_flag() {
-  gcloud compute project-info describe --format=json | jq "any(.commonInstanceMetadata.items[]; .key ==\"${1}\")"
-}
-
-# $1=flag name
-# $2=flag value
-gcloud_set_project_flag() {
-  gcloud compute project-info add-metadata --metadata="${1}=${2}" 2> /dev/null
-}
-
-# $1=flag name
-gcloud_unset_project_flag() {
-  gcloud compute project-info remove-metadata --keys="${1}" 2> /dev/null
 }

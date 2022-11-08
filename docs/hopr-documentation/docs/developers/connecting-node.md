@@ -162,9 +162,7 @@ If successful, you should get a response similar to this one:
 ```json
 {
   "nativeAddress": "0x3a54dDE3ee5ACfd43C902cbecC8ED0CBA10Ff326",
-  "native": "0x3a54dDE3ee5ACfd43C902cbecC8ED0CBA10Ff326",
-  "hoprAddress": "16Uiu2HAmE9b3TSHeF25uJS1Ecf2Js3TutnaSnipdV9otEpxbRN8Q",
-  "hopr": "16Uiu2HAmE9b3TSHeF25uJS1Ecf2Js3TutnaSnipdV9otEpxbRN8Q"
+  "hoprAddress": "16Uiu2HAmE9b3TSHeF25uJS1Ecf2Js3TutnaSnipdV9otEpxbRN8Q"
 }
 ```
 

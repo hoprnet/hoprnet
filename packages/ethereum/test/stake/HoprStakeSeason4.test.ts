@@ -84,7 +84,7 @@ describe('HoprStakeSeason4', function () {
 
     // create NFT and stake contract
     nftContract = await deployContractFromFactory(deployer, 'HoprBoost', [adminAddress, BASE_URI])
-    stakeContract = await deployContractFromFactory(deployer, 'HoprStakeSeason4', [
+    stakeContract = await deployContractFromFactory(deployer, 'HoprStakeSeason3', [
       nftContract.address,
       adminAddress,
       erc677.address,

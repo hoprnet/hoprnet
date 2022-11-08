@@ -5,8 +5,9 @@ title: Demo - Boomerang Chat
 
 import BoomerangChat from './components/BoomerangChat'
 
-Boomerang Chat is a simple app that sends a message to the HOPR Network and returns it to the sender. Because
-nodes in the network have no idea who sent the message and who’s the final recipient, a node can always send a message to itself, and no other node would be any the wiser. HOPR nodes only know who to forward the message to next.
+Boomerang Chat is a simple app which sends a message to the HOPR Network which then returns it to the sender. Because
+nodes in the network have no idea who sent the message and who’s the final recipient, a node can always send a message to itself
+and no other node would be any the wiser. HOPR nodes only know who to forward the message to next.
 
 This demo showcases the minimal requirements needed to build a HOPR app. Boomerang Chat is a `React`-based web application that
 uses native WebSockets to connect to your HOPR node and its REST API to send messages to itself.
@@ -69,9 +70,10 @@ export default function BoomerangChat() {
 ```
 
 From lines `6` to `8`, we see a series of values called `httpEndpoint`, `wsEndpoint`, and `securityToken`.
-These are needed in most HOPR Applications. Without these values, which are configurable by the user, HOPR apps cannot communicate with HOPR nodes.
+These are needed in most HOPR Applications. Without these values, which are configurable by the user, HOPR apps cannot
+not communicate with HOPR nodes.
 
-In line `25`, we see a component called `WebSocketHandler`. Here is its code:
+In line `25` we see a component called `WebSocketHandler`. Here is its code:
 
 ```jsx title="WebSocketHandler.jsx"
 import React, { useEffect, useState } from "react";
@@ -99,7 +101,7 @@ export const WebSocketHandler = ({ wsEndpoint, securityToken }) => {
 
 Here's where things start getting interesting.
 
-1. We are attempting to connect to our HOPR node WebSocket endpoint on load, and
+1. We are attempting to connnect to our HOPR node WebSocket endpoint on load, and
 2. When we succeed, we attach an event handler to every message it receives.
 
 Of course, you could always just try and connect on request rather than on load. For now, the easiest way is
@@ -128,9 +130,9 @@ useEffect(() => {
 }, [securityToken, httpEndpoint])
 ```
 
-In line `4`, we are talking to the node's REST API using the native `fetch` call to obtain its HOPR Address since
+In line `4` we are talking to the node's REST API using the native `fetch` call to obtain its HOPR Address, since
 we’ll be using that later when we want to send a message. It's important to include the `Headers` (see next line)
-which authenticates the client against the call to avoid unauthorized calls. Here's the `getHeaders` method for reference:
+which authenticate the client against the call to avoid unauthorized calls. Here's the `getHeaders` method for reference:
 
 ```js title="getHeaders method"
 const getHeaders = (isPost = false) => {
@@ -164,14 +166,14 @@ const sendMessage = async () => {
 ```
 
 We can see that the message is being sent via the REST API endpoint, including also headers (which are now different)
-since we are making a `POST` request. The important part is on line `7`, where we state the `recipient` of the message
-is `address`, a value which we set up in the initial `useEffect` request. This is how we are signalling to the API to send
-a message to that particular address, which happens to be ourselves. For the HOPR Network, the destination of the message
+since we are doing a `POST` request. The important part is on line `7`, where we state the `recipient` of the message
+is `address`, a value which we set up in the initial `useEffect` request. This is how we are signaling to the API to send
+a message to that particular address, which happens to be ourselves. For the HOPR Network the destination of the message
 is irrelevant.
 
 ### Demo: Boomerang
 
-You can see the application working and running on this same page. Give it a try! Don’t forget that you need
+You can see the application working and running within this same page. Give it a try! Don’t forget that you need
 at least a running HOPR cluster for it to work.
 
 <BoomerangChat />
@@ -187,7 +189,7 @@ Used as a WebSocket interface to react and connect to our HOPR node accordingly.
 ```js title="useWebSocket.js"
 /*
   A react hook.
-  Keeps websocket connection alive and reconnects on disconnections or endpoint changes.
+  Keeps websocket connection alive, reconnects on disconnections or endpoint change.
 */
 import { useImmer } from 'use-immer'
 import { useEffect, useRef, useState } from 'react'
@@ -281,7 +283,7 @@ export default useWebsocket
 
 #### `WebSocketHandler.jsx`
 
-Used a React component to load our HOPR node using the `useWebSocket` hook.
+Used to a React component to load our HOPR node using the `useWebSocket` hook.
 
 ```jsx title="WebSocketHandler.jsx"
 import React, { useEffect, useState } from 'react'
@@ -321,7 +323,7 @@ export default WebSocketHandler
 
 #### `BoomerangChat.jsx`
 
-The actual HOPR application can send and read a message to the same node it’s connected to using its HTTP/WS endpoints.
+Actual HOPR application able to send and read a message to the same node it’s connected to using its HTTP/WS endpoints.
 
 ```jsx title="BoomerangChat.jsx"
 import React, { useEffect, useState } from 'react'

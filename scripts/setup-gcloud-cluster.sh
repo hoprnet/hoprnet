@@ -60,6 +60,10 @@ usage() {
 
 # verify and set parameters
 : "${FAUCET_SECRET_API_KEY?"Missing environment variable FAUCET_SECRET_API_KEY"}"
+: "${STAKING_ACCOUNT_BA28?"Missing environment variable STAKING_ACCOUNT_BA28"}"
+: "${STAKING_ACCOUNT_F84B?"Missing environment variable STAKING_ACCOUNT_F84B"}"
+: "${STAKING_ACCOUNT_0FD4?"Missing environment variable STAKING_ACCOUNT_0FD4"}"
+: "${STAKING_ACCOUNT_6C15?"Missing environment variable STAKING_ACCOUNT_6C15"}"
 
 declare environment="${1?"missing parameter <environment>"}"
 declare init_script=${2:-}
@@ -133,6 +137,27 @@ gcloud_create_or_update_managed_instance_group  \
   "${cluster_size}" \
   "${instance_template_name}"
 
+# This maps "staking account address" => "private key"
+declare -A staking_addrs_dict
+
+# NOTE: the addresses are sorted alphabetically here, to see the actual order the keys will
+# have after sorting. As usual, dictionaries do not keep the insertion order of the keys.
+
+# May be supplied differently in future to accommodate with bigger GCP cluster sizes.
+if [[  "${docker_image}" != *-nat:* ]]; then
+  # Staking addresses for public nodes
+  staking_addrs_dict=(
+    [0xBA28EE6743d008ed6794D023B10D212bc4Eb7e75]="${STAKING_ACCOUNT_BA28}"
+    [0xf84Ba32dd2f2EC2F355fB63F3fC3e048900aE3b2]="${STAKING_ACCOUNT_F84B}"
+  )
+else
+  # Staking addresses for NAT nodes
+  staking_addrs_dict=(
+    [0x0Fd4C32CC8C6237132284c1600ed94D06AC478C6]="${STAKING_ACCOUNT_0FD4}"
+    [0x6c150A63941c6d58a2f2687a23d5a8E0DbdE181C]="${STAKING_ACCOUNT_6C15}"
+  )
+fi
+
 declare network_id
 network_id="$(get_network "${environment}")"
 
@@ -142,8 +167,11 @@ network_id="$(get_network "${environment}")"
 # FIXME: Correctly format the condition (in line with *meta* environment), so that the following lines are skipped for most of the time, and only be executed when:
 # - the CI nodes wants to perform `selfRegister`
 # This can be called always, because the "stake" task is idempotent given the same arguments
-# CI wallet stakes a developer NR NFT
-make -C "${mydir}/.." stake-nrnft environment="${environment}" nftrank=developer network="${network_id}"
+for staking_addr in "${!staking_addrs_dict[@]}" ; do
+  fund_if_empty "${staking_addr}" "${environment}"
+  # we only stake NFT for valencia release
+  PRIVATE_KEY="${staking_addrs_dict[${staking_addr}]}" make -C "${mydir}/.." stake-nrnft environment="${environment}" nftrank=developer network="${network_id}"
+done
 
 # Get names of all instances in this cluster
 # TODO: now `native-addresses` (a.k.a. `hopr_addrs`) doesn't need to contain unique values. The array can contain repetitive addresses
@@ -152,10 +180,15 @@ instance_names="$(gcloud_get_managed_instance_group_instances_names "${cluster_i
 declare -a instance_names_arr
 IFS="," read -r -a instance_names_arr <<< "$(echo "${instance_names}" | jq -r '@csv' | tr -d '\"')"
 
-# These arrays will hold IP addresses and peer IDs
+# Prepare sorted staking account addresses so we ensure a stable order of assignment
+declare staking_addresses_arr=( "${!staking_addrs_dict[@]}" )
+readarray -t staking_addresses_arr < <(for addr in "${!staking_addrs_dict[@]}"; do echo "$addr"; done | sort)
+
+# These arrays will hold IP addresses, peer IDs and staking addresses
 # for instance VMs in the encounter order of the `instance_names` array
 declare -a ip_addrs
 declare -a hopr_addrs
+declare -a used_staking_addrs
 
 # Iterate through all VM instances
 # The loop should be parallelized in future to accommodate better with larger clusters
@@ -167,7 +200,7 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
   wait_until_node_is_ready "${node_ip}"
 
   if [[ "${reset_metadata}" = "true" ]]; then
-    gcloud_remove_instance_metadata "${instance_name}" "HOPRD_PEER_ID,HOPRD_WALLET_ADDR,HOPRD_STAKING_STATUS"
+    gcloud_remove_instance_metadata "${instance_name}" "HOPRD_PEER_ID,HOPRD_WALLET_ADDR,HOPRD_STAKING_ADDR"
   fi
 
   # All VM instances in the deployed cluster will get a special metadata entries
@@ -175,35 +208,37 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
   # These currently include:
   # - node wallet address
   # - node peer ID
-  # - staking status
+  # - associated staking account
   # This information is constant during the lifetime of the VM and
   # does not change during re-deployment once set.
   declare instance_metadata
   instance_metadata="$(gcloud_get_node_info_metadata "${instance_name}")"
 
   # known metadata keys
-  declare wallet_addr peer_id staking_status
+  declare wallet_addr peer_id staking_addr
   wallet_addr="$(echo "${instance_metadata}" | jq -r '."HOPRD_WALLET_ADDR" // empty')"
   peer_id="$(echo "${instance_metadata}" | jq -r '."HOPRD_PEER_ID" // empty')"
-  staking_status="$(echo "${instance_metadata}" | jq -r '."HOPRD_STAKING_STATUS" // empty')"
+  staking_addr="$(echo "${instance_metadata}" | jq -r '."HOPRD_STAKING_ADDR" // empty')"
 
   # data from the node's API for verification or initialization
   declare api_wallet_addr api_peer_id
   api_wallet_addr="$(get_native_address "${api_token}@${node_ip}:3001")"
   api_peer_id="$(get_hopr_address "${api_token}@${node_ip}:3001")"
 
-  if [[ -z "${staking_status}" ]]; then
+  if [[ -z "${staking_addr}" ]]; then
     # If the instance does not have metadata yet, we set it once
 
     # NOTE: We leave only the first public node unstaked
     if [[ ${instance_idx} -eq 0 && "${instance_template_name}" != *-nat* && "${skip_unstaked}" != "true" ]]; then
-      staking_status="unstaked"
+      staking_addr="unstaked"
     else
-      staking_status="staked"
+      # Staking accounts are assigned round-robin
+      staking_addr_idx=$(( (instance_idx ) % ${#staking_addresses_arr[@]} ))
+      staking_addr="${staking_addresses_arr[staking_addr_idx]}"
     fi
 
     # Save the metadata
-    declare new_metadata="HOPRD_WALLET_ADDR=${api_wallet_addr},HOPRD_PEER_ID=${api_peer_id},HOPRD_STAKING_STATUS=${staking_status}"
+    declare new_metadata="HOPRD_WALLET_ADDR=${api_wallet_addr},HOPRD_PEER_ID=${api_peer_id},HOPRD_STAKING_ADDR=${staking_addr}"
     gcloud_add_instance_metadata "${instance_name}" "${new_metadata}"
     gcloud_execute_command_instance "${instance_name}" 'sudo /opt/hoprd/startup-script.sh >> /tmp/startup-script-`date +%Y%m%d-%H%M%S`.log'
   else
@@ -219,9 +254,10 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
 
   ip_addrs+=( "${node_ip}" )
 
-  # Build an array of hopr_addrs to be staked
+  # Do not include the unstaked nodes (= skipped during registration for NR)
   if [[ "${staking_addr}" != "unstaked" ]]; then
     hopr_addrs+=( "${api_peer_id}" )
+    used_staking_addrs+=( "${staking_addr}" )
   fi
 
   # Fund the node as well
@@ -230,9 +266,14 @@ done
 
 # Register all nodes in cluster
 IFS=','
+# If same order of parameters is given, the "register" task is idempotent
+make -C "${mydir}/.." register-nodes \
+  environment="${environment}" \
+  native_addresses="${used_staking_addrs[*]}" \
+  peer_ids="${hopr_addrs[*]}" \
+  network="${network_id}"
 
-# use CI wallet to register VM instances. This action may fail if nodes were previously linked to other staking accounts
-make -C "${mydir}/.." self-register-node \
+make -C "${mydir}/.." sync-eligibility \
   environment="${environment}" \
   peer_ids="${hopr_addrs[*]}" \
   network="${network_id}"

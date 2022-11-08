@@ -3,7 +3,7 @@ id: visualising-hopr-network-topology
 title: Visualizing topology of HOPR network
 ---
 
-Before data packets can be sent between HOPR nodes, nodes need to possess **HOPR** tokens (or **tHOPR** for testnets) and open payment channels with other nodes in the _HoprChannels_ smart contract. By monitoring the opening, closing and updates of payment channels through events emitted from _HoprChannels_, the topology of the current HOPR network can be effectively mapped out.
+Before data packets can be sent between HOPR nodes, nodes need to possess **HOPR** tokens (or **tHOPR** for testnets) and open payment channels with other nodes in the _HoprChannels_ smart contract. By monitoring opening, closing and updates of payment channels through events emitted from _HoprChannels_, the topology of the current HOPR network can be effectively mapped out.
 
 #### HoprChannel Events
 
@@ -15,14 +15,14 @@ The following events are relevant for visualizing the network topology:
 - `ChannelClosureInitiated`
 - `ChannelClosureFinalized`
 
-Connection (including the direction of payment channels), stake (amount of HOPR tokens as channel balance), ticket redemption (number of tickets being redeemed per channel) and change in channel status can be visualized with on-chain events.
+Connection (incluiding the direction of payment channels), stake (amount of HOPR tokens as channel balance), ticket redemption (number of tickets being redeemd per channel) and change change in channel status can be visualized with on-chain events.
 
 A full specification of all the events from _HoprChannels_ smart contract is detailed in section ["Smart Contract Overview"](/developers/smart-contract)
 
 #### Importance score
 
 With the latest channel balances, **importance score** can be calculated per channel. This score is used as an indicator for cover traffic nodes to prioritize the distribution of cover traffic.
-The importance score is calculated as a product of the **stake** of a node and the sum of the **weights** of all outgoing channels.
+The importance score is calculated as a product of the **stake** of a node and the sum of **weights** of all the outgoing channels.
 
 $$
 \Omega(N_i) = st(N_i) \cdot \sum_{j} w(C_{N_iN_j})

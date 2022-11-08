@@ -1,15 +1,5 @@
 # Changelog
 
-<a name="1.91"></a>
-
-- Include HOPR Staking Season 5 smart contracts ([#4221](https://github.com/hoprnet/hoprnet/pull/4221))
-- Various optimizations of Rust crates ([#4221](https://github.com/hoprnet/hoprnet/pull/4260))
-- Add Metrics API for Prometheus, `metrics` API endpoint and collection of various metrics ([#4233](https://github.com/hoprnet/hoprnet/pull/4233))
-- Improve pre-merge check to prevent PR from merging when the upstream deployment is in the failed state ([#4294](https://github.com/hoprnet/hoprnet/pull/4294))
-- Add Health Status Indicator in the Admin UI ([#4197](https://github.com/hoprnet/hoprnet/pull/4197))
-
----
-
 <a name="1.90"></a>
 
 ## [1.90](https://github.com/hoprnet/hoprnet/compare/release/paleochora...hoprnet:release/valencia)
@@ -23,7 +13,6 @@
 - Remove charset complexity validation on API token ([#4210](https://github.com/hoprnet/hoprnet/pull/4210))
 - Properly encode API token passed from the Admin UI ([#4210](https://github.com/hoprnet/hoprnet/pull/4210))
 - Refactor timeouts for more throughput and increase usage of iterables ([#4238](https://github.com/hoprnet/hoprnet/pull/4238))
-- Fix incoming channels being listed as outgoing and vice versa in API ([#4236](https://github.com/hoprnet/hoprnet/pull/4236))
 - Refactor packet forward interaction for less locking ([#4232](https://github.com/hoprnet/hoprnet/pull/4243))
 - Refactor mixer to migitate backpressure ([#4232](https://github.com/hoprnet/hoprnet/pull/4243))
 - Filter addresses before adding them to libp2p's PeerStore ([#4246](https://github.com/hoprnet/hoprnet/pull/4246))
@@ -83,7 +72,6 @@
 - Changed `release/paleochora` default environment to `monte_rosa` in preparation of next release
 - Fix broken package link in Avado ([#4082](https://github.com/hoprnet/hoprnet/pull/4082))
 - Automate contract verification on Gnosis chain and Goerli testnet.
-- Add support for communication between different releases within the same environment
 
 # Breaking changes
 

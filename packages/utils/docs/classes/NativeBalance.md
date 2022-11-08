@@ -70,7 +70,7 @@ BalanceBase.bn
 
 #### Defined in
 
-[src/types/primitives.ts:171](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L171)
+[types/primitives.ts:171](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L171)
 
 ___
 
@@ -84,7 +84,7 @@ BalanceBase.symbol
 
 #### Defined in
 
-[src/types/primitives.ts:241](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L241)
+[types/primitives.ts:241](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L241)
 
 ___
 
@@ -98,7 +98,7 @@ BalanceBase.DECIMALS
 
 #### Defined in
 
-[src/types/primitives.ts:168](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L168)
+[types/primitives.ts:168](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L168)
 
 ___
 
@@ -112,7 +112,7 @@ BalanceBase.SIZE
 
 #### Defined in
 
-[src/types/primitives.ts:167](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L167)
+[types/primitives.ts:167](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L167)
 
 ___
 
@@ -122,7 +122,7 @@ ___
 
 #### Defined in
 
-[src/types/primitives.ts:240](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L240)
+[types/primitives.ts:240](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L240)
 
 ## Accessors
 

@@ -142,10 +142,10 @@ If you sent a successful request, the response will look something like this:
 ## Send messages
 
 The HOPR protocol allows you to send private messages between nodes by using other nodes as relayers. Each message “hops” (hence the
-name “HOPR”) until it reaches its final destination, its contents are known only to the final recipient. This is done automatically
+name “HOPR”) until it reaches its final destination, its contents known only to the final recipient. This is done automatically
 by HOPR nodes, which pick a random path to send your message to your recipient.
 
-The path consists of at least `2` nodes that have channels opened between each other. For instance, to send a message to `node 2`
+The path consists of at least `2` nodes that have channels openned between each other. For instance, to send a message to `node 2`
 from `node 1`, one path a message could take is `node 1 -> node 4 -> node 3 -> node 2`. Since HOPR clusters have channels open between all nodes, all possible paths are available.
 
 To try this out, let's use the REST API from `node 1` and send a message to `node 2`, which we'll be able to see via our
@@ -199,14 +199,14 @@ Congratulations! You have sent your first message using the HOPR protocol!
 
 ### 3. Extra: Channels and tickets
 
-You cannot send unlimited messages[^2]. Each message requires `tickets` and headers with signatures for claiming
-balance updates in a `HOPR` token balanced payment channel. For every relayer you use (default `2`), you need to "attach"
-`HOPR` tokens (`0.01` per relay) which are used to pay for the relayer's work. Tickets are settled in a single global entry
+You cannot send unlimited messages[^2]. Each message requires `ticket`s, headers with signatures for claiming
+balance updates in a `HOPR` token balanced payment channel. For every relayer you use (default `2`) you need to "attach"
+`HOPR` tokens (`0.01` per relay) which are used to pay for relayer's work. Tickets are settled in a global single entry
 `HoprChannels` Ethereum contract.
 
 The previous message worked because a cluster is configured by default to open a few channels and lock enough `HOPR`
 tokens to send messages to at least `2` relayers. When a path used to relay has depleted (empty) or closed `channels`,
-your message will not be forwarded. You can always see your open `channels` and their balance with the following command:
+your message will no longer be forwarded. You can always see your open `channels` and ther balance with the following command:
 
 ```bash
 channels
@@ -227,7 +227,7 @@ To view the interface in your browser, simply paste your `HOPR_NODE_1_WS_URL`. Y
 
 ## Walkthrough
 
-If you need help completing this tutorial, you can watch our 15-minute walkthrough, which also includes the setup of the local HOPR cluster.
+If you need help to complete this tutorial, you can watch our 15-minute walkthrough which also includes the setup of the local HOPR cluster.
 
 <figure class="video-container" style={{"marginTop": "-100px", "marginBottom": "-100px"}}>
   <iframe src="https://player.vimeo.com/video/672847960?h=bc02050298" width="640" height="564" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>
@@ -235,13 +235,13 @@ If you need help completing this tutorial, you can watch our 15-minute walkthrou
 
 [^1]:
     As defined in ["Running a local HOPR Cluster"](/developers/starting-local-cluster), a HOPR cluster is a set of HOPR nodes that are connected (i.e
-    reachable) between each other and have opened funded channels between each other. This is also known as a [Complete
+    reachable) between each other and have openned funded channels between each other. This is also known as a [Complete
     Graph](https://en.wikipedia.org/wiki/Complete_graph), and although it is not required for successfully sending a message
     (i.e. you only need `1` path to a recipient when sending a message), it makes testing and developing HOPR apps easier.
 
 [^2]:
     When a HOPR node uses the `/api/v2/messages` REST API endpoint to send a message, it will use a random path of at
-    least `2` nodes as relayers. These messages cost `$HOPR` tokens because it pays each relayer accordingly to forward the
-    packet. However, you can also send what is known as `0-hop` messages, which bear no cost but provides no privacy, as
+    least `2` nodes as relayers. These messages cost `$HOPR` tokens, because it pays each relayer accordingly to forward the
+    packet. However, you can also send what it is known as `0-hop` messages, which bears no cost, but provides no privacy, as
     the message is sent directly to the recipient. The REST API endpoint does not expose this, but you can send a `0-hop`
     message via the HOPR admin UI or WebSocket client by typing `send ,$peerId message`.

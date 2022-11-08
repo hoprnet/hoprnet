@@ -46,3 +46,4 @@ jobs:
         continue-on-error: true
         run:
           shellcheck -a --norc -s bash -x scripts/*.sh
+

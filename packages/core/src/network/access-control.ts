@@ -1,16 +1,10 @@
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type NetworkPeers from './network-peers.js'
-import { create_counter, debug } from '@hoprnet/hopr-utils'
+import { debug } from '@hoprnet/hopr-utils'
 import { NetworkPeersOrigin } from './network-peers.js'
 
 // const log = debug('hopr-core:access-control')
 const logError = debug('hopr-core:access-control:error')
-
-// Metrics
-const metric_rejectedConnections = create_counter(
-  'core_counter_nr_rejected_conns',
-  'Number of rejected connections due to NR'
-)
 
 /**
  * Encapsulates logic to control access behaviours.
@@ -27,7 +21,7 @@ export default class AccessControl {
     this.networkPeers.register(peerId, origin)
   }
 
-  private denyConnectionWithPeer(peerId: PeerId, origin: NetworkPeersOrigin): void {
+  private async denyConnectionWithPeer(peerId: PeerId, origin: NetworkPeersOrigin): Promise<void> {
     this.closeConnectionsTo(peerId)
     this.networkPeers.addPeerToDenied(peerId, origin)
   }
@@ -47,7 +41,6 @@ export default class AccessControl {
         this.allowConnectionWithPeer(peerId, origin)
       } else {
         this.denyConnectionWithPeer(peerId, origin)
-        metric_rejectedConnections.increment()
       }
     } catch (error) {
       logError(`unexpected error when reviewing connection ${peerId.toString()} from ${origin}`, error)

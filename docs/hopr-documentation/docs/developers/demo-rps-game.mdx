@@ -6,7 +6,7 @@ title: Demo - Rock, Paper & Scissors Game
 import IframeLoader from './components/IframeLoader'
 
 The Rock, Paper, Scissors (RPS) Game is a HOPR app which can use the HOPR network as a p2p gaming platform. Players can send off-chain moves to a HOPR node which acts as a "referee" using fixed logic (i.e., rock beats scissors, scissors beat paper, and
-paper beats rock) to produce a winner. After each node has sent its move, the referee displays the winner of the game and the moves
+paper beats rock) to produce a winner. After each node has send its move, the referee displays the winner of the game and the moves
 made by each player.
 
 In this demo app, we will also show the pros and cons of the HOPR protocol when sending private messages.
@@ -22,8 +22,8 @@ for guidance.
 
 ## How it works
 
-The game requires at least `3` HOPR nodes within a HOPR cluster. Each node has two possible roles: `Player` and `Referee`. A `Player`
-plays a game by sending its move (i.e., "rock", "paper", or "scissors") to a `Referee`. When `2` `Players` have sent a move to a single
+The game requires at least `3` HOPR nodes within a HOPR cluster. Each of these nodes has two possible roles: `Player` and `Referee`. A `Player`
+plays a game by sending its move (i.e., "rock", "paper" or "scissors") to a `Referee`. When `2` `Players` have sent a move to a single
 `Referee`, then the `Referee` will send a message back to each `Player` telling them whether they have won, lost, or tied.
 
 ```
@@ -114,7 +114,7 @@ export default function Connector({
 
 ### WebSocketHandler
 
-Similarly, a HOPR app needs to initialize a WebSocket client and reload upon changes to the `WS_ENDPOINT` value. Underneath
+In a similar fashion, a HOPR app needs to initialize a WebSocket client and reload upon changes to the `WS_ENDPOINT` value. Underneath
 we also use a `useWebSocket` hook which does the actual binding against the socket via `addEventListener`.
 
 ```jsx title="WebSocketHandler.jsx"
@@ -311,7 +311,7 @@ export default function RPSGame() {
 ## Game Dynamic
 
 Upon load, the RPS game prompts the user with the connecting information and a decision on whether the particular node
-should be a `Player` or a `Referee`. `Player` nodes can send moves, and `Referee` nodes can listen to multiple messages.
+should be a `Player` or a `Referee`. `Player` nodes can send moves, and `Referee` nodes are able to listen to multiple messages.
 
 ### Move Phase
 
@@ -375,7 +375,7 @@ useEffect(() => {
 
 The logic can be described as follows.
 
-1. First, we make sure we parse only _moves_ and not any message sent to our nodes. In lines `4-6`, we parse the messages
+1. First, we make sure we parse only _moves_ and not any message sent to our nodes. In lines `4-6` we parse the messages
    given the expected format `address-move`. We need both values to know who’s playing and reply to them.
 
 2. In lines `9-10` we make sure to ignore messages that do not follow the expected format.
@@ -383,10 +383,10 @@ The logic can be described as follows.
 3. Line `12` makes sure the game can only be played by different users.
 
 4. Lines `14-16` and `21-23` are the ones actually comparing the moves, and send their respective lines after sending the
-   appropriate response to the players, concluding the game.
+   appropiate response to the players, concluding the game.
 
 5. Last but not least, line `33` ensures this logic is only called by `Referee` nodes, so even if `Player` nodes get
-   messages, they will not act as `Referee` nodes and send messages back.
+   messages, they will not act as a `Referee` nodes and send messages back.
 
 ## Demo - Rock, Paper, Scissors Game
 
@@ -448,7 +448,7 @@ The logic can be described as follows.
 
 This RPS game already highlights some of the benefits of the HOPR network as a p2p platform:
 
-- Instead of relying on a central authority, anyone can execute a game logic and evaluate player actions as needed.
+- Instead of having to rely on a central authority, anyone can execute a game logic and evaluate player actions as needed.
 - Because of how the technology works, these applications can be coded as simple web pages that connect to a more complex backend.
 - Since all information is private, you could send sensitive information and even create games around secrets or private keys.
 
@@ -456,10 +456,10 @@ That being said, it should also be obvious there are also wrinkles and shortcomi
 
 - Since there is no sender-receiver linkage, anyone can pretend to send a message (this can be solved using the `/sign` API endpoint,
   which ensures a message was sent by _your_ node and not _any_ node).
-- At the time of writing, the HOPR protocol does not have an acknowledge-like feature, so message senders have no way
-  to know whether their messages arrive (this is currently handled on an application level, like the `Referee` sending a response back).
+- At time of writing, the HOPR protocol does not have an acknowledge-like feature, so message senders have no way
+  to know whether their messages arrive or not (this is currently handled on an application level, like the `Referee` sending a response back).
 - Messages can take any shape or form, so the encoding and decoding of the messages to information that’s relevant is currently handled
-  on an application basis. In the future, there will be a HOPR SDK which will help with some basic message parsing.
+  on an application basis. In the future there will be a HOPR SDK which will help with some basic message parsing.
 
 ### Annex: RockPaperScissorsGame.jsx
 

@@ -39,9 +39,9 @@
       "channels_contract_address": "0xc81E2Bf738f8018202c8Bd9dA85a12D5D7291d08",
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
       "xhopr_contract_address": "0xe8aD2ac347dA7549Aaca8F5B1c5Bf979d85bC78F",
-      "boost_contract_address": "0xDA335D985710b80e5BfC697C6Fba0A906Dd4a1CE",
-      "stake_contract_address": "0xab231873246daaff05c99b3682ea649e6C80AB68",
-      "network_registry_proxy_contract_address": "0xb311239b46feCde9D68d70Ae4bA8733C3dBC7023",
+      "boost_contract_address": "0x52C7c5AC7d0570eF03d274E2644974fa0097089e",
+      "stake_contract_address": "0x8CF4c5e0e1A9DB314a959DFDFB488DdF66d5B23f",
+      "network_registry_proxy_contract_address": "0xBEf9de8A8EA1f6c18205E4c68DeC5f19Eb725C03",
       "network_registry_contract_address": "0xf3374666487A58aa424BF9dB9bCf74250393a757",
       "tags": ["etherscan"]
     },
@@ -139,13 +139,13 @@
       "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
       "stake_contract_address": "0x5Bb7e435aDa333A6714e27962e4Bb6aFDE1cECd4",
       "network_registry_contract_address": "0xf0D4D48866C4F9665212B29A64c14A1f0FEDFD4c",
-      "network_registry_proxy_contract_address": "0x15e068Ef1f76319b1848b1fcB3e49D68724AEE07",
-      "tags": ["etherscan"]
+      "tags": ["etherscan"],
+      "network_registry_proxy_contract_address": "0x15e068Ef1f76319b1848b1fcB3e49D68724AEE07"
     },
     "monte_rosa": {
       "network_id": "xdai",
       "environment_type": "production",
-      "version_range": "1.89||1.90||1.91",
+      "version_range": "1.89||1.90",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0x66225dE86Cac02b32f34992eb3410F59DE416698",
       "channels_contract_address": "0xFaBeE463f31E39eC8952bBfB4490C41103bf573e",
@@ -182,7 +182,7 @@
       "description": "Görli Testnet is the first proof-of-authority cross-client testnet, synching Parity Ethereum, Geth, Nethermind, Hyperledger Besu (formerly Pantheon), and EthereumJS",
       "chain_id": 5,
       "live": true,
-      "max_fee_per_gas": "200 gwei",
+      "max_fee_per_gas": "10 gwei",
       "max_priority_fee_per_gas": "2 gwei",
       "default_provider": "https://provider-proxy.hoprnet.workers.dev/eth_goerli",
       "etherscan_api_url": "http://api-goerli.etherscan.io/api",

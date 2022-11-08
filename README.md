@@ -75,7 +75,7 @@ docker pull gcr.io/hoprassociation/hoprd:valencia
 For ease of use you can set up a shell alias to run the latest release as a docker container:
 
 ```sh
-alias hoprd='docker run --pull always -m 2g -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:valencia'
+alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:valencia'
 ```
 
 **IMPORTANT:** Using the above command will map the database folder used by hoprd to a local folder called `.hoprd-db` in your home directory. You can customize the location of that folder further by executing the following command:
@@ -113,7 +113,7 @@ npm install @hoprnet/hoprd@1.88
 ### Install via [Nix package manager][1]
 
 NOTE: This setup should only be used for development or if you know what you
-are doing and don't need further support. Otherwise you should use the `npm`
+are doing and don't neetd further supported. Otherwise you should use the `npm`
 or `docker` setup.
 
 You will need to clone the `hoprnet` repo first:
@@ -186,7 +186,7 @@ The following command assumes you've setup an alias like described in [Install v
 hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --admin --adminHost 0.0.0.0 --apiToken <MY_TOKEN> --environment monte_rosa
 ```
 
-Here is a short breakdown of each argument.
+Here is a short break-down of each argument.
 
 ```sh
 hoprd
@@ -243,7 +243,7 @@ We attempt to provide instructions on how to migrate your tokens between release
 5. Run `info` and take note of the **network name**.
 6. Once funds are confirmed to exist in a different wallet, backup `.hopr-identity` folder.
 7. Launch new `HOPRd` instance using latest release, observe the account address.
-8. Only transfer funds to new `HOPRd` instance if `HOPRd` operates on the **same network** as last release, you can compare the two networks using `info`.
+8. Only tranfer funds to new `HOPRd` instance if `HOPRd` operates on the **same network** as last release, you can compare the two networks using `info`.
 
 ## Develop
 
@@ -359,11 +359,11 @@ Read the full help information of the script in case of questions:
 ```
 
 That command will spawn multiple `hoprd` nodes locally from the local
-source code and run the tests against this cluster of nodes. The tests can be
-found in the files `test/*.sh`. The script will clean up all nodes once completed
+source-code and run the tests against this cluster of nodes. The tests can be
+found in the files `test/*.sh`. The script will cleanup all nodes once completed
 unless instructed otherwise.
 
-An alternative to using the local source code is running the tests against
+An alternative to using the local source-code is running the tests against
 a NPM package.
 
 ```sh
@@ -382,9 +382,9 @@ Read the full help information of the script in case of questions:
 
 #### Running Tests on Google Cloud Platform
 
-In some unique cases, some bugs might not have been picked up by our end-to-end
+In some unique cases, some bugs might not had been picked up by our end-to-end
 testing and instead only show up when deployed to production. To avoid having
-to see these only after a time-consuming build, a cluster of nodes can be
+to see these only after a time consuming build, a cluster of nodes can be
 deployed to Google Cloud Platform which is then used to run tests against it.
 
 A requirement for this setup is a working `gcloud` configuration locally.
@@ -410,7 +410,7 @@ Read the full help information of the script in case of questions:
 
 ## Deploy
 
-The deployment nodes and networks are mostly orchestrated through the script
+The deployment nodes and networks is mostly orchestrated through the script
 files in `scripts/` which are executed by the Github Actions CI workflows.
 Therefore, all common and minimal networks do not require manual steps to be
 deployed.

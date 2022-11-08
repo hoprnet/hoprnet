@@ -18,7 +18,7 @@ steps:
       - --cache-ttl=96h
       - --build-arg=PACKAGE_VERSION=${_PACKAGE_VERSION}
       - --build-arg=HOPRD_RELEASE=${_IMAGE_VERSION}
-    timeout: 1200s
+    timeout: 600s
     waitFor:
       - buildHoprd
   - name: 'gcr.io/kaniko-project/executor:latest'
@@ -29,7 +29,7 @@ steps:
       - --cache=true
       - --cache-ttl=96h
       - --build-arg=PACKAGE_VERSION=${_PACKAGE_VERSION}
-    timeout: 1200s
+    timeout: 600s
     waitFor: ['-']
   - name: 'gcr.io/kaniko-project/executor:latest'
     id: buildHardhat
@@ -38,7 +38,7 @@ steps:
       - --destination=gcr.io/${PROJECT_ID}/hopr-hardhat:${_IMAGE_VERSION}
       - --cache=true
       - --cache-ttl=96h
-    timeout: 1200s
+    timeout: 600s
     waitFor: ['-']
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: testImages
@@ -51,7 +51,7 @@ steps:
     env:
       - 'PACKAGE_VERSION=$_PACKAGE_VERSION'
       - 'IMAGE_VERSION=$_IMAGE_VERSION'
-    timeout: 1200s
+    timeout: 600s
     waitFor:
       - buildHoprd
       - buildHoprdNat

@@ -17,7 +17,7 @@
 
 #### Defined in
 
-[src/network/hosts.ts:2](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/hosts.ts#L2)
+[network/hosts.ts:2](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/hosts.ts#L2)
 
 ___
 
@@ -27,4 +27,4 @@ ___
 
 #### Defined in
 
-[src/network/hosts.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/hosts.ts#L3)
+[network/hosts.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/hosts.ts#L3)

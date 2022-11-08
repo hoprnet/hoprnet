@@ -1,5 +1,5 @@
 # use slim version of node on Debian bullseye for smaller image sizes during build
-FROM node:16-bullseye-slim@sha256:95d4fdef5e12916a89f7d56dca6d8099de61df875c3c61106cb53e0ba1a48d44 as build
+FROM node:16-bullseye-slim@sha256:8265ac132f720998222008355e11535caf53d6bccecbb562a055605138975b4e as build
 
 LABEL description="This image launches a hardhat node running a local network with the HOPR contracts deployed and available."
 
@@ -61,12 +61,6 @@ RUN make -j build \
 
 # use alpine version of node for smallest image sizes
 FROM node:16-alpine as runtime
-
-# install tools required within our scripts
-RUN apk add --no-cache libc6-compat
-
-# symlink to ensure any files relying on the presence of the library keep working
-RUN ln -s /lib/libc.musl-x86_64.so.1 /lib/ld-linux-x86-64.so.2
 
 RUN mkdir /core
 

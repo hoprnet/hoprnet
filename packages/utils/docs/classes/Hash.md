@@ -42,7 +42,7 @@
 
 #### Defined in
 
-[src/types/primitives.ts:76](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L76)
+[types/primitives.ts:76](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L76)
 
 ## Methods
 
