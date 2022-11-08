@@ -185,17 +185,16 @@ HOPRD_PERFORM_CLEANUP=true ./scripts/setup-gcloud-cluster.sh "${ENVIRONMENT_NAME
 ```
 
 7. On the `release/${RELEASE_NAME}` branch, check that everything is ready and push it to GitHub by executing : `git push origin`. Wait until the [deployment of the cluster](https://github.com/hoprnet/hoprnet/actions/workflows/deploy.yaml) has finished successfully.
-8. Create a release tag for the new release: `git tag release/${RELEASE_NAME} && git push origin release/${RELEASE_NAME}` 
-9. Create a Pull Request for tracking the release changes against the `master` branch. Remark in the PR description that it should never be merged!. Also use the label `DO NOT MERGE` and `release`. As a reference take a look at https://github.com/hoprnet/hoprnet/pull/4311
-10. On the `release/${RELEASE_NAME}` branch, create a topology cluster using the [script](./release.md#topology-deployment-script) mentioned at the end of this document.
-11. Create a release testnet page in the wiki at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
+8. Create a Pull Request for tracking the release changes against the `master` branch. Remark in the PR description that it should never be merged!. Also use the label `DO NOT MERGE`, `release` and `release/${RELEASE_NAME}`. As a reference take a look at https://github.com/hoprnet/hoprnet/pull/4311
+9. On the `release/${RELEASE_NAME}` branch, create a topology cluster using the [script](./release.md#topology-deployment-script) mentioned at the end of this document.
+10. Create a release testnet page in the wiki at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
     You may use previous testnet pages as templates. Ensure all started nodes are documented.
-12. Share the links to the release tracking issue, tracking PR and testnet wiki page in the `#release` Element channel.
+11. Share the links to the release tracking issue, tracking PR and testnet wiki page in the `#release` Element channel.
     On the `#testing` channel, members are expected to run their own nodes (either AVADO or via their workstation) to participate in the release.
-13. Patches to the release are created via `hotfix/RELEASE_NAME/**` branches.
+12. Patches to the release are created via `hotfix/RELEASE_NAME/**` branches.
     Each of these merges will trigger a new release version, and re-build our infrastructure
     for that version. Upon successfully testing a release
-14. Once the first release version has been built and is running, the release branch should be merged-back into `master` once to trigger version upgrades on `master`. See [the next](./release.md#release-merge-back) section for details.
+13. Once the first release version has been built and is running, the release branch should be merged-back into `master` once to trigger version upgrades on `master`. See [the next](./release.md#release-merge-back) section for details.
 
 Once the release testing has concluded, or if any significant amount of patches has been applied to the release branch, the release branch should be merged back into `master` again.
 
