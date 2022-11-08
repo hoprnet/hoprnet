@@ -64,11 +64,7 @@ export default function Logs(props: { isConnected: boolean; messages: Log[] }) {
   let disclaimer
 
   if (process.env.NODE_ENV === 'production') {
-    disclaimer = (
-      <div className={styles.disclaimer}>
-        {DISCLAIMER}
-      </div>
-    )
+    disclaimer = <div className={styles.disclaimer}>{DISCLAIMER}</div>
   }
 
   return (
