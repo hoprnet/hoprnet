@@ -125,24 +125,29 @@ particular branch to deploy on every change.
 ### Release Cycle
 
 ```
+   hotfix/patch-bogota    staging/bogota         release/bogota           master
 
-   hotfix/patch-constantine    release/constantine          master
-
-         x                   x                       x 1.90.0-next.44
-         x                   │ ◄─────────────────────x
-         x                   │                       x
-         x                   │ 1.90.0                x
-         x                   │                       x
-         x                   ▼                       x
-         ┌◄──────────────────x                       x
-         │                   x                       x
-         │                   x                       x
-         │                   x                       x
-         ▼──────────────────►┐ 1.90.1                x
-         x                   │                       x
-         x                   ▼──────────────────────►x 1.91.0-next.0
-         x                   x                       x
-         x                   x                       x
+         x                   x                       x  create new release  x
+         x                   x                       x◄─────────────────────x 1.91.0-next.44
+         x                   x   create new staging  x 1.91.0               x
+         x                   │ ◄─────────────────────│                      x
+         x                   │                       │   first merge-back   x
+         x                   │                       │ ──────────────────►  x 1.92.0-next.0
+         x                   │ 1.91.0-next.0         │                      x
+         x                   │                       │                      x
+         x  start hotfix     ▼                       │                      x
+         ┌◄──────────────────x                       │                      x
+         │                   x                       │                      x
+         │  hotfix merge     x                       │                      x
+         ▼──────────────────►┐ 1.91.0-next.1         │                      x
+         x                   │                       │                      x
+                             │   release upgrade     │                      x
+         x                   ▼──────────────────────►┐ 1.91.1               x
+         x                   x   staging upgrade     │                      x
+         x                   x ◄─────────────────────│                      x
+         x                   x 1.91.1-next.0         │                      x
+         x                   x                       │   next merge-back    x
+         x                   x                       │ ──────────────────►  x
 
 ```
 
@@ -191,13 +196,46 @@ HOPRD_PERFORM_CLEANUP=true ./scripts/setup-gcloud-cluster.sh "${ENVIRONMENT_NAME
     You may use previous testnet pages as templates. Ensure all started nodes are documented.
 11. Share the links to the release tracking issue, tracking PR and testnet wiki page in the `#release` Element channel.
     On the `#testing` channel, members are expected to run their own nodes (either AVADO or via their workstation) to participate in the release.
-12. Patches to the release are created via `hotfix/RELEASE_NAME/**` branches.
-    Each of these merges will trigger a new release version, and re-build our infrastructure
-    for that version. Upon successfully testing a release
-13. Once the first release version has been built and is running, the release branch should be merged-back into `master` once to trigger version upgrades on `master`. See [the next](./release.md#release-merge-back) section for details.
+11. For details how patches are applied to the release, see the `Release patching` section below.
+12. Once the first release version has been built and is running, the release branch should be merged-back into `master` once to trigger version upgrades on `master`. See [the next](./release.md#release-merge-back) section for details.
 
 Once the release testing has concluded, or if any significant amount of patches has been applied to the release branch, the release branch should be merged back into `master` again.
 
+#### Release patching
+
+Whenever a patch to a release `${RELEASE_NAME}` is needed, it first needs to be tested in the Staging deployment. The Staging deployment
+is specific per each release and runs within the same network environment as the Release. Once the fix is
+considered stable enough (after testing in the Staging deployment), it can be merged into the Release branch (this is called Release upgrade).
+The developers are encourage to batch the hotfixes in the Staging branch and minimize the number of Release upgrades.
+
+If `staging/${RELEASE_NAME}` does not exist yet:
+
+1. (on `release/${RELEASE_NAME}`) if `staging/${RELEASE_NAME}` branch does not exist yet, create it: `git checkout -b staging/${RELEASE_NAME}`
+2. (on `staging/${RELEASE_NAME}`) create and push empty commit to trigger deployment: `git commit --allow-empty -m "Deploy staging ${RELEASE_NAME} && git push -u origin staging/${RELEASE_NAME}"`
+
+To create a hotfix:
+
+1. (on `staging/${RELEASE_NAME}`) create a hotfix branch `hotfix/fix-bug`
+2. (on `hotfix/fix-bug`) add commits to fix the bug
+3. Once the fix needs to be tested, create a PR of `hotfix/fix-bug` to `staging/${RELEASE_NAME}` and merge once peer-reviewed & approved.
+
+#### Release upgrade
+
+The Release upgrade is done, when the Staging deployment is considered stable, so it can be merged back to the Release.
+Once the upgraded release is deployed, the Staging deployment must be updated as well from the Release branch (this is called Staging upgrade).
+
+1. (on `staging/${RELEASE_NAME}`) create branch `release-upgrade-${RELEASE_NAME}`: `git checkout -b release-upgrade-${RELEASE_NAME}`
+2. (on `release-upgrade-${RELEASE_NAME}`) merge `release/${RELEASE_NAME}` into the branch: `git merge release/${RELEASE_NAME}`.
+   In case of a merge conflict, the changes from the `release-upgrade-${RELEASE_NAME}` branch take precedence.
+3. Create a PR of `release-upgrade-${RELEASE_NAME}` and ask for a peer review.
+   Each of such PR merges will trigger a new release version, and re-build our infrastructure.
+4. Wait for the CI to deploy upgraded Release. Then perform the following steps for Staging upgrade.
+5. (on `staging/${RELEASE_NAME}`) create branch `staging-upgrade-${RELEASE_NAME}`: `git checkout -b staging-upgrade-${RELEASE_NAME}`
+6. (on `staging-upgrade-${RELEASE_NAME}`) merge `release/${RELEASE_NAME}` into the branch: `git merge release/${RELEASE_NAME}`.
+   In case of a merge conflict, the changes from `release/${RELEASE_NAME}` take precedence.
+7. Create a PR of `staging-upgrade-${RELEASE_NAME}` and ask for a peer review (should be straight-forward).
+   The merge of the PR will trigger re-build of the Staging infrastructure.
+   
 #### Release merge-back
 
 1. On the `master` branch update the latest changes by executing: `git pull`
