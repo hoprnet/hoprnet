@@ -1,7 +1,10 @@
-import type { Log } from '../utils/index'
 import React, { useEffect, useState, useRef } from 'react'
-import styles from '../../styles/log.module.css'
 import dynamic from 'next/dynamic'
+
+import styles from '../../styles/log.module.css'
+import type { Log } from '../utils/index'
+
+const DISCLAIMER = `ATTENTION: This software is still under development. For testing, this node requires both native and HOPR funds. Use the command "balance" to check the node's funds.`
 
 // TODO: fix type in refactor
 const Jazzicon = dynamic(() => import('./jazzicon'), { ssr: false }) as any
@@ -58,8 +61,15 @@ export default function Logs(props: { isConnected: boolean; messages: Log[] }) {
     container.current.scrollIntoView({ block: 'end', behaviour: 'smooth' })
   })
 
+  let disclaimer
+
+  if (process.env.NODE_ENV === 'production') {
+    disclaimer = <div className={styles.disclaimer}>{DISCLAIMER}</div>
+  }
+
   return (
     <div className={`${styles.logs} ${!props.isConnected ? styles.connecting : ''}`}>
+      {disclaimer}
       <div ref={container}>
         {!props.isConnected && <span>Attempting to connect, please ensure correct settings are set!</span>}
         {props.messages.map((log) => (
