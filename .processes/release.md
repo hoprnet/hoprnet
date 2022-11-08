@@ -196,8 +196,8 @@ HOPRD_PERFORM_CLEANUP=true ./scripts/setup-gcloud-cluster.sh "${ENVIRONMENT_NAME
     You may use previous testnet pages as templates. Ensure all started nodes are documented.
 11. Share the links to the release tracking issue, tracking PR and testnet wiki page in the `#release` Element channel.
     On the `#testing` channel, members are expected to run their own nodes (either AVADO or via their workstation) to participate in the release.
-11. For details how patches are applied to the release, see the `Release patching` section below.
-12. Once the first release version has been built and is running, the release branch should be merged-back into `master` once to trigger version upgrades on `master`. See [the next](./release.md#release-merge-back) section for details.
+12. For details how patches are applied to the release, see the `Release patching` section below.
+13. Once the first release version has been built and is running, the release branch should be merged-back into `master` once to trigger version upgrades on `master`. See [the next](./release.md#release-merge-back) section for details.
 
 Once the release testing has concluded, or if any significant amount of patches has been applied to the release branch, the release branch should be merged back into `master` again.
 
@@ -235,7 +235,7 @@ Once the upgraded release is deployed, the Staging deployment must be updated as
    In case of a merge conflict, the changes from `release/${RELEASE_NAME}` take precedence.
 7. Create a PR of `staging-upgrade-${RELEASE_NAME}` and ask for a peer review (should be straight-forward).
    The merge of the PR will trigger re-build of the Staging infrastructure.
-   
+
 #### Release merge-back
 
 1. On the `master` branch update the latest changes by executing: `git pull`
