@@ -208,7 +208,7 @@ Once the release testing has concluded, or if any significant amount of patches 
    1. Revert changes in `packages/avado/docker-compose.yml`
    2. Revert any chain specific changes.
    3. Revert changes made to Avado configuration files as part of the initial release creation.
-   In regards to version naming convention for the merge-back:
+      In regards to version naming convention for the merge-back:
    - If it is the first merge-back, then the version number to be used should be the one being used in the release branch which does not have the suffix `-next.XX`.
    - If it is other merge-back, then the version number to be used should be the one being used in the master branch which it has the suffix `-next.XX`.
 4. Modify the above created PR to add reviewers, and labels accordingly. Wait for the review before merge the `merge-back-release-${RELEASE_NAME}` branch to `master`.
