@@ -185,7 +185,7 @@ HOPRD_PERFORM_CLEANUP=true ./scripts/setup-gcloud-cluster.sh "${ENVIRONMENT_NAME
 ```
 
 7. On the `release/${RELEASE_NAME}` branch, check that everything is ready and push it to GitHub by executing : `git push origin`. Wait until the [deployment of the cluster](https://github.com/hoprnet/hoprnet/actions/workflows/deploy.yaml) has finished successfully.
-8. Create a release tag for the new release: `git tag release/${RELEASE_NAME} && git push origin release/${RELEASE_NAME}` 
+8. Create a release tag for the new release: `git tag release/${RELEASE_NAME} && git push origin release/${RELEASE_NAME}`
 9. Create a Pull Request for tracking the release changes against the `master` branch. Remark in the PR description that it should never be merged!. Also use the label `DO NOT MERGE` and `release`. As a reference take a look at https://github.com/hoprnet/hoprnet/pull/4311
 10. On the `release/${RELEASE_NAME}` branch, create a topology cluster using the [script](./release.md#topology-deployment-script) mentioned at the end of this document.
 11. Create a release testnet page in the wiki at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
@@ -209,7 +209,7 @@ Once the release testing has concluded, or if any significant amount of patches 
    1. Revert changes in `packages/avado/docker-compose.yml`
    2. Revert any chain specific changes.
    3. Revert changes made to Avado configuration files as part of the initial release creation.
-   In regards to version naming convention for the merge-back:
+      In regards to version naming convention for the merge-back:
    - If it is the first merge-back, then the version number to be used should be the one being used in the release branch which does not have the suffix `-next.XX`.
    - If it is other merge-back, then the version number to be used should be the one being used in the master branch which it has the suffix `-next.XX`.
 4. Modify the above created PR to add reviewers, and labels accordingly. Wait for the review before merge the `merge-back-release-${RELEASE_NAME}` branch to `master`.
