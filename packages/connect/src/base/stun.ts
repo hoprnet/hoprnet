@@ -61,6 +61,7 @@ const kStunTypeMask = 0x0110
 export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInfo, __fakeRInfo?: RemoteInfo): void {
   let replyAddress = rinfo.address
 
+  // When using 'udp6' sockets, IPv4 addresses get prefixed by ::ffff:
   if (rinfo.family === 'IPv6') {
     const match = rinfo.address.match(/(?<=::ffff:)[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/)
 
@@ -78,7 +79,7 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
 
   switch (stunMessage.type & kStunTypeMask) {
     case isStunRequest:
-      let message = createMessage(constants.STUN_BINDING_RESPONSE, stunMessage.transactionId)
+      const message = createMessage(constants.STUN_BINDING_RESPONSE, stunMessage.transactionId)
 
       verbose(`Received ${stunMessage.isLegacy() ? 'legacy ' : ''}STUN request from ${rinfo.address}:${rinfo.port}`)
 
