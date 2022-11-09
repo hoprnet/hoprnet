@@ -95,7 +95,7 @@ At this point, you should have the peerID of the node you want to register copie
 
 Scroll down and make sure you are on the **Write Contract** tab.
 
-![connect wallet blockscout](/img/node/blockscout-NR-connect%20wallet.png)
+![connect wallet blockscout](/img/node/blockscout-NR-connect-wallet.png)
 
 (**2**) Connect the wallet which you used to stake your NFT
 
