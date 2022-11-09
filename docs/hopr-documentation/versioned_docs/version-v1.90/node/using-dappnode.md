@@ -11,15 +11,11 @@ Please withdraw all your funds and delete the old package before installing a ne
 
 ## Installing the HOPR Client
 
-(**1**) Open the DAppStore using the sidebar to the left. Then at the top of the DAppStore, toggle on the public repository bar.
-
-(**2**) A warning prompt will appear. Press `I understand, take me to the public repo` to continue.
-
-**Note:** You may see an empty directory after going to the public repository, just refresh the page if this happens. You may need to refresh several times until you see several packages in your directory, one of them being `Hopr`.
+(**1**) Open the DAppStore using the sidebar to the left.
 
 ![DappStore](./images/DappStore-NR.png)
 
-(**3**) You should see the latest version of the HOPR client now. Just click `Get` and wait for it to install
+(**2**) You should see the latest version of the HOPR client now. Just click `Get` and wait for it to install.
 
 That's all! You should now be able to find the HOPR client in your 'Packages'.
 
