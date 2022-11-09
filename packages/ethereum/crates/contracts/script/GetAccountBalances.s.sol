@@ -5,8 +5,8 @@ import "forge-std/Script.sol";
 import "forge-std/Test.sol";
 import "./utils/EnvironmentConfig.s.sol";
 
-contract GetAccountBalancesScript is Test, Script, EnvironmentConfig {
-    function run(address account) external returns (uint256 nativeBalance, uint256 tokenBalance) {
+contract GetAccountBalancesScript is Script, Test, EnvironmentConfig {
+    function run(address account) external returns (address wallet, uint256 nativeBalance, uint256 tokenBalance) {
         // 1. Environment check
         // get envirionment of the script
         getEnvrionment();
@@ -19,7 +19,7 @@ contract GetAccountBalancesScript is Test, Script, EnvironmentConfig {
         // check token balance of account;
         (bool successReadTokenBalance, bytes memory returndataTokenBalance) = currentEnvironmentDetail.hoprTokenContractAddress.staticcall(abi.encodeWithSignature("balanceOf(address)", account));
         if (!successReadTokenBalance) {
-            emit log_string("Cannot read balanceOf token contract");
+            revert("Cannot read balanceOf token contract");
         }
         uint256 tokenBalance = abi.decode(returndataTokenBalance, (uint256));
 
@@ -29,6 +29,6 @@ contract GetAccountBalancesScript is Test, Script, EnvironmentConfig {
         emit log_named_decimal_uint("token_balance", tokenBalance, 18);
 
         // 4. return
-        return (nativeBalance, tokenBalance);
+        return (account, nativeBalance, tokenBalance);
     }
 }
