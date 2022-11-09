@@ -211,7 +211,7 @@ The developers are encourage to batch the hotfixes in the Staging branch and min
 If `staging/${RELEASE_NAME}` does not exist yet:
 
 1. (on `release/${RELEASE_NAME}`) if `staging/${RELEASE_NAME}` branch does not exist yet, create it: `git checkout -b staging/${RELEASE_NAME}`
-2. (on `staging/${RELEASE_NAME}`) create and push empty commit to trigger deployment: `git commit --allow-empty -m "Deploy staging ${RELEASE_NAME} && git push -u origin staging/${RELEASE_NAME}"`
+2. (on `staging/${RELEASE_NAME}`) create and push empty commit to trigger deployment: `git commit --allow-empty -m "Deploy staging ${RELEASE_NAME}" && git push -u origin staging/${RELEASE_NAME}`
 
 To create a hotfix:
 
