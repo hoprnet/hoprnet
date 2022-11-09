@@ -100,7 +100,7 @@ build_and_tag_images() {
         scripts/nat &
     fi
 
-    if [ -z "${image_name}" ] ||  [ "${image_name}" = "pluto-complete" ]; then
+    if [ -z "${image_name}" ] || [ "${image_name}" = "hardhat" ] || [ "${image_name}" = "pluto-complete" ]; then
       log "Building Docker image hopr-hardhat-local"
       docker build -t hopr-hardhat-local \
         -f packages/ethereum/Dockerfile.hardhat . &

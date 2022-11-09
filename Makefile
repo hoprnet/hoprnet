@@ -10,7 +10,7 @@ $(WORKSPACES_WITH_RUST_MODULES):
 
 .PHONY: toolchain
 toolchain: ## install toolchain
-	scripts/install-toolchain.sh
+	scripts/toolchain/install-toolchain.sh
 
 .PHONY: deps
 deps: ## install dependencies
