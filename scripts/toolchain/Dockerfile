@@ -14,6 +14,7 @@ SHELL ["/bin/bash", "-lc"]
 
 COPY .yarn .yarn/
 COPY package.json .yarnrc.yml rust-toolchain.toml .nvmrc yarn.lock ./
-COPY scripts/install-toolchain.sh ./scripts/
+RUN mkdir -p scripts/toolchain
+COPY scripts/toolchain/install-toolchain.sh ./scripts/toolchain
 
-RUN ./scripts/install-toolchain.sh
+RUN ./scripts/toolchain/install-toolchain.sh

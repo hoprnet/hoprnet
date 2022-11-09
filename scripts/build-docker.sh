@@ -84,21 +84,18 @@ build_and_tag_images() {
     if [ -z "${image_name}" ] || [ "${image_name}" = "hoprd" ] || [ "${image_name}" = "pluto-complete" ]; then
       log "Building Docker image hoprd-local"
       docker build -q -t hoprd-local \
-        --build-arg=PACKAGE_VERSION="${package_version}" \
         -f packages/hoprd/Dockerfile . &
     fi
 
     if [ -z "${image_name}" ] || [ "${image_name}" = "cover-traffic-daemon" ]; then
       log "Building Docker image hopr-cover-traffic-daemon-local"
       docker build -q -t hopr-cover-traffic-daemon-local \
-        --build-arg=PACKAGE_VERSION="${package_version}" \
         -f packages/cover-traffic-daemon/Dockerfile . &
     fi
 
     if [ -z "${image_name}" ] || [ "${image_name}" = "hoprd-nat" ]; then
       log "Building Docker image hoprd-nat-local"
       docker build -q -t hoprd-nat-local \
-        --build-arg=PACKAGE_VERSION="${package_version}" \
         --build-arg=HOPRD_RELEASE="${image_version}" \
         scripts/nat &
     fi

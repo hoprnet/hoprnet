@@ -1,7 +1,9 @@
+ARG HOPR_TOOLCHAIN_IMAGE=${HOPR_TOOLCHAIN_IMAGE:-hopr-toolchain}
+
 # Run hopr-cover-traffic-daemon within a single container using yarn
 
 # use slim version of node on Debian for smaller image sizes
-FROM hopr-toolchain as build
+FROM ${HOPR_TOOLCHAIN_IMAGE} as build
 
 COPY .yarn .yarn
 COPY Makefile Makefile.deps Cargo.toml Cargo.lock yarn.lock tsconfig.build.json tsconfig.json tsconfig.scripts.json yarn.lock rust-toolchain.toml ./
