@@ -2,6 +2,7 @@
 id: using-avado
 title: Using an Avado Node
 ---
+
 To set up your AVADO Node, follow the instructions that came with the box. If you have a HOPR PC Node, it will come with HOPR pre-installed. All you have to do is download the HOPR client to start interacting with your node!
 
 :::caution Warning
