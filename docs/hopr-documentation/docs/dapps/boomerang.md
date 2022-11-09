@@ -7,7 +7,7 @@ A proof of concept dApp to demonstrate multihop messages, send messages from you
 
 Click on any node URL to open Boomerang.
 
-![Boomerang playground](./images-dApps/boomerang-2.png)
+![Boomerang playground](/img/dapps/boomerang-2.png)
 
 (**1**) Enter a message into the "Send a message" field.
 

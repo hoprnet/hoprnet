@@ -164,7 +164,7 @@ docker container ls --all
 
 This will create a list of all your docker containers similar to the one below:
 
-![Container ID logs](./images/container-ID-logs.png)
+![Container ID logs](/img/node/container-ID-logs.png)
 
 (**2**) look through the list and find the `container ID` of the most recently exited container. The example above would be `5955dbd23bb2` as the most recent container is still running.
 

@@ -2,6 +2,7 @@
 id: using-avado
 title: Using an Avado Node
 ---
+
 To set up your AVADO Node, follow the instructions that came with the box. If you have a HOPR PC Node, it will come with HOPR pre-installed. All you have to do is download the HOPR client to start interacting with your node!
 
 :::caution Warning
@@ -38,7 +39,7 @@ If you have previously installed a node and have the [identity file downloaded](
 
 (**1**) Locate your HOPR package and click on the manage icon. From there, scroll down to the file manager.
 
-![avado upload](./images/avado-db.png)
+![avado upload](/img/node/avado-db.png)
 
 (**2**) Click on `Browse` button to the right of the first text field under `Upload to DNP`.
 
@@ -54,11 +55,11 @@ To collect the logs:
 
 (**1**) Locate your HOPR package and click on the manage icon.
 
-![Manage Avado](./images/avado-manage.png)
+![Manage Avado](/img/node/avado-manage.png)
 
 (**2**) Scroll to the bottom to find your logs.
 
-![Avado Logs](./images/Avado-logs.png)
+![Avado Logs](/img/node/Avado-logs.png)
 
 (**3**) Enter 1500 into the `Lines` text field instead of 200 and turn `auto-refresh logs` off. Now you should be able to copy your logs easily.
 
@@ -75,7 +76,7 @@ You can set your own RPC endpoint for HOPR to use. Ideally, you would install an
 
 If you have already installed an ETH client, you can find its RPC endpoint on the client's settings page.
 
-![ETH client settings](./images/RPC-endpoint-avado.png)
+![ETH client settings](/img/node/RPC-endpoint-avado.png)
 
 The image above shows the RPC for the GETH client: `http://ethchain-geth.my.ava.do:8545`. Your endpoint will be different depending on the client you have installed. Otherwise, you can use any non-local RPC provider such as [ankr.](https://www.ankr.com/)
 
@@ -85,11 +86,11 @@ To change your RPC endpoint:
 
 (**1**) Locate your HOPR package and click on the manage icon.
 
-![Manage Avado](./images/avado-manage.png)
+![Manage Avado](/img/node/avado-manage.png)
 
 (**2**) Under `Environment Variables`, you should find the variable `HOPRD_PROVIDER` along with an editable text field to its right.
 
-![Environment variables](./images/HOPR-provider-Avado.png)
+![Environment variables](/img/node/HOPR-provider-Avado.png)
 
 (**3**) The default endpoint is `https://provider-proxy.hoprnet.workers.dev/dai_mainnet`. Replace this with your own, e.g. `http://ethchain-geth.my.ava.do:8545` in my case.
 

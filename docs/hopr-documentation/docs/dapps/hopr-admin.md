@@ -5,7 +5,7 @@ title: Hopr-admin
 
 The familiar hopr-admin from previous testnets, click on any of the URLs to open the admin, then wait ~20s for the screen to turn from yellow to blue. You should end up with the following interface:
 
-![hopr-admin playground](./images-dApps/hopr-admin-playground-2.png)
+![hopr-admin playground](/img/dapps/hopr-admin-playground-2.png)
 
 (**1**) You can click this to see a list of your connected peers; this should be the four other nodes on your cluster.
 
