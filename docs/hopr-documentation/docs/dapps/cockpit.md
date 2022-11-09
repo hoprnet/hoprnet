@@ -7,7 +7,7 @@ This dashboard lets you see status information about your node at a glance, incl
 
 You should see your current node; click on "open" to expand its overview,
 
-![cockpit single node](/img/dapps/cockpit-playground-single%20node.png)
+![cockpit single node](/img/dapps/cockpit-playground-single-node.png)
 
 This overview is also expandable; clicking on the individual fields will give you a more detailed overview.
 
