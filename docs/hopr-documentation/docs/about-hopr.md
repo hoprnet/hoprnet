@@ -43,7 +43,7 @@ This simple but extremely powerful innovation unlocks a whole world of possibili
 
 :::info
 
-For more indepth information on HOPR and it’s core concepts, as well as its governance modell and future ambitions, have a look at our [Book of HOPR](https://hoprnet.org/Book_Of_Hopr_2021.01_v1.pdf)
+For more indepth information on HOPR and it’s core concepts, as well as its governance modell and future ambitions, have a look at our [Book of HOPR](https://hoprnet.org/assets/documents/Book_of_HOPR_v1.pdf)
 
 :::
 

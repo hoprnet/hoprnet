@@ -1,6 +1,13 @@
+pub mod real;
+mod utils;
+
 use wasm_bindgen::prelude::*;
 
-pub mod real;
+// When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
+// allocator.
+#[cfg(feature = "wee_alloc")]
+#[global_allocator]
+static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 /// Dummy function to test WASM.
 #[wasm_bindgen]
@@ -20,6 +27,3 @@ mod tests {
         assert_eq!(dummy_get_one().as_str(), "1");
     }
 }
-
-// NOTE: this crate cannot have the `set_console_panic_hook` function, because
-// the crates using this package already have it. There can be at most 1 per WASM module.

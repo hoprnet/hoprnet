@@ -9,7 +9,10 @@ FROM ${HARDHAT_IMAGE} as runtime
 LABEL description="Docker image running a HOPR-enabled hardhat network with 5 hoprd nodes using it and being fully interconnected."
 
 # install tools required within our scripts
-RUN apk add --no-cache bash lsof curl jq
+RUN apk add --no-cache bash libc6-compat lsof curl jq
+
+# symlink required to get WRTC to work
+RUN ln -s /lib/libc.musl-x86_64.so.1 /lib/ld-linux-x86-64.so.2
 
 WORKDIR /app
 

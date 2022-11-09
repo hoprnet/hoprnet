@@ -104,21 +104,11 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if ((result as any).status === '0') {
       // When {"message": "Contract source code not verified", "status": "0"} continue with the verification
       try {
-        // specify contract path for HoprStake, as the base contract has the same deployed bytecode as seasons
-        if (contractName === 'HoprStake') {
-          await hre.run('verify:verify', {
-            address: contractAddress,
-            contract: data.storageLayout.storage[0].contract,
-            constructorArguments: data.args,
-            listNetworks: true
-          })
-        } else {
-          await hre.run('verify:verify', {
-            address: contractAddress,
-            constructorArguments: data.args,
-            listNetworks: true
-          })
-        }
+        await hre.run('verify:verify', {
+          address: contractAddress,
+          constructorArguments: data.args,
+          listNetworks: true
+        })
       } catch (error) {
         if (error.message.includes('Reason: Already Verified')) {
           console.log(`  Contract ${contractName} has been already verified!`)

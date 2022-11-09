@@ -50,7 +50,7 @@
 
 #### Defined in
 
-[src/types/accountEntry.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L18)
+[types/accountEntry.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L18)
 
 ___
 
@@ -60,7 +60,7 @@ ___
 
 #### Defined in
 
-[src/types/accountEntry.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L17)
+[types/accountEntry.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L17)
 
 ___
 
@@ -70,7 +70,7 @@ ___
 
 #### Defined in
 
-[src/types/accountEntry.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L19)
+[types/accountEntry.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L19)
 
 ## Accessors
 

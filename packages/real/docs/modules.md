@@ -4,25 +4,16 @@
 
 ## Table of contents
 
+### Namespaces
+
+- [real](modules/real.md)
+
 ### Functions
 
-- [dummy\_get\_one](modules.md#dummy_get_one)
 - [read\_file](modules.md#read_file)
 - [write\_file](modules.md#write_file)
 
 ## Functions
-
-### dummy\_get\_one
-
-▸ **dummy_get_one**(): `string`
-
-Dummy function to test WASM.
-
-#### Returns
-
-`string`
-
-___
 
 ### read\_file
 

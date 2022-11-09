@@ -25,8 +25,7 @@ import {
   durations,
   type AcknowledgedTicket,
   type DeferType,
-  type Hash,
-  create_counter
+  type Hash
 } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import NonceTracker from './nonce-tracker.js'
@@ -41,12 +40,6 @@ import retimer from 'retimer'
 
 const log = debug('hopr:core-ethereum:ethereum')
 const abiCoder = new utils.AbiCoder()
-
-// Metrics
-const metric_countSendTransaction = create_counter(
-  'core_ethereum_counter_num_send_transactions',
-  'The number of sendTransaction calls'
-)
 
 export type Receipt = string
 export type ChainWrapper = Awaited<ReturnType<typeof createChainWrapper>>
@@ -415,7 +408,6 @@ export async function createChainWrapper(
     }
 
     log('Transaction with nonce %d successfully sent %s, waiting for confimation', populatedTx.nonce, transaction.hash)
-    metric_countSendTransaction.increment()
     nonceLock.releaseLock()
 
     // wait for the tx to be mined - mininal and scheduled implementation

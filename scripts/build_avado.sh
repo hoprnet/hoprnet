@@ -74,13 +74,7 @@ function cleanup {
   exit $EC
 }
 
-# For master builds, we need to use special upstream version, since we do not publish 0.100.0 Docker tag
-declare upstream_version="${avado_version}"
-if [[ "${avado_version}" = "0.100.0" && "${release_id}" = "master-goerli" ]]; then
-  upstream_version="master-goerli"
-fi
-
-msg "Building Avado v. ${avado_version} for release ${release_id} (upstream v. ${upstream_version}) using environment ${environment_id} with default provider ${provider_url}"
+msg "Building Avado v. ${avado_version} for release ${release_id} using environment ${environment_id} with default provider ${provider_url}"
 
 # Create backups
 cp ./docker-compose.yml ./docker-compose.bak
@@ -90,7 +84,7 @@ cp ./build/Dockerfile ./build/Dockerfile.bak
 trap cleanup SIGINT SIGTERM ERR EXIT
 
 ### Update docker-compose.yaml
-sed -E "s/%AVADO_VERSION%/${avado_version}/g ; s/%TOKEN%/${api_token}/g ; s/%UPSTREAM_VERSION%/${upstream_version}/g ; \
+sed -E "s/%AVADO_VERSION%/${avado_version}/g ; s/%TOKEN%/${api_token}/g ; \
  s/%ENV_ID%/${environment_id}/g ; s|%PROVIDER_URL%|${provider_url}|g" ./docker-compose.yml \
   > ./docker-compose.yml.tmp && mv ./docker-compose.yml.tmp ./docker-compose.yml
 

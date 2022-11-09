@@ -18,7 +18,6 @@
 - [HoprStake2](interfaces/HoprStake2.md)
 - [HoprStakeSeason3](interfaces/HoprStakeSeason3.md)
 - [HoprStakeSeason4](interfaces/HoprStakeSeason4.md)
-- [HoprStakeSeason5](interfaces/HoprStakeSeason5.md)
 - [HoprToken](interfaces/HoprToken.md)
 - [HoprWhitehat](interfaces/HoprWhitehat.md)
 - [TypedEvent](interfaces/TypedEvent.md)
@@ -55,7 +54,7 @@
 
 #### Defined in
 
-[packages/ethereum/src/index.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L34)
+[packages/ethereum/src/index.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L33)
 
 ___
 
@@ -65,7 +64,7 @@ ___
 
 #### Defined in
 
-[packages/ethereum/src/index.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L22)
+[packages/ethereum/src/index.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L21)
 
 ___
 

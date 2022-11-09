@@ -18,8 +18,7 @@ import {
   ChannelStatus,
   Balance,
   PRICE_PER_PACKET,
-  INVERSE_TICKET_WIN_PROB,
-  create_counter
+  INVERSE_TICKET_WIN_PROB
 } from '@hoprnet/hopr-utils'
 import type { HalfKey, HalfKeyChallenge, ChannelEntry, Challenge, Hash } from '@hoprnet/hopr-utils'
 import { AcknowledgementChallenge } from './acknowledgementChallenge.js'
@@ -34,10 +33,6 @@ export const INTERMEDIATE_HOPS = 3 // 3 relayers and 1 destination
 const PACKET_LENGTH = getPacketLength(INTERMEDIATE_HOPS + 1, POR_STRING_LENGTH, 0)
 
 const log = debug('hopr-core:message:packet')
-
-// Metrics
-const metric_ticketCounter = create_counter('core_counter_created_tickets', 'Number of created tickets')
-const metric_packetCounter = create_counter('core_counter_packets', 'Number of created packets')
 
 async function bumpTicketIndex(channelId: Hash, db: HoprDB): Promise<UINT256> {
   let currentTicketIndex = await db.getCurrentTicketIndex(channelId)
@@ -109,7 +104,6 @@ export async function createTicket(
   await db.markPending(ticket)
 
   log(`Creating ticket in channel ${channel.getId().toHex()}. Ticket data: \n${ticket.toString()}`)
-  metric_ticketCounter.increment()
 
   return ticket
 }
@@ -255,9 +249,7 @@ export class Packet {
   public ackChallenge: HalfKeyChallenge
   public oldChallenge: AcknowledgementChallenge
 
-  public constructor(private packet: Uint8Array, private challenge: AcknowledgementChallenge, public ticket: Ticket) {
-    metric_packetCounter.increment()
-  }
+  public constructor(private packet: Uint8Array, private challenge: AcknowledgementChallenge, public ticket: Ticket) {}
 
   private setReadyToForward(ackChallenge: HalfKeyChallenge) {
     this.ackChallenge = ackChallenge

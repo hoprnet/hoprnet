@@ -429,43 +429,6 @@
         }
       }
     },
-    "/node/metrics": {
-      "parameters": [],
-      "get": {
-        "description": "Retrieve Prometheus metrics from the running node.",
-        "tags": ["Node"],
-        "operationId": "nodeGetMetrics",
-        "responses": {
-          "200": {
-            "description": "Returns the encoded serialized metrics.",
-            "content": {
-              "text/plain; version=0.0.4": {
-                "schema": {
-                  "type": "string",
-                  "description": "Prometheus metrics text format",
-                  "example": "basic_counter 30"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Unknown failure.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
-                    "error": { "type": "string", "example": "Full error message." }
-                  }
-                },
-                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
-              }
-            }
-          }
-        }
-      }
-    },
     "/node/info": {
       "parameters": [],
       "get": {

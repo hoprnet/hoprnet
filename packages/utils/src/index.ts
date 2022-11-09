@@ -14,30 +14,6 @@ export * from './db/index.js'
 export * from './ethereum/index.js'
 export * from './utils.js'
 
-// Load `utils-misc` crate
-import { set_panic_hook as utils_misc_panic_hook } from '../lib/utils_misc.js'
-utils_misc_panic_hook()
-export { get_package_version } from '../lib/utils_misc.js'
-
-// Load `utils-metrics` crate
-import { set_panic_hook as utils_metrics_panic_hook } from '../lib/utils_metrics.js'
-utils_metrics_panic_hook()
-
-export {
-  create_counter,
-  SimpleCounter,
-  create_multi_counter,
-  MultiCounter,
-  create_gauge,
-  SimpleGauge,
-  create_multi_gauge,
-  MultiGauge,
-  create_histogram,
-  create_histogram_with_buckets,
-  SimpleHistogram,
-  create_multi_histogram,
-  create_multi_histogram_with_buckets,
-  MultiHistogram,
-  SimpleTimer,
-  gather_all_metrics
-} from '../lib/utils_metrics.js'
+// WASM functions must be migrated from cjs to esm explicitely to be importable by other packags
+import utilsMisc from '../lib/utils_misc.cjs'
+export const { get_package_version } = utilsMisc

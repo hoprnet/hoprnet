@@ -23,11 +23,7 @@ import {
   u8aToHex,
   FIFO,
   type DeferType,
-  type Ticket,
-  create_counter,
-  create_multi_counter,
-  create_gauge,
-  create_multi_gauge
+  type Ticket
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum.js'
@@ -56,31 +52,6 @@ const verbose = debug('hopr-core-ethereum:verbose:indexer')
 const getSyncPercentage = (start: number, current: number, end: number) =>
   (((current - start) / (end - start)) * 100).toFixed(2)
 const backoffOption: Parameters<typeof retryWithBackoffThenThrow>[1] = { maxDelay: MAX_TRANSACTION_BACKOFF }
-
-// Metrics
-const metric_indexerErrors = create_multi_counter(
-  'core_ethereum_mcounter_indexer_provider_errors',
-  'Multicounter for provider errors in Indexer',
-  ['type']
-)
-const metric_unconfirmedBlocks = create_counter(
-  'core_ethereum_counter_indexer_processed_unconfirmed_blocks',
-  'Number of processed unconfirmed blocks'
-)
-const metric_numAnnouncements = create_counter(
-  'core_ethereum_counter_indexer_announcements',
-  'Number of processed announcements'
-)
-const metric_blockNumber = create_gauge('core_ethereum_gauge_indexer_block_number', 'Current block number')
-const metric_channelStatus = create_multi_gauge(
-  'core_ethereum_gauge_indexer_channel_status',
-  'Status of different channels',
-  ['channel']
-)
-const metric_ticketsRedeemed = create_counter(
-  'core_ethereum_counter_indexer_tickets_redeemed',
-  'Number of redeemed tickets'
-)
 
 /**
  * Indexes HoprChannels smart contract and stores to the DB,
@@ -421,14 +392,12 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     log(chalk.red(`etherjs error: ${error}`))
 
     try {
-      const errorType = [errors.SERVER_ERROR, errors.TIMEOUT, 'ECONNRESET', 'ECONNREFUSED'].filter((err) =>
-        [error?.code, String(error)].includes(err)
-      )
-
       // if provider connection issue
-      if (errorType.length != 0) {
-        metric_indexerErrors.increment([errorType[0]])
-
+      if (
+        [errors.SERVER_ERROR, errors.TIMEOUT, 'ECONNRESET', 'ECONNREFUSED'].some((err) =>
+          [error?.code, String(error)].includes(err)
+        )
+      ) {
         log(chalk.blue('code error falls here', this.chain.getAllQueuingTransactionRequests().length))
         // allow the indexer to restart even there is no transaction in queue
         await retryWithBackoffThenThrow(
@@ -448,7 +417,6 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
           backoffOption
         )
       } else {
-        metric_indexerErrors.increment(['unknown'])
         await retryWithBackoffThenThrow(() => this.restart(), backoffOption)
       }
     } catch (err) {
@@ -495,7 +463,6 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     // update latest block
     this.latestBlock = Math.max(this.latestBlock, blockNumber)
-    metric_blockNumber.set(this.latestBlock)
 
     let lastDatabaseSnapshot = await this.db.getLatestConfirmedSnapshotOrUndefined()
 
@@ -792,8 +759,6 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
           log(`ignoring event '${String(eventName)}'`)
       }
 
-      metric_unconfirmedBlocks.increment()
-
       if (
         !blocking &&
         this.unconfirmedEvents.size() > 0 &&
@@ -826,7 +791,6 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     const account = new AccountEntry(publicKey, multiaddr, blockNumber)
 
     log('New node announced', account.getAddress().toHex(), account.multiAddr.toString())
-    metric_numAnnouncements.increment()
 
     await this.db.updateAccountAndSnapshot(account, lastSnapshot)
 
@@ -854,8 +818,6 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     }
 
     await this.db.updateChannelAndSnapshot(channel.getId(), channel, lastSnapshot)
-
-    metric_channelStatus.set([channel.getId().toHex()], channel.status)
 
     if (prevState && channel.status == ChannelStatus.Closed && prevState.status != ChannelStatus.Closed) {
       log('channel was closed')
@@ -905,7 +867,6 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
           // TODO: handle this may allow sender to send arbitrary amount of tickets through open
           // channels with positive balance, before the counterparty initiates closure.
         }
-        metric_ticketsRedeemed.increment()
       } catch (error) {
         log(`error in onTicketRedeemed ${error}`)
         throw new Error(`error in onTicketRedeemed ${error}`)

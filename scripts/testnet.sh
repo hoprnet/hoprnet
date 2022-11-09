@@ -201,7 +201,6 @@ start_local_hardhat() {
   log "Running hardhat local node"
   HOPR_ENVIRONMENT_ID="hardhat-localhost" \
     TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
-    NODE_OPTIONS="--experimental-wasm-modules" \
     yarn workspace @hoprnet/hopr-ethereum hardhat node \
       --network hardhat \
       --show-stack-traces > \
@@ -221,7 +220,6 @@ fund_nodes() {
 
   HOPR_ENVIRONMENT_ID=hardhat-localhost \
   TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
-  NODE_OPTIONS="--experimental-wasm-modules" \
     yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
       --identity-prefix "${node_prefix}" \
       --identity-directory "${tmp}" \
@@ -236,7 +234,6 @@ disable_network_registry() {
   log "Disabling register"
   HOPR_ENVIRONMENT_ID=hardhat-localhost \
   TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
-  NODE_OPTIONS="--experimental-wasm-modules" \
   yarn workspace @hoprnet/hopr-ethereum hardhat register \
     --network hardhat \
     --task disable

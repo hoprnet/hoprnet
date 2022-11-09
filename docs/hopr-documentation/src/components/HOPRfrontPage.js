@@ -8,7 +8,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl'
  * **/
 
 const FeatureList = [
-  /*{
+  {
     title: 'About HOPR',
     Svg: <img class="svg_icon" src={'/img/front_icons/hopr-about.svg'} />,
     description: <>Brief explanation what is HOPR.</>,
@@ -19,25 +19,25 @@ const FeatureList = [
     Svg: <img class="svg_icon" src={'/img/front_icons/hopr-node-setup.svg'} />,
     description: <>Guide on how to install a hoprd node.</>,
     docName: 'v1.86/node/start-here'
-  },*/
+  },
   {
     title: 'Run a hoprd node',
     Svg: <img class="svg_icon" src={'/img/front_icons/hopr-node.svg'} />,
-    description: <>Start here to install and run a hoprd node.</>,
-    docName: 'node/start-here'
+    description: <>Guide on how to use a hoprd node.</>,
+    docName: 'v1.86/node/guide-using-a-hoprd-node'
   },
   {
     title: 'HOPR core concepts',
     Svg: <img class="svg_icon" src={'/img/front_icons/hopr-core-concepts.svg'} />,
     description: <>Broader educational material for understanding HOPR</>,
-    docName: 'core/what-is-hopr'
+    docName: 'v1.86/core/what-is-hopr'
   },
-  /*{
+  {
     title: 'Staking',
     Svg: <img class="svg_icon" src={'/img/front_icons/hopr-staking.svg'} />,
     description: <>How to earn money by staking on HOPR smart contract.</>,
     docName: 'v1.86/staking/how-to-stake'
-  },*/
+  },
   {
     title: 'Developers',
     Svg: <img class="svg_icon" src={'/img/front_icons/hopr-development.svg'} />,
@@ -48,9 +48,9 @@ const FeatureList = [
     title: 'dApps',
     Svg: <img class="svg_icon" src={'/img/front_icons/hopr-dapps.svg'} />,
     description: <>Documentations and guides of dApps built on HOPR.</>,
-    docName: 'dapps/playground'
-  }
-  /*{
+    docName: 'dapps/myne-chat'
+  },
+  {
     title: 'Ecosystem',
     Svg: <img class="svg_icon" src={'/img/front_icons/hopr-ecosystem.svg'} />,
     description: <>Everything you need to know about HOPR's ecosystem.</>,
@@ -61,7 +61,7 @@ const FeatureList = [
     Svg: <img class="svg_icon" src={'/img/front_icons/hopr-faqs.svg'} />,
     description: <>Frequently asked questions related to HOPR.</>,
     docName: 'v1.86/faq'
-  }*/
+  }
 ]
 
 function Feature({ Svg, title, description, docName }) {

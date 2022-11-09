@@ -1,6 +1,6 @@
 import type { PeerId } from '@libp2p/interface-peer-id'
 
-import { durations, pickVersion, pubKeyToPeerId, type HoprDB, create_counter } from '@hoprnet/hopr-utils'
+import { durations, pickVersion, pubKeyToPeerId, type HoprDB } from '@hoprnet/hopr-utils'
 import { debug } from '@hoprnet/hopr-utils'
 
 import { Packet } from '../../messages/index.js'
@@ -13,10 +13,6 @@ const log = debug('hopr-core:packet:forward')
 const error = debug('hopr-core:packet:forward:error')
 
 const FORWARD_TIMEOUT = durations.seconds(6)
-
-// Metrics
-const metric_fwdMessageCount = create_counter('core_counter_forwarded_messages', 'Number of forwarded messages')
-const metric_recvMessageCount = create_counter('core_counter_received_messages', 'Number of received messages')
 
 // Do not type-check JSON files
 // @ts-ignore
@@ -91,7 +87,6 @@ export class PacketForwardInteraction {
       this.emitMessage(packet.plaintext)
       // Send acknowledgements independently
       this.acknowledgements.sendAcknowledgement(packet, packet.previousHop.toPeerId())
-      metric_recvMessageCount.increment()
       // Nothing else to do
       return
     }
@@ -122,6 +117,5 @@ export class PacketForwardInteraction {
 
     // Send acknowledgements independently
     this.acknowledgements.sendAcknowledgement(packet, packet.previousHop.toPeerId())
-    metric_fwdMessageCount.increment()
   }
 }

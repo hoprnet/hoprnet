@@ -53,10 +53,7 @@ import {
   type Hash,
   type HalfKeyChallenge,
   type Ticket,
-  type HoprDB,
-  create_gauge,
-  create_counter,
-  create_histogram_with_buckets
+  type HoprDB
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { type Indexer } from '@hoprnet/hopr-core-ethereum'
 
@@ -83,16 +80,6 @@ const DEBUG_PREFIX = `hopr-core`
 const log = debug(DEBUG_PREFIX)
 const verbose = debug(DEBUG_PREFIX.concat(`:verbose`))
 const error = debug(DEBUG_PREFIX.concat(`:error`))
-
-// Metrics
-const metric_outChannelCount = create_gauge('core_gauge_num_outgoing_channels', 'Number of outgoing channels')
-const metric_inChannelCount = create_gauge('core_gauge_num_incoming_channels', 'Number of incoming channels')
-const metric_sentMessageCount = create_counter('core_counter_sent_messages', 'Number of sent messages')
-const metric_pathLength = create_histogram_with_buckets(
-  'core_histogram_path_length',
-  'Distribution of number of hops of sent messages',
-  new Float64Array([0, 1, 2, 3, 4])
-)
 
 // Using libp2p components directly because it allows us
 // to bypass the API layer
@@ -508,11 +495,6 @@ class Hopr extends EventEmitter {
    * @param channel object
    */
   private async onOwnChannelUpdated(channel: ChannelEntry): Promise<void> {
-    // Determine which counter (incoming/outgoing) we need to increment
-    const selfAddr = this.getEthereumAddress()
-    if (selfAddr.eq(channel.destination.toAddress())) metric_inChannelCount.increment()
-    else if (selfAddr.eq(channel.source.toAddress())) metric_outChannelCount.increment()
-
     if (channel.status === ChannelStatus.PendingToClose) {
       await this.strategy.onChannelWillClose(channel, this.connector)
     }
@@ -846,7 +828,6 @@ class Hopr extends EventEmitter {
     }
 
     const path: PublicKey[] = [].concat(intermediatePath, [PublicKey.fromPeerId(destination)])
-    metric_pathLength.observe(path.length)
 
     let packet: Packet
     try {
@@ -868,7 +849,6 @@ class Hopr extends EventEmitter {
       throw Error(`Error while trying to send final packet ${JSON.stringify(err)}`)
     }
 
-    metric_sentMessageCount.increment()
     return packet.ackChallenge.toHex()
   }
 

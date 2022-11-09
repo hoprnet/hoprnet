@@ -53,11 +53,11 @@ export const getChannels = async (node: Hopr, includingClosed: boolean) => {
 
   const channelsFrom: ChannelInfo[] = (await node.getChannelsFrom(selfAddress))
     .filter((channel) => includingClosed || channel.status !== ChannelStatus.Closed)
-    .map(formatOutgoingChannel)
+    .map(formatIncomingChannel)
 
   const channelsTo: ChannelInfo[] = (await node.getChannelsTo(selfAddress))
     .filter((channel) => includingClosed || channel.status !== ChannelStatus.Closed)
-    .map(formatIncomingChannel)
+    .map(formatOutgoingChannel)
 
   return { incoming: channelsTo, outgoing: channelsFrom }
 }

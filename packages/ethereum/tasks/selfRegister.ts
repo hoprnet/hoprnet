@@ -5,7 +5,7 @@ import type { HoprNetworkRegistry } from '../src/types'
 export type SelfRegisterOpts = {
   task: 'add' | 'remove'
   peerIds: string
-  privatekey?: string // private key of the caller
+  privatekey: string // private key of the caller
 }
 
 /**

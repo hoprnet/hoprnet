@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.91.0-next.18",
+  "version": "1.90.63",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -19,7 +19,7 @@
     "rest-api-v2-spec.yaml"
   ],
   "engines": {
-    "node": ">=16.15"
+    "node": "16.15"
   },
   "scripts": {
     "clean:wasm": "make -C crates clean",
@@ -28,12 +28,12 @@
     "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo ./build ./rest-api-v2-full-spec.json",
     "build": "yarn clean && yarn build:wasm && tsc -p . && yarn buildAdmin && chmod u+x lib/*.js",
     "buildAdmin": "HOPRD_GIT_COMMIT=$(git rev-parse --short HEAD) next build hopr-admin",
-    "test": "yarn test:wasm && NODE_OPTIONS=\"--experimental-wasm-modules\" mocha --reporter=tap --full-trace --exit . test && yarn testAdmin",
-    "testAdmin": "cd hopr-admin && NODE_OPTIONS=\"--experimental-wasm-modules\" mocha --require ts-node/register ./**/*.spec.ts",
+    "test": "yarn test:wasm && mocha --reporter=tap --full-trace --exit . test && yarn testAdmin",
+    "testAdmin": "cd hopr-admin && mocha --require ts-node/register ./**/*.spec.ts",
     "prebuild": "next telemetry disable",
-    "start": "NODE_OPTIONS=\"--experimental-wasm-modules\" node lib/main.cjs --admin --init --api",
+    "start": "node lib/main.cjs --admin --init --api",
     "dev": "NODE_ENV=development yarn start --environment hardhat-localhost --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses --testPreferLocalAddresses --testNoAuthentication",
-    "devAdmin": "NODE_OPTIONS=\"--experimental-wasm-modules\" next dev hopr-admin",
+    "devAdmin": "next dev hopr-admin",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },
@@ -41,8 +41,8 @@
     "@hoprnet/hopr-core": "workspace:packages/core",
     "@hoprnet/hopr-real": "workspace:packages/real",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
-    "@libp2p/interface-peer-id": "1.0.5",
-    "@libp2p/peer-id": "1.1.16",
+    "@libp2p/interface-peer-id": "1.0.2",
+    "@libp2p/peer-id": "1.1.13",
     "@multiformats/multiaddr": "10.3.3",
     "bn.js": "5.2.0",
     "body-parser": "1.19.2",

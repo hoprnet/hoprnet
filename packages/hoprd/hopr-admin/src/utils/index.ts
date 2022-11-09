@@ -63,11 +63,3 @@ export const createLog = (msg: string, ts?: number): Log => {
     ts: ts || +new Date()
   }
 }
-
-export enum HealthStatus {
-  Unknown = '❔',
-  Red = '🔴',
-  Orange = '🟠',
-  Yellow = '🟡',
-  Green = '🟢'
-}
