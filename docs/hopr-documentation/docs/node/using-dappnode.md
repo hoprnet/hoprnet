@@ -13,13 +13,13 @@ Please withdraw all your funds and delete the old package before installing a ne
 
 (**1**) Open the DAppStore using the sidebar to the left.
 
-![DappStore](./images/DappStore-NR-1.png)
+![DappStore](/img/node/DappStore-NR-1.png)
 
 (**2**) You should see the latest version of the HOPR client now. Just click `Get` and wait for it to install.
 
 That's all! You should now be able to find the HOPR client in your 'Packages'.
 
-![MyDapps](./images/Dappnode-2.png)
+![MyDapps](/img/node/Dappnode-2.png)
 
 Simply open the client, and you should be greeted with the hopr-admin interface.
 
@@ -37,7 +37,7 @@ If you have previously installed a node and have the [identity file downloaded](
 
 Find HOPR in your packages and navigate to the backup section. From there, all you have to do is click 'Restore' and open your [zipped backup file](using-hopr-admin#backing-up-your-identity-file) when prompted.
 
-![dappnode restore](./images/dappnode-backup.png)
+![dappnode restore](/img/node/dappnode-backup.png)
 
 ## Collecting Logs
 
@@ -47,7 +47,7 @@ To collect the logs:
 
 (**1**) Find HOPR in your packages and navigate to the backup section.
 
-![Dappnode Logs](./images/Dappnode-logs.png)
+![Dappnode Logs](/img/node/Dappnode-logs.png)
 
 (**2**) From there, all you have to do is click 'Download all'.
 
@@ -64,7 +64,7 @@ You can set your own RPC endpoint for HOPR to use. Ideally, you would install an
 
 If you have already installed an ETH client, you can find its RPC endpoint on the package's info page.
 
-![ETH client settings](./images/RPC-endpoint-Dappnode.png)
+![ETH client settings](/img/node/RPC-endpoint-Dappnode.png)
 
 The image above shows the RPC endpoint for the GETH client (querying API in the image): `http://ethchain-geth.my.ava.do:8545`. Your endpoint will be different depending on the client you have installed. Otherwise, you can use any non-local RPC provider such as [ankr.](https://www.ankr.com/)
 
@@ -74,7 +74,7 @@ To change your RPC endpoint:
 
 (**1**) Find HOPR in your packages and navigate to the 'Config' section.
 
-![RPC Prpvider Dappnode](./images/HOPR-provider-Dappnode.png)
+![RPC Prpvider Dappnode](/img/node/HOPR-provider-Dappnode.png)
 
 (**2**) Paste your custom RPC endpoint in the text field under `RPC Provider URL`.
 

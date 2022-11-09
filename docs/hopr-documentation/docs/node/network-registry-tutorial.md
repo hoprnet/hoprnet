@@ -35,17 +35,17 @@ If you are chosen to join the registry, you will be sent a network registry NFT 
 
 (**2**) Connect your wallet (make sure this is the one containing your NFT). You should see an icon for this on the top right of the site. Once you have connected your wallet, you should see the option to 'Sync'.
 
-![connect wallet](./images/connect_wallet_NR.png)
+![connect wallet](/img/node/connect_wallet_NR.png)
 
 (**3**) Click the sync icon.
 
-![sync](./images/sync_NR.png)
+![sync](/img/node/sync_NR.png)
 
 (**4**) You should now see your Network Registry NFT under available HOPR NFTs
 
 (**5**) Click Lock NFT
 
-![NFT](./images/NFT-NR.png)
+![NFT](/img/node/NFT-NR.png)
 
 (**6**) Then click sync again and make sure your NFT now appears under 'locked HOPR NFTs'.
 
@@ -65,11 +65,11 @@ Continue here once you have installed a node and can see the hopr-admin interfac
 
 You should be greeted with a screen similar to the one below, if your screen is yellow and asks you to check your settings, you need to check your security token and API endpoint. (See steps 1 & 2 below.)
 
-![NR gear](./images/NR-admin-gear.png)
+![NR gear](/img/node/NR-admin-gear.png)
 
 (**1**) Click on the gear icon, this should open a pop-up box.
 
-![API info](./images/API-info.png)
+![API info](/img/node/API-info.png)
 
 (**2**) From here, make sure you have the correct information. By default, `API endpoint` should be set to `http://localhost:3001`, but you may need to replace `localhost` with your server IP address if you used a VPS and change the port if you adjusted the mapping on installation.
 
@@ -77,7 +77,7 @@ If you are using an Avado or Dappnode then the endpoints are `http://hopr.my.ava
 
 The `API Token` is whatever you set your security token as in the installation process.
 
-![NR peerID](./images/NR-peerID-2.png)
+![NR peerID](/img/node/NR-peerID-2.png)
 
 (**3**) From the admin interface, you should be able to see the peerID labelled as node address. Click on this contracted 5-letter address to expand it to its full length and copy it. The address should look similar to this: `16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV`.
 
@@ -95,13 +95,13 @@ At this point, you should have the peerID of the node you want to register copie
 
 Scroll down and make sure you are on the **Write Contract** tab.
 
-![connect wallet blockscout](./images/blockscout-NR-connect%20wallet.png)
+![connect wallet blockscout](/img/node/blockscout-NR-connect%20wallet.png)
 
 (**2**) Connect the wallet which you used to stake your NFT
 
 (**3**) Locate the function `selfRegister`. It should be the 8th function under 'Write Contract'.
 
-![selfRegister NR](./images/NR-SelfRegister.png)
+![selfRegister NR](/img/node/NR-SelfRegister.png)
 
 (**4**) In the text field, paste your peerID
 
@@ -135,11 +135,11 @@ To check if you have been registered:
 
 (**1**) Switch to the [**Read Contract** tab.](https://blockscout.com/xdai/mainnet/address/0x819E6a81e1e3f96CF1ac9200477C2d09c676959D/read-contract#address-tabs)
 
-![Read Contract Tab](./images/Read-contract-NR.png)
+![Read Contract Tab](/img/node/Read-contract-NR.png)
 
 (**2**) Find the functon `isNodeRegisteredAndEligible`, it should be the 4th function under 'Read Contract'.
 
-![Eligibility function](./images/isNodeEligible-NR.png)
+![Eligibility function](/img/node/isNodeEligible-NR.png)
 
 (**3**) Enter your peerID into the text field and click **Query**.
 
@@ -155,7 +155,7 @@ The registration process is now complete! You can proceed to our [hopr-admin tut
 
 (**1**) Open the hopr-admin interface, you should hopefully have kept it open from step 2. If not, reopen it.
 
-![info admin command](./images/info-NR-admin.png)
+![info admin command](/img/node/info-NR-admin.png)
 
 (**2**) Type ‘info’ into the command line
 
