@@ -818,7 +818,13 @@ class Hopr extends EventEmitter {
 
       if (ticketIssuer.eq(ticketReceiver)) log(`WARNING: duplicated adjacent path entries.`)
 
-      const channel = await this.db.getChannelX(ticketIssuer, ticketReceiver)
+      let channel
+      try {
+        channel = await this.db.getChannelX(ticketIssuer, ticketReceiver)
+      }
+      catch (err) {
+        throw Error(`Channel from ${ticketIssuer.toAddress().toString()} to ${ticketReceiver.toAddress().toString()} not found`)
+      }
 
       if (channel.status !== ChannelStatus.Open) {
         throw Error(`Channel ${channel.getId().toHex()} is not open`)
@@ -847,7 +853,7 @@ class Hopr extends EventEmitter {
       intermediatePath = await this.getIntermediateNodes(PublicKey.fromPeerId(destination))
 
       if (intermediatePath == null || !intermediatePath.length) {
-        throw Error(`bad path`)
+        throw Error(`Failed to find automatic path`)
       }
     }
 
@@ -863,7 +869,8 @@ class Hopr extends EventEmitter {
         this.db
       )
     } catch (err) {
-      throw Error(`Error while creating packet ${JSON.stringify(err)}`)
+      log(`Could not create packet ${err}`)
+      throw Error(`Error while creating packet.`)
     }
 
     await packet.storePendingAcknowledgement(this.db)
@@ -871,7 +878,8 @@ class Hopr extends EventEmitter {
     try {
       await this.forward.interact(path[0].toPeerId(), packet)
     } catch (err) {
-      throw Error(`Error while trying to send final packet ${JSON.stringify(err)}`)
+      log(`Could not send packet ${err}`)
+      throw Error(`Failed to send packet.`)
     }
 
     metric_sentMessageCount.increment()
