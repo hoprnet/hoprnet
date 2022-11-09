@@ -92,6 +92,7 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
             addrInfo = {
               ...rinfo,
               family: 'IPv4',
+              port: __fakeRInfo.port,
               address: match[0]
             }
           } else {
