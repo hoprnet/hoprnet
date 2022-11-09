@@ -1,0 +1,140 @@
+---
+id: hello-world-browser
+title: Hello World in Browser
+---
+
+This is the complete tutorial on how to send messages over the HOPR network using [Swagger UI](https://swagger.io/tools/swagger-ui/) and hopr-admin. At this point it is assumed you have a running [local cluster](./starting-local-cluster.md) or are using [Playground](https://playground.hoprnet.org/).
+
+Lets start by connecting to our nodes and verifying some basic functionality using both the REST and Websocket endpoints.
+
+## Requirements
+
+The only requirement for this tutorial is that you know your `apiToken` and node REST/WebSocket endpoints.
+
+If you are using the default local cluster setup you should have the following values:
+
+```bash
+apiToken = ^^LOCAL-testing-123^^
+HOPR_NODE_1_HTTP_URL = http://127.0.0.1:13301   HOPR_NODE_1_WS_URL = ws://127.0.0.1:19501 
+HOPR_NODE_2_HTTP_URL = http://127.0.0.1:13302   HOPR_NODE_2_WS_URL = ws://127.0.0.1:19502
+HOPR_NODE_3_HTTP_URL = http://127.0.0.1:13303   HOPR_NODE_3_WS_URL = ws://127.0.0.1:19503
+HOPR_NODE_4_HTTP_URL = http://127.0.0.1:13304   HOPR_NODE_4_WS_URL = ws://127.0.0.1:19504
+HOPR_NODE_5_HTTP_URL = http://127.0.0.1:13305   HOPR_NODE_5_WS_URL = ws://127.0.0.1:19505
+```
+We use `127.0.0.1` instead of `localhost` as some tools like `websocat` (described below) struggle to resolve `localhost` properly.
+
+If you are using Playground or a public node, please locate the relevant URLs and API Tokens. The REST and WebSocket endpoints will usually have the ports `3001` & `3000` rspectively. E.g. `HOPR_NODE_1_HTTP_URL=https://zero_amalthea_fuchsia_aras.playground.hoprnet.org:3001` & `HOPR_NODE_1_WS_URL=ws://zero_amalthea_fuchsia_aras.playground.hoprnet.org:3000`
+
+## Connect to a HOPR node
+
+### Using WebSocket and REST clients
+
+To properly[^1] interact with a HOPR node, you'll need both REST and WebSocket client software. A REST client is used to give instructions to your
+HOPR node via its REST API, and the WebSocket client is to listen to these interactions, usually given by other nodes.
+
+Use the following clients to connect to your HOPR node fully.
+
+**Note:** You will need to know your `apiToken`.
+
+**WebSocket clients**
+
+- [Piesocket WebSocket Tester](https://www.piesocket.com/websocket-tester): This is a great tool to debug both listening to and sending
+  messages from/to your HOPR node. Make sure to paste your `HOPR_NODE_1_WS_URL` and append your `apiToken` as a query parameter. Also,
+  you'll need to change the `http` protocol to `ws`.
+
+```bash
+ws://127.0.0.1:19501/?apiToken=^^LOCAL-testing-123^^
+```
+
+**REST client**
+
+- [ReqBin](https://reqbin.com/): Using their `Custom` header option, you can send the proper `Authorization` request so you can test your
+  HOPR node endpoint. For testing, we suggest using `HOPR_NODE_1_HTTP_URL` and the `api/v2/account/address` endpoint. Make sure to use
+  the `base64` encoded version of your `apiToken` and add the prefix `Basic `.
+
+:::info Tip
+For the standard `apiToken` `^^LOCAL-testing-123^^`, the `base64` encoded value is `Xl5MT0NBTC10ZXN0aW5nLTEyM15e`. To use [ReqBin](https://reqbin.com/)
+with a different `apiToken` value, you can use the `btoa` function of your browser developer tools to figure it out.
+
+<br/>
+
+**Custom Header**
+
+```bash
+Basic Xl5MT0NBTC10ZXN0aW5nLTEyM15e
+```
+
+:::
+
+With the connection verified to both our REST and WebSocket endpoints, we can now go ahead and go through the basic functions of the API to send messages across nodes.
+
+## Sending a message
+
+You can use your browser to inteact with your HOPR cluster using:
+
+- Swagger UI 
+- hopr-admin
+
+### Swagger UI
+
+#### Accessing our HOPR node REST API documentation 
+
+Your HOPR node comes with [Swagger UI](https://swagger.io/tools/swagger-ui/) documentation showcasing all the exposed API methods available to your
+node, and the expected parameters and format to use them.
+
+You can access the UI by visiting `HOPR_NODE_1_HTTP_URL/api/v2/_swagger/#` in your browser.
+
+You can also click here to open [127.0.0.1:3001](http://127.0.0.1:3001/api/v2/_swagger/#) for an individual node or [127.0.0.1:13301](http://127.0.0.1:13301/api/v2/_swagger/#) for the first node in a HOPR cluster.
+
+If your node is running properly, you should see an image similar to this one:
+
+![HOPR network](/img/developer/hopr_swagger_api.png)
+
+#### Using Swagger UI to send messages
+
+We can use this documentation interactively to run commands on the HOPR network. The ones we are interested in specifically for this tutorial are `address` and `messages`.
+
+Most commands will require authorization, to get access you can click the green `Authorize` button and enter your API Token in the pop-up presented. 
+
+Now we can run the address command interactively by clicking `try it out` and `execute` under `/account/addresses/`
+
+This will display an output similar to:
+
+```json
+{
+  "nativeAddress": "0x3a54dDE3ee5ACfd43C902cbecC8ED0CBA10Ff326",
+  "native": "0x3a54dDE3ee5ACfd43C902cbecC8ED0CBA10Ff326",
+  "hoprAddress": "16Uiu2HAmE9b3TSHeF25uJS1Ecf2Js3TutnaSnipdV9otEpxbRN8Q",
+  "hopr": "16Uiu2HAmE9b3TSHeF25uJS1Ecf2Js3TutnaSnipdV9otEpxbRN8Q"
+}
+```
+
+Here we want to note the `hoprAddress` of the node, as this is what we use to communicate with other nodes.
+
+Repeat this for the node you want to message, make sure to open the correct URL: `HOPR_NODE_1_HTTP_URL/api/v2/_swagger/#`, if using node 2.
+
+To message `node 2` use the POST command `/messages/`, this takes three parametres: 
+
+- the address of the recipient (`hoprAddress`)
+- the message you want to send
+- and, an optional field for the route the message will take. we will leave this empty to let the network choose it's own path for simplicity.
+
+**Using Node 2** - now run Get `/messages/websocket/`, You should see the message sent.
+
+### HOPR Admin UI and REST API
+
+Instead of using the Swagger UI, you can view and execute all HOPR commands via our web UI interface called `hopr-admin`. 
+To view the interface in your browser, simply paste your `HOPR_NODE_1_WS_URL`. You should be able to see an image like the following one:
+
+![HOPR Admin Image](/img/developer/hopr-admin.png)
+
+**Note:** You may see a yellow screen, this just means you have to enter your security token and API endpoint.
+
+We recommend you complete the [hopr-admin tutorial](../node/using-hopr-admin.md) to familarise yourself with HOPR's basic functionality.  
+
+
+[^1]:
+    Although you can successfully interact with a HOPR node only using a WebSocket client, it is recommended to always use the REST API
+    to send commands to the HOPR node. This is because the API is optimized for applications, whereas the WebSocket commands are mostly used within the
+    `hopr-admin` UI, an operator-targeted tooling used to verify the functionality of the node. In other words, only use the WebSocket server
+    when you need to process information sent to a node, and use the REST API when you need to write actions to a node.
