@@ -9,7 +9,7 @@ To start a conversation, both you and your friend both have to complete a few st
 
 ### Your Perspective (the host):
 
-![Myne Chat two nodes](/img/dapps/playground-two%20nodes.png)
+![Myne Chat two nodes](/img/dapps/playground-two-nodes.png)
 
 (**1**) Pick two nodes to use, open one, and send the other to your friend.
 
