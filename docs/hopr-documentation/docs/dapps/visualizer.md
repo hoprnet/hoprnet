@@ -9,11 +9,11 @@ Visualizer draws a graphical representation of the HOPR network showing all the 
 
 (**1**) You can open any URL to see a graph of every node and connection on the Paleochera testnet.
 
-![visualizer graph](./images-dApps/visualizer-graph-2.png)
+![visualizer graph](/img/dapps/visualizer-graph-2.png)
 
 (**2**) Zoom in to nodes and hover over them to see their individual connections. You can also click on these nodes' address details on blockscout.
 
-![visualizer graph hover](./images-dApps/visualizer-zoom-2.png)
+![visualizer graph hover](/img/dapps/visualizer-zoom-2.png)
 
 (**3**) You can see the direction of each payment channel and the funds staked on them.
 
