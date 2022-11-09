@@ -227,7 +227,7 @@ interface Vm {
     // struct json = { uint256 a; address b; }
     // If we defined a json struct with the opposite order, meaning placing the address b first, it would try to
     // decode the tuple in that order, and thus fail.
-        function serializeBool(string calldata, string calldata, bool) external returns(string memory);
+    function serializeBool(string calldata, string calldata, bool) external returns(string memory);
     function serializeUint(string calldata, string calldata, uint256) external returns(string memory);
     function serializeInt(string calldata, string calldata, int256) external returns(string memory);
     function serializeAddress(string calldata, string calldata, address) external returns(string memory);
