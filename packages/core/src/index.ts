@@ -821,9 +821,10 @@ class Hopr extends EventEmitter {
       let channel
       try {
         channel = await this.db.getChannelX(ticketIssuer, ticketReceiver)
-      }
-      catch (err) {
-        throw Error(`Channel from ${ticketIssuer.toAddress().toString()} to ${ticketReceiver.toAddress().toString()} not found`)
+      } catch (err) {
+        throw Error(
+          `Channel from ${ticketIssuer.toAddress().toString()} to ${ticketReceiver.toAddress().toString()} not found`
+        )
       }
 
       if (channel.status !== ChannelStatus.Open) {
