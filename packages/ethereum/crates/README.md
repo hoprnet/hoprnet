@@ -202,5 +202,6 @@ Note that deployment for `HoprDistributor` and `HoprWrapper` are skipped; ERC182
 - Production (Gnosis Chain): Sourcify or Gnosisscan
 - Staging (Goerli): Etherscan. However it's been reported (in foundry support TG) that goerli etherscan verification doesn't work since roughly a week ago.
 
-10. Script migration: 
+10. Script migration:
+
 - `hardhat accounts` turns into `make get-account-balances environment-name=<name of the meta environment> environment-type=<type of environment, from development, staging, to production> account=<address to check>`
