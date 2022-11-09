@@ -89,7 +89,11 @@ const error = debug(DEBUG_PREFIX.concat(`:error`))
 // Metrics
 const metric_outChannelCount = create_gauge('core_gauge_num_outgoing_channels', 'Number of outgoing channels')
 const metric_inChannelCount = create_gauge('core_gauge_num_incoming_channels', 'Number of incoming channels')
-const metric_channelBalances = create_multi_gauge('core_mgauge_channel_balances', 'Balances on channels with counterparties', ['counterparty', 'direction'])
+const metric_channelBalances = create_multi_gauge(
+  'core_mgauge_channel_balances',
+  'Balances on channels with counterparties',
+  ['counterparty', 'direction']
+)
 const metric_sentMessageCount = create_counter('core_counter_sent_messages', 'Number of sent messages')
 const metric_pathLength = create_histogram_with_buckets(
   'core_histogram_path_length',
@@ -601,15 +605,21 @@ class Hopr extends EventEmitter {
 
     const selfAddr = this.getEthereumAddress()
 
-    let incomingChannels = 0, outgoingChannels = 0
+    let incomingChannels = 0,
+      outgoingChannels = 0
     for await (const channel of this.getAllChannels()) {
       // Determine which counter (incoming/outgoing) we need to increment
       if (selfAddr.eq(channel.destination.toAddress())) {
-        metric_channelBalances.set([channel.source.toAddress().toHex(), 'in'], +ethersUtils.formatEther(channel.balance.toBN().toString()))
+        metric_channelBalances.set(
+          [channel.source.toAddress().toHex(), 'in'],
+          +ethersUtils.formatEther(channel.balance.toBN().toString())
+        )
         incomingChannels++
-      }
-      else if (selfAddr.eq(channel.source.toAddress())) {
-        metric_channelBalances.set([channel.source.toAddress().toHex(), 'out'], +ethersUtils.formatEther(channel.balance.toBN().toString()))
+      } else if (selfAddr.eq(channel.source.toAddress())) {
+        metric_channelBalances.set(
+          [channel.source.toAddress().toHex(), 'out'],
+          +ethersUtils.formatEther(channel.balance.toBN().toString())
+        )
         outgoingChannels++
       }
 
