@@ -25,11 +25,11 @@ If you used Docker to install your node, you should be able to access it at: [ht
 
 **_Note:_** You may be greeted with a yellow screen asking you to check your settings. You can fix this by entering the correct API endpoint and token (see steps 1 & 2).
 
-![hopr-admin user interface](./images/admin-UI-first-2.png)
+![hopr-admin user interface](/img/node/admin-UI-first-2.png)
 
 (**1**) First, click on the gear icon. This should give you a pop-up similar to the one below.
 
-![API info](./images/API-info.png)
+![API info](/img/node/API-info.png)
 
 (**2**) From here, make sure you have the correct information. By default, `API endpoint` should be set to `http://localhost:3001`, but you may need to replace `localhost` with your server IP address if you used a VPS and change the port if you adjusted the mapping on installation.
 
@@ -61,7 +61,7 @@ And you can always use our [token wrapper](https://wrapper.hoprnet.org/) to wrap
 
 :::
 
-![hopr-admin user interface](./images/admin-UI-second-2.png)
+![hopr-admin user interface](/img/node/admin-UI-second-2.png)
 
 (**4**) You will see your `Network Health Indicator`. Depending on your connection to the network, this can be either Red, Orange, Yellow or Green. It's normal for it to be **Red** when you first start your node, you should wait a few minutes to see if it improves, but this is not required.
 
@@ -111,7 +111,7 @@ If you are using Dappnode or Avado, you can download your identity file on their
 
 **_DAppNode –_** Find HOPR in your packages and navigate to the backup section. From there, all you have to do is click 'Download backup'. This will download a `.zip` file containing your identity file. For DAppNode, you should use this zipped file to [restore your node](using-dappnode#restoring-an-old-node) if needed.
 
-![dappnode backup](./images/dappnode-backup.png)
+![dappnode backup](/img/node/dappnode-backup.png)
 
 #### How to view your DAppNode identity file:
 
@@ -121,17 +121,17 @@ You will not be able to use the identity file alone to [restore your old node](u
 
 (**2**) Once extracted, open the folder: `db`.
 
-![dappnode db folder](./images/Dappnode-DB-folder.png)
+![dappnode db folder](/img/node/Dappnode-DB-folder.png)
 
 (**3**) You will see the file `identity` if hidden files are visible.
 
 **_Avado –_** For Avado, you have to specify you want to download /app/hoprd-db in the Avado UI. Locate your HOPR package and click on the 'manage' icon.
 
-![avado manage](./images/avado-manage.png)
+![avado manage](/img/node/avado-manage.png)
 
 From here, scroll down to the file manager and enter `/app/hoprd-db` in the field under `Download from DNP`. Then click 'Download'. This will download a `.zip` file.
 
-![avado download](./images/avado-db.png)
+![avado download](/img/node/avado-db.png)
 
 #### How to view your Avado identity file
 
@@ -139,11 +139,11 @@ From here, scroll down to the file manager and enter `/app/hoprd-db` in the fiel
 
 (**2**) Extract the zipped folder you just downloaded.
 
-![Avado db folder](./images/Avado-DB-folder.png)
+![Avado db folder](/img/node/Avado-DB-folder.png)
 
 (**3**) Once extracted, open the folder `hoprd-db`.
 
-![Avado identity file](./images/Avado-identity-file.png)
+![Avado identity file](/img/node/Avado-identity-file.png)
 
 (**4**) If hidden files are visible on your OS, you should see a file named `.hopr-identity`. Use this to [restore your node](using-avado#alternative-method-using-your-identity-file) if needed.
 
@@ -375,7 +375,7 @@ To use another node on the network to relay data, you have to pay them for their
 
 Payment channels are funded edges between two nodes. They are a link between two nodes with some HOPR tokens staked in them to pay the nodes that relay data for the sender.
 
-![payment channel](./images/payment-channel-2.png)
+![payment channel](/img/node/payment-channel-2.png)
 
 ### Opening a channel
 
@@ -405,7 +405,7 @@ This will open a channel from you to Betty with **0.2 HOPR** staked in it. You c
 
 **_Note:_** Channels are unidirectional; opening this channel does not mean a channel from Betty to your node exists.
 
-![Channel direction](./images/channel-direction-2.png)
+![Channel direction](/img/node/channel-direction-2.png)
 
 Only one channel can exist in a single direction between two nodes. You can have both a channel from Betty → Chāo & Chāo → Betty but not more than one channel from Betty → Chāo.
 
@@ -504,7 +504,7 @@ In this example, we’re using Betty’s node to relay a message back to ourselv
 
 This is also why 0-HOP/direct messages are possible without open payment channels.
 
-![1-HOP message](./images/1-hop-2.png)
+![1-HOP message](/img/node/1-hop-2.png)
 
 This is a manually selected 1-HOP path. If you try and replicate this with Chāo, it should fail as you have no open channels with Chāo.
 
@@ -532,7 +532,7 @@ Now let’s try and send a 2-HOP message. For this to work, every node in the pa
 
 So a 2-HOP message to yourself through Betty and Chāo: me → Betty → Chāo → me would require channels to be open from me → Betty & Betty → Chāo (me → Betty → Chāo). The final channel from Chāo → me is not required as the last HOP of a relay is not incentivised. We assume that the reciever has an inherant desire to receive messages.
 
-![2-hop-success](./images/2-hop-success-3.png)
+![2-hop-success](/img/node/2-hop-success-3.png)
 
 You can try and send a 2-HOP message by typing:
 
@@ -544,13 +544,13 @@ send Betty,Chāo,me Hi!
 
 If it fails to send, it is likely, that Betty does not have a channel open to Chāo (Betty → Chāo) since you should have a channel open to Betty (me → Betty) with sufficient funds staked. A successful message costs 0.01 HOPR tokens per HOP currently.
 
-![2-hop-fail](./images/2-hop-fail-3.png)
+![2-hop-fail](/img/node/2-hop-fail-3.png)
 
 ### Path directionality
 
 Even if the message succeeds, you should note that you won’t be able to make this 2-HOP message in the other direction as you don’t have an open channel with Chāo. And Chāo may not have an open channel with Betty.
 
-![Reverse route](./images/reverse-directionality-3.png)
+![Reverse route](/img/node/reverse-directionality-3.png)
 
 Here the first route is viable, whereas the second route will fail.
 
@@ -562,7 +562,7 @@ You want to connect to other well-connected nodes to increase your pathing optio
 
 You can not have consecutively repeating nodes. For example, me → Betty → Betty → Zoë.
 
-![Consecutively repeating node](./images/consecutively-repeating-3.png)
+![Consecutively repeating node](/img/node/consecutively-repeating-3.png)
 
 This is also why the first node specified on a path cannot be yourself, as you are also the sending node.
 
@@ -651,7 +651,7 @@ Tickets are redeemed automatically, so the tickets which contain value will be c
 
 If a channel exists in both directions between consecutive nodes on the relay, the ticket is redeemed into the following nodes channel instead of its balance.
 
-![tickets-channels](./images/tickets-channels-3.png)
+![tickets-channels](/img/node/tickets-channels-3.png)
 
 In the above example, you, as the sender, will create two tickets of value 0.02 HOPR to pay for the entire relay. Since no channel exists from Betty -> me, the tickets are redeemed into Betty's node. Betty now generates a ticket of value 0.01 HOPR to pay for the remaining relay, and since a channel does exist from Chāo -> Betty, the ticket is redeemed into this channel instead of Chāo's balance.
 
