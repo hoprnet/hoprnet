@@ -26,6 +26,9 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
         vm.startBroadcast(deployerPrivateKey);
     }
 
+    /**
+     * @dev On network registry contract, register peers associated with the calling wallet.
+     */
     function selfRegisterNodes(string[] calldata peerIds) external {
         // 1. get environment and msg.sender
         getEnvironmentAndMsgSender();
@@ -39,6 +42,9 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
         vm.stopBroadcast();
     }
 
+    /**
+     * @dev On network registry contract, deregister peers associated with the calling wallet.
+     */
     function selfDeregisterNodes(string[] calldata peerIds) external {
         // 1. get environment and msg.sender
         getEnvironmentAndMsgSender();
@@ -53,7 +59,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     }
 
     /**
-     * @dev function called by the owner
+     * @dev On network registry contract, register nodes to a set of addresses. This function should only be called by the owner
      */
     function registerNodes(address[] calldata stakingAddresses, string[] calldata peerIds) external {
         require(stakingAddresses.length == peerIds.length, "Input lengths are different");
@@ -80,7 +86,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     }
 
     /**
-     * @dev function called by the owner
+     * @dev On network registry contract, deregister nodes from a set of addresses. This function should only be called by the owner
      */
     function deregisterNodes(address[] calldata stakingAddresses, string[] calldata peerIds) external {
         // 1. get environment and msg.sender
@@ -105,7 +111,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     }
 
     /**
-     * @dev function called by the owner
+     * @dev On network registry contract, disable it. This function should only be called by the owner
      */
     function disableNetworkRegistry() external {
         // 1. get environment and msg.sender
@@ -130,7 +136,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     }
 
     /**
-     * @dev function called by the owner
+     * @dev On network registry contract, enable it. This function should only be called by the owner
      */
     function enableNetworkRegistry() external {
         // 1. get environment and msg.sender
@@ -155,7 +161,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     }
 
     /**
-     * @dev function called by the owner
+     * @dev On network registry contract, update eligibility of some staking addresses to the desired . This function should only be called by the owner
      */
     function forceEligibilityUpdate(address[] calldata stakingAddresses, bool[] calldata eligibility) external {
         require(stakingAddresses.length == eligibility.length, "Input lengths are different");
@@ -173,7 +179,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     }
 
     /**
-     * @dev function called by the owner
+     * @dev On network registry contract, sync eligibility of some staking addresses. This function should only be called by the owner
      */
     function syncEligibility(string[] calldata peerIds) external {
         // 1. get environment and msg.sender
