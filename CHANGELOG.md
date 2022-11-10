@@ -12,6 +12,7 @@
 - Add Health Status Indicator in the Admin UI ([#4197](https://github.com/hoprnet/hoprnet/pull/4197))
 - Allow connectivity indicator to be GREEN on public nodes too ([#4314](https://github.com/hoprnet/hoprnet/pull/4314))
 - Show correct counterparty in the `channels` command output ([#4370](https://github.com/hoprnet/hoprnet/pull/4370))
+- Fix channel metrics, add channel balances metrics ([#4374](https://github.com/hoprnet/hoprnet/pull/4374))
 
 ---
 
