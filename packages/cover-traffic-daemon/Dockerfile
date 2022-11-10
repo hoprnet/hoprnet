@@ -1,6 +1,6 @@
 ARG HOPR_TOOLCHAIN_IMAGE=${HOPR_TOOLCHAIN_IMAGE:-hopr-toolchain}
 
-# Run hopr-cover-traffic-daemon within a single container using yarn
+# Creates a Docker container that encapsulates a cover-traffic node
 
 # use slim version of node on Debian for smaller image sizes
 FROM ${HOPR_TOOLCHAIN_IMAGE} as build

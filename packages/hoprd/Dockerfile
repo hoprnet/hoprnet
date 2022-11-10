@@ -1,6 +1,7 @@
 ARG HOPR_TOOLCHAIN_IMAGE=${HOPR_TOOLCHAIN_IMAGE:-hopr-toolchain}
 
-# Run HOPRd  within a single container using npm
+# Creates a Docker container that encapsulates a horpd node
+
 FROM ${HOPR_TOOLCHAIN_IMAGE} as build
 
 WORKDIR /app/hoprnet

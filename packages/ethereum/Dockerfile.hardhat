@@ -1,6 +1,7 @@
 ARG HOPR_TOOLCHAIN_IMAGE=${HOPR_TOOLCHAIN_IMAGE:-hopr-toolchain}
 
-# Run HOPRd  within a single container using yarn
+# Creates a Docker container that encapsulates a local testnet with deployed smart contracts
+
 FROM ${HOPR_TOOLCHAIN_IMAGE} as build
 
 WORKDIR /app/hoprnet
