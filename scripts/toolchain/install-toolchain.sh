@@ -54,8 +54,20 @@ while (( "$#" )); do
   esac
 done
 
-declare download_dir="${mydir}/download"
-mkdir ${download_dir}
+if [[ "${PATH}" =~ "/usr/local/bin" ]]; then
+    echo "Cannot install utilities. \"/usr/local/bin\" is not part of home-path."
+fi
+
+if ! [ -w "/usr/local/bin" ]; then
+    echo "Cannot install utilities. \"/usr/local/bin\" is not writable."
+fi
+
+if ! [ -d "/opt" ] && ! [ -w "/opt" ] || ! [ -w "/" ]; then
+    echo "Cannot install utilities. \"/opt\" does not exist or is not writable."
+fi
+
+declare download_dir="/tmp/hopr-toolchain/download"
+mkdir -p ${download_dir}
 
 function install_rustup() {
     if ! command -v rustup; then

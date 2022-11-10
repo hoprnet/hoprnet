@@ -37,7 +37,7 @@ toolchain: ## install toolchain
 .PHONY: deps
 deps: ## install dependencies in CI
 	${YARN_ENVIRONMENT} yarn workspaces focus ${YARNFLAGS}
-# Don't fetch Rust crates
+# Don't fetch Rust crates since syncing with crates registry is slow
 ifeq ($(origin NO_CARGO),undefined)
 	cargo fetch --target wasm32-unknown-unknown ${CARGOFLAGS}
 endif

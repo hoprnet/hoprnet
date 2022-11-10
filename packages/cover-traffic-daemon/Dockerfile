@@ -1,4 +1,4 @@
-ARG HOPR_TOOLCHAIN_IMAGE=${HOPR_TOOLCHAIN_IMAGE:-hopr-toolchain}
+ARG HOPR_TOOLCHAIN_IMAGE=${HOPR_TOOLCHAIN_IMAGE:-hopr-toolchain:latest}
 
 # Creates a Docker container that encapsulates a cover-traffic node
 
@@ -36,7 +36,7 @@ RUN CI=true NO_CARGO=true PRODUCTION=true make deps package=hopr-cover-traffic-d
 # Remove all typescript files
 RUN find ./packages -type f -name '*.ts' -delete
 
-FROM alpine as runtime
+FROM alpine:16@sha256:1304f174557314a7ed9eddb4eab12fed12cb0cd9809e4c28f29af86979a3c870 as runtime
 
 WORKDIR /app/hoprnet
 
