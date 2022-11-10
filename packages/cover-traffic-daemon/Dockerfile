@@ -62,8 +62,6 @@ EXPOSE 9091
 # symlink required to get WRTC to work
 RUN ln -s /lib/libc.musl-x86_64.so.1 /lib/ld-linux-x86-64.so.2
 
-WORKDIR /app/hoprnet
-
 # copy over the contents of node_modules etc
 COPY package.json .
 COPY --from=build /app/hoprnet/node_modules node_modules/
