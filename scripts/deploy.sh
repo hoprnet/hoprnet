@@ -54,7 +54,7 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
       elif [[ "${branch}" =~ staging/.* ]]; then
         # Prepend "staging-" tag prefix, if this is a staging branch
         docker_image_full="${docker_image}:staging-${release_id}"
-        cluster_tag="staging-${cluster_tag}"
+        cluster_tag="-staging${cluster_tag}"
       else
         docker_image_full="${docker_image}:${release_id}"
       fi
