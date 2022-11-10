@@ -42,6 +42,10 @@
 
 `void`
 
+#### Defined in
+
+lib/utils_metrics.d.ts:112
+
 ___
 
 ### decrement\_by
@@ -59,6 +63,10 @@ ___
 
 `void`
 
+#### Defined in
+
+lib/utils_metrics.d.ts:108
+
 ___
 
 ### free
@@ -68,6 +76,10 @@ ___
 #### Returns
 
 `void`
+
+#### Defined in
+
+lib/utils_metrics.d.ts:94
 
 ___
 
@@ -85,6 +97,10 @@ ___
 
 `number`
 
+#### Defined in
+
+lib/utils_metrics.d.ts:122
+
 ___
 
 ### increment
@@ -100,6 +116,10 @@ ___
 #### Returns
 
 `void`
+
+#### Defined in
+
+lib/utils_metrics.d.ts:103
 
 ___
 
@@ -118,6 +138,10 @@ ___
 
 `void`
 
+#### Defined in
+
+lib/utils_metrics.d.ts:99
+
 ___
 
 ### labels
@@ -128,6 +152,10 @@ ___
 
 `string`[]
 
+#### Defined in
+
+lib/utils_metrics.d.ts:130
+
 ___
 
 ### name
@@ -137,6 +165,10 @@ ___
 #### Returns
 
 `string`
+
+#### Defined in
+
+lib/utils_metrics.d.ts:126
 
 ___
 
@@ -154,3 +186,7 @@ ___
 #### Returns
 
 `void`
+
+#### Defined in
+
+lib/utils_metrics.d.ts:117

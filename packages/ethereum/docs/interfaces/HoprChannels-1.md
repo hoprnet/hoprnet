@@ -438,6 +438,10 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:81
 
 `Promise`<`BigNumber`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprChannels.ts:460
+
 ___
 
 ### TOKENS\_RECIPIENT\_INTERFACE\_HASH
@@ -453,6 +457,10 @@ ___
 #### Returns
 
 `Promise`<`string`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprChannels.ts:462
 
 ___
 
@@ -474,6 +482,10 @@ ___
 
 BaseContract.\_checkRunningEvents
 
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:121
+
 ___
 
 ### \_deployed
@@ -493,6 +505,10 @@ ___
 #### Inherited from
 
 BaseContract.\_deployed
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:114
 
 ___
 
@@ -516,6 +532,10 @@ ___
 
 BaseContract.\_wrapEvent
 
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:122
+
 ___
 
 ### announce
@@ -533,6 +553,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprChannels.ts:464
 
 ___
 
@@ -554,6 +578,10 @@ ___
 
 BaseContract.attach
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprChannels.ts:344
+
 ___
 
 ### bumpChannel
@@ -571,6 +599,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprChannels.ts:470
 
 ___
 
@@ -590,6 +622,10 @@ ___
 
 `Promise`<`string`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprChannels.ts:476
+
 ___
 
 ### channels
@@ -606,6 +642,10 @@ ___
 #### Returns
 
 `Promise`<[`BigNumber`, `string`, `BigNumber`, `BigNumber`, `number`, `BigNumber`, `number`] & { `balance`: `BigNumber` ; `channelEpoch`: `BigNumber` ; `closureTime`: `number` ; `commitment`: `string` ; `status`: `number` ; `ticketEpoch`: `BigNumber` ; `ticketIndex`: `BigNumber`  }\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprChannels.ts:482
 
 ___
 
@@ -627,6 +667,10 @@ ___
 
 BaseContract.connect
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprChannels.ts:343
+
 ___
 
 ### deployed
@@ -640,6 +684,10 @@ ___
 #### Overrides
 
 BaseContract.deployed
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprChannels.ts:345
 
 ___
 
@@ -662,6 +710,10 @@ ___
 
 BaseContract.emit
 
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:127
+
 ___
 
 ### fallback
@@ -682,6 +734,10 @@ ___
 
 BaseContract.fallback
 
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:115
+
 ___
 
 ### finalizeChannelClosure
@@ -698,6 +754,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprChannels.ts:497
 
 ___
 
@@ -719,6 +779,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprChannels.ts:502
+
 ___
 
 ### initiateChannelClosure
@@ -735,6 +799,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprChannels.ts:510
 
 ___
 
@@ -755,6 +823,10 @@ ___
 #### Inherited from
 
 BaseContract.listenerCount
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:128
 
 ___
 
@@ -782,6 +854,10 @@ ___
 
 BaseContract.listeners
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprChannels.ts:355
+
 ▸ **listeners**(`eventName?`): `Listener`[]
 
 #### Parameters
@@ -797,6 +873,10 @@ BaseContract.listeners
 #### Overrides
 
 BaseContract.listeners
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprChannels.ts:358
 
 ___
 
@@ -815,6 +895,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprChannels.ts:515
+
 ___
 
 ### publicKeys
@@ -831,6 +915,10 @@ ___
 #### Returns
 
 `Promise`<`string`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprChannels.ts:520
 
 ___
 
@@ -860,6 +948,10 @@ ___
 
 BaseContract.queryFilter
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprChannels.ts:349
+
 ___
 
 ### redeemTicket
@@ -883,6 +975,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprChannels.ts:522
 
 ___
 
@@ -910,6 +1006,10 @@ ___
 
 BaseContract.removeAllListeners
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprChannels.ts:359
+
 ▸ **removeAllListeners**(`eventName?`): [`HoprChannels`](HoprChannels-1.md)
 
 #### Parameters
@@ -925,6 +1025,10 @@ BaseContract.removeAllListeners
 #### Overrides
 
 BaseContract.removeAllListeners
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprChannels.ts:362
 
 ___
 
@@ -942,6 +1046,10 @@ ___
 
 `Promise`<`number`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprChannels.ts:534
+
 ___
 
 ### token
@@ -957,6 +1065,10 @@ ___
 #### Returns
 
 `Promise`<`string`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprChannels.ts:536
 
 ___
 
@@ -979,3 +1091,7 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprChannels.ts:538

@@ -531,6 +531,10 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:81
 
 `Promise`<`string`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:631
+
 ___
 
 ### MINTER\_ROLE
@@ -546,6 +550,10 @@ ___
 #### Returns
 
 `Promise`<`string`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:633
 
 ___
 
@@ -567,6 +575,10 @@ ___
 
 BaseContract.\_checkRunningEvents
 
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:121
+
 ___
 
 ### \_deployed
@@ -586,6 +598,10 @@ ___
 #### Inherited from
 
 BaseContract.\_deployed
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:114
 
 ___
 
@@ -609,6 +625,10 @@ ___
 
 BaseContract.\_wrapEvent
 
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:122
+
 ___
 
 ### approve
@@ -626,6 +646,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:635
 
 ___
 
@@ -647,6 +671,10 @@ ___
 
 BaseContract.attach
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:434
+
 ___
 
 ### balanceOf
@@ -663,6 +691,10 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:641
 
 ___
 
@@ -685,6 +717,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:643
+
 ___
 
 ### boostOf
@@ -701,6 +737,10 @@ ___
 #### Returns
 
 `Promise`<[`BigNumber`, `BigNumber`]\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:652
 
 ___
 
@@ -722,6 +762,10 @@ ___
 
 BaseContract.connect
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:433
+
 ___
 
 ### deployed
@@ -735,6 +779,10 @@ ___
 #### Overrides
 
 BaseContract.deployed
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:435
 
 ___
 
@@ -757,6 +805,10 @@ ___
 
 BaseContract.emit
 
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:127
+
 ___
 
 ### fallback
@@ -777,6 +829,10 @@ ___
 
 BaseContract.fallback
 
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:115
+
 ___
 
 ### getApproved
@@ -794,6 +850,10 @@ ___
 
 `Promise`<`string`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:657
+
 ___
 
 ### getRoleAdmin
@@ -810,6 +870,10 @@ ___
 #### Returns
 
 `Promise`<`string`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:662
 
 ___
 
@@ -829,6 +893,10 @@ ___
 
 `Promise`<`string`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:664
+
 ___
 
 ### getRoleMemberCount
@@ -845,6 +913,10 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:670
 
 ___
 
@@ -864,6 +936,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:675
+
 ___
 
 ### hasRole
@@ -882,6 +958,10 @@ ___
 
 `Promise`<`boolean`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:681
+
 ___
 
 ### isApprovedForAll
@@ -899,6 +979,10 @@ ___
 #### Returns
 
 `Promise`<`boolean`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:687
 
 ___
 
@@ -919,6 +1003,10 @@ ___
 #### Inherited from
 
 BaseContract.listenerCount
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:128
 
 ___
 
@@ -946,6 +1034,10 @@ ___
 
 BaseContract.listeners
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:445
+
 ▸ **listeners**(`eventName?`): `Listener`[]
 
 #### Parameters
@@ -961,6 +1053,10 @@ BaseContract.listeners
 #### Overrides
 
 BaseContract.listeners
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:448
 
 ___
 
@@ -983,6 +1079,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:693
+
 ___
 
 ### name
@@ -998,6 +1098,10 @@ ___
 #### Returns
 
 `Promise`<`string`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:702
 
 ___
 
@@ -1015,6 +1119,10 @@ ___
 #### Returns
 
 `Promise`<`string`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:704
 
 ___
 
@@ -1044,6 +1152,10 @@ ___
 
 BaseContract.queryFilter
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:439
+
 ___
 
 ### reclaimErc20Tokens
@@ -1060,6 +1172,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:706
 
 ___
 
@@ -1078,6 +1194,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:711
 
 ___
 
@@ -1105,6 +1225,10 @@ ___
 
 BaseContract.removeAllListeners
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:449
+
 ▸ **removeAllListeners**(`eventName?`): [`HoprBoost`](HoprBoost.md)
 
 #### Parameters
@@ -1120,6 +1244,10 @@ BaseContract.removeAllListeners
 #### Overrides
 
 BaseContract.removeAllListeners
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:452
 
 ___
 
@@ -1139,6 +1267,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:717
+
 ___
 
 ### revokeRole
@@ -1156,6 +1288,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:723
 
 ___
 
@@ -1175,6 +1311,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:729
 
 ___
 
@@ -1196,6 +1336,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:736
+
 ___
 
 ### setApprovalForAll
@@ -1214,6 +1358,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:744
+
 ___
 
 ### supportsInterface
@@ -1231,6 +1379,10 @@ ___
 
 `Promise`<`boolean`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:750
+
 ___
 
 ### symbol
@@ -1246,6 +1398,10 @@ ___
 #### Returns
 
 `Promise`<`string`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:755
 
 ___
 
@@ -1263,6 +1419,10 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:757
 
 ___
 
@@ -1282,6 +1442,10 @@ ___
 
 `Promise`<`BigNumber`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:762
+
 ___
 
 ### tokenURI
@@ -1299,6 +1463,10 @@ ___
 
 `Promise`<`string`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:768
+
 ___
 
 ### totalSupply
@@ -1314,6 +1482,10 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:770
 
 ___
 
@@ -1334,6 +1506,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:772
+
 ___
 
 ### typeAt
@@ -1350,6 +1526,10 @@ ___
 #### Returns
 
 `Promise`<`string`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:779
 
 ___
 
@@ -1368,6 +1548,10 @@ ___
 
 `Promise`<`BigNumber`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:781
+
 ___
 
 ### typeOf
@@ -1385,6 +1569,10 @@ ___
 
 `Promise`<`string`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:786
+
 ___
 
 ### updateBaseURI
@@ -1401,3 +1589,7 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprBoost.ts:788
