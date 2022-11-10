@@ -13,6 +13,14 @@ import "./utils/EnvironmentConfig.s.sol";
 contract RegisterScript is Test, EnvironmentConfig {
     using stdJson for string;
 
+    modifier compareLength(address[] calldata accounts, string[] calldata peerIds) {
+        if (accounts.length != peerIds.length) {
+            emit log_string("Input lengths are different.");
+            revert("Input lengths are different.");
+        }
+        _;
+    }
+
     function getEnvironmentAndMsgSender() private {
         // 1. Environment check
         // get envirionment of the script
@@ -26,7 +34,7 @@ contract RegisterScript is Test, EnvironmentConfig {
         vm.startBroadcast(deployerPrivateKey);
     }
 
-    function selfRegisterNodes(string[] memory peerIds) external {
+    function selfRegisterNodes(string[] calldata peerIds) external {
         // 1. get environment and msg.sender
         getEnvironmentAndMsgSender();
 
@@ -39,7 +47,7 @@ contract RegisterScript is Test, EnvironmentConfig {
         vm.stopBroadcast();
     }
 
-    function selfDeregisterNodes(string[] memory peerIds) external {
+    function selfDeregisterNodes(string[] calldata peerIds) external {
         // 1. get environment and msg.sender
         getEnvironmentAndMsgSender();
 
@@ -52,7 +60,10 @@ contract RegisterScript is Test, EnvironmentConfig {
         vm.stopBroadcast();
     }
 
-    function registerNodes(address[] memory stakingAddresses, string[] memory peerIds) external {
+    /**
+     * @dev function called by the owner
+     */
+    function registerNodes(address[] calldata stakingAddresses, string[] calldata peerIds) compareLength(stakingAddresses, peerIds) external {
         // 1. get environment and msg.sender
         getEnvironmentAndMsgSender();
 
@@ -72,5 +83,34 @@ contract RegisterScript is Test, EnvironmentConfig {
             revert("Cannot register nodes as an owner");
         }
         vm.stopBroadcast();
+    }
+
+    /**
+     * @dev function called by the owner
+     */
+    function deregisterNodes(address[] calldata stakingAddresses, string[] calldata peerIds) external {
+        // 1. get environment and msg.sender
+        getEnvironmentAndMsgSender();
+
+        // 2. owner registers nodes, depending on the envirionment 
+        if (currentEnvironmentType == EnvironmentType.DEVELOPMENT) {
+            // call deregister accounts on HoprDummyProxyForNetworkRegistry
+            (bool successDeregisterNodesOnDummyProxy, ) = currentEnvironmentDetail.networkRegistryProxyContractAddress.call(abi.encodeWithSignature("ownerBatchRemoveAccounts(address[])", stakingAddresses));
+            if (!successDeregisterNodesOnDummyProxy) {
+                emit log_string("Cannot remove stakingAddresses from the dummy proxy.");
+                revert("Cannot remove stakingAddresses from the dummy proxy.");
+            }
+        }
+        // actual deregister nodes
+        (bool successDeregisterNodes, ) = currentEnvironmentDetail.networkRegistryContractAddress.call(abi.encodeWithSignature("ownerDeregister(string[])", peerIds));
+        if (!successDeregisterNodes) {
+            emit log_string("Cannot rdeegister nodes as an owner");
+            revert("Cannot deregister nodes as an owner");
+        }
+        vm.stopBroadcast();
+    }
+
+    function disableNetworkRegistry() external {
+
     }
 }

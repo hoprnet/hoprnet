@@ -67,6 +67,21 @@ ifeq ($(origin PRIVATE_KEY),undefined)
 endif
 	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/Register.s.sol:RegisterScript --broadcast --sig "registerNodes(address[],string[])" $(staking_addresses) $(peer_ids)
 
+# E.g. make deregister-nodes environment-name=localhost environment-type=development staking_addresses="[0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266]" peer_ids="[16Uiu2HAmAmXnq8FtFsBAnSyfujaXbU3B5wdVRPYGfN8S99E5azdH,16Uiu2HAky1FmbdyrY4EC2ZmKVH5t1XTqZqkutnqNf5BpSjHuD9nF]"
+.PHONY: deregister-nodes
+deregister-nodes: ensure-environment-is-set
+deregister-nodes: ## owner deregister given nodes from network registry contract
+ifeq ($(peer_ids),)
+	echo "parameter <peer_ids> missing" >&2 && exit 1
+endif
+ifeq ($(staking_addresses),)
+	echo "parameter <staking_addresses> missing. Please provide an empty array "[]" if no value of staking address should be provided." >&2 && exit 1
+endif
+ifeq ($(origin PRIVATE_KEY),undefined)
+	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
+endif
+	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/Register.s.sol:RegisterScript --broadcast --sig "deregisterNodes(address[],string[])" $(staking_addresses) $(peer_ids)
+
 ensure-environment-is-set:
 ifeq ($(environment-name),)
 	echo "parameter <environment-name> missing" >&2 && exit 1
