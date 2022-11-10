@@ -1,6 +1,2 @@
 #!include:.gitignore
 #!include:.dockerignore
-
-# Copy cached packages to prevent from
-# fetching them from registry
-!.yarn/cache
