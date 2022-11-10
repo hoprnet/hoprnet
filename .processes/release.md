@@ -225,7 +225,7 @@ Once the upgraded release is deployed, the Staging deployment must be updated as
    In case of a merge conflict, the changes from `release/${RELEASE_NAME}` take precedence.
 7. Create a PR of `staging-upgrade-${RELEASE_NAME}` and ask for a peer review (should be straight-forward).
    The merge of the PR will trigger re-build of the Staging infrastructure.
-   
+
 #### Release merge-back
 
 1. (on `release/${RELEASE_NAME}`) Create a PR branch off of the release branch: `git checkout -b merge-back-release-${RELEASE_NAME}`
