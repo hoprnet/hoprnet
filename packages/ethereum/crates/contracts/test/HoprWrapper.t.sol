@@ -3,7 +3,7 @@ pragma solidity >=0.6.0 <0.9.0;
 
 import "../src/HoprWrapper.sol";
 import "../src/HoprToken.sol";
-import "./utils/Deploy.sol";
+import "./utils/ERC1820Registry.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract HoprWrapperTest is Test, ERC1820RegistryFixture {

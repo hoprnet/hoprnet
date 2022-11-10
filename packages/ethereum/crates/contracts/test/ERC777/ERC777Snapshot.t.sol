@@ -2,7 +2,7 @@
 pragma solidity >=0.6.0 <0.9.0;
 
 import "../mocks/ERC777SnapshotMock.sol";
-import "../utils/Deploy.sol";
+import "../utils/ERC1820Registry.sol";
 
 contract ERC777SnapshotTest is Test, ERC1820RegistryFixture {
     ERC777SnapshotMock public erc777Snapshot;

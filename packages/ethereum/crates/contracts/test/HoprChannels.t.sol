@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.6.0 <0.9.0;
 
-import "./utils/Deploy.sol";
+import "./utils/ERC1820Registry.sol";
 import "./utils/Accounts.sol";
 import "./utils/Channels.sol";
 import "./utils/Tickets.sol";

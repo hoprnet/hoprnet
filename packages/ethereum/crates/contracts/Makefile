@@ -38,7 +38,7 @@ endif
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
-	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/Register.s.sol:RegisterScript --broadcast --sig "selfRegisterNodes(string[])" $(peer_ids)
+	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/SingleAction.s.sol:SingleActionFromPrivateKeyScript --broadcast --sig "selfRegisterNodes(string[])" $(peer_ids)
 
 # E.g. make self-deregister-node environment-name=localhost environment-type=development peer_ids="[16Uiu2HAmAmXnq8FtFsBAnSyfujaXbU3B5wdVRPYGfN8S99E5azdH,16Uiu2HAky1FmbdyrY4EC2ZmKVH5t1XTqZqkutnqNf5BpSjHuD9nF]"
 .PHONY: self-deregister-node
@@ -50,7 +50,7 @@ endif
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
-	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/Register.s.sol:RegisterScript --broadcast --sig "selfDeregisterNodes(string[])" $(peer_ids)
+	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/SingleAction.s.sol:SingleActionFromPrivateKeyScript --broadcast --sig "selfDeregisterNodes(string[])" $(peer_ids)
 
 # E.g. make register-nodes environment-name=localhost environment-type=development staking_addresses="[0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266,0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266]" peer_ids="[16Uiu2HAmAmXnq8FtFsBAnSyfujaXbU3B5wdVRPYGfN8S99E5azdH,16Uiu2HAky1FmbdyrY4EC2ZmKVH5t1XTqZqkutnqNf5BpSjHuD9nF]"
 .PHONY: register-nodes
@@ -65,7 +65,7 @@ endif
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
-	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/Register.s.sol:RegisterScript --broadcast --sig "registerNodes(address[],string[])" $(staking_addresses) $(peer_ids)
+	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/SingleAction.s.sol:SingleActionFromPrivateKeyScript --broadcast --sig "registerNodes(address[],string[])" $(staking_addresses) $(peer_ids)
 
 # E.g. make deregister-nodes environment-name=localhost environment-type=development staking_addresses="[0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266]" peer_ids="[16Uiu2HAmAmXnq8FtFsBAnSyfujaXbU3B5wdVRPYGfN8S99E5azdH,16Uiu2HAky1FmbdyrY4EC2ZmKVH5t1XTqZqkutnqNf5BpSjHuD9nF]"
 .PHONY: deregister-nodes
@@ -80,19 +80,19 @@ endif
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
-	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/Register.s.sol:RegisterScript --broadcast --sig "deregisterNodes(address[],string[])" $(staking_addresses) $(peer_ids)
+	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/SingleAction.s.sol:SingleActionFromPrivateKeyScript --broadcast --sig "deregisterNodes(address[],string[])" $(staking_addresses) $(peer_ids)
 
 # E.g. make enable-network-registry environment-name=localhost environment-type=development
 .PHONY: enable-network-registry
 enable-network-registry: ensure-environment-is-set
 enable-network-registry: ## owner enables network registry (smart contract) globally
-	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/Register.s.sol:RegisterScript --broadcast --sig "enableNetworkRegistry()"
+	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/SingleAction.s.sol:SingleActionFromPrivateKeyScript --broadcast --sig "enableNetworkRegistry()"
 
 # E.g. make disable-network-registry environment-name=localhost environment-type=development
 .PHONY: disable-network-registry
 disable-network-registry: ensure-environment-is-set
 disable-network-registry: ## owner disables network registry (smart contract) globally
-	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/Register.s.sol:RegisterScript --broadcast --sig "disableNetworkRegistry()"
+	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/SingleAction.s.sol:SingleActionFromPrivateKeyScript --broadcast --sig "disableNetworkRegistry()"
 
 # E.g. make force-eligibility-update environment-name=localhost environment-type=development staking_addresses="[0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266,0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266]" eligibility="[true,false]"
 .PHONY: fLrce-eligibility-update
@@ -104,7 +104,7 @@ endif
 ifeq ($(eligibility),)
 	echo "parameter <eligibility> missing" >&2 && exit 1
 endif
-	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/Register.s.sol:RegisterScript --broadcast --sig "forceEligibilityUpdate(address[],bool[])" $(staking_addresses) $(eligibility)
+	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/SingleAction.s.sol:SingleActionFromPrivateKeyScript --broadcast --sig "forceEligibilityUpdate(address[],bool[])" $(staking_addresses) $(eligibility)
 
 # E.g. make sync-eligibility environment-name=localhost environment-type=development peer_ids="[16Uiu2HAmAmXnq8FtFsBAnSyfujaXbU3B5wdVRPYGfN8S99E5azdH,16Uiu2HAky1FmbdyrY4EC2ZmKVH5t1XTqZqkutnqNf5BpSjHuD9nF]"
 .PHONY: sync-eligibility
@@ -113,7 +113,7 @@ sync-eligibility: ## owner sync eligibility of peers
 ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
-	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/Register.s.sol:RegisterScript --broadcast --sig "syncEligibility(string[])" $(peer_ids)
+	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/SingleAction.s.sol:SingleActionFromPrivateKeyScript --broadcast --sig "syncEligibility(string[])" $(peer_ids)
 
 ensure-environment-is-set:
 ifeq ($(environment-name),)

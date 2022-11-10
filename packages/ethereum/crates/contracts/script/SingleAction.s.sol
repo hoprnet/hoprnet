@@ -6,11 +6,11 @@ import "forge-std/Test.sol";
 import "./utils/EnvironmentConfig.s.sol";
 
 /**
- * @dev script to interact with Network Registry for both selfRegister and onlyOwner register
+ * @dev script to interact with contract(s) of a given envirionment where the msg.sender comes from the environment variable `PRIVATE_KEY`
  * Private key of the caller must be saved under the envrionment variable `PRIVATE_KEY`
- * Wrapper of NetworkRegistery contract with detection of contract address per environment_name/environment_type
+ * Wrapper of contracts (incl. NetworkRegistery, HoprStake) with detection of contract address per environment_name/environment_type
  */
-contract RegisterScript is Test, EnvironmentConfig {
+contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     using stdJson for string;
 
     function getEnvironmentAndMsgSender() private {
