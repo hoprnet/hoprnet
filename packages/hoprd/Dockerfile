@@ -35,7 +35,20 @@ RUN yarn config set nmMode hardlinks-local
 RUN DEBUG= CI=true NO_CARGO=true PRODUCTION=true make deps package=hoprd
 
 # # use slim version of node on Debian buster for smaller image sizes
-FROM node:16-alpine as runtime
+FROM alpine as runtime
+
+WORKDIR /app/hoprnet
+
+RUN apk add --no-cache tini libc6-compat bash curl tar
+
+COPY .nvmrc .
+RUN mkdir -p scripts/toolchain
+COPY scripts/toolchain/install-toolchain.sh ./scripts/toolchain
+
+# Install Node.js
+RUN ./scripts/toolchain/install-toolchain.sh --runtime-only
+
+RUN apk del bash curl tar && rm -R scripts .nvmrc
 
 # # making sure some standard environment variables are set for production use
 ENV NODE_ENV production
@@ -52,12 +65,8 @@ EXPOSE 8080
 # p2p
 EXPOSE 9091
 
-RUN apk add --no-cache tini libc6-compat
-
 # symlink required to get WRTC to work
 RUN ln -s /lib/libc.musl-x86_64.so.1 /lib/ld-linux-x86-64.so.2
-
-WORKDIR /app/hoprnet
 
 COPY package.json ./
 COPY --from=build /app/hoprnet/packages ./packages

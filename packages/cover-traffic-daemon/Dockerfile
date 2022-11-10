@@ -5,6 +5,8 @@ ARG HOPR_TOOLCHAIN_IMAGE=${HOPR_TOOLCHAIN_IMAGE:-hopr-toolchain}
 # use slim version of node on Debian for smaller image sizes
 FROM ${HOPR_TOOLCHAIN_IMAGE} as build
 
+WORKDIR /app/hoprnet
+
 COPY .yarn .yarn
 COPY Makefile Makefile.deps Cargo.toml Cargo.lock yarn.lock tsconfig.build.json tsconfig.json tsconfig.scripts.json yarn.lock rust-toolchain.toml ./
 COPY packages/ ./packages
@@ -34,7 +36,20 @@ RUN CI=true NO_CARGO=true PRODUCTION=true make deps package=hopr-cover-traffic-d
 # Remove all typescript files
 RUN find ./packages -type f -name '*.ts' -delete
 
-FROM node:16-alpine as runtime
+FROM alpine as runtime
+
+WORKDIR /app/hoprnet
+
+RUN apk add --no-cache tini libc6-compat bash curl tar
+
+COPY .nvmrc .
+RUN mkdir -p scripts/toolchain
+COPY scripts/toolchain/install-toolchain.sh ./scripts/toolchain
+
+# Install Node.js
+RUN ./scripts/toolchain/install-toolchain.sh --runtime-only
+
+RUN apk del bash curl tar && rm -R scripts .nvmrc
 
 # making sure some standard environment variables are set for production use
 ENV NODE_ENV production
@@ -43,8 +58,6 @@ ENV NODE_OPTIONS='--max_old_space_size=4096 --experimental-wasm-modules'
 
 # p2p
 EXPOSE 9091
-
-RUN apk add --no-cache tini libc6-compat
 
 # symlink required to get WRTC to work
 RUN ln -s /lib/libc.musl-x86_64.so.1 /lib/ld-linux-x86-64.so.2

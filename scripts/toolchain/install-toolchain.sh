@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # prevent sourcing of this script, only allow execution
 $(return >/dev/null 2>&1)
 test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
@@ -18,74 +20,143 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
 # @TODO adapt this script for macOS arm64 machines
 
-if ! $(command -v rustup); then
-    echo "Installing Rustup"
-    # Get rustup but install toolchain later
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none
-    source "$HOME/.cargo/env"
-fi
+function usage() {
+  msg
+  msg "Usage: $0 [-h|--help] [--runtime-only]"
+  msg
+  msg "This script installs all required toolchain utilities to build hoprnet monorepo"
+  msg
+  msg "Use --runtime-only to install only those utilities that are necessary at runtime"
+  msg
+}
 
-if ! $(command -v cargo); then
-    declare rust_toolchain_toml_path="${mydir}/../../rust-toolchain.toml"
-    declare rust_version=$(sed -En 's/^channel = "([0-9a-z.]*)"$/\1/p' ${rust_toolchain_toml_path})
-    echo "Installing Cargo, Rust compiler v${rust_version}"
-    declare target=$(sed -En 's/^targets = \[ "([a-z0-9-]*)" \]$/\1/p' ${rust_toolchain_toml_path})
-    declare profile=$(sed -En 's/^profile = "([a-z]*)"$/\1/p' ${rust_toolchain_toml_path})
+declare install_all
+install_all="true"
 
-    # Always install the version specified in `rust-toolchain.toml`
-    rustup toolchain install ${rust_version} --profile ${profile} --target ${target}
-fi
+while (( "$#" )); do
+  case "$1" in
+    -h|--help)
+      # return early with help info when requested
+      usage
+      exit 0
+      ;;
+    --runtime-only)
+      install_all="false"
+      shift
+      ;;
+    -*|--*=)
+      usage
+      exit 1
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
 
 declare download_dir="${mydir}/download"
-
 mkdir ${download_dir}
-cd ${download_dir}
 
-if ! $(command -v wasm-pack); then
-    echo "Installing wasm-pack"
-    declare wasm_pack_release=$(curl 'https://api.github.com/repos/rustwasm/wasm-pack/releases/latest' | jq -r '.tag_name')
-    curl -fsSLO --output-dir "${download_dir}" --compressed "https://github.com/rustwasm/wasm-pack/releases/download/${wasm_pack_release}/wasm-pack-${wasm_pack_release}-x86_64-unknown-linux-musl.tar.gz"
-    tar -xzf "wasm-pack-${wasm_pack_release}-x86_64-unknown-linux-musl.tar.gz"
-    cp "wasm-pack-${wasm_pack_release}-x86_64-unknown-linux-musl/wasm-pack" /usr/local/bin
+function install_rustup() {
+    if ! command -v rustup; then
+        echo "Installing Rustup"
+        # Get rustup but install toolchain later
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain none -y
+    fi
+}
+
+function install_cargo() {
+    if ! command -v cargo; then
+        declare rust_toolchain_toml_path="${mydir}/../../rust-toolchain.toml"
+        declare rust_version=$(sed -En 's/^channel = "([0-9a-z.]*)"$/\1/p' ${rust_toolchain_toml_path})
+        echo "Installing Cargo, Rust compiler v${rust_version}"
+        declare target=$(sed -En 's/^targets = \[ "([a-z0-9-]*)" \]$/\1/p' ${rust_toolchain_toml_path})
+        declare profile=$(sed -En 's/^profile = "([a-z]*)"$/\1/p' ${rust_toolchain_toml_path})
+
+        # Always install the version specified in `rust-toolchain.toml`
+        $HOME/.cargo/bin/rustup toolchain install ${rust_version} --profile ${profile} --target ${target}
+        source "$HOME/.cargo/env"
+    fi
+}
+
+function install_wasm_pack() {
+    if ! command -v wasm-pack; then
+        cd ${download_dir}
+        echo "Installing wasm-pack"
+        declare wasm_pack_release=$(curl 'https://api.github.com/repos/rustwasm/wasm-pack/releases/latest' | jq -r '.tag_name')
+        curl -fsSLO --output-dir "${download_dir}" --compressed "https://github.com/rustwasm/wasm-pack/releases/download/${wasm_pack_release}/wasm-pack-${wasm_pack_release}-x86_64-unknown-linux-musl.tar.gz"
+        tar -xzf "wasm-pack-${wasm_pack_release}-x86_64-unknown-linux-musl.tar.gz"
+        cp "wasm-pack-${wasm_pack_release}-x86_64-unknown-linux-musl/wasm-pack" /usr/local/bin
+        cd ${mydir}
+    fi
+}
+
+# Used by wasm-pack to optimize WebAssembly binaries
+function install_wasm_opt() {
+    if ! command -v wasm-opt; then
+        cd ${download_dir}
+        echo "Installing wasm-opt"
+        declare binaryen_release=$(curl 'https://api.github.com/repos/WebAssembly/binaryen/releases/latest'| jq -r '.tag_name')
+        curl -fsSLO --output-dir "${download_dir}" --compressed "https://github.com/WebAssembly/binaryen/releases/download/${binaryen_release}/binaryen-${binaryen_release}-x86_64-linux.tar.gz"
+        tar -xzf "binaryen-${binaryen_release}-x86_64-linux.tar.gz"
+        cp "binaryen-${binaryen_release}/bin/wasm-opt" /usr/local/bin
+        cd ${mydir}
+    fi
+}
+
+function install_node_js() {
+    if ! command -v node; then
+        cd ${download_dir}
+        # Downloads Node.js version specified in `.nvmrc` file
+        declare nvmrc_path="${mydir}/../../.nvmrc"
+        declare node_js_version=$(sed -En 's/^v*([0-9.])/\1/p' ${nvmrc_path})
+        echo "Installing Node.js v${node_js_version}"
+        # Using musl builds for alpine
+        declare node_release=$(curl 'https://unofficial-builds.nodejs.org/download/release/index.json' | jq -r "[.[] | .version | select(. | startswith(\"v${node_js_version}\"))][0]")
+        curl -fsSLO --output-dir "${download_dir}" --compressed "https://unofficial-builds.nodejs.org/download/release/${node_release}/node-${node_release}-linux-x64-musl.tar.xz"
+        tar -xJf "node-${node_release}-linux-x64-musl.tar.xz" -C /usr/local --strip-components=1 --no-same-owner
+        cd ${mydir}
+    fi
+}
+
+# Install legacy version of yarn that supports handover to yarn 2+
+function install_yarn() {
+    if ! command -v yarn; then
+        cd ${download_dir}
+        declare yarn_release="1.22.19"
+        curl -fsSLO --output-dir "${download_dir}" --compressed "https://yarnpkg.com/downloads/${yarn_release}/yarn-v${yarn_release}.tar.gz"
+        mkdir -p /opt
+        tar -xzf "yarn-v${yarn_release}.tar.gz" -C /opt
+        ln -s /opt/yarn-v${yarn_release}/bin/yarn /usr/local/bin/yarn
+        cd ${mydir}
+    fi
+}
+
+function install_javascript_utilities() {
+    # Install JS Toolchain, i.e. Typescript
+    echo "Installing Javascript toolchain utilities"
+    CI=true yarn workspaces focus hoprnet
+}
+
+if ${install_all}; then
+    install_rustup
+    install_cargo
+    install_wasm_pack
+    install_wasm_opt
+    install_node_js
+    install_yarn
+    install_javascript_utilities
+
+    # Show some debug output
+    cargo --version
+    echo "node $(node --version)"
+    wasm-pack --version
+    wasm-opt --version
+    echo "yarn $(yarn --version)"
+    echo "Typescript $(npx tsc --version)"
+else
+    # We only need Node.js
+    install_node_js
 fi
 
-if ! $(command -v wasm-opt); then
-    echo "Installing wasm-opt"
-    declare binaryen_release=$(curl 'https://api.github.com/repos/WebAssembly/binaryen/releases/latest'| jq -r '.tag_name')
-    curl -fsSLO --output-dir "${download_dir}" --compressed "https://github.com/WebAssembly/binaryen/releases/download/${binaryen_release}/binaryen-${binaryen_release}-x86_64-linux.tar.gz"
-    tar -xzf "binaryen-${binaryen_release}-x86_64-linux.tar.gz"
-    cp "binaryen-${binaryen_release}/bin/wasm-opt" /usr/local/bin
-fi
-
-if ! $(command -v node); then
-    # Downloads Node.js version specified in `.nvmrc` file
-    declare nvmrc_path="${mydir}/../../.nvmrc"
-    declare node_js_version=$(sed -En 's/^v*([0-9.])/\1/p' ${nvmrc_path})
-    echo "Installing Node.js v${node_js_version}"
-    # Using musl builds for alpine
-    declare node_release=$(curl 'https://unofficial-builds.nodejs.org/download/release/index.json' | jq -r "[.[] | .version | select(. | startswith(\"v${node_js_version}\"))][0]")
-    curl -fsSLO --output-dir "${download_dir}" --compressed "https://unofficial-builds.nodejs.org/download/release/${node_release}/node-${node_release}-linux-x64-musl.tar.xz"
-    tar -xJf "node-${node_release}-linux-x64-musl.tar.xz" -C /usr/local --strip-components=1 --no-same-owner
-fi
-
-if ! $(command -v yarn); then
-    declare yarn_release="1.22.19"
-    curl -fsSLO --output-dir "${download_dir}" --compressed "https://yarnpkg.com/downloads/${yarn_release}/yarn-v${yarn_release}.tar.gz"
-    mkdir -p /opt
-    tar -xzf "yarn-v${yarn_release}.tar.gz" -C /opt
-    ln -s /opt/yarn-v${yarn_release}/bin/yarn /usr/local/bin/yarn
-fi
-
-cd ${mydir}
 rm -R ${download_dir}
-
-# Show some debug output
-cargo --version
-echo "node $(node --version)"
-wasm-pack --version
-wasm-opt --version
-echo "yarn $(yarn --version)"
-
-# Install JS Toolchain, i.e. Typescript
-echo "Installing Javascript toolchain utilities"
-CI=true yarn workspaces focus hoprnet
