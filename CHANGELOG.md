@@ -14,7 +14,7 @@
 - Show correct counterparty in the `channels` command output ([#4370](https://github.com/hoprnet/hoprnet/pull/4370))
 - Improve error messages passed to the User ([#4375](https://github.com/hoprnet/hoprnet/pull/4375))
 - Fix channel metrics, add channel balances metrics ([#4374](https://github.com/hoprnet/hoprnet/pull/4374))
-- Fix ticket redemption ([]())
+- Fix ticket redemption ([#4382](https://github.com/hoprnet/hoprnet/pull/4382))
 
 ---
 
