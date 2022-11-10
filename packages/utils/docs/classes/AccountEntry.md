@@ -42,6 +42,10 @@
 | `multiAddr` | `Multiaddr` |
 | `updatedBlock` | `BN` |
 
+#### Defined in
+
+[src/types/accountEntry.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L16)
+
 ## Properties
 
 ### multiAddr
@@ -82,6 +86,10 @@ ___
 
 `boolean`
 
+#### Defined in
+
+[src/types/accountEntry.ts:81](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L81)
+
 ___
 
 ### hasAnnounced
@@ -91,6 +99,10 @@ ___
 #### Returns
 
 `boolean`
+
+#### Defined in
+
+[src/types/accountEntry.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L90)
 
 ___
 
@@ -102,6 +114,10 @@ ___
 
 `number`
 
+#### Defined in
+
+[src/types/accountEntry.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L22)
+
 ## Methods
 
 ### getAddress
@@ -111,6 +127,10 @@ ___
 #### Returns
 
 [`Address`](Address.md)
+
+#### Defined in
+
+[src/types/accountEntry.ts:77](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L77)
 
 ___
 
@@ -122,6 +142,10 @@ ___
 
 `PeerId`
 
+#### Defined in
+
+[src/types/accountEntry.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L73)
+
 ___
 
 ### serialize
@@ -132,6 +156,10 @@ ___
 
 `Uint8Array`
 
+#### Defined in
+
+[src/types/accountEntry.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L45)
+
 ___
 
 ### toString
@@ -141,6 +169,10 @@ ___
 #### Returns
 
 `string`
+
+#### Defined in
+
+[src/types/accountEntry.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L94)
 
 ___
 
@@ -157,3 +189,7 @@ ___
 #### Returns
 
 [`AccountEntry`](AccountEntry.md)
+
+#### Defined in
+
+[src/types/accountEntry.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L26)

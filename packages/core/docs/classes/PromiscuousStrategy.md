@@ -105,6 +105,10 @@ ___
 
 [SaneDefaults](SaneDefaults.md).[onChannelWillClose](SaneDefaults.md#onchannelwillclose)
 
+#### Defined in
+
+[packages/core/src/channel-strategy.ts:66](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L66)
+
 ___
 
 ### onWinningTicket
@@ -130,6 +134,10 @@ ___
 
 [SaneDefaults](SaneDefaults.md).[onWinningTicket](SaneDefaults.md#onwinningticket)
 
+#### Defined in
+
+[packages/core/src/channel-strategy.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L60)
+
 ___
 
 ### shouldCommitToChannel
@@ -154,6 +162,10 @@ ___
 
 [SaneDefaults](SaneDefaults.md).[shouldCommitToChannel](SaneDefaults.md#shouldcommittochannel)
 
+#### Defined in
+
+[packages/core/src/channel-strategy.ts:79](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L79)
+
 ___
 
 ### tick
@@ -176,3 +188,7 @@ ___
 #### Implementation of
 
 [ChannelStrategyInterface](../interfaces/ChannelStrategyInterface.md).[tick](../interfaces/ChannelStrategyInterface.md#tick)
+
+#### Defined in
+
+[packages/core/src/channel-strategy.ts:100](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L100)

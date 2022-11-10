@@ -527,6 +527,10 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:81
 
 `Promise`<`string`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:651
+
 ___
 
 ### MINTER\_ROLE
@@ -542,6 +546,10 @@ ___
 #### Returns
 
 `Promise`<`string`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:653
 
 ___
 
@@ -563,6 +571,10 @@ ___
 
 BaseContract.\_checkRunningEvents
 
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:121
+
 ___
 
 ### \_deployed
@@ -582,6 +594,10 @@ ___
 #### Inherited from
 
 BaseContract.\_deployed
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:114
 
 ___
 
@@ -605,6 +621,10 @@ ___
 
 BaseContract.\_wrapEvent
 
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:122
+
 ___
 
 ### accountSnapshots
@@ -622,6 +642,10 @@ ___
 #### Returns
 
 `Promise`<[`BigNumber`, `BigNumber`] & { `fromBlock`: `BigNumber` ; `value`: `BigNumber`  }\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:655
 
 ___
 
@@ -641,6 +665,10 @@ ___
 
 `Promise`<`BigNumber`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:663
+
 ___
 
 ### approve
@@ -658,6 +686,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:669
 
 ___
 
@@ -679,6 +711,10 @@ ___
 
 BaseContract.attach
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:462
+
 ___
 
 ### authorizeOperator
@@ -696,6 +732,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:675
+
 ___
 
 ### balanceOf
@@ -712,6 +752,10 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:680
 
 ___
 
@@ -731,6 +775,10 @@ ___
 
 `Promise`<`BigNumber`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:682
+
 ___
 
 ### burn
@@ -748,6 +796,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:688
 
 ___
 
@@ -769,6 +821,10 @@ ___
 
 BaseContract.connect
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:461
+
 ___
 
 ### decimals
@@ -784,6 +840,10 @@ ___
 #### Returns
 
 `Promise`<`number`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:694
 
 ___
 
@@ -801,6 +861,10 @@ ___
 
 `Promise`<`string`[]\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:696
+
 ___
 
 ### deployed
@@ -814,6 +878,10 @@ ___
 #### Overrides
 
 BaseContract.deployed
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:463
 
 ___
 
@@ -836,6 +904,10 @@ ___
 
 BaseContract.emit
 
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:127
+
 ___
 
 ### fallback
@@ -856,6 +928,10 @@ ___
 
 BaseContract.fallback
 
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:115
+
 ___
 
 ### getRoleAdmin
@@ -872,6 +948,10 @@ ___
 #### Returns
 
 `Promise`<`string`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:698
 
 ___
 
@@ -891,6 +971,10 @@ ___
 
 `Promise`<`string`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:700
+
 ___
 
 ### getRoleMemberCount
@@ -907,6 +991,10 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:706
 
 ___
 
@@ -926,6 +1014,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:711
+
 ___
 
 ### granularity
@@ -941,6 +1033,10 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:717
 
 ___
 
@@ -960,6 +1056,10 @@ ___
 
 `Promise`<`boolean`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:719
+
 ___
 
 ### isOperatorFor
@@ -977,6 +1077,10 @@ ___
 #### Returns
 
 `Promise`<`boolean`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:725
 
 ___
 
@@ -997,6 +1101,10 @@ ___
 #### Inherited from
 
 BaseContract.listenerCount
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:128
 
 ___
 
@@ -1024,6 +1132,10 @@ ___
 
 BaseContract.listeners
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:473
+
 ▸ **listeners**(`eventName?`): `Listener`[]
 
 #### Parameters
@@ -1039,6 +1151,10 @@ BaseContract.listeners
 #### Overrides
 
 BaseContract.listeners
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:476
 
 ___
 
@@ -1060,6 +1176,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:731
+
 ___
 
 ### name
@@ -1075,6 +1195,10 @@ ___
 #### Returns
 
 `Promise`<`string`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:739
 
 ___
 
@@ -1096,6 +1220,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:741
+
 ___
 
 ### operatorSend
@@ -1116,6 +1244,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:749
 
 ___
 
@@ -1145,6 +1277,10 @@ ___
 
 BaseContract.queryFilter
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:467
+
 ___
 
 ### removeAllListeners
@@ -1171,6 +1307,10 @@ ___
 
 BaseContract.removeAllListeners
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:477
+
 ▸ **removeAllListeners**(`eventName?`): [`HoprToken`](HoprToken.md)
 
 #### Parameters
@@ -1186,6 +1326,10 @@ BaseContract.removeAllListeners
 #### Overrides
 
 BaseContract.removeAllListeners
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:480
 
 ___
 
@@ -1205,6 +1349,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:758
+
 ___
 
 ### revokeOperator
@@ -1221,6 +1369,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:764
 
 ___
 
@@ -1239,6 +1391,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:769
 
 ___
 
@@ -1259,6 +1415,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:775
+
 ___
 
 ### symbol
@@ -1275,6 +1435,10 @@ ___
 
 `Promise`<`string`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:782
+
 ___
 
 ### totalSupply
@@ -1290,6 +1454,10 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:784
 
 ___
 
@@ -1308,6 +1476,10 @@ ___
 
 `Promise`<`BigNumber`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:786
+
 ___
 
 ### totalSupplySnapshots
@@ -1324,6 +1496,10 @@ ___
 #### Returns
 
 `Promise`<[`BigNumber`, `BigNumber`] & { `fromBlock`: `BigNumber` ; `value`: `BigNumber`  }\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:791
 
 ___
 
@@ -1343,6 +1519,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:798
+
 ___
 
 ### transferFrom
@@ -1361,3 +1541,7 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/HoprToken.ts:804

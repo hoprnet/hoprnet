@@ -90,3 +90,4 @@ Embed code should be included into `<div class="embed-container"></div>` html ta
 2. Paste into `versioned_docs` directory and rename `docs` to `version-v1.xx`
 3. On sidebars directory Duplicate `version-v1.87-sidebars.json` file and rename to `version-v1.xx-sidebars.json`, update duplicated file contents from `Next` version sidebar.
 4. Edit file `versions.json` to add a new version.
+5. Edit file `docusaurus.config.js` and update the `lastVersion:` to the latest version.

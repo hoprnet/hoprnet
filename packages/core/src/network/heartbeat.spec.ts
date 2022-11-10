@@ -25,6 +25,7 @@ class NetworkHealth extends EventEmitter {
   }
 }
 
+const Me = privKeyToPeerId('0x9135f358f94b59e8cdee5545eb9ecc8ff32bc3a79227a09ee2bb6b50f1ad8159')
 const Alice = privKeyToPeerId('0x427ff36aacbac09f6da4072161a6a338308c53cfb6e50ca56aa70b1a38602a9f')
 const Bob = privKeyToPeerId('0xf9bfbad938482b29076932b080fb6ac1e14616ee621fb3f77739784bcf1ee8cf')
 const Charly = privKeyToPeerId('0xfab2610822e8c973bec74c811e2f44b6b4b501e922b1d67f5367a26ce46088ea')
@@ -136,6 +137,7 @@ async function getPeer(
   const peers = new NetworkPeers([], [self], 0.3)
 
   const heartbeat = new TestingHeartbeat(
+    Me,
     peers,
     (protocols: string | string[], handler: LibP2PHandlerFunction<any>) => network.subscribe(self, protocols, handler),
     ((dest: PeerId, protocols: string | string[], msg: Uint8Array) =>
@@ -145,7 +147,7 @@ async function getPeer(
     }) as any,
     () => Promise.resolve(true),
     netStatEvents,
-    (peerId) => !peerId.equals(Charly),
+    (peerId) => !peerId.equals(Charly) && !peerId.equals(Me),
     TESTING_ENVIRONMENT,
     {
       ...SHORT_TIMEOUTS,
@@ -164,6 +166,7 @@ describe('unit test heartbeat', async () => {
   it('check nodes is noop with empty store & health indicator is red', async () => {
     let netHealth = new NetworkHealth()
     const heartbeat = new TestingHeartbeat(
+      Me,
       new NetworkPeers([], [Alice], 0.3),
       (() => {}) as any,
       (async () => {
