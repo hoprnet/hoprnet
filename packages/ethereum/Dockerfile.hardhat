@@ -8,16 +8,15 @@ WORKDIR /app/hoprnet
 # Get all we need from the monorepo
 COPY .yarn .yarn/
 COPY packages packages/
-COPY package.json .yarnrc.yml yarn.lock tsconfig.json Makefile Makefile.deps Cargo.toml Cargo.lock ./
+COPY package.json .yarnrc.yml yarn.lock tsconfig.json Makefile Cargo.toml Cargo.lock ./
 
-LABEL description="Launches a hardhat node running a local network with the HOPR contracts deployed and available."
-
-WORKDIR /app/hoprnet/packages/ethereum
+LABEL description="Launches a hardhat node running a local network with the HOPR contracts deployed and available." 
 
 # Turn Ethereum package into hardhat package
-RUN mv package.hardhat.json package.json && mv tsconfig.hardhat.json tsconfig.json 
-
-WORKDIR /app/hoprnet
+RUN cd /app/hoprnet/packages/ethereum && \
+    mv package.hardhat.json package.json && \
+    mv tsconfig.hardhat.json tsconfig.json && \
+    cd /app/hoprnet
 
 RUN CI=true make deps package=hopr-ethereum
 
@@ -39,7 +38,7 @@ RUN apk add --no-cache tini libc6-compat make
 RUN ln -s /lib/libc.musl-x86_64.so.1 /lib/ld-linux-x86-64.so.2
 
 COPY --from=build /app/hoprnet/.yarn .yarn/
-COPY Makefile Makefile.deps .yarnrc.yml package.json yarn.lock tsconfig.json ./
+COPY Makefile .yarnrc.yml package.json yarn.lock tsconfig.json ./
 COPY --from=build /app/hoprnet/node_modules node_modules/
 COPY --from=build /app/hoprnet/packages/ packages/
 
@@ -54,4 +53,4 @@ EXPOSE 8545
 
 ENV NODE_OPTIONS=--max_old_space_size=1024
 
-ENTRYPOINT ["/sbin/tini", "--", "yarn", "run", "network", "--network", "hardhat", "--show-stack-traces"]
+ENTRYPOINT ["/sbin/tini", "--", "yarn", "run:network", "--network", "hardhat", "--show-stack-traces"]

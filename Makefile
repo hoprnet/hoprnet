@@ -1,5 +1,27 @@
 WORKSPACES_WITH_RUST_MODULES := $(wildcard $(addsuffix /crates, $(wildcard ./packages/*)))
 
+YARNFLAGS :=
+YARN_ENVIRONMENT :=
+CARGOFLAGS :=
+
+# Build specific package
+ifeq ($(package),)
+	YARNFLAGS := ${YARNFLAGS} -A
+else
+	YARNFLAGS := ${YARNFLAGS} @hoprnet/${package}
+endif
+
+# Don't install devDependencies in production
+ifneq ($(origin PRODUCTION),undefined)
+	YARNFLAGS := ${YARNFLAGS} --production
+	YARN_ENVIRONMENT := ${YARN_ENVIRONMENT} DEBUG=
+endif
+
+# Don't try to resolve dependencies if CI=true
+ifneq ($(origin CI),undefined)
+	CARGOFLAGS := ${CARGOFLAGS} --locked
+endif
+
 .POSIX:
 
 all: help
@@ -13,8 +35,12 @@ toolchain: ## install toolchain
 	scripts/toolchain/install-toolchain.sh
 
 .PHONY: deps
-deps: ## install dependencies
-	$(MAKE) -f Makefile.deps deps
+deps: ## install dependencies in CI
+	${YARN_ENVIRONMENT} yarn workspaces focus ${YARNFLAGS}
+# Don't fetch Rust crates
+ifeq ($(origin NO_CARGO),undefined)
+	cargo fetch --target wasm32-unknown-unknown ${CARGOFLAGS}
+endif
 
 .PHONY: build
 build: ## build all packages
@@ -22,6 +48,7 @@ build: build-hopr-admin build-yarn
 
 .PHONY: build-hopr-admin
 build-hopr-admin: ## build hopr admin React frontend
+# Don't build hopr-admin e.g. for cover-traffic-daemon
 ifeq ($(origin NO_NEXT),undefined)	
 	yarn workspace @hoprnet/hoprd run buildAdmin
 endif
@@ -46,13 +73,14 @@ build-yarn-watch: build-solidity-types build-cargo
 
 .PHONY: build-cargo
 build-cargo: ## build cargo packages and create boilerplate JS code
+# Skip building Rust crates
 ifeq ($(origin NO_CARGO),undefined)
 	$(MAKE) -j 1 $(WORKSPACES_WITH_RUST_MODULES)
 endif
 
 .PHONY: build-yellowpaper
 build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
-	make -C docs/yellowpaper
+	$(MAKE) -C docs/yellowpaper
 
 .PHONY: build-docs
 build-docs: ## build typedocs, Rest API docs, and docs website

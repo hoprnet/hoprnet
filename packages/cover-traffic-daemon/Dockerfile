@@ -8,7 +8,7 @@ FROM ${HOPR_TOOLCHAIN_IMAGE} as build
 WORKDIR /app/hoprnet
 
 COPY .yarn .yarn
-COPY Makefile Makefile.deps Cargo.toml Cargo.lock yarn.lock tsconfig.build.json tsconfig.json tsconfig.scripts.json yarn.lock rust-toolchain.toml ./
+COPY Makefile Cargo.toml Cargo.lock yarn.lock tsconfig.build.json tsconfig.json tsconfig.scripts.json yarn.lock rust-toolchain.toml ./
 COPY packages/ ./packages
 
 LABEL description="Launches a cover-traffic node which keeps sending cover-traffic through the hopr network"
@@ -40,7 +40,7 @@ FROM alpine as runtime
 
 WORKDIR /app/hoprnet
 
-RUN apk add --no-cache tini libc6-compat bash curl tar
+RUN apk add --no-cache tini libc6-compat bash curl tar jq xz
 
 COPY .nvmrc .
 RUN mkdir -p scripts/toolchain
@@ -49,7 +49,7 @@ COPY scripts/toolchain/install-toolchain.sh ./scripts/toolchain
 # Install Node.js
 RUN ./scripts/toolchain/install-toolchain.sh --runtime-only
 
-RUN apk del bash curl tar && rm -R scripts .nvmrc
+RUN apk del bash curl tar jq xz && rm -R scripts .nvmrc
 
 # making sure some standard environment variables are set for production use
 ENV NODE_ENV production
