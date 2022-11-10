@@ -10,11 +10,12 @@ WORKDIR /app/hoprnet
 # use bash to have source command and persistent environment
 SHELL ["/bin/bash", "-lc"]
 
-## Get toolchain utilities
-
+# Gets yarn executable
 COPY .yarn .yarn/
+
 COPY package.json .yarnrc.yml rust-toolchain.toml .nvmrc yarn.lock ./
 RUN mkdir -p scripts/toolchain
 COPY scripts/toolchain/install-toolchain.sh ./scripts/toolchain
 
+# Downloads prebuilt toolchain utilities
 RUN ./scripts/toolchain/install-toolchain.sh
