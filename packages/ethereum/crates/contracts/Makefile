@@ -82,6 +82,39 @@ ifeq ($(origin PRIVATE_KEY),undefined)
 endif
 	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/Register.s.sol:RegisterScript --broadcast --sig "deregisterNodes(address[],string[])" $(staking_addresses) $(peer_ids)
 
+# E.g. make enable-network-registry environment-name=localhost environment-type=development
+.PHONY: enable-network-registry
+enable-network-registry: ensure-environment-is-set
+enable-network-registry: ## owner enables network registry (smart contract) globally
+	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/Register.s.sol:RegisterScript --broadcast --sig "enableNetworkRegistry()"
+
+# E.g. make disable-network-registry environment-name=localhost environment-type=development
+.PHONY: disable-network-registry
+disable-network-registry: ensure-environment-is-set
+disable-network-registry: ## owner disables network registry (smart contract) globally
+	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/Register.s.sol:RegisterScript --broadcast --sig "disableNetworkRegistry()"
+
+# E.g. make force-eligibility-update environment-name=localhost environment-type=development staking_addresses="[0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266,0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266]" eligibility="[true,false]"
+.PHONY: fLrce-eligibility-update
+force-eligibility-update: ensure-environment-is-set
+force-eligibility-update: ## owner forces eligibility update
+ifeq ($(staking_addresses),)
+	echo "parameter <staking_addresses> missing" >&2 && exit 1
+endif
+ifeq ($(eligibility),)
+	echo "parameter <eligibility> missing" >&2 && exit 1
+endif
+	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/Register.s.sol:RegisterScript --broadcast --sig "forceEligibilityUpdate(address[],bool[])" $(staking_addresses) $(eligibility)
+
+# E.g. make sync-eligibility environment-name=localhost environment-type=development peer_ids="[16Uiu2HAmAmXnq8FtFsBAnSyfujaXbU3B5wdVRPYGfN8S99E5azdH,16Uiu2HAky1FmbdyrY4EC2ZmKVH5t1XTqZqkutnqNf5BpSjHuD9nF]"
+.PHONY: sync-eligibility
+sync-eligibility: ensure-environment-is-set
+sync-eligibility: ## owner sync eligibility of peers
+ifeq ($(peer_ids),)
+	echo "parameter <peer_ids> missing" >&2 && exit 1
+endif
+	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/Register.s.sol:RegisterScript --broadcast --sig "syncEligibility(string[])" $(peer_ids)
+
 ensure-environment-is-set:
 ifeq ($(environment-name),)
 	echo "parameter <environment-name> missing" >&2 && exit 1

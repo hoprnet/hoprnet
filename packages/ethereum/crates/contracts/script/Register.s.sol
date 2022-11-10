@@ -13,14 +13,6 @@ import "./utils/EnvironmentConfig.s.sol";
 contract RegisterScript is Test, EnvironmentConfig {
     using stdJson for string;
 
-    modifier compareLength(address[] calldata accounts, string[] calldata peerIds) {
-        if (accounts.length != peerIds.length) {
-            emit log_string("Input lengths are different.");
-            revert("Input lengths are different.");
-        }
-        _;
-    }
-
     function getEnvironmentAndMsgSender() private {
         // 1. Environment check
         // get envirionment of the script
@@ -63,7 +55,9 @@ contract RegisterScript is Test, EnvironmentConfig {
     /**
      * @dev function called by the owner
      */
-    function registerNodes(address[] calldata stakingAddresses, string[] calldata peerIds) compareLength(stakingAddresses, peerIds) external {
+    function registerNodes(address[] calldata stakingAddresses, string[] calldata peerIds) external {
+        require(stakingAddresses.length == peerIds.length, "Input lengths are different");
+
         // 1. get environment and msg.sender
         getEnvironmentAndMsgSender();
 
@@ -110,7 +104,87 @@ contract RegisterScript is Test, EnvironmentConfig {
         vm.stopBroadcast();
     }
 
+    /**
+     * @dev function called by the owner
+     */
     function disableNetworkRegistry() external {
+        // 1. get environment and msg.sender
+        getEnvironmentAndMsgSender();
 
+        // 2. check if current NR is enabled.
+        (bool successReadEnabled, bytes memory returndataReadEnabled) = currentEnvironmentDetail.networkRegistryContractAddress.staticcall(abi.encodeWithSignature("enabled()"));
+        if (!successReadEnabled) {
+            revert("Cannot read enabled from network registry contract.");
+        }
+        bool isEnabled = abi.decode(returndataReadEnabled, (bool));
+
+        // 3. disable if needed
+        if (isEnabled) {
+            (bool successDisableNetworkRegistry, ) = currentEnvironmentDetail.networkRegistryContractAddress.call(abi.encodeWithSignature("disableRegistry()"));
+            if (!successDisableNetworkRegistry) {
+                emit log_string("Cannot disable network registery as an owner");
+                revert("Cannotdisable network registery as an owner");
+            }
+            vm.stopBroadcast();
+        }
+    }
+
+    /**
+     * @dev function called by the owner
+     */
+    function enableNetworkRegistry() external {
+        // 1. get environment and msg.sender
+        getEnvironmentAndMsgSender();
+
+        // 2. check if current NR is enabled.
+        (bool successReadEnabled, bytes memory returndataReadEnabled) = currentEnvironmentDetail.networkRegistryContractAddress.staticcall(abi.encodeWithSignature("enabled()"));
+        if (!successReadEnabled) {
+            revert("Cannot read enabled from network registry contract.");
+        }
+        bool isEnabled = abi.decode(returndataReadEnabled, (bool));
+
+        // 3. enable if needed
+        if (!isEnabled) {
+            (bool successEnableNetworkRegistry, ) = currentEnvironmentDetail.networkRegistryContractAddress.call(abi.encodeWithSignature("enableRegistry()"));
+            if (!successEnableNetworkRegistry) {
+                emit log_string("Cannot enable network registery as an owner");
+                revert("Cannot enable network registery as an owner");
+            }
+            vm.stopBroadcast();
+        }
+    }
+
+    /**
+     * @dev function called by the owner
+     */
+    function forceEligibilityUpdate(address[] calldata stakingAddresses, bool[] calldata eligibility) external {
+        require(stakingAddresses.length == eligibility.length, "Input lengths are different");
+
+        // 1. get environment and msg.sender
+        getEnvironmentAndMsgSender();
+
+        // 2. update emit EligibilityUpdate events by the owner
+        (bool successForceEligibilityUpdate, ) = currentEnvironmentDetail.networkRegistryContractAddress.call(abi.encodeWithSignature("ownerForceEligibility(address[],bool[])", stakingAddresses, eligibility));
+        if (!successForceEligibilityUpdate) {
+            emit log_string("Cannot force update eligibility as an owner");
+            revert("Cannot force update eligibility as an owner");
+        }
+        vm.stopBroadcast();
+    }
+
+    /**
+     * @dev function called by the owner
+     */
+    function syncEligibility(string[] calldata peerIds) external {
+        // 1. get environment and msg.sender
+        getEnvironmentAndMsgSender();
+
+        // 2. sync peers eligibility according to the latest requirement of its current state
+        (bool successSyncEligibility, ) = currentEnvironmentDetail.networkRegistryContractAddress.call(abi.encodeWithSignature("sync(string[])", peerIds));
+        if (!successSyncEligibility) {
+            emit log_string("Cannot sync eligibility as an owner");
+            revert("Cannot sync eligibility as an owner");
+        }
+        vm.stopBroadcast();
     }
 }
