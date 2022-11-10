@@ -40,7 +40,7 @@ make -j deps && make -j build
    which in most macOS devices require an upgrade, the easiest being via `brew bash`.
 
 ```
-./scripts/setup-local-cluster.sh -m "http://app.myne.chat" -i scripts/topologies/full_interconnected_cluster.sh
+./scripts/setup-local-cluster.sh -m "http://app.myne.chat" -i topologies/full_interconnected_cluster.sh
 ```
 
 Afterwards, a set off accounts with their respective HTTP REST API, HOPR Admin, and WebSocket interface will be displayed

@@ -272,7 +272,7 @@ HOPR_ENVIRONMENT_ID=hardhat-localhost yarn run:faucet:all
 ## Local cluster
 
 The best way to test with multiple HOPR nodes is by using a local cluster of interconnected nodes.
-See [how to start your local HOPR cluster](SETUP_LOCAL_CLUSTER.md).
+See [how to start your local HOPR cluster](https://docs.hoprnet.org/developers/starting-local-cluster).
 
 ## Test
 
