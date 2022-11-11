@@ -20,7 +20,11 @@
 - [automaticChainCreation](default.md#automaticchaincreation)
 - [cachedGetNativeBalance](default.md#cachedgetnativebalance)
 - [chain](default.md#chain)
+- [db](default.md#db)
 - [indexer](default.md#indexer)
+- [options](default.md#options)
+- [privateKey](default.md#privatekey)
+- [publicKey](default.md#publickey)
 - [redeemingAll](default.md#redeemingall)
 - [started](default.md#started)
 - [ticketRedemtionInChannelOperations](default.md#ticketredemtioninchanneloperations)
@@ -99,6 +103,10 @@
 #### Overrides
 
 EventEmitter.constructor
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L67)
 
 ## Properties
 
@@ -182,6 +190,16 @@ ___
 
 ___
 
+### db
+
+• `Private` **db**: `HoprDB`
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:69](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L69)
+
+___
+
 ### indexer
 
 • **indexer**: [`Indexer`](Indexer.md)
@@ -189,6 +207,36 @@ ___
 #### Defined in
 
 [packages/core-ethereum/src/index.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L60)
+
+___
+
+### options
+
+• `Private` **options**: [`ChainOptions`](../modules.md#chainoptions)
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L72)
+
+___
+
+### privateKey
+
+• `Private` **privateKey**: `Uint8Array`
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L71)
+
+___
+
+### publicKey
+
+• `Private` **publicKey**: `PublicKey`
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L70)
 
 ___
 
@@ -294,7 +342,9 @@ node_modules/@types/node/events.d.ts:272
 
 Alias for `emitter.on(eventName, listener)`.
 
-**`since`** v0.1.26
+**`Since`**
+
+v0.1.26
 
 #### Parameters
 
@@ -310,6 +360,10 @@ Alias for `emitter.on(eventName, listener)`.
 #### Inherited from
 
 EventEmitter.addListener
+
+#### Defined in
+
+node_modules/@types/node/events.d.ts:299
 
 ___
 
@@ -327,6 +381,10 @@ ___
 
 `Promise`<`string`\>
 
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:147](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L147)
+
 ___
 
 ### commitToChannel
@@ -343,6 +401,10 @@ ___
 
 `Promise`<`void`\>
 
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:221](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L221)
+
 ___
 
 ### createChain
@@ -352,6 +414,10 @@ ___
 #### Returns
 
 `Promise`<`void`\>
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L97)
 
 ___
 
@@ -397,7 +463,9 @@ myEmitter.emit('event', 1, 2, 3, 4, 5);
 // event with parameters 1, 2, 3, 4, 5 in third listener
 ```
 
-**`since`** v0.1.26
+**`Since`**
+
+v0.1.26
 
 #### Parameters
 
@@ -413,6 +481,10 @@ myEmitter.emit('event', 1, 2, 3, 4, 5);
 #### Inherited from
 
 EventEmitter.emit
+
+#### Defined in
+
+node_modules/@types/node/events.d.ts:555
 
 ___
 
@@ -436,7 +508,9 @@ console.log(myEE.eventNames());
 // Prints: [ 'foo', 'bar', Symbol(symbol) ]
 ```
 
-**`since`** v6.0.0
+**`Since`**
+
+v6.0.0
 
 #### Returns
 
@@ -445,6 +519,10 @@ console.log(myEE.eventNames());
 #### Inherited from
 
 EventEmitter.eventNames
+
+#### Defined in
+
+node_modules/@types/node/events.d.ts:614
 
 ___
 
@@ -461,6 +539,10 @@ ___
 #### Returns
 
 `Promise`<`string`\>
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:426](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L426)
 
 ___
 
@@ -480,6 +562,10 @@ ___
 
 `Promise`<`string`\>
 
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:454](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L454)
+
 ___
 
 ### getAccount
@@ -495,6 +581,10 @@ ___
 #### Returns
 
 `Promise`<`AccountEntry`\>
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:166](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L166)
 
 ___
 
@@ -518,6 +608,10 @@ the coming events which require 8 blocks to be confirmed.
 
 HOPR balance
 
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:184](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L184)
+
 ___
 
 ### getMaxListeners
@@ -527,7 +621,9 @@ ___
 Returns the current max listener value for the `EventEmitter` which is either
 set by `emitter.setMaxListeners(n)` or defaults to [defaultMaxListeners](default.md#defaultmaxlisteners).
 
-**`since`** v1.0.0
+**`Since`**
+
+v1.0.0
 
 #### Returns
 
@@ -536,6 +632,10 @@ set by `emitter.setMaxListeners(n)` or defaults to [defaultMaxListeners](default
 #### Inherited from
 
 EventEmitter.getMaxListeners
+
+#### Defined in
+
+node_modules/@types/node/events.d.ts:471
 
 ___
 
@@ -553,6 +653,10 @@ ___
 
 `Promise`<`NativeBalance`\>
 
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:203](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L203)
+
 ___
 
 ### getOpenChannelsFrom
@@ -569,6 +673,10 @@ ___
 
 `Promise`<[`ChannelEntry`](ChannelEntry.md)[]\>
 
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:162](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L162)
+
 ___
 
 ### getPublicKey
@@ -578,6 +686,10 @@ ___
 #### Returns
 
 `PublicKey`
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:188](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L188)
 
 ___
 
@@ -595,6 +707,10 @@ ___
 
 `Promise`<`PublicKey`\>
 
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:170](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L170)
+
 ___
 
 ### getRandomOpenChannel
@@ -605,6 +721,10 @@ ___
 
 `Promise`<[`ChannelEntry`](ChannelEntry.md)\>
 
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:174](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L174)
+
 ___
 
 ### initializeChainWrapper
@@ -614,6 +734,10 @@ ___
 #### Returns
 
 `Promise`<`void`\>
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:85](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L85)
 
 ___
 
@@ -630,6 +754,10 @@ ___
 #### Returns
 
 `Promise`<`string`\>
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:416](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L416)
 
 ___
 
@@ -653,6 +781,10 @@ when the register is enabled, a `hoprNode` needs to also be `eligible`.
 
 true if registered
 
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:476](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L476)
+
 ___
 
 ### listenerCount
@@ -661,7 +793,9 @@ ___
 
 Returns the number of listeners listening to the event named `eventName`.
 
-**`since`** v3.2.0
+**`Since`**
+
+v3.2.0
 
 #### Parameters
 
@@ -676,6 +810,10 @@ Returns the number of listeners listening to the event named `eventName`.
 #### Inherited from
 
 EventEmitter.listenerCount
+
+#### Defined in
+
+node_modules/@types/node/events.d.ts:561
 
 ___
 
@@ -693,7 +831,9 @@ console.log(util.inspect(server.listeners('connection')));
 // Prints: [ [Function] ]
 ```
 
-**`since`** v0.1.26
+**`Since`**
+
+v0.1.26
 
 #### Parameters
 
@@ -709,6 +849,10 @@ console.log(util.inspect(server.listeners('connection')));
 
 EventEmitter.listeners
 
+#### Defined in
+
+node_modules/@types/node/events.d.ts:484
+
 ___
 
 ### off
@@ -717,7 +861,9 @@ ___
 
 Alias for `emitter.removeListener()`.
 
-**`since`** v10.0.0
+**`Since`**
+
+v10.0.0
 
 #### Parameters
 
@@ -733,6 +879,10 @@ Alias for `emitter.removeListener()`.
 #### Inherited from
 
 EventEmitter.off
+
+#### Defined in
+
+node_modules/@types/node/events.d.ts:444
 
 ___
 
@@ -766,7 +916,9 @@ myEE.emit('foo');
 //   a
 ```
 
-**`since`** v0.1.101
+**`Since`**
+
+v0.1.101
 
 #### Parameters
 
@@ -782,6 +934,10 @@ myEE.emit('foo');
 #### Inherited from
 
 EventEmitter.on
+
+#### Defined in
+
+node_modules/@types/node/events.d.ts:330
 
 ___
 
@@ -813,7 +969,9 @@ myEE.emit('foo');
 //   a
 ```
 
-**`since`** v0.3.0
+**`Since`**
+
+v0.3.0
 
 #### Parameters
 
@@ -829,6 +987,10 @@ myEE.emit('foo');
 #### Inherited from
 
 EventEmitter.once
+
+#### Defined in
+
+node_modules/@types/node/events.d.ts:359
 
 ___
 
@@ -846,6 +1008,10 @@ ___
 #### Returns
 
 `Promise`<{ `channelId`: `Hash` ; `receipt`: `string`  }\>
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:436](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L436)
 
 ___
 
@@ -866,7 +1032,9 @@ server.prependListener('connection', (stream) => {
 
 Returns a reference to the `EventEmitter`, so that calls can be chained.
 
-**`since`** v6.0.0
+**`Since`**
+
+v6.0.0
 
 #### Parameters
 
@@ -882,6 +1050,10 @@ Returns a reference to the `EventEmitter`, so that calls can be chained.
 #### Inherited from
 
 EventEmitter.prependListener
+
+#### Defined in
+
+node_modules/@types/node/events.d.ts:579
 
 ___
 
@@ -900,7 +1072,9 @@ server.prependOnceListener('connection', (stream) => {
 
 Returns a reference to the `EventEmitter`, so that calls can be chained.
 
-**`since`** v6.0.0
+**`Since`**
+
+v6.0.0
 
 #### Parameters
 
@@ -916,6 +1090,10 @@ Returns a reference to the `EventEmitter`, so that calls can be chained.
 #### Inherited from
 
 EventEmitter.prependOnceListener
+
+#### Defined in
+
+node_modules/@types/node/events.d.ts:595
 
 ___
 
@@ -950,7 +1128,9 @@ newListeners[0]();
 emitter.emit('log');
 ```
 
-**`since`** v9.4.0
+**`Since`**
+
+v9.4.0
 
 #### Parameters
 
@@ -966,6 +1146,10 @@ emitter.emit('log');
 
 EventEmitter.rawListeners
 
+#### Defined in
+
+node_modules/@types/node/events.d.ts:514
+
 ___
 
 ### redeemAllTickets
@@ -976,6 +1160,10 @@ ___
 
 `Promise`<`void`\>
 
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:242](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L242)
+
 ___
 
 ### redeemAllTicketsInternalLoop
@@ -985,6 +1173,10 @@ ___
 #### Returns
 
 `Promise`<`void`\>
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:257](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L257)
 
 ___
 
@@ -1003,6 +1195,10 @@ ___
 
 `Promise`<[`RedeemTicketResponse`](../modules.md#redeemticketresponse)\>
 
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:360](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L360)
+
 ___
 
 ### redeemTicketsInChannel
@@ -1018,6 +1214,10 @@ ___
 #### Returns
 
 `Promise`<`unknown`\>
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:275](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L275)
 
 ___
 
@@ -1035,6 +1235,10 @@ ___
 
 `Promise`<`unknown`\>
 
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:270](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L270)
+
 ___
 
 ### redeemTicketsInChannelLoop
@@ -1051,6 +1255,10 @@ ___
 
 `Promise`<`void`\>
 
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:297](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L297)
+
 ___
 
 ### removeAllListeners
@@ -1065,7 +1273,9 @@ component or module (e.g. sockets or file streams).
 
 Returns a reference to the `EventEmitter`, so that calls can be chained.
 
-**`since`** v0.1.26
+**`Since`**
+
+v0.1.26
 
 #### Parameters
 
@@ -1080,6 +1290,10 @@ Returns a reference to the `EventEmitter`, so that calls can be chained.
 #### Inherited from
 
 EventEmitter.removeAllListeners
+
+#### Defined in
+
+node_modules/@types/node/events.d.ts:455
 
 ___
 
@@ -1164,7 +1378,9 @@ ee.emit('ping');
 
 Returns a reference to the `EventEmitter`, so that calls can be chained.
 
-**`since`** v0.1.26
+**`Since`**
+
+v0.1.26
 
 #### Parameters
 
@@ -1181,6 +1397,10 @@ Returns a reference to the `EventEmitter`, so that calls can be chained.
 
 EventEmitter.removeListener
 
+#### Defined in
+
+node_modules/@types/node/events.d.ts:439
+
 ___
 
 ### setMaxListeners
@@ -1194,7 +1414,9 @@ modified for this specific `EventEmitter` instance. The value can be set to`Infi
 
 Returns a reference to the `EventEmitter`, so that calls can be chained.
 
-**`since`** v0.3.5
+**`Since`**
+
+v0.3.5
 
 #### Parameters
 
@@ -1209,6 +1431,10 @@ Returns a reference to the `EventEmitter`, so that calls can be chained.
 #### Inherited from
 
 EventEmitter.setMaxListeners
+
+#### Defined in
+
+node_modules/@types/node/events.d.ts:465
 
 ___
 
@@ -1226,6 +1452,10 @@ ___
 #### Returns
 
 `DeferType`<`string`\>
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:158](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L158)
 
 ___
 
@@ -1245,6 +1475,10 @@ ___
 | `hoprTokenAddress` | `string` |
 | `network` | `string` |
 
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:207](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L207)
+
 ___
 
 ### start
@@ -1254,6 +1488,10 @@ ___
 #### Returns
 
 `Promise`<[`default`](default.md)\>
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:110](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L110)
 
 ___
 
@@ -1266,6 +1504,10 @@ Stops the connector.
 #### Returns
 
 `Promise`<`void`\>
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:142](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L142)
 
 ___
 
@@ -1281,6 +1523,10 @@ Retrieves ETH balance, optionally uses the cache.
 
 ETH balance
 
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:196](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L196)
+
 ___
 
 ### waitForPublicNodes
@@ -1290,6 +1536,10 @@ ___
 #### Returns
 
 `Promise`<{ `id`: `PeerId` ; `multiaddrs`: `Multiaddr`[]  }[]\>
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:217](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L217)
 
 ___
 
@@ -1308,6 +1558,10 @@ ___
 #### Returns
 
 `Promise`<`string`\>
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:151](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L151)
 
 ___
 
@@ -1340,7 +1594,9 @@ const { getEventListeners, EventEmitter } = require('events');
 }
 ```
 
-**`since`** v15.2.0
+**`Since`**
+
+v15.2.0
 
 #### Parameters
 
@@ -1356,6 +1612,10 @@ const { getEventListeners, EventEmitter } = require('events');
 #### Inherited from
 
 EventEmitter.getEventListeners
+
+#### Defined in
+
+node_modules/@types/node/events.d.ts:262
 
 ___
 
@@ -1374,9 +1634,13 @@ console.log(listenerCount(myEmitter, 'event'));
 // Prints: 2
 ```
 
-**`since`** v0.9.12
+**`Since`**
 
-**`deprecated`** Since v3.2.0 - Use `listenerCount` instead.
+v0.9.12
+
+**`Deprecated`**
+
+Since v3.2.0 - Use `listenerCount` instead.
 
 #### Parameters
 
@@ -1392,6 +1656,10 @@ console.log(listenerCount(myEmitter, 'event'));
 #### Inherited from
 
 EventEmitter.listenerCount
+
+#### Defined in
+
+node_modules/@types/node/events.d.ts:234
 
 ___
 
@@ -1453,7 +1721,9 @@ const ac = new AbortController();
 process.nextTick(() => ac.abort());
 ```
 
-**`since`** v13.6.0, v12.16.0
+**`Since`**
+
+v13.6.0, v12.16.0
 
 #### Parameters
 
@@ -1472,6 +1742,10 @@ that iterates `eventName` events emitted by the `emitter`
 #### Inherited from
 
 EventEmitter.on
+
+#### Defined in
+
+node_modules/@types/node/events.d.ts:217
 
 ___
 
@@ -1559,7 +1833,9 @@ ac.abort(); // Abort waiting for the event
 ee.emit('foo'); // Prints: Waiting for the event was canceled!
 ```
 
-**`since`** v11.13.0, v10.16.0
+**`Since`**
+
+v11.13.0, v10.16.0
 
 #### Parameters
 
@@ -1576,6 +1852,10 @@ ee.emit('foo'); // Prints: Waiting for the event was canceled!
 #### Inherited from
 
 EventEmitter.once
+
+#### Defined in
+
+node_modules/@types/node/events.d.ts:157
 
 ▸ `Static` **once**(`emitter`, `eventName`, `options?`): `Promise`<`any`[]\>
 
@@ -1594,3 +1874,7 @@ EventEmitter.once
 #### Inherited from
 
 EventEmitter.once
+
+#### Defined in
+
+node_modules/@types/node/events.d.ts:158

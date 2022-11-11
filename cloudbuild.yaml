@@ -18,7 +18,7 @@ steps:
       - --cache-ttl=96h
       - --build-arg=PACKAGE_VERSION=${_PACKAGE_VERSION}
       - --build-arg=HOPRD_RELEASE=${_IMAGE_VERSION}
-    timeout: 600s
+    timeout: 1200s
     waitFor:
       - buildHoprd
   - name: 'gcr.io/kaniko-project/executor:v1.9.1'
@@ -29,7 +29,7 @@ steps:
       - --cache=true
       - --cache-ttl=96h
       - --build-arg=PACKAGE_VERSION=${_PACKAGE_VERSION}
-    timeout: 600s
+    timeout: 1200s
     waitFor: ['-']
   - name: 'gcr.io/kaniko-project/executor:v1.9.1'
     id: buildHardhat
@@ -51,7 +51,7 @@ steps:
     env:
       - 'PACKAGE_VERSION=$_PACKAGE_VERSION'
       - 'IMAGE_VERSION=$_IMAGE_VERSION'
-    timeout: 600s
+    timeout: 1200s
     waitFor:
       - buildHoprd
       - buildHoprdNat

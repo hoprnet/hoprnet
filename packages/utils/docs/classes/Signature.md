@@ -44,6 +44,10 @@ as this makes interop with the underlying ECDSA library simpler.
 | `signature` | `Uint8Array` |
 | `recovery` | `number` |
 
+#### Defined in
+
+[src/types/primitives.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L119)
+
 ## Properties
 
 ### recovery
@@ -84,6 +88,10 @@ ___
 
 `Uint8Array`
 
+#### Defined in
+
+[src/types/primitives.ts:147](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L147)
+
 ___
 
 ### toHex
@@ -93,6 +101,10 @@ ___
 #### Returns
 
 `string`
+
+#### Defined in
+
+[src/types/primitives.ts:158](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L158)
 
 ___
 
@@ -111,6 +123,10 @@ ___
 
 `boolean`
 
+#### Defined in
+
+[src/types/primitives.ts:154](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L154)
+
 ___
 
 ### create
@@ -128,6 +144,10 @@ ___
 
 [`Signature`](Signature.md)
 
+#### Defined in
+
+[src/types/primitives.ts:142](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L142)
+
 ___
 
 ### deserialize
@@ -143,3 +163,7 @@ ___
 #### Returns
 
 [`Signature`](Signature.md)
+
+#### Defined in
+
+[src/types/primitives.ts:128](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L128)

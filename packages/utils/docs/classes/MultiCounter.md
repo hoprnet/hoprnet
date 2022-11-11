@@ -33,6 +33,10 @@
 
 `void`
 
+#### Defined in
+
+lib/utils_metrics.d.ts:67
+
 ___
 
 ### get
@@ -49,6 +53,10 @@ ___
 
 `bigint`
 
+#### Defined in
+
+lib/utils_metrics.d.ts:81
+
 ___
 
 ### increment
@@ -64,6 +72,10 @@ ___
 #### Returns
 
 `void`
+
+#### Defined in
+
+lib/utils_metrics.d.ts:76
 
 ___
 
@@ -82,6 +94,10 @@ ___
 
 `void`
 
+#### Defined in
+
+lib/utils_metrics.d.ts:72
+
 ___
 
 ### labels
@@ -92,6 +108,10 @@ ___
 
 `string`[]
 
+#### Defined in
+
+lib/utils_metrics.d.ts:89
+
 ___
 
 ### name
@@ -101,3 +121,7 @@ ___
 #### Returns
 
 `string`
+
+#### Defined in
+
+lib/utils_metrics.d.ts:85
