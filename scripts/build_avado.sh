@@ -80,6 +80,11 @@ if [[ "${avado_version}" = "0.100.0" && "${release_id}" = "master-goerli" ]]; th
   upstream_version="master-goerli"
 fi
 
+# For staging releases, we need to prepend a prefix
+if [[ "${avado_version}" = "0.200.0" ]]; then
+  upstream_version="staging-${release_id}"
+fi
+
 msg "Building Avado v. ${avado_version} for release ${release_id} (upstream v. ${upstream_version}) using environment ${environment_id} with default provider ${provider_url}"
 
 # Create backups

@@ -9,7 +9,7 @@ env:
 
 on:
   push:
-    branches: ['integration/**', 'master', 'release/**', 'avado', 'debug-deploy/**']
+    branches: ['integration/**', 'master', 'release/**', 'staging/**', 'avado', 'debug-deploy/**']
     paths-ignore:
       - '.processes/**/*'
       - 'docs/**/*'
@@ -104,8 +104,8 @@ jobs:
         env:
           HOPR_GIT_MSG: 'chore(release): update smart contract deployments'
 
-      - name: '[NPM] Publish prerelease version (On pushes to master and debug-deploy/*)'
-        if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/') }}
+      - name: '[NPM] Publish prerelease version (On pushes to master, debug-deploy/* or staging/*)'
+        if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/')  || startsWith(github.ref, 'refs/heads/staging/') }}
         run: ./scripts/publish-version.sh prerelease
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -119,7 +119,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: '[NPM] Wait for packages to be accessible'
-        if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/') || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+        if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/') || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: |
           ./scripts/wait-for-npm-package.sh hoprd
           ./scripts/wait-for-npm-package.sh core
@@ -129,8 +129,8 @@ jobs:
           ./scripts/wait-for-npm-package.sh cover-traffic-daemon
           ./scripts/wait-for-npm-package.sh connect
 
-      - name: '[FINISH] Send notification if anything failed on master or release branches'
-        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+      - name: '[FINISH] Send notification if anything failed on master or release/staging branches'
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: |
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
             "${{ github.workflow }}" "${{ github.run_id }}"
@@ -162,8 +162,8 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Send notification if anything failed on master or release branches
-        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+      - name: Send notification if anything failed on master or release/staging branches
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: |
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
             "${{ github.workflow }}" "${{ github.run_id }}"
@@ -203,8 +203,8 @@ jobs:
       - name: Build Docker images
         run: ./scripts/build-docker.sh
 
-      - name: Send notification if anything failed on master or release branches
-        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+      - name: Send notification if anything failed on master or release/staging branches
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: |
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
             "${{ github.workflow }}" "${{ github.run_id }}"
@@ -236,9 +236,12 @@ jobs:
           # Set this to an arbitrary number less than 1
           declare version="0.100.0"
           if [[ "${HOPR_GITHUB_REF}" == refs/heads/release/* ]]; then
-             # only assing the proper version only on release branches because
+             # assign the proper version only on release branches because
              # only there we have simple semver versions
             version="$(scripts/get-package-version.sh)"
+          elif [[ "${HOPR_GITHUB_REF}" == refs/heads/staging/* ]]; then
+            # staging releases get different special version
+            version="0.200.0"
           fi
           echo "::set-output name=vsn::${version}"
         env:
@@ -258,8 +261,8 @@ jobs:
           HOPR_GITHUB_REF: ${{ github.ref }}
         run: ./scripts/commit-and-push-all-changes.sh
 
-      - name: Send notification if anything failed on master or release branches
-        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+      - name: Send notification if anything failed on master or release/staging branches
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: |
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
             "${{ github.workflow }}" "${{ github.run_id }}"
@@ -348,8 +351,8 @@ jobs:
           path: packages/
           key: hoprnet-build-${{ github.run_id }}
 
-      - name: Run deploy script for public nodes
-        if: ${{ !env.ACT }}
+      - name: Run deploy script for public nodes (non-staging)
+        if: ${{ !startsWith(github.ref, 'refs/heads/staging/') && !env.ACT }}
         run: |
           ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd" 3
         env:
@@ -357,10 +360,16 @@ jobs:
           HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
           FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
-          STAKING_ACCOUNT_BA28: ${{ secrets.STAKING_ACCOUNT_BA28 }}
-          STAKING_ACCOUNT_F84B: ${{ secrets.STAKING_ACCOUNT_F84B }}
-          STAKING_ACCOUNT_0FD4: ${{ secrets.STAKING_ACCOUNT_0FD4 }}
-          STAKING_ACCOUNT_6C15: ${{ secrets.STAKING_ACCOUNT_6C15 }}
+
+      - name: Run deploy script for public nodes (staging-only)
+        if: ${{ startsWith(github.ref, 'refs/heads/staging/') && !env.ACT }}
+        run: |
+          HOPRD_SKIP_UNSTAKED=true ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd" 1
+        env:
+          DEPLOYER_WALLET_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
+          HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
+          HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
+          FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
 
       - name: Send cluster info to Matrix
         if: ${{ success() && !env.ACT }}
@@ -370,8 +379,8 @@ jobs:
           MATRIX_ROOM: ${{ env.MATRIX_CLUSTER_INFO_ROOM }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
 
-      - name: Send notification if anything failed on master or release branches
-        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+      - name: Send notification if anything failed on master or release/staging branches
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: |
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
             "${{ github.workflow }}" "${{ github.run_id }}"
@@ -437,7 +446,7 @@ jobs:
           key: hoprnet-build-${{ github.run_id }}
 
       - name: Run deploy script for nodes behind NAT
-        if: ${{ !env.ACT }}
+        if: ${{ !startsWith(github.ref, 'refs/heads/staging/') && !env.ACT }}
         run: |
           ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd" 2 "-nat"
         env:
@@ -445,10 +454,16 @@ jobs:
           HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
           FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
-          STAKING_ACCOUNT_BA28: ${{ secrets.STAKING_ACCOUNT_BA28 }}
-          STAKING_ACCOUNT_F84B: ${{ secrets.STAKING_ACCOUNT_F84B }}
-          STAKING_ACCOUNT_0FD4: ${{ secrets.STAKING_ACCOUNT_0FD4 }}
-          STAKING_ACCOUNT_6C15: ${{ secrets.STAKING_ACCOUNT_6C15 }}
+
+      - name: Run deploy script for nodes behind NAT (staging-only)
+        if: ${{ startsWith(github.ref, 'refs/heads/staging/') && !env.ACT }}
+        run: |
+          HOPRD_SKIP_UNSTAKED=true ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd" 1 "-nat"
+        env:
+          DEPLOYER_WALLET_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
+          HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
+          HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
+          FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
 
       - name: Send cluster info to Matrix
         if: ${{ success() && !env.ACT }}
@@ -458,8 +473,8 @@ jobs:
           MATRIX_ROOM: ${{ env.MATRIX_CLUSTER_INFO_ROOM }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
 
-      - name: Send notification if anything failed on master or release branches
-        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+      - name: Send notification if anything failed on master or release/staging branches
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: |
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
             "${{ github.workflow }}" "${{ github.run_id }}"
