@@ -23,7 +23,8 @@ eth_rpc_url = "http://localhost:8545" # cannot directly use profile.default.rpc_
 
 # staging environment
 [profile.staging]
-eth_rpc_url = "https://provider-proxy.hoprnet.workers.dev/eth_goerli" # alternative can be "https://goerli.infura.io/v3/${INFURA_API_KEY}"
+# eth_rpc_url = "https://provider-proxy.hoprnet.workers.dev/eth_goerli" # alternative can be "https://goerli.infura.io/v3/${INFURA_API_KEY}"
+eth_rpc_url = "https://rpc.eu-central-2.gateway.fm/v3/gnosis/archival/chiado" # Gnosis Chiado testnet
 
 # production environment environment
 [profile.production]
