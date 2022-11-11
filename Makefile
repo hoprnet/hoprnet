@@ -1,12 +1,20 @@
+# Gets all packages that include a Rust crates
 WORKSPACES_WITH_RUST_MODULES := $(wildcard $(addsuffix /crates, $(wildcard ./packages/*)))
+
+# Gets all individual crates such that they can get built
+CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(crate)/*/Cargo.toml)))
 
 .POSIX:
 
 all: help
 
-.PHONY: $(WORKSPACES_WITH_RUST_MODULES) ## build all WASM modules
+.PHONY: $(CRATES) ## builds all Rust crates
+$(CRATES):
+	wasm-pack build --target=bundler --out-dir $@pkg $@
+
+.PHONY: $(WORKSPACES_WITH_RUST_MODULES) ## builds all WebAssembly modules
 $(WORKSPACES_WITH_RUST_MODULES):
-	$(MAKE) -j 1 -C $@ all install
+	# $(MAKE) -j 1 -C $@ install
 
 .PHONY: deps
 deps: ## install dependencies
@@ -40,8 +48,10 @@ build-yarn-watch: build-solidity-types build-cargo
 
 .PHONY: build-cargo
 build-cargo: ## build cargo packages and create boilerplate JS code
-	cargo build --release --target wasm32-unknown-unknown
-	$(MAKE) -j 1 $(WORKSPACES_WITH_RUST_MODULES)
+# First compile Rust crates and create bindings
+	$(MAKE) $(CRATES)
+# Copy bindings to their destination
+	$(MAKE) ${WORKSPACES_WITH_RUST_MODULES}
 
 .PHONY: build-yellowpaper
 build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
