@@ -18,8 +18,6 @@ ENV NODE_ENV production
 ENV NODE_OPTIONS=--max_old_space_size=4096
 ENV npm_config_build_from_source false
 
-WORKDIR /app/hoprnet
-
 RUN CI=true make deps package=hopr-cover-traffic-daemon
 
 RUN NO_NEXT=true make -j build package=cover-traffic-daemon

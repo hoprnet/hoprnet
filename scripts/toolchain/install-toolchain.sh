@@ -17,6 +17,8 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 # - Typescript + related utilities, such as ts-node
 # - Rust (rustc, cargo)
 # - wasm-pack + wasm-opt, necessary to build WebAssembly modules
+# 
+# Currently tested for x86_64 and Alpine Linux based environments
 
 # @TODO adapt this script for macOS arm64 machines
 
