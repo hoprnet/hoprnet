@@ -90,6 +90,8 @@ test: ## run unit tests for all packages, or a single package if package= is set
 ifeq ($(package),)
 	yarn workspaces foreach -pv run test
 else
+# Prebuild Rust unit tests
+	cargo build --tests
 	yarn workspace @hoprnet/${package} run test
 endif
 
