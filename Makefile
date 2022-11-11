@@ -10,11 +10,12 @@ all: help
 
 .PHONY: $(CRATES) ## builds all Rust crates
 $(CRATES):
-	wasm-pack build --target=bundler --out-dir $@pkg $@
+# --out-dir is relative to working directory
+	wasm-pack build --target=bundler --out-dir ./pkg $@
 
 .PHONY: $(WORKSPACES_WITH_RUST_MODULES) ## builds all WebAssembly modules
 $(WORKSPACES_WITH_RUST_MODULES):
-	# $(MAKE) -j 1 -C $@ install
+	$(MAKE) -C $@ install
 
 .PHONY: deps
 deps: ## install dependencies
