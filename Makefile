@@ -21,7 +21,7 @@ deps: ## install dependencies
 	# only use corepack on non-nix systems
 	[ -n "${NIX_PATH}" ] || corepack enable
 	yarn
-#	command -v rustup && rustup update || echo "No rustup installed, ignoring"
+	command -v rustup && rustup update || echo "No rustup installed, ignoring"
 	command -v wasm-pack || cargo install wasm-pack
 
 .PHONY: build
@@ -49,7 +49,7 @@ build-yarn-watch: build-solidity-types build-cargo
 .PHONY: build-cargo
 build-cargo: ## build cargo packages and create boilerplate JS code
 # First compile Rust crates and create bindings
-	$(MAKE) $(CRATES)
+	$(MAKE) -j 1 $(CRATES)
 # Copy bindings to their destination
 	$(MAKE) ${WORKSPACES_WITH_RUST_MODULES}
 
