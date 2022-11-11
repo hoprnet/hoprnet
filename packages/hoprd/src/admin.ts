@@ -4,7 +4,8 @@ import http from 'http'
 import fs from 'fs'
 import path from 'path'
 import { parse } from 'url'
-import { default as next } from 'next'
+import next from 'next'
+
 import type { Server as HttpServer } from 'http'
 import type { LogStream } from './logs.js'
 import { NODE_ENV } from './env.js'
@@ -28,7 +29,7 @@ const MIN_NATIVE_BALANCE = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormatt
  * Server that hosts hopr-admin website
  */
 export class AdminServer {
-  private app: ReturnType<typeof next>
+  private app: ReturnType<typeof next.default>
   public server: HttpServer | undefined
   private node: Hopr | undefined
 
@@ -65,7 +66,7 @@ export class AdminServer {
         }
       }
 
-      this.app = next(nextConfig)
+      this.app = next.default(nextConfig)
       const handle = this.app.getRequestHandler()
       await this.app.prepare()
 
