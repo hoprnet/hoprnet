@@ -128,10 +128,6 @@ export class AdminServer {
     // Setup some noise
     startConnectionReports(this.node, this.logs)
     startResourceUsageLogger(debugLog)
-
-    if (process.env.NODE_ENV === 'production') {
-      showDisclaimer(this.logs)
-    }
   }
 
   public onConnection(socket: WebSocket) {
@@ -146,15 +142,6 @@ export class AdminServer {
     })
     this.logs.subscribe(socket)
   }
-}
-
-const DISCLAIMER = `-- This software is still under development --\n\tFor testing, this node requires ${MIN_NATIVE_BALANCE}, and at least ${MIN_BALANCE} \n\tHowever, do NOT add assets to the node that you can't lose!`
-
-export function showDisclaimer(logs: LogStream) {
-  logs.warn(DISCLAIMER)
-  setInterval(() => {
-    logs.warn(DISCLAIMER)
-  }, 60 * 1000)
 }
 
 export async function startConnectionReports(node: Hopr, logs: LogStream) {

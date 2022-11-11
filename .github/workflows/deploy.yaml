@@ -88,6 +88,12 @@ jobs:
           path: packages/
           key: hoprnet-build-${{ github.run_id }}
 
+      - name: 'Cache built artifacts (for later use)'
+        uses: actions/cache@v3
+        with:
+          path: packages/
+          key: hoprnet-build-${{ github.run_id }}
+
       - name: '[SMART-CONTRACTS] Deploy for known environments'
         if: ${{ !env.ACT }}
         run: ./scripts/deploy-smart-contracts.sh
