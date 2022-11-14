@@ -34,9 +34,12 @@ contract EnvironmentConfig is Script {
     address constant PROD_HOPR_BOOST_CONTRACT_ADDRESS = 0x43d13D7B83607F14335cF2cB75E87dA369D056c7;
     uint256 constant NETWORK_REGISTRY_NFT_INDEX = 26;
     string constant NETWORK_REGISTRY_TYPE_NAME = "Network_registry";
+    string constant NETWORK_REGISTRY_RANK1_NAME = "developer";
+    string constant NETWORK_REGISTRY_RANK2_NAME = "community";
     string constant DUMMY_TYPE_PREFIX = "Dummy_";
     bytes32 constant NETWORK_REGISTRY_TYPE_HASH = keccak256(bytes(NETWORK_REGISTRY_TYPE_NAME));
     bytes32 constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    address constant DEV_BANK_ADDRESS = 0x2402da10A6172ED018AEEa22CA60EDe1F766655C;
 
     string public currentEnvironmentName;
     EnvironmentType public currentEnvironmentType;
@@ -77,8 +80,6 @@ contract EnvironmentConfig is Script {
             networkRegistryContractAddress: networkRegistryAddr,
             networkRegistryProxyContractAddress: networkRegistryProxyAddr
         });
-        // FIXME:
-        displayCurrentEnvironmentDetail();
     }
 
     function readCurrentEnvironment() internal {

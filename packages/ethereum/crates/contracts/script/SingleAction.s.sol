@@ -4,6 +4,7 @@ pragma solidity >=0.8.0 <0.9.0;
 import "forge-std/Script.sol";
 import "forge-std/Test.sol";
 import "./utils/EnvironmentConfig.s.sol";
+import "./utils/BoostUtilsLib.sol";
 
 /**
  * @dev script to interact with contract(s) of a given envirionment where the msg.sender comes from the environment variable `PRIVATE_KEY`
@@ -12,6 +13,9 @@ import "./utils/EnvironmentConfig.s.sol";
  */
 contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     using stdJson for string;
+    using BoostUtilsLib for address;
+
+    address msgSender;
 
     function getEnvironmentAndMsgSender() private {
         // 1. Environment check
@@ -21,9 +25,9 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
         readCurrentEnvironment();
 
         // 2. Get private key of caller
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        address deployerAddress = vm.addr(deployerPrivateKey);
-        vm.startBroadcast(deployerPrivateKey);
+        uint256 privateKey = vm.envUint("PRIVATE_KEY");
+        msgSender = vm.addr(privateKey);
+        vm.startBroadcast(privateKey);
     }
 
     /**
@@ -191,6 +195,105 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
             emit log_string("Cannot sync eligibility as an owner");
             revert("Cannot sync eligibility as an owner");
         }
+        vm.stopBroadcast();
+    }
+
+    /**
+     * @dev On stake contract, stake xHopr to the target value
+     */
+    function stakeXHopr(uint256 stakeTarget) external {
+        // 1. get environment and msg.sender
+        getEnvironmentAndMsgSender();
+
+        // 2. check the staked value. Return if the target has reached
+        (bool successReadStaked, bytes memory returndataReadStaked) = currentEnvironmentDetail.stakeContractAddress.staticcall(abi.encodeWithSignature("stakedHoprTokens(address)", msgSender));
+        if (!successReadStaked) {
+            revert("Cannot read staked amount on stake contract.");
+        }
+        uint256 stakedAmount = abi.decode(returndataReadStaked, (uint256));
+        if (stakedAmount >= stakeTarget) {
+            emit log_string("Stake target has reached");
+            return;
+        }
+
+        // 3. stake the difference, if allowed
+        uint256 amountToStake = stakeTarget - stakedAmount;
+        (bool successReadBalance, bytes memory returndataReadBalance) = currentEnvironmentDetail.xhoprTokenContractAddress.staticcall(abi.encodeWithSignature("balanceOf(address)", msgSender));
+        if (!successReadBalance) {
+            revert("Cannot read token balance on xHOPR token contract.");
+        }
+        uint256 balance = abi.decode(returndataReadBalance, (uint256));
+        if (stakedAmount >= stakeTarget) {
+            emit log_string("Stake target has reached");
+            return;
+        }
+        if (balance < amountToStake) {
+            revert("Not enough xHOPR token balance to stake to the target.");
+        } else {
+            (bool successStakeXhopr, ) = currentEnvironmentDetail.xhoprTokenContractAddress.call(abi.encodeWithSignature("transferAndCall(address,uint256,bytes)", currentEnvironmentDetail.stakeContractAddress, amountToStake));
+            if (!successStakeXhopr) {
+                emit log_string("Cannot stake amountToStake");
+                revert("Cannot stake amountToStake");
+            }
+        }
+        vm.stopBroadcast();
+    }
+
+    /**
+     * @dev On stake contract, stake Network registry NFT to the target value
+     */
+    function stakeNetworkRegistryNft(string calldata nftRank) external {
+        // 1. get environment and msg.sender
+        getEnvironmentAndMsgSender();
+
+        // 2. Check if the msg.sender has staked Network_registry NFT
+        (bool successHasStaked, bytes memory returndataHasStaked) = currentEnvironmentDetail.stakeContractAddress.staticcall(abi.encodeWithSignature("isNftTypeAndRankRedeemed2(uint256,string,address)", NETWORK_REGISTRY_NFT_INDEX, nftRank, msgSender));
+        if (!successHasStaked) {
+            revert("Cannot read if caller has staked Network_registry NFTs.");
+        }
+        bool hasStaked = abi.decode(returndataHasStaked, (bool));
+        if (hasStaked) {
+            return;
+        }
+
+        // 3. Check if msg.sender has Network_registry NFT
+        (bool successOwnedNftBalance, bytes memory returndataOwnedNftBalance) = currentEnvironmentDetail.hoprBoostContractAddress.staticcall(abi.encodeWithSignature("balanceOf(address)", msgSender));
+        if (!successOwnedNftBalance) {
+            revert("Cannot read if the amount of Network_registry NFTs owned by the caller.");
+        }
+        uint256 ownedNftBalance = abi.decode(returndataOwnedNftBalance, (uint256));
+        bytes32 desiredHaashedTokenUri = keccak256(abi.encode(NETWORK_REGISTRY_TYPE_NAME, "/", nftRank));
+        uint256 index;
+        for (index = 0; index < ownedNftBalance; index++) {
+            (bool successOwnedNftTokenId, bytes memory returndataOwnedNftTokenId) = currentEnvironmentDetail.hoprBoostContractAddress.staticcall(abi.encodeWithSignature("tokenOfOwnerByIndex(address,uint256)", msgSender, index));
+            if (!successOwnedNftTokenId) {
+                revert("Cannot read owned NFT at a given index.");
+            }
+            uint256 ownedNftTokenId = abi.decode(returndataOwnedNftTokenId, (uint256));
+            (bool successTokenUri, bytes memory returndataTokenUri) = currentEnvironmentDetail.hoprBoostContractAddress.staticcall(abi.encodeWithSignature("tokenURI(uint256)", ownedNftTokenId));
+            if (!successTokenUri) {
+                revert("Cannot read token URI of the given ID.");
+            }
+
+            if (desiredHaashedTokenUri == keccak256(returndataTokenUri)) {
+                // FIXME:
+                vm.writeLine("test.txt", string(abi.encodePacked('"desiredHaashedTokenUri": "', vm.toString(desiredHaashedTokenUri))));
+                vm.writeLine("test.txt", string(abi.encodePacked('"returndataTokenUri": "', vm.toString(returndataTokenUri))));
+
+               // 4. found the tokenId, perform safeTransferFrom
+                (bool successStakeNft, ) = currentEnvironmentDetail.hoprBoostContractAddress.staticcall(abi.encodeWithSignature("safeTransferFrom(address,address,uint256)", msgSender, currentEnvironmentDetail.stakeContractAddress, ownedNftTokenId));
+                if (!successStakeNft) {
+                    revert("Cannot stake the NFT");
+                }
+                break;
+            }
+        }
+
+
+        if (index >= ownedNftBalance) {
+            revert("Failed to find the owned NFT");
+        }
+
         vm.stopBroadcast();
     }
 }

@@ -5,8 +5,11 @@ pragma abicoder v2;
 import "forge-std/Script.sol";
 import "../test/utils/ERC1820Registry.sol";
 import "./utils/EnvironmentConfig.s.sol";
+import "./utils/BoostUtilsLib.sol";
 
 contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryFixture {
+    using BoostUtilsLib for address;
+
     function run() external {
         // 1. Environment check
         // get envirionment of the script
@@ -29,7 +32,7 @@ contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryF
             // deploy token contract
             currentEnvironmentDetail.hoprTokenContractAddress = deployCode("HoprToken.sol");
             // grant deployer minter role
-            (bool successGrantMinterRole, ) = currentEnvironmentDetail.hoprTokenContractAddress.call(abi.encodeWithSignature("grantRole(bytes32,address)", keccak256("MINTER_ROLE"), deployerAddress));
+            (bool successGrantMinterRole, ) = currentEnvironmentDetail.hoprTokenContractAddress.call(abi.encodeWithSignature("grantRole(bytes32,address)", MINTER_ROLE, deployerAddress));
             if (!successGrantMinterRole) {
                 emit log_string("Cannot grantMinterRole");
             }
@@ -149,6 +152,34 @@ contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryF
                     emit log_string("Cannot updateRequirementImplementation");
                 }
             }
+        }
+
+        // 4. Batch mint Network_registry NFTs in development/staging envirionment
+        // Ensure a "Network_registry" boost type is at the index 26. If not, mint dummy proxies (E.g. "Dummy_1") until index 25 and "Network_registry" at 26
+        (bool existAtNetworkRegistryIndex, string memory nameOrError) = currentEnvironmentDetail.hoprBoostContractAddress.getBoostTypeAtIndex(NETWORK_REGISTRY_NFT_INDEX);
+        vm.writeLine("test.txt", string(abi.encodePacked('"nameOrError": "', nameOrError)));
+        if (existAtNetworkRegistryIndex && keccak256(bytes(nameOrError)) != NETWORK_REGISTRY_TYPE_HASH) {
+          // when type at place is not right
+          revert("NFT type mismatch. Need to redeploy Boost contract");
+        }
+        // mint dummy NFTs (1..25)
+        for (uint256 index = 1; index < NETWORK_REGISTRY_NFT_INDEX; index++) { // boost type is one-based index 
+            (bool existAtIndex, string memory nameOrError) = currentEnvironmentDetail.hoprBoostContractAddress.getBoostTypeAtIndex(index);
+            if (existAtIndex) {
+                continue;
+            } else {
+                // mint a dummy type
+                (bool successMintDummyNft, ) = currentEnvironmentDetail.hoprBoostContractAddress.call(abi.encodeWithSignature("mint(address,string,string,uint256,uint256)", deployerAddress, string(abi.encode(DUMMY_TYPE_PREFIX, vm.toString(index))), DUMMY_TYPE_PREFIX, 0, 0));
+                if (!successMintDummyNft) {
+                  revert("Error in minting dummy nfts");
+                }
+            }
+        }
+        // mint  Network_registry type
+        (bool successBatchMint1, ) = currentEnvironmentDetail.hoprBoostContractAddress.call(abi.encodeWithSignature("batchMint(address[],string,string,uint256,uint256)", [deployerAddress, deployerAddress, deployerAddress, DEV_BANK_ADDRESS, DEV_BANK_ADDRESS, DEV_BANK_ADDRESS], NETWORK_REGISTRY_TYPE_NAME, NETWORK_REGISTRY_RANK1_NAME, 0, 0));
+        (bool successBatchMint2, ) = currentEnvironmentDetail.hoprBoostContractAddress.call(abi.encodeWithSignature("batchMint(address[],string,string,uint256,uint256)", [deployerAddress, deployerAddress, deployerAddress, DEV_BANK_ADDRESS, DEV_BANK_ADDRESS, DEV_BANK_ADDRESS], NETWORK_REGISTRY_TYPE_NAME, NETWORK_REGISTRY_RANK2_NAME, 0, 0));
+        if (!successBatchMint1 || !successBatchMint2) {
+          revert("Error in minting Network_registry in batches");
         }
 
         // broadcast transaction bundle
