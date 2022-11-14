@@ -1,10 +1,13 @@
+.POSIX:
+
 # Gets all packages that include a Rust crates
 WORKSPACES_WITH_RUST_MODULES := $(wildcard $(addsuffix /crates, $(wildcard ./packages/*)))
 
 # Gets all individual crates such that they can get built
 CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(crate)/*/Cargo.toml)))
 
-.POSIX:
+# add local Cargo install path
+PATH := "${PATH}:`pwd`/.bin"
 
 all: help
 
@@ -21,9 +24,10 @@ $(WORKSPACES_WITH_RUST_MODULES):
 deps: ## install dependencies
 	# only use corepack on non-nix systems
 	[ -n "${NIX_PATH}" ] || corepack enable
-	yarn
 	command -v rustup && rustup update || echo "No rustup installed, ignoring"
 	command -v wasm-pack || cargo install wasm-pack
+	echo ${PATH}
+	yarn
 
 .PHONY: build
 build: ## build all packages
