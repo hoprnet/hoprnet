@@ -17,7 +17,7 @@ all: help
 
 .PHONY: $(CRATES) ## builds all Rust crates
 $(CRATES):
-	# --out-dir is relative to working directory
+# --out-dir is relative to working directory
 	wasm-pack build --target=bundler --out-dir ./pkg $@
 
 .PHONY: $(WORKSPACES_WITH_RUST_MODULES) ## builds all WebAssembly modules
@@ -34,7 +34,7 @@ deps: ## install dependencies
 
 .PHONY: cargo-update
 cargo-update: ## update vendored Cargo dependencies
-	$(cargo) vendor vendor/cargo
+	$(cargo) vendor --versioned-dirs --frozen vendor/cargo
 
 .PHONY: build
 build: ## build all packages
