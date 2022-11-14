@@ -59,6 +59,12 @@ contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryF
         if (currentEnvironmentType == EnvironmentType.DEVELOPMENT || !isValidAddress(currentEnvironmentDetail.xhoprTokenContractAddress)) {
             // deploy xtoken contract
             currentEnvironmentDetail.xhoprTokenContractAddress = deployCode("ERC677Mock.sol");
+            // mint 5 million xHOPR tokens to the deployer
+            bytes memory builtMintXHoprPayload = buildXHoprBatchMintInternal(deployerAddress); // This payload is built because default abi.encode returns different value (no size info) when array is static.
+            (bool successMintXTokens, ) = currentEnvironmentDetail.xhoprTokenContractAddress.call(builtMintXHoprPayload);
+            if (!successMintXTokens) {
+                emit log_string("Cannot mint xHOPR tokens");
+            }
         }
         
         // 3.4. HoprBoost Contract
@@ -91,11 +97,11 @@ contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryF
             currentEnvironmentDetail.networkRegistryProxyContractAddress = deployCode("HoprStakingProxyForNetworkRegistry.sol", abi.encode(currentEnvironmentDetail.stakeContractAddress, deployerAddress, 1000 ether));
             // TODO: If needed, add `eligibleNftTypeAndRank`. Only execute this transaction when NR accepts accounts with staking amount above certain threshold
             // Add `Network_registry` NFT (index. 26) (`developer` and `community`) into `specialNftTypeAndRank` TODO: extend this array if more NR NFTs are to be included
-            bytes memory builtPayload = buildBatchRegisterSpecialNrNft(); // This payload is built because default abi.encode returns different value (no size info) when array is static.
-            (bool successOwnerBatchAddSpecialNftTypeAndRank, ) = currentEnvironmentDetail.networkRegistryProxyContractAddress.call(builtPayload);
+            bytes memory builtProxyPayload = buildBatchRegisterSpecialNrNft(); // This payload is built because default abi.encode returns different value (no size info) when array is static.
+            (bool successOwnerBatchAddSpecialNftTypeAndRank, ) = currentEnvironmentDetail.networkRegistryProxyContractAddress.call(builtProxyPayload);
             if (!successOwnerBatchAddSpecialNftTypeAndRank) {
                 emit log_string("Cannot ownerBatchAddSpecialNftTypeAndRank");
-                emit log_bytes(builtPayload);
+                emit log_bytes(builtProxyPayload);
             }
         } else {
             // When a NetworkRegistryProxy contract is provided, check if its `stakeContract` matches with the latest stakeContractAddress. 
@@ -176,8 +182,9 @@ contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryF
             }
         }
         // mint  Network_registry type
-        (bool successBatchMint1, ) = currentEnvironmentDetail.hoprBoostContractAddress.call(abi.encodeWithSignature("batchMint(address[],string,string,uint256,uint256)", [deployerAddress, deployerAddress, deployerAddress, DEV_BANK_ADDRESS, DEV_BANK_ADDRESS, DEV_BANK_ADDRESS], NETWORK_REGISTRY_TYPE_NAME, NETWORK_REGISTRY_RANK1_NAME, 0, 0));
-        (bool successBatchMint2, ) = currentEnvironmentDetail.hoprBoostContractAddress.call(abi.encodeWithSignature("batchMint(address[],string,string,uint256,uint256)", [deployerAddress, deployerAddress, deployerAddress, DEV_BANK_ADDRESS, DEV_BANK_ADDRESS, DEV_BANK_ADDRESS], NETWORK_REGISTRY_TYPE_NAME, NETWORK_REGISTRY_RANK2_NAME, 0, 0));
+        (bytes memory builtNftBatchMintPayload1, bytes memory builtNftBatchMintPayload2) = buildNftBatchMintInternal(deployerAddress, DEV_BANK_ADDRESS); // This payload is built because default abi.encode returns different value (no size info) when array is static.
+        (bool successBatchMint1, ) = currentEnvironmentDetail.hoprBoostContractAddress.call(builtNftBatchMintPayload1);
+        (bool successBatchMint2, ) = currentEnvironmentDetail.hoprBoostContractAddress.call(builtNftBatchMintPayload2);
         if (!successBatchMint1 || !successBatchMint2) {
           revert("Error in minting Network_registry in batches");
         }
@@ -209,5 +216,31 @@ contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryF
         maxAllowedReg[1] = 1;
 
         return abi.encodeWithSignature("ownerBatchAddSpecialNftTypeAndRank(uint256[],string[],uint256[])", typeIndex, ranks, maxAllowedReg);
+    }
+
+    /**
+     * @dev Helper function to build payload for "batchMintInternal(address[],uint256)"
+     */
+    function buildXHoprBatchMintInternal(address addr) private returns(bytes memory) {
+        address[] memory addrBook = new address[](1);
+        addrBook[0] = addr;
+
+        return abi.encodeWithSignature("batchMintInternal(address[],uint256)", addrBook, 5000000 ether);
+    }
+
+    /**
+     * @dev Helper function to build payload for "batchMint(address[],string,string,uint256,uint256)"
+     */
+    function buildNftBatchMintInternal(address addr1, address addr2) private returns(bytes memory devPayload, bytes memory communityPayload) {
+        address[] memory addrBook = new address[](6);
+        addrBook[0] = addr1;
+        addrBook[1] = addr1;
+        addrBook[2] = addr1;
+        addrBook[3] = addr2;
+        addrBook[4] = addr2;
+        addrBook[5] = addr2;
+
+        devPayload = abi.encodeWithSignature("batchMint(address[],string,string,uint256,uint256)", addrBook, NETWORK_REGISTRY_TYPE_NAME, NETWORK_REGISTRY_RANK1_NAME, 0, 0);
+        communityPayload = abi.encodeWithSignature("batchMint(address[],string,string,uint256,uint256)", addrBook, NETWORK_REGISTRY_TYPE_NAME, NETWORK_REGISTRY_RANK2_NAME, 0, 0);
     }
 }

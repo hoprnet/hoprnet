@@ -89,10 +89,6 @@ contract EnvironmentConfig is Script {
     function writeEnvironment(string memory _environmentName, EnvironmentDetail memory envDetail) internal {
         string memory parsedNewEnvDetail = parseEnvironmentDetailToString(envDetail);
 
-        // FIXME:
-        displayEnvironmentDetail("test.txt", envDetail);
-        vm.writeLine("test.txt", string(abi.encodePacked('parsedNewEnvDetail: ', parsedNewEnvDetail)));
-
         // write parsedNewEnvDetail to corresponding key
         string memory configKey = string(abi.encodePacked(".environments.", _environmentName));
 

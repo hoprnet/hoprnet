@@ -28,6 +28,52 @@ ifeq ($(account),)
 endif
 	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/GetAccountBalances.s.sol:GetAccountBalancesScript --sig "run(address)" $(account)
 
+# E.g. make request-funds environment-name=localhost environment-type=development recipient=0x2402da10A6172ED018AEEa22CA60EDe1F766655C
+.PHONY: request-funds
+request-funds: ensure-environment-is-set ensure-privatekey-is-set
+request-funds: ## Request 1000 xHOPR tokens for the recipient
+ifeq ($(recipient),)
+	echo "parameter <recipient> missing" >&2 && exit 1
+endif
+	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/SingleAction.s.sol:SingleActionFromPrivateKeyScript --broadcast --sig "mintXHopr(address,uint256)" $(recipient) 1000
+
+# .PHONY: request-nrnft
+# request-nrnft: ensure-environment-is-set ensure-privatekey-is-set
+# request-nrnft: ## Request one HoprBoost Network_registry NFT for the recipient given it has none and hasn't staked Network_registry NFT
+# ifeq ($(recipient),)
+# 	echo "parameter <recipient> missing" >&2 && exit 1
+# endif
+# ifeq ($(nftrank),)
+# 	echo "parameter <nftrank> missing, it can be either 'developer' or 'community'" >&2 && exit 1
+# endif
+# ifeq ($(origin PRIVATE_KEY),undefined)
+# 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
+# endif
+# 	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+# 	HOPR_ENVIRONMENT_ID="$(environment)" \
+# 	  yarn workspace @hoprnet/hopr-ethereum run hardhat request-test-tokens \
+#    --network $(network) \
+#    --type nrnft \
+#    --nftrank $(nftrank) \
+#    --recipient $(recipient) \
+#    --privatekey "$(PRIVATE_KEY)"
+
+# E.g. make stake-funds environment-name=localhost environment-type=development
+.PHONY: stake-funds
+stake-funds: ensure-environment-is-set ensure-privatekey-is-set
+stake-funds: ## stake funds (idempotent operation)
+	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/SingleAction.s.sol:SingleActionFromPrivateKeyScript --broadcast --sig "stakeXHopr(uint256)" 1000000000000000000000
+
+
+# E.g. make stake-nrnft environment-name=localhost environment-type=development nftrank=developer
+.PHONY: stake-nrnft
+stake-nrnft: ensure-environment-is-set ensure-privatekey-is-set
+stake-nrnft: ## stake Network_registry NFTs (idempotent operation)
+ifeq ($(nftrank),)
+	echo "parameter <nftrank> missing, it can be either 'developer' or 'community'" >&2 && exit 1
+endif
+	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/SingleAction.s.sol:SingleActionFromPrivateKeyScript --broadcast --sig "stakeNetworkRegistryNft(string)" $(nftrank)
+
 # E.g. make self-register-node environment-name=localhost environment-type=development peer_ids="[16Uiu2HAmAmXnq8FtFsBAnSyfujaXbU3B5wdVRPYGfN8S99E5azdH,16Uiu2HAky1FmbdyrY4EC2ZmKVH5t1XTqZqkutnqNf5BpSjHuD9nF]"
 .PHONY: self-register-node
 self-register-node: ensure-environment-is-set
@@ -95,7 +141,7 @@ disable-network-registry: ## owner disables network registry (smart contract) gl
 	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/SingleAction.s.sol:SingleActionFromPrivateKeyScript --broadcast --sig "disableNetworkRegistry()"
 
 # E.g. make force-eligibility-update environment-name=localhost environment-type=development staking_addresses="[0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266,0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266]" eligibility="[true,false]"
-.PHONY: fLrce-eligibility-update
+.PHONY: force-eligibility-update
 force-eligibility-update: ensure-environment-is-set
 force-eligibility-update: ## owner forces eligibility update
 ifeq ($(staking_addresses),)
@@ -123,4 +169,8 @@ environment-type != jq '.environments."$(environment-name)".environment_type // 
 ifeq ($(environment-type),)
 	echo "could not read environment info from contracts-addresses.json" >&2 && exit 1
 endif
+endif
+ensure-privatekey-is-set:
+ifeq ($(origin PRIVATE_KEY),undefined)
+	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif

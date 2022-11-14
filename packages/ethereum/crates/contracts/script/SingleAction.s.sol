@@ -230,7 +230,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
         if (balance < amountToStake) {
             revert("Not enough xHOPR token balance to stake to the target.");
         } else {
-            (bool successStakeXhopr, ) = currentEnvironmentDetail.xhoprTokenContractAddress.call(abi.encodeWithSignature("transferAndCall(address,uint256,bytes)", currentEnvironmentDetail.stakeContractAddress, amountToStake));
+            (bool successStakeXhopr, ) = currentEnvironmentDetail.xhoprTokenContractAddress.call(abi.encodeWithSignature("transferAndCall(address,uint256,bytes)", currentEnvironmentDetail.stakeContractAddress, amountToStake, hex"00"));
             if (!successStakeXhopr) {
                 emit log_string("Cannot stake amountToStake");
                 revert("Cannot stake amountToStake");
@@ -262,7 +262,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
             revert("Cannot read if the amount of Network_registry NFTs owned by the caller.");
         }
         uint256 ownedNftBalance = abi.decode(returndataOwnedNftBalance, (uint256));
-        bytes32 desiredHaashedTokenUri = keccak256(abi.encode(NETWORK_REGISTRY_TYPE_NAME, "/", nftRank));
+        bytes32 desiredHaashedTokenUri = keccak256(bytes(abi.encodePacked(NETWORK_REGISTRY_TYPE_NAME, "/", nftRank)));
         uint256 index;
         for (index = 0; index < ownedNftBalance; index++) {
             (bool successOwnedNftTokenId, bytes memory returndataOwnedNftTokenId) = currentEnvironmentDetail.hoprBoostContractAddress.staticcall(abi.encodeWithSignature("tokenOfOwnerByIndex(address,uint256)", msgSender, index));
@@ -275,13 +275,9 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
                 revert("Cannot read token URI of the given ID.");
             }
 
-            if (desiredHaashedTokenUri == keccak256(returndataTokenUri)) {
-                // FIXME:
-                vm.writeLine("test.txt", string(abi.encodePacked('"desiredHaashedTokenUri": "', vm.toString(desiredHaashedTokenUri))));
-                vm.writeLine("test.txt", string(abi.encodePacked('"returndataTokenUri": "', vm.toString(returndataTokenUri))));
-
+            if (desiredHaashedTokenUri == keccak256(bytes(abi.decode(returndataTokenUri, (string))))) {
                // 4. found the tokenId, perform safeTransferFrom
-                (bool successStakeNft, ) = currentEnvironmentDetail.hoprBoostContractAddress.staticcall(abi.encodeWithSignature("safeTransferFrom(address,address,uint256)", msgSender, currentEnvironmentDetail.stakeContractAddress, ownedNftTokenId));
+                (bool successStakeNft, ) = currentEnvironmentDetail.hoprBoostContractAddress.call(abi.encodeWithSignature("safeTransferFrom(address,address,uint256)", msgSender, currentEnvironmentDetail.stakeContractAddress, ownedNftTokenId));
                 if (!successStakeNft) {
                     revert("Cannot stake the NFT");
                 }
@@ -292,6 +288,25 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
 
         if (index >= ownedNftBalance) {
             revert("Failed to find the owned NFT");
+        }
+
+        vm.stopBroadcast();
+    }
+
+    /**
+     * @dev Mint some xHOPR to the recipient
+     */
+    function mintXHopr(address recipient, uint256 amountInEther) external {
+        // 1. get environment and msg.sender
+        getEnvironmentAndMsgSender();
+
+        address[] memory addrBook = new address[](1);
+        addrBook[0] = recipient;
+
+        // 2. Check if the msg.sender has staked Network_registry NFT
+        (bool successMintXTokens, ) = currentEnvironmentDetail.xhoprTokenContractAddress.call(abi.encodeWithSignature("batchMintInternal(address[],uint256)", addrBook, amountInEther * 1e18));
+        if (!successMintXTokens) {
+            emit log_string("Cannot mint xHOPR tokens");
         }
 
         vm.stopBroadcast();
