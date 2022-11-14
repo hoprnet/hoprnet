@@ -257,38 +257,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
         }
 
         // 3. Check if msg.sender has Network_registry NFT
-        (bool successOwnedNftBalance, bytes memory returndataOwnedNftBalance) = currentEnvironmentDetail.hoprBoostContractAddress.staticcall(abi.encodeWithSignature("balanceOf(address)", msgSender));
-        if (!successOwnedNftBalance) {
-            revert("Cannot read if the amount of Network_registry NFTs owned by the caller.");
-        }
-        uint256 ownedNftBalance = abi.decode(returndataOwnedNftBalance, (uint256));
-        bytes32 desiredHaashedTokenUri = keccak256(bytes(abi.encodePacked(NETWORK_REGISTRY_TYPE_NAME, "/", nftRank)));
-        uint256 index;
-        for (index = 0; index < ownedNftBalance; index++) {
-            (bool successOwnedNftTokenId, bytes memory returndataOwnedNftTokenId) = currentEnvironmentDetail.hoprBoostContractAddress.staticcall(abi.encodeWithSignature("tokenOfOwnerByIndex(address,uint256)", msgSender, index));
-            if (!successOwnedNftTokenId) {
-                revert("Cannot read owned NFT at a given index.");
-            }
-            uint256 ownedNftTokenId = abi.decode(returndataOwnedNftTokenId, (uint256));
-            (bool successTokenUri, bytes memory returndataTokenUri) = currentEnvironmentDetail.hoprBoostContractAddress.staticcall(abi.encodeWithSignature("tokenURI(uint256)", ownedNftTokenId));
-            if (!successTokenUri) {
-                revert("Cannot read token URI of the given ID.");
-            }
-
-            if (desiredHaashedTokenUri == keccak256(bytes(abi.decode(returndataTokenUri, (string))))) {
-               // 4. found the tokenId, perform safeTransferFrom
-                (bool successStakeNft, ) = currentEnvironmentDetail.hoprBoostContractAddress.call(abi.encodeWithSignature("safeTransferFrom(address,address,uint256)", msgSender, currentEnvironmentDetail.stakeContractAddress, ownedNftTokenId));
-                if (!successStakeNft) {
-                    revert("Cannot stake the NFT");
-                }
-                break;
-            }
-        }
-
-
-        if (index >= ownedNftBalance) {
-            revert("Failed to find the owned NFT");
-        }
+        safeTransferNetworkRegistryNft(currentEnvironmentDetail.hoprBoostContractAddress, msgSender, currentEnvironmentDetail.stakeContractAddress, nftRank);
 
         vm.stopBroadcast();
     }
@@ -310,5 +279,59 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
         }
 
         vm.stopBroadcast();
+    }
+
+    /**
+     * @dev Check if msgSender owned the requested rank. If so, transfer one to recipient
+     */
+    function transferNetworkRegistryNft(address recipient, string calldata nftRank) external {
+        // 1. get environment and msg.sender
+        getEnvironmentAndMsgSender();
+
+        // 2. Check if msg.sender has Network_registry NFT
+        safeTransferNetworkRegistryNft(currentEnvironmentDetail.hoprBoostContractAddress, msgSender, recipient, nftRank);
+        vm.stopBroadcast();
+    }
+
+    /**
+     * @dev private function to transfer a NR NFT of nftRank from sender to recipient. 
+     */
+    function safeTransferNetworkRegistryNft(address boostContractAddr, address sender, address recipient, string calldata nftRank) private {
+        // 1. Check sender's Network_registry NFT balance
+        (bool successOwnedNftBalance, bytes memory returndataOwnedNftBalance) = boostContractAddr.staticcall(abi.encodeWithSignature("balanceOf(address)", sender));
+        if (!successOwnedNftBalance) {
+            revert("Cannot read if the amount of Network_registry NFTs owned by the caller.");
+        }
+        uint256 ownedNftBalance = abi.decode(returndataOwnedNftBalance, (uint256));
+        // get the desired nft uri hash
+        bytes32 desiredHaashedTokenUri = keccak256(bytes(abi.encodePacked(NETWORK_REGISTRY_TYPE_NAME, "/", nftRank)));
+
+        // 2. Loop through balance and compare token URI
+        uint256 index;
+        for (index = 0; index < ownedNftBalance; index++) {
+            (bool successOwnedNftTokenId, bytes memory returndataOwnedNftTokenId) = boostContractAddr.staticcall(abi.encodeWithSignature("tokenOfOwnerByIndex(address,uint256)", sender, index));
+            if (!successOwnedNftTokenId) {
+                revert("Cannot read owned NFT at a given index.");
+            }
+            uint256 ownedNftTokenId = abi.decode(returndataOwnedNftTokenId, (uint256));
+            (bool successTokenUri, bytes memory returndataTokenUri) = boostContractAddr.staticcall(abi.encodeWithSignature("tokenURI(uint256)", ownedNftTokenId));
+            if (!successTokenUri) {
+                revert("Cannot read token URI of the given ID.");
+            }
+
+            if (desiredHaashedTokenUri == keccak256(bytes(abi.decode(returndataTokenUri, (string))))) {
+               // 3. find the tokenId, perform safeTransferFrom
+                (bool successStakeNft, ) = boostContractAddr.call(abi.encodeWithSignature("safeTransferFrom(address,address,uint256)", sender, recipient, ownedNftTokenId));
+                if (!successStakeNft) {
+                    revert("Cannot stake the NFT");
+                }
+                break;
+            }
+        }
+
+
+        if (index >= ownedNftBalance) {
+            revert("Failed to find the owned NFT");
+        }
     }
 }

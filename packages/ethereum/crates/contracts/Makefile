@@ -37,33 +37,23 @@ ifeq ($(recipient),)
 endif
 	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/SingleAction.s.sol:SingleActionFromPrivateKeyScript --broadcast --sig "mintXHopr(address,uint256)" $(recipient) 1000
 
-# .PHONY: request-nrnft
-# request-nrnft: ensure-environment-is-set ensure-privatekey-is-set
-# request-nrnft: ## Request one HoprBoost Network_registry NFT for the recipient given it has none and hasn't staked Network_registry NFT
-# ifeq ($(recipient),)
-# 	echo "parameter <recipient> missing" >&2 && exit 1
-# endif
-# ifeq ($(nftrank),)
-# 	echo "parameter <nftrank> missing, it can be either 'developer' or 'community'" >&2 && exit 1
-# endif
-# ifeq ($(origin PRIVATE_KEY),undefined)
-# 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
-# endif
-# 	TS_NODE_PROJECT=./tsconfig.hardhat.json \
-# 	HOPR_ENVIRONMENT_ID="$(environment)" \
-# 	  yarn workspace @hoprnet/hopr-ethereum run hardhat request-test-tokens \
-#    --network $(network) \
-#    --type nrnft \
-#    --nftrank $(nftrank) \
-#    --recipient $(recipient) \
-#    --privatekey "$(PRIVATE_KEY)"
+# E.g. make request-nrnft environment-name=localhost environment-type=development recipient=0x2402da10A6172ED018AEEa22CA60EDe1F766655C nftrank=developer
+.PHONY: request-nrnft
+request-nrnft: ensure-environment-is-set ensure-privatekey-is-set
+request-nrnft: ## Request one HoprBoost Network_registry NFT for the recipient given it has none and hasn't staked Network_registry NFT
+ifeq ($(recipient),)
+	echo "parameter <recipient> missing" >&2 && exit 1
+endif
+ifeq ($(nftrank),)
+	echo "parameter <nftrank> missing, it can be either 'developer' or 'community'" >&2 && exit 1
+endif
+	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/SingleAction.s.sol:SingleActionFromPrivateKeyScript --broadcast --sig "transferNetworkRegistryNft(address,string)" $(recipient) $(nftrank)
 
 # E.g. make stake-funds environment-name=localhost environment-type=development
 .PHONY: stake-funds
 stake-funds: ensure-environment-is-set ensure-privatekey-is-set
 stake-funds: ## stake funds (idempotent operation)
 	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/SingleAction.s.sol:SingleActionFromPrivateKeyScript --broadcast --sig "stakeXHopr(uint256)" 1000000000000000000000
-
 
 # E.g. make stake-nrnft environment-name=localhost environment-type=development nftrank=developer
 .PHONY: stake-nrnft
