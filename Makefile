@@ -6,14 +6,18 @@ WORKSPACES_WITH_RUST_MODULES := $(wildcard $(addsuffix /crates, $(wildcard ./pac
 # Gets all individual crates such that they can get built
 CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(crate)/*/Cargo.toml)))
 
-# add local Cargo install path
-PATH := "${PATH}:`pwd`/.bin"
+# add local Cargo install path and use it as custom shell PATH
+PATH := ${PATH}:${CURDIR}/.cargo/bin
+SHELL := env PATH=$(PATH) $(shell which bash)
+
+# use custom Cargo config file for each invocation
+cargo := cargo --config ${CURDIR}/.cargo/config.toml
 
 all: help
 
 .PHONY: $(CRATES) ## builds all Rust crates
 $(CRATES):
-# --out-dir is relative to working directory
+	# --out-dir is relative to working directory
 	wasm-pack build --target=bundler --out-dir ./pkg $@
 
 .PHONY: $(WORKSPACES_WITH_RUST_MODULES) ## builds all WebAssembly modules
@@ -25,9 +29,12 @@ deps: ## install dependencies
 	# only use corepack on non-nix systems
 	[ -n "${NIX_PATH}" ] || corepack enable
 	command -v rustup && rustup update || echo "No rustup installed, ignoring"
-	command -v wasm-pack || cargo install wasm-pack
-	echo ${PATH}
+	command -v wasm-pack || $(cargo) install wasm-pack
 	yarn
+
+.PHONY: cargo-update
+cargo-update: ## update vendored Cargo dependencies
+	$(cargo) vendor vendor/cargo
 
 .PHONY: build
 build: ## build all packages
@@ -95,7 +102,7 @@ ifeq ($(package),)
 	yarn workspaces foreach -pv run test
 else
 # Prebuild Rust unit tests
-	cargo build --tests
+	$(cargo) build --tests
 	yarn workspace @hoprnet/${package} run test
 endif
 

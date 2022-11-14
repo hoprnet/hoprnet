@@ -5,4 +5,4 @@ replace-with = "vendored-sources"
 directory = "vendor/cargo"
 
 [install]
-root = "$ROOT/.bin"
+root = ".cargo"
