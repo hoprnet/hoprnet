@@ -1,2 +1,0 @@
-[v1]
-"wasm-pack 0.10.3 (registry+https://github.com/rust-lang/crates.io-index)" = ["wasm-pack"]

@@ -38,3 +38,5 @@ logs.txt
 
 /.cargo/bin
 /.cargo/.package-cache
+/.cargo/.crates.toml
+/.cargo/.crates2.json
