@@ -71,7 +71,8 @@ export default class CloseChannel extends Command {
         `Initiated channel closure, the channel must remain open for at least ${channelClosurePeriod} minutes. Please send the close command again once the cool-off has passed. Receipt: "${receipt}".`
       )
     } else {
-      return log(`Closing channel. Receipt: ${receipt}`)
+      if (receipt != undefined) return log(`Closed channel. Receipt: ${receipt}`)
+      else return log(`Closing channel, closure window still active.`)
     }
   }
 }
