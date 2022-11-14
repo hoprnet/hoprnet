@@ -32,6 +32,11 @@ contract EnvironmentConfig is Script {
     // address constant PROD_WXHOPR_TOKEN_CONTRACT_ADDRESS = 0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1; // TODO: this contract is not necessarily the "HoprToken" contract used in releases
     address constant PROD_XHOPR_TOKEN_CONTRACT_ADDRESS = 0xD057604A14982FE8D88c5fC25Aac3267eA142a08;
     address constant PROD_HOPR_BOOST_CONTRACT_ADDRESS = 0x43d13D7B83607F14335cF2cB75E87dA369D056c7;
+    uint256 constant NETWORK_REGISTRY_NFT_INDEX = 26;
+    string constant NETWORK_REGISTRY_TYPE_NAME = "Network_registry";
+    string constant DUMMY_TYPE_PREFIX = "Dummy_";
+    bytes32 constant NETWORK_REGISTRY_TYPE_HASH = keccak256(bytes(NETWORK_REGISTRY_TYPE_NAME));
+    bytes32 constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     string public currentEnvironmentName;
     EnvironmentType public currentEnvironmentType;
@@ -72,6 +77,8 @@ contract EnvironmentConfig is Script {
             networkRegistryContractAddress: networkRegistryAddr,
             networkRegistryProxyContractAddress: networkRegistryProxyAddr
         });
+        // FIXME:
+        displayCurrentEnvironmentDetail();
     }
 
     function readCurrentEnvironment() internal {
@@ -80,6 +87,10 @@ contract EnvironmentConfig is Script {
 
     function writeEnvironment(string memory _environmentName, EnvironmentDetail memory envDetail) internal {
         string memory parsedNewEnvDetail = parseEnvironmentDetailToString(envDetail);
+
+        // FIXME:
+        displayEnvironmentDetail("test.txt", envDetail);
+        vm.writeLine("test.txt", string(abi.encodePacked('parsedNewEnvDetail: ', parsedNewEnvDetail)));
 
         // write parsedNewEnvDetail to corresponding key
         string memory configKey = string(abi.encodePacked(".environments.", _environmentName));
@@ -134,16 +145,16 @@ contract EnvironmentConfig is Script {
     }
 
     function parseEnvironmentDetailToString(EnvironmentDetail memory envDetail) internal returns (string memory) {
-        string memory json;
-        vm.serializeString(json, "environment_type", parseEnvironmentTypeToString(envDetail.environmentType));
-        vm.serializeUint(json, "stake_season", envDetail.stakeSeason);
-        vm.serializeAddress(json, "token_contract_address", envDetail.hoprTokenContractAddress);
-        vm.serializeAddress(json, "channels_contract_address", envDetail.hoprChannelsContractAddress);
-        vm.serializeAddress(json, "xhopr_contract_address", envDetail.xhoprTokenContractAddress);
-        vm.serializeAddress(json, "boost_contract_address", envDetail.hoprBoostContractAddress);
-        vm.serializeAddress(json, "stake_contract_address", envDetail.stakeContractAddress);
-        vm.serializeAddress(json, "network_registry_proxy_contract_address", envDetail.networkRegistryProxyContractAddress);
-        vm.serializeAddress(json, "network_registry_contract_address", envDetail.networkRegistryContractAddress);
+        string memory json = "config";
+        json.serialize("environment_type", parseEnvironmentTypeToString(envDetail.environmentType));
+        json.serialize("stake_season", envDetail.stakeSeason);
+        json.serialize("token_contract_address", envDetail.hoprTokenContractAddress);
+        json.serialize("channels_contract_address", envDetail.hoprChannelsContractAddress);
+        json.serialize("xhopr_contract_address", envDetail.xhoprTokenContractAddress);
+        json.serialize("boost_contract_address", envDetail.hoprBoostContractAddress);
+        json.serialize("stake_contract_address", envDetail.stakeContractAddress);
+        json.serialize("network_registry_proxy_contract_address", envDetail.networkRegistryProxyContractAddress);
+        json = json.serialize("network_registry_contract_address", envDetail.networkRegistryContractAddress);
         return json;
     }
 }

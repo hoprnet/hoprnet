@@ -13,6 +13,12 @@ interface VmSafe {
     struct Log {
         bytes32[] topics;
         bytes data;
+        address emitter;
+    }
+
+    struct Rpc {
+        string name;
+        string url;
     }
 
     // Loads a storage slot from an address (who, slot)
@@ -117,14 +123,9 @@ interface VmSafe {
     function deriveKey(string calldata, string calldata, uint32) external pure returns (uint256);
     // Adds a private key to the local forge wallet and returns the address
     function rememberKey(uint256) external returns (address);
-    // Given a string of JSON, return the ABI-encoded value of provided key
-    // (stringified json, key) => (ABI-encoded data)
-    // Read the note below!
-    function parseJson(string calldata, string calldata) external pure returns (bytes memory);
-    // Given a string of JSON, return it as ABI-encoded, (stringified json, key) => (ABI-encoded data)
-    // Read the note below!
-    function parseJson(string calldata) external pure returns (bytes memory);
-    // Note:
+    //
+    // parseJson
+    //
     // ----
     // In case the returned value is a JSON object, it's encoded as a ABI-encoded tuple. As JSON objects
     // don't have the notion of ordered, but tuples do, they JSON object is encoded with it's fields ordered in
@@ -138,34 +139,67 @@ interface VmSafe {
     // struct json = { uint256 a; address b; }
     // If we defined a json struct with the opposite order, meaning placing the address b first, it would try to
     // decode the tuple in that order, and thus fail.
+    // ----
+    // Given a string of JSON, return it as ABI-encoded, (stringified json, key) => (ABI-encoded data)
+    function parseJson(string calldata, string calldata) external pure returns (bytes memory);
+    function parseJson(string calldata) external pure returns (bytes memory);
+    //
+    // writeJson
+    //
+    // ----
+    // Let's assume we want to write the following JSON to a file:
+    //
+    // { "boolean": true, "number": 342, "object": { "title": "finally json serialization" } }
+    //
+    // ```
+    //  string memory json1 = "some key";
+    //  vm.serializeBool(json1, "boolean", true);
+    //  vm.serializeBool(json1, "number", uint256(342));
+    //  json2 = "some other key";
+    //  string memory output = vm.serializeString(json2, "title", "finally json serialization");
+    //  string memory finalJson = vm.serialize(json1, "object", output);
+    //  vm.writeJson(finalJson, "./output/example.json");
+    // ```
+    //  The critical insight is that every invocation of serialization will return the stringified version of the JSON
+    // up to that point. That means we can construct arbitrary JSON objects and then use the return stringified version
+    // to serialize them as values to another JSON object.
+    //
+    //  json1 and json2 are simply keys used by the backend to keep track of the objects. So vm.serializeJson(json1,..)
+    //  will find the object in-memory that is keyed by "some key".   // writeJson
+    // ----
+    // Serialize a key and value to a JSON object stored in-memory that can be latery written to a file
+    // It returns the stringified version of the specific JSON file up to that moment.
+    // (object_key, value_key, value) => (stringified JSON)
+    function serializeBool(string calldata, string calldata, bool) external returns (string memory);
+    function serializeUint(string calldata, string calldata, uint256) external returns (string memory);
+    function serializeInt(string calldata, string calldata, int256) external returns (string memory);
+    function serializeAddress(string calldata, string calldata, address) external returns (string memory);
+    function serializeBytes32(string calldata, string calldata, bytes32) external returns (string memory);
+    function serializeString(string calldata, string calldata, string calldata) external returns (string memory);
+    function serializeBytes(string calldata, string calldata, bytes calldata) external returns (string memory);
 
+    function serializeBool(string calldata, string calldata, bool[] calldata) external returns (string memory);
+    function serializeUint(string calldata, string calldata, uint256[] calldata) external returns (string memory);
+    function serializeInt(string calldata, string calldata, int256[] calldata) external returns (string memory);
+    function serializeAddress(string calldata, string calldata, address[] calldata) external returns (string memory);
+    function serializeBytes32(string calldata, string calldata, bytes32[] calldata) external returns (string memory);
+    function serializeString(string calldata, string calldata, string[] calldata) external returns (string memory);
+    function serializeBytes(string calldata, string calldata, bytes[] calldata) external returns (string memory);
+    // Write a serialized JSON object to a file. If the file exists, it will be overwritten.
+    // (stringified_json, path)
+    function writeJson(string calldata, string calldata) external;
+    // Write a serialized JSON object to an **existing** JSON file, replacing a value with key = <value_key>
+    // This is useful to replace a specific value of a JSON file, without having to parse the entire thing
+    // (stringified_json, path, value_key)
+    function writeJson(string calldata, string calldata, string calldata) external;
     // Returns the RPC url for the given alias
     function rpcUrl(string calldata) external view returns (string memory);
     // Returns all rpc urls and their aliases `[alias, url][]`
     function rpcUrls() external view returns (string[2][] memory);
-
+    // Returns all rpc urls and their aliases as structs.
+    function rpcUrlStructs() external view returns (Rpc[] memory);
     // If the condition is false, discard this run's fuzz inputs and generate new ones.
     function assume(bool) external pure;
-
-    // TODO: remove when a new `forge-std` is released with Serialize class
-    function serializeBool(string calldata, string calldata, bool) external returns(string memory);
-    function serializeUint(string calldata, string calldata, uint256) external returns(string memory);
-    function serializeInt(string calldata, string calldata, int256) external returns(string memory);
-    function serializeAddress(string calldata, string calldata, address) external returns(string memory);
-    function serializeBytes32(string calldata, string calldata, bytes32) external returns(string memory);
-    function serializeString(string calldata, string calldata, string calldata) external returns(string memory);
-    function serializeBytes(string calldata, string calldata, bytes calldata) external returns(string memory);
-
-    function serializeBool(string calldata, string calldata, bool[] calldata) external returns(string memory);
-    function serializeUint(string calldata, string calldata, uint256[] calldata) external returns(string memory);
-    function serializeInt(string calldata, string calldata, int256[] calldata) external returns(string memory);
-    function serializeAddress(string calldata, string calldata, address[] calldata) external returns(string memory);
-    function serializeBytes32(string calldata, string calldata, bytes32[] calldata) external returns(string memory);
-    function serializeString(string calldata, string calldata, string[] calldata) external returns(string memory);
-    function serializeBytes(string calldata, string calldata, bytes[] calldata) external returns(string memory);
-    function writeJson(string calldata, string calldata) external;
-    function writeJson(string calldata, string calldata, string calldata) external;
-
 }
 
 interface Vm is VmSafe {
