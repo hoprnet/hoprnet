@@ -6,12 +6,17 @@ export type DeferType<T> = {
 
 // Typed version of https://github.com/sindresorhus/p-defer
 export function defer<T>(): DeferType<T> {
-  const deferred = {} as DeferType<T>
+  let resolve: (arg: T) => void
+  let reject: (err: any) => void
 
-  deferred.promise = new Promise<T>((resolve, reject) => {
-    deferred.resolve = resolve
-    deferred.reject = reject
+  const promise = new Promise<T>((innerResolve, innerReject) => {
+    resolve = innerResolve
+    reject = innerReject
   })
 
-  return deferred
+  return {
+    promise,
+    resolve,
+    reject
+  }
 }

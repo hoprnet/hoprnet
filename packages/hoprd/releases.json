@@ -46,10 +46,16 @@
     "version_minor": "89"
   },
   "valencia": {
-    "git_ref": "^release/valencia$",
+    "git_ref": "^(release|staging)/valencia$",
     "environment_id": "monte_rosa",
     "version_major": "1",
     "version_minor": "90"
+  },
+  "bogota": {
+    "git_ref": "^(release|staging)/bogota$",
+    "environment_id": "monte_rosa",
+    "version_major": "1",
+    "version_minor": "91"
   },
   "debug-goerli": {
     "git_ref": "^debug-deploy/.*",

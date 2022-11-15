@@ -3,6 +3,7 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Initializable, Components } from '@libp2p/interfaces/components'
 import type { Startable } from '@libp2p/interfaces/startable'
 import type { Connection, MultiaddrConnection } from '@libp2p/interface-connection'
+import { CustomEvent } from '@libp2p/interfaces/events'
 
 import errCode from 'err-code'
 import Debug from 'debug'
@@ -11,7 +12,7 @@ import { CODE_DNS4, CODE_DNS6, CODE_IP4, CODE_IP6, CODE_P2P } from './constants.
 import { peerIdFromBytes } from '@libp2p/peer-id'
 import { type CreateListenerOptions, type DialOptions, symbol, type Transport } from '@libp2p/interface-transport'
 import chalk from 'chalk'
-import { TCPConnection, Listener } from './base/index.js'
+import { createTCPConnection, Listener } from './base/index.js'
 
 // Do not type-check JSON files
 // @ts-ignore
@@ -32,11 +33,11 @@ import { EntryNodes } from './base/entry.js'
 import { WebRTCUpgrader } from './webrtc/upgrader.js'
 import { UpnpManager } from './base/upnp.js'
 import { create_counter, timeout } from '@hoprnet/hopr-utils'
+import { cleanExistingConnections } from './utils/index.js'
 
 const DEBUG_PREFIX = 'hopr-connect'
 const log = Debug(DEBUG_PREFIX)
 const verbose = Debug(DEBUG_PREFIX.concat(':verbose'))
-const warn = Debug(DEBUG_PREFIX.concat(':warn'))
 const error = Debug(DEBUG_PREFIX.concat(':error'))
 
 // Metrics
@@ -268,13 +269,28 @@ class HoprConnect implements Transport, Initializable, Startable {
   private async dialWithRelay(relay: PeerId, destination: PeerId, options: DialOptions): Promise<Connection> {
     log(`Dialing ${chalk.yellow(`/p2p/${relay.toString()}/p2p-circuit/p2p/${destination.toString()}`)}`)
 
-    let maConn = await this.getConnectComponents().getRelay().connect(relay, destination, options)
+    let conn: Connection | undefined
+
+    let maConn = await this.getConnectComponents()
+      .getRelay()
+      .connect(
+        relay,
+        destination,
+        () => {
+          if (conn) {
+            ;(this.components as Components).getUpgrader().dispatchEvent(
+              new CustomEvent(`connectionEnd`, {
+                detail: conn
+              })
+            )
+          }
+        },
+        options
+      )
 
     if (maConn == undefined) {
       throw Error(`Could not establish relayed connection.`)
     }
-
-    let conn: Connection
 
     try {
       conn = await options.upgrader.upgradeOutbound(maConn)
@@ -285,6 +301,9 @@ class HoprConnect implements Transport, Initializable, Startable {
       // want to log it for debugging purposes
       throw err
     }
+
+    // Not supposed to throw any exception
+    cleanExistingConnections(this.components as Components, conn.remotePeer, conn.id, error)
 
     // Merges all tags from `maConn` into `conn` and then make both objects
     // use the *same* array
@@ -307,45 +326,32 @@ class HoprConnect implements Transport, Initializable, Startable {
    * @param ma destination
    * @param options optional dial options
    */
-  public async dialDirectly(
-    ma: Multiaddr,
-    options: DialOptions & { onDisconnect?: (ma: Multiaddr) => void }
-  ): Promise<Connection> {
+  public async dialDirectly(ma: Multiaddr, options: DialOptions): Promise<Connection> {
     log(`Dialing ${chalk.yellow(ma.toString())}`)
 
-    const maConn = await TCPConnection.create(ma, options)
+    let conn: Connection | undefined
+    const maConn = await createTCPConnection(
+      ma,
+      () => {
+        if (conn) {
+          ;(this.components as Components).getUpgrader().dispatchEvent(
+            new CustomEvent(`connectionEnd`, {
+              detail: conn
+            })
+          )
+        }
+      },
+      options
+    )
 
     verbose(
       `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshake.`
     )
 
-    const conn = await timeout(DEFAULT_CONNECTION_UPGRADE_TIMEOUT, () => options.upgrader.upgradeOutbound(maConn))
+    conn = await timeout(DEFAULT_CONNECTION_UPGRADE_TIMEOUT, () => options.upgrader.upgradeOutbound(maConn))
 
-    // Assign various connection properties once we're sure that public keys match,
-    // i.e. dialed node == desired destination
-
-    // Set the SO_KEEPALIVE flag on socket to tell kernel to be more aggressive on keeping the connection up
-    maConn.socket.setKeepAlive(true, 1000)
-
-    maConn.socket.on('end', function () {
-      log(`SOCKET END on connection to ${maConn.remoteAddr.toString()}: other end of the socket sent a FIN packet`)
-    })
-
-    maConn.socket.on('timeout', function () {
-      warn(`SOCKET TIMEOUT on connection to ${maConn.remoteAddr.toString()}`)
-    })
-
-    maConn.socket.on('error', function (e) {
-      error(`SOCKET ERROR on connection to ${maConn.remoteAddr.toString()}: ' ${JSON.stringify(e)}`)
-    })
-
-    maConn.socket.on('close', (had_error) => {
-      log(`SOCKET CLOSE on connection to ${maConn.remoteAddr.toString()}: error flag is ${had_error}`)
-      // Don't call the disconnect handler if connection has been closed intentionally
-      if (!maConn.closed && options && options.onDisconnect) {
-        options.onDisconnect(ma)
-      }
-    })
+    // Not supposed to throw any exception
+    cleanExistingConnections(this.components as Components, conn.remotePeer, conn.id, error)
 
     verbose(`Direct connection to ${maConn.remoteAddr.toString()} has been established successfully!`)
     if (conn.tags) {

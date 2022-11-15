@@ -69,7 +69,8 @@ async function getNode(id: PeerId, withDht = false, oracle?: Map<string, Compone
     transports: [new MyTCP(oracle)],
     streamMuxers: [new Mplex()],
     connectionEncryption: [new Noise()],
-    dht: withDht ? new KadDHT({ protocolPrefix: '/hopr', clientMode: false }) : undefined,
+    // @ts-ignore
+    dht: withDht ? new KadDHT({ protocolPrefix: '/hopr', clientMode: false, pingTimeout: 1e3, lan: true }) : undefined,
     metrics: {
       enabled: false
     },

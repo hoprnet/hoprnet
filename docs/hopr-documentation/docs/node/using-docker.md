@@ -96,7 +96,7 @@ Before downloading the HOPRd image, make sure **Docker** is installed.
 
 All our docker images can be found in [our Google Cloud Container Registry](https://console.cloud.google.com/gcr/images/hoprassociation/global/hoprd).
 Each image is prefixed with `gcr.io/hoprassociation/hoprd`.
-The `valencia` tag represents the latest community release version.
+The `bogota` tag represents the latest community release version.
 
 (**1**) Open your terminal.
 
@@ -119,7 +119,7 @@ This ensures the node cannot be accessed by a malicious user residing in the sam
 (**3**) Copy the following command and replace **YOUR_SECURITY_TOKEN** with your own.
 
 ```bash
-docker run --pull always --restart on-failure -m 2g -ti -v $HOME/.hoprd-db-valencia:/app/hoprd-db -p 9091:9091 -p 3000:3000 -p 3001:3001 -e DEBUG="hopr*" gcr.io/hoprassociation/hoprd:valencia --environment monte_rosa --init --api --admin --identity /app/hoprd-db/.hopr-id-valencia --data /app/hoprd-db --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --apiHost "0.0.0.0" --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --healthCheck --healthCheckHost "0.0.0.0"
+docker run --pull always --restart on-failure -m 2g -ti -v $HOME/.hoprd-db-bogota:/app/hoprd-db -p 9091:9091 -p 3000:3000 -p 3001:3001 -e DEBUG="hopr*" gcr.io/hoprassociation/hoprd:bogota --environment monte_rosa --init --api --admin --identity /app/hoprd-db/.hopr-id-bogota --data /app/hoprd-db --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --apiHost "0.0.0.0" --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --healthCheck --healthCheckHost "0.0.0.0"
 ```
 
 If you are not logged in as the root user, add sudo to the start of the above command. E.g. `sudo docker run ...`. If you are using a VPS, you are likely a root user and can use the default command.
@@ -164,7 +164,7 @@ docker container ls --all
 
 This will create a list of all your docker containers similar to the one below:
 
-![Container ID logs](./images/container-ID-logs.png)
+![Container ID logs](/img/node/container-ID-logs.png)
 
 (**2**) look through the list and find the `container ID` of the most recently exited container. The example above would be `5955dbd23bb2` as the most recent container is still running.
 

@@ -1,0 +1,412 @@
+---
+id: demo-boomerang-chat
+title: Demo - Boomerang Chat
+---
+
+import BoomerangChat from './components/BoomerangChat'
+
+Boomerang Chat is a simple app that sends a message to the HOPR Network and returns it to the sender. Because
+nodes in the network have no idea who sent the message and who’s the final recipient, a node can always send a message to itself, and no other node would be any the wiser. HOPR nodes only know who to forward the message to next.
+
+This demo showcases the minimal requirements needed to build a HOPR app. Boomerang Chat is a `React`-based web application that
+uses native WebSockets to connect to your HOPR node and its REST API to send messages to itself.
+
+## Requirements
+
+- a HOPR cluster, and at least a single HOPR node with its respective `HTTP_ENDPOINT`, `WS_ENDPOINT` and `API_TOKEN`
+- a React-ready web framework used to run the application. We recommend [`next.js`](https://nextjs.org/).
+
+For simplicity, you can also see the code for this demo in [Codesandbox](https://codesandbox.io/s/hopr-demo-react-hello-world-yo0uc?file=/src/App.tsx).
+To see an example of how to run this as an isolated application, you can also check our [demo chat application, MyneChat](https://github.com/hoprnet/myne-chat).
+
+## Building the Boomerang Chat
+
+### 1. Connecting to our HOPR nodes
+
+Our React application starts like any other: simply loading the application within an entry point.
+
+```jsx {3,6} title="index.jsx (usually your React application entrypoint)"
+import { render } from 'react-dom'
+
+import BoomerangChat from './BoomerangChat'
+
+const rootElement = document.getElementById('root')
+render(<BoomerangChat />, rootElement)
+```
+
+We can see how we are loading our app in line `3` and rendering it on line `6`.
+`BoomerangChat.jsx` renders the actual component we are looking to build as a HOPR App, so let's take a look at `BoomerangChat.jsx`:
+
+```jsx {6-8,25} title="BoomerangChat.jsx"
+import React, { useEffect, useState } from "react";
+import WebSocketHandler from "./WebSocketHandler";
+
+export default function BoomerangChat() {
+  const [message, setMessage] = useState("Hello world");
+  const [securityToken, setSecurityToken] = useState("");
+  const [wsEndpoint, setWsEndpoint] = useState("ws://localhost:3000");
+  const [httpEndpoint, setHTTPEndpoint] = useState("http://localhost:3001");
+  const [address, setAddress] = useState("");
+
+  useEffect(() => {
+    const loadAddress = async () => {
+      ...
+    };
+    loadAddress();
+  }, [securityToken, httpEndpoint]);
+
+  const sendMessage = async () => {
+    ...
+  };
+
+  return (
+    <div>
+      ...
+      <WebSocketHandler wsEndpoint={wsEndpoint} securityToken={securityToken} />
+    </div>
+  );
+}
+```
+
+From lines `6` to `8`, we see a series of values called `httpEndpoint`, `wsEndpoint`, and `securityToken`.
+These are needed in most HOPR Applications. Without these values, which are configurable by the user, HOPR apps cannot communicate with HOPR nodes.
+
+In line `25`, we see a component called `WebSocketHandler`. Here is its code:
+
+```jsx title="WebSocketHandler.jsx"
+import React, { useEffect, useState } from "react";
+import useWebsocket from "../hooks/useWebSockets ";
+
+export const WebSocketHandler = ({ wsEndpoint, securityToken }) => {
+  const [message, setMessage] = useState("");
+  const websocket = useWebsocket({ wsEndpoint, securityToken });
+  const { socketRef } = websocket;
+  const handleReceivedMessage = async (ev) => {
+    ...
+  };
+  useEffect(() => {
+    if (!socketRef.current) return;
+    socketRef.current.addEventListener("message", handleReceivedMessage);
+    return () => {
+      if (!socketRef.current) return;
+      socketRef.current.removeEventListener("message", handleReceivedMessage);
+    };
+  }, [socketRef.current]);
+
+  ...
+};
+```
+
+Here's where things start getting interesting.
+
+1. We are attempting to connect to our HOPR node WebSocket endpoint on load, and
+2. When we succeed, we attach an event handler to every message it receives.
+
+Of course, you could always just try and connect on request rather than on load. For now, the easiest way is
+to use the `useWebSocket` helper (you can find the code at the bottom of this page) to initialize the `WebSocket` interface
+and retries on changes to the `wsEndpoint` value.
+
+### 2. Obtaining information about your HOPR node
+
+In addition to the WebSocket endpoint, a HOPR app should also try to use a HOPR node's REST API endpoint to display
+useful information about it in the app, such as address and balance.
+
+In our previous example, inside `BoomerangChat.jsx` we had a `useEffect` call, which goes something like this:
+
+```jsx {4-5} title="BoomerangChat.jsx"
+useEffect(() => {
+  const loadAddress = async () => {
+    const headers = getHeaders()
+    const account = await fetch(`${httpEndpoint}/api/v2/account/address`, {
+      headers
+    })
+      .then((res) => res.json())
+      .catch((err) => console.error(err))
+    setAddress(account?.hoprAddress)
+  }
+  loadAddress()
+}, [securityToken, httpEndpoint])
+```
+
+In line `4`, we are talking to the node's REST API using the native `fetch` call to obtain its HOPR Address since
+we’ll be using that later when we want to send a message. It's important to include the `Headers` (see next line)
+which authenticates the client against the call to avoid unauthorized calls. Here's the `getHeaders` method for reference:
+
+```js title="getHeaders method"
+const getHeaders = (isPost = false) => {
+  const headers = new Headers()
+  if (isPost) {
+    headers.set('Content-Type', 'application/json')
+    headers.set('Accept-Content', 'application/json')
+  }
+  headers.set('Authorization', 'Basic ' + btoa(securityToken))
+  return headers
+}
+```
+
+### 3. Sending the message via the REST API
+
+The final part of the demo revolves around the actual request to send the message. We can see the code from the same
+file here:
+
+```jsx {7} title="BoomerangChat.jsx"
+const sendMessage = async () => {
+  if (!address) return
+  await fetch(`${httpEndpoint}/api/v2/messages`, {
+    method: 'POST',
+    headers: getHeaders(true),
+    body: JSON.stringify({
+      recipient: address,
+      body: message
+    })
+  }).catch((err) => console.error(err))
+}
+```
+
+We can see that the message is being sent via the REST API endpoint, including also headers (which are now different)
+since we are making a `POST` request. The important part is on line `7`, where we state the `recipient` of the message
+is `address`, a value which we set up in the initial `useEffect` request. This is how we are signalling to the API to send
+a message to that particular address, which happens to be ourselves. For the HOPR Network, the destination of the message
+is irrelevant.
+
+### Demo: Boomerang
+
+You can see the application working and running on this same page. Give it a try! Don’t forget that you need
+at least a running HOPR cluster for it to work.
+
+<BoomerangChat />
+
+### Annex: Components/hooks code
+
+Here's all the code for all components and hooks used.
+
+#### `useWebSocket.js`
+
+Used as a WebSocket interface to react and connect to our HOPR node accordingly.
+
+```js title="useWebSocket.js"
+/*
+  A react hook.
+  Keeps websocket connection alive and reconnects on disconnections or endpoint changes.
+*/
+import { useImmer } from 'use-immer'
+import { useEffect, useRef, useState } from 'react'
+import debounce from 'debounce'
+
+const useWebsocket = (settings) => {
+  // update timestamp when you want to reconnect to the websocket
+  const [reconnectTmsp, setReconnectTmsp] = useState()
+  const [state, setState] = useImmer({ status: 'DISCONNECTED' })
+
+  const socketRef = useRef()
+
+  const setReconnectTmspDebounced = debounce((timestamp) => {
+    setReconnectTmsp(timestamp)
+  }, 1e3)
+
+  const handleOpenEvent = () => {
+    console.info('WS CONNECTED')
+    setState((draft) => {
+      draft.status = 'CONNECTED'
+      return draft
+    })
+  }
+
+  const handleCloseEvent = () => {
+    console.info('WS DISCONNECTED')
+    setState((draft) => {
+      draft.status = 'DISCONNECTED'
+      return draft
+    })
+    setReconnectTmspDebounced(+new Date())
+  }
+
+  const handleErrorEvent = (e) => {
+    console.error('WS ERROR', e)
+    setState((draft) => {
+      draft.status = 'DISCONNECTED'
+      draft.error = String(e)
+    })
+    setReconnectTmspDebounced(+new Date())
+  }
+
+  // runs everytime "endpoint" or "reconnectTmsp" changes
+  useEffect(() => {
+    if (typeof window === 'undefined') return // We are on SSR
+
+    // disconnect from previous connection
+    if (socketRef.current) {
+      console.info('WS Disconnecting..')
+      socketRef.current.close(1000, 'Shutting down')
+    }
+
+    // need to set the token in the query parameters, to enable websocket authentication
+    try {
+      const wsUrl = new URL(settings.wsEndpoint)
+
+      if (settings.securityToken) {
+        wsUrl.search = `?apiToken=${settings.securityToken}`
+      }
+      console.info('WS Connecting..')
+      socketRef.current = new WebSocket(wsUrl)
+
+      // handle connection opening
+      socketRef.current.addEventListener('open', handleOpenEvent)
+      // handle connection closing
+      socketRef.current.addEventListener('close', handleCloseEvent)
+      // handle errors
+      socketRef.current.addEventListener('error', handleErrorEvent)
+    } catch (err) {
+      console.error('URL is invalid', settings.wsEndpoint)
+    }
+
+    // cleanup when unmounting
+    return () => {
+      if (!socketRef.current) return
+
+      socketRef.current.removeEventListener('open', handleOpenEvent)
+      socketRef.current.removeEventListener('close', handleCloseEvent)
+      socketRef.current.removeEventListener('error', handleErrorEvent)
+    }
+  }, [settings.wsEndpoint, settings.securityToken])
+
+  return {
+    state,
+    socketRef
+  }
+}
+
+export default useWebsocket
+```
+
+#### `WebSocketHandler.jsx`
+
+Used a React component to load our HOPR node using the `useWebSocket` hook.
+
+```jsx title="WebSocketHandler.jsx"
+import React, { useEffect, useState } from 'react'
+import useWebsocket from '../hooks/useWebSockets '
+
+export const WebSocketHandler = ({ wsEndpoint, securityToken }) => {
+  const [message, setMessage] = useState('')
+  const websocket = useWebsocket({ wsEndpoint, securityToken })
+  const { socketRef } = websocket
+  const handleReceivedMessage = async (ev) => {
+    try {
+      // we are only interested in messages, not all the other events coming in on the socket
+      const data = JSON.parse(ev.data)
+      console.log('WebSocket Data', data)
+      if (data.type === 'message') {
+        setMessage(data.msg)
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
+  useEffect(() => {
+    if (!socketRef.current) return
+    socketRef.current.addEventListener('message', handleReceivedMessage)
+
+    return () => {
+      if (!socketRef.current) return
+      socketRef.current.removeEventListener('message', handleReceivedMessage)
+    }
+  }, [socketRef.current])
+
+  return <span>{message ? message : 'You have no messages.'}</span>
+}
+
+export default WebSocketHandler
+```
+
+#### `BoomerangChat.jsx`
+
+The actual HOPR application can send and read a message to the same node it’s connected to using its HTTP/WS endpoints.
+
+```jsx title="BoomerangChat.jsx"
+import React, { useEffect, useState } from 'react'
+import WebSocketHandler from './WebSocketHandler'
+
+export default function BoomerangChat() {
+  const [message, setMessage] = useState('Hello world')
+  const [securityToken, setSecurityToken] = useState('')
+  const [wsEndpoint, setWsEndpoint] = useState('ws://localhost:3000')
+  const [httpEndpoint, setHTTPEndpoint] = useState('http://localhost:3001')
+  const [address, setAddress] = useState('')
+
+  const getHeaders = (isPost = false) => {
+    const headers = new Headers()
+    if (isPost) {
+      headers.set('Content-Type', 'application/json')
+      headers.set('Accept-Content', 'application/json')
+    }
+    headers.set('Authorization', 'Basic ' + btoa(securityToken))
+    return headers
+  }
+
+  useEffect(() => {
+    const loadAddress = async () => {
+      const headers = getHeaders()
+      const account = await fetch(`${httpEndpoint}/api/v2/account/address`, {
+        headers
+      })
+        .then((res) => res.json())
+        .catch((err) => console.error(err))
+      setAddress(account?.hoprAddress)
+    }
+    loadAddress()
+  }, [securityToken, httpEndpoint])
+
+  const sendMessage = async () => {
+    if (!address) return
+    await fetch(`${httpEndpoint}/api/v2/messages`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify({
+        recipient: address,
+        body: message
+      })
+    }).catch((err) => console.error(err))
+  }
+
+  return (
+    <div>
+      <div>
+        <label>WS Endpoint</label>{' '}
+        <input
+          name="wsEndpoint"
+          placeholder={wsEndpoint}
+          value={wsEndpoint}
+          onChange={(e) => setWsEndpoint(e.target.value)}
+        />
+      </div>
+      <div>
+        <label>HTTP Endpoint</label>{' '}
+        <input
+          name="httpEndpoint"
+          placeholder={httpEndpoint}
+          value={httpEndpoint}
+          onChange={(e) => setHTTPEndpoint(e.target.value)}
+        />
+      </div>
+      <div>
+        <label>Security Token</label>{' '}
+        <input
+          name="securityToken"
+          placeholder={securityToken}
+          value={securityToken}
+          onChange={(e) => setSecurityToken(e.target.value)}
+        />
+      </div>
+      <div>
+        <label>Send a message</label>{' '}
+        <input name="httpEndpoint" value={message} placeholder={message} onChange={(e) => setMessage(e.target.value)} />
+      </div>
+      <button onClick={() => sendMessage()}>Send message to node</button>
+      <br />
+      <br />
+      <WebSocketHandler wsEndpoint={wsEndpoint} securityToken={securityToken} />
+    </div>
+  )
+}
+```

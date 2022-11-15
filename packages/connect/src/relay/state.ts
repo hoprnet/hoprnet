@@ -3,7 +3,7 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { unmarshalPublicKey } from '@libp2p/crypto/keys'
 
 import { nAtATime, u8aCompare } from '@hoprnet/hopr-utils'
-import { RelayContext } from './context.js'
+import { RelayContext, type RelayContextInterface } from './context.js'
 
 import debug from 'debug'
 
@@ -13,7 +13,7 @@ const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
 const error = debug(DEBUG_PREFIX.concat(':error'))
 
 type RelayConnections = {
-  [id: string]: RelayContext
+  [id: string]: RelayContextInterface
 }
 
 /**
@@ -115,7 +115,7 @@ class RelayState {
    * Performs an operation for each relay context in the current set.
    * @param action
    */
-  async forEach(action: (dst: string, ctx: RelayContext) => Promise<void>) {
+  async forEach(action: (dst: string, ctx: RelayContextInterface) => Promise<void>) {
     await nAtATime(
       action,
       this,
@@ -139,12 +139,12 @@ class RelayState {
     toDestination: Stream,
     __relayFreeTimeout?: number
   ): Promise<void> {
-    const toSourceContext = new RelayContext(
+    const toSourceContext = RelayContext(
       toSource,
       { onClose: this.cleanListener(source, destination), onUpgrade: this.cleanListener(source, destination) },
       this.options
     )
-    const toDestinationContext = new RelayContext(
+    const toDestinationContext = RelayContext(
       toDestination,
       {
         onClose: this.cleanListener(destination, source),

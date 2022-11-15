@@ -31,3 +31,7 @@ This is because WASM does not support system time functionality from the Rust st
 #### Returns
 
 `void`
+
+#### Defined in
+
+lib/utils_metrics.d.ts:265

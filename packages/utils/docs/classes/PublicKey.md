@@ -11,6 +11,7 @@
 ### Properties
 
 - [\_address](PublicKey.md#_address)
+- [arr](PublicKey.md#arr)
 
 ### Accessors
 
@@ -52,6 +53,10 @@
 | :------ | :------ |
 | `arr` | `Uint8Array` |
 
+#### Defined in
+
+[src/types/publicKey.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L18)
+
 ## Properties
 
 ### \_address
@@ -61,6 +66,16 @@
 #### Defined in
 
 [src/types/publicKey.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L16)
+
+___
+
+### arr
+
+• `Private` **arr**: `Uint8Array`
+
+#### Defined in
+
+[src/types/publicKey.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L18)
 
 ## Accessors
 
@@ -72,6 +87,10 @@
 
 `boolean`
 
+#### Defined in
+
+[src/types/publicKey.ts:129](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L129)
+
 ___
 
 ### SIZE\_COMPRESSED
@@ -82,6 +101,10 @@ ___
 
 `number`
 
+#### Defined in
+
+[src/types/publicKey.ts:121](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L121)
+
 ___
 
 ### SIZE\_UNCOMPRESSED
@@ -91,6 +114,10 @@ ___
 #### Returns
 
 `number`
+
+#### Defined in
+
+[src/types/publicKey.ts:125](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L125)
 
 ## Methods
 
@@ -108,6 +135,10 @@ ___
 
 `boolean`
 
+#### Defined in
+
+[src/types/publicKey.ts:181](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L181)
+
 ___
 
 ### serializeCompressed
@@ -117,6 +148,10 @@ ___
 #### Returns
 
 `Uint8Array`
+
+#### Defined in
+
+[src/types/publicKey.ts:160](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L160)
 
 ___
 
@@ -128,6 +163,10 @@ ___
 
 `Uint8Array`
 
+#### Defined in
+
+[src/types/publicKey.ts:168](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L168)
+
 ___
 
 ### toAddress
@@ -137,6 +176,10 @@ ___
 #### Returns
 
 [`Address`](Address.md)
+
+#### Defined in
+
+[src/types/publicKey.ts:133](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L133)
 
 ___
 
@@ -148,6 +191,10 @@ ___
 
 `string`
 
+#### Defined in
+
+[src/types/publicKey.ts:152](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L152)
+
 ___
 
 ### toPeerId
@@ -157,6 +204,10 @@ ___
 #### Returns
 
 `PeerId`
+
+#### Defined in
+
+[src/types/publicKey.ts:156](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L156)
 
 ___
 
@@ -168,6 +219,10 @@ ___
 
 `string`
 
+#### Defined in
+
+[src/types/publicKey.ts:177](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L177)
+
 ___
 
 ### toUncompressedPubKeyHex
@@ -178,6 +233,10 @@ ___
 
 `string`
 
+#### Defined in
+
+[src/types/publicKey.ts:148](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L148)
+
 ___
 
 ### createMock
@@ -187,6 +246,10 @@ ___
 #### Returns
 
 [`PublicKey`](PublicKey.md)
+
+#### Defined in
+
+[src/types/publicKey.ts:191](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L191)
 
 ___
 
@@ -203,6 +266,10 @@ ___
 #### Returns
 
 [`PublicKey`](PublicKey.md)
+
+#### Defined in
+
+[src/types/publicKey.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L32)
 
 ___
 
@@ -224,6 +291,10 @@ Deserializes a Uint8Array containing serialized publicKeys
 
 an array of deserialized publicKeys
 
+#### Defined in
+
+[src/types/publicKey.ts:56](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L56)
+
 ___
 
 ### fromPeerId
@@ -239,6 +310,10 @@ ___
 #### Returns
 
 [`PublicKey`](PublicKey.md)
+
+#### Defined in
+
+[src/types/publicKey.ts:95](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L95)
 
 ___
 
@@ -256,6 +331,10 @@ ___
 
 [`PublicKey`](PublicKey.md)
 
+#### Defined in
+
+[src/types/publicKey.ts:102](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L102)
+
 ___
 
 ### fromPrivKey
@@ -272,6 +351,10 @@ ___
 
 [`PublicKey`](PublicKey.md)
 
+#### Defined in
+
+[src/types/publicKey.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L24)
+
 ___
 
 ### fromPrivKeyString
@@ -287,6 +370,10 @@ ___
 #### Returns
 
 [`PublicKey`](PublicKey.md)
+
+#### Defined in
+
+[src/types/publicKey.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L20)
 
 ___
 
@@ -305,6 +392,10 @@ ___
 #### Returns
 
 [`PublicKey`](PublicKey.md)
+
+#### Defined in
+
+[src/types/publicKey.ts:106](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L106)
 
 ___
 
@@ -325,6 +416,10 @@ ___
 
 [`PublicKey`](PublicKey.md)
 
+#### Defined in
+
+[src/types/publicKey.ts:110](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L110)
+
 ___
 
 ### fromString
@@ -340,6 +435,10 @@ ___
 #### Returns
 
 [`PublicKey`](PublicKey.md)
+
+#### Defined in
+
+[src/types/publicKey.ts:114](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L114)
 
 ___
 
@@ -360,3 +459,7 @@ Serializes an array of publicKeys
 `Uint8Array`
 
 a Uint8Array containing the given publicKeys
+
+#### Defined in
+
+[src/types/publicKey.ts:91](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L91)

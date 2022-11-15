@@ -55,6 +55,10 @@
 | `channelEpoch` | `UINT256` |
 | `closureTime` | `UINT256` |
 
+#### Defined in
+
+packages/utils/lib/types/channelEntry.d.ts:39
+
 ## Properties
 
 ### balance
@@ -155,6 +159,10 @@ packages/utils/lib/types/channelEntry.d.ts:35
 
 `number`
 
+#### Defined in
+
+packages/utils/lib/types/channelEntry.d.ts:40
+
 ## Methods
 
 ### closureTimePassed
@@ -164,6 +172,10 @@ packages/utils/lib/types/channelEntry.d.ts:35
 #### Returns
 
 `boolean`
+
+#### Defined in
+
+packages/utils/lib/types/channelEntry.d.ts:46
 
 ___
 
@@ -175,6 +187,10 @@ ___
 
 `Hash`
 
+#### Defined in
+
+packages/utils/lib/types/channelEntry.d.ts:45
+
 ___
 
 ### getRemainingClosureTime
@@ -185,11 +201,17 @@ Computes the remaining time in seconds until the channel can be closed.
 Outputs `0` if there is no waiting time, and `-1` if the
 closure time of this channel is unknown.
 
-**`dev`** used to create more comprehensive debug logs
+**`Dev`**
+
+used to create more comprehensive debug logs
 
 #### Returns
 
 `BN`
+
+#### Defined in
+
+packages/utils/lib/types/channelEntry.d.ts:53
 
 ___
 
@@ -201,6 +223,10 @@ ___
 
 `Uint8Array`
 
+#### Defined in
+
+packages/utils/lib/types/channelEntry.d.ts:43
+
 ___
 
 ### toString
@@ -211,6 +237,10 @@ ___
 
 `string`
 
+#### Defined in
+
+packages/utils/lib/types/channelEntry.d.ts:44
+
 ___
 
 ### createMock
@@ -220,6 +250,10 @@ ___
 #### Returns
 
 [`ChannelEntry`](ChannelEntry.md)
+
+#### Defined in
+
+packages/utils/lib/types/channelEntry.d.ts:54
 
 ___
 
@@ -237,6 +271,10 @@ ___
 
 [`ChannelEntry`](ChannelEntry.md)
 
+#### Defined in
+
+packages/utils/lib/types/channelEntry.d.ts:41
+
 ___
 
 ### fromSCEvent
@@ -253,3 +291,7 @@ ___
 #### Returns
 
 `Promise`<[`ChannelEntry`](ChannelEntry.md)\>
+
+#### Defined in
+
+packages/utils/lib/types/channelEntry.d.ts:42

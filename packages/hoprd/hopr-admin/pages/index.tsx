@@ -245,7 +245,7 @@ export default function Home() {
       {/* display connected peers panel */}
       {showConnectedPanel && (
         <div className={styles.popup}>
-          <h2>Connected Peers ({peers.length})</h2>
+          <h2>Peers seen in the network ({peers.length})</h2>
           <div className={styles.connectedPeersList}>
             {peers.map((x) => (
               <div className={styles.peer} key={x}>

@@ -56,6 +56,10 @@
 | `channelEpoch` | [`UINT256`](UINT256.md) |
 | `signature` | [`Signature`](Signature.md) |
 
+#### Defined in
+
+[src/types/ticket.ts:49](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L49)
+
 ## Properties
 
 ### amount
@@ -146,6 +150,10 @@ ___
 
 `number`
 
+#### Defined in
+
+[src/types/ticket.ts:138](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L138)
+
 ## Methods
 
 ### getHash
@@ -155,6 +163,10 @@ ___
 #### Returns
 
 [`Hash`](Hash.md)
+
+#### Defined in
+
+[src/types/ticket.ts:134](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L134)
 
 ___
 
@@ -173,6 +185,10 @@ ___
 
 [`UINT256`](UINT256.md)
 
+#### Defined in
+
+[src/types/ticket.ts:160](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L160)
+
 ___
 
 ### getPathPosition
@@ -183,6 +199,10 @@ ___
 
 `number`
 
+#### Defined in
+
+[src/types/ticket.ts:184](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L184)
+
 ___
 
 ### isWinningTicket
@@ -192,7 +212,9 @@ ___
 Decides whether a ticket is a win or not.
 Note that this mimics the on-chain logic.
 
-**`dev`** Purpose of the function is to check the validity of
+**`Dev`**
+
+Purpose of the function is to check the validity of
 a ticket before we submit it to the blockchain.
 
 #### Parameters
@@ -207,6 +229,10 @@ a ticket before we submit it to the blockchain.
 
 `boolean`
 
+#### Defined in
+
+[src/types/ticket.ts:179](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L179)
+
 ___
 
 ### recoverSigner
@@ -216,6 +242,10 @@ ___
 #### Returns
 
 [`PublicKey`](PublicKey.md)
+
+#### Defined in
+
+[src/types/ticket.ts:151](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L151)
 
 ___
 
@@ -227,6 +257,10 @@ ___
 
 `Uint8Array`
 
+#### Defined in
+
+[src/types/ticket.ts:89](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L89)
+
 ___
 
 ### serializeUnsigned
@@ -237,6 +271,10 @@ ___
 
 `Uint8Array`
 
+#### Defined in
+
+[src/types/ticket.ts:93](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L93)
+
 ___
 
 ### toString
@@ -246,6 +284,10 @@ ___
 #### Returns
 
 `string`
+
+#### Defined in
+
+[src/types/ticket.ts:120](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L120)
 
 ___
 
@@ -262,6 +304,10 @@ ___
 #### Returns
 
 `boolean`
+
+#### Defined in
+
+[src/types/ticket.ts:155](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L155)
 
 ___
 
@@ -286,6 +332,10 @@ ___
 
 [`Ticket`](Ticket.md)
 
+#### Defined in
+
+[src/types/ticket.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L60)
+
 ___
 
 ### deserialize
@@ -301,3 +351,7 @@ ___
 #### Returns
 
 [`Ticket`](Ticket.md)
+
+#### Defined in
+
+[src/types/ticket.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L97)

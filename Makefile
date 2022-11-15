@@ -1,12 +1,21 @@
+# Gets all packages that include a Rust crates
 WORKSPACES_WITH_RUST_MODULES := $(wildcard $(addsuffix /crates, $(wildcard ./packages/*)))
+
+# Gets all individual crates such that they can get built
+CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(crate)/*/Cargo.toml)))
 
 .POSIX:
 
 all: help
 
-.PHONY: $(WORKSPACES_WITH_RUST_MODULES) ## build all WASM modules
+.PHONY: $(CRATES) ## builds all Rust crates
+$(CRATES):
+# --out-dir is relative to working directory
+	wasm-pack build --target=bundler --out-dir ./pkg $@
+
+.PHONY: $(WORKSPACES_WITH_RUST_MODULES) ## builds all WebAssembly modules
 $(WORKSPACES_WITH_RUST_MODULES):
-	$(MAKE) -j 1 -C $@ all install
+	$(MAKE) -C $@ install
 
 .PHONY: deps
 deps: ## install dependencies
@@ -14,6 +23,7 @@ deps: ## install dependencies
 	[ -n "${NIX_PATH}" ] || corepack enable
 	yarn
 	command -v rustup && rustup update || echo "No rustup installed, ignoring"
+	command -v wasm-pack || cargo install wasm-pack
 
 .PHONY: build
 build: ## build all packages
@@ -39,8 +49,10 @@ build-yarn-watch: build-solidity-types build-cargo
 
 .PHONY: build-cargo
 build-cargo: ## build cargo packages and create boilerplate JS code
-	cargo build --release --target wasm32-unknown-unknown
-	$(MAKE) -j 1 $(WORKSPACES_WITH_RUST_MODULES)
+# First compile Rust crates and create bindings
+	$(MAKE) -j 1 $(CRATES)
+# Copy bindings to their destination
+	$(MAKE) ${WORKSPACES_WITH_RUST_MODULES}
 
 .PHONY: build-yellowpaper
 build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
@@ -78,6 +90,8 @@ test: ## run unit tests for all packages, or a single package if package= is set
 ifeq ($(package),)
 	yarn workspaces foreach -pv run test
 else
+# Prebuild Rust unit tests
+	cargo build --tests
 	yarn workspace @hoprnet/${package} run test
 endif
 
@@ -88,6 +102,23 @@ lint-check: ## run linter in check mode
 .PHONY: lint-check
 lint-fix: ## run linter in fix mode
 	npx prettier --write .
+
+.PHONY: run-hardhat
+run-hardhat: ## run local hardhat environment
+	cd packages/ethereum && \
+		env NODE_OPTIONS="--experimental-wasm-modules" NODE_ENV=development \
+		TS_NODE_PROJECT=./tsconfig.hardhat.json \
+		HOPR_ENVIRONMENT_ID=hardhat-localhost yarn run hardhat node \
+		--network hardhat --show-stack-traces
+
+.PHONY: run-local
+run-local: ## run HOPRd from local repo
+	env NODE_OPTIONS="--experimental-wasm-modules" NODE_ENV=development node \
+		packages/hoprd/lib/main.cjs --admin --init --api \
+		--password="local" --identity=`pwd`/.identity-local \
+		--environment hardhat-localhost --announce \
+		--testUseWeakCrypto --testAnnounceLocalAddresses \
+		--testPreferLocalAddresses --testNoAuthentication
 
 .PHONY: docker-build-local
 docker-build-local: ## build Docker images locally, or single image if image= is set
@@ -157,12 +188,17 @@ endif
 .PHONY: stake-nrnft
 stake-nrnft: ensure-environment-is-set
 stake-nrnft: ## stake Network_registry NFTs (idempotent operation)
-ifeq ($(origin PRIVATE_KEY),undefined)
-	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
-endif
 ifeq ($(nftrank),)
 	echo "parameter <nftrank> missing, it can be either 'developer' or 'community'" >&2 && exit 1
 endif
+ifeq ($(origin PRIVATE_KEY),undefined)
+	@TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+		yarn workspace @hoprnet/hopr-ethereum run hardhat stake \
+		--network $(network) \
+		--type nrnft \
+		--nftrank $(nftrank)
+else
 	@TS_NODE_PROJECT=./tsconfig.hardhat.json \
 	HOPR_ENVIRONMENT_ID="$(environment)" \
 		yarn workspace @hoprnet/hopr-ethereum run hardhat stake \
@@ -170,6 +206,7 @@ endif
 		--type nrnft \
 		--nftrank $(nftrank) \
 		--privatekey "$(PRIVATE_KEY)"
+endif
 
 enable-network-registry: ensure-environment-is-set
 enable-network-registry: ## owner enables network registry (smart contract) globally
@@ -261,8 +298,13 @@ ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
 ifeq ($(origin PRIVATE_KEY),undefined)
-	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
-endif
+	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID="$(environment)" \
+	  yarn workspace @hoprnet/hopr-ethereum run hardhat register:self \
+   --network $(network) \
+   --task add \
+   --peer-ids "$(peer_ids)"
+else
 	TS_NODE_PROJECT=./tsconfig.hardhat.json \
 	HOPR_ENVIRONMENT_ID="$(environment)" \
 	  yarn workspace @hoprnet/hopr-ethereum run hardhat register:self \
@@ -270,6 +312,8 @@ endif
    --task add \
    --peer-ids "$(peer_ids)" \
    --privatekey "$(PRIVATE_KEY)"
+endif
+
 
 .PHONY: self-deregister-node
 self-deregister-node: ensure-environment-is-set

@@ -35,15 +35,16 @@
   "devDependencies": {
     "@ethersproject/cli": "5.7.0",
     "prettier": "2.7.1",
-    "ts-node": "10.8.1",
-    "typescript": "4.7.4",
-    "wasm-pack": "0.10.3",
+    "ts-node": "10.9.1",
+    "typescript": "4.8.4",
     "yargs": "17.5.1"
   },
   "resolutions": {
     "@ethersproject/providers": "https://github.com/hoprnet/ethers-js-provider/archive/refs/tags/v5.7.0-fixed-memory-leak.tar.gz",
+    "@libp2p/kad-dht": "https://github.com/hoprnet/js-libp2p-kad-dht/archive/refs/tags/v1.0.17.tar.gz",
     "@overnightjs/logger": "1.2.1",
-    "colors": "1.4.0"
+    "colors": "1.4.0",
+    "it-length-prefixed": "https://github.com/hoprnet/it-length-prefixed/archive/refs/tags/v7.0.3.tar.gz"
   },
   "prettier": {
     "tabWidth": 2,

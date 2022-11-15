@@ -1,4 +1,9 @@
-import { RelayHandshake, RelayHandshakeMessage } from './handshake.js'
+import {
+  RelayHandshakeMessage,
+  negotiateRelayHandshake,
+  initiateRelayHandshake,
+  handleRelayHandshake
+} from './handshake.js'
 import { u8aEquals, defer, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { duplexPair } from 'it-pair/duplex'
 import type { PeerId } from '@libp2p/interface-peer-id'
@@ -13,7 +18,7 @@ const initiator = privKeyToPeerId('0x695a1ad048d12a1a82f827a38815ab33aa4464194fa
 const relay = privKeyToPeerId('0xf0b8e814c3594d0c552d72fb3dfda7f0d9063458a7792369e7c044eda10f3b52')
 const destination = privKeyToPeerId('0xf2462c7eec43cde144e025c8feeac547d8f87fb9ad87e625c833391085e94d5d')
 
-function getRelayState(existing: boolean = false): Parameters<RelayHandshake['negotiate']>[2] {
+function getRelayState(existing: boolean = false): Parameters<typeof negotiateRelayHandshake>[3] {
   return {
     exists: () => existing,
     isActive: async () => false,
@@ -48,7 +53,6 @@ describe('test relay handshake', function () {
           async ({ stream }) => {
             stream.sink(
               (async function* () {
-                console.log(`sent`)
                 yield Uint8Array.from([RelayHandshakeMessage.OK])
               })()
             )
@@ -66,12 +70,9 @@ describe('test relay handshake', function () {
       .getPeerStore()
       .addressBook.add(destinationComponents.getPeerId(), destinationComponents.getTransportManager().getAddrs())
 
-    const initiatorHandshake = new RelayHandshake(relayToInitiator)
-    const relayHandshake = new RelayHandshake(initiatorToRelay)
+    initiateRelayHandshake(relayToInitiator, relay, destination)
 
-    initiatorHandshake.initiate(relay, destination)
-
-    await relayHandshake.negotiate(initiator, relayComponents, getRelayState())
+    await negotiateRelayHandshake(initiatorToRelay, initiator, relayComponents, getRelayState(), {})
 
     await initiatorReceived.promise
     network.stop()
@@ -103,26 +104,30 @@ describe('test relay handshake', function () {
 
     const okReceived = defer<void>()
 
-    const relayHandshake = new RelayHandshake({
-      source: (async function* () {
-        yield unmarshalPublicKey(destination.publicKey as Uint8Array).marshal()
-      })(),
-      sink: async (source: Stream['source']) => {
-        for await (const msg of source) {
-          if (msg.slice()[0] == RelayHandshakeMessage.OK) {
-            okReceived.resolve()
-          }
-        }
-      }
-    })
-
-    const destinationHandshake = new RelayHandshake(relayToDestination).handle(relay)
+    const destinationHandshake = handleRelayHandshake(relayToDestination, relay)
 
     await relayComponents
       .getPeerStore()
       .addressBook.add(destinationComponents.getPeerId(), destinationComponents.getTransportManager().getAddrs())
 
-    const handshakePromise = relayHandshake.negotiate(initiator, relayComponents, getRelayState())
+    const handshakePromise = negotiateRelayHandshake(
+      {
+        source: (async function* (): AsyncIterable<Uint8Array> {
+          yield unmarshalPublicKey(destination.publicKey as Uint8Array).marshal()
+        })(),
+        sink: async (source: Stream['source']) => {
+          for await (const msg of source) {
+            if (msg.slice()[0] == RelayHandshakeMessage.OK) {
+              okReceived.resolve()
+            }
+          }
+        }
+      },
+      initiator,
+      relayComponents,
+      getRelayState(),
+      {}
+    )
 
     await Promise.all([handshakePromise, destinationHandshake])
 
@@ -154,20 +159,15 @@ describe('test relay handshake', function () {
       ]
     })
 
-    const initiatorHandshake = new RelayHandshake(relayToInitiator)
-    const relayHandshake = new RelayHandshake(initiatorToRelay)
-
-    const destinationHandshake = new RelayHandshake(relayToDestination)
-
     await relayComponents
       .getPeerStore()
       .addressBook.add(destinationComponents.getPeerId(), destinationComponents.getTransportManager().getAddrs())
 
-    relayHandshake.negotiate(initiator, relayComponents, getRelayState(true))
+    negotiateRelayHandshake(relayToInitiator, initiator, relayComponents, getRelayState(true), {})
 
     const [initiatorResult, destinationResult] = await Promise.all([
-      initiatorHandshake.initiate(relay, destination),
-      destinationHandshake.handle(relay)
+      initiateRelayHandshake(initiatorToRelay, relay, destination),
+      handleRelayHandshake(relayToDestination, relay)
     ])
 
     assert(initiatorResult.success && destinationResult.success)

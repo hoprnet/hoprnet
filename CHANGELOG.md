@@ -2,18 +2,23 @@
 
 <a name="1.91"></a>
 
+## [1.91](https://github.com/hoprnet/hoprnet/compare/release/valencia...hoprnet:release/bogota)
+
 - Include HOPR Staking Season 5 smart contracts ([#4221](https://github.com/hoprnet/hoprnet/pull/4221))
 - Various optimizations of Rust crates ([#4221](https://github.com/hoprnet/hoprnet/pull/4260))
 - Add Metrics API for Prometheus, `metrics` API endpoint and collection of various metrics ([#4233](https://github.com/hoprnet/hoprnet/pull/4233))
 - Improve pre-merge check to prevent PR from merging when the upstream deployment is in the failed state ([#4294](https://github.com/hoprnet/hoprnet/pull/4294))
+- Restore STUN functionality ([#4312](https://github.com/hoprnet/hoprnet/pull/4312))
+- Add Health Status Indicator in the Admin UI ([#4197](https://github.com/hoprnet/hoprnet/pull/4197))
+- Allow connectivity indicator to be GREEN on public nodes too ([#4314](https://github.com/hoprnet/hoprnet/pull/4314))
+- Show correct counterparty in the `channels` command output ([#4370](https://github.com/hoprnet/hoprnet/pull/4370))
 
 ---
 
 <a name="1.90"></a>
 
-## [1.90](https://github.com/hoprnet/hoprnet/compare/release/paleochora...hoprnet:release/Valencia)
+## [1.90](https://github.com/hoprnet/hoprnet/compare/release/paleochora...hoprnet:release/valencia)
 
-- Add Health Status Indicator in the Admin UI ([#4197](https://github.com/hoprnet/hoprnet/pull/4197))
 - Improve Network Registry smart contract to allow 1-to-many node registration, add enable/disable make targets ([#4008](https://github.com/hoprnet/hoprnet/pull/4091))
 - Replace `yarn` with `npx` in `pluto` Docker image to run `hoprd` to fix binary discoverability issue
 - Add support for communication between different releases within the same environment
@@ -31,6 +36,13 @@
 - Reuse existing connections to connections to entry nodes ([#4250](https://github.com/hoprnet/hoprnet/pull/4250))
 - Remove recurring DHT ping queue cleanup and turn all public relay nodes into DHT servers ([#4247](https://github.com/hoprnet/hoprnet/pull/4247))
 - Various enhancements regarding memory consumption and overall efficiency, spread over multiple PRs
+- Remove obsolete stream compatibility layer ([#4276](https://github.com/hoprnet/hoprnet/pull/4276))
+- Allow `info` command before node startup has finished ([#4273](https://github.com/hoprnet/hoprnet/pull/4273))
+- Turn libp2p dual DHT into single DHT by forking DHT package in order to avoid a memory leak https://github.com/hoprnet/hoprnet/pull/4288
+- Turn db operations into `zero-copy` operations ([#4293](https://github.com/hoprnet/hoprnet/pull/4293))
+- Close existing connections once there is new one ([#4281](https://github.com/hoprnet/hoprnet/pull/4281))
+- Properly remove closed connections from libp2p's `ConnectionManager`([#4281](https://github.com/hoprnet/hoprnet/pull/4281))
+- Reimplement stream handling `class`es with `function`s in `connect` package for better performance ([#4285](https://github.com/hoprnet/hoprnet/pull/4285))
 
 ---
 

@@ -274,6 +274,11 @@ class Hopr extends EventEmitter {
     await this.connector.start()
     verbose('Started HoprEthereum. Waiting for indexer to find connected nodes.')
 
+    // Add us as public node if announced
+    if (this.options.announce) {
+      this.knownPublicNodesCache.add(this.id.toString())
+    }
+
     // Fetch previous announcements from database
     const initialNodes = await this.connector.waitForPublicNodes()
 
@@ -357,6 +362,7 @@ class Hopr extends EventEmitter {
     peers.forEach((peer) => log(`peer store: loaded peer ${peer.id.toString()}`))
 
     this.heartbeat = new Heartbeat(
+      this.id,
       this.networkPeers,
       subscribe,
       sendMessage,
@@ -772,6 +778,10 @@ class Hopr extends EventEmitter {
    * List the addresses on which the node is listening
    */
   public getListeningAddresses(): Multiaddr[] {
+    if (this.status !== 'RUNNING') {
+      // Not listening to any address unless `hopr` is running
+      return []
+    }
     // @TODO find a better way to do this
     // @ts-ignore undocumented method
     return this.libp2pComponents.getAddressManager().getListenAddrs()

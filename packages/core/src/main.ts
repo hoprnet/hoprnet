@@ -117,6 +117,7 @@ export async function createLibp2pInstance(
       ],
       streamMuxers: [new Mplex()],
       connectionEncryption: [new Noise()],
+      // @ts-ignore forked DHT
       dht: new KadDHT({
         // Protocol prefixes require a trailing slash
         // @TODO disabled for compatibility reasons
@@ -125,8 +126,12 @@ export async function createLibp2pInstance(
         // Make entry nodes Kad-DHT servers
         // A network requires at least on Kad-DHT server otherwise nodes
         // will flood each other forever with Kad-DHT ping attempts
-        clientMode: !options.announce
+        clientMode: !options.announce,
         // Limit size of ping queue by using smaller timeouts
+        pingTimeout: 2e3,
+        // Only for e2e testing, use DHT `lan` mode to accept connections
+        // to nodes on the same machine
+        lan: options.testing?.announceLocalAddresses ?? false
       }),
       connectionManager: {
         autoDial: true,

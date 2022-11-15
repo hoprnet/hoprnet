@@ -1,4 +1,4 @@
-import type { Connection } from '@libp2p/interface-connection'
+import type { Connection, MultiaddrConnection } from '@libp2p/interface-connection'
 import type { Listener as InterfaceListener, ListenerEvents } from '@libp2p/interface-transport'
 import { EventEmitter, CustomEvent } from '@libp2p/interfaces/events'
 
@@ -12,6 +12,8 @@ import {
 } from 'net'
 import { createSocket, type RemoteInfo, type Socket as UDPSocket } from 'dgram'
 import { once } from 'events'
+import { lookup } from 'dns'
+import { isIPv6 } from 'net'
 
 import Debug from 'debug'
 import { peerIdFromBytes } from '@libp2p/peer-id'
@@ -28,9 +30,9 @@ import {
 } from '../types.js'
 import { handleStunRequest, getExternalIp } from './stun.js'
 import { getAddrs } from './addrs.js'
-import { TCPConnection } from './tcp.js'
+import { fromSocket } from './tcp.js'
 import { RELAY_CHANGED_EVENT } from './entry.js'
-import { bindToPort, attemptClose, nodeToMultiaddr } from '../utils/index.js'
+import { bindToPort, attemptClose, nodeToMultiaddr, cleanExistingConnections } from '../utils/index.js'
 
 import type { Components } from '@libp2p/interfaces/components'
 import type { ConnectComponents } from '../components.js'
@@ -85,13 +87,27 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
 
     this.tcpSocket = createServer()
     this.udpSocket = createSocket({
-      // @TODO
-      // `udp6` does not seem to work in Node 12.x
-      // can receive IPv6 packet and IPv4 after reconnecting the socket
-      type: 'udp4',
-      // set to true to reuse port that is bound
-      // to TCP socket
-      reuseAddr: true
+      // `udp4` seems to have binding issues
+      type: 'udp6',
+      // set to true to use same port for TCP and UDP
+      reuseAddr: true,
+      // We use IPv4 traffic on udp6 sockets, so DNS queries
+      // must return the A record (IPv4) not the AAAA record (IPv6)
+      // - unless we explicitly check for a IPv6 address
+      lookup: (...requestArgs: any[]) => {
+        if (isIPv6(requestArgs[0])) {
+          // @ts-ignore
+          return lookup(...requestArgs)
+        }
+        return lookup(requestArgs[0], 4, (...responseArgs: any[]) => {
+          const callback = requestArgs.length == 3 ? requestArgs[2] : requestArgs[1]
+          // Error | null
+          if (responseArgs[0] != null) {
+            return callback(responseArgs[0])
+          }
+          callback(responseArgs[0], `::ffff:${responseArgs[1]}`, responseArgs[2])
+        })
+      }
     })
 
     this.state = ListenerState.UNINITIALIZED
@@ -195,11 +211,8 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       // bind the UDP socket and bind to same port
       await this.listenTCP().then((tcpPort) => this.listenUDP(tcpPort))
     } else {
-      await Promise.all([
-        // prettier-ignore
-        this.listenTCP(options),
-        this.listenUDP(options.port)
-      ])
+      await this.listenTCP(options)
+      await this.listenUDP(options.port)
     }
   }
 
@@ -400,7 +413,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
 
     return () => {
       verbose(`currently tracking ${this.__connections.length} connections --`)
-      let index = this.__connections.findIndex((c: Connection) => c === maConn)
+      let index = this.__connections.findIndex((c: Connection) => c.id === maConn.id)
 
       if (index < 0) {
         // connection not found
@@ -424,10 +437,19 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     // Avoid uncaught errors caused by unstable connections
     socket.on('error', (err) => error('socket error', err))
 
-    let maConn: TCPConnection | undefined
+    let maConn: MultiaddrConnection | undefined
+    let conn: Connection | undefined
 
     try {
-      maConn = TCPConnection.fromSocket(socket)
+      maConn = fromSocket(socket, () => {
+        if (conn) {
+          this.components.getUpgrader().dispatchEvent(
+            new CustomEvent(`connectionEnd`, {
+              detail: conn
+            })
+          )
+        }
+      }) as any
     } catch (err: any) {
       error(`inbound connection failed. ${err.message}`)
     }
@@ -439,7 +461,6 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
 
     log('new inbound connection %s', maConn.remoteAddr)
 
-    let conn: Connection
     try {
       conn = await this.components.getUpgrader().upgradeInbound(maConn)
     } catch (err: any) {
@@ -464,6 +485,8 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
 
       return
     }
+
+    cleanExistingConnections(this.components, conn.remotePeer, conn.id, error)
 
     if (conn.tags) {
       conn.tags.push(PeerConnectionType.DIRECT)

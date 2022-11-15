@@ -29,7 +29,8 @@ export function setupPromiseRejectionFilter() {
         // Requires changes in libp2p, tbd in upstream PRs to libp2p
         msgString.match(/The operation was aborted/) ||
         // issues with WebRTC socket and `stream-to-it`
-        msgString.match(/ERR_DATA_CHANNEL/)
+        msgString.match(/ERR_DATA_CHANNEL/) ||
+        msgString.match(/ERR_ICE_CONNECTION_FAILURE/)
       ) {
         console.error('Unhandled promise rejection silenced')
         metric_countSuppresedRejections.increment()

@@ -4,7 +4,8 @@ import http from 'http'
 import fs from 'fs'
 import path from 'path'
 import { parse } from 'url'
-import { default as next } from 'next'
+import next from 'next'
+
 import type { Server as HttpServer } from 'http'
 import type { LogStream } from './logs.js'
 import { NODE_ENV } from './env.js'
@@ -28,7 +29,7 @@ const MIN_NATIVE_BALANCE = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormatt
  * Server that hosts hopr-admin website
  */
 export class AdminServer {
-  private app: ReturnType<typeof next>
+  private app: ReturnType<typeof next.default>
   public server: HttpServer | undefined
   private node: Hopr | undefined
 
@@ -65,7 +66,7 @@ export class AdminServer {
         }
       }
 
-      this.app = next(nextConfig)
+      this.app = next.default(nextConfig)
       const handle = this.app.getRequestHandler()
       await this.app.prepare()
 
@@ -127,10 +128,6 @@ export class AdminServer {
     // Setup some noise
     startConnectionReports(this.node, this.logs)
     startResourceUsageLogger(debugLog)
-
-    if (process.env.NODE_ENV === 'production') {
-      showDisclaimer(this.logs)
-    }
   }
 
   public onConnection(socket: WebSocket) {
@@ -145,15 +142,6 @@ export class AdminServer {
     })
     this.logs.subscribe(socket)
   }
-}
-
-const DISCLAIMER = `-- This software is still under development --\n\tFor testing, this node requires ${MIN_NATIVE_BALANCE}, and at least ${MIN_BALANCE} \n\tHowever, do NOT add assets to the node that you can't lose!`
-
-export function showDisclaimer(logs: LogStream) {
-  logs.warn(DISCLAIMER)
-  setInterval(() => {
-    logs.warn(DISCLAIMER)
-  }, 60 * 1000)
 }
 
 export async function startConnectionReports(node: Hopr, logs: LogStream) {

@@ -23,20 +23,20 @@ You can run a HOPR cluster locally or use [Playground](https://playground.hoprne
 ## Use the latest release
 
 Due to the rapid development done on the project, you might be better off using a stable
-release. The latest stable release known at the time of writing is [`Valencia`](https://github.com/hoprnet/hoprnet/archive/refs/heads/release/valencia.zip).
+release. The latest stable release known at the time of writing is [`bogota`](https://github.com/hoprnet/hoprnet/archive/refs/heads/release/bogota.zip).
 
 ## Local Setup
 
 Running a local setup will give you a similar setup to the one the HOPR team works with on a daily basis. After all dependencies are installed,
 this configuration will allow you to develop HOPR apps offline.
 
-1. **Download the latest version of the repository**: Download a local version of our [GitHub repository monorepo](https://github.com/hoprnet/hoprnet/tree/release/valencia)
-   with the latest release (`valencia` at the time of writing) and unzip it in your local folder (roughly `~30 Mb` at the time of writing). For the next tasks, we will assume you are within that folder.
+1. **Download the latest version of the repository**: Download a local version of our [GitHub repository monorepo](https://github.com/hoprnet/hoprnet/tree/release/bogota)
+   with the latest release (`bogota` at the time of writing) and unzip it in your local folder (roughly `~30 Mb` at the time of writing). For the next tasks, we will assume you are within that folder.
 
 ```bash
-wget https://github.com/hoprnet/hoprnet/archive/refs/heads/release/valencia.zip
-unzip valencia.zip
-cd hoprnet-release-valencia
+wget https://github.com/hoprnet/hoprnet/archive/refs/heads/release/bogota.zip
+unzip bogota.zip
+cd hoprnet-release-bogota
 ```
 
 2. **Install the dependencies of the project and build it**:
@@ -46,7 +46,7 @@ In order to install and build the required packages and project modules, make su
 - `nodejs@16` (we suggest installing it via [nvm](https://github.com/nvm-sh/nvm), i.e., `nvm install lts/gallium`), and `yarn` (included in `nodejs@16` by running `corepack enable`)
 - [Rust toolchain](https://www.rust-lang.org/tools/install) (at least 1.60)
 
-Ideally you will also have basic development toolsets[^2] set up on your computer. If you have installed the above, run the following command. Please bear in mind that this process will take at least 5-10 minutes depending on your computer.
+Ideally you will also have basic development toolsets[^1] set up on your computer. If you have installed the above, run the following command. Please bear in mind that this process will take at least 5-10 minutes depending on your computer.
 
 ```bash
 make deps build
@@ -86,9 +86,11 @@ Alternatively, you can copy and paste these URLs and `export` them to your termi
 export apiToken=^^LOCAL-testing-123^^ HOPR_NODE_1_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_1_WS_URL=ws://127.0.0.1:19501 HOPR_NODE_2_HTTP_URL=http://127.0.0.1:13302 HOPR_NODE_2_WS_URL=ws://127.0.0.1:19502 HOPR_NODE_3_HTTP_URL=http://127.0.0.1:13303 HOPR_NODE_3_WS_URL=ws://127.0.0.1:19503 HOPR_NODE_4_HTTP_URL=http://127.0.0.1:13304 HOPR_NODE_4_WS_URL=ws://127.0.0.1:19504 HOPR_NODE_5_HTTP_URL=http://127.0.0.1:13305 HOPR_NODE_5_WS_URL=ws://127.0.0.1:19505
 ```
 
-[^1]:
-    The demo application [MyneChat](https://github.com/hoprnet/myne-chat) uses a
-    [mock server](https://github.com/hoprnet/myne-chat/blob/cf6501b2ffa24502834f567ab575630e302e3d34/mocks/index.js#L47-L79)
-    to simplify its development workflow. However, to fully experience the extent of its features, you will need either a local or public HOPR cluster.
+## Playground
 
-[^2]: If you have installed and built another `node.js` application from your computer in the past, you likely will not need to do anything else. However, in the case your are only starting to develop in `node.js`, there's a high chance you might need to install a few extra tools. For instance, in `Linux`-based OS, you will likely also need to install `build-essentials` (e.g. in Ubuntu do `apt-get install build-essentials`), whereas in `macOS` you need Xcode developer tools, installable via `xcode-select --install`.
+Instead of setting up a cluster locally, you can launch a cluster without any installations at [playground.hoprnet.org](https://playground.hoprnet.org/)
+
+Clusters launched through Playground are fully interconnected and prefunded similar to the described local setup.
+But will only run for 20 minutes at a time before closing. This is a good alternative for testing and devloping dApps. Simply use the nodes API URL and key when connecting to a node.
+
+[^1]: If you have installed and built another `node.js` application from your computer in the past, you likely will not need to do anything else. However, in the case your are only starting to develop in `node.js`, there's a high chance you might need to install a few extra tools. For instance, in `Linux`-based OS, you will likely also need to install `build-essentials` (e.g. in Ubuntu do `apt-get install build-essentials`), whereas in `macOS` you need Xcode developer tools, installable via `xcode-select --install`.
