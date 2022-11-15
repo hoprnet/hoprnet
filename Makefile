@@ -36,7 +36,7 @@ deps: ## install dependencies
 
 .PHONY: cargo-update
 cargo-update: ## update vendored Cargo dependencies
-	$(cargo) vendor --versioned-dirs --frozen vendor/cargo
+	$(cargo) vendor --versioned-dirs vendor/cargo
 
 .PHONY: build
 build: ## build all packages
