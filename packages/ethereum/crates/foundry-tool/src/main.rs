@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand};
 use std::path::{Path};
+use std::fs;
 
 #[derive(Parser, Default, Debug)]
 #[command(name = "Contract Deployment Helper")]
@@ -24,6 +25,22 @@ enum Commands {
     Files {
         #[arg(short, long)]
         list: bool,
+    },
+    Faucet {
+        #[arg(short = 'a', long)]
+        address: Option<String>,
+        #[arg(short, long)]
+        password: String,
+        #[arg(short, long)]
+        use_local_identities: bool,
+        #[arg(short = 'm', long)]
+        amount: String,
+        #[arg(short = 'd', long)]
+        identity_directory: Option<String>,
+        #[arg(short = 'x', long)]
+        identity_prefix: Option<String>,
+        #[arg(short, long)]
+        token_type: String, // 'hopr' | 'native'
     }
 }
 
@@ -34,7 +51,23 @@ fn main() {
         Some(Commands::Files { list }) => {
             let new_p = buildPath(&cli.environment_name, &cli.environment_type);
             println!("check if path {} is created", new_p);
-        }
+        },
+        Some(Commands::Faucet { address, password, use_local_identities, amount, identity_directory, identity_prefix, token_type }) => {
+            // Check if local identity files should be used. Push all the read identities.
+            let file_names;
+            if use_local_identities {
+                // read all the files from the directory
+                match identity_directory {
+                    None => println!("identity_directory must be provided"),
+                    Some(identity_directory) => {
+                        file_names = fs::read_dir(Path::new(&identity_directory)).unwrap();
+                        for path in file_names {
+                            println!("Name: {}", path.unwrap().path().display())
+                        }
+                    }
+                }
+            }
+        },
         None => {}
     }
 }
