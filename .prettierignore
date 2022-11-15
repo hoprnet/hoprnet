@@ -40,3 +40,6 @@ target/
 
 # Yarn - conflict with yarn builtin linter
 .yarnrc.yaml
+
+# do not lint vendored source files
+vendor/
