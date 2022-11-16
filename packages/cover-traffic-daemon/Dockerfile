@@ -20,14 +20,14 @@ RUN CI=true make deps package=hopr-cover-traffic-daemon && \
     # Remove all typescript files 
     find ./packages -type f -name '*.ts' -delete && \
     # No need for these packages
-    rm -R packages/avado packages/horpd && \
+    rm -R ./packages/avado ./packages/horpd && \
     # Everything that we don't need in ethereum package
-    rm -R packages/ethereum/contracts packages/ethereum/deploy packages/ethereum/hardhat packages/ethereum/tasks packages/ethereum/test && \
+    rm -R ./packages/ethereum/contracts ./packages/ethereum/deploy ./packages/ethereum/hardhat ./packages/ethereum/tasks ./packages/ethereum/test && \
     # Remove node_modules as they include devDependencies
     rm -R node_modules && \
     # As we are on *nix, use hardlinks in node_modules to save some space
     yarn config set nmMode hardlinks-local && \
-    # Install without devDependencies and release build of wrtc
+    # Install without devDependencies and us release build of wrtc
     DEBUG= CI=true NO_CARGO=true PRODUCTION=true make deps package=hopr-cover-traffic-daemon
 
 # Alpine 3.16 x86_64
@@ -37,10 +37,10 @@ WORKDIR /app/hoprnet
 
 RUN mkdir -p scripts/toolchain
 
-COPY .nvmrc package.json .
+COPY .nvmrc package.json ./
 COPY scripts/toolchain/install-toolchain.sh ./scripts/toolchain
 
-RUN apk add --no-cache tini libc6-compat bash curl tar jq xz && \
+RUN apk add --no-cache tini libc6-compat bash curl tar jq xz libstdc++ && \
     # Install Node.js
     ./scripts/toolchain/install-toolchain.sh --runtime-only && \
     # Remove unused tools

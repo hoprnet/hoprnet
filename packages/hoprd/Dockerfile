@@ -52,10 +52,10 @@ WORKDIR /app/hoprnet
 
 RUN mkdir -p scripts/toolchain
 
-COPY .nvmrc package.json .
+COPY .nvmrc package.json ./
 COPY scripts/toolchain/install-toolchain.sh ./scripts/toolchain
 
-RUN apk add --no-cache tini libc6-compat bash curl tar jq xz && \
+RUN apk add --no-cache tini libc6-compat bash curl tar jq xz libstdc++ && \
     # Install Node.js
     ./scripts/toolchain/install-toolchain.sh --runtime-only && \
     # Remove unused tools
@@ -87,4 +87,4 @@ WORKDIR /app/hoprnet/packages/hoprd
 # finally set the non-root user so the process also run un-privilidged
 # USER node
 
-ENTRYPOINT ["/sbin/tini", "--", "node", "./lib/main.js"]
+ENTRYPOINT ["/sbin/tini", "--", "node", "./lib/main.cjs"]

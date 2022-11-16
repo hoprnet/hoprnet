@@ -41,7 +41,7 @@ COPY scripts/toolchain/install-toolchain.sh ./scripts/toolchain
 
 WORKDIR /app/hardhat
 
-RUN apk add --no-cache tini libc6-compat bash curl tar jq xz && \
+RUN apk add --no-cache tini libc6-compat bash curl tar jq xz libstdc++ && \
     # Install Node.js
     ./scripts/toolchain/install-toolchain.sh --runtime-only && \
     # Remove unused tools
