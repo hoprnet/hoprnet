@@ -22,5 +22,5 @@ console_error_panic_hook = { version = "0.1.6", optional = true }
 [dev-dependencies]
 wasm-bindgen-test = "0.3.30"
 
-[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+[target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 wasm-pack = { workspace = true }
