@@ -31,7 +31,7 @@ deps: ## install dependencies
 	command -v rustup && rustup update || echo "No rustup installed, ignoring"
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	$(MAKE) cargo-update
-	command -v wasm-pack || $(cargo) install wasm-pack
+	command -v wasm-pack || $(cargo) install --frozen --offline wasm-pack
 	yarn
 
 .PHONY: cargo-update
@@ -109,7 +109,7 @@ ifeq ($(package),)
 	yarn workspaces foreach -pv run test
 else
 # Prebuild Rust unit tests
-	$(cargo) build --tests
+	$(cargo) --frozen --offline build --tests
 	yarn workspace @hoprnet/${package} run test
 endif
 

@@ -17,5 +17,7 @@ wasm-bindgen = "0.2.83"
 wasm-bindgen-test = "0.3.30"
 
 [dev-dependencies]
-wasm-pack = { workspace = true }
 wasm-bindgen-test = "0.3.30"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+wasm-pack = { workspace = true }
