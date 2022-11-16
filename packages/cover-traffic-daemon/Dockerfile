@@ -7,7 +7,7 @@ FROM ${HOPR_TOOLCHAIN_IMAGE} as build
 WORKDIR /app/hoprnet
 
 COPY .yarn .yarn
-COPY Makefile Cargo.toml Cargo.lock yarn.lock tsconfig.build.json tsconfig.json tsconfig.scripts.json yarn.lock rust-toolchain.toml ./
+COPY Makefile Cargo.toml Cargo.lock yarn.lock .yarnrc.yml package.json tsconfig.build.json tsconfig.json tsconfig.scripts.json yarn.lock rust-toolchain.toml ./
 COPY packages/ ./packages
 
 LABEL description="Launches a cover-traffic node which keeps sending cover-traffic through the hopr network"

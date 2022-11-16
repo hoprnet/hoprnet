@@ -12,11 +12,11 @@ declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
 # Installs all toolchain utilities that are required to build hoprnet monorepo, including
-# - Node.js
-# - Yarn
-# - Typescript + related utilities, such as ts-node
-# - Rust (rustc, cargo)
-# - wasm-pack + wasm-opt, necessary to build WebAssembly modules
+# - Node.js -> /usr/local/bin
+# - Yarn -> /usr/local/bin + /opt/yarn-v${version}
+# - Typescript + related utilities, such as ts-node -> ${mydir}/node_modules
+# - Rust (rustc, cargo) -> $HOME/.cargo/bin
+# - wasm-pack + wasm-opt, necessary to build WebAssembly modules -> $HOME/.cargo/bin
 # 
 # Currently tested for x86_64 and Alpine Linux based environments
 

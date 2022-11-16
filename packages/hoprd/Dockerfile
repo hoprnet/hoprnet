@@ -8,7 +8,7 @@ WORKDIR /app/hoprnet
 
 COPY .yarn .yarn
 COPY packages/ ./packages
-COPY Makefile Cargo.toml Cargo.lock yarn.lock tsconfig.build.json tsconfig.json tsconfig.scripts.json yarn.lock rust-toolchain.toml ./
+COPY Makefile Cargo.toml Cargo.lock .yarnrc.yml yarn.lock package.json tsconfig.build.json tsconfig.json tsconfig.scripts.json yarn.lock rust-toolchain.toml ./
 
 LABEL description="Launches a hoprd node"
 
