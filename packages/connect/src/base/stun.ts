@@ -4,7 +4,7 @@ import { decode, constants, createMessage, createTransaction, validateFingerprin
 // @ts-ignore untyped module
 import isStun from 'is-stun'
 
-import type { Socket, RemoteInfo } from 'dgram'
+import { Socket, RemoteInfo, createSocket } from 'dgram'
 import { Multiaddr } from '@multiformats/multiaddr'
 import debug from 'debug'
 import {
@@ -13,9 +13,12 @@ import {
   isLocalhost,
   isPrivateAddress,
   u8aAddrToString,
-  u8aToNumber
+  u8aToNumber,
+  u8aToHex
 } from '@hoprnet/hopr-utils'
 import { CODE_IP4, CODE_IP6, CODE_DNS4, CODE_DNS6 } from '../constants.js'
+import { lookup } from 'dns'
+import { isIPv6 } from 'net'
 // @ts-ignore untyped module
 import retimer from 'retimer'
 
@@ -75,13 +78,13 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
     return
   }
 
-  const stunMessage = decode(data)
+  const request = decode(data)
 
-  switch (stunMessage.type & kStunTypeMask) {
+  switch (request.type & kStunTypeMask) {
     case isStunRequest:
-      const message = createMessage(constants.STUN_BINDING_RESPONSE, stunMessage.transactionId)
+      const response = createMessage(constants.STUN_BINDING_RESPONSE, request.transactionId)
 
-      verbose(`Received ${stunMessage.isLegacy() ? 'legacy ' : ''}STUN request from ${rinfo.address}:${rinfo.port}`)
+      verbose(`Received ${request.isLegacy() ? 'legacy ' : ''}STUN request from ${rinfo.address}:${rinfo.port}`)
 
       let addrInfo = rinfo
       if (__fakeRInfo) {
@@ -104,19 +107,30 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
       }
 
       // To be compliant with RFC 3489
-      if (stunMessage.isLegacy()) {
+      if (request.isLegacy()) {
         // Copy magic STUN cookie as specified by RFC 5389
-        message[Symbol.for('kCookie')] = stunMessage[Symbol.for('kCookie')]
-        message.addAttribute(constants.STUN_ATTR_MAPPED_ADDRESS, addrInfo.address, addrInfo.port)
-        socket.send(message.toBuffer(), rinfo.port, replyAddress)
+        response[Symbol.for('kCookie')] = request[Symbol.for('kCookie')]
+        response.addAttribute(constants.STUN_ATTR_MAPPED_ADDRESS, addrInfo.address, addrInfo.port)
+        socket.send(response.toBuffer(), rinfo.port, replyAddress)
         return
       }
 
-      // Comply with RFC 5780
-      message.addAttribute(constants.STUN_ATTR_XOR_MAPPED_ADDRESS, addrInfo.address, addrInfo.port)
-      message.addFingerprint()
+      let replyPort = addrInfo.port
 
-      socket.send(message.toBuffer(), rinfo.port, replyAddress)
+      // RESPONSE_PORT can be 0
+      const responsePort = request.getAttribute(constants.STUN_ATTR_RESPONSE_PORT)
+      if (responsePort != undefined) {
+        replyPort = responsePort.value
+      }
+
+      // Comply with RFC 5780
+      response.addAttribute(constants.STUN_ATTR_MAPPED_ADDRESS, addrInfo.address, addrInfo.port)
+      response.addAttribute(constants.STUN_ATTR_XOR_MAPPED_ADDRESS, addrInfo.address, addrInfo.port)
+
+      // Allows multiplexing STUN protocol with other protocols
+      response.addFingerprint()
+
+      socket.send(response.toBuffer(), replyPort, replyAddress)
 
       break
     default:
@@ -126,18 +140,14 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
 
 export type Request = {
   multiaddr: Multiaddr
-  tId: Buffer
+  responsePort?: number
   response?: Interface
+  timeout: any
 }
 
-type RequestWithResponse = Required<Request>
+type Requests = Map<string, Request>
 
-function isRequestWithResponse(request: Request): request is RequestWithResponse {
-  if (request.response == undefined) {
-    return false
-  }
-  return true
-}
+type RequestWithResponse = { response: Interface }
 
 /**
  * Takes a list of STUN servers and tries them one-by-one
@@ -163,6 +173,7 @@ export async function iterateThroughStunServers(
     selectedStunServers = multiaddrs
   }
 
+  // @ts-ignore
   let responses: RequestWithResponse[] = await performSTUNRequests(
     selectedStunServers,
     socket,
@@ -184,7 +195,7 @@ export async function iterateThroughStunServers(
 
       selectedStunServers = randomSubset(multiaddrs, toFetch, (ma: Multiaddr) => !usedStunServers.has(ma.toString()))
 
-      responses.push(...(await performSTUNRequests(selectedStunServers, socket, STUN_TIMEOUT, runningLocally)))
+      // responses.push(...(await performSTUNRequests(selectedStunServers, socket, STUN_TIMEOUT, runningLocally)))
 
       if (selectedStunServers.length < toFetch) {
         break
@@ -194,155 +205,401 @@ export async function iterateThroughStunServers(
 
   return responses
 }
+
+enum STUN_ALIVE_STATE {
+  SEARCHING_STUN_SERVER,
+  SEARCHING_RFC_5780_STUN_SERVER,
+  CHECKING_PORT_MAPPING
+}
+
+export function isBindingAlive(
+  multiaddrs: Iterable<Multiaddr>,
+  socket: Socket,
+  timeout = STUN_TIMEOUT,
+  stunPort = socket.address().port,
+  runningLocally = false
+): Promise<boolean> {
+  if (runningLocally) {
+    return Promise.resolve(true)
+  }
+
+  return new Promise<boolean>(async (resolve, reject) => {
+    const requests = new Map<string, Request & { state: STUN_ALIVE_STATE }>()
+
+    const secondarySocket = createSocket({
+      type: 'udp6',
+      lookup: (...requestArgs: any[]) => {
+        if (isIPv6(requestArgs[0])) {
+          // @ts-ignore
+          return lookup(...requestArgs)
+        }
+        return lookup(requestArgs[0], 4, (...responseArgs: any[]) => {
+          const callback = requestArgs.length == 3 ? requestArgs[2] : requestArgs[1]
+          // Error | null
+          if (responseArgs[0] != null) {
+            return callback(responseArgs[0])
+          }
+          callback(responseArgs[0], `::ffff:${responseArgs[1]}`, responseArgs[2])
+        })
+      }
+    })
+
+    const secondaryInterface = await performSTUNRequests(multiaddrs, secondarySocket, timeout, runningLocally)
+
+    if (secondaryInterface == undefined) {
+      // Endpoint-dependent mapping, most likely bidirectional NAT
+      resolve(false)
+      return
+    }
+
+    let stopListening: () => void
+    let stopListeningSecondary: () => void
+
+    const end = () => {
+      log(`ending`)
+      stopListening()
+      stopListeningSecondary()
+      secondarySocket.close()
+    }
+
+    const it = multiaddrs[Symbol.iterator]()
+
+    const onTimeoutSecondary = (transactionId: Buffer) => {
+      console.log(`onTimeout secondary`, u8aToHex(transactionId))
+      requests.delete(u8aToHex(transactionId))
+
+      nextSTUNRequest(
+        it,
+        requests,
+        timeout,
+        secondarySocket,
+        secondaryInterface.port,
+        onTimeoutSecondary,
+        onError,
+        STUN_ALIVE_STATE.SEARCHING_RFC_5780_STUN_SERVER
+      )
+    }
+
+    const onTimeoutPrimary = (transactionId: Buffer) => {
+      console.log(`onTimeout primary`, u8aToHex(transactionId))
+
+      const tIdString = u8aToHex(transactionId)
+      const request = requests.get(tIdString)
+
+      if (request == undefined) {
+        verbose(`Received unexpected STUN response from. Dropping response`)
+        return
+      }
+
+      log(`onTimeout primary`, tIdString)
+
+      end()
+      resolve(false)
+      return
+    }
+
+    const updateSecondary = (response: { response: Interface; transactionId: Buffer }) => {
+      const tIdString = u8aToHex(response.transactionId)
+      const request = requests.get(tIdString)
+
+      if (request == undefined) {
+        verbose(
+          `Received unexpected STUN response from ${response.response.address}:${response.response.port}. Dropping response`
+        )
+        return
+      }
+
+      log(`update secondary`, request.state, tIdString)
+
+      request.timeout.clear()
+
+      requests.delete(tIdString)
+
+      switch (request.state) {
+        case STUN_ALIVE_STATE.SEARCHING_RFC_5780_STUN_SERVER:
+          nextSTUNRequest(
+            [request.multiaddr][Symbol.iterator](),
+            requests,
+            timeout,
+            secondarySocket,
+            stunPort,
+            onTimeoutPrimary,
+            () => {},
+            STUN_ALIVE_STATE.CHECKING_PORT_MAPPING
+          )
+          break
+        case STUN_ALIVE_STATE.CHECKING_PORT_MAPPING:
+          // STUN server does not understand RESPONSE_PORT extension
+          log(`not useful, move to next`)
+          nextSTUNRequest(
+            it,
+            requests,
+            timeout,
+            secondarySocket,
+            secondaryInterface.port,
+            onTimeoutSecondary,
+            () => {},
+            STUN_ALIVE_STATE.SEARCHING_RFC_5780_STUN_SERVER
+          )
+          break
+      }
+    }
+
+    const updatePrimary = (response: { response: Interface; transactionId: Buffer }) => {
+      const tIdString = u8aToHex(response.transactionId)
+      const request = requests.get(tIdString)
+
+      if (request == undefined) {
+        verbose(
+          `Received unexpected STUN response from ${response.response.address}:${response.response.port}. Dropping response`
+        )
+        return
+      }
+
+      log(`Update primary`, request.state, tIdString)
+
+      request.timeout.clear()
+      requests.delete(tIdString)
+
+      switch (request.state) {
+        case STUN_ALIVE_STATE.CHECKING_PORT_MAPPING:
+          end()
+          resolve(true)
+          break
+        default:
+          // Unexpected request, trying another STUN server
+          nextSTUNRequest(
+            it,
+            requests,
+            timeout,
+            secondarySocket,
+            secondaryInterface.port,
+            onTimeoutSecondary,
+            () => {},
+            STUN_ALIVE_STATE.CHECKING_PORT_MAPPING
+          )
+          break
+      }
+    }
+
+    stopListening = decodeIncomingSTUNResponses(socket, updatePrimary)
+    stopListeningSecondary = decodeIncomingSTUNResponses(secondarySocket, updateSecondary)
+
+    const onError = (err: any) => {
+      end()
+      reject(err)
+    }
+
+    log(`first measurement`)
+    nextSTUNRequest(
+      it,
+      requests,
+      timeout,
+      secondarySocket,
+      secondaryInterface.port,
+      onTimeoutSecondary,
+      onError,
+      STUN_ALIVE_STATE.SEARCHING_RFC_5780_STUN_SERVER
+    )
+  })
+}
+
+function sameEndpoint(first: Interface, second: Interface): boolean {
+  return first.address === second.address && first.port == second.port
+}
+
+function nextSTUNRequest(
+  it: Iterator<Multiaddr>,
+  requests: Map<string, Request & { state?: STUN_ALIVE_STATE }>,
+  timeout: number,
+  socket: Socket,
+  stunPort: number | undefined,
+  onTimeout: (tId: Buffer) => void,
+  onError: (err: any) => void,
+  state?: STUN_ALIVE_STATE
+) {
+  const chunk = it.next()
+
+  if (chunk.done) {
+    onError(Error(`Not enough STUN servers given to determine own public IP address`))
+    return
+  }
+
+  const nextSTUNServer = {
+    transactionId: createTransaction(),
+    multiaddr: chunk.value
+  }
+  requests.set(u8aToHex(nextSTUNServer.transactionId), {
+    multiaddr: nextSTUNServer.multiaddr,
+    timeout: retimer(onTimeout, timeout, nextSTUNServer.transactionId),
+    state
+  })
+  sendStunRequests(nextSTUNServer.multiaddr, nextSTUNServer.transactionId, stunPort, socket)
+
+  return nextSTUNServer.transactionId
+}
+
+function sameResponse(requests: Map<string, Request>, response: { response: Interface; transactionId: Buffer }) {
+  for (const [tid, storedRequest] of requests) {
+    if (tid === u8aToHex(response.transactionId)) {
+      continue
+    }
+
+    if (storedRequest.response != undefined) {
+      return sameEndpoint(response.response, storedRequest.response) ? storedRequest.response : undefined
+    }
+  }
+}
 /**
  * Performs STUN requests and returns their responses, if any
- * @param multiAddrs STUN servers to contact
+ * @param multiaddrs STUN servers to contact
  * @param socket socket to send requests and receive responses
  * @param timeout STUN timeout
  * @param runningLocally [optional] enable STUN local-mode
  * @returns the responses, if any
  */
-export async function performSTUNRequests(
-  multiAddrs: Multiaddr[],
+export function performSTUNRequests(
+  multiaddrs: Iterable<Multiaddr>,
   socket: Socket,
   timeout = STUN_TIMEOUT,
   runningLocally = false
-): Promise<RequestWithResponse[]> {
-  const requests: Request[] = []
-  for (const multiaddr of multiAddrs) {
-    requests.push({
-      multiaddr,
-      tId: createTransaction()
-    })
-  }
-  // Assign the event handler before sending the requests
-  const results = decodeIncomingSTUNResponses(requests, socket, timeout)
-  // Everything is set up, so we can dispatch the requests
-  sendStunRequests(requests, socket)
+): Promise<Interface | undefined> {
+  return new Promise<Interface | undefined>((resolve, reject) => {
+    let successfulResponses = 0
+    const requests: Requests = new Map<string, Request>()
 
-  const responses = await results
+    const it = multiaddrs[Symbol.iterator]()
 
-  return getUsableResults(responses ?? [], runningLocally)
+    let stopListening: () => void
+
+    let onTimeout = (transactionId: Buffer) => {
+      requests.delete(u8aToHex(transactionId))
+      nextSTUNRequest(it, requests, timeout, socket, undefined, onTimeout, onError)
+    }
+
+    const update = (response: { response: Interface; transactionId: Buffer }) => {
+      const tIdString = u8aToHex(response.transactionId)
+      const request = requests.get(tIdString)
+
+      if (request == undefined) {
+        verbose(
+          `Received unexpected STUN response from ${response.response.address}:${response.response.port}. Dropping response`
+        )
+        return
+      }
+
+      request.timeout.clear()
+
+      if (!isUsableResult(response.response, runningLocally)) {
+        requests.delete(tIdString)
+
+        nextSTUNRequest(it, requests, timeout, socket, undefined, onTimeout, onError)
+        return
+      }
+
+      request.response = response.response
+      requests.set(tIdString, request)
+
+      successfulResponses++
+      if (successfulResponses == 2) {
+        stopListening()
+        resolve(sameResponse(requests, response) != undefined ? response.response : undefined)
+        return
+      }
+    }
+
+    stopListening = decodeIncomingSTUNResponses(socket, update)
+
+    const onError = (err: any) => {
+      stopListening()
+      reject(err)
+    }
+
+    for (let i = 0; i < 2; i++) {
+      nextSTUNRequest(it, requests, timeout, socket, undefined, onTimeout, onError)
+    }
+  })
 }
 
 /**
- * Send requests to given STUN servers
- * @param addrs requests with addr and transaction id
- * @param socket the socket to send the STUN requests
- * @returns usable transaction IDs and the corresponding multiaddrs
+ * Encodes STUN message and sends them using the given socket
+ * to a STUN server.
+ * @param multiaddr address to contact
+ * @param tId
+ * @param socket socket to send the STUN requests
  */
-function sendStunRequests(addrs: Request[], socket: Socket): void {
-  for (const addr of addrs) {
-    if (![CODE_IP4, CODE_IP6, CODE_DNS4, CODE_DNS6].includes(addr.multiaddr.tuples()[0][0])) {
-      error(`Cannot contact STUN server ${addr.multiaddr.toString()} due to invalid address.`)
-      continue
-    }
+function sendStunRequests(multiaddr: Multiaddr, tId: Buffer, responsePort: number | undefined, socket: Socket): void {
+  const tuples = multiaddr.tuples()
 
-    const tuples = addr.multiaddr.tuples()
-
-    if (tuples.length == 0) {
-      throw Error(`Cannot perform STUN request: empty Multiaddr`)
-    }
-
-    let address: string
-
-    switch (tuples[0][0]) {
-      case CODE_DNS4:
-      case CODE_DNS6:
-        address = new TextDecoder().decode(tuples[0][1] as Uint8Array)
-        break
-      case CODE_IP6:
-        address = u8aAddrToString(tuples[0][1] as Uint8Array, 'IPv6')
-        break
-      case CODE_IP4:
-        address = `::ffff:${u8aAddrToString(tuples[0][1] as Uint8Array, 'IPv4')}`
-        break
-      default:
-        throw Error(`Invalid address: ${addr.multiaddr.toString()}`)
-    }
-
-    const port: number | undefined = tuples.length >= 2 ? u8aToNumber(tuples[1][1] as Uint8Array) : undefined
-
-    const message = createMessage(constants.STUN_BINDING_REQUEST, addr.tId)
-
-    message.addFingerprint()
-
-    socket.send(message.toBuffer(), port, address, (err?: any) => {
-      if (err) {
-        error(err.message)
-      } else {
-        verbose(`STUN request successfully sent to ${address}:${port}`)
-      }
-    })
+  if (tuples.length == 0) {
+    throw Error(`Cannot perform STUN request: empty Multiaddr`)
   }
+
+  let address: string
+
+  switch (tuples[0][0]) {
+    case CODE_DNS4:
+    case CODE_DNS6:
+      address = new TextDecoder().decode(tuples[0][1]?.slice(1) as Uint8Array)
+      break
+    case CODE_IP6:
+      address = u8aAddrToString(tuples[0][1] as Uint8Array, 'IPv6')
+      break
+    case CODE_IP4:
+      address = `::ffff:${u8aAddrToString(tuples[0][1] as Uint8Array, 'IPv4')}`
+      break
+    default:
+      throw Error(`Invalid address: ${multiaddr.toString()}`)
+  }
+
+  const port: number | undefined = tuples.length >= 2 ? u8aToNumber(tuples[1][1] as Uint8Array) : undefined
+
+  const message = createMessage(constants.STUN_BINDING_REQUEST, tId)
+
+  // Response port can be 0
+  if (responsePort != undefined) {
+    message.addAttribute(constants.STUN_ATTR_RESPONSE_PORT, responsePort)
+  }
+
+  // Allows multiplexing of STUN protocol with other protocols
+  // message.addFingerprint()
+
+  socket.send(message.toBuffer(), port, address, (err?: any) => {
+    if (err) {
+      error(err.message)
+    } else {
+      verbose(`STUN request successfully sent to ${address}:${port} Transaction: ${u8aToHex(tId)}`)
+    }
+  })
 }
 
-function decodeIncomingSTUNResponses(addrs: Request[], socket: Socket, ms: number = STUN_TIMEOUT): Promise<Request[]> {
-  return new Promise<Request[]>((resolve) => {
-    let responsesReceived = 0
-    let finished = false
-
-    const listener = (data: Buffer) => {
-      if (!isStun(data)) {
-        return
-      }
-
-      const response = decode(data)
-
-      // Don't check for STUN FINGERPRINT since external
-      // STUN servers might not support this feature
-
-      switch (response.type & kStunTypeMask) {
-        case isStunSuccessResponse:
-          for (const addr of addrs) {
-            if (Buffer.compare(addr.tId, response.transactionId) === 0) {
-              if (addr.response != undefined) {
-                continue
-              }
-
-              addr.response = response.getXorAddress() ?? response.getAddress()
-              // If we have filled an entry, increase response counter
-              if (addr.response != undefined) {
-                responsesReceived++
-              }
-              break
-            }
-          }
-
-          if (responsesReceived == addrs.length) {
-            log(`STUN success. ${responsesReceived} of ${addrs.length} servers replied.`)
-            done()
-          }
-          break
-        default:
-          break
-      }
+function decodeIncomingSTUNResponses(
+  socket: Socket,
+  update: (response: { response: Interface; transactionId: Buffer }) => void
+): () => void {
+  const listener = (data: Buffer) => {
+    if (!isStun(data)) {
+      return
     }
 
-    const done = () => {
-      if (finished) {
-        return
-      }
-      finished = true
+    const response = decode(data)
 
-      socket.removeListener('message', listener)
-      timer.clear()
-
-      resolve(addrs)
+    switch (response.type & kStunTypeMask) {
+      case isStunSuccessResponse:
+        update({
+          response: response.getXorAddress() ?? response.getAddress(),
+          transactionId: response.transactionId
+        })
+        break
+      default:
+        break
     }
+  }
 
-    const timer = retimer(() => {
-      log(
-        `STUN timeout. ${addrs.filter((addr) => addr.response).length} of ${
-          addrs.length
-        } selected STUN servers replied.`
-      )
-      done()
-    }, ms)
+  // Node.js sockets emit Buffers
+  socket.on('message', listener)
 
-    // Receiving a Buffer, not a Uint8Array
-    socket.on('message', listener)
-  })
+  return () => socket.removeListener('message', listener)
 }
 
 /**
@@ -351,37 +608,31 @@ function decodeIncomingSTUNResponses(addrs: Request[], socket: Socket, ms: numbe
  * @param runningLocally whether to run in local-mode or not
  * @returns filtered results
  */
-export function getUsableResults(responses: Request[], runningLocally = false): RequestWithResponse[] {
-  let filtered: RequestWithResponse[] = []
+export function isUsableResult(result: Interface, runningLocally = false): boolean {
+  switch (result.family) {
+    case 'IPv6':
+      // STUN over IPv6 is not yet supported
+      break
+    case 'IPv4':
+      const u8aAddr = ipToU8aAddress(result.address, 'IPv4')
 
-  for (const result of responses) {
-    if (!isRequestWithResponse(result)) {
-      continue
-    }
-
-    switch (result.response.family) {
-      case 'IPv6':
-        // STUN over IPv6 is not yet supported
-        break
-      case 'IPv4':
-        const u8aAddr = ipToU8aAddress(result.response.address, 'IPv4')
-
-        if (runningLocally) {
-          // Only take local or private addresses
-          if (isPrivateAddress(u8aAddr, 'IPv4') || isLocalhost(u8aAddr, 'IPv4')) {
-            filtered.push(result)
-          }
-        } else {
-          // Only take public addresses
-          if (!isPrivateAddress(u8aAddr, 'IPv4') && !isLocalhost(u8aAddr, 'IPv4')) {
-            filtered.push(result)
-          }
+      if (runningLocally) {
+        // Only take local or private addresses
+        if (isPrivateAddress(u8aAddr, 'IPv4') || isLocalhost(u8aAddr, 'IPv4')) {
+          return true
         }
         break
-    }
+      }
+
+      // Only take public addresses
+      if (!isPrivateAddress(u8aAddr, 'IPv4') && !isLocalhost(u8aAddr, 'IPv4')) {
+        return true
+      }
+
+      break
   }
 
-  return filtered
+  return false
 }
 
 /**
