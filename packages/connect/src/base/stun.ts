@@ -568,7 +568,11 @@ function sendStunRequests(multiaddr: Multiaddr, tId: Buffer, responsePort: numbe
     if (err) {
       error(err.message)
     } else {
-      verbose(`STUN request successfully sent to ${address}:${port} Transaction: ${u8aToHex(tId)}`)
+      verbose(
+        `STUN request successfully sent to ${address}:${port} Transaction: ${u8aToHex(tId)}${
+          responsePort != undefined ? ` port ${responsePort}` : ''
+        }`
+      )
     }
   })
 }
