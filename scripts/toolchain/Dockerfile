@@ -1,3 +1,4 @@
+# Alpin 3.16 x86_64
 FROM alpine:16@sha256:1304f174557314a7ed9eddb4eab12fed12cb0cd9809e4c28f29af86979a3c870
 
 LABEL description="Image that contains all utilities necessary to build hopr monorepo, including Rust and Yarn"

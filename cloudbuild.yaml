@@ -66,7 +66,6 @@ steps:
       - 'IMAGE_VERSION=$_IMAGE_VERSION'
     timeout: 1200s
     waitFor:
-      - buildHoprToolchain
       - buildHoprd
       - buildHoprdNat
       - buildCoverTrafficDaemon

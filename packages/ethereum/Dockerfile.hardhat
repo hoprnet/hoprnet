@@ -17,29 +17,41 @@ LABEL description="Launches a hardhat node running a local network with the HOPR
 RUN cd /app/hoprnet/packages/ethereum && \
     mv package.hardhat.json package.json && \
     mv tsconfig.hardhat.json tsconfig.json && \
-    cd /app/hoprnet
+    cd /app/hoprnet && \
+    # Install dependencies of ethereum package
+    CI=true make deps package=hopr-ethereum && \
+    # Build ethereum package + its depedencies 
+    NO_NEXT=true make build package=ethereum && \
+    # Remove all unused packages
+    rm -R packages/avado packages/connect packages/cover-traffic-daemon packages/core-ethereum packages/hoprd
 
-RUN CI=true make deps package=hopr-ethereum
+# Alpine 3.16 x86_64
+FROM alpine:16@sha256:1304f174557314a7ed9eddb4eab12fed12cb0cd9809e4c28f29af86979a3c870 as runtime
 
-RUN NO_NEXT=true make build package=ethereum
+# making sure some standard environment variables are set for production use
+ENV NODE_ENV production
+ENV NODE_OPTIONS=--max_old_space_size=1024
 
-# Remove all unused packages
-RUN rm -R packages/avado packages/connect packages/cover-traffic-daemon packages/core-ethereum packages/hoprd
+EXPOSE 8545
 
-WORKDIR /app/hoprnet/packages/ethereum/
+RUN mkdir -p scripts/toolchain
 
-# # use alpine version of node for smallest image sizes
-FROM node:16-alpine as runtime
+COPY .nvmrc package.json Makefile .yarnrc.yml package.json yarn.lock tsconfig.json ./
+COPY scripts/toolchain/install-toolchain.sh ./scripts/toolchain
 
 WORKDIR /app/hardhat
 
-RUN apk add --no-cache tini libc6-compat make
-
-# Required to make hardhat work
-RUN ln -s /lib/libc.musl-x86_64.so.1 /lib/ld-linux-x86-64.so.2
+RUN apk add --no-cache tini libc6-compat bash curl tar jq xz && \
+    # Install Node.js
+    ./scripts/toolchain/install-toolchain.sh --runtime-only && \
+    # Remove unused tools
+    apk del bash curl tar jq xz && \
+    # Remove unused files and config
+    rm -R scripts .nvmrc && \
+    # symlink required to make hardhat work
+    ln -s /lib/libc.musl-x86_64.so.1 /lib/ld-linux-x86-64.so.2
 
 COPY --from=build /app/hoprnet/.yarn .yarn/
-COPY Makefile .yarnrc.yml package.json yarn.lock tsconfig.json ./
 COPY --from=build /app/hoprnet/node_modules node_modules/
 COPY --from=build /app/hoprnet/packages/ packages/
 
@@ -49,9 +61,5 @@ RUN CI=true NO_CARGO=true make deps package=hopr-ethereum
 WORKDIR /app/hardhat/packages/ethereum
 
 RUN yarn run compile
-
-EXPOSE 8545
-
-ENV NODE_OPTIONS=--max_old_space_size=1024
 
 ENTRYPOINT ["/sbin/tini", "--", "yarn", "run:network", "--network", "hardhat", "--show-stack-traces"]
