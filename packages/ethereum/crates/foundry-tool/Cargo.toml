@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.0.18", features = ["derive", "env"] }
+ethers = { git = "https://github.com/gakonst/ethers-rs", version = "1.0.0" }

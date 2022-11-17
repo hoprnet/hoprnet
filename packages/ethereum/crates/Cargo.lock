@@ -913,6 +913,7 @@ name = "foundry-tool"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "ethers",
 ]
 
 [[package]]

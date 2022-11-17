@@ -1,21 +1,22 @@
 use std::path::{Path, PathBuf};
 use std::fs;
 use std::io;
+use ethers::signers::Signer;
+use ethers::signers::Wallet;
+use ethers::core::rand::thread_rng;
+use ethers::types::Address;
 
-pub fn read_identities (identity_directory: &str, identity_prefix: Option<String>) -> Result<Vec<PathBuf>, io::Error> {
-    
-    // read all the files from the directory
-  // Check if local identity files should be used. Push all the read identities.
-  let file_names = fs::read_dir(Path::new(identity_directory))?
-    .into_iter()
+pub fn read_identities (identity_directory: &str, password: &String, identity_prefix: Option<String>) -> Result<Vec<Address>, io::Error> {
+  let addresses = fs::read_dir(Path::new(identity_directory))?
+    .into_iter() // read all the files from the directory
     .filter(|r| r.is_ok()) // Get rid of Err variants for Result<DirEntry>
-    .map(|r| r.unwrap().path()) // This is safe, since we only have the Ok variants
+    .map(|r| r.unwrap().path()) // Read all the files from the given directory
     .filter(|r| r.is_file() && r.extension().unwrap() == "id") // Filter out folders
+    .map(|r| Wallet::decrypt_keystore(r, password).unwrap().address()) // read keystore and return address
     .collect();
     
-  println!("file_names {:?}", file_names);
-
-  Ok(file_names)
+  println!("Addresses from identities {:?}", addresses);
+  Ok(addresses)
 }
 
 #[cfg(test)]
@@ -24,18 +25,34 @@ mod tests {
 
     #[test]
     fn read_identities_from_directory_with_id_files() {
-        match read_identities("/tmp", None) {
-            Ok(val) => assert_eq!(val.len(), 2),
+        let path = "./tmp";
+        let pwd = "password";
+        create_json_keystore(path, pwd).unwrap();
+        match read_identities(path, &pwd.to_string(), None) {
+            Ok(val) => assert_eq!(val.len(), 1),
             _ => assert!(false)
         }
+        remove_json_keystore(path);
     }
     #[test]
     fn read_identities_from_directory_without_id_files() {
-        match read_identities("/var", None) {
+        match read_identities("./", &"".to_string(), None) {
             Ok(val) => assert_eq!(val.len(), 0),
-            // Ok(10) => assert!(true),
             _ => assert!(false)
         }
-        // assert_eq!(read_identities("/tmp", None).is_ok_and(|&x| x ==10), 10);
+    }
+
+    fn create_json_keystore(dir_name: &str, pwd: &str) -> Result<(), io::Error> {
+      fs::create_dir_all(dir_name)?;
+      let (key, uuid) = Wallet::new_keystore(Path::new(&dir_name), &mut thread_rng(), pwd, None).unwrap();
+      let old_file_path = vec![dir_name, "/", &*uuid].concat();
+      let new_file_path = vec![dir_name, "/", &*uuid, ".id"].concat();
+      fs::rename(&old_file_path, &new_file_path); // Rename keystore from uuid to uuid.id
+      Ok(())
+    }
+    
+    fn remove_json_keystore(path: &str) -> Result<(), io::Error> {
+        println!("remove_json_keystore {:?}", path);
+        fs::remove_dir_all(path)
     }
 }
