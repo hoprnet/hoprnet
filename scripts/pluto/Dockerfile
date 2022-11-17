@@ -52,4 +52,4 @@ EXPOSE 19505
 ARG HOPRD_API_TOKEN
 ENV HOPRD_API_TOKEN=${HOPRD_API_TOKEN:-%th1s-IS-a-S3CR3T-ap1-PUSHING-b1ts-TO-you%}
 
-RUN /app/hardhat/scripts/setup-local-cluster.sh -p -t "${HOPRD_API_TOKEN}" -i /app/hardhat/scripts/topologies/full_interconnected_cluster.sh --hoprd-command "node --experimental-wasm-modules hoprnet/packages/hoprd/lib/main.cjs" --hardhat-basedir "/app/hardhat/packages/ethereum" -l "0.0.0.0"
+ENTRYPOINT /app/hardhat/scripts/setup-local-cluster.sh -p -t "${HOPRD_API_TOKEN}" -i /app/hardhat/scripts/topologies/full_interconnected_cluster.sh --hoprd-command "node --experimental-wasm-modules hoprnet/packages/hoprd/lib/main.cjs" --hardhat-basedir "/app/hardhat/packages/ethereum" -l "0.0.0.0"
