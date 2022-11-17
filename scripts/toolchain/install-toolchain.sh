@@ -24,16 +24,18 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
 function usage() {
   msg
-  msg "Usage: $0 [-h|--help] [--runtime-only]"
+  msg "Usage: $0 [-h|--help] [--runtime-only] [--with-yarn]"
   msg
   msg "This script installs all required toolchain utilities to build hoprnet monorepo"
   msg
   msg "Use --runtime-only to install only those utilities that are necessary at runtime"
+  msg "Use --with-yarn to install yarn"
   msg
 }
 
-declare install_all
+declare install_all with_yarn
 install_all="true"
+with_yarn="false"
 
 while (( "$#" )); do
   case "$1" in
@@ -44,6 +46,10 @@ while (( "$#" )); do
       ;;
     --runtime-only)
       install_all="false"
+      shift
+      ;;
+    --with-yarn)
+      with_yarn="true"
       shift
       ;;
     -*|--*=)
@@ -171,6 +177,9 @@ if ${install_all}; then
 else
     # We only need Node.js
     install_node_js
+    if ${with_yarn}; then
+        install_yarn
+    fi
 fi
 
 rm -R ${download_dir}

@@ -28,16 +28,16 @@ RUN cd /app/hoprnet/packages/ethereum && \
 # Alpine 3.16 x86_64
 FROM alpine:16@sha256:1304f174557314a7ed9eddb4eab12fed12cb0cd9809e4c28f29af86979a3c870 as runtime
 
+WORKDIR /app/hardhat
+
 RUN mkdir -p scripts/toolchain
 
 COPY .nvmrc package.json Makefile .yarnrc.yml package.json yarn.lock tsconfig.json ./
 COPY scripts/toolchain/install-toolchain.sh ./scripts/toolchain
 
-WORKDIR /app/hardhat
-
-RUN apk add --no-cache tini libc6-compat bash curl tar jq xz libstdc++ && \
+RUN apk add --no-cache tini libc6-compat bash curl tar jq xz libstdc++ make && \
     # Install Node.js
-    ./scripts/toolchain/install-toolchain.sh --runtime-only && \
+    ./scripts/toolchain/install-toolchain.sh --runtime-only --with-yarn && \
     # Remove unused tools
     apk del bash curl tar jq xz && \
     # Remove unused files and config
