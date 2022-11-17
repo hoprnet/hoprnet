@@ -1,5 +1,5 @@
-ARG HOPRD_IMAGE=${HOPRD_IMAGE}
-ARG HARDHAT_IMAGE=${HARDHAT_IMAGE}
+ARG HOPRD_IMAGE=${HOPRD_IMAGE:-hoprd-local:latest}
+ARG HARDHAT_IMAGE=${HARDHAT_IMAGE:-hopr-hardhat-local:latest}
 
 # simply import hoprd image to copy in files later
 FROM ${HOPRD_IMAGE} as hoprd
@@ -13,11 +13,13 @@ RUN apk add --no-cache bash lsof curl jq
 
 WORKDIR /app
 
-COPY --from=hoprd /app/hoprnet .
+COPY --from=hoprd /app/hoprnet ./hoprnet
+
+COPY scripts /app/hardhat/scripts
 
 # copy deployment files to make them available to hoprd as well
-RUN mkdir /hardhat/deployments/hardhat-localhost \
- && ln -s /hardhat/deployments/hardhat-localhost ./node_modules/@hoprnet/hopr-ethereum/deployments/
+RUN mkdir /app/hardhat/packages/ethereum/deployments/hardhat-localhost \
+ && ln -s /app/hardhat/packages/ethereum/deployments/hardhat-localhost ./hoprnet/packages/ethereum/deployments/
 
 # hardhat RPC port
 EXPOSE 8545
@@ -50,4 +52,4 @@ EXPOSE 19505
 ARG HOPRD_API_TOKEN
 ENV HOPRD_API_TOKEN=${HOPRD_API_TOKEN:-%th1s-IS-a-S3CR3T-ap1-PUSHING-b1ts-TO-you%}
 
-ENTRYPOINT /hardhat/scripts/setup-local-cluster.sh -p -t "${HOPRD_API_TOKEN}" -i /hardhat/scripts/topologies/full_interconnected_cluster.sh --hoprd-command "npx hoprd" --hardhat-basedir "/hardhat" -l "0.0.0.0"
+RUN /app/hardhat/scripts/setup-local-cluster.sh -p -t "${HOPRD_API_TOKEN}" -i /app/hardhat/scripts/topologies/full_interconnected_cluster.sh --hoprd-command "node --experimental-wasm-modules hoprnet/packages/hoprd/lib/main.cjs" --hardhat-basedir "/app/hardhat/packages/ethereum" -l "0.0.0.0"

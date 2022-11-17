@@ -114,7 +114,7 @@ build_and_tag_images() {
       docker build -q -t hopr-pluto-local \
         --build-arg=HARDHAT_IMAGE="hopr-hardhat-local" \
         --build-arg=HOPRD_IMAGE="hoprd-local" \
-        scripts/pluto &
+        -f scripts/pluto/Dockerfile &
     fi
 
     log "Waiting for Docker builds (part 2) to finish"

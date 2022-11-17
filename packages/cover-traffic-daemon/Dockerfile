@@ -7,8 +7,10 @@ FROM ${HOPR_TOOLCHAIN_IMAGE} as build
 WORKDIR /app/hoprnet
 
 COPY .yarn .yarn
+COPY .cargo .cargo/
+COPY vendor vendor/
+COPY packages packages/
 COPY Makefile Cargo.toml Cargo.lock yarn.lock .yarnrc.yml package.json tsconfig.build.json tsconfig.json tsconfig.scripts.json yarn.lock rust-toolchain.toml ./
-COPY packages/ ./packages
 
 LABEL description="Launches a cover-traffic node which keeps sending cover-traffic through the hopr network"
 
@@ -30,8 +32,8 @@ RUN CI=true make deps package=hopr-cover-traffic-daemon && \
     # Install without devDependencies and us release build of wrtc
     DEBUG= CI=true NO_CARGO=true PRODUCTION=true make deps package=hopr-cover-traffic-daemon
 
-# Alpine 3.16 x86_64
-FROM alpine:16@sha256:1304f174557314a7ed9eddb4eab12fed12cb0cd9809e4c28f29af86979a3c870 as runtime
+# Alpine 3.16 x86_64 https://hub.docker.com/layers/library/alpine/3.16.3/images/sha256-3d426b0bfc361d6e8303f51459f17782b219dece42a1c7fe463b6014b189c86d
+FROM alpine:3.16@sha256:3d426b0bfc361d6e8303f51459f17782b219dece42a1c7fe463b6014b189c86d as runtime
 
 WORKDIR /app/hoprnet
 

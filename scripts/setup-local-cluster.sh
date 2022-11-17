@@ -253,7 +253,7 @@ rm -Rfv \
 # --- Running Mock Blockchain --- {{{
 log "Running hardhat local node"
 cd "${hardhat_basedir}" && \
-  yarn run:network \
+  NODE_OPTIONS=--experimental-wasm-modules yarn run:network \
     --network hardhat --show-stack-traces > \
     "${hardhat_rpc_log}" 2>&1 &
 
@@ -289,7 +289,7 @@ log "Funding nodes"
 
 #  --- Fund nodes --- {{{
 cd "${hardhat_basedir}" && \
-  yarn faucet --identity-directory "${tmp_dir}"
+  NODE_OPTIONS=--experimental-wasm-modules yarn faucet --identity-directory "${tmp_dir}"
 # }}}
 
 log "Waiting for nodes startup"
