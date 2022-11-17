@@ -20,9 +20,9 @@ RUN CI=true make deps package=hopr-cover-traffic-daemon && \
     # Remove all typescript files 
     find ./packages -type f -name '*.ts' -delete && \
     # No need for these packages
-    rm -R ./packages/avado ./packages/horpd && \
+    rm -R packages/avado packages/hoprd && \
     # Everything that we don't need in ethereum package
-    rm -R ./packages/ethereum/contracts ./packages/ethereum/deploy ./packages/ethereum/hardhat ./packages/ethereum/tasks ./packages/ethereum/test && \
+    rm -R packages/ethereum/contracts packages/ethereum/deploy packages/ethereum/hardhat packages/ethereum/tasks packages/ethereum/test && \
     # Remove node_modules as they include devDependencies
     rm -R node_modules && \
     # As we are on *nix, use hardlinks in node_modules to save some space
@@ -53,16 +53,7 @@ RUN apk add --no-cache tini libc6-compat bash curl tar jq xz libstdc++ && \
     # permissions when mapped to a volume
     mkdir -p hoprd-db
 
-# making sure some standard environment variables are set for production use
-ENV NODE_ENV production
-ENV DEBUG 'hopr*'
-ENV NODE_OPTIONS='--max_old_space_size=4096 --experimental-wasm-modules'
-
-# p2p
-EXPOSE 9091
-
 # copy over the contents of node_modules etc
-COPY package.json .
 COPY --from=build /app/hoprnet/node_modules node_modules/
 COPY --from=build /app/hoprnet/packages packages/
 
@@ -73,5 +64,13 @@ VOLUME ["/app/hoprnet/hoprd-db"]
 ENV HOPRD_DATA=/app/hoprnet/hoprd-db
 
 WORKDIR /app/hoprnet/packages/cover-traffic-daemon
+
+# making sure some standard environment variables are set for production use
+ENV NODE_ENV production
+ENV DEBUG 'hopr*'
+ENV NODE_OPTIONS='--max_old_space_size=4096 --experimental-wasm-modules'
+
+# p2p
+EXPOSE 9091
 
 ENTRYPOINT ["/sbin/tini", "--", "node", "lib/main.cjs"]

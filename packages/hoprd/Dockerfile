@@ -33,21 +33,6 @@ RUN CI=true make deps package=hoprd && \
 # Alpine 3.16 x86_64
 FROM alpine:16@sha256:1304f174557314a7ed9eddb4eab12fed12cb0cd9809e4c28f29af86979a3c870 as runtime
 
-# making sure some standard environment variables are set for production use
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
-ENV DEBUG 'hopr*'
-ENV NODE_OPTIONS="--max_old_space_size=4096 --experimental-wasm-modules"
-
-# Admin web server
-EXPOSE 3000
-# REST API
-EXPOSE 3001
-# Healthcheck server
-EXPOSE 8080
-# p2p
-EXPOSE 9091
-
 WORKDIR /app/hoprnet
 
 RUN mkdir -p scripts/toolchain
@@ -86,5 +71,20 @@ WORKDIR /app/hoprnet/packages/hoprd
 # DISABLED temporarily until a migration path has been tested
 # finally set the non-root user so the process also run un-privilidged
 # USER node
+
+# making sure some standard environment variables are set for production use
+ENV NODE_ENV production
+ENV NEXT_TELEMETRY_DISABLED 1
+ENV DEBUG 'hopr*'
+ENV NODE_OPTIONS="--max_old_space_size=4096 --experimental-wasm-modules"
+
+# Admin web server
+EXPOSE 3000
+# REST API
+EXPOSE 3001
+# Healthcheck server
+EXPOSE 8080
+# p2p
+EXPOSE 9091
 
 ENTRYPOINT ["/sbin/tini", "--", "node", "./lib/main.cjs"]

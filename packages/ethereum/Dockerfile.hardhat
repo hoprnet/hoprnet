@@ -28,12 +28,6 @@ RUN cd /app/hoprnet/packages/ethereum && \
 # Alpine 3.16 x86_64
 FROM alpine:16@sha256:1304f174557314a7ed9eddb4eab12fed12cb0cd9809e4c28f29af86979a3c870 as runtime
 
-# making sure some standard environment variables are set for production use
-ENV NODE_ENV production
-ENV NODE_OPTIONS=--max_old_space_size=1024
-
-EXPOSE 8545
-
 RUN mkdir -p scripts/toolchain
 
 COPY .nvmrc package.json Makefile .yarnrc.yml package.json yarn.lock tsconfig.json ./
@@ -59,6 +53,12 @@ COPY --from=build /app/hoprnet/packages/ packages/
 RUN CI=true NO_CARGO=true make deps package=hopr-ethereum
 
 WORKDIR /app/hardhat/packages/ethereum
+
+# making sure some standard environment variables are set for production use
+ENV NODE_ENV production
+ENV NODE_OPTIONS=--max_old_space_size=1024
+
+EXPOSE 8545
 
 RUN yarn run compile
 
