@@ -2,6 +2,8 @@ use clap::{Parser, Subcommand};
 use std::path::{Path};
 use std::fs;
 
+mod key_pair;
+
 #[derive(Parser, Default, Debug)]
 #[command(name = "Contract Deployment Helper")]
 #[command(author = "HOPR <tech@hoprnet.org>")]

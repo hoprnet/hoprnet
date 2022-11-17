@@ -10,5 +10,10 @@ Complete some missing funcitonalities of the foundry-centered smart contract too
 ```
 cargo run -- -h
 cargo run -- --environment-name localhost --environment-type 0 files 
-cargo run -- --environment-name localhost --environment-type 0 faucet --password switzerland --use-local-identities --amount 300 --token-type native --identity-directory "./"
+cargo run -- --environment-name localhost --environment-type 0 faucet --password switzerland --use-local-identities --amount 300 --token-type native --identity-directory "/tmp"
+```
+
+### Test
+```
+cargo test -- --nocapture
 ```
