@@ -34,3 +34,9 @@ logs.txt
 **/*.tsbuildinfo
 
 .env
+.identity-local
+
+/.cargo/bin
+/.cargo/.package-cache
+/.cargo/.crates.toml
+/.cargo/.crates2.json

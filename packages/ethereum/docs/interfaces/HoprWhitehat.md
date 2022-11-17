@@ -478,6 +478,10 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:81
 
 BaseContract.\_checkRunningEvents
 
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:121
+
 ___
 
 ### \_deployed
@@ -497,6 +501,10 @@ ___
 #### Inherited from
 
 BaseContract.\_deployed
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:114
 
 ___
 
@@ -520,6 +528,10 @@ ___
 
 BaseContract.\_wrapEvent
 
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:122
+
 ___
 
 ### activate
@@ -535,6 +547,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:449
 
 ___
 
@@ -556,6 +572,10 @@ ___
 
 BaseContract.attach
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:323
+
 ___
 
 ### canImplementInterfaceForAddress
@@ -573,6 +593,10 @@ ___
 #### Returns
 
 `Promise`<`string`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:453
 
 ___
 
@@ -594,6 +618,10 @@ ___
 
 BaseContract.connect
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:322
+
 ___
 
 ### currentCaller
@@ -609,6 +637,10 @@ ___
 #### Returns
 
 `Promise`<`string`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:459
 
 ___
 
@@ -626,6 +658,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:461
+
 ___
 
 ### deployed
@@ -639,6 +675,10 @@ ___
 #### Overrides
 
 BaseContract.deployed
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:324
 
 ___
 
@@ -661,6 +701,10 @@ ___
 
 BaseContract.emit
 
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:127
+
 ___
 
 ### fallback
@@ -681,6 +725,10 @@ ___
 
 BaseContract.fallback
 
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:115
+
 ___
 
 ### gimmeToken
@@ -696,6 +744,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:465
 
 ___
 
@@ -714,6 +766,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:469
+
 ___
 
 ### isActive
@@ -729,6 +785,10 @@ ___
 #### Returns
 
 `Promise`<`boolean`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:474
 
 ___
 
@@ -749,6 +809,10 @@ ___
 #### Inherited from
 
 BaseContract.listenerCount
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:128
 
 ___
 
@@ -776,6 +840,10 @@ ___
 
 BaseContract.listeners
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:334
+
 ▸ **listeners**(`eventName?`): `Listener`[]
 
 #### Parameters
@@ -791,6 +859,10 @@ BaseContract.listeners
 #### Overrides
 
 BaseContract.listeners
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:337
 
 ___
 
@@ -808,6 +880,10 @@ ___
 
 `Promise`<`string`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:476
+
 ___
 
 ### myHoprStake
@@ -823,6 +899,10 @@ ___
 #### Returns
 
 `Promise`<`string`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:478
 
 ___
 
@@ -844,6 +924,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:480
+
 ___
 
 ### onTokenTransfer
@@ -863,6 +947,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:488
+
 ___
 
 ### owner
@@ -878,6 +966,10 @@ ___
 #### Returns
 
 `Promise`<`string`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:495
 
 ___
 
@@ -897,6 +989,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:497
+
 ___
 
 ### ownerRescueBoosterNftInBatch
@@ -913,6 +1009,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:503
 
 ___
 
@@ -942,6 +1042,10 @@ ___
 
 BaseContract.queryFilter
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:328
+
 ___
 
 ### reclaimErc20Tokens
@@ -958,6 +1062,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:508
 
 ___
 
@@ -976,6 +1084,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:513
 
 ___
 
@@ -1003,6 +1115,10 @@ ___
 
 BaseContract.removeAllListeners
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:338
+
 ▸ **removeAllListeners**(`eventName?`): [`HoprWhitehat`](HoprWhitehat.md)
 
 #### Parameters
@@ -1018,6 +1134,10 @@ BaseContract.removeAllListeners
 #### Overrides
 
 BaseContract.removeAllListeners
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:341
 
 ___
 
@@ -1035,6 +1155,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:519
+
 ___
 
 ### rescuedXHoprAmount
@@ -1050,6 +1174,10 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:523
 
 ___
 
@@ -1073,6 +1201,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:525
+
 ___
 
 ### transferBackOwnership
@@ -1089,6 +1221,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:535
 
 ___
 
@@ -1107,6 +1243,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:540
+
 ___
 
 ### wxHopr
@@ -1123,6 +1263,10 @@ ___
 
 `Promise`<`string`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:545
+
 ___
 
 ### xHopr
@@ -1138,3 +1282,7 @@ ___
 #### Returns
 
 `Promise`<`string`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprWhitehat.ts:547

@@ -1,0 +1,16 @@
+[package]
+name = "serde_ignored"
+version = "0.0.4" # update version in readme for breaking changes
+authors = ["David Tolnay <dtolnay@gmail.com>"]
+license = "MIT/Apache-2.0"
+description = "Find out about keys that are ignored when deserializing data"
+repository = "https://github.com/dtolnay/serde-ignored"
+keywords = ["serde"]
+categories = ["encoding"]
+
+[dependencies]
+serde = "1.0"
+
+[dev-dependencies]
+serde_derive = "1.0"
+serde_json = "1.0"

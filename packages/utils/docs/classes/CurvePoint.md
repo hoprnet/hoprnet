@@ -14,6 +14,10 @@
 
 - [constructor](CurvePoint.md#constructor)
 
+### Properties
+
+- [arr](CurvePoint.md#arr)
+
 ### Accessors
 
 - [SIZE](CurvePoint.md#size)
@@ -43,6 +47,20 @@
 | :------ | :------ |
 | `arr` | `Uint8Array` |
 
+#### Defined in
+
+[src/types/curvePoint.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L12)
+
+## Properties
+
+### arr
+
+• `Private` **arr**: `Uint8Array`
+
+#### Defined in
+
+[src/types/curvePoint.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L12)
+
 ## Accessors
 
 ### SIZE
@@ -52,6 +70,10 @@
 #### Returns
 
 `number`
+
+#### Defined in
+
+[src/types/curvePoint.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L55)
 
 ## Methods
 
@@ -69,6 +91,10 @@
 
 `boolean`
 
+#### Defined in
+
+[src/types/curvePoint.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L67)
+
 ___
 
 ### serialize
@@ -78,6 +104,10 @@ ___
 #### Returns
 
 `Uint8Array`
+
+#### Defined in
+
+[src/types/curvePoint.ts:59](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L59)
 
 ___
 
@@ -89,6 +119,10 @@ ___
 
 [`Address`](Address.md)
 
+#### Defined in
+
+[src/types/curvePoint.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L38)
+
 ___
 
 ### toHex
@@ -98,6 +132,10 @@ ___
 #### Returns
 
 `string`
+
+#### Defined in
+
+[src/types/curvePoint.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L63)
 
 ___
 
@@ -109,6 +147,10 @@ ___
 
 `PeerId`
 
+#### Defined in
+
+[src/types/curvePoint.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L47)
+
 ___
 
 ### toUncompressedCurvePoint
@@ -118,6 +160,10 @@ ___
 #### Returns
 
 `string`
+
+#### Defined in
+
+[src/types/curvePoint.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L42)
 
 ___
 
@@ -135,6 +181,10 @@ ___
 
 [`CurvePoint`](CurvePoint.md)
 
+#### Defined in
+
+[src/types/curvePoint.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L18)
+
 ___
 
 ### fromPeerId
@@ -150,6 +200,10 @@ ___
 #### Returns
 
 [`CurvePoint`](CurvePoint.md)
+
+#### Defined in
+
+[src/types/curvePoint.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L34)
 
 ___
 
@@ -167,6 +221,10 @@ ___
 
 [`CurvePoint`](CurvePoint.md)
 
+#### Defined in
+
+[src/types/curvePoint.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L51)
+
 ___
 
 ### fromUncompressedUncompressedCurvePoint
@@ -182,3 +240,7 @@ ___
 #### Returns
 
 [`CurvePoint`](CurvePoint.md)
+
+#### Defined in
+
+[src/types/curvePoint.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L26)

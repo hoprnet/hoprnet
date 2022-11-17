@@ -13,7 +13,7 @@ RUN apk add --no-cache bash lsof curl jq
 
 WORKDIR /app
 
-COPY --from=hoprd /app .
+COPY --from=hoprd /app/hoprnet .
 
 # copy deployment files to make them available to hoprd as well
 RUN mkdir /hardhat/deployments/hardhat-localhost \

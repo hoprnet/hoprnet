@@ -10,6 +10,7 @@
 
 ### Properties
 
+- [arr](HalfKey.md#arr)
 - [SIZE](HalfKey.md#size)
 
 ### Methods
@@ -33,7 +34,21 @@
 | :------ | :------ |
 | `arr` | `Uint8Array` |
 
+#### Defined in
+
+[src/types/halfKey.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L6)
+
 ## Properties
+
+### arr
+
+• `Private` `Readonly` **arr**: `Uint8Array`
+
+#### Defined in
+
+[src/types/halfKey.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L6)
+
+___
 
 ### SIZE
 
@@ -53,6 +68,10 @@
 
 [`HalfKey`](HalfKey.md)
 
+#### Defined in
+
+[src/types/halfKey.ts:36](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L36)
+
 ___
 
 ### eq
@@ -69,6 +88,10 @@ ___
 
 `boolean`
 
+#### Defined in
+
+[src/types/halfKey.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L28)
+
 ___
 
 ### serialize
@@ -78,6 +101,10 @@ ___
 #### Returns
 
 `Uint8Array`
+
+#### Defined in
+
+[src/types/halfKey.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L20)
 
 ___
 
@@ -89,6 +116,10 @@ ___
 
 [`HalfKeyChallenge`](HalfKeyChallenge.md)
 
+#### Defined in
+
+[src/types/halfKey.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L16)
+
 ___
 
 ### toHex
@@ -98,6 +129,10 @@ ___
 #### Returns
 
 `string`
+
+#### Defined in
+
+[src/types/halfKey.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L24)
 
 ___
 
@@ -114,3 +149,7 @@ ___
 #### Returns
 
 [`HalfKey`](HalfKey.md)
+
+#### Defined in
+
+[src/types/halfKey.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L32)

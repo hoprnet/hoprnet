@@ -1,8 +1,21 @@
+.POSIX:
+
+# Gets all packages that include a Rust crates
 WORKSPACES_WITH_RUST_MODULES := $(wildcard $(addsuffix /crates, $(wildcard ./packages/*)))
 
+# Gets all individual crates such that they can get built
+CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(crate)/*/Cargo.toml)))
+
+# add local Cargo install path and use it as custom shell PATH
+PATH := ${PATH}:${CURDIR}/.cargo/bin
+SHELL := env PATH=$(PATH) $(shell which bash)
+
+# use custom Cargo config file for each invocation
+cargo := cargo --config ${CURDIR}/.cargo/config.toml
+
+# use custom flags for installing dependencies
 YARNFLAGS :=
 YARN_ENVIRONMENT :=
-CARGOFLAGS :=
 
 # Build specific package
 ifeq ($(package),)
@@ -17,18 +30,16 @@ ifneq ($(origin PRODUCTION),undefined)
 	YARN_ENVIRONMENT := ${YARN_ENVIRONMENT} DEBUG=
 endif
 
-# Don't try to resolve dependencies if CI=true
-ifneq ($(origin CI),undefined)
-	CARGOFLAGS := ${CARGOFLAGS} --locked
-endif
-
-.POSIX:
-
 all: help
 
-.PHONY: $(WORKSPACES_WITH_RUST_MODULES) ## build all WASM modules
+.PHONY: $(CRATES) ## builds all Rust crates
+$(CRATES):
+# --out-dir is relative to working directory
+	wasm-pack build --target=bundler --out-dir ./pkg $@
+
+.PHONY: $(WORKSPACES_WITH_RUST_MODULES) ## builds all WebAssembly modules
 $(WORKSPACES_WITH_RUST_MODULES):
-	$(MAKE) -j 1 -C $@ all install
+	$(MAKE) -C $@ install
 
 .PHONY: toolchain
 toolchain: ## install toolchain
@@ -39,8 +50,18 @@ deps: ## install dependencies in CI
 	${YARN_ENVIRONMENT} yarn workspaces focus ${YARNFLAGS}
 # Don't fetch Rust crates since syncing with crates registry is slow
 ifeq ($(origin NO_CARGO),undefined)
-	cargo fetch --target wasm32-unknown-unknown ${CARGOFLAGS}
+# we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
+	$(MAKE) cargo-update
 endif
+
+.PHONY: cargo-update
+cargo-update: ## update vendored Cargo dependencies
+	$(cargo) update
+
+.PHONY: cargo-download
+cargo-download: ## download vendored Cargo dependencies
+	$(cargo) vendor --versioned-dirs vendor/cargo
+	$(cargo) fetch
 
 .PHONY: build
 build: ## build all packages
@@ -75,7 +96,10 @@ build-yarn-watch: build-solidity-types build-cargo
 build-cargo: ## build cargo packages and create boilerplate JS code
 # Skip building Rust crates
 ifeq ($(origin NO_CARGO),undefined)
-	$(MAKE) -j 1 $(WORKSPACES_WITH_RUST_MODULES)
+# First compile Rust crates and create bindings
+	$(MAKE) -j 1 $(CRATES)
+# Copy bindings to their destination
+	$(MAKE) ${WORKSPACES_WITH_RUST_MODULES}
 endif
 
 .PHONY: build-yellowpaper
@@ -114,6 +138,8 @@ test: ## run unit tests for all packages, or a single package if package= is set
 ifeq ($(package),)
 	yarn workspaces foreach -pv run test
 else
+# Prebuild Rust unit tests
+	$(cargo) --frozen --offline build --tests
 	yarn workspace @hoprnet/${package} run test
 endif
 
@@ -124,6 +150,23 @@ lint-check: ## run linter in check mode
 .PHONY: lint-check
 lint-fix: ## run linter in fix mode
 	npx prettier --write .
+
+.PHONY: run-hardhat
+run-hardhat: ## run local hardhat environment
+	cd packages/ethereum && \
+		env NODE_OPTIONS="--experimental-wasm-modules" NODE_ENV=development \
+		TS_NODE_PROJECT=./tsconfig.hardhat.json \
+		HOPR_ENVIRONMENT_ID=hardhat-localhost yarn run hardhat node \
+		--network hardhat --show-stack-traces
+
+.PHONY: run-local
+run-local: ## run HOPRd from local repo
+	env NODE_OPTIONS="--experimental-wasm-modules" NODE_ENV=development node \
+		packages/hoprd/lib/main.cjs --admin --init --api \
+		--password="local" --identity=`pwd`/.identity-local \
+		--environment hardhat-localhost --announce \
+		--testUseWeakCrypto --testAnnounceLocalAddresses \
+		--testPreferLocalAddresses --testNoAuthentication
 
 .PHONY: docker-build-local
 docker-build-local: ## build Docker images locally, or single image if image= is set

@@ -50,6 +50,10 @@
 
 [CurvePoint](CurvePoint.md).[constructor](CurvePoint.md#constructor)
 
+#### Defined in
+
+[src/types/curvePoint.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L12)
+
 ## Accessors
 
 ### SIZE
@@ -63,6 +67,10 @@
 #### Inherited from
 
 CurvePoint.SIZE
+
+#### Defined in
+
+[src/types/curvePoint.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L55)
 
 ## Methods
 
@@ -84,6 +92,10 @@ CurvePoint.SIZE
 
 [CurvePoint](CurvePoint.md).[eq](CurvePoint.md#eq)
 
+#### Defined in
+
+[src/types/curvePoint.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L67)
+
 ___
 
 ### serialize
@@ -97,6 +109,10 @@ ___
 #### Inherited from
 
 [CurvePoint](CurvePoint.md).[serialize](CurvePoint.md#serialize)
+
+#### Defined in
+
+[src/types/curvePoint.ts:59](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L59)
 
 ___
 
@@ -112,6 +128,10 @@ ___
 
 [CurvePoint](CurvePoint.md).[toAddress](CurvePoint.md#toaddress)
 
+#### Defined in
+
+[src/types/curvePoint.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L38)
+
 ___
 
 ### toEthereumChallenge
@@ -121,6 +141,10 @@ ___
 #### Returns
 
 [`EthereumChallenge`](EthereumChallenge.md)
+
+#### Defined in
+
+[src/types/challenge.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/challenge.ts#L20)
 
 ___
 
@@ -136,6 +160,10 @@ ___
 
 [CurvePoint](CurvePoint.md).[toHex](CurvePoint.md#tohex)
 
+#### Defined in
+
+[src/types/curvePoint.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L63)
+
 ___
 
 ### toPeerId
@@ -150,6 +178,10 @@ ___
 
 [CurvePoint](CurvePoint.md).[toPeerId](CurvePoint.md#topeerid)
 
+#### Defined in
+
+[src/types/curvePoint.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L47)
+
 ___
 
 ### toUncompressedCurvePoint
@@ -163,6 +195,10 @@ ___
 #### Inherited from
 
 [CurvePoint](CurvePoint.md).[toUncompressedCurvePoint](CurvePoint.md#touncompressedcurvepoint)
+
+#### Defined in
+
+[src/types/curvePoint.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L42)
 
 ___
 
@@ -184,6 +220,10 @@ ___
 
 [CurvePoint](CurvePoint.md).[fromExponent](CurvePoint.md#fromexponent)
 
+#### Defined in
+
+[src/types/challenge.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/challenge.ts#L8)
+
 ___
 
 ### fromHintAndShare
@@ -201,6 +241,10 @@ ___
 
 [`Challenge`](Challenge.md)
 
+#### Defined in
+
+[src/types/challenge.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/challenge.ts#L12)
+
 ___
 
 ### fromOwnShareAndHalfKey
@@ -217,6 +261,10 @@ ___
 #### Returns
 
 [`Challenge`](Challenge.md)
+
+#### Defined in
+
+[src/types/challenge.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/challenge.ts#L16)
 
 ___
 
@@ -238,6 +286,10 @@ ___
 
 [CurvePoint](CurvePoint.md).[fromPeerId](CurvePoint.md#frompeerid)
 
+#### Defined in
+
+[src/types/curvePoint.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L34)
+
 ___
 
 ### fromString
@@ -258,6 +310,10 @@ ___
 
 [CurvePoint](CurvePoint.md).[fromString](CurvePoint.md#fromstring)
 
+#### Defined in
+
+[src/types/curvePoint.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L51)
+
 ___
 
 ### fromUncompressedUncompressedCurvePoint
@@ -277,3 +333,7 @@ ___
 #### Inherited from
 
 [CurvePoint](CurvePoint.md).[fromUncompressedUncompressedCurvePoint](CurvePoint.md#fromuncompresseduncompressedcurvepoint)
+
+#### Defined in
+
+[src/types/curvePoint.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L26)

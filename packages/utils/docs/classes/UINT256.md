@@ -8,6 +8,10 @@
 
 - [constructor](UINT256.md#constructor)
 
+### Properties
+
+- [bn](UINT256.md#bn)
+
 ### Accessors
 
 - [DUMMY\_INVERSE\_PROBABILITY](UINT256.md#dummy_inverse_probability)
@@ -36,6 +40,20 @@
 | :------ | :------ |
 | `bn` | `BN` |
 
+#### Defined in
+
+[src/types/solidity.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L4)
+
+## Properties
+
+### bn
+
+• `Private` **bn**: `BN`
+
+#### Defined in
+
+[src/types/solidity.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L4)
+
 ## Accessors
 
 ### DUMMY\_INVERSE\_PROBABILITY
@@ -46,6 +64,10 @@
 
 [`UINT256`](UINT256.md)
 
+#### Defined in
+
+[src/types/solidity.ts:44](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L44)
+
 ___
 
 ### SIZE
@@ -55,6 +77,10 @@ ___
 #### Returns
 
 `number`
+
+#### Defined in
+
+[src/types/solidity.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L48)
 
 ## Methods
 
@@ -72,6 +98,10 @@ ___
 
 `number`
 
+#### Defined in
+
+[src/types/solidity.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L26)
+
 ___
 
 ### eq
@@ -88,6 +118,10 @@ ___
 
 `boolean`
 
+#### Defined in
+
+[src/types/solidity.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L22)
+
 ___
 
 ### serialize
@@ -97,6 +131,10 @@ ___
 #### Returns
 
 `Uint8Array`
+
+#### Defined in
+
+[src/types/solidity.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L14)
 
 ___
 
@@ -108,6 +146,10 @@ ___
 
 `BN`
 
+#### Defined in
+
+[src/types/solidity.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L6)
+
 ___
 
 ### toHex
@@ -117,6 +159,10 @@ ___
 #### Returns
 
 `string`
+
+#### Defined in
+
+[src/types/solidity.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L18)
 
 ___
 
@@ -134,6 +180,10 @@ ___
 
 [`UINT256`](UINT256.md)
 
+#### Defined in
+
+[src/types/solidity.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L10)
+
 ___
 
 ### fromInverseProbability
@@ -150,6 +200,10 @@ ___
 
 [`UINT256`](UINT256.md)
 
+#### Defined in
+
+[src/types/solidity.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L34)
+
 ___
 
 ### fromString
@@ -165,3 +219,7 @@ ___
 #### Returns
 
 [`UINT256`](UINT256.md)
+
+#### Defined in
+
+[src/types/solidity.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L30)

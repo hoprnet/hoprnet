@@ -33,8 +33,8 @@ export default class Ping extends Command {
     if (!response.ok) {
       return log(
         await this.failedApiCall(response, 'ping node', {
-          400: `invalid peer ID ${peerIdStr}`,
-          422: ''
+          400: `Invalid peer ID ${peerIdStr}`,
+          422: `Peer ${peerIdStr} not reachable`
         })
       )
     }
@@ -42,7 +42,7 @@ export default class Ping extends Command {
     const ping = await response.json()
 
     if (ping.latency >= 0) {
-      return log(`Pong received in ${ping.latency} ms`)
+      return log(`Pong from peer ${peerIdStr} received in ${ping.latency} ms`)
     } else {
       return log(this.failedCommand('ping node', 'timeout'))
     }
