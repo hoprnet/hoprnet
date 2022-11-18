@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::fs;
 use std::io;
+// use std::str::pattern::Pattern; // TODO: only incldue this feature when it's stablized.
 use ethers::signers::Signer;
 use ethers::signers::Wallet;
 use ethers::core::rand::thread_rng;
@@ -12,6 +13,7 @@ pub fn read_identities (identity_directory: &str, password: &String, identity_pr
     .filter(|r| r.is_ok()) // Get rid of Err variants for Result<DirEntry>
     .map(|r| r.unwrap().path()) // Read all the files from the given directory
     .filter(|r| r.is_file() && r.extension().unwrap() == "id") // Filter out folders
+    // .filter(|r| r.as_path().display().to_string().strip_prefix_of(&identity_prefix.unwrap()))// TODO: additional filter on the prefix. Only include it when it's stabilized.
     .map(|r| Wallet::decrypt_keystore(r, password).unwrap().address()) // read keystore and return address
     .collect();
     
