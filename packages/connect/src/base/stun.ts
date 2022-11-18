@@ -8,19 +8,19 @@ import { Socket, RemoteInfo, createSocket } from 'dgram'
 import { Multiaddr } from '@multiformats/multiaddr'
 import debug from 'debug'
 import {
-  randomSubset,
   ipToU8aAddress,
   isLocalhost,
   isPrivateAddress,
   u8aAddrToString,
   u8aToNumber,
-  u8aToHex
+  u8aToHex,
+  randomPermutation
 } from '@hoprnet/hopr-utils'
 import { CODE_IP4, CODE_IP6, CODE_DNS4, CODE_DNS6 } from '../constants.js'
-import { lookup } from 'dns'
-import { isIPv6 } from 'net'
+
 // @ts-ignore untyped module
 import retimer from 'retimer'
+import { upd6Lookup } from '../utils/index.js'
 
 const log = debug('hopr-connect:stun:error')
 const error = debug('hopr-connect:stun:error')
@@ -44,8 +44,6 @@ export const PUBLIC_STUN_SERVERS = [
   new Multiaddr(`/dns4/stun.sipgate.net/udp/3478`),
   new Multiaddr(`/dns4/stun.callwithus.com/udp/3478`)
 ]
-
-export const DEFAULT_PARALLEL_STUN_CALLS = 4
 
 // STUN server constants
 const isStunRequest = 0x0000
@@ -147,65 +145,6 @@ export type Request = {
 
 type Requests = Map<string, Request>
 
-type RequestWithResponse = { response: Interface }
-
-/**
- * Takes a list of STUN servers and tries them one-by-one
- * in random order.
- * @param multiaddrs list of STUN servers
- * @param socket socket to receive replies
- * @param maxAttempts [optional] maximum number of attempts
- * @param runningLocally [optional] enable STUN local-mode
- * @returns STUN responses
- */
-export async function iterateThroughStunServers(
-  multiaddrs: Multiaddr[],
-  socket: Socket,
-  maxAttempts = Infinity,
-  runningLocally = false
-): Promise<RequestWithResponse[]> {
-  const usedStunServers = new Set<string>()
-
-  let selectedStunServers: Multiaddr[]
-  if (multiaddrs.length > DEFAULT_PARALLEL_STUN_CALLS) {
-    selectedStunServers = randomSubset(multiaddrs, DEFAULT_PARALLEL_STUN_CALLS)
-  } else {
-    selectedStunServers = multiaddrs
-  }
-
-  // @ts-ignore
-  let responses: RequestWithResponse[] = await performSTUNRequests(
-    selectedStunServers,
-    socket,
-    STUN_TIMEOUT,
-    runningLocally
-  )
-
-  if (multiaddrs.length > DEFAULT_PARALLEL_STUN_CALLS) {
-    while (responses.length < 2) {
-      for (const selected of selectedStunServers) {
-        usedStunServers.add(selected.toString())
-      }
-
-      if (usedStunServers.size >= maxAttempts) {
-        break
-      }
-
-      const toFetch = Math.min(maxAttempts, DEFAULT_PARALLEL_STUN_CALLS + usedStunServers.size) - usedStunServers.size
-
-      selectedStunServers = randomSubset(multiaddrs, toFetch, (ma: Multiaddr) => !usedStunServers.has(ma.toString()))
-
-      // responses.push(...(await performSTUNRequests(selectedStunServers, socket, STUN_TIMEOUT, runningLocally)))
-
-      if (selectedStunServers.length < toFetch) {
-        break
-      }
-    }
-  }
-
-  return responses
-}
-
 enum STUN_ALIVE_STATE {
   SEARCHING_STUN_SERVER,
   SEARCHING_RFC_5780_STUN_SERVER,
@@ -228,20 +167,7 @@ export function isBindingAlive(
 
     const secondarySocket = createSocket({
       type: 'udp6',
-      lookup: (...requestArgs: any[]) => {
-        if (isIPv6(requestArgs[0])) {
-          // @ts-ignore
-          return lookup(...requestArgs)
-        }
-        return lookup(requestArgs[0], 4, (...responseArgs: any[]) => {
-          const callback = requestArgs.length == 3 ? requestArgs[2] : requestArgs[1]
-          // Error | null
-          if (responseArgs[0] != null) {
-            return callback(responseArgs[0])
-          }
-          callback(responseArgs[0], `::ffff:${responseArgs[1]}`, responseArgs[2])
-        })
-      }
+      lookup: upd6Lookup
     })
 
     const secondaryInterface = await performSTUNRequests(multiaddrs, secondarySocket, timeout, runningLocally)
@@ -265,7 +191,6 @@ export function isBindingAlive(
     const it = multiaddrs[Symbol.iterator]()
 
     const onTimeoutSecondary = (transactionId: Buffer) => {
-      console.log(`onTimeout secondary`, u8aToHex(transactionId))
       requests.delete(u8aToHex(transactionId))
 
       nextSTUNRequest(
@@ -281,8 +206,6 @@ export function isBindingAlive(
     }
 
     const onTimeoutPrimary = (transactionId: Buffer) => {
-      console.log(`onTimeout primary`, u8aToHex(transactionId))
-
       const tIdString = u8aToHex(transactionId)
       const request = requests.get(tIdString)
 
@@ -577,11 +500,18 @@ function sendStunRequests(multiaddr: Multiaddr, tId: Buffer, responsePort: numbe
   })
 }
 
+/**
+ * Attaches a listener to the given socket that calls the `update`
+ * function on every reception of a BindingResponse
+ * @param socket socket to listen for messages
+ * @param update called on incoming STUN BindingResponses
+ * @returns
+ */
 function decodeIncomingSTUNResponses(
   socket: Socket,
   update: (response: { response: Interface; transactionId: Buffer }) => void
 ): () => void {
-  const listener = (data: Buffer) => {
+  const listener = (data: Buffer, rinfo: any) => {
     if (!isStun(data)) {
       return
     }
@@ -595,7 +525,11 @@ function decodeIncomingSTUNResponses(
           transactionId: response.transactionId
         })
         break
+      case isStunRequest:
+        // handled by STUN server, ignoring
+        break
       default:
+        log(`unknown STUN response`, data, rinfo)
         break
     }
   }
@@ -607,8 +541,9 @@ function decodeIncomingSTUNResponses(
 }
 
 /**
- * Remove unusable responses from results
- * @param responses results to filter
+ * Filters STUN responses according to network situation, e.g. local testnet
+ * @dev Drops IPv6 responses because IPv6 is not yet supported
+ * IPv6 interfaces
  * @param runningLocally whether to run in local-mode or not
  * @returns filtered results
  */
@@ -640,40 +575,6 @@ export function isUsableResult(result: Interface, runningLocally = false): boole
 }
 
 /**
- * Check if the results are ambiguous and return single response
- * if not ambiguous.
- * @param results results to check for ambiguity
- * @returns a public address if, and only if, the results are not ambiguous
- */
-export function intepreteResults(results: RequestWithResponse[]):
-  | {
-      ambiguous: true
-    }
-  | {
-      ambiguous: false
-      publicAddress: Interface
-    } {
-  if (results.length == 0 || results[0].response == undefined) {
-    return { ambiguous: true }
-  }
-
-  for (const [index, result] of results.entries()) {
-    if (index == 0) {
-      continue
-    }
-
-    if (result.response.address != results[0].response.address || result.response.port != results[0].response.port) {
-      return { ambiguous: true }
-    }
-  }
-
-  return {
-    ambiguous: false,
-    publicAddress: results[0].response
-  }
-}
-
-/**
  * Tries to determine the external IPv4 address
  * @returns Addr+Port or undefined if the STUN response are ambiguous (e.g. bidirectional NAT)
  *
@@ -686,7 +587,21 @@ export async function getExternalIp(
   socket: Socket,
   __preferLocalAddress = false
 ): Promise<Interface | undefined> {
-  let responses: RequestWithResponse[] = []
+  const permutated = function* () {
+    if (multiAddrs == undefined || multiAddrs.length == 0) {
+      yield* []
+      return
+    }
+    const indices = Array.from({ length: (multiAddrs ?? []).length }, (_, i) => i)
+
+    // Permutates in-place
+    randomPermutation(indices)
+
+    for (let i = 0; i < multiAddrs.length; i++) {
+      yield multiAddrs[indices[i]]
+    }
+  }
+
   if (__preferLocalAddress) {
     if (multiAddrs == undefined || multiAddrs.length == 0) {
       const socketAddress = socket.address() as Interface | null
@@ -704,42 +619,18 @@ export async function getExternalIp(
       }
     }
 
-    responses.push(...(await iterateThroughStunServers(multiAddrs, socket, Infinity, true)))
-
-    if (responses.length == 0) {
-      log(`Cannot determine external IP because running in local mode and none of the local STUN servers replied.`)
-      return
-    }
+    return await performSTUNRequests(permutated(), socket, undefined, true)
   } else {
-    if (multiAddrs == undefined || multiAddrs.length == 0) {
-      responses.push(...(await iterateThroughStunServers(PUBLIC_STUN_SERVERS, socket)))
-    } else {
-      responses.push(...(await iterateThroughStunServers(multiAddrs, socket)))
-
-      // We need at least two answers to determine whether the node
-      // operates behind a bidirectional NAT
-      if (responses.length < 2) {
-        responses.push(...(await iterateThroughStunServers(PUBLIC_STUN_SERVERS, socket)))
-      }
-    }
-  }
-
-  if (responses.length < 2) {
-    // We have tried all ways to check if the node
-    // is operating behind a bidirectional NAT but we
-    // could not get more than one response from STUN servers
-    log(
-      `Could not get more than one response from available STUN servers. Assuming that node operates behind a bidirectional NAT`
+    return await performSTUNRequests(
+      (function* () {
+        if (multiAddrs != undefined && multiAddrs.length > 0) {
+          yield* permutated()
+        }
+        // Fallback option
+        yield* PUBLIC_STUN_SERVERS
+      })(),
+      socket,
+      undefined
     )
-    return
-  }
-
-  const interpreted = intepreteResults(responses)
-
-  if (interpreted.ambiguous) {
-    log(`Received STUN results are ambiguous. Assuming that node operates behind a bidirectional NAT`)
-    return
-  } else {
-    return interpreted.publicAddress
   }
 }

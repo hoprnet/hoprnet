@@ -12,8 +12,6 @@ import {
 } from 'net'
 import { createSocket, type RemoteInfo, type Socket as UDPSocket } from 'dgram'
 import { once } from 'events'
-import { lookup } from 'dns'
-import { isIPv6 } from 'net'
 
 import Debug from 'debug'
 import { peerIdFromBytes } from '@libp2p/peer-id'
@@ -32,7 +30,7 @@ import { handleStunRequest, getExternalIp } from './stun.js'
 import { getAddrs } from './addrs.js'
 import { fromSocket } from './tcp.js'
 import { RELAY_CHANGED_EVENT } from './entry.js'
-import { bindToPort, attemptClose, nodeToMultiaddr, cleanExistingConnections } from '../utils/index.js'
+import { bindToPort, attemptClose, nodeToMultiaddr, cleanExistingConnections, upd6Lookup } from '../utils/index.js'
 
 import type { Components } from '@libp2p/interfaces/components'
 import type { ConnectComponents } from '../components.js'
@@ -52,6 +50,10 @@ enum ListenerState {
 }
 
 type Address = { port: number; address: string }
+
+type NATSituation =
+  | { bidirectionalNAT: true }
+  | { bidirectionalNAT: false; externalAddress: string; externalPort: number; isExposed: boolean }
 
 // @ts-ignore libp2p interfaces type clash
 class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener {
@@ -94,20 +96,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       // We use IPv4 traffic on udp6 sockets, so DNS queries
       // must return the A record (IPv4) not the AAAA record (IPv6)
       // - unless we explicitly check for a IPv6 address
-      lookup: (...requestArgs: any[]) => {
-        if (isIPv6(requestArgs[0])) {
-          // @ts-ignore
-          return lookup(...requestArgs)
-        }
-        return lookup(requestArgs[0], 4, (...responseArgs: any[]) => {
-          const callback = requestArgs.length == 3 ? requestArgs[2] : requestArgs[1]
-          // Error | null
-          if (responseArgs[0] != null) {
-            return callback(responseArgs[0])
-          }
-          callback(responseArgs[0], `::ffff:${responseArgs[1]}`, responseArgs[2])
-        })
-      }
+      lookup: upd6Lookup
     })
 
     this.state = ListenerState.UNINITIALIZED
@@ -213,98 +202,6 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     } else {
       await this.listenTCP(options)
       await this.listenUDP(options.port)
-    }
-  }
-
-  async isExposedHost(
-    externalIp: string,
-    port: number
-  ): Promise<{
-    udpMapped: boolean
-    tcpMapped: boolean
-  }> {
-    const UDP_TEST = new TextEncoder().encode('TEST_UDP')
-    const TCP_TEST = new TextEncoder().encode('TEST_TCP')
-
-    const waitForIncomingUdpPacket = defer<void>()
-    const waitForIncomingTcpPacket = defer<void>()
-
-    const TIMEOUT = 500
-
-    const abort = new AbortController()
-    const tcpTimeout = setTimeout(() => {
-      abort.abort()
-      waitForIncomingTcpPacket.reject()
-    }, TIMEOUT).unref()
-    const udpTimeout = setTimeout(waitForIncomingUdpPacket.reject.bind(waitForIncomingUdpPacket), TIMEOUT).unref()
-
-    const checkTcpMessage = (socket: TCPSocket) => {
-      socket.on('data', (data: Buffer) => {
-        if (u8aEquals(data, TCP_TEST)) {
-          clearTimeout(tcpTimeout)
-          waitForIncomingTcpPacket.resolve()
-        }
-      })
-    }
-    this.tcpSocket.on('connection', checkTcpMessage)
-
-    const checkUdpMessage = (msg: Buffer) => {
-      if (u8aEquals(msg, UDP_TEST)) {
-        clearTimeout(udpTimeout)
-        waitForIncomingUdpPacket.resolve()
-      }
-    }
-    this.udpSocket.on('message', checkUdpMessage)
-
-    const secondUdpSocket = createSocket('udp4')
-    secondUdpSocket.send(UDP_TEST, port, externalIp)
-
-    let done = false
-    const cleanUp = (): void => {
-      if (done) {
-        return
-      }
-      done = true
-      clearTimeout(tcpTimeout)
-      clearTimeout(udpTimeout)
-      this.udpSocket.removeListener('message', checkUdpMessage)
-      this.tcpSocket.removeListener('connection', checkTcpMessage)
-      tcpSocket.destroy()
-      secondUdpSocket.close()
-    }
-
-    const tcpSocket = createConnection({
-      port,
-      host: externalIp,
-      signal: abort.signal
-    })
-      .on('connect', () => {
-        tcpSocket.write(TCP_TEST, (err: any) => {
-          if (err) {
-            log(`Failed to send TCP packet`, err)
-          }
-        })
-      })
-      .on('error', (err: any) => {
-        if (err && (err.code == undefined || err.code !== 'ABORT_ERR')) {
-          error(`Error while checking NAT situation`, err.message)
-        }
-      })
-
-    if (!done) {
-      const results = await Promise.allSettled([waitForIncomingUdpPacket.promise, waitForIncomingTcpPacket.promise])
-
-      cleanUp()
-
-      return {
-        udpMapped: results[0].status === 'fulfilled',
-        tcpMapped: results[1].status === 'fulfilled'
-      }
-    }
-
-    return {
-      udpMapped: false,
-      tcpMapped: false
     }
   }
 
@@ -564,13 +461,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
    * @param ownPort the port on which we are listening
    * @returns Promise that resolves once STUN request came back or STUN timeout was reched
    */
-  async checkNATSituation(
-    ownAddress: string,
-    ownPort: number
-  ): Promise<
-    | { bidirectionalNAT: true }
-    | { bidirectionalNAT: false; externalAddress: string; externalPort: number; isExposed: boolean }
-  > {
+  async checkNATSituation(ownAddress: string, ownPort: number): Promise<NATSituation> {
     if (this.testingOptions.__runningLocally) {
       const address = this.tcpSocket.address() as Address
 
@@ -582,6 +473,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
         isExposed: true
       }
     }
+
     let externalAddress = this.testingOptions.__noUPNP
       ? undefined
       : await this.connectComponents.getUpnpManager().externalIp()

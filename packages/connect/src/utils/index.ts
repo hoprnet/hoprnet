@@ -1,5 +1,6 @@
-import type { AddressInfo, Server as TCPServer } from 'net'
+import { type AddressInfo, type Server as TCPServer, isIPv6 } from 'net'
 import type { Socket as UDPSocket } from 'dgram'
+import { lookup } from 'dns'
 import type { Connection, MultiaddrConnection } from '@libp2p/interface-connection'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Components } from '@libp2p/interfaces/components'
@@ -171,6 +172,26 @@ export function bindToPort<T extends 'UDP' | 'TCP'>(
         reject(err)
       }
     }
+  })
+}
+
+/**
+ * Hook to attach to `udp6` sockets to resolve dns4 queries
+ * similar to `udp4` sockets
+ * @param requestArgs UDP socket lookup arguments
+ */
+export function upd6Lookup(...requestArgs: any[]) {
+  if (isIPv6(requestArgs[0])) {
+    // @ts-ignore
+    return lookup(...requestArgs)
+  }
+  return lookup(requestArgs[0], 4, (...responseArgs: any[]) => {
+    const callback = requestArgs.length == 3 ? requestArgs[2] : requestArgs[1]
+    // Error | null
+    if (responseArgs[0] != null) {
+      return callback(responseArgs[0])
+    }
+    callback(responseArgs[0], `::ffff:${responseArgs[1]}`, responseArgs[2])
   })
 }
 
