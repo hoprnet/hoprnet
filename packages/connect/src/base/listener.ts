@@ -3,13 +3,7 @@ import type { Listener as InterfaceListener, ListenerEvents } from '@libp2p/inte
 import { EventEmitter, CustomEvent } from '@libp2p/interfaces/events'
 
 import { networkInterfaces, type NetworkInterfaceInfo } from 'os'
-import {
-  createServer,
-  createConnection,
-  type AddressInfo,
-  type Socket as TCPSocket,
-  type Server as TCPServer
-} from 'net'
+import { createServer, type AddressInfo, type Socket as TCPSocket, type Server as TCPServer } from 'net'
 import { createSocket, type RemoteInfo, type Socket as UDPSocket } from 'dgram'
 import { once } from 'events'
 
@@ -17,7 +11,7 @@ import Debug from 'debug'
 import { peerIdFromBytes } from '@libp2p/peer-id'
 import { Multiaddr } from '@multiformats/multiaddr'
 
-import { isAnyAddress, u8aEquals, defer } from '@hoprnet/hopr-utils'
+import { isAnyAddress } from '@hoprnet/hopr-utils'
 
 import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP } from '../constants.js'
 import {
@@ -26,7 +20,7 @@ import {
   type HoprConnectTestingOptions,
   PeerConnectionType
 } from '../types.js'
-import { handleStunRequest, getExternalIp } from './stun.js'
+import { handleStunRequest, getExternalIp, Interface } from './stun.js'
 import { getAddrs } from './addrs.js'
 import { fromSocket } from './tcp.js'
 import { RELAY_CHANGED_EVENT } from './entry.js'
@@ -34,6 +28,7 @@ import { bindToPort, attemptClose, nodeToMultiaddr, cleanExistingConnections, up
 
 import type { Components } from '@libp2p/interfaces/components'
 import type { ConnectComponents } from '../components.js'
+import { checkForHairpinning } from './hairpin.js'
 
 const log = Debug('hopr-connect:listener')
 const error = Debug('hopr-connect:listener:error')
@@ -479,13 +474,20 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       : await this.connectComponents.getUpnpManager().externalIp()
     let externalPort: number | undefined
 
-    let isExposedHost: Awaited<ReturnType<Listener['isExposedHost']>> | undefined
+    let isExposedHost: Awaited<ReturnType<typeof checkForHairpinning>> | undefined
     if (externalAddress != undefined) {
       // UPnP is supported, let's try to open the port
       await this.connectComponents.getUpnpManager().map(ownPort)
 
       // Don't trust the router blindly ...
-      isExposedHost = await this.isExposedHost(externalAddress, ownPort)
+      isExposedHost = await checkForHairpinning(
+        {
+          address: externalAddress,
+          port: ownPort
+        } as Interface,
+        this.tcpSocket,
+        this.udpSocket
+      )
 
       if (isExposedHost.tcpMapped || isExposedHost.udpMapped) {
         // Either TCP or UDP were mapped
@@ -509,7 +511,14 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
         if (externalInterface != undefined) {
           externalPort = externalInterface.port
 
-          isExposedHost = await this.isExposedHost(externalAddress, externalPort)
+          isExposedHost = await checkForHairpinning(
+            {
+              address: externalAddress,
+              port: externalPort
+            } as Interface,
+            this.tcpSocket,
+            this.udpSocket
+          )
         }
       }
     } else {
@@ -531,7 +540,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
         externalPort = externalInterface.port
         externalAddress = externalInterface.address
 
-        isExposedHost = await this.isExposedHost(externalInterface.address, externalInterface.port)
+        isExposedHost = await checkForHairpinning(externalInterface as Interface, this.tcpSocket, this.udpSocket)
       }
     }
 

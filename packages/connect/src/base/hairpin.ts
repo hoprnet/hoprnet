@@ -1,103 +1,83 @@
 import { Interface, performSTUNRequests } from './stun.js'
-import { defer } from '@hoprnet/hopr-utils'
-import { Socket as UDPSocket } from 'dgram'
-import { Socket as TCPSocket } from 'net'
+import { type Socket as UDPSocket } from 'dgram'
+import { type Server as TCPSocket, createConnection } from 'net'
 import { Multiaddr } from '@multiformats/multiaddr'
+import debug from 'debug'
 
-async function isExposedHost(
+import { u8aEquals } from '@hoprnet/hopr-utils'
+
+// @ts-ignore
+import { retimer } from 'retimer'
+
+const log = debug('hopr-connect:hairpin')
+const error = debug('hopr-connect:hairpin:error')
+
+export async function checkForHairpinning(
   externalInterface: Interface,
-  tcpSocket,
+  tcpSocket: TCPSocket,
   udpSocket: UDPSocket
-): Promise<{
-  udpMapped: boolean
-  tcpMapped: boolean
-}> {
-  const UDP_TEST = new TextEncoder().encode('TEST_UDP')
-  const TCP_TEST = new TextEncoder().encode('TEST_TCP')
-
-  const waitForIncomingUdpPacket = defer<void>()
-  const waitForIncomingTcpPacket = defer<void>()
-
-  const TIMEOUT = 500
-
-  const abort = new AbortController()
-  const tcpTimeout = setTimeout(() => {
-    abort.abort()
-    waitForIncomingTcpPacket.reject()
-  }, TIMEOUT).unref()
-  const udpTimeout = setTimeout(waitForIncomingUdpPacket.reject.bind(waitForIncomingUdpPacket), TIMEOUT).unref()
-
-  const checkTcpMessage = (socket: TCPSocket) => {
-    socket.on('data', (data: Buffer) => {
-      if (u8aEquals(data, TCP_TEST)) {
-        clearTimeout(tcpTimeout)
-        waitForIncomingTcpPacket.resolve()
-      }
-    })
-  }
-  this.tcpSocket.on('connection', checkTcpMessage)
-
-  const checkUdpMessage = (msg: Buffer) => {
-    if (u8aEquals(msg, UDP_TEST)) {
-      clearTimeout(udpTimeout)
-      waitForIncomingUdpPacket.resolve()
-    }
-  }
-  this.udpSocket.on('message', checkUdpMessage)
-
-  const secondUdpSocket = createSocket('udp4')
-  secondUdpSocket.send(UDP_TEST, port, externalIp)
-
-  let done = false
-  const cleanUp = (): void => {
-    if (done) {
-      return
-    }
-    done = true
-    clearTimeout(tcpTimeout)
-    clearTimeout(udpTimeout)
-    this.udpSocket.removeListener('message', checkUdpMessage)
-    this.tcpSocket.removeListener('connection', checkTcpMessage)
-    tcpSocket.destroy()
-    secondUdpSocket.close()
-  }
-
-  const tcpSocket = createConnection({
-    port,
-    host: externalIp,
-    signal: abort.signal
-  })
-    .on('connect', () => {
-      tcpSocket.write(TCP_TEST, (err: any) => {
-        if (err) {
-          log(`Failed to send TCP packet`, err)
-        }
-      })
-    })
-    .on('error', (err: any) => {
-      if (err && (err.code == undefined || err.code !== 'ABORT_ERR')) {
-        error(`Error while checking NAT situation`, err.message)
-      }
-    })
-
-  if (!done) {
-    const results = await Promise.allSettled([waitForIncomingUdpPacket.promise, waitForIncomingTcpPacket.promise])
-
-    cleanUp()
-
-    return {
-      udpMapped: results[0].status === 'fulfilled',
-      tcpMapped: results[1].status === 'fulfilled'
-    }
-  }
+): Promise<{ udpMapped: boolean; tcpMapped: boolean }> {
+  const [udpMapped, tcpMapped] = await Promise.all([
+    checkUDPHairpin(externalInterface, udpSocket),
+    checkTCPHairpin(externalInterface, tcpSocket)
+  ])
 
   return {
-    udpMapped: false,
-    tcpMapped: false
+    udpMapped,
+    tcpMapped
   }
 }
 
-function checkTCPHairpin() {}
+async function checkTCPHairpin(externalInterface: Interface, socket: TCPSocket): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    const TCP_TEST = new TextEncoder().encode('TEST_TCP')
+
+    const TIMEOUT = 500
+
+    const abort = new AbortController()
+
+    const timeout = retimer(() => {
+      abort.abort()
+      done(undefined, false)
+    }, TIMEOUT).unref()
+
+    const checkMessage = (socket: TCPSocket) => {
+      socket.on('data', (data: Buffer) => {
+        if (u8aEquals(data, TCP_TEST)) {
+          timeout.clear()
+          done(undefined, true)
+        }
+      })
+    }
+
+    const done = (err: any, result?: boolean) => {
+      socket.removeListener('connection', checkMessage)
+
+      resolve(err != undefined ? false : result ?? false)
+    }
+
+    socket.on('connection', checkMessage)
+
+    const outgoingSocket = createConnection({
+      port: externalInterface.port,
+      host: externalInterface.address,
+      signal: abort.signal
+    })
+      .on('connect', () => {
+        outgoingSocket.write(TCP_TEST, (err: any) => {
+          if (err) {
+            log(`Failed to send TCP packet`, err)
+          }
+        })
+      })
+      .on('error', (err: any) => {
+        if (err && (err.code == undefined || err.code !== 'ABORT_ERR')) {
+          error(`Error while checking NAT situation`, err.message)
+          done(err)
+        }
+      })
+  })
+}
 
 async function checkUDPHairpin(externalInterface: Interface, socket: UDPSocket): Promise<boolean> {
   return (
