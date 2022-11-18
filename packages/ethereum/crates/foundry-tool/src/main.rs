@@ -5,16 +5,17 @@ use std::fs;
 mod key_pair;
 
 #[derive(Parser, Default, Debug)]
-#[command(name = "Contract Deployment Helper")]
-#[command(author = "HOPR <tech@hoprnet.org>")]
-#[command(version = "0.1")]
-#[command(about = "Toolchain to deploy multiple smart contracts, store deployment files and ", long_about = None)]
-#[command(author, version, about, long_about = None)]
+#[clap(
+    name = "HOPR ethereum package helper",
+    author = "HOPR <tech@hoprnet.org>",
+    version = "0.1",
+    about = "Helper to store deployment files and fund nodes",
+)]
 struct Cli {
-    #[arg(long)]
+    #[clap(long)]
     environment_name: String,
 
-    #[arg(long, short, default_value_t = 0)]
+    #[clap(long, short, default_value_t = 0)]
     environment_type: u8,
 
     #[command(subcommand)]
@@ -23,26 +24,61 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    // related to file structure
+    // related to file structure. TODO: Extend this command to store deployment files, if needed
+    #[clap(about = "Print path to the folder that should store deployment files for given envirionment and type.")]
     Files {
-        #[arg(short, long)]
+        #[clap(short, long)]
         list: bool,
     },
+    #[clap(about = "Fund given address and/or addressed derived from identity files native tokens or HOPR tokens")]
     Faucet {
-        #[arg(short = 'a', long)]
+        #[clap(
+            help = "Ethereum address of node that will receive funds",
+            long,
+            short,
+            default_value = None
+        )]
         address: Option<String>,
-        #[arg(short, long)]
+
+        #[clap(
+            help = "Password to decrypt identity files",
+            long,
+            short,
+            default_value = ""
+        )]
         password: String,
-        #[arg(short, long)]
+
+        #[clap(
+            help = "Make faucet script access and extract addresses from local identity files",
+            long,
+            short,
+            default_value = "false"
+        )]
         use_local_identities: bool,
-        #[arg(short = 'm', long)]
-        amount: String,
-        #[arg(short = 'd', long)]
+
+        #[clap(
+            help = "Path to the directory that stores identity files",
+            long,
+            short = 'd',
+            default_value = "/tmp"
+        )]
         identity_directory: Option<String>,
-        #[arg(short = 'x', long)]
+
+        #[clap(
+            help = "Only use identity files with prefix",
+            long,
+            short = 'x',
+            default_value = None
+        )]
         identity_prefix: Option<String>,
-        #[arg(short, long)]
-        token_type: String, // 'hopr' | 'native'
+
+        #[clap(
+            help = "specify the type of token to be sent ('hopr' or 'native'), if needed. Defaut value means sending both tokens",
+            long,
+            short,
+            default_value = None
+        )]
+        token_type: Option<String>,
     }
 }
 
@@ -54,7 +90,7 @@ fn main() {
             let new_p = buildPath(&cli.environment_name, &cli.environment_type);
             println!("check if path {} is created", new_p);
         },
-        Some(Commands::Faucet { address, password, use_local_identities, amount, identity_directory, identity_prefix, token_type }) => {
+        Some(Commands::Faucet { address, password, use_local_identities, identity_directory, identity_prefix, token_type }) => {
             // Check if local identity files should be used. Push all the read identities.
             let file_names;
             if use_local_identities {

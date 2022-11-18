@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::{Path};
 use std::fs;
 use std::io;
 // use std::str::pattern::Pattern; // TODO: only incldue this feature when it's stablized.
@@ -7,7 +7,7 @@ use ethers::signers::Wallet;
 use ethers::core::rand::thread_rng;
 use ethers::types::Address;
 
-pub fn read_identities (identity_directory: &str, password: &String, identity_prefix: Option<String>) -> Result<Vec<Address>, io::Error> {
+pub fn read_identities (identity_directory: &str, password: &String, _identity_prefix: Option<String>) -> Result<Vec<Address>, io::Error> {
   let addresses = fs::read_dir(Path::new(identity_directory))?
     .into_iter() // read all the files from the directory
     .filter(|r| r.is_ok()) // Get rid of Err variants for Result<DirEntry>
