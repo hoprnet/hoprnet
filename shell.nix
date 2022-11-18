@@ -21,7 +21,7 @@ mkShell {
     nodejs-16_x # v16.5.0
     (yarn.override { nodejs = nodejs-16_x; }) # v1.22.10
 
-    ## rust for core development
+    ## rust for core development and required utils
     (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
 
     ## python is required by node module bcrypto

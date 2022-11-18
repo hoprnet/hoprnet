@@ -66,6 +66,10 @@ ___
 
 `Promise`<`void`\>
 
+#### Defined in
+
+[packages/core/src/channel-strategy.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L47)
+
 ___
 
 ### onWinningTicket
@@ -83,6 +87,10 @@ ___
 
 `Promise`<`void`\>
 
+#### Defined in
+
+[packages/core/src/channel-strategy.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L48)
+
 ___
 
 ### shouldCommitToChannel
@@ -98,6 +106,10 @@ ___
 #### Returns
 
 `Promise`<`boolean`\>
+
+#### Defined in
+
+[packages/core/src/channel-strategy.ts:49](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L49)
 
 ___
 
@@ -117,3 +129,7 @@ ___
 #### Returns
 
 `Promise`<[`StrategyTickResult`](../modules.md#strategytickresult)\>
+
+#### Defined in
+
+[packages/core/src/channel-strategy.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L39)

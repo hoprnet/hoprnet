@@ -24,22 +24,19 @@
 - [blockHash](TypedEvent.md#blockhash)
 - [blockNumber](TypedEvent.md#blocknumber)
 - [data](TypedEvent.md#data)
+- [decode](TypedEvent.md#decode)
 - [decodeError](TypedEvent.md#decodeerror)
 - [event](TypedEvent.md#event)
 - [eventSignature](TypedEvent.md#eventsignature)
+- [getBlock](TypedEvent.md#getblock)
+- [getTransaction](TypedEvent.md#gettransaction)
+- [getTransactionReceipt](TypedEvent.md#gettransactionreceipt)
 - [logIndex](TypedEvent.md#logindex)
+- [removeListener](TypedEvent.md#removelistener)
 - [removed](TypedEvent.md#removed)
 - [topics](TypedEvent.md#topics)
 - [transactionHash](TypedEvent.md#transactionhash)
 - [transactionIndex](TypedEvent.md#transactionindex)
-
-### Methods
-
-- [decode](TypedEvent.md#decode)
-- [getBlock](TypedEvent.md#getblock)
-- [getTransaction](TypedEvent.md#gettransaction)
-- [getTransactionReceipt](TypedEvent.md#gettransactionreceipt)
-- [removeListener](TypedEvent.md#removelistener)
 
 ## Properties
 
@@ -113,6 +110,35 @@ node_modules/@ethersproject/abstract-provider/lib/index.d.ts:60
 
 ___
 
+### decode
+
+• `Optional` **decode**: (`data`: `string`, `topics?`: `string`[]) => `any`
+
+#### Type declaration
+
+▸ (`data`, `topics?`): `any`
+
+##### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `data` | `string` |
+| `topics?` | `string`[] |
+
+##### Returns
+
+`any`
+
+#### Inherited from
+
+Event.decode
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:51
+
+___
+
 ### decodeError
 
 • `Optional` **decodeError**: `Error`
@@ -155,6 +181,72 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:48
 
 ___
 
+### getBlock
+
+• **getBlock**: () => `Promise`<`Block`\>
+
+#### Type declaration
+
+▸ (): `Promise`<`Block`\>
+
+##### Returns
+
+`Promise`<`Block`\>
+
+#### Inherited from
+
+Event.getBlock
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:53
+
+___
+
+### getTransaction
+
+• **getTransaction**: () => `Promise`<`TransactionResponse`\>
+
+#### Type declaration
+
+▸ (): `Promise`<`TransactionResponse`\>
+
+##### Returns
+
+`Promise`<`TransactionResponse`\>
+
+#### Inherited from
+
+Event.getTransaction
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:54
+
+___
+
+### getTransactionReceipt
+
+• **getTransactionReceipt**: () => `Promise`<`TransactionReceipt`\>
+
+#### Type declaration
+
+▸ (): `Promise`<`TransactionReceipt`\>
+
+##### Returns
+
+`Promise`<`TransactionReceipt`\>
+
+#### Inherited from
+
+Event.getTransactionReceipt
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:55
+
+___
+
 ### logIndex
 
 • **logIndex**: `number`
@@ -166,6 +258,28 @@ Event.logIndex
 #### Defined in
 
 node_modules/@ethersproject/abstract-provider/lib/index.d.ts:63
+
+___
+
+### removeListener
+
+• **removeListener**: () => `void`
+
+#### Type declaration
+
+▸ (): `void`
+
+##### Returns
+
+`void`
+
+#### Inherited from
+
+Event.removeListener
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:52
 
 ___
 
@@ -222,80 +336,3 @@ Event.transactionIndex
 #### Defined in
 
 node_modules/@ethersproject/abstract-provider/lib/index.d.ts:57
-
-## Methods
-
-### decode
-
-▸ `Optional` **decode**(`data`, `topics?`): `any`
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `data` | `string` |
-| `topics?` | `string`[] |
-
-#### Returns
-
-`any`
-
-#### Inherited from
-
-Event.decode
-
-___
-
-### getBlock
-
-▸ **getBlock**(): `Promise`<`Block`\>
-
-#### Returns
-
-`Promise`<`Block`\>
-
-#### Inherited from
-
-Event.getBlock
-
-___
-
-### getTransaction
-
-▸ **getTransaction**(): `Promise`<`TransactionResponse`\>
-
-#### Returns
-
-`Promise`<`TransactionResponse`\>
-
-#### Inherited from
-
-Event.getTransaction
-
-___
-
-### getTransactionReceipt
-
-▸ **getTransactionReceipt**(): `Promise`<`TransactionReceipt`\>
-
-#### Returns
-
-`Promise`<`TransactionReceipt`\>
-
-#### Inherited from
-
-Event.getTransactionReceipt
-
-___
-
-### removeListener
-
-▸ **removeListener**(): `void`
-
-#### Returns
-
-`void`
-
-#### Inherited from
-
-Event.removeListener

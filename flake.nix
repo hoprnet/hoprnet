@@ -12,7 +12,7 @@
       shell = ./shell.nix;
       systems = [ "x86_64-linux" "aarch64-darwin" ];
       preOverlays = [
-        rust-overlay.overlay
+        rust-overlay.overlays.default
       ];
     };
 }
