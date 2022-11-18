@@ -1579,7 +1579,7 @@ ___
 
 ### storePendingAcknowledgement
 
-▸ **storePendingAcknowledgement**(`halfKeyChallenge`, `isMessageSender`): `Promise`<`void`\>
+▸ **storePendingAcknowledgement**(`halfKeyChallenge`, `isMessageSender`, `unackTicket?`): `Promise`<`void`\>
 
 #### Parameters
 
