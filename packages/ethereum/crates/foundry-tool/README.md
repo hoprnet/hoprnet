@@ -9,8 +9,8 @@ Complete some missing funcitonalities of the foundry-centered smart contract too
 ### Run local development
 ```
 cargo run -- -h
-cargo run -- --environment-name localhost --environment-type 0 files 
-cargo run -- --environment-name localhost --environment-type 0 faucet --password local --use-local-identities --amount 300 --token-type native --identity-directory "/tmp"
+cargo run -- --environment-name localhost --environment-type 0 files --list
+cargo run -- --environment-name localhost --environment-type 0 faucet --password local --use-local-identities --token-type native --identity-directory "/tmp"
 ```
 
 ### Test

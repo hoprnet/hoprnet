@@ -1,8 +1,9 @@
 use clap::{Parser, Subcommand};
 use std::path::{Path};
-use std::fs;
+use ethers::types::Address;
 
 mod key_pair;
+use key_pair::HelperErrors;
 
 #[derive(Parser, Default, Debug)]
 #[clap(
@@ -82,38 +83,56 @@ enum Commands {
     }
 }
 
-fn main() {
+fn main()-> Result<(), HelperErrors> {
     let cli = Cli::parse();
 
     match cli.command {
         Some(Commands::Files { list }) => {
-            let new_p = buildPath(&cli.environment_name, &cli.environment_type);
-            println!("check if path {} is created", new_p);
+            if list {
+                let new_p = build_path(&cli.environment_name, &cli.environment_type);
+                println!("check if path {} is created", new_p);
+            }
+            Ok(())
         },
         Some(Commands::Faucet { address, password, use_local_identities, identity_directory, identity_prefix, token_type }) => {
+            // Include provided address
+            let mut addresses_all = Vec::new();
+            if let Some(addr) = address {
+                if let Ok(parsed_addr) = addr.parse::<Address>() {
+                    addresses_all.push(parsed_addr)
+                }
+                match addr.parse::<Address>() {
+                    Ok(parsed_addr) => addresses_all.push(parsed_addr),
+                    Err(_) => return Err(HelperErrors::UnableToParseAddress(addr))
+                }
+            }
+            
             // Check if local identity files should be used. Push all the read identities.
-            let file_names;
             if use_local_identities {
                 // read all the files from the directory
-                match identity_directory {
-                    None => println!("identity_directory must be provided"),
-                    Some(identity_directory) => {
-                        file_names = fs::read_dir(Path::new(&identity_directory)).unwrap();
-                        for path in file_names {
-                            println!("Name: {}", path.unwrap().path().display())
-                        }
+                if let Some(id_dir) = identity_directory {
+                    match key_pair::read_identities(&id_dir.as_str(), &password, &identity_prefix) {
+                        Ok(addresses_from_identities) => {
+                            addresses_all.extend(addresses_from_identities);
+                        },
+                        Err(e) => return Err(e)
                     }
                 }
             }
+
+            println!("All the addresses {:?}", addresses_all);
+            Ok(())
         },
-        None => {}
+        None => {
+            Ok(())
+        }
     }
 }
 
 
 // fn saveFileToDeployments() -> std::io::Result<()> {}
 
-fn buildPath(environment_name: &str, environment_type: &u8) -> String {
+fn build_path(environment_name: &str, environment_type: &u8) -> String {
     let new_path = vec!["./", environment_name, "/", &environment_type.to_string()].concat();
     match Path::new(&new_path).to_str() {
         None => panic!("new path is not a valid UTF-8 sequence"),
