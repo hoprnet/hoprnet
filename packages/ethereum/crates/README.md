@@ -33,7 +33,7 @@ make sc-coverage
 ```
 anvil
 make anvil-deploy-erc1820
-FOUNDRY_PROFILE=development ENVIRONMENT_NAME=localhost forge script --broadcast script/DeployAll.s.sol:DeployAllContractsScript
+FOUNDRY_PROFILE=development ENVIRONMENT_NAME=anvil forge script --broadcast script/DeployAll.s.sol:DeployAllContractsScript
 ```
 
 #### Staging
