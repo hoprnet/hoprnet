@@ -11,8 +11,8 @@ forked-local-anvil:
 	anvil -f 'https://provider-proxy.hoprnet.workers.dev/xdai_mainnet'
 
 .PHONY: overwrite-sc-bindings
-overwrite-sc-bindings:
-	forge bind --bindings-path ../bindings --crate-name bindings --overwrite
+overwrite-sc-bindings: # Only create types for Hopr* contracts
+	forge bind --bindings-path ../bindings --crate-name bindings --overwrite --select "^Hopr.*(([^T][^e][^s][^t]$|[^S][^c][^r][^i][^p][^t])$)"
 
 .PHONY: anvil-deploy-erc1820
 anvil-deploy-erc1820:

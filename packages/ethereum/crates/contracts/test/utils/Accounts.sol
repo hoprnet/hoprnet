@@ -3,7 +3,7 @@ pragma solidity >=0.6.0 <0.9.0;
 
 import "forge-std/Test.sol";
 
-contract AccountsFixture is Test {
+contract AccountsFixtureTest is Test {
     struct Account {
         address accountAddr;
         uint256 privateKey;

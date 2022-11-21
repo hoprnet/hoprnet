@@ -7,7 +7,7 @@ import "../test/utils/ERC1820Registry.sol";
 import "./utils/EnvironmentConfig.s.sol";
 import "./utils/BoostUtilsLib.sol";
 
-contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryFixture {
+contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryFixtureTest {
     using BoostUtilsLib for address;
 
     function run() external {

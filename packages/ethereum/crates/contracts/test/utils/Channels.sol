@@ -4,7 +4,7 @@ pragma solidity >=0.6.0 <0.9.0;
 import "forge-std/Test.sol";
 import "../../src/HoprChannels.sol";
 
-contract ChannelsUtils is Test {
+contract ChannelsUtilsTest is Test {
     bytes32 public SECRET_0 = keccak256(abi.encodePacked('secret'));
     bytes32 public SECRET_1 = keccak256(abi.encodePacked(SECRET_0));
     bytes32 public SECRET_2 = keccak256(abi.encodePacked(SECRET_1));

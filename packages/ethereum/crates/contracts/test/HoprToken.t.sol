@@ -5,7 +5,7 @@ import "../src/HoprToken.sol";
 import "./utils/ERC1820Registry.sol";
 import "forge-std/Test.sol";
 
-contract HoprTokenTest is Test, ERC1820RegistryFixture {
+contract HoprTokenTest is Test, ERC1820RegistryFixtureTest {
     HoprToken public hoprToken;
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00;

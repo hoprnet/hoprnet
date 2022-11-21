@@ -4,7 +4,7 @@ pragma solidity >=0.6.0 <0.9.0;
 import "./utils/Accounts.sol";
 import "forge-std/Test.sol";
 
-contract AccountTest is Test, AccountsFixture {
+contract AccountTest is Test, AccountsFixtureTest {
     function setUp() public {}
 
     function testAccountAIsCorrect() public {

@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import "./Channels.sol";
 import "./Accounts.sol";
 
-contract TicketsUtils is Test, AccountsFixture, ChannelsUtils {
+contract TicketsUtilsTest is Test, AccountsFixtureTest, ChannelsUtilsTest {
     struct Ticket {
         address source;
         bytes32 nextCommitment;

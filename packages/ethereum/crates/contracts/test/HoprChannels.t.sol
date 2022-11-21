@@ -8,7 +8,7 @@ import "./utils/Tickets.sol";
 import "../src/HoprChannels.sol";
 import "forge-std/Test.sol";
 
-contract HoprChannelsTest is Test, ERC1820RegistryFixture, AccountsFixture, ChannelsUtils, TicketsUtils {
+contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTest, ChannelsUtilsTest, TicketsUtilsTest {
     HoprChannels public hoprChannels;
     bytes32 channelIdAB = getChannelId(accountA.accountAddr, accountB.accountAddr);
     bytes32 channelIdBA = getChannelId(accountB.accountAddr, accountA.accountAddr);

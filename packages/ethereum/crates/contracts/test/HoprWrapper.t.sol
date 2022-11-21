@@ -6,7 +6,7 @@ import "../src/HoprToken.sol";
 import "./utils/ERC1820Registry.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract HoprWrapperTest is Test, ERC1820RegistryFixture {
+contract HoprWrapperTest is Test, ERC1820RegistryFixtureTest {
     HoprWrapper public hoprWrapper;
 
     function setUp() public virtual override {
