@@ -30,7 +30,7 @@ RUN CI=true make deps package=hoprd && \
     # As we are on *nix, use hardlinks in node_modules to save some space
     yarn config set nmMode hardlinks-local && \
     # Install without devDependencies
-    DEBUG= CI=true NO_CARGO=true PRODUCTION=true make deps package=hoprd
+    DEBUG= CI=true PRODUCTION=true make deps package=hoprd
 
 # Alpine 3.16 x86_64 https://hub.docker.com/layers/library/alpine/3.16.3/images/sha256-3d426b0bfc361d6e8303f51459f17782b219dece42a1c7fe463b6014b189c86d
 FROM alpine:3.16@sha256:3d426b0bfc361d6e8303f51459f17782b219dece42a1c7fe463b6014b189c86d as runtime

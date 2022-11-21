@@ -58,11 +58,8 @@ ifneq ($(origin GITHUB_ACTIONS),undefined)
 endif
 	${YARN_ENVIRONMENT} yarn workspaces focus ${YARNFLAGS}
 endif
-# Don't fetch Rust crates since syncing with crates registry is slow
-ifeq ($(origin NO_CARGO),undefined)
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	$(MAKE) cargo-update
-endif
 
 .PHONY: cargo-update
 cargo-update: ## update vendored Cargo dependencies

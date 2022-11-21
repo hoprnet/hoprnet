@@ -52,7 +52,7 @@ COPY --from=build /app/hoprnet/node_modules node_modules/
 COPY --from=build /app/hoprnet/packages/ packages/
 
 # Rerun yarn to recreate symlinks
-RUN CI=true NO_CARGO=true make deps package=hopr-ethereum
+RUN CI=true make deps package=hopr-ethereum
 
 WORKDIR /app/hardhat/packages/ethereum
 
