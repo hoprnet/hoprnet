@@ -33,6 +33,8 @@ function usage() {
   msg
 }
 
+export PATH=${PATH}:${mydir}/../../.cargo/bin
+
 declare install_all with_yarn
 install_all="true"
 with_yarn="false"
@@ -119,7 +121,9 @@ function install_wasm_pack() {
         esac 
         curl -fsSLO --compressed "https://github.com/rustwasm/wasm-pack/releases/download/${wasm_pack_release}/wasm-pack-${wasm_pack_release}-${cputype}-${ostype}.tar.gz"
         tar -xzf "wasm-pack-${wasm_pack_release}-${cputype}-${ostype}.tar.gz"
-        cp "wasm-pack-${wasm_pack_release}-${cputype}-${ostype}/wasm-pack" /usr/local/bin
+        local install_dir="${mydir}/../../.cargo"
+        mkdir -p "${install_dir}/bin"
+        cp "wasm-pack-${wasm_pack_release}-${cputype}-${ostype}/wasm-pack" "${install_dir}/bin"
         cd ${mydir}
     fi
 }
@@ -147,12 +151,12 @@ function install_wasm_opt() {
         #declare binaryen_release=$(curl 'https://api.github.com/repos/WebAssembly/binaryen/releases/latest'| jq -r '.tag_name')
         curl -fsSLO --compressed "https://github.com/WebAssembly/binaryen/releases/download/${binaryen_release}/binaryen-${binaryen_release}-${cputype}-${ostype}.tar.gz"
         tar -xzf "binaryen-${binaryen_release}-${cputype}-${ostype}.tar.gz"
-        cp "binaryen-${binaryen_release}/bin/wasm-opt" /usr/local/bin
-        if [ -w "/usr/local/lib" ]; then
-            cp -R "binaryen-${binaryen_release}/lib" /usr/local/
-        else 
-            sudo cp -R "binaryen-${binaryen_release}/lib" /usr/local/
-        fi
+        local install_dir="${mydir}/../../.cargo"
+        mkdir -p "${install_dir}"
+        mkdir -p "${install_dir}/bin"
+        cp "binaryen-${binaryen_release}/bin/wasm-opt" "${install_dir}/bin"
+        cp -R "binaryen-${binaryen_release}/lib" "${install_dir}"
+
         cd ${mydir}
     fi
 }
@@ -194,7 +198,7 @@ function install_javascript_utilities() {
 if ${install_all}; then
     # install_rustup
     # install_cargo
-    # install_wasm_pack
+    install_wasm_pack
     install_wasm_opt
     # install_node_js
     # install_yarn
@@ -203,7 +207,7 @@ if ${install_all}; then
     # Show some debug output
     # cargo --version
     # echo "node $(node --version)"
-    # wasm-pack --version
+    wasm-pack --version
     wasm-opt --version
     # echo "yarn $(yarn --version)"
     # echo "Typescript $(npx tsc --version)"
