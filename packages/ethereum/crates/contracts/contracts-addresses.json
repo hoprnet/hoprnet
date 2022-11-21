@@ -1,1 +1,60 @@
-{"environments":{"localhost":{"stake_season":5,"network_registry_proxy_contract_address":"0x610178dA211FEF7D417bC0e6FeD39F05609AD788","token_contract_address":"0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0","xhopr_contract_address":"0x0165878A594ca255338adfa4d48449f69242Eb8F","channels_contract_address":"0x5FC8d32690cc91D4c39d9d3abcBD16989F875707","boost_contract_address":"0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6","environment_type":"development","stake_contract_address":"0x8A791620dd6260079BF849Dc5567aDC3F2FdC318","network_registry_contract_address":"0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"},"debug-goerli":{"network_registry_contract_address":"0xDfF27C8fbc27b717ee6286E7E202a0DC2834926f","environment_type":"staging","stake_season":5,"boost_contract_address":"0xf306609b2A05Bbc7ad4d96034b0Ee38C2105336B","xhopr_contract_address":"0x07e34EC87A0dBdfC0ACA377948A09e2031526937","stake_contract_address":"0x61C831184D3a44C5CeC49E4Fb13A41FE40563d07","channels_contract_address":"0x90B35CB2f1e49908B8423B20E6cCc4D39850C33F","network_registry_proxy_contract_address":"0xA1c92093FE2435C13150BFD6E9beA8fcA3BEce18","token_contract_address":"0x93639EB65C0e78262f9F92291e8D885039C9De0A"},"master-goerli":{"network_registry_proxy_contract_address":"0xA1c92093FE2435C13150BFD6E9beA8fcA3BEce18","stake_contract_address":"0x61C831184D3a44C5CeC49E4Fb13A41FE40563d07","stake_season":5,"channels_contract_address":"0x90B35CB2f1e49908B8423B20E6cCc4D39850C33F","token_contract_address":"0x93639EB65C0e78262f9F92291e8D885039C9De0A","network_registry_contract_address":"0xDfF27C8fbc27b717ee6286E7E202a0DC2834926f","xhopr_contract_address":"0x07e34EC87A0dBdfC0ACA377948A09e2031526937","boost_contract_address":"0xf306609b2A05Bbc7ad4d96034b0Ee38C2105336B","environment_type":"production"},"monte_rosa":{"environment_type":"production","stake_season":5,"minted_token_receiver_address":"","token_contract_address":"","channels_contract_address":"","xhopr_contract_address":"","boost_contract_address":"","stake_contract_address":"","network_registry_proxy_contract_address":"","network_registry_contract_address":""},"chiado":{"xhopr_contract_address":"0xf306609b2A05Bbc7ad4d96034b0Ee38C2105336B","network_registry_proxy_contract_address":"0x9bcC4ee060841c2Cc94c7D47DC020354A265B021","network_registry_contract_address":"0x1933C89AB0Ba412411b719A3EE5bBf98aB48ac84","stake_contract_address":"0xA1c92093FE2435C13150BFD6E9beA8fcA3BEce18","boost_contract_address":"0x61C831184D3a44C5CeC49E4Fb13A41FE40563d07","token_contract_address":"0xdAa3FE53131B717E32ED0962694F4fB5D9525528","channels_contract_address":"0x07e34EC87A0dBdfC0ACA377948A09e2031526937","stake_season":5,"environment_type":"staging"}}}
+{
+  "environments": {
+    "localhost": {
+      "stake_season": 5,
+      "network_registry_proxy_contract_address": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
+      "token_contract_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+      "xhopr_contract_address": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
+      "channels_contract_address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
+      "boost_contract_address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
+      "environment_type": "development",
+      "stake_contract_address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
+      "network_registry_contract_address": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
+    },
+    "debug-goerli": {
+      "network_registry_contract_address": "0xDfF27C8fbc27b717ee6286E7E202a0DC2834926f",
+      "environment_type": "staging",
+      "stake_season": 5,
+      "boost_contract_address": "0xf306609b2A05Bbc7ad4d96034b0Ee38C2105336B",
+      "xhopr_contract_address": "0x07e34EC87A0dBdfC0ACA377948A09e2031526937",
+      "stake_contract_address": "0x61C831184D3a44C5CeC49E4Fb13A41FE40563d07",
+      "channels_contract_address": "0x90B35CB2f1e49908B8423B20E6cCc4D39850C33F",
+      "network_registry_proxy_contract_address": "0xA1c92093FE2435C13150BFD6E9beA8fcA3BEce18",
+      "token_contract_address": "0x93639EB65C0e78262f9F92291e8D885039C9De0A"
+    },
+    "master-goerli": {
+      "network_registry_proxy_contract_address": "0xA1c92093FE2435C13150BFD6E9beA8fcA3BEce18",
+      "stake_contract_address": "0x61C831184D3a44C5CeC49E4Fb13A41FE40563d07",
+      "stake_season": 5,
+      "channels_contract_address": "0x90B35CB2f1e49908B8423B20E6cCc4D39850C33F",
+      "token_contract_address": "0x93639EB65C0e78262f9F92291e8D885039C9De0A",
+      "network_registry_contract_address": "0xDfF27C8fbc27b717ee6286E7E202a0DC2834926f",
+      "xhopr_contract_address": "0x07e34EC87A0dBdfC0ACA377948A09e2031526937",
+      "boost_contract_address": "0xf306609b2A05Bbc7ad4d96034b0Ee38C2105336B",
+      "environment_type": "production"
+    },
+    "monte_rosa": {
+      "environment_type": "production",
+      "stake_season": 5,
+      "minted_token_receiver_address": "",
+      "token_contract_address": "",
+      "channels_contract_address": "",
+      "xhopr_contract_address": "",
+      "boost_contract_address": "",
+      "stake_contract_address": "",
+      "network_registry_proxy_contract_address": "",
+      "network_registry_contract_address": ""
+    },
+    "chiado": {
+      "xhopr_contract_address": "0xf306609b2A05Bbc7ad4d96034b0Ee38C2105336B",
+      "network_registry_proxy_contract_address": "0x9bcC4ee060841c2Cc94c7D47DC020354A265B021",
+      "network_registry_contract_address": "0x1933C89AB0Ba412411b719A3EE5bBf98aB48ac84",
+      "stake_contract_address": "0xA1c92093FE2435C13150BFD6E9beA8fcA3BEce18",
+      "boost_contract_address": "0x61C831184D3a44C5CeC49E4Fb13A41FE40563d07",
+      "token_contract_address": "0xdAa3FE53131B717E32ED0962694F4fB5D9525528",
+      "channels_contract_address": "0x07e34EC87A0dBdfC0ACA377948A09e2031526937",
+      "stake_season": 5,
+      "environment_type": "staging"
+    }
+  }
+}
