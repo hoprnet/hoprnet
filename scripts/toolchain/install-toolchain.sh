@@ -148,7 +148,7 @@ function install_wasm_opt() {
         curl -fsSLO --compressed "https://github.com/WebAssembly/binaryen/releases/download/${binaryen_release}/binaryen-${binaryen_release}-${cputype}-${ostype}.tar.gz"
         tar -xzf "binaryen-${binaryen_release}-${cputype}-${ostype}.tar.gz"
         cp "binaryen-${binaryen_release}/bin/wasm-opt" /usr/local/bin
-        cp -R "binaryen-${binaryen_release}/lib" /usr/local/
+        sudo cp "binaryen-${binaryen_release}/lib/*" /usr/local/lib
         cd ${mydir}
     fi
 }
