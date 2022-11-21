@@ -1,19 +1,12 @@
 use std::path::{Path};
 use std::fs;
-use std::io;
-// use std::str::pattern::Pattern; // TODO: only incldue this feature when it's stablized.
 use ethers::signers::Signer;
 use ethers::signers::Wallet;
 use ethers::core::rand::thread_rng;
 use ethers::types::Address;
 
-#[derive(Debug)]
-pub enum HelperErrors {
-    UnableToReadIdentitiesFromPath(io::Error),
-    UnableToParseAddress(String),
-}
+use crate::helper_errors::HelperErrors;
 
-// pub fn read_identities (identity_directory: &str, password: &String, _identity_prefix: Option<String>) -> Result<Vec<PathBuf>, io::Error> {
 pub fn read_identities (identity_directory: &str, password: &String, identity_prefix: &Option<String>) -> Result<Vec<Address>, HelperErrors> {
     match fs::read_dir(Path::new(identity_directory)) {
         Ok(directory) => {
@@ -118,7 +111,7 @@ mod tests {
         remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
     }
 
-    fn create_json_keystore(dir_name: &str, pwd: &str, local_like: bool) -> Result<(), io::Error> {
+    fn create_json_keystore(dir_name: &str, pwd: &str, local_like: bool) -> Result<(), std::io::Error> {
       fs::create_dir_all(dir_name)?;
       let (_key, uuid) = Wallet::new_keystore(Path::new(dir_name), &mut thread_rng(), pwd, None).unwrap();
       let old_file_path = vec![dir_name, "/", &*uuid].concat();
@@ -127,7 +120,7 @@ mod tests {
       Ok(())
     }
     
-    fn remove_json_keystore(path: &str) -> Result<(), io::Error> {
+    fn remove_json_keystore(path: &str) -> Result<(), std::io::Error> {
         println!("remove_json_keystore {:?}", path);
         fs::remove_dir_all(path)
     }

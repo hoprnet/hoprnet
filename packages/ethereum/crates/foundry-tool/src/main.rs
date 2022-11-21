@@ -1,9 +1,15 @@
 use clap::{Parser, Subcommand};
 use std::path::{Path};
+use std::env;
+use std::ffi::OsStr;
+use std::io::{self, Write};
+use std::process::Command;
 use ethers::types::Address;
 
 mod key_pair;
-use key_pair::HelperErrors;
+mod helper_errors;
+mod process;
+use helper_errors::HelperErrors;
 
 #[derive(Parser, Default, Debug)]
 #[clap(
@@ -16,8 +22,8 @@ struct Cli {
     #[clap(long)]
     environment_name: String,
 
-    #[clap(long, short, default_value_t = 0)]
-    environment_type: u8,
+    #[clap(long, short)]
+    environment_type: String,
 
     #[command(subcommand)]
     command: Option<Commands>,
@@ -74,12 +80,28 @@ enum Commands {
         identity_prefix: Option<String>,
 
         #[clap(
-            help = "specify the type of token to be sent ('hopr' or 'native'), if needed. Defaut value means sending both tokens",
+            help = "Specify the type of token to be sent ('hopr' or 'native'), if needed. Defaut value means sending both tokens",
             long,
             short,
             default_value = None
         )]
         token_type: Option<String>,
+
+        #[clap(
+            help = "Specify path pointing to the faucet make target",
+            long,
+            short,
+            default_value = None
+        )]
+        make_root: Option<String>,
+
+        #[clap(
+            help = "Private key of the caller address, e.g. 0xabc",
+            long,
+            short = 'k',
+            default_value = None
+        )]
+        private_key: String,
     }
 }
 
@@ -94,15 +116,14 @@ fn main()-> Result<(), HelperErrors> {
             }
             Ok(())
         },
-        Some(Commands::Faucet { address, password, use_local_identities, identity_directory, identity_prefix, token_type }) => {
+        Some(Commands::Faucet { address, password, use_local_identities, identity_directory, identity_prefix, token_type:_, make_root, private_key }) => {
             // Include provided address
             let mut addresses_all = Vec::new();
             if let Some(addr) = address {
-                if let Ok(parsed_addr) = addr.parse::<Address>() {
-                    addresses_all.push(parsed_addr)
-                }
+                // parse provided address string into `Address` type
                 match addr.parse::<Address>() {
                     Ok(parsed_addr) => addresses_all.push(parsed_addr),
+                    // TODO: Consider accept peer id here 
                     Err(_) => return Err(HelperErrors::UnableToParseAddress(addr))
                 }
             }
@@ -121,7 +142,11 @@ fn main()-> Result<(), HelperErrors> {
             }
 
             println!("All the addresses {:?}", addresses_all);
-            Ok(())
+
+            // TODO: by default, use faucet to fund both native tokens and HOPR tokens
+
+            // iterate and collect execution result. If error occurs, the entire operation failes.
+            addresses_all.into_iter().map(|a| process::child_process_call_make(&make_root, &private_key, &cli.environment_name, &cli.environment_type, &a)).collect()
         },
         None => {
             Ok(())
@@ -132,7 +157,7 @@ fn main()-> Result<(), HelperErrors> {
 
 // fn saveFileToDeployments() -> std::io::Result<()> {}
 
-fn build_path(environment_name: &str, environment_type: &u8) -> String {
+fn build_path(environment_name: &str, environment_type: &str) -> String {
     let new_path = vec!["./", environment_name, "/", &environment_type.to_string()].concat();
     match Path::new(&new_path).to_str() {
         None => panic!("new path is not a valid UTF-8 sequence"),

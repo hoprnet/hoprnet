@@ -3,17 +3,25 @@
 Complete some missing funcitonalities of the foundry-centered smart contract toolchain. Notably storage of deployment files per environment.
 
 
- 9650  cargo build --release
- 9652  cargo install --path .
-
 ### Run local development
 ```
 cargo run -- -h
-cargo run -- --environment-name localhost --environment-type 0 files --list
-cargo run -- --environment-name localhost --environment-type 0 faucet --password local --use-local-identities --token-type native --identity-directory "/tmp"
+cargo run -- --environment-name localhost --environment-type development files --list
+cargo run -- --environment-name localhost --environment-type development faucet --password local --use-local-identities --token-type native --identity-directory "/tmp"
+
+cargo run -- --environment-name localhost --environment-type development faucet --password local --use-local-identities --token-type native --identity-directory "/tmp" --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 --private-key <bank private key> --make-root "../contracts"
 ```
 
 ### Test
 ```
 cargo test -- --nocapture
+```
+
+### Installation
+```
+cargo build --release
+cargo install --path .
+```
+```
+foundry-tool --environment-name localhost --environment-type development faucet --password local --use-local-identities --token-type native --identity-directory "/tmp" --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 --private-key <bank private key> --make-root "../contracts"
 ```
