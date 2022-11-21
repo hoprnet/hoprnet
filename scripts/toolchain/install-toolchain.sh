@@ -103,7 +103,6 @@ function install_wasm_pack() {
     if ! command -v wasm-pack; then
         cd ${download_dir}
         echo "Installing wasm-pack"
-        echo "Machine type $(uname -o)"
         declare wasm_pack_release=$(curl 'https://api.github.com/repos/rustwasm/wasm-pack/releases/latest' | jq -r '.tag_name')
         local ostype="$(uname -s)"
         local cputype="$(uname -m)"
@@ -119,8 +118,8 @@ function install_wasm_pack() {
             ;;
         esac 
         curl -fsSLO --compressed "https://github.com/rustwasm/wasm-pack/releases/download/${wasm_pack_release}/wasm-pack-${wasm_pack_release}-${cputype}-${ostype}.tar.gz"
-        tar -xzf "wasm-pack-${wasm_pack_release}-x86_64-unknown-linux-musl.tar.gz"
-        cp "wasm-pack-${wasm_pack_release}-x86_64-unknown-linux-musl/wasm-pack" /usr/local/bin
+        tar -xzf "wasm-pack-${wasm_pack_release}-${cputype}-${ostype}.tar.gz"
+        cp "wasm-pack-${wasm_pack_release}-${cputype}-${ostype}/wasm-pack" /usr/local/bin
         cd ${mydir}
     fi
 }
@@ -132,9 +131,22 @@ function install_wasm_opt() {
         echo "Installing wasm-opt"
         # Version 111 has no prebuilt binaries
         declare binaryen_release="version_110"
+        local ostype="$(uname -s)"
+        local cputype="$(uname -m)"
+        case "${ostype}" in
+            Linux | linux)
+                ostype="linux"
+                ;;
+            Darwin)
+                ostype="macos"
+                ;;
+            *)
+                echo "no precompiled binaries available for OS: ${ostype}"
+            ;;
+        esac
         #declare binaryen_release=$(curl 'https://api.github.com/repos/WebAssembly/binaryen/releases/latest'| jq -r '.tag_name')
-        curl -fsSLO --compressed "https://github.com/WebAssembly/binaryen/releases/download/${binaryen_release}/binaryen-${binaryen_release}-x86_64-linux.tar.gz"
-        tar -xzf "binaryen-${binaryen_release}-x86_64-linux.tar.gz"
+        curl -fsSLO --compressed "https://github.com/WebAssembly/binaryen/releases/download/${binaryen_release}/binaryen-${binaryen_release}-${cputype}-${ostype}.tar.gz"
+        tar -xzf "binaryen-${binaryen_release}-${cputype}-${ostype}.tar.gz"
         cp "binaryen-${binaryen_release}/bin/wasm-opt" /usr/local/bin
         cd ${mydir}
     fi
