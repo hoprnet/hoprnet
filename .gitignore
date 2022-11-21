@@ -43,3 +43,6 @@ logs.txt
 
 # make sure anything which is vendored is copied
 !/vendor/
+
+# ignore local secret env file
+/.secrets

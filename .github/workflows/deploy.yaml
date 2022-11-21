@@ -75,14 +75,6 @@ jobs:
       - name: "[SETUP] Configure Git info"
         run: ./scripts/configure-git-info.sh
 
-      - name: "[SETUP] Install Yarn (only when using ACT)"
-        if: ${{ env.ACT == 'true' }}
-        run: |
-          curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
-          echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
-          apt update
-          apt install --no-install-recommends yarn
-
       - name: "[BUILD] Install dependencies / link / build"
         run: |
           # Deploying with hardhat requires built hopr-utils package
@@ -118,7 +110,7 @@ jobs:
           HOPR_GIT_MSG: "chore(release): update smart contract deployments"
 
       - name: "[NPM] Publish prerelease version (On pushes to master, debug-deploy/* or staging/*)"
-        if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/')  || startsWith(github.ref, 'refs/heads/staging/') }}
+        if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/')  || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: ./scripts/publish-version.sh prerelease
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -126,7 +118,7 @@ jobs:
       # Pushing a PR to a release branch should increment the patch version in
       # accordance with semver.
       - name: "[NPM] Publish patch version (On pushes to release branches)"
-        if: ${{ startsWith(github.ref, 'refs/heads/release/') }}
+        if: ${{ startsWith(github.ref, 'refs/heads/release/') && !env.ACT }}
         run: ./scripts/publish-version.sh patch
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
