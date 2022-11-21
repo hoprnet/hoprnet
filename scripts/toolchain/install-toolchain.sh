@@ -105,7 +105,20 @@ function install_wasm_pack() {
         echo "Installing wasm-pack"
         echo "Machine type $(uname -o)"
         declare wasm_pack_release=$(curl 'https://api.github.com/repos/rustwasm/wasm-pack/releases/latest' | jq -r '.tag_name')
-        curl -fsSLO --compressed "https://github.com/rustwasm/wasm-pack/releases/download/${wasm_pack_release}/wasm-pack-${wasm_pack_release}-x86_64-unknown-linux-musl.tar.gz"
+        local ostype="$(uname -s)"
+        local cputype="$(uname -m)"
+        case "${ostype}" in
+            Linux | linux)
+                ostype="unknown-linux-musl"
+                ;;
+            Darwin)
+                ostype="apple-darwin"
+                ;;
+            *)
+                echo "no precompiled binaries available for OS: ${ostype}"
+            ;;
+        esac 
+        curl -fsSLO --compressed "https://github.com/rustwasm/wasm-pack/releases/download/${wasm_pack_release}/wasm-pack-${wasm_pack_release}-${cputype}-${ostype}.tar.gz"
         tar -xzf "wasm-pack-${wasm_pack_release}-x86_64-unknown-linux-musl.tar.gz"
         cp "wasm-pack-${wasm_pack_release}-x86_64-unknown-linux-musl/wasm-pack" /usr/local/bin
         cd ${mydir}
