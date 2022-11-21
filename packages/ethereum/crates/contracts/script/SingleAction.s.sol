@@ -280,6 +280,25 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
 
         vm.stopBroadcast();
     }
+    
+    /**
+     * @dev send some HOPR tokens to the recipient address
+     */
+    function mintHopr(address recipient, uint256 tokenamountInEther) external {
+        // 1. get environment and msg.sender
+        getEnvironmentAndMsgSender();
+
+        // 2.Mint some Hopr tokens to the recipient
+        if (tokenamountInEther > 0) {
+            uint256 hoprTokenAmount = tokenamountInEther * 1 ether;
+            (bool successMintTokens, ) = currentEnvironmentDetail.hoprTokenContractAddress.call(abi.encodeWithSignature("mint(address,uint256,bytes,bytes)", recipient, hoprTokenAmount, hex"00", hex"00"));
+            if (!successMintTokens) {
+                emit log_string("Cannot mint HOPR tokens");
+            }
+        }
+
+        vm.stopBroadcast();
+    }
 
     /**
      * @dev Check if msgSender owned the requested rank. If so, transfer one to recipient

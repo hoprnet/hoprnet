@@ -37,6 +37,16 @@ ifeq ($(recipient),)
 endif
 	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/SingleAction.s.sol:SingleActionFromPrivateKeyScript --broadcast --sig "mintXHopr(address,uint256)" $(recipient) 1000
 
+# E.g. make faucet environment-name=localhost environment-type=development recipient=0x2402da10A6172ED018AEEa22CA60EDe1F766655C
+.PHONY: faucet
+faucet: ensure-environment-is-set ensure-privatekey-is-set
+faucet: ## Mint 20000 HOPR tokens and send 10 native tokens to the recipient
+ifeq ($(recipient),)
+	echo "parameter <recipient> missing" >&2 && exit 1
+endif
+	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script script/SingleAction.s.sol:SingleActionFromPrivateKeyScript --broadcast --sig "mintHopr(address,uint256)" $(recipient) 20000
+	FOUNDRY_PROFILE=$(environment-type) cast send $(recipient) --value 10ether --private-key $(PRIVATE_KEY)
+
 # E.g. make request-nrnft environment-name=localhost environment-type=development recipient=0x2402da10A6172ED018AEEa22CA60EDe1F766655C nftrank=developer
 .PHONY: request-nrnft
 request-nrnft: ensure-environment-is-set ensure-privatekey-is-set
