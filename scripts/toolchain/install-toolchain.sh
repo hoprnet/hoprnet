@@ -133,8 +133,6 @@ function install_wasm_opt() {
     if ! command -v wasm-opt; then
         cd ${download_dir}
         echo "Installing wasm-opt"
-        # Version 111 has no prebuilt binaries
-        declare binaryen_release="version_110"
         local ostype="$(uname -s)"
         local cputype="$(uname -m)"
         case "${ostype}" in
@@ -148,6 +146,8 @@ function install_wasm_opt() {
                 echo "no precompiled binaries available for OS: ${ostype}"
             ;;
         esac
+        # Version 111 has no prebuilt binaries
+        declare binaryen_release="version_110"
         #declare binaryen_release=$(curl 'https://api.github.com/repos/WebAssembly/binaryen/releases/latest'| jq -r '.tag_name')
         curl -fsSLO --compressed "https://github.com/WebAssembly/binaryen/releases/download/${binaryen_release}/binaryen-${binaryen_release}-${cputype}-${ostype}.tar.gz"
         tar -xzf "binaryen-${binaryen_release}-${cputype}-${ostype}.tar.gz"
@@ -196,21 +196,21 @@ function install_javascript_utilities() {
 }
 
 if ${install_all}; then
-    # install_rustup
-    # install_cargo
+    install_rustup
+    install_cargo
     install_wasm_pack
     install_wasm_opt
-    # install_node_js
-    # install_yarn
-    # install_javascript_utilities
+    install_node_js
+    install_yarn
+    install_javascript_utilities
 
     # Show some debug output
-    # cargo --version
-    # echo "node $(node --version)"
+    cargo --version
+    echo "node $(node --version)"
     wasm-pack --version
     wasm-opt --version
-    # echo "yarn $(yarn --version)"
-    # echo "Typescript $(npx tsc --version)"
+    echo "yarn $(yarn --version)"
+    echo "Typescript $(npx tsc --version)"
 else
     # We only need Node.js
     install_node_js

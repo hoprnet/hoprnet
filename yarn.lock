@@ -2989,7 +2989,7 @@ __metadata:
     "@types/chai-spies": 1.0.3
     "@types/debug": 4.1.7
     "@types/mocha": 9.1.1
-    "@types/node": 16.11.26
+    "@types/node": 16
     "@types/simple-peer": 9.11.4
     "@types/yargs": 17.0.10
     abortable-iterator: 4.0.2
@@ -3173,6 +3173,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-real@workspace:packages/real"
   dependencies:
+    "@types/mocha": 9.1.1
     mocha: 9.2.2
     typedoc: 0.23.20
     typedoc-plugin-markdown: 3.13.6
@@ -3193,6 +3194,7 @@ __metadata:
     "@libp2p/interface-keys": 1.0.3
     "@libp2p/interface-peer-id": 1.0.5
     "@libp2p/interface-peer-store": 1.0.0
+    "@libp2p/interface-registrar": 1.1.0
     "@libp2p/kad-dht": 1.0.16
     "@libp2p/mplex": 1.2.2
     "@libp2p/peer-id": 1.1.16
@@ -5879,10 +5881,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:16.11.26":
-  version: 16.11.26
-  resolution: "@types/node@npm:16.11.26"
-  checksum: 57757caaba3f0d95de82198cb276a1002c49b710108c932a1d02d7c91ff2fa57cfe2dd19fde60853b6dd90b0964b3cf35557981d2628e20aed6a909057aedfe6
+"@types/node@npm:16":
+  version: 16.18.3
+  resolution: "@types/node@npm:16.18.3"
+  checksum: 6b8ba2ea5d842f7986e366cb9184c54d273d492784dc62e08fd5afeae938d9b61aec6e4222d2541cd18f9b1412ba361bbcb3f4204fb003608af80a2a6af959f9
   languageName: node
   linkType: hard
 
@@ -13092,6 +13094,7 @@ __metadata:
   resolution: "hoprnet@workspace:."
   dependencies:
     "@ethersproject/cli": 5.7.0
+    "@types/node": 16
     prettier: 2.7.1
     ts-node: 10.9.1
     typescript: 4.8.4
