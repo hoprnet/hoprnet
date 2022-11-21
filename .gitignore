@@ -40,3 +40,6 @@ logs.txt
 /.cargo/.package-cache
 /.cargo/.crates.toml
 /.cargo/.crates2.json
+
+# make sure anything which is vendored is copied
+!/vendor/

@@ -60,3 +60,6 @@ packages/*/crates/*/pkg
 
 # vagrant metadata
 /scripts/vm-nat-testing/.vagrant
+
+# make sure anything which is vendored is copied
+!/vendor/
