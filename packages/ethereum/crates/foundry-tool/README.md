@@ -7,9 +7,8 @@ Complete some missing funcitonalities of the foundry-centered smart contract too
 ```
 cargo run -- -h
 cargo run -- --environment-name localhost --environment-type development files --list
-cargo run -- --environment-name localhost --environment-type development faucet --password local --use-local-identities --token-type native --identity-directory "/tmp"
 
-cargo run -- --environment-name localhost --environment-type development faucet --password local --use-local-identities --token-type native --identity-directory "/tmp" --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 --private-key <bank private key> --make-root "../contracts"
+cargo run -- --environment-name localhost --environment-type development faucet --password local --use-local-identities --token-type native --identity-directory "/tmp" --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 --private-key <bank_private_key> --make-root "../contracts"
 ```
 
 ### Test
@@ -23,5 +22,5 @@ cargo build --release
 cargo install --path .
 ```
 ```
-foundry-tool --environment-name localhost --environment-type development faucet --password local --use-local-identities --token-type native --identity-directory "/tmp" --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 --private-key <bank private key> --make-root "../contracts"
+foundry-tool --environment-name localhost --environment-type development faucet --password local --use-local-identities --token-type native --identity-directory "/tmp" --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 --private-key <bank_private_key> --make-root "../contracts"
 ```

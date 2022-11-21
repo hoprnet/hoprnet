@@ -1,8 +1,5 @@
 use clap::{Parser, Subcommand};
 use std::path::{Path};
-use std::env;
-use std::ffi::OsStr;
-use std::io::{self, Write};
 use std::process::Command;
 use ethers::types::Address;
 
@@ -111,7 +108,7 @@ fn main()-> Result<(), HelperErrors> {
     match cli.command {
         Some(Commands::Files { list }) => {
             if list {
-                let new_p = build_path(&cli.environment_name, &cli.environment_type);
+                let new_p = process::build_path(&cli.environment_name, &cli.environment_type);
                 println!("check if path {} is created", new_p);
             }
             Ok(())
@@ -145,25 +142,16 @@ fn main()-> Result<(), HelperErrors> {
 
             // TODO: by default, use faucet to fund both native tokens and HOPR tokens
 
+            // set directory and environment variables
+            if let Err(e) = process::set_process_path_env(&make_root, &private_key) {
+                return Err(e)
+            }
+
             // iterate and collect execution result. If error occurs, the entire operation failes.
-            addresses_all.into_iter().map(|a| process::child_process_call_make(&make_root, &private_key, &cli.environment_name, &cli.environment_type, &a)).collect()
+            addresses_all.into_iter().map(|a| process::child_process_call_make(&cli.environment_name, &cli.environment_type, &a)).collect()
         },
         None => {
             Ok(())
         }
-    }
-}
-
-
-// fn saveFileToDeployments() -> std::io::Result<()> {}
-
-fn build_path(environment_name: &str, environment_type: &str) -> String {
-    let new_path = vec!["./", environment_name, "/", &environment_type.to_string()].concat();
-    match Path::new(&new_path).to_str() {
-        None => panic!("new path is not a valid UTF-8 sequence"),
-        Some(s) => {
-            println!("new path is {}", s);
-            s.to_string()
-        },
     }
 }
