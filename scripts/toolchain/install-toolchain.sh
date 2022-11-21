@@ -148,7 +148,11 @@ function install_wasm_opt() {
         curl -fsSLO --compressed "https://github.com/WebAssembly/binaryen/releases/download/${binaryen_release}/binaryen-${binaryen_release}-${cputype}-${ostype}.tar.gz"
         tar -xzf "binaryen-${binaryen_release}-${cputype}-${ostype}.tar.gz"
         cp "binaryen-${binaryen_release}/bin/wasm-opt" /usr/local/bin
-        sudo cp "binaryen-${binaryen_release}/lib/*" /usr/local/lib
+        if [ -w "/usr/local/lib" ]; then
+            cp "binaryen-${binaryen_release}/lib" /usr/local/
+        else 
+            sudo cp "binaryen-${binaryen_release}/lib" /usr/local/
+        fi
         cd ${mydir}
     fi
 }
@@ -188,21 +192,21 @@ function install_javascript_utilities() {
 }
 
 if ${install_all}; then
-    install_rustup
-    install_cargo
-    install_wasm_pack
+    # install_rustup
+    # install_cargo
+    # install_wasm_pack
     install_wasm_opt
-    install_node_js
-    install_yarn
-    install_javascript_utilities
+    # install_node_js
+    # install_yarn
+    # install_javascript_utilities
 
     # Show some debug output
-    cargo --version
-    echo "node $(node --version)"
-    wasm-pack --version
+    # cargo --version
+    # echo "node $(node --version)"
+    # wasm-pack --version
     wasm-opt --version
-    echo "yarn $(yarn --version)"
-    echo "Typescript $(npx tsc --version)"
+    # echo "yarn $(yarn --version)"
+    # echo "Typescript $(npx tsc --version)"
 else
     # We only need Node.js
     install_node_js
