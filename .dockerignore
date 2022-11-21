@@ -62,4 +62,4 @@ packages/*/crates/*/pkg
 /scripts/vm-nat-testing/.vagrant
 
 # make sure anything which is vendored is copied
-!/vendor/
+!/vendor/**/*.log

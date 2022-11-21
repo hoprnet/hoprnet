@@ -42,7 +42,7 @@ logs.txt
 /.cargo/.crates2.json
 
 # make sure anything which is vendored is copied
-!/vendor/
+!/vendor/**/*.log
 
 # ignore local secret env file
 /.secrets
