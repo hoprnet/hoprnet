@@ -117,7 +117,9 @@ function install_wasm_opt() {
     if ! command -v wasm-opt; then
         cd ${download_dir}
         echo "Installing wasm-opt"
-        declare binaryen_release=$(curl 'https://api.github.com/repos/WebAssembly/binaryen/releases/latest'| jq -r '.tag_name')
+        # Version 111 has no prebuilt binaries
+        declare binaryen_release="version_110"
+        #declare binaryen_release=$(curl 'https://api.github.com/repos/WebAssembly/binaryen/releases/latest'| jq -r '.tag_name')
         curl -fsSLO --compressed "https://github.com/WebAssembly/binaryen/releases/download/${binaryen_release}/binaryen-${binaryen_release}-x86_64-linux.tar.gz"
         tar -xzf "binaryen-${binaryen_release}-x86_64-linux.tar.gz"
         cp "binaryen-${binaryen_release}/bin/wasm-opt" /usr/local/bin
