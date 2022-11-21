@@ -55,6 +55,7 @@ jobs:
             ~/.cargo/git/db/
             target/
             .cargo/.package-cache/
+            .cargo/bin/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
 
       - name: "[SETUP] Use Node.js"
@@ -321,6 +322,7 @@ jobs:
             ~/.cargo/git/db/
             target/
             .cargo/.package-cache/
+            .cargo/bin/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
 
       - name: Configure Git info
@@ -416,6 +418,7 @@ jobs:
             ~/.cargo/git/db/
             target/
             .cargo/.package-cache/
+            .cargo/bin/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
 
       - name: Configure Git info
