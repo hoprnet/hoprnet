@@ -4,6 +4,7 @@ Complete some missing funcitonalities of the foundry-centered smart contract too
 
 
 ### Run local development
+
 ```
 cargo run -- -h
 cargo run -- --environment-name localhost --environment-type development files --list
@@ -12,6 +13,7 @@ cargo run -- --environment-name localhost --environment-type development faucet 
 ```
 
 ### Test
+
 ```
 cargo test -- --nocapture
 ```
