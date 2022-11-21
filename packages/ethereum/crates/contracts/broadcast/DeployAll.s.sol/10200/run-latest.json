@@ -44,12 +44,7 @@
       "contractName": "HoprToken",
       "contractAddress": "0xdAa3FE53131B717E32ED0962694F4fB5D9525528",
       "function": "mint(address,uint256,bytes,bytes)",
-      "arguments": [
-        "0x35A3e15A2E2C297686A4fac5999647312fdDfa3f",
-        "130000000000000000000000000",
-        "0x00",
-        "0x00"
-      ],
+      "arguments": ["0x35A3e15A2E2C297686A4fac5999647312fdDfa3f", "130000000000000000000000000", "0x00", "0x00"],
       "transaction": {
         "type": "0x00",
         "from": "0x35a3e15a2e2c297686a4fac5999647312fddfa3f",
@@ -67,10 +62,7 @@
       "contractName": "HoprChannels",
       "contractAddress": "0x07e34EC87A0dBdfC0ACA377948A09e2031526937",
       "function": null,
-      "arguments": [
-        "0xdAa3FE53131B717E32ED0962694F4fB5D9525528",
-        "300"
-      ],
+      "arguments": ["0xdAa3FE53131B717E32ED0962694F4fB5D9525528", "300"],
       "transaction": {
         "type": "0x00",
         "from": "0x35a3e15a2e2c297686a4fac5999647312fddfa3f",
@@ -104,10 +96,7 @@
       "contractName": "HoprBoost",
       "contractAddress": "0x61C831184D3a44C5CeC49E4Fb13A41FE40563d07",
       "function": null,
-      "arguments": [
-        "0x35A3e15A2E2C297686A4fac5999647312fdDfa3f",
-        ""
-      ],
+      "arguments": ["0x35A3e15A2E2C297686A4fac5999647312fdDfa3f", ""],
       "transaction": {
         "type": "0x00",
         "from": "0x35a3e15a2e2c297686a4fac5999647312fddfa3f",
@@ -189,10 +178,7 @@
       "contractName": "HoprNetworkRegistry",
       "contractAddress": "0x1933C89AB0Ba412411b719A3EE5bBf98aB48ac84",
       "function": null,
-      "arguments": [
-        "0x9bcC4ee060841c2Cc94c7D47DC020354A265B021",
-        "0x35A3e15A2E2C297686A4fac5999647312fdDfa3f"
-      ],
+      "arguments": ["0x9bcC4ee060841c2Cc94c7D47DC020354A265B021", "0x35A3e15A2E2C297686A4fac5999647312fdDfa3f"],
       "transaction": {
         "type": "0x00",
         "from": "0x35a3e15a2e2c297686a4fac5999647312fddfa3f",
