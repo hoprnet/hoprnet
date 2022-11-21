@@ -103,9 +103,9 @@ function install_wasm_pack() {
     if ! command -v wasm-pack; then
         cd ${download_dir}
         echo "Installing wasm-pack"
-        echo "Machine type $(uname -m)"
+        echo "Machine type $(uname -o)"
         declare wasm_pack_release=$(curl 'https://api.github.com/repos/rustwasm/wasm-pack/releases/latest' | jq -r '.tag_name')
-        curl -fsSLO --output-dir "${download_dir}" --compressed "https://github.com/rustwasm/wasm-pack/releases/download/${wasm_pack_release}/wasm-pack-${wasm_pack_release}-x86_64-unknown-linux-musl.tar.gz"
+        curl -fsSLO --compressed "https://github.com/rustwasm/wasm-pack/releases/download/${wasm_pack_release}/wasm-pack-${wasm_pack_release}-x86_64-unknown-linux-musl.tar.gz"
         tar -xzf "wasm-pack-${wasm_pack_release}-x86_64-unknown-linux-musl.tar.gz"
         cp "wasm-pack-${wasm_pack_release}-x86_64-unknown-linux-musl/wasm-pack" /usr/local/bin
         cd ${mydir}
@@ -118,7 +118,7 @@ function install_wasm_opt() {
         cd ${download_dir}
         echo "Installing wasm-opt"
         declare binaryen_release=$(curl 'https://api.github.com/repos/WebAssembly/binaryen/releases/latest'| jq -r '.tag_name')
-        curl -fsSLO --output-dir "${download_dir}" --compressed "https://github.com/WebAssembly/binaryen/releases/download/${binaryen_release}/binaryen-${binaryen_release}-x86_64-linux.tar.gz"
+        curl -fsSLO --compressed "https://github.com/WebAssembly/binaryen/releases/download/${binaryen_release}/binaryen-${binaryen_release}-x86_64-linux.tar.gz"
         tar -xzf "binaryen-${binaryen_release}-x86_64-linux.tar.gz"
         cp "binaryen-${binaryen_release}/bin/wasm-opt" /usr/local/bin
         cd ${mydir}
@@ -134,7 +134,7 @@ function install_node_js() {
         echo "Installing Node.js v${node_js_version}"
         # Using musl builds for alpine
         declare node_release=$(curl 'https://unofficial-builds.nodejs.org/download/release/index.json' | jq -r "[.[] | .version | select(. | startswith(\"v${node_js_version}\"))][0]")
-        curl -fsSLO --output-dir "${download_dir}" --compressed "https://unofficial-builds.nodejs.org/download/release/${node_release}/node-${node_release}-linux-x64-musl.tar.xz"
+        curl -fsSLO --compressed "https://unofficial-builds.nodejs.org/download/release/${node_release}/node-${node_release}-linux-x64-musl.tar.xz"
         tar -xJf "node-${node_release}-linux-x64-musl.tar.xz" -C /usr/local --strip-components=1 --no-same-owner
         cd ${mydir}
     fi
@@ -145,7 +145,7 @@ function install_yarn() {
     if ! command -v yarn; then
         cd ${download_dir}
         declare yarn_release="1.22.19"
-        curl -fsSLO --output-dir "${download_dir}" --compressed "https://yarnpkg.com/downloads/${yarn_release}/yarn-v${yarn_release}.tar.gz"
+        curl -fsSLO --compressed "https://yarnpkg.com/downloads/${yarn_release}/yarn-v${yarn_release}.tar.gz"
         mkdir -p /opt
         tar -xzf "yarn-v${yarn_release}.tar.gz" -C /opt
         ln -s /opt/yarn-v${yarn_release}/bin/yarn /usr/local/bin/yarn
