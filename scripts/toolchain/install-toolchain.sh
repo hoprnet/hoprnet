@@ -149,9 +149,9 @@ function install_wasm_opt() {
         tar -xzf "binaryen-${binaryen_release}-${cputype}-${ostype}.tar.gz"
         cp "binaryen-${binaryen_release}/bin/wasm-opt" /usr/local/bin
         if [ -w "/usr/local/lib" ]; then
-            cp "binaryen-${binaryen_release}/lib" /usr/local/
+            cp -R "binaryen-${binaryen_release}/lib" /usr/local/
         else 
-            sudo cp "binaryen-${binaryen_release}/lib" /usr/local/
+            sudo cp -R "binaryen-${binaryen_release}/lib" /usr/local/
         fi
         cd ${mydir}
     fi
