@@ -41,13 +41,23 @@ $(CRATES):
 $(WORKSPACES_WITH_RUST_MODULES):
 	$(MAKE) -C $@ install
 
-.PHONY: toolchain
-toolchain: ## install toolchain
-	scripts/toolchain/install-toolchain.sh
-
 .PHONY: deps
 deps: ## install dependencies in CI
+ifeq ($(origin CI),undefined)
+	[ -n "${NIX_PATH}" ] || corepack enable
+	command -v rustup && rustup update || echo "No rustup installed, ignoring"
+# we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
+	$(MAKE) cargo-update
+	command -v wasm-pack || $(cargo) install wasm-pack
+	command -v wasm-opt || $(cargo) install wasm-opt
+	yarn
+else
+# Use install script for GitHub Actions whereas Docker builds use the toolchain image
+ifneq ($(origin GITHUB_ACTIONS),undefined)
+	${CURDIR}/scripts/toolchain/install-toolchain.sh
+endif
 	${YARN_ENVIRONMENT} yarn workspaces focus ${YARNFLAGS}
+endif
 # Don't fetch Rust crates since syncing with crates registry is slow
 ifeq ($(origin NO_CARGO),undefined)
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op

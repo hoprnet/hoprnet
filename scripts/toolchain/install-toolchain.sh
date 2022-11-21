@@ -103,6 +103,7 @@ function install_wasm_pack() {
     if ! command -v wasm-pack; then
         cd ${download_dir}
         echo "Installing wasm-pack"
+        echo "Machine type $(uname -m)"
         declare wasm_pack_release=$(curl 'https://api.github.com/repos/rustwasm/wasm-pack/releases/latest' | jq -r '.tag_name')
         curl -fsSLO --output-dir "${download_dir}" --compressed "https://github.com/rustwasm/wasm-pack/releases/download/${wasm_pack_release}/wasm-pack-${wasm_pack_release}-x86_64-unknown-linux-musl.tar.gz"
         tar -xzf "wasm-pack-${wasm_pack_release}-x86_64-unknown-linux-musl.tar.gz"
