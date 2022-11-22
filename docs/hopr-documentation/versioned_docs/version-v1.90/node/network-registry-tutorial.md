@@ -165,7 +165,7 @@ The registration process is now complete! You can proceed to our [hopr-admin tut
 
 ## Monte Rosa rewards
 
-Participants of the Monte Rosa release will be rewarded depending on their uptime. The more active and available your node is, the higher you will score. Your uptime (and score) will be measured through pings sent out by five nodes controlled by HOPR.
+Participants of the Monte Rosa release will be rewarded depending on their uptime. The more active and available your node is, the higher you will score. Your uptime (and score) will be measured through pings sent out by four nodes controlled by HOPR.
 
 To become visible to these nodes, you should:
 
@@ -183,7 +183,7 @@ Nodes to ping:
 16Uiu2HAm5FwCGb7MhYuw1ddto12LBhsc5bKfZ1XEjegUMBzAWbv4
 ```
 
-These five nodes will ping each node on the network registry at randomised intervals throughout the day and record whether or not the ping was received and its latency if received. This is publicly viewable at [network.hoprnet.org](https://network.hoprnet.org/).
+These four nodes will ping each node on the network registry at randomised intervals throughout the day and record whether or not the ping was received and its latency if received. This is publicly viewable at [network.hoprnet.org](https://network.hoprnet.org/).
 
 You can use this site to search your peerID (or any peerID on the network) and view its availability, average latency, and total pings received. HOPR will use these metrics to give each node a score, and at the end of the initial release, rewards will be distributed as follows:
 
