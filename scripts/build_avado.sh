@@ -80,6 +80,11 @@ if [[ "${avado_version}" = "0.100.0" && "${release_id}" = "master-goerli" ]]; th
   upstream_version="master-goerli"
 fi
 
+# For debug-deploy builds, we need to use special upstream version, since we do not publish 0.100.0 Docker tag
+if [[ "${avado_version}" = "0.100.0" && "${release_id}" = "debug-goerli" ]]; then
+  upstream_version="debug-goerli"
+fi
+
 # For staging releases, we need to prepend a prefix
 if [[ "${avado_version}" = "0.200.0" ]]; then
   upstream_version="staging-${release_id}"
