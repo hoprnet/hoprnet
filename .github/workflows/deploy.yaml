@@ -154,7 +154,7 @@ jobs:
 
       - name: Get version from package.json
         id: get-package-version
-        run: echo "::set-output name=tag::v$(./scripts/get-package-version.sh)"
+        run: echo "tag=v$(./scripts/get-package-version.sh)" >> $GITHUB_OUTPUT
         env:
           HOPR_PACKAGE: hoprd
 
@@ -249,7 +249,7 @@ jobs:
             # staging releases get different special version
             version="0.200.0"
           fi
-          echo "::set-output name=vsn::${version}"
+          echo "vsn=${version}" >> $GITHUB_OUTPUT
         env:
           HOPR_PACKAGE: hoprd
 
