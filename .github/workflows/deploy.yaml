@@ -258,7 +258,7 @@ jobs:
           HOPR_GITHUB_REF: ${{ github.ref }}
           AVADO_VERSION: ${{ steps.set-version.outputs.vsn }}
         run: |
-          ./scripts/build_avado.sh ${AVADO_VERSION}
+          ./scripts/build-avado.sh ${AVADO_VERSION}
 
       - name: Commit & Push changes
         if: ${{ !env.ACT }}
