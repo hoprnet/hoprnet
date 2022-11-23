@@ -2,6 +2,7 @@
 id: using-dappnode
 title: Using Dappnode
 ---
+
 To set up your DAppNode, follow the instructions that came with the box. Then, just install the HOPR client and you can start using your node right away!
 
 :::caution Warning
