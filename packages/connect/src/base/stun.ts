@@ -61,6 +61,7 @@ const kStunTypeMask = 0x0110
 export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInfo, __fakeRInfo?: RemoteInfo): void {
   let replyAddress = rinfo.address
 
+  // When using 'udp6' sockets, IPv4 addresses get prefixed by ::ffff:
   if (rinfo.family === 'IPv6') {
     const match = rinfo.address.match(/(?<=::ffff:)[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/)
 
@@ -80,23 +81,40 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
     case isStunRequest:
       const message = createMessage(constants.STUN_BINDING_RESPONSE, stunMessage.transactionId)
 
+      verbose(`Received ${stunMessage.isLegacy() ? 'legacy ' : ''}STUN request from ${rinfo.address}:${rinfo.port}`)
+
+      let addrInfo = rinfo
       if (__fakeRInfo) {
         if (__fakeRInfo.family === 'IPv6') {
           const match = __fakeRInfo.address.match(/(?<=::ffff:)[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/)
 
           if (match) {
-            __fakeRInfo.family = 'IPv4'
-            __fakeRInfo.address = match[0]
+            addrInfo = {
+              ...rinfo,
+              family: 'IPv4',
+              port: __fakeRInfo.port,
+              address: match[0]
+            }
+          } else {
+            addrInfo = __fakeRInfo
           }
+        } else {
+          addrInfo = __fakeRInfo
         }
-
-        message.addXorAddress(__fakeRInfo.address, __fakeRInfo.port)
-      } else {
-        message.addXorAddress(rinfo.address, rinfo.port)
       }
-      message.addFingerprint()
 
-      verbose(`Received STUN request from ${rinfo.address}:${rinfo.port}`)
+      // To be compliant with RFC 3489
+      if (stunMessage.isLegacy()) {
+        // Copy magic STUN cookie as specified by RFC 5389
+        message[Symbol.for('kCookie')] = stunMessage[Symbol.for('kCookie')]
+        message.addAttribute(constants.STUN_ATTR_MAPPED_ADDRESS, addrInfo.address, addrInfo.port)
+        socket.send(message.toBuffer(), rinfo.port, replyAddress)
+        return
+      }
+
+      // Comply with RFC 5780
+      message.addAttribute(constants.STUN_ATTR_XOR_MAPPED_ADDRESS, addrInfo.address, addrInfo.port)
+      message.addFingerprint()
 
       socket.send(message.toBuffer(), rinfo.port, replyAddress)
 

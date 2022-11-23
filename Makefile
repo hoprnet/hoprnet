@@ -1,10 +1,17 @@
+.POSIX:
+
 # Gets all packages that include a Rust crates
 WORKSPACES_WITH_RUST_MODULES := $(wildcard $(addsuffix /crates, $(wildcard ./packages/*)))
 
 # Gets all individual crates such that they can get built
 CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(crate)/*/Cargo.toml)))
 
-.POSIX:
+# add local Cargo install path and use it as custom shell PATH
+PATH := ${PATH}:${CURDIR}/.cargo/bin
+SHELL := env PATH=$(PATH) $(shell which bash)
+
+# use custom Cargo config file for each invocation
+cargo := cargo --config ${CURDIR}/.cargo/config.toml
 
 all: help
 
@@ -19,11 +26,22 @@ $(WORKSPACES_WITH_RUST_MODULES):
 
 .PHONY: deps
 deps: ## install dependencies
-	# only use corepack on non-nix systems
+# only use corepack on non-nix systems
 	[ -n "${NIX_PATH}" ] || corepack enable
-	yarn
 	command -v rustup && rustup update || echo "No rustup installed, ignoring"
-	command -v wasm-pack || cargo install wasm-pack
+# we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
+	$(MAKE) cargo-update
+	command -v wasm-pack || $(cargo) install wasm-pack
+	yarn
+
+.PHONY: cargo-update
+cargo-update: ## update vendored Cargo dependencies
+	$(cargo) update
+
+.PHONY: cargo-download
+cargo-download: ## download vendored Cargo dependencies
+	$(cargo) vendor --versioned-dirs vendor/cargo
+	$(cargo) fetch
 
 .PHONY: build
 build: ## build all packages
@@ -91,7 +109,7 @@ ifeq ($(package),)
 	yarn workspaces foreach -pv run test
 else
 # Prebuild Rust unit tests
-	cargo build --tests
+	$(cargo) --frozen --offline build --tests
 	yarn workspace @hoprnet/${package} run test
 endif
 

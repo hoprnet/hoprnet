@@ -35,5 +35,5 @@ describe('test Ping command', function () {
   shouldFailExecutionOnInvalidQuery(cmdWithOkRes, 'x x')
   shouldFailExecutionOnInvalidParam(cmdWithOkRes, '1')
   shouldFailExecutionOnApiError(cmdWithBadRes, PEER_A)
-  shouldSucceedExecution(cmdWithOkRes, [PEER_A, ['Pong received in 100 ms']])
+  shouldSucceedExecution(cmdWithOkRes, [PEER_A, [`Pong from peer ${PEER_A} received in 100 ms`]])
 })

@@ -433,13 +433,6 @@ export class HoprDB {
     )
   }
 
-  public async storePendingAcknowledgement(halfKeyChallenge: HalfKeyChallenge, isMessageSender: true): Promise<void>
-  public async storePendingAcknowledgement(
-    halfKeyChallenge: HalfKeyChallenge,
-    isMessageSender: false,
-    unackTicket: UnacknowledgedTicket
-  ): Promise<void>
-
   public async storePendingAcknowledgement(
     halfKeyChallenge: HalfKeyChallenge,
     isMessageSender: boolean,
