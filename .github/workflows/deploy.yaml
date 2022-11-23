@@ -158,7 +158,7 @@ jobs:
         env:
           HOPR_PACKAGE: hoprd
 
-      - uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@v0.1.15
         if: ${{ !env.ACT }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
