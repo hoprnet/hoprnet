@@ -86,7 +86,7 @@ To exit your current session without closing it. To be clear, you press ctrl and
 
 Please make sure you are in a newly opened session and haven't exited it before continuing.
 
-## Installing HOPRd
+## Installing HOPRd: 1.90.63 (Valencia)
 
 :::info NOTE
 

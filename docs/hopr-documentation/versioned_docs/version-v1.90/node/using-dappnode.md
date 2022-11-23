@@ -2,14 +2,13 @@
 id: using-dappnode
 title: Using Dappnode
 ---
-
 To set up your DAppNode, follow the instructions that came with the box. Then, just install the HOPR client and you can start using your node right away!
 
 :::caution Warning
 Please withdraw all your funds and delete the old package before installing a new one.
 :::
 
-## Installing the HOPR Client
+## Installing the HOPR Client: 1.90.63 (Valencia)
 
 (**1**) Open the DAppStore using the sidebar to the left.
 
