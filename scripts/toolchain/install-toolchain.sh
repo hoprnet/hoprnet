@@ -18,8 +18,11 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 # - Rust (rustc, cargo) -> $HOME/.cargo/bin
 # - wasm-pack + wasm-opt, necessary to build WebAssembly modules -> $HOME/.cargo/bin
 # 
-# Currently tested for x86_64 and Alpine Linux based environments + GitHub Actions
-
+# Supposed to work for
+#   x86_64: Docker + Alpine
+#   x86_64: Debian-based
+#   x86_64: macOS
+#   x86_64: GitHub Actions images: macos-latest + ubuntu-latest
 # @TODO adapt this script for macOS arm64 machines
 
 function usage() {

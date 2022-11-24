@@ -49,7 +49,7 @@ deps-ci: ## Installs dependencies when running in CI
 
 .PHONY: deps-docker
 deps-docker: ## Installs dependencies when building Docker images
-# Toolchain dependencies are already installed using toolchain.sh script
+# Toolchain dependencies are already installed using scripts/install-toolchain.sh script
 ifeq ($(origin PRODUCTION),undefined)
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	$(MAKE) cargo-update
