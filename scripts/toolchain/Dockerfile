@@ -8,15 +8,15 @@ RUN apk add --no-cache bash build-base ca-certificates jq curl git
 
 WORKDIR /app/hoprnet-toolchain
 
-# use bash to have source command and persistent environment
-SHELL ["/bin/bash", "-lc"]
-
 # Gets yarn executable
 COPY .yarn .yarn/
 
-COPY package.json .yarnrc.yml rust-toolchain.toml .nvmrc yarn.lock ./
+COPY package.json .yarnrc.yml rust-toolchain.toml .nvmrc yarn.lock Cargo.toml ./
 RUN mkdir -p scripts/toolchain
 COPY scripts/toolchain/install-toolchain.sh ./scripts/toolchain
+
+# Make sure that Rust toolchain utilities can be found
+ENV PATH=${PATH}:${HOME}/.cargo/bin
 
 # Downloads prebuilt toolchain utilities
 RUN ./scripts/toolchain/install-toolchain.sh

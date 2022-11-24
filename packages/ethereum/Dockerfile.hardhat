@@ -11,7 +11,7 @@ COPY .yarn .yarn/
 COPY .cargo .cargo/
 COPY vendor vendor/
 COPY packages packages/
-COPY package.json .yarnrc.yml yarn.lock tsconfig.json Makefile Cargo.toml Cargo.lock ./
+COPY package.json .yarnrc.yml yarn.lock tsconfig.json Makefile Cargo.toml Cargo.lock rust-toolchain.toml ./
 
 LABEL description="Launches a hardhat node running a local network with the HOPR contracts deployed and available." 
 
@@ -21,7 +21,7 @@ RUN cd /app/hoprnet/packages/ethereum && \
     mv tsconfig.hardhat.json tsconfig.json && \
     cd /app/hoprnet && \
     # Install dependencies of ethereum package
-    CI=true make deps package=hopr-ethereum && \
+    make deps-docker package=hopr-ethereum && \
     # Build ethereum package + its depedencies 
     NO_NEXT=true make build package=ethereum && \
     # Remove all unused packages
@@ -37,6 +37,8 @@ RUN mkdir -p scripts/toolchain
 COPY .nvmrc package.json Makefile .yarnrc.yml package.json yarn.lock tsconfig.json ./
 COPY scripts/toolchain/install-toolchain.sh ./scripts/toolchain
 
+COPY --from=build /app/hoprnet/.yarn .yarn/
+
 RUN apk add --no-cache tini libc6-compat bash curl tar jq xz libstdc++ make && \
     # Install Node.js
     ./scripts/toolchain/install-toolchain.sh --runtime-only --with-yarn && \
@@ -47,12 +49,11 @@ RUN apk add --no-cache tini libc6-compat bash curl tar jq xz libstdc++ make && \
     # symlink required to make hardhat work
     ln -s /lib/libc.musl-x86_64.so.1 /lib/ld-linux-x86-64.so.2
 
-COPY --from=build /app/hoprnet/.yarn .yarn/
 COPY --from=build /app/hoprnet/node_modules node_modules/
 COPY --from=build /app/hoprnet/packages/ packages/
 
 # Rerun yarn to recreate symlinks
-RUN CI=true make deps package=hopr-ethereum
+RUN PRODUCTION=true make deps-docker package=hopr-ethereum
 
 WORKDIR /app/hardhat/packages/ethereum
 

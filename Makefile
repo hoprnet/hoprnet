@@ -7,21 +7,14 @@ WORKSPACES_WITH_RUST_MODULES := $(wildcard $(addsuffix /crates, $(wildcard ./pac
 CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(crate)/*/Cargo.toml)))
 
 # add local Cargo install path and use it as custom shell PATH
-ifeq ($(origin CI),undefined)
-	PATH := ${PATH}:${CURDIR}/.cargo/bin
-else
-	PATH := ${PATH}:${HOME}/.cargo/bin:${CURDIR}/.cargo/bin
-endif
+PATH := ${PATH}:${HOME}/.cargo/bin:${CURDIR}/.cargo/bin
 SHELL := env PATH=$(PATH) $(shell which bash)
-
-
 
 # use custom Cargo config file for each invocation
 cargo := cargo --config ${CURDIR}/.cargo/config.toml
 
 # use custom flags for installing dependencies
 YARNFLAGS :=
-YARN_ENVIRONMENT :=
 
 # Build specific package
 ifeq ($(package),)
@@ -33,7 +26,6 @@ endif
 # Don't install devDependencies in production
 ifneq ($(origin PRODUCTION),undefined)
 	YARNFLAGS := ${YARNFLAGS} --production
-	YARN_ENVIRONMENT := ${YARN_ENVIRONMENT} DEBUG=
 endif
 
 all: help
@@ -47,26 +39,32 @@ $(CRATES):
 $(WORKSPACES_WITH_RUST_MODULES):
 	$(MAKE) -C $@ install
 
-.PHONY: deps
-deps: ## install dependencies
+.PHONY: deps-ci
+deps-ci: ## Installs dependencies when running in CI
 # GitHub Actions: fetch prebuilt sources
-ifneq ($(origin GITHUB_ACTIONS),undefined)
 	${CURDIR}/scripts/toolchain/install-toolchain.sh
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	$(MAKE) cargo-update
-else ifneq ($(origin CI),undefined)
-# Already installed using script
+	CI=true yarn workspaces focus ${YARNFLAGS}
+
+.PHONY: deps-docker
+deps-docker: ## Installs dependencies when building Docker images
+# Toolchain dependencies are already installed using toolchain.sh script
+ifeq ($(origin PRODUCTION),undefined)
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	$(MAKE) cargo-update
-else
+endif
+	DEBUG= CI=true yarn workspaces focus ${YARNFLAGS}
+
+.PHONY: deps
+deps: ## Installs dependencies for development setup
 	[ -n "${NIX_PATH}" ] || corepack enable
 	command -v rustup && rustup update || echo "No rustup installed, ignoring"
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	$(MAKE) cargo-update
 	command -v wasm-pack || $(cargo) install wasm-pack
 	command -v wasm-opt || $(cargo) install wasm-opt
-endif
-	${YARN_ENVIRONMENT} yarn workspaces focus ${YARNFLAGS}
+	yarn workspaces focus ${YARNFLAGS}
 
 .PHONY: cargo-update
 cargo-update: ## update vendored Cargo dependencies

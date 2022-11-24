@@ -14,7 +14,7 @@ COPY Makefile Cargo.toml Cargo.lock .yarnrc.yml yarn.lock package.json tsconfig.
 
 LABEL description="Launches a hoprd node"
 
-RUN CI=true make deps package=hoprd && \
+RUN make deps-docker package=hoprd && \
     # Remove all tests
     find ./packages -type f -name '*.spec.ts' -delete && \
     # Only build hoprd + dependencies
@@ -30,7 +30,7 @@ RUN CI=true make deps package=hoprd && \
     # As we are on *nix, use hardlinks in node_modules to save some space
     yarn config set nmMode hardlinks-local && \
     # Install without devDependencies
-    DEBUG= CI=true PRODUCTION=true make deps package=hoprd
+    PRODUCTION=true make deps-docker package=hoprd
 
 # Alpine 3.16 x86_64 https://hub.docker.com/layers/library/alpine/3.16.3/images/sha256-3d426b0bfc361d6e8303f51459f17782b219dece42a1c7fe463b6014b189c86d
 FROM alpine:3.16@sha256:3d426b0bfc361d6e8303f51459f17782b219dece42a1c7fe463b6014b189c86d as runtime

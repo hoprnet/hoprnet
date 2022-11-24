@@ -49,7 +49,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          make -j deps
+          make -j deps-ci
 
       - name: Build
         run: |
