@@ -7,8 +7,14 @@ WORKSPACES_WITH_RUST_MODULES := $(wildcard $(addsuffix /crates, $(wildcard ./pac
 CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(crate)/*/Cargo.toml)))
 
 # add local Cargo install path and use it as custom shell PATH
-PATH := ${PATH}:${CURDIR}/.cargo/bin
+ifeq ($(origin CI),undefined)
+	PATH := ${PATH}:${CURDIR}/.cargo/bin
+else
+	PATH := ${PATH}:${HOME}/.cargo/bin:${CURDIR}/.cargo/bin
+endif
 SHELL := env PATH=$(PATH) $(shell which bash)
+
+
 
 # use custom Cargo config file for each invocation
 cargo := cargo --config ${CURDIR}/.cargo/config.toml
@@ -42,24 +48,25 @@ $(WORKSPACES_WITH_RUST_MODULES):
 	$(MAKE) -C $@ install
 
 .PHONY: deps
-deps: ## install dependencies in CI
-ifeq ($(origin CI),undefined)
+deps: ## install dependencies
+# GitHub Actions: fetch prebuilt sources
+ifneq ($(origin GITHUB_ACTIONS),undefined)
+	${CURDIR}/scripts/toolchain/install-toolchain.sh
+# we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
+	$(MAKE) cargo-update
+else ifneq ($(origin CI),undefined)
+# Already installed using script
+# we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
+	$(MAKE) cargo-update
+else
 	[ -n "${NIX_PATH}" ] || corepack enable
 	command -v rustup && rustup update || echo "No rustup installed, ignoring"
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	$(MAKE) cargo-update
 	command -v wasm-pack || $(cargo) install wasm-pack
 	command -v wasm-opt || $(cargo) install wasm-opt
-	yarn
-else
-# Use install script for GitHub Actions whereas Docker builds use the toolchain image
-ifneq ($(origin GITHUB_ACTIONS),undefined)
-	${CURDIR}/scripts/toolchain/install-toolchain.sh
 endif
 	${YARN_ENVIRONMENT} yarn workspaces focus ${YARNFLAGS}
-endif
-# we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
-	$(MAKE) cargo-update
 
 .PHONY: cargo-update
 cargo-update: ## update vendored Cargo dependencies
