@@ -154,11 +154,11 @@ jobs:
 
       - name: Get version from package.json
         id: get-package-version
-        run: echo "::set-output name=tag::v$(./scripts/get-package-version.sh)"
+        run: echo "tag=v$(./scripts/get-package-version.sh)" >> $GITHUB_OUTPUT
         env:
           HOPR_PACKAGE: hoprd
 
-      - uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@v0.1.15
         if: ${{ !env.ACT }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -249,7 +249,7 @@ jobs:
             # staging releases get different special version
             version="0.200.0"
           fi
-          echo "::set-output name=vsn::${version}"
+          echo "vsn=${version}" >> $GITHUB_OUTPUT
         env:
           HOPR_PACKAGE: hoprd
 
@@ -258,7 +258,7 @@ jobs:
           HOPR_GITHUB_REF: ${{ github.ref }}
           AVADO_VERSION: ${{ steps.set-version.outputs.vsn }}
         run: |
-          ./scripts/build_avado.sh ${AVADO_VERSION}
+          ./scripts/build-avado.sh ${AVADO_VERSION}
 
       - name: Commit & Push changes
         if: ${{ !env.ACT }}

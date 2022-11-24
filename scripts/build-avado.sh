@@ -74,15 +74,10 @@ function cleanup {
   exit $EC
 }
 
-# For master builds, we need to use special upstream version, since we do not publish 0.100.0 Docker tag
+# For master and debug-deploy builds, we need to use special upstream version, since we do not publish 0.100.0 Docker tag
 declare upstream_version="${avado_version}"
-if [[ "${avado_version}" = "0.100.0" && "${release_id}" =~ "(master-goerli|debug-goerli)" ]]; then
+if [[ "${avado_version}" = "0.100.0" && ("${release_id}" = "master-goerli" || "${release_id}" = "debug-goerli") ]]; then
   upstream_version="${release_id}"
-fi
-
-# For debug-deploy builds, we need to use special upstream version, since we do not publish 0.100.0 Docker tag
-if [[ "${avado_version}" = "0.100.0" && "${release_id}" = "debug-goerli" ]]; then
-  upstream_version="debug-goerli"
 fi
 
 # For staging releases, we need to prepend a prefix
