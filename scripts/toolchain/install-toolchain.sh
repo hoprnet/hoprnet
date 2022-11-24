@@ -127,9 +127,9 @@ function install_wasm_pack() {
         esac 
         curl -fsSLO --compressed "https://github.com/rustwasm/wasm-pack/releases/download/${wasm_pack_release}/wasm-pack-${wasm_pack_release}-${cputype}-${ostype}.tar.gz"
         tar -xzf "wasm-pack-${wasm_pack_release}-${cputype}-${ostype}.tar.gz"
-        local install_dir="${HOME}/.cargo/bin"
-        mkdir -p "${install_dir}"
-        cp "wasm-pack-${wasm_pack_release}-${cputype}-${ostype}/wasm-pack" "${install_dir}"
+        local install_dir="${HOME}/.cargo"
+        mkdir -p "${install_dir}/bin"
+        cp "wasm-pack-${wasm_pack_release}-${cputype}-${ostype}/wasm-pack" "${install_dir}/bin"
         cd ${mydir}
     fi
 }
@@ -155,11 +155,10 @@ function install_wasm_opt() {
         local binaryen_release=$(curl 'https://api.github.com/repos/WebAssembly/binaryen/releases/latest'| jq -r '.tag_name')
         curl -fsSLO --compressed "https://github.com/WebAssembly/binaryen/releases/download/${binaryen_release}/binaryen-${binaryen_release}-${cputype}-${ostype}.tar.gz"
         tar -xzf "binaryen-${binaryen_release}-${cputype}-${ostype}.tar.gz"
-        local install_dir="${HOME}/.cargo/bin"
-        mkdir -p "${install_dir}"
-        cp "binaryen-${binaryen_release}/bin/wasm-opt" "${install_dir}"
+        local install_dir="${HOME}/.cargo"
+        mkdir -p "${install_dir}/bin"
+        cp "binaryen-${binaryen_release}/bin/wasm-opt" "${install_dir}/bin"
         cp -R "binaryen-${binaryen_release}/lib" "${install_dir}"
-
         cd ${mydir}
     fi
 }
