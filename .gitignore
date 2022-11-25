@@ -36,6 +36,7 @@ logs.txt
 .env
 .identity-local
 
+/.cargo/lib
 /.cargo/bin
 /.cargo/.package-cache
 /.cargo/.crates.toml

@@ -53,7 +53,7 @@ jobs:
 
       - name: Build
         run: |
-          make -j deps
+          make -j deps-ci
           make -j build
 
       - name: Install websocat

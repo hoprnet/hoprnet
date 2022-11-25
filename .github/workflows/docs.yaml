@@ -37,7 +37,7 @@ jobs:
 
       - name: Generate docs
         run: |
-          make -j deps
+          make -j deps-ci
           make -j build-docs
 
       - name: Format newly created files

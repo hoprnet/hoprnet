@@ -45,7 +45,7 @@ jobs:
           cache: yarn
 
       - name: Install dependencies
-        run: make -j deps
+        run: make -j deps-ci
 
       - name: Build
         run: make -j build

@@ -79,7 +79,7 @@ jobs:
       - name: "[BUILD] Install dependencies / link / build"
         run: |
           # Deploying with hardhat requires built hopr-utils package
-          CI=true make -j deps
+          make -j deps-ci
           make -j build
 
       - name: "Cache built artifacts (for later use)"
@@ -351,7 +351,7 @@ jobs:
           # get latest version
           git pull
           # need to build our packages which might by used by the scripts, such as the fund script
-          CI=true make -j deps
+          make -j deps-ci
 
       - name: Restore built artifacts
         uses: actions/cache@v3
@@ -447,7 +447,7 @@ jobs:
           # get latest version
           git pull
           # need to build our packages which might by used by the scripts, such as the fund script
-          CI=true make -j deps
+          make -j deps-ci
 
       - name: Restore built artifacts
         uses: actions/cache@v3

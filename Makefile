@@ -6,12 +6,27 @@ WORKSPACES_WITH_RUST_MODULES := $(wildcard $(addsuffix /crates, $(wildcard ./pac
 # Gets all individual crates such that they can get built
 CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(crate)/*/Cargo.toml)))
 
-# add local Cargo install path and use it as custom shell PATH (only once)
-PATH := $(PATH::${CURDIR}/.cargo/bin=):${CURDIR}/.cargo/bin
+# add local Cargo install path and users' Cargo install path and use it as custom shell PATH (only once)
+PATH := $(subst :${CURDIR}/.cargo/bin,,$(subst :${HOME}/.cargo/bin,,$(PATH))):${HOME}/.cargo/bin:${CURDIR}/.cargo/bin
 SHELL := env PATH=$(PATH) $(shell which bash)
 
 # use custom Cargo config file for each invocation
 cargo := cargo --config ${CURDIR}/.cargo/config.toml
+
+# use custom flags for installing dependencies
+YARNFLAGS :=
+
+# Build specific package
+ifeq ($(package),)
+	YARNFLAGS := ${YARNFLAGS} -A
+else
+	YARNFLAGS := ${YARNFLAGS} @hoprnet/${package}
+endif
+
+# Don't install devDependencies in production
+ifneq ($(origin PRODUCTION),undefined)
+	YARNFLAGS := ${YARNFLAGS} --production
+endif
 
 all: help
 
@@ -24,16 +39,33 @@ $(CRATES):
 $(WORKSPACES_WITH_RUST_MODULES):
 	$(MAKE) -C $@ install
 
+.PHONY: deps-ci
+deps-ci: ## Installs dependencies when running in CI
+# GitHub Actions: fetch prebuilt sources
+	${CURDIR}/scripts/toolchain/install-toolchain.sh
+# we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
+	$(MAKE) cargo-update
+	CI=true yarn workspaces focus ${YARNFLAGS}
+
+.PHONY: deps-docker
+deps-docker: ## Installs dependencies when building Docker images
+# Toolchain dependencies are already installed using scripts/install-toolchain.sh script
+ifeq ($(origin PRODUCTION),undefined)
+# we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
+	$(MAKE) cargo-update
+endif
+	DEBUG= CI=true yarn workspaces focus ${YARNFLAGS}
+
 .PHONY: deps
-deps: ## install dependencies
-# only use corepack on non-nix systems
+deps: ## Installs dependencies for development setup
 	[ -n "${NIX_PATH}" ] || corepack enable
 	command -v rustup && rustup update || echo "No rustup installed, ignoring"
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	mkdir -p .cargo/bin
 	$(MAKE) cargo-update
 	command -v wasm-pack || $(cargo) install wasm-pack
-	yarn
+	command -v wasm-opt || $(cargo) install wasm-opt
+	yarn workspaces focus ${YARNFLAGS}
 
 .PHONY: cargo-update
 cargo-update: ## update vendored Cargo dependencies
@@ -50,7 +82,10 @@ build: build-hopr-admin build-yarn
 
 .PHONY: build-hopr-admin
 build-hopr-admin: ## build hopr admin React frontend
+# Don't build hopr-admin e.g. for cover-traffic-daemon
+ifeq ($(origin NO_NEXT),undefined)	
 	yarn workspace @hoprnet/hoprd run buildAdmin
+endif
 
 .PHONY: build-solidity-types
 build-solidity-types: ## generate Solidity typings
@@ -59,7 +94,11 @@ build-solidity-types: ## generate Solidity typings
 .PHONY: build-yarn
 build-yarn: ## build yarn packages
 build-yarn: build-solidity-types build-cargo
+ifeq ($(package),)
 	npx tsc --build tsconfig.build.json
+else
+	npx tsc --build packages/${package}/tsconfig.json
+endif
 
 .PHONY: build-yarn-watch
 build-yarn-watch: ## build yarn packages (in watch mode)
@@ -68,14 +107,17 @@ build-yarn-watch: build-solidity-types build-cargo
 
 .PHONY: build-cargo
 build-cargo: ## build cargo packages and create boilerplate JS code
+# Skip building Rust crates
+ifeq ($(origin NO_CARGO),undefined)
 # First compile Rust crates and create bindings
 	$(MAKE) -j 1 $(CRATES)
 # Copy bindings to their destination
 	$(MAKE) ${WORKSPACES_WITH_RUST_MODULES}
+endif
 
 .PHONY: build-yellowpaper
 build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
-	make -C docs/yellowpaper
+	$(MAKE) -C docs/yellowpaper
 
 .PHONY: build-docs
 build-docs: ## build typedocs, Rest API docs, and docs website

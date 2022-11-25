@@ -1,6 +1,6 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import type { UnsignedTransaction, BigNumber, providers } from 'ethers'
-import type { HoprToken } from '@hoprnet/hopr-ethereum'
+import type { HoprToken } from '../src/types/index.js'
 
 import { utils, constants } from 'ethers'
 import { readdir, readFile } from 'fs/promises'
