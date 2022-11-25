@@ -55,6 +55,7 @@ import {
   type Ticket,
   type HoprDB,
   create_gauge,
+  create_multi_gauge,
   create_counter,
   create_histogram_with_buckets
 } from '@hoprnet/hopr-utils'
@@ -76,6 +77,7 @@ import type { ResolvedEnvironment } from './environment.js'
 import { createLibp2pInstance } from './main.js'
 import type { EventEmitter as Libp2pEmitter } from '@libp2p/interfaces/events'
 import { PeerConnectionType } from '@hoprnet/hopr-connect'
+import { utils as ethersUtils } from 'ethers/lib/ethers.js'
 
 const CODE_P2P = protocols('p2p').code
 
@@ -87,6 +89,11 @@ const error = debug(DEBUG_PREFIX.concat(`:error`))
 // Metrics
 const metric_outChannelCount = create_gauge('core_gauge_num_outgoing_channels', 'Number of outgoing channels')
 const metric_inChannelCount = create_gauge('core_gauge_num_incoming_channels', 'Number of incoming channels')
+const metric_channelBalances = create_multi_gauge(
+  'core_mgauge_channel_balances',
+  'Balances on channels with counterparties',
+  ['counterparty', 'direction']
+)
 const metric_sentMessageCount = create_counter('core_counter_sent_messages', 'Number of sent messages')
 const metric_pathLength = create_histogram_with_buckets(
   'core_histogram_path_length',
@@ -514,11 +521,6 @@ class Hopr extends EventEmitter {
    * @param channel object
    */
   private async onOwnChannelUpdated(channel: ChannelEntry): Promise<void> {
-    // Determine which counter (incoming/outgoing) we need to increment
-    const selfAddr = this.getEthereumAddress()
-    if (selfAddr.eq(channel.destination.toAddress())) metric_inChannelCount.increment()
-    else if (selfAddr.eq(channel.source.toAddress())) metric_outChannelCount.increment()
-
     if (channel.status === ChannelStatus.PendingToClose) {
       await this.strategy.onChannelWillClose(channel, this.connector)
     }
@@ -601,18 +603,36 @@ class Hopr extends EventEmitter {
 
     const currentChannels: ChannelEntry[] = []
 
+    const selfAddr = this.getEthereumAddress()
+
+    let incomingChannels = 0,
+      outgoingChannels = 0
     for await (const channel of this.getAllChannels()) {
+      // Determine which counter (incoming/outgoing) we need to increment
+      if (selfAddr.eq(channel.destination.toAddress())) {
+        metric_channelBalances.set(
+          [channel.source.toAddress().toHex(), 'in'],
+          +ethersUtils.formatEther(channel.balance.toBN().toString())
+        )
+        incomingChannels++
+      } else if (selfAddr.eq(channel.source.toAddress())) {
+        metric_channelBalances.set(
+          [channel.source.toAddress().toHex(), 'out'],
+          +ethersUtils.formatEther(channel.balance.toBN().toString())
+        )
+        outgoingChannels++
+      }
+
       out += `${channel.toString()}\n`
       currentChannels.push(channel)
       this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_EXISTING_CHANNEL) // Make sure current channels are 'interesting'
     }
 
+    metric_inChannelCount.set(incomingChannels)
+    metric_outChannelCount.set(outgoingChannels)
+
     // Remove last `\n`
     verbose(out.substring(0, out.length - 1))
-
-    if (currentChannels === undefined) {
-      throw new Error('invalid channels retrieved from database')
-    }
 
     let balance: Balance
     try {
@@ -818,7 +838,14 @@ class Hopr extends EventEmitter {
 
       if (ticketIssuer.eq(ticketReceiver)) log(`WARNING: duplicated adjacent path entries.`)
 
-      const channel = await this.db.getChannelX(ticketIssuer, ticketReceiver)
+      let channel
+      try {
+        channel = await this.db.getChannelX(ticketIssuer, ticketReceiver)
+      } catch (err) {
+        throw Error(
+          `Channel from ${ticketIssuer.toAddress().toString()} to ${ticketReceiver.toAddress().toString()} not found`
+        )
+      }
 
       if (channel.status !== ChannelStatus.Open) {
         throw Error(`Channel ${channel.getId().toHex()} is not open`)
@@ -847,7 +874,7 @@ class Hopr extends EventEmitter {
       intermediatePath = await this.getIntermediateNodes(PublicKey.fromPeerId(destination))
 
       if (intermediatePath == null || !intermediatePath.length) {
-        throw Error(`bad path`)
+        throw Error(`Failed to find automatic path`)
       }
     }
 
@@ -863,7 +890,8 @@ class Hopr extends EventEmitter {
         this.db
       )
     } catch (err) {
-      throw Error(`Error while creating packet ${JSON.stringify(err)}`)
+      log(`Could not create packet ${err}`)
+      throw Error(`Error while creating packet.`)
     }
 
     await packet.storePendingAcknowledgement(this.db)
@@ -871,7 +899,8 @@ class Hopr extends EventEmitter {
     try {
       await this.forward.interact(path[0].toPeerId(), packet)
     } catch (err) {
-      throw Error(`Error while trying to send final packet ${JSON.stringify(err)}`)
+      log(`Could not send packet ${err}`)
+      throw Error(`Failed to send packet.`)
     }
 
     metric_sentMessageCount.increment()

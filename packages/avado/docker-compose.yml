@@ -1,4 +1,4 @@
-# NOTE: This cannot be built as is, it must be built using scripts/build_avado.sh
+# NOTE: This cannot be built as is, it must be built using scripts/build-avado.sh
 # %AVADO_VERSION%, %TOKEN%, %ENV_ID% and %PROVIDER_URL% will be replaced with actual values
 # when built using the above script.
 version: '3.4'

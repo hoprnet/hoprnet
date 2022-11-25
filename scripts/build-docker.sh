@@ -130,6 +130,10 @@ for git_ref in $(jq -r "to_entries[] | .value.git_ref" < "${mydir}/../packages/h
   if [[ "${branch}" =~ ${git_ref} ]]; then
     declare additional_releases
     additional_releases="$(jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\") | .key" < "${mydir}/../packages/hoprd/releases.json")"
+    # Prepend "staging-" tag prefix, if this is a staging branch
+    if [[ "${branch}" =~ staging/.* ]]; then
+      additional_releases="staging-${additional_releases//[[:space:]]/" staging-"}"
+    fi
     releases="${releases} ${additional_releases}"
   fi
 done

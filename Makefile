@@ -6,8 +6,8 @@ WORKSPACES_WITH_RUST_MODULES := $(wildcard $(addsuffix /crates, $(wildcard ./pac
 # Gets all individual crates such that they can get built
 CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(crate)/*/Cargo.toml)))
 
-# add local Cargo install path and use it as custom shell PATH
-PATH := ${PATH}:${HOME}/.cargo/bin:${CURDIR}/.cargo/bin
+# add local Cargo install path and users' Cargo install path and use it as custom shell PATH (only once)
+PATH := $(subst :${CURDIR}/.cargo/bin,,$(subst :${HOME}/.cargo/bin,,$(PATH))):${HOME}/.cargo/bin:${CURDIR}/.cargo/bin
 SHELL := env PATH=$(PATH) $(shell which bash)
 
 # use custom Cargo config file for each invocation
@@ -61,6 +61,7 @@ deps: ## Installs dependencies for development setup
 	[ -n "${NIX_PATH}" ] || corepack enable
 	command -v rustup && rustup update || echo "No rustup installed, ignoring"
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
+	mkdir -p .cargo/bin
 	$(MAKE) cargo-update
 	command -v wasm-pack || $(cargo) install wasm-pack
 	command -v wasm-opt || $(cargo) install wasm-opt

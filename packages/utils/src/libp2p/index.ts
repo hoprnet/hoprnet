@@ -120,7 +120,7 @@ export async function libp2pSendMessage<T extends boolean>(
 
   if (r.status !== 'SUCCESS') {
     logError(r)
-    throw new Error(r.status)
+    throw Error(`Failed to dial destination while sending message. Status: ${r.status}`)
   }
 
   const timeoutController = new TimeoutController(opts.timeout ?? DEFAULT_SEND_TIMEOUT)
@@ -142,7 +142,7 @@ export async function libp2pSendMessage<T extends boolean>(
       )
       return result as any
     } catch (err) {
-      logError(`Could not send message to ${destination.toString()} due to "${err?.message}".`)
+      throw Error(`Could not send message to ${destination.toString()} due to "${err?.message}".`)
     } finally {
       timeoutController.clear()
     }
@@ -156,7 +156,7 @@ export async function libp2pSendMessage<T extends boolean>(
         r.resp.stream
       )
     } catch (err) {
-      logError(`Could not send message to ${destination.toString()} due to "${err?.message}".`)
+      throw Error(`Could not send message to ${destination.toString()} due to "${err?.message}".`)
     } finally {
       timeoutController.clear()
     }

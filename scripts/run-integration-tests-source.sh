@@ -102,6 +102,17 @@ declare ct_db_file="${tmp}/hopr-ct-db.json"
 
 declare hardhat_rpc_log="${tmp}/hopr-source-hardhat-rpc.log"
 
+# hardhat port
+declare -a all_ports=( 8545 )
+# HOPRd API ports
+all_ports+=( 13301 13302 13303 13304 13305 13306 13307 )
+# HOPRd p2p ports
+all_ports+=( 19091 19092 19093 19094 19095 19096 19097 )
+# HOPRd Admin ports
+all_ports+=( 19501 19502 19503 19504 19505 19506 19507 )
+# CTd healthcheck port
+all_ports+=( 20000 )
+
 function cleanup {
   local EXIT_CODE=$?
 
@@ -110,11 +121,8 @@ function cleanup {
   set +Eeuo pipefail
 
   # Cleaning up everything
-  log "Wiping databases"
-  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${node7_dir}" "${ct_node1_dir}"
-
   log "Cleaning up processes"
-  for port in 8545 13301 13302 13303 13304 13305 13306 13307 19091 19092 19093 19094 19095 19096 19097 20000; do
+  for port in ${all_ports[@]}; do
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
 
@@ -123,18 +131,19 @@ function cleanup {
     log=$(wait_for_regex ${node_log} "Process exiting with signal [0-9]")
 
     if [ -z "${log}" ]; then
-      log "${node_log}"
-      log "Process did not exit properly"
+      log "${node_log}: Process did not exit properly"
       exit 1
     fi
 
     exit_code=$(echo ${log} | sed -E "s/.*signal[ ]([0-9]+).*/\1/")
     if [ ${exit_code} != "0" ]; then
       non_zero=true
-      log "${node_log}"
-      log "terminated with non-zero exit code ${exit_code}"
+      log "${node_log}: terminated with non-zero exit code ${exit_code}"
     fi
   done
+
+  log "Wiping databases"
+  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${node7_dir}" "${ct_node1_dir}"
 
   if [ ${non_zero} ]; then
     exit 1
@@ -298,22 +307,9 @@ log "\t\tlog: ${ct_node1_log}"
 # }}}
 
 # --- Check all resources we need are free {{{
-ensure_port_is_free 8545
-ensure_port_is_free 13301
-ensure_port_is_free 13302
-ensure_port_is_free 13303
-ensure_port_is_free 13304
-ensure_port_is_free 13305
-ensure_port_is_free 13306
-ensure_port_is_free 13307
-ensure_port_is_free 19091
-ensure_port_is_free 19092
-ensure_port_is_free 19093
-ensure_port_is_free 19094
-ensure_port_is_free 19095
-ensure_port_is_free 19096
-ensure_port_is_free 19097
-ensure_port_is_free 20000
+for p in ${all_ports[@]}; do
+  ensure_port_is_free "${p}"
+done
 # }}}
 
 # --- Cleanup old contract deployments {{{
