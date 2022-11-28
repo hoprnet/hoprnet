@@ -2947,8 +2947,7 @@ __metadata:
     retimer: 3.0.0
     simple-peer: 9.11.1
     stream-to-it: 0.2.4
-    stun: 2.1.0
-    typescript: 4.8.4
+    typescript: 4.7.4
     uint8arraylist: 2.3.2
     wrtc: 0.4.7
     yargs: 17.5.1
@@ -15924,16 +15923,6 @@ __metadata:
   dependencies:
     minimatch: ^3.0.5
   checksum: 88ec96e276237290607edc0872b4f9842837b95cfde0cdbb1e00ba9623dfdf3514d44cdd14496ab60a0c2dd180a6ef8a3f1c34599e6cf2273afac9b72a6fb2b5
-  languageName: node
-  linkType: hard
-
-"redent@npm:^2.0.0":
-  version: 2.0.0
-  resolution: "redent@npm:2.0.0"
-  dependencies:
-    indent-string: ^3.0.0
-    strip-indent: ^2.0.0
-  checksum: c3bcea97de01023efbe826cd72abf2e5948e096acd808a498b4de5dd25e64ad8df0cb4218403197b4ea050ce73f2264a318bf469a27f87ba8ca31543892011d4
   languageName: node
   linkType: hard
 
