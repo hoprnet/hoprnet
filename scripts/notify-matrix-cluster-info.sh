@@ -63,6 +63,12 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
       version_minor=$(_jq "${row}" ".value.version_minor")
 
       cluster_name="${release_id}${cluster_tag}"
+
+      if [[ "${branch}" =~ staging/.* ]]; then
+        # Prepend "staging-" tag prefix, if this is a staging branch
+        cluster_tag="-staging${cluster_tag}"
+      fi
+
       if [ "${version_major}" != "null" ] && [ "${version_minor}" != "null" ]; then
         version_maj_min="$version_major.$version_minor"
         cluster_name="${cluster_name}-${version_maj_min//./-}"
