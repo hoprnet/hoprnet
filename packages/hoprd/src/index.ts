@@ -31,7 +31,6 @@ import {
 import type { State } from './types.js'
 import setupAPI from './api/index.js'
 import setupHealthcheck from './healthcheck.js'
-import { AdminServer } from './admin.js'
 import { LogStream } from './logs.js'
 import { getIdentity } from './identity.js'
 import { decodeMessage } from './api/utils.js'
@@ -106,21 +105,6 @@ const argv = yargsInstance
     describe: 'Announce public IP to the network [env: HOPRD_ANNOUNCE]',
     default: false
   })
-  .option('admin', {
-    boolean: true,
-    describe: 'Run an admin interface on localhost:3000, requires --apiToken [env: HOPRD_ADMIN]',
-    default: false
-  })
-  .option('adminHost', {
-    string: true,
-    describe: 'Host to listen to for admin console [env: HOPRD_ADMIN_HOST]',
-    default: 'localhost'
-  })
-  .option('adminPort', {
-    string: true,
-    describe: 'Port to listen to for admin console [env: HOPRD_ADMIN_PORT]',
-    default: 3000
-  })
   .option('api', {
     boolean: true,
     describe: 'Expose the API on localhost:3001. [env: HOPRD_API]',
@@ -138,7 +122,7 @@ const argv = yargsInstance
   })
   .option('apiToken', {
     string: true,
-    describe: 'A REST API token and admin panel password for user authentication [env: HOPRD_API_TOKEN]',
+    describe: 'A REST API token and for user authentication [env: HOPRD_API_TOKEN]',
     default: undefined,
     conflicts: 'testNoAuthentication'
   })
@@ -359,7 +343,6 @@ async function main() {
 
   let node: Hopr
   let logs = new LogStream()
-  let adminServer: AdminServer = undefined
   let state: State = {
     aliases: new Map(),
     settings: {
@@ -412,18 +395,6 @@ async function main() {
   }
 
   const apiToken = argv.testNoAuthentication ? null : argv.apiToken
-
-  // We need to setup the admin server before the HOPR node
-  // as if the HOPR node fails, we need to put an error message up.
-  if (argv.admin) {
-    adminServer = new AdminServer(logs, argv.adminHost, argv.adminPort)
-    try {
-      await adminServer.setup()
-    } catch (err) {
-      console.error(err)
-      process.exit(1)
-    }
-  }
 
   const environment = resolveEnvironment(argv.environment, argv.provider)
   logs.log(`[DEBUG] hoprd get environment`)
@@ -499,10 +470,6 @@ async function main() {
       // 3. Start the node.
       await node.start()
 
-      if (adminServer) {
-        adminServer.registerNode(node)
-      }
-
       // alias self
       state.aliases.set('me', node.getId())
 
@@ -517,10 +484,7 @@ async function main() {
   } catch (e) {
     logs.log('Node failed to start:')
     logs.logFatalError('' + e)
-    if (!argv.admin) {
-      // If the admin interface is running, we should keep process alive
-      process.exit(1)
-    }
+    process.exit(1)
   }
 
   function stopGracefully(signal) {
