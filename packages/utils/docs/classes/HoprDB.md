@@ -1284,28 +1284,15 @@ ___
 
 ### storePendingAcknowledgement
 
-▸ **storePendingAcknowledgement**(`halfKeyChallenge`, `isMessageSender`): `Promise`<`void`\>
+▸ **storePendingAcknowledgement**(`halfKeyChallenge`, `isMessageSender`, `unackTicket?`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `halfKeyChallenge` | [`HalfKeyChallenge`](HalfKeyChallenge.md) |
-| `isMessageSender` | ``true`` |
-
-#### Returns
-
-`Promise`<`void`\>
-
-▸ **storePendingAcknowledgement**(`halfKeyChallenge`, `isMessageSender`, `unackTicket`): `Promise`<`void`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `halfKeyChallenge` | [`HalfKeyChallenge`](HalfKeyChallenge.md) |
-| `isMessageSender` | ``false`` |
-| `unackTicket` | [`UnacknowledgedTicket`](UnacknowledgedTicket.md) |
+| `isMessageSender` | `boolean` |
+| `unackTicket?` | [`UnacknowledgedTicket`](UnacknowledgedTicket.md) |
 
 #### Returns
 
