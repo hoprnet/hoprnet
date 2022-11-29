@@ -1,38 +1,44 @@
-use std::path::{Path};
-use std::fs;
+use ethers::core::rand::thread_rng;
 use ethers::signers::Signer;
 use ethers::signers::Wallet;
-use ethers::core::rand::thread_rng;
 use ethers::types::Address;
+use std::fs;
+use std::path::Path;
 
-use crate::helper_errors::HelperErrors;
-
-pub fn read_identities (identity_directory: &str, password: &String, identity_prefix: &Option<String>) -> Result<Vec<Address>, HelperErrors> {
+pub fn read_identities(
+    identity_directory: &str,
+    password: &String,
+    identity_prefix: &Option<String>,
+) -> Result<Vec<Address>, std::io::Error> {
     match fs::read_dir(Path::new(identity_directory)) {
         Ok(directory) => {
-            let addresses: Vec<Address> = directory.into_iter() // read all the files from the directory
-            .filter(|r| r.is_ok()) // Get rid of Err variants for Result<DirEntry>
-            .map(|r| r.unwrap().path()) // Read all the files from the given directory
-            .filter(|r| r.is_file()) // Filter out folders
-            .filter(|r| match r.extension() {
-                Some(ext) => {
-                    &ext.to_os_string().into_string().unwrap() == "id"
-                },
-                None => false
-            }) // Filter out wrong extension
-            // .map(|r| r.into_os_string().into_string().unwrap())
-            .filter(|r| match &identity_prefix {
-                Some(identity_prefix) => r.file_stem().unwrap().to_str().unwrap().contains(identity_prefix.as_str()),
-                _ => true
-            })// TODO: Now it is a loose check on contain but not strict on the prefix
-            .filter_map(|r| Wallet::decrypt_keystore(r, password).ok()) // read keystore and return non-error results
-            .map(|r| r.address()) // read keystore and return address
-            .collect();
+            let addresses: Vec<Address> = directory
+                .into_iter() // read all the files from the directory
+                .filter(|r| r.is_ok()) // Get rid of Err variants for Result<DirEntry>
+                .map(|r| r.unwrap().path()) // Read all the files from the given directory
+                .filter(|r| r.is_file()) // Filter out folders
+                .filter(|r| match r.extension() {
+                    Some(ext) => &ext.to_os_string().into_string().unwrap() == "id",
+                    None => false,
+                }) // Filter out wrong extension
+                // .map(|r| r.into_os_string().into_string().unwrap())
+                .filter(|r| match &identity_prefix {
+                    Some(identity_prefix) => r
+                        .file_stem()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .contains(identity_prefix.as_str()),
+                    _ => true,
+                }) // TODO: Now it is a loose check on contain but not strict on the prefix
+                .filter_map(|r| Wallet::decrypt_keystore(r, password).ok()) // read keystore and return non-error results
+                .map(|r| r.address()) // read keystore and return address
+                .collect();
 
             println!("Addresses from identities {:?}", addresses);
             Ok(addresses)
-        },
-        Err(e) => Err(HelperErrors::UnableToReadIdentitiesFromPath(e))
+        }
+        Err(e) => Err(e),
     }
 }
 
@@ -48,9 +54,11 @@ mod tests {
         create_json_keystore(path, pwd, false).unwrap();
         match read_identities(path, &pwd.to_string(), &None) {
             Ok(val) => assert_eq!(val.len(), 1),
-            _ => assert!(false)
+            _ => assert!(false),
         }
-        remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
+        remove_json_keystore(path)
+            .map_err(|err| println!("{:?}", err))
+            .ok();
     }
 
     #[test]
@@ -61,9 +69,11 @@ mod tests {
         create_json_keystore(path, pwd, false).unwrap();
         match read_identities(path, &wrong_pwd.to_string(), &None) {
             Ok(val) => assert_eq!(val.len(), 0),
-            _ => assert!(false)
+            _ => assert!(false),
         }
-        remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
+        remove_json_keystore(path)
+            .map_err(|err| println!("{:?}", err))
+            .ok();
     }
 
     #[test]
@@ -71,7 +81,7 @@ mod tests {
         let path = "./";
         match read_identities(path, &"".to_string(), &None) {
             Ok(val) => assert_eq!(val.len(), 0),
-            _ => assert!(false)
+            _ => assert!(false),
         }
     }
 
@@ -82,9 +92,11 @@ mod tests {
         create_json_keystore(path, pwd, true).unwrap();
         match read_identities(path, &pwd.to_string(), &None) {
             Ok(val) => assert_eq!(val.len(), 1),
-            _ => assert!(false)
+            _ => assert!(false),
         }
-        remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
+        remove_json_keystore(path)
+            .map_err(|err| println!("{:?}", err))
+            .ok();
     }
 
     #[test]
@@ -94,9 +106,11 @@ mod tests {
         create_json_keystore(path, pwd, true).unwrap();
         match read_identities(path, &pwd.to_string(), &Some("local".to_string())) {
             Ok(val) => assert_eq!(val.len(), 1),
-            _ => assert!(false)
+            _ => assert!(false),
         }
-        remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
+        remove_json_keystore(path)
+            .map_err(|err| println!("{:?}", err))
+            .ok();
     }
 
     #[test]
@@ -106,20 +120,33 @@ mod tests {
         create_json_keystore(path, pwd, true).unwrap();
         match read_identities(path, &pwd.to_string(), &Some("npm-".to_string())) {
             Ok(val) => assert_eq!(val.len(), 0),
-            _ => assert!(false)
+            _ => assert!(false),
         }
-        remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
+        remove_json_keystore(path)
+            .map_err(|err| println!("{:?}", err))
+            .ok();
     }
 
-    fn create_json_keystore(dir_name: &str, pwd: &str, local_like: bool) -> Result<(), std::io::Error> {
-      fs::create_dir_all(dir_name)?;
-      let (_key, uuid) = Wallet::new_keystore(Path::new(dir_name), &mut thread_rng(), pwd, None).unwrap();
-      let old_file_path = vec![dir_name, "/", &*uuid].concat();
-      let new_file_path = if local_like {vec![dir_name, "/local-alice.id"].concat()} else {vec![dir_name, "/", &*uuid, ".id"].concat()};
-      fs::rename(&old_file_path, &new_file_path).map_err(|err| println!("{:?}", err)).ok(); // Rename keystore from uuid to uuid.id
-      Ok(())
+    fn create_json_keystore(
+        dir_name: &str,
+        pwd: &str,
+        local_like: bool,
+    ) -> Result<(), std::io::Error> {
+        fs::create_dir_all(dir_name)?;
+        let (_key, uuid) =
+            Wallet::new_keystore(Path::new(dir_name), &mut thread_rng(), pwd, None).unwrap();
+        let old_file_path = vec![dir_name, "/", &*uuid].concat();
+        let new_file_path = if local_like {
+            vec![dir_name, "/local-alice.id"].concat()
+        } else {
+            vec![dir_name, "/", &*uuid, ".id"].concat()
+        };
+        fs::rename(&old_file_path, &new_file_path)
+            .map_err(|err| println!("{:?}", err))
+            .ok(); // Rename keystore from uuid to uuid.id
+        Ok(())
     }
-    
+
     fn remove_json_keystore(path: &str) -> Result<(), std::io::Error> {
         println!("remove_json_keystore {:?}", path);
         fs::remove_dir_all(path)

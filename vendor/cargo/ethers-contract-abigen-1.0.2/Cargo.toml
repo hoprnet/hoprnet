@@ -1,0 +1,52 @@
+[package]
+name = "ethers-contract-abigen"
+version = "1.0.2"
+authors = [
+    "Nicholas Rodrigues Lordello <nlordell@gmail.com>",
+    "Georgios Konstantopoulos <me@gakonst.com>",
+]
+edition = "2018"
+license = "MIT OR Apache-2.0"
+description = "Code generation for type-safe bindings to Ethereum smart contracts"
+homepage = "https://docs.rs/ethers"
+repository = "https://github.com/gakonst/ethers-rs"
+keywords = ["ethereum", "web3", "celo", "ethers"]
+
+[dependencies]
+ethers-core = { version = "^1.0.0", path = "../../ethers-core", features = ["macros"] }
+
+Inflector = "0.11"
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = "1.0.12"
+url = "2.1"
+serde_json = "1.0.61"
+serde = { version = "1.0.124", features = ["derive"] }
+hex = { version = "0.4.2", default-features = false, features = ["std"] }
+reqwest = { version = "0.11.3", default-features = false, features = ["blocking"], optional = true }
+cfg-if = "1.0.0"
+dunce = "1.0.2"
+walkdir = "2.3.2"
+eyre = "0.6"
+regex = "1.6.0"
+toml = "0.5.9"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# NOTE: this enables wasm compatibility for getrandom indirectly
+getrandom = { version = "0.2", features = ["js"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[features]
+default = ["reqwest", "rustls"]
+openssl = ["reqwest/native-tls"]
+rustls = ["reqwest/rustls-tls"]
+
+[dev-dependencies]
+tempfile = "3.2.0"
+ethers-solc = { version = "^1.0.0", path = "../../ethers-solc", default-features = false, features = [
+    "project-util",
+    "svm-solc",
+] }

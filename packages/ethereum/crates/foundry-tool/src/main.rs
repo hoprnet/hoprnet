@@ -1,10 +1,10 @@
 use clap::{Parser, Subcommand};
-use std::path::{Path};
-use std::process::Command;
 use ethers::types::Address;
+use std::path::Path;
+use std::process::Command;
 
-mod key_pair;
 mod helper_errors;
+mod key_pair;
 mod process;
 use helper_errors::HelperErrors;
 
@@ -13,7 +13,7 @@ use helper_errors::HelperErrors;
     name = "HOPR ethereum package helper",
     author = "HOPR <tech@hoprnet.org>",
     version = "0.1",
-    about = "Helper to store deployment files and fund nodes",
+    about = "Helper to store deployment files and fund nodes"
 )]
 struct Cli {
     #[clap(long)]
@@ -29,12 +29,16 @@ struct Cli {
 #[derive(Subcommand, Debug)]
 enum Commands {
     // related to file structure. TODO: Extend this command to store deployment files, if needed
-    #[clap(about = "Print path to the folder that should store deployment files for given envirionment and type.")]
+    #[clap(
+        about = "Print path to the folder that should store deployment files for given envirionment and type."
+    )]
     Files {
         #[clap(short, long)]
         list: bool,
     },
-    #[clap(about = "Fund given address and/or addressed derived from identity files native tokens or HOPR tokens")]
+    #[clap(
+        about = "Fund given address and/or addressed derived from identity files native tokens or HOPR tokens"
+    )]
     Faucet {
         #[clap(
             help = "Ethereum address of node that will receive funds",
@@ -99,10 +103,10 @@ enum Commands {
             default_value = None
         )]
         private_key: String,
-    }
+    },
 }
 
-fn main()-> Result<(), HelperErrors> {
+fn main() -> Result<(), HelperErrors> {
     let cli = Cli::parse();
 
     match cli.command {
@@ -112,19 +116,28 @@ fn main()-> Result<(), HelperErrors> {
                 println!("check if path {} is created", new_p);
             }
             Ok(())
-        },
-        Some(Commands::Faucet { address, password, use_local_identities, identity_directory, identity_prefix, token_type:_, make_root, private_key }) => {
+        }
+        Some(Commands::Faucet {
+            address,
+            password,
+            use_local_identities,
+            identity_directory,
+            identity_prefix,
+            token_type: _,
+            make_root,
+            private_key,
+        }) => {
             // Include provided address
             let mut addresses_all = Vec::new();
             if let Some(addr) = address {
                 // parse provided address string into `Address` type
                 match addr.parse::<Address>() {
                     Ok(parsed_addr) => addresses_all.push(parsed_addr),
-                    // TODO: Consider accept peer id here 
-                    Err(_) => return Err(HelperErrors::UnableToParseAddress(addr))
+                    // TODO: Consider accept peer id here
+                    Err(_) => return Err(HelperErrors::UnableToParseAddress(addr)),
                 }
             }
-            
+
             // Check if local identity files should be used. Push all the read identities.
             if use_local_identities {
                 // read all the files from the directory
@@ -132,8 +145,8 @@ fn main()-> Result<(), HelperErrors> {
                     match key_pair::read_identities(&id_dir.as_str(), &password, &identity_prefix) {
                         Ok(addresses_from_identities) => {
                             addresses_all.extend(addresses_from_identities);
-                        },
-                        Err(e) => return Err(e)
+                        }
+                        Err(e) => return Err(HelperErrors::UnableToReadIdentitiesFromPath(e)),
                     }
                 }
             }
@@ -144,14 +157,21 @@ fn main()-> Result<(), HelperErrors> {
 
             // set directory and environment variables
             if let Err(e) = process::set_process_path_env(&make_root, &private_key) {
-                return Err(e)
+                return Err(e);
             }
 
             // iterate and collect execution result. If error occurs, the entire operation failes.
-            addresses_all.into_iter().map(|a| process::child_process_call_make(&cli.environment_name, &cli.environment_type, &a)).collect()
-        },
-        None => {
-            Ok(())
+            addresses_all
+                .into_iter()
+                .map(|a| {
+                    process::child_process_call_make(
+                        &cli.environment_name,
+                        &cli.environment_type,
+                        &a,
+                    )
+                })
+                .collect()
         }
+        None => Ok(()),
     }
 }

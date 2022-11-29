@@ -1,0 +1,75 @@
+package:
+
+  # When releasing to crates.io:
+  #
+  # - last check for all TODO, FIXME, expect, unwrap.
+  # - recheck log statements (informative, none left that were just for development, ...)
+  # - `cargo +nightly doc` and re-read and final polish of documentation.
+  #
+  # - Update CHANGELOG.md.
+  # - Update version numbers in Cargo.yml, Cargo.toml, install section of readme.
+  #
+  # - `touch **.rs && cargo clippy --tests --examples --benches --all-features`
+  # - `cargo update`
+  # - `cargo udeps --all-targets --all-features`
+  # - `cargo audit`
+  # - `cargo crev crate verify --show-all --recursive` and review.
+  # - 'cargo test --all-targets --all-features'
+  #
+  # - push dev and verify CI result
+  # - `cargo test` on dependent crates
+  #
+  # - cargo publish
+  # - `git checkout master && git merge dev --no-ff`
+  # - `git tag x.x.x` with version number.
+  # - `git push && git push --tags`
+  #
+  version       : 0.5.3
+  name          : pharos
+  authors       : [ Naja Melan <najamelan@autistici.org> ]
+  edition       : '2021'
+  readme        : README.md
+  license       : Unlicense
+  repository    : https://github.com/najamelan/pharos
+  documentation : https://docs.rs/pharos
+  description   : Observer pattern which generates a futures 0.3 stream of events
+  categories    : [ asynchronous ]
+  keywords      : [ observer, futures, stream, broadcast, publish_subscribe ]
+  exclude       : [ tests, examples, ci, .travis.yml, TODO.md, CONTRIBUTING.md ]
+
+  metadata:
+    docs:
+      rs:
+        all-features: true
+        targets     : []
+
+
+badges:
+
+  travis-ci   : { repository: najamelan/pharos   }
+  maintenance : { status    : actively-developed }
+
+
+dependencies:
+
+  futures: { version: ^0.3, default-features: false, features: [std] }
+
+
+dev-dependencies:
+
+  futures           : ^0.3
+  assert_matches    : ^1
+  async-std         : { version: ^1  , features: [ attributes ] }
+  async_executors   : { version: ^0.4, features: [ async_std  ] }
+  wasm-bindgen-test : ^0.3
+
+build-dependencies:
+
+  rustc_version: ^0.4
+
+
+profile:
+
+  release:
+
+    codegen-units: 1
