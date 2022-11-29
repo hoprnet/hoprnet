@@ -33,6 +33,9 @@ deps: ## install dependencies
 	$(MAKE) cargo-update
 	command -v wasm-pack || $(cargo) install wasm-pack
 	yarn
+# install foundry (cast + forge + anvil)
+	cargo install --git https://github.com/foundry-rs/foundry --profile local --locked foundry-cli anvil
+  
 
 .PHONY: cargo-update
 cargo-update: ## update vendored Cargo dependencies
@@ -121,15 +124,17 @@ lint-check: ## run linter in check mode
 lint-fix: ## run linter in fix mode
 	npx prettier --write .
 
-.PHONY: run-hardhat
-run-hardhat: ## run local hardhat environment
-	cd packages/ethereum && \
-		env NODE_OPTIONS="--experimental-wasm-modules" NODE_ENV=development \
-		TS_NODE_PROJECT=./tsconfig.hardhat.json \
-		HOPR_ENVIRONMENT_ID=hardhat-localhost yarn run hardhat node \
-		--network hardhat --show-stack-traces
+.PHONY: run-anvil
+run-anvil: ## spinup a local anvil instance (daemon) and deploy contracts
+	echo "Spin up a local anvil instance and deploy all the contracts, incl. Erc1820Registry, to the local environment"
+	anvil & \
+	$(MAKE) -C packages/ethereum/crates/contracts/ -j anvil-deploy-all
 
-.PHONY: run-local
+.PHONY: kill-anvil
+kill-anvil: ## kill process running at port 8545 (default port of anvil)
+	kill $(lsof -i :8545 | grep 8545 | awk '{ print $2 }')
+
+s.PHONY: run-local
 run-local: ## run HOPRd from local repo
 	env NODE_OPTIONS="--experimental-wasm-modules" NODE_ENV=development node \
 		packages/hoprd/lib/main.cjs --admin --init --api \

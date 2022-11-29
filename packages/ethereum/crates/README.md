@@ -31,9 +31,13 @@ make sc-coverage
 #### Local
 
 ```
-anvil
-make anvil-deploy-erc1820
-FOUNDRY_PROFILE=development ENVIRONMENT_NAME=anvil forge script --broadcast script/DeployAll.s.sol:DeployAllContractsScript
+# run anvil as a daemon.
+anvil & make anvil-deploy-all
+```
+
+```
+# The anvil daemon can be killed with
+kill $(lsof -i :8545 | grep 8545 | awk '{ print $2 }')
 ```
 
 #### Staging
