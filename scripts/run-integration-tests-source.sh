@@ -108,8 +108,6 @@ declare -a all_ports=( 8545 )
 all_ports+=( 13301 13302 13303 13304 13305 13306 13307 )
 # HOPRd p2p ports
 all_ports+=( 19091 19092 19093 19094 19095 19096 19097 )
-# HOPRd Admin ports
-all_ports+=( 19501 19502 19503 19504 19505 19506 19507 )
 # CTd healthcheck port
 all_ports+=( 20000 )
 
@@ -157,8 +155,8 @@ if [ "${skip_cleanup}" != "1" ] && [ "${skip_cleanup}" != "true" ]; then
 fi
 
 # $1 = api port
-# $2 = node port
-# $3 = admin port
+# $2 = api token
+# $3 = node port
 # $4 = node data directory
 # $5 = node log file
 # $6 = node id file
@@ -168,12 +166,11 @@ function setup_node() {
   local api_port=${1}
   local api_token=${2}
   local node_port=${3}
-  local admin_port=${4}
-  local dir=${5}
-  local log=${6}
-  local id=${7}
-  local private_key=${8}
-  local additional_args=${9:-""}
+  local dir=${4}
+  local log=${5}
+  local id=${6}
+  local private_key=${7}
+  local additional_args=${8:-""}
 
   log "Run node ${id} on API port ${api_port} -> ${log}"
 
@@ -192,9 +189,7 @@ function setup_node() {
 
   log "Additional args: \"${additional_args}\""
 
-  # Set NODE_ENV=development to rebuild hopr-admin next files
-  # at runtime. Necessary to start multiple instances of hoprd
-  # in parallel. Using a mix of CLI parameters and env variables to ensure
+  # Using a mix of CLI parameters and env variables to ensure
   # both work.
   env \
     DEBUG="hopr*" \
@@ -206,9 +201,6 @@ function setup_node() {
     HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
     NODE_OPTIONS="--experimental-wasm-modules" \
     node packages/hoprd/lib/main.cjs \
-      --admin \
-      --adminHost "127.0.0.1" \
-      --adminPort ${admin_port} \
       --data="${dir}" \
       --host="127.0.0.1:${node_port}" \
       --identity="${id}" \
@@ -338,15 +330,15 @@ cp -R \
 declare ct_node1_address="0xde913eeed23bce5274ead3de8c196a41176fbd49"
 
 #  --- Run nodes --- {{{
-setup_node 13301 ${default_api_token} 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}" "${node1_privkey}" "--announce"
+setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "${node1_privkey}" "--announce"
 setup_node 13302 "" 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "${node2_privkey}" "--announce"
-setup_node 13303 ${default_api_token} 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}" "${node3_privkey}" "--announce"
-setup_node 13304 ${default_api_token} 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}" "${node4_privkey}" "--testNoDirectConnections"
-setup_node 13305 ${default_api_token} 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}" "${node5_privkey}" "--testNoDirectConnections"
+setup_node 13303 ${default_api_token} 19093 "${node3_dir}" "${node3_log}" "${node3_id}" "${node3_privkey}" "--announce"
+setup_node 13304 ${default_api_token} 19094 "${node4_dir}" "${node4_log}" "${node4_id}" "${node4_privkey}" "--testNoDirectConnections"
+setup_node 13305 ${default_api_token} 19095 "${node5_dir}" "${node5_log}" "${node5_id}" "${node5_privkey}" "--testNoDirectConnections"
 # should not be able to talk to the rest
-setup_node 13306 ${default_api_token} 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "${node6_privkey}" "--announce --environment hardhat-localhost2"
+setup_node 13306 ${default_api_token} 19096 "${node6_dir}" "${node6_log}" "${node6_id}" "${node6_privkey}" "--announce --environment hardhat-localhost2"
 # node n8 will be the only one NOT registered
-setup_node 13307 ${default_api_token} 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "${node7_privkey}" "--announce"
+setup_node 13307 ${default_api_token} 19097 "${node7_dir}" "${node7_log}" "${node7_id}" "${node7_privkey}" "--announce"
 setup_ct_node "${ct_node1_log}" "0xa08666bca1363cb00b5402bbeb6d47f6b84296f3bba0f2f95b1081df5588a613" 20000 "${ct_node1_dir}"
 # }}}
 
@@ -394,7 +386,7 @@ log "All nodes came up online"
 
 # --- Run security tests --- {{{
 ${mydir}/../test/security-test.sh \
-  127.0.0.1 13301 13302 19501 19502 "${default_api_token}"
+  127.0.0.1 13301 13302 "${default_api_token}"
 # }}}
 
 # --- Run protocol test --- {{{

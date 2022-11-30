@@ -20,22 +20,18 @@ declare bad_token="bad_token"
 
 usage() {
   msg
-  msg "Usage: $0 <host> <api_port> <insecure_api_port> <admin_port> <insecure_admin_port> <api_token>"
+  msg "Usage: $0 <host> <api_port> <insecure_api_port> <api_token>"
   msg
 }
 
 declare host="${1}"
 declare api_port="${2}"
 declare insecure_api_port="${3}"
-declare admin_port="${4}"
-declare insecure_admin_port="${5}"
-declare api_token="${6}"
+declare api_token="${4}"
 
 log "Security tests started"
 log "API @ ${host}:${api_port}"
 log "No-auth API @ ${host}:${insecure_api_port}"
-log "Admin websocket API @ ${host}:${admin_port}"
-log "No-auth admin websocket API @ ${host}:${insecure_admin_port}"
 
 # prefer local websocat binary over global version
 alias websocat=websocat
@@ -45,8 +41,6 @@ alias websocat=websocat
 wait_for_port "${api_port}" "${host}"
 wait_for_port "${api_port}" "${host}"
 wait_for_port "${insecure_api_port}" "${host}"
-wait_for_port "${admin_port}" "${host}"
-wait_for_port "${insecure_admin_port}" "${host}"
 
 declare http_status_code
 
