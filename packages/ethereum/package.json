@@ -41,7 +41,7 @@
     "@ethersproject/wallet": "5.7.0",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "@multiformats/multiaddr": "10.3.3",
-    "@nomicfoundation/hardhat-chai-matchers": "1.0.3",
+    "@nomicfoundation/hardhat-chai-matchers": "1.0.5",
     "@nomiclabs/hardhat-ethers": "2.1.1",
     "@nomiclabs/hardhat-etherscan": "3.1.0",
     "@nomiclabs/hardhat-solhint": "2.0.1",
