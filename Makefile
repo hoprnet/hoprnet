@@ -127,14 +127,7 @@ cargo-download: ## download vendored Cargo dependencies
 
 .PHONY: build
 build: ## build all packages
-build: build-hopr-admin build-yarn
-
-.PHONY: build-hopr-admin
-build-hopr-admin: ## build hopr admin React frontend
-# Don't build hopr-admin e.g. for cover-traffic-daemon
-ifeq ($(origin NO_NEXT),undefined)	
-	yarn workspace @hoprnet/hoprd run buildAdmin
-endif
+build: build-yarn
 
 .PHONY: build-solidity-types
 build-solidity-types: ## generate Solidity typings
@@ -232,7 +225,7 @@ kill-anvil: ## kill process running at port 8545 (default port of anvil)
 .PHONY: run-local
 run-local: ## run HOPRd from local repo
 	env NODE_OPTIONS="--experimental-wasm-modules" NODE_ENV=development DEBUG="hopr*" node \
-		packages/hoprd/lib/main.cjs --admin --init --api \
+		packages/hoprd/lib/main.cjs --init --api \
 		--password="local" --identity=`pwd`/.identity-local.id \
 		--environment anvil-localhost --announce \
 		--testUseWeakCrypto --testAnnounceLocalAddresses \
@@ -452,6 +445,13 @@ ifeq ($(environment_type),)
 	echo "could not read environment type info from contracts-addresses.json" >&2 && exit 1
 endif
 endif
+
+.PHONY: run-hopr-admin
+run-hopr-admin: version=07aec21b
+run-hopr-admin: port=3000
+run-hopr-admin: ## launches HOPR Admin in a Docker container, supports port= and version=, use http://host.docker.internal to access the host machine
+	docker run -p $(port):3000 --add-host=host.docker.internal:host-gateway \
+		gcr.io/hoprassociation/hopr-admin:$(version)
 
 .PHONY: help
 help:

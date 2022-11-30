@@ -26,7 +26,7 @@ services:
       - -c
       - |
         ./prepare-node.sh
-        node /opt/hopr/packages/hoprd/lib/main.cjs --admin --adminHost 0.0.0.0 \
+        node /opt/hopr/packages/hoprd/lib/main.cjs \
           --healthCheck --healthCheckHost 0.0.0.0 --init --api --apiHost 0.0.0.0 --environment anvil-localhost \
           --apiToken MyT0ken123^ --password switzerland --testPreferLocalAddresses \
           --identity /var/hopr/identities/local-nat-node1.id --testUseWeakCrypto
@@ -36,7 +36,6 @@ services:
     networks:
       - 'hoprd-local-network-1'
     ports:
-      - '3010:3000'
       - '3011:3001'
     environment:
       - 'DEBUG=hopr*'
@@ -47,8 +46,13 @@ services:
       - -c
       - |
         ./prepare-node.sh
+<<<<<<< HEAD
         node /opt/hopr/packages/hoprd/lib/main.cjs --admin --adminHost 0.0.0.0 \
           --healthCheck --healthCheckHost 0.0.0.0 --init --api --apiHost 0.0.0.0 --environment anvil-localhost \
+=======
+        node /opt/hopr/packages/hoprd/lib/main.cjs \
+          --healthCheck --healthCheckHost 0.0.0.0 --init --api --apiHost 0.0.0.0 --environment hardhat-localhost \
+>>>>>>> 529099d8d (hopr-admin: Remove from script references)
           --apiToken MyT0ken123^ --password switzerland --testPreferLocalAddresses \
           --identity /var/hopr/identities/local-nat-node2.id --testUseWeakCrypto
     volumes:
@@ -57,7 +61,6 @@ services:
     networks:
       - 'hoprd-local-network-2'
     ports:
-      - '3020:3000'
       - '3021:3001'
     environment:
       - 'DEBUG=hopr*'

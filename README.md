@@ -144,9 +144,6 @@ Options:
   --environment                  Environment id which the node shall run on (HOPRD_ENVIRONMENT)  [string] [choices: "anvil-localhost", "anvil-localhost2", "master-goerli", "debug-goerli", "tuttlingen", "prague", "budapest", "athens", "lisbon", "ouagadougou", "paleochora", "monte_rosa"] [default: ""]
   --host                         The network host to run the HOPR node on [env: HOPRD_HOST]  [string] [default: "0.0.0.0:9091"]
   --announce                     Announce public IP to the network [env: HOPRD_ANNOUNCE]  [boolean] [default: false]
-  --admin                        Run an admin interface on localhost:3000, requires --apiToken [env: HOPRD_ADMIN]  [boolean] [default: false]
-  --adminHost                    Host to listen to for admin console [env: HOPRD_ADMIN_HOST]  [string] [default: "localhost"]
-  --adminPort                    Port to listen to for admin console [env: HOPRD_ADMIN_PORT]  [string] [default: 3000]
   --api                          Expose the API on localhost:3001, requires --apiToken. [env: HOPRD_API]  [boolean] [default: false]
   --apiHost                      Set host IP to which the API server will bind. [env: HOPRD_API_HOST]  [string] [default: "localhost"]
   --apiPort                      Set host port to which the API server will bind. [env: HOPRD_API_PORT]  [number] [default: 3001]
@@ -154,7 +151,7 @@ Options:
   --healthCheckHost              Updates the host for the healthcheck server [env: HOPRD_HEALTH_CHECK_HOST]  [string] [default: "localhost"]
   --healthCheckPort              Updates the port for the healthcheck server [env: HOPRD_HEALTH_CHECK_PORT]  [number] [default: 8080]
   --password                     A password to encrypt your keys [env: HOPRD_PASSWORD]  [string] [default: ""]
-  --apiToken                     A REST API token and admin panel password for user authentication [env: HOPRD_API_TOKEN]  [string]
+  --apiToken                     A REST API token for user authentication [env: HOPRD_API_TOKEN]  [string]
   --privateKey                   A private key to be used for the node [env: HOPRD_PRIVATE_KEY]  [string]
   --provider                     A custom RPC provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER]  [string]
   --identity                     The path to the identity file [env: HOPRD_IDENTITY]  [string] [default: "/home/tino/.hopr-identity"]
@@ -183,24 +180,22 @@ As you might have noticed running the node without any command-line argument mig
 The following command assumes you've setup an alias like described in [Install via Docker](#install-via-docker).
 
 ```sh
-hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --admin --adminHost 0.0.0.0 --apiToken <MY_TOKEN> --environment monte_rosa
+hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --apiToken <MY_TOKEN> --environment monte_rosa
 ```
 
 Here is a short breakdown of each argument.
 
 ```sh
 hoprd
-  --identity /app/hoprd-db/.hopr-identity      # store your node identity information in the persisted database folder
-  --password switzerland   	# set the encryption password for your identity
-  --init 				    # initialize the database and identity if not present
-  --announce 				# announce the node to other nodes in the network and act as relay if publicly reachable
-  --host "0.0.0.0:9091"   	# set IP and port of the P2P API to the container's external IP so it can be reached on your host
-  --admin   	            # enable the node's admin UI
-  --adminHost 0.0.0.0       # set IP of the Rest API to the container's external IP so it can be reached on your host
-  --apiToken <MY_TOKEN>     # specify password for accessing admin panel and REST API(REQUIRED)
-  --environment monte_rosa # an environment is defined as a chain plus a number of deployed smart contract addresses to use on that chain
-                            # each release has a default environment id set, but the user can override this value
-                            # nodes from different environments are **not able** to communicate
+  --identity /app/hoprd-db/.hopr-identity     # store your node identity information in the persisted database folder
+  --password switzerland   	                  # set the encryption password for your identity
+  --init 				                              # initialize the database and identity if not present
+  --announce 				                          # announce the node to other nodes in the network and act as relay if publicly reachable
+  --host "0.0.0.0:9091"   	                  # set IP and port of the P2P API to the container's external IP so it can be reached on your host
+  --apiToken <MY_TOKEN>                       # specify password for accessing REST API(REQUIRED)
+  --environment monte_rosa                    # an environment is defined as a chain plus a number of deployed smart contract addresses to use on that chain
+                                              # each release has a default environment id set, but the user can override this value
+                                              # nodes from different environments are **not able** to communicate
 ```
 
 ### Using NPM
@@ -209,19 +204,18 @@ The following command assumes you've setup a local installation like described i
 
 ```sh
 cd MY_NEW_HOPR_TEST_FOLDER
-DEBUG=hopr* npx hoprd --admin --init --announce --identity .hopr-identity --password switzerland --apiToken <MY_TOKEN>
+DEBUG=hopr* npx hoprd --init --announce --identity .hopr-identity --password switzerland --apiToken <MY_TOKEN>
 ```
 
 Here is a short break-down of each argument.
 
 ```sh
 hoprd
-  --admin   	              # enable the node's admin UI, available at localhost:3000
-  --init 				      # initialize the database and identity if not present
-  --announce 				  # announce the node to other nodes in the network and act as relay if publicly reachable
+  --init 				              # initialize the database and identity if not present
+  --announce 				          # announce the node to other nodes in the network and act as relay if publicly reachable
   --identity .hopr-identity   # store your node identity information in your test folder
   --password switzerland   	  # set the encryption password for your identity
-  --apiToken <MY_TOKEN>       # specify password for accessing admin panel and REST API (REQUIRED)
+  --apiToken <MY_TOKEN>       # specify password for accessing REST API (REQUIRED)
 ```
 
 ## Testnet accessibility
