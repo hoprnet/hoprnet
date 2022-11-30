@@ -1,3 +1,4 @@
+use ethers::core::k256::ecdsa::SigningKey;
 use ethers::core::rand::thread_rng;
 use ethers::signers::Signer;
 use ethers::signers::Wallet;
@@ -31,7 +32,7 @@ pub fn read_identities(
                         .contains(identity_prefix.as_str()),
                     _ => true,
                 }) // TODO: Now it is a loose check on contain but not strict on the prefix
-                .filter_map(|r| Wallet::decrypt_keystore(r, password).ok()) // read keystore and return non-error results
+                .filter_map(|r| Wallet::<SigningKey>::decrypt_keystore(r, password).ok()) // read keystore and return non-error results
                 .map(|r| r.address()) // read keystore and return address
                 .collect();
 

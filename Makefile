@@ -15,10 +15,19 @@ cargo := cargo --config ${CURDIR}/.cargo/config.toml
 
 all: help
 
-.PHONY: $(CRATES) ## builds all Rust crates
+
+.PHONY: $(CRATES) ## builds all Rust crates with wasm-pack (except for foundry-tool)
 $(CRATES):
 # --out-dir is relative to working directory
+	echo "use wasm-pack build"
 	wasm-pack build --target=bundler --out-dir ./pkg $@
+
+.PHONY: ./packages/ethereum/crates/foundry-tool/ ## builds foundry-tool Rust crates with cargo
+./packages/ethereum/crates/foundry-tool/:
+	echo "use cargo build" 
+	cargo build --manifest-path $@/Cargo.toml
+# install the package
+	cargo install --path $@
 
 .PHONY: $(WORKSPACES_WITH_RUST_MODULES) ## builds all WebAssembly modules
 $(WORKSPACES_WITH_RUST_MODULES):
@@ -34,8 +43,13 @@ deps: ## install dependencies
 	command -v wasm-pack || $(cargo) install wasm-pack
 	yarn
 # install foundry (cast + forge + anvil)
-	cargo install --git https://github.com/foundry-rs/foundry --profile local --locked foundry-cli anvil
+	$(MAKE) install-foundry
   
+
+.PHONY: install-foundry
+install-foundry: ## install foundry
+	curl -L https://foundry.paradigm.xyz | bash
+	foundryup
 
 .PHONY: cargo-update
 cargo-update: ## update vendored Cargo dependencies
@@ -139,7 +153,7 @@ run-local: ## run HOPRd from local repo
 	env NODE_OPTIONS="--experimental-wasm-modules" NODE_ENV=development node \
 		packages/hoprd/lib/main.cjs --admin --init --api \
 		--password="local" --identity=`pwd`/.identity-local \
-		--environment hardhat-localhost --announce \
+		--environment anvil-localhost --announce \
 		--testUseWeakCrypto --testAnnounceLocalAddresses \
 		--testPreferLocalAddresses --testNoAuthentication
 
