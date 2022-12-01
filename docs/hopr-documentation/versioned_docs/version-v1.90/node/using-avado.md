@@ -9,7 +9,7 @@ To set up your AVADO Node, follow the instructions that came with the box. If yo
 Please withdraw all your funds and delete the old package before installing a new one.
 :::
 
-## Installing the HOPR Client
+## Installing the HOPR Client: 1.90.63 (Valencia)
 
 While connected to your AVADO's network or via a VPN, go to the following [link](http://my.ava.do/#/installer/%2Fipfs%2FQmcDkbkH4TdjSnqXpUYya4FRscHHhTq1Q5FQZMBwsVy1gt). Just click the install button and wait until the download completes.
 
