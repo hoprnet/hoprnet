@@ -245,10 +245,11 @@ HOPR contains modules written in Rust, therefore a Rust toolchain is needed to s
 To install Rust toolchain (at least version 1.60) please follow instructions at [https://www.rust-lang.org/tools/install](https://www.rust-lang.org/tools/install) first.
 
 ```sh
+# build deps and HOPRd code
 make -j deps && make -j build
 
-# starting network
-HOPR_ENVIRONMENT_ID=hardhat-localhost yarn run:network
+# starting network (and put into background)
+make run-hardhat &
 
 # workaround for a temp issue with local hardhat-network
 cp -R packages/ethereum/deployments/hardhat-localhost/localhost/. packages/ethereum/deployments/hardhat-localhost/hardhat
@@ -261,7 +262,12 @@ DEBUG="hopr*" yarn run:hoprd:bob
 
 # fund all your nodes to get started
 HOPR_ENVIRONMENT_ID=hardhat-localhost yarn run:faucet:all
+
+# start local HOPR admin in a container (and put into background)
+make run-hopr-admin &
 ```
+
+## 
 
 ## Local cluster
 
