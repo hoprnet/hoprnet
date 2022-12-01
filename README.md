@@ -267,7 +267,7 @@ HOPR_ENVIRONMENT_ID=hardhat-localhost yarn run:faucet:all
 make run-hopr-admin &
 ```
 
-## 
+##
 
 ## Local cluster
 
