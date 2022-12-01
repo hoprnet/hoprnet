@@ -272,7 +272,7 @@ make fund-local-all
 make run-hopr-admin &
 ```
 
-## 
+##
 
 ## Local cluster
 
