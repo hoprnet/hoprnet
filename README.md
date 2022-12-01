@@ -245,10 +245,16 @@ HOPR contains modules written in Rust, therefore a Rust toolchain is needed to s
 To install Rust toolchain (at least version 1.60) please follow instructions at [https://www.rust-lang.org/tools/install](https://www.rust-lang.org/tools/install) first.
 
 ```sh
+# build deps and HOPRd code
 make -j deps && make -j build
 
+<<<<<<< HEAD
 # starting network
 make run-anvil
+=======
+# starting network (and put into background)
+make run-hardhat &
+>>>>>>> 69cb561c2 (Add missing wasm-opt dependency)
 
 # update protocol-config
 scripts/update-protocol-config.sh -e anvil-localhost
@@ -261,7 +267,12 @@ DEBUG="hopr*" yarn run:hoprd:bob
 
 # fund all your nodes to get started
 make fund-local-all
+
+# start local HOPR admin in a container (and put into background)
+make run-hopr-admin &
 ```
+
+## 
 
 ## Local cluster
 
