@@ -17,7 +17,7 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 # - Typescript + related utilities, such as ts-node -> ${mydir}/node_modules
 # - Rust (rustc, cargo) -> $HOME/.cargo/bin
 # - wasm-pack + wasm-opt, necessary to build WebAssembly modules -> $HOME/.cargo/bin
-# 
+#
 # Supposed to work for
 #   x86_64: Docker + Alpine
 #   x86_64: Debian-based
@@ -124,7 +124,7 @@ function install_wasm_pack() {
             *)
                 echo "no precompiled binaries available for OS: ${ostype}"
             ;;
-        esac 
+        esac
         curl -fsSLO --compressed "https://github.com/rustwasm/wasm-pack/releases/download/${wasm_pack_release}/wasm-pack-${wasm_pack_release}-${cputype}-${ostype}.tar.gz"
         tar -xzf "wasm-pack-${wasm_pack_release}-${cputype}-${ostype}.tar.gz"
         local install_dir="${HOME}/.cargo"
@@ -138,7 +138,9 @@ function install_wasm_pack() {
 function install_wasm_opt() {
     if ! command -v wasm-opt; then
         cd ${download_dir}
-        echo "Installing wasm-opt"
+        local rust_cargo_toml_path="${mydir}/../../Cargo.toml"
+        local wasm_opt_release=$(sed -En 's/^wasm-opt= \"([0-9.]*)\"$/v\1/p' ${rust_cargo_toml_path})
+        echo "Installing wasm-opt ${wasm_opt_release}"
         local ostype="$(uname -s)"
         local cputype="$(uname -m)"
         case "${ostype}" in
@@ -152,8 +154,7 @@ function install_wasm_opt() {
                 echo "no precompiled binaries available for OS: ${ostype}"
             ;;
         esac
-        local binaryen_release=$(curl 'https://api.github.com/repos/WebAssembly/binaryen/releases/latest' | jq -r '.tag_name')
-        echo "curl https://github.com/WebAssembly/binaryen/releases/download/${binaryen_release}/binaryen-${binaryen_release}-${cputype}-${ostype}.tar.gz"
+        local binaryen_release="version_$(echo "${wasm_opt_release}" | awk -F. '{ print $2; }')"
         curl -fsSLO --compressed "https://github.com/WebAssembly/binaryen/releases/download/${binaryen_release}/binaryen-${binaryen_release}-${cputype}-${ostype}.tar.gz"
         tar -xzf "binaryen-${binaryen_release}-${cputype}-${ostype}.tar.gz"
         local install_dir="${HOME}/.cargo"
