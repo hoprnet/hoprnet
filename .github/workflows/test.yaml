@@ -33,7 +33,9 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+            .cargo/.package-cache/
+            .cargo/bin/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
 
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
@@ -43,7 +45,7 @@ jobs:
           cache: yarn
 
       - name: Install dependencies
-        run: make -j deps
+        run: make -j deps-ci
 
       - name: Build
         run: make -j build

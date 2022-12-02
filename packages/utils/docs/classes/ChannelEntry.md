@@ -55,6 +55,10 @@
 | `channelEpoch` | [`UINT256`](UINT256.md) |
 | `closureTime` | [`UINT256`](UINT256.md) |
 
+#### Defined in
+
+[src/types/channelEntry.ts:75](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L75)
+
 ## Properties
 
 ### balance
@@ -155,6 +159,10 @@ ___
 
 `number`
 
+#### Defined in
+
+[src/types/channelEntry.ts:87](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L87)
+
 ## Methods
 
 ### closureTimePassed
@@ -164,6 +172,10 @@ ___
 #### Returns
 
 `boolean`
+
+#### Defined in
+
+[src/types/channelEntry.ts:185](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L185)
 
 ___
 
@@ -175,6 +187,10 @@ ___
 
 [`Hash`](Hash.md)
 
+#### Defined in
+
+[src/types/channelEntry.ts:176](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L176)
+
 ___
 
 ### getRemainingClosureTime
@@ -185,11 +201,17 @@ Computes the remaining time in seconds until the channel can be closed.
 Outputs `0` if there is no waiting time, and `-1` if the
 closure time of this channel is unknown.
 
-**`dev`** used to create more comprehensive debug logs
+**`Dev`**
+
+used to create more comprehensive debug logs
 
 #### Returns
 
 `BN`
+
+#### Defined in
+
+[src/types/channelEntry.ts:197](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L197)
 
 ___
 
@@ -201,6 +223,10 @@ ___
 
 `Uint8Array`
 
+#### Defined in
+
+[src/types/channelEntry.ts:146](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L146)
+
 ___
 
 ### toString
@@ -211,6 +237,10 @@ ___
 
 `string`
 
+#### Defined in
+
+[src/types/channelEntry.ts:160](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L160)
+
 ___
 
 ### createMock
@@ -220,6 +250,10 @@ ___
 #### Returns
 
 [`ChannelEntry`](ChannelEntry.md)
+
+#### Defined in
+
+[src/types/channelEntry.ts:208](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L208)
 
 ___
 
@@ -237,6 +271,10 @@ ___
 
 [`ChannelEntry`](ChannelEntry.md)
 
+#### Defined in
+
+[src/types/channelEntry.ts:101](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L101)
+
 ___
 
 ### fromSCEvent
@@ -253,3 +291,7 @@ ___
 #### Returns
 
 `Promise`<[`ChannelEntry`](ChannelEntry.md)\>
+
+#### Defined in
+
+[src/types/channelEntry.ts:127](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L127)

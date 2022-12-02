@@ -9,11 +9,19 @@ env:
 
 on:
   push:
-    branches: ['integration/**', 'master', 'release/**', 'staging/**', 'avado', 'debug-deploy/**']
+    branches:
+      [
+        "integration/**",
+        "master",
+        "release/**",
+        "staging/**",
+        "avado",
+        "debug-deploy/**",
+      ]
     paths-ignore:
-      - '.processes/**/*'
-      - 'docs/**/*'
-      - 'packages/*/docs/**/*'
+      - ".processes/**/*"
+      - "docs/**/*"
+      - "packages/*/docs/**/*"
 
 concurrency:
   # limit invocations of this workflow to one at a time to prevent race
@@ -29,8 +37,8 @@ jobs:
     strategy:
       matrix:
         node-version: [16]
-        os: ['ubuntu-latest']
-        rust: ['stable']
+        os: ["ubuntu-latest"]
+        rust: ["stable"]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
@@ -46,17 +54,18 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+            .cargo/.package-cache/
+            .cargo/bin/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
 
-      - name: '[SETUP] Use Node.js'
+      - name: "[SETUP] Use Node.js"
         uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
           registry-url: https://registry.npmjs.org/
           cache: yarn
 
-
-      - name: '[SETUP] Print additional information'
+      - name: "[SETUP] Print additional information"
         run: |
           node --version
           npm --version
@@ -64,31 +73,28 @@ jobs:
           rustc --version
           cargo --version
 
-      - name: '[SETUP] Configure Git info'
+      - name: "[SETUP] Configure Git info"
         run: ./scripts/configure-git-info.sh
 
-
-      - name: '[SETUP] Install Yarn (only when using ACT)'
-        if: ${{ env.ACT == 'true' }}
-        run: |
-          curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
-          echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
-          apt update
-          apt install --no-install-recommends yarn
-
-      - name: '[BUILD] Install dependencies / link / build'
+      - name: "[BUILD] Install dependencies / link / build"
         run: |
           # Deploying with hardhat requires built hopr-utils package
-          CI=true make -j deps
+          make -j deps-ci
           make -j build
 
-      - name: 'Cache built artifacts (for later use)'
+      - name: "Cache built artifacts (for later use)"
         uses: actions/cache@v3
         with:
           path: packages/
           key: hoprnet-build-${{ github.run_id }}
 
-      - name: '[SMART-CONTRACTS] Deploy for known environments'
+      - name: "Cache built artifacts (for later use)"
+        uses: actions/cache@v3
+        with:
+          path: packages/
+          key: hoprnet-build-${{ github.run_id }}
+
+      - name: "[SMART-CONTRACTS] Deploy for known environments"
         if: ${{ !env.ACT }}
         run: ./scripts/deploy-smart-contracts.sh
         env:
@@ -96,29 +102,29 @@ jobs:
           ETHERSCAN_KEY: ${{ secrets.ETHERSCAN }}
           BLOCKSCOUT_KEY: ${{ secrets.BLOCKSCOUT }}
 
-      - name: '[SMART-CONTRACTS] Commit & push changes'
+      - name: "[SMART-CONTRACTS] Commit & push changes"
         if: ${{ !env.ACT }}
         run: |
           make lint-fix
           ./scripts/commit-and-push-all-changes.sh
         env:
-          HOPR_GIT_MSG: 'chore(release): update smart contract deployments'
+          HOPR_GIT_MSG: "chore(release): update smart contract deployments"
 
-      - name: '[NPM] Publish prerelease version (On pushes to master, debug-deploy/* or staging/*)'
-        if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/')  || startsWith(github.ref, 'refs/heads/staging/') }}
+      - name: "[NPM] Publish prerelease version (On pushes to master, debug-deploy/* or staging/*)"
+        if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/')  || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: ./scripts/publish-version.sh prerelease
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       # Pushing a PR to a release branch should increment the patch version in
       # accordance with semver.
-      - name: '[NPM] Publish patch version (On pushes to release branches)'
-        if: ${{ startsWith(github.ref, 'refs/heads/release/') }}
+      - name: "[NPM] Publish patch version (On pushes to release branches)"
+        if: ${{ startsWith(github.ref, 'refs/heads/release/') && !env.ACT }}
         run: ./scripts/publish-version.sh patch
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: '[NPM] Wait for packages to be accessible'
+      - name: "[NPM] Wait for packages to be accessible"
         if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/') || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: |
           ./scripts/wait-for-npm-package.sh hoprd
@@ -129,7 +135,7 @@ jobs:
           ./scripts/wait-for-npm-package.sh cover-traffic-daemon
           ./scripts/wait-for-npm-package.sh connect
 
-      - name: '[FINISH] Send notification if anything failed on master or release/staging branches'
+      - name: "[FINISH] Send notification if anything failed on master or release/staging branches"
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: |
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
@@ -148,11 +154,11 @@ jobs:
 
       - name: Get version from package.json
         id: get-package-version
-        run: echo "::set-output name=tag::v$(./scripts/get-package-version.sh)"
+        run: echo "tag=v$(./scripts/get-package-version.sh)" >> $GITHUB_OUTPUT
         env:
           HOPR_PACKAGE: hoprd
 
-      - uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@v0.1.15
         if: ${{ !env.ACT }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -212,7 +218,7 @@ jobs:
   avado:
     name: Build Avado (master or release pushes)
     runs-on: ubuntu-latest
-    needs: [build_deploy_sc_npm,build_docker]
+    needs: [build_deploy_sc_npm, build_docker]
     steps:
       - uses: actions/checkout@v3
         with:
@@ -243,7 +249,7 @@ jobs:
             # staging releases get different special version
             version="0.200.0"
           fi
-          echo "::set-output name=vsn::${version}"
+          echo "vsn=${version}" >> $GITHUB_OUTPUT
         env:
           HOPR_PACKAGE: hoprd
 
@@ -252,12 +258,12 @@ jobs:
           HOPR_GITHUB_REF: ${{ github.ref }}
           AVADO_VERSION: ${{ steps.set-version.outputs.vsn }}
         run: |
-          ./scripts/build_avado.sh ${AVADO_VERSION}
+          ./scripts/build-avado.sh ${AVADO_VERSION}
 
       - name: Commit & Push changes
         if: ${{ !env.ACT }}
         env:
-          HOPR_GIT_MSG: 'chore(release): publish Avado ${{ steps.set-version.outputs.vsn }}'
+          HOPR_GIT_MSG: "chore(release): publish Avado ${{ steps.set-version.outputs.vsn }}"
           HOPR_GITHUB_REF: ${{ github.ref }}
         run: ./scripts/commit-and-push-all-changes.sh
 
@@ -268,9 +274,9 @@ jobs:
             "${{ github.workflow }}" "${{ github.run_id }}"
 
   set_failed_deployment_flag:
-    name: 'Set failed deployment flag'
+    name: "Set failed deployment flag"
     runs-on: ubuntu-latest
-    needs: [ build_docker ]
+    needs: [build_docker]
     steps:
       - uses: actions/checkout@v3
         with:
@@ -293,14 +299,14 @@ jobs:
           ./scripts/deployment-gater.sh set
 
   deploy_public_instances:
-    name: 'Continuous Deployment: Deploy public instances'
+    name: "Continuous Deployment: Deploy public instances"
     strategy:
       matrix:
         node-version: [16]
-        os: ['ubuntu-latest']
-        rust: ['stable']
+        os: ["ubuntu-latest"]
+        rust: ["stable"]
     runs-on: ${{ matrix.os }}
-    needs: [ set_failed_deployment_flag ]
+    needs: [set_failed_deployment_flag]
     steps:
       - uses: actions/checkout@v3
         with:
@@ -315,7 +321,9 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+            .cargo/.package-cache/
+            .cargo/bin/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
 
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
@@ -343,7 +351,7 @@ jobs:
           # get latest version
           git pull
           # need to build our packages which might by used by the scripts, such as the fund script
-          CI=true make -j deps
+          make -j deps-ci
 
       - name: Restore built artifacts
         uses: actions/cache@v3
@@ -386,15 +394,15 @@ jobs:
             "${{ github.workflow }}" "${{ github.run_id }}"
 
   deploy_nat_instances:
-    name: 'Continuous Deployment: Deploy NAT instances'
+    name: "Continuous Deployment: Deploy NAT instances"
     strategy:
       matrix:
         node-version: [16]
-        os: ['ubuntu-latest']
-        rust: ['stable']
+        os: ["ubuntu-latest"]
+        rust: ["stable"]
 
     runs-on: ${{ matrix.os }}
-    needs: [ deploy_public_instances ] # Public nodes need to be deployed first
+    needs: [deploy_public_instances] # Public nodes need to be deployed first
     steps:
       - uses: actions/checkout@v3
         with:
@@ -409,7 +417,9 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+            .cargo/.package-cache/
+            .cargo/bin/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
 
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
@@ -437,7 +447,7 @@ jobs:
           # get latest version
           git pull
           # need to build our packages which might by used by the scripts, such as the fund script
-          CI=true make -j deps
+          make -j deps-ci
 
       - name: Restore built artifacts
         uses: actions/cache@v3
@@ -480,9 +490,9 @@ jobs:
             "${{ github.workflow }}" "${{ github.run_id }}"
 
   unset_failed_deployment_flag:
-    name: 'Unset failed deployment flag'
+    name: "Unset failed deployment flag"
     runs-on: ubuntu-latest
-    needs: [ avado, deploy_public_instances, deploy_nat_instances ]
+    needs: [avado, deploy_public_instances, deploy_nat_instances]
     steps:
       - uses: actions/checkout@v3
         with:

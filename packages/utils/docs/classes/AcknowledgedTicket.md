@@ -40,6 +40,10 @@
 | `preImage` | [`Hash`](Hash.md) |
 | `signer` | [`PublicKey`](PublicKey.md) |
 
+#### Defined in
+
+[src/types/acknowledgedTicket.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L5)
+
 ## Properties
 
 ### preImage
@@ -90,6 +94,10 @@ ___
 
 `number`
 
+#### Defined in
+
+[src/types/acknowledgedTicket.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L41)
+
 ## Methods
 
 ### serialize
@@ -99,6 +107,10 @@ ___
 #### Returns
 
 `Uint8Array`
+
+#### Defined in
+
+[src/types/acknowledgedTicket.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L16)
 
 ___
 
@@ -116,6 +128,10 @@ ___
 
 `boolean`
 
+#### Defined in
+
+[src/types/acknowledgedTicket.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L25)
+
 ___
 
 ### deserialize
@@ -131,3 +147,7 @@ ___
 #### Returns
 
 [`AcknowledgedTicket`](AcknowledgedTicket.md)
+
+#### Defined in
+
+[src/types/acknowledgedTicket.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L31)

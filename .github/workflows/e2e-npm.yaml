@@ -37,7 +37,9 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+            .cargo/.package-cache/
+            .cargo/bin/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
 
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
@@ -48,7 +50,7 @@ jobs:
 
       - name: Build
         run: |
-          make -j deps
+          make -j deps-ci
           make -j build
 
       - name: Install websocat

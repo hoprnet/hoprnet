@@ -8,6 +8,10 @@
 
 - [constructor](Address.md#constructor)
 
+### Properties
+
+- [arr](Address.md#arr)
+
 ### Accessors
 
 - [SIZE](Address.md#size)
@@ -38,6 +42,20 @@
 | :------ | :------ |
 | `arr` | `Uint8Array` |
 
+#### Defined in
+
+[src/types/primitives.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L10)
+
+## Properties
+
+### arr
+
+• `Private` **arr**: `Uint8Array`
+
+#### Defined in
+
+[src/types/primitives.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L10)
+
 ## Accessors
 
 ### SIZE
@@ -47,6 +65,10 @@
 #### Returns
 
 `number`
+
+#### Defined in
+
+[src/types/primitives.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L16)
 
 ## Methods
 
@@ -64,6 +86,10 @@
 
 `number`
 
+#### Defined in
+
+[src/types/primitives.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L48)
+
 ___
 
 ### eq
@@ -79,6 +105,10 @@ ___
 #### Returns
 
 `boolean`
+
+#### Defined in
+
+[src/types/primitives.ts:44](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L44)
 
 ___
 
@@ -96,6 +126,10 @@ ___
 
 `boolean`
 
+#### Defined in
+
+[src/types/primitives.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L52)
+
 ___
 
 ### serialize
@@ -105,6 +139,10 @@ ___
 #### Returns
 
 `Uint8Array`
+
+#### Defined in
+
+[src/types/primitives.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L28)
 
 ___
 
@@ -122,6 +160,10 @@ ___
 
 [[`Address`](Address.md), [`Address`](Address.md)]
 
+#### Defined in
+
+[src/types/primitives.ts:56](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L56)
+
 ___
 
 ### toBytes32
@@ -131,6 +173,10 @@ ___
 #### Returns
 
 `Uint8Array`
+
+#### Defined in
+
+[src/types/primitives.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L40)
 
 ___
 
@@ -142,6 +188,10 @@ ___
 
 `string`
 
+#### Defined in
+
+[src/types/primitives.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L32)
+
 ___
 
 ### toString
@@ -152,6 +202,10 @@ ___
 
 `string`
 
+#### Defined in
+
+[src/types/primitives.ts:36](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L36)
+
 ___
 
 ### createMock
@@ -161,6 +215,10 @@ ___
 #### Returns
 
 [`Address`](Address.md)
+
+#### Defined in
+
+[src/types/primitives.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L60)
 
 ___
 
@@ -178,6 +236,10 @@ ___
 
 [`Address`](Address.md)
 
+#### Defined in
+
+[src/types/primitives.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L24)
+
 ___
 
 ### fromString
@@ -193,3 +255,7 @@ ___
 #### Returns
 
 [`Address`](Address.md)
+
+#### Defined in
+
+[src/types/primitives.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L20)
