@@ -199,7 +199,7 @@ Note that deployment for `HoprDistributor` and `HoprWrapper` are skipped; ERC182
 
 - It does not need "networks" attribute
 - In "environment" attribute:
-  `- "network_id": "goerli", - "version_range": "*", - "channel_contract_deploy_block": 0, + "stake_season": 5,`
+  `- "network_id": "goerli", - "version_range": "*", - "channel_contract_deploy_block": 0, + "stake_season": 5, + "indexer_start_block_number": <the minimum block number of transactions that deploys HoprChannels and HoprNetworkRegistry>,`
 
 9. Contract verification:
 

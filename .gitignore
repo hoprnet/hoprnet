@@ -40,3 +40,17 @@ logs.txt
 /.cargo/.package-cache
 /.cargo/.crates.toml
 /.cargo/.crates2.json
+
+# FIXME: temporary fix to commit code
+*.js
+*.js.map
+*.d.ts
+*.d.ts.map
+*.mts
+*.mts.map
+*.mjs
+*.mjs.map
+*.cts
+*.cts.map
+*.cjs
+*.cjs.map

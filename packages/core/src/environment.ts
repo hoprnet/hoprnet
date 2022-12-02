@@ -88,8 +88,12 @@ export function supportedEnvironments(): Environment[] {
  * @returns the environment details, throws if environment is not supported
  */
 export function resolveEnvironment(environment_id: string, customProvider?: string): ResolvedEnvironment {
+  console.log(`[DEBUG] resolveEnvironment ${environment_id}, ${customProvider}`);
   const environment = (protocolConfig as ProtocolConfig).environments[environment_id]
+  console.log(`[DEBUG] resolveEnvironmentenvironment environment ${environment}`);
   const network = (protocolConfig as ProtocolConfig).networks[environment?.network_id]
+  console.log(`[DEBUG] resolveEnvironmentenvironment network ${network}`);
+  console.log(`[DEBUG] resolveEnvironmentenvironment semver.satisfies ${semver.satisfies(FULL_VERSION_COERCED, environment.version_range)}`);
 
   if (environment && network && semver.satisfies(FULL_VERSION_COERCED, environment.version_range)) {
     network.id = environment.network_id
@@ -97,7 +101,7 @@ export function resolveEnvironment(environment_id: string, customProvider?: stri
       network.default_provider = customProvider
     }
 
-    return {
+    const debug = {
       id: environment_id,
       network,
       environment_type: environment.environment_type,
@@ -110,6 +114,8 @@ export function resolveEnvironment(environment_id: string, customProvider?: stri
       network_registry_proxy_contract_address: environment.network_registry_proxy_contract_address,
       network_registry_contract_address: environment.network_registry_contract_address
     }
+    console.log(`[DEBUG] return ${JSON.stringify(debug, null, 2)}`);
+    return debug;
   }
 
   const supportedEnvsString: string = supportedEnvironments()

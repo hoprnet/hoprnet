@@ -70,7 +70,9 @@ build-hopr-admin: ## build hopr admin React frontend
 
 .PHONY: build-solidity-types
 build-solidity-types: ## generate Solidity typings
-	yarn workspace @hoprnet/hopr-ethereum run build:sol:types
+# FIXME: replace this with foundry binding generation
+	echo "TODO: Foundry create binding"
+# yarn workspace @hoprnet/hopr-ethereum run build:sol:types
 
 .PHONY: build-yarn
 build-yarn: ## build yarn packages
@@ -178,14 +180,7 @@ endif
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
-	TS_NODE_PROJECT=./tsconfig.hardhat.json \
-	HOPR_ENVIRONMENT_ID="$(environment)" \
-	  yarn workspace @hoprnet/hopr-ethereum run hardhat request-test-tokens \
-   --network $(network) \
-   --type xhopr \
-   --amount 1000000000000000000000 \
-   --recipient $(recipient) \
-   --privatekey "$(PRIVATE_KEY)"
+	make -C packages/ethereum/crates/contracts request-funds environment-name=$(environment) environment-type=$(environment_type) recipient=$(recipient)
 
 .PHONY: request-nrnft
 request-nrnft: ensure-environment-is-set
@@ -199,14 +194,7 @@ endif
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
-	TS_NODE_PROJECT=./tsconfig.hardhat.json \
-	HOPR_ENVIRONMENT_ID="$(environment)" \
-	  yarn workspace @hoprnet/hopr-ethereum run hardhat request-test-tokens \
-   --network $(network) \
-   --type nrnft \
-   --nftrank $(nftrank) \
-   --recipient $(recipient) \
-   --privatekey "$(PRIVATE_KEY)"
+	make -C packages/ethereum/crates/contracts request-nrnft environment-name=$(environment) environment-type=$(environment_type) recipient=$(recipient) nftrank=$(nftrank)
 
 .PHONY: stake-funds
 stake-funds: ensure-environment-is-set
@@ -214,13 +202,7 @@ stake-funds: ## stake funds (idempotent operation)
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
-	@TS_NODE_PROJECT=./tsconfig.hardhat.json \
-	HOPR_ENVIRONMENT_ID="$(environment)" \
-		yarn workspace @hoprnet/hopr-ethereum run hardhat stake \
-		--network $(network) \
-		--type xhopr \
-		--amount 1000000000000000000000 \
-		--privatekey "$(PRIVATE_KEY)"
+	make -C packages/ethereum/crates/contracts stake-funds environment-name=$(environment) environment-type=$(environment_type)
 
 .PHONY: stake-nrnft
 stake-nrnft: ensure-environment-is-set
@@ -228,38 +210,16 @@ stake-nrnft: ## stake Network_registry NFTs (idempotent operation)
 ifeq ($(nftrank),)
 	echo "parameter <nftrank> missing, it can be either 'developer' or 'community'" >&2 && exit 1
 endif
-ifeq ($(origin PRIVATE_KEY),undefined)
-	@TS_NODE_PROJECT=./tsconfig.hardhat.json \
-	HOPR_ENVIRONMENT_ID="$(environment)" \
-		yarn workspace @hoprnet/hopr-ethereum run hardhat stake \
-		--network $(network) \
-		--type nrnft \
-		--nftrank $(nftrank)
-else
-	@TS_NODE_PROJECT=./tsconfig.hardhat.json \
-	HOPR_ENVIRONMENT_ID="$(environment)" \
-		yarn workspace @hoprnet/hopr-ethereum run hardhat stake \
-		--network $(network) \
-		--type nrnft \
-		--nftrank $(nftrank) \
-		--privatekey "$(PRIVATE_KEY)"
-endif
+	make -C packages/ethereum/crates/contracts stake-nrnft environment-name=$(environment) environment-type=$(environment_type) nftrank=$(nftrank)
+
 
 enable-network-registry: ensure-environment-is-set
 enable-network-registry: ## owner enables network registry (smart contract) globally
-	TS_NODE_PROJECT=./tsconfig.hardhat.json \
-	HOPR_ENVIRONMENT_ID="$(environment)" \
-	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
-   --network $(network) \
-   --task enable
+	make -C packages/ethereum/crates/contracts enable-network-registry environment-name=$(environment) environment-type=$(environment_type)
 
 disable-network-registry: ensure-environment-is-set
 disable-network-registry: ## owner disables network registry (smart contract) globally
-	TS_NODE_PROJECT=./tsconfig.hardhat.json \
-	HOPR_ENVIRONMENT_ID="$(environment)" \
-	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
-   --network $(network) \
-   --task disable
+	make -C packages/ethereum/crates/contracts disable-network-registry environment-name=$(environment) environment-type=$(environment_type)
 
 force-eligibility-update: ensure-environment-is-set
 force-eligibility-update: ## owner forces eligibility update
@@ -269,25 +229,18 @@ endif
 ifeq ($(eligibility),)
 	echo "parameter <eligibility> missing" >&2 && exit 1
 endif
-	TS_NODE_PROJECT=./tsconfig.hardhat.json \
-	HOPR_ENVIRONMENT_ID="$(environment)" \
-	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
-   --network $(network) \
-   --task force-eligibility-update \
-   --native-addresses "$(native_addresses)"\
-   --eligibility "$(eligibility)"
+	make -C packages/ethereum/crates/contracts force-eligibility-update \
+	environment-name=$(environment) environment-type=$(environment_type) \
+	staking_addresses="$(native_addresses)" eligibility="$(eligibility)"
 
 sync-eligibility: ensure-environment-is-set
 sync-eligibility: ## owner sync eligibility of peers
 ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
-	TS_NODE_PROJECT=./tsconfig.hardhat.json \
-	HOPR_ENVIRONMENT_ID="$(environment)" \
-	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
-   --network $(network) \
-   --task sync \
-   --peer-ids "$(peer_ids)"
+	make -C packages/ethereum/crates/contracts sync-eligibility \
+	environment-name=$(environment) environment-type=$(environment_type) \
+	peer_ids="$(peer_ids)"
 
 register-nodes: ensure-environment-is-set
 register-nodes: ## owner register given nodes in network registry contract
@@ -297,36 +250,18 @@ endif
 ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
-	TS_NODE_PROJECT=./tsconfig.hardhat.json \
-	HOPR_ENVIRONMENT_ID="$(environment)" \
-	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
-   --network $(network) \
-   --task add \
-   --native-addresses "$(native_addresses)" \
-   --peer-ids "$(peer_ids)"
+	make -C packages/ethereum/crates/contracts register-nodes \
+	environment-name=$(environment) environment-type=$(environment_type) \
+	staking_addresses="$(native_addresses)" peer_ids="$(peer_ids)"
 
 deregister-nodes: ensure-environment-is-set
 deregister-nodes: ## owner de-register given nodes in network registry contract
 ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
-ifeq ($(native_addresses),)
-	echo "no parameter <native_addresses>" >&2
-	TS_NODE_PROJECT=./tsconfig.hardhat.json \
-	HOPR_ENVIRONMENT_ID="$(environment)" \
-	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
-   --network $(network) \
-   --task remove \
-   --peer-ids "$(peer_ids)"
-else
-	TS_NODE_PROJECT=./tsconfig.hardhat.json \
-	HOPR_ENVIRONMENT_ID="$(environment)" \
-	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
-   --network $(network) \
-   --task remove \
-   --peer-ids "$(peer_ids)" \
-   --native-addresses "$(native_addresses)"
-endif
+	make -C packages/ethereum/crates/contracts deregister-nodes \
+	environment-name=$(environment) environment-type=$(environment_type) \
+	staking_addresses="$(native_addresses)" peer_ids="$(peer_ids)"
 
 .PHONY: self-register-node
 self-register-node: ensure-environment-is-set
@@ -334,23 +269,9 @@ self-register-node: ## staker register a node in network registry contract
 ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
-ifeq ($(origin PRIVATE_KEY),undefined)
-	TS_NODE_PROJECT=./tsconfig.hardhat.json \
-	HOPR_ENVIRONMENT_ID="$(environment)" \
-	  yarn workspace @hoprnet/hopr-ethereum run hardhat register:self \
-   --network $(network) \
-   --task add \
-   --peer-ids "$(peer_ids)"
-else
-	TS_NODE_PROJECT=./tsconfig.hardhat.json \
-	HOPR_ENVIRONMENT_ID="$(environment)" \
-	  yarn workspace @hoprnet/hopr-ethereum run hardhat register:self \
-   --network $(network) \
-   --task add \
-   --peer-ids "$(peer_ids)" \
-   --privatekey "$(PRIVATE_KEY)"
-endif
-
+	make -C packages/ethereum/crates/contracts self-register-node \
+	environment-name=$(environment) environment-type=$(environment_type) \
+	peer_ids="$(peer_ids)"
 
 .PHONY: self-deregister-node
 self-deregister-node: ensure-environment-is-set
@@ -358,39 +279,35 @@ self-deregister-node: ## staker deregister a node in network registry contract
 ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
-	TS_NODE_PROJECT=./tsconfig.hardhat.json \
-	HOPR_ENVIRONMENT_ID="$(environment)" \
-	  yarn workspace @hoprnet/hopr-ethereum run hardhat register:self \
-   --network $(network) \
-   --task remove \
-   --peer-ids "$(peer_ids)" \
-   --privatekey "$(PRIVATE_KEY)"
+	make -C packages/ethereum/crates/contracts self-deregister-node \
+	environment-name=$(environment) environment-type=$(environment_type) \
+	peer_ids="$(peer_ids)"
 
-.PHONY: register-node-when-dummy-proxy
-# DEPRECATED. Only use it when a dummy network registry proxy is in use
-# Register a node when a dummy proxy is in place of staking proxy
-# node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'
-register-node-when-dummy-proxy: ensure-environment-is-set
-ifeq ($(endpoint),)
-	echo "parameter <endpoint> is default to localhost:3001" >&2
-endif
-ifeq ($(api_token),)
-	echo "parameter <api_token> missing" >&2 && exit 1
-endif
-ifeq ($(account),)
-	echo "parameter <account> missing" >&2 && exit 1
-endif
-ifeq ($(origin CI_DEPLOYER_PRIVKEY),undefined)
-	echo "<CI_DEPLOYER_PRIVKEY> environment variable missing" >&2 && exit 1
-endif
-	TS_NODE_PROJECT=./tsconfig.hardhat.json \
-	HOPR_ENVIRONMENT_ID="$(environment)" \
-	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
-   --network $(network) \
-   --task add \
-   --native-addresses "$(account)" \
-   --peer-ids "$(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")" \
-   --privatekey "$(CI_DEPLOYER_PRIVKEY)"
+# .PHONY: register-node-when-dummy-proxy
+# # DEPRECATED. Only use it when a dummy network registry proxy is in use
+# # Register a node when a dummy proxy is in place of staking proxy
+# # node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'
+# register-node-when-dummy-proxy: ensure-environment-is-set
+# ifeq ($(endpoint),)
+# 	echo "parameter <endpoint> is default to localhost:3001" >&2
+# endif
+# ifeq ($(api_token),)
+# 	echo "parameter <api_token> missing" >&2 && exit 1
+# endif
+# ifeq ($(account),)
+# 	echo "parameter <account> missing" >&2 && exit 1
+# endif
+# ifeq ($(origin CI_DEPLOYER_PRIVKEY),undefined)
+# 	echo "<CI_DEPLOYER_PRIVKEY> environment variable missing" >&2 && exit 1
+# endif
+# 	TS_NODE_PROJECT=./tsconfig.hardhat.json \
+# 	HOPR_ENVIRONMENT_ID="$(environment)" \
+# 	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
+#    --network $(network) \
+#    --task add \
+#    --native-addresses "$(account)" \
+#    --peer-ids "$(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")" \
+#    --privatekey "$(CI_DEPLOYER_PRIVKEY)"
 
 .PHONY: register-node-with-nft
 # node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'
@@ -437,9 +354,9 @@ ensure-environment-is-set:
 ifeq ($(environment),)
 	echo "parameter <environment> missing" >&2 && exit 1
 else
-network != jq '.environments."$(environment)".network_id // empty' packages/core/protocol-config.json
-ifeq ($(network),)
-	echo "could not read environment info from protocol-config.json" >&2 && exit 1
+environment_type != jq '.environments."$(environment)".environment_type // empty' packages/ethereum/crates/contracts/contracts-addresses.json
+ifeq ($(environment_type),)
+	echo "could not read environment type info from contracts-addresses.json" >&2 && exit 1
 endif
 endif
 

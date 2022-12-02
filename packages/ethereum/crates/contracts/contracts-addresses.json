@@ -2,14 +2,15 @@
   "environments": {
     "anvil": {
       "stake_season": 5,
+      "network_registry_contract_address": "0x3904b8f5b0F49cD206b7d5AABeE5D1F37eE15D8d",
       "environment_type": "development",
-      "network_registry_proxy_contract_address": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
-      "channels_contract_address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
-      "xhopr_contract_address": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
-      "boost_contract_address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
-      "stake_contract_address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
-      "network_registry_contract_address": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
-      "token_contract_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+      "boost_contract_address": "0xe70f935c32dA4dB13e7876795f1e175465e6458e",
+      "channels_contract_address": "0xE8addD62feD354203d079926a8e563BC1A7FE81e",
+      "network_registry_proxy_contract_address": "0xccf1769D8713099172642EB55DDFFC0c5A444FE9",
+      "stake_contract_address": "0x3C15538ED063e688c8DF3d571Cb7a0062d2fB18D",
+      "xhopr_contract_address": "0xe039608E695D21aB11675EBBA00261A0e750526c",
+      "token_contract_address": "0xf090f16dEc8b6D24082Edd25B1C8D26f2bC86128",
+      "indexer_start_block_number": 51
     },
     "debug-goerli": {
       "network_registry_contract_address": "0xDfF27C8fbc27b717ee6286E7E202a0DC2834926f",
@@ -20,7 +21,8 @@
       "stake_contract_address": "0x61C831184D3a44C5CeC49E4Fb13A41FE40563d07",
       "channels_contract_address": "0x90B35CB2f1e49908B8423B20E6cCc4D39850C33F",
       "network_registry_proxy_contract_address": "0xA1c92093FE2435C13150BFD6E9beA8fcA3BEce18",
-      "token_contract_address": "0x93639EB65C0e78262f9F92291e8D885039C9De0A"
+      "token_contract_address": "0x93639EB65C0e78262f9F92291e8D885039C9De0A",
+      "indexer_start_block_number": 0
     },
     "master-goerli": {
       "network_registry_proxy_contract_address": "0xA1c92093FE2435C13150BFD6E9beA8fcA3BEce18",
@@ -31,7 +33,8 @@
       "network_registry_contract_address": "0xDfF27C8fbc27b717ee6286E7E202a0DC2834926f",
       "xhopr_contract_address": "0x07e34EC87A0dBdfC0ACA377948A09e2031526937",
       "boost_contract_address": "0xf306609b2A05Bbc7ad4d96034b0Ee38C2105336B",
-      "environment_type": "production"
+      "environment_type": "production",
+      "indexer_start_block_number": 0
     },
     "monte_rosa": {
       "environment_type": "production",
@@ -43,7 +46,8 @@
       "boost_contract_address": "",
       "stake_contract_address": "",
       "network_registry_proxy_contract_address": "",
-      "network_registry_contract_address": ""
+      "network_registry_contract_address": "",
+      "indexer_start_block_number": 0
     },
     "chiado": {
       "xhopr_contract_address": "0xf306609b2A05Bbc7ad4d96034b0Ee38C2105336B",
@@ -54,7 +58,8 @@
       "token_contract_address": "0xdAa3FE53131B717E32ED0962694F4fB5D9525528",
       "channels_contract_address": "0x07e34EC87A0dBdfC0ACA377948A09e2031526937",
       "stake_season": 5,
-      "environment_type": "staging"
+      "environment_type": "staging",
+      "indexer_start_block_number": 0
     }
   }
 }

@@ -1,7 +1,7 @@
 {
   "environments": {
-    "hardhat-localhost": {
-      "network_id": "hardhat",
+    "anvil-localhost": {
+      "network_id": "anvil",
       "environment_type": "development",
       "version_range": "*",
       "channel_contract_deploy_block": 0,
@@ -158,9 +158,9 @@
     }
   },
   "networks": {
-    "hardhat": {
-      "description": "Hardhat is an Ethereum development environment",
-      "chain_id": 1,
+    "anvil": {
+      "description": "Local Ethereum node, akin to Ganache, Hardhat network",
+      "chain_id": 31337,
       "live": false,
       "max_fee_per_gas": "1 gwei",
       "max_priority_fee_per_gas": "0.2 gwei",

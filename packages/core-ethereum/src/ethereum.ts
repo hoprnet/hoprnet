@@ -11,13 +11,6 @@ import {
   type BaseContract
 } from 'ethers'
 import {
-  getContractData,
-  type HoprToken,
-  type HoprChannels,
-  type HoprNetworkRegistry,
-  type ContractData
-} from '@hoprnet/hopr-ethereum'
-import {
   Address,
   Balance,
   NativeBalance,
@@ -34,10 +27,10 @@ import TransactionManager, { type TransactionPayload } from './transaction-manag
 import { debug } from '@hoprnet/hopr-utils'
 import { TX_CONFIRMATION_WAIT } from './constants.js'
 import type { Block } from '@ethersproject/abstract-provider'
-import type { Deployment } from 'hardhat-deploy/dist/types.js'
 
 // @ts-ignore untyped library
 import retimer from 'retimer'
+import { getContractData, HOPR_CHANNELS_ABI, HOPR_NETWORK_REGISTRY_ABI, HOPR_TOKEN_ABI, HoprChannels, HoprNetworkRegistry, HoprToken } from './utils/index.js'
 
 const log = debug('hopr:core-ethereum:ethereum')
 const abiCoder = new utils.AbiCoder()
@@ -80,52 +73,47 @@ export async function createChainWrapper(
   const provider = networkInfo.provider.startsWith('http')
     ? new providers.StaticJsonRpcProvider(networkInfo.provider)
     : new providers.WebSocketProvider(networkInfo.provider)
+  log(`[DEBUG] provider ${provider}`);
   const publicKey = PublicKey.fromPrivKey(privateKey)
+  log(`[DEBUG] publicKey ${publicKey}`);
   const address = publicKey.toAddress()
+  log(`[DEBUG] address ${address}`);
   const providerChainId = (await provider.getNetwork()).chainId
-
+  log(`[DEBUG] providerChainId ${providerChainId}`);
+  
   // ensure chain id matches our expectation
   if (networkInfo.chainId !== providerChainId) {
     throw Error(`Providers chain id ${providerChainId} does not match ${networkInfo.chainId}`)
   }
+  
+  // const hoprTokenDeployment = getContractData(networkInfo.network, networkInfo.environment, 'HoprToken')
+  // log(`[DEBUG] hoprTokenDeployment ${hoprTokenDeployment.address}`);
+  // const hoprChannelsDeployment = getContractData(networkInfo.network, networkInfo.environment, 'HoprChannels')
+  // log(`[DEBUG] hoprChannelsDeployment ${hoprChannelsDeployment.address}`);
+  // const hoprNetworkRegistryDeployment = getContractData(
+  //   networkInfo.network,
+  //   networkInfo.environment,
+  //   'HoprNetworkRegistry'
+  //   )
+  // log(`[DEBUG] hoprNetworkRegistryDeployment ${hoprNetworkRegistryDeployment.address}`);
+  const deploymentExtract = getContractData(networkInfo.environment);
 
-  const hoprTokenDeployment = getContractData(networkInfo.network, networkInfo.environment, 'HoprToken')
-  const hoprChannelsDeployment = getContractData(networkInfo.network, networkInfo.environment, 'HoprChannels')
-  const hoprNetworkRegistryDeployment = getContractData(
-    networkInfo.network,
-    networkInfo.environment,
-    'HoprNetworkRegistry'
-  )
-
-  const token = new ethers.Contract(hoprTokenDeployment.address, hoprTokenDeployment.abi, provider) as any as HoprToken
+  const token = new ethers.Contract(deploymentExtract.hoprTokenAddress, HOPR_TOKEN_ABI, provider) as any as HoprToken
 
   const channels = new ethers.Contract(
-    hoprChannelsDeployment.address,
-    hoprChannelsDeployment.abi,
+    deploymentExtract.hoprChannelsAddress,
+    HOPR_CHANNELS_ABI,
     provider
   ) as any as HoprChannels
 
   const networkRegistry = new ethers.Contract(
-    hoprNetworkRegistryDeployment.address,
-    hoprNetworkRegistryDeployment.abi,
+    deploymentExtract.hoprNetworkRegistryAddress,
+    HOPR_NETWORK_REGISTRY_ABI,
     provider
   ) as any as HoprNetworkRegistry
 
   //getGenesisBlock, taking the earlier deployment block between the channel and network Registery
-  const [channelDeployBlockNumber, networkRegistryDeployBlockNumber] = [
-    hoprChannelsDeployment,
-    hoprNetworkRegistryDeployment
-  ].map((deployment: Deployment | ContractData) => {
-    if ((deployment as Deployment).receipt?.blockNumber != undefined) {
-      return (deployment as Deployment).receipt.blockNumber
-    } else if ((deployment as ContractData).blockNumber != undefined) {
-      return (deployment as ContractData).blockNumber
-    } else {
-      throw Error(`Cannot get blockNumber for ${deployment.address}. Please add it manually to deployment file`)
-    }
-  })
-
-  const genesisBlock = Math.min(channelDeployBlockNumber, networkRegistryDeployBlockNumber)
+  const genesisBlock = deploymentExtract.indexerStartBlockNumber;
   const channelClosureSecs = await channels.secsClosure()
 
   const transactions = new TransactionManager()
@@ -872,9 +860,9 @@ export async function createChainWrapper(
     getPublicKey: () => publicKey,
     getInfo: () => ({
       network: networkInfo.network,
-      hoprTokenAddress: hoprTokenDeployment.address,
-      hoprChannelsAddress: hoprChannelsDeployment.address,
-      hoprNetworkRegistryAddress: hoprNetworkRegistryDeployment.address,
+      hoprTokenAddress: deploymentExtract.hoprTokenAddress,
+      hoprChannelsAddress: deploymentExtract.hoprChannelsAddress,
+      hoprNetworkRegistryAddress: deploymentExtract.hoprNetworkRegistryAddress,
       channelClosureSecs
     }),
     updateConfirmedTransaction: transactions.moveToConfirmed.bind(

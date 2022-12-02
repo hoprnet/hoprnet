@@ -12,4 +12,4 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 clap = { version = "4.0.28", features = ["derive", "env"] }
-ethers = { git = "https://github.com/gakonst/ethers-rs", version = "1.0.0" }
+ethers = "1.0.2"

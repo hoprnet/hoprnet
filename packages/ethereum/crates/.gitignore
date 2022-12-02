@@ -16,3 +16,5 @@ test.txt
 contracts/broadcast/*.*/*/*
 !contracts/broadcast/*.*/*/run-latest.json
 contracts/broadcast/*.*/31337
+
+target/
