@@ -144,7 +144,7 @@ lint-fix: ## run linter in fix mode
 run-anvil: ## spinup a local anvil instance (daemon) and deploy contracts
 	echo "Spin up a local anvil instance and deploy all the contracts, incl. Erc1820Registry, to the local environment"
 	anvil & \
-	$(MAKE) -C packages/ethereum/crates/contracts/ -j anvil-deploy-all
+	$(MAKE) -C packages/ethereum/contracts/ -j anvil-deploy-all
 
 .PHONY: kill-anvil
 kill-anvil: ## kill process running at port 8545 (default port of anvil)
@@ -180,7 +180,7 @@ endif
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
-	make -C packages/ethereum/crates/contracts request-funds environment-name=$(environment) environment-type=$(environment_type) recipient=$(recipient)
+	make -C packages/ethereum/contracts request-funds environment-name=$(environment) environment-type=$(environment_type) recipient=$(recipient)
 
 .PHONY: request-nrnft
 request-nrnft: ensure-environment-is-set
@@ -194,7 +194,7 @@ endif
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
-	make -C packages/ethereum/crates/contracts request-nrnft environment-name=$(environment) environment-type=$(environment_type) recipient=$(recipient) nftrank=$(nftrank)
+	make -C packages/ethereum/contracts request-nrnft environment-name=$(environment) environment-type=$(environment_type) recipient=$(recipient) nftrank=$(nftrank)
 
 .PHONY: stake-funds
 stake-funds: ensure-environment-is-set
@@ -202,7 +202,7 @@ stake-funds: ## stake funds (idempotent operation)
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
-	make -C packages/ethereum/crates/contracts stake-funds environment-name=$(environment) environment-type=$(environment_type)
+	make -C packages/ethereum/contracts stake-funds environment-name=$(environment) environment-type=$(environment_type)
 
 .PHONY: stake-nrnft
 stake-nrnft: ensure-environment-is-set
@@ -210,16 +210,16 @@ stake-nrnft: ## stake Network_registry NFTs (idempotent operation)
 ifeq ($(nftrank),)
 	echo "parameter <nftrank> missing, it can be either 'developer' or 'community'" >&2 && exit 1
 endif
-	make -C packages/ethereum/crates/contracts stake-nrnft environment-name=$(environment) environment-type=$(environment_type) nftrank=$(nftrank)
+	make -C packages/ethereum/contracts stake-nrnft environment-name=$(environment) environment-type=$(environment_type) nftrank=$(nftrank)
 
 
 enable-network-registry: ensure-environment-is-set
 enable-network-registry: ## owner enables network registry (smart contract) globally
-	make -C packages/ethereum/crates/contracts enable-network-registry environment-name=$(environment) environment-type=$(environment_type)
+	make -C packages/ethereum/contracts enable-network-registry environment-name=$(environment) environment-type=$(environment_type)
 
 disable-network-registry: ensure-environment-is-set
 disable-network-registry: ## owner disables network registry (smart contract) globally
-	make -C packages/ethereum/crates/contracts disable-network-registry environment-name=$(environment) environment-type=$(environment_type)
+	make -C packages/ethereum/contracts disable-network-registry environment-name=$(environment) environment-type=$(environment_type)
 
 force-eligibility-update: ensure-environment-is-set
 force-eligibility-update: ## owner forces eligibility update
@@ -229,7 +229,7 @@ endif
 ifeq ($(eligibility),)
 	echo "parameter <eligibility> missing" >&2 && exit 1
 endif
-	make -C packages/ethereum/crates/contracts force-eligibility-update \
+	make -C packages/ethereum/contracts force-eligibility-update \
 	environment-name=$(environment) environment-type=$(environment_type) \
 	staking_addresses="$(native_addresses)" eligibility="$(eligibility)"
 
@@ -238,7 +238,7 @@ sync-eligibility: ## owner sync eligibility of peers
 ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
-	make -C packages/ethereum/crates/contracts sync-eligibility \
+	make -C packages/ethereum/contracts sync-eligibility \
 	environment-name=$(environment) environment-type=$(environment_type) \
 	peer_ids="$(peer_ids)"
 
@@ -250,7 +250,7 @@ endif
 ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
-	make -C packages/ethereum/crates/contracts register-nodes \
+	make -C packages/ethereum/contracts register-nodes \
 	environment-name=$(environment) environment-type=$(environment_type) \
 	staking_addresses="$(native_addresses)" peer_ids="$(peer_ids)"
 
@@ -259,7 +259,7 @@ deregister-nodes: ## owner de-register given nodes in network registry contract
 ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
-	make -C packages/ethereum/crates/contracts deregister-nodes \
+	make -C packages/ethereum/contracts deregister-nodes \
 	environment-name=$(environment) environment-type=$(environment_type) \
 	staking_addresses="$(native_addresses)" peer_ids="$(peer_ids)"
 
@@ -269,7 +269,7 @@ self-register-node: ## staker register a node in network registry contract
 ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
-	make -C packages/ethereum/crates/contracts self-register-node \
+	make -C packages/ethereum/contracts self-register-node \
 	environment-name=$(environment) environment-type=$(environment_type) \
 	peer_ids="$(peer_ids)"
 
@@ -279,7 +279,7 @@ self-deregister-node: ## staker deregister a node in network registry contract
 ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
-	make -C packages/ethereum/crates/contracts self-deregister-node \
+	make -C packages/ethereum/contracts self-deregister-node \
 	environment-name=$(environment) environment-type=$(environment_type) \
 	peer_ids="$(peer_ids)"
 
@@ -354,7 +354,7 @@ ensure-environment-is-set:
 ifeq ($(environment),)
 	echo "parameter <environment> missing" >&2 && exit 1
 else
-environment_type != jq '.environments."$(environment)".environment_type // empty' packages/ethereum/crates/contracts/contracts-addresses.json
+environment_type != jq '.environments."$(environment)".environment_type // empty' packages/ethereum/contracts/contracts-addresses.json
 ifeq ($(environment_type),)
 	echo "could not read environment type info from contracts-addresses.json" >&2 && exit 1
 endif

@@ -28,6 +28,3 @@ clean:
 ifneq ($(PACKAGES),)
 	rm -rf $(PKG_DIRS)
 endif
-
-check-sc-bindings: # Only create types for Hopr* contracts
-	forge bind --bindings-path ./bindings --root ./contracts --crate-name bindings --select "^Hopr.*(([^T][^e][^s][^t]$|[^S][^c][^r][^i][^p][^t])$)"

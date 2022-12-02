@@ -13,7 +13,7 @@ export const getContractData = (
     // unlike normal the release workflow, when running the E2E tests, we build the project
     // and then run deployments, which may update the broadcast folder and `contracts-addresses.json`
     // this makes sure to always pick the `contracts-addresses.json` with the updated data
-    const deploymentsPath = "../../ethereum/crates/contracts/contracts-addresses.json";
+    const deploymentsPath = "../../ethereum/contracts/contracts-addresses.json";
     let deploymentSummary;
     try {
         deploymentSummary = require(deploymentsPath)

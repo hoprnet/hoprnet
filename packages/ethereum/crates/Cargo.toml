@@ -1,6 +1,0 @@
-[workspace]
-
-members = [
-    "bindings",
-    "foundry-tool",
-]
