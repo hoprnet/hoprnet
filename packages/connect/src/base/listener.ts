@@ -11,7 +11,7 @@ import Debug from 'debug'
 import { peerIdFromBytes } from '@libp2p/peer-id'
 import { Multiaddr } from '@multiformats/multiaddr'
 
-import { isAnyAddress } from '@hoprnet/hopr-utils'
+import { isAnyAddress, randomInteger, retimer } from '@hoprnet/hopr-utils'
 
 import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP } from '../constants.js'
 import {
@@ -20,15 +20,14 @@ import {
   type HoprConnectTestingOptions,
   PeerConnectionType
 } from '../types.js'
-import { handleStunRequest, getExternalIp, Interface } from './stun.js'
+import { handleUdpStunRequest, getExternalIp, isExposedHost } from './stun/index.js'
 import { getAddrs } from './addrs.js'
 import { fromSocket } from './tcp.js'
 import { RELAY_CHANGED_EVENT } from './entry.js'
-import { bindToPort, attemptClose, nodeToMultiaddr, cleanExistingConnections, upd6Lookup } from '../utils/index.js'
+import { bindToPort, attemptClose, nodeToMultiaddr, cleanExistingConnections, ip6Lookup } from '../utils/index.js'
 
 import type { Components } from '@libp2p/interfaces/components'
 import type { ConnectComponents } from '../components.js'
-import { checkForHairpinning } from './hairpin.js'
 
 const log = Debug('hopr-connect:listener')
 const error = Debug('hopr-connect:listener:error')
@@ -54,6 +53,8 @@ type NATSituation =
 class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener {
   protected __connections: Connection[]
   protected tcpSocket: TCPServer
+
+  private stopUdpSocketKeepAliveInterval: (() => void) | undefined
   private udpSocket: UDPSocket
 
   private state: ListenerState
@@ -91,7 +92,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       // We use IPv4 traffic on udp6 sockets, so DNS queries
       // must return the A record (IPv4) not the AAAA record (IPv6)
       // - unless we explicitly check for a IPv6 address
-      lookup: upd6Lookup
+      lookup: ip6Lookup
     })
 
     this.state = ListenerState.UNINITIALIZED
@@ -150,7 +151,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
         error(`network error`, err)
       }
     })
-    this.udpSocket.on('message', (msg: Buffer, rinfo: RemoteInfo) => handleStunRequest(this.udpSocket, msg, rinfo))
+    this.udpSocket.on('message', (msg: Buffer, rinfo: RemoteInfo) => handleUdpStunRequest(this.udpSocket, msg, rinfo))
   }
 
   async bind(ma: Multiaddr): Promise<void> {
@@ -274,11 +275,52 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     this.connectComponents.getEntryNodes().stop()
     this.connectComponents.getEntryNodes().off(RELAY_CHANGED_EVENT, this._emitListening)
 
+    this.stopUdpSocketKeepAliveInterval?.()
+
     await Promise.all([this.closeUDP(), this.closeTCP()])
 
     this.state = ListenerState.CLOSED
     this.connectComponents.getRelay().stop()
     this.dispatchEvent(new CustomEvent('close'))
+  }
+
+  /**
+   * Closes the TCP socket and tries to close all pending
+   * connections.
+   * @returns Promise that resolves once TCP socket is closed
+   */
+  private async closeTCP() {
+    if (!this.tcpSocket.listening) {
+      return
+    }
+
+    await Promise.all(this.__connections.map((conn: Connection) => attemptClose(conn, error)))
+
+    const promise = once(this.tcpSocket, 'close')
+
+    this.tcpSocket.close()
+
+    // Node.js bug workaround: ocassionally on macOS close is not emitted and callback is not called
+    return Promise.race([
+      promise,
+      new Promise<void>((resolve) =>
+        setTimeout(() => {
+          resolve()
+        }, SOCKET_CLOSE_TIMEOUT)
+      )
+    ])
+  }
+
+  /**
+   * Closes the UDP socket
+   * @returns Promise that resolves once UDP socket is closed
+   */
+  private closeUDP() {
+    const promise = once(this.udpSocket, 'close')
+
+    this.udpSocket.close()
+
+    return promise
   }
 
   /**
@@ -411,45 +453,6 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
   }
 
   /**
-   * Closes the TCP socket and tries to close all pending
-   * connections.
-   * @returns Promise that resolves once TCP socket is closed
-   */
-  private async closeTCP() {
-    if (!this.tcpSocket.listening) {
-      return
-    }
-
-    await Promise.all(this.__connections.map((conn: Connection) => attemptClose(conn, error)))
-
-    const promise = once(this.tcpSocket, 'close')
-
-    this.tcpSocket.close()
-
-    // Node.js bug workaround: ocassionally on macOS close is not emitted and callback is not called
-    return Promise.race([
-      promise,
-      new Promise<void>((resolve) =>
-        setTimeout(() => {
-          resolve()
-        }, SOCKET_CLOSE_TIMEOUT)
-      )
-    ])
-  }
-
-  /**
-   * Closes the UDP socket
-   * @returns Promise that resolves once UDP socket is closed
-   */
-  private closeUDP() {
-    const promise = once(this.udpSocket, 'close')
-
-    this.udpSocket.close()
-
-    return promise
-  }
-
-  /**
    * Tries to determine a node's public IP address by
    * using STUN servers
    * @param ownAddress the host on which we are listening
@@ -469,96 +472,40 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       }
     }
 
-    let externalAddress = this.testingOptions.__noUPNP
-      ? undefined
-      : await this.connectComponents.getUpnpManager().externalIp()
-    let externalPort: number | undefined
+    const usableStunServers = this.getUsableStunServers(ownAddress, ownPort)
 
-    let isExposedHost: Awaited<ReturnType<typeof checkForHairpinning>> | undefined
-    if (externalAddress != undefined) {
-      // UPnP is supported, let's try to open the port
-      await this.connectComponents.getUpnpManager().map(ownPort)
+    // allocate UDP port mapping
+    let externalInterface = await getExternalIp(
+      usableStunServers,
+      this.udpSocket,
+      this.testingOptions.__preferLocalAddresses
+    )
 
-      // Don't trust the router blindly ...
-      isExposedHost = await checkForHairpinning(
-        {
-          address: externalAddress,
-          port: ownPort
-        } as Interface,
-        this.tcpSocket,
-        this.udpSocket
-      )
-
-      if (isExposedHost.tcpMapped || isExposedHost.udpMapped) {
-        // Either TCP or UDP were mapped
-        externalPort = ownPort
-      } else {
-        // Neither TCP nor UDP were reachable, maybe external IP / Port is wrong
-        // fallback to STUN to get better results
-        const usableStunServers = this.getUsableStunServers(ownAddress, ownPort)
-
-        let externalInterface: Address | undefined
-        try {
-          externalInterface = await getExternalIp(
-            usableStunServers,
-            this.udpSocket,
-            this.testingOptions.__preferLocalAddresses
-          )
-        } catch (err: any) {
-          error(`Determining public IP failed`, err.message)
-        }
-
-        if (externalInterface != undefined) {
-          externalPort = externalInterface.port
-
-          isExposedHost = await checkForHairpinning(
-            {
-              address: externalAddress,
-              port: externalPort
-            } as Interface,
-            this.tcpSocket,
-            this.udpSocket
-          )
-        }
-      }
-    } else {
-      // UPnP is not supported, fallback to STUN
-      const usableStunServers = this.getUsableStunServers(ownAddress, ownPort)
-
-      let externalInterface: Address | undefined
-      try {
-        externalInterface = await getExternalIp(
-          usableStunServers,
-          this.udpSocket,
-          this.testingOptions.__preferLocalAddresses
-        )
-      } catch (err: any) {
-        error(`Determining public IP failed`, err.message)
-      }
-
-      if (externalInterface != undefined) {
-        externalPort = externalInterface.port
-        externalAddress = externalInterface.address
-
-        isExposedHost = await checkForHairpinning(externalInterface as Interface, this.tcpSocket, this.udpSocket)
-      }
-    }
-
-    if (externalAddress && externalPort) {
+    if (externalInterface == undefined) {
       return {
-        externalAddress,
-        externalPort,
-        // If we don't allow direct connections, then the host can obviously
-        // not be considered to be exposed
-        isExposed: this.testingOptions.__noDirectConnections
-          ? false
-          : (isExposedHost?.udpMapped && isExposedHost?.tcpMapped) ?? false,
-        bidirectionalNAT: false
+        bidirectionalNAT: true
       }
     }
+
+    this.stopUdpSocketKeepAliveInterval = retimer(
+      async () => {
+        const multiaddrs = this.getUsableStunServers(ownAddress, ownPort)
+
+        await getExternalIp(multiaddrs, this.udpSocket, this.testingOptions.__preferLocalAddresses)
+      },
+      // Following recommendations of https://www.rfc-editor.org/rfc/rfc5626
+      () => randomInteger(24_000, 29_000)
+    )
+
+    const isUdpExposed = await isExposedHost(usableStunServers, this.tcpSocket, this.udpSocket, externalInterface.port)
 
     return {
-      bidirectionalNAT: true
+      bidirectionalNAT: false,
+      externalAddress: externalInterface.address,
+      externalPort: externalInterface.port,
+      // assuming that TCP is exposed as well
+      // @TODO add TCP STUN support
+      isExposed: isUdpExposed
     }
   }
 

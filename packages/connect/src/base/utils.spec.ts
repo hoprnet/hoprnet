@@ -1,5 +1,5 @@
 import { once, type EventEmitter } from 'events'
-import { handleStunRequest } from './stun.js'
+import { handleUdpStunRequest } from './stun/index.js'
 import type { PeerStoreType } from '../types.js'
 import { createSocket, type RemoteInfo, type Socket } from 'dgram'
 import { type DeferType, privKeyToPeerId, u8aToHex } from '@hoprnet/hopr-utils'
@@ -49,7 +49,7 @@ export async function startStunServer(
 
   socket.on('message', (msg: Buffer, rinfo: RemoteInfo) => {
     state?.msgReceived?.resolve()
-    handleStunRequest(socket, msg, rinfo)
+    handleUdpStunRequest(socket, msg, rinfo)
   })
 
   return socket

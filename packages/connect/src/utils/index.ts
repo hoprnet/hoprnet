@@ -7,7 +7,7 @@ import type { Components } from '@libp2p/interfaces/components'
 
 import { peerIdFromBytes } from '@libp2p/peer-id'
 
-import { isAnyAddress } from '@hoprnet/hopr-utils'
+import { isAnyAddress, randomPermutation } from '@hoprnet/hopr-utils'
 
 import { Multiaddr } from '@multiformats/multiaddr'
 import { CODE_CIRCUIT, CODE_P2P } from '../constants.js'
@@ -180,7 +180,7 @@ export function bindToPort<T extends 'UDP' | 'TCP'>(
  * similar to `udp4` sockets
  * @param requestArgs UDP socket lookup arguments
  */
-export function upd6Lookup(...requestArgs: any[]) {
+export function ip6Lookup(...requestArgs: any[]) {
   if (isIPv6(requestArgs[0])) {
     // @ts-ignore
     return lookup(...requestArgs)
@@ -243,5 +243,21 @@ export function cleanExistingConnections(
     }
 
     attemptClose(conn, error)
+  }
+}
+
+export function* randomIterator<T>(arr: T[]): Iterable<T> {
+  if (arr == undefined || arr.length == 0) {
+    yield* [] as T[]
+    return
+  }
+
+  const indices = Array.from({ length: arr.length }, (_, i) => i)
+
+  // Permutates in-place
+  randomPermutation(indices)
+
+  for (let i = 0; i < arr.length; i++) {
+    yield arr[indices[i]]
   }
 }
