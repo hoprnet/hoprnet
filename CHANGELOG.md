@@ -14,6 +14,8 @@
 - Improve error messages passed to the User ([#4375](https://github.com/hoprnet/hoprnet/pull/4375))
 - Fix channel metrics, add channel balances metrics ([#4374](https://github.com/hoprnet/hoprnet/pull/4374))
 - Fix ticket redemption ([#4382](https://github.com/hoprnet/hoprnet/pull/4382))
+- Increase wait timeout for on-chain transactions to 60 seconds ([#4425](https://github.com/hoprnet/hoprnet/pull/4425))
+- Fix bug in waiting logic for on-chain transactions ([#4425](https://github.com/hoprnet/hoprnet/pull/4425))
 
 ---
 
