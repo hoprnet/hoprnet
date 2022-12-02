@@ -19,7 +19,7 @@ source "${mydir}/dns.sh"
 declare API_ENDPOINT="${API_ENDPOINT:-https://api.hoprnet.org}"
 
 # Native (e.g. XDAI)
-declare min_funds=0.1
+declare min_funds=0.001
 
 # HOPR tokens
 # a topology node uses 0.5 HOPR to open channels, the rest are left in reserve
@@ -50,7 +50,7 @@ get_network() {
 get_rpc() {
   local network_id
   network_id="$(get_network "${1}")"
-  
+
   jq -r ".networks.\"${network_id}\".default_provider" "${mydir}/../packages/core/protocol-config.json" | envsubst
 }
 
@@ -106,30 +106,30 @@ fund_if_empty() {
   if [[ ! ${faucet_address} =~  ^0x[a-fA-F0-9]{40}$ ]]; then
     log "Failed to retrieve funding wallet address: ${faucet_address}"
     exit 1
-  fi;
+  fi
 
   local faucet_native_balance faucet_hopr_balance
   faucet_native_balance=$(funding_wallet_info "${environment}" "native")
   if [[ ! ${faucet_native_balance} =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
     log "Failed to retrieve funding wallet native balance: ${faucet_native_balance}"
     exit 1
-  fi;
+  fi
 
   faucet_hopr_balance=$(funding_wallet_info "${environment}" "hopr")
   if [[ ! ${faucet_hopr_balance} =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
     log "Failed to retrieve funding wallet token balance: ${faucet_hopr_balance}"
     exit 1
-  fi;
+  fi
 
   if [ "${faucet_native_balance}" = '0.0' ]; then
-    log "Wallet ${faucet_address} has zero balance and cannot fund node ${address}"
+    log "Funding wallet ${faucet_address} has zero balance and cannot fund node ${address}"
     exit 1
-  fi;
+  fi
 
   if [ "${faucet_hopr_balance}" = '0.0' ]; then
-    log "Wallet ${faucet_address} has no HOPR tokens and cannot fund node ${address}"
+    log "Funding wallet ${faucet_address} has no HOPR tokens and cannot fund node ${address}"
     exit 1
-  fi;
+  fi
 
   log "Funding wallet ${faucet_address} has native funds: ${faucet_native_balance}"
   log "Funding wallet ${faucet_address} has HOPR funds: ${faucet_hopr_balance}"
@@ -144,21 +144,21 @@ fund_if_empty() {
   log "Native balance of ${address} is ${address_native_balance}"
   log "HOPR balance of ${address} is ${address_hopr_balance}"
 
-  if [ "${address_native_balance}" = '0.0' ]; then
+  if (( $(echo "${address_native_balance} < ${min_funds}" | bc -l) )); then
     # @TODO: Provide retry by checking balance again.
-    log "${address} has no native balance. Funding native tokens..."
+    log "Hoprd node with peerId ${address} has not enough native balance. Funding native tokens..."
     local tx_hash tx_error tx_res
     tx_res="$(faucet_to_address "${environment}" "${address}" "native")"
     tx_error="$(echo "${tx_res}" | jq -r '.err // empty' 2>/dev/null || echo "${tx_res}")"
     tx_hash="$(echo "${tx_res}" | jq -r '.hash // empty' 2>/dev/null || echo "")"
     if [ -n "${tx_error}" ]; then
       log "Funding native tokens failed with error: ${tx_error}"
-    exit 1
+      exit 1
     fi
     log "Funded native tokens, see tx hash ${tx_hash}"
   fi
 
-  if [ "${address_hopr_balance}" = '0.0' ]; then
+  if (( $(echo "${address_hopr_balance} < ${min_funds_hopr}" | bc -l) )); then
     # @TODO: Provide retry by checking balance again.
     log "${address} has no HOPR tokens. Funding HOPR tokens..."
     local tx_hash tx_error tx_res
@@ -167,7 +167,7 @@ fund_if_empty() {
     tx_hash="$(echo "${tx_res}" | jq -r '.hash // empty' 2>/dev/null || echo "")"
     if [ -n "${tx_error}" ]; then
       log "Funding HOPR tokens failed with error: ${tx_error}"
-    exit 1
+      exit 1
     fi
     log "Funded HOPR tokens, see tx hash ${tx_hash}"
   fi

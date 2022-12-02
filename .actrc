@@ -1,2 +1,2 @@
 # use image with standard tools installed
--P ubuntu-latest=catthehacker/ubuntu:rust-20.04
+-P ubuntu-latest=catthehacker/ubuntu:custom-20.04-20221015

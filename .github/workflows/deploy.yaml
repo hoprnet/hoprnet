@@ -55,6 +55,7 @@ jobs:
             ~/.cargo/git/db/
             target/
             .cargo/.package-cache/
+            .cargo/bin/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
 
       - name: "[SETUP] Use Node.js"
@@ -75,18 +76,10 @@ jobs:
       - name: "[SETUP] Configure Git info"
         run: ./scripts/configure-git-info.sh
 
-      - name: "[SETUP] Install Yarn (only when using ACT)"
-        if: ${{ env.ACT == 'true' }}
-        run: |
-          curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
-          echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
-          apt update
-          apt install --no-install-recommends yarn
-
       - name: "[BUILD] Install dependencies / link / build"
         run: |
           # Deploying with hardhat requires built hopr-utils package
-          CI=true make -j deps
+          make -j deps-ci
           make -j build
 
       - name: "Cache built artifacts (for later use)"
@@ -118,7 +111,7 @@ jobs:
           HOPR_GIT_MSG: "chore(release): update smart contract deployments"
 
       - name: "[NPM] Publish prerelease version (On pushes to master, debug-deploy/* or staging/*)"
-        if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/')  || startsWith(github.ref, 'refs/heads/staging/') }}
+        if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/')  || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: ./scripts/publish-version.sh prerelease
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -126,7 +119,7 @@ jobs:
       # Pushing a PR to a release branch should increment the patch version in
       # accordance with semver.
       - name: "[NPM] Publish patch version (On pushes to release branches)"
-        if: ${{ startsWith(github.ref, 'refs/heads/release/') }}
+        if: ${{ startsWith(github.ref, 'refs/heads/release/') && !env.ACT }}
         run: ./scripts/publish-version.sh patch
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -161,11 +154,11 @@ jobs:
 
       - name: Get version from package.json
         id: get-package-version
-        run: echo "::set-output name=tag::v$(./scripts/get-package-version.sh)"
+        run: echo "tag=v$(./scripts/get-package-version.sh)" >> $GITHUB_OUTPUT
         env:
           HOPR_PACKAGE: hoprd
 
-      - uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@v0.1.15
         if: ${{ !env.ACT }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -256,7 +249,7 @@ jobs:
             # staging releases get different special version
             version="0.200.0"
           fi
-          echo "::set-output name=vsn::${version}"
+          echo "vsn=${version}" >> $GITHUB_OUTPUT
         env:
           HOPR_PACKAGE: hoprd
 
@@ -265,7 +258,7 @@ jobs:
           HOPR_GITHUB_REF: ${{ github.ref }}
           AVADO_VERSION: ${{ steps.set-version.outputs.vsn }}
         run: |
-          ./scripts/build_avado.sh ${AVADO_VERSION}
+          ./scripts/build-avado.sh ${AVADO_VERSION}
 
       - name: Commit & Push changes
         if: ${{ !env.ACT }}
@@ -329,6 +322,7 @@ jobs:
             ~/.cargo/git/db/
             target/
             .cargo/.package-cache/
+            .cargo/bin/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
 
       - name: Configure Git info
@@ -357,7 +351,7 @@ jobs:
           # get latest version
           git pull
           # need to build our packages which might by used by the scripts, such as the fund script
-          CI=true make -j deps
+          make -j deps-ci
 
       - name: Restore built artifacts
         uses: actions/cache@v3
@@ -424,6 +418,7 @@ jobs:
             ~/.cargo/git/db/
             target/
             .cargo/.package-cache/
+            .cargo/bin/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
 
       - name: Configure Git info
@@ -452,7 +447,7 @@ jobs:
           # get latest version
           git pull
           # need to build our packages which might by used by the scripts, such as the fund script
-          CI=true make -j deps
+          make -j deps-ci
 
       - name: Restore built artifacts
         uses: actions/cache@v3

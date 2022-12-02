@@ -1,22 +1,32 @@
 steps:
   - name: 'gcr.io/kaniko-project/executor:v1.9.1'
-    id: buildHoprd
+    id: buildHoprToolchain
     args:
-      - --context=dir://packages/hoprd
-      - --destination=gcr.io/${PROJECT_ID}/hoprd:${_IMAGE_VERSION}
+      - --dockerfile=scripts/toolchain/Dockerfile
+      - --destination=gcr.io/${PROJECT_ID}/hopr-toolchain:${_IMAGE_VERSION}
       - --cache=true
-      - --cache-ttl=96h
-      - --build-arg=PACKAGE_VERSION=${_PACKAGE_VERSION}
+      - --cache-ttl=168h
     timeout: 1200s
     waitFor: ['-']
   - name: 'gcr.io/kaniko-project/executor:v1.9.1'
+    id: buildHoprd
+    args:
+      - --build-arg=HOPR_TOOLCHAIN_IMAGE=gcr.io/${PROJECT_ID}/hopr-toolchain:${_IMAGE_VERSION}
+      - --dockerfile=packages/hoprd/Dockerfile
+      - --destination=gcr.io/${PROJECT_ID}/hoprd:${_IMAGE_VERSION}
+      - --cache=true
+      - --cache-ttl=96h
+    timeout: 1200s
+    waitFor:
+      - 'buildHoprToolchain'
+  - name: 'gcr.io/kaniko-project/executor:v1.9.1'
     id: buildHoprdNat
     args:
+      - --build-arg=HOPR_TOOLCHAIN_IMAGE=gcr.io/${PROJECT_ID}/hopr-toolchain:${_IMAGE_VERSION}
       - --context=dir://scripts/nat
       - --destination=gcr.io/${PROJECT_ID}/hoprd-nat:${_IMAGE_VERSION}
       - --cache=true
       - --cache-ttl=96h
-      - --build-arg=PACKAGE_VERSION=${_PACKAGE_VERSION}
       - --build-arg=HOPRD_RELEASE=${_IMAGE_VERSION}
     timeout: 1200s
     waitFor:
@@ -24,22 +34,25 @@ steps:
   - name: 'gcr.io/kaniko-project/executor:v1.9.1'
     id: buildCoverTrafficDaemon
     args:
-      - --context=dir://packages/cover-traffic-daemon
+      - --build-arg=HOPR_TOOLCHAIN_IMAGE=gcr.io/${PROJECT_ID}/hopr-toolchain:${_IMAGE_VERSION}
+      - --dockerfile=packages/cover-traffic-daemon/Dockerfile
       - --destination=gcr.io/${PROJECT_ID}/hopr-cover-traffic-daemon:${_IMAGE_VERSION}
       - --cache=true
       - --cache-ttl=96h
-      - --build-arg=PACKAGE_VERSION=${_PACKAGE_VERSION}
     timeout: 1200s
-    waitFor: ['-']
+    waitFor:
+      - 'buildHoprToolchain'
   - name: 'gcr.io/kaniko-project/executor:v1.9.1'
     id: buildHardhat
     args:
-      - --dockerfile=Dockerfile.hardhat
+      - --build-arg=HOPR_TOOLCHAIN_IMAGE=gcr.io/${PROJECT_ID}/hopr-toolchain:${_IMAGE_VERSION}
+      - --dockerfile=packages/ethereum/Dockerfile.hardhat
       - --destination=gcr.io/${PROJECT_ID}/hopr-hardhat:${_IMAGE_VERSION}
       - --cache=true
       - --cache-ttl=96h
     timeout: 1200s
-    waitFor: ['-']
+    waitFor:
+      - 'buildHoprToolchain'
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: testImages
     script: |
@@ -60,7 +73,7 @@ steps:
   - name: 'gcr.io/kaniko-project/executor:v1.9.1'
     id: buildPluto
     args:
-      - --context=dir://scripts/pluto
+      - --dockerfile=scripts/pluto/Dockerfile
       - --destination=gcr.io/${PROJECT_ID}/hopr-pluto:${_IMAGE_VERSION}
       - --cache=true
       - --cache-ttl=96h
