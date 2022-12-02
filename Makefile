@@ -191,11 +191,11 @@ run-anvil: ## spinup a local anvil instance (daemon) and deploy contracts
 
 .PHONY: kill-anvil
 kill-anvil: ## kill process running at port 8545 (default port of anvil)
-	kill $(lsof -i :8545 | grep 8545 | awk '{ print $2 }')
+	kill $(shell lsof -i :8545 | grep -o '\d*' | head -1)
 
 s.PHONY: run-local
 run-local: ## run HOPRd from local repo
-	env NODE_OPTIONS="--experimental-wasm-modules" NODE_ENV=development node \
+	env NODE_OPTIONS="--experimental-wasm-modules" NODE_ENV=development DEBUG="hopr*" node \
 		packages/hoprd/lib/main.cjs --admin --init --api \
 		--password="local" --identity=`pwd`/.identity-local \
 		--environment anvil-localhost --announce \
