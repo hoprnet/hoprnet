@@ -61,3 +61,5 @@ logs.txt
 *.cts.map
 *.cjs
 *.cjs.map
+
+*.id
