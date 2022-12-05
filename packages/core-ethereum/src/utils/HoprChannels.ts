@@ -11,404 +11,285 @@ import type {
   Overrides,
   PopulatedTransaction,
   Signer,
-  utils,
-} from "ethers";
-import type {
-  FunctionFragment,
-  Result,
-  EventFragment,
-} from "@ethersproject/abi";
-import type { Listener, Provider } from "@ethersproject/providers";
-import type {
-  TypedEventFilter,
-  TypedEvent,
-  TypedListener,
-  OnEvent,
-} from "./common.js";
+  utils
+} from 'ethers'
+import type { FunctionFragment, Result, EventFragment } from '@ethersproject/abi'
+import type { Listener, Provider } from '@ethersproject/providers'
+import type { TypedEventFilter, TypedEvent, TypedListener, OnEvent } from './common.js'
 
 export declare namespace HoprChannels {
   export type ChannelStruct = {
-    balance: BigNumberish;
-    commitment: BytesLike;
-    ticketEpoch: BigNumberish;
-    ticketIndex: BigNumberish;
-    status: BigNumberish;
-    channelEpoch: BigNumberish;
-    closureTime: BigNumberish;
-  };
+    balance: BigNumberish
+    commitment: BytesLike
+    ticketEpoch: BigNumberish
+    ticketIndex: BigNumberish
+    status: BigNumberish
+    channelEpoch: BigNumberish
+    closureTime: BigNumberish
+  }
 
-  export type ChannelStructOutput = [
-    BigNumber,
-    string,
-    BigNumber,
-    BigNumber,
-    number,
-    BigNumber,
-    number
-  ] & {
-    balance: BigNumber;
-    commitment: string;
-    ticketEpoch: BigNumber;
-    ticketIndex: BigNumber;
-    status: number;
-    channelEpoch: BigNumber;
-    closureTime: number;
-  };
+  export type ChannelStructOutput = [BigNumber, string, BigNumber, BigNumber, number, BigNumber, number] & {
+    balance: BigNumber
+    commitment: string
+    ticketEpoch: BigNumber
+    ticketIndex: BigNumber
+    status: number
+    channelEpoch: BigNumber
+    closureTime: number
+  }
 }
 
 export interface HoprChannelsInterface extends utils.Interface {
   functions: {
-    "FUND_CHANNEL_MULTI_SIZE()": FunctionFragment;
-    "TOKENS_RECIPIENT_INTERFACE_HASH()": FunctionFragment;
-    "announce(bytes,bytes)": FunctionFragment;
-    "bumpChannel(address,bytes32)": FunctionFragment;
-    "canImplementInterfaceForAddress(bytes32,address)": FunctionFragment;
-    "channels(bytes32)": FunctionFragment;
-    "finalizeChannelClosure(address)": FunctionFragment;
-    "fundChannelMulti(address,address,uint256,uint256)": FunctionFragment;
-    "initiateChannelClosure(address)": FunctionFragment;
-    "multicall(bytes[])": FunctionFragment;
-    "publicKeys(address)": FunctionFragment;
-    "redeemTicket(address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)": FunctionFragment;
-    "secsClosure()": FunctionFragment;
-    "token()": FunctionFragment;
-    "tokensReceived(address,address,address,uint256,bytes,bytes)": FunctionFragment;
-  };
+    'FUND_CHANNEL_MULTI_SIZE()': FunctionFragment
+    'TOKENS_RECIPIENT_INTERFACE_HASH()': FunctionFragment
+    'announce(bytes,bytes)': FunctionFragment
+    'bumpChannel(address,bytes32)': FunctionFragment
+    'canImplementInterfaceForAddress(bytes32,address)': FunctionFragment
+    'channels(bytes32)': FunctionFragment
+    'finalizeChannelClosure(address)': FunctionFragment
+    'fundChannelMulti(address,address,uint256,uint256)': FunctionFragment
+    'initiateChannelClosure(address)': FunctionFragment
+    'multicall(bytes[])': FunctionFragment
+    'publicKeys(address)': FunctionFragment
+    'redeemTicket(address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)': FunctionFragment
+    'secsClosure()': FunctionFragment
+    'token()': FunctionFragment
+    'tokensReceived(address,address,address,uint256,bytes,bytes)': FunctionFragment
+  }
 
   getFunction(
     nameOrSignatureOrTopic:
-      | "FUND_CHANNEL_MULTI_SIZE"
-      | "TOKENS_RECIPIENT_INTERFACE_HASH"
-      | "announce"
-      | "bumpChannel"
-      | "canImplementInterfaceForAddress"
-      | "channels"
-      | "finalizeChannelClosure"
-      | "fundChannelMulti"
-      | "initiateChannelClosure"
-      | "multicall"
-      | "publicKeys"
-      | "redeemTicket"
-      | "secsClosure"
-      | "token"
-      | "tokensReceived"
-  ): FunctionFragment;
+      | 'FUND_CHANNEL_MULTI_SIZE'
+      | 'TOKENS_RECIPIENT_INTERFACE_HASH'
+      | 'announce'
+      | 'bumpChannel'
+      | 'canImplementInterfaceForAddress'
+      | 'channels'
+      | 'finalizeChannelClosure'
+      | 'fundChannelMulti'
+      | 'initiateChannelClosure'
+      | 'multicall'
+      | 'publicKeys'
+      | 'redeemTicket'
+      | 'secsClosure'
+      | 'token'
+      | 'tokensReceived'
+  ): FunctionFragment
 
+  encodeFunctionData(functionFragment: 'FUND_CHANNEL_MULTI_SIZE', values?: undefined): string
+  encodeFunctionData(functionFragment: 'TOKENS_RECIPIENT_INTERFACE_HASH', values?: undefined): string
+  encodeFunctionData(functionFragment: 'announce', values: [BytesLike, BytesLike]): string
+  encodeFunctionData(functionFragment: 'bumpChannel', values: [string, BytesLike]): string
+  encodeFunctionData(functionFragment: 'canImplementInterfaceForAddress', values: [BytesLike, string]): string
+  encodeFunctionData(functionFragment: 'channels', values: [BytesLike]): string
+  encodeFunctionData(functionFragment: 'finalizeChannelClosure', values: [string]): string
+  encodeFunctionData(functionFragment: 'fundChannelMulti', values: [string, string, BigNumberish, BigNumberish]): string
+  encodeFunctionData(functionFragment: 'initiateChannelClosure', values: [string]): string
+  encodeFunctionData(functionFragment: 'multicall', values: [BytesLike[]]): string
+  encodeFunctionData(functionFragment: 'publicKeys', values: [string]): string
   encodeFunctionData(
-    functionFragment: "FUND_CHANNEL_MULTI_SIZE",
-    values?: undefined
-  ): string;
+    functionFragment: 'redeemTicket',
+    values: [string, BytesLike, BigNumberish, BigNumberish, BytesLike, BigNumberish, BigNumberish, BytesLike]
+  ): string
+  encodeFunctionData(functionFragment: 'secsClosure', values?: undefined): string
+  encodeFunctionData(functionFragment: 'token', values?: undefined): string
   encodeFunctionData(
-    functionFragment: "TOKENS_RECIPIENT_INTERFACE_HASH",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "announce",
-    values: [BytesLike, BytesLike]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "bumpChannel",
-    values: [string, BytesLike]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "canImplementInterfaceForAddress",
-    values: [BytesLike, string]
-  ): string;
-  encodeFunctionData(functionFragment: "channels", values: [BytesLike]): string;
-  encodeFunctionData(
-    functionFragment: "finalizeChannelClosure",
-    values: [string]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "fundChannelMulti",
-    values: [string, string, BigNumberish, BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "initiateChannelClosure",
-    values: [string]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "multicall",
-    values: [BytesLike[]]
-  ): string;
-  encodeFunctionData(functionFragment: "publicKeys", values: [string]): string;
-  encodeFunctionData(
-    functionFragment: "redeemTicket",
-    values: [
-      string,
-      BytesLike,
-      BigNumberish,
-      BigNumberish,
-      BytesLike,
-      BigNumberish,
-      BigNumberish,
-      BytesLike
-    ]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "secsClosure",
-    values?: undefined
-  ): string;
-  encodeFunctionData(functionFragment: "token", values?: undefined): string;
-  encodeFunctionData(
-    functionFragment: "tokensReceived",
+    functionFragment: 'tokensReceived',
     values: [string, string, string, BigNumberish, BytesLike, BytesLike]
-  ): string;
+  ): string
 
-  decodeFunctionResult(
-    functionFragment: "FUND_CHANNEL_MULTI_SIZE",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "TOKENS_RECIPIENT_INTERFACE_HASH",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(functionFragment: "announce", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "bumpChannel",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "canImplementInterfaceForAddress",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(functionFragment: "channels", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "finalizeChannelClosure",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "fundChannelMulti",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "initiateChannelClosure",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(functionFragment: "multicall", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "publicKeys", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "redeemTicket",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "secsClosure",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(functionFragment: "token", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "tokensReceived",
-    data: BytesLike
-  ): Result;
+  decodeFunctionResult(functionFragment: 'FUND_CHANNEL_MULTI_SIZE', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'TOKENS_RECIPIENT_INTERFACE_HASH', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'announce', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'bumpChannel', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'canImplementInterfaceForAddress', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'channels', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'finalizeChannelClosure', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'fundChannelMulti', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'initiateChannelClosure', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'multicall', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'publicKeys', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'redeemTicket', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'secsClosure', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'token', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'tokensReceived', data: BytesLike): Result
 
   events: {
-    "Announcement(address,bytes,bytes)": EventFragment;
-    "ChannelBumped(address,address,bytes32,uint256,uint256)": EventFragment;
-    "ChannelClosureFinalized(address,address,uint32,uint256)": EventFragment;
-    "ChannelClosureInitiated(address,address,uint32)": EventFragment;
-    "ChannelFunded(address,address,address,uint256)": EventFragment;
-    "ChannelOpened(address,address)": EventFragment;
-    "ChannelUpdated(address,address,tuple)": EventFragment;
-    "TicketRedeemed(address,address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)": EventFragment;
-  };
+    'Announcement(address,bytes,bytes)': EventFragment
+    'ChannelBumped(address,address,bytes32,uint256,uint256)': EventFragment
+    'ChannelClosureFinalized(address,address,uint32,uint256)': EventFragment
+    'ChannelClosureInitiated(address,address,uint32)': EventFragment
+    'ChannelFunded(address,address,address,uint256)': EventFragment
+    'ChannelOpened(address,address)': EventFragment
+    'ChannelUpdated(address,address,tuple)': EventFragment
+    'TicketRedeemed(address,address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)': EventFragment
+  }
 
-  getEvent(nameOrSignatureOrTopic: "Announcement"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "ChannelBumped"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "ChannelClosureFinalized"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "ChannelClosureInitiated"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "ChannelFunded"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "ChannelOpened"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "ChannelUpdated"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "TicketRedeemed"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: 'Announcement'): EventFragment
+  getEvent(nameOrSignatureOrTopic: 'ChannelBumped'): EventFragment
+  getEvent(nameOrSignatureOrTopic: 'ChannelClosureFinalized'): EventFragment
+  getEvent(nameOrSignatureOrTopic: 'ChannelClosureInitiated'): EventFragment
+  getEvent(nameOrSignatureOrTopic: 'ChannelFunded'): EventFragment
+  getEvent(nameOrSignatureOrTopic: 'ChannelOpened'): EventFragment
+  getEvent(nameOrSignatureOrTopic: 'ChannelUpdated'): EventFragment
+  getEvent(nameOrSignatureOrTopic: 'TicketRedeemed'): EventFragment
 }
 
 export interface AnnouncementEventObject {
-  account: string;
-  publicKey: string;
-  multiaddr: string;
+  account: string
+  publicKey: string
+  multiaddr: string
 }
-export type AnnouncementEvent = TypedEvent<
-  [string, string, string],
-  AnnouncementEventObject
->;
+export type AnnouncementEvent = TypedEvent<[string, string, string], AnnouncementEventObject>
 
-export type AnnouncementEventFilter = TypedEventFilter<AnnouncementEvent>;
+export type AnnouncementEventFilter = TypedEventFilter<AnnouncementEvent>
 
 export interface ChannelBumpedEventObject {
-  source: string;
-  destination: string;
-  newCommitment: string;
-  ticketEpoch: BigNumber;
-  channelBalance: BigNumber;
+  source: string
+  destination: string
+  newCommitment: string
+  ticketEpoch: BigNumber
+  channelBalance: BigNumber
 }
-export type ChannelBumpedEvent = TypedEvent<
-  [string, string, string, BigNumber, BigNumber],
-  ChannelBumpedEventObject
->;
+export type ChannelBumpedEvent = TypedEvent<[string, string, string, BigNumber, BigNumber], ChannelBumpedEventObject>
 
-export type ChannelBumpedEventFilter = TypedEventFilter<ChannelBumpedEvent>;
+export type ChannelBumpedEventFilter = TypedEventFilter<ChannelBumpedEvent>
 
 export interface ChannelClosureFinalizedEventObject {
-  source: string;
-  destination: string;
-  closureFinalizationTime: number;
-  channelBalance: BigNumber;
+  source: string
+  destination: string
+  closureFinalizationTime: number
+  channelBalance: BigNumber
 }
 export type ChannelClosureFinalizedEvent = TypedEvent<
   [string, string, number, BigNumber],
   ChannelClosureFinalizedEventObject
->;
+>
 
-export type ChannelClosureFinalizedEventFilter =
-  TypedEventFilter<ChannelClosureFinalizedEvent>;
+export type ChannelClosureFinalizedEventFilter = TypedEventFilter<ChannelClosureFinalizedEvent>
 
 export interface ChannelClosureInitiatedEventObject {
-  source: string;
-  destination: string;
-  closureInitiationTime: number;
+  source: string
+  destination: string
+  closureInitiationTime: number
 }
-export type ChannelClosureInitiatedEvent = TypedEvent<
-  [string, string, number],
-  ChannelClosureInitiatedEventObject
->;
+export type ChannelClosureInitiatedEvent = TypedEvent<[string, string, number], ChannelClosureInitiatedEventObject>
 
-export type ChannelClosureInitiatedEventFilter =
-  TypedEventFilter<ChannelClosureInitiatedEvent>;
+export type ChannelClosureInitiatedEventFilter = TypedEventFilter<ChannelClosureInitiatedEvent>
 
 export interface ChannelFundedEventObject {
-  funder: string;
-  source: string;
-  destination: string;
-  amount: BigNumber;
+  funder: string
+  source: string
+  destination: string
+  amount: BigNumber
 }
-export type ChannelFundedEvent = TypedEvent<
-  [string, string, string, BigNumber],
-  ChannelFundedEventObject
->;
+export type ChannelFundedEvent = TypedEvent<[string, string, string, BigNumber], ChannelFundedEventObject>
 
-export type ChannelFundedEventFilter = TypedEventFilter<ChannelFundedEvent>;
+export type ChannelFundedEventFilter = TypedEventFilter<ChannelFundedEvent>
 
 export interface ChannelOpenedEventObject {
-  source: string;
-  destination: string;
+  source: string
+  destination: string
 }
-export type ChannelOpenedEvent = TypedEvent<
-  [string, string],
-  ChannelOpenedEventObject
->;
+export type ChannelOpenedEvent = TypedEvent<[string, string], ChannelOpenedEventObject>
 
-export type ChannelOpenedEventFilter = TypedEventFilter<ChannelOpenedEvent>;
+export type ChannelOpenedEventFilter = TypedEventFilter<ChannelOpenedEvent>
 
 export interface ChannelUpdatedEventObject {
-  source: string;
-  destination: string;
-  newState: HoprChannels.ChannelStructOutput;
+  source: string
+  destination: string
+  newState: HoprChannels.ChannelStructOutput
 }
 export type ChannelUpdatedEvent = TypedEvent<
   [string, string, HoprChannels.ChannelStructOutput],
   ChannelUpdatedEventObject
->;
+>
 
-export type ChannelUpdatedEventFilter = TypedEventFilter<ChannelUpdatedEvent>;
+export type ChannelUpdatedEventFilter = TypedEventFilter<ChannelUpdatedEvent>
 
 export interface TicketRedeemedEventObject {
-  source: string;
-  destination: string;
-  nextCommitment: string;
-  ticketEpoch: BigNumber;
-  ticketIndex: BigNumber;
-  proofOfRelaySecret: string;
-  amount: BigNumber;
-  winProb: BigNumber;
-  signature: string;
+  source: string
+  destination: string
+  nextCommitment: string
+  ticketEpoch: BigNumber
+  ticketIndex: BigNumber
+  proofOfRelaySecret: string
+  amount: BigNumber
+  winProb: BigNumber
+  signature: string
 }
 export type TicketRedeemedEvent = TypedEvent<
-  [
-    string,
-    string,
-    string,
-    BigNumber,
-    BigNumber,
-    string,
-    BigNumber,
-    BigNumber,
-    string
-  ],
+  [string, string, string, BigNumber, BigNumber, string, BigNumber, BigNumber, string],
   TicketRedeemedEventObject
->;
+>
 
-export type TicketRedeemedEventFilter = TypedEventFilter<TicketRedeemedEvent>;
+export type TicketRedeemedEventFilter = TypedEventFilter<TicketRedeemedEvent>
 
 export interface HoprChannels extends BaseContract {
-  connect(signerOrProvider: Signer | Provider | string): this;
-  attach(addressOrName: string): this;
-  deployed(): Promise<this>;
+  connect(signerOrProvider: Signer | Provider | string): this
+  attach(addressOrName: string): this
+  deployed(): Promise<this>
 
-  interface: HoprChannelsInterface;
+  interface: HoprChannelsInterface
 
   queryFilter<TEvent extends TypedEvent>(
     event: TypedEventFilter<TEvent>,
     fromBlockOrBlockhash?: string | number | undefined,
     toBlock?: string | number | undefined
-  ): Promise<Array<TEvent>>;
+  ): Promise<Array<TEvent>>
 
-  listeners<TEvent extends TypedEvent>(
-    eventFilter?: TypedEventFilter<TEvent>
-  ): Array<TypedListener<TEvent>>;
-  listeners(eventName?: string): Array<Listener>;
-  removeAllListeners<TEvent extends TypedEvent>(
-    eventFilter: TypedEventFilter<TEvent>
-  ): this;
-  removeAllListeners(eventName?: string): this;
-  off: OnEvent<this>;
-  on: OnEvent<this>;
-  once: OnEvent<this>;
-  removeListener: OnEvent<this>;
+  listeners<TEvent extends TypedEvent>(eventFilter?: TypedEventFilter<TEvent>): Array<TypedListener<TEvent>>
+  listeners(eventName?: string): Array<Listener>
+  removeAllListeners<TEvent extends TypedEvent>(eventFilter: TypedEventFilter<TEvent>): this
+  removeAllListeners(eventName?: string): this
+  off: OnEvent<this>
+  on: OnEvent<this>
+  once: OnEvent<this>
+  removeListener: OnEvent<this>
 
   functions: {
-    FUND_CHANNEL_MULTI_SIZE(overrides?: CallOverrides): Promise<[BigNumber]>;
+    FUND_CHANNEL_MULTI_SIZE(overrides?: CallOverrides): Promise<[BigNumber]>
 
-    TOKENS_RECIPIENT_INTERFACE_HASH(
-      overrides?: CallOverrides
-    ): Promise<[string]>;
+    TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<[string]>
 
     announce(
       publicKey: BytesLike,
       multiaddr: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
     bumpChannel(
       source: string,
       newCommitment: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
     canImplementInterfaceForAddress(
       interfaceHash: BytesLike,
       account: string,
       overrides?: CallOverrides
-    ): Promise<[string]>;
+    ): Promise<[string]>
 
     channels(
       arg0: BytesLike,
       overrides?: CallOverrides
     ): Promise<
       [BigNumber, string, BigNumber, BigNumber, number, BigNumber, number] & {
-        balance: BigNumber;
-        commitment: string;
-        ticketEpoch: BigNumber;
-        ticketIndex: BigNumber;
-        status: number;
-        channelEpoch: BigNumber;
-        closureTime: number;
+        balance: BigNumber
+        commitment: string
+        ticketEpoch: BigNumber
+        ticketIndex: BigNumber
+        status: number
+        channelEpoch: BigNumber
+        closureTime: number
       }
-    >;
+    >
 
     finalizeChannelClosure(
       destination: string,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
     fundChannelMulti(
       account1: string,
@@ -416,19 +297,19 @@ export interface HoprChannels extends BaseContract {
       amount1: BigNumberish,
       amount2: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
     initiateChannelClosure(
       destination: string,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
     multicall(
       data: BytesLike[],
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
-    publicKeys(arg0: string, overrides?: CallOverrides): Promise<[string]>;
+    publicKeys(arg0: string, overrides?: CallOverrides): Promise<[string]>
 
     redeemTicket(
       source: string,
@@ -440,11 +321,11 @@ export interface HoprChannels extends BaseContract {
       winProb: BigNumberish,
       signature: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
-    secsClosure(overrides?: CallOverrides): Promise<[number]>;
+    secsClosure(overrides?: CallOverrides): Promise<[number]>
 
-    token(overrides?: CallOverrides): Promise<[string]>;
+    token(overrides?: CallOverrides): Promise<[string]>
 
     tokensReceived(
       operator: string,
@@ -454,50 +335,46 @@ export interface HoprChannels extends BaseContract {
       userData: BytesLike,
       operatorData: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
-  };
+    ): Promise<ContractTransaction>
+  }
 
-  FUND_CHANNEL_MULTI_SIZE(overrides?: CallOverrides): Promise<BigNumber>;
+  FUND_CHANNEL_MULTI_SIZE(overrides?: CallOverrides): Promise<BigNumber>
 
-  TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<string>;
+  TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<string>
 
   announce(
     publicKey: BytesLike,
     multiaddr: BytesLike,
     overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
   bumpChannel(
     source: string,
     newCommitment: BytesLike,
     overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
-  canImplementInterfaceForAddress(
-    interfaceHash: BytesLike,
-    account: string,
-    overrides?: CallOverrides
-  ): Promise<string>;
+  canImplementInterfaceForAddress(interfaceHash: BytesLike, account: string, overrides?: CallOverrides): Promise<string>
 
   channels(
     arg0: BytesLike,
     overrides?: CallOverrides
   ): Promise<
     [BigNumber, string, BigNumber, BigNumber, number, BigNumber, number] & {
-      balance: BigNumber;
-      commitment: string;
-      ticketEpoch: BigNumber;
-      ticketIndex: BigNumber;
-      status: number;
-      channelEpoch: BigNumber;
-      closureTime: number;
+      balance: BigNumber
+      commitment: string
+      ticketEpoch: BigNumber
+      ticketIndex: BigNumber
+      status: number
+      channelEpoch: BigNumber
+      closureTime: number
     }
-  >;
+  >
 
   finalizeChannelClosure(
     destination: string,
     overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
   fundChannelMulti(
     account1: string,
@@ -505,19 +382,19 @@ export interface HoprChannels extends BaseContract {
     amount1: BigNumberish,
     amount2: BigNumberish,
     overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
   initiateChannelClosure(
     destination: string,
     overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
   multicall(
     data: BytesLike[],
     overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
-  publicKeys(arg0: string, overrides?: CallOverrides): Promise<string>;
+  publicKeys(arg0: string, overrides?: CallOverrides): Promise<string>
 
   redeemTicket(
     source: string,
@@ -529,11 +406,11 @@ export interface HoprChannels extends BaseContract {
     winProb: BigNumberish,
     signature: BytesLike,
     overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
-  secsClosure(overrides?: CallOverrides): Promise<number>;
+  secsClosure(overrides?: CallOverrides): Promise<number>
 
-  token(overrides?: CallOverrides): Promise<string>;
+  token(overrides?: CallOverrides): Promise<string>
 
   tokensReceived(
     operator: string,
@@ -543,50 +420,39 @@ export interface HoprChannels extends BaseContract {
     userData: BytesLike,
     operatorData: BytesLike,
     overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
   callStatic: {
-    FUND_CHANNEL_MULTI_SIZE(overrides?: CallOverrides): Promise<BigNumber>;
+    FUND_CHANNEL_MULTI_SIZE(overrides?: CallOverrides): Promise<BigNumber>
 
-    TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<string>;
+    TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<string>
 
-    announce(
-      publicKey: BytesLike,
-      multiaddr: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<void>;
+    announce(publicKey: BytesLike, multiaddr: BytesLike, overrides?: CallOverrides): Promise<void>
 
-    bumpChannel(
-      source: string,
-      newCommitment: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<void>;
+    bumpChannel(source: string, newCommitment: BytesLike, overrides?: CallOverrides): Promise<void>
 
     canImplementInterfaceForAddress(
       interfaceHash: BytesLike,
       account: string,
       overrides?: CallOverrides
-    ): Promise<string>;
+    ): Promise<string>
 
     channels(
       arg0: BytesLike,
       overrides?: CallOverrides
     ): Promise<
       [BigNumber, string, BigNumber, BigNumber, number, BigNumber, number] & {
-        balance: BigNumber;
-        commitment: string;
-        ticketEpoch: BigNumber;
-        ticketIndex: BigNumber;
-        status: number;
-        channelEpoch: BigNumber;
-        closureTime: number;
+        balance: BigNumber
+        commitment: string
+        ticketEpoch: BigNumber
+        ticketIndex: BigNumber
+        status: number
+        channelEpoch: BigNumber
+        closureTime: number
       }
-    >;
+    >
 
-    finalizeChannelClosure(
-      destination: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
+    finalizeChannelClosure(destination: string, overrides?: CallOverrides): Promise<void>
 
     fundChannelMulti(
       account1: string,
@@ -594,16 +460,13 @@ export interface HoprChannels extends BaseContract {
       amount1: BigNumberish,
       amount2: BigNumberish,
       overrides?: CallOverrides
-    ): Promise<void>;
+    ): Promise<void>
 
-    initiateChannelClosure(
-      destination: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
+    initiateChannelClosure(destination: string, overrides?: CallOverrides): Promise<void>
 
-    multicall(data: BytesLike[], overrides?: CallOverrides): Promise<string[]>;
+    multicall(data: BytesLike[], overrides?: CallOverrides): Promise<string[]>
 
-    publicKeys(arg0: string, overrides?: CallOverrides): Promise<string>;
+    publicKeys(arg0: string, overrides?: CallOverrides): Promise<string>
 
     redeemTicket(
       source: string,
@@ -615,11 +478,11 @@ export interface HoprChannels extends BaseContract {
       winProb: BigNumberish,
       signature: BytesLike,
       overrides?: CallOverrides
-    ): Promise<void>;
+    ): Promise<void>
 
-    secsClosure(overrides?: CallOverrides): Promise<number>;
+    secsClosure(overrides?: CallOverrides): Promise<number>
 
-    token(overrides?: CallOverrides): Promise<string>;
+    token(overrides?: CallOverrides): Promise<string>
 
     tokensReceived(
       operator: string,
@@ -629,94 +492,80 @@ export interface HoprChannels extends BaseContract {
       userData: BytesLike,
       operatorData: BytesLike,
       overrides?: CallOverrides
-    ): Promise<void>;
-  };
+    ): Promise<void>
+  }
 
   filters: {
-    "Announcement(address,bytes,bytes)"(
+    'Announcement(address,bytes,bytes)'(
       account?: string | null,
       publicKey?: null,
       multiaddr?: null
-    ): AnnouncementEventFilter;
-    Announcement(
-      account?: string | null,
-      publicKey?: null,
-      multiaddr?: null
-    ): AnnouncementEventFilter;
+    ): AnnouncementEventFilter
+    Announcement(account?: string | null, publicKey?: null, multiaddr?: null): AnnouncementEventFilter
 
-    "ChannelBumped(address,address,bytes32,uint256,uint256)"(
+    'ChannelBumped(address,address,bytes32,uint256,uint256)'(
       source?: string | null,
       destination?: string | null,
       newCommitment?: null,
       ticketEpoch?: null,
       channelBalance?: null
-    ): ChannelBumpedEventFilter;
+    ): ChannelBumpedEventFilter
     ChannelBumped(
       source?: string | null,
       destination?: string | null,
       newCommitment?: null,
       ticketEpoch?: null,
       channelBalance?: null
-    ): ChannelBumpedEventFilter;
+    ): ChannelBumpedEventFilter
 
-    "ChannelClosureFinalized(address,address,uint32,uint256)"(
+    'ChannelClosureFinalized(address,address,uint32,uint256)'(
       source?: string | null,
       destination?: string | null,
       closureFinalizationTime?: null,
       channelBalance?: null
-    ): ChannelClosureFinalizedEventFilter;
+    ): ChannelClosureFinalizedEventFilter
     ChannelClosureFinalized(
       source?: string | null,
       destination?: string | null,
       closureFinalizationTime?: null,
       channelBalance?: null
-    ): ChannelClosureFinalizedEventFilter;
+    ): ChannelClosureFinalizedEventFilter
 
-    "ChannelClosureInitiated(address,address,uint32)"(
+    'ChannelClosureInitiated(address,address,uint32)'(
       source?: string | null,
       destination?: string | null,
       closureInitiationTime?: null
-    ): ChannelClosureInitiatedEventFilter;
+    ): ChannelClosureInitiatedEventFilter
     ChannelClosureInitiated(
       source?: string | null,
       destination?: string | null,
       closureInitiationTime?: null
-    ): ChannelClosureInitiatedEventFilter;
+    ): ChannelClosureInitiatedEventFilter
 
-    "ChannelFunded(address,address,address,uint256)"(
+    'ChannelFunded(address,address,address,uint256)'(
       funder?: string | null,
       source?: string | null,
       destination?: string | null,
       amount?: null
-    ): ChannelFundedEventFilter;
+    ): ChannelFundedEventFilter
     ChannelFunded(
       funder?: string | null,
       source?: string | null,
       destination?: string | null,
       amount?: null
-    ): ChannelFundedEventFilter;
+    ): ChannelFundedEventFilter
 
-    "ChannelOpened(address,address)"(
-      source?: string | null,
-      destination?: string | null
-    ): ChannelOpenedEventFilter;
-    ChannelOpened(
-      source?: string | null,
-      destination?: string | null
-    ): ChannelOpenedEventFilter;
+    'ChannelOpened(address,address)'(source?: string | null, destination?: string | null): ChannelOpenedEventFilter
+    ChannelOpened(source?: string | null, destination?: string | null): ChannelOpenedEventFilter
 
-    "ChannelUpdated(address,address,tuple)"(
+    'ChannelUpdated(address,address,tuple)'(
       source?: string | null,
       destination?: string | null,
       newState?: null
-    ): ChannelUpdatedEventFilter;
-    ChannelUpdated(
-      source?: string | null,
-      destination?: string | null,
-      newState?: null
-    ): ChannelUpdatedEventFilter;
+    ): ChannelUpdatedEventFilter
+    ChannelUpdated(source?: string | null, destination?: string | null, newState?: null): ChannelUpdatedEventFilter
 
-    "TicketRedeemed(address,address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)"(
+    'TicketRedeemed(address,address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)'(
       source?: string | null,
       destination?: string | null,
       nextCommitment?: null,
@@ -726,7 +575,7 @@ export interface HoprChannels extends BaseContract {
       amount?: null,
       winProb?: null,
       signature?: null
-    ): TicketRedeemedEventFilter;
+    ): TicketRedeemedEventFilter
     TicketRedeemed(
       source?: string | null,
       destination?: string | null,
@@ -737,40 +586,38 @@ export interface HoprChannels extends BaseContract {
       amount?: null,
       winProb?: null,
       signature?: null
-    ): TicketRedeemedEventFilter;
-  };
+    ): TicketRedeemedEventFilter
+  }
 
   estimateGas: {
-    FUND_CHANNEL_MULTI_SIZE(overrides?: CallOverrides): Promise<BigNumber>;
+    FUND_CHANNEL_MULTI_SIZE(overrides?: CallOverrides): Promise<BigNumber>
 
-    TOKENS_RECIPIENT_INTERFACE_HASH(
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
+    TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<BigNumber>
 
     announce(
       publicKey: BytesLike,
       multiaddr: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
+    ): Promise<BigNumber>
 
     bumpChannel(
       source: string,
       newCommitment: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
+    ): Promise<BigNumber>
 
     canImplementInterfaceForAddress(
       interfaceHash: BytesLike,
       account: string,
       overrides?: CallOverrides
-    ): Promise<BigNumber>;
+    ): Promise<BigNumber>
 
-    channels(arg0: BytesLike, overrides?: CallOverrides): Promise<BigNumber>;
+    channels(arg0: BytesLike, overrides?: CallOverrides): Promise<BigNumber>
 
     finalizeChannelClosure(
       destination: string,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
+    ): Promise<BigNumber>
 
     fundChannelMulti(
       account1: string,
@@ -778,19 +625,16 @@ export interface HoprChannels extends BaseContract {
       amount1: BigNumberish,
       amount2: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
+    ): Promise<BigNumber>
 
     initiateChannelClosure(
       destination: string,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
+    ): Promise<BigNumber>
 
-    multicall(
-      data: BytesLike[],
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
+    multicall(data: BytesLike[], overrides?: Overrides & { from?: string | Promise<string> }): Promise<BigNumber>
 
-    publicKeys(arg0: string, overrides?: CallOverrides): Promise<BigNumber>;
+    publicKeys(arg0: string, overrides?: CallOverrides): Promise<BigNumber>
 
     redeemTicket(
       source: string,
@@ -802,11 +646,11 @@ export interface HoprChannels extends BaseContract {
       winProb: BigNumberish,
       signature: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
+    ): Promise<BigNumber>
 
-    secsClosure(overrides?: CallOverrides): Promise<BigNumber>;
+    secsClosure(overrides?: CallOverrides): Promise<BigNumber>
 
-    token(overrides?: CallOverrides): Promise<BigNumber>;
+    token(overrides?: CallOverrides): Promise<BigNumber>
 
     tokensReceived(
       operator: string,
@@ -816,45 +660,38 @@ export interface HoprChannels extends BaseContract {
       userData: BytesLike,
       operatorData: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
-  };
+    ): Promise<BigNumber>
+  }
 
   populateTransaction: {
-    FUND_CHANNEL_MULTI_SIZE(
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
+    FUND_CHANNEL_MULTI_SIZE(overrides?: CallOverrides): Promise<PopulatedTransaction>
 
-    TOKENS_RECIPIENT_INTERFACE_HASH(
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
+    TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<PopulatedTransaction>
 
     announce(
       publicKey: BytesLike,
       multiaddr: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
     bumpChannel(
       source: string,
       newCommitment: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
     canImplementInterfaceForAddress(
       interfaceHash: BytesLike,
       account: string,
       overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
-    channels(
-      arg0: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
+    channels(arg0: BytesLike, overrides?: CallOverrides): Promise<PopulatedTransaction>
 
     finalizeChannelClosure(
       destination: string,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
     fundChannelMulti(
       account1: string,
@@ -862,22 +699,19 @@ export interface HoprChannels extends BaseContract {
       amount1: BigNumberish,
       amount2: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
     initiateChannelClosure(
       destination: string,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
     multicall(
       data: BytesLike[],
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
-    publicKeys(
-      arg0: string,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
+    publicKeys(arg0: string, overrides?: CallOverrides): Promise<PopulatedTransaction>
 
     redeemTicket(
       source: string,
@@ -889,11 +723,11 @@ export interface HoprChannels extends BaseContract {
       winProb: BigNumberish,
       signature: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
-    secsClosure(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    secsClosure(overrides?: CallOverrides): Promise<PopulatedTransaction>
 
-    token(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    token(overrides?: CallOverrides): Promise<PopulatedTransaction>
 
     tokensReceived(
       operator: string,
@@ -903,6 +737,6 @@ export interface HoprChannels extends BaseContract {
       userData: BytesLike,
       operatorData: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
-  };
+    ): Promise<PopulatedTransaction>
+  }
 }

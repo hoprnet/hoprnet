@@ -30,7 +30,15 @@ import type { Block } from '@ethersproject/abstract-provider'
 
 // @ts-ignore untyped library
 import retimer from 'retimer'
-import { HOPR_CHANNELS_ABI, HOPR_NETWORK_REGISTRY_ABI, HOPR_TOKEN_ABI, HoprChannels, HoprNetworkRegistry, HoprToken, DeploymentExtract } from './utils/index.js'
+import {
+  HOPR_CHANNELS_ABI,
+  HOPR_NETWORK_REGISTRY_ABI,
+  HOPR_TOKEN_ABI,
+  HoprChannels,
+  HoprNetworkRegistry,
+  HoprToken,
+  DeploymentExtract
+} from './utils/index.js'
 
 const log = debug('hopr:core-ethereum:ethereum')
 const abiCoder = new utils.AbiCoder()
@@ -71,24 +79,24 @@ export async function createChainWrapper(
   checkDuplicate: Boolean = true,
   txTimeout = TX_CONFIRMATION_WAIT
 ) {
-  log(`[DEBUG] networkInfo.provider ${JSON.stringify(networkInfo.provider, null, 2)}`);
+  log(`[DEBUG] networkInfo.provider ${JSON.stringify(networkInfo.provider, null, 2)}`)
   const provider = networkInfo.provider.startsWith('http')
     ? new providers.StaticJsonRpcProvider(networkInfo.provider)
     : new providers.WebSocketProvider(networkInfo.provider)
-  log(`[DEBUG] provider ${provider}`);
+  log(`[DEBUG] provider ${provider}`)
   const publicKey = PublicKey.fromPrivKey(privateKey)
-  log(`[DEBUG] publicKey ${publicKey}`);
+  log(`[DEBUG] publicKey ${publicKey}`)
   const address = publicKey.toAddress()
-  log(`[DEBUG] address ${address}`);
+  log(`[DEBUG] address ${address}`)
   const providerChainId = (await provider.getNetwork()).chainId
-  log(`[DEBUG] providerChainId ${providerChainId}`);
-  
+  log(`[DEBUG] providerChainId ${providerChainId}`)
+
   // ensure chain id matches our expectation
   if (networkInfo.chainId !== providerChainId) {
     throw Error(`Providers chain id ${providerChainId} does not match ${networkInfo.chainId}`)
   }
-  
-  log(`[DEBUG] deploymentExtract ${JSON.stringify(deploymentExtract, null ,2)}`);
+
+  log(`[DEBUG] deploymentExtract ${JSON.stringify(deploymentExtract, null, 2)}`)
 
   const token = new ethers.Contract(deploymentExtract.hoprTokenAddress, HOPR_TOKEN_ABI, provider) as any as HoprToken
 
@@ -105,7 +113,7 @@ export async function createChainWrapper(
   ) as any as HoprNetworkRegistry
 
   //getGenesisBlock, taking the earlier deployment block between the channel and network Registery
-  const genesisBlock = deploymentExtract.indexerStartBlockNumber;
+  const genesisBlock = deploymentExtract.indexerStartBlockNumber
   const channelClosureSecs = await channels.secsClosure()
 
   const transactions = new TransactionManager()
