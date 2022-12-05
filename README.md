@@ -256,6 +256,9 @@ make -j deps && make -j build
 # starting network
 make run-anvil
 
+# update protocol-config
+scripts/update-protocol-config.sh -e anvil-localhost
+
 # running normal node alice (separate terminal)
 DEBUG="hopr*" yarn run:hoprd:alice
 
