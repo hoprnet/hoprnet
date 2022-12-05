@@ -139,7 +139,7 @@ function install_wasm_opt() {
     if ! command -v wasm-opt; then
         cd ${download_dir}
         local rust_cargo_toml_path="${mydir}/../../Cargo.toml"
-        local wasm_opt_release=$(sed -En 's/^wasm-opt= \"([0-9.]*)\"$/v\1/p' ${rust_cargo_toml_path})
+        local wasm_opt_release=$(sed -En 's/^wasm-opt = \"([0-9.]*)\"$/v\1/p' ${rust_cargo_toml_path})
         echo "Installing wasm-opt ${wasm_opt_release}"
         local ostype="$(uname -s)"
         local cputype="$(uname -m)"
