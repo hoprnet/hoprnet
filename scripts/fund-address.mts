@@ -159,7 +159,7 @@ async function main() {
   const { getContractData } = await import('@hoprnet/hopr-core/src/environment.js')
 
   // Wait as long as it takes to mine the transaction, i.e. timeout=0
-  const deploymentExtract = getContractData(environment.id);
+  const deploymentExtract = getContractData(environment.id)
   const chain = await createChainWrapper(deploymentExtract, chainOptions, privKey, true, 0)
   const sender = chain.getPublicKey().toAddress().toString()
 

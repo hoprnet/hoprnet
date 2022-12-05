@@ -89,9 +89,9 @@ export function supportedEnvironments(): Environment[] {
  * @returns the environment details, throws if environment is not supported
  */
 export function resolveEnvironment(environment_id: string, customProvider?: string): ResolvedEnvironment {
-  console.log(`[DEBUG] resolveEnvironment ${environment_id}, ${customProvider}`);
+  console.log(`[DEBUG] resolveEnvironment ${environment_id}, ${customProvider}`)
   const environment = (protocolConfig as ProtocolConfig).environments[environment_id]
-  console.log(`[DEBUG] resolveEnvironmentenvironment environment ${JSON.stringify(environment, null, 2)}`);
+  console.log(`[DEBUG] resolveEnvironmentenvironment environment ${JSON.stringify(environment, null, 2)}`)
   const network = (protocolConfig as ProtocolConfig).networks[environment?.network_id]
 
   if (environment && network && semver.satisfies(FULL_VERSION_COERCED, environment.version_range)) {
@@ -122,7 +122,7 @@ export function resolveEnvironment(environment_id: string, customProvider?: stri
 }
 
 export const getContractData = (environment_id: string): DeploymentExtract => {
-  const resolvedEnvironment = resolveEnvironment(environment_id);
+  const resolvedEnvironment = resolveEnvironment(environment_id)
   return {
     hoprTokenAddress: resolvedEnvironment.token_contract_address,
     hoprChannelsAddress: resolvedEnvironment.channels_contract_address,

@@ -98,7 +98,13 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   private async createChain(deploymentAddresses: DeploymentExtract): Promise<void> {
     try {
-      log(`[DEBUG] createChain createChainWrapper starting with deploymentAddresses... ${JSON.stringify(deploymentAddresses, null, 2)} `)
+      log(
+        `[DEBUG] createChain createChainWrapper starting with deploymentAddresses... ${JSON.stringify(
+          deploymentAddresses,
+          null,
+          2
+        )} `
+      )
       this.chain = await createChainWrapper(deploymentAddresses, this.options, this.privateKey, true)
     } catch (err) {
       const errMsg = 'failed to create provider chain wrapper'
