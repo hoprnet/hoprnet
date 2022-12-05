@@ -111,7 +111,7 @@ declare node5_id="${node5_dir}.id"
 
 declare password="local"
 
-declare hardhat_rpc_log="${tmp_dir}/hopr-local-hardhat-rpc.log"
+declare anvil_rpc_log="${tmp_dir}/hopr-local-anvil-rpc.log"
 declare env_file="${tmp_dir}/local-cluster.env"
 
 function cleanup {
@@ -161,7 +161,7 @@ function setup_node() {
   log "Run node ${id} on rest port ${api_port} -> ${log}"
 
   if [[ "${additional_args}" != *"--environment "* ]]; then
-    additional_args="--environment hardhat-localhost ${additional_args}"
+    additional_args="--environment anvil-localhost ${additional_args}"
   fi
 
   log "Additional args: \"${additional_args}\""
@@ -206,7 +206,7 @@ function setup_node() {
 # --- Log setup info {{{
 log "Node files and directories"
 log "\thardhat"
-log "\t\tlog: ${hardhat_rpc_log}"
+log "\t\tlog: ${anvil_rpc_log}"
 log "\tnode1"
 log "\t\tdata dir: ${node1_dir} (will be removed)"
 log "\t\tlog: ${node1_log}"
@@ -243,30 +243,27 @@ ensure_port_is_free 19094
 ensure_port_is_free 19095
 # }}}
 
+declare protocol_config="${mydir}/../packages/core/protocol-config.json"
+declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
+
 # --- Cleanup old contract deployments {{{
 log "Removing artifacts from old contract deployments"
-rm -Rfv \
-  "${hardhat_basedir}/deployments/hardhat-localhost/*" \
-  "${hardhat_basedir}/deployments/hardhat-localhost2"
+cleanup_local_protocol_config "${protocol_config}" "anvil-localhost"
+cleanup_local_protocol_config "${protocol_config}" "anvil-localhost2"
 # }}}
 
 # --- Running Mock Blockchain --- {{{
-log "Running hardhat local node"
-cd "${hardhat_basedir}" && \
-  NODE_OPTIONS=--experimental-wasm-modules yarn run:network \
-    --network hardhat --show-stack-traces > \
-    "${hardhat_rpc_log}" 2>&1 &
+log "Running anvil local node"
+make -C "${mydir}/.." run-anvil > \
+    "${anvil_rpc_log}" 2>&1 &
 
-wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
+log "Wait for regex"
+wait_for_regex ${anvil_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
 log "Hardhat node started (127.0.0.1:8545)"
 
-# need to mirror contract data because of hardhat-deploy node only writing to localhost
-cp -R \
-  "${hardhat_basedir}/deployments/hardhat-localhost/localhost" \
-  "${hardhat_basedir}/deployments/hardhat-localhost/hardhat"
-cp -R \
-  "${hardhat_basedir}/deployments/hardhat-localhost" \
-  "${hardhat_basedir}/deployments/hardhat-localhost2"
+# need to mirror contract data because of anvil-deploy node only writing to localhost
+update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost"
+update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost2"
 # }}}
 
 #  --- Run nodes --- {{{

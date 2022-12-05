@@ -64,7 +64,7 @@ for git_ref in $(cat "${release_config}" | jq -r "to_entries[] | .value.git_ref"
       make -C "${mydir}/../packages/ethereum/contracts/" anvil-deploy-contracts environment-name="${environment_id}" environment-type="${environment_type}"
 
       # update the deployed files in protocol-config
-      update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "${environment_id}"
+      update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "${environment_id}" "${environment_id}"
     done
   fi
 done

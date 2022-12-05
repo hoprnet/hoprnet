@@ -2,7 +2,7 @@
 
 To test HOPR protocol and develop dApps on top of HOPR at a resonable scale, nodes are only allowed to join the network (sending messages) if they are registered on a "Network Registry" smart contract.
 
-This restriction on the access guarded by the "Network Registry" is only enabled in the staging or production environment by default. If you are running a cluster of HOPR nodes locally in the hardhat network, the "Network Registry" is not enabled.
+This restriction on the access guarded by the "Network Registry" is only enabled in the staging or production environment by default. If you are running a cluster of HOPR nodes locally in the anvil network, the "Network Registry" is not enabled.
 
 There are two ways of registering a node:
 
@@ -217,12 +217,8 @@ To register one (`community` rank) or many (`developer` rank) eligible node in t
    To stake one `developer` NFT:
 
    ```
-   HOPR_ENVIRONMENT_ID=monte_rosa \
-   TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-   yarn workspace @hoprnet/hopr-ethereum run hardhat stake \
-   	--network xdai \
-   	--type nrnft \
-   	--nftrank developer
+   PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-nrnft environment=monte_rosa environment_type=production \
+      nftrank=developer
    ```
 
    To register some peers:
@@ -230,27 +226,19 @@ To register one (`community` rank) or many (`developer` rank) eligible node in t
    1. When "staking proxy" is used:
 
       ```
-      HOPR_ENVIRONMENT_ID=monte_rosa \
-      TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-      yarn workspace @hoprnet/hopr-ethereum run hardhat register:self \
-      --network xdai \
-      --task add \
-      --peer-ids <peerId1,peerId2,peerId3,peerId4...>
+      PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node environment=monte_rosa environment_type=production \
+         peer_ids=<peerId1,peerId2,peerId3,peerId4...>
       ```
 
    2. When "dummy proxy" is used:
       ```
-      HOPR_ENVIRONMENT_ID=monte_rosa \
-      TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-      yarn workspace @hoprnet/hopr-ethereum run hardhat register:self \
-      --network xdai \
-      --task sync \
-      --peer-ids <peerId1,peerId2,peerId3,peerId4...>
+      PRIVATE_KEY=${ACCOUNT_PRIVKEY} make sync-eligibility environment=monte_rosa environment_type=production \
+         peer_ids=<peerId1,peerId2,peerId3,peerId4...>
       ```
 
    b. For community/team testing:
 
    ```
-   PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-nrnft nftrank=<"developer" or "community"> environment=monte_rosa network=xdai
-   PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_ids=<peerId1,peerId2,peerId3,peerId4...> environment=monte_rosa network=xdai
+   PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-nrnft nftrank=<"developer" or "community"> environment=monte_rosa environment_type=production
+   PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_ids=<peerId1,peerId2,peerId3,peerId4...> environment=monte_rosa environment_type=production
    ```

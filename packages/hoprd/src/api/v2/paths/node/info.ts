@@ -59,7 +59,7 @@ GET.apiDoc = {
             properties: {
               environment: {
                 type: 'string',
-                example: 'hardhat-localhost',
+                example: 'anvil-localhost',
                 description: 'Name of the enviroment the node is running on.'
               },
               announcedAddress: {

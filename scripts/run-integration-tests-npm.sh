@@ -113,6 +113,8 @@ declare node8_privkey="0xc7453d74b13c6ad452b2b261d9b85e47ef8e8781a18c3a7063c68c3
 declare password="e2e-test"
 
 declare hardhat_rpc_log="${tmp}/hopr-npm-hardhat-rpc.log"
+declare protocol_config="${mydir}/../packages/core/protocol-config.json"
+declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
 
 function cleanup {
   local EXIT_CODE=$?
@@ -183,7 +185,7 @@ function setup_node() {
   log "Run node ${id} on API port ${api_port} -> ${log}"
 
   if [[ "${additional_args}" != *"--environment "* ]]; then
-    additional_args="--environment hardhat-localhost ${additional_args}"
+    additional_args="--environment anvil-localhost ${additional_args}"
   fi
 
   log "Additional args: \"${additional_args}\""
@@ -264,20 +266,10 @@ function install_npm_packages() {
 
     # Copies local deployment information to npm install directory
     # Fixme: copy also other environments
-    # need to mirror contract data because of hardhat-deploy node only writing to localhost
+    # need to mirror contract data because of anvil-deploy node only writing to localhost
     log "Copying deployment information to npm directory (${npm_install_dir})"
-    cp -R \
-      "${mydir}/../packages/ethereum/deployments/hardhat-localhost/localhost" \
-      "${mydir}/../packages/ethereum/deployments/hardhat-localhost/hardhat"
-    cp -R \
-      "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
-      "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
-    cp -R \
-      "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
-      "${npm_install_dir}/node_modules/@hoprnet/hopr-ethereum/deployments/hardhat-localhost"
-    cp -R \
-      "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
-      "${npm_install_dir}/node_modules/@hoprnet/hopr-ethereum/deployments/hardhat-localhost2"
+    update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost"
+    update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost2"
   fi
 }
 
@@ -346,11 +338,8 @@ ensure_port_is_free 19098
 
 # --- Cleanup old contract deployments {{{
 log "Removing artifacts from old contract deployments"
-rm -Rf \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost2" \
-  "${npm_install_dir}/node_modules/@hoprnet/hopr-ethereum/deployments/hardhat-localhost" \
-  "${npm_install_dir}/node_modules/@hoprnet/hopr-ethereum/deployments/hardhat-localhost2"
+cleanup_local_protocol_config "${protocol_config}" "anvil-localhost"
+cleanup_local_protocol_config "${protocol_config}" "anvil-localhost2"
 # }}}
 
 #  --- Create packages if needed --- {{{
@@ -362,13 +351,13 @@ if [ -z "${npm_package_version}" ]; then
   create_npm_package "hopr-ethereum"
   create_npm_package "hopr-core-ethereum"
   # set default environment
-  echo '{"id": "hardhat-localhost"}' > "${mydir}/../packages/hoprd/default-environment.json"
+  echo '{"id": "anvil-localhost"}' > "${mydir}/../packages/hoprd/default-environment.json"
   create_npm_package "hoprd"
 fi
 # }}}
 
 # --- Running Mock Blockchain --- {{{
-start_local_hardhat "${hardhat_rpc_log}"
+start_local_anvil "${hardhat_rpc_log}"
 
 wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
 log "Hardhat node started (127.0.0.1:8545)"
@@ -382,7 +371,7 @@ setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}" "${node
 setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}" "${node5_privkey}" "--testNoDirectConnections"
 setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "${node6_privkey}" "--announce --run \"info;balance\""
 # should not be able to talk to the rest
-setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "${node7_privkey}" "--announce --environment hardhat-localhost2"
+setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "${node7_privkey}" "--announce --environment anvil-localhost2"
 # node n8 will be the only one NOT registered
 setup_node 13308 19098 19508 "${node8_dir}" "${node8_log}" "${node8_id}" "${node8_privkey}" "--announce"
 # }}}

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # TODO: this script currently uses goerli as the RPC provider. However, it
-# should be extended to use its own instance of hardhat too.
+# should be extended to use its own instance of anvil too.
 
 # prevent sourcing of this script, only allow execution
 $(return >/dev/null 2>&1)

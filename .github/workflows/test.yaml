@@ -53,4 +53,4 @@ jobs:
       - name: Test
         run: make -j test
         env:
-          HOPR_ENVIRONMENT_ID: hardhat-localhost
+          HOPR_ENVIRONMENT_ID: anvil-localhost

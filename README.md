@@ -141,7 +141,7 @@ $ hoprd --help
 Options:
   --help                         Show help  [boolean]
   --version                      Show version number  [boolean]
-  --environment                  Environment id which the node shall run on (HOPRD_ENVIRONMENT)  [string] [choices: "hardhat-localhost", "hardhat-localhost2", "master-goerli", "debug-goerli", "tuttlingen", "prague", "budapest", "athens", "lisbon", "ouagadougou", "paleochora", "monte_rosa"] [default: ""]
+  --environment                  Environment id which the node shall run on (HOPRD_ENVIRONMENT)  [string] [choices: "anvil-localhost", "anvil-localhost2", "master-goerli", "debug-goerli", "tuttlingen", "prague", "budapest", "athens", "lisbon", "ouagadougou", "paleochora", "monte_rosa"] [default: ""]
   --host                         The network host to run the HOPR node on [env: HOPRD_HOST]  [string] [default: "0.0.0.0:9091"]
   --announce                     Announce public IP to the network [env: HOPRD_ANNOUNCE]  [boolean] [default: false]
   --admin                        Run an admin interface on localhost:3000, requires --apiToken [env: HOPRD_ADMIN]  [boolean] [default: false]
@@ -254,7 +254,7 @@ To install Rust toolchain (at least version 1.60) please follow instructions at 
 make -j deps && make -j build
 
 # starting network
-make run-local
+make run-anvil
 
 # running normal node alice (separate terminal)
 DEBUG="hopr*" yarn run:hoprd:alice

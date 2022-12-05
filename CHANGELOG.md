@@ -16,6 +16,7 @@
 - Improve error messages passed to the User ([#4375](https://github.com/hoprnet/hoprnet/pull/4375))
 - Fix channel metrics, add channel balances metrics ([#4374](https://github.com/hoprnet/hoprnet/pull/4374))
 - Fix ticket redemption ([#4382](https://github.com/hoprnet/hoprnet/pull/4382))
+- Smart contract toolchain upgrade ([#4382](https://github.com/hoprnet/hoprnet/pull/4230))
 
 ---
 

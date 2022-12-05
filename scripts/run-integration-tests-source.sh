@@ -102,7 +102,7 @@ declare ct_db_file="${tmp}/hopr-ct-db.json"
 
 declare hardhat_rpc_log="${tmp}/hopr-source-hardhat-rpc.log"
 
-# hardhat port
+# anvil port
 declare -a all_ports=( 8545 )
 # HOPRd API ports
 all_ports+=( 13301 13302 13303 13304 13305 13306 13307 )
@@ -178,7 +178,7 @@ function setup_node() {
   log "Run node ${id} on API port ${api_port} -> ${log}"
 
   if [[ "${additional_args}" != *"--environment "* ]]; then
-    additional_args="--environment hardhat-localhost ${additional_args}"
+    additional_args="--environment anvil-localhost ${additional_args}"
   fi
 
   if [[ -n "${api_token}" ]]; then
@@ -245,7 +245,7 @@ function setup_ct_node() {
   log "Run CT node -> ${log}"
 
   if [[ "${additional_args}" != *"--environment "* ]]; then
-    additional_args="--environment hardhat-localhost ${additional_args}"
+    additional_args="--environment anvil-localhost ${additional_args}"
   fi
   log "Additional args: \"${additional_args}\""
 
@@ -312,26 +312,24 @@ for p in ${all_ports[@]}; do
 done
 # }}}
 
+declare protocol_config="${mydir}/../packages/core/protocol-config.json"
+declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
+
 # --- Cleanup old contract deployments {{{
 log "Removing artifacts from old contract deployments"
-rm -Rf \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
+cleanup_local_protocol_config "${protocol_config}" "anvil-localhost"
+cleanup_local_protocol_config "${protocol_config}" "anvil-localhost2"
 # }}}
 
 # --- Running Mock Blockchain --- {{{
-start_local_hardhat "${hardhat_rpc_log}"
+start_local_anvil "${hardhat_rpc_log}"
 
 wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
 log "Hardhat node started (127.0.0.1:8545)"
 
-# need to mirror contract data because of hardhat-deploy node only writing to localhost {{{
-cp -R \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost/localhost" \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost/hardhat"
-cp -R \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
+# need to mirror contract data because of anvil-deploy node only writing to localhost {{{
+update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost"
+update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost2"
 # }}}
 
 # static address because static private key
@@ -344,7 +342,7 @@ setup_node 13303 ${default_api_token} 19093 19503 "${node3_dir}" "${node3_log}" 
 setup_node 13304 ${default_api_token} 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}" "${node4_privkey}" "--testNoDirectConnections"
 setup_node 13305 ${default_api_token} 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}" "${node5_privkey}" "--testNoDirectConnections"
 # should not be able to talk to the rest
-setup_node 13306 ${default_api_token} 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "${node6_privkey}" "--announce --environment hardhat-localhost2"
+setup_node 13306 ${default_api_token} 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "${node6_privkey}" "--announce --environment anvil-localhost2"
 # node n8 will be the only one NOT registered
 setup_node 13307 ${default_api_token} 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "${node7_privkey}" "--announce"
 setup_ct_node "${ct_node1_log}" "0xa08666bca1363cb00b5402bbeb6d47f6b84296f3bba0f2f95b1081df5588a613" 20000 "${ct_node1_dir}"

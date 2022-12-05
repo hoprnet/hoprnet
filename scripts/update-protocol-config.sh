@@ -49,4 +49,4 @@ cd "${mydir}/../"
 declare protocol_config="${mydir}/../packages/core/protocol-config.json"
 declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
 
-update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "${environment_id}"
+update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "${environment_id}" "${environment_id}"
