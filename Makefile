@@ -193,14 +193,28 @@ run-anvil: ## spinup a local anvil instance (daemon) and deploy contracts
 kill-anvil: ## kill process running at port 8545 (default port of anvil)
 	kill $(shell lsof -i :8545 | grep -o '\d*' | head -1)
 
-s.PHONY: run-local
+.PHONY: run-local
 run-local: ## run HOPRd from local repo
 	env NODE_OPTIONS="--experimental-wasm-modules" NODE_ENV=development DEBUG="hopr*" node \
 		packages/hoprd/lib/main.cjs --admin --init --api \
-		--password="local" --identity=`pwd`/.identity-local \
+		--password="local" --identity=`pwd`/.identity-local.id \
 		--environment anvil-localhost --announce \
 		--testUseWeakCrypto --testAnnounceLocalAddresses \
 		--testPreferLocalAddresses --testNoAuthentication
+
+.PHONY: fund-local
+fund-local: # use faucet script to fund local identities
+	foundry-tool --environment-name anvil-localhost --environment-type development \
+		faucet --password local --use-local-identities --identity-directory "." \
+		--private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+		--make-root "./packages/ethereum/contracts"
+
+.PHONY: fund-local-all
+fund-local-all: # use faucet script to fund all the local identities
+	foundry-tool --environment-name anvil-localhost --environment-type development \
+		faucet --password local --use-local-identities --identity-directory "/tmp/" \
+		--private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+		--make-root "./packages/ethereum/contracts"
 
 .PHONY: docker-build-local
 docker-build-local: ## build Docker images locally, or single image if image= is set

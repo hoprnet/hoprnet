@@ -426,7 +426,9 @@ async function main() {
   }
 
   const environment = resolveEnvironment(argv.environment, argv.provider)
+  logs.log(`[DEBUG] hoprd get environment`)
   let options = generateNodeOptions(environment)
+  logs.log(`[DEBUG] options ${JSON.stringify(options, null, 2)}`)
   if (argv.dryRun) {
     console.log(JSON.stringify(options, undefined, 2))
     process.exit(0)

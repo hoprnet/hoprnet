@@ -4,6 +4,7 @@
 import protocolConfig from '../protocol-config.json' assert { type: 'json' }
 import semver from 'semver'
 import { FULL_VERSION } from './constants.js'
+import { DeploymentExtract } from '@hoprnet/hopr-core-ethereum/src/utils/utils.js'
 
 /**
  * Coerced full version using
@@ -90,10 +91,8 @@ export function supportedEnvironments(): Environment[] {
 export function resolveEnvironment(environment_id: string, customProvider?: string): ResolvedEnvironment {
   console.log(`[DEBUG] resolveEnvironment ${environment_id}, ${customProvider}`);
   const environment = (protocolConfig as ProtocolConfig).environments[environment_id]
-  console.log(`[DEBUG] resolveEnvironmentenvironment environment ${environment}`);
+  console.log(`[DEBUG] resolveEnvironmentenvironment environment ${JSON.stringify(environment, null, 2)}`);
   const network = (protocolConfig as ProtocolConfig).networks[environment?.network_id]
-  console.log(`[DEBUG] resolveEnvironmentenvironment network ${network}`);
-  console.log(`[DEBUG] resolveEnvironmentenvironment semver.satisfies ${semver.satisfies(FULL_VERSION_COERCED, environment.version_range)}`);
 
   if (environment && network && semver.satisfies(FULL_VERSION_COERCED, environment.version_range)) {
     network.id = environment.network_id
@@ -101,7 +100,7 @@ export function resolveEnvironment(environment_id: string, customProvider?: stri
       network.default_provider = customProvider
     }
 
-    const debug = {
+    return {
       id: environment_id,
       network,
       environment_type: environment.environment_type,
@@ -114,12 +113,20 @@ export function resolveEnvironment(environment_id: string, customProvider?: stri
       network_registry_proxy_contract_address: environment.network_registry_proxy_contract_address,
       network_registry_contract_address: environment.network_registry_contract_address
     }
-    console.log(`[DEBUG] return ${JSON.stringify(debug, null, 2)}`);
-    return debug;
   }
 
   const supportedEnvsString: string = supportedEnvironments()
     .map((env) => env.id)
     .join(', ')
   throw new Error(`environment '${environment_id}' is not supported, supported environments: ${supportedEnvsString}`)
+}
+
+export const getContractData = (environment_id: string): DeploymentExtract => {
+  const resolvedEnvironment = resolveEnvironment(environment_id);
+  return {
+    hoprTokenAddress: resolvedEnvironment.token_contract_address,
+    hoprChannelsAddress: resolvedEnvironment.channels_contract_address,
+    hoprNetworkRegistryAddress: resolvedEnvironment.network_registry_contract_address,
+    indexerStartBlockNumber: resolvedEnvironment.channel_contract_deploy_block
+  }
 }

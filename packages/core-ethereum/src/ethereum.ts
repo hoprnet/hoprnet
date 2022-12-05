@@ -30,7 +30,7 @@ import type { Block } from '@ethersproject/abstract-provider'
 
 // @ts-ignore untyped library
 import retimer from 'retimer'
-import { getContractData, HOPR_CHANNELS_ABI, HOPR_NETWORK_REGISTRY_ABI, HOPR_TOKEN_ABI, HoprChannels, HoprNetworkRegistry, HoprToken } from './utils/index.js'
+import { HOPR_CHANNELS_ABI, HOPR_NETWORK_REGISTRY_ABI, HOPR_TOKEN_ABI, HoprChannels, HoprNetworkRegistry, HoprToken, DeploymentExtract } from './utils/index.js'
 
 const log = debug('hopr:core-ethereum:ethereum')
 const abiCoder = new utils.AbiCoder()
@@ -58,6 +58,7 @@ export type SendTransactionReturn =
     }
 
 export async function createChainWrapper(
+  deploymentExtract: DeploymentExtract,
   networkInfo: {
     provider: string
     chainId: number
@@ -70,6 +71,7 @@ export async function createChainWrapper(
   checkDuplicate: Boolean = true,
   txTimeout = TX_CONFIRMATION_WAIT
 ) {
+  log(`[DEBUG] networkInfo.provider ${JSON.stringify(networkInfo.provider, null, 2)}`);
   const provider = networkInfo.provider.startsWith('http')
     ? new providers.StaticJsonRpcProvider(networkInfo.provider)
     : new providers.WebSocketProvider(networkInfo.provider)
@@ -86,17 +88,7 @@ export async function createChainWrapper(
     throw Error(`Providers chain id ${providerChainId} does not match ${networkInfo.chainId}`)
   }
   
-  // const hoprTokenDeployment = getContractData(networkInfo.network, networkInfo.environment, 'HoprToken')
-  // log(`[DEBUG] hoprTokenDeployment ${hoprTokenDeployment.address}`);
-  // const hoprChannelsDeployment = getContractData(networkInfo.network, networkInfo.environment, 'HoprChannels')
-  // log(`[DEBUG] hoprChannelsDeployment ${hoprChannelsDeployment.address}`);
-  // const hoprNetworkRegistryDeployment = getContractData(
-  //   networkInfo.network,
-  //   networkInfo.environment,
-  //   'HoprNetworkRegistry'
-  //   )
-  // log(`[DEBUG] hoprNetworkRegistryDeployment ${hoprNetworkRegistryDeployment.address}`);
-  const deploymentExtract = getContractData(networkInfo.environment);
+  log(`[DEBUG] deploymentExtract ${JSON.stringify(deploymentExtract, null ,2)}`);
 
   const token = new ethers.Contract(deploymentExtract.hoprTokenAddress, HOPR_TOKEN_ABI, provider) as any as HoprToken
 

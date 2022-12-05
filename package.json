@@ -26,7 +26,6 @@
     "run:hoprd:alice": "yarn workspace @hoprnet/hoprd run dev --host=0.0.0.0:9092 --adminPort=3010 --apiPort=3011  --data=/tmp/local-alice --identity=/tmp/local-alice.id",
     "run:hoprd:bob": "yarn workspace @hoprnet/hoprd run dev --host=0.0.0.0:9093 --adminPort=3020 --apiPort=3021 --data=/tmp/local-bob --identity=/tmp/local-bob.id",
     "run:hoprd:charlie": "yarn workspace @hoprnet/hoprd run dev --host=0.0.0.0:9094 --adminPort=3030 --apiPort=3031 --data=/tmp/local-charlie --identity=/tmp/local-charly.id",
-    "run:faucet:all": "yarn workspace @hoprnet/hopr-ethereum run faucet",
     "clean": "yarn workspaces foreach --exclude hoprnet --exclude hopr-docs -v run clean && rm -Rf ./target ./tsconfig.scripts.tsbuildinfo ./tsconfig.build.tsbuildinfo",
     "reset": "rm -Rf packages/*/node_modules node_modules"
   },

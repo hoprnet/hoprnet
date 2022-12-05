@@ -254,10 +254,7 @@ To install Rust toolchain (at least version 1.60) please follow instructions at 
 make -j deps && make -j build
 
 # starting network
-HOPR_ENVIRONMENT_ID=hardhat-localhost yarn run:network
-
-# workaround for a temp issue with local hardhat-network
-cp -R packages/ethereum/deployments/hardhat-localhost/localhost/. packages/ethereum/deployments/hardhat-localhost/hardhat
+make run-local
 
 # running normal node alice (separate terminal)
 DEBUG="hopr*" yarn run:hoprd:alice
@@ -266,7 +263,7 @@ DEBUG="hopr*" yarn run:hoprd:alice
 DEBUG="hopr*" yarn run:hoprd:bob
 
 # fund all your nodes to get started
-HOPR_ENVIRONMENT_ID=hardhat-localhost yarn run:faucet:all
+make fund-local-all
 ```
 
 ## Local cluster
