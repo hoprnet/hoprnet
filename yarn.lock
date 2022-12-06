@@ -2936,6 +2936,7 @@ __metadata:
     "@libp2p/peer-id": 1.1.16
     "@multiformats/multiaddr": 10.3.3
     "@sinonjs/referee": 9.1.1
+    "@types/bn.js": ^5.1.1
     "@types/chai": 4.3.3
     "@types/mocha": 9.1.1
     "@types/sinon": 10.0.13
@@ -4658,6 +4659,15 @@ __metadata:
     "@types/node": "*"
     "@types/readable-stream": "*"
   checksum: 5fcdf594ab775fc221bbe9d62e6d597db2c9cec294ea337f65682b968cc6a21c9106b411cb3971f4140eedc4a3a72f12e9b748ccab1658d0e14c2838654168cd
+  languageName: node
+  linkType: hard
+
+"@types/bn.js@npm:^5.1.1":
+  version: 5.1.1
+  resolution: "@types/bn.js@npm:5.1.1"
+  dependencies:
+    "@types/node": "*"
+  checksum: e50ed2dd3abe997e047caf90e0352c71e54fc388679735217978b4ceb7e336e51477791b715f49fd77195ac26dd296c7bad08a3be9750e235f9b2e1edb1b51c2
   languageName: node
   linkType: hard
 

@@ -44,6 +44,7 @@
     "secp256k1": "4.0.3"
   },
   "devDependencies": {
+    "@types/bn.js": "^5.1.1",
     "@types/chai": "4.3.3",
     "@types/mocha": "9.1.1",
     "@types/sinon": "10.0.13",
