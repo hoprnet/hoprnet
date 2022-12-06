@@ -55,6 +55,8 @@ deps-ci: ## Installs dependencies when running in CI
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	$(MAKE) cargo-update
 	CI=true yarn workspaces focus ${YARNFLAGS}
+# install foundry (cast + forge + anvil)
+	$(MAKE) install-foundry
 
 .PHONY: deps-docker
 deps-docker: ## Installs dependencies when building Docker images
