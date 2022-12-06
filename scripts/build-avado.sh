@@ -15,10 +15,17 @@ source "${mydir}/utils.sh"
 
 usage() {
   msg
-  msg "Usage: $0 [-h|--help] version [environment] [release] [api token]"
+  msg "Usage: $0 [-h|--help] version [environment] [release] [api_token] [upstream_version]"
   msg
-  msg "Sets the version of the AVADO build and builds the image. Version must be semver"
-  msg "Optional: set default environment, release name and API token"
+  msg "This script builds and uploads an Avado package based on the given parameters."
+  msg
+  msg "Parameters:"
+  msg
+  msg "\tname: Version of the Avado package."
+  msg "\tenvironment: Default environment which will be set in the package. Inferred if not set."
+  msg "\trelease: Release for which the package is built."
+  msg "\tapi_token: API token which is set in the Avado package."
+  msg "\tupstream_version: hoprd Docker image version to be used. Inferred if not set."
   msg
 }
 
@@ -38,6 +45,7 @@ declare avado_version="${1}"
 declare environment_id="${2:-"$(${mydir}/get-default-environment.sh)"}"
 declare release_id="${3:-"$(${mydir}/get-default-environment.sh --release)"}"
 declare api_token="${4:-"!5qxc9Lp1BE7IFQ-nrtttU"}" # <- Default AVADO API token
+declare upstream_version="${5:-$avado_version}"
 
 # Validate environment and release ids
 if [[ -z "${environment_id}" ]] || [[ -z "${release_id}" ]]; then
@@ -58,7 +66,6 @@ if [ -z "${provider_url}" ]; then
   exit 1
 fi
 
-
 cd "${mydir}/../packages/avado"
 
 function cleanup {
@@ -75,7 +82,6 @@ function cleanup {
 }
 
 # For master and debug-deploy builds, we need to use special upstream version, since we do not publish 0.100.0 Docker tag
-declare upstream_version="${avado_version}"
 if [[ "${avado_version}" = "0.100.0" && ("${release_id}" = "master-goerli" || "${release_id}" = "debug-goerli") ]]; then
   upstream_version="${release_id}"
 fi
@@ -114,13 +120,7 @@ sed -E "s/%TOKEN%/${api_token}/g" ./dappnode_package.json \
 
 ###
 
-# AVADO SDK does not do proper releases, therefore using GitHub + git commit hashes
-declare avado_sdk_commit="7b035be"
-
-# Must be installed globally due to bad directory calls
-npm install -g git+https://github.com/AvadoDServer/AVADOSDK.git#${avado_sdk_commit}
-
-# Must run as sudo due to underlying call to docker-compose
-sudo avadosdk build --provider http://80.208.229.228:5001
+# build actual image and store it on IPFS
+npx avadosdk build --provider http://80.208.229.228:5001
 
 # http://go.ava.do/install/<IPFS HASH>

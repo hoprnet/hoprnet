@@ -10,14 +10,14 @@
   "dependencies": {},
   "image": {},
   "links": {
-    "OnboardingWizard": "http://hopr.my.ava.do:3000/?apiEndpoint=http://hopr.my.ava.do:3001&apiToken=%TOKEN%",
+    "OnboardingWizard": "http://hopr-admin.my.ava.do:3000/?apiEndpoint=http://hopr.my.ava.do:3001&apiToken=%TOKEN%",
     "homepage": "https://hoprnet.org",
-    "Admin interface": "http://hopr.my.ava.do:3000?apiEndpoint=http://hopr.my.ava.do:3001&apiToken=%TOKEN%",
+    "Admin interface": "http://hopr-admin.my.ava.do:3000?apiEndpoint=http://hopr.my.ava.do:3001&apiToken=%TOKEN%",
     "Rest API V2": "http://hopr.my.ava.do:3001/api/v2/_swagger/"
   },
   "ui": {
     "OnboardingWizard": {
-      "url": "http://hopr.my.ava.do:3000/?apiEndpoint=http://hopr.my.ava.do:3001&apiToken=%TOKEN%",
+      "url": "http://hopr-admin.my.ava.do:3000/?apiEndpoint=http://hopr.my.ava.do:3001&apiToken=%TOKEN%",
       "external": false
     }
   }

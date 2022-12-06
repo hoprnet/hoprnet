@@ -5,11 +5,15 @@ version: '3.4'
 services:
   hopr.avado.dnp.dappnode.eth:
     image: 'hopr.avado.dnp.dappnode.eth:%AVADO_VERSION%'
+    restart: always
     build:
       context: ./build
       args:
         UPSTREAM_VERSION: '%UPSTREAM_VERSION%'
-    network_mode: host
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     # Lines between *_JSON_EXPORT are intentionally also a valid JSON
     # Info: a hoprd node should never consume more than 1GByte of memory
     # DO NOT REMOVE
@@ -22,9 +26,6 @@ services:
         'HOPRD_ENVIRONMENT=%ENV_ID%',
         'HOPRD_HOST=0.0.0.0:9091',
         'HOPRD_ANNOUNCE=false',
-        'HOPRD_ADMIN=true',
-        'HOPRD_ADMIN_HOST=0.0.0.0',
-        'HOPRD_ADMIN_PORT=3000',
         'HOPRD_API=true',
         'HOPRD_API_HOST=0.0.0.0',
         'HOPRD_API_PORT=3001',
@@ -39,10 +40,17 @@ services:
         'HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS=false',
         'HOPRD_PROVIDER=%PROVIDER_URL%'
       ]
-    'ports': ['3000:3000/tcp', '3001:3001/tcp', '8080:8080/tcp', '9091:9091/tcp', '9091:9091/udp']
-    'deploy': { 'resources': { 'limits': { 'memory': '1G' } } }
-    'restart': 'always'
+    'ports': ['3001:3001/tcp', '8080:8080/tcp', '9091:9091/tcp', '9091:9091/udp']
     #}
     # END_JSON_EXPORT
+  hopr-admin.avado.dnp.dappnode.eth:
+    image: 'gcr.io/hoprassociation/hopr-admin:07aec21b'
+    restart: always
+    ports:
+      - 3000
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 volumes:
   db: {}
