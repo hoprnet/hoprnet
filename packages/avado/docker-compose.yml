@@ -4,6 +4,20 @@
 version: '3.4'
 services:
   hopr.avado.dnp.dappnode.eth:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - 3000
+      - 3001
+    volumes:
+      - $PWD/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+  hoprd.avado.dnp.dappnode.eth:
     image: 'hopr.avado.dnp.dappnode.eth:%AVADO_VERSION%'
     restart: always
     build:
@@ -54,3 +68,5 @@ services:
           memory: 256M
 volumes:
   db: {}
+  caddy_data: {}
+  caddy_config: {}
