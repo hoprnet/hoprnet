@@ -39,6 +39,9 @@ mkShell {
     # devops tooling
     google-cloud-sdk
 
+    # used by AvadoSDK
+    docker-compose
+
     # custom pkg groups
     macosPkgs
     linuxPkgs
