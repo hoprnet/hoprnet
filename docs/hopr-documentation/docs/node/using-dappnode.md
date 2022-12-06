@@ -58,11 +58,11 @@ Using the downlaoded file either:
 
 ## Using a Custom RPC Endpoint
 
-You can set your own RPC endpoint for HOPR to use. Ideally, you would install an ETH client on your DAppNode and use its local provider. A local provider helps increase decentralisation and is generally good practice, but you can also use any RPC provider of your choice.
+You can set your own RPC endpoint for HOPR to use. Ideally, you would install an ETH client (Gnosis Chain) on your DAppNode and use its local provider. A local provider helps increase decentralisation and is generally good practice, but you can also use any RPC provider of your choice.
 
 ### Finding your local endpoint
 
-If you have already installed an ETH client, you can find its RPC endpoint on the package's info page.
+If you have already installed an ETH (Gnosis Chain) client, you can find its RPC endpoint on the package's info page.
 
 ![ETH client settings](/img/node/RPC-endpoint-Dappnode.png)
 
