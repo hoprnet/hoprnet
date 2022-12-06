@@ -4,30 +4,11 @@
 version: '3.4'
 services:
   hopr.avado.dnp.dappnode.eth:
-    image: caddy:2-alpine
-    restart: always
-    ports:
-      - 3000
-      - 3001
-    volumes:
-      - $PWD/Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-  hoprd.avado.dnp.dappnode.eth:
     image: 'hopr.avado.dnp.dappnode.eth:%AVADO_VERSION%'
-    restart: always
     build:
       context: ./build
       args:
         UPSTREAM_VERSION: '%UPSTREAM_VERSION%'
-    deploy:
-      resources:
-        limits:
-          memory: 1G
     # Lines between *_JSON_EXPORT are intentionally also a valid JSON
     # Info: a hoprd node should never consume more than 1GByte of memory
     # DO NOT REMOVE
@@ -54,19 +35,10 @@ services:
         'HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS=false',
         'HOPRD_PROVIDER=%PROVIDER_URL%'
       ]
-    'ports': ['3001:3001/tcp', '8080:8080/tcp', '9091:9091/tcp', '9091:9091/udp']
+    'ports': ['3000:3000/tcp', '3001:3001/tcp', '8080:8080/tcp', '9091:9091/tcp', '9091:9091/udp']
+    'restart': 'always'
+    'deploy': { 'resources': { 'limits': { 'memory': '1G' } } }
     #}
     # END_JSON_EXPORT
-  hopr-admin.avado.dnp.dappnode.eth:
-    image: 'gcr.io/hoprassociation/hopr-admin:07aec21b'
-    restart: always
-    ports:
-      - 3000
-    deploy:
-      resources:
-        limits:
-          memory: 256M
 volumes:
   db: {}
-  caddy_data: {}
-  caddy_config: {}
