@@ -197,7 +197,7 @@ run-anvil: ## spinup a local anvil instance (daemon) and deploy contracts
 
 .PHONY: kill-anvil
 kill-anvil: ## kill process running at port 8545 (default port of anvil)
-	kill $(shell lsof -i :8545 | grep -o '\d*' | head -1)
+	lsof -i :8545 -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
 
 .PHONY: run-local
 run-local: ## run HOPRd from local repo

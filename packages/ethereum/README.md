@@ -37,7 +37,7 @@ anvil & make anvil-deploy-all
 
 ```
 # The anvil daemon can be killed with
-kill $(lsof -i :8545 | grep 8545 | awk '{ print $2 }')
+lsof -i :8545 -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
 ```
 
 #### Staging
