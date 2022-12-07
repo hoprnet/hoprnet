@@ -108,9 +108,8 @@ endif
 
 .PHONY: build-solidity-types
 build-solidity-types: ## generate Solidity typings
-# FIXME: replace this with foundry binding generation
-	echo "TODO: Foundry create binding"
-# yarn workspace @hoprnet/hopr-ethereum run build:sol:types
+	echo "Foundry create binding"
+	$(MAKE) -C packages/ethereum/contracts/ overwrite-sc-bindings
 
 .PHONY: build-yarn
 build-yarn: ## build yarn packages

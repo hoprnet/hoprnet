@@ -12,11 +12,11 @@ forked-local-anvil:
 
 .PHONY: overwrite-sc-bindings
 overwrite-sc-bindings: # Only create types for Hopr* contracts
-	forge bind --bindings-path ../crates/bindings --crate-name bindings --overwrite --select "^Hopr.*(([^T][^e][^s][^t]$|[^S][^c][^r][^i][^p][^t])$)"
+	forge bind --bindings-path ../crates/bindings --crate-name bindings --overwrite --select '^Hopr.*?(Boost|[^t])$$'
 
 .PHONY: check-sc-bindings
 check-sc-bindings: # Only create types for Hopr* contracts
-	forge bind --bindings-path ./crates/bindings --root ./contracts --crate-name bindings --select "^Hopr.*(([^T][^e][^s][^t]$|[^S][^c][^r][^i][^p][^t])$)"
+	forge bind --bindings-path ./crates/bindings --root ./contracts --crate-name bindings --select '^Hopr.*?(Boost|[^t])$$'
 
 .PHONY: anvil-deploy-erc1820
 anvil-deploy-erc1820:
