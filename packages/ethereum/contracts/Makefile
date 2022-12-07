@@ -38,13 +38,11 @@ anvil-deploy-contracts: ensure-environment-is-set
 	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script --broadcast script/DeployAll.s.sol:DeployAllContractsScript
 
 .PHONY: anvil-deploy-all
-anvil-deploy-all: anvil-deploy-erc1820 
+anvil-deploy-all: anvil-deploy-erc1820
 	make anvil-deploy-contracts environment-name=anvil-localhost environment-type=development
 
 .PHONY: update-protocol-config
 update-protocol-config: # after deploying contracts, update `protocol-config.json` with the latest `contracts-addresses.json`
-
-
 
 # E.g. make get-account-balances environment-name=anvil-localhost environment-type=development account=0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
 .PHONY: get-account-balances

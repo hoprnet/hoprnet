@@ -11,5 +11,7 @@ path = "src/key_pair.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-clap = { version = "4.0.28", features = ["derive", "env"] }
-ethers = "1.0.2"
+clap = { version = "4.0.29", features = ["derive", "env"] }
+# use the Git repository to be compatible with the foundry auto-generated
+# dependencies
+ethers = { version = "1.0.2", git = "https://github.com/gakonst/ethers-rs" }
