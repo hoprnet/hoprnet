@@ -8,13 +8,14 @@
 - Various optimizations of Rust crates ([#4221](https://github.com/hoprnet/hoprnet/pull/4260))
 - Add Metrics API for Prometheus, `metrics` API endpoint and collection of various metrics ([#4233](https://github.com/hoprnet/hoprnet/pull/4233))
 - Improve pre-merge check to prevent PR from merging when the upstream deployment is in the failed state ([#4294](https://github.com/hoprnet/hoprnet/pull/4294))
-- Restore STUN functionality ([#4312](https://github.com/hoprnet/hoprnet/pull/4312))
 - Add Health Status Indicator in the Admin UI ([#4197](https://github.com/hoprnet/hoprnet/pull/4197))
 - Allow connectivity indicator to be GREEN on public nodes too ([#4314](https://github.com/hoprnet/hoprnet/pull/4314))
 - Show correct counterparty in the `channels` command output ([#4370](https://github.com/hoprnet/hoprnet/pull/4370))
 - Improve error messages passed to the User ([#4375](https://github.com/hoprnet/hoprnet/pull/4375))
 - Fix channel metrics, add channel balances metrics ([#4374](https://github.com/hoprnet/hoprnet/pull/4374))
 - Fix ticket redemption ([#4382](https://github.com/hoprnet/hoprnet/pull/4382))
+- Increase wait timeout for on-chain transactions to 60 seconds ([#4425](https://github.com/hoprnet/hoprnet/pull/4425))
+- Fix bug in waiting logic for on-chain transactions ([#4425](https://github.com/hoprnet/hoprnet/pull/4425))
 
 ---
 
