@@ -36,8 +36,8 @@ services:
         'HOPRD_PROVIDER=%PROVIDER_URL%'
       ]
     'ports': ['3000:3000/tcp', '3001:3001/tcp', '8080:8080/tcp', '9091:9091/tcp', '9091:9091/udp']
-    'restart': 'always'
     'deploy': { 'resources': { 'limits': { 'memory': '1G' } } }
+    'restart': 'always'
     #}
     # END_JSON_EXPORT
 volumes:
