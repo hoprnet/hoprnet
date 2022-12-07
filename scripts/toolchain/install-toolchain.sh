@@ -152,7 +152,8 @@ function install_wasm_opt() {
                 echo "no precompiled binaries available for OS: ${ostype}"
             ;;
         esac
-        local binaryen_release=$(curl 'https://api.github.com/repos/WebAssembly/binaryen/releases/latest'| jq -r '.tag_name')
+        local binaryen_release=$(curl 'https://api.github.com/repos/WebAssembly/binaryen/releases/latest' | jq -r '.tag_name')
+        echo "curl https://github.com/WebAssembly/binaryen/releases/download/${binaryen_release}/binaryen-${binaryen_release}-${cputype}-${ostype}.tar.gz"
         curl -fsSLO --compressed "https://github.com/WebAssembly/binaryen/releases/download/${binaryen_release}/binaryen-${binaryen_release}-${cputype}-${ostype}.tar.gz"
         tar -xzf "binaryen-${binaryen_release}-${cputype}-${ostype}.tar.gz"
         local install_dir="${HOME}/.cargo"
