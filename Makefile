@@ -8,7 +8,7 @@ CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(cra
 
 # Set local foundry directory (for binaries) and versions
 FOUNDRY_DIR := ${CURDIR}/.foundry
-FOUNDRYUP_VSN := e919a63
+FOUNDRY_VSN := e919a63
 
 # use custom foundryup to ensure the local directory is used
 foundryup := env FOUNDRY_DIR="${FOUNDRY_DIR}" foundryup
@@ -99,13 +99,19 @@ install-foundry: ## install foundry
 	@if [ -f "${FOUNDRY_DIR}/bin/foundryup" ]; then \
 		echo "foundryup already installed under "${FOUNDRY_DIR}/bin", skipping"; \
 	else \
-		echo "installing foundryup (vsn ${FOUNDRYUP_VSN})"; \
-		curl -L "https://raw.githubusercontent.com/foundry-rs/foundry/${FOUNDRYUP_VSN}/foundryup/foundryup" > "${FOUNDRY_DIR}/bin/foundryup"; \
+		echo "installing foundryup (vsn ${FOUNDRY_VSN})"; \
+		curl -L "https://raw.githubusercontent.com/foundry-rs/foundry/${FOUNDRY_VSN}/foundryup/foundryup" > "${FOUNDRY_DIR}/bin/foundryup"; \
 	  chmod +x "${FOUNDRY_DIR}/bin/foundryup"; \
 	fi
 	@if [ ! -f "${FOUNDRY_DIR}/bin/anvil" ] || [ ! -f "${FOUNDRY_DIR}/bin/cast" ] || [ ! -f "${FOUNDRY_DIR}/bin/forge" ]; then \
 		echo "missing foundry binaries, installing via foundryup"; \
-		$(foundryup); \
+		if [ ! -d /tmp/foundry-git ]; then git clone https://github.com/foundry-rs/foundry /tmp/foundry-git; fi; \
+		pushd /tmp/foundry-git; \
+		$(foundryup) -p /tmp/foundry-git; \
+		popd; \
+		rm -f "${FOUNDRY_DIR}/bin/anvil" "${FOUNDRY_DIR}/bin/cast" "${FOUNDRY_DIR}/bin/forge"; \
+	  cp "/tmp/foundry-git/target/release/anvil" "/tmp/foundry-git/target/release/cast" "/tmp/foundry-git/target/release/forge" "${FOUNDRY_DIR}/bin"; \
+		rm -rf /tmp/foundry-git; \
 	else \
 	  echo "foundry binaries already installed under "${FOUNDRY_DIR}/bin", skipping"; \
 	fi
@@ -201,8 +207,8 @@ else
 	yarn workspace @hoprnet/${package} run test
 endif
 
-.PHONY: smart-contract-test
-smart-contract-test: # forge test smart contracts
+.PHONY: test-sc
+test-sc: # forge test smart contracts
 	$(MAKE) -C packages/ethereum/contracts/ sc-test
 
 .PHONY: lint-check
