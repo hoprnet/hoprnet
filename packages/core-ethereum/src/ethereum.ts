@@ -203,7 +203,9 @@ export async function createChainWrapper(
         done = true
         timer?.clear()
 
-        provider.off(txHash, onTransaction)
+        // delete all listeners for this particular tx
+        provider.off(txHash)
+
         // Give other tasks time to get scheduled before
         // processing the result
         if (err) {
@@ -223,13 +225,16 @@ export async function createChainWrapper(
         if (receipt.confirmations >= 1) {
           transactions.moveFromPendingToMined(receipt.transactionHash)
           cleanUp()
+        } else {
+          log(`Received tx receipt for ${txHash} with 0 confirmations, continue listening`)
         }
       }
-      timer = retimer(cleanUp, txTimeout, `Timeout while waiting for transaction ${txHash}`)
 
-      // Immediately stops polling once the transaction hash appeared
-      // in the mempool
-      provider.once(txHash, onTransaction)
+      // Subscribe to all tx events, unsubscription is handled in cleanup
+      provider.on(txHash, onTransaction)
+
+      // Schedule clean up if the timeout is reached
+      timer = retimer(cleanUp, txTimeout, `Timed out after waiting ${txTimeout}ms for transaction ${txHash}`)
     })
   }
 
