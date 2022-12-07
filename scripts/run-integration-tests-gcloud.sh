@@ -146,7 +146,7 @@ done
 
 # --- Run security tests on the first public node --- {{{
 "${mydir}/../test/security-test.sh" \
-  "${node_ips[0]}" 3001 3000 3001 "${api_token}"
+  "${node_ips[0]}" 3001 3001 "${api_token}"
 #}}}
 
 # --- Run test --- {{{
