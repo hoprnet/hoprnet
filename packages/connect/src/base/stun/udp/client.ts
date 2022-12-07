@@ -1,9 +1,8 @@
-import { type Socket, createSocket } from 'dgram'
+import { type Socket, createSocket, type RemoteInfo } from 'dgram'
 
 // @ts-ignore untyped module
 import { decode, constants, createMessage, createTransaction, validateFingerprint } from 'stun'
 
-// @ts-ignore untyped module
 import isStun from 'is-stun'
 
 // @ts-ignore untyped module
@@ -135,7 +134,7 @@ function decodeIncomingSTUNResponses(
   socket: Socket,
   update: (response: { response?: Interface; transactionId: Buffer }) => void
 ): () => void {
-  const listener = (data: Buffer, rinfo: any) => {
+  const listener = (data: Buffer, rinfo: RemoteInfo) => {
     if (!isStun(data)) {
       return
     }
@@ -144,12 +143,14 @@ function decodeIncomingSTUNResponses(
 
     switch (response.type & kStunTypeMask) {
       case isStunSuccessResponse:
+        log(`received STUN response from ${rinfo.address}:${rinfo.port}`)
         update({
           response: response.getXorAddress() ?? response.getAddress(),
           transactionId: response.transactionId
         })
         break
       case isStunRequest:
+        log(`client: received STUN request`)
         // handled by STUN server, ignoring
         break
       case isStunErrorResponse:

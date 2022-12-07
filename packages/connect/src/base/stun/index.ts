@@ -1,5 +1,5 @@
 import { type Socket } from 'dgram'
-import { type Server } from 'net'
+import { type Server, type Socket as TCPSocket } from 'net'
 
 import { Multiaddr } from '@multiformats/multiaddr'
 import debug from 'debug'
@@ -79,7 +79,7 @@ export async function getExternalIp(
  */
 export async function isExposedHost(
   multiAddrs: Multiaddr[],
-  tcpServer: Server,
+  _tcpServer: Server,
   udpSocket: Socket,
   port: number,
   runningLocally = false
@@ -107,7 +107,7 @@ export async function isExposedHost(
       }
       yield* PUBLIC_TCP_RFC_5780_SERVERS
     })(),
-    tcpServer,
+    (_listener: (socket: TCPSocket) => void) => () => {},
     undefined,
     port,
     runningLocally

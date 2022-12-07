@@ -3,7 +3,6 @@ import { type AddressInfo, type Socket, createConnection } from 'net'
 // @ts-ignore untyped module
 import { decode, constants, createMessage, createTransaction, validateFingerprint } from 'stun'
 
-// @ts-ignore untyped module
 import isStun from 'is-stun'
 
 import debug from 'debug'
@@ -17,7 +16,11 @@ const verbose = debug('hopr-connect:verbose:stun:tcp')
  * @param socket Node.JS TCP socket to use
  * @param __fakeRInfo [testing] overwrite incoming information to intentionally send misleading STUN response
  */
-export function handleTcpStunRequest(socket: Socket, __fakeRInfo?: AddressInfo): void {
+export async function handleTcpStunRequest(
+  socket: Socket,
+  stream: AsyncIterable<Uint8Array>,
+  __fakeRInfo?: AddressInfo
+): Promise<void> {
   let replyAddress = socket.remoteAddress as string
 
   const rinfo = {
@@ -35,8 +38,8 @@ export function handleTcpStunRequest(socket: Socket, __fakeRInfo?: AddressInfo):
     }
   }
 
-  socket.on('data', (data: Buffer) => {
-    if (!isStun(data)) {
+  for await (const data of stream) {
+    if (!isStun(Buffer.from(data.buffer, data.byteOffset, data.byteLength))) {
       return
     }
 
@@ -113,5 +116,5 @@ export function handleTcpStunRequest(socket: Socket, __fakeRInfo?: AddressInfo):
       default:
         break
     }
-  })
+  }
 }

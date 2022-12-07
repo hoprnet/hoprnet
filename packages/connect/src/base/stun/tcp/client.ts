@@ -1,4 +1,4 @@
-import { type Socket, type Server, type AddressInfo, createConnection } from 'net'
+import { type Socket, createConnection } from 'net'
 
 // @ts-ignore untyped module
 import { decode, constants, createMessage, createTransaction, validateFingerprint } from 'stun'
@@ -216,9 +216,9 @@ function nextSTUNRequest(
 
 export function isTcpExposedHost(
   multiaddrs: Iterable<Multiaddr>,
-  server: Server,
+  addListener: (listener: (socket: Socket) => void) => () => void,
   timeout = STUN_TCP_TIMEOUT,
-  stunPort = (server.address() as AddressInfo).port,
+  stunPort: number,
   runningLocally = false
 ): Promise<STUN_EXPOSED_CHECK_RESPOSE> {
   if (runningLocally) {
@@ -228,9 +228,11 @@ export function isTcpExposedHost(
   return new Promise<STUN_EXPOSED_CHECK_RESPOSE>(async (resolve) => {
     const requests = new Map<string, Request & { state: STUN_QUERY_STATE }>()
 
+    let removeListener: () => void
+
     const end = () => {
       log(`ending`)
-      server.removeListener('data', onConnection)
+      removeListener()
     }
 
     const it = multiaddrs[Symbol.iterator]()
@@ -380,7 +382,7 @@ export function isTcpExposedHost(
       })
     }
 
-    server.on('connection', onConnection)
+    removeListener = addListener(onConnection)
 
     log(`first measurement`)
     nextSTUNRequest(
