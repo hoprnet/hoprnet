@@ -10,4 +10,3 @@ ethers = { git = "https://github.com/gakonst/ethers-rs", default-features = fals
 
 [lib] 
 crate-type = ["cdylib", "rlib"] # rlib is necessary to run integration tests
-
