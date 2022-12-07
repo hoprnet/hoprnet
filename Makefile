@@ -134,7 +134,7 @@ endif
 build-solidity-types: ## generate Solidity typings
 	echo "Foundry create binding"
 	$(MAKE) -C packages/ethereum/contracts/ overwrite-sc-bindings
-	echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"] # rlib is necessary to run integration tests\n" >> packages/ethereum/crates/bindings/Cargo.toml
+	echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"] # rlib is necessary to run integration tests" >> ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
 
 .PHONY: build-yarn
 build-yarn: ## build yarn packages
@@ -151,7 +151,7 @@ build-yarn-watch: build-solidity-types build-cargo
 	npx tsc --build tsconfig.build.json -w
 
 .PHONY: build-cargo
-build-cargo: ## build cargo packages and create boilerplate JS code
+build-cargo: build-solidity-types ## build cargo packages and create boilerplate JS code
 # Skip building Rust crates
 ifeq ($(origin NO_CARGO),undefined)
 # First compile Rust crates and create bindings
