@@ -168,7 +168,7 @@ reset: clean
 	yarn reset
 
 .PHONY: test
-test: ## run unit tests for all packages, or a single package if package= is set
+test: smart-contract-test ## run unit tests for all packages, or a single package if package= is set
 ifeq ($(package),)
 	yarn workspaces foreach -pv run test
 else
@@ -176,6 +176,10 @@ else
 	$(cargo) --frozen --offline build --tests
 	yarn workspace @hoprnet/${package} run test
 endif
+
+.PHONY: smart-contract-test
+smart-contract-test: # forge test smart contracts
+	$(MAKE) -C packages/ethereum/contracts/ sc-test
 
 .PHONY: lint-check
 lint-check: ## run linter in check mode
