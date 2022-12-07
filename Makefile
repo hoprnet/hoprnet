@@ -6,8 +6,20 @@ WORKSPACES_WITH_RUST_MODULES := $(wildcard $(addsuffix /crates, $(wildcard ./pac
 # Gets all individual crates such that they can get built
 CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(crate)/*/Cargo.toml)))
 
-# add local Cargo install path and users' Cargo install path and use it as custom shell PATH (only once)
-PATH := $(subst :${CURDIR}/.cargo/bin,,$(subst :${HOME}/.cargo/bin,,$(PATH))):${HOME}/.cargo/bin:${CURDIR}/.cargo/bin:${HOME}/.foundry/bin
+# Set local foundry directory (for binaries) and versions
+FOUNDRY_DIR := ${CURDIR}/.foundry
+FOUNDRYUP_VSN := e919a63
+
+# use custom foundryup to ensure the local directory is used
+foundryup := env FOUNDRY_DIR="${FOUNDRY_DIR}" foundryup
+
+# add local Cargo install path (only once)
+PATH := $(subst :${CURDIR}/.cargo/bin,,$(PATH)):${CURDIR}/.cargo/bin
+# add users home Cargo install path (only once)
+PATH := $(subst :${HOME}/.cargo/bin,,$(PATH)):${HOME}/.cargo/bin
+# add local Foundry install path (only once)
+PATH := $(subst :${FOUNDRY_DIR}/bin,,$(PATH)):${FOUNDRY_DIR}/bin
+# use custom PATH in all shell processes
 SHELL := env PATH=$(PATH) $(shell which bash)
 
 # use custom Cargo config file for each invocation
@@ -39,7 +51,7 @@ $(CRATES):
 
 .PHONY: ./packages/ethereum/crates/foundry-tool/ ## builds foundry-tool Rust crates with cargo
 ./packages/ethereum/crates/foundry-tool/:
-	echo "use cargo build" 
+	echo "use cargo build"
 	cargo build --manifest-path $@/Cargo.toml
 # install the package
 	cargo install --path $@
@@ -80,11 +92,23 @@ deps: ## Installs dependencies for development setup
 # install foundry (cast + forge + anvil)
 	$(MAKE) install-foundry
 
-
 .PHONY: install-foundry
 install-foundry: ## install foundry
-	curl -L https://foundry.paradigm.xyz | bash
-	foundryup
+	mkdir -p "${FOUNDRY_DIR}/bin"
+	mkdir -p "${FOUNDRY_DIR}/share/man/man1"
+	@if [ -f "${FOUNDRY_DIR}/bin/foundryup" ]; then \
+		echo "foundryup already installed under "${FOUNDRY_DIR}/bin", skipping"; \
+	else \
+		echo "installing foundryup (vsn ${FOUNDRYUP_VSN})"; \
+		curl -L "https://raw.githubusercontent.com/foundry-rs/foundry/${FOUNDRYUP_VSN}/foundryup/foundryup" > "${FOUNDRY_DIR}/bin/foundryup"; \
+	  chmod +x "${FOUNDRY_DIR}/bin/foundryup"; \
+	fi
+	@if [ ! -f "${FOUNDRY_DIR}/bin/anvil" ] || [ ! -f "${FOUNDRY_DIR}/bin/cast" ] || [ ! -f "${FOUNDRY_DIR}/bin/forge" ]; then \
+		echo "missing foundry binaries, installing via foundryup"; \
+		$(foundryup); \
+	else \
+	  echo "foundry binaries already installed under "${FOUNDRY_DIR}/bin", skipping"; \
+	fi
 
 .PHONY: cargo-update
 cargo-update: ## update vendored Cargo dependencies
