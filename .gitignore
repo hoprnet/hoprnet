@@ -63,3 +63,6 @@ logs.txt
 *.cjs.map
 
 *.id
+
+# local foundry installation
+/.foundry/

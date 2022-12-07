@@ -1,3 +1,12 @@
+# Use local foundry directory (for binaries)
+FOUNDRY_DIR := ${CURDIR}/../../../.foundry
+
+# add local Foundry install path (only once)
+PATH := $(subst :${FOUNDRY_DIR}/bin,,$(PATH)):${FOUNDRY_DIR}/bin
+
+# use custom PATH in all shell processes
+SHELL := env PATH=$(PATH) $(shell which bash)
+
 .PHONY: sc-test
 sc-test:
 	forge test --gas-report
