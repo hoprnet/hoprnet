@@ -47,9 +47,12 @@ services:
       - |
         ./prepare-node.sh
 <<<<<<< HEAD
+<<<<<<< HEAD
         node /opt/hopr/packages/hoprd/lib/main.cjs --admin --adminHost 0.0.0.0 \
           --healthCheck --healthCheckHost 0.0.0.0 --init --api --apiHost 0.0.0.0 --environment anvil-localhost \
 =======
+=======
+>>>>>>> master
         node /opt/hopr/packages/hoprd/lib/main.cjs \
           --healthCheck --healthCheckHost 0.0.0.0 --init --api --apiHost 0.0.0.0 --environment hardhat-localhost \
 >>>>>>> 529099d8d (hopr-admin: Remove from script references)
