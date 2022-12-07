@@ -20,11 +20,13 @@ import {
   type HoprConnectTestingOptions,
   PeerConnectionType
 } from '../types.js'
-import { handleUdpStunRequest, getExternalIp, isExposedHost } from './stun/index.js'
+import { handleUdpStunRequest, getExternalIp, isExposedHost, handleTcpStunRequest } from './stun/index.js'
 import { getAddrs } from './addrs.js'
 import { fromSocket } from './tcp.js'
 import { RELAY_CHANGED_EVENT } from './entry.js'
 import { bindToPort, attemptClose, nodeToMultiaddr, cleanExistingConnections, ip6Lookup } from '../utils/index.js'
+
+import isStun from 'is-stun'
 
 import type { Components } from '@libp2p/interfaces/components'
 import type { ConnectComponents } from '../components.js'
@@ -49,6 +51,12 @@ type NATSituation =
   | { bidirectionalNAT: true }
   | { bidirectionalNAT: false; externalAddress: string; externalPort: number; isExposed: boolean }
 
+export type ProtocolListener = {
+  identifier: string
+  isProtocol: (msg: Buffer) => boolean
+  takeStream: (socket: TCPSocket, stream: AsyncIterable<Uint8Array>) => void
+}
+
 // @ts-ignore libp2p interfaces type clash
 class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener {
   protected __connections: Connection[]
@@ -56,6 +64,8 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
 
   private stopUdpSocketKeepAliveInterval: (() => void) | undefined
   private udpSocket: UDPSocket
+
+  private protocols: ProtocolListener[]
 
   private state: ListenerState
   private _emitListening: () => void
@@ -125,6 +135,14 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
 
       this.dispatchEvent(new CustomEvent('listening'))
     }.bind(this)
+
+    this.protocols = [
+      {
+        identifier: 'STUN server',
+        isProtocol: isStun,
+        takeStream: handleTcpStunRequest
+      }
+    ]
   }
 
   attachSocketHandlers() {
@@ -393,6 +411,24 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       return
     }
 
+    const it = (maConn.source as AsyncIterable<Uint8Array>)[Symbol.asyncIterator]()
+    const firstMessage = await it.next()
+
+    const stream = (async function* () {
+      yield firstMessage.value
+
+      yield* it as any
+    })() as any
+
+    for (const additionalProtocol of this.protocols) {
+      if (additionalProtocol.isProtocol(firstMessage.value)) {
+        additionalProtocol.takeStream(socket, stream)
+        return
+      }
+    }
+
+    maConn.source = stream
+
     log('new inbound connection %s', maConn.remoteAddr)
 
     try {
@@ -490,6 +526,8 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     this.stopUdpSocketKeepAliveInterval = retimer(
       async () => {
         const multiaddrs = this.getUsableStunServers(ownAddress, ownPort)
+
+        log(`Re-allocating NAT UDP mapping`, multiaddrs)
 
         await getExternalIp(multiaddrs, this.udpSocket, this.testingOptions.__preferLocalAddresses)
       },
