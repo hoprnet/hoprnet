@@ -110,6 +110,7 @@ endif
 build-solidity-types: ## generate Solidity typings
 	echo "Foundry create binding"
 	$(MAKE) -C packages/ethereum/contracts/ overwrite-sc-bindings
+	echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"] # rlib is necessary to run integration tests\n" >> packages/ethereum/crates/bindings/Cargo.toml
 
 .PHONY: build-yarn
 build-yarn: ## build yarn packages
