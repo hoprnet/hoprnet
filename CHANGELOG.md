@@ -1,5 +1,9 @@
 # Changelog
 
+- Removal of HOPR admin from `hoprd` ([#4420](https://github.com/hoprnet/hoprnet/pull/4420))
+  - Includes removal of CLI option `--admin`, `--adminHost` and `--adminPort`
+  - HOPR admin may now be used as a stand-alone component, see https://github.com/hoprnet/hopr-admin
+
 <a name="1.91"></a>
 
 ## [1.91](https://github.com/hoprnet/hoprnet/compare/release/valencia...hoprnet:release/bogota)

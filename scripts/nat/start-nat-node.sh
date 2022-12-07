@@ -27,7 +27,6 @@ if [[ $# = 1 && "$1" = "--version" ]]; then
 fi
 
 # Default hoprd ports, configurable using env variables passed to the container
-declare admin_port=${HOPRD_ADMIN_PORT:-3000}
 declare api_port=${HOPRD_API_PORT:-3001}
 declare healthcheck_port=${HOPRD_HEALTHCHECK_PORT:-8080}
 
@@ -49,7 +48,7 @@ docker stop ${container_name} > /dev/null 2>&1 || true && docker rm ${container_
 declare internal_env=$(env -u HOPRD_RELEASE -u HOPRD_CONTAINER_NAME)
 
 # Fork here and pass all the environment variables down into the forked image
-docker run -d --pull always -v /var/hoprd/:/app/hoprd-db -p ${admin_port}:3000 -p ${api_port}:3001 -p ${healthcheck_port}:8080 \
+docker run -d --pull always -v /var/hoprd/:/app/hoprd-db -p ${api_port}:3001 -p ${healthcheck_port}:8080 \
  --name=${container_name} --restart=on-failure \
  --network=${network_name} \
  --env-file <(echo ${internal_env}) \
