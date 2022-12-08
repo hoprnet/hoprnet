@@ -193,20 +193,6 @@ add_keys() {
   fi
 }
 
-# $1 anvil debug log file
-start_local_anvil() {
-  # Remove previous log file to make sure that the regex does not match
-  log "remove ${1}"
-  rm -f "${1}"
-
-  log "Running anvil local node at ${mydir}"
-  # make -C "${mydir}/.." run-anvil > \
-  #     "$1" 2>&1 &
-  # FIXME: stucking at here...
-  anvil > "$1" 2>&1 &
-  make -C "${mydir}/../packages/ethereum/contracts/" -j anvil-deploy-all 2>&1 &
-}
-
 # $1 prefix, e.g. "e2e-source"
 # $2 identity file directory, e.g. "/tmp"
 # $3 password, e.g. "dummy e2e password"

@@ -55,11 +55,7 @@ trap cleanup SIGINT SIGTERM ERR EXIT
 log "Clean previously generated spec (if exists)"
 rm -f "${spec_file_path}"
 
-log "Start local anvil network"
-make -C "../" run-anvil > \
-    "${hardhat_rpc_log}" 2>&1 &
-wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
-log "Anvil node started (127.0.0.1:8545)"
+${mydir}/run-local-anvil.sh
 
 # need to mirror contract data because of anvil-deploy node only writing to localhost {{{
 declare protocol_config="${mydir}/../packages/core/protocol-config.json"

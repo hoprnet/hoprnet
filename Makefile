@@ -188,7 +188,7 @@ reset: clean
 	yarn reset
 
 .PHONY: test
-test: smart-contract-test ## run unit tests for all packages, or a single package if package= is set
+test: test-sc ## run unit tests for all packages, or a single package if package= is set
 ifeq ($(package),)
 	yarn workspaces foreach -pv run test
 else
@@ -211,9 +211,7 @@ lint-fix: ## run linter in fix mode
 
 .PHONY: run-anvil
 run-anvil: ## spinup a local anvil instance (daemon) and deploy contracts
-	echo "Spin up a local anvil instance and deploy all the contracts, incl. Erc1820Registry, to the local environment"
-	anvil & \
-	$(MAKE) -C packages/ethereum/contracts/ -j anvil-deploy-all
+	./script/run-local-anvil.sh
 
 .PHONY: kill-anvil
 kill-anvil: ## kill process running at port 8545 (default port of anvil)

@@ -100,7 +100,7 @@ declare password="e2e-test"
 
 declare ct_db_file="${tmp}/hopr-ct-db.json"
 
-declare hardhat_rpc_log="${tmp}/hopr-source-hardhat-rpc.log"
+declare anvil_rpc_log="${tmp}/hopr-source-anvil-rpc.log"
 
 # anvil port
 declare -a all_ports=( 8545 )
@@ -263,8 +263,8 @@ function setup_ct_node() {
 
 # --- Log test info {{{
 log "Test files and directories"
-log "\thardhat"
-log "\t\tlog: ${hardhat_rpc_log}"
+log "\tanvil"
+log "\t\tlog: ${anvil_rpc_log}"
 log "\tnode1"
 log "\t\tdata dir: ${node1_dir} (will be removed)"
 log "\t\tlog: ${node1_log}"
@@ -314,10 +314,7 @@ cleanup_local_protocol_config "${protocol_config}" "anvil-localhost2"
 # }}}
 
 # --- Running Mock Blockchain --- {{{
-start_local_anvil "${hardhat_rpc_log}"
-
-wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
-log "Hardhat node started (127.0.0.1:8545)"
+${mydir}/run-local-anvil.sh "${anvil_rpc_log}"
 
 # need to mirror contract data because of anvil-deploy node only writing to localhost {{{
 update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost"
