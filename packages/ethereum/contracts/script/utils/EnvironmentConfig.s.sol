@@ -48,7 +48,7 @@ contract EnvironmentConfig is Script {
 
   string public pathToDeploymentFile = string(abi.encodePacked(vm.projectRoot(), '/contracts-addresses.json'));
 
-  function getEnvrionment() public {
+  function getEnvironment() public {
     // get envirionment of the script
     string memory profile = vm.envString('FOUNDRY_PROFILE');
     currentEnvironmentName = vm.envString('ENVIRONMENT_NAME');

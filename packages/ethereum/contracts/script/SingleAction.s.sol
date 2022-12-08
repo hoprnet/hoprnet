@@ -20,7 +20,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     function getEnvironmentAndMsgSender() private {
         // 1. Environment check
         // get envirionment of the script
-        getEnvrionment();
+        getEnvironment();
         // read records of deployed files
         readCurrentEnvironment();
 

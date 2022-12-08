@@ -15,7 +15,7 @@ contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryF
   function run() external {
     // 1. Environment check
     // get envirionment of the script
-    getEnvrionment();
+    getEnvironment();
     // read records of deployed files
     readCurrentEnvironment();
     // Halt if ERC1820Registry has not been deployed.
