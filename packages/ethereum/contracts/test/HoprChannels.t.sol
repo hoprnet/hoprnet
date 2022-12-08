@@ -597,7 +597,7 @@ contract HoprChannelsTest is
    * @dev With funded open channels:
    * it should fail to redeem ticket when signer is not the issuer
    */
-  function testRevert_RedeemATicketFromAnotherSigner(uint256 amount1, uint256 amount2) public {
+  function testFail_RedeemATicketFromAnotherSigner(uint256 amount1, uint256 amount2) public {
     // channel is funded for at least 10 HoprTokens (Ticket's amount)
     amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
     amount2 = bound(amount2, TICKET_BA_WIN.amount, 1e36);
@@ -608,6 +608,33 @@ contract HoprChannelsTest is
     vm.prank(accountB.accountAddr);
     // fail to redeem the redeemed ticket due to wrong signature
     vm.expectRevert(bytes('signer must match the counterparty'));
+    hoprChannels.redeemTicket(
+      TICKET_AB_LOSS.source,
+      TICKET_AB_LOSS.nextCommitment,
+      TICKET_AB_LOSS.ticketEpoch,
+      TICKET_AB_LOSS.ticketIndex,
+      TICKET_AB_LOSS.proofOfRelaySecret,
+      TICKET_AB_LOSS.amount,
+      TICKET_AB_LOSS.winProb,
+      TICKET_AB_LOSS.signature
+    );
+  }
+
+  /**
+   * @dev With funded open channels:
+   * it should fail to redeem ticket if it's a loss
+   */
+  function testFail_RedeemLossTicket(uint256 amount1, uint256 amount2) public {
+    // channel is funded for at least 10 HoprTokens (Ticket's amount)
+    amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
+    amount2 = bound(amount2, TICKET_BA_WIN.amount, 1e36);
+    // Open channels A<->B with some tokens that are above possible winning tickets
+    _helperOpenBidirectionalChannels(amount1, amount2);
+
+    // accountB redeem ticket
+    vm.prank(accountB.accountAddr);
+    // fail to redeem the redeemed ticket due to wrong signature
+    vm.expectRevert(bytes('ticket must be a win'));
     hoprChannels.redeemTicket(
       TICKET_AB_WIN.source,
       TICKET_AB_WIN.nextCommitment,
