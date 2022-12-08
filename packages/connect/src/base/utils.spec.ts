@@ -8,8 +8,7 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { peerIdFromBytes } from '@libp2p/peer-id'
 import { Multiaddr } from '@multiformats/multiaddr'
 import { CODE_P2P } from '../constants.js'
-import { isIPv6 } from 'net'
-import { lookup } from 'dns'
+import { ip6Lookup } from '../utils/index.js'
 
 interface Listening<ListenOpts> extends EventEmitter {
   listen: (opts: ListenOpts) => void
@@ -62,25 +61,9 @@ export async function startStunServer(
  */
 export function bindToUdpSocket(port?: number): Promise<Socket> {
   const socket = createSocket({
-    // `udp4` seems to have binding issues
     type: 'udp6',
-    // We use IPv4 traffic on udp6 sockets, so DNS queries
-    // must return the A record (IPv4) not the AAAA record (IPv6)
-    // - unless we explicitly check for a IPv6 address
-    lookup: (...requestArgs: any[]) => {
-      if (isIPv6(requestArgs[0])) {
-        // @ts-ignore
-        return lookup(...requestArgs)
-      }
-      return lookup(requestArgs[0], 4, (...responseArgs: any[]) => {
-        const callback = requestArgs.length == 3 ? requestArgs[2] : requestArgs[1]
-        // Error | null
-        if (responseArgs[0] != null) {
-          return callback(responseArgs[0])
-        }
-        callback(responseArgs[0], `::ffff:${responseArgs[1]}`, responseArgs[2])
-      })
-    }
+    lookup: ip6Lookup,
+    reuseAddr: true
   })
 
   return new Promise<Socket>((resolve, reject) => {

@@ -3,7 +3,7 @@ import { type Socket, createSocket, type RemoteInfo } from 'dgram'
 // @ts-ignore untyped module
 import { decode, constants, createMessage, createTransaction, validateFingerprint } from 'stun'
 
-import isStun from 'is-stun'
+import { isStun } from '../../../utils/index.js'
 
 // @ts-ignore untyped module
 import retimer from 'retimer'
@@ -134,12 +134,12 @@ function decodeIncomingSTUNResponses(
   socket: Socket,
   update: (response: { response?: Interface; transactionId: Buffer }) => void
 ): () => void {
-  const listener = (data: Buffer, rinfo: RemoteInfo) => {
+  const listener = (data: Buffer | Uint8Array, rinfo: RemoteInfo) => {
     if (!isStun(data)) {
       return
     }
 
-    const response = decode(data)
+    const response = decode(Buffer.isBuffer(data) ? data : Buffer.from(data.buffer, data.byteOffset, data.byteLength))
 
     switch (response.type & kStunTypeMask) {
       case isStunSuccessResponse:

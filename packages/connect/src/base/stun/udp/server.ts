@@ -1,10 +1,9 @@
 import { type Socket, type RemoteInfo } from 'dgram'
 
 // @ts-ignore untyped module
-import { decode, constants, createMessage, createTransaction, validateFingerprint } from 'stun'
+import { decode, constants, createMessage } from 'stun'
 
-// @ts-ignore untyped module
-import isStun from 'is-stun'
+import { isStun } from '../../../utils/index.js'
 
 import debug from 'debug'
 
@@ -19,7 +18,12 @@ const verbose = debug('hopr-connect:verbose:stun')
  * @param rinfo Addr+Port of the incoming connection
  * @param __fakeRInfo [testing] overwrite incoming information to intentionally send misleading STUN response
  */
-export function handleUdpStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInfo, __fakeRInfo?: RemoteInfo): void {
+export function handleUdpStunRequest(
+  socket: Socket,
+  data: Buffer | Uint8Array,
+  rinfo: RemoteInfo,
+  __fakeRInfo?: RemoteInfo
+): void {
   let replyAddress = rinfo.address
 
   // When using 'udp6' sockets, IPv4 addresses get prefixed by ::ffff:
@@ -36,7 +40,7 @@ export function handleUdpStunRequest(socket: Socket, data: Buffer, rinfo: Remote
     return
   }
 
-  const request = decode(data)
+  const request = decode(Buffer.isBuffer(data) ? data : Buffer.from(data.buffer, data.byteOffset, data.byteLength))
 
   switch (request.type & kStunTypeMask) {
     case isStunRequest:

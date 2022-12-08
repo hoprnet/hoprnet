@@ -1,9 +1,9 @@
 import { type AddressInfo, type Socket, createConnection } from 'net'
 
 // @ts-ignore untyped module
-import { decode, constants, createMessage, createTransaction, validateFingerprint } from 'stun'
+import { decode, constants, createMessage } from 'stun'
 
-import isStun from 'is-stun'
+import { isStun } from '../../../utils/index.js'
 
 import debug from 'debug'
 
@@ -39,11 +39,11 @@ export async function handleTcpStunRequest(
   }
 
   for await (const data of stream) {
-    if (!isStun(Buffer.from(data.buffer, data.byteOffset, data.byteLength))) {
+    if (!isStun(data)) {
       return
     }
 
-    const request = decode(data)
+    const request = decode(Buffer.from(data.buffer, data.byteOffset, data.byteLength))
 
     switch (request.type & kStunTypeMask) {
       case isStunRequest:

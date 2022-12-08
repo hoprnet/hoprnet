@@ -261,3 +261,15 @@ export function* randomIterator<T>(arr: T[]): Iterable<T> {
     yield arr[indices[i]]
   }
 }
+
+// inspired by https://github.com/nodertc/is-stun
+/**
+ * Checks to test if received packet is a STUN packet
+ * Used to distinguish whether an incoming stream is a libp2p multistream one
+ * or a STUN protocol execution
+ * @param data packet to be tested
+ * @returns true if packet is considered a STUN packet
+ */
+export function isStun(data: Uint8Array): boolean {
+  return data.length > 0 && data[0] >= 0 && data[0] <= 3
+}

@@ -216,7 +216,7 @@ function nextSTUNRequest(
 
 export function isTcpExposedHost(
   multiaddrs: Iterable<Multiaddr>,
-  addListener: (listener: (socket: Socket) => void) => () => void,
+  addListener: (listener: (socket: Socket, stream: AsyncIterable<Uint8Array>) => void) => () => void,
   timeout = STUN_TCP_TIMEOUT,
   stunPort: number,
   runningLocally = false
@@ -361,9 +361,11 @@ export function isTcpExposedHost(
       resolve(STUN_EXPOSED_CHECK_RESPOSE.UNKNOWN)
     }
 
-    const onConnection = (socket: Socket) => {
-      socket.on('data', (data: Buffer) => {
-        const response = decode(data)
+    const onConnection = async (_socket: Socket, stream: AsyncIterable<Uint8Array>) => {
+      for await (const data of stream) {
+        const response = decode(
+          Buffer.isBuffer(data) ? data : Buffer.from(data.buffer, data.byteOffset, data.byteLength)
+        )
 
         switch (response.type & kStunTypeMask) {
           case isStunSuccessResponse:
@@ -379,7 +381,7 @@ export function isTcpExposedHost(
             log(`primary unknown STUN response`, data)
             break
         }
-      })
+      }
     }
 
     removeListener = addListener(onConnection)
