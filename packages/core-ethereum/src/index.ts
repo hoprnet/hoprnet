@@ -301,20 +301,23 @@ export default class HoprCoreEthereum extends EventEmitter {
       delete this.ticketRedemtionInChannelOperations[channelId]
       throw new Error('Cannot redeem ticket in channel that is not to us')
     }
+
     // Because tickets are ordered and require the previous redemption to
     // have succeeded before we can redeem the next, we need to do this
     // sequentially.
     // We redeem step-wise, reading only the next ticket from the db, to
     // reduce the chance for race-conditions with db write operations on
     // those tickets.
-    let tickets = await this.db.getAcknowledgedTickets({ channel })
 
     const boundRedeemTicket = this.redeemTicket.bind(this)
+    const boundGetAckdTickets = this.db.getAcknowledgedTickets.bind(this.db)
 
     // Use an async iterator to make execution interruptable and allow
     // Node.JS to schedule iterations at any time
     const ticketRedeemIterator = async function* () {
-      for (const ticket of tickets) {
+      let tickets = await boundGetAckdTickets({ channel })
+      let ticket: AcknowledgedTicket
+      while (tickets.length > 0) {
         if (ticket != undefined && ticket.ticket.index.eq(tickets[0].ticket.index)) {
           // @TODO handle errors
           log(
@@ -324,11 +327,15 @@ export default class HoprCoreEthereum extends EventEmitter {
           )
           break
         }
+
+        ticket = tickets[0]
+
         log(
           `redeeming ticket ${ticket.response.toHex()} in channel from ${channel.source} to ${
             channel.destination
           }, preImage ${ticket.preImage.toHex()}, porSecret ${ticket.response.toHex()}`
         )
+
         log(ticket.ticket.toString())
         const result = await boundRedeemTicket(channel.source, ticket)
 
@@ -341,6 +348,8 @@ export default class HoprCoreEthereum extends EventEmitter {
         }
 
         yield ticket.response
+
+        tickets = await boundGetAckdTickets({ channel })
       }
     }
 
