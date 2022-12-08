@@ -541,8 +541,8 @@ contract HoprChannelsTest is
    */
   function testFail_RedeemARedeemedTicket(uint256 amount1, uint256 amount2) public {
     // channel is funded for at least 10 HoprTokens (Ticket's amount)
-    amount1 = bound(amount1, TICKET_AB_WIN.amount + 100, 1e36);
-    amount2 = bound(amount2, TICKET_BA_WIN.amount + 100, 1e36);
+    amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
+    amount2 = bound(amount2, TICKET_BA_WIN.amount, 1e36);
     // accountB bumps channel A->B with SECRET_2
     // accountA bumps channel B->A with SECRET_2
     vm.prank(accountB.accountAddr);
