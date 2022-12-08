@@ -16,6 +16,7 @@
 - Fix ticket redemption ([#4382](https://github.com/hoprnet/hoprnet/pull/4382))
 - Increase wait timeout for on-chain transactions to 60 seconds ([#4425](https://github.com/hoprnet/hoprnet/pull/4425))
 - Fix bug in waiting logic for on-chain transactions ([#4425](https://github.com/hoprnet/hoprnet/pull/4425))
+- Fixed incorrect acknowledged tickets handling in the DB
 
 ---
 
