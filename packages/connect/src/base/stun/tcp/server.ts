@@ -104,6 +104,7 @@ export async function handleTcpStunRequest(
           const secondarySocket = createConnection(replyPort, replyAddress, () => {
             secondarySocket.write(response.toBuffer(), () => {
               secondarySocket.end()
+              socket.end()
             })
           })
         } else {
