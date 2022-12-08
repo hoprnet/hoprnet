@@ -70,8 +70,10 @@ COPY --from=build /app/packages/ethereum .
 COPY --from=build /app/packages/core/protocol-config.json /core/
 
 # pre-compile as much as we can to reduce startup time
-RUN rm package.json \
- && mv package.hardhat.json package.json \
+# use exact version of hopr-utils
+RUN apk add --no-cache jq \
+ && vsn=$(jq -r '.version' package.json) \
+ && jq ".devDependencies.\"@hoprnet/hopr-utils\" = \"${vsn}\"" package.hardhat.json > package.json \
  && yarn \
  && yarn run compile
 
