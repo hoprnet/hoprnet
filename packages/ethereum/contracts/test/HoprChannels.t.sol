@@ -657,6 +657,42 @@ contract HoprChannelsTest is
   }
 
   /**
+   * @dev With funded open channels, B can initialize channel closure
+   */
+  function test_BInitializeChannelClosure(uint256 amount1, uint256 amount2) public {
+    // channel is funded for at least 10 HoprTokens (Ticket's amount)
+    amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
+    amount2 = bound(amount2, TICKET_BA_WIN.amount, 1e36);
+    // Open channels A<->B with some tokens that are above possible winning tickets
+    _helperOpenBidirectionalChannels(amount1, amount2);
+
+    // Update channel BA state
+    HoprChannels.Channel memory channelBA = getChannelFromTuple(hoprChannels, channelIdBA);
+    channelBA.status = HoprChannels.ChannelStatus.PENDING_TO_CLOSE;
+    channelBA.closureTime = uint32(block.timestamp) + hoprChannels.secsClosure();
+
+    vm.expectEmit(true, true, false, true, address(hoprChannels));
+    emit ChannelUpdated(accountB.accountAddr, accountA.accountAddr, channelBA);
+    // account B initiate channel closure
+    vm.prank(accountB.accountAddr);
+    hoprChannels.initiateChannelClosure(accountA.accountAddr);
+
+    // channels after ticket redemption
+    HoprChannels.Channel memory channelAB = HoprChannels.Channel(
+      amount1,
+      SECRET_2,
+      0,
+      0,
+      HoprChannels.ChannelStatus.OPEN,
+      1,
+      0
+    );
+    // check vallidate from channels()
+    assertEqChannels(getChannelFromTuple(hoprChannels, channelIdAB), channelAB);
+    assertEqChannels(getChannelFromTuple(hoprChannels, channelIdBA), channelBA);
+  }
+
+  /**
    * @dev With funded open channels:
    * it should fail to redeem ticket if it's a loss
    */
