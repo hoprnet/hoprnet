@@ -92,7 +92,7 @@ contract TicketsUtilsTest is Test, AccountsFixtureTest, ChannelsUtilsTest {
     */
   Ticket public TICKET_AB_LOSS =
     Ticket({
-      source: accountB.accountAddr,
+      source: accountA.accountAddr,
       nextCommitment: SECRET_1,
       ticketEpoch: 0,
       ticketIndex: 1,

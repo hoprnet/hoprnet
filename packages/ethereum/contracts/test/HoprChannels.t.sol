@@ -594,6 +594,33 @@ contract HoprChannelsTest is
   }
 
   /**
+   * @dev With funded open channels:
+   * it should fail to redeem ticket when signer is not the issuer
+   */
+  function testRevert_RedeemATicketFromAnotherSigner(uint256 amount1, uint256 amount2) public {
+    // channel is funded for at least 10 HoprTokens (Ticket's amount)
+    amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
+    amount2 = bound(amount2, TICKET_BA_WIN.amount, 1e36);
+    // Open channels A<->B with some tokens that are above possible winning tickets
+    _helperOpenBidirectionalChannels(amount1, amount2);
+
+    // accountB redeem ticket
+    vm.prank(accountB.accountAddr);
+    // fail to redeem the redeemed ticket due to wrong signature
+    vm.expectRevert(bytes('signer must match the counterparty'));
+    hoprChannels.redeemTicket(
+      TICKET_AB_WIN.source,
+      TICKET_AB_WIN.nextCommitment,
+      TICKET_AB_WIN.ticketEpoch,
+      TICKET_AB_WIN.ticketIndex,
+      TICKET_AB_WIN.proofOfRelaySecret,
+      TICKET_AB_WIN.amount,
+      TICKET_AB_WIN.winProb,
+      hex'2bea87a4a771731c3dcf8c17443765344a0bfee9354f87636d068055cde15f6e2ddb4ce35e11b57dcc44f28206af89894feea677834c6e5be17d180cbeb514ba' // use AccountB to sign `TICKET_AB_WIN`
+    );
+  }
+
+  /**
    *@dev Helper function to announce account A and B
    */
   function _helperAnnounceAB(bool annouceA, bool announceB) internal {
@@ -628,6 +655,7 @@ contract HoprChannelsTest is
     );
     // fund channel A->B and B->A
     hoprChannels.fundChannelMulti(accountA.accountAddr, accountB.accountAddr, amount1, amount2);
+    vm.clearMockedCalls();
   }
 
   /**
