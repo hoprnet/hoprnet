@@ -322,8 +322,8 @@ if [ -n "${init_script}" ]; then
 
   # execute script if a path was found
   if [ -n "${full_init_script}" ]; then
-    log "Calling init script ${init_script}"
-    HOPRD_API_TOKEN="${api_token}" "${mydir}/${init_script}" ${endpoints}
+    log "Calling init script ${full_init_script}"
+    HOPRD_API_TOKEN="${api_token}" "${full_init_script}" ${endpoints}
   else
     log "Error: Could not determine executable path of init script ${init_script}"
   fi
