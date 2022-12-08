@@ -630,14 +630,30 @@ contract HoprChannelsTest is
     // Open channels A<->B with some tokens that are above possible winning tickets
     _helperOpenBidirectionalChannels(amount1, amount2);
 
+    // Update channel AB state
     HoprChannels.Channel memory channelAB = getChannelFromTuple(hoprChannels, channelIdAB);
     channelAB.status = HoprChannels.ChannelStatus.PENDING_TO_CLOSE;
     channelAB.closureTime = uint32(block.timestamp) + hoprChannels.secsClosure();
+
     vm.expectEmit(true, true, false, true, address(hoprChannels));
     emit ChannelUpdated(accountA.accountAddr, accountB.accountAddr, channelAB);
     // account A initiate channel closure
     vm.prank(accountA.accountAddr);
     hoprChannels.initiateChannelClosure(accountB.accountAddr);
+
+    // channels after ticket redemption
+    HoprChannels.Channel memory channelBA = HoprChannels.Channel(
+      amount2,
+      SECRET_2,
+      0,
+      0,
+      HoprChannels.ChannelStatus.OPEN,
+      1,
+      0
+    );
+    // check vallidate from channels()
+    assertEqChannels(getChannelFromTuple(hoprChannels, channelIdAB), channelAB);
+    assertEqChannels(getChannelFromTuple(hoprChannels, channelIdBA), channelBA);
   }
 
   /**
