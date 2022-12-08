@@ -318,10 +318,25 @@ log "All nodes came up online"
 declare endpoints="localhost:13301 localhost:13302 localhost:13303 localhost:13304 localhost:13305"
 
 # --- Call init script--- {{{
-if [ -n "${init_script}" ] && [ -x "${mydir}/${init_script}" ]; then
-  log "Calling init script ${init_script}"
-  HOPRD_API_TOKEN="${api_token}" \
-    "${mydir}/${init_script}" ${endpoints}
+if [ -n "${init_script}" ]; then
+  declare full_init_script=""
+
+  # find full executable path of the script
+  if [ -x "${init_script}" ]; then
+    full_init_script="${init_script}"
+  elif [ -x "${mydir}/${init_script}" ]; then
+    full_init_script="${mydir}/${init_script}"
+  fi
+
+  # execute script if a path was found
+  if [ -n "${full_init_script}" ]; then
+    log "Calling init script ${init_script}"
+    HOPRD_API_TOKEN="${api_token}" "${mydir}/${init_script}" ${endpoints}
+  else
+    log "Error: Could not determine executable path of init script ${init_script}"
+  fi
+else
+  log "No init script provided, skipping"
 fi
 # }}}
 
