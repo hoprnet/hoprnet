@@ -396,6 +396,7 @@ contract HoprChannelsTest is
       TICKET_AB_WIN.winProb,
       TICKET_AB_WIN.signature
     );
+    vm.clearMockedCalls();
   }
 
   /**
@@ -532,6 +533,76 @@ contract HoprChannelsTest is
     // check vallidate from channels()
     assertEqChannels(getChannelFromTuple(hoprChannels, channelIdAB), channelABAfterARedeems);
     assertEqChannels(getChannelFromTuple(hoprChannels, channelIdBA), channelBAAfterARedeems);
+  }
+
+  /**
+   * @dev With funded HoprChannels: AB: amount1, BA: amount 2, where both amount1 and amount2 are above 10 (amount of TICKET_AB_WIN and TICKET_BA_WIN),
+   * it should fail to redeem ticket when ticket has been already redeemed
+   */
+  function testFail_RedeemARedeemedTicket(uint256 amount1, uint256 amount2) public {
+    // channel is funded for at least 10 HoprTokens (Ticket's amount)
+    amount1 = bound(amount1, TICKET_AB_WIN.amount + 100, 1e36);
+    amount2 = bound(amount2, TICKET_BA_WIN.amount + 100, 1e36);
+    // accountB bumps channel A->B with SECRET_2
+    // accountA bumps channel B->A with SECRET_2
+    vm.prank(accountB.accountAddr);
+    hoprChannels.bumpChannel(accountA.accountAddr, SECRET_2);
+    vm.prank(accountA.accountAddr);
+    hoprChannels.bumpChannel(accountB.accountAddr, SECRET_2);
+    // then fund channel
+    _helperFundMultiAB(amount1, amount2);
+
+    vm.expectEmit(true, true, false, true, address(hoprChannels));
+    emit TicketRedeemed(
+      TICKET_AB_WIN.source,
+      accountB.accountAddr,
+      TICKET_AB_WIN.nextCommitment,
+      TICKET_AB_WIN.ticketEpoch,
+      TICKET_AB_WIN.ticketIndex,
+      TICKET_AB_WIN.proofOfRelaySecret,
+      TICKET_AB_WIN.amount,
+      TICKET_AB_WIN.winProb,
+      TICKET_AB_WIN.signature
+    );
+
+    // accountB redeem ticket
+    vm.prank(accountB.accountAddr);
+    hoprChannels.redeemTicket(
+      TICKET_AB_WIN.source,
+      TICKET_AB_WIN.nextCommitment,
+      TICKET_AB_WIN.ticketEpoch,
+      TICKET_AB_WIN.ticketIndex,
+      TICKET_AB_WIN.proofOfRelaySecret,
+      TICKET_AB_WIN.amount,
+      TICKET_AB_WIN.winProb,
+      TICKET_AB_WIN.signature
+    );
+
+    // fail to redeem the redeemed ticket
+    vm.expectRevert(bytes('redemptions must be in order'));
+    hoprChannels.redeemTicket(
+      TICKET_AB_WIN.source,
+      SECRET_0,
+      TICKET_AB_WIN.ticketEpoch,
+      TICKET_AB_WIN.ticketIndex,
+      TICKET_AB_WIN.proofOfRelaySecret,
+      TICKET_AB_WIN.amount,
+      TICKET_AB_WIN.winProb,
+      TICKET_AB_WIN.signature
+    );
+
+    // fail to redeem the redeemed ticket
+    vm.expectRevert(bytes('ticket epoch must match'));
+    hoprChannels.redeemTicket(
+      TICKET_AB_WIN.source,
+      SECRET_0,
+      TICKET_AB_WIN.ticketEpoch + 1,
+      TICKET_AB_WIN.ticketIndex,
+      TICKET_AB_WIN.proofOfRelaySecret,
+      TICKET_AB_WIN.amount,
+      TICKET_AB_WIN.winProb,
+      TICKET_AB_WIN.signature
+    );
   }
 
   /**
