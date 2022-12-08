@@ -81,24 +81,27 @@ In order to ensure that external contributions pass our CI tests, the bounty cre
 3. When work is complete, PR is merged into the branch, ensuring tests pass.
 4. If the bounty is a Dune Analytics query or dashboard, ensure that the full code of all queries got submitted via PR and the query/Dashboard got forked by the `hoprnet` Dune account.
 
-## Payment of Rewards 
+## Payment of Rewards
 
-Bounty rewards are set in US Dollar. However, the program owner pays out the bounty in HOPR tokens reflecting the set UD Dollar amount. 
+Bounty rewards are set in US Dollar. However, the program owner pays out the bounty in HOPR tokens reflecting the set UD Dollar amount.
 
 - For example, consider the case where we choose 100 USD as the bounty reward and assume that at the time of publishing the bounty the HOPR token price equals 1 USD. A bounty hunter submits the work a month later and the program owner decides to pay out the bounty. In the meantime the HOPR token price drops to 0.5 USD. Therfore, the program owner pays out 200 HOPR token worth 100 USD at the time of payment.
 
-## How to deal with bad hunters and different submission qualities 
+## How to deal with bad hunters and different submission qualities
 
 1. Bounty hunter submits a satisfactory solution that fullfills all deliverables outlined in the github issue within the specified deadlines (if any)
+
    - Pay out the promised bounty reward
 
 2. Bounty hunter submits a solution of extraordinary quality exceeding the expectations outlined in the github issue
-   - Pay out the promised bounty reward and tip the bounty hunter. __ Maybe max 20% of the promised amount?__  
+
+   - Pay out the promised bounty reward and tip the bounty hunter. ** Maybe max 20% of the promised amount?**
 
 3. Bounty hunter submits a dis-satisfactory solution but it technically fullfills the deliverables outlined in the github issue
-   - Pay out the promised bounty reward 
-   - program owner and bounty admin make a 'what went wrong' assessment of the github issue to minimize the probability that this happens again in the future. 
+
+   - Pay out the promised bounty reward
+   - program owner and bounty admin make a 'what went wrong' assessment of the github issue to minimize the probability that this happens again in the future.
 
 4. Bounty hunter disappears
-   - Program owner does __NOT__ pay out the bounty reward 
-   - Program owner checks with the bounty admin whether is makes sense to re-assign the bounty to someone else or whether the bounty gets canceled 
+   - Program owner does **NOT** pay out the bounty reward
+   - Program owner checks with the bounty admin whether is makes sense to re-assign the bounty to someone else or whether the bounty gets canceled
