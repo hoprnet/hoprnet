@@ -10,11 +10,14 @@ CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(cra
 FOUNDRY_DIR := ${CURDIR}/.foundry
 FOUNDRY_VSN := e919a63
 
+# Set local cargo directory (for binaries)
+CARGO_DIR := ${CURDIR}/.cargo
+
 # use custom foundryup to ensure the local directory is used
 foundryup := env FOUNDRY_DIR="${FOUNDRY_DIR}" foundryup
 
 # add local Cargo install path (only once)
-PATH := $(subst :${CURDIR}/.cargo/bin,,$(PATH)):${CURDIR}/.cargo/bin
+PATH := $(subst :${CARGO_DIR}/bin,,$(PATH)):${CARGO_DIR}/bin
 # add users home Cargo install path (only once)
 PATH := $(subst :${HOME}/.cargo/bin,,$(PATH)):${HOME}/.cargo/bin
 # add local Foundry install path (only once)
@@ -23,7 +26,7 @@ PATH := $(subst :${FOUNDRY_DIR}/bin,,$(PATH)):${FOUNDRY_DIR}/bin
 SHELL := env PATH=$(PATH) $(shell which bash)
 
 # use custom Cargo config file for each invocation
-cargo := cargo --config ${CURDIR}/.cargo/config.toml
+cargo := cargo --config ${CARGO_DIR}/config.toml
 
 # use custom flags for installing dependencies
 YARNFLAGS :=
@@ -105,13 +108,7 @@ install-foundry: ## install foundry
 	fi
 	@if [ ! -f "${FOUNDRY_DIR}/bin/anvil" ] || [ ! -f "${FOUNDRY_DIR}/bin/cast" ] || [ ! -f "${FOUNDRY_DIR}/bin/forge" ]; then \
 		echo "missing foundry binaries, installing via foundryup"; \
-		if [ ! -d /tmp/foundry-git ]; then git clone https://github.com/foundry-rs/foundry /tmp/foundry-git; fi; \
-		pushd /tmp/foundry-git; \
-		$(foundryup) -p /tmp/foundry-git; \
-		popd; \
-		rm -f "${FOUNDRY_DIR}/bin/anvil" "${FOUNDRY_DIR}/bin/cast" "${FOUNDRY_DIR}/bin/forge"; \
-	  cp "/tmp/foundry-git/target/release/anvil" "/tmp/foundry-git/target/release/cast" "/tmp/foundry-git/target/release/forge" "${FOUNDRY_DIR}/bin"; \
-		rm -rf /tmp/foundry-git; \
+		$(foundryup); \
 	else \
 	  echo "foundry binaries already installed under "${FOUNDRY_DIR}/bin", skipping"; \
 	fi
