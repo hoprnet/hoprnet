@@ -12,30 +12,32 @@ A bounty usually serves multiple purposes.
 
 The primary goal of a bounty creator is to take into account all 3 aspects, and depending on the bounty, adjust accordingly.
 
-## Bounty Admin Process  
+## Bounty Admin Process
 
-### Creating the bounty 
+### Creating the bounty
 
-1. The bounty admin approaches the program owner with a bounty idea and the program owner approves it. Optionally the bounty admin appoints a bounty expert to assist with the technical content.   
-   - Sometimes the program owner may approaches a person with a bounty idea and asks that person to be the bounty admin. 
-2. The bounty admin creates a GitHub issue using the [bounty template](../.github/ISSUE_TEMPLATE/bounty.md) in the dedicated bounty repository __(Needs to be created)__
+1. The bounty admin approaches the program owner with a bounty idea and the program owner approves it. Optionally the bounty admin appoints a bounty expert to assist with the technical content.
+   - Sometimes the program owner may approaches a person with a bounty idea and asks that person to be the bounty admin.
+2. The bounty admin creates a GitHub issue using the [bounty template](../.github/ISSUE_TEMPLATE/bounty.md) in the dedicated bounty repository **(Needs to be created)**
    - Within each section of the template, provide the most concise details you can.
    - Feel free to expand on sections `Developing HOPR` and `What is HOPR?` with information more related to the bounty.
 3. The bounty admin assignes herself/himself to the bounty as well as the program owner
-   - If the bounty admin appoints a bounty expert the bounty admin assigns the bounty expert to the issue as well. 
-5. The bounty admin assignes the dedicated bounty label to the issue.  
-6. The bounty admin makes a comment in the GitHub issue (tagging the program owner) with an estimate of:
+   - If the bounty admin appoints a bounty expert the bounty admin assigns the bounty expert to the issue as well.
+4. The bounty admin assignes the dedicated bounty label to the issue.
+5. The bounty admin makes a comment in the GitHub issue (tagging the program owner) with an estimate of:
    - The time required to complete the bounty (in hours).
    - A guestimate of the bounty reward (in USD) based on a rate of ~50 USD per hour.
 
 ### During the time the bounty hunter is working on the bounty
-- The bounty admin may be asked (by the program owner) to answer some questions related to the bounty (posted by the bounty hunter) that the program owner cannot answer herself/himself. The bounty admin may consult with the bounty expert before answering the questions. 
+
+- The bounty admin may be asked (by the program owner) to answer some questions related to the bounty (posted by the bounty hunter) that the program owner cannot answer herself/himself. The bounty admin may consult with the bounty expert before answering the questions.
 - In case of an emergency, the program owner might ask the bounty admin to get in touch with the bounty hunter directly to sort out the issue related to the bounty.
 
 ### After the bounty hunter submits the work
+
 - The bounty admin (optionally: bounty expert) needs to review/test the submission and the bounty admin gives a reccomendation to the program owner. See xxxx
 
-## Program Owner Process 
+## Program Owner Process
 
 ### Funding the bounty
 
