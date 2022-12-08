@@ -409,14 +409,8 @@ contract HoprChannelsTest is
     // channel is funded for at least 10 HoprTokens (Ticket's amount)
     amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
     amount2 = bound(amount2, TICKET_BA_WIN.amount, 1e36);
-    // accountB bumps channel A->B with SECRET_2
-    // accountA bumps channel B->A with SECRET_2
-    vm.prank(accountB.accountAddr);
-    hoprChannels.bumpChannel(accountA.accountAddr, SECRET_2);
-    vm.prank(accountA.accountAddr);
-    hoprChannels.bumpChannel(accountB.accountAddr, SECRET_2);
-    // then fund channel
-    _helperFundMultiAB(amount1, amount2);
+    // Open channels A<->B with some tokens that are above possible winning tickets
+    _helperOpenBidirectionalChannels(amount1, amount2);
 
     // channels before ticket redemption
     HoprChannels.Channel memory channelAB = HoprChannels.Channel(
@@ -543,14 +537,8 @@ contract HoprChannelsTest is
     // channel is funded for at least 10 HoprTokens (Ticket's amount)
     amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
     amount2 = bound(amount2, TICKET_BA_WIN.amount, 1e36);
-    // accountB bumps channel A->B with SECRET_2
-    // accountA bumps channel B->A with SECRET_2
-    vm.prank(accountB.accountAddr);
-    hoprChannels.bumpChannel(accountA.accountAddr, SECRET_2);
-    vm.prank(accountA.accountAddr);
-    hoprChannels.bumpChannel(accountB.accountAddr, SECRET_2);
-    // then fund channel
-    _helperFundMultiAB(amount1, amount2);
+    // Open channels A<->B with some tokens that are above possible winning tickets
+    _helperOpenBidirectionalChannels(amount1, amount2);
 
     vm.expectEmit(true, true, false, true, address(hoprChannels));
     emit TicketRedeemed(
@@ -640,5 +628,21 @@ contract HoprChannelsTest is
     );
     // fund channel A->B and B->A
     hoprChannels.fundChannelMulti(accountA.accountAddr, accountB.accountAddr, amount1, amount2);
+  }
+
+  /**
+   * @dev Helper function to fund channel A->B (amount1) and B->A (amount2) to OPEN,
+   * where both amount1 and amount2 are above the amount of possible winning ticket
+   * (i.e. TICKET_AB_WIN and TICKET_BA_WIN)
+   */
+  function _helperOpenBidirectionalChannels(uint256 amount1, uint256 amount2) internal {
+    // accountB bumps channel A->B with SECRET_2
+    // accountA bumps channel B->A with SECRET_2
+    vm.prank(accountB.accountAddr);
+    hoprChannels.bumpChannel(accountA.accountAddr, SECRET_2);
+    vm.prank(accountA.accountAddr);
+    hoprChannels.bumpChannel(accountB.accountAddr, SECRET_2);
+    // then fund channel
+    _helperFundMultiAB(amount1, amount2);
   }
 }
