@@ -7,6 +7,10 @@ members = [
     "packages/utils/crates/utils-metrics"
 ]
 
+[workspace.dependencies]
+wasm-pack = "0.10.3"
+wasm-opt = "0.110.2"
+
 [profile.release]
 # Tell `rustc` to optimize for small code size.
 opt-level = "s"

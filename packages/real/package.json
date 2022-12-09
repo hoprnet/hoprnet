@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-real",
-  "version": "1.91.23",
+  "version": "1.92.0-next.19",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0-only",
@@ -24,10 +24,11 @@
     "docs:watch": "typedoc --watch"
   },
   "devDependencies": {
+    "@types/mocha": "9.1.1",
     "mocha": "9.2.2",
-    "typedoc": "0.23.2",
-    "typedoc-plugin-markdown": "3.13.1",
-    "typescript": "4.7.4"
+    "typedoc": "0.23.20",
+    "typedoc-plugin-markdown": "3.13.6",
+    "typescript": "4.8.4"
   },
   "mocha": {
     "spec": "lib/**/*.spec.js"

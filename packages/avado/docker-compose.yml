@@ -1,4 +1,4 @@
-# NOTE: This cannot be built as is, it must be built using scripts/build_avado.sh
+# NOTE: This cannot be built as is, it must be built using scripts/build-avado.sh
 # %AVADO_VERSION%, %TOKEN%, %ENV_ID% and %PROVIDER_URL% will be replaced with actual values
 # when built using the above script.
 version: '3.4'
@@ -9,7 +9,6 @@ services:
       context: ./build
       args:
         UPSTREAM_VERSION: '%UPSTREAM_VERSION%'
-    network_mode: host
     # Lines between *_JSON_EXPORT are intentionally also a valid JSON
     # Info: a hoprd node should never consume more than 1GByte of memory
     # DO NOT REMOVE
@@ -22,9 +21,6 @@ services:
         'HOPRD_ENVIRONMENT=%ENV_ID%',
         'HOPRD_HOST=0.0.0.0:9091',
         'HOPRD_ANNOUNCE=false',
-        'HOPRD_ADMIN=true',
-        'HOPRD_ADMIN_HOST=0.0.0.0',
-        'HOPRD_ADMIN_PORT=3000',
         'HOPRD_API=true',
         'HOPRD_API_HOST=0.0.0.0',
         'HOPRD_API_PORT=3001',

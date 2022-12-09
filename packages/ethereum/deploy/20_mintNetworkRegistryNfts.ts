@@ -32,11 +32,10 @@ const getToCreateDummyNftIndexes = async (
     }
     mintedIndex++
   }
-
   const dummyNftIndexsToMint =
-    mintedIndex > shouldHaveIndexesBefore
+    mintedIndex >= shouldHaveIndexesBefore - 1
       ? []
-      : Array.from({ length: shouldHaveIndexesBefore - mintedIndex + 1 }, (_, i) => i + mintedIndex)
+      : Array.from({ length: shouldHaveIndexesBefore - mintedIndex - 1 }, (_, i) => i + mintedIndex)
 
   console.log(
     `To have HoprBoost NFT of ${NR_NFT_TYPE} type at index ${shouldHaveIndexesBefore}, ${dummyNftIndexsToMint.length} type(s) of dummy NFTs of indexes ${dummyNftIndexsToMint} should be minted.`

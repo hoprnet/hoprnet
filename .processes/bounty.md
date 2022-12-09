@@ -2,29 +2,42 @@
 
 The purpose of this process is to follow a consistent way of creating, funding, publishing, and marketing bounties at HOPR.
 
-## The bounty
+## A Bounty
 
-A bounty usually serves multiple goals.
+A bounty usually serves multiple purposes.
 
-1. Takes away workload from the _tech_ team as it allows external developers improve the HOPR protocol and the various applications/tools we maintain.
-2. Gives the _comm_ team the opportunity to showcase HOPR's involvement in open source.
+1. Takes away workload from the teams at HOPR as it allows external developers to improve the HOPR protocol and the various applications/tools we maintain.
+2. Gives the COM-Team the opportunity to showcase HOPR's involvement in open source.
 3. Allows us to build a relationship between HOPR and the bounty hunter (tech community).
 
 The primary goal of a bounty creator is to take into account all 3 aspects, and depending on the bounty, adjust accordingly.
 
-## How to
+## Bounty Admin Process
 
-### Creating a bounty
+### Creating the bounty
 
-- Create a GitHub issue using the [bounty template](../.github/ISSUE_TEMPLATE/bounty.md) in the repository where the bounty is most applicable.
-- Within each section of the template, provide the most concise details you can.
-- Feel free to expand on sections `Developing HOPR` and `What is HOPR?` with information more related to the bounty.
-- Creator makes a comment in the PR with an estimate of:
-  1. Prize of the bounty (in dollars).
-  2. Time required to complete the bounty (in days).
-- Bounty is sent to be reviewed by the [tech representatives](./development#tech-representatives), most importantly to make sure that:
-  1. Bounty does not disturb tech's roadmap.
-  2. Prize and time required make sense.
+1. The bounty admin approaches the program owner with a bounty idea and the program owner approves it. Optionally the bounty admin appoints a bounty expert to assist with the technical content.
+   - Sometimes the program owner may approache a person with a bounty idea and asks that person to be the bounty admin.
+2. The bounty admin creates a GitHub issue using the [bounty template](../.github/ISSUE_TEMPLATE/bounty.md) in the dedicated bounty repository **(Needs to be created)**
+   - Within each section of the template, provide the most concise details you can.
+   - Feel free to expand on sections `Developing HOPR` and `What is HOPR?` with information more related to the bounty.
+3. The bounty admin assignes herself/himself to the bounty as well as the program owner.
+   - If the bounty admin appoints a bounty expert the bounty admin assigns the bounty expert to the issue as well.
+4. The bounty admin assignes the dedicated bounty label to the issue.
+5. The bounty admin makes a comment in the GitHub issue (tagging the program owner) with an estimate of:
+   - The time required to complete the bounty (in hours).
+   - A guestimate of the bounty reward (in USD) based on a rate of ~50 USD per hour.
+
+### During the time the bounty hunter is working on the bounty
+
+- The bounty admin may be asked (by the program owner) to answer some questions related to the bounty (posted by the bounty hunter) that the program owner cannot answer herself/himself. The bounty admin may consult with the bounty expert before answering the questions.
+- In case of an emergency, the program owner might ask the bounty admin to get in touch with the bounty hunter directly to sort out the issue related to the bounty.
+
+### After the bounty hunter submits the work
+
+- The bounty admin (optionally: bounty expert) needs to review/test the submission and the bounty admin gives a reccomendation to the program owner. See xxxx
+
+## Program Owner Process
 
 ### Funding the bounty
 
@@ -68,13 +81,27 @@ In order to ensure that external contributions pass our CI tests, the bounty cre
 3. When work is complete, PR is merged into the branch, ensuring tests pass.
 4. If the bounty is a Dune Analytics query or dashboard, ensure that the full code of all queries got submitted via PR and the query/Dashboard got forked by the `hoprnet` Dune account.
 
-## Prizes and rewards
+## Payment of Rewards
 
-Depending on the prize's currency, there might be fluctuations in the price relative to the dollar amount.
+Bounty rewards are set in US Dollar. However, the program owner pays out the bounty in HOPR tokens reflecting the set UD Dollar amount.
 
-- Price decrease: Bounty creator may choose to tip the bounty hunter with the difference, but not necessary.
-- Price increase: Bounty creator is not allowed to change the prize, bounty hunter should receive set amount.
+- For example, consider the case where we choose 100 USD as the bounty reward and assume that at the time of publishing the bounty the HOPR token price equals 1 USD. A bounty hunter submits the work a month later and the program owner decides to pay out the bounty. In the meantime the HOPR token price drops to 0.5 USD. Therfore, the program owner pays out 200 HOPR token worth 100 USD at the time of payment.
 
-## Awarding the prize
+## How to deal with bad hunters and different submission qualities
 
-Before the bounty is awarded, one of the [tech representatives](./development#tech-representatives) has to approve the PR which was created to resolve the bounty.
+1. Bounty hunter submits a satisfactory solution that fullfills all deliverables outlined in the github issue within the specified deadlines (if any)
+
+   - Pay out the promised bounty reward
+
+2. Bounty hunter submits a solution of extraordinary quality exceeding the expectations outlined in the github issue
+
+   - Pay out the promised bounty reward and tip the bounty hunter. ** Maybe max 20% of the promised amount?**
+
+3. Bounty hunter submits a dis-satisfactory solution but it technically fullfills the deliverables outlined in the github issue
+
+   - Pay out the promised bounty reward
+   - program owner and bounty admin make a 'what went wrong' assessment of the github issue to minimize the probability that this happens again in the future.
+
+4. Bounty hunter disappears
+   - Program owner does **NOT** pay out the bounty reward
+   - Program owner checks with the bounty admin whether is makes sense to re-assign the bounty to someone else or whether the bounty gets canceled

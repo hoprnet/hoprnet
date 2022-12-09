@@ -39,6 +39,10 @@ Represents a snapshot in the blockchain.
 | `transactionIndex` | `BN` |
 | `logIndex` | `BN` |
 
+#### Defined in
+
+[src/types/snapshot.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L9)
+
 ## Properties
 
 ### blockNumber
@@ -79,6 +83,10 @@ ___
 
 `number`
 
+#### Defined in
+
+[src/types/snapshot.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L28)
+
 ## Methods
 
 ### serialize
@@ -88,6 +96,10 @@ ___
 #### Returns
 
 `Uint8Array`
+
+#### Defined in
+
+[src/types/snapshot.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L20)
 
 ___
 
@@ -104,3 +116,7 @@ ___
 #### Returns
 
 [`Snapshot`](Snapshot.md)
+
+#### Defined in
+
+[src/types/snapshot.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L11)
