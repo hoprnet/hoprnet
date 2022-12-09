@@ -110,6 +110,10 @@ contract EnvironmentConfig is Script {
   }
 
   function writeCurrentEnvironment() internal {
+    // if currentEnvironmentName is anvil-localhost, update both `anvil-localhost` and `anvil-localhost2`
+    if (keccak256(bytes(currentEnvironmentName)) == keccak256(bytes('anvil-localhost'))) {
+      writeEnvironment('anvil-localhost2', currentEnvironmentDetail);
+    }
     writeEnvironment(currentEnvironmentName, currentEnvironmentDetail);
   }
 
