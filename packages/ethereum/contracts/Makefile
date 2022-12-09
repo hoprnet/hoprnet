@@ -38,7 +38,10 @@ anvil-deploy-contracts: ensure-environment-is-set
 	FOUNDRY_PROFILE=$(environment-type) ENVIRONMENT_NAME=$(environment-name) forge script --broadcast script/DeployAll.s.sol:DeployAllContractsScript
 
 .PHONY: anvil-deploy-all
-anvil-deploy-all: anvil-deploy-erc1820
+anvil-deploy-all: 
+ifeq ($(shell cast code 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24), "0x")
+	anvil-deploy-erc1820
+endif
 	make anvil-deploy-contracts environment-name=anvil-localhost environment-type=development
 
 .PHONY: update-protocol-config
