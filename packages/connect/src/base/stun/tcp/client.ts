@@ -109,7 +109,10 @@ function createRequest(
       return
     }
     done = true
-    error(err)
+    // Ignore timeouts
+    if (err.type !== 'abort') {
+      error(err)
+    }
     onUpdate({ transactionId: tId })
     socket.destroy()
   }
