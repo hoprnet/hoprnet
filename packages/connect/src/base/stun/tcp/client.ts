@@ -110,8 +110,7 @@ function createRequest(
     }
     done = true
     // Ignore timeouts
-    if (err.type !== 'abort') {
-      console.log(err)
+    if (err.type !== 'abort' && err.code !== 'ABORT_ERR') {
       error(err)
     }
     onUpdate({ transactionId: tId })
