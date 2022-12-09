@@ -534,6 +534,8 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       }
     }
 
+    log(`External interface seems to be ${externalInterface.address}:${externalInterface.port}`)
+
     const isExposed = await isExposedHost(
       usableStunServers,
       (listener: (socket: TCPSocket, stream: AsyncIterable<Uint8Array>) => void): (() => void) => {

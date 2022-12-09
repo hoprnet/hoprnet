@@ -56,11 +56,12 @@ export async function getExternalIp(
   return (
     await performSTUNRequests(
       (function* () {
+        // Intermediate solution, to be changed once more nodes are upgraded
+        // Fallback option
+        yield* PUBLIC_UDP_STUN_SERVERS
         if (multiAddrs != undefined && multiAddrs.length > 0) {
           yield* randomIterator(multiAddrs)
         }
-        // Fallback option
-        yield* PUBLIC_UDP_STUN_SERVERS
       })(),
       socket,
       undefined
@@ -92,10 +93,12 @@ export async function isExposedHost(
   // receive TCP packets on that port.
   const udpMapped = await isUdpExposedHost(
     (function* () {
+      // Intermediate solution, to be changed once more nodes are upgraded
+      yield* PUBLIC_UDP_RFC_5780_SERVERS
+
       if (multiAddrs != undefined && multiAddrs.length > 0) {
         yield* randomIterator(multiAddrs)
       }
-      yield* PUBLIC_UDP_RFC_5780_SERVERS
     })(),
     udpSocket,
     undefined,
@@ -105,10 +108,12 @@ export async function isExposedHost(
 
   const tcpMapped = await isTcpExposedHost(
     (function* () {
+      // Intermediate solution, to be changed once more nodes are upgraded
+      yield* PUBLIC_TCP_RFC_5780_SERVERS
+
       if (multiAddrs != undefined && multiAddrs.length > 0) {
         yield* randomIterator(multiAddrs)
       }
-      yield* PUBLIC_TCP_RFC_5780_SERVERS
     })(),
     addTcpProtocolListener,
     undefined,
