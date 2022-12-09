@@ -12,7 +12,6 @@ declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="testnet"
 source "${mydir}/utils.sh"
-source "${mydir}/gcloud.sh"
 source "${mydir}/dns.sh"
 
 # API used for funding the calls, source code in https://github.com/hoprnet/api

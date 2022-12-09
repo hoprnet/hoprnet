@@ -126,14 +126,15 @@ function cleanup {
 
   local log exit_code non_zero
   for node_log in "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}" "${node5_log}" "${node6_log}" "${node7_log}"; do
-    log=$(grep -E ${node_log} "Process exiting with signal [0-9]")
+    log=$(grep -E ${node_log} "Process exiting with signal [0-9]" || echo "")
 
     if [ -z "${log}" ]; then
       log "${node_log}: Process did not exit properly"
-      exit 1
+      exit_code=1
+    else
+      exit_code=$(echo ${log} | sed -E "s/.*signal[ ]([0-9]+).*/\1/")
     fi
 
-    exit_code=$(echo ${log} | sed -E "s/.*signal[ ]([0-9]+).*/\1/")
     if [ ${exit_code} != "0" ]; then
       non_zero=true
       log "${node_log}: terminated with non-zero exit code ${exit_code}"
@@ -307,18 +308,12 @@ done
 declare protocol_config="${mydir}/../packages/core/protocol-config.json"
 declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
 
-# --- Cleanup old contract deployments {{{
-log "Removing artifacts from old contract deployments"
-cleanup_local_protocol_config "${protocol_config}" "anvil-localhost"
-cleanup_local_protocol_config "${protocol_config}" "anvil-localhost2"
-# }}}
-
 # --- Running Mock Blockchain --- {{{
 ${mydir}/run-local-anvil.sh "${anvil_rpc_log}"
 
 # need to mirror contract data because of anvil-deploy node only writing to localhost {{{
-update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost"
-update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost2"
+update_protocol_config_addresses "${protocol_config}" "anvil-localhost" "anvil-localhost"
+update_protocol_config_addresses "${protocol_config}" "anvil-localhost" "anvil-localhost2"
 # }}}
 
 # static address because static private key

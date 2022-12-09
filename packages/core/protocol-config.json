@@ -4,15 +4,15 @@
       "network_id": "anvil",
       "environment_type": "development",
       "version_range": "*",
-      "channel_contract_deploy_block": "2",
-      "token_contract_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-      "channels_contract_address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
+      "channel_contract_deploy_block": "",
+      "token_contract_address": "",
+      "channels_contract_address": "",
       "minted_token_receiver_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
-      "xhopr_contract_address": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
-      "boost_contract_address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
-      "stake_contract_address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
-      "network_registry_proxy_contract_address": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
-      "network_registry_contract_address": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
+      "xhopr_contract_address": "",
+      "boost_contract_address": "",
+      "stake_contract_address": "",
+      "network_registry_proxy_contract_address": "",
+      "network_registry_contract_address": "",
       "tags": []
     },
     "anvil-localhost2": {
@@ -43,7 +43,9 @@
       "stake_contract_address": "0xab231873246daaff05c99b3682ea649e6C80AB68",
       "network_registry_proxy_contract_address": "0xb311239b46feCde9D68d70Ae4bA8733C3dBC7023",
       "network_registry_contract_address": "0xf3374666487A58aa424BF9dB9bCf74250393a757",
-      "tags": ["etherscan"]
+      "tags": [
+        "etherscan"
+      ]
     },
     "debug-goerli": {
       "network_id": "goerli",
@@ -58,7 +60,9 @@
       "xhopr_contract_address": "0x552aBf0EBCd6B6162519132A831C181f87e46874",
       "boost_contract_address": "0x1c5Fe2Ac0D6Ec7a4213004CCB4aC35A71aF5aCd9",
       "network_registry_proxy_contract_address": "0xe08280669faDA942d550c0bcAA9Bd6484a19abd8",
-      "tags": ["development"]
+      "tags": [
+        "development"
+      ]
     },
     "tuttlingen": {
       "environment_type": "production",
@@ -140,7 +144,9 @@
       "stake_contract_address": "0x5Bb7e435aDa333A6714e27962e4Bb6aFDE1cECd4",
       "network_registry_contract_address": "0xf0D4D48866C4F9665212B29A64c14A1f0FEDFD4c",
       "network_registry_proxy_contract_address": "0x15e068Ef1f76319b1848b1fcB3e49D68724AEE07",
-      "tags": ["etherscan"]
+      "tags": [
+        "etherscan"
+      ]
     },
     "monte_rosa": {
       "network_id": "xdai",
@@ -154,7 +160,9 @@
       "stake_contract_address": "0xd80fbbfe9d057254d80eebb49f17aca66a238e2d",
       "network_registry_contract_address": "0x819E6a81e1e3f96CF1ac9200477C2d09c676959D",
       "network_registry_proxy_contract_address": "0x1C0C4EFb9a2ccE18d66eaFFc585876d8CA768013",
-      "tags": ["etherscan"]
+      "tags": [
+        "etherscan"
+      ]
     }
   },
   "networks": {
