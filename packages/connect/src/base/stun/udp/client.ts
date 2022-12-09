@@ -1,15 +1,12 @@
 import { type Socket, createSocket, type RemoteInfo } from 'dgram'
-
-// @ts-ignore untyped module
-import { decode, constants, createMessage, createTransaction, validateFingerprint } from 'stun'
+import debug from 'debug'
+import { Multiaddr } from '@multiformats/multiaddr'
+import { decode, constants, createMessage, createTransaction } from 'stun'
 
 import { isStun } from '../../../utils/index.js'
 
 // @ts-ignore untyped module
 import retimer from 'retimer'
-
-import debug from 'debug'
-import { Multiaddr } from '@multiformats/multiaddr'
 
 import {
   u8aToHex,
@@ -218,7 +215,7 @@ function sendStunRequest(multiaddr: Multiaddr, tId: Buffer, responsePort: number
       error(err.message)
     } else {
       verbose(
-        `STUN request successfully sent to ${address}:${port} Transaction: ${u8aToHex(tId)}${
+        `STUN request successfully sent to ${address}:${port}, transaction ${u8aToHex(tId)}${
           responsePort != undefined ? ` port ${responsePort}` : ''
         }`
       )
@@ -389,7 +386,6 @@ export function isUdpExposedHost(
     let stopListeningSecondary: () => void
 
     const end = () => {
-      log(`ending`)
       stopListening()
       stopListeningSecondary()
       secondarySocket.close()
@@ -420,7 +416,7 @@ export function isUdpExposedHost(
       const request = requests.get(tIdString)
 
       if (request == undefined) {
-        verbose(`Received unexpected STUN response from. Dropping response`)
+        verbose(`Received unexpected STUN response. Dropping response`)
         return
       }
 
@@ -436,11 +432,11 @@ export function isUdpExposedHost(
       const request = requests.get(tIdString)
 
       if (request == undefined) {
-        verbose(`Received unexpected STUN response from. Dropping response`)
+        verbose(`Received unexpected STUN response. Dropping response`)
         return
       }
 
-      log(`update secondary`, request.state, tIdString)
+      log(`Received RFC 5780 STUN response on secondary interface, transaction ${tIdString}`)
 
       request.timeout.clear()
       requests.delete(tIdString)
@@ -473,8 +469,9 @@ export function isUdpExposedHost(
           )
           break
         case STUN_QUERY_STATE.CHECKING_PORT_MAPPING:
-          // STUN server does not understand RESPONSE_PORT extension
-          log(`not useful, move to next`)
+          verbose(
+            `Received unexpected RFC 5780 response on secondary port, server does not support RESPONSE_PORT extension, transaction ${tIdString}`
+          )
           nextSTUNRequest(
             it,
             requests,
@@ -498,7 +495,7 @@ export function isUdpExposedHost(
         return
       }
 
-      log(`Update primary`, request.state, tIdString)
+      verbose(`Received RFC 5780 STUN response, transaction ${tIdString}`)
 
       request.timeout.clear()
       requests.delete(tIdString)
@@ -533,7 +530,6 @@ export function isUdpExposedHost(
       resolve(STUN_EXPOSED_CHECK_RESPOSE.UNKNOWN)
     }
 
-    log(`first measurement`)
     nextSTUNRequest(
       it,
       requests,

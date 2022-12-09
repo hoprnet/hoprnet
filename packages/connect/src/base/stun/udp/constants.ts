@@ -2,7 +2,10 @@ import { Multiaddr } from '@multiformats/multiaddr'
 
 export const STUN_UDP_TIMEOUT = 700
 
+// To be extended
 export const PUBLIC_UDP_RFC_5780_SERVERS = [
+  // see https://github.com/hoprnet/hoprnet/issues/4416
+  // new Multiaddr(`/dns4/stun.hoprnet.org/tcp/3478`),
   new Multiaddr(`/dns4/stun.bluesip.net/udp/3478`),
   new Multiaddr(`/dns4/stun.stunprotocol.org/udp/3478`)
 ]

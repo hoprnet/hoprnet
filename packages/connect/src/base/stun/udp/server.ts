@@ -1,12 +1,8 @@
 import { type Socket, type RemoteInfo } from 'dgram'
-
-// @ts-ignore untyped module
 import { decode, constants, createMessage } from 'stun'
-
-import { isStun } from '../../../utils/index.js'
-
 import debug from 'debug'
 
+import { isStun } from '../../../utils/index.js'
 import { isStunRequest, kStunTypeMask } from '../constants.js'
 
 const verbose = debug('hopr-connect:verbose:stun')

@@ -1,5 +1,6 @@
 import { Multiaddr } from '@multiformats/multiaddr'
 
+// To be extended
 export const PUBLIC_TCP_RFC_5780_SERVERS = [
   // see https://github.com/hoprnet/hoprnet/issues/4416
   // new Multiaddr(`/dns4/stun.hoprnet.org/tcp/3478`),

@@ -482,13 +482,15 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
   }
 
   /**
-   * Tries to determine a node's public IP address by
-   * using STUN servers
+   * *Tries* to determine the node's NAT situation. Note that this
+   * is *not* an exact science and can lead to incorrect results.
+   *
    * @param ownAddress the host on which we are listening
    * @param ownPort the port on which we are listening
    * @returns Promise that resolves once STUN request came back or STUN timeout was reched
    */
   async checkNATSituation(ownAddress: string, ownPort: number): Promise<NATSituation> {
+    // Continously contacts other stun servers to preserve NAT mapping
     this.stopUdpSocketKeepAliveInterval = retimer(
       async () => {
         const multiaddrs = this.getUsableStunServers(ownAddress, ownPort)
@@ -499,7 +501,6 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
         }
 
         log(`Re-allocating NAT UDP mapping`, multiaddrs)
-
         await getExternalIp(multiaddrs, this.udpSocket, this.testingOptions.__preferLocalAddresses)
       },
       // Following recommendations of https://www.rfc-editor.org/rfc/rfc5626

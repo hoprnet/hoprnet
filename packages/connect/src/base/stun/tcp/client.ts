@@ -42,10 +42,14 @@ type Request = {
 type Requests = Map<string, Request>
 
 /**
- * Encodes STUN message and sends it using the given socket
- * to a STUN server.
+ * Encodes STUN message and sends it to the STUN server using
+ * a secondary TCP connection.
+ *
  * @param multiaddr address to contact
- * @param tId
+ * @param tId transactionId, used to distinguish requests
+ * @param responsePort port on which the response is expected
+ * @param signal used to terminate request
+ * @param onUpdate callback, called on incoming responses
  */
 function createRequest(
   multiaddr: Multiaddr,
@@ -53,7 +57,7 @@ function createRequest(
   responsePort: number | undefined,
   signal: AbortSignal,
   onUpdate: (response: { response?: Interface; transactionId: Buffer }) => void
-) {
+): void {
   const tuples = multiaddr.tuples()
 
   if (tuples.length == 0) {
@@ -83,6 +87,7 @@ function createRequest(
 
   // Response port can be 0
   if (responsePort != undefined) {
+    // Ask the STUN server to reply on a specific port, see RFC 5780
     message.addAttribute(constants.STUN_ATTR_RESPONSE_PORT, responsePort)
   }
 
@@ -91,6 +96,7 @@ function createRequest(
 
   let done = false
 
+  // Creates a secondary connection
   const socket = createConnection({
     port: port as number,
     host: address,
@@ -213,6 +219,15 @@ function nextSTUNRequest(
   return nextSTUNRequest.transactionId
 }
 
+/**
+ * Checks whether host is exposed on TCP listening port, using
+ * RFC 5780 STUN protocol.
+ * @param multiaddrs list of RFC 5780 STUN servers to contact
+ * @param addListener adds a listener to the *existing* TCP socket
+ * @param timeout [optional] specify custom timeout
+ * @param stunPort port where the response is expected
+ * @param runningLocally [optional] local-mode, used for unit and e2e testing
+ */
 export function isTcpExposedHost(
   multiaddrs: Iterable<Multiaddr>,
   addListener: (listener: (socket: Socket, stream: AsyncIterable<Uint8Array>) => void) => () => void,
@@ -225,6 +240,7 @@ export function isTcpExposedHost(
   }
 
   return new Promise<STUN_EXPOSED_CHECK_RESPOSE>(async (resolve) => {
+    // Holds sent requests, used to link incoming responses to previous requests
     const requests = new Map<string, Request & { state: STUN_QUERY_STATE }>()
 
     let removeListener: () => void
@@ -235,11 +251,15 @@ export function isTcpExposedHost(
 
     const it = multiaddrs[Symbol.iterator]()
 
+    /**
+     * Called once requests on secondary sockets time out.
+     * @param transactionId used to link to sent requests
+     */
     const onTimeoutSecondary = (transactionId: Buffer) => {
       const tIdString = u8aToHex(transactionId)
       requests.delete(tIdString)
 
-      log(`onTimeout secondary`, tIdString)
+      verbose(`RFC 5780 STUN request on secondary socket timed out, transaction ${tIdString}`)
 
       nextSTUNRequest(
         it,
@@ -253,16 +273,24 @@ export function isTcpExposedHost(
       )
     }
 
+    /**
+     * Called once request to be received on primary TCP socket times out
+     * @param transactionId used to link to sent requests
+     */
     const onTimeoutPrimary = (transactionId: Buffer) => {
       const tIdString = u8aToHex(transactionId)
       requests.delete(tIdString)
 
-      log(`onTimeout primary`, tIdString)
+      log(`RFC 5780 STUN request on primary socket timed out, transaction ${tIdString}`)
 
       end()
       resolve(STUN_EXPOSED_CHECK_RESPOSE.NOT_EXPOSED)
     }
 
+    /**
+     * Called once secondary TCP socket receives a STUN response
+     * @param response the STUN response
+     */
     const updateSecondary = (response: { response?: Interface; transactionId: Buffer }) => {
       const tIdString = u8aToHex(response.transactionId)
       const request = requests.get(tIdString)
@@ -321,6 +349,10 @@ export function isTcpExposedHost(
       }
     }
 
+    /**
+     * Called once primary TCP socket receives a STUN response
+     * @param response the STUN response
+     */
     const updatePrimary = (response: { response?: Interface; transactionId: Buffer }) => {
       const tIdString = u8aToHex(response.transactionId)
       const request = requests.get(tIdString)
@@ -354,11 +386,19 @@ export function isTcpExposedHost(
       }
     }
 
+    /**
+     * Called on errors
+     */
     const onError = () => {
       end()
       resolve(STUN_EXPOSED_CHECK_RESPOSE.UNKNOWN)
     }
 
+    /**
+     * TCP connection listeners, called once TCP multiplexer detects STUN packets
+     * @param _socket not used by this function
+     * @param stream packet stream to drain
+     */
     const onConnection = async (_socket: Socket, stream: AsyncIterable<Uint8Array>) => {
       for await (const data of stream) {
         const response = decode(
@@ -384,6 +424,7 @@ export function isTcpExposedHost(
 
     removeListener = addListener(onConnection)
 
+    // Initiate search for usable RFC 5780 STUN server
     nextSTUNRequest(
       it,
       requests,

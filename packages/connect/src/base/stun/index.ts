@@ -22,7 +22,7 @@ const log = debug('hopr-connect:stun')
 
 /**
  * Tries to determine the external IPv4 address using STUN over UDP
- * @returns Addr+Port or undefined if the STUN response are ambiguous (e.g. bidirectional NAT)
+ * @returns Addr+Port or undefined if the STUN responses are ambiguous (e.g. due to bidirectional NAT)
  *
  * @param multiAddrs Multiaddrs to use as STUN servers
  * @param socket Node.JS socket to use for the STUN request
@@ -69,12 +69,15 @@ export async function getExternalIp(
 }
 
 /**
+ * Checks whether a given port is publicly accessible using TCP *and* UDP.
+ *
+ * Used to determine whether a node can act as a public relay node.
  *
  * @param multiAddrs list of STUN servers
- * @param tcpServer tcp server to use for outgoing
- * @param udpSocket
- * @param port
- * @param runningLocally
+ * @param addTcpProtocolListener adds a connection listener to an *existing* TCP socket
+ * @param udpSocket UDP socket to send and receive messages
+ * @param port port to be checked
+ * @param runningLocally [testing] local-mode STUN, used for unit and e2e testing
  * @returns
  */
 export async function isExposedHost(
@@ -85,7 +88,7 @@ export async function isExposedHost(
   runningLocally = false
 ): Promise<boolean> {
   // Performs a STUN request from the given socket and thereby creates
-  // a mapping in the DHT. In some cases, this is sufficient to also
+  // a mapping in the NAT table. In some cases, this is sufficient to also
   // receive TCP packets on that port.
   const udpMapped = await isUdpExposedHost(
     (function* () {
@@ -113,7 +116,11 @@ export async function isExposedHost(
     runningLocally
   )
 
-  log(`NAT measurement: TCP ${exposedResponseToString(tcpMapped)}, UDP ${exposedResponseToString(udpMapped)}`)
+  log(
+    `NAT measurement: TCP socket ${exposedResponseToString(tcpMapped)}, UDP socket ${exposedResponseToString(
+      udpMapped
+    )}`
+  )
 
   switch (tcpMapped) {
     case STUN_EXPOSED_CHECK_RESPOSE.EXPOSED:

@@ -1,19 +1,19 @@
 import { type AddressInfo, type Socket, createConnection } from 'net'
-
-// @ts-ignore untyped module
+import debug from 'debug'
 import { decode, constants, createMessage } from 'stun'
 
 import { isStun } from '../../../utils/index.js'
-
-import debug from 'debug'
-
 import { isStunRequest, kStunTypeMask } from '../constants.js'
 
 const verbose = debug('hopr-connect:verbose:stun:tcp')
 
 /**
- * Handles STUN requests
- * @param socket Node.JS TCP socket to use
+ * Handles TCP STUN requests, mostly used by other nodes
+ * to determine whether TCP socket is exposed to public.
+ *
+ * Called once TCP multiplexer detects STUN traffic
+ *
+ * @param socket TCP socket of incoming STUN traffic
  * @param __fakeRInfo [testing] overwrite incoming information to intentionally send misleading STUN response
  */
 export async function handleTcpStunRequest(
