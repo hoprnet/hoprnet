@@ -78,6 +78,7 @@ export async function handleTcpStunRequest(
         // To be compliant with RFC 3489
         if (request.isLegacy()) {
           // Copy magic STUN cookie as specified by RFC 5389
+          // @ts-ignore issue with typings for Symbol index properties
           response[Symbol.for('kCookie')] = request[Symbol.for('kCookie')]
           response.addAttribute(constants.STUN_ATTR_MAPPED_ADDRESS, addrInfo.address, addrInfo.port)
           socket.write(response.toBuffer())
@@ -90,7 +91,7 @@ export async function handleTcpStunRequest(
         // RESPONSE_PORT can be 0
         const responsePort = request.getAttribute(constants.STUN_ATTR_RESPONSE_PORT)
         if (responsePort != undefined) {
-          replyPort = responsePort.value
+          replyPort = responsePort.value as number
         }
 
         // Comply with RFC 5780
@@ -104,9 +105,9 @@ export async function handleTcpStunRequest(
           const secondarySocket = createConnection(replyPort, replyAddress, () => {
             secondarySocket.write(response.toBuffer(), () => {
               secondarySocket.end()
-              socket.end()
             })
           })
+          socket.end()
         } else {
           socket.write(response.toBuffer(), () => {
             socket.end()

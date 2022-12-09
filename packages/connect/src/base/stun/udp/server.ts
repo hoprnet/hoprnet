@@ -71,6 +71,7 @@ export function handleUdpStunRequest(
       // To be compliant with RFC 3489
       if (request.isLegacy()) {
         // Copy magic STUN cookie as specified by RFC 5389
+        // @ts-ignore issue with typings for Symbol index properties
         response[Symbol.for('kCookie')] = request[Symbol.for('kCookie')]
         response.addAttribute(constants.STUN_ATTR_MAPPED_ADDRESS, addrInfo.address, addrInfo.port)
         socket.send(response.toBuffer(), rinfo.port, replyAddress)
@@ -82,7 +83,7 @@ export function handleUdpStunRequest(
       // RESPONSE_PORT can be 0
       const responsePort = request.getAttribute(constants.STUN_ATTR_RESPONSE_PORT)
       if (responsePort != undefined) {
-        replyPort = responsePort.value
+        replyPort = responsePort.value as number
       }
 
       // Comply with RFC 5780

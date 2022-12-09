@@ -1,14 +1,13 @@
 import { type Socket, createConnection } from 'net'
 
-// @ts-ignore untyped module
-import { decode, constants, createMessage, createTransaction, validateFingerprint } from 'stun'
+import { decode, constants, createMessage, createTransaction } from 'stun'
 
 // @ts-ignore untyped module
 import retimer from 'retimer'
 
 import { Multiaddr } from '@multiformats/multiaddr'
 
-import { u8aToHex, u8aAddrToString, u8aToNumber } from '@hoprnet/hopr-utils'
+import { u8aToHex, u8aAddrToString, u8aToNumber, u8aEquals } from '@hoprnet/hopr-utils'
 import { STUN_TCP_TIMEOUT } from './constants.js'
 import { CODE_IP4, CODE_IP6, CODE_DNS4, CODE_DNS6 } from '../../../constants.js'
 import {
@@ -138,7 +137,7 @@ function createRequest(
           response: response.getXorAddress() ?? response.getAddress(),
           transactionId: response.transactionId
         })
-        if (response.transactionId === u8aToHex(tId)) {
+        if (u8aEquals(response.transactionId, tId)) {
           done = true
           socket.end()
           socket.destroy()
@@ -151,14 +150,14 @@ function createRequest(
         onUpdate({
           transactionId: response.transactionId
         })
-        if (response.transactionId === u8aToHex(tId)) {
+        if (u8aEquals(response.transactionId, tId)) {
           done = true
           socket.end()
           socket.destroy()
         }
         break
       default:
-        log(`secondary unknown STUN response`, data)
+        log(`secondary socket: unknown STUN response`, data)
         break
     }
   })
@@ -231,7 +230,6 @@ export function isTcpExposedHost(
     let removeListener: () => void
 
     const end = () => {
-      log(`ending`)
       removeListener()
     }
 
@@ -295,6 +293,7 @@ export function isTcpExposedHost(
 
       switch (request.state) {
         case STUN_QUERY_STATE.SEARCHING_RFC_5780_STUN_SERVER:
+          // STUN server is online, let's see if it supports RESPONSE_PORT extension
           nextSTUNRequest(
             [request.multiaddr][Symbol.iterator](),
             requests,
@@ -308,7 +307,6 @@ export function isTcpExposedHost(
           break
         case STUN_QUERY_STATE.CHECKING_PORT_MAPPING:
           // STUN server does not understand RESPONSE_PORT extension
-          log(`not useful, move to next`)
           nextSTUNRequest(
             it,
             requests,
@@ -378,7 +376,7 @@ export function isTcpExposedHost(
             // handled by STUN server, ignoring
             break
           default:
-            log(`primary unknown STUN response`, data)
+            log(`primary socket: unknown STUN response`, data)
             break
         }
       }
@@ -386,7 +384,6 @@ export function isTcpExposedHost(
 
     removeListener = addListener(onConnection)
 
-    log(`first measurement`)
     nextSTUNRequest(
       it,
       requests,
