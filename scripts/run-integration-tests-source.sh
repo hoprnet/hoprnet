@@ -312,8 +312,8 @@ declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-a
 ${mydir}/run-local-anvil.sh "${anvil_rpc_log}"
 
 # need to mirror contract data because of anvil-deploy node only writing to localhost {{{
-update_protocol_config_addresses "${protocol_config}" "anvil-localhost" "anvil-localhost"
-update_protocol_config_addresses "${protocol_config}" "anvil-localhost" "anvil-localhost2"
+update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost"
+update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost2"
 # }}}
 
 # static address because static private key

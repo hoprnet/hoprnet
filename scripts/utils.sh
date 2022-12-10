@@ -6,6 +6,7 @@ test "$?" -eq "0" || { echo "This script should only be sourced." >&2; exit 1; }
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
+set -x
 
 # $1=version string, semver
 function get_version_maj_min() {
@@ -316,18 +317,23 @@ get_authenticated_curl_cmd() {
   echo "${cmd}"
 }
 
-# $1 - protocol_config path to protocol-config.json
+# $1 - target file
+# $2 - source file
 # $2 - source_environment_id environment name of source e.g. anvil-localhost
 # $3 - destination_environment_id environment name of destination e.g. anvil-localhost2
 update_protocol_config_addresses() {
-  local protocol_config="${1}"
-  local source_environment_id="${2}"
-  local destination_environment_id="${3}"
+  local target_file="${1}"
+  local source_file="${2}"
+  local source_environment_id="${3}"
+  local destination_environment_id="${4}"
 
   log "updating contract addresses in protocol configuration"
 
-  jq ".environments.\"${destination_environment_id}\" = .environments.\"${source_environment_id}\"" > "${protocol_config}.new"
-  mv "${protocol_config}.new" "${protocol_config}"
+  local source_data
+
+  source_data="$(jq -r ".environments.\"${source_environment_id}\"" "${source_file}")"
+
+  jq --argjson inputdata "${source_data}" ".environments.\"${destination_environment_id}\" = $inputdata" > "${target_file}"
 
   log "contract addresses are updated in protocol configuration"
 }
