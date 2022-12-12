@@ -65,7 +65,9 @@ export async function getExternalIp(
       (function* () {
         // Intermediate solution, to be changed once more nodes are upgraded
         // Fallback option
-        yield* PUBLIC_UDP_STUN_SERVERS
+        if (!__preferLocalAddress) {
+          yield* PUBLIC_UDP_STUN_SERVERS
+        }
         if (multiAddrs != undefined && multiAddrs.length > 0) {
           yield* randomIterator(multiAddrs)
         }
@@ -93,7 +95,8 @@ export async function isExposedHost(
   addTcpProtocolListener: (listener: (socket: TCPSocket, stream: AsyncIterable<Uint8Array>) => void) => () => void,
   udpSocket: Socket,
   port: number,
-  runningLocally = false
+  runningLocally = false,
+  standaloneTest = false
 ): Promise<boolean> {
   // Performs a STUN request from the given socket and thereby creates
   // a mapping in the NAT table. In some cases, this is sufficient to also
@@ -101,7 +104,9 @@ export async function isExposedHost(
   const udpMapped = await isUdpExposedHost(
     (function* () {
       // Intermediate solution, to be changed once more nodes are upgraded
-      yield* PUBLIC_UDP_RFC_5780_SERVERS
+      if (!standaloneTest) {
+        yield* PUBLIC_UDP_RFC_5780_SERVERS
+      }
 
       if (multiAddrs != undefined && multiAddrs.length > 0) {
         yield* randomIterator(multiAddrs)
@@ -110,13 +115,16 @@ export async function isExposedHost(
     udpSocket,
     undefined,
     port,
-    runningLocally
+    runningLocally,
+    standaloneTest
   )
 
   const tcpMapped = await isTcpExposedHost(
     (function* () {
       // Intermediate solution, to be changed once more nodes are upgraded
-      yield* PUBLIC_TCP_RFC_5780_SERVERS
+      if (!standaloneTest) {
+        yield* PUBLIC_TCP_RFC_5780_SERVERS
+      }
 
       if (multiAddrs != undefined && multiAddrs.length > 0) {
         yield* randomIterator(multiAddrs)

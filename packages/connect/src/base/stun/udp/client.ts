@@ -299,7 +299,6 @@ export function performSTUNRequests(
       }
 
       request.timeout.clear()
-
       if (response.response == undefined || !isUsableResult(response.response, runningLocally)) {
         requests.delete(tIdString)
 
@@ -355,8 +354,10 @@ export function isUdpExposedHost(
   socket: Socket,
   timeout = STUN_UDP_TIMEOUT,
   stunPort = socket.address().port,
-  runningLocally = false
+  runningLocally = false,
+  standaloneTest = false
 ): Promise<STUN_EXPOSED_CHECK_RESPOSE> {
+  // @TODO replace this by proper support for initial (first) bootstrap node
   if (runningLocally) {
     return Promise.resolve(STUN_EXPOSED_CHECK_RESPOSE.EXPOSED)
   }
@@ -369,11 +370,13 @@ export function isUdpExposedHost(
       lookup: ip6Lookup
     })
 
+    await new Promise<void>((resolve) => secondarySocket.bind(resolve))
+
     const [secondaryInterface, usedStunServers] = await performSTUNRequests(
       multiaddrs,
       secondarySocket,
       timeout,
-      runningLocally
+      standaloneTest
     )
 
     if (secondaryInterface == undefined) {

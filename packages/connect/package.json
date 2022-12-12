@@ -82,7 +82,7 @@
   },
   "mocha": {
     "spec": [
-      "lib/base/stun/index.spec.js"
+      "lib/**/*.spec.js"
     ]
   },
   "publishConfig": {
