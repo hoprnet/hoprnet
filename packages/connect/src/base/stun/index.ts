@@ -4,6 +4,8 @@ import { type Socket as TCPSocket } from 'net'
 import { Multiaddr } from '@multiformats/multiaddr'
 import debug from 'debug'
 
+import { create_gauge } from '@hoprnet/hopr-utils'
+
 import { randomIterator } from '../../utils/index.js'
 import { isUdpExposedHost, performSTUNRequests } from './udp/index.js'
 
@@ -19,6 +21,11 @@ type Interface = {
 }
 
 const log = debug('hopr-connect:stun')
+
+const metric_isExposed = create_gauge(
+  `connect_node_is_exposed`,
+  `Shows whether a node believes to run on an exposed host`
+)
 
 /**
  * Tries to determine the external IPv4 address using STUN over UDP
@@ -127,25 +134,39 @@ export async function isExposedHost(
     )}`
   )
 
+  let isExposed: boolean
+
+  // Intermediate solution. To be hardened once more nodes are upgraded
   switch (tcpMapped) {
     case STUN_EXPOSED_CHECK_RESPOSE.EXPOSED:
       switch (udpMapped) {
         case STUN_EXPOSED_CHECK_RESPOSE.EXPOSED:
         case STUN_EXPOSED_CHECK_RESPOSE.UNKNOWN:
-          return true
+          isExposed = true
+          break
         default:
-          return false
+          isExposed = false
+          break
       }
+      break
     case STUN_EXPOSED_CHECK_RESPOSE.UNKNOWN:
       switch (udpMapped) {
         case STUN_EXPOSED_CHECK_RESPOSE.EXPOSED:
-          return true
+          isExposed = true
+          break
         default:
-          return false
+          isExposed = false
+          break
       }
+      break
     case STUN_EXPOSED_CHECK_RESPOSE.NOT_EXPOSED:
-      return false
+      isExposed = false
+      break
   }
+
+  metric_isExposed.set(isExposed ? 1 : 0)
+
+  return isExposed
 }
 
 export { handleTcpStunRequest, PUBLIC_RFC_5780_SERVERS } from './tcp/index.js'

@@ -110,7 +110,9 @@ function createRequest(
     }
     done = true
     // Ignore timeouts
-    if (err.type !== 'abort' && err.code !== 'ABORT_ERR') {
+    if (err.type === 'abort' || err.code === 'ABORT_ERR') {
+      verbose(`Timeout while contacting ${address}:${port}`)
+    } else {
       error(err)
     }
     onUpdate({ transactionId: tId })

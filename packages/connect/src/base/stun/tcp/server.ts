@@ -2,10 +2,15 @@ import { type AddressInfo, type Socket, createConnection } from 'net'
 import debug from 'debug'
 import { decode, constants, createMessage } from 'stun'
 
+import { create_counter } from '@hoprnet/hopr-utils'
+
 import { isStun } from '../../../utils/index.js'
 import { isStunRequest, kStunTypeMask } from '../constants.js'
 
 const verbose = debug('hopr-connect:verbose:stun:tcp')
+
+// Metrics
+const metric_tcpStunRequests = create_counter('connect_counter_tcp_stun_requests', 'Number of TCP STUN requests')
 
 /**
  * Handles TCP STUN requests, mostly used by other nodes
@@ -42,6 +47,8 @@ export async function handleTcpStunRequest(
     if (!isStun(data)) {
       return
     }
+
+    metric_tcpStunRequests.increment()
 
     const request = decode(Buffer.from(data.buffer, data.byteOffset, data.byteLength))
 
