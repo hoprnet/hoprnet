@@ -330,10 +330,9 @@ update_protocol_config_addresses() {
   log "updating contract addresses in protocol configuration"
 
   local source_data
-
   source_data="$(jq -r ".environments.\"${source_environment_id}\"" "${source_file}")"
-
-  jq --argjson inputdata "${source_data}" ".environments.\"${destination_environment_id}\" = $inputdata" > "${target_file}"
+  jq --argjson inputdata "${source_data}" ".environments.\"${destination_environment_id}\" += \$inputdata" "${target_file}" > "${target_file}.new"
+  mv "${target_file}.new" "${target_file}"
 
   log "contract addresses are updated in protocol configuration"
 }

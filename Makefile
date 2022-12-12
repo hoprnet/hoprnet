@@ -6,6 +6,9 @@ WORKSPACES_WITH_RUST_MODULES := $(wildcard $(addsuffix /crates, $(wildcard ./pac
 # Gets all individual crates such that they can get built
 CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(crate)/*/Cargo.toml)))
 
+# define specific crate for foundry-tool which is a native helper
+FOUNDRY_TOOL_CRATE := ./packages/ethereum/foundry-tool
+
 # Set local foundry directory (for binaries) and versions
 FOUNDRY_DIR := ${CURDIR}/.foundry
 FOUNDRY_VSN := e919a63
@@ -45,22 +48,21 @@ endif
 
 all: help
 
-
-.PHONY: $(CRATES) ## builds all Rust crates with wasm-pack (except for foundry-tool)
-$(CRATES):
+.PHONY: $(CRATES)
+$(CRATES): ## builds all Rust crates with wasm-pack (except for foundry-tool)
 # --out-dir is relative to working directory
 	echo "use wasm-pack build"
 	wasm-pack build --target=bundler --out-dir ./pkg $@
 
-.PHONY: ./packages/ethereum/crates/foundry-tool/ ## builds foundry-tool Rust crates with cargo
-./packages/ethereum/crates/foundry-tool/:
+.PHONY: $(FOUNDRY_TOOL_CRATE)
+$(FOUNDRY_TOOL_CRATE): ## builds foundry-tool Rust crates with cargo
 	echo "use cargo build"
 	cargo build --manifest-path $@/Cargo.toml
 # install the package
 	cargo install --path $@
 
-.PHONY: $(WORKSPACES_WITH_RUST_MODULES) ## builds all WebAssembly modules
-$(WORKSPACES_WITH_RUST_MODULES):
+.PHONY: $(WORKSPACES_WITH_RUST_MODULES)
+$(WORKSPACES_WITH_RUST_MODULES): ## builds all WebAssembly modules
 	$(MAKE) -C $@ install
 
 .PHONY: deps-ci
@@ -154,6 +156,8 @@ ifeq ($(origin NO_CARGO),undefined)
 	$(MAKE) -j 1 $(CRATES)
 # Copy bindings to their destination
 	$(MAKE) ${WORKSPACES_WITH_RUST_MODULES}
+# build foundry-tool
+	$(MAKE) $(FOUNDRY_TOOL_CRATE)
 endif
 
 .PHONY: build-yellowpaper
@@ -227,14 +231,14 @@ run-local: ## run HOPRd from local repo
 		--testPreferLocalAddresses --testNoAuthentication
 
 .PHONY: fund-local
-fund-local: # use faucet script to fund local identities
+fund-local: ## use faucet script to fund local identities
 	foundry-tool --environment-name anvil-localhost --environment-type development \
 		faucet --password local --use-local-identities --identity-directory "." \
 		--private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 		--make-root "./packages/ethereum/contracts"
 
 .PHONY: fund-local-all
-fund-local-all: # use faucet script to fund all the local identities
+fund-local-all: ## use faucet script to fund all the local identities
 	foundry-tool --environment-name anvil-localhost --environment-type development \
 		faucet --password local --use-local-identities --identity-directory "/tmp/" \
 		--private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
