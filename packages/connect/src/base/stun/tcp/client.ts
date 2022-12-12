@@ -299,11 +299,6 @@ export function isTcpExposedHost(
     const updateSecondary = (response: { response?: Interface; transactionId: Buffer }) => {
       const tIdString = u8aToHex(response.transactionId)
 
-      if (response.response == undefined) {
-        verbose(`Ignoring empty STUN response, transaction ${tIdString}`)
-        return
-      }
-
       const request = requests.get(tIdString)
 
       if (request == undefined) {
@@ -315,6 +310,7 @@ export function isTcpExposedHost(
       requests.delete(tIdString)
 
       if (response.response == undefined) {
+        verbose(`Ignoring empty STUN response, transaction ${tIdString}`)
         nextSTUNRequest(
           it,
           requests,
@@ -364,12 +360,6 @@ export function isTcpExposedHost(
      */
     const updatePrimary = (response: { response?: Interface; transactionId: Buffer }) => {
       const tIdString = u8aToHex(response.transactionId)
-
-      if (response.response == undefined) {
-        verbose(`Ignoring empty STUN response, transaction ${tIdString}`)
-        return
-      }
-
       const request = requests.get(tIdString)
 
       if (request == undefined) {
