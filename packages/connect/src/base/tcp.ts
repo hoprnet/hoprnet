@@ -1,7 +1,7 @@
-import net, { type Socket } from 'net'
+import net, { isIPv6, type Socket } from 'net'
 import { abortableSource } from 'abortable-iterator'
 import Debug from 'debug'
-import { nodeToMultiaddr } from '../utils/index.js'
+import { ip6Lookup, nodeToMultiaddr } from '../utils/index.js'
 // @ts-ignore untyped module
 import retimer from 'retimer'
 
@@ -192,6 +192,10 @@ export async function createTCPConnection(
     const start = Date.now()
     const cOpts = ma.toOptions()
 
+    if (!isIPv6(cOpts.host)) {
+      cOpts.host = `::ffff:${cOpts.host}`
+    }
+
     let rawSocket: Socket
     let finished = false
 
@@ -238,7 +242,9 @@ export async function createTCPConnection(
       .createConnection({
         host: cOpts.host,
         port: cOpts.port,
-        signal: options?.signal
+        signal: options?.signal,
+        family: 6,
+        lookup: ip6Lookup
       })
       .once('error', onError)
       .once('timeout', onTimeout)
