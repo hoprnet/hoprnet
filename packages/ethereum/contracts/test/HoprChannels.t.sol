@@ -6,6 +6,7 @@ import './utils/Accounts.sol';
 import './utils/Channels.sol';
 import './utils/Tickets.sol';
 import '../src/HoprChannels.sol';
+import './mocks/ChannelsMock.sol';
 import 'forge-std/Test.sol';
 
 contract HoprChannelsTest is
@@ -16,8 +17,11 @@ contract HoprChannelsTest is
   TicketsUtilsTest
 {
   HoprChannels public hoprChannels;
+  ChannelsMockTest public channelsMockTest;
   bytes32 channelIdAB = getChannelId(accountA.accountAddr, accountB.accountAddr);
   bytes32 channelIdBA = getChannelId(accountB.accountAddr, accountA.accountAddr);
+
+  uint256 constant ENOUGH_TIME_FOR_CLOSURE = 100;
 
   // uint256 public globalSnapshot;
 
@@ -25,6 +29,7 @@ contract HoprChannelsTest is
     super.setUp();
     // make vm.addr(1) HoprToken contract
     hoprChannels = new HoprChannels(vm.addr(1), 15);
+    channelsMockTest = new ChannelsMockTest(vm.addr(1), 15);
   }
 
   function testAnnounceAddressFromPublicKey() public {
@@ -637,6 +642,8 @@ contract HoprChannelsTest is
 
     vm.expectEmit(true, true, false, true, address(hoprChannels));
     emit ChannelUpdated(accountA.accountAddr, accountB.accountAddr, channelAB);
+    vm.expectEmit(true, true, false, true, address(hoprChannels));
+    emit ChannelClosureInitiated(accountA.accountAddr, accountB.accountAddr, uint32(block.timestamp));
     // account A initiate channel closure
     vm.prank(accountA.accountAddr);
     hoprChannels.initiateChannelClosure(accountB.accountAddr);
@@ -720,6 +727,433 @@ contract HoprChannelsTest is
   }
 
   /**
+   * @dev With funded open channels:
+   * it should fail to initialize channel closure A->A
+   */
+  function testRevert_InitiateChannelClosureCircularChannel(uint256 amount1, uint256 amount2) public {
+    // channel is funded for at least 10 HoprTokens (Ticket's amount)
+    amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
+    amount2 = bound(amount2, TICKET_BA_WIN.amount, 1e36);
+    // Open channels A<->B with some tokens that are above possible winning tickets
+    _helperOpenBidirectionalChannels(amount1, amount2);
+
+    // accountA redeem ticket
+    vm.prank(accountA.accountAddr);
+    // fail to initiate channel closure for channel pointing to the source
+    vm.expectRevert(bytes('source and destination must not be the same'));
+    hoprChannels.initiateChannelClosure(accountA.accountAddr);
+  }
+
+  /**
+   * @dev With funded open channels:
+   * it should fail to initialize channel closure A->0
+   */
+  function testRevert_InitiateChannelClosureFromAddressZero(uint256 amount1, uint256 amount2) public {
+    // channel is funded for at least 10 HoprTokens (Ticket's amount)
+    amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
+    amount2 = bound(amount2, TICKET_BA_WIN.amount, 1e36);
+    // Open channels A<->B with some tokens that are above possible winning tickets
+    _helperOpenBidirectionalChannels(amount1, amount2);
+
+    // accountA redeem ticket
+    vm.prank(accountA.accountAddr);
+    // fail to initiate channel closure pointing to address zero
+    vm.expectRevert(bytes('destination must not be empty'));
+    hoprChannels.initiateChannelClosure(address(0));
+  }
+
+  /**
+   * @dev With funded open channels:
+   * it should fail to finalize channel closure when is not pending
+   */
+  function testRevert_FinalizedNotInitiatedChannelClosure(uint256 amount1, uint256 amount2) public {
+    // channel is funded for at least 10 HoprTokens (Ticket's amount)
+    amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
+    amount2 = bound(amount2, TICKET_BA_WIN.amount, 1e36);
+    // Open channels A<->B with some tokens that are above possible winning tickets
+    _helperOpenBidirectionalChannels(amount1, amount2);
+
+    // accountA redeem ticket
+    vm.prank(accountA.accountAddr);
+    // fail to force finalize channel closure
+    vm.expectRevert(bytes('channel must be pending to close'));
+    hoprChannels.finalizeChannelClosure(accountB.accountAddr);
+  }
+
+  /**
+   * @dev With funded non-open channels:
+   * it should fail to initialize channel closure when channel is not open
+   */
+  function testRevert_InitializedClosureForNonOpenChannel(uint256 amount1, uint256 amount2) public {
+    // channel is funded for at least 10 HoprTokens (Ticket's amount)
+    amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
+    amount2 = bound(amount2, TICKET_BA_WIN.amount, 1e36);
+    // fund channels
+    _helperFundMultiAB(amount1, amount2);
+    // accountA redeem ticket
+    vm.prank(accountA.accountAddr);
+    // initiate channel closure first
+    hoprChannels.initiateChannelClosure(accountB.accountAddr);
+
+    // fail to force initiate again channel closure
+    vm.expectRevert(bytes('channel must be open or waiting for commitment'));
+    hoprChannels.initiateChannelClosure(accountB.accountAddr);
+  }
+
+  /**
+   * @dev With funded non-open channels:
+   * it should finalize channel closure
+   */
+  function test_FinalizeInitializedClosure(uint256 amount1, uint256 amount2) public {
+    // channel is funded for at least 10 HoprTokens (Ticket's amount)
+    amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
+    amount2 = bound(amount2, TICKET_BA_WIN.amount, 1e36);
+    // fund channels
+    _helperFundMultiAB(amount1, amount2);
+    // accountA redeem ticket
+    vm.startPrank(accountA.accountAddr);
+    // initiate channel closure first
+    hoprChannels.initiateChannelClosure(accountB.accountAddr);
+
+    // increase enough time for channel closure;
+    vm.warp(block.timestamp + ENOUGH_TIME_FOR_CLOSURE);
+
+    // Update channel AB state
+    HoprChannels.Channel memory channelAB = getChannelFromTuple(hoprChannels, channelIdAB);
+    // succeed in finalizing channel closure
+    vm.expectEmit(true, true, false, true, address(hoprChannels));
+    emit ChannelClosureFinalized(accountA.accountAddr, accountB.accountAddr, channelAB.closureTime, amount1);
+    vm.expectEmit(true, true, false, true, address(hoprChannels));
+    emit ChannelUpdated(
+      accountA.accountAddr,
+      accountB.accountAddr,
+      HoprChannels.Channel(0, bytes32(0), 0, 0, HoprChannels.ChannelStatus.CLOSED, 1, 0)
+    );
+    vm.mockCall(
+      vm.addr(1),
+      abi.encodeWithSignature('transfer(address,uint256)', accountA.accountAddr, amount1), // provide specific
+      abi.encode(true)
+    );
+    hoprChannels.finalizeChannelClosure(accountB.accountAddr);
+    vm.stopPrank();
+  }
+
+  /**
+   * @dev With funded non-open channels:
+   * it should fail to initialize channel closure, in various situtations
+   */
+  function testRevert_FinalizeChannelClosure(uint256 amount1, uint256 amount2) public {
+    // channel is funded for at least 10 HoprTokens (Ticket's amount)
+    amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
+    amount2 = bound(amount2, TICKET_BA_WIN.amount, 1e36);
+    // fund channels
+    _helperFundMultiAB(amount1, amount2);
+    // accountA redeem ticket
+    vm.startPrank(accountA.accountAddr);
+    // initiate channel closure first
+    hoprChannels.initiateChannelClosure(accountB.accountAddr);
+
+    // fail when source and destination are the same
+    vm.expectRevert(bytes('source and destination must not be the same'));
+    hoprChannels.finalizeChannelClosure(accountA.accountAddr);
+
+    // fail when the destination is empty
+    vm.expectRevert(bytes('destination must not be empty'));
+    hoprChannels.finalizeChannelClosure(address(0));
+
+    // fail when finallization hasn't reached yet
+    vm.expectRevert(bytes('closureTime must be before now'));
+    hoprChannels.finalizeChannelClosure(accountB.accountAddr);
+    vm.stopPrank();
+  }
+
+  /**
+   * @dev With a closed channel:
+   * it should fail to redeem ticket when channel in closed
+   */
+  function testRevert_WhenRedeemTicketsInAClosedChannel(uint256 amount1, uint256 amount2) public {
+    // channel is funded for at least 10 HoprTokens (Ticket's amount)
+    amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
+    amount2 = bound(amount2, TICKET_BA_WIN.amount, 1e36);
+    // with a closed channel A->B
+    _helperWithAClosedChannel(amount1, amount2);
+
+    vm.prank(accountB.accountAddr);
+    // fail when source and destination are the same
+    vm.expectRevert(bytes('spending channel must be open or pending to close'));
+    hoprChannels.redeemTicket(
+      TICKET_AB_WIN.source,
+      TICKET_AB_WIN.nextCommitment,
+      TICKET_AB_WIN.ticketEpoch,
+      TICKET_AB_WIN.ticketIndex,
+      TICKET_AB_WIN.proofOfRelaySecret,
+      TICKET_AB_WIN.amount,
+      TICKET_AB_WIN.winProb,
+      TICKET_AB_WIN.signature
+    );
+  }
+
+  /**
+   * @dev With a closed channel:
+   * it should allow a fund to reopen channel
+   */
+  function test_AllowFundToReopenAClosedChannel(
+    uint256 amount1,
+    uint256 amount2,
+    uint256 reopenAmount1,
+    uint256 reopenAmount2
+  ) public {
+    // channel is funded for at least 10 HoprTokens (Ticket's amount)
+    amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
+    amount2 = bound(amount2, TICKET_BA_WIN.amount, 1e36);
+    // reopen amount should be larger than 0
+    reopenAmount1 = bound(reopenAmount1, 1, 1e36);
+    reopenAmount2 = bound(reopenAmount2, 1, 1e36);
+
+    // with a closed channel A->B
+    _helperWithAClosedChannel(amount1, amount2);
+
+    // fund channel again
+    vm.prank(address(1));
+    vm.mockCall(
+      vm.addr(1),
+      abi.encodeWithSignature(
+        'transferFrom(address,address,uint256)',
+        address(1),
+        address(hoprChannels),
+        reopenAmount1 + reopenAmount2
+      ),
+      abi.encode(true)
+    );
+    // succeed in reopening a channel
+    hoprChannels.fundChannelMulti(accountA.accountAddr, accountB.accountAddr, reopenAmount1, reopenAmount2);
+
+    // succeed in reopening a channel
+    HoprChannels.Channel memory channelAB = HoprChannels.Channel(
+      reopenAmount1,
+      SECRET_2,
+      0,
+      0,
+      HoprChannels.ChannelStatus.OPEN,
+      2,
+      0
+    );
+
+    HoprChannels.Channel memory channelBA = HoprChannels.Channel(
+      amount2 + reopenAmount2,
+      hex'00', // never bumped
+      0,
+      0,
+      HoprChannels.ChannelStatus.WAITING_FOR_COMMITMENT,
+      1,
+      0
+    );
+    // check vallidate from channels()
+    assertEqChannels(getChannelFromTuple(hoprChannels, channelIdAB), channelAB);
+    assertEqChannels(getChannelFromTuple(hoprChannels, channelIdBA), channelBA);
+
+    vm.clearMockedCalls();
+  }
+
+  /**
+   * @dev With a reopened channel:
+   * it should pass the sanity check
+   */
+  function test_SanityCheck(
+    uint256 amount1,
+    uint256 amount2,
+    uint256 reopenAmount1,
+    uint256 reopenAmount2
+  ) public {
+    // channel is funded for at least 10 HoprTokens (Ticket's amount)
+    amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
+    amount2 = bound(amount2, TICKET_BA_WIN.amount, 1e36);
+    // reopen amount should be larger than 0
+    reopenAmount1 = bound(reopenAmount1, 1, 1e36);
+    reopenAmount2 = bound(reopenAmount2, 1, 1e36);
+    _helperWithAReopenedChannel(amount1, amount2, reopenAmount1, reopenAmount2);
+
+    // succeed in reopening a channel
+    HoprChannels.Channel memory channelAB = HoprChannels.Channel(
+      reopenAmount1,
+      SECRET_2,
+      0,
+      0,
+      HoprChannels.ChannelStatus.OPEN,
+      2,
+      0
+    );
+
+    HoprChannels.Channel memory channelBA = HoprChannels.Channel(
+      amount2 + reopenAmount2,
+      SECRET_2,
+      0,
+      0,
+      HoprChannels.ChannelStatus.OPEN,
+      1,
+      0
+    );
+    // check vallidate from channels()
+    assertEqChannels(getChannelFromTuple(hoprChannels, channelIdAB), channelAB);
+    assertEqChannels(getChannelFromTuple(hoprChannels, channelIdBA), channelBA);
+  }
+
+  /**
+   * @dev With a reopened channel:
+   * it should fail to redeem ticket when channel in in different channelEpoch
+   */
+  function testRevert_WhenDifferentChannelEpochFailToRedeemTicket(
+    uint256 amount1,
+    uint256 amount2,
+    uint256 reopenAmount1,
+    uint256 reopenAmount2
+  ) public {
+    // channel is funded for at least 10 HoprTokens (Ticket's amount)
+    amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
+    amount2 = bound(amount2, TICKET_BA_WIN.amount, 1e36);
+    // reopen amount should be larger than 0
+    reopenAmount1 = bound(reopenAmount1, 1, 1e36);
+    reopenAmount2 = bound(reopenAmount2, 1, 1e36);
+    _helperWithAReopenedChannel(amount1, amount2, reopenAmount1, reopenAmount2);
+
+    vm.prank(accountB.accountAddr);
+    // fail when source and destination are the same
+    vm.expectRevert(bytes('signer must match the counterparty'));
+    hoprChannels.redeemTicket(
+      TICKET_AB_WIN.source,
+      TICKET_AB_WIN.nextCommitment,
+      TICKET_AB_WIN.ticketEpoch,
+      TICKET_AB_WIN.ticketIndex,
+      TICKET_AB_WIN.proofOfRelaySecret,
+      TICKET_AB_WIN.amount,
+      TICKET_AB_WIN.winProb,
+      TICKET_AB_WIN.signature
+    );
+  }
+
+  /**
+   * @dev With a reopened channel:
+   * it should should reedem ticket for account B
+   */
+  function test_RedeemTicketForAccountB(
+    uint256 amount1,
+    uint256 amount2,
+    uint256 reopenAmount1,
+    uint256 reopenAmount2
+  ) public {
+    // channel is funded for at least 10 HoprTokens (Ticket's amount)
+    amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
+    amount2 = bound(amount2, TICKET_BA_WIN.amount, 1e36);
+    // reopen amount should be larger than TICKET_AB_WIN_RECYCLED.amount and 0 respectively
+    reopenAmount1 = bound(reopenAmount1, TICKET_AB_WIN_RECYCLED.amount, 1e36);
+    reopenAmount2 = bound(reopenAmount2, 1, 1e36);
+    _helperWithAReopenedChannel(amount1, amount2, reopenAmount1, reopenAmount2);
+
+    vm.prank(accountB.accountAddr);
+    // fail when source and destination are the same
+    hoprChannels.redeemTicket(
+      TICKET_AB_WIN_RECYCLED.source,
+      TICKET_AB_WIN_RECYCLED.nextCommitment,
+      TICKET_AB_WIN_RECYCLED.ticketEpoch,
+      TICKET_AB_WIN_RECYCLED.ticketIndex,
+      TICKET_AB_WIN_RECYCLED.proofOfRelaySecret,
+      TICKET_AB_WIN_RECYCLED.amount,
+      TICKET_AB_WIN_RECYCLED.winProb,
+      TICKET_AB_WIN_RECYCLED.signature
+    );
+
+    // succeed in redeeming the ticket
+    HoprChannels.Channel memory channelAB = HoprChannels.Channel(
+      reopenAmount1 - TICKET_AB_WIN_RECYCLED.amount,
+      SECRET_1,
+      0,
+      1,
+      HoprChannels.ChannelStatus.OPEN,
+      2,
+      0
+    );
+
+    HoprChannels.Channel memory channelBA = HoprChannels.Channel(
+      amount2 + reopenAmount2 + TICKET_AB_WIN_RECYCLED.amount,
+      SECRET_2,
+      0,
+      0,
+      HoprChannels.ChannelStatus.OPEN,
+      1,
+      0
+    );
+    // check vallidate from channels()
+    assertEqChannels(getChannelFromTuple(hoprChannels, channelIdAB), channelAB);
+    assertEqChannels(getChannelFromTuple(hoprChannels, channelIdBA), channelBA);
+  }
+
+  /**
+   * @dev With a reopened channel:
+   * it should allow closure
+   */
+  function test_AllowClosingReopenedChannel(
+    uint256 amount1,
+    uint256 amount2,
+    uint256 reopenAmount1,
+    uint256 reopenAmount2
+  ) public {
+    // channel is funded for at least 10 HoprTokens (Ticket's amount)
+    amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
+    amount2 = bound(amount2, TICKET_BA_WIN.amount, 1e36);
+    // reopen amount should be larger than TICKET_AB_WIN_RECYCLED.amount and 0 respectively
+    reopenAmount1 = bound(reopenAmount1, TICKET_AB_WIN_RECYCLED.amount, 1e36);
+    reopenAmount2 = bound(reopenAmount2, 1, 1e36);
+    _helperWithAReopenedChannel(amount1, amount2, reopenAmount1, reopenAmount2);
+
+    // accountA initiate channel closure
+    vm.startPrank(accountA.accountAddr);
+    // initiate channel closure first
+    hoprChannels.initiateChannelClosure(accountB.accountAddr);
+    // increase enough time for channel closure;
+    vm.warp(block.timestamp + ENOUGH_TIME_FOR_CLOSURE);
+    // finalize channel closure
+    vm.mockCall(
+      vm.addr(1),
+      abi.encodeWithSignature('transfer(address,uint256)', accountA.accountAddr, reopenAmount1), // provide specific
+      abi.encode(true)
+    );
+    hoprChannels.finalizeChannelClosure(accountB.accountAddr);
+    vm.stopPrank();
+
+    // succeed in redeeming the ticket
+    HoprChannels.Channel memory channelAB = HoprChannels.Channel(
+      0,
+      SECRET_2,
+      0,
+      0,
+      HoprChannels.ChannelStatus.CLOSED,
+      2,
+      0
+    );
+
+    HoprChannels.Channel memory channelBA = HoprChannels.Channel(
+      amount2 + reopenAmount2,
+      SECRET_2,
+      0,
+      0,
+      HoprChannels.ChannelStatus.OPEN,
+      1,
+      0
+    );
+    // check vallidate from channels()
+    assertEqChannels(getChannelFromTuple(hoprChannels, channelIdAB), channelAB);
+    assertEqChannels(getChannelFromTuple(hoprChannels, channelIdBA), channelBA);
+  }
+
+  /**
+   * @dev test internals with mock:
+   * it should get channel id, returning the same channel ID
+   */
+  function test_SameChannelId() public {
+    assertEq(channelIdAB, channelsMockTest.getChannelIdInternal(accountA.accountAddr, accountB.accountAddr));
+  }
+
+  /**
    *@dev Helper function to announce account A and B
    */
   function _helperAnnounceAB(bool annouceA, bool announceB) internal {
@@ -771,5 +1205,75 @@ contract HoprChannelsTest is
     hoprChannels.bumpChannel(accountB.accountAddr, SECRET_2);
     // then fund channel
     _helperFundMultiAB(amount1, amount2);
+  }
+
+  /**
+   * @dev With a closed channel:
+   */
+  function _helperWithAClosedChannel(uint256 amount1, uint256 amount2) public {
+    // make channel A->B open
+    vm.prank(accountB.accountAddr);
+    hoprChannels.bumpChannel(accountA.accountAddr, SECRET_2);
+    // fund channels
+    _helperFundMultiAB(amount1, amount2);
+
+    // accountA initiate channel closure
+    vm.startPrank(accountA.accountAddr);
+    // initiate channel closure first
+    hoprChannels.initiateChannelClosure(accountB.accountAddr);
+    // increase enough time for channel closure;
+    vm.warp(block.timestamp + ENOUGH_TIME_FOR_CLOSURE);
+    // finalize channel closure
+    vm.mockCall(
+      vm.addr(1),
+      abi.encodeWithSignature('transfer(address,uint256)', accountA.accountAddr, amount1), // provide specific
+      abi.encode(true)
+    );
+    hoprChannels.finalizeChannelClosure(accountB.accountAddr);
+    vm.stopPrank();
+  }
+
+  /**
+   * @dev With a reopened channel:
+   */
+  function _helperWithAReopenedChannel(
+    uint256 amount1,
+    uint256 amount2,
+    uint256 reopenAmount1,
+    uint256 reopenAmount2
+  ) public {
+    // make channel A->B and B=>A open
+    _helperOpenBidirectionalChannels(amount1, amount2);
+
+    // accountA initiate channel closure
+    vm.startPrank(accountA.accountAddr);
+    // initiate channel closure first
+    hoprChannels.initiateChannelClosure(accountB.accountAddr);
+    // increase enough time for channel closure;
+    vm.warp(block.timestamp + ENOUGH_TIME_FOR_CLOSURE);
+    // finalize channel closure
+    vm.mockCall(
+      vm.addr(1),
+      abi.encodeWithSignature('transfer(address,uint256)', accountA.accountAddr, amount1), // provide specific
+      abi.encode(true)
+    );
+    hoprChannels.finalizeChannelClosure(accountB.accountAddr);
+    vm.stopPrank();
+
+    // fund channel again
+    vm.prank(address(1));
+    vm.mockCall(
+      vm.addr(1),
+      abi.encodeWithSignature(
+        'transferFrom(address,address,uint256)',
+        address(1),
+        address(hoprChannels),
+        reopenAmount1 + reopenAmount2
+      ),
+      abi.encode(true)
+    );
+    // succeed in reopening a channel
+    hoprChannels.fundChannelMulti(accountA.accountAddr, accountB.accountAddr, reopenAmount1, reopenAmount2);
+    vm.clearMockedCalls();
   }
 }
