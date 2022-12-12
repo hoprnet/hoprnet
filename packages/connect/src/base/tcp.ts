@@ -285,7 +285,5 @@ export function fromSocket(socket: Socket, onClose: () => void) {
     family: remoteFamily
   })
 
-  verbose(`Incoming TCP connection from ${remoteAddress}:${socket.remotePort}`)
-
   return TCPConnection(remoteAddr, socket, onClose)
 }
