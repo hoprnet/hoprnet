@@ -16,14 +16,11 @@ A bounty usually serves multiple purposes.
 
 1. The bounty admin approaches the program owner with a bounty idea and the program owner approves it. Optionally the bounty admin appoints a bounty expert to assist with the technical content.
    - Sometimes the program owner may approache a person with a bounty idea and asks that person to be the bounty admin.
-   
 2. The bounty admin creates a GitHub issue using the [bounty template](../.github/ISSUE_TEMPLATE/bounty.md) in the dedicated bounty repository **(Needs to be created)**
    - Within each section of the template, provide the most concise details you can.
    - Feel free to expand on sections `Developing HOPR` and `What is HOPR?` with information more related to the bounty.
-   
 3. The bounty admin assignes herself/himself to the bounty as well as the program owner.
    - If the bounty admin appoints a bounty expert the bounty admin assigns the bounty expert to the issue as well. **(Need to link program.md)**
-   
 4. The bounty admin assignes the dedicated bounty label to the issue.
 
 5. The bounty admin makes a comment in the GitHub issue (tagging the program owner) with an estimate of:
@@ -37,26 +34,27 @@ A bounty usually serves multiple purposes.
 
 ### After the bounty hunter submits the work
 
-- The bounty admin (optionally: bounty expert) needs to review/test the submission and the bounty admin gives a reccomendation to the program owner. ***(Link Subsection)***
+- The bounty admin (optionally: bounty expert) needs to review/test the submission and the bounty admin gives a reccomendation to the program owner. **_(Link Subsection)_**
 
 ## Program Owner Process
 
-### Posting the Bounty 
+### Posting the Bounty
 
-1. Program owner approves the github issue created by the bounty admin. 
+1. Program owner approves the github issue created by the bounty admin.
 
 2. Program owner requests 10% of the bounty reward from COM-Safe as the [Gitcoin](https://gitcoin.co/) fee for publishing the bounty.
 
 3. Program owner publishes the bounty via [Gitcoin](https://gitcoin.co/)
 
-4. Program owner reviews bounty applications and selects a bounty hunter  
-   - program owner might consult with the bounty admin (optinally: bounty expert) before making a decision 
+4. Program owner reviews bounty applications and selects a bounty hunter
 
-5. Program owner establishes a communication channel with the bounty hunter (Discord, Telegram, GitHub, etc..) 
+   - program owner might consult with the bounty admin (optinally: bounty expert) before making a decision
 
-### During the time the bounty hunter is working on the bounty 
+5. Program owner establishes a communication channel with the bounty hunter (Discord, Telegram, GitHub, etc..)
 
-- The program owner requests frequent progress updates from the bounty hunter. The program owner decides the update frequency which might vary from bounty to bounty. 
+### During the time the bounty hunter is working on the bounty
+
+- The program owner requests frequent progress updates from the bounty hunter. The program owner decides the update frequency which might vary from bounty to bounty.
 - The program owner answers questions that the bounty hunter might have or delegates the questions to the bounty admin (optinally: bounty expert)
 
 ### After the bounty hunter submits the work
@@ -70,7 +68,6 @@ For most cases, use of HOPR tokens is encouraged.
   1. Creator of the bounty [creates a wallet](./wallets.md) to be used as an operator wallet.
   2. Request of funds is done by emailing HOPR's accountant.
   3. Funds are sent to the wallet.
-
 
 ### Posting the bounty
 
@@ -121,7 +118,7 @@ Bounty rewards are set in US Dollar. However, the program owner pays out the bou
 3. Bounty hunter submits a dis-satisfactory solution but it technically fullfills the deliverables outlined in the github issue.
 
    - Pay out the promised bounty reward.
-   - Program owner and bounty admin schedule a ***what went wrong*** assessment of the github issue to minimize the probability that this happens again in the future.
+   - Program owner and bounty admin schedule a **_what went wrong_** assessment of the github issue to minimize the probability that this happens again in the future.
 
 4. Bounty hunter disappears
    - Program owner does **NOT** pay out the bounty reward.
