@@ -8,6 +8,7 @@ pub mod shared_keys;
 pub mod primitives;
 pub mod prp;
 pub mod prg;
+pub mod errors;
 
 #[allow(dead_code)]
 #[wasm_bindgen]

@@ -28,7 +28,7 @@ k256 = { version = "0.11.6", features = ["arithmetic", "ecdh"] }
 sha3 = "0.10.6"
 static_assertions = "1.1.0"
 typenum = "1.15.0"
-#thiserror = "1.0.37"
+thiserror = "1.0.37"
 
 wasm-bindgen = "0.2.83"
 
