@@ -273,3 +273,9 @@ export function* randomIterator<T>(arr: T[]): Iterable<T> {
 export function isStun(data: Uint8Array): boolean {
   return data.length > 0 && data[0] >= 0 && data[0] <= 3
 }
+
+/**
+ * Use to check if an IPv6 address contains an embedded IPv4 address
+ * and if so, extract the IPv4 part.
+ */
+export const IPV4_EMBEDDED_ADDRESS = /(?<=::ffff:)[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/

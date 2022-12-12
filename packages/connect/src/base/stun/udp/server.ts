@@ -4,7 +4,7 @@ import debug from 'debug'
 
 import { create_counter } from '@hoprnet/hopr-utils'
 
-import { isStun } from '../../../utils/index.js'
+import { IPV4_EMBEDDED_ADDRESS, isStun } from '../../../utils/index.js'
 import { isStunRequest, kStunTypeMask } from '../constants.js'
 
 const metric_udpStunRequests = create_counter('connect_counter_udp_stun_requests', 'Number of UDP STUN requests')
@@ -28,7 +28,7 @@ export function handleUdpStunRequest(
 
   // When using 'udp6' sockets, IPv4 addresses get prefixed by ::ffff:
   if (rinfo.family === 'IPv6') {
-    const match = rinfo.address.match(/(?<=::ffff:)[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/)
+    const match = rinfo.address.match(IPV4_EMBEDDED_ADDRESS)
 
     if (match) {
       rinfo.family = 'IPv4'
@@ -53,7 +53,7 @@ export function handleUdpStunRequest(
       let addrInfo = rinfo
       if (__fakeRInfo) {
         if (__fakeRInfo.family === 'IPv6') {
-          const match = __fakeRInfo.address.match(/(?<=::ffff:)[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/)
+          const match = __fakeRInfo.address.match(IPV4_EMBEDDED_ADDRESS)
 
           if (match) {
             addrInfo = {

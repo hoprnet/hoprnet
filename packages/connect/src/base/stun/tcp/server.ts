@@ -4,7 +4,7 @@ import { decode, constants, createMessage } from 'stun'
 
 import { create_counter } from '@hoprnet/hopr-utils'
 
-import { isStun } from '../../../utils/index.js'
+import { IPV4_EMBEDDED_ADDRESS, isStun } from '../../../utils/index.js'
 import { isStunRequest, kStunTypeMask } from '../constants.js'
 
 const verbose = debug('hopr-connect:verbose:stun:tcp')
@@ -35,7 +35,7 @@ export async function handleTcpStunRequest(
   }
 
   if (socket.remoteFamily === 'IPv6') {
-    const match = rinfo.address.match(/(?<=::ffff:)[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/)
+    const match = rinfo.address.match(IPV4_EMBEDDED_ADDRESS)
 
     if (match) {
       rinfo.family = 'IPv4'

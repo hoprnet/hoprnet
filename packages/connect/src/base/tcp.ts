@@ -1,7 +1,7 @@
 import net, { isIPv6, type Socket } from 'net'
 import { abortableSource } from 'abortable-iterator'
 import Debug from 'debug'
-import { ip6Lookup, nodeToMultiaddr } from '../utils/index.js'
+import { ip6Lookup, IPV4_EMBEDDED_ADDRESS, nodeToMultiaddr } from '../utils/index.js'
 // @ts-ignore untyped module
 import retimer from 'retimer'
 
@@ -267,13 +267,25 @@ export function fromSocket(socket: Socket, onClose: () => void) {
     }
   })
 
+  let remoteAddress: string
+  let remoteFamily: 'IPv4' | 'IPv6'
+  const ipv4Embedded = socket.remoteAddress.match(IPV4_EMBEDDED_ADDRESS)
+  if (ipv4Embedded) {
+    remoteAddress = ipv4Embedded[0]
+    remoteFamily = 'IPv4'
+  } else {
+    remoteAddress = socket.remoteAddress
+    remoteFamily = socket.remoteFamily as 'IPv4' | 'IPv6'
+  }
   // PeerId of remote peer is not yet known,
   // will be available after encryption is set up
   const remoteAddr = nodeToMultiaddr({
-    address: socket.remoteAddress,
+    address: remoteAddress,
     port: socket.remotePort,
-    family: socket.remoteFamily
+    family: remoteFamily
   })
+
+  verbose(`Incoming TCP connection from ${remoteAddress}:${socket.remotePort}`)
 
   return TCPConnection(remoteAddr, socket, onClose)
 }
