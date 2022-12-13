@@ -121,11 +121,10 @@ foundryup --version nightly-64cbdd183e0aae99eb1be507196b6b5d640b3801
 | |____HoprDummyProxyForNetworkRegistry.t.sol
 |____ERC777
 | |____ERC777Snapshot.t.sol
-|____HoprChannels.t.sol (the other half)
 |____HoprDistributor.t.sol
 |____HoprForwarder.t.sol
 |____HoprWrapper.t.sol
-|____HoprNetworkRegistry.t.sol
+
 ```
 
 5. Temporarily skipped deployment scripts for
