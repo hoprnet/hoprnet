@@ -46,9 +46,12 @@ function cleanup {
 }
 trap cleanup SIGINT SIGTERM ERR
 
+# mine a block every 2 seconds
+declare flags="--block-time 2"
+
 if ! lsof -i ":8545" -s TCP:LISTEN; then
   log "Start local anvil network"
-  ${mydir}/../.foundry/bin/anvil > "${log_file}" 2>&1 &
+  ${mydir}/../.foundry/bin/anvil ${flags} > "${log_file}" 2>&1 &
   wait_for_regex ${log_file} "Listening on 127.0.0.1:8545"
   log "Anvil network started (127.0.0.1:8545)"
 else
