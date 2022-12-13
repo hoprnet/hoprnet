@@ -96,6 +96,4 @@ export type HoprConnectTestingOptions = {
   // Local mode: only use local address, i.e. don't try to
   // determine any external / public IP addresses
   __preferLocalAddresses?: boolean
-  // Disable UPNP support
-  __noUPNP?: boolean
 }
