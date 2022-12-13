@@ -53,6 +53,8 @@
 - Close existing connections once there is new one ([#4281](https://github.com/hoprnet/hoprnet/pull/4281))
 - Properly remove closed connections from libp2p's `ConnectionManager`([#4281](https://github.com/hoprnet/hoprnet/pull/4281))
 - Reimplement stream handling `class`es with `function`s in `connect` package for better performance ([#4285](https://github.com/hoprnet/hoprnet/pull/4285))
+- Fix ticket redemption mechanism & acknowledged ticket fix in the DB ([#4437](https://github.com/hoprnet/hoprnet/pull/4437))
+- Pluto: Fix initialization of channels once the cluster has started up ([#4436](https://github.com/hoprnet/hoprnet/pull/4436))
 
 ---
 
