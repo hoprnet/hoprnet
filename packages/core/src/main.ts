@@ -96,6 +96,7 @@ export async function createLibp2pInstance(
             allowPrivateConnections: options.allowPrivateConnections,
             // Amount of nodes for which we are willing to act as a relay
             maxRelayedConnections: 50_000,
+            announce: options.announce,
             isAllowedToAccessNetwork
           },
           testing: {

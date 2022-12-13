@@ -82,6 +82,8 @@ export type HoprConnectOptions = {
   dhtRenewalTimeout?: number
   entryNodeReconnectBaseTimeout?: number
   entryNodeReconnectBackoff?: number
+  // Set to true whenever node is supposed to announce itself
+  announce?: boolean
   // To be removed once NR got removed
   isAllowedToAccessNetwork?: (id: PeerId) => Promise<boolean>
 }

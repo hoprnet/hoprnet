@@ -77,7 +77,6 @@ async function startClient(serverPorts: number[]) {
       },
       udpSocket,
       tcpPort,
-      false,
       true
     ),
     close: async () => {

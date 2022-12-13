@@ -95,8 +95,7 @@ export async function isExposedHost(
   addTcpProtocolListener: (listener: (socket: TCPSocket, stream: AsyncIterable<Uint8Array>) => void) => () => void,
   udpSocket: Socket,
   port: number,
-  runningLocally = false,
-  standaloneTest = false
+  runningLocally = false
 ): Promise<boolean> {
   // Performs a STUN request from the given socket and thereby creates
   // a mapping in the NAT table. In some cases, this is sufficient to also
@@ -104,7 +103,7 @@ export async function isExposedHost(
   const udpMapped = await isUdpExposedHost(
     (function* () {
       // Intermediate solution, to be changed once more nodes are upgraded
-      if (!standaloneTest) {
+      if (!runningLocally) {
         yield* PUBLIC_UDP_RFC_5780_SERVERS
       }
 
@@ -115,14 +114,13 @@ export async function isExposedHost(
     udpSocket,
     undefined,
     port,
-    runningLocally,
-    standaloneTest
+    runningLocally
   )
 
   const tcpMapped = await isTcpExposedHost(
     (function* () {
       // Intermediate solution, to be changed once more nodes are upgraded
-      if (!standaloneTest) {
+      if (!runningLocally) {
         yield* PUBLIC_TCP_RFC_5780_SERVERS
       }
 
@@ -132,8 +130,7 @@ export async function isExposedHost(
     })(),
     addTcpProtocolListener,
     undefined,
-    port,
-    runningLocally
+    port
   )
 
   log(

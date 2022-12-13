@@ -237,13 +237,8 @@ export function isTcpExposedHost(
   multiaddrs: Iterable<Multiaddr>,
   addListener: (listener: (socket: Socket, stream: AsyncIterable<Uint8Array>) => void) => () => void,
   timeout = STUN_TCP_TIMEOUT,
-  stunPort: number,
-  runningLocally = false
+  stunPort: number
 ): Promise<STUN_EXPOSED_CHECK_RESPOSE> {
-  if (runningLocally) {
-    return Promise.resolve(STUN_EXPOSED_CHECK_RESPOSE.EXPOSED)
-  }
-
   return new Promise<STUN_EXPOSED_CHECK_RESPOSE>(async (resolve) => {
     // Holds sent requests, used to link incoming responses to previous requests
     const requests = new Map<string, Request & { state: STUN_QUERY_STATE }>()

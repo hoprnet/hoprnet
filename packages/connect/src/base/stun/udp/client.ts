@@ -354,14 +354,8 @@ export function isUdpExposedHost(
   socket: Socket,
   timeout = STUN_UDP_TIMEOUT,
   stunPort = socket.address().port,
-  runningLocally = false,
-  standaloneTest = false
+  runningLocally = false
 ): Promise<STUN_EXPOSED_CHECK_RESPOSE> {
-  // @TODO replace this by proper support for initial (first) bootstrap node
-  if (runningLocally) {
-    return Promise.resolve(STUN_EXPOSED_CHECK_RESPOSE.EXPOSED)
-  }
-
   return new Promise<STUN_EXPOSED_CHECK_RESPOSE>(async (resolve) => {
     const requests = new Map<string, Request & { state: STUN_QUERY_STATE }>()
 
@@ -376,7 +370,7 @@ export function isUdpExposedHost(
       multiaddrs,
       secondarySocket,
       timeout,
-      standaloneTest
+      runningLocally
     )
 
     if (secondaryInterface == undefined) {

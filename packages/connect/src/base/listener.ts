@@ -269,8 +269,10 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
 
     this._emitListening()
 
-    // Only add relay nodes if node is not directly reachable or running locally
-    if (this.testingOptions.__preferLocalAddresses || natSituation.bidirectionalNAT || !natSituation.isExposed) {
+    // If node is supposed to announce with routable address -> don't assign to other relays
+    // If node is running behind bidirectional NAT or deteced as not being exposed -> assign to other relays
+    // If node is not supposed to announce with routable address -> assign to other relays as fallback
+    if (!this.options.announce || natSituation.bidirectionalNAT || !natSituation.isExposed) {
       this.connectComponents.getEntryNodes().on(RELAY_CHANGED_EVENT, this._emitListening)
 
       // Instructs entry node manager to assign to available
