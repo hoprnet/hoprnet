@@ -23,7 +23,7 @@ type Interface = {
 const log = debug('hopr-connect:stun')
 
 const metric_isExposed = create_gauge(
-  `connect_node_is_exposed`,
+  `connect_gauge_node_is_exposed`,
   `Shows whether a node believes to run on an exposed host`
 )
 

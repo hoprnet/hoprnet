@@ -42,7 +42,7 @@ The following sections document the metrics per package:
 | `connect_counter_failed_conns`             | counter | Number of failed connection attempts                          |                            |
 | `connect_counter_udp_stun_requests`        | counter | Number of UDP STUN requests                                   |                            |
 | `connect_counter_tcp_stun_requests`        | counter | Number of TCP STUN requests                                   |                            |
-| `connect_node_is_exposed`                  | gauge   | Shows whether a node believes that it runs on an exposed host | 1: exposed, 0: not exposed |
+| `connect_gauge_node_is_exposed`            | gauge   | Shows whether a node believes that it runs on an exposed host | 1: exposed, 0: not exposed |
 
 ### core
 
