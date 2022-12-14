@@ -166,7 +166,7 @@ build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
 
 .PHONY: build-docs
 build-docs: ## build typedocs, Rest API docs, and docs website
-build-docs: build-docs-typescript build-docs-website build-docs-api
+build-docs: | build-docs-typescript build-docs-website build-docs-api
 
 .PHONY: build-docs-typescript
 build-docs-typescript: ## build typedocs
