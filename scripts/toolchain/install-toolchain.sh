@@ -208,15 +208,7 @@ if ${install_all}; then
     install_yarn
     install_javascript_utilities
 
-    # Show some debug output
-    cargo --version
-    echo "node $(node --version)"
-    wasm-pack --version
-    wasm-opt --version
-    echo "yarn $(yarn --version)"
-    echo "Typescript $(npx tsc --version)"
-
-    # We got yarn, so let's remove no longer necessary cache
+   # We got yarn, so let's remove no longer necessary cache
     yarn cache clean --all
 else
     # We only need Node.js
@@ -227,5 +219,16 @@ else
         yarn cache clean --all
     fi
 fi
+
+# Show some debug output
+echo "Checking installed tool versions"
+echo "================================"
+rustc --version
+cargo --version
+wasm-pack --version
+wasm-opt --version
+echo "node $(node --version)"
+echo "yarn $(yarn --version)"
+echo "Typescript $(npx tsc --version)"
 
 rm -R ${download_dir}

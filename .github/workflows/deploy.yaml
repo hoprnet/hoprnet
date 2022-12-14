@@ -1,3 +1,4 @@
+---
 name: HOPR Deploy
 
 env:
@@ -338,18 +339,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
 
-       - name: restore cargo cache
-         uses: actions/cache@v3
-         with:
-           path: |
-             ~/.cargo/bin/
-             ~/.cargo/registry/index/
-             ~/.cargo/registry/cache/
-             ~/.cargo/git/db/
-             target/
-             .cargo/.package-cache/
-             .cargo/bin/
-           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
+      - name: restore cargo cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+            .cargo/.package-cache/
+            .cargo/bin/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
 
       - name: Set up Google Cloud Credentials
         uses: google-github-actions/auth@v0
@@ -440,18 +441,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
 
-       - name: restore cargo cache
-         uses: actions/cache@v3
-         with:
-           path: |
-             ~/.cargo/bin/
-             ~/.cargo/registry/index/
-             ~/.cargo/registry/cache/
-             ~/.cargo/git/db/
-             target/
-             .cargo/.package-cache/
-             .cargo/bin/
-           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
+      - name: restore cargo cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+            .cargo/.package-cache/
+            .cargo/bin/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
 
       - name: Set up Google Cloud Credentials
         uses: google-github-actions/auth@v0
