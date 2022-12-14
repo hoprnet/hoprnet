@@ -71,7 +71,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
         // 1. get environment and msg.sender
         getEnvironmentAndMsgSender();
 
-        // 2. owner registers nodes, depending on the envirionment 
+        // 2. owner registers nodes, depending on the envirionment
         if (currentEnvironmentType == EnvironmentType.DEVELOPMENT) {
             // call register accounts on HoprDummyProxyForNetworkRegistry
             (bool successRegisterNodesOnDummyProxy, ) = currentEnvironmentDetail.networkRegistryProxyContractAddress.call(abi.encodeWithSignature("ownerBatchAddAccounts(address[])", stakingAddresses));
@@ -96,7 +96,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
         // 1. get environment and msg.sender
         getEnvironmentAndMsgSender();
 
-        // 2. owner registers nodes, depending on the envirionment 
+        // 2. owner registers nodes, depending on the envirionment
         if (currentEnvironmentType == EnvironmentType.DEVELOPMENT) {
             // call deregister accounts on HoprDummyProxyForNetworkRegistry
             (bool successDeregisterNodesOnDummyProxy, ) = currentEnvironmentDetail.networkRegistryProxyContractAddress.call(abi.encodeWithSignature("ownerBatchRemoveAccounts(address[])", stakingAddresses));

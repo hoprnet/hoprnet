@@ -17,11 +17,12 @@ usage() {
   msg
   msg "This script can be used to run a local Anvil instance at 127.0.0.1:8545"
   msg
-  msg "Usage: $0 [<log_file>]"
+  msg "Usage: $0 [<log_file>] [<cfg_file>]"
   msg
   msg "Parameters:"
   msg
   msg "log_file: (optional) log file name to be used by Anvil"
+  msg "cfg_file: (optional) cfg file name to be used by Anvil"
 }
 
 # return early with help info when requested
@@ -29,6 +30,7 @@ usage() {
 
 declare tmp="$(find_tmp_dir)"
 declare log_file="${1:-${tmp}/anvil.log}"
+declare cfg_file="${2:-${mydir}/../.anvil.cfg}"
 
 function cleanup {
   local EXIT_CODE=$?
@@ -40,6 +42,9 @@ function cleanup {
   log "Stop anvil network"
   lsof -i ":8545" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
 
+  log "Remove anvil configuration file ${cfg_file}"
+  rm -f "${cfg_file}"
+
   wait
 
   exit $EXIT_CODE
@@ -47,7 +52,7 @@ function cleanup {
 trap cleanup SIGINT SIGTERM ERR
 
 # mine a block every 2 seconds
-declare flags="--block-time 2"
+declare flags="--block-time 2 --config-out ${cfg_file}"
 
 if ! lsof -i ":8545" -s TCP:LISTEN; then
   log "Start local anvil network"
@@ -59,5 +64,5 @@ else
 fi
 
 log "Deploying contracts"
-make -C ${mydir}/../packages/ethereum/contracts/ -j anvil-deploy-all
+make -C ${mydir}/../packages/ethereum/contracts/ anvil-deploy-all
 log "Deploying contracts finished"

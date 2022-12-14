@@ -101,6 +101,7 @@ declare password="e2e-test"
 declare ct_db_file="${tmp}/hopr-ct-db.json"
 
 declare anvil_rpc_log="${tmp}/hopr-source-anvil-rpc.log"
+declare anvil_cfg_file="${tmp}/hopr-source-anvil.cfg"
 
 # anvil port
 declare -a all_ports=( 8545 )
@@ -266,6 +267,7 @@ function setup_ct_node() {
 log "Test files and directories"
 log "\tanvil"
 log "\t\tlog: ${anvil_rpc_log}"
+log "\t\tcfg: ${anvil_cfg_file}"
 log "\tnode1"
 log "\t\tdata dir: ${node1_dir} (will be removed)"
 log "\t\tlog: ${node1_log}"
@@ -309,7 +311,17 @@ declare protocol_config="${mydir}/../packages/core/protocol-config.json"
 declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
 
 # --- Running Mock Blockchain --- {{{
-${mydir}/run-local-anvil.sh "${anvil_rpc_log}"
+${mydir}/run-local-anvil.sh "${anvil_rpc_log}" "${anvil_cfg_file}"
+
+# read auto-generated private key from anvil configuration
+declare anvil_private_key
+anvil_private_key="$(jq -r ".private_keys[0]" "${anvil_cfg_file}")"
+if [ -z "${anvil_private_key}" ]; then
+  log "Could not find private key in anvil cfg file ${anvil_cfg_file}"
+  exit 1
+fi
+# we export the private key so it gets picked up by other sub-shells
+export PRIVATE_KEY=${anvil_private_key}
 
 # need to mirror contract data because of anvil-deploy node only writing to localhost {{{
 update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost"
@@ -321,7 +333,8 @@ declare ct_node1_address="0xde913eeed23bce5274ead3de8c196a41176fbd49"
 
 #  --- Run nodes --- {{{
 setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "${node1_privkey}" "--announce"
-setup_node 13302 ${default_api_token} 19092 "${node2_dir}" "${node2_log}" "${node2_id}" "${node2_privkey}" "--announce"
+# use empty auth token to be able to test this in the security tests
+setup_node 13302 "" 19092 "${node2_dir}" "${node2_log}" "${node2_id}" "${node2_privkey}" "--announce"
 setup_node 13303 ${default_api_token} 19093 "${node3_dir}" "${node3_log}" "${node3_id}" "${node3_privkey}" "--announce"
 setup_node 13304 ${default_api_token} 19094 "${node4_dir}" "${node4_log}" "${node4_id}" "${node4_privkey}" "--testNoDirectConnections"
 setup_node 13305 ${default_api_token} 19095 "${node5_dir}" "${node5_log}" "${node5_id}" "${node5_privkey}" "--testNoDirectConnections"

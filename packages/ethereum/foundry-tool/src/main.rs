@@ -142,10 +142,8 @@ fn main() -> Result<(), HelperErrors> {
             if use_local_identities {
                 // read all the files from the directory
                 if let Some(id_dir) = identity_directory {
-                    println!("ID DIR: {:?}", id_dir);
                     match key_pair::read_identities(&id_dir.as_str(), &password, &identity_prefix) {
                         Ok(addresses_from_identities) => {
-                            println!("ADDRESSES : {:?}", addresses_from_identities);
                             addresses_all.extend(addresses_from_identities);
                         }
                         Err(e) => return Err(HelperErrors::UnableToReadIdentitiesFromPath(e)),
@@ -158,7 +156,6 @@ fn main() -> Result<(), HelperErrors> {
             // TODO: by default, use faucet to fund both native tokens and HOPR tokens
 
             // set directory and environment variables
-            println!("Set env pwd: {:?}", make_root);
             if let Err(e) = process::set_process_path_env(&make_root, &private_key) {
                 return Err(e);
             }

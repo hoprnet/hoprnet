@@ -103,19 +103,34 @@ redeem_tickets() {
 # $1 native addresses ("Ethereum addresses"), comma-separated list
 # $2 peerIds, comma-separated list
 register_nodes() {
-  make -C "${mydir}/.. register-nodes" \
+  log "Registering nodes"
+
+  make -C "${mydir}/.." register-nodes \
     environment=anvil-localhost environment_type=development \
-    native_addresses="${1}" \
-    peer_ids="${2}"
+    native_addresses="[${1}]" \
+    peer_ids="[${2}]"
+
+  log "Registering nodes finished"
+}
+
+# $1 - peerIds, comma-separated list
+sync_nodes_in_network_registry() {
+  log "Sync nodes in network registry"
+
+  make -C "${mydir}/.." sync-eligibility \
+    environment=anvil-localhost environment_type=development \
+    peer_ids="[${1}]"
+
+  log "Sync nodes in network registry finished"
 }
 
 enable_network_registry() {
-  log "Enabling register"
-  env \
-    make -C "${mydir}/.. enable-network-registry" \
+  log "Enabling network registry"
+
+  make -C "${mydir}/.." enable-network-registry \
     environment=anvil-localhost environment_type=development
 
-  log "Register enabled"
+  log "Enabling network registry finished"
 }
 
 log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5}, ${api6}, ${api7}"
@@ -191,13 +206,9 @@ fi
 
 # Register nodes in the NR, emit "Registered" events
 register_nodes "${native_addrs_to_register}" "${native_peerids_to_register}"
-log "Nodes added to register (Registered)"
 
 # Sync nodes in the NR, emit "EligibilityUpdated" events
-make -C "${mydir}/.. sync-eligibility" \
-    environment=anvil-localhost environment_type=development \
-    peer_ids="${native_peerids_to_register}"
-log "Nodes added to register (EligibilityUpdated)"
+sync_nodes_in_network_registry "${native_peerids_to_register}"
 
 # running withdraw and checking it results at the end of this test run
 balances=$(api_get_balances ${api1})
