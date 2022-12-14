@@ -36,9 +36,7 @@ jobs:
     name: Build / Deploy SCs / Publish NPM
     strategy:
       matrix:
-        node-version: [16]
         os: ["ubuntu-latest"]
-        rust: ["stable"]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
@@ -56,37 +54,16 @@ jobs:
             target/
             .cargo/.package-cache/
             .cargo/bin/
+            .foundry/bin/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
-
-      - name: "[SETUP] Use Node.js"
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ matrix.node-version }}
-          registry-url: https://registry.npmjs.org/
-          cache: yarn
-
-      - name: "[SETUP] Print additional information"
-        run: |
-          node --version
-          npm --version
-          yarn --version
-          rustc --version
-          cargo --version
 
       - name: "[SETUP] Configure Git info"
         run: ./scripts/configure-git-info.sh
 
       - name: "[BUILD] Install dependencies / link / build"
         run: |
-          # Deploying with hardhat requires built hopr-utils package
           make -j deps-ci
           make -j build
-
-      - name: "Cache built artifacts (for later use)"
-        uses: actions/cache@v3
-        with:
-          path: packages/
-          key: hoprnet-build-${{ github.run_id }}
 
       - name: "Cache built artifacts (for later use)"
         uses: actions/cache@v3
@@ -302,9 +279,7 @@ jobs:
     name: "Continuous Deployment: Deploy public instances"
     strategy:
       matrix:
-        node-version: [16]
         os: ["ubuntu-latest"]
-        rust: ["stable"]
     runs-on: ${{ matrix.os }}
     needs: [set_failed_deployment_flag]
     steps:
@@ -323,17 +298,11 @@ jobs:
             target/
             .cargo/.package-cache/
             .cargo/bin/
+            .foundry/bin/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
 
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
-
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ matrix.node-version }}
-          registry-url: https://registry.npmjs.org/
-          cache: yarn
 
       - name: Set up Google Cloud Credentials
         uses: google-github-actions/auth@v0
@@ -397,9 +366,7 @@ jobs:
     name: "Continuous Deployment: Deploy NAT instances"
     strategy:
       matrix:
-        node-version: [16]
         os: ["ubuntu-latest"]
-        rust: ["stable"]
 
     runs-on: ${{ matrix.os }}
     needs: [deploy_public_instances] # Public nodes need to be deployed first
@@ -419,17 +386,11 @@ jobs:
             target/
             .cargo/.package-cache/
             .cargo/bin/
+            .foundry/bin/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
 
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
-
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ matrix.node-version }}
-          registry-url: https://registry.npmjs.org/
-          cache: yarn
 
       - name: Set up Google Cloud Credentials
         uses: google-github-actions/auth@v0
