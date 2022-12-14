@@ -914,9 +914,16 @@ export class HoprDB {
       registeredNodes = await this.findHoprNodesUsingAccountInNetworkRegistry(account)
     } catch (error) {}
 
+    const serializedSnapshot = snapshot.serialize()
+
     // Prevents from adding nodes more than once
     for (const registeredNode of registeredNodes) {
       if (registeredNode.eq(pubKey)) {
+        // update snapshot
+        await this.db.put(
+          Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
+          Buffer.from(serializedSnapshot.buffer, serializedSnapshot.byteOffset, serializedSnapshot.byteLength)
+        )
         // already registered, nothing to do
         return
       }
@@ -926,7 +933,6 @@ export class HoprDB {
     registeredNodes.push(pubKey)
 
     const serializedRegisteredNodes = PublicKey.serializeArray(registeredNodes)
-    const serializedSnapshot = snapshot.serialize()
     const serializedAccount = account.serialize()
 
     await this.db
