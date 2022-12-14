@@ -17,12 +17,12 @@ import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
 import Hopr, { type HoprOptions } from './index.js'
 import { getAddrs } from './identity.js'
-import type AccessControl from './network/access-control.js'
 import { createLibp2pMock } from './libp2p.mock.js'
-import { NetworkPeersOrigin } from './network/network-peers.js'
 import { supportedEnvironments } from './environment.js'
+import { MultiaddrConnection } from '@libp2p/interfaces/transport'
 
 const log = debug(`hopr-core:create-hopr`)
+const error = debug(`hopr-core:error`)
 
 /*
  * General function to create a libp2p instance to start sending
@@ -39,7 +39,6 @@ export async function createLibp2pInstance(
   options: HoprOptions,
   initialNodes: { id: PeerId; multiaddrs: Multiaddr[] }[],
   publicNodes: PublicNodesEmitter,
-  reviewConnection: AccessControl['reviewConnection'],
   isAllowedToAccessNetwork: Hopr['isAllowedAccessToNetwork']
 ): Promise<Libp2p> {
   let libp2p: Libp2p
@@ -147,11 +146,21 @@ export async function createLibp2pInstance(
         dialTimeout: 10e3
       },
       connectionGater: {
-        denyDialPeer: async (peer: PeerId) => {
-          return !(await reviewConnection(peer, NetworkPeersOrigin.OUTGOING_CONNECTION))
-        },
-        denyInboundEncryptedConnection: async (peer: PeerId) => {
-          return !(await reviewConnection(peer, NetworkPeersOrigin.INCOMING_CONNECTION))
+        denyDialPeer: async (peer: PeerId) => !(await isAllowedToAccessNetwork(peer)),
+        denyInboundEncryptedConnection: async (peer: PeerId, conn: MultiaddrConnection) => {
+          const isAllowed = await isAllowedToAccessNetwork(peer)
+
+          if (!isAllowed) {
+            try {
+              // Connection must be closed explicitly because not yet
+              // part of any data structure
+              await conn.close()
+            } catch (err) {
+              error(`Error while closing connection to non-registered node`)
+            }
+          }
+
+          return !isAllowed
         }
       },
       relay: {

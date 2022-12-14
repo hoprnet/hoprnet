@@ -145,7 +145,6 @@ async function getPeer(
     (async () => {
       assert.fail(`must not call hangUp`)
     }) as any,
-    () => Promise.resolve(true),
     netStatEvents,
     (peerId) => !peerId.equals(Charly) && !peerId.equals(Me),
     TESTING_ENVIRONMENT,
@@ -175,7 +174,6 @@ describe('unit test heartbeat', async () => {
       (async () => {
         assert.fail(`must not call hangUp`)
       }) as any,
-      () => Promise.resolve(true),
       netHealth,
       (_) => true,
       TESTING_ENVIRONMENT,

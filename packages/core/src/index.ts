@@ -19,7 +19,6 @@ import retimer from 'retimer'
 
 import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants.js'
 
-import AccessControl from './network/access-control.js'
 import NetworkPeers, { type Entry, NetworkPeersOrigin } from './network/network-peers.js'
 import Heartbeat, { NetworkHealthIndicator } from './network/heartbeat.js'
 
@@ -303,9 +302,6 @@ class Hopr extends EventEmitter {
       this.options,
       initialNodes,
       this.publicNodesEmitter,
-      async (peerId: PeerId, origin: NetworkPeersOrigin): Promise<boolean> => {
-        return accessControl.reviewConnection(peerId, origin)
-      },
       this.isAllowedAccessToNetwork.bind(this)
     )) as Libp2p
 
@@ -341,27 +337,42 @@ class Hopr extends EventEmitter {
       }
     )
 
-    // Initialize AccessControl
-    const accessControl = new AccessControl(
-      this.networkPeers,
-      this.isAllowedAccessToNetwork.bind(this),
-      this.closeConnectionsTo.bind(this)
-    )
-
     // react when network registry is enabled / disabled
-    this.connector.indexer.on('network-registry-status-changed', (_enabled: boolean) => {
-      accessControl.reviewConnections()
+    this.connector.indexer.on('network-registry-status-changed', async (enabled: boolean) => {
+      // If Network Registry got enabled, we might need to close existing connections,
+      // otherwise there is nothing to do
+      if (enabled) {
+        for (const connection of this.libp2pComponents.getConnectionManager().getConnections()) {
+          if (!(await this.isAllowedAccessToNetwork(connection.remotePeer))) {
+            this.networkPeers.unregister(connection.remotePeer)
+            try {
+              await connection.close()
+            } catch (err) {
+              error(`error while closing existing connection to ${connection.remotePeer.toString()}`)
+            }
+          }
+        }
+      }
     })
+
     // react when an account's eligibility has changed
     this.connector.indexer.on(
       'network-registry-eligibility-changed',
-      (_account: Address, nodes: PublicKey[], _eligible: boolean) => {
-        for (const node of nodes) {
-          const peerId = node.toPeerId()
-          const origin = this.networkPeers.has(peerId)
-            ? this.networkPeers.getConnectionInfo(peerId).origin
-            : NetworkPeersOrigin.NETWORK_REGISTRY
-          accessControl.reviewConnection(peerId, origin)
+      async (_account: Address, nodes: PublicKey[], eligible: boolean) => {
+        // If account is no longer eligible to register nodes, we might need to close existing connections,
+        // otherwise there is nothing to do
+        if (!eligible) {
+          for (const node of nodes) {
+            this.networkPeers.unregister(node.toPeerId())
+
+            for (const conn of this.libp2pComponents.getConnectionManager().getConnections(node.toPeerId())) {
+              try {
+                await conn.close()
+              } catch (err) {
+                error(`error while closing existing connection to ${conn.remotePeer.toString()}`)
+              }
+            }
+          }
         }
       }
     )
@@ -374,7 +385,6 @@ class Hopr extends EventEmitter {
       subscribe,
       sendMessage,
       this.closeConnectionsTo.bind(this),
-      accessControl.reviewConnection.bind(accessControl),
       this,
       (peerId: PeerId) => {
         if (this.knownPublicNodesCache.has(peerId.toString())) return true
@@ -625,7 +635,9 @@ class Hopr extends EventEmitter {
 
       out += `${channel.toString()}\n`
       currentChannels.push(channel)
-      this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_EXISTING_CHANNEL) // Make sure current channels are 'interesting'
+      if (!(await this.isAllowedAccessToNetwork(channel.destination.toPeerId()))) {
+        this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_EXISTING_CHANNEL) // Make sure current channels are 'interesting'
+      }
     }
 
     metric_inChannelCount.set(incomingChannels)
@@ -688,7 +700,9 @@ class Hopr extends EventEmitter {
 
     for (let i = 0; i < tickResult.toOpen.length; i++) {
       const channel = tickResult.toOpen[i]
-      this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_NEW_CHANNEL)
+      if (!(await this.isAllowedAccessToNetwork(channel.destination.toPeerId()))) {
+        this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_NEW_CHANNEL)
+      }
       try {
         // Opening channels can fail if we can't establish a connection.
         const hash = await this.openChannel(channel.destination.toPeerId(), channel.stake)
@@ -915,6 +929,9 @@ class Hopr extends EventEmitter {
   public async ping(destination: PeerId): Promise<{ info?: string; latency: number }> {
     let start = Date.now()
 
+    if (!(await this.isAllowedAccessToNetwork(destination))) {
+      throw Error(`Connection to node is not allowed`)
+    }
     // Propagate any errors thrown upwards
     let pingResult = await this.heartbeat.pingNode(destination)
 
