@@ -133,10 +133,6 @@ export type HoprOptions = {
     // don't do the upgrade to it to test bidirectional NAT
     // default: false
     noWebRTCUpgrade?: boolean
-    // when true, disable usage of UPNP to automatically detect
-    // external IP
-    // default: false
-    noUPNP?: boolean
     // Use mocked libp2p instance instead of real one
     useMockedLibp2p?: boolean
     // When using mocked libp2p instance, use existing mocked
