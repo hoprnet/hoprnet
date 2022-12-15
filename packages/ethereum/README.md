@@ -116,9 +116,6 @@ foundryup --version nightly-64cbdd183e0aae99eb1be507196b6b5d640b3801
 | |____HoprStakeBase.t.sol
 | |____HoprBoost.t.sol
 | |____HoprWhitehat.t.sol
-|____proxy
-| |____HoprStakingProxyForNetworkRegistry.t.sol
-| |____HoprDummyProxyForNetworkRegistry.t.sol
 |____ERC777
 | |____ERC777Snapshot.t.sol
 |____HoprDistributor.t.sol
