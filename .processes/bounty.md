@@ -1,6 +1,6 @@
 # Bounty Process
 
-The purpose of this process is to follow a consistent way of creating, funding, publishing, and marketing bounties at HOPR. Please familiarize yourself with the [Program.md](https://github.com/hoprnet/bounties-hoprnet-org/blob/main/PROGRAM.md) document before you continue with the bounty process.
+The purpose of this process is to follow a consistent way of creating, funding, publishing, and marketing bounties at HOPR. Please familiarize yourself with the [Program.md](https://github.com/hoprnet/bounties-hoprnet-org/blob/main/PROGRAM.md) document before you continue with the bounty process. 
 
 ## A Bounty
 
@@ -20,7 +20,7 @@ A bounty usually serves multiple purposes.
    - Within each section of the template, provide the most concise details you can.
    - Feel free to expand on sections `Developing HOPR` and `What is HOPR?` with information more related to the bounty.
 3. The bounty admin assignes herself/himself to the bounty as well as the program owner.
-   - If the bounty admin appoints a bounty expert the bounty admin assigns the bounty expert to the issue as well. **(Need to link program.md)**
+   - If the bounty admin appoints a bounty expert the bounty admin assigns the bounty expert to the issue as well. 
 4. The bounty admin assignes the dedicated bounty label to the issue.
 
 5. The bounty admin makes a comment in the GitHub issue (tagging the program owner) with an estimate of:
@@ -54,30 +54,18 @@ A bounty usually serves multiple purposes.
 
 ### During the time the bounty hunter is working on the bounty
 
-- The program owner requests frequent progress updates from the bounty hunter. The program owner decides the update frequency which might vary from bounty to bounty.
+- The program owner requests frequent progress updates from the bounty hunter. The program owner decides the update frequency which might vary from bounty to bounty and can be specified in the bounty template (optinally).
 - The program owner answers questions that the bounty hunter might have or delegates the questions to the bounty admin (optinally: bounty expert)
 
 ### After the bounty hunter submits the work
 
-The bounty _must_ be reviewed before receiving funds.
+- program owner asks the bounty admin (optinally: bounty expert) to review the submission and give a [recommendation](#Recommendation-to-program-owner)
 
-Depending on the medium used to post the bounty, the funds used may be different.
-For most cases, use of HOPR tokens is encouraged.
 
-- the funds are in crypto (HOPR, xDai, etc)
-  1. Creator of the bounty [creates a wallet](./wallets.md) to be used as an operator wallet.
-  2. Request of funds is done by emailing HOPR's accountant.
-  3. Funds are sent to the wallet.
+## Posting the bounty on Gitcoin 
 
-### Posting the bounty
-
-Depending on the medium used the process may vary.
-
-- via [Gitcoin](https://gitcoin.co/)
-
-  1. Creator enters the GitHub issue link in Gitcoin's bounty creation portal.
-  2. Creator sets prize of the bounty, organisation github handle to `hoprnet`, notification email to `tech@hoprnet.org`
-  3. Operator wallet is the one created in [Funding the bounty](#funding-the-bounty).
+ - Program owner enters the GitHub issue link via Gitcoin's bounty creation portal.
+ - Program owner sets prize of the bounty and organisation github handle to `hoprnet`. 
 
 ## Deadlines
 
@@ -117,7 +105,8 @@ Bounty rewards are set in US Dollar. However, the program owner pays out the bou
 
 3. Bounty hunter submits a dis-satisfactory solution but it technically fullfills the deliverables outlined in the github issue.
 
-   - Pay out the promised bounty reward.
+   - Ask the bounty hunter to implement changes where the changes need to be specified by the bounty admin (optinally: bounty expert) 
+   - In case the bounty hunter refuses to implement the changes: Pay out the promised bounty reward.
    - Program owner and bounty admin schedule a **_what went wrong_** assessment of the github issue to minimize the probability that this happens again in the future.
 
 4. Bounty hunter disappears
