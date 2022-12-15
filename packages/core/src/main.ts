@@ -96,6 +96,7 @@ export async function createLibp2pInstance(
             allowPrivateConnections: options.allowPrivateConnections,
             // Amount of nodes for which we are willing to act as a relay
             maxRelayedConnections: 50_000,
+            announce: options.announce,
             isAllowedToAccessNetwork
           },
           testing: {
@@ -109,9 +110,7 @@ export async function createLibp2pInstance(
             __noDirectConnections: options.testing?.noDirectConnections,
             // Do not upgrade to a direct WebRTC connection, even if it
             // is available. Used to test behavior of bidirectional NATs
-            __noWebRTCUpgrade: options.testing?.noWebRTCUpgrade,
-            // Prevent usage of UPNP to determine external IP address
-            __noUPNP: options.testing?.noUPNP
+            __noWebRTCUpgrade: options.testing?.noWebRTCUpgrade
           }
         })
       ],

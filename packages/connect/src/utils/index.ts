@@ -1,12 +1,13 @@
-import type { AddressInfo, Server as TCPServer } from 'net'
+import { type AddressInfo, type Server as TCPServer, isIPv6 } from 'net'
 import type { Socket as UDPSocket } from 'dgram'
+import { lookup } from 'dns'
 import type { Connection, MultiaddrConnection } from '@libp2p/interface-connection'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Components } from '@libp2p/interfaces/components'
 
 import { peerIdFromBytes } from '@libp2p/peer-id'
 
-import { isAnyAddress } from '@hoprnet/hopr-utils'
+import { isAnyAddress, randomPermutation } from '@hoprnet/hopr-utils'
 
 import { Multiaddr } from '@multiformats/multiaddr'
 import { CODE_CIRCUIT, CODE_P2P } from '../constants.js'
@@ -175,6 +176,26 @@ export function bindToPort<T extends 'UDP' | 'TCP'>(
 }
 
 /**
+ * Hook to attach to `udp6` sockets to resolve dns4 queries
+ * similar to `udp4` sockets
+ * @param requestArgs UDP socket lookup arguments
+ */
+export function ip6Lookup(...requestArgs: any[]) {
+  if (isIPv6(requestArgs[0])) {
+    // @ts-ignore
+    return lookup(...requestArgs)
+  }
+  return lookup(requestArgs[0], 4, (...responseArgs: any[]) => {
+    const callback = requestArgs.length == 3 ? requestArgs[2] : requestArgs[1]
+    // Error | null
+    if (responseArgs[0] != null) {
+      return callback(responseArgs[0])
+    }
+    callback(responseArgs[0], `::ffff:${responseArgs[1]}`, responseArgs[2])
+  })
+}
+
+/**
  * Attempts to close the given maConn. If a failure occurs, it will be logged.
  * @private
  * @param maConn
@@ -224,3 +245,37 @@ export function cleanExistingConnections(
     attemptClose(conn, error)
   }
 }
+
+export function* randomIterator<T>(arr: T[]): Iterable<T> {
+  if (arr == undefined || arr.length == 0) {
+    yield* [] as T[]
+    return
+  }
+
+  const indices = Array.from({ length: arr.length }, (_, i) => i)
+
+  // Permutates in-place
+  randomPermutation(indices)
+
+  for (let i = 0; i < arr.length; i++) {
+    yield arr[indices[i]]
+  }
+}
+
+// inspired by https://github.com/nodertc/is-stun
+/**
+ * Checks to test if received packet is a STUN packet
+ * Used to distinguish whether an incoming stream is a libp2p multistream one
+ * or a STUN protocol execution
+ * @param data packet to be tested
+ * @returns true if packet is considered a STUN packet
+ */
+export function isStun(data: Uint8Array): boolean {
+  return data.length > 0 && data[0] >= 0 && data[0] <= 3
+}
+
+/**
+ * Use to check if an IPv6 address contains an embedded IPv4 address
+ * and if so, extract the IPv4 part.
+ */
+export const IPV4_EMBEDDED_ADDRESS = /(?<=::ffff:)[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/
