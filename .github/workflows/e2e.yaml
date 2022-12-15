@@ -45,6 +45,7 @@ jobs:
       - name: restore cargo cache
         uses: actions/cache@v3
         with:
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
           path: |
             ~/.cargo/bin/
             ~/.cargo/registry/index/
@@ -53,7 +54,6 @@ jobs:
             target/
             .cargo/.package-cache/
             .cargo/bin/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
 
       - name: Install dependencies
         run: make -j deps-ci
