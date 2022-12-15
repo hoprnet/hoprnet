@@ -6,7 +6,7 @@ The purpose of this process is to follow a consistent way of creating, funding, 
 
 A bounty usually serves multiple purposes.
 
-1. Takes away workload from the teams at HOPR as it allows external developers to improve the HOPR protocol and the various applications/tools we maintain.
+1. Takes away workload from the teams at HOPR as it allows external developers to improve the HOPR protocol and the various applications/tools hopr maintains.
 2. Gives the COM-team the opportunity to showcase HOPR's involvement in open source.
 3. Allows us to build a relationship between HOPR and the bounty hunter (tech community).
 
@@ -15,8 +15,8 @@ A bounty usually serves multiple purposes.
 ### Creating the bounty
 
 1. The bounty admin approaches the program owner with a bounty idea and the program owner approves it. Optionally the bounty admin appoints a bounty expert to assist with the technical content.
-   - Sometimes the program owner may approache a person with a bounty idea and asks that person to be the bounty admin.
-2. The bounty admin creates a GitHub issue using the [bounty template](../.github/ISSUE_TEMPLATE/bounty.md) in the dedicated bounty repository **(Needs to be created)**
+   - Sometimes the program owner may approach a person with a bounty idea and asks that person to be the bounty admin.
+2. The bounty admin creates a GitHub issue using the [bounty template](../.github/ISSUE_TEMPLATE/bounty.md) in the dedicated [bounty repository](https://github.com/hoprnet/hopr-bounty-submission)
    - Within each section of the template, provide the most concise details you can.
    - Feel free to expand on sections `Developing HOPR` and `What is HOPR?` with information more related to the bounty.
 3. The bounty admin assignes herself/himself to the bounty as well as the program owner.
