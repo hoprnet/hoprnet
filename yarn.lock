@@ -2977,6 +2977,39 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@hoprnet/avadosdk@npm:0.4.4-rc.1":
+  version: 0.4.4-rc.1
+  resolution: "@hoprnet/avadosdk@npm:0.4.4-rc.1"
+  dependencies:
+    "@dappnode/dnp-manifest": ^0.0.4
+    "@octokit/rest": ^16.27.3
+    async-retry: ^1.2.3
+    chalk: ^2.4.2
+    ethjs: ^0.4.0
+    ethjs-abi: ^0.2.1
+    ethjs-ens: ^2.0.1
+    ethjs-util: ^0.1.6
+    execa: ^1.0.0
+    figlet: ^1.2.3
+    form-data: ^3.0.0
+    got: ^10.5.5
+    image-size: ^0.8.1
+    inquirer: ^6.2.1
+    ipfs-http-client: ^49.0.4
+    js-yaml: ^3.12.1
+    listr: ^0.14.3
+    lodash: ^4.17.15
+    mime-types: ^2.1.24
+    semver: ^5.6.0
+    tar-fs: ^2.0.0
+    timestring: ^5.0.1
+    yargs: ^13.2.4
+  bin:
+    avadosdk: src/avadosdk.js
+  checksum: f8a6735eafe94dc6e0bbb13cbfe94f6707c0f55f4011a85b43d0775a3351e1d848ed07f151baa7d0c3b8d21a97ac8c97b659165645cd228021a0afa110852ee4
+  languageName: node
+  linkType: hard
+
 "@hoprnet/hopr-connect@workspace:packages/connect":
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-connect@workspace:packages/connect"
@@ -7257,39 +7290,6 @@ __metadata:
   bin:
     autoprefixer: bin/autoprefixer
   checksum: dcb1cb7ae96a3363d65d82e52f9a0a7d8c982256f6fd032d7e1ec311f099c23acfebfd517ff8e96bf93f716a66c4ea2b80c60aa19efd2f474ce434bd75ef7b79
-  languageName: node
-  linkType: hard
-
-"avadosdk@git+https://github.com/avadodserver/avadosdk.git#7b035be69754a9410d14e0e1d50d88bcd4c143fa":
-  version: 0.4.3
-  resolution: "avadosdk@https://github.com/avadodserver/avadosdk.git#commit=7b035be69754a9410d14e0e1d50d88bcd4c143fa"
-  dependencies:
-    "@dappnode/dnp-manifest": ^0.0.4
-    "@octokit/rest": ^16.27.3
-    async-retry: ^1.2.3
-    chalk: ^2.4.2
-    ethjs: ^0.4.0
-    ethjs-abi: ^0.2.1
-    ethjs-ens: ^2.0.1
-    ethjs-util: ^0.1.6
-    execa: ^1.0.0
-    figlet: ^1.2.3
-    form-data: ^3.0.0
-    got: ^10.5.5
-    image-size: ^0.8.1
-    inquirer: ^6.2.1
-    ipfs-http-client: ^49.0.4
-    js-yaml: ^3.12.1
-    listr: ^0.14.3
-    lodash: ^4.17.15
-    mime-types: ^2.1.24
-    semver: ^5.6.0
-    tar-fs: ^2.0.0
-    timestring: ^5.0.1
-    yargs: ^13.2.4
-  bin:
-    avadosdk: ./src/avadosdk.js
-  checksum: 2553932a8536a91650de8379b4c81a24da21dd3061ae0519efd834fa62547ce3a3da19918f8db5b355f0d5898aded3f64f93e85d527271409ddf2074e5f9b945
   languageName: node
   linkType: hard
 
@@ -13569,8 +13569,8 @@ __metadata:
   resolution: "hoprnet@workspace:."
   dependencies:
     "@ethersproject/cli": 5.7.0
+    "@hoprnet/avadosdk": 0.4.4-rc.1
     "@types/node": 16
-    avadosdk: "git+https://github.com/avadodserver/avadosdk.git#7b035be69754a9410d14e0e1d50d88bcd4c143fa"
     prettier: 2.7.1
     ts-node: 10.9.1
     typescript: 4.8.4
