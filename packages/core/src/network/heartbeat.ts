@@ -180,16 +180,16 @@ export default class Heartbeat {
     if (pingErrorThrown || pingResponse == null || pingResponse.length != 1) {
       if (pingErrorThrown) {
         log(`Error while pinging ${destination.toString()}`, pingError)
-      } else if (pingResponse.length == 1) {
+      } else if (pingResponse == null || pingResponse.length == 1) {
         const expectedResponse = Heartbeat.calculatePingResponse(challenge)
 
         if (!u8aEquals(expectedResponse, pingResponse[0])) {
           log(`Mismatched challenge. Got ${u8aToHex(pingResponse[0])} but expected ${u8aToHex(expectedResponse)}`)
         }
-      }
 
-      // Eventually close the connections, all errors are handled
-      this.closeConnectionsTo(destination)
+        // Eventually close the connections, all errors are handled
+        this.closeConnectionsTo(destination)
+      }
 
       metric_timeToPing.cancel_measure(ping_timer)
       metric_pingFailureCount.increment()
