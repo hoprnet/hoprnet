@@ -124,6 +124,7 @@ dependencies = [
  "k256",
  "sha3",
  "static_assertions",
+ "thiserror",
  "typenum",
  "wasm-bindgen",
  "wasm-bindgen-test",
