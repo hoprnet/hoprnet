@@ -1,6 +1,6 @@
 # Bounty Process
 
-The purpose of this process is to follow a consistent way of creating, funding, publishing, and marketing bounties at HOPR. Please familiarize yourself with the [Program.md](https://github.com/hoprnet/bounties-hoprnet-org/blob/main/PROGRAM.md) document before you continue with the bounty process. 
+The purpose of this process is to follow a consistent way of creating, funding, publishing, and marketing bounties at HOPR. Please familiarize yourself with the [Program.md](https://github.com/hoprnet/bounties-hoprnet-org/blob/main/PROGRAM.md) document before you continue with the bounty process.
 
 ## A Bounty
 
@@ -20,7 +20,7 @@ A bounty usually serves multiple purposes.
    - Within each section of the template, provide the most concise details you can.
    - Feel free to expand on sections `Developing HOPR` and `What is HOPR?` with information more related to the bounty.
 3. The bounty admin assignes herself/himself to the bounty as well as the program owner.
-   - If the bounty admin appoints a bounty expert the bounty admin assigns the bounty expert to the issue as well. 
+   - If the bounty admin appoints a bounty expert the bounty admin assigns the bounty expert to the issue as well.
 4. The bounty admin assignes the dedicated bounty label to the issue.
 
 5. The bounty admin makes a comment in the GitHub issue (tagging the program owner) with an estimate of:
@@ -61,11 +61,10 @@ A bounty usually serves multiple purposes.
 
 - program owner asks the bounty admin (optinally: bounty expert) to review the submission and give a [recommendation](#Recommendation-to-program-owner)
 
+## Posting the bounty on Gitcoin
 
-## Posting the bounty on Gitcoin 
-
- - Program owner enters the GitHub issue link via Gitcoin's bounty creation portal.
- - Program owner sets prize of the bounty and organisation github handle to `hoprnet`. 
+- Program owner enters the GitHub issue link via Gitcoin's bounty creation portal.
+- Program owner sets prize of the bounty and organisation github handle to `hoprnet`.
 
 ## Deadlines
 
@@ -105,7 +104,7 @@ Bounty rewards are set in US Dollar. However, the program owner pays out the bou
 
 3. Bounty hunter submits a dis-satisfactory solution but it technically fullfills the deliverables outlined in the github issue.
 
-   - Ask the bounty hunter to implement changes where the changes need to be specified by the bounty admin (optinally: bounty expert) 
+   - Ask the bounty hunter to implement changes where the changes need to be specified by the bounty admin (optinally: bounty expert)
    - In case the bounty hunter refuses to implement the changes: Pay out the promised bounty reward.
    - Program owner and bounty admin schedule a **_what went wrong_** assessment of the github issue to minimize the probability that this happens again in the future.
 
