@@ -7,9 +7,9 @@ import retimer from 'retimer'
 
 import { Multiaddr } from '@multiformats/multiaddr'
 
-import { u8aToHex, u8aAddrToString, u8aToNumber, u8aEquals } from '@hoprnet/hopr-utils'
+import { u8aToHex, u8aEquals } from '@hoprnet/hopr-utils'
 import { STUN_TCP_TIMEOUT } from './constants.js'
-import { CODE_IP4, CODE_IP6, CODE_DNS4, CODE_DNS6 } from '../../../constants.js'
+import { parseStunAddress } from '../utils.js'
 import {
   isStunErrorResponse,
   isStunRequest,
@@ -58,30 +58,7 @@ function createRequest(
   signal: AbortSignal,
   onUpdate: (response: { response?: Interface; transactionId: Buffer }) => void
 ): void {
-  const tuples = multiaddr.tuples()
-
-  if (tuples.length == 0) {
-    throw Error(`Cannot perform STUN request: empty Multiaddr`)
-  }
-
-  let address: string
-
-  switch (tuples[0][0]) {
-    case CODE_DNS4:
-    case CODE_DNS6:
-      address = new TextDecoder().decode(tuples[0][1]?.slice(1) as Uint8Array)
-      break
-    case CODE_IP6:
-      address = u8aAddrToString(tuples[0][1] as Uint8Array, 'IPv6')
-      break
-    case CODE_IP4:
-      address = `::ffff:${u8aAddrToString(tuples[0][1] as Uint8Array, 'IPv4')}`
-      break
-    default:
-      throw Error(`Invalid address: ${multiaddr.toString()}`)
-  }
-
-  const port: number | undefined = tuples.length >= 2 ? u8aToNumber(tuples[1][1] as Uint8Array) : undefined
+  const { address, port } = parseStunAddress(multiaddr)
 
   const message = createMessage(constants.STUN_BINDING_REQUEST, tId)
 
@@ -98,7 +75,7 @@ function createRequest(
 
   // Creates a secondary connection
   const socket = createConnection({
-    port: port as number,
+    port,
     host: address,
     family: 6,
     signal

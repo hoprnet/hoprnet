@@ -8,14 +8,7 @@ import { isStun } from '../../../utils/index.js'
 // @ts-ignore untyped module
 import retimer from 'retimer'
 
-import {
-  u8aToHex,
-  u8aToNumber,
-  ipToU8aAddress,
-  u8aAddrToString,
-  isPrivateAddress,
-  isLocalhost
-} from '@hoprnet/hopr-utils'
+import { u8aToHex, ipToU8aAddress, isPrivateAddress, isLocalhost } from '@hoprnet/hopr-utils'
 
 import {
   isStunErrorResponse,
@@ -26,8 +19,8 @@ import {
   STUN_QUERY_STATE
 } from '../constants.js'
 import { STUN_UDP_TIMEOUT } from './constants.js'
-import { CODE_IP4, CODE_IP6, CODE_DNS4, CODE_DNS6 } from '../../../constants.js'
 import { ip6Lookup } from '../../../utils/index.js'
+import { parseStunAddress } from '../utils.js'
 
 const log = debug('hopr-connect:stun:udp')
 const error = debug('hopr-connect:stun:udp:error')
@@ -175,30 +168,7 @@ function decodeIncomingSTUNResponses(
  * @param socket socket to send the STUN requests
  */
 function sendStunRequest(multiaddr: Multiaddr, tId: Buffer, responsePort: number | undefined, socket: Socket): void {
-  const tuples = multiaddr.tuples()
-
-  if (tuples.length == 0) {
-    throw Error(`Cannot perform STUN request: empty Multiaddr`)
-  }
-
-  let address: string
-
-  switch (tuples[0][0]) {
-    case CODE_DNS4:
-    case CODE_DNS6:
-      address = new TextDecoder().decode(tuples[0][1]?.slice(1) as Uint8Array)
-      break
-    case CODE_IP6:
-      address = u8aAddrToString(tuples[0][1] as Uint8Array, 'IPv6')
-      break
-    case CODE_IP4:
-      address = `::ffff:${u8aAddrToString(tuples[0][1] as Uint8Array, 'IPv4')}`
-      break
-    default:
-      throw Error(`Invalid address: ${multiaddr.toString()}`)
-  }
-
-  const port: number | undefined = tuples.length >= 2 ? u8aToNumber(tuples[1][1] as Uint8Array) : undefined
+  const { address, port } = parseStunAddress(multiaddr)
 
   const message = createMessage(constants.STUN_BINDING_REQUEST, tId)
 
@@ -281,7 +251,11 @@ export function performSTUNRequests(
 
     const usedStunServers: Multiaddr[] = []
 
-    let onTimeout = (transactionId: Buffer) => {
+    /**
+     * Called once a STUN request times out.
+     * Used to issue a new request.
+     */
+    const onTimeout = (transactionId: Buffer) => {
       requests.delete(u8aToHex(transactionId))
       const result = nextSTUNRequest(it, requests, timeout, socket, undefined, onTimeout, onError)
       if (result != undefined) {
@@ -289,6 +263,11 @@ export function performSTUNRequests(
       }
     }
 
+    /**
+     * Called on received STUN responses.
+     * Validates response and issues a new request if necessary
+     * @param response the STUN response
+     */
     const update = (response: { response?: Interface; transactionId: Buffer }) => {
       const tIdString = u8aToHex(response.transactionId)
       const request = requests.get(tIdString)
@@ -334,6 +313,7 @@ export function performSTUNRequests(
     for (let i = 0; i < 2; i++) {
       result = nextSTUNRequest(it, requests, timeout, socket, undefined, onTimeout, onError)
       if (result != undefined) {
+        // Reuse servers for RFC 5780 STUN requests later
         usedStunServers.push(result[1])
       }
     }
@@ -393,6 +373,11 @@ export function isUdpExposedHost(
       yield* multiaddrs
     })()
 
+    /**
+     * Called onces a request sent *from* the secondary socket times out.
+     * Will issue a new STUN request
+     * @param transactionId identifier of the STUN request
+     */
     const onTimeoutSecondary = (transactionId: Buffer) => {
       requests.delete(u8aToHex(transactionId))
 
@@ -408,6 +393,10 @@ export function isUdpExposedHost(
       )
     }
 
+    /**
+     * Called when giving up waiting for a STUN response on primary socket
+     * @param transactionId identifier of the STUN request
+     */
     const onTimeoutPrimary = (transactionId: Buffer) => {
       const tIdString = u8aToHex(transactionId)
       const request = requests.get(tIdString)
@@ -417,13 +406,17 @@ export function isUdpExposedHost(
         return
       }
 
-      log(`onTimeout primary`, tIdString)
-
       end()
       resolve(STUN_EXPOSED_CHECK_RESPOSE.NOT_EXPOSED)
       return
     }
 
+    /**
+     * Called when receiving a response on the secondary socket
+     * Issues a new request if unexpected response or response on the wrong socket.
+     * Escalates request if RFC 5780 seems to be supported by STUN server
+     * @param response the STUN response, including transactionId
+     */
     const updateSecondary = (response: { response?: Interface; transactionId: Buffer }) => {
       const tIdString = u8aToHex(response.transactionId)
       const request = requests.get(tIdString)
@@ -483,6 +476,10 @@ export function isUdpExposedHost(
       }
     }
 
+    /**
+     * Called when receiving a STUN response on primary socket
+     * @param response the STUN response
+     */
     const updatePrimary = (response: { response?: Interface; transactionId: Buffer }) => {
       const tIdString = u8aToHex(response.transactionId)
       const request = requests.get(tIdString)
@@ -527,6 +524,7 @@ export function isUdpExposedHost(
       resolve(STUN_EXPOSED_CHECK_RESPOSE.UNKNOWN)
     }
 
+    // Initiate requests
     nextSTUNRequest(
       it,
       requests,
