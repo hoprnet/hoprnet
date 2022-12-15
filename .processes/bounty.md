@@ -1,6 +1,6 @@
 # Bounty Process
 
-The purpose of this process is to follow a consistent way of creating, funding, publishing, and marketing bounties at HOPR.
+The purpose of this process is to follow a consistent way of creating, funding, publishing, and marketing bounties at HOPR. Please familiarize yourself with the [Program.md](https://github.com/hoprnet/bounties-hoprnet-org/blob/main/PROGRAM.md) document before you continue with the bounty process. 
 
 ## A Bounty
 
