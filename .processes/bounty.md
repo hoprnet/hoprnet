@@ -34,7 +34,7 @@ A bounty usually serves multiple purposes.
 
 ### After the bounty hunter submits the work
 
-- The bounty admin (optionally: bounty expert) needs to review/test the submission and the bounty admin gives a reccomendation to the program owner. **_(Link Subsection)_**
+- The bounty admin (optionally: bounty expert) needs to review/test the submission and the bounty admin gives a [recommendation](#Recommendation-to-program-owner) to the program owner. 
 
 ## Program Owner Process
 
@@ -105,7 +105,7 @@ Bounty rewards are set in US Dollar. However, the program owner pays out the bou
 
 - For example, consider the case where we choose 100 USD as the bounty reward and assume that at the time of publishing the bounty the HOPR token price equals 1 USD. A bounty hunter submits the work a month later and the program owner decides to pay out the bounty. In the meantime the HOPR token price drops to 0.5 USD. Therfore, the program owner pays out 200 HOPR token worth 100 USD at the time of payment.
 
-## How to deal with bad hunters and different submission qualities
+## Recommendation to program owner
 
 1. Bounty hunter submits a satisfactory solution that fullfills all deliverables outlined in the github issue within the specified deadlines (if any)
 
