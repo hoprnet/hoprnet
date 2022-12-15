@@ -34,7 +34,7 @@ A bounty usually serves multiple purposes.
 
 ### After the bounty hunter submits the work
 
-- The bounty admin (optionally: bounty expert) needs to review/test the submission and the bounty admin gives a [recommendation](#Recommendation-to-program-owner) to the program owner. 
+- The bounty admin (optionally: bounty expert) needs to review/test the submission and the bounty admin gives a [recommendation](#Recommendation-to-program-owner) to the program owner.
 
 ## Program Owner Process
 
