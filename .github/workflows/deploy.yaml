@@ -1,3 +1,4 @@
+---
 name: HOPR Deploy
 
 env:
@@ -36,14 +37,31 @@ jobs:
     name: Build / Deploy SCs / Publish NPM
     strategy:
       matrix:
-        node-version: [16]
         os: ["ubuntu-latest"]
-        rust: ["stable"]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+
+      - name: "[SETUP] Configure Git info"
+        run: ./scripts/configure-git-info.sh
+
+      - name: install toolchain
+        run: ./scripts/toolchain/install-toolchain.sh
+
+      - name: get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
+
+      - name: restore yarn cache
+        uses: actions/cache@v3
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
 
       - name: restore cargo cache
         uses: actions/cache@v3
@@ -58,35 +76,10 @@ jobs:
             .cargo/bin/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
 
-      - name: "[SETUP] Use Node.js"
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ matrix.node-version }}
-          registry-url: https://registry.npmjs.org/
-          cache: yarn
-
-      - name: "[SETUP] Print additional information"
-        run: |
-          node --version
-          npm --version
-          yarn --version
-          rustc --version
-          cargo --version
-
-      - name: "[SETUP] Configure Git info"
-        run: ./scripts/configure-git-info.sh
-
       - name: "[BUILD] Install dependencies / link / build"
         run: |
-          # Deploying with hardhat requires built hopr-utils package
           make -j deps-ci
           make -j build
-
-      - name: "Cache built artifacts (for later use)"
-        uses: actions/cache@v3
-        with:
-          path: packages/
-          key: hoprnet-build-${{ github.run_id }}
 
       - name: "Cache built artifacts (for later use)"
         uses: actions/cache@v3
@@ -224,8 +217,24 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Configure Git info
+      - name: "[SETUP] Configure Git info"
         run: ./scripts/configure-git-info.sh
+
+      - name: install toolchain
+        run: ./scripts/toolchain/install-toolchain.sh
+
+      - name: get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
+
+      - name: restore yarn cache
+        uses: actions/cache@v3
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
 
       - name: Pull recent Git changes
         if: ${{ !env.ACT }}
@@ -258,6 +267,7 @@ jobs:
           HOPR_GITHUB_REF: ${{ github.ref }}
           AVADO_VERSION: ${{ steps.set-version.outputs.vsn }}
         run: |
+          make deps-ci
           ./scripts/build-avado.sh ${AVADO_VERSION}
 
       - name: Commit & Push changes
@@ -302,15 +312,32 @@ jobs:
     name: "Continuous Deployment: Deploy public instances"
     strategy:
       matrix:
-        node-version: [16]
         os: ["ubuntu-latest"]
-        rust: ["stable"]
     runs-on: ${{ matrix.os }}
     needs: [set_failed_deployment_flag]
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+
+      - name: "[SETUP] Configure Git info"
+        run: ./scripts/configure-git-info.sh
+
+      - name: install toolchain
+        run: ./scripts/toolchain/install-toolchain.sh
+
+      - name: get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
+
+      - name: restore yarn cache
+        uses: actions/cache@v3
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
 
       - name: restore cargo cache
         uses: actions/cache@v3
@@ -324,16 +351,6 @@ jobs:
             .cargo/.package-cache/
             .cargo/bin/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
-
-      - name: Configure Git info
-        run: ./scripts/configure-git-info.sh
-
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ matrix.node-version }}
-          registry-url: https://registry.npmjs.org/
-          cache: yarn
 
       - name: Set up Google Cloud Credentials
         uses: google-github-actions/auth@v0
@@ -397,16 +414,32 @@ jobs:
     name: "Continuous Deployment: Deploy NAT instances"
     strategy:
       matrix:
-        node-version: [16]
         os: ["ubuntu-latest"]
-        rust: ["stable"]
-
     runs-on: ${{ matrix.os }}
     needs: [deploy_public_instances] # Public nodes need to be deployed first
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+
+      - name: "[SETUP] Configure Git info"
+        run: ./scripts/configure-git-info.sh
+
+      - name: install toolchain
+        run: ./scripts/toolchain/install-toolchain.sh
+
+      - name: get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
+
+      - name: restore yarn cache
+        uses: actions/cache@v3
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
 
       - name: restore cargo cache
         uses: actions/cache@v3
@@ -420,16 +453,6 @@ jobs:
             .cargo/.package-cache/
             .cargo/bin/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
-
-      - name: Configure Git info
-        run: ./scripts/configure-git-info.sh
-
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ matrix.node-version }}
-          registry-url: https://registry.npmjs.org/
-          cache: yarn
 
       - name: Set up Google Cloud Credentials
         uses: google-github-actions/auth@v0

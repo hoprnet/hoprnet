@@ -34,8 +34,8 @@
   },
   "devDependencies": {
     "@ethersproject/cli": "5.7.0",
+    "@hoprnet/avadosdk": "0.4.4-rc.1",
     "@types/node": "16",
-    "avadosdk": "git+https://github.com/avadodserver/avadosdk.git#7b035be69754a9410d14e0e1d50d88bcd4c143fa",
     "prettier": "2.7.1",
     "ts-node": "10.9.1",
     "typescript": "4.8.4",
@@ -55,5 +55,5 @@
     "printWidth": 120,
     "trailingComma": "none"
   },
-  "packageManager": "yarn@3.2.1"
+  "packageManager": "yarn@3.3.0"
 }
