@@ -19,7 +19,7 @@ RUN make deps-docker package=hoprd && \
     find ./packages -type f -name '*.spec.ts' -delete && \
     # Only build hoprd + dependencies
     make -j build package=hoprd && \
-    # Remove all typescript files 
+    # Remove all typescript files
     find ./packages -type f -name '*.ts' -delete && \
     # No need for these packages
     rm -R packages/avado packages/cover-traffic-daemon && \
