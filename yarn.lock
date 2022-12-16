@@ -3117,7 +3117,7 @@ __metadata:
     "@libp2p/kad-dht": 1.0.16
     "@libp2p/mplex": 1.2.2
     "@libp2p/peer-id": 1.1.16
-    "@libp2p/peer-id-factory": 1.0.18
+    "@libp2p/peer-id-factory": 1.0.20
     "@libp2p/tcp": 1.0.11
     "@multiformats/multiaddr": 10.3.3
     "@types/chai": 4.3.3
@@ -3242,7 +3242,7 @@ __metadata:
     "@libp2p/kad-dht": 1.0.16
     "@libp2p/mplex": 1.2.2
     "@libp2p/peer-id": 1.1.16
-    "@libp2p/peer-id-factory": 1.0.18
+    "@libp2p/peer-id-factory": 1.0.20
     "@libp2p/tcp": 1.0.11
     "@multiformats/multiaddr": 10.3.3
     "@types/chai": 4.3.3
@@ -3816,7 +3816,23 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@libp2p/peer-id-factory@npm:1.0.18, @libp2p/peer-id-factory@npm:^1.0.9":
+"@libp2p/peer-id-factory@npm:1.0.20":
+  version: 1.0.20
+  resolution: "@libp2p/peer-id-factory@npm:1.0.20"
+  dependencies:
+    "@libp2p/crypto": ^1.0.0
+    "@libp2p/interface-keys": ^1.0.2
+    "@libp2p/interface-peer-id": ^1.0.0
+    "@libp2p/peer-id": ^1.0.0
+    multiformats: ^10.0.0
+    protons-runtime: ^4.0.1
+    uint8arraylist: ^2.0.0
+    uint8arrays: ^4.0.2
+  checksum: bb5b4624e3433a595b285f31db80238f1cb4933248e58f1f9ae3f1486f644a93368e4147ab466a5c3b79c1cc693447afdb556eaacdecd2977148839c694f884d
+  languageName: node
+  linkType: hard
+
+"@libp2p/peer-id-factory@npm:^1.0.9":
   version: 1.0.18
   resolution: "@libp2p/peer-id-factory@npm:1.0.18"
   dependencies:
@@ -20196,6 +20212,18 @@ __metadata:
   peerDependencies:
     uint8arraylist: ^2.3.2
   checksum: f24989391aee314c8c257d6e459df082b6849f3cdd0cda1b0196fd0a66f3b39089b82764f9b66c5bbb4dd0d4e68ff6284e222b10413859f7c54517d2efd62d43
+  languageName: node
+  linkType: hard
+
+"protons-runtime@npm:^4.0.1":
+  version: 4.0.1
+  resolution: "protons-runtime@npm:4.0.1"
+  dependencies:
+    protobufjs: ^7.0.0
+    uint8arraylist: ^2.3.2
+  peerDependencies:
+    uint8arraylist: ^2.3.2
+  checksum: 7d5246fc55991ea4028b19986c65a9d646d479c53afcbfa19a37140dce7ca1c3287f23de80b1fbab08f929d515096171a07f181d0e27fd77c7407bb29ab3475d
   languageName: node
   linkType: hard
 
