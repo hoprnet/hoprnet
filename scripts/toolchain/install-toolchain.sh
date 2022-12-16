@@ -223,12 +223,12 @@ fi
 # Show some debug output
 echo "Checking installed tool versions"
 echo "================================"
-rustc --version
-cargo --version
-wasm-pack --version
-wasm-opt --version
-echo "node $(node --version)"
-echo "yarn $(yarn --version)"
-echo "Typescript $(npx tsc --version)"
+[ command -v rustc ] && rustc --version
+[ command -v cargo ] && cargo --version
+[ command -v wasm-pack ] && wasm-pack --version
+[ command -v wasm-opt ] && wasm-opt --version
+[ command -v node ] && echo "node $(node --version)"
+[ command -v yarn ] && echo "yarn $(yarn --version)"
+[ npx --no tsc --version ] && echo "Typescript $(npx tsc --version)"
 
 rm -R ${download_dir}
