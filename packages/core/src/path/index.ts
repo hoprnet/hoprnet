@@ -90,5 +90,5 @@ export async function findPath(
   }
 
   log('Path not found')
-  throw new Error('Path not found')
+  throw Error('Failed to find automatic path')
 }

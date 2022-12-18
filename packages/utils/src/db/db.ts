@@ -433,13 +433,6 @@ export class HoprDB {
     )
   }
 
-  public async storePendingAcknowledgement(halfKeyChallenge: HalfKeyChallenge, isMessageSender: true): Promise<void>
-  public async storePendingAcknowledgement(
-    halfKeyChallenge: HalfKeyChallenge,
-    isMessageSender: false,
-    unackTicket: UnacknowledgedTicket
-  ): Promise<void>
-
   public async storePendingAcknowledgement(
     halfKeyChallenge: HalfKeyChallenge,
     isMessageSender: boolean,
@@ -545,7 +538,7 @@ export class HoprDB {
       .batch()
       .del(Buffer.from(unAcknowledgedDbKey.buffer, unAcknowledgedDbKey.byteOffset, unAcknowledgedDbKey.byteLength))
       .put(
-        Buffer.from(acknowledgedDbKey.buffer, unAcknowledgedDbKey.byteOffset, unAcknowledgedDbKey.byteLength),
+        Buffer.from(acknowledgedDbKey.buffer, acknowledgedDbKey.byteOffset, acknowledgedDbKey.byteLength),
         Buffer.from(serializedTicket.buffer, serializedTicket.byteOffset, serializedTicket.byteLength)
       )
       .write()

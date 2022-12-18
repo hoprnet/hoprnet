@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "1.92.0-next.5",
+  "version": "1.92.0-next.26",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -78,7 +78,7 @@
     "sinon": "12.0.1",
     "typedoc": "0.23.20",
     "typedoc-plugin-markdown": "3.13.6",
-    "typescript": "4.7.4"
+    "typescript": "4.8.4"
   },
   "mocha": {
     "spec": "lib/**/*.spec.js"

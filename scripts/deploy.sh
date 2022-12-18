@@ -49,12 +49,16 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
       version_minor=$(_jq "${row}" ".value.version_minor")
       docker_image_version=$(_jq "${row}" ".value.docker_image_version")
 
-      if [ "${docker_image_version}" != "null" ]; then 
+      if [ "${docker_image_version}" != "null" ]; then
         docker_image_full="${docker_image}:${docker_image_version}"
-      else 
+      elif [[ "${branch}" =~ staging/.* ]]; then
+        # Prepend "staging-" tag prefix, if this is a staging branch
+        docker_image_full="${docker_image}:staging-${release_id}"
+        cluster_tag="-staging${cluster_tag}"
+      else
         docker_image_full="${docker_image}:${release_id}"
       fi
-      
+
       if [ "${deprecated}" == "true" ]; then
         log "${release_id} deprecated, skipping deployment"
         continue

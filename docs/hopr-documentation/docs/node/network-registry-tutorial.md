@@ -177,11 +177,10 @@ If you are unfamiliar with HOPR commands, start by completing the [hopr-admin tu
 Nodes to ping:
 
 ```bash
-16Uiu2HAmDBEQyPQbSvdUuAgm48evrjkVpbhibFCRCLxHXFtgixop
-16Uiu2HAm3dq3EBLzPGWS5D1e7jweQ8fwyMvTb3riq6xDcQbCBtwd
-16Uiu2HAmMz3sSsFc9mhycdAcuB6QHa3ybPdHuvZctbECUc1aCEhr
-16Uiu2HAm2Jd8uipA1QmUUDroY8EdPtRpn3JGuQ7yxCLnat1Sqm4L
-16Uiu2HAm6wh6qjrkfbyhHzktFovC7wUNZVCnTrU2dQ7sc22FYrVW
+16Uiu2HAmTHiLF5msGmRzQDLZv1XLTSR3BcoDsn912JA5rVESupWb
+16Uiu2HAkz3qkpDZmqC8sdGCZghG7RWfGwd2ACAKWjRutqMvSSowZ
+16Uiu2HAkxDbueSuUZ2Kd7YFF5fFjG1fCHLnTNfjexu6mGcgEdZoJ
+16Uiu2HAm5FwCGb7MhYuw1ddto12LBhsc5bKfZ1XEjegUMBzAWbv4
 ```
 
 These five nodes will ping each node on the network registry at randomised intervals throughout the day and record whether or not the ping was received and its latency if received. This is publicly viewable at [network.hoprnet.org](https://network.hoprnet.org/).

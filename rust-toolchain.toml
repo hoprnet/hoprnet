@@ -1,4 +1,5 @@
 [toolchain]
 channel = "1.65"
 targets = [ "wasm32-unknown-unknown" ]
-profile = "minimal"
+# we need rustc + cargo + rustfmt
+profile = "default"

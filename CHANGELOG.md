@@ -1,5 +1,9 @@
 # Changelog
 
+- Removal of HOPR admin from `hoprd` ([#4420](https://github.com/hoprnet/hoprnet/pull/4420))
+  - Includes removal of CLI option `--admin`, `--adminHost` and `--adminPort`
+  - HOPR admin may now be used as a stand-alone component, see https://github.com/hoprnet/hopr-admin
+
 <a name="1.91"></a>
 
 ## [1.91](https://github.com/hoprnet/hoprnet/compare/release/valencia...hoprnet:release/bogota)
@@ -8,9 +12,16 @@
 - Various optimizations of Rust crates ([#4221](https://github.com/hoprnet/hoprnet/pull/4260))
 - Add Metrics API for Prometheus, `metrics` API endpoint and collection of various metrics ([#4233](https://github.com/hoprnet/hoprnet/pull/4233))
 - Improve pre-merge check to prevent PR from merging when the upstream deployment is in the failed state ([#4294](https://github.com/hoprnet/hoprnet/pull/4294))
-- Restore STUN functionality ([#4312](https://github.com/hoprnet/hoprnet/pull/4312))
 - Add Health Status Indicator in the Admin UI ([#4197](https://github.com/hoprnet/hoprnet/pull/4197))
 - Allow connectivity indicator to be GREEN on public nodes too ([#4314](https://github.com/hoprnet/hoprnet/pull/4314))
+- Show correct counterparty in the `channels` command output ([#4370](https://github.com/hoprnet/hoprnet/pull/4370))
+- Docker build pipeline refactor: use Alpine Linux + toolchain base image ([#4362](https://github.com/hoprnet/hoprnet/pull/4362))
+- Improve error messages passed to the User ([#4375](https://github.com/hoprnet/hoprnet/pull/4375))
+- Fix channel metrics, add channel balances metrics ([#4374](https://github.com/hoprnet/hoprnet/pull/4374))
+- Fix ticket redemption ([#4382](https://github.com/hoprnet/hoprnet/pull/4382))
+- Increase wait timeout for on-chain transactions to 60 seconds ([#4425](https://github.com/hoprnet/hoprnet/pull/4425))
+- Fix bug in waiting logic for on-chain transactions ([#4425](https://github.com/hoprnet/hoprnet/pull/4425))
+- Fixed incorrect acknowledged tickets handling in the DB
 
 ---
 
@@ -23,7 +34,7 @@
 - Add support for communication between different releases within the same environment
 - Avado: limit Docker container memory to maximum 1GB
 - Reduce memory copy operations by reusing underlying memory pages ([#4168](https://github.com/hoprnet/hoprnet/pull/4168))
-- Fix public node resolution for connectivity indicator ([#4205]https://github.com/hoprnet/hoprnet/pull/4205)
+- Fix public node resolution for connectivity indicator ([#4205](https://github.com/hoprnet/hoprnet/pull/4205))
 - Remove charset complexity validation on API token ([#4210](https://github.com/hoprnet/hoprnet/pull/4210))
 - Properly encode API token passed from the Admin UI ([#4210](https://github.com/hoprnet/hoprnet/pull/4210))
 - Refactor timeouts for more throughput and increase usage of iterables ([#4238](https://github.com/hoprnet/hoprnet/pull/4238))
@@ -42,6 +53,8 @@
 - Close existing connections once there is new one ([#4281](https://github.com/hoprnet/hoprnet/pull/4281))
 - Properly remove closed connections from libp2p's `ConnectionManager`([#4281](https://github.com/hoprnet/hoprnet/pull/4281))
 - Reimplement stream handling `class`es with `function`s in `connect` package for better performance ([#4285](https://github.com/hoprnet/hoprnet/pull/4285))
+- Fix ticket redemption mechanism & acknowledged ticket fix in the DB ([#4437](https://github.com/hoprnet/hoprnet/pull/4437))
+- Pluto: Fix initialization of channels once the cluster has started up ([#4436](https://github.com/hoprnet/hoprnet/pull/4436))
 
 ---
 

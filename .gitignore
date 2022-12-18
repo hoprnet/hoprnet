@@ -34,3 +34,16 @@ logs.txt
 **/*.tsbuildinfo
 
 .env
+.identity-local
+
+/.cargo/lib
+/.cargo/bin
+/.cargo/.package-cache
+/.cargo/.crates.toml
+/.cargo/.crates2.json
+
+# make sure anything which is vendored is copied
+!/vendor/**/*.log
+
+# ignore local secret env file
+/.secrets

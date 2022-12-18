@@ -26,7 +26,7 @@ export const formatOutgoingChannel = (channel: ChannelEntry): ChannelInfo => {
   return {
     type: 'outgoing',
     channelId: channel.getId().toHex(),
-    peerId: channel.source.toPeerId().toString(),
+    peerId: channel.destination.toPeerId().toString(),
     status: channelStatusToString(channel.status),
     balance: channel.balance.toBN().toString()
   }
@@ -36,7 +36,7 @@ export const formatIncomingChannel = (channel: ChannelEntry): ChannelInfo => {
   return {
     type: 'incoming',
     channelId: channel.getId().toHex(),
-    peerId: channel.destination.toPeerId().toString(),
+    peerId: channel.source.toPeerId().toString(),
     status: channelStatusToString(channel.status),
     balance: channel.balance.toBN().toString()
   }
