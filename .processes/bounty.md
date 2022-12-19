@@ -84,7 +84,7 @@ Bounty rewards are set in US Dollar. However, the program owner pays out the bou
 
 2. Bounty hunter submits a solution of extraordinary quality exceeding the expectations outlined in the github issue
 
-   - Pay out the promised bounty reward and tip the bounty hunter. **Maybe max 20% of the promised amount?**
+   - Pay out the promised bounty reward and tip the bounty hunter. 
 
 3. Bounty hunter submits a dis-satisfactory solution but it technically fullfills the deliverables outlined in the github issue.
 
