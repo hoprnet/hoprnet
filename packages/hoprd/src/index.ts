@@ -124,7 +124,7 @@ const argv = yargsInstance
     string: true,
     describe: 'A REST API token and for user authentication [env: HOPRD_API_TOKEN]',
     default: undefined,
-    conflicts: 'testNoAuthentication'
+    conflicts: 'disableApiAuthentication'
   })
   .option('healthCheck', {
     boolean: true,
@@ -187,6 +187,12 @@ const argv = yargsInstance
       'Allow connections to other nodes running on private addresses [env: HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS]',
     default: false
   })
+  .option('disableApiAuthentication', {
+    hidden: true,
+    boolean: true,
+    describe: 'Disable authentication for the API endpoints [env: HOPRD_DISABLE_API_AUTHENTICATION]',
+    default: undefined
+  })
   .option('testAnnounceLocalAddresses', {
     hidden: true,
     boolean: true,
@@ -204,12 +210,6 @@ const argv = yargsInstance
     boolean: true,
     describe: 'weaker crypto for faster node startup [env: HOPRD_TEST_USE_WEAK_CRYPTO]',
     default: false
-  })
-  .option('testNoAuthentication', {
-    hidden: true,
-    boolean: true,
-    describe: 'no remote authentication for easier testing [env: HOPRD_TEST_NO_AUTHENTICATION]',
-    default: undefined
   })
   .option('testNoDirectConnections', {
     hidden: true,
@@ -385,7 +385,7 @@ async function main() {
     }
   }
 
-  if (!argv.testNoAuthentication && argv.api) {
+  if (!argv.disableApiAuthentication && argv.api) {
     if (argv.apiToken == null) {
       throw Error(`Must provide --apiToken when --api is specified`)
     }
@@ -394,7 +394,7 @@ async function main() {
     }
   }
 
-  const apiToken = argv.testNoAuthentication ? null : argv.apiToken
+  const apiToken = argv.disableApiAuthentication ? null : argv.apiToken
 
   const environment = resolveEnvironment(argv.environment, argv.provider)
   let options = generateNodeOptions(environment)
