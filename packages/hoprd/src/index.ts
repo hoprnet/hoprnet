@@ -188,10 +188,10 @@ const argv = yargsInstance
     default: false
   })
   .option('disableApiAuthentication', {
-    hidden: true,
+    hidden: false,
     boolean: true,
     describe: 'Disable authentication for the API endpoints [env: HOPRD_DISABLE_API_AUTHENTICATION]',
-    default: undefined
+    default: false
   })
   .option('testAnnounceLocalAddresses', {
     hidden: true,
