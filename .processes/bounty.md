@@ -16,9 +16,8 @@ A bounty usually serves multiple purposes.
 
 1. The bounty admin approaches the program owner with a bounty idea and the program owner approves it. Optionally the bounty admin appoints a bounty expert to assist with the technical content.
    - Sometimes the program owner may approach a person with a bounty idea and asks that person to be the bounty admin.
-2. The bounty admin creates a GitHub issue using the [bounty template](https://github.com/hoprnet/hopr-bounty-submission/blob/main/.github/ISSUE_TEMPLATE/bounty-issue-template-.md) in the dedicated [bounty repository](https://github.com/hoprnet/hopr-bounty-submission)
+2. The bounty admin creates a GitHub issue using the [bounty template](https://github.com/hoprnet/hopr-bounty-submission/blob/main/.github/ISSUE_TEMPLATE/bounty-issue-template-.md) in the dedicated [bounty repository](https://github.com/hoprnet/hopr-bounty-submission).
    - Within each section of the template, provide the most concise details you can.
-   - Feel free to expand on sections `Developing HOPR` and `What is HOPR?` with information more related to the bounty.
 3. The bounty admin assignes herself/himself to the bounty as well as the program owner.
    - If the bounty admin appoints a bounty expert the bounty admin assigns the bounty expert to the issue as well.
 4. The bounty admin assignes the dedicated bounty label to the issue.
@@ -46,9 +45,9 @@ A bounty usually serves multiple purposes.
 
 3. Program owner publishes the bounty via [Gitcoin](https://gitcoin.co/)
 
-4. Program owner reviews bounty applications and selects a bounty hunter
+4. Program owner reviews bounty applications and selects a bounty hunter.
 
-   - program owner might consult with the bounty admin (optinally: bounty expert) before making a decision
+   - program owner might consult with the bounty admin (optinally: bounty expert) before making a decision.
 
 5. Program owner establishes a communication channel with the bounty hunter (Discord, Telegram, GitHub, etc..)
 
@@ -68,23 +67,8 @@ A bounty usually serves multiple purposes.
 
 ## Deadlines
 
-While it's possible to create bounties which do not affect the tech teams roadmap, it's ideal, that we try to create bounties which are relevant to the upcoming roadmap.
-
-After a bounty is [reviewed](#creating-a-bounty), two dates need to be set:
-
-1. tech deadline: the deadline which the tech team requires this bounty to be completed.
-2. pickup deadline: the deadline which the tech team will need to pick up this task so it's completed on time according to the roadmap.
-
-The deadline set for the bounty hunter should be the `pickup deadline`, this way, it allows the tech team to fully avoid working on the task in the case it's completed or assist the bounty hunter on completing it. Either way, bounty hunter must be showing good progress throughout the time they are accepted to work on it.
-
-## Creating a PR
-
-In order to ensure that external contributions pass our CI tests, the bounty creator must:
-
-1. Create a branch prefixed by `bounty/<name>` and push it.
-2. Bounty hunter may create PRs that merge into that branch.
-3. When work is complete, PR is merged into the branch, ensuring tests pass.
-4. If the bounty is a Dune Analytics query or dashboard, ensure that the full code of all queries got submitted via PR and the query/Dashboard got forked by the `hoprnet` Dune account.
+1. Some bounties may not require a deadline. Therefore, no deadline needs to be set in the [bounty template](https://github.com/hoprnet/hopr-bounty-submission/blob/main/.github/ISSUE_TEMPLATE/bounty-issue-template-.md)
+2. Most bounties do require a deadline as they are relevant for HOPR's roadmap. In this case a deadline must be specified in the [bounty template](https://github.com/hoprnet/hopr-bounty-submission/blob/main/.github/ISSUE_TEMPLATE/bounty-issue-template-.md).
 
 ## Payment of Rewards
 
