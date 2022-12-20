@@ -32,7 +32,7 @@ services:
         'HOPRD_HEALTH_CHECK_HOST=0.0.0.0',
         'HOPRD_HEALTH_CHECK_PORT=8080',
         'HOPRD_PASSWORD=open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0',
-        'HOPRD_API_TOKEN=%TOKEN%',
+        'HOPRD_DISABLE_API_AUTHENTICATION=true',
         'HOPRD_IDENTITY=/app/hoprd-db/.hopr-identity',
         'HOPRD_DATA=/app/hoprd-db/data-%ENV_ID%',
         'HOPRD_INIT=true',
