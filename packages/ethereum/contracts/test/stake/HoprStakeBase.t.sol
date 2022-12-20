@@ -165,6 +165,33 @@ contract HoprStakeBaseTest is Test, ERC1820RegistryFixtureTest {
     vm.prank(nftAddr);
     vm.expectRevert('HoprStake: Cannot SafeTransferFrom tokens other than HoprBoost.');
     hoprStakeBase.onERC721Received(account, account, tokenId, hex'00');
+    vm.clearMockedCalls();
+  }
+
+  function test_RedeemNFTsOfSameType(address account) public {
+    _helperAccountsStakeTokensAndNFTs();
+
+    // account first stakes NFT of id 3
+    vm.startPrank(nftAddress);
+    vm.mockCall(
+      account,
+      abi.encodeWithSignature('safeTransferFrom(address,address,uint256)', account, address(hoprStakeBase), 3),
+      abi.encode(true)
+    );
+    hoprStakeBase.onERC721Received(account, account, 2, hex'00');
+
+    // account then stakes an NFT of the same type (of id 2)
+    vm.mockCall(
+      account,
+      abi.encodeWithSignature('safeTransferFrom(address,address,uint256)', account, address(hoprStakeBase), 2),
+      abi.encode(true)
+    );
+
+    // redeem NFTs of the same type
+    vm.expectEmit(true, true, true, false, address(hoprStakeBase));
+    emit Redeemed(account, tokenId, true); // token of id 2 has a higher factor than of id 3
+    hoprStakeBase.onERC721Received(account, account, 2, hex'00');
+    vm.clearMockedCalls();
   }
 
   /**
