@@ -188,7 +188,6 @@ const argv = yargsInstance
     default: false
   })
   .option('disableApiAuthentication', {
-    hidden: false,
     boolean: true,
     describe: 'Disable authentication for the API endpoints [env: HOPRD_DISABLE_API_AUTHENTICATION]',
     default: false
