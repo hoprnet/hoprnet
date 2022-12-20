@@ -181,7 +181,7 @@ function setup_node() {
   if [[ -n "${api_token}" ]]; then
     additional_args="--api-token='${api_token}' ${additional_args}"
   else
-    additional_args="--testNoAuthentication ${additional_args}"
+    additional_args="--disableApiAuthentication ${additional_args}"
   fi
 
   # Remove previous logs to make sure the regex does not match

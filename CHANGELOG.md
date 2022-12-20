@@ -3,6 +3,7 @@
 - Removal of HOPR admin from `hoprd` ([#4420](https://github.com/hoprnet/hoprnet/pull/4420))
   - Includes removal of CLI option `--admin`, `--adminHost` and `--adminPort`
   - HOPR admin may now be used as a stand-alone component, see https://github.com/hoprnet/hopr-admin
+  - Add `--disableApiAuthentication` CLI option to allow using the API without authentication, default for Avado & Dappnode ([#4466](https://github.com/hoprnet/hoprnet/pull/4466))
 
 <a name="1.91"></a>
 

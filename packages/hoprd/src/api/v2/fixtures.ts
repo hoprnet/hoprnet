@@ -32,7 +32,7 @@ export const createTestApiInstance = async (node: any) => {
   const service = express()
   return {
     api: await setupRestApi(service, '/api/v2', node, createTestMocks(), {
-      testNoAuthentication: true
+      disableApiAuthentication: true
     }),
     service
   }
