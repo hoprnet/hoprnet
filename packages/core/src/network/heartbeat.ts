@@ -18,7 +18,6 @@ import {
 import { createHash, randomBytes } from 'crypto'
 
 import type { Subscribe, SendMessage } from '../index.js'
-import EventEmitter from 'events'
 import { NetworkPeersOrigin } from './network-peers.js'
 
 const log = debug('hopr-core:heartbeat')
@@ -100,7 +99,7 @@ export default class Heartbeat {
     private subscribe: Subscribe,
     protected sendMessage: SendMessage,
     private closeConnectionsTo: (peer: PeerId) => void,
-    private stateChangeEmitter: EventEmitter,
+    private onNetworkHealthChange: (oldValue: NetworkHealthIndicator, currentHealth: NetworkHealthIndicator) => void,
     private isPublicNode: (addr: PeerId) => boolean,
     environmentId: string,
     config?: Partial<HeartbeatConfig>
@@ -260,7 +259,7 @@ export default class Heartbeat {
     if (newHealthValue != this.currentHealth) {
       let oldValue = this.currentHealth
       this.currentHealth = newHealthValue
-      this.stateChangeEmitter.emit('hopr:network-health-changed', oldValue, this.currentHealth)
+      this.onNetworkHealthChange(oldValue, this.currentHealth)
 
       // Map network state to integers
       switch (newHealthValue as NetworkHealthIndicator) {

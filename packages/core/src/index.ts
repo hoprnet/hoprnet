@@ -385,7 +385,8 @@ class Hopr extends EventEmitter {
       subscribe,
       sendMessage,
       this.closeConnectionsTo.bind(this),
-      this,
+      (oldHealthValue: NetworkHealthIndicator, newNetworkHealth: NetworkHealthIndicator) =>
+        this.emit('hopr:network-health-changed', oldHealthValue, newNetworkHealth),
       (peerId: PeerId) => {
         if (this.knownPublicNodesCache.has(peerId.toString())) return true
 
@@ -637,6 +638,8 @@ class Hopr extends EventEmitter {
       currentChannels.push(channel)
       if (!(await this.isAllowedAccessToNetwork(channel.destination.toPeerId()))) {
         this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_EXISTING_CHANNEL) // Make sure current channels are 'interesting'
+      } else {
+        error(`Protocol error: Strategy is monitoring non-registered peer ${channel.destination.toString()}`)
       }
     }
 
@@ -702,6 +705,8 @@ class Hopr extends EventEmitter {
       const channel = tickResult.toOpen[i]
       if (!(await this.isAllowedAccessToNetwork(channel.destination.toPeerId()))) {
         this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_NEW_CHANNEL)
+      } else {
+        error(`Protocol error: strategy wants to open channel to non-registered peer ${channel.destination.toString()}`)
       }
       try {
         // Opening channels can fail if we can't establish a connection.
