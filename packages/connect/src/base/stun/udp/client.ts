@@ -8,7 +8,7 @@ import { isStun } from '../../../utils/index.js'
 // @ts-ignore untyped module
 import retimer from 'retimer'
 
-import { u8aToHex, ipToU8aAddress, isPrivateAddress, isLocalhost } from '@hoprnet/hopr-utils'
+import { u8aToHex, ipToU8aAddress, isAvadoPrivateNetwork, isPrivateAddress, isLocalhost } from '@hoprnet/hopr-utils'
 
 import {
   isStunErrorResponse,
@@ -214,6 +214,12 @@ function isUsableResult(result: Interface, runningLocally = false): boolean {
           return true
         }
         break
+      }
+
+      if ((process.env.AVADO ?? 'false').toLowerCase() === 'true' && isAvadoPrivateNetwork(u8aAddr, 'IPv4')) {
+        // Even if we find a STUN server within our DAppnode or AVADO network,
+        // the perceived internal container address is not public despite it looks like that
+        return false
       }
 
       // Only take public addresses
