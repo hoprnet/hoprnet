@@ -23,7 +23,7 @@
     "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo",
     "coverage": "nyc --reporter=html mocha",
     "build": "yarn clean && yarn build:wasm && tsc -p .",
-    "test": "yarn test:wasm && NODE_OPTIONS=\"--experimental-wasm-modules --trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
+    "test": "yarn test:wasm && NODE_OPTIONS=\"--experimental-wasm-modules --trace-warnings --unhandled-rejections=strict\" mocha --full-trace",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },
