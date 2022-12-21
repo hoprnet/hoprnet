@@ -18,6 +18,7 @@
 - Fix bug in waiting logic for on-chain transactions ([#4425](https://github.com/hoprnet/hoprnet/pull/4425))
 - Fixed incorrect acknowledged tickets handling in the DB
 - Fix non-registered nodes can connect despite they are not allowed to so ([#4454](https://github.com/hoprnet/hoprnet/pull/4454))
+- Fix STUN functionality, enhance it to check if host is exposed and a keep-alive mechanism to keep NAT port mapping ([#4401](https://github.com/hoprnet/hoprnet/pull/4401))
 
 ---
 
