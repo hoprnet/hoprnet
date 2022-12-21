@@ -916,16 +916,30 @@ export class HoprDB {
    * @param snapshot
    */
   public async addToNetworkRegistry(pubKey: PublicKey, account: Address, snapshot: Snapshot): Promise<void> {
-    let registeredNodes = []
+    let registeredNodes: PublicKey[] = []
     try {
       registeredNodes = await this.findHoprNodesUsingAccountInNetworkRegistry(account)
     } catch (error) {}
+
+    const serializedSnapshot = snapshot.serialize()
+
+    // Prevents from adding nodes more than once
+    for (const registeredNode of registeredNodes) {
+      if (registeredNode.eq(pubKey)) {
+        // update snapshot
+        await this.db.put(
+          Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
+          Buffer.from(serializedSnapshot.buffer, serializedSnapshot.byteOffset, serializedSnapshot.byteLength)
+        )
+        // already registered, nothing to do
+        return
+      }
+    }
 
     // add new node to the list
     registeredNodes.push(pubKey)
 
     const serializedRegisteredNodes = PublicKey.serializeArray(registeredNodes)
-    const serializedSnapshot = snapshot.serialize()
     const serializedAccount = account.serialize()
 
     await this.db
@@ -979,7 +993,7 @@ export class HoprDB {
    * @param snapshot
    */
   public async removeFromNetworkRegistry(pubKey: PublicKey, account: Address, snapshot: Snapshot): Promise<void> {
-    let registeredNodes = []
+    let registeredNodes: PublicKey[] = []
     try {
       registeredNodes = await this.findHoprNodesUsingAccountInNetworkRegistry(account)
     } catch (error) {
@@ -987,41 +1001,31 @@ export class HoprDB {
       throw Error('HoprNode not registered to the account')
     }
 
-    // find registered peer id index
-    const registeredIndex = registeredNodes.findIndex((registeredPubKey) => pubKey.eq(registeredPubKey))
-
-    if (registeredIndex < 0) {
-      log(`cannot remove node from network registry, not found`)
-      throw Error('HoprNode not registered to the account')
-    }
-
-    // remove nodes
-    registeredNodes.splice(registeredIndex, 1)
+    // Remove all occurences, even if there are more than one
+    registeredNodes = registeredNodes.filter((registeredNode: PublicKey) => !registeredNode.eq(pubKey))
 
     const entryKey = createNetworkRegistryEntryKey(pubKey)
 
-    if (entryKey) {
-      const serializedRegisteredNodes = PublicKey.serializeArray(registeredNodes)
-      const serializedSnapshot = snapshot.serialize()
+    const serializedRegisteredNodes = PublicKey.serializeArray(registeredNodes)
+    const serializedSnapshot = snapshot.serialize()
 
-      await this.db
-        .batch()
-        .del(Buffer.from(this.keyOf(entryKey)))
-        // address to node public keys (1->M) in the format of key -> PublicKey[]
-        .put(
-          Buffer.from(this.keyOf(createNetworkRegistryAddressToPublicKeyKey(account))),
-          Buffer.from(
-            serializedRegisteredNodes.buffer,
-            serializedRegisteredNodes.byteOffset,
-            serializedRegisteredNodes.byteLength
-          )
+    await this.db
+      .batch()
+      .del(Buffer.from(this.keyOf(entryKey)))
+      // address to node public keys (1->M) in the format of key -> PublicKey[]
+      .put(
+        Buffer.from(this.keyOf(createNetworkRegistryAddressToPublicKeyKey(account))),
+        Buffer.from(
+          serializedRegisteredNodes.buffer,
+          serializedRegisteredNodes.byteOffset,
+          serializedRegisteredNodes.byteLength
         )
-        .put(
-          Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
-          Buffer.from(serializedSnapshot.buffer, serializedSnapshot.byteOffset, serializedSnapshot.byteLength)
-        )
-        .write()
-    }
+      )
+      .put(
+        Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
+        Buffer.from(serializedSnapshot.buffer, serializedSnapshot.byteOffset, serializedSnapshot.byteLength)
+      )
+      .write()
   }
 
   /**
