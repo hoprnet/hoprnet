@@ -12,7 +12,12 @@ license = "LGPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+clap = { version = "4.0.29", features = ["derive"] }
+js-sys = "0.3.60"
 real-base = { path = "../../../real/crates/real-base" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde-wasm-bindgen = "0.4"
 wasm-bindgen = "0.2.83"
 wasm-bindgen-test = "0.3.30"
 

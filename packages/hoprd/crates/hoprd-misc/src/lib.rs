@@ -1,5 +1,7 @@
 use wasm_bindgen::prelude::wasm_bindgen;
 
+pub mod cli;
+
 #[allow(dead_code)]
 #[wasm_bindgen]
 pub fn set_panic_hook() {

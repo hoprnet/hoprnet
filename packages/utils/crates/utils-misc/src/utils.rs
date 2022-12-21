@@ -1,16 +1,19 @@
+use real_base::real;
+use serde::Deserialize;
 use std::fmt::Display;
 use wasm_bindgen::prelude::*;
-use serde::{Deserialize};
-use real_base::real;
 
 /// Serialization structure for package.json
 #[derive(Deserialize)]
 struct PackageJsonFile {
-    version: String
+    version: String,
 }
 
 /// Helper function to convert string-convertible types (like errors) to JsValue
-fn as_jsvalue<T>(v: T) -> JsValue where T: Display {
+fn as_jsvalue<T>(v: T) -> JsValue
+where
+    T: Display,
+{
     JsValue::from(v.to_string())
 }
 
