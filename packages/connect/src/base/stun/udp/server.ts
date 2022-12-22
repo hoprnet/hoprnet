@@ -2,12 +2,8 @@ import { type Socket, type RemoteInfo } from 'dgram'
 import { decode, constants, createMessage } from 'stun'
 import debug from 'debug'
 
-import { create_counter } from '@hoprnet/hopr-utils'
-
 import { IPV4_EMBEDDED_ADDRESS, isStun } from '../../../utils/index.js'
 import { isStunRequest, kStunTypeMask } from '../constants.js'
-
-const metric_udpStunRequests = create_counter('connect_counter_udp_stun_requests', 'Number of UDP STUN requests')
 
 const verbose = debug('hopr-connect:verbose:stun')
 
@@ -39,8 +35,6 @@ export function handleUdpStunRequest(
   if (!isStun(data)) {
     return
   }
-
-  metric_udpStunRequests.increment()
 
   const request = decode(Buffer.isBuffer(data) ? data : Buffer.from(data.buffer, data.byteOffset, data.byteLength))
 
