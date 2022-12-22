@@ -8,5 +8,5 @@ scrape_configs:
   - job_name: 'hoprd'
     scrape_interval: 5s
     static_configs:
-      - targets: [ 'localhost:3001' ]
+      - targets: ['localhost:3001']
     metrics_path: /api/v2/node/metrics
