@@ -19,6 +19,7 @@
 - Fixed incorrect acknowledged tickets handling in the DB
 - Fix non-registered nodes can connect despite they are not allowed to so ([#4454](https://github.com/hoprnet/hoprnet/pull/4454))
 - Fix STUN functionality, enhance it to check if host is exposed and a keep-alive mechanism to keep NAT port mapping ([#4401](https://github.com/hoprnet/hoprnet/pull/4401))
+- Fix DAppnode / AVADO announcing internal container addresses ([#4467](https://github.com/hoprnet/hoprnet/pull/4467))
 
 ---
 

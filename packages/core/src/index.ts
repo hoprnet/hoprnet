@@ -853,7 +853,7 @@ class Hopr extends EventEmitter {
 
       if (ticketIssuer.eq(ticketReceiver)) log(`WARNING: duplicated adjacent path entries.`)
 
-      let channel
+      let channel: ChannelEntry
       try {
         channel = await this.db.getChannelX(ticketIssuer, ticketReceiver)
       } catch (err) {
