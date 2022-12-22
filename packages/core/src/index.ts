@@ -790,7 +790,14 @@ class Hopr extends EventEmitter {
 
       if (ticketIssuer.eq(ticketReceiver)) log(`WARNING: duplicated adjacent path entries.`)
 
-      const channel = await this.db.getChannelX(ticketIssuer, ticketReceiver)
+      let channel: ChannelEntry
+      try {
+        channel = await this.db.getChannelX(ticketIssuer, ticketReceiver)
+      } catch (err) {
+        throw Error(
+          `Channel from ${ticketIssuer.toAddress().toString()} to ${ticketReceiver.toAddress().toString()} not found`
+        )
+      }
 
       if (channel.status !== ChannelStatus.Open) {
         throw Error(`Channel ${channel.getId().toHex()} is not open`)
