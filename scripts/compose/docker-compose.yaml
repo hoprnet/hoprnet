@@ -20,32 +20,32 @@ services:
     networks:
       - hopr-nat
     ports:
-      - "8080:8080"
-      - "9091:9091"
-      - "3001:3001"
+      - '8080:8080'
+      - '9091:9091'
+      - '3001:3001'
     environment:
       - DEBUG=hopr*
       - GCLOUD=1
     command:
-      - "--data"
-      - "/app/hoprd-db"
-      - "--password"
-      - "${HOPRD_PASSWORD}"
-      - "--init"
-      - "--api"
-      - "--apiHost"
-      - "0.0.0.0"
-      - "--identity"
-      - "/app/hoprd-db/.hopr-id"
-      - "--apiToken"
-      - "--disableApiAuthentication"
-      - "--environment"
-      - "${HOPRD_ENVIRONMENT_ID}"
-      - "--healthCheck"
-      - "--healthCheckHost"
-      - "0.0.0.0"
-      - "${HOPRD_ANNOUNCE}"
-      - "${HOPRD_PRIVATE_KEY}"
+      - '--data'
+      - '/app/hoprd-db'
+      - '--password'
+      - '${HOPRD_PASSWORD}'
+      - '--init'
+      - '--api'
+      - '--apiHost'
+      - '0.0.0.0'
+      - '--identity'
+      - '/app/hoprd-db/.hopr-id'
+      - '--apiToken'
+      - '--disableApiAuthentication'
+      - '--environment'
+      - '${HOPRD_ENVIRONMENT_ID}'
+      - '--healthCheck'
+      - '--healthCheckHost'
+      - '0.0.0.0'
+      - '${HOPRD_ANNOUNCE}'
+      - '${HOPRD_PRIVATE_KEY}'
     volumes:
       - '/var/hoprd:/app/hoprd-db'
       - '/var/run/docker.sock:/var/run/docker.sock'
@@ -55,9 +55,9 @@ services:
           memory: 2G
 
   admin:
-    image: "gcr.io/hoprassociation/hopr-admin:07aec21b"
+    image: 'gcr.io/hoprassociation/hopr-admin:07aec21b'
     ports:
-      - "3000"
+      - '3000'
     restart: unless-stopped
     depends_on:
       - hoprd
@@ -81,7 +81,7 @@ services:
     expose:
       - 9093
     ports:
-      - "9093:8080"
+      - '9093:8080'
     networks:
       - hopr-nat
     devices:
@@ -103,7 +103,7 @@ services:
     expose:
       - 9100
     ports:
-      - "9100:9100"
+      - '9100:9100'
     networks:
       - hopr-nat
 
@@ -143,9 +143,8 @@ services:
     env_file:
       - ./grafana/config.monitoring
     ports:
-      - "3030:3000"
+      - '3030:3000'
     depends_on:
       - prometheus
     networks:
       - hopr-nat
-
