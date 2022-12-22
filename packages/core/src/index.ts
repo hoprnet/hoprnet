@@ -591,7 +591,7 @@ class Hopr extends EventEmitter {
     for await (const channel of this.getAllChannels()) {
       out += `${channel.toString()}\n`
       currentChannels.push(channel)
-      if (!(await this.isAllowedAccessToNetwork(channel.destination.toPeerId()))) {
+      if (await this.isAllowedAccessToNetwork(channel.destination.toPeerId())) {
         this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_EXISTING_CHANNEL) // Make sure current channels are 'interesting'
       } else {
         error(`Protocol error: Strategy is monitoring non-registered peer ${channel.destination.toString()}`)
@@ -659,7 +659,7 @@ class Hopr extends EventEmitter {
 
     for (let i = 0; i < tickResult.toOpen.length; i++) {
       const channel = tickResult.toOpen[i]
-      if (!(await this.isAllowedAccessToNetwork(channel.destination.toPeerId()))) {
+      if (await this.isAllowedAccessToNetwork(channel.destination.toPeerId())) {
         this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_NEW_CHANNEL)
       } else {
         error(`Protocol error: strategy wants to open channel to non-registered peer ${channel.destination.toString()}`)
