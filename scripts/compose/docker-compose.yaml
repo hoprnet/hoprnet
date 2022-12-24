@@ -8,6 +8,7 @@ networks:
 volumes:
   prometheus_data: {}
   grafana_data: {}
+  hoprd_data: {}
 
 services:
   hoprd:
@@ -43,10 +44,9 @@ services:
       - '--healthCheck'
       - '--healthCheckHost'
       - '0.0.0.0'
-      - '${HOPRD_ANNOUNCE}'
+
     volumes:
-      - '/var/hoprd:/app/hoprd-db'
-      - '/var/run/docker.sock:/var/run/docker.sock'
+      - hoprd_data:/app/hoprd-db
     deploy:
       resources:
         limits:
@@ -122,10 +122,7 @@ services:
       - '9090:9090'
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus-data:/prometheus
-      - type: bind
-        source: ./prometheus/scrape-targets
-        target: /prometheus/targets
+      - prometheus_data:/prometheus
     networks:
       - hopr-nat
 
