@@ -37,7 +37,6 @@ services:
       - '0.0.0.0'
       - '--identity'
       - '/app/hoprd-db/.hopr-id'
-      - '--apiToken'
       - '--disableApiAuthentication'
       - '--environment'
       - '${HOPRD_ENVIRONMENT_ID}'
@@ -45,7 +44,6 @@ services:
       - '--healthCheckHost'
       - '0.0.0.0'
       - '${HOPRD_ANNOUNCE}'
-      - '${HOPRD_PRIVATE_KEY}'
     volumes:
       - '/var/hoprd:/app/hoprd-db'
       - '/var/run/docker.sock:/var/run/docker.sock'
@@ -55,7 +53,7 @@ services:
           memory: 2G
 
   admin:
-    image: 'gcr.io/hoprassociation/hopr-admin:07aec21b'
+    image: ${HOPR_ADMIN_DOCKER_IMAGE}
     ports:
       - '3000'
     restart: unless-stopped
