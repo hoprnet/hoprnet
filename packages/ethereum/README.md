@@ -108,14 +108,13 @@ foundryup --version nightly-64cbdd183e0aae99eb1be507196b6b5d640b3801
 
 ```
 |____stake
-| |____HoprStake.t.sol
-| |____HoprStake2.t.sol
-| |____HoprStakeSeason3.t.sol
-| |____HoprStakeSeason4.t.sol
-| |____HoprStakeSeason5.t.sol
-| |____HoprStakeBase.t.sol
+| |____HoprStake.t.sol // <- skip this as this contract is archived
+| |____HoprStake2.t.sol // <- skip this as this contract is archived
+| |____HoprStakeSeason3.t.sol // <- skip this as this contract is archived
+| |____HoprStakeSeason4.t.sol // <- skip this as this contract is archived
+| |____HoprStakeSeason5.t.sol // <- skip this as this contract is archived
+| |____HoprWhitehat.t.sol // <- skip this as this contract is archived
 | |____HoprBoost.t.sol
-| |____HoprWhitehat.t.sol
 |____ERC777
 | |____ERC777Snapshot.t.sol
 |____HoprDistributor.t.sol
