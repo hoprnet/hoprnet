@@ -552,6 +552,15 @@ contract HoprStakeBaseTest is Test, ERC1820RegistryFixtureTest {
       abi.encodeWithSignature('safeTransferFrom(address,address,uint256)', address(hoprStakeBase), accounts[0], 0),
       abi.encode(true)
     );
+
+    if (account == accounts[2]) {
+      // mock the redeemed NFT transfers (of token id 4)
+      vm.mockCall(
+        address(hoprStakeBase),
+        abi.encodeWithSignature('safeTransferFrom(address,address,uint256)', address(hoprStakeBase), accounts[2], 4),
+        abi.encode(true)
+      );
+    }
     // perform actual unlock
     vm.expectEmit(true, true, false, false, address(hoprStakeBase));
     emit Released(accounts[0], actualLocked); // token of id 1 has the sanme type and rank as token 0
@@ -600,24 +609,26 @@ contract HoprStakeBaseTest is Test, ERC1820RegistryFixtureTest {
   /**
    * @dev Reclaim accidentally sent ERC20 tokens, when ERC20 is lock token
    */
-  function test_reclaimErc20LockToken() public {
-    // hoprStakeBase has 1 ether of locked token
-    uint256 lockedSlot = stdstore.target(address(hoprStakeBase)).sig('totalLocked()').find();
-    vm.store(address(hoprStakeBase), bytes32(lockedSlot), bytes32(abi.encode(1 ether)));
-    // hoprStakeBase has 2 ether of reward token
-    uint256 rewardSlot = stdstore.target(address(hoprStakeBase)).sig('availableReward()').find();
-    vm.store(address(hoprStakeBase), bytes32(rewardSlot), bytes32(abi.encode(2 ether)));
+  function test_reclaimErc20LockToken(uint256 balance, uint256 locked) public {
+    balance = bound(balance, 0, 1e3);
+    locked = bound(locked, 0, 1e3);
+    vm.assume(balance >= locked);
 
-    // mock the token transfer, for 10 - 1 = 9 ether
-    // hoprStakeBase has 10 ether of some erc20 token
+    // hoprStakeBase has `locked` of locked token
+    uint256 lockedSlot = stdstore.target(address(hoprStakeBase)).sig('totalLocked()').find();
+    vm.store(address(hoprStakeBase), bytes32(lockedSlot), bytes32(abi.encode(locked)));
+
+    // mock the token transfer, for `balance - locked` tokens
+    // hoprStakeBase has `balance` of some erc20 token
     vm.mockCall(
       address(lockToken),
       abi.encodeWithSignature('balanceOf(address)', address(hoprStakeBase)),
-      abi.encode(10 ether)
+      abi.encode(balance)
     );
+
     vm.mockCall(
       address(lockToken),
-      abi.encodeWithSignature('transfer(address,uint256)', newOwner, 9 ether),
+      abi.encodeWithSignature('transfer(address,uint256)', newOwner, balance - locked),
       abi.encode(true)
     );
     vm.prank(newOwner);
