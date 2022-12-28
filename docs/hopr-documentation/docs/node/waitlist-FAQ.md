@@ -15,6 +15,7 @@ Staking these NFTs in the HOPR staking program allows users to register their ad
 To join the waitlist, first you have to:
 
 (**1**) Stake HOPR tokens at https://stake.hoprnet.org (see below for the minimum stake)
+
 (**2**) Fill out the registration form: http://forms.gle/rHLwbXVZyATRuRmK7
 
 ### What is the minimum stake required to participate in the Monte Rosa release?
