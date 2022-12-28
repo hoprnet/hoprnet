@@ -39,11 +39,7 @@ If you have previously installed a node and have the [identity file downloaded](
 
 (**1**) Locate your HOPR package and click on the manage icon. From there, scroll down to the file manager.
 
-<<<<<<< HEAD
 ![avado upload](/img/node/avado-db.png)
-=======
-![avado upload](/img/avado-db.png)
->>>>>>> bfcf809b536afeac60b5d764d3e349304c7115a2
 
 (**2**) Click on `Browse` button to the right of the first text field under `Upload to DNP`.
 
