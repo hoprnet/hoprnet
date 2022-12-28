@@ -49,7 +49,7 @@ const sidebars = {
         'node/using-hopr-admin',
         'node/hoprd-commands',
         'node/network-registry-tutorial',
-        'version-v1.90/node/waitlist-FAQ'
+        'node/waitlist-FAQ'
       ]
     },
 
