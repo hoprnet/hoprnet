@@ -13,7 +13,11 @@ Please withdraw all your funds and delete the old package before installing a ne
 
 (**1**) Open the DAppStore using the sidebar to the left.
 
+<<<<<<< HEAD
 ![DappStore](/img/node/DappStore-NR-1.png)
+=======
+![DappStore](./images/DappStore-NR.png)
+>>>>>>> bfcf809b536afeac60b5d764d3e349304c7115a2
 
 (**2**) You should see the latest version of the HOPR client now. Just click `Get` and wait for it to install.
 
