@@ -12,7 +12,6 @@ declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="testnet"
 source "${mydir}/utils.sh"
-source "${mydir}/gcloud.sh"
 source "${mydir}/dns.sh"
 
 # API used for funding the calls, source code in https://github.com/hoprnet/api
@@ -193,20 +192,6 @@ add_keys() {
   fi
 }
 
-# $1 anvil debug log file
-start_local_anvil() {
-  # Remove previous log file to make sure that the regex does not match
-  log "remove ${1}"
-  rm -f "${1}"
-
-  log "Running anvil local node at ${mydir}"
-  # make -C "${mydir}/.." run-anvil > \
-  #     "$1" 2>&1 &
-  # FIXME: stucking at here...
-  anvil > "$1" 2>&1 &
-  make -C "${mydir}/../packages/ethereum/contracts/" -j anvil-deploy-all 2>&1 &
-}
-
 # $1 prefix, e.g. "e2e-source"
 # $2 identity file directory, e.g. "/tmp"
 # $3 password, e.g. "dummy e2e password"
@@ -218,11 +203,12 @@ fund_nodes() {
   local addr_arg=""
   [[ -n "${4:-}" ]] && addr_arg="--address ${4}"
 
-  foundry-tool --environment-name anvil-localhost --environment-type development \
+  ${mydir}/../.cargo/bin/foundry-tool \
+    --environment-name anvil-localhost --environment-type development \
     faucet --password "${password}" --use-local-identities \
     --identity-prefix "${node_prefix}" --identity-directory "${tmp}" \
     --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-    --make-root "../packages/ethereum/contracts" \
+    --make-root "${mydir}/../packages/ethereum/contracts" \
     ${addr_arg}
 }
 

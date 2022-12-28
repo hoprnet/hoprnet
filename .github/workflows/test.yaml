@@ -15,9 +15,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [16]
         os: ['ubuntu-latest']
-        rust: ['stable']
 
     steps:
       - uses: actions/checkout@v3
@@ -35,14 +33,8 @@ jobs:
             target/
             .cargo/.package-cache/
             .cargo/bin/
+            .foundry/bin/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
-
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ matrix.node-version }}
-          registry-url: https://registry.npmjs.org/
-          cache: yarn
 
       - name: Install dependencies
         run: make -j deps-ci

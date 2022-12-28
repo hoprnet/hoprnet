@@ -151,7 +151,7 @@ fn main() -> Result<(), HelperErrors> {
                 }
             }
 
-            println!("All the addresses {:?}", addresses_all);
+            println!("All the addresses: {:?}", addresses_all);
 
             // TODO: by default, use faucet to fund both native tokens and HOPR tokens
 

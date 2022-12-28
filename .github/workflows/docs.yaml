@@ -27,13 +27,11 @@ jobs:
           registry-url: https://registry.npmjs.org/
           cache: yarn
 
-      - name: Install Yarn (only when using ACT)
+      - name: Install tools (only when using ACT)
         if: ${{ env.ACT == 'true' }}
         run: |
-          curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
-          echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
           apt update
-          apt install --no-install-recommends yarn
+          apt install --no-install-recommends lsof
 
       - name: Generate docs
         run: |
@@ -49,7 +47,7 @@ jobs:
           git add docs/hopr-documentation/rest-api-v2-full-spec.json
 
       - name: Commit docs changes
-        # only commit changes when not running via act and when on final branch<Plug>_es
+        # only commit changes when not running via act and when on final branches
         if: |
           (github.ref == 'refs/heads/master' ||
            github.ref == 'refs/heads/avado' ||

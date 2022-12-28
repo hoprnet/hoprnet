@@ -66,3 +66,8 @@ logs.txt
 
 # local foundry installation
 /.foundry/
+/packages/ethereum/contracts/build-info/
+/target-install/
+
+# auto-generated temporary anvil configuration file
+/.anvil.cfg

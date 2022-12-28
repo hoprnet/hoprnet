@@ -6,6 +6,7 @@ test "$?" -eq "0" || { echo "This script should only be sourced." >&2; exit 1; }
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
+set -x
 
 # $1=version string, semver
 function get_version_maj_min() {
@@ -316,90 +317,24 @@ get_authenticated_curl_cmd() {
   echo "${cmd}"
 }
 
-# $1 - protocol_config path to `protocol-config.json`
-# $2 - deployment_summary path to `contracts-addresses.json`
-# $3 - source_environment_id environment name of source e.g. anvil-localhost
-# $4 - destination_environment_id environment name of destination e.g. anvil-localhost2
+# $1 - target file
+# $2 - source file
+# $2 - source_environment_id environment name of source e.g. anvil-localhost
+# $3 - destination_environment_id environment name of destination e.g. anvil-localhost2
 update_protocol_config_addresses() {
-  local protocol_config=${1}
-  local deployment_summary=${2}
-  local source_environment_id=${3}
-  local destination_environment_id=${3}
+  local target_file="${1}"
+  local source_file="${2}"
+  local source_environment_id="${3}"
+  local destination_environment_id="${4}"
 
   log "updating contract addresses in protocol configuration"
 
-  declare token_contract_address channels_contract_address network_registry_contract_address channel_contract_deploy_block
-  declare xhopr_contract_address boost_contract_address stake_contract_address network_registry_proxy_contract_address
-
-  token_contract_address="$(cat "${deployments_summary}" | jq -r ".environments.\"${source_environment_id}\".token_contract_address")"
-  channels_contract_address="$(cat "${deployments_summary}" | jq -r ".environments.\"${source_environment_id}\".channels_contract_address")"
-  network_registry_contract_address="$(cat "${deployments_summary}" | jq -r ".environments.\"${source_environment_id}\".network_registry_contract_address")"
-  xhopr_contract_address="$(cat "${deployments_summary}" | jq -r ".environments.\"${source_environment_id}\".xhopr_contract_address")"
-  boost_contract_address="$(cat "${deployments_summary}" | jq -r ".environments.\"${source_environment_id}\".boost_contract_address")"
-  stake_contract_address="$(cat "${deployments_summary}" | jq -r ".environments.\"${source_environment_id}\".stake_contract_address")"
-  network_registry_proxy_contract_address="$(cat "${deployments_summary}" | jq -r ".environments.\"${source_environment_id}\".network_registry_proxy_contract_address")"
-  channel_contract_deploy_block="$(cat "${deployments_summary}" | jq -r ".environments.\"${source_environment_id}\".indexer_start_block_number")"
-
-  cat "${protocol_config}" | jq ".environments.\"${destination_environment_id}\".token_contract_address = \"${token_contract_address}\"" > "${protocol_config}.new"
-  mv "${protocol_config}.new" "${protocol_config}"
-
-  cat "${protocol_config}" | jq ".environments.\"${destination_environment_id}\".channels_contract_address = \"${channels_contract_address}\"" > "${protocol_config}.new"
-  mv "${protocol_config}.new" "${protocol_config}"
-
-  cat "${protocol_config}" | jq ".environments.\"${destination_environment_id}\".network_registry_contract_address = \"${network_registry_contract_address}\"" > "${protocol_config}.new"
-  mv "${protocol_config}.new" "${protocol_config}"
-
-  cat "${protocol_config}" | jq ".environments.\"${destination_environment_id}\".xhopr_contract_address = \"${xhopr_contract_address}\"" > "${protocol_config}.new"
-  mv "${protocol_config}.new" "${protocol_config}"
-
-  cat "${protocol_config}" | jq ".environments.\"${destination_environment_id}\".boost_contract_address = \"${boost_contract_address}\"" > "${protocol_config}.new"
-  mv "${protocol_config}.new" "${protocol_config}"
-
-  cat "${protocol_config}" | jq ".environments.\"${destination_environment_id}\".stake_contract_address = \"${stake_contract_address}\"" > "${protocol_config}.new"
-  mv "${protocol_config}.new" "${protocol_config}"
-
-  cat "${protocol_config}" | jq ".environments.\"${destination_environment_id}\".network_registry_proxy_contract_address = \"${network_registry_proxy_contract_address}\"" > "${protocol_config}.new"
-  mv "${protocol_config}.new" "${protocol_config}"
-
-  cat "${protocol_config}" | jq ".environments.\"${destination_environment_id}\".channel_contract_deploy_block = \"${channel_contract_deploy_block}\"" > "${protocol_config}.new"
-  mv "${protocol_config}.new" "${protocol_config}"
+  local source_data
+  source_data="$(jq -r ".environments.\"${source_environment_id}\"" "${source_file}")"
+  jq --argjson inputdata "${source_data}" ".environments.\"${destination_environment_id}\" += \$inputdata" "${target_file}" > "${target_file}.new"
+  mv "${target_file}.new" "${target_file}"
 
   log "contract addresses are updated in protocol configuration"
-}
-
-# $1 - protocol_config path to `protocol-config.json`
-# $2 - environment_id environment name of source e.g. anvil-localhost, anvil-localhost-2
-cleanup_local_protocol_config() {
-  local protocol_config=${1}
-  local environment_id=${2}
-
-  log "cleaning up contract addresses ${environment_id} in protocol configuration"
-
-  cat "${protocol_config}" | jq ".environments.\"${environment_id}\".token_contract_address = \"\"" > "${protocol_config}.new"
-  mv "${protocol_config}.new" "${protocol_config}"
-
-  cat "${protocol_config}" | jq ".environments.\"${environment_id}\".channels_contract_address = \"\"" > "${protocol_config}.new"
-  mv "${protocol_config}.new" "${protocol_config}"
-
-  cat "${protocol_config}" | jq ".environments.\"${environment_id}\".network_registry_contract_address = \"\"" > "${protocol_config}.new"
-  mv "${protocol_config}.new" "${protocol_config}"
-
-  cat "${protocol_config}" | jq ".environments.\"${environment_id}\".xhopr_contract_address = \"\"" > "${protocol_config}.new"
-  mv "${protocol_config}.new" "${protocol_config}"
-
-  cat "${protocol_config}" | jq ".environments.\"${environment_id}\".boost_contract_address = \"\"" > "${protocol_config}.new"
-  mv "${protocol_config}.new" "${protocol_config}"
-
-  cat "${protocol_config}" | jq ".environments.\"${environment_id}\".stake_contract_address = \"\"" > "${protocol_config}.new"
-  mv "${protocol_config}.new" "${protocol_config}"
-
-  cat "${protocol_config}" | jq ".environments.\"${environment_id}\".network_registry_proxy_contract_address = \"\"" > "${protocol_config}.new"
-  mv "${protocol_config}.new" "${protocol_config}"
-
-  cat "${protocol_config}" | jq ".environments.\"${environment_id}\".channel_contract_deploy_block = \"\"" > "${protocol_config}.new"
-  mv "${protocol_config}.new" "${protocol_config}"
-
-  log "contract addresses are cleaned up in protocol configuration"
 }
 
 setup_colors

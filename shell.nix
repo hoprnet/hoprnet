@@ -46,4 +46,10 @@ mkShell {
     macosPkgs
     linuxPkgs
   ];
+  shellHook = ''
+    make deps
+    patchelf --interpreter `cat $NIX_CC/nix-support/dynamic-linker` .foundry/bin/anvil
+    patchelf --interpreter `cat $NIX_CC/nix-support/dynamic-linker` .foundry/bin/cast
+    patchelf --interpreter `cat $NIX_CC/nix-support/dynamic-linker` .foundry/bin/forge
+  '';
 }

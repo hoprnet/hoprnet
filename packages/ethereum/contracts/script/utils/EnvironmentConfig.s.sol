@@ -48,7 +48,7 @@ contract EnvironmentConfig is Script {
 
   string public pathToDeploymentFile = string(abi.encodePacked(vm.projectRoot(), '/contracts-addresses.json'));
 
-  function getEnvrionment() public {
+  function getEnvironment() public {
     // get envirionment of the script
     string memory profile = vm.envString('FOUNDRY_PROFILE');
     currentEnvironmentName = vm.envString('ENVIRONMENT_NAME');
@@ -110,6 +110,10 @@ contract EnvironmentConfig is Script {
   }
 
   function writeCurrentEnvironment() internal {
+    // if currentEnvironmentName is anvil-localhost, update both `anvil-localhost` and `anvil-localhost2`
+    if (keccak256(bytes(currentEnvironmentName)) == keccak256(bytes('anvil-localhost'))) {
+      writeEnvironment('anvil-localhost2', currentEnvironmentDetail);
+    }
     writeEnvironment(currentEnvironmentName, currentEnvironmentDetail);
   }
 

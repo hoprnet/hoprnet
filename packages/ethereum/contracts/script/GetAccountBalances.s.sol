@@ -9,7 +9,7 @@ contract GetAccountBalancesScript is Script, Test, EnvironmentConfig {
     function run(address account) external returns (address wallet, uint256 nativeBalance, uint256 tokenBalance) {
         // 1. Environment check
         // get envirionment of the script
-        getEnvrionment();
+        getEnvironment();
         // read records of deployed files
         readCurrentEnvironment();
 

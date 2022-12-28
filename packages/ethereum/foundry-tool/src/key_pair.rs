@@ -25,11 +25,11 @@ pub fn read_identities(
                 // .map(|r| r.into_os_string().into_string().unwrap())
                 .filter(|r| match &identity_prefix {
                     Some(identity_prefix) => r
-                        .file_stem()
-                        .unwrap()
-                        .to_str()
-                        .unwrap()
-                        .contains(identity_prefix.as_str()),
+                            .file_stem()
+                            .unwrap()
+                            .to_str()
+                            .unwrap()
+                            .contains(identity_prefix.as_str()),
                     _ => true,
                 }) // TODO: Now it is a loose check on contain but not strict on the prefix
                 .filter_map(|r| Wallet::<SigningKey>::decrypt_keystore(r, password).ok()) // read keystore and return non-error results

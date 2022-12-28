@@ -6,15 +6,21 @@ WORKSPACES_WITH_RUST_MODULES := $(wildcard $(addsuffix /crates, $(wildcard ./pac
 # Gets all individual crates such that they can get built
 CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(crate)/*/Cargo.toml)))
 
+# define specific crate for foundry-tool which is a native helper
+FOUNDRY_TOOL_CRATE := ./packages/ethereum/foundry-tool
+
 # Set local foundry directory (for binaries) and versions
 FOUNDRY_DIR := ${CURDIR}/.foundry
 FOUNDRY_VSN := e919a63
+
+# Set local cargo directory (for binaries)
+CARGO_DIR := ${CURDIR}/.cargo
 
 # use custom foundryup to ensure the local directory is used
 foundryup := env FOUNDRY_DIR="${FOUNDRY_DIR}" foundryup
 
 # add local Cargo install path (only once)
-PATH := $(subst :${CURDIR}/.cargo/bin,,$(PATH)):${CURDIR}/.cargo/bin
+PATH := $(subst :${CARGO_DIR}/bin,,$(PATH)):${CARGO_DIR}/bin
 # add users home Cargo install path (only once)
 PATH := $(subst :${HOME}/.cargo/bin,,$(PATH)):${HOME}/.cargo/bin
 # add local Foundry install path (only once)
@@ -23,7 +29,7 @@ PATH := $(subst :${FOUNDRY_DIR}/bin,,$(PATH)):${FOUNDRY_DIR}/bin
 SHELL := env PATH=$(PATH) $(shell which bash)
 
 # use custom Cargo config file for each invocation
-cargo := cargo --config ${CURDIR}/.cargo/config.toml
+cargo := cargo --config ${CARGO_DIR}/config.toml
 
 # use custom flags for installing dependencies
 YARNFLAGS :=
@@ -42,22 +48,21 @@ endif
 
 all: help
 
-
-.PHONY: $(CRATES) ## builds all Rust crates with wasm-pack (except for foundry-tool)
-$(CRATES):
+.PHONY: $(CRATES)
+$(CRATES): ## builds all Rust crates with wasm-pack (except for foundry-tool)
 # --out-dir is relative to working directory
 	echo "use wasm-pack build"
 	wasm-pack build --target=bundler --out-dir ./pkg $@
 
-.PHONY: ./packages/ethereum/crates/foundry-tool/ ## builds foundry-tool Rust crates with cargo
-./packages/ethereum/crates/foundry-tool/:
+.PHONY: $(FOUNDRY_TOOL_CRATE)
+$(FOUNDRY_TOOL_CRATE): ## builds foundry-tool Rust crates with cargo
 	echo "use cargo build"
 	cargo build --manifest-path $@/Cargo.toml
 # install the package
 	cargo install --path $@
 
-.PHONY: $(WORKSPACES_WITH_RUST_MODULES) ## builds all WebAssembly modules
-$(WORKSPACES_WITH_RUST_MODULES):
+.PHONY: $(WORKSPACES_WITH_RUST_MODULES)
+$(WORKSPACES_WITH_RUST_MODULES): ## builds all WebAssembly modules
 	$(MAKE) -C $@ install
 
 .PHONY: deps-ci
@@ -105,13 +110,7 @@ install-foundry: ## install foundry
 	fi
 	@if [ ! -f "${FOUNDRY_DIR}/bin/anvil" ] || [ ! -f "${FOUNDRY_DIR}/bin/cast" ] || [ ! -f "${FOUNDRY_DIR}/bin/forge" ]; then \
 		echo "missing foundry binaries, installing via foundryup"; \
-		if [ ! -d /tmp/foundry-git ]; then git clone https://github.com/foundry-rs/foundry /tmp/foundry-git; fi; \
-		pushd /tmp/foundry-git; \
-		$(foundryup) -p /tmp/foundry-git; \
-		popd; \
-		rm -f "${FOUNDRY_DIR}/bin/anvil" "${FOUNDRY_DIR}/bin/cast" "${FOUNDRY_DIR}/bin/forge"; \
-	  cp "/tmp/foundry-git/target/release/anvil" "/tmp/foundry-git/target/release/cast" "/tmp/foundry-git/target/release/forge" "${FOUNDRY_DIR}/bin"; \
-		rm -rf /tmp/foundry-git; \
+		$(foundryup); \
 	else \
 	  echo "foundry binaries already installed under "${FOUNDRY_DIR}/bin", skipping"; \
 	fi
@@ -160,6 +159,8 @@ ifeq ($(origin NO_CARGO),undefined)
 	$(MAKE) -j 1 $(CRATES)
 # Copy bindings to their destination
 	$(MAKE) ${WORKSPACES_WITH_RUST_MODULES}
+# build foundry-tool
+	$(MAKE) $(FOUNDRY_TOOL_CRATE)
 endif
 
 .PHONY: build-yellowpaper
@@ -168,7 +169,7 @@ build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
 
 .PHONY: build-docs
 build-docs: ## build typedocs, Rest API docs, and docs website
-build-docs: build-docs-typescript build-docs-website build-docs-api
+build-docs: | build-docs-typescript build-docs-website build-docs-api
 
 .PHONY: build-docs-typescript
 build-docs-typescript: ## build typedocs
@@ -194,7 +195,7 @@ reset: clean
 	yarn reset
 
 .PHONY: test
-test: smart-contract-test ## run unit tests for all packages, or a single package if package= is set
+test: test-sc ## run unit tests for all packages, or a single package if package= is set
 ifeq ($(package),)
 	yarn workspaces foreach -pv run test
 else
@@ -217,9 +218,7 @@ lint-fix: ## run linter in fix mode
 
 .PHONY: run-anvil
 run-anvil: ## spinup a local anvil instance (daemon) and deploy contracts
-	echo "Spin up a local anvil instance and deploy all the contracts, incl. Erc1820Registry, to the local environment"
-	anvil & \
-	$(MAKE) -C packages/ethereum/contracts/ -j anvil-deploy-all
+	./script/run-local-anvil.sh
 
 .PHONY: kill-anvil
 kill-anvil: ## kill process running at port 8545 (default port of anvil)
@@ -235,14 +234,14 @@ run-local: ## run HOPRd from local repo
 		--testPreferLocalAddresses --testNoAuthentication
 
 .PHONY: fund-local
-fund-local: # use faucet script to fund local identities
+fund-local: ## use faucet script to fund local identities
 	foundry-tool --environment-name anvil-localhost --environment-type development \
 		faucet --password local --use-local-identities --identity-directory "." \
 		--private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 		--make-root "./packages/ethereum/contracts"
 
 .PHONY: fund-local-all
-fund-local-all: # use faucet script to fund all the local identities
+fund-local-all: ## use faucet script to fund all the local identities
 	foundry-tool --environment-name anvil-localhost --environment-type development \
 		faucet --password local --use-local-identities --identity-directory "/tmp/" \
 		--private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
