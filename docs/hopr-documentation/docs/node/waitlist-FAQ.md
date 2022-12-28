@@ -14,12 +14,14 @@ Staking these NFTs in the HOPR staking program allows users to register their ad
 
 To join the waitlist, first you have to:
 
-Stake HOPR tokens at https://stake.hoprnet.org (see below for the minimum stake)
-Fill out the registration form: http://forms.gle/rHLwbXVZyATRuRmK7
+- Stake HOPR tokens at https://stake.hoprnet.org (see below for the minimum stake)
+
+- Fill out the registration form: http://forms.gle/rHLwbXVZyATRuRmK7
 
 ### What is the minimum stake required to participate in the Monte Rosa release?
 
-Avado and Dappnode users must stake a minimum of 1000 HOPR tokens. Everyone else must stake at least 2000 HOPR tokens.
+- Avado and Dappnode users must stake a minimum of 1000 HOPR tokens.
+- Everyone else must stake at least 2000 HOPR tokens.
 
 ### How often is the waitlist updated?
 
@@ -42,9 +44,9 @@ Avado and Dappnode owners have waitlist priority, but the waitlist is used to br
 
 New slots are distributed based on the following ratio:
 
-60% - users based purely on waitlist position (Avado and Dappnode users will be also included here if they organically have a high rank)
-20% - Avado users
-20% - Dappnode users
+- 60% - users based purely on waitlist position (Avado and Dappnode users will be also included here if they organically have a high rank)
+- 20% - Avado users
+- 20% - Dappnode users
 
 ### Why did my position change after the waitlist was updated?
 
