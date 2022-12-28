@@ -133,6 +133,9 @@ build: build-yarn
 build-solidity-types: ## generate Solidity typings
 	echo "Foundry create binding"
 	$(MAKE) -C packages/ethereum/contracts/ overwrite-sc-bindings
+# Change git = "http://..." into version = "1.0.2"
+	sed -i -e 's/git/version/g' ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
+	sed -i -e 's/https:\/\/github.com\/gakonst\/ethers-rs/1.0.2/g' ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
 	echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"] # rlib is necessary to run integration tests" >> ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
 
 .PHONY: build-yarn
