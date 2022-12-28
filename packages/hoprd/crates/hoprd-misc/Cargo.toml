@@ -12,7 +12,7 @@ license = "LGPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-clap = { version = "4.0.29", features = ["derive"] }
+clap = { version = "4.0.29", features = ["derive","env", "string"] }
 js-sys = "0.3.60"
 real-base = { path = "../../../real/crates/real-base" }
 serde = { version = "1.0", features = ["derive"] }
