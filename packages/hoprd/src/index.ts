@@ -138,9 +138,8 @@ const argv = yargsInstance
   })
   .option('apiToken', {
     string: true,
-    describe: 'A REST API token and admin panel password for user authentication [env: HOPRD_API_TOKEN]',
-    default: undefined,
-    conflicts: 'disableApiAuthentication'
+    describe: 'A REST API token and for user authentication [env: HOPRD_API_TOKEN]',
+    default: undefined
   })
   .option('healthCheck', {
     boolean: true,

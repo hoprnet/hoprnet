@@ -122,11 +122,7 @@ export async function setupRestApi(
         // Applying multiple URI encoding is an identity
         let apiTokenFromUser = encodeURIComponent(req.get('x-auth-token') || '')
 
-        if (
-          !this.options.disableApiAuthentication &&
-          this.options.apiToken !== undefined &&
-          apiTokenFromUser !== encodedApiToken
-        ) {
+        if (this.options.apiToken !== undefined && apiTokenFromUser !== encodedApiToken) {
           // because this is not the last auth check, we just indicate that
           // the authentication failed so the auth chain can continue
           return false
@@ -143,11 +139,7 @@ export async function setupRestApi(
         // We only expect a single value here, instead of the usual user:password, so we take the user part as token
         let apiTokenFromUser = encodeURIComponent(Buffer.from(authEncoded, 'base64').toString('binary').split(':')[0])
 
-        if (
-          !this.options.disableApiAuthentication &&
-          this.options.apiToken !== undefined &&
-          apiTokenFromUser !== encodedApiToken
-        ) {
+        if (this.options.apiToken !== undefined && apiTokenFromUser !== encodedApiToken) {
           // because this is the last auth check, we must throw the appropriate
           // error to be sent back to the user
           throw {
