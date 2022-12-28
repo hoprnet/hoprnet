@@ -203,15 +203,15 @@ else
 	yarn workspace @hoprnet/${package} run test
 endif
 
-.PHONY: test-sc
-test-sc: # forge test smart contracts
+.PHONY: smart-contract-test
+smart-contract-test: # forge test smart contracts
 	$(MAKE) -C packages/ethereum/contracts/ sc-test
 
 .PHONY: lint-check
 lint-check: ## run linter in check mode
 	npx prettier --check .
 
-.PHONY: lint-check
+.PHONY: lint-fix
 lint-fix: ## run linter in fix mode
 	npx prettier --write .
 
