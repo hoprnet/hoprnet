@@ -132,6 +132,9 @@ build: build-yarn
 build-solidity-types: ## generate Solidity typings
 	echo "Foundry create binding"
 	$(MAKE) -C packages/ethereum/contracts/ overwrite-sc-bindings
+# Change git = "http://..." into version = "1.0.2"
+	sed -i -e 's/https:\/\/github.com\/gakonst\/ethers-rs/1.0.2/g' ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
+	sed -i -e 's/git/version/g' ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
 	echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"] # rlib is necessary to run integration tests" >> ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
 
 .PHONY: build-yarn
@@ -192,7 +195,7 @@ reset: clean
 	yarn reset
 
 .PHONY: test
-test: test-sc ## run unit tests for all packages, or a single package if package= is set
+test: smart-contract-test ## run unit tests for all packages, or a single package if package= is set
 ifeq ($(package),)
 	yarn workspaces foreach -pv run test
 else
@@ -201,15 +204,15 @@ else
 	yarn workspace @hoprnet/${package} run test
 endif
 
-.PHONY: test-sc
-test-sc: # forge test smart contracts
+.PHONY: smart-contract-test
+smart-contract-test: # forge test smart contracts
 	$(MAKE) -C packages/ethereum/contracts/ sc-test
 
 .PHONY: lint-check
 lint-check: ## run linter in check mode
 	npx prettier --check .
 
-.PHONY: lint-check
+.PHONY: lint-fix
 lint-fix: ## run linter in fix mode
 	npx prettier --write .
 

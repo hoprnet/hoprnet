@@ -273,8 +273,7 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
    * @param nftRank HoprBoost rank which is associated to the eligible NFT, in string
    */
   function _addNftTypeAndRank(uint256 nftType, string memory nftRank) private {
-    uint256 i = 0;
-    for (i; i < eligibleNftTypeAndRank.length; i++) {
+    for (uint256 i = 0; i < eligibleNftTypeAndRank.length; i++) {
       // walk through all the types
       if (
         eligibleNftTypeAndRank[i].nftType == nftType &&
