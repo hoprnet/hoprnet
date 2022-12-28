@@ -28,7 +28,8 @@
         "version-v1.90/node/using-docker",
         "version-v1.90/node/using-hopr-admin",
         "version-v1.90/node/hoprd-commands",
-        "version-v1.90/node/network-registry-tutorial"
+        "version-v1.90/node/network-registry-tutorial",
+        "version-v1.90/node/waitlist-FAQ"
       ]
     },
     {
