@@ -20,6 +20,7 @@ contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryF
     readCurrentEnvironment();
     // Halt if ERC1820Registry has not been deployed.
     mustHaveErc1820Registry();
+    emit log_string(string(abi.encodePacked('Deploying in ', currentEnvironmentName)));
 
     // 2. Get deployer private key
     uint256 deployerPrivateKey = vm.envUint('DEPLOYER_PRIVATE_KEY');
@@ -166,15 +167,16 @@ contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryF
         emit log_string('Cannot read owner');
       }
       address proxyOwner = abi.decode(returndataProxyOwner, (address));
-      // When a mismatch is deteced and the deployer (transaction sender) is the owner, update the `stakeContract` with the latest staking contract address
-      if (linkedStakeContract != currentEnvironmentDetail.stakeContractAddress && proxyOwner == deployerAddress) {
-        (bool successUpdateStakeContract, ) = currentEnvironmentDetail.networkRegistryProxyContractAddress.call(
-          abi.encodeWithSignature('updateStakeContract(address)', currentEnvironmentDetail.stakeContractAddress)
-        );
-        if (!successUpdateStakeContract) {
-          emit log_string('Cannot updateStakeContract');
-        }
-      }
+      // // When a mismatch is detected and the deployer (transaction sender) is the owner,
+      // // update the `stakeContract` with the latest staking contract address
+      // if (linkedStakeContract != currentEnvironmentDetail.stakeContractAddress && proxyOwner == deployerAddress) {
+      //   (bool successUpdateStakeContract, ) = currentEnvironmentDetail.networkRegistryProxyContractAddress.call(
+      //     abi.encodeWithSignature('updateStakeContract(address)', currentEnvironmentDetail.stakeContractAddress)
+      //   );
+      //   if (!successUpdateStakeContract) {
+      //     emit log_string('Cannot updateStakeContract');
+      //   }
+      // }
     }
 
     // 3.7. NetworkRegistry Contract
@@ -269,15 +271,17 @@ contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryF
         }
       }
     }
-    // mint  Network_registry type
-    (bytes memory builtNftBatchMintPayload1, bytes memory builtNftBatchMintPayload2) = buildNftBatchMintInternal(
-      deployerAddress,
-      DEV_BANK_ADDRESS
-    ); // This payload is built because default abi.encode returns different value (no size info) when array is static.
-    (bool successBatchMint1, ) = currentEnvironmentDetail.hoprBoostContractAddress.call(builtNftBatchMintPayload1);
-    (bool successBatchMint2, ) = currentEnvironmentDetail.hoprBoostContractAddress.call(builtNftBatchMintPayload2);
-    if (!successBatchMint1 || !successBatchMint2) {
-      revert('Error in minting Network_registry in batches');
+    // mint Network_registry type (except for production)
+    if (currentEnvironmentType != EnvironmentType.PRODUCTION) {
+      (bytes memory builtNftBatchMintPayload1, bytes memory builtNftBatchMintPayload2) = buildNftBatchMintInternal(
+        deployerAddress,
+        DEV_BANK_ADDRESS
+      ); // This payload is built because default abi.encode returns different value (no size info) when array is static.
+      (bool successBatchMint1, ) = currentEnvironmentDetail.hoprBoostContractAddress.call(builtNftBatchMintPayload1);
+      (bool successBatchMint2, ) = currentEnvironmentDetail.hoprBoostContractAddress.call(builtNftBatchMintPayload2);
+      if (!successBatchMint1 || !successBatchMint2) {
+        revert('Error in minting Network_registry in batches');
+      }
     }
 
     // if both HoprChannels and HoprNetworkRegistry contracts are deployed, update the startup block number for indexer

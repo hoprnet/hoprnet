@@ -53,13 +53,16 @@ source .env
 FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-goerli forge script --broadcast --verify --verifier sourcify script/DeployAll.s.sol:DeployAllContractsScript
 
 // This deploys contract to goerli testnet and verifies contracts on etherscan
-FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-goerli forge script --broadcast --verify --verifier etherscan --chain 5 script/DeployAll.s.sol:DeployAllContractsScript
+FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=master-goerli forge script --broadcast --verify --verifier etherscan --chain 5 script/DeployAll.s.sol:DeployAllContractsScript
 ```
 
 #### Production
 
 ```
-FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-goerli forge script --broadcast --verify --verifier sourcify script/DeployAll.s.sol:DeployAllContractsScript
+// use either of the command below
+FOUNDRY_PROFILE=production ENVIRONMENT_NAME=post_monte_rosa forge script --broadcast --verify --verifier sourcify script/DeployAll.s.sol:DeployAllContractsScript
+
+FOUNDRY_PROFILE=production ENVIRONMENT_NAME=post_monte_rosa forge script --broadcast --verify --verifier etherscan --chain 100 script/DeployAll.s.sol:DeployAllContractsScript
 ```
 
 ### Note
