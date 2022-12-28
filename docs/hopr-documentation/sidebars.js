@@ -48,7 +48,8 @@ const sidebars = {
         'node/using-docker',
         'node/using-hopr-admin',
         'node/hoprd-commands',
-        'node/network-registry-tutorial'
+        'node/network-registry-tutorial',
+        'version-v1.90/node/waitlist-FAQ'
       ]
     },
 
