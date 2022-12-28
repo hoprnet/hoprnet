@@ -37,9 +37,7 @@
       "effectiveGasPrice": "0xb2d05e07"
     }
   ],
-  "libraries": [
-    "script/utils/BoostUtilsLib.sol:BoostUtilsLib:0x8197525557233031b110038ae52dfc3c4a75567a"
-  ],
+  "libraries": ["script/utils/BoostUtilsLib.sol:BoostUtilsLib:0x8197525557233031b110038ae52dfc3c4a75567a"],
   "pending": [],
   "path": "/Users/qyu/Documents/hoprnet/packages/ethereum/contracts/broadcast/DeployAll.s.sol/100/run-latest.json",
   "returns": {},
