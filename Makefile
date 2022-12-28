@@ -195,7 +195,7 @@ reset: clean
 	yarn reset
 
 .PHONY: test
-test: test-sc ## run unit tests for all packages, or a single package if package= is set
+test: smart-contract-test ## run unit tests for all packages, or a single package if package= is set
 ifeq ($(package),)
 	yarn workspaces foreach -pv run test
 else
