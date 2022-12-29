@@ -118,7 +118,7 @@ foundryup --version nightly-64cbdd183e0aae99eb1be507196b6b5d640b3801
 |____ERC777
 | |____ERC777Snapshot.t.sol
 |____HoprDistributor.t.sol
-|____HoprForwarder.t.sol
+|____HoprForwarder.t.sol // <- skip this as this contract is deprecated. Multisig can register implementation to receive ERC777 tokens
 |____HoprWrapper.t.sol
 
 ```
