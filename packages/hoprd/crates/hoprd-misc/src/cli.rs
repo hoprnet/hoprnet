@@ -2,95 +2,21 @@ use clap::builder::{
     IntoResettable, PossibleValue, PossibleValuesParser, Resettable, Str, StringValueParser,
     TypedValueParser,
 };
-use clap::error::ErrorKind;
-use clap::{Arg, ArgAction, ArgMatches, Command, Error, Parser};
+use clap::{Arg, ArgAction, ArgMatches, Command};
 use real_base::real;
 use serde::Serialize;
 use serde_json;
 use serde_json::{Map, Value};
 use wasm_bindgen::JsValue;
 
+const DEFAULT_ID_PATH: &str = ".hopr-identity";
+
 #[derive(serde::Deserialize)]
 pub struct ProtocolConfigFile {
     environments: Map<String, Value>,
 }
 
-#[derive(Clone)]
-pub struct PossibleEnvironmentsParser {}
-
-impl PossibleEnvironmentsParser {
-    fn new(path: &str) -> PossibleEnvironmentsParser {
-        Self {}
-    }
-}
-
-// impl TypedValueParser for PossibleEnvironmentsParser {
-//     type Value = String;
-
-//     fn parse_ref(
-//         &self,
-//         cmd: &Command,
-//         arg: Option<&Arg>,
-//         value: &std::ffi::OsStr,
-//     ) -> Result<Self::Value, Error> {
-//         TypedValueParser::parse(self, cmd, arg, value.to_owned())
-//     }
-
-//     fn parse(
-//         &self,
-//         cmd: &Command,
-//         arg: Option<&Arg>,
-//         value: std::ffi::OsString,
-//     ) -> Result<String, Error> {
-//         let value = match value.into_string() {
-//             Ok(val) => val,
-//             Err(e) => return Err(cmd.error(ErrorKind::InvalidUtf8, cmd.render_usage())),
-//         };
-
-//         let ignore_case = arg.map(|a| a.is_ignore_case_set()).unwrap_or(false);
-
-//         let possible_values = self.possible_values().unwrap_or(Box::new([].into_iter()));
-
-//         if possible_values.any(|v| v.matches(&value, ignore_case)) {
-//             Ok(value)
-//         } else {
-//             let possible_vals = possible_values
-//                 .filter(|v| !v.is_hide_set())
-//                 .map(|v| v.get_name().to_owned())
-//                 .collect::<Vec<_>>();
-
-//             Err(cmd.error(ErrorKind::InvalidValue, "").with_cmd(cmd))
-//             // Err(clap::Error::invalid_value(
-//             //     cmd,
-//             //     value,
-//             //     &possible_vals,
-//             //     arg.map(ToString::to_string)
-//             //         .unwrap_or_else(|| "...".to_owned()),
-//             // ))
-//         }
-//     }
-
-//     fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
-//         let data = match real::read_file("./packages/core/protocol-config.json") {
-//             Ok(data) => data,
-//             Err(err) => return None,
-//         };
-
-//         let protocolConfig = match serde_json::from_slice::<ProtocolConfigFile>(&data) {
-//             Ok(config) => config,
-//             Err(err) => return None,
-//         };
-
-//         Some(Box::new(
-//             protocolConfig
-//                 .environments
-//                 .iter()
-//                 .map(|env| PossibleValue::new(env.0.to_owned())),
-//         ))
-//     }
-// }
-
-#[derive(Serialize)]
+#[derive(Serialize, Parser)]
 struct Args {
     enviromment: String,
     api_port: u16,
@@ -106,27 +32,6 @@ impl From<ArgMatches> for Args {
         }
     }
 }
-// #[derive(Clone)]
-// pub struct EnvironmentParser {}
-
-// impl clap::builder::TypedValueParser for EnvironmentParser {
-//     type Value = String;
-//     fn parse_ref(
-//         &self,
-//         cmd: &clap::Command,
-//         arg: Option<&clap::Arg>,
-//         value: &std::ffi::OsStr,
-//     ) -> Result<Self::Value, clap::Error> {
-//         let inner = clap::value_parser!(String);
-//         let val = inner.parse_ref(cmd, arg, value)?;
-
-//         Ok(String::from("foo"))
-//     }
-// }
-
-// impl Arg {
-//     fn env() {}
-// }
 
 #[derive(serde::Deserialize)]
 struct PackageJsonFile {
@@ -158,23 +63,25 @@ fn get_environments(path: String) -> Result<Vec<String>, JsValue> {
 pub fn parse_cli_arguments(cli_args: Vec<&str>) -> Result<JsValue, JsValue> {
     let envs: Vec<String> = get_environments(String::from("./packages/core/protocol-config.json"))?;
 
+    let version = get_package_version(String::from("./package.json"))?;
+
     let cmd = Command::new("hoprd")
+    .after_help("All CLI options can be configured through environment variables as well. CLI parameters have precedence over environment variables.")
+        .version(&version)
         .arg(
             Arg::new("apiHost")
                 .long("apiHost")
                 .default_value("localhost")
                 .env("HOPRD_API_HOST")
                 .value_name("HOST")
-                .help("Set host IP to which the API server will bind"),
-        )
+                .help("Set host IP to which the API server will bind"))
         .arg(
             Arg::new("apiPort")
                 .long("apiPort")
                 .default_value("3001")
                 .value_parser(clap::value_parser!(u16))
                 .env("HOPRD_API_PORT")
-                .help("Set host port to which the API server will bind."),
-        )
+                .help("Set host port to which the API server will bind."))
         .arg(
             Arg::new("environment")
                 .long("environment")
@@ -182,9 +89,82 @@ pub fn parse_cli_arguments(cli_args: Vec<&str>) -> Result<JsValue, JsValue> {
                 .env("HOPRD_ENVIRONMENT")
                 .value_name("ENVIRONMENT")
                 .help("Environment id which the node shall run on")
-                .value_parser(PossibleValuesParser::new(envs)),
-        );
+                .value_parser(PossibleValuesParser::new(envs)))
+        .arg(
+            Arg::new("api")
+                .long("api")
+                .env("HOPRD_API")
+                .action(ArgAction::SetTrue)
+                .help("Expose the API on localhost:3001")
+                .default_value("false"))
+        .arg(Arg::new("apiToken")
+                .long("apiToken")
+                .env("HOPRD_API_TOKEN")
+                .help("A REST API token and for user authentication"))
+        .arg(Arg::new("healthCheck")
+                .long("healthCheck")
+                .env("HOPRD_HEALTH_CHECK")
+                .help("Run a health check end point on localhost:8080")
+                .action(ArgAction::SetTrue)
+            .default_value("false"))
+        .arg(Arg::new("healthCheckHost")
+                .long("healthCheckHost")
+                .env("HOPRD_HEALTH_CHECK_HOST")
+                .help("Updates the host for the healthcheck server")
+                .default_value("localhost"))
+        .arg(Arg::new("healthCheckPort")
+                .long("healthCheckPort")
+                .env("HOPRD_HEALTH_CHECK_PORT")
+                .help("Updates the port for the healthcheck server")
+                .default_value("8080"))
+        .arg(Arg::new("password")
+                .long("password")
+                .help("A password to encrypt your keys")
+                .env("HOPRD_PASSWORD")
+                .default_value(""))
+        .arg(Arg::new("provider")
+                .long("provider")
+                .help("A custom RPC provider to be used for the node to connect to blockchain")
+                .env("HOPRD_PROVIDER"))
+        .arg(Arg::new("identity")
+                .long("identity")
+                .help("The path to the identity file")
+                .env("HOPRD_IDENTITY")
+                .default_value(DEFAULT_ID_PATH))
+        .arg(Arg::new("dryRun")
+                .long("dryRun")
+                .help("List all the options used to run the HOPR node, but quit instead of starting")
+                .env("HOPRD_DRY_RUN")
+                .default_value("false")
+                .action(ArgAction::SetTrue));
 
+    // .option('data', {
+    //   string: true,
+    //   describe: 'manually specify the data directory to use [env: HOPRD_DATA]',
+    //   default: defaultDataPath
+    // })
+    // .option('init', {
+    //   boolean: true,
+    //   describe: "initialize a database if it doesn't already exist [env: HOPRD_INIT]",
+    //   default: false
+    // })
+    // .option('privateKey', {
+    //   hidden: true,
+    //   string: true,
+    //   describe: 'A private key to be used for the node [env: HOPRD_PRIVATE_KEY]',
+    //   default: undefined
+    // })
+    // .option('allowLocalNodeConnections', {
+    //   boolean: true,
+    //   describe: 'Allow connections to other nodes running on localhost [env: HOPRD_ALLOW_LOCAL_NODE_CONNECTIONS]',
+    //   default: false
+    // })
+    // .option('allowPrivateNodeConnections', {
+    //   boolean: true,
+    //   describe:
+    //     'Allow connections to other nodes running on private addresses [env: HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS]',
+    //   default: false
+    // })
     let args = match cmd.try_get_matches_from(cli_args) {
         Ok(matches) => Args::from(matches),
         Err(e) => return Err(JsValue::from(e.to_string())),
@@ -235,10 +215,6 @@ pub mod wasm {
 }
 
 // .env('HOPRD') // enable options to be set as environment variables with the HOPRD prefix
-// .epilogue(
-//   'All CLI options can be configured through environment variables as well. CLI parameters have precedence over environment variables.'
-// )
-// .version(version)
 // .option('environment', {
 //   string: true,
 //   describe: 'Environment id which the node shall run on (HOPRD_ENVIRONMENT)',
@@ -246,79 +222,6 @@ pub mod wasm {
 //   default: defaultEnvironment()
 // })
 
-// .option('api', {
-//   boolean: true,
-//   describe: 'Expose the API on localhost:3001. [env: HOPRD_API]',
-//   default: false
-// })
-
-// .option('apiToken', {
-//   string: true,
-//   describe: 'A REST API token and for user authentication [env: HOPRD_API_TOKEN]',
-//   default: undefined,
-//   conflicts: 'testNoAuthentication'
-// })
-// .option('healthCheck', {
-//   boolean: true,
-//   describe: 'Run a health check end point on localhost:8080 [env: HOPRD_HEALTH_CHECK]',
-//   default: false
-// })
-// .option('healthCheckHost', {
-//   string: true,
-//   describe: 'Updates the host for the healthcheck server [env: HOPRD_HEALTH_CHECK_HOST]',
-//   default: 'localhost'
-// })
-// .option('healthCheckPort', {
-//   number: true,
-//   describe: 'Updates the port for the healthcheck server [env: HOPRD_HEALTH_CHECK_PORT]',
-//   default: 8080
-// })
-// .option('password', {
-//   string: true,
-//   describe: 'A password to encrypt your keys [env: HOPRD_PASSWORD]',
-//   default: ''
-// })
-// .option('provider', {
-//   string: true,
-//   describe: 'A custom RPC provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER]'
-// })
-// .option('identity', {
-//   string: true,
-//   describe: 'The path to the identity file [env: HOPRD_IDENTITY]',
-//   default: DEFAULT_ID_PATH
-// })
-// .option('dryRun', {
-//   boolean: true,
-//   describe: 'List all the options used to run the HOPR node, but quit instead of starting [env: HOPRD_DRY_RUN]',
-//   default: false
-// })
-// .option('data', {
-//   string: true,
-//   describe: 'manually specify the data directory to use [env: HOPRD_DATA]',
-//   default: defaultDataPath
-// })
-// .option('init', {
-//   boolean: true,
-//   describe: "initialize a database if it doesn't already exist [env: HOPRD_INIT]",
-//   default: false
-// })
-// .option('privateKey', {
-//   hidden: true,
-//   string: true,
-//   describe: 'A private key to be used for the node [env: HOPRD_PRIVATE_KEY]',
-//   default: undefined
-// })
-// .option('allowLocalNodeConnections', {
-//   boolean: true,
-//   describe: 'Allow connections to other nodes running on localhost [env: HOPRD_ALLOW_LOCAL_NODE_CONNECTIONS]',
-//   default: false
-// })
-// .option('allowPrivateNodeConnections', {
-//   boolean: true,
-//   describe:
-//     'Allow connections to other nodes running on private addresses [env: HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS]',
-//   default: false
-// })
 // .option('testAnnounceLocalAddresses', {
 //   hidden: true,
 //   boolean: true,
