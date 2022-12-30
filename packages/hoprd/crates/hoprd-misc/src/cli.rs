@@ -1,7 +1,4 @@
-use clap::builder::{
-    IntoResettable, PossibleValue, PossibleValuesParser, Resettable, Str, StringValueParser,
-    TypedValueParser,
-};
+use clap::builder::PossibleValuesParser;
 use clap::{Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _};
 use real_base::real;
 use serde::{Deserialize, Serialize};
@@ -9,6 +6,8 @@ use serde_json;
 
 use serde_json::{Map, Value};
 use wasm_bindgen::JsValue;
+
+use wasm_bindgen::prelude::*;
 
 const DEFAULT_ID_PATH: &str = ".hopr-identity";
 
@@ -33,6 +32,18 @@ pub struct ProtocolConfigFile {
 
 #[derive(Serialize, Args)]
 struct CliArgs {
+    // Filled by Builder API at runtime
+    #[arg(skip)]
+    environment: String,
+
+    // Filled by Builder API at runtime
+    #[arg(skip)]
+    identity: String,
+    
+    // Filled by Builder API at runtime
+    #[arg(skip)]
+    data: String,
+
     #[arg(
         long, 
         default_value_t = false, 
@@ -266,6 +277,14 @@ struct CliArgs {
     network_quality_threshold: f32,
 }
 
+impl CliArgs {
+    fn augment_runtime_args(&mut self, m: &ArgMatches) {
+        self.environment = m.get_one::<String>("environment").unwrap().to_owned();
+        self.data = m.get_one::<String>("data").unwrap().to_owned();
+        self.identity = m.get_one::<String>("identity").unwrap().to_owned();
+    }
+}
+
 #[derive(serde::Deserialize)]
 struct PackageJsonFile {
     version: String,
@@ -298,11 +317,16 @@ struct DefaultEnvironmentFile {
     id: String,
 }
 
-fn get_default_environment(path: String) -> Result<String, JsValue> {
-    let data = real::read_file(&path)?;
+fn get_default_environment(path: String) -> Result<Option<String>, JsValue> {
+    let data = match real::read_file(&path) {
+        Ok(data) => data,
+        // File only exists in containers,
+        // so nothing to worry if file cannot be read
+        Err(_) => return Ok(None)
+    };
 
     match serde_json::from_slice::<DefaultEnvironmentFile>(&data) {
-        Ok(json) => Ok(json.id),
+        Ok(json) => Ok(Some(json.id)),
         Err(e) => Err(JsValue::from(e.to_string())),
     }
 }
@@ -310,65 +334,57 @@ fn get_default_environment(path: String) -> Result<String, JsValue> {
 pub fn parse_cli_arguments(cli_args: Vec<&str>) -> Result<JsValue, JsValue> {
     let envs: Vec<String> = get_environments(String::from("./packages/core/protocol-config.json"))?;
 
-    let version = get_package_version(String::from("./package.json"))?;
+    let version = get_package_version(String::from("./packages/hoprd/package.json"))?;
 
-    let default_environment = get_default_environment(String::from("../default-environment.json"))?;
+    let maybe_default_environment = get_default_environment(String::from("../default-environment.json"))?;
 
     let mut default_data_path = String::from("hoprd-db");
-    default_data_path.push_str(default_environment.as_str());
 
-    let cmd = Command::new("hoprd")
-    .after_help("All CLI options can be configured through environment variables as well. CLI parameters have precedence over environment variables.")
+    let mut env_arg = Arg::new("environment")
+        .long("environment")
+        .required(true)
+        .env("HOPRD_ENVIRONMENT")
+        .value_name("ENVIRONMENT")
+        .help("Environment id which the node shall run on")
+        .value_parser(PossibleValuesParser::new(envs));
+
+    if let Some(default_environment) = maybe_default_environment {
+        default_data_path.push_str(default_environment.as_str());
+
+        env_arg = env_arg.default_value(default_environment);
+    }
+
+    let mut cmd = Command::new("hoprd")
+        .about("HOPRd")
+        .bin_name("index.cjs")
         .version(&version)
-
-        .arg(
-            Arg::new("environment")
-                .long("environment")
-                .required(true)
-                .env("HOPRD_ENVIRONMENT")
-                .value_name("ENVIRONMENT")
-                .help("Environment id which the node shall run on")
-                .value_parser(PossibleValuesParser::new(envs)))
-        
+        .arg(env_arg)
         .arg(Arg::new("identity")
-                .long("identity")
-                .help("The path to the identity file")
-                .env("HOPRD_IDENTITY")
-                .default_value(DEFAULT_ID_PATH))
+            .long("identity")
+            .help("The path to the identity file")
+            .env("HOPRD_IDENTITY")
+            .default_value(DEFAULT_ID_PATH))
         .arg(Arg::new("data")
-                .long("data")
-                .help("manually specify the data directory to use")
-                .env("HOPRD_DATA")
-                .default_value(&default_data_path));
+            .long("data")
+            .help("manually specify the data directory to use")
+            .env("HOPRD_DATA")
+            .default_value(&default_data_path));
 
-        
+    cmd = CliArgs::augment_args(cmd);
 
-    // CliArgs::from_arg_matches(&cmd.try_get_matches_from(cli_args).unwrap());
+    let derived_matches = match cmd.try_get_matches_from(cli_args) {
+        Ok(matches) => matches,
+        Err(e) => return Err(JsValue::from(e.to_string()))
+    };
 
-    // let args = match cmd.try_get_matches_from(cli_args) {
-    //     Ok(matches) => CliArgs::from(matches),
-    //     Err(e) => return Err(JsValue::from(e.to_string())),
-    // };
+    let mut args = CliArgs::from_arg_matches(&derived_matches).unwrap();
 
-    // match serde_wasm_bindgen::to_value(&args) {
-    //     Ok(s) => Ok(s),
-    //     Err(e) => Err(JsValue::from(e.to_string())),
-    // }
-    // Args::try_update_from(
-    //     ,
-    //     cli_args,
-    // );
+    args.augment_runtime_args(&derived_matches);
 
-    // real::read_file("../package.json")
-    // .map(|data| {
-    //     serde_json::from_slice::<PackageJsonFile>(data)
-    //         .map(|json| json.version)
-    //         .map_err(|e| JsValue::from(e))
-    // })
-    // .map_err(|e| JsValue::from(e))
-
-    // serde_json::from_slice(&data)
-    Ok(JsValue::from("foo"))
+    match serde_wasm_bindgen::to_value(&args) {
+        Ok(s) => Ok(s),
+        Err(e) => Err(JsValue::from(e.to_string())),
+    }
 }
 
 pub mod wasm {
