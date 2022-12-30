@@ -44,6 +44,7 @@ services:
       - '--healthCheck'
       - '--healthCheckHost'
       - '0.0.0.0'
+# TODO: Add ${HOPRD_ANNOUNCE}
 
     volumes:
       - hoprd_data:/app/hoprd-db
