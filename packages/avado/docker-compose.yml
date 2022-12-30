@@ -38,7 +38,7 @@ services:
         'HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS=false',
         'HOPRD_PROVIDER=%PROVIDER_URL%'
       ]
-    'ports': ['3000:3000/tcp', '3001:3001/tcp', '8080:8080/tcp', '9091:9091/tcp', '9091:9091/udp']
+    'ports': ['3000:3000/tcp', '30030:3030/tcp', '3001:3001/tcp', '8080:8080/tcp', '9091:9091/tcp', '9091:9091/udp']
     'deploy': { 'resources': { 'limits': { 'memory': '1G' } } }
     'restart': 'always'
     #}
