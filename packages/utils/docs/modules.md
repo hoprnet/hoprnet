@@ -149,6 +149,7 @@
 - [ipToU8aAddress](modules.md#iptou8aaddress)
 - [isAddressWithPeerId](modules.md#isaddresswithpeerid)
 - [isAnyAddress](modules.md#isanyaddress)
+- [isAvadoPrivateNetwork](modules.md#isavadoprivatenetwork)
 - [isErrorOutOfFunds](modules.md#iserroroutoffunds)
 - [isErrorOutOfHoprFunds](modules.md#iserroroutofhoprfunds)
 - [isErrorOutOfNativeFunds](modules.md#iserroroutofnativefunds)
@@ -1756,6 +1757,26 @@ Checks if given address is any address
 
 ___
 
+### isAvadoPrivateNetwork
+
+▸ **isAvadoPrivateNetwork**(`address`, `family`): `boolean`
+
+Checks if given address is in internally network of
+Dappnode or AVADO based nodes.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `address` | `Uint8Array` |
+| `family` | ``"IPv4"`` \| ``"IPv6"`` |
+
+#### Returns
+
+`boolean`
+
+___
+
 ### isErrorOutOfFunds
 
 ▸ **isErrorOutOfFunds**(`error`): ``"NATIVE"`` \| ``"HOPR"`` \| ``false``
@@ -2508,7 +2529,7 @@ Repeatedly apply a function after a timeout
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `fn` | () => `void` | function to apply after every timeout |
+| `fn` | () => `void` \| `Promise`<`void`\> | function to apply after every timeout |
 | `newTimeout` | () => `number` | function that returns the new timeout |
 
 #### Returns

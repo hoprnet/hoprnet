@@ -84,12 +84,11 @@
 | `onChainConfirmations?` | `number` |
 | `password?` | `string` |
 | `strategy?` | [`ChannelStrategyInterface`](interfaces/ChannelStrategyInterface.md) |
-| `testing?` | { `announceLocalAddresses?`: `boolean` ; `mockedDHT?`: `Map`<`string`, `string`[]\> ; `mockedNetwork?`: `Libp2pEmitter`<`any`\> ; `noDirectConnections?`: `boolean` ; `noUPNP?`: `boolean` ; `noWebRTCUpgrade?`: `boolean` ; `preferLocalAddresses?`: `boolean` ; `useMockedLibp2p?`: `boolean`  } |
+| `testing?` | { `announceLocalAddresses?`: `boolean` ; `mockedDHT?`: `Map`<`string`, `string`[]\> ; `mockedNetwork?`: `Libp2pEmitter`<`any`\> ; `noDirectConnections?`: `boolean` ; `noWebRTCUpgrade?`: `boolean` ; `preferLocalAddresses?`: `boolean` ; `useMockedLibp2p?`: `boolean`  } |
 | `testing.announceLocalAddresses?` | `boolean` |
 | `testing.mockedDHT?` | `Map`<`string`, `string`[]\> |
 | `testing.mockedNetwork?` | `Libp2pEmitter`<`any`\> |
 | `testing.noDirectConnections?` | `boolean` |
-| `testing.noUPNP?` | `boolean` |
 | `testing.noWebRTCUpgrade?` | `boolean` |
 | `testing.preferLocalAddresses?` | `boolean` |
 | `testing.useMockedLibp2p?` | `boolean` |
@@ -106,7 +105,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:150](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L150)
+[packages/core/src/index.ts:146](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L146)
 
 ___
 
@@ -142,7 +141,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:165](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L165)
+[packages/core/src/index.ts:161](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L161)
 
 ___
 
@@ -169,7 +168,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:152](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L152)
+[packages/core/src/index.ts:148](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L148)
 
 ## Variables
 
