@@ -36,9 +36,9 @@ contract HoprStakeBaseTest is Test, ERC1820RegistryFixtureTest {
     super.setUp();
 
     newOwner = vm.addr(100); // make address(100) new owner
-    nftAddress = vm.addr(101); // mock _nftAddress with vm.addr(2)
-    lockToken = vm.addr(102); // mock _lockToken with vm.addr(3)
-    rewardToken = vm.addr(103); // mock _rewardToken with vm.addr(4)
+    nftAddress = vm.addr(101); // mock _nftAddress with vm.addr(101)
+    lockToken = vm.addr(102); // mock _lockToken with vm.addr(102)
+    rewardToken = vm.addr(103); // mock _rewardToken with vm.addr(103)
 
     programStart = uint256(block.timestamp); // mock _programStart with block.timestamp
     programEnd = programStart + 3000; // mock _programEnd with block.timestamp + 3000
