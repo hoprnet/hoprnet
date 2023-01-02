@@ -103,7 +103,7 @@ foundryup --version nightly-64cbdd183e0aae99eb1be507196b6b5d640b3801
 - lib/openzeppelin-contracts-v3-0-1/contracts/utils/Address.sol (^0.6.2) -->
 
 6. Remove "PermittableToken.sol" from source code as it prevents coverage engine from working. Possibly because its required compiler version is 0.4.x This contract is only used when testing "HoprWrapper" contract. TODO: use a different approach to test "HoprWrapper"
-7. Moved `src/mock` to `test/mock` folder, and adapt the relative path used in "HoprWhitehat.sol"
+7. Moved `src/mock` to `test/mock` folder, and adapt the relative path used in "HoprWhitehat.sol". Remove `ERC20Mock.sol`, `ERC721Mock.sol`, `ERC777SenderRecipientMock.sol` contracts
 8. To move faster on the rest of toolchain upgrade, only tests for "HoprToken" contract is fully migrated. Tests for "HoprChannels" is halfway through. TODO: complete tests for the following contracts:
 
 ```

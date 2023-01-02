@@ -565,7 +565,6 @@ contract HoprStakeBaseTest is Test, ERC1820RegistryFixtureTest {
     vm.expectEmit(true, true, false, false, address(hoprStakeBase));
     emit Released(accounts[0], actualLocked); // token of id 1 has the sanme type and rank as token 0
     hoprStakeBase.unlockFor(accounts[0]);
-    vm.clearMockedCalls();
 
     // for another account
     vm.assume(account != accounts[0]);
