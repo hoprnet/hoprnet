@@ -309,8 +309,6 @@ contract HoprStakeBaseTest is Test, ERC1820RegistryFixtureTest {
     // after some time elapsed
     skip(elapsedTime);
 
-    // get the cumulated rewards
-    uint256 rewardToClaim = hoprStakeBase.getCumulatedRewardsIncrement(accounts[0]);
     vm.expectRevert('HoprStake: Insufficient reward pool.');
     hoprStakeBase.claimRewards(accounts[0]);
     vm.clearMockedCalls();
@@ -526,14 +524,11 @@ contract HoprStakeBaseTest is Test, ERC1820RegistryFixtureTest {
     _helperAccountsStakeTokensNFTsProvideRewards();
     // advance block timestamp to the end of this staking season
     vm.warp(hoprStakeBase.PROGRAM_END() + 1);
-    uint256 snapshotId = vm.snapshot();
 
     // for account[0]
     // check the amount of rewards
     hoprStakeBase.sync(accounts[0]);
-    (uint256 actualLocked, uint256 lastSync, uint256 cumulatedRewards, uint256 claimedRewards) = hoprStakeBase.accounts(
-      accounts[0]
-    );
+    (uint256 actualLocked, , uint256 cumulatedRewards, uint256 claimedRewards) = hoprStakeBase.accounts(accounts[0]);
     // mock the transfer of reward tokens
     vm.mockCall(
       rewardToken,

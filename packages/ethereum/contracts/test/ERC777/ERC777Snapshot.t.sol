@@ -98,7 +98,7 @@ contract ERC777SnapshotTest is Test, ERC1820RegistryFixtureTest {
    * snapshots return the supply before and after the changes
    * all posterior snapshots return the supply after the changes
    */
-  function test_TotalSupplyAtWithSupplyChanges(address otherRecipient) public {
+  function test_TotalSupplyAtWithSupplyChanges() public {
     vm.roll(5);
     erc777SnapshotMock.mint(OTHER_RECIPIENT, 5 ether, hex'00', hex'00');
     vm.roll(6);
@@ -120,7 +120,7 @@ contract ERC777SnapshotTest is Test, ERC1820RegistryFixtureTest {
   /**
    * @dev balanceOfAt
    */
-  function test_BalanceOfAtWithSupplyChanges(address otherRecipient) public {
+  function test_BalanceOfAtWithSupplyChanges() public {
     // it should return 0 at block 0
     assertEq(erc777SnapshotMock.balanceOfAt(INITIAL_HOLDER, 0), 0);
     // it should return latest balance at block number after creation
