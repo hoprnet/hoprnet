@@ -29,6 +29,8 @@
 - Reimplement stream handling `class`es with `function`s in `connect` package for better performance ([#4285](https://github.com/hoprnet/hoprnet/pull/4285))
 - Fix ticket redemption mechanism & acknowledged ticket fix in the DB ([#4437](https://github.com/hoprnet/hoprnet/pull/4437))
 - Pluto: Fix initialization of channels once the cluster has started up ([#4436](https://github.com/hoprnet/hoprnet/pull/4436))
+- Fix DAppnode / AVADO announcing internal container addresses ([#4467](https://github.com/hoprnet/hoprnet/pull/4467))
+- Fix STUN functionality, enhance it to check if host is exposed and a keep-alive mechanism to keep NAT port mapping ([#4401](https://github.com/hoprnet/hoprnet/pull/4401))
 
 ---
 
