@@ -27,25 +27,18 @@ services:
     environment:
       - DEBUG=hopr*
       - GCLOUD=1
-    command:
-      - '--data'
-      - '/app/hoprd-db'
-      - '--password'
-      - '${HOPRD_PASSWORD}'
-      - '--init'
-      - '--api'
-      - '--apiHost'
-      - '0.0.0.0'
-      - '--identity'
-      - '/app/hoprd-db/.hopr-id'
-      - '--disableApiAuthentication'
-      - '--environment'
-      - '${HOPRD_ENVIRONMENT_ID}'
-      - '--healthCheck'
-      - '--healthCheckHost'
-      - '0.0.0.0'
-      - '--announce'
-      - '${HOPRD_ANNOUNCE}'
+    command: |
+      --data /app/hoprd-db
+      --password ${HOPRD_PASSWORD}
+      --init
+      --api
+      --apiHost 0.0.0.0
+      --identity /app/hoprd-db/.hopr-id
+      --disableApiAuthentication
+      --environment ${HOPRD_ENVIRONMENT_ID}
+      --healthCheck
+      --healthCheckHost 0.0.0.0
+      --announce ${HOPRD_ANNOUNCE}
 
     volumes:
       - hoprd_data:/app/hoprd-db
