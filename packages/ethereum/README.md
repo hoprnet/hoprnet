@@ -115,12 +115,12 @@ foundryup --version nightly-64cbdd183e0aae99eb1be507196b6b5d640b3801
 | |____HoprStakeSeason5.t.sol // <- skip this as this contract is archived
 | |____HoprWhitehat.t.sol // <- skip this as this contract is archived
 |____HoprForwarder.t.sol // <- skip this as this contract is deprecated. Multisig can register implementation to receive ERC777 tokens
-|____HoprWrapper.t.sol
 ```
 
 Notes on Test cases:
 
 - `testFail_ExceedMaxMint` in `packages/ethereum/contracts/test/HoprDistributor.t.sol` should have been `testRevert_ExceedMaxMint`. However, foundry has trouble catching uint128 overflow.
+- After the update of Permittable token, it's possible to wrap tokens with "transfer" (Regarding `test_CanAlsoWrapWithTransfer` case in `HoprWrapper.t.sol`)
 
 5. Temporarily skipped deployment scripts for
 
