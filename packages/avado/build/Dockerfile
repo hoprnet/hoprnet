@@ -1,13 +1,37 @@
 ARG UPSTREAM_VERSION
+ARG HOPR_ADMIN_VERSION=07aec21b
+ARG PROMETHEUS_VERSION=2.32.0
+ARG GRAFANA_VERSION=8.1.8
 
-FROM gcr.io/hoprassociation/hopr-admin:07aec21b as hopr-admin
+FROM gcr.io/hoprassociation/hopr-admin:${HOPR_ADMIN_VERSION} as hopr-admin
+
+# Arguments have to be repeated for each image build stage
+ARG UPSTREAM_VERSION
+ARG PROMETHEUS_VERSION
+ARG GRAFANA_VERSION
 
 FROM gcr.io/hoprassociation/hoprd:${UPSTREAM_VERSION}
 
-RUN apk add --no-cache --purge -uU supervisor && \
-    rm -rf /var/cache/apk/* /tmp/*
+# Arguments have to be repeated for each image build stage
+ARG PROMETHEUS_VERSION
+ARG GRAFANA_VERSION
 
 ENV AVADO=true
+
+WORKDIR /opt
+ADD https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS_VERSION}/prometheus-${PROMETHEUS_VERSION}.linux-amd64.tar.gz prometheus.tar.gz
+RUN tar xzf prometheus.tar.gz && rm prometheus.tar.gz && mv prometheus* prometheus
+RUN mkdir /opt/prometheus/data
+
+ADD https://dl.grafana.com/oss/release/grafana-${GRAFANA_VERSION}.linux-amd64.tar.gz grafana.tar.gz
+RUN tar xzf grafana.tar.gz && rm grafana.tar.gz && mv grafana* grafana
+
+COPY grafana/ /etc/grafana/
+COPY prometheus/ /etc/prometheus/
+WORKDIR /app/hoprnet/packages/hoprd
+
+RUN apk add --no-cache --purge -uU supervisor && \
+    rm -rf /var/cache/apk/* /tmp/*
 
 COPY supervisord.conf /etc/supervisord.conf
 

@@ -27,6 +27,7 @@
   - [Install via Nix package manager](#install-via-nix-package-manager)
 - [Using](#using)
   - [Using Docker](#using-docker)
+  - [Using Docker Compose with extended monitoring](#using-docker-compose-with-extended-hopr-node-monitoring)
   - [Using NPM](#using-npm)
 - [Testnet accessibility](#testnet-accessibility)
 - [Migrating between releases](#migrating-between-releases)
@@ -197,6 +198,23 @@ hoprd
                                               # each release has a default environment id set, but the user can override this value
                                               # nodes from different environments are **not able** to communicate
 ```
+
+### Using Docker Compose with extended HOPR node monitoring
+
+There is an optional Docker Compose setup that can be used to run the above Docker image with HOPRd and also
+have an extended monitoring of the HOPR node's activity (using Prometheus + Grafana dashboard).
+
+To startup a HOPRd node with monitoring, you can use the following command:
+
+```shell
+docker compose --env-file scripts/compose/default.env --file scripts/compose/docker-compose.yaml up -d
+```
+
+The configuration of the HOPRd node can be changed in the `scripts/compose/default.env` file.
+
+Once the configuration starts up, the HOPRd Admin UI is accessible as usual via `localhost:3000`. The Grafana instance is
+accessible via `localhost:3030` and is provisioned with a dashboard that contains useful metrics and information
+about the HOPR network as percieved from your node plus some additional runtime information.
 
 ### Using NPM
 

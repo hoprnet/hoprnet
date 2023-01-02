@@ -9,6 +9,9 @@ services:
       context: ./build
       args:
         UPSTREAM_VERSION: '%UPSTREAM_VERSION%'
+        PROMETHEUS_VERSION: 2.30.0
+        GRAFANA_VERSION: 8.1.8
+        HOPR_ADMIN_VERSION: 07aec21b
     # Lines between *_JSON_EXPORT are intentionally also a valid JSON
     # Info: a hoprd node should never consume more than 1GByte of memory
     # DO NOT REMOVE
@@ -28,6 +31,7 @@ services:
         'HOPRD_HEALTH_CHECK_HOST=0.0.0.0',
         'HOPRD_HEALTH_CHECK_PORT=8080',
         'HOPRD_PASSWORD=open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0',
+        'HOPRD_API_TOKEN=',
         'HOPRD_DISABLE_API_AUTHENTICATION=true',
         'HOPRD_IDENTITY=/app/hoprd-db/.hopr-identity',
         'HOPRD_DATA=/app/hoprd-db/data-%ENV_ID%',
@@ -35,7 +39,7 @@ services:
         'HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS=false',
         'HOPRD_PROVIDER=%PROVIDER_URL%'
       ]
-    'ports': ['3000:3000/tcp', '3001:3001/tcp', '8080:8080/tcp', '9091:9091/tcp', '9091:9091/udp']
+    'ports': ['3000:3000/tcp', '3030:3030/tcp', '3001:3001/tcp', '8080:8080/tcp', '9091:9091/tcp', '9091:9091/udp']
     'deploy': { 'resources': { 'limits': { 'memory': '1G' } } }
     'restart': 'always'
     #}
