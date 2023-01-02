@@ -37,7 +37,7 @@ contract HoprWrapperProxy is IERC777Recipient {
   /**
    * @dev register this contract to ERC1820 registry
    */
-  constructor() public {
+  constructor() {
     ERC1820_REGISTRY.setInterfaceImplementer(address(this), TOKENS_RECIPIENT_INTERFACE_HASH, address(this));
   }
 

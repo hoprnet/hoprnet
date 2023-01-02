@@ -59,7 +59,7 @@ $(FOUNDRY_TOOL_CRATE): ## builds foundry-tool Rust crates with cargo
 	echo "use cargo build"
 	cargo build --manifest-path $@/Cargo.toml
 # install the package
-	cargo install --path $@
+	cargo install --path $@ --force
 
 .PHONY: $(WORKSPACES_WITH_RUST_MODULES)
 $(WORKSPACES_WITH_RUST_MODULES): ## builds all WebAssembly modules

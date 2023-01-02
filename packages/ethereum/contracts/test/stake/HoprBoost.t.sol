@@ -43,7 +43,7 @@ contract HoprBoostTest is Test {
   /**
    * @dev the contract is created with many correct parameters
    */
-  function test_RightParameters(uint256 typeIndex) public {
+  function test_RightParameters() public {
     assertEq(hoprBoost.name(), 'HOPR Boost NFT');
     assertEq(hoprBoost.symbol(), 'HOPR Boost');
     assertEq(hoprBoost.totalSupply(), 0);
