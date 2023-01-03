@@ -55,7 +55,7 @@ contract EnvironmentConfig is Script {
     currentEnvironmentType = parseEnvironmentTypeFromString(profile);
   }
 
-  function readEnvironment(string memory _environmentName) internal returns (EnvironmentDetail memory envDetail) {
+  function readEnvironment(string memory _environmentName) internal view returns (EnvironmentDetail memory envDetail) {
     string memory json = vm.readFile(pathToDeploymentFile);
     bytes memory levelToEnvironmentConfig = abi.encodePacked('.environments.', _environmentName);
 

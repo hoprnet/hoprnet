@@ -223,7 +223,6 @@ contract HoprStakeBase is Ownable, IERC777Recipient, IERC721Receiver, Reentrancy
   function onTokenTransfer(
     address _from,
     uint256 _value,
-    // solhint-disable-next-line no-unused-vars
     bytes memory _data
   ) external returns (bool) {
     require(msg.sender == LOCK_TOKEN, 'HoprStake: Only accept LOCK_TOKEN in staking');
@@ -247,14 +246,11 @@ contract HoprStakeBase is Ownable, IERC777Recipient, IERC721Receiver, Reentrancy
    * @param operatorData bytes extra information provided by the operator (if any)
    */
   function tokensReceived(
-    // solhint-disable-next-line no-unused-vars
     address operator,
     address from,
     address to,
     uint256 amount,
-    // solhint-disable-next-line no-unused-vars
     bytes calldata userData,
-    // solhint-disable-next-line no-unused-vars
     bytes calldata operatorData
   ) external override {
     require(msg.sender == REWARD_TOKEN, 'HoprStake: Sender must be wxHOPR token');
@@ -274,11 +270,9 @@ contract HoprStakeBase is Ownable, IERC777Recipient, IERC721Receiver, Reentrancy
    * @param data bytes hex information provided by the token holder (if any)
    */
   function onERC721Received(
-    // solhint-disable-next-line no-unused-vars
     address operator,
     address from,
     uint256 tokenId,
-    // solhint-disable-next-line no-unused-vars
     bytes calldata data
   ) external override returns (bytes4) {
     require(_msgSender() == address(NFT_CONTRACT), 'HoprStake: Cannot SafeTransferFrom tokens other than HoprBoost.');
@@ -303,7 +297,7 @@ contract HoprStakeBase is Ownable, IERC777Recipient, IERC721Receiver, Reentrancy
       uint256 redeemedIndex = NFT_CONTRACT.typeIndexOf(redeemedId);
       (uint256 redeemedFactorValue, ) = NFT_CONTRACT.boostOf(redeemedId);
 
-      if (NFT_CONTRACT.typeIndexOf(redeemedId) == typeId) {
+      if (redeemedIndex == typeId) {
         if (redeemedFactorValue < factor) {
           redeemedFactor[from][index] = tokenId;
         }

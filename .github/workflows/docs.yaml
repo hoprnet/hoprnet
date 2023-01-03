@@ -20,12 +20,34 @@ jobs:
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
 
-      - name: Use Node.js
-        uses: actions/setup-node@v3
+      - name: install toolchain
+        run: ./scripts/toolchain/install-toolchain.sh
+
+      - name: get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
+
+      - name: restore yarn cache
+        uses: actions/cache@v3
+        id: yarn-cache
         with:
-          node-version: 16
-          registry-url: https://registry.npmjs.org/
-          cache: yarn
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
+      - name: restore cargo cache
+        uses: actions/cache@v3
+        with:
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+            .cargo/.package-cache/
+            .cargo/bin/
 
       - name: Install tools (only when using ACT)
         if: ${{ env.ACT == 'true' }}
@@ -37,6 +59,8 @@ jobs:
         run: |
           make -j deps-ci
           make -j build-docs
+        env:
+          DEPLOYER_PRIVATE_KEY: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
       - name: Format newly created files
         run: make lint-fix

@@ -2883,6 +2883,39 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@hoprnet/avadosdk@npm:0.4.4-rc.1":
+  version: 0.4.4-rc.1
+  resolution: "@hoprnet/avadosdk@npm:0.4.4-rc.1"
+  dependencies:
+    "@dappnode/dnp-manifest": ^0.0.4
+    "@octokit/rest": ^16.27.3
+    async-retry: ^1.2.3
+    chalk: ^2.4.2
+    ethjs: ^0.4.0
+    ethjs-abi: ^0.2.1
+    ethjs-ens: ^2.0.1
+    ethjs-util: ^0.1.6
+    execa: ^1.0.0
+    figlet: ^1.2.3
+    form-data: ^3.0.0
+    got: ^10.5.5
+    image-size: ^0.8.1
+    inquirer: ^6.2.1
+    ipfs-http-client: ^49.0.4
+    js-yaml: ^3.12.1
+    listr: ^0.14.3
+    lodash: ^4.17.15
+    mime-types: ^2.1.24
+    semver: ^5.6.0
+    tar-fs: ^2.0.0
+    timestring: ^5.0.1
+    yargs: ^13.2.4
+  bin:
+    avadosdk: src/avadosdk.js
+  checksum: f8a6735eafe94dc6e0bbb13cbfe94f6707c0f55f4011a85b43d0775a3351e1d848ed07f151baa7d0c3b8d21a97ac8c97b659165645cd228021a0afa110852ee4
+  languageName: node
+  linkType: hard
+
 "@hoprnet/hopr-connect@workspace:packages/connect":
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-connect@workspace:packages/connect"
@@ -6135,39 +6168,6 @@ __metadata:
   bin:
     autoprefixer: bin/autoprefixer
   checksum: dcb1cb7ae96a3363d65d82e52f9a0a7d8c982256f6fd032d7e1ec311f099c23acfebfd517ff8e96bf93f716a66c4ea2b80c60aa19efd2f474ce434bd75ef7b79
-  languageName: node
-  linkType: hard
-
-"avadosdk@git+https://github.com/avadodserver/avadosdk.git#7b035be69754a9410d14e0e1d50d88bcd4c143fa":
-  version: 0.4.3
-  resolution: "avadosdk@https://github.com/avadodserver/avadosdk.git#commit=7b035be69754a9410d14e0e1d50d88bcd4c143fa"
-  dependencies:
-    "@dappnode/dnp-manifest": ^0.0.4
-    "@octokit/rest": ^16.27.3
-    async-retry: ^1.2.3
-    chalk: ^2.4.2
-    ethjs: ^0.4.0
-    ethjs-abi: ^0.2.1
-    ethjs-ens: ^2.0.1
-    ethjs-util: ^0.1.6
-    execa: ^1.0.0
-    figlet: ^1.2.3
-    form-data: ^3.0.0
-    got: ^10.5.5
-    image-size: ^0.8.1
-    inquirer: ^6.2.1
-    ipfs-http-client: ^49.0.4
-    js-yaml: ^3.12.1
-    listr: ^0.14.3
-    lodash: ^4.17.15
-    mime-types: ^2.1.24
-    semver: ^5.6.0
-    tar-fs: ^2.0.0
-    timestring: ^5.0.1
-    yargs: ^13.2.4
-  bin:
-    avadosdk: ./src/avadosdk.js
-  checksum: 2553932a8536a91650de8379b4c81a24da21dd3061ae0519efd834fa62547ce3a3da19918f8db5b355f0d5898aded3f64f93e85d527271409ddf2074e5f9b945
   languageName: node
   linkType: hard
 
@@ -10260,9 +10260,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"fsevents@patch:fsevents@~2.1.1#~builtin<compat/fsevents>":
+  version: 2.1.3
+  resolution: "fsevents@patch:fsevents@npm%3A2.1.3#~builtin<compat/fsevents>::version=2.1.3&hash=31d12a"
+  dependencies:
+    node-gyp: latest
+  conditions: os=darwin
+  languageName: node
+  linkType: hard
+
 "fsevents@patch:fsevents@~2.3.2#~builtin<compat/fsevents>":
   version: 2.3.2
-  resolution: "fsevents@patch:fsevents@npm%3A2.3.2#~builtin<compat/fsevents>::version=2.3.2&hash=18f3a7"
+  resolution: "fsevents@patch:fsevents@npm%3A2.3.2#~builtin<compat/fsevents>::version=2.3.2&hash=df0bf1"
   dependencies:
     node-gyp: latest
   conditions: os=darwin
@@ -11134,8 +11143,8 @@ __metadata:
   resolution: "hoprnet@workspace:."
   dependencies:
     "@ethersproject/cli": 5.7.0
+    "@hoprnet/avadosdk": 0.4.4-rc.1
     "@types/node": 16
-    avadosdk: "git+https://github.com/avadodserver/avadosdk.git#7b035be69754a9410d14e0e1d50d88bcd4c143fa"
     prettier: 2.7.1
     ts-node: 10.9.1
     typescript: 4.8.4
@@ -17707,9 +17716,25 @@ __metadata:
   languageName: node
   linkType: hard
 
-"resolve@patch:resolve@^1.1.6#~builtin<compat/resolve>, resolve@patch:resolve@^1.14.2#~builtin<compat/resolve>, resolve@patch:resolve@^1.3.2#~builtin<compat/resolve>":
+"resolve@patch:resolve@1.1.x#~builtin<compat/resolve>":
+  version: 1.1.7
+  resolution: "resolve@patch:resolve@npm%3A1.1.7#~builtin<compat/resolve>::version=1.1.7&hash=3bafbf"
+  checksum: e9dbca78600ae56835c43a09f1276876c883e4b4bbd43e2683fa140671519d2bdebeb1c1576ca87c8c508ae2987b3ec481645ac5d3054b0f23254cfc1ce49942
+  languageName: node
+  linkType: hard
+
+"resolve@patch:resolve@1.17.0#~builtin<compat/resolve>":
+  version: 1.17.0
+  resolution: "resolve@patch:resolve@npm%3A1.17.0#~builtin<compat/resolve>::version=1.17.0&hash=c3c19d"
+  dependencies:
+    path-parse: ^1.0.6
+  checksum: 6fd799f282ddf078c4bc20ce863e3af01fa8cb218f0658d9162c57161a2dbafe092b13015b9a4c58d0e1e801cf7aa7a4f13115fea9db98c3f9a0c43e429bad6f
+  languageName: node
+  linkType: hard
+
+"resolve@patch:resolve@^1.1.6#~builtin<compat/resolve>, resolve@patch:resolve@^1.10.0#~builtin<compat/resolve>, resolve@patch:resolve@^1.14.2#~builtin<compat/resolve>, resolve@patch:resolve@^1.3.2#~builtin<compat/resolve>, resolve@patch:resolve@^1.8.1#~builtin<compat/resolve>":
   version: 1.22.1
-  resolution: "resolve@patch:resolve@npm%3A1.22.1#~builtin<compat/resolve>::version=1.22.1&hash=07638b"
+  resolution: "resolve@patch:resolve@npm%3A1.22.1#~builtin<compat/resolve>::version=1.22.1&hash=c3c19d"
   dependencies:
     is-core-module: ^2.9.0
     path-parse: ^1.0.7
@@ -19816,11 +19841,11 @@ __metadata:
 
 "typescript@patch:typescript@4.8.4#~builtin<compat/typescript>":
   version: 4.8.4
-  resolution: "typescript@patch:typescript@npm%3A4.8.4#~builtin<compat/typescript>::version=4.8.4&hash=7ad353"
+  resolution: "typescript@patch:typescript@npm%3A4.8.4#~builtin<compat/typescript>::version=4.8.4&hash=0102e9"
   bin:
     tsc: bin/tsc
     tsserver: bin/tsserver
-  checksum: 563a0ef47abae6df27a9a3ab38f75fc681f633ccf1a3502b1108e252e187787893de689220f4544aaf95a371a4eb3141e4a337deb9895de5ac3c1ca76430e5f0
+  checksum: 301459fc3eb3b1a38fe91bf96d98eb55da88a9cb17b4ef80b4d105d620f4d547ba776cc27b44cc2ef58b66eda23fe0a74142feb5e79a6fb99f54fc018a696afa
   languageName: node
   linkType: hard
 

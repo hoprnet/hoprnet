@@ -22,9 +22,26 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: install toolchain
+        run: ./scripts/toolchain/install-toolchain.sh
+
+      - name: get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
+
+      - name: restore yarn cache
+        uses: actions/cache@v3
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
       - name: restore cargo cache
         uses: actions/cache@v3
         with:
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
           path: |
             ~/.cargo/bin/
             ~/.cargo/registry/index/
@@ -34,7 +51,6 @@ jobs:
             .cargo/.package-cache/
             .cargo/bin/
             .foundry/bin/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
 
       - name: Install dependencies
         run: make -j deps-ci

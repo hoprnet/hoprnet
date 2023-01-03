@@ -34,3 +34,5 @@ We have compiled a list of comparisons ([v3.0.1](https://github.com/OpenZeppelin
 - math/SafeMath.sol [diff](https://github.com/OpenZeppelin/openzeppelin-contracts/compare/v3.0.1...3b4c951838ddf82f4d2b44ae7c967f0573039f28#diff-2756602dafa80f54b5620a9c18731eb09dc0b9dcd849bb30f47b7474956cb1e1): various changes
 - utils/Address.sol [diff](https://github.com/OpenZeppelin/openzeppelin-contracts/compare/v3.0.1...3b4c951838ddf82f4d2b44ae7c967f0573039f28#diff-3723538f11e9073477613a08f0f092e286fcab832b33b66b4a3d8f153cbe4c34): various changes
 - introspection/IERC1820Registry.sol [diff](https://github.com/OpenZeppelin/openzeppelin-contracts/compare/v3.0.1...3b4c951838ddf82f4d2b44ae7c967f0573039f28#diff-276e7e904e538a49c660974feafa69634d150cdccd9d7871808cccd288d72456): changed pragma & cosmetic change
+
+Additionally, visibility for the constructor is removed as it is not needed.

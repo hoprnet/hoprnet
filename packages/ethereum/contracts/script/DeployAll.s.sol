@@ -249,9 +249,7 @@ contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryF
     // mint dummy NFTs (1..25)
     for (uint256 index = 1; index < NETWORK_REGISTRY_NFT_INDEX; index++) {
       // boost type is one-based index
-      (bool existAtIndex, string memory nameOrError) = currentEnvironmentDetail
-        .hoprBoostContractAddress
-        .getBoostTypeAtIndex(index);
+      (bool existAtIndex, ) = currentEnvironmentDetail.hoprBoostContractAddress.getBoostTypeAtIndex(index);
       if (existAtIndex) {
         continue;
       } else {
@@ -301,7 +299,7 @@ contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryF
    * By default, it adds `Network_registry` NFT (index. 26) (`developer` and `community`)
    * It's possible to extend this array if more NR NFTs are issued
    */
-  function buildBatchRegisterSpecialNrNft() private returns (bytes memory) {
+  function buildBatchRegisterSpecialNrNft() private pure returns (bytes memory) {
     // "Network_registry" type
     uint256[] memory typeIndex = new uint256[](2);
     typeIndex[0] = 26;
@@ -327,7 +325,7 @@ contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryF
   /**
    * @dev Helper function to build payload for "batchMintInternal(address[],uint256)"
    */
-  function buildXHoprBatchMintInternal(address addr) private returns (bytes memory) {
+  function buildXHoprBatchMintInternal(address addr) private pure returns (bytes memory) {
     address[] memory addrBook = new address[](1);
     addrBook[0] = addr;
 
@@ -339,6 +337,7 @@ contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryF
    */
   function buildNftBatchMintInternal(address addr1, address addr2)
     private
+    pure
     returns (bytes memory devPayload, bytes memory communityPayload)
   {
     address[] memory addrBook = new address[](6);

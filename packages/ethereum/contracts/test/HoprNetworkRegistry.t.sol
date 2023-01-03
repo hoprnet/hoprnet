@@ -5,6 +5,9 @@ import '../src/HoprNetworkRegistry.sol';
 import 'forge-std/Test.sol';
 
 contract HoprNetworkRegistryTest is Test {
+  // to alter the storage
+  using stdStorage for StdStorage;
+
   HoprNetworkRegistry public hoprNetworkRegistry;
   address public proxy;
   address public owner;
@@ -38,22 +41,22 @@ contract HoprNetworkRegistryTest is Test {
 
   function testFuzz_MockProxyReturn() public {
     _helperMockProxyReturns();
-    (bool successRead0, bytes memory returndataAllowance0) = proxy.staticcall(
+    (, bytes memory returndataAllowance0) = proxy.staticcall(
       abi.encodeWithSignature('maxAllowedRegistrations(address)', vm.addr(1))
     );
-    (bool successRead1, bytes memory returndataAllowance1) = proxy.staticcall(
+    (, bytes memory returndataAllowance1) = proxy.staticcall(
       abi.encodeWithSignature('maxAllowedRegistrations(address)', vm.addr(2))
     );
-    (bool successRead2, bytes memory returndataAllowance2) = proxy.staticcall(
+    (, bytes memory returndataAllowance2) = proxy.staticcall(
       abi.encodeWithSignature('maxAllowedRegistrations(address)', vm.addr(3))
     );
-    (bool successRead3, bytes memory returndataAllowance3) = proxy.staticcall(
+    (, bytes memory returndataAllowance3) = proxy.staticcall(
       abi.encodeWithSignature('maxAllowedRegistrations(address)', vm.addr(4))
     );
-    (bool successRead4, bytes memory returndataAllowance4) = proxy.staticcall(
+    (, bytes memory returndataAllowance4) = proxy.staticcall(
       abi.encodeWithSignature('maxAllowedRegistrations(address)', vm.addr(5))
     );
-    (bool successRead5, bytes memory returndataAllowance5) = proxy.staticcall(
+    (, bytes memory returndataAllowance5) = proxy.staticcall(
       abi.encodeWithSignature('maxAllowedRegistrations(address)', vm.addr(6))
     );
     uint256 allowance0 = abi.decode(returndataAllowance0, (uint256));
@@ -494,14 +497,31 @@ contract HoprNetworkRegistryTest is Test {
    * it fails to deregister an non-registered node.
    */
   function testRevert_DeregisterOtherNode() public {
+    _helperMockProxyReturns();
     uint256 accountIndex = 1;
-    string[] memory nodeIds = _helperRegisterOneNode(accountIndex);
     string[] memory nodeAddresses = new string[](1);
     nodeAddresses[0] = HOPR_NODE_ADDRESSES[accountIndex];
 
-    vm.prank(vm.addr(accountIndex));
+    vm.startPrank(vm.addr(accountIndex));
+    // when countRegisterdNodesPerAccount(caller) is smaller than the nodeAddresses array length
+    vm.expectRevert(stdError.arithmeticError);
+    hoprNetworkRegistry.selfDeregister(nodeAddresses);
+
+    // when there are enough registered nodes but none of them matches with the provided nodes
+    vm.store(
+      address(hoprNetworkRegistry),
+      bytes32(
+        stdstore
+          .target(address(hoprNetworkRegistry))
+          .sig('countRegisterdNodesPerAccount(address)')
+          .with_key(vm.addr(accountIndex))
+          .find()
+      ),
+      bytes32(abi.encode(1))
+    );
     vm.expectRevert('HoprNetworkRegistry: Cannot delete an entry not associated with the caller.');
     hoprNetworkRegistry.selfDeregister(nodeAddresses);
+    vm.stopPrank();
     vm.clearMockedCalls();
   }
 
@@ -544,8 +564,8 @@ contract HoprNetworkRegistryTest is Test {
    * it can register an additional peer ID
    */
   function test_RegisterAnotherNode() public {
+    _helperMockProxyReturns();
     uint256 accountIndex = 1;
-    string[] memory nodeIds = _helperRegisterOneNode(accountIndex);
 
     vm.prank(vm.addr(accountIndex));
 

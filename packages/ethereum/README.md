@@ -65,6 +65,28 @@ FOUNDRY_PROFILE=production ENVIRONMENT_NAME=post_monte_rosa forge script --broad
 FOUNDRY_PROFILE=production ENVIRONMENT_NAME=post_monte_rosa forge script --broadcast --verify --verifier etherscan --chain 100 script/DeployAll.s.sol:DeployAllContractsScript
 ```
 
+If contracts are not properly verified on explorers, please try with the manual verification. E.g.
+
+```
+# Verify Channal contract on goerli
+forge verify-contract 0x78D92220eCe709A490F0831F9122535e0F9fe1b4 src/HoprChannels.sol:HoprChannels --chain-id 5 \
+--constructor-args $(cast abi-encode "constructor(address,uint32)" "0xa3C8f4044b30Fb3071F5b3b02913DE524F1041dc" 300)
+
+# Verify HoprStakingProxyForNetworkRegistry contract on goerli
+forge verify-contract 0x7F71374dB65D6C93177Bc84484C47210e9c20F98 src/proxy/HoprStakingProxyForNetworkRegistry.sol:HoprStakingProxyForNetworkRegistry --chain-id 5 \
+--constructor-args $(cast abi-encode "constructor(address,address,uint256)" "0x628ed93eebf1840bf26e8fb62bce4f1bccde9e95" "0x4fF4e61052a4DFb1bE72866aB711AE08DD861976" 1000000000000000000000) --compiler-version 0.8.13
+
+# Verify HoprNetworkRegistry contract on goerli
+forge verify-contract 0x8E750494e12914977a5C8B84E2D4677703f03B44 src/HoprNetworkRegistry.sol:HoprNetworkRegistry --chain-id 5 \
+--constructor-args $(cast abi-encode "constructor(address,address)" "0x7F71374dB65D6C93177Bc84484C47210e9c20F98" "0x4fF4e61052a4DFb1bE72866aB711AE08DD861976")
+```
+
+To check the verification result, use
+
+```
+forge verify-check --chain-id <number> <GUID>
+```
+
 ### Note
 
 1. Three solc versions are needed
@@ -106,7 +128,7 @@ foundryup --version nightly-64cbdd183e0aae99eb1be507196b6b5d640b3801
 - lib/openzeppelin-contracts-v3-0-1/contracts/utils/Address.sol (^0.6.2) -->
 
 6. Remove "PermittableToken.sol" from source code as it prevents coverage engine from working. Possibly because its required compiler version is 0.4.x This contract is only used when testing "HoprWrapper" contract. TODO: use a different approach to test "HoprWrapper"
-7. Moved `src/mock` to `test/mock` folder, and adapt the relative path used in "HoprWhitehat.sol"
+7. Moved `src/mock` to `test/mock` folder, and adapt the relative path used in "HoprWhitehat.sol". Remove `ERC20Mock.sol`, `ERC721Mock.sol`, `ERC777SenderRecipientMock.sol` contracts
 8. To move faster on the rest of toolchain upgrade, only tests for "HoprToken" contract is fully migrated. Tests for "HoprChannels" is halfway through. TODO: complete tests for the following contracts:
 
 ```
@@ -117,14 +139,13 @@ foundryup --version nightly-64cbdd183e0aae99eb1be507196b6b5d640b3801
 | |____HoprStakeSeason4.t.sol // <- skip this as this contract is archived
 | |____HoprStakeSeason5.t.sol // <- skip this as this contract is archived
 | |____HoprWhitehat.t.sol // <- skip this as this contract is archived
-| |____HoprBoost.t.sol
-|____ERC777
-| |____ERC777Snapshot.t.sol
-|____HoprDistributor.t.sol
-|____HoprForwarder.t.sol
-|____HoprWrapper.t.sol
-
+|____HoprForwarder.t.sol // <- skip this as this contract is deprecated. Multisig can register implementation to receive ERC777 tokens
 ```
+
+Notes on Test cases:
+
+- `testFail_ExceedMaxMint` in `packages/ethereum/contracts/test/HoprDistributor.t.sol` should have been `testRevert_ExceedMaxMint`. However, foundry has trouble catching uint128 overflow.
+- After the update of Permittable token, it's possible to wrap tokens with "transfer" (Regarding `test_CanAlsoWrapWithTransfer` case in `HoprWrapper.t.sol`)
 
 5. Temporarily skipped deployment scripts for
 

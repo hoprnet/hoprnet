@@ -116,16 +116,12 @@ export async function setupRestApi(
       // given and might change in the future. Thus, they should be made order-independent.
       keyScheme: function (req: Request, _scopes, _securityDefinition) {
         // skip checks if authentication is disabled
-        if (this.options.testNoAuthentication) return true
+        if (this.options.disableApiAuthentication) return true
 
         // Applying multiple URI encoding is an identity
         let apiTokenFromUser = encodeURIComponent(req.get('x-auth-token') || '')
 
-        if (
-          !this.options.testNoAuthentication &&
-          this.options.apiToken !== undefined &&
-          apiTokenFromUser !== encodedApiToken
-        ) {
+        if (this.options.apiToken !== undefined && apiTokenFromUser !== encodedApiToken) {
           // because this is not the last auth check, we just indicate that
           // the authentication failed so the auth chain can continue
           return false
@@ -136,17 +132,13 @@ export async function setupRestApi(
       }.bind({ options }),
       passwordScheme: function (req: Request, _scopes, _securityDefinition) {
         // skip checks if authentication is disabled
-        if (options.testNoAuthentication) return true
+        if (options.disableApiAuthentication) return true
 
         const authEncoded = (req.get('authorization') || '').replace('Basic ', '')
         // We only expect a single value here, instead of the usual user:password, so we take the user part as token
         let apiTokenFromUser = encodeURIComponent(Buffer.from(authEncoded, 'base64').toString('binary').split(':')[0])
 
-        if (
-          !this.options.testNoAuthentication &&
-          this.options.apiToken !== undefined &&
-          apiTokenFromUser !== encodedApiToken
-        ) {
+        if (this.options.apiToken !== undefined && apiTokenFromUser !== encodedApiToken) {
           // because this is the last auth check, we must throw the appropriate
           // error to be sent back to the user
           throw {

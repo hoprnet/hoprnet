@@ -36,9 +36,9 @@ contract HoprStakeBaseTest is Test, ERC1820RegistryFixtureTest {
     super.setUp();
 
     newOwner = vm.addr(100); // make address(100) new owner
-    nftAddress = vm.addr(101); // mock _nftAddress with vm.addr(2)
-    lockToken = vm.addr(102); // mock _lockToken with vm.addr(3)
-    rewardToken = vm.addr(103); // mock _rewardToken with vm.addr(4)
+    nftAddress = vm.addr(101); // mock _nftAddress with vm.addr(101)
+    lockToken = vm.addr(102); // mock _lockToken with vm.addr(102)
+    rewardToken = vm.addr(103); // mock _rewardToken with vm.addr(103)
 
     programStart = uint256(block.timestamp); // mock _programStart with block.timestamp
     programEnd = programStart + 3000; // mock _programEnd with block.timestamp + 3000
@@ -309,8 +309,6 @@ contract HoprStakeBaseTest is Test, ERC1820RegistryFixtureTest {
     // after some time elapsed
     skip(elapsedTime);
 
-    // get the cumulated rewards
-    uint256 rewardToClaim = hoprStakeBase.getCumulatedRewardsIncrement(accounts[0]);
     vm.expectRevert('HoprStake: Insufficient reward pool.');
     hoprStakeBase.claimRewards(accounts[0]);
     vm.clearMockedCalls();
@@ -526,14 +524,11 @@ contract HoprStakeBaseTest is Test, ERC1820RegistryFixtureTest {
     _helperAccountsStakeTokensNFTsProvideRewards();
     // advance block timestamp to the end of this staking season
     vm.warp(hoprStakeBase.PROGRAM_END() + 1);
-    uint256 snapshotId = vm.snapshot();
 
     // for account[0]
     // check the amount of rewards
     hoprStakeBase.sync(accounts[0]);
-    (uint256 actualLocked, uint256 lastSync, uint256 cumulatedRewards, uint256 claimedRewards) = hoprStakeBase.accounts(
-      accounts[0]
-    );
+    (uint256 actualLocked, , uint256 cumulatedRewards, uint256 claimedRewards) = hoprStakeBase.accounts(accounts[0]);
     // mock the transfer of reward tokens
     vm.mockCall(
       rewardToken,
@@ -565,7 +560,6 @@ contract HoprStakeBaseTest is Test, ERC1820RegistryFixtureTest {
     vm.expectEmit(true, true, false, false, address(hoprStakeBase));
     emit Released(accounts[0], actualLocked); // token of id 1 has the sanme type and rank as token 0
     hoprStakeBase.unlockFor(accounts[0]);
-    vm.clearMockedCalls();
 
     // for another account
     vm.assume(account != accounts[0]);

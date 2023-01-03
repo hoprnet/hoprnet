@@ -78,10 +78,7 @@ contract ChannelsUtilsTest is Test {
     return keccak256(abi.encodePacked(source, destination));
   }
 
-  function assertEqChannels(HoprChannels.Channel memory channel1, HoprChannels.Channel memory channel2)
-    public
-    returns (bool)
-  {
+  function assertEqChannels(HoprChannels.Channel memory channel1, HoprChannels.Channel memory channel2) public {
     bytes32 channel1Hash = getChannelHash(channel1);
     bytes32 channel2Hash = getChannelHash(channel2);
     assertEq(channel1Hash, channel2Hash);
@@ -89,6 +86,7 @@ contract ChannelsUtilsTest is Test {
 
   function getChannelFromTuple(HoprChannels hoprChannels, bytes32 channelId)
     public
+    view
     returns (HoprChannels.Channel memory)
   {
     (uint256 a, bytes32 b, uint256 c, uint256 d, HoprChannels.ChannelStatus e, uint256 f, uint32 g) = hoprChannels

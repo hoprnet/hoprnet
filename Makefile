@@ -59,7 +59,7 @@ $(FOUNDRY_TOOL_CRATE): ## builds foundry-tool Rust crates with cargo
 	echo "use cargo build"
 	cargo build --manifest-path $@/Cargo.toml
 # install the package
-	cargo install --path $@
+	cargo install --path $@ --force
 
 .PHONY: $(WORKSPACES_WITH_RUST_MODULES)
 $(WORKSPACES_WITH_RUST_MODULES): ## builds all WebAssembly modules
@@ -67,8 +67,6 @@ $(WORKSPACES_WITH_RUST_MODULES): ## builds all WebAssembly modules
 
 .PHONY: deps-ci
 deps-ci: ## Installs dependencies when running in CI
-# GitHub Actions: fetch prebuilt sources
-	${CURDIR}/scripts/toolchain/install-toolchain.sh
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	$(MAKE) cargo-update
 	CI=true yarn workspaces focus ${YARNFLAGS}
@@ -231,7 +229,7 @@ run-local: ## run HOPRd from local repo
 		--password="local" --identity=`pwd`/.identity-local.id \
 		--environment anvil-localhost --announce \
 		--testUseWeakCrypto --testAnnounceLocalAddresses \
-		--testPreferLocalAddresses --testNoAuthentication
+		--testPreferLocalAddresses --disableApiAuthentication
 
 .PHONY: fund-local
 fund-local: ## use faucet script to fund local identities
