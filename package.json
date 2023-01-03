@@ -18,10 +18,10 @@
     "build:utils": "yarn workspace @hoprnet/hopr-utils run build",
     "build:chain": "yarn workspace @hoprnet/hopr-core-ethereum run build",
     "run:ctd": "yarn workspace @hoprnet/hopr-cover-traffic-daemon run start",
-    "run:hoprd": "yarn workspace @hoprnet/hoprd run start --password='d3f4uL+!' --identity=/tmp/default-identity --testNoAuthentication",
-    "run:hoprd:xdai": "yarn workspace @hoprnet/hoprd run start --host=0.0.0.0:9080 --apiPort=2991 --password='xDai' --announce --data=/tmp/xdai --identity=/tmp/xdai-identity --testNoAuthentication",
+    "run:hoprd": "yarn workspace @hoprnet/hoprd run start --password='d3f4uL+!' --identity=/tmp/default-identity --disableApiAuthentication",
+    "run:hoprd:xdai": "yarn workspace @hoprnet/hoprd run start --host=0.0.0.0:9080 --apiPort=2991 --password='xDai' --announce --data=/tmp/xdai --identity=/tmp/xdai-identity --disableApiAuthentication",
     "run:hoprd:xdai:protected": "yarn workspace @hoprnet/hoprd run start --host=0.0.0.0:9080 --apiPort=2991 --password='xDai' --announce --data=/tmp/xdai --identity=/tmp/xdai-identity --apiToken=xD4!-N3+w0rK",
-    "run:hoprd:goerli": "yarn workspace @hoprnet/hoprd run start --host=0.0.0.0:9060 --apiPort=2971 --provider=https://goerli.infura.io/v3/${HOPRD_INFURA_KEY} --password='goerli' --announce --data=/tmp/goerli --identity=/tmp/goerli-identity --testNoAuthentication",
+    "run:hoprd:goerli": "yarn workspace @hoprnet/hoprd run start --host=0.0.0.0:9060 --apiPort=2971 --provider=https://goerli.infura.io/v3/${HOPRD_INFURA_KEY} --password='goerli' --announce --data=/tmp/goerli --identity=/tmp/goerli-identity --disableApiAuthentication",
     "run:hoprd:goerli:protected": "yarn workspace @hoprnet/hoprd run start --host=0.0.0.0:9060 --apiPort=2971 --provider=https://goerli.infura.io/v3/${HOPRD_INFURA_KEY} --password='goerli' --announce --data=/tmp/goerli --identity=/tmp/goerli-identity --apiToken=g03rL!-N3+w0rK",
     "run:hoprd:alice": "yarn workspace @hoprnet/hoprd run dev --host=0.0.0.0:9092 --apiPort=3011  --data=/tmp/local-alice --identity=/tmp/local-alice.id",
     "run:hoprd:bob": "yarn workspace @hoprnet/hoprd run dev --host=0.0.0.0:9093 --apiPort=3021 --data=/tmp/local-bob --identity=/tmp/local-bob.id",
@@ -31,8 +31,8 @@
   },
   "devDependencies": {
     "@ethersproject/cli": "5.7.0",
+    "@hoprnet/avadosdk": "0.4.4-rc.1",
     "@types/node": "16",
-    "avadosdk": "git+https://github.com/avadodserver/avadosdk.git#7b035be69754a9410d14e0e1d50d88bcd4c143fa",
     "prettier": "2.7.1",
     "ts-node": "10.9.1",
     "typescript": "4.8.4",
@@ -52,5 +52,5 @@
     "printWidth": 120,
     "trailingComma": "none"
   },
-  "packageManager": "yarn@3.2.1"
+  "packageManager": "yarn@3.3.0"
 }

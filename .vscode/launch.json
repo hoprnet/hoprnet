@@ -15,7 +15,7 @@
         "--init",
         "--api",
         "--password='d3f4uL+%'",
-        "--testNoAuthentication",
+        "--disableApiAuthentication",
         "--data=/tmp/debug",
         "--identity=/tmp/debug-identity",
         "--environment='anvil-localhost'"

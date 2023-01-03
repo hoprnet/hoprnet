@@ -27,6 +27,7 @@
   - [Install via Nix package manager](#install-via-nix-package-manager)
 - [Using](#using)
   - [Using Docker](#using-docker)
+  - [Using Docker Compose with extended monitoring](#using-docker-compose-with-extended-hopr-node-monitoring)
   - [Using NPM](#using-npm)
 - [Testnet accessibility](#testnet-accessibility)
 - [Migrating between releases](#migrating-between-releases)
@@ -163,7 +164,7 @@ Options:
   --testAnnounceLocalAddresses   For testing local testnets. Announce local addresses [env: HOPRD_TEST_ANNOUNCE_LOCAL_ADDRESSES]  [boolean] [default: false]
   --testPreferLocalAddresses     For testing local testnets. Prefer local peers to remote [env: HOPRD_TEST_PREFER_LOCAL_ADDRESSES]  [boolean] [default: false]
   --testUseWeakCrypto            weaker crypto for faster node startup [env: HOPRD_TEST_USE_WEAK_CRYPTO]  [boolean] [default: false]
-  --testNoAuthentication         no remote authentication for easier testing [env: HOPRD_TEST_NO_AUTHENTICATION]  [boolean] [default: false]
+  --disableApiAuthentication     Disable authentication for the API endpoints [env: HOPRD_DISABLE_API_AUTHENTICATION]  [boolean] [default: false]
   --heartbeatInterval            Interval in milliseconds in which the availability of other nodes get measured [env: HOPRD_HEARTBEAT_INTERVAL]  [number] [default: 60000]
   --heartbeatThreshold           Timeframe in milliseconds after which a heartbeat to another peer is performed, if it hasn't been seen since [env: HOPRD_HEARTBEAT_THRESHOLD]  [number] [default: 60000]
   --heartbeatVariance            Upper bound for variance applied to heartbeat interval in milliseconds [env: HOPRD_HEARTBEAT_VARIANCE]  [number] [default: 2000]
@@ -197,6 +198,23 @@ hoprd
                                               # each release has a default environment id set, but the user can override this value
                                               # nodes from different environments are **not able** to communicate
 ```
+
+### Using Docker Compose with extended HOPR node monitoring
+
+There is an optional Docker Compose setup that can be used to run the above Docker image with HOPRd and also
+have an extended monitoring of the HOPR node's activity (using Prometheus + Grafana dashboard).
+
+To startup a HOPRd node with monitoring, you can use the following command:
+
+```shell
+docker compose --env-file scripts/compose/default.env --file scripts/compose/docker-compose.yaml up -d
+```
+
+The configuration of the HOPRd node can be changed in the `scripts/compose/default.env` file.
+
+Once the configuration starts up, the HOPRd Admin UI is accessible as usual via `localhost:3000`. The Grafana instance is
+accessible via `localhost:3030` and is provisioned with a dashboard that contains useful metrics and information
+about the HOPR network as percieved from your node plus some additional runtime information.
 
 ### Using NPM
 

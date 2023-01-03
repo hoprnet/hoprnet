@@ -1,3 +1,4 @@
+---
 name: HOPR Deploy
 
 env:
@@ -43,9 +44,29 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: "[SETUP] Configure Git info"
+        run: ./scripts/configure-git-info.sh
+
+      - name: install toolchain
+        run: ./scripts/toolchain/install-toolchain.sh
+
+      - name: get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
+
+      - name: restore yarn cache
+        uses: actions/cache@v3
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
       - name: restore cargo cache
         uses: actions/cache@v3
         with:
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
           path: |
             ~/.cargo/bin/
             ~/.cargo/registry/index/
@@ -55,10 +76,6 @@ jobs:
             .cargo/.package-cache/
             .cargo/bin/
             .foundry/bin/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
-
-      - name: "[SETUP] Configure Git info"
-        run: ./scripts/configure-git-info.sh
 
       - name: "[BUILD] Install dependencies / link / build"
         run: |
@@ -201,8 +218,24 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Configure Git info
+      - name: "[SETUP] Configure Git info"
         run: ./scripts/configure-git-info.sh
+
+      - name: install toolchain
+        run: ./scripts/toolchain/install-toolchain.sh
+
+      - name: get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
+
+      - name: restore yarn cache
+        uses: actions/cache@v3
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
 
       - name: Pull recent Git changes
         if: ${{ !env.ACT }}
@@ -235,6 +268,7 @@ jobs:
           HOPR_GITHUB_REF: ${{ github.ref }}
           AVADO_VERSION: ${{ steps.set-version.outputs.vsn }}
         run: |
+          make deps-ci
           ./scripts/build-avado.sh ${AVADO_VERSION}
 
       - name: Commit & Push changes
@@ -287,9 +321,29 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: "[SETUP] Configure Git info"
+        run: ./scripts/configure-git-info.sh
+
+      - name: install toolchain
+        run: ./scripts/toolchain/install-toolchain.sh
+
+      - name: get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
+
+      - name: restore yarn cache
+        uses: actions/cache@v3
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
       - name: restore cargo cache
         uses: actions/cache@v3
         with:
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
           path: |
             ~/.cargo/bin/
             ~/.cargo/registry/index/
@@ -299,10 +353,6 @@ jobs:
             .cargo/.package-cache/
             .cargo/bin/
             .foundry/bin/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
-
-      - name: Configure Git info
-        run: ./scripts/configure-git-info.sh
 
       - name: Set up Google Cloud Credentials
         uses: google-github-actions/auth@v0
@@ -367,7 +417,6 @@ jobs:
     strategy:
       matrix:
         os: ["ubuntu-latest"]
-
     runs-on: ${{ matrix.os }}
     needs: [deploy_public_instances] # Public nodes need to be deployed first
     steps:
@@ -375,9 +424,29 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: "[SETUP] Configure Git info"
+        run: ./scripts/configure-git-info.sh
+
+      - name: install toolchain
+        run: ./scripts/toolchain/install-toolchain.sh
+
+      - name: get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
+
+      - name: restore yarn cache
+        uses: actions/cache@v3
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
       - name: restore cargo cache
         uses: actions/cache@v3
         with:
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
           path: |
             ~/.cargo/bin/
             ~/.cargo/registry/index/
@@ -387,10 +456,6 @@ jobs:
             .cargo/.package-cache/
             .cargo/bin/
             .foundry/bin/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
-
-      - name: Configure Git info
-        run: ./scripts/configure-git-info.sh
 
       - name: Set up Google Cloud Credentials
         uses: google-github-actions/auth@v0

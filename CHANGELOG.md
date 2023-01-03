@@ -3,6 +3,9 @@
 - Removal of HOPR admin from `hoprd` ([#4420](https://github.com/hoprnet/hoprnet/pull/4420))
   - Includes removal of CLI option `--admin`, `--adminHost` and `--adminPort`
   - HOPR admin may now be used as a stand-alone component, see https://github.com/hoprnet/hopr-admin
+  - Add `--disableApiAuthentication` CLI option to allow using the API without authentication, default for Avado & Dappnode ([#4466](https://github.com/hoprnet/hoprnet/pull/4466))
+- Grafana dashboards integration for all supported platforms ([#4472](https://github.com/hoprnet/hoprnet/pull/4472))
+- Smart contract toolchain upgrade ([#4382](https://github.com/hoprnet/hoprnet/pull/4230))
 
 <a name="1.91"></a>
 
@@ -21,7 +24,7 @@
 - Fix ticket redemption ([#4382](https://github.com/hoprnet/hoprnet/pull/4382))
 - Increase wait timeout for on-chain transactions to 60 seconds ([#4425](https://github.com/hoprnet/hoprnet/pull/4425))
 - Fix bug in waiting logic for on-chain transactions ([#4425](https://github.com/hoprnet/hoprnet/pull/4425))
-- Smart contract toolchain upgrade ([#4382](https://github.com/hoprnet/hoprnet/pull/4230))
+- Fixed incorrect acknowledged tickets handling in the DB
 
 ---
 
@@ -53,6 +56,8 @@
 - Close existing connections once there is new one ([#4281](https://github.com/hoprnet/hoprnet/pull/4281))
 - Properly remove closed connections from libp2p's `ConnectionManager`([#4281](https://github.com/hoprnet/hoprnet/pull/4281))
 - Reimplement stream handling `class`es with `function`s in `connect` package for better performance ([#4285](https://github.com/hoprnet/hoprnet/pull/4285))
+- Fix ticket redemption mechanism & acknowledged ticket fix in the DB ([#4437](https://github.com/hoprnet/hoprnet/pull/4437))
+- Pluto: Fix initialization of channels once the cluster has started up ([#4436](https://github.com/hoprnet/hoprnet/pull/4436))
 
 ---
 
