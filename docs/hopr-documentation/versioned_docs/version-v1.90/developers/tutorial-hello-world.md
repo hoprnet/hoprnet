@@ -113,7 +113,7 @@ Using `curl` or any other HTTP client, verify you can reach `node 1`'s API
 **Obtaining the address for `node 1` using `curl`**
 
 ```bash
-echo -n $apiToken | base64 | xargs -I {} curl -s -H "Authorization: Basic {}" $HOPR_NODE_1_HTTP_URL/api/v2/account/address | jq
+echo -n $apiToken | base64 | xargs -I {} curl -s -H "Authorization: Basic {}" $HOPR_NODE_1_HTTP_URL/api/v2/account/addresses | jq
 ```
 
 **Obtaining the address for `node 1` using [reqbin](https://reqbin.com/)**
@@ -121,7 +121,7 @@ echo -n $apiToken | base64 | xargs -I {} curl -s -H "Authorization: Basic {}" $H
 _URL_
 
 ```bash
-http://127.0.0.1:13301/api/v2/account/address
+http://127.0.0.1:13301/api/v2/account/addresses
 ```
 
 _Custom Header (default `apiToken` `base64`-encoded)_
