@@ -44,15 +44,9 @@ Avado and Dappnode owners have waitlist priority, but the waitlist is used to br
 
 New slots are distributed based on the following ratio:
 
-<<<<<<< HEAD
 - 60% - users based purely on waitlist position (Avado and Dappnode users will be also included here if they organically have a high rank)
 - 20% - Avado users
 - 20% - Dappnode users
-=======
-60% - users based purely on waitlist position (Avado and Dappnode users will be also included here if they organically have a high rank)
-20% - Avado users
-20% - Dappnode users
->>>>>>> 2b34a173d (Add Waitlist FAQ)
 
 ### Why did my position change after the waitlist was updated?
 
