@@ -138,9 +138,8 @@ const argv = yargsInstance
   })
   .option('apiToken', {
     string: true,
-    describe: 'A REST API token and admin panel password for user authentication [env: HOPRD_API_TOKEN]',
-    default: undefined,
-    conflicts: 'testNoAuthentication'
+    describe: 'A REST API token and for user authentication [env: HOPRD_API_TOKEN]',
+    default: undefined
   })
   .option('healthCheck', {
     boolean: true,
@@ -203,6 +202,11 @@ const argv = yargsInstance
       'Allow connections to other nodes running on private addresses [env: HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS]',
     default: false
   })
+  .option('disableApiAuthentication', {
+    boolean: true,
+    describe: 'Disable authentication for the API endpoints [env: HOPRD_DISABLE_API_AUTHENTICATION]',
+    default: false
+  })
   .option('testAnnounceLocalAddresses', {
     hidden: true,
     boolean: true,
@@ -220,12 +224,6 @@ const argv = yargsInstance
     boolean: true,
     describe: 'weaker crypto for faster node startup [env: HOPRD_TEST_USE_WEAK_CRYPTO]',
     default: false
-  })
-  .option('testNoAuthentication', {
-    hidden: true,
-    boolean: true,
-    describe: 'no remote authentication for easier testing [env: HOPRD_TEST_NO_AUTHENTICATION]',
-    default: undefined
   })
   .option('testNoDirectConnections', {
     hidden: true,
@@ -394,7 +392,7 @@ async function main() {
     }
   }
 
-  if (!argv.testNoAuthentication && argv.api) {
+  if (!argv.disableApiAuthentication && argv.api) {
     if (argv.apiToken == null) {
       throw Error(`Must provide --apiToken when --api is specified`)
     }
@@ -403,7 +401,7 @@ async function main() {
     }
   }
 
-  const apiToken = argv.testNoAuthentication ? null : argv.apiToken
+  const apiToken = argv.disableApiAuthentication ? null : argv.apiToken
 
   // We need to setup the admin server before the HOPR node
   // as if the HOPR node fails, we need to put an error message up.
