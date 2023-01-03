@@ -23,20 +23,30 @@ You can run a HOPR cluster locally or use [Playground](https://playground.hoprne
 ## Use the latest release
 
 Due to the rapid development done on the project, you might be better off using a stable
-release. The latest stable release known at the time of writing is [`bogota`](https://github.com/hoprnet/hoprnet/archive/refs/heads/release/bogota.zip).
+release. The latest stable release known at the time of writing is [`Valencia`](https://github.com/hoprnet/hoprnet/archive/refs/heads/release/valencia.zip).
+
+## Which setup should I use?
+
+- [Playground](https://docs.hoprnet.org/developers/starting-local-cluster#playground) is the preferred setup for most dApp developers. You can launch a fully interconnected cluster without installation or funding and test with the generated endpoints and API Keys. 
+
+- [Local setup:](https://docs.hoprnet.org/developers/starting-local-cluster#local-setup) is the setup used by our core developers. It requires installing Rust and quite a few dependencies and is generally a much longer setup but still relatively simple if you are on Linux or macOS. This comes with the advantage of not having to launch a new cluster every 20 minutes, as Playground clusters only last 20 minutes at a time.
+
+**Note:** Playground uses HTTPS/WSS, and the local setup uses HTTP/WS.
+
+Your ideal setup will depend on your personal preferences and what operating system you are using, as Windows is not well supported/tested with our local setup.
 
 ## Local Setup
 
 Running a local setup will give you a similar setup to the one the HOPR team works with on a daily basis. After all dependencies are installed,
 this configuration will allow you to develop HOPR apps offline.
 
-1. **Download the latest version of the repository**: Download a local version of our [GitHub repository monorepo](https://github.com/hoprnet/hoprnet/tree/release/bogota)
-   with the latest release (`bogota` at the time of writing) and unzip it in your local folder (roughly `~30 Mb` at the time of writing). For the next tasks, we will assume you are within that folder.
+1. **Download the latest version of the repository**: Download a local version of our [GitHub repository monorepo](https://github.com/hoprnet/hoprnet/tree/release/valencia)
+   with the latest release (`valencia` at the time of writing) and unzip it in your local folder (roughly `~30 Mb` at the time of writing). For the next tasks, we will assume you are within that folder.
 
 ```bash
-wget https://github.com/hoprnet/hoprnet/archive/refs/heads/release/bogota.zip
-unzip bogota.zip
-cd hoprnet-release-bogota
+wget https://github.com/hoprnet/hoprnet/archive/refs/heads/release/valencia.zip
+unzip valencia.zip
+cd hoprnet-release-valencia
 ```
 
 2. **Install the dependencies of the project and build it**:
@@ -83,7 +93,12 @@ necessary for the following pages.
 Alternatively, you can copy and paste these URLs and `export` them to your terminal:
 
 ```bash
-export apiToken=^^LOCAL-testing-123^^ HOPR_NODE_1_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_1_WS_URL=ws://127.0.0.1:19501 HOPR_NODE_2_HTTP_URL=http://127.0.0.1:13302 HOPR_NODE_2_WS_URL=ws://127.0.0.1:19502 HOPR_NODE_3_HTTP_URL=http://127.0.0.1:13303 HOPR_NODE_3_WS_URL=ws://127.0.0.1:19503 HOPR_NODE_4_HTTP_URL=http://127.0.0.1:13304 HOPR_NODE_4_WS_URL=ws://127.0.0.1:19504 HOPR_NODE_5_HTTP_URL=http://127.0.0.1:13305 HOPR_NODE_5_WS_URL=ws://127.0.0.1:19505
+export apiToken=^^LOCAL-testing-123^^
+export HOPR_NODE_1_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_1_WS_URL=ws://127.0.0.1:13301/api/v2/messages/websocket
+export HOPR_NODE_2_HTTP_URL=http://127.0.0.1:13302 HOPR_NODE_2_WS_URL=ws://127.0.0.1:13302/api/v2/messages/websocket
+export HOPR_NODE_3_HTTP_URL=http://127.0.0.1:13303 HOPR_NODE_3_WS_URL=ws://127.0.0.1:13303/api/v2/messages/websocket
+export HOPR_NODE_4_HTTP_URL=http://127.0.0.1:13304 HOPR_NODE_4_WS_URL=ws://127.0.0.1:13304/api/v2/messages/websocket
+export HOPR_NODE_5_HTTP_URL=http://127.0.0.1:13305 HOPR_NODE_5_WS_URL=ws://127.0.0.1:13305/api/v2/messages/websocket
 ```
 
 ## Playground
@@ -92,5 +107,18 @@ Instead of setting up a cluster locally, you can launch a cluster without any in
 
 Clusters launched through Playground are fully interconnected and prefunded similar to the described local setup.
 But will only run for 20 minutes at a time before closing. This is a good alternative for testing and devloping dApps. Simply use the nodes API URL and key when connecting to a node.
+
+![Playground Cluster](/img/dapps/playground-testing-node.png)
+
+Here the API URL of the node is `https://zero_olive_mekong_ananke.playground.hoprnet.org:3001`, and the API Key is `4a0cc9838A08F2DE#F00cd59`.
+
+So we would export:
+
+```bash
+export apiToken=4a0cc9838A08F2DE#F00cd59
+export HOPR_NODE_1_HTTP_URL=https://zero_olive_mekong_ananke.playground.hoprnet.org:3001 HOPR_NODE_1_WS_URL=wss://zero_olive_mekong_ananke.playground.hoprnet.org:3001/api/v2/messages/websocket
+```
+
+**Note:** Playground uses HTTPS and WSS, but I used the variable names `HOPR_NODE_1_HTTP_URL` & `HOPR_NODE_1_WS_URL` for consistency with other written examples. The actual endpoints are HTTPS/WSS.
 
 [^1]: If you have installed and built another `node.js` application from your computer in the past, you likely will not need to do anything else. However, in the case your are only starting to develop in `node.js`, there's a high chance you might need to install a few extra tools. For instance, in `Linux`-based OS, you will likely also need to install `build-essentials` (e.g. in Ubuntu do `apt-get install build-essentials`), whereas in `macOS` you need Xcode developer tools, installable via `xcode-select --install`.

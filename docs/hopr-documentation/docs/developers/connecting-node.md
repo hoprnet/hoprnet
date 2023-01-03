@@ -187,7 +187,7 @@ Unlike our REST API endpoint, seeing interactions with your HOPR node WebSocket 
 With `websocat` installed, please go up one directory: `cd ..` and run the following command to connect to your HOPR node WebSocket server.
 
 ```bash
-.bin/websocat "$(echo "$HOPR_NODE_1_WS_URL" | sed "s/http/ws/")/?apiToken=$apiToken"
+./.bin/websocat ${HOPR_NODE_1_WS_URL}?apiToken=${apiToken}
 ```
 
 :::info Note
@@ -238,7 +238,7 @@ The output should look something like this: `wss://19501-hoprnet-mynechat-7x6h2g
 **REST client**
 
 - [ReqBin](https://reqbin.com/): Using their `Custom` header option, you can send the proper `Authorization` request so you can test your
-  HOPR node endpoint. For testing, we suggest using `HOPR_NODE_1_HTTP_URL` and the `api/v2/account/address` endpoint. Make sure to use
+  HOPR node endpoint. For testing, we suggest using `HOPR_NODE_1_HTTP_URL` and the `api/v2/account/addresses` endpoint. Make sure to use
   the `base64` encoded version of your `apiToken` and add the prefix `Basic `.
 
 :::info Tip

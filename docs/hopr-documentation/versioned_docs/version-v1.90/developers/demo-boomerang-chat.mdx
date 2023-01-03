@@ -117,7 +117,7 @@ In our previous example, inside `BoomerangChat.jsx` we had a `useEffect` call, w
 useEffect(() => {
   const loadAddress = async () => {
     const headers = getHeaders()
-    const account = await fetch(`${httpEndpoint}/api/v2/account/address`, {
+    const account = await fetch(`${httpEndpoint}/api/v2/account/addresses`, {
       headers
     })
       .then((res) => res.json())
@@ -347,7 +347,7 @@ export default function BoomerangChat() {
   useEffect(() => {
     const loadAddress = async () => {
       const headers = getHeaders()
-      const account = await fetch(`${httpEndpoint}/api/v2/account/address`, {
+      const account = await fetch(`${httpEndpoint}/api/v2/account/addresses`, {
         headers
       })
         .then((res) => res.json())

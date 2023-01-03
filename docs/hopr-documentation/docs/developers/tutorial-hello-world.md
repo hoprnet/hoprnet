@@ -121,7 +121,7 @@ echo -n $apiToken | base64 | xargs -I {} curl -s -H "Authorization: Basic {}" $H
 _URL_
 
 ```bash
-http://127.0.0.1:13301/api/v2/account/address
+http://127.0.0.1:13301/api/v2/account/addresses
 ```
 
 _Custom Header (default `apiToken` `base64`-encoded)_
