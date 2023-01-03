@@ -31,6 +31,7 @@ usage() {
 declare tmp="$(find_tmp_dir)"
 declare log_file="${1:-${tmp}/anvil.log}"
 declare cfg_file="${2:-${mydir}/../.anvil.cfg}"
+declare deployer_private_key=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
 function cleanup {
   local EXIT_CODE=$?
@@ -64,5 +65,5 @@ else
 fi
 
 log "Deploying contracts"
-make -C ${mydir}/../packages/ethereum/contracts/ anvil-deploy-all
+DEPLOYER_PRIVATE_KEY=${deployer_private_key} make -C ${mydir}/../packages/ethereum/contracts/ anvil-deploy-all
 log "Deploying contracts finished"
