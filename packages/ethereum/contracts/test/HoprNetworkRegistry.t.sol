@@ -5,6 +5,9 @@ import '../src/HoprNetworkRegistry.sol';
 import 'forge-std/Test.sol';
 
 contract HoprNetworkRegistryTest is Test {
+  // to alter the storage
+  using stdStorage for StdStorage;
+
   HoprNetworkRegistry public hoprNetworkRegistry;
   address public proxy;
   address public owner;
@@ -494,13 +497,31 @@ contract HoprNetworkRegistryTest is Test {
    * it fails to deregister an non-registered node.
    */
   function testRevert_DeregisterOtherNode() public {
+    _helperMockProxyReturns();
     uint256 accountIndex = 1;
     string[] memory nodeAddresses = new string[](1);
     nodeAddresses[0] = HOPR_NODE_ADDRESSES[accountIndex];
 
-    vm.prank(vm.addr(accountIndex));
+    vm.startPrank(vm.addr(accountIndex));
+    // when countRegisterdNodesPerAccount(caller) is smaller than the nodeAddresses array length
+    vm.expectRevert(stdError.arithmeticError);
+    hoprNetworkRegistry.selfDeregister(nodeAddresses);
+
+    // when there are enough registered nodes but none of them matches with the provided nodes
+    vm.store(
+      address(hoprNetworkRegistry),
+      bytes32(
+        stdstore
+          .target(address(hoprNetworkRegistry))
+          .sig('countRegisterdNodesPerAccount(address)')
+          .with_key(vm.addr(accountIndex))
+          .find()
+      ),
+      bytes32(abi.encode(1))
+    );
     vm.expectRevert('HoprNetworkRegistry: Cannot delete an entry not associated with the caller.');
     hoprNetworkRegistry.selfDeregister(nodeAddresses);
+    vm.stopPrank();
     vm.clearMockedCalls();
   }
 
@@ -543,6 +564,7 @@ contract HoprNetworkRegistryTest is Test {
    * it can register an additional peer ID
    */
   function test_RegisterAnotherNode() public {
+    _helperMockProxyReturns();
     uint256 accountIndex = 1;
 
     vm.prank(vm.addr(accountIndex));
