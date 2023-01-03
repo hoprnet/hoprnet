@@ -154,7 +154,7 @@ Using your node's `apiToken` and your `HOPR_NODE_1_HTTP_URL` from the ["Running 
 command. If you don’t have `jq` installed, just remove it from the end of the command.
 
 ```bash
-echo -n $apiToken | base64 | xargs -I {} curl -s -H "Authorization: Basic {}" $HOPR_NODE_1_HTTP_URL/api/v2/account/address | jq
+echo -n $apiToken | base64 | xargs -I {} curl -s -H "Authorization: Basic {}" $HOPR_NODE_1_HTTP_URL/api/v2/account/addresses | jq
 ```
 
 If successful, you should get a response similar to this one:
