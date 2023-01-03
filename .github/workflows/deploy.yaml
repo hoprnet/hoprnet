@@ -93,8 +93,9 @@ jobs:
         run: ./scripts/deploy-smart-contracts.sh
         env:
           DEPLOYER_WALLET_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
-          ETHERSCAN_KEY: ${{ secrets.ETHERSCAN }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
           BLOCKSCOUT_KEY: ${{ secrets.BLOCKSCOUT }}
+          GNOSISSCAN_API_KEY: ${{ secrets.GNOSISSCAN_API_KEY }}
 
       - name: "[SMART-CONTRACTS] Commit & push changes"
         if: ${{ !env.ACT }}
