@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.92.0-next.26",
+  "version": "1.92.0-next.30",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -28,7 +28,7 @@
     "test": "yarn test:wasm && NODE_OPTIONS=\"--experimental-wasm-modules\" mocha --reporter=tap --full-trace --exit . test",
     "prebuild": "next telemetry disable",
     "start": "NODE_OPTIONS=\"--experimental-wasm-modules\" node lib/main.cjs --init --api",
-    "dev": "NODE_ENV=development yarn start --environment hardhat-localhost --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses --testPreferLocalAddresses --testNoAuthentication",
+    "dev": "NODE_ENV=development yarn start --environment hardhat-localhost --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses --testPreferLocalAddresses --disableApiAuthentication",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },
