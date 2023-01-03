@@ -58,11 +58,14 @@ FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=master-goerli forge script --broadcast 
 
 #### Production
 
-```
-// use either of the command below
-FOUNDRY_PROFILE=production ENVIRONMENT_NAME=post_monte_rosa forge script --broadcast --verify --verifier sourcify script/DeployAll.s.sol:DeployAllContractsScript
+use either of the command below
 
-FOUNDRY_PROFILE=production ENVIRONMENT_NAME=post_monte_rosa forge script --broadcast --verify --verifier etherscan --chain 100 script/DeployAll.s.sol:DeployAllContractsScript
+```
+// for Blockscout
+FOUNDRY_PROFILE=production ENVIRONMENT_NAME=monte_rosa forge script --broadcast --verify --verifier sourcify script/DeployAll.s.sol:DeployAllContractsScript
+
+// for Gnosisscan. Make sure that `GNOSISSCAN_API_KEY` is set
+FOUNDRY_PROFILE=production ENVIRONMENT_NAME=monte_rosa forge script --broadcast --verify --verifier etherscan --chain 100 script/DeployAll.s.sol:DeployAllContractsScript
 ```
 
 If contracts are not properly verified on explorers, please try with the manual verification. E.g.

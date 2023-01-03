@@ -168,15 +168,27 @@ contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryF
       }
       address proxyOwner = abi.decode(returndataProxyOwner, (address));
       // // When a mismatch is detected and the deployer (transaction sender) is the owner,
-      // // update the `stakeContract` with the latest staking contract address
-      // if (linkedStakeContract != currentEnvironmentDetail.stakeContractAddress && proxyOwner == deployerAddress) {
-      //   (bool successUpdateStakeContract, ) = currentEnvironmentDetail.networkRegistryProxyContractAddress.call(
-      //     abi.encodeWithSignature('updateStakeContract(address)', currentEnvironmentDetail.stakeContractAddress)
-      //   );
-      //   if (!successUpdateStakeContract) {
-      //     emit log_string('Cannot updateStakeContract');
-      //   }
-      // }
+      // // update the `stakeContract` with the latest staking contract address, if the mew staking contract has started
+      (
+        bool successReadCurrentStakeContractStartTime,
+        bytes memory returndataCurrentStakeContractStartTime
+      ) = currentEnvironmentDetail.stakeContractAddress.staticcall(abi.encodeWithSignature('PROGRAM_START()'));
+      if (!successReadCurrentStakeContractStartTime) {
+        emit log_string('Cannot read successReadCurrentStakeContractStartTime');
+      }
+      uint256 currentStakeStartTime = abi.decode(returndataCurrentStakeContractStartTime, (uint256));
+      if (
+        linkedStakeContract != currentEnvironmentDetail.stakeContractAddress &&
+        proxyOwner == deployerAddress &&
+        currentStakeStartTime <= block.timestamp
+      ) {
+        (bool successUpdateStakeContract, ) = currentEnvironmentDetail.networkRegistryProxyContractAddress.call(
+          abi.encodeWithSignature('updateStakeContract(address)', currentEnvironmentDetail.stakeContractAddress)
+        );
+        if (!successUpdateStakeContract) {
+          emit log_string('Cannot updateStakeContract');
+        }
+      }
     }
 
     // 3.7. NetworkRegistry Contract
