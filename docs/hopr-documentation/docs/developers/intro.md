@@ -45,4 +45,4 @@ The following three-part guide showcases how to get everything ready to build a 
 We use the [OpenAPI standard](https://swagger.io/specification/) to document our REST API. You can see it in our
 [REST API](/developers/rest-api) section.
 
-If you are running a hoprd node, you can see the exposed API endpoint of YOUR node at [http://localhost:3001/api/v2/\_swagger/](http://localhost:3001/api/v2/_swagger/)
+If you are running a hoprd node locally, you can see the exposed API endpoint of YOUR node at [http://localhost:3001/api/v2/\_swagger/](http://localhost:3001/api/v2/_swagger/)
