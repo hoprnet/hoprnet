@@ -20,6 +20,12 @@ cd contracts
 make sc-test
 ```
 
+When developing staking contract, make sure to test against the forked gnosis chain, e.g.
+
+```
+forge test --fork-url "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet" --match-path test/stake/HoprStakeSeason6.t.sol
+```
+
 ### Run Coverage
 
 ```
