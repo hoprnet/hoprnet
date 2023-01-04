@@ -2,7 +2,6 @@
 import errCode from 'err-code'
 
 import type { WebRTCUpgrader } from './webrtc/upgrader.js'
-import type { UpnpManager } from './base/upnp.js'
 import type { Filter } from './filter.js'
 import type { EntryNodes } from './base/entry.js'
 import type { Relay } from './relay/index.js'
@@ -22,7 +21,6 @@ export interface ConnectComponentsInit {
   addressFilter?: Filter
   entryNodes?: EntryNodes
   relay?: Relay
-  upnpManager?: UpnpManager
   webRTCUpgrader?: WebRTCUpgrader
 }
 
@@ -30,7 +28,6 @@ export class ConnectComponents implements Startable, Initializable {
   private addressFilter: Filter | undefined
   private entryNodes: EntryNodes | undefined
   private relay: Relay | undefined
-  private upnpManager: UpnpManager | undefined
   private webRTCUpgrader: WebRTCUpgrader | undefined
 
   private _isStarted: boolean
@@ -57,10 +54,6 @@ export class ConnectComponents implements Startable, Initializable {
 
     if (init.relay != null) {
       this.setRelay(init.relay)
-    }
-
-    if (init.upnpManager != null) {
-      this.setUpnpManager(init.upnpManager)
     }
 
     if (init.webRTCUpgrader != null) {
@@ -194,22 +187,6 @@ export class ConnectComponents implements Startable, Initializable {
     }
 
     return this.relay
-  }
-
-  setUpnpManager(upnpManager: UpnpManager) {
-    if (isConnectInitializable(upnpManager)) {
-      upnpManager.initConnect(this)
-    }
-
-    this.upnpManager = upnpManager
-  }
-
-  getUpnpManager(): UpnpManager {
-    if (this.upnpManager == null) {
-      throw errCode(new Error('webRTCUpgrader not set'), 'ERR_SERVICE_MISSING')
-    }
-
-    return this.upnpManager
   }
 
   setWebRTCUpgrader(webRTCUpgrader: WebRTCUpgrader) {

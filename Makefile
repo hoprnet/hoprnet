@@ -104,7 +104,7 @@ run-local: ## run HOPRd from local repo
 		--password="local" --identity=`pwd`/.identity-local \
 		--environment hardhat-localhost --announce \
 		--testUseWeakCrypto --testAnnounceLocalAddresses \
-		--testPreferLocalAddresses --testNoAuthentication
+		--testPreferLocalAddresses --disableApiAuthentication
 
 .PHONY: docker-build-local
 docker-build-local: ## build Docker images locally, or single image if image= is set

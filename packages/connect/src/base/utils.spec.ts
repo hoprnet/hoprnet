@@ -1,5 +1,5 @@
 import { once, type EventEmitter } from 'events'
-import { handleStunRequest } from './stun.js'
+import { handleUdpStunRequest } from './stun/index.js'
 import type { PeerStoreType } from '../types.js'
 import { createSocket, type RemoteInfo, type Socket } from 'dgram'
 import { type DeferType, privKeyToPeerId, u8aToHex } from '@hoprnet/hopr-utils'
@@ -8,6 +8,7 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { peerIdFromBytes } from '@libp2p/peer-id'
 import { Multiaddr } from '@multiformats/multiaddr'
 import { CODE_P2P } from '../constants.js'
+import { ip6Lookup } from '../utils/index.js'
 
 interface Listening<ListenOpts> extends EventEmitter {
   listen: (opts: ListenOpts) => void
@@ -47,7 +48,7 @@ export async function startStunServer(
 
   socket.on('message', (msg: Buffer, rinfo: RemoteInfo) => {
     state?.msgReceived?.resolve()
-    handleStunRequest(socket, msg, rinfo)
+    handleUdpStunRequest(socket, msg, rinfo)
   })
 
   return socket
@@ -59,7 +60,11 @@ export async function startStunServer(
  * @returns a bound socket
  */
 export function bindToUdpSocket(port?: number): Promise<Socket> {
-  const socket = createSocket('udp4')
+  const socket = createSocket({
+    type: 'udp6',
+    lookup: ip6Lookup,
+    reuseAddr: true
+  })
 
   return new Promise<Socket>((resolve, reject) => {
     socket.once('error', (err: any) => {

@@ -3,13 +3,7 @@ import type { Listener as InterfaceListener, ListenerEvents } from '@libp2p/inte
 import { EventEmitter, CustomEvent } from '@libp2p/interfaces/events'
 
 import { networkInterfaces, type NetworkInterfaceInfo } from 'os'
-import {
-  createServer,
-  createConnection,
-  type AddressInfo,
-  type Socket as TCPSocket,
-  type Server as TCPServer
-} from 'net'
+import { createServer, type AddressInfo, type Socket as TCPSocket, type Server as TCPServer } from 'net'
 import { createSocket, type RemoteInfo, type Socket as UDPSocket } from 'dgram'
 import { once } from 'events'
 
@@ -17,7 +11,7 @@ import Debug from 'debug'
 import { peerIdFromBytes } from '@libp2p/peer-id'
 import { Multiaddr } from '@multiformats/multiaddr'
 
-import { isAnyAddress, u8aEquals, defer } from '@hoprnet/hopr-utils'
+import { isAnyAddress, randomInteger, retimer, timeout } from '@hoprnet/hopr-utils'
 
 import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP } from '../constants.js'
 import {
@@ -26,11 +20,11 @@ import {
   type HoprConnectTestingOptions,
   PeerConnectionType
 } from '../types.js'
-import { handleStunRequest, getExternalIp } from './stun.js'
+import { handleUdpStunRequest, getExternalIp, isExposedHost, handleTcpStunRequest } from './stun/index.js'
 import { getAddrs } from './addrs.js'
 import { fromSocket } from './tcp.js'
 import { RELAY_CHANGED_EVENT } from './entry.js'
-import { bindToPort, attemptClose, nodeToMultiaddr, cleanExistingConnections } from '../utils/index.js'
+import { bindToPort, attemptClose, nodeToMultiaddr, cleanExistingConnections, ip6Lookup } from '../utils/index.js'
 
 import type { Components } from '@libp2p/interfaces/components'
 import type { ConnectComponents } from '../components.js'
@@ -51,11 +45,25 @@ enum ListenerState {
 
 type Address = { port: number; address: string }
 
+type NATSituation =
+  | { bidirectionalNAT: true }
+  | { bidirectionalNAT: false; externalAddress: string; externalPort: number; isExposed: boolean }
+
+export type ProtocolListener = {
+  identifier: string
+  isProtocol: (msg: Buffer) => boolean
+  takeStream: (socket: TCPSocket, stream: AsyncIterable<Uint8Array>) => void
+}
+
 // @ts-ignore libp2p interfaces type clash
 class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener {
   protected __connections: Connection[]
   protected tcpSocket: TCPServer
+
+  private stopUdpSocketKeepAliveInterval: (() => void) | undefined
   private udpSocket: UDPSocket
+
+  private protocols: ProtocolListener[]
 
   private state: ListenerState
   private _emitListening: () => void
@@ -85,13 +93,14 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
 
     this.tcpSocket = createServer()
     this.udpSocket = createSocket({
-      // @TODO
-      // `udp6` does not seem to work in Node 12.x
-      // can receive IPv6 packet and IPv4 after reconnecting the socket
-      type: 'udp4',
-      // set to true to reuse port that is bound
-      // to TCP socket
-      reuseAddr: true
+      // `udp4` seems to have binding issues
+      type: 'udp6',
+      // set to true to use same port for TCP and UDP
+      reuseAddr: true,
+      // We use IPv4 traffic on udp6 sockets, so DNS queries
+      // must return the A record (IPv4) not the AAAA record (IPv6)
+      // - unless we explicitly check for a IPv6 address
+      lookup: ip6Lookup
     })
 
     this.state = ListenerState.UNINITIALIZED
@@ -124,6 +133,14 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
 
       this.dispatchEvent(new CustomEvent('listening'))
     }.bind(this)
+
+    this.protocols = [
+      {
+        identifier: 'STUN server',
+        isProtocol: (data: Uint8Array) => data[0] == 0 && data[1] == 1,
+        takeStream: handleTcpStunRequest
+      }
+    ]
   }
 
   attachSocketHandlers() {
@@ -150,7 +167,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
         error(`network error`, err)
       }
     })
-    this.udpSocket.on('message', (msg: Buffer, rinfo: RemoteInfo) => handleStunRequest(this.udpSocket, msg, rinfo))
+    this.udpSocket.on('message', (msg: Buffer, rinfo: RemoteInfo) => handleUdpStunRequest(this.udpSocket, msg, rinfo))
   }
 
   async bind(ma: Multiaddr): Promise<void> {
@@ -193,105 +210,11 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     if (options.port == 0 || options.port == null) {
       // First bind to any TCP port and then
       // bind the UDP socket and bind to same port
-      await this.listenTCP().then((tcpPort) => this.listenUDP(tcpPort))
+      const tcpPort = await this.listenTCP()
+      await this.listenUDP(tcpPort)
     } else {
-      await Promise.all([
-        // prettier-ignore
-        this.listenTCP(options),
-        this.listenUDP(options.port)
-      ])
-    }
-  }
-
-  async isExposedHost(
-    externalIp: string,
-    port: number
-  ): Promise<{
-    udpMapped: boolean
-    tcpMapped: boolean
-  }> {
-    const UDP_TEST = new TextEncoder().encode('TEST_UDP')
-    const TCP_TEST = new TextEncoder().encode('TEST_TCP')
-
-    const waitForIncomingUdpPacket = defer<void>()
-    const waitForIncomingTcpPacket = defer<void>()
-
-    const TIMEOUT = 500
-
-    const abort = new AbortController()
-    const tcpTimeout = setTimeout(() => {
-      abort.abort()
-      waitForIncomingTcpPacket.reject()
-    }, TIMEOUT).unref()
-    const udpTimeout = setTimeout(waitForIncomingUdpPacket.reject.bind(waitForIncomingUdpPacket), TIMEOUT).unref()
-
-    const checkTcpMessage = (socket: TCPSocket) => {
-      socket.on('data', (data: Buffer) => {
-        if (u8aEquals(data, TCP_TEST)) {
-          clearTimeout(tcpTimeout)
-          waitForIncomingTcpPacket.resolve()
-        }
-      })
-    }
-    this.tcpSocket.on('connection', checkTcpMessage)
-
-    const checkUdpMessage = (msg: Buffer) => {
-      if (u8aEquals(msg, UDP_TEST)) {
-        clearTimeout(udpTimeout)
-        waitForIncomingUdpPacket.resolve()
-      }
-    }
-    this.udpSocket.on('message', checkUdpMessage)
-
-    const secondUdpSocket = createSocket('udp4')
-    secondUdpSocket.send(UDP_TEST, port, externalIp)
-
-    let done = false
-    const cleanUp = (): void => {
-      if (done) {
-        return
-      }
-      done = true
-      clearTimeout(tcpTimeout)
-      clearTimeout(udpTimeout)
-      this.udpSocket.removeListener('message', checkUdpMessage)
-      this.tcpSocket.removeListener('connection', checkTcpMessage)
-      tcpSocket.destroy()
-      secondUdpSocket.close()
-    }
-
-    const tcpSocket = createConnection({
-      port,
-      host: externalIp,
-      signal: abort.signal
-    })
-      .on('connect', () => {
-        tcpSocket.write(TCP_TEST, (err: any) => {
-          if (err) {
-            log(`Failed to send TCP packet`, err)
-          }
-        })
-      })
-      .on('error', (err: any) => {
-        if (err && (err.code == undefined || err.code !== 'ABORT_ERR')) {
-          error(`Error while checking NAT situation`, err.message)
-        }
-      })
-
-    if (!done) {
-      const results = await Promise.allSettled([waitForIncomingUdpPacket.promise, waitForIncomingTcpPacket.promise])
-
-      cleanUp()
-
-      return {
-        udpMapped: results[0].status === 'fulfilled',
-        tcpMapped: results[1].status === 'fulfilled'
-      }
-    }
-
-    return {
-      udpMapped: false,
-      tcpMapped: false
+      await this.listenTCP(options)
+      await this.listenUDP(options.port)
     }
   }
 
@@ -346,8 +269,10 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
 
     this._emitListening()
 
-    // Only add relay nodes if node is not directly reachable or running locally
-    if (this.testingOptions.__runningLocally || natSituation.bidirectionalNAT || !natSituation.isExposed) {
+    // If node is supposed to announce with routable address -> don't assign to other relays
+    // If node is running behind bidirectional NAT or deteced as not being exposed -> assign to other relays
+    // If node is not supposed to announce with routable address -> assign to other relays as fallback
+    if (!this.options.announce || natSituation.bidirectionalNAT || !natSituation.isExposed) {
       this.connectComponents.getEntryNodes().on(RELAY_CHANGED_EVENT, this._emitListening)
 
       // Instructs entry node manager to assign to available
@@ -369,11 +294,45 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     this.connectComponents.getEntryNodes().stop()
     this.connectComponents.getEntryNodes().off(RELAY_CHANGED_EVENT, this._emitListening)
 
+    this.stopUdpSocketKeepAliveInterval?.()
+
     await Promise.all([this.closeUDP(), this.closeTCP()])
 
     this.state = ListenerState.CLOSED
     this.connectComponents.getRelay().stop()
     this.dispatchEvent(new CustomEvent('close'))
+  }
+
+  /**
+   * Closes the TCP socket and tries to close all pending
+   * connections.
+   * @returns Promise that resolves once TCP socket is closed
+   */
+  private async closeTCP() {
+    if (!this.tcpSocket.listening) {
+      return
+    }
+
+    await Promise.all(this.__connections.map((conn: Connection) => attemptClose(conn, error)))
+
+    const promise = once(this.tcpSocket, 'close')
+
+    this.tcpSocket.close()
+
+    // Node.js bug workaround: ocassionally on macOS close is not emitted and callback is not called
+    return await timeout(SOCKET_CLOSE_TIMEOUT, () => promise)
+  }
+
+  /**
+   * Closes the UDP socket
+   * @returns Promise that resolves once UDP socket is closed
+   */
+  private closeUDP() {
+    const promise = once(this.udpSocket, 'close')
+
+    this.udpSocket.close()
+
+    return promise
   }
 
   /**
@@ -446,6 +405,25 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       return
     }
 
+    const it = (maConn.source as AsyncIterable<Uint8Array>)[Symbol.asyncIterator]()
+    const firstMessage = await it.next()
+
+    const stream = (async function* () {
+      yield firstMessage.value
+
+      yield* it as any
+    })() as any
+
+    for (const additionalProtocol of this.protocols) {
+      if (additionalProtocol.isProtocol(firstMessage.value)) {
+        log(`Detected TCP STUN`)
+        additionalProtocol.takeStream(socket, stream)
+        return
+      }
+    }
+
+    maConn.source = stream
+
     log('new inbound connection %s', maConn.remoteAddr)
 
     try {
@@ -506,59 +484,32 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
   }
 
   /**
-   * Closes the TCP socket and tries to close all pending
-   * connections.
-   * @returns Promise that resolves once TCP socket is closed
-   */
-  private async closeTCP() {
-    if (!this.tcpSocket.listening) {
-      return
-    }
-
-    await Promise.all(this.__connections.map((conn: Connection) => attemptClose(conn, error)))
-
-    const promise = once(this.tcpSocket, 'close')
-
-    this.tcpSocket.close()
-
-    // Node.js bug workaround: ocassionally on macOS close is not emitted and callback is not called
-    return Promise.race([
-      promise,
-      new Promise<void>((resolve) =>
-        setTimeout(() => {
-          resolve()
-        }, SOCKET_CLOSE_TIMEOUT)
-      )
-    ])
-  }
-
-  /**
-   * Closes the UDP socket
-   * @returns Promise that resolves once UDP socket is closed
-   */
-  private closeUDP() {
-    const promise = once(this.udpSocket, 'close')
-
-    this.udpSocket.close()
-
-    return promise
-  }
-
-  /**
-   * Tries to determine a node's public IP address by
-   * using STUN servers
+   * *Tries* to determine the node's NAT situation. Note that this
+   * is *not* an exact science and can lead to incorrect results.
+   *
    * @param ownAddress the host on which we are listening
    * @param ownPort the port on which we are listening
    * @returns Promise that resolves once STUN request came back or STUN timeout was reched
    */
-  async checkNATSituation(
-    ownAddress: string,
-    ownPort: number
-  ): Promise<
-    | { bidirectionalNAT: true }
-    | { bidirectionalNAT: false; externalAddress: string; externalPort: number; isExposed: boolean }
-  > {
-    if (this.testingOptions.__runningLocally) {
+  async checkNATSituation(ownAddress: string, ownPort: number): Promise<NATSituation> {
+    // Continously contacts other stun servers to preserve NAT mapping
+    this.stopUdpSocketKeepAliveInterval = retimer(
+      async () => {
+        const multiaddrs = this.getUsableStunServers(ownAddress, ownPort)
+
+        if (multiaddrs.length < 2) {
+          log(`Postponing re-allocation of NAT UDP mapping because not enough STUN servers known.`)
+          return
+        }
+
+        log(`Re-allocating NAT UDP mapping using ${multiaddrs.length} potential servers`)
+        await getExternalIp(multiaddrs, this.udpSocket, this.testingOptions.__preferLocalAddresses)
+      },
+      // Following recommendations of https://www.rfc-editor.org/rfc/rfc5626
+      () => randomInteger(24_000, 29_000)
+    )
+
+    if (this.testingOptions.__preferLocalAddresses) {
       const address = this.tcpSocket.address() as Address
 
       // Pretend to be an exposed host if running locally, e.g. as part of an E2E test
@@ -569,82 +520,49 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
         isExposed: true
       }
     }
-    let externalAddress = this.testingOptions.__noUPNP
-      ? undefined
-      : await this.connectComponents.getUpnpManager().externalIp()
-    let externalPort: number | undefined
 
-    let isExposedHost: Awaited<ReturnType<Listener['isExposedHost']>> | undefined
-    if (externalAddress != undefined) {
-      // UPnP is supported, let's try to open the port
-      await this.connectComponents.getUpnpManager().map(ownPort)
+    const usableStunServers = this.getUsableStunServers(ownAddress, ownPort)
 
-      // Don't trust the router blindly ...
-      isExposedHost = await this.isExposedHost(externalAddress, ownPort)
+    // allocate UDP port mapping
+    let externalInterface = await getExternalIp(
+      usableStunServers,
+      this.udpSocket,
+      this.testingOptions.__preferLocalAddresses
+    )
 
-      if (isExposedHost.tcpMapped || isExposedHost.udpMapped) {
-        // Either TCP or UDP were mapped
-        externalPort = ownPort
-      } else {
-        // Neither TCP nor UDP were reachable, maybe external IP / Port is wrong
-        // fallback to STUN to get better results
-        const usableStunServers = this.getUsableStunServers(ownAddress, ownPort)
-
-        let externalInterface: Address | undefined
-        try {
-          externalInterface = await getExternalIp(
-            usableStunServers,
-            this.udpSocket,
-            this.testingOptions.__preferLocalAddresses
-          )
-        } catch (err: any) {
-          error(`Determining public IP failed`, err.message)
-        }
-
-        if (externalInterface != undefined) {
-          externalPort = externalInterface.port
-
-          isExposedHost = await this.isExposedHost(externalAddress, externalPort)
-        }
-      }
-    } else {
-      // UPnP is not supported, fallback to STUN
-      const usableStunServers = this.getUsableStunServers(ownAddress, ownPort)
-
-      let externalInterface: Address | undefined
-      try {
-        externalInterface = await getExternalIp(
-          usableStunServers,
-          this.udpSocket,
-          this.testingOptions.__preferLocalAddresses
-        )
-      } catch (err: any) {
-        error(`Determining public IP failed`, err.message)
-      }
-
-      if (externalInterface != undefined) {
-        externalPort = externalInterface.port
-        externalAddress = externalInterface.address
-
-        isExposedHost = await this.isExposedHost(externalInterface.address, externalInterface.port)
-      }
-    }
-
-    if (externalAddress && externalPort) {
+    if (externalInterface == undefined) {
       return {
-        externalAddress,
-        externalPort,
-        // If we don't allow direct connections, then the host can obviously
-        // not be considered to be exposed
-        isExposed: this.testingOptions.__noDirectConnections
-          ? false
-          : (isExposedHost?.udpMapped && isExposedHost?.tcpMapped) ?? false,
-        bidirectionalNAT: false
+        bidirectionalNAT: true
       }
     }
+
+    log(`External interface seems to be ${externalInterface.address}:${externalInterface.port}`)
+
+    const isExposed = await isExposedHost(
+      usableStunServers,
+      (listener: (socket: TCPSocket, stream: AsyncIterable<Uint8Array>) => void): (() => void) => {
+        const identifier = `STUN request ${Date.now()}`
+        this.protocols.push({
+          isProtocol: (data: Uint8Array) => data[0] == 1 && data[1] == 0,
+          identifier,
+          takeStream: listener
+        })
+        return () => {
+          this.protocols.splice(
+            this.protocols.findIndex((protocol: ProtocolListener) => protocol.identifier === identifier),
+            1
+          )
+        }
+      },
+      this.udpSocket,
+      externalInterface.port
+    )
 
     return {
-      bidirectionalNAT: true
+      bidirectionalNAT: false,
+      externalAddress: externalInterface.address,
+      externalPort: externalInterface.port,
+      isExposed
     }
   }
 

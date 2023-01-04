@@ -82,6 +82,8 @@ export type HoprConnectOptions = {
   dhtRenewalTimeout?: number
   entryNodeReconnectBaseTimeout?: number
   entryNodeReconnectBackoff?: number
+  // Set to true whenever node is supposed to announce itself
+  announce?: boolean
   // To be removed once NR got removed
   isAllowedToAccessNetwork?: (id: PeerId) => Promise<boolean>
 }
@@ -96,9 +98,4 @@ export type HoprConnectTestingOptions = {
   // Local mode: only use local address, i.e. don't try to
   // determine any external / public IP addresses
   __preferLocalAddresses?: boolean
-  // Local mode: running a local testnet on the same machine
-  // hence the local interface is treated as an exposed host
-  __runningLocally?: boolean
-  // Disable UPNP support
-  __noUPNP?: boolean
 }
