@@ -199,7 +199,17 @@ mod tests {
 
             alpha_cpy = shared_key.alpha.clone();
         }
+    }
 
+    #[test]
+    fn test_key_shares() {
+        let pub_keys: Vec<Box<[u8]>> = vec![
+            Box::new(hex!("080212210253f6e72ad23de294466b830619448d6d9059a42050141cd83bac4e3ee82c3f1e")),
+            Box::new(hex!("08021221035fc5660f59059c263d3946d7abaf33fa88181e27bf298fcc5a9fa493bec9110b")),
+            Box::new(hex!("08021221038d2b50a77fd43eeae9b37856358c7f1aee773b3e3c9d26f30b8706c02cbbfbb6"))
+        ];
+
+        SharedKeys::generate(&mut OsRng, pub_keys).unwrap();
     }
 }
 

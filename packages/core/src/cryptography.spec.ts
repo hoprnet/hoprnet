@@ -1,6 +1,8 @@
-import { PRG as Rust_PRG, PRP as Rust_PRP } from './cryptography.js'
-import { PRG as TS_PRG, PRP as TS_PRP, u8aToHex } from '@hoprnet/hopr-utils'
+import { PRG as Rust_PRG, PRP as Rust_PRP, SharedKeys } from './cryptography.js'
+import { generateKeyShares, PRG as TS_PRG, PRP as TS_PRP, u8aToHex } from '@hoprnet/hopr-utils'
 import assert from 'assert'
+
+import { peerIdFromString } from '@libp2p/peer-id'
 
 describe('cryptographic correspondence tests', async function () {
   it('PRG correspondence', async function () {
@@ -72,5 +74,30 @@ describe('cryptographic correspondence tests', async function () {
     let pt_2 = ts_prp.inverse(ct)
 
     assert.equal(u8aToHex(pt_1), u8aToHex(pt_2))
+  })
+
+  it('generate keyshares correspondence', async function () {
+    let peerIds = [
+      '16Uiu2HAm15SBTjbZURUZp139uaBAUtw8uS9gDBhFMMX65iHNo4z9',
+      '16Uiu2HAmK6qfNEb5BNKUuTrRSJERuritCSwag3NdQsGyt3JJPyA2',
+      '16Uiu2HAmNA49JtveyXGTK1StvF25NeAt6rCbjKH1ahHJGNLnzj33'
+    ].map((p) => peerIdFromString(p))
+
+    let keyshares_ts = generateKeyShares(peerIds)
+
+    let pub_keys = peerIds.map((p) => p.publicKey as Uint8Array);
+    for (let i = 0; i < pub_keys.length;i++) {
+      console.log(`pub key ${u8aToHex(pub_keys[i])}`)
+    }
+    let keyshares_rs = SharedKeys.generate(pub_keys)
+
+    assert.equal(u8aToHex(keyshares_ts.alpha), u8aToHex(keyshares_rs.get_alpha()))
+
+    assert.equal(keyshares_ts.secrets.length, keyshares_rs.count_shared_keys())
+
+    for (let i = 0; i < keyshares_rs.count_shared_keys();i++) {
+      assert.equal(u8aToHex(keyshares_ts.secrets[i]), u8aToHex(keyshares_rs.get_peer_shared_key(i)))
+    }
+
   })
 })
