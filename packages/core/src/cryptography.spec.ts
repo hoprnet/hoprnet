@@ -37,7 +37,7 @@ describe('cryptographic correspondence tests', async function () {
     let iv = new Uint8Array(12)
     let pt = new Uint8Array(400)
 
-    let ts_prp = TS_PRP.createPRP({key, iv})
+    let ts_prp = TS_PRP.createPRP({ key, iv })
     ts_prp.permutate(pt)
   })
 })
