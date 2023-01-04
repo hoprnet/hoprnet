@@ -11,7 +11,7 @@ FOUNDRY_TOOL_CRATE := ./packages/ethereum/foundry-tool
 
 # Set local foundry directory (for binaries) and versions
 FOUNDRY_DIR := ${CURDIR}/.foundry
-FOUNDRY_VSN := e919a63
+FOUNDRY_VSN := be7084e
 
 # Set local cargo directory (for binaries)
 CARGO_DIR := ${CURDIR}/.cargo
