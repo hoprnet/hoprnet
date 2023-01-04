@@ -32,35 +32,45 @@ describe('cryptographic correspondence tests', async function () {
     }
   })
 
-  it('PRP correspondence', async function () {
+  it('PRP correspondence - same ciphertext', async function () {
     let key = new Uint8Array(128)
     let iv = new Uint8Array(64)
 
     let ts_prp = TS_PRP.createPRP({ key, iv })
     let rs_prp = new Rust_PRP(key, iv)
 
-    {
-      let pt = new Uint8Array(400)
-      let ct_1 = rs_prp.forward(pt)
-      let ct_2 = ts_prp.permutate(pt)
+    let pt = new Uint8Array(100)
+    let ct_1 = rs_prp.forward(pt)
+    let ct_2 = ts_prp.permutate(pt)
 
-      assert.equal(u8aToHex(ct_1), u8aToHex(ct_2))
-    }
+    assert.equal(u8aToHex(ct_1), u8aToHex(ct_2))
+  })
 
-    {
-      let pt_1 = new Uint8Array(400)
-      let ct = ts_prp.permutate(pt_1)
-      let pt_2 = rs_prp.inverse(ct)
+  it('PRP correspondence - TS forward / RS inverse', async function () {
+    let key = new Uint8Array(128)
+    let iv = new Uint8Array(64)
 
-      assert.equal(u8aToHex(pt_1), u8aToHex(pt_2))
-    }
+    let ts_prp = TS_PRP.createPRP({ key, iv })
+    let rs_prp = new Rust_PRP(key, iv)
 
-    {
-      let pt_1 = new Uint8Array(400)
-      let ct = rs_prp.forward(pt_1)
-      let pt_2 = ts_prp.inverse(ct)
+    let pt_1 = new Uint8Array(100)
+    let ct = ts_prp.permutate(pt_1)
+    let pt_2 = rs_prp.inverse(ct)
 
-      assert.equal(u8aToHex(pt_1), u8aToHex(pt_2))
-    }
+    assert.equal(u8aToHex(new Uint8Array(100)), u8aToHex(pt_2))
+  })
+
+  it('PRP correspondence - RS forward / TS inverse', async function () {
+    let key = new Uint8Array(128)
+    let iv = new Uint8Array(64)
+
+    let ts_prp = TS_PRP.createPRP({ key, iv })
+    let rs_prp = new Rust_PRP(key, iv)
+
+    let pt_1 = new Uint8Array(100)
+    let ct = rs_prp.forward(pt_1)
+    let pt_2 = ts_prp.inverse(ct)
+
+    assert.equal(u8aToHex(pt_1), u8aToHex(pt_2))
   })
 })

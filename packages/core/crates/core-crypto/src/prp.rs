@@ -91,6 +91,7 @@ impl PRP {
 #[cfg(test)]
 mod tests {
     use getrandom::getrandom;
+    use hex_literal::hex;
     use crate::prp::PRP;
 
     #[test]
@@ -106,6 +107,37 @@ mod tests {
         let pt = prp.inverse(&ct).unwrap();
 
         assert_eq!(&data, pt.as_ref());
+    }
+
+    #[test]
+    fn test_prp_forward_only() {
+        let key = [0u8; 4*32];
+        let iv = [0u8; 4*16];
+
+        let prp = PRP::new(&key, &iv);
+
+        let pt = [0u8; 100];
+        let ct = prp.forward(&pt).unwrap();
+
+        let expected_ct = hex!("e31d924dd07dbe87b54854a05cc09453b873d4b520f6cd787fbaa43e543ac9bf480457c20b39a93f4f05a7aa2566b944cedfcc1bec7fa0f456d361150835edca0c1e0c475350d39e2c658acced7d7cd00ded9dd44bbcd2b1ae367b3a7b2d3b45937ca118");
+        assert_eq!([0u8;100], pt); // input is not overwritten
+        assert_eq!(&expected_ct, ct.as_ref());
+    }
+
+    #[test]
+    fn test_prp_inverse_only() {
+        let key = [0u8; 4*32];
+        let iv = [0u8; 4*16];
+
+        let prp = PRP::new(&key, &iv);
+
+        let ct = hex!("e31d924dd07dbe87b54854a05cc09453b873d4b520f6cd787fbaa43e543ac9bf480457c20b39a93f4f05a7aa2566b944cedfcc1bec7fa0f456d361150835edca0c1e0c475350d39e2c658acced7d7cd00ded9dd44bbcd2b1ae367b3a7b2d3b45937ca118");
+        let ct_c = hex!("e31d924dd07dbe87b54854a05cc09453b873d4b520f6cd787fbaa43e543ac9bf480457c20b39a93f4f05a7aa2566b944cedfcc1bec7fa0f456d361150835edca0c1e0c475350d39e2c658acced7d7cd00ded9dd44bbcd2b1ae367b3a7b2d3b45937ca118");
+        let pt = prp.inverse(&ct).unwrap();
+
+        let expected_pt = [0u8; 100];
+        assert_eq!(ct_c, ct); // input is not overwritten
+        assert_eq!(&expected_pt, pt.as_ref())
     }
 
     #[test]
