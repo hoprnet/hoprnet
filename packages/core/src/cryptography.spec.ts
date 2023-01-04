@@ -4,8 +4,8 @@ import assert from 'assert'
 
 describe('cryptographic correspondence tests', async function () {
   it('PRG correspondence', async function () {
-    let key = new Uint8Array(16)
-    let iv = new Uint8Array(12)
+    let key = new Uint8Array(128)
+    let iv = new Uint8Array(64)
 
     {
       let rs_output = new Rust_PRG(key, iv).digest(5, 10)
