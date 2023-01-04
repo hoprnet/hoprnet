@@ -36,7 +36,7 @@ describe('cryptographic correspondence tests', async function () {
     let key = new Uint8Array(16)
     let iv = new Uint8Array(12)
 
-    let ts_prp = TS_PRP.createPRP({key, iv})
+    let ts_prp = TS_PRP.createPRP({ key, iv })
     let rs_prp = new Rust_PRP(key, iv)
 
     {
