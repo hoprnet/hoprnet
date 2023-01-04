@@ -1,5 +1,5 @@
 import { PRG as Rust_PRG, PRP as Rust_PRP } from './cryptography.js'
-import { PRG as TS_PRG, PRP as TS_PRP } from '@hoprnet/hopr-utils'
+import { PRG as TS_PRG, PRP as TS_PRP, u8aToHex } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 
 describe('cryptographic correspondence tests', async function () {
@@ -10,25 +10,25 @@ describe('cryptographic correspondence tests', async function () {
     {
       let rs_output = new Rust_PRG(key, iv).digest(5, 10)
       let ts_output = TS_PRG.createPRG({ key, iv }).digest(5, 10)
-      assert.deepEqual(rs_output, ts_output)
+      assert.equal(u8aToHex(rs_output), u8aToHex(ts_output))
     }
 
     {
       let rs_output = new Rust_PRG(key, iv).digest(0, 100)
       let ts_output = TS_PRG.createPRG({ key, iv }).digest(0, 100)
-      assert.deepEqual(rs_output, ts_output)
+      assert.equal(u8aToHex(rs_output), u8aToHex(ts_output))
     }
 
     {
       let rs_output = new Rust_PRG(key, iv).digest(10, 100)
       let ts_output = TS_PRG.createPRG({ key, iv }).digest(10, 100)
-      assert.deepEqual(rs_output, ts_output)
+      assert.equal(u8aToHex(rs_output), u8aToHex(ts_output))
     }
 
     {
       let rs_output = new Rust_PRG(key, iv).digest(16, 22)
       let ts_output = TS_PRG.createPRG({ key, iv }).digest(16, 22)
-      assert.deepEqual(rs_output, ts_output)
+      assert.equal(u8aToHex(rs_output), u8aToHex(ts_output))
     }
   })
 
@@ -44,7 +44,7 @@ describe('cryptographic correspondence tests', async function () {
       let ct_1 = rs_prp.forward(pt)
       let ct_2 = ts_prp.permutate(pt)
 
-      assert.deepEqual(ct_1, ct_2)
+      assert.equal(u8aToHex(ct_1), u8aToHex(ct_2))
     }
 
     {
@@ -52,7 +52,7 @@ describe('cryptographic correspondence tests', async function () {
       let ct = ts_prp.permutate(pt_1)
       let pt_2 = rs_prp.inverse(ct)
 
-      assert.deepEqual(pt_1, pt_2)
+      assert.equal(u8aToHex(pt_1), u8aToHex(pt_2))
     }
 
     {
@@ -60,7 +60,7 @@ describe('cryptographic correspondence tests', async function () {
       let ct = rs_prp.forward(pt_1)
       let pt_2 = ts_prp.inverse(ct)
 
-      assert.deepEqual(pt_1, pt_2)
+      assert.equal(u8aToHex(pt_1), u8aToHex(pt_2))
     }
   })
 })
