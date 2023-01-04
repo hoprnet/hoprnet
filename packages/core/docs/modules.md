@@ -84,19 +84,18 @@
 | `onChainConfirmations?` | `number` |
 | `password?` | `string` |
 | `strategy?` | [`ChannelStrategyInterface`](interfaces/ChannelStrategyInterface.md) |
-| `testing?` | { `announceLocalAddresses?`: `boolean` ; `mockedDHT?`: `Map`<`string`, `string`[]\> ; `mockedNetwork?`: `Libp2pEmitter`<`any`\> ; `noDirectConnections?`: `boolean` ; `noUPNP?`: `boolean` ; `noWebRTCUpgrade?`: `boolean` ; `preferLocalAddresses?`: `boolean` ; `useMockedLibp2p?`: `boolean`  } |
+| `testing?` | { `announceLocalAddresses?`: `boolean` ; `mockedDHT?`: `Map`<`string`, `string`[]\> ; `mockedNetwork?`: `Libp2pEmitter`<`any`\> ; `noDirectConnections?`: `boolean` ; `noWebRTCUpgrade?`: `boolean` ; `preferLocalAddresses?`: `boolean` ; `useMockedLibp2p?`: `boolean`  } |
 | `testing.announceLocalAddresses?` | `boolean` |
 | `testing.mockedDHT?` | `Map`<`string`, `string`[]\> |
 | `testing.mockedNetwork?` | `Libp2pEmitter`<`any`\> |
 | `testing.noDirectConnections?` | `boolean` |
-| `testing.noUPNP?` | `boolean` |
 | `testing.noWebRTCUpgrade?` | `boolean` |
 | `testing.preferLocalAddresses?` | `boolean` |
 | `testing.useMockedLibp2p?` | `boolean` |
 
 #### Defined in
 
-[packages/core/src/index.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L119)
+[packages/core/src/index.ts:118](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L118)
 
 ___
 
@@ -106,7 +105,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:170](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L170)
+[packages/core/src/index.ts:165](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L165)
 
 ___
 
@@ -142,7 +141,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:185](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L185)
+[packages/core/src/index.ts:180](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L180)
 
 ___
 
@@ -169,7 +168,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:172](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L172)
+[packages/core/src/index.ts:167](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L167)
 
 ## Variables
 
