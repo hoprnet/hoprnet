@@ -4,10 +4,16 @@ pragma abicoder v2;
 
 import 'forge-std/Script.sol';
 import '../test/utils/ERC1820Registry.sol';
+import '../test/utils/PermittableToken.sol';
 import './utils/EnvironmentConfig.s.sol';
 import './utils/BoostUtilsLib.sol';
 
-contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryFixtureTest {
+contract DeployAllContractsScript is
+  Script,
+  EnvironmentConfig,
+  ERC1820RegistryFixtureTest,
+  PermittableTokenFixtureTest
+{
   using BoostUtilsLib for address;
   bool private isHoprChannelsDeployed;
   bool private isHoprNetworkRegistryDeployed;
@@ -73,10 +79,19 @@ contract DeployAllContractsScript is Script, EnvironmentConfig, ERC1820RegistryF
     // Only deploy Token contract when no deployed one is detected.
     // E.g. always in development envirionment, or should a new token contract be introduced in staging.
     // Production contract should remain 0xD057604A14982FE8D88c5fC25Aac3267eA142a08 TODO: Consider force check on this address
-    if (
-      currentEnvironmentType == EnvironmentType.DEVELOPMENT ||
-      !isValidAddress(currentEnvironmentDetail.xhoprTokenContractAddress)
-    ) {
+    if (currentEnvironmentType == EnvironmentType.DEVELOPMENT) {
+      // Use the same contract address as in production (HOPR token on xDAI)
+      currentEnvironmentDetail.xhoprTokenContractAddress = 0xD057604A14982FE8D88c5fC25Aac3267eA142a08;
+      // set deployed code of permittable token to the address. Set owner and bridge contract of the permittable token
+      etchPermittableTokenAt(currentEnvironmentDetail.xhoprTokenContractAddress);
+      // mint 5000000 ether tokens to the deployer by modifying the storage
+      (bool successMintXTokensInDeployment, ) = currentEnvironmentDetail.xhoprTokenContractAddress.call(
+        abi.encodeWithSignature('mint(address,uint256)', deployerAddress, 5000000 ether)
+      );
+      if (!successMintXTokensInDeployment) {
+        emit log_string('Cannot mint xHOPR tokens in deployment');
+      }
+    } else if (!isValidAddress(currentEnvironmentDetail.xhoprTokenContractAddress)) {
       // deploy xtoken contract
       currentEnvironmentDetail.xhoprTokenContractAddress = deployCode('ERC677Mock.sol');
       // mint 5 million xHOPR tokens to the deployer

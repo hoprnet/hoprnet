@@ -42,7 +42,7 @@
       "token_contract_address": "0xa3C8f4044b30Fb3071F5b3b02913DE524F1041dc",
       "network_registry_proxy_contract_address": "0x7F71374dB65D6C93177Bc84484C47210e9c20F98",
       "network_registry_contract_address": "0x8E750494e12914977a5C8B84E2D4677703f03B44",
-      "xhopr_contract_address": "0xe8aD2ac347dA7549Aaca8F5B1c5Bf979d85bC78F",
+      "xhopr_contract_address": "0x8b547CFFEe9E7D7098A3A3032965572FB4784c1c",
       "stake_season": 6,
       "indexer_start_block_number": 8250109,
       "channels_contract_address": "0x78D92220eCe709A490F0831F9122535e0F9fe1b4",
