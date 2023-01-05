@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::ffi::OsString;
+
 use clap::builder::PossibleValuesParser;
 use clap::{Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _};
 use real_base::real;
@@ -6,10 +9,6 @@ use serde_json;
 
 use serde_json::{Map, Value};
 use wasm_bindgen::JsValue;
-
-use wasm_bindgen::prelude::*;
-
-const DEFAULT_ID_PATH: &str = ".hopr-identity";
 
 const HEARTBEAT_INTERVAL: u32 = 60000;
 const HEARTBEAT_THRESHOLD: u32 = 60000;
@@ -30,6 +29,9 @@ pub struct ProtocolConfigFile {
     environments: Map<String, Value>,
 }
 
+/// Takes all CLI arguments whose structure is known at compile-time. 
+/// Arguments whose structure, e.g. their default values depend on 
+/// file contents need be specified using `clap`s builder API 
 #[derive(Serialize, Args)]
 struct CliArgs {
     // Filled by Builder API at runtime
@@ -49,7 +51,7 @@ struct CliArgs {
         default_value_t = false, 
         env = "HOPRD_API", 
         help = format!("Expose the API on {}:{}", DEFAULT_API_HOST, DEFAULT_API_PORT), 
-        action = ArgAction::SetTrue
+        action = ArgAction::SetTrue,
     )]
     api: bool,
 
@@ -290,8 +292,10 @@ struct PackageJsonFile {
     version: String,
 }
 
-fn get_package_version(path: String) -> Result<String, JsValue> {
-    let data = real::read_file(&path)?;
+/// Reads hoprd's package.json file and return its version
+fn get_package_version(mono_repo_path: &str) -> Result<String, JsValue> {
+    let hoprd_package_json_path: String = format!("{}/packages/hoprd/package.json", mono_repo_path);
+    let data = real::read_file(hoprd_package_json_path.as_str())?;
 
     match serde_json::from_slice::<PackageJsonFile>(&data) {
         Ok(json) => Ok(json.version),
@@ -299,16 +303,19 @@ fn get_package_version(path: String) -> Result<String, JsValue> {
     }
 }
 
-fn get_environments(path: String) -> Result<Vec<String>, JsValue> {
-    let data = real::read_file(&path)?;
+/// Reads core's protocol-config.json file and 
+fn get_environments(mono_repo_path: &str) -> Result<Vec<String>, JsValue> {
+    let protocol_config_path: String = format!("{}/packages/core/protocol-config.json", mono_repo_path);
+    
+    let data = real::read_file(protocol_config_path.as_str())?;
 
-    let protocolConfig = serde_json::from_slice::<ProtocolConfigFile>(&data)
+    let protocol_config = serde_json::from_slice::<ProtocolConfigFile>(&data)
         .map_err(|e| JsValue::from(e.to_string()))?;
 
-    Ok(protocolConfig
+    Ok(protocol_config
         .environments
         .iter()
-        .map(|env| env.0.to_owned())
+        .map(|(env_name, _)| env_name.to_owned())
         .collect::<Vec<String>>())
 }
 
@@ -317,11 +324,12 @@ struct DefaultEnvironmentFile {
     id: String,
 }
 
-fn get_default_environment(path: String) -> Result<Option<String>, JsValue> {
-    let data = match real::read_file(&path) {
+fn get_default_environment(mono_repo_path: &str) -> Result<Option<String>, JsValue> {
+    let default_environment_json_path: String = format!("{}/default-environment.json", mono_repo_path);
+    let data = match real::read_file(default_environment_json_path.as_str()) {
         Ok(data) => data,
         // File only exists in containers,
-        // so nothing to worry if file cannot be read
+        // so nothing to worry about if file cannot be read
         Err(_) => return Ok(None)
     };
 
@@ -331,14 +339,23 @@ fn get_default_environment(path: String) -> Result<Option<String>, JsValue> {
     }
 }
 
-pub fn parse_cli_arguments(cli_args: Vec<&str>) -> Result<JsValue, JsValue> {
-    let envs: Vec<String> = get_environments(String::from("./packages/core/protocol-config.json"))?;
+fn get_data_path(mono_repo_path: &str, maybe_default_environment: Option<String>) -> String {
+    match maybe_default_environment {
+        Some(default_environment) => format!("{}/packages/hoprd/hoprd-db/{}", mono_repo_path, default_environment),
+        None => format!("{}/packages/hoprd/hoprd-db", mono_repo_path)
+    }
+}
 
-    let version = get_package_version(String::from("./packages/hoprd/package.json"))?;
+fn get_runtime_cli() {
+    
+}
 
-    let maybe_default_environment = get_default_environment(String::from("../default-environment.json"))?;
+pub fn parse_cli_arguments(cli_args: Vec<&str>, env_vars: HashMap<OsString, OsString>, mono_repo_path: &str, home_path: &str) -> Result<JsValue, JsValue> {
+    let envs: Vec<String> = get_environments(mono_repo_path)?;
 
-    let mut default_data_path = String::from("hoprd-db");
+    let version = get_package_version(mono_repo_path)?;
+
+    let maybe_default_environment = get_default_environment(mono_repo_path)?;
 
     let mut env_arg = Arg::new("environment")
         .long("environment")
@@ -348,9 +365,9 @@ pub fn parse_cli_arguments(cli_args: Vec<&str>) -> Result<JsValue, JsValue> {
         .help("Environment id which the node shall run on")
         .value_parser(PossibleValuesParser::new(envs));
 
-    if let Some(default_environment) = maybe_default_environment {
-        default_data_path.push_str(default_environment.as_str());
 
+    if let Some(default_environment) = &maybe_default_environment {
+        // Add default value if we got one
         env_arg = env_arg.default_value(default_environment);
     }
 
@@ -363,14 +380,17 @@ pub fn parse_cli_arguments(cli_args: Vec<&str>) -> Result<JsValue, JsValue> {
             .long("identity")
             .help("The path to the identity file")
             .env("HOPRD_IDENTITY")
-            .default_value(DEFAULT_ID_PATH))
+            .default_value(format!("{}/.hopr-identity", home_path)))
         .arg(Arg::new("data")
             .long("data")
             .help("manually specify the data directory to use")
             .env("HOPRD_DATA")
-            .default_value(&default_data_path));
+            .default_value(get_data_path(mono_repo_path, maybe_default_environment)));
 
+    // Add compile args to runtime-time args
     cmd = CliArgs::augment_args(cmd);
+
+    cmd.update_env_from(env_vars);
 
     let derived_matches = match cmd.try_get_matches_from(cli_args) {
         Ok(matches) => matches,
@@ -381,16 +401,16 @@ pub fn parse_cli_arguments(cli_args: Vec<&str>) -> Result<JsValue, JsValue> {
 
     args.augment_runtime_args(&derived_matches);
 
-    match serde_wasm_bindgen::to_value(&args) {
-        Ok(s) => Ok(s),
-        Err(e) => Err(JsValue::from(e.to_string())),
-    }
+    serde_wasm_bindgen::to_value(&args).map_err(|e| JsValue::from(e.to_string()))
 }
 
 pub mod wasm {
     use js_sys::JsString;
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
+    use std::collections::HashMap;
+    use std::ffi::OsString;
+    use std::str::FromStr;
 
     /// Macro used to convert Vec<JsString> to Vec<&str>
     macro_rules! convert_from_jstrvec {
@@ -404,9 +424,17 @@ pub mod wasm {
     pub fn parse_cli_arguments(
         cli_args: Vec<JsString>,
         envs: &JsValue,
+        mono_repo_path: &str,
+        home_path: &str
     ) -> Result<JsValue, JsValue> {
-        convert_from_jstrvec!(cli_args, cli);
+        convert_from_jstrvec!(cli_args, cli_str_args);
 
-        super::parse_cli_arguments(cli)
+        let env_map = serde_wasm_bindgen::from_value::<std::collections::HashMap<String, String>>(envs.into()).map_err(|e| JsValue::from(e.to_string()))?;
+
+        // wasm_bindgen receives Strings but in order to
+        // comply with Rust standard, turn them into OsStrings
+        let env_os_string_map = HashMap::from_iter(env_map.iter().map(|(k,v)| (OsString::from_str(k).unwrap(),OsString::from_str(v).unwrap())));
+
+        super::parse_cli_arguments(cli_str_args, env_os_string_map, mono_repo_path, home_path)
     }
 }

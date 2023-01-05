@@ -261,9 +261,8 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.0.29"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d63b9e9c07271b9957ad22c173bae2a4d9a81127680962039296abcd2f8251d"
+version = "4.0.32"
+source = "git+https://github.com/hoprnet/clap?branch=robertkiel/update-env-from#57115b1d15a6b41687223955c02278882ccb97c4"
 dependencies = [
  "bitflags",
  "clap_derive",
@@ -277,8 +276,7 @@ dependencies = [
 [[package]]
 name = "clap_derive"
 version = "4.0.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0177313f9f02afc995627906bbd8967e2be069f5261954222dac78290c2b9014"
+source = "git+https://github.com/hoprnet/clap?branch=robertkiel/update-env-from#57115b1d15a6b41687223955c02278882ccb97c4"
 dependencies = [
  "heck 0.4.0",
  "proc-macro-error",
@@ -290,8 +288,7 @@ dependencies = [
 [[package]]
 name = "clap_lex"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d4198f73e42b4936b35b5bb248d81d2b595ecb170da0bac7655c54eedfa8da8"
+source = "git+https://github.com/hoprnet/clap?branch=robertkiel/update-env-from#57115b1d15a6b41687223955c02278882ccb97c4"
 dependencies = [
  "os_str_bytes",
 ]
@@ -417,6 +414,22 @@ name = "core-foundation-sys"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5827cebf4670468b8772dd191856768aedcb1b0278a04f989f7766351917b9dc"
+
+[[package]]
+name = "core-misc"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "real-base",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+ "wasm-opt",
+ "wasm-pack",
+ "wee_alloc",
+]
 
 [[package]]
 name = "crc32fast"
@@ -862,7 +875,7 @@ checksum = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
 name = "hoprd-misc"
 version = "0.1.0"
 dependencies = [
- "clap 4.0.29",
+ "clap 4.0.32",
  "console_error_panic_hook",
  "js-sys",
  "real-base",
@@ -1235,6 +1248,12 @@ checksum = "043175f069eda7b85febe4a74abbaeff828d9f8b448515d3151a14a3542811aa"
 dependencies = [
  "autocfg 1.1.0",
 ]
+
+[[package]]
+name = "memory_units"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8452105ba047068f40ff7093dd1d9da90898e63dd61736462e9cdda6a90ad3c3"
 
 [[package]]
 name = "mime"
@@ -2826,6 +2845,18 @@ checksum = "bcda906d8be16e728fd5adc5b729afad4e444e106ab28cd1c7256e54fa61510f"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "wee_alloc"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dbb3b5a6b2bb17cb6ad44a2e68a43e8d2722c997da10e928665c72ec6c0a0b8e"
+dependencies = [
+ "cfg-if 0.1.10",
+ "libc",
+ "memory_units",
+ "winapi 0.3.9",
 ]
 
 [[package]]
