@@ -81,8 +81,29 @@ services:
     devices:
       - /dev/kmsg:/dev/kmsg
 
+  nodeexporter:
+    image: prom/node-exporter:v1.4.0
+    container_name: nodeexporter
+    hostname: nodeexporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+    restart: unless-stopped
+    expose:
+      - 9100
+    ports:
+      - '9100:9100'
+    networks:
+      - hopr-net
+
   prometheus:
-    image: prom/prometheus:v2.30.0
+    image: prom/prometheus:v2.41.0
     restart: always
     container_name: prometheus
     hostname: prometheus
@@ -105,7 +126,7 @@ services:
       - hopr-net
 
   grafana:
-    image: grafana/grafana:8.1.8
+    image: grafana/grafana:9.3.2
     user: '472'
     restart: always
     environment:
