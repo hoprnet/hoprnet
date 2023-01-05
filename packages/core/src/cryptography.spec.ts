@@ -77,6 +77,7 @@ describe('cryptographic correspondence tests', async function () {
   })
 
   it('generate keyshares correspondence', async function () {
+    //let peerIds = [0, 1, 2].map(async (_) => await createSecp256k1PeerId());
     let peerIds = [
       '16Uiu2HAm15SBTjbZURUZp139uaBAUtw8uS9gDBhFMMX65iHNo4z9',
       '16Uiu2HAmK6qfNEb5BNKUuTrRSJERuritCSwag3NdQsGyt3JJPyA2',
@@ -85,10 +86,7 @@ describe('cryptographic correspondence tests', async function () {
 
     let keyshares_ts = generateKeyShares(peerIds)
 
-    let pub_keys = peerIds.map((p) => p.publicKey as Uint8Array)
-    for (let i = 0; i < pub_keys.length; i++) {
-      console.log(`pub key ${u8aToHex(pub_keys[i])}`)
-    }
+    let pub_keys = peerIds.map((p) => (p.publicKey as Uint8Array).slice(4))
     let keyshares_rs = SharedKeys.generate(pub_keys)
 
     assert.equal(u8aToHex(keyshares_ts.alpha), u8aToHex(keyshares_rs.get_alpha()))
