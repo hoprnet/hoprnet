@@ -143,6 +143,12 @@ mod tests {
     use elliptic_curve::rand_core::OsRng;
 
     #[test]
+    fn test_decode_point() {
+        let point = hex!("080212210253f6e72ad23de294466b830619448d6d9059a42050141cd83bac4e3ee82c3f1e");
+        decode_public_key_to_point(&point).unwrap();
+    }
+
+    #[test]
     fn test_extract_key_from_group_element() {
         let salt = [0xde, 0xad, 0xbe, 0xef ];
         let pt = AffinePoint::generator();
@@ -209,7 +215,8 @@ mod tests {
             Box::new(hex!("08021221038d2b50a77fd43eeae9b37856358c7f1aee773b3e3c9d26f30b8706c02cbbfbb6"))
         ];
 
-        SharedKeys::generate(&mut OsRng, pub_keys).unwrap();
+        let keyshares = SharedKeys::generate(&mut OsRng, pub_keys).unwrap();
+        assert_eq!(3, keyshares.secrets.len());
     }
 }
 
