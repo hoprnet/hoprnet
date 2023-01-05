@@ -1,8 +1,9 @@
 import { PRG as Rust_PRG, PRP as Rust_PRP, SharedKeys } from './cryptography.js'
-import { generateKeyShares, PRG as TS_PRG, PRP as TS_PRP, u8aToHex } from '@hoprnet/hopr-utils'
+import { generateKeyShares, PRG as TS_PRG, PRP as TS_PRP, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 
-import { peerIdFromString } from '@libp2p/peer-id'
+import { createSecp256k1PeerId } from '@libp2p/peer-id-factory'
+import { forwardTransform } from '@hoprnet/hopr-utils/lib/crypto/packet/keyShares.js'
 
 describe('cryptographic correspondence tests', async function () {
   it('PRG correspondence', async function () {
@@ -76,25 +77,45 @@ describe('cryptographic correspondence tests', async function () {
     assert.equal(u8aToHex(pt_1), u8aToHex(pt_2))
   })
 
-  it('generate keyshares correspondence', async function () {
-    //let peerIds = [0, 1, 2].map(async (_) => await createSecp256k1PeerId());
-    let peerIds = [
-      '16Uiu2HAm15SBTjbZURUZp139uaBAUtw8uS9gDBhFMMX65iHNo4z9',
-      '16Uiu2HAmK6qfNEb5BNKUuTrRSJERuritCSwag3NdQsGyt3JJPyA2',
-      '16Uiu2HAmNA49JtveyXGTK1StvF25NeAt6rCbjKH1ahHJGNLnzj33'
-    ].map((p) => peerIdFromString(p))
+  it('keyshares correspondence: generate key shares in RS and verify them in TS', async function () {
+    const AMOUNT = 4
+    const peerIds = await Promise.all(Array.from({ length: AMOUNT }).map((_) => createSecp256k1PeerId()))
 
-    let keyshares_ts = generateKeyShares(peerIds)
+    let peer_pub_keys = peerIds.map((p) => (p.publicKey as Uint8Array).slice(4))
+    let keyshares_rs = SharedKeys.generate(peer_pub_keys)
 
-    let pub_keys = peerIds.map((p) => (p.publicKey as Uint8Array).slice(4))
-    let keyshares_rs = SharedKeys.generate(pub_keys)
+    assert.equal(keyshares_rs.count_shared_keys(), AMOUNT)
 
-    assert.equal(u8aToHex(keyshares_ts.alpha), u8aToHex(keyshares_rs.get_alpha()))
+    const alpha = keyshares_rs.get_alpha()
+    const secrets = Array.from({ length: keyshares_rs.count_shared_keys() }).map((_,i) => keyshares_rs.get_peer_shared_key(i));
 
-    assert.equal(keyshares_ts.secrets.length, keyshares_rs.count_shared_keys())
+    for (let i = 0; i < AMOUNT; i++) {
+      const { alpha: tmpAlpha, secret } = forwardTransform(alpha, peerIds[i])
 
-    for (let i = 0; i < keyshares_rs.count_shared_keys(); i++) {
-      assert.equal(u8aToHex(keyshares_ts.secrets[i]), u8aToHex(keyshares_rs.get_peer_shared_key(i)))
+      assert(u8aEquals(secret, secrets[i]))
+
+      alpha.set(tmpAlpha)
     }
   })
+
+  it('keyshares correspondence: generate key shares in TS and verify them in RS', async function () {
+    const AMOUNT = 4
+    const keyPairs = await Promise.all(Array.from({ length: AMOUNT }).map((_) => createSecp256k1PeerId()))
+
+    const { alpha, secrets } = generateKeyShares(keyPairs)
+
+    for (let i = 0; i < AMOUNT; i++) {
+      let fwd_keyshare_rs = SharedKeys.forward_transform(alpha, keyPairs[i].publicKey.slice(4), keyPairs[i].privateKey.slice(4))
+
+      assert.equal(fwd_keyshare_rs.count_shared_keys(), 1)
+
+      const tmpAlpha = fwd_keyshare_rs.get_alpha()
+      const secret = fwd_keyshare_rs.get_peer_shared_key(0)
+
+      assert(u8aEquals(secret, secrets[i]))
+
+      alpha.set(tmpAlpha)
+    }
+  })
+
 })
