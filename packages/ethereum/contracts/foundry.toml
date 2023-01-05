@@ -15,7 +15,7 @@ build_info_path = "build-info"
 [rpc_endpoints]
 local = "http://localhost:8545"
 gnosis = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
-goerli = "https://goerli.infura.io/v3/${INFURA_API_KEY}" # "https://provider-proxy.hoprnet.workers.dev/eth_goerli" # alternative can be "https://goerli.infura.io/v3/${INFURA_API_KEY}" or  "https://rpc.ankr.com/eth_goerli"
+goerli = "https://provider-proxy.hoprnet.workers.dev/eth_goerli" # alternative can be "https://goerli.infura.io/v3/${INFURA_API_KEY}" or  "https://rpc.ankr.com/eth_goerli"
 
 [etherscan]
 goerli = { key = "${ETHERSCAN_API_KEY}", url = "https://api-goerli.etherscan.io" }
