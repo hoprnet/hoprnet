@@ -2,7 +2,7 @@
 version: '3.8'
 
 networks:
-  hopr-nat:
+  hopr-net:
     driver: bridge
 
 volumes:
@@ -19,7 +19,7 @@ services:
     hostname: hoprd
     restart: unless-stopped
     networks:
-      - hopr-nat
+      - hopr-net
     ports:
       - '8080:8080'
       - '9091:9091'
@@ -50,12 +50,12 @@ services:
   admin:
     image: ${HOPR_ADMIN_DOCKER_IMAGE}
     ports:
-      - '3000'
+      - '3000:3000'
     restart: unless-stopped
     depends_on:
       - hoprd
     networks:
-      - hopr-nat
+      - hopr-net
     deploy:
       resources:
         limits:
@@ -77,7 +77,7 @@ services:
     ports:
       - '9093:8080'
     networks:
-      - hopr-nat
+      - hopr-net
     devices:
       - /dev/kmsg:/dev/kmsg
 
@@ -102,7 +102,7 @@ services:
     environment:
       DATA_RETENTION_DAYS: 30
     networks:
-      - hopr-nat
+      - hopr-net
 
   grafana:
     image: grafana/grafana:8.1.8
@@ -120,4 +120,4 @@ services:
     depends_on:
       - prometheus
     networks:
-      - hopr-nat
+      - hopr-net
