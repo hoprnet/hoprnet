@@ -60,12 +60,14 @@ export type ResolvedEnvironment = {
   network_registry_contract_address: string // an Ethereum address,
 }
 
+const MONO_REPO_PATH = new URL('../../../', import.meta.url).pathname
+
 /**
  * @param version HOPR version
  * @returns environments that the given HOPR version should be able to use
  */
 export function supportedEnvironments(): Environment[] {
-  return supported_environments(new URL('../../../', import.meta.url).pathname)
+  return supported_environments(MONO_REPO_PATH)
 }
 
 /**
@@ -74,5 +76,5 @@ export function supportedEnvironments(): Environment[] {
  * @returns the environment details, throws if environment is not supported
  */
 export function resolveEnvironment(environment_id: string, customProvider?: string): ResolvedEnvironment {
-  return resolve_environment(new URL('../../../', import.meta.url).pathname, environment_id, customProvider)
+  return resolve_environment(MONO_REPO_PATH, environment_id, customProvider)
 }

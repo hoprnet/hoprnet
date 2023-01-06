@@ -41,8 +41,6 @@ $(WORKSPACES_WITH_RUST_MODULES):
 
 .PHONY: deps-ci
 deps-ci: ## Installs dependencies when running in CI
-# GitHub Actions: fetch prebuilt sources
-	${CURDIR}/scripts/toolchain/install-toolchain.sh
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	$(MAKE) cargo-update
 	CI=true yarn workspaces focus ${YARNFLAGS}
@@ -172,7 +170,7 @@ run-local: ## run HOPRd from local repo
 		--password="local" --identity=`pwd`/.identity-local \
 		--environment hardhat-localhost --announce \
 		--testUseWeakCrypto --testAnnounceLocalAddresses \
-		--testPreferLocalAddresses --testNoAuthentication
+		--testPreferLocalAddresses --disableApiAuthentication
 
 .PHONY: docker-build-local
 docker-build-local: ## build Docker images locally, or single image if image= is set

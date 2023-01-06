@@ -181,7 +181,7 @@ function setup_node() {
   if [[ -n "${api_token}" ]]; then
     additional_args="--api-token='${api_token}' ${additional_args}"
   else
-    additional_args="--testNoAuthentication ${additional_args}"
+    additional_args="--disableApiAuthentication ${additional_args}"
   fi
 
   # Remove previous logs to make sure the regex does not match
@@ -331,7 +331,7 @@ declare ct_node1_address="0xde913eeed23bce5274ead3de8c196a41176fbd49"
 
 #  --- Run nodes --- {{{
 setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "${node1_privkey}" "--announce"
-setup_node 13302 "" 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "${node2_privkey}" "--announce"
+setup_node 13302 ""                   19092 "${node2_dir}" "${node2_log}" "${node2_id}" "${node2_privkey}" "--announce"
 setup_node 13303 ${default_api_token} 19093 "${node3_dir}" "${node3_log}" "${node3_id}" "${node3_privkey}" "--announce"
 setup_node 13304 ${default_api_token} 19094 "${node4_dir}" "${node4_log}" "${node4_id}" "${node4_privkey}" "--testNoDirectConnections"
 setup_node 13305 ${default_api_token} 19095 "${node5_dir}" "${node5_log}" "${node5_id}" "${node5_privkey}" "--testNoDirectConnections"
