@@ -1,4 +1,3 @@
-
 #[cfg(test)]
 pub mod dummy_rng {
     use elliptic_curve::rand_core::{CryptoRng, Error, RngCore};

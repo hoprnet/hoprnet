@@ -2,7 +2,7 @@ use crate::parameters;
 
 use blake2::Blake2s256;
 use hkdf::SimpleHkdf;
-use hmac::{SimpleHmac, Mac};
+use hmac::{Mac, SimpleHmac};
 use crate::errors::CryptoError::{InvalidInputSize, InvalidParameterSize};
 
 use crate::errors::Result;
@@ -74,4 +74,23 @@ mod tests {
         let r = hex!("6CBD916300C24CC0DA636490668A4D85A4F42113496FCB452099F76131A3662E");
         assert_eq!(r, res.unwrap().as_ref());
     }
+}
+
+pub fn generate_key_iv(secret: &[u8], info: &[u8], key: &mut [u8], iv: &mut [u8]) -> Result<()> {
+    if secret.len() != SECRET_KEY_LENGTH {
+        return Err(InvalidParameterSize{name: "secret".into(), expected: SECRET_KEY_LENGTH})
+    }
+
+    let hkdf = SimpleHkdf::<Blake2s256>::from_prk(secret)
+        .map_err(|_| InvalidParameterSize{name: "secret".into(), expected: SECRET_KEY_LENGTH})?;
+
+    let mut out = vec![0u8; key.len() + iv.len()];
+    hkdf.expand(info, &mut out)
+        .map_err(|_| InvalidInputSize)?;
+
+    let (v_key, v_iv) = out.split_at(key.len());
+    key.copy_from_slice(v_key);
+    iv.copy_from_slice(v_iv);
+
+    Ok(())
 }

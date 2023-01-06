@@ -31,22 +31,3 @@ pub const PRG_COUNTER_LENGTH: usize = 4;
 pub const PRG_IV_LENGTH: usize = AES_BLOCK_SIZE - PRG_COUNTER_LENGTH;
 
 pub const PACKET_TAG_LENGTH: usize = 16;
-
-pub fn generate_key_iv(secret: &[u8], info: &[u8], key: &mut [u8], iv: &mut [u8]) -> Result<()> {
-    if secret.len() != SECRET_KEY_LENGTH {
-        return Err(InvalidParameterSize{name: "secret".into(), expected: SECRET_KEY_LENGTH})
-    }
-
-    let hkdf = SimpleHkdf::<Blake2s256>::from_prk(secret)
-        .map_err(|_| InvalidParameterSize{name: "secret".into(), expected: SECRET_KEY_LENGTH})?;
-
-    let mut out = vec![0u8; key.len() + iv.len()];
-    hkdf.expand(info, &mut out)
-        .map_err(|_| InvalidInputSize)?;
-
-    let (v_key, v_iv) = out.split_at(key.len());
-    key.copy_from_slice(v_key);
-    iv.copy_from_slice(v_iv);
-
-    Ok(())
-}

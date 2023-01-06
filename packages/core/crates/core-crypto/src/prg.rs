@@ -1,7 +1,8 @@
 use aes::cipher::{KeyIvInit, StreamCipher};
+use crate::derivation::generate_key_iv;
 use crate::errors::Result;
 use crate::errors::CryptoError::{InvalidInputSize, InvalidParameterSize};
-use crate::parameters::{AES_BLOCK_SIZE, generate_key_iv, HASH_KEY_PRG, PRG_IV_LENGTH, PRG_KEY_LENGTH};
+use crate::parameters::{AES_BLOCK_SIZE, HASH_KEY_PRG, PRG_IV_LENGTH, PRG_KEY_LENGTH};
 
 type Aes128Ctr32BE = ctr::Ctr32BE<aes::Aes128>;
 

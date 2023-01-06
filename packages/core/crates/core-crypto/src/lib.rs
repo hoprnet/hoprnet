@@ -2,7 +2,7 @@ mod utils;
 
 pub(crate) mod dummy_rng;
 
-pub mod commitment;
+pub mod derivation;
 pub mod parameters;
 pub mod shared_keys;
 pub mod primitives;

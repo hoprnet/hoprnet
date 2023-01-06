@@ -1,7 +1,8 @@
+use crate::derivation::generate_key_iv;
 use crate::errors::Result;
 use crate::errors::CryptoError::{InvalidInputSize, InvalidParameterSize};
 
-use crate::parameters::{generate_key_iv, HASH_KEY_PRP, PRP_INTERMEDIATE_IV_LENGTH, PRP_INTERMEDIATE_KEY_LENGTH, PRP_IV_LENGTH, PRP_KEY_LENGTH, PRP_MIN_LENGTH};
+use crate::parameters::{HASH_KEY_PRP, PRP_INTERMEDIATE_IV_LENGTH, PRP_INTERMEDIATE_KEY_LENGTH, PRP_IV_LENGTH, PRP_KEY_LENGTH, PRP_MIN_LENGTH};
 use crate::primitives::{calculate_mac, SimpleStreamCipher};
 
 pub struct PRPParameters {
