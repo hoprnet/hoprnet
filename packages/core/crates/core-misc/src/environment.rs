@@ -5,7 +5,6 @@ use wasm_bindgen::JsValue;
 
 #[wasm_bindgen(module = "@hoprnet/hopr-real")]
 extern "C" {
-    // Reads the given file and returns it as array of bytes.
     #[wasm_bindgen(catch)]
     pub fn coerce_version(version: String) -> Result<String, JsValue>;
 
@@ -115,6 +114,7 @@ pub struct ProtocolConfig {
     networks: std::collections::HashMap<String, NetworkOptions>,
 }
 
+/// Reads current protocol config and returns it
 pub fn get_protocol_config(mono_repo_path: &str) -> Result<ProtocolConfig, JsValue> {
     let protocol_config_path = format!("{}/packages/core/protocol-config.json", mono_repo_path);
 
@@ -128,6 +128,7 @@ struct PackageJsonFile {
     version: String,
 }
 
+/// Reads `hoprd` package.json file and returns its version
 fn get_package_version(mono_repo_path: &str) -> Result<String, JsValue> {
     let package_json_path = format!("{}/packages/hoprd/package.json", mono_repo_path);
 
