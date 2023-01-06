@@ -8,7 +8,6 @@ import { derivePRGParameters } from '@hoprnet/hopr-utils/lib/crypto/packet/keyDe
 import { SECRET_LENGTH } from '@hoprnet/hopr-utils/lib/crypto/packet/constants.js'
 
 describe('cryptographic correspondence tests', async function () {
-
   it('PRG parameters correspondence', async function () {
     let prg_params_ts = derivePRGParameters(new Uint8Array(SECRET_LENGTH))
     console.log(u8aToHex(prg_params_ts.key))
