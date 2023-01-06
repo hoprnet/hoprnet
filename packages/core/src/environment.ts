@@ -5,10 +5,6 @@ import {
 } from '../lib/core_misc.js'
 core_misc_panic_hook()
 export { resolve_environment, supported_environments } from '../lib/core_misc.js'
-/**
- * Coerced full version using
- * semver.coerce('42.6.7.9.3-alpha') // '42.6.7'
- */
 
 export type NetworkOptions = {
   id: string

@@ -23,6 +23,9 @@
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },
+  "dependencies": {
+    "semver": "7.3.8"
+  },
   "devDependencies": {
     "@types/mocha": "9.1.1",
     "mocha": "9.2.2",
