@@ -3,18 +3,13 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 
-#[wasm_bindgen]
-pub struct SemverResult {
-    version: String,
-}
-
-#[wasm_bindgen(module = "semver")]
+#[wasm_bindgen(module = "@hoprnet/hopr-real")]
 extern "C" {
     // Reads the given file and returns it as array of bytes.
-    #[wasm_bindgen(catch, js_namespace = semver)]
-    pub fn coerce(version: String) -> Result<SemverResult, JsValue>;
+    #[wasm_bindgen(catch)]
+    pub fn coerce_version(version: String) -> Result<String, JsValue>;
 
-    #[wasm_bindgen(catch, js_namespace = semver)]
+    #[wasm_bindgen(catch)]
     pub fn satisfies(version: String, range: String) -> Result<bool, JsValue>;
 }
 
@@ -36,8 +31,12 @@ impl ToString for EnvironmentType {
     }
 }
 
+/// Holds all information we need about the blockchain network
+/// the client is going to use
 #[derive(Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct NetworkOptions {
+    #[serde(skip)]
     id: String,
     description: String,
     /// >= 0
@@ -53,16 +52,20 @@ pub struct NetworkOptions {
     max_priority_fee_per_gas: String,
     native_token_name: String,
     hopr_token_name: String,
-    tags: Vec<String>,
+    tags: Option<Vec<String>>,
 }
 
+/// Holds all information about the protocol environment
+/// to be used by the client
 #[derive(Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct Environment {
     #[serde(skip)]
     id: String,
     /// must match one of the Network.id
     network_id: String,
     environment_type: EnvironmentType,
+    // Node.js-fashioned semver string
     version_range: String,
     channel_contract_deploy_block: u32,
     /// an Ethereum address
@@ -79,6 +82,7 @@ pub struct Environment {
     network_registry_proxy_contract_address: String,
     /// an Ethereum address
     network_registry_contract_address: String,
+    tags: Vec<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -105,6 +109,7 @@ pub struct ResolvedEnvironment {
 }
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ProtocolConfig {
     environments: std::collections::HashMap<String, Environment>,
     networks: std::collections::HashMap<String, NetworkOptions>,
@@ -128,10 +133,14 @@ fn get_package_version(mono_repo_path: &str) -> Result<String, JsValue> {
 
     let data = real::read_file(package_json_path.as_str())?;
 
-    match serde_json::from_slice::<PackageJsonFile>(&data) {
-        Ok(json) => Ok(coerce(json.version).unwrap().version),
-        Err(e) => Err(JsValue::from(e.to_string())),
-    }
+    let package_json = serde_json::from_slice::<PackageJsonFile>(&data)
+        .map_err(|e| JsValue::from(e.to_string()))?;
+
+    /*
+     * Coerced full version using
+     * coerce_version('42.6.7.9.3-alpha') // '42.6.7'
+     */
+    coerce_version(package_json.version)
 }
 
 /// Returns a list of environments which the node is able to work with
@@ -177,6 +186,8 @@ pub fn resolve_environment(
             environment.network_id, environment_id
         )))?;
 
+    network.id = environment.network_id.to_owned();
+
     if let Some(custom_provider) = maybe_custom_provider {
         network.default_provider = String::from(custom_provider);
     }
@@ -199,7 +210,17 @@ pub fn resolve_environment(
                 .network_registry_proxy_contract_address
                 .to_owned(),
         }),
-        Ok(false) => Err(JsValue::from("Environment does not satisfy version range")),
+        Ok(false) => match supported_environments(mono_repo_path) {
+            Ok(envs) => Err(JsValue::from(format!(
+                "environment {} is not supported, supported environments {:?}",
+                environment_id,
+                envs.iter()
+                    .map(|e| e.id.to_owned())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ))),
+            Err(e) => Err(e),
+        },
         Err(e) => Err(e),
     }
 }
@@ -208,9 +229,17 @@ pub mod wasm {
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
 
+    macro_rules! clean_mono_repo_path {
+        ($v:expr,$r:ident) => {
+            let $r = $v.strip_suffix("/").unwrap_or($v);
+        };
+    }
+
     #[wasm_bindgen]
     pub fn supported_environments(mono_repo_path: &str) -> Result<JsValue, JsValue> {
-        let supported_envs = super::supported_environments(mono_repo_path)?;
+        clean_mono_repo_path!(mono_repo_path, cleaned_mono_repo_path);
+
+        let supported_envs = super::supported_environments(cleaned_mono_repo_path)?;
 
         serde_wasm_bindgen::to_value(&supported_envs).map_err(|e| JsValue::from(e.to_string()))
     }
@@ -221,8 +250,10 @@ pub mod wasm {
         environment_id: &str,
         maybe_custom_provider: Option<String>,
     ) -> Result<JsValue, JsValue> {
+        clean_mono_repo_path!(mono_repo_path, cleaned_mono_repo_path);
+
         let resolved_environment = super::resolve_environment(
-            mono_repo_path,
+            cleaned_mono_repo_path,
             environment_id,
             maybe_custom_provider.as_ref().map(|c| c.as_str()),
         )?;
