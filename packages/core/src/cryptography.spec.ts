@@ -96,7 +96,9 @@ describe('cryptographic correspondence tests', async function () {
     assert.equal(keyshares_rs.count_shared_keys(), AMOUNT)
 
     const alpha = keyshares_rs.get_alpha()
-    const secrets = Array.from({ length: keyshares_rs.count_shared_keys() }).map((_,i) => keyshares_rs.get_peer_shared_key(i));
+    const secrets = Array.from({ length: keyshares_rs.count_shared_keys() }).map((_, i) =>
+      keyshares_rs.get_peer_shared_key(i)
+    )
 
     for (let i = 0; i < AMOUNT; i++) {
       const { alpha: tmpAlpha, secret } = forwardTransform(alpha, peerIds[i])
@@ -114,7 +116,11 @@ describe('cryptographic correspondence tests', async function () {
     const { alpha, secrets } = generateKeyShares(keyPairs)
 
     for (let i = 0; i < AMOUNT; i++) {
-      let fwd_keyshare_rs = SharedKeys.forward_transform(alpha, keyPairs[i].publicKey.slice(4), keyPairs[i].privateKey.slice(4))
+      let fwd_keyshare_rs = SharedKeys.forward_transform(
+        alpha,
+        keyPairs[i].publicKey.slice(4),
+        keyPairs[i].privateKey.slice(4)
+      )
 
       assert.equal(fwd_keyshare_rs.count_shared_keys(), 1)
 
@@ -126,5 +132,4 @@ describe('cryptographic correspondence tests', async function () {
       alpha.set(tmpAlpha)
     }
   })
-
 })
