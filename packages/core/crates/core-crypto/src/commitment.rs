@@ -3,9 +3,10 @@ use crate::parameters;
 use blake2::Blake2s256;
 use hkdf::SimpleHkdf;
 use hmac::{SimpleHmac, Mac};
-use crate::errors::CryptoError::InvalidInputSize;
+use crate::errors::CryptoError::{InvalidInputSize, InvalidParameterSize};
 
 use crate::errors::Result;
+use crate::parameters::{HASH_KEY_PACKET_TAG, PACKET_TAG_LENGTH, SECRET_KEY_LENGTH};
 
 /// Derives the commitment seed given the compressed private key representation
 /// and the serialized channel information.
@@ -30,9 +31,25 @@ pub fn derive_commitment_seed(private_key: &[u8], channel_info: &[u8]) -> Result
     Ok(mac_value.as_slice().into())
 }
 
+pub fn derive_packet_tag(secret: &[u8]) -> Result<Box<[u8]>> {
+    let hkdf = SimpleHkdf::<Blake2s256>::from_prk(secret)
+        .map_err(|_| InvalidParameterSize{name: "secret".into(), expected: SECRET_KEY_LENGTH})?;
+
+    let mut out = vec![0u8; PACKET_TAG_LENGTH];
+    hkdf.expand(HASH_KEY_PACKET_TAG.as_bytes(), &mut out)
+        .map_err(|_| InvalidInputSize)?;
+
+    Ok(out.into_boxed_slice())
+}
+
 pub mod wasm {
     use wasm_bindgen::prelude::*;
     use crate::utils::{as_jsvalue, JsResult};
+
+    #[wasm_bindgen]
+    pub fn derive_packet_tag(secret: &[u8]) -> JsResult<Box<[u8]>> {
+        super::derive_packet_tag(secret).map_err(as_jsvalue)
+    }
 
     #[wasm_bindgen]
     pub fn derive_commitment_seed(private_key: &[u8], channel_info: &[u8]) -> JsResult<Box<[u8]>> {

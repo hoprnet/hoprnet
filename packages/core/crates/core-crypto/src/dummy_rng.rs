@@ -1,7 +1,10 @@
-use elliptic_curve::rand_core::{CryptoRng, Error, RngCore};
-use hex_literal::hex;
 
-const RNG_BYTES: [u8; 512] = hex!("cc6cb43c4928eea3c31e0d3bfcf8563f85d4bcc771e8efc4792fe3422a09f08a
+#[cfg(test)]
+pub mod dummy_rng {
+    use elliptic_curve::rand_core::{CryptoRng, Error, RngCore};
+    use hex_literal::hex;
+
+    const RNG_BYTES: [u8; 512] = hex!("cc6cb43c4928eea3c31e0d3bfcf8563f85d4bcc771e8efc4792fe3422a09f08a
     36dd22e648fce34edcd20439d9075075073f6da33d344430a45e7e2dfd297890
     7975caa9619afec8b43b3da891ec2369710a61d9630fbdfcd5509da466139c5f7
     a3c91f01fd6fac3665ad229def29873a2b0498bfefadbcb95f946bbea2a3f7657
@@ -18,57 +21,56 @@ const RNG_BYTES: [u8; 512] = hex!("cc6cb43c4928eea3c31e0d3bfcf8563f85d4bcc771e8e
     bb8cfb2c005c7de64fb7c8f08613fafe824f1cbebd869aae560299d771f2b896b
     26fcf9a70b0ea3066531ac1a9190b52eb12cc10997aca62d7ce");
 
-/// Dummy RNG that cyclically outputs same set of random bytes
-#[derive(Clone, Copy, Debug, Default)]
-pub(crate) struct DummyFixedRng {
-    ptr: usize
-}
-
-impl DummyFixedRng {
-    pub fn new() -> Self {
-        DummyFixedRng { ptr: 0 }
+    /// Dummy RNG that cyclically outputs same set of random bytes
+    #[derive(Clone, Copy, Debug, Default)]
+    pub(crate) struct DummyFixedRng {
+        ptr: usize
     }
 
-    fn read_raw_byte(&mut self) -> u8 {
-        if self.ptr >=  RNG_BYTES.len() {
-            self.ptr = 0
-        }
-        else if self.ptr != 0 {
-            self.ptr += 1;
+    impl DummyFixedRng {
+        pub fn new() -> Self {
+            DummyFixedRng { ptr: 0 }
         }
 
-        RNG_BYTES[self.ptr]
-    }
+        fn read_raw_byte(&mut self) -> u8 {
+            if self.ptr >= RNG_BYTES.len() {
+                self.ptr = 0
+            } else if self.ptr != 0 {
+                self.ptr += 1;
+            }
 
-    fn read_bytes(&mut self, data: &mut [u8]) {
-        for i in 0..data.len() {
-            data[i] = self.read_raw_byte()
+            RNG_BYTES[self.ptr]
+        }
+
+        fn read_bytes(&mut self, data: &mut [u8]) {
+            for i in 0..data.len() {
+                data[i] = self.read_raw_byte()
+            }
         }
     }
+
+    impl RngCore for DummyFixedRng {
+        fn next_u32(&mut self) -> u32 {
+            let mut data = [0u8; 4];
+            self.read_bytes(&mut data);
+            u32::from_ne_bytes(data)
+        }
+
+        fn next_u64(&mut self) -> u64 {
+            let mut data = [0u8; 8];
+            self.read_bytes(&mut data);
+            u64::from_ne_bytes(data)
+        }
+
+        fn fill_bytes(&mut self, dest: &mut [u8]) {
+            self.read_bytes(dest)
+        }
+
+        fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Error> {
+            self.fill_bytes(dest);
+            Ok(())
+        }
+    }
+
+    impl CryptoRng for DummyFixedRng {}
 }
-
-impl RngCore for DummyFixedRng {
-
-    fn next_u32(&mut self) -> u32 {
-        let mut data = [0u8; 4];
-        self.read_bytes(&mut data);
-        u32::from_ne_bytes(data)
-    }
-
-    fn next_u64(&mut self) -> u64 {
-        let mut data = [0u8; 8];
-        self.read_bytes(&mut data);
-        u64::from_ne_bytes(data)
-    }
-
-    fn fill_bytes(&mut self, dest: &mut [u8]) {
-        self.read_bytes(dest)
-    }
-
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Error> {
-        self.fill_bytes(dest);
-        Ok(())
-    }
-}
-
-impl CryptoRng for DummyFixedRng { }

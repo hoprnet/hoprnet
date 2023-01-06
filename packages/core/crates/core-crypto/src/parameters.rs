@@ -12,6 +12,7 @@ pub const HASH_KEY_COMMITMENT_SEED: &str = "HASH_KEY_COMMITMENT_SEED";
 pub const HASH_KEY_HMAC: &str = "HASH_KEY_HMAC";
 pub const HASH_KEY_PRG: &str = "HASH_KEY_PRG";
 pub const HASH_KEY_PRP: &str = "HASH_KEY_PRP";
+pub const HASH_KEY_PACKET_TAG: &str = "HASH_KEY_PACKET_TAG";
 
 pub const SECRET_KEY_LENGTH: usize = 32;
 
@@ -29,6 +30,7 @@ pub const PRG_KEY_LENGTH: usize = AES_KEY_SIZE;
 pub const PRG_COUNTER_LENGTH: usize = 4;
 pub const PRG_IV_LENGTH: usize = AES_BLOCK_SIZE - PRG_COUNTER_LENGTH;
 
+pub const PACKET_TAG_LENGTH: usize = 16;
 
 pub fn generate_key_iv(secret: &[u8], info: &[u8], key: &mut [u8], iv: &mut [u8]) -> Result<()> {
     if secret.len() != SECRET_KEY_LENGTH {

@@ -10,16 +10,17 @@ use generic_array::GenericArray;
 use k256::{AffinePoint, NonZeroScalar, Secp256k1};
 
 use hkdf::SimpleHkdf;
+use crate::errors::CryptoError::{EllipticCurveError, InvalidSecretScalar};
 
 use crate::parameters;
+
+use crate::errors::Result;
 
 /// Type for the secret keys with fixed size
 /// The GenericArray<..> is mostly deprecated since Rust 1.51 and it's introduction of const generics,
 /// but we need to use it because elliptic_curves and all RustCrypto crates mostly expose it in their
 /// public interfaces.
 pub type KeyBytes = GenericArray<u8, typenum::U32>;
-
-// TODO: Define custom error type instead of using String in the Result<>
 
 /// Extract a keying material from an EC point using HKDF extract
 fn extract_key_from_group_element(group_element: &AffinePoint, salt: &[u8]) -> KeyBytes {
@@ -43,18 +44,18 @@ fn expand_key_from_group_element(group_element: &AffinePoint, salt: &[u8]) -> Ke
 }
 
 /// Decodes the public key and converts it into an EC point in projective coordinates
-fn decode_public_key_to_point(encoded_public_key: &[u8]) -> Result<ProjectivePoint<Secp256k1>, String> {
+fn decode_public_key_to_point(encoded_public_key: &[u8]) -> Result<ProjectivePoint<Secp256k1>> {
     PublicKey::<Secp256k1>::from_sec1_bytes(encoded_public_key)
         .map(|decoded| ProjectivePoint::<Secp256k1>::from(decoded))
-        .map_err(|e| e.to_string())
+        .map_err(|e| EllipticCurveError(e))
 }
 
 /// Checks if the given key bytes can form a scalar for EC point
-fn to_checked_secret_scalar(secret_scalar: KeyBytes) -> Result<NonZeroScalar, String> {
+fn to_checked_secret_scalar(secret_scalar: KeyBytes) -> Result<NonZeroScalar> {
     let scalar = NonZeroScalar::from_repr(secret_scalar);
     match Option::from(scalar) {
         Some(s) => Ok(s),
-        None => Err("Invalid secret scalar resulting in EC point in infinity".into())
+        None => Err(InvalidSecretScalar)
     }
 }
 
@@ -70,7 +71,7 @@ impl SharedKeys {
     /// Generates shared secrets given the peer public keys array.
     /// The order of the peer public keys is preserved for resulting shared keys.
     /// The specified random number generator will be used.
-    pub fn generate(rng: impl CryptoRng + RngCore, peer_public_keys: Vec<Box<[u8]>>) -> Result<SharedKeys, String> {
+    pub fn generate(rng: impl CryptoRng + RngCore, peer_public_keys: Vec<Box<[u8]>>) -> Result<SharedKeys> {
 
         let mut shared_keys = Vec::new();
 
@@ -114,7 +115,7 @@ impl SharedKeys {
     }
 
     /// Calculates the forward transformation for the given peer public key.
-    pub fn forward_transform(alpha: &[u8], public_key: &[u8], private_key: &[u8]) -> Result<SharedKeys, String> {
+    pub fn forward_transform(alpha: &[u8], public_key: &[u8], private_key: &[u8]) -> Result<SharedKeys> {
 
         let priv_key = to_checked_secret_scalar(KeyBytes::clone_from_slice(&private_key[0..private_key.len()]))?;
         let alpha_proj = decode_public_key_to_point(alpha)?;
