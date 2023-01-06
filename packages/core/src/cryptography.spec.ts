@@ -4,8 +4,17 @@ import assert from 'assert'
 
 import { createSecp256k1PeerId } from '@libp2p/peer-id-factory'
 import { forwardTransform } from '@hoprnet/hopr-utils/lib/crypto/packet/keyShares.js'
+import { derivePRGParameters } from '@hoprnet/hopr-utils/lib/crypto/packet/keyDerivation.js'
+import { SECRET_LENGTH } from '@hoprnet/hopr-utils/lib/crypto/packet/constants.js'
 
 describe('cryptographic correspondence tests', async function () {
+
+  it('PRG parameters correspondence', async function () {
+    let prg_params_ts = derivePRGParameters(new Uint8Array(SECRET_LENGTH))
+    console.log(u8aToHex(prg_params_ts.key))
+    console.log(u8aToHex(prg_params_ts.iv))
+  })
+
   it('PRG correspondence', async function () {
     let key = new Uint8Array(16)
     let iv = new Uint8Array(12)

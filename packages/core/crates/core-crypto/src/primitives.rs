@@ -5,6 +5,10 @@ use hmac::{Mac, SimpleHmac};
 use chacha20::cipher::KeyIvInit;
 use digest::FixedOutputReset;
 
+use crate::errors::Result;
+use crate::errors::CryptoError::{InvalidInputSize, InvalidParameterSize};
+use crate::parameters::SECRET_KEY_LENGTH;
+
 /// Simple Message Authentication Code (MAC) computation wrapper
 /// Use `new`, `update` and `finalize` triplet to produce MAC of arbitrary data.
 /// Currently this instance is computing HMAC based on Blake2s256
@@ -15,9 +19,9 @@ pub struct SimpleMac {
 impl SimpleMac {
 
     /// Create new instance of the MAC using the given secret key.
-    pub fn new(key: &[u8]) -> Result<Self, String> {
+    pub fn new(key: &[u8]) -> Result<Self> {
         Ok(Self {
-            instance: SimpleHmac::<Blake2s256>::new_from_slice(key).map_err(|e| e.to_string())?
+            instance: SimpleHmac::<Blake2s256>::new_from_slice(key).map_err(|_| InvalidParameterSize {name: "key".into(), expected: SECRET_KEY_LENGTH})?
         })
     }
 
@@ -44,17 +48,20 @@ impl SimpleStreamCipher {
 
     /// Create new instance of the stream cipher initialized
     /// with the given secret key and IV.
-    pub fn new(key: &[u8], iv: &[u8]) -> Result<Self, String> {
+    pub fn new(key: &[u8], iv: &[u8]) -> Result<Self> {
         let chacha_iv_size = ChaCha20::iv_size();
+        if iv.len() < chacha_iv_size {
+            return Err(InvalidParameterSize {name: "iv".into(), expected: chacha_iv_size})
+        }
+
         let chacha_key_size = ChaCha20::key_size();
-        if iv.len() >= chacha_iv_size || key.len() != chacha_key_size {
-            Ok(Self {
-                instance: ChaCha20::new_from_slices(key, &iv[0..chacha_iv_size]).map_err(|e| e.to_string())?
-            })
+        if key.len() < chacha_key_size {
+            return Err(InvalidParameterSize {name: "key".into(), expected: chacha_key_size})
         }
-        else {
-            Err("Incorrect key size or IV too small".into())
-        }
+
+        Ok(Self {
+            instance: ChaCha20::new_from_slices(key, &iv[0..chacha_iv_size]).map_err(|_| InvalidInputSize)?
+        })
     }
 
     /// Apply keystream to the given data in-place.
@@ -72,7 +79,7 @@ impl SimpleStreamCipher {
 
 /// Calculates MAC using the given key and data.
 /// Uses HMAC based on Blake2s256.
-pub fn calculate_mac(key: &[u8], data: &[u8]) -> Result<Box<[u8]>, String> {
+pub fn calculate_mac(key: &[u8], data: &[u8]) -> Result<Box<[u8]>> {
     let mut mac = SimpleMac::new(key)?;
     mac.update(data);
     Ok(mac.finalize())
@@ -81,12 +88,11 @@ pub fn calculate_mac(key: &[u8], data: &[u8]) -> Result<Box<[u8]>, String> {
 /// Functions and types exposed to WASM
 pub mod wasm {
     use wasm_bindgen::prelude::*;
-    use wasm_bindgen::JsValue;
 
-    use crate::utils::as_jsvalue;
+    use crate::utils::{as_jsvalue, JsResult};
 
     #[wasm_bindgen]
-    pub fn calculate_mac(key: &[u8], data: &[u8]) -> Result<Box<[u8]>, JsValue> {
+    pub fn calculate_mac(key: &[u8], data: &[u8]) -> JsResult<Box<[u8]>> {
         super::calculate_mac(key, data).map_err(as_jsvalue)
     }
 }
