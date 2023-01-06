@@ -36,7 +36,7 @@ impl ToString for EnvironmentType {
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct NetworkOptions {
-    #[serde(skip)]
+    #[serde(skip_deserializing)]
     id: String,
     description: String,
     /// >= 0
@@ -60,7 +60,7 @@ pub struct NetworkOptions {
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Environment {
-    #[serde(skip)]
+    #[serde(skip_deserializing)]
     id: String,
     /// must match one of the Network.id
     network_id: String,
