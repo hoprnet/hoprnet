@@ -1,4 +1,11 @@
-import { PRG as Rust_PRG, PRGParameters as Rust_PRGParameters, PRP as Rust_PRP, PRPParameters as Rust_PRPParameters, SharedKeys, derive_packet_tag } from './cryptography.js'
+import {
+  PRG as Rust_PRG,
+  PRGParameters as Rust_PRGParameters,
+  PRP as Rust_PRP,
+  PRPParameters as Rust_PRPParameters,
+  SharedKeys,
+  derive_packet_tag
+} from './cryptography.js'
 import { generateKeyShares, PRG as TS_PRG, PRP as TS_PRP, stringToU8a, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 
@@ -80,12 +87,22 @@ describe('cryptographic correspondence tests', async function () {
 
     //let ts_prp = TS_PRP.createPRP({ key: rs_prp_params.key(), iv: rs_prp_params.iv() })
     let ts_prp = TS_PRP.createPRP({
-      key: stringToU8a('0xa9c6632c9f76e5e4dd03203196932350a47562f816cebb810c64287ff68586f35cb715a26e268fc3ce68680e16767581de4e2cb3944c563d1f1a0cc077f3e788a12f31ae07111d77a876a66de5bdd6176bdaa2e07d1cb2e36e428afafdebb2109f70ce8422c8821233053bdd5871523ffb108f1e0f86809999a99d407590df25'),
-      iv: stringToU8a('0xa59991716be504b26471dea53d688c4bab8e910328e54ebb6ebf07b49e6d12eacfc56e0935ba2300559b43ede25aa09eee7e8a2deea5f0bdaee2e859834edd38')
+      key: stringToU8a(
+        '0xa9c6632c9f76e5e4dd03203196932350a47562f816cebb810c64287ff68586f35cb715a26e268fc3ce68680e16767581de4e2cb3944c563d1f1a0cc077f3e788a12f31ae07111d77a876a66de5bdd6176bdaa2e07d1cb2e36e428afafdebb2109f70ce8422c8821233053bdd5871523ffb108f1e0f86809999a99d407590df25'
+      ),
+      iv: stringToU8a(
+        '0xa59991716be504b26471dea53d688c4bab8e910328e54ebb6ebf07b49e6d12eacfc56e0935ba2300559b43ede25aa09eee7e8a2deea5f0bdaee2e859834edd38'
+      )
     })
 
-    let rs_prp = Rust_PRP.create(stringToU8a('0xa9c6632c9f76e5e4dd03203196932350a47562f816cebb810c64287ff68586f35cb715a26e268fc3ce68680e16767581de4e2cb3944c563d1f1a0cc077f3e788a12f31ae07111d77a876a66de5bdd6176bdaa2e07d1cb2e36e428afafdebb2109f70ce8422c8821233053bdd5871523ffb108f1e0f86809999a99d407590df25'),
-      stringToU8a('0xa59991716be504b26471dea53d688c4bab8e910328e54ebb6ebf07b49e6d12eacfc56e0935ba2300559b43ede25aa09eee7e8a2deea5f0bdaee2e859834edd38'))
+    let rs_prp = Rust_PRP.create(
+      stringToU8a(
+        '0xa9c6632c9f76e5e4dd03203196932350a47562f816cebb810c64287ff68586f35cb715a26e268fc3ce68680e16767581de4e2cb3944c563d1f1a0cc077f3e788a12f31ae07111d77a876a66de5bdd6176bdaa2e07d1cb2e36e428afafdebb2109f70ce8422c8821233053bdd5871523ffb108f1e0f86809999a99d407590df25'
+      ),
+      stringToU8a(
+        '0xa59991716be504b26471dea53d688c4bab8e910328e54ebb6ebf07b49e6d12eacfc56e0935ba2300559b43ede25aa09eee7e8a2deea5f0bdaee2e859834edd38'
+      )
+    )
 
     let pt = new Uint8Array(100)
     let ct_1 = rs_prp.forward(pt)
@@ -93,7 +110,7 @@ describe('cryptographic correspondence tests', async function () {
 
     console.log(u8aToHex(ct_1))
     console.log(u8aToHex(ct_2))
-    assert.equal(u8aToHex(ct_1), u8aToHex(ct_2), "ciphertexts dont correspond")
+    assert.equal(u8aToHex(ct_1), u8aToHex(ct_2), 'ciphertexts dont correspond')
   })
 
   it('PRP correspondence - TS forward / RS inverse', async function () {
@@ -102,8 +119,8 @@ describe('cryptographic correspondence tests', async function () {
     let rs_prp_params = new Rust_PRPParameters(secret)
     let ts_prp_params = derivePRPParameters(secret)
 
-    assert.equal(u8aToHex(ts_prp_params.key), u8aToHex(rs_prp_params.key()), "keys dont correspond")
-    assert.equal(u8aToHex(ts_prp_params.iv), u8aToHex(rs_prp_params.iv()), "ivs dont correspond")
+    assert.equal(u8aToHex(ts_prp_params.key), u8aToHex(rs_prp_params.key()), 'keys dont correspond')
+    assert.equal(u8aToHex(ts_prp_params.iv), u8aToHex(rs_prp_params.iv()), 'ivs dont correspond')
 
     let rs_prp = new Rust_PRP(rs_prp_params)
     let ts_prp = TS_PRP.createPRP(ts_prp_params)
@@ -112,7 +129,7 @@ describe('cryptographic correspondence tests', async function () {
     let ct = ts_prp.permutate(pt_1)
     let pt_2 = rs_prp.inverse(ct)
 
-    assert.equal(u8aToHex(new Uint8Array(100)), u8aToHex(pt_2), "plaintexts dont correspond")
+    assert.equal(u8aToHex(new Uint8Array(100)), u8aToHex(pt_2), 'plaintexts dont correspond')
   })
 
   it('PRP correspondence - RS forward / TS inverse', async function () {
@@ -121,8 +138,8 @@ describe('cryptographic correspondence tests', async function () {
     let rs_prp_params = new Rust_PRPParameters(secret)
     let ts_prp_params = derivePRPParameters(secret)
 
-    assert.equal(u8aToHex(ts_prp_params.key), u8aToHex(rs_prp_params.key()), "keys dont correspond")
-    assert.equal(u8aToHex(ts_prp_params.iv), u8aToHex(rs_prp_params.iv()), "ivs dont correspond")
+    assert.equal(u8aToHex(ts_prp_params.key), u8aToHex(rs_prp_params.key()), 'keys dont correspond')
+    assert.equal(u8aToHex(ts_prp_params.iv), u8aToHex(rs_prp_params.iv()), 'ivs dont correspond')
 
     let rs_prp = new Rust_PRP(rs_prp_params)
     let ts_prp = TS_PRP.createPRP(ts_prp_params)
@@ -131,7 +148,7 @@ describe('cryptographic correspondence tests', async function () {
     let ct = rs_prp.forward(pt_1)
     let pt_2 = ts_prp.inverse(ct)
 
-    assert.equal(u8aToHex(pt_1), u8aToHex(pt_2), "plaintexts dont correspond")
+    assert.equal(u8aToHex(pt_1), u8aToHex(pt_2), 'plaintexts dont correspond')
   })
 
   it('keyshares correspondence: generate key shares in RS and verify them in TS', async function () {
