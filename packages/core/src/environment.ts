@@ -1,15 +1,10 @@
-// May not change at runtime
-// Don't do type-checks on JSON files
-// @ts-ignore
-import protocolConfig from '../protocol-config.json' assert { type: 'json' }
-import semver from 'semver'
-import { FULL_VERSION } from './constants.js'
-
-/**
- * Coerced full version using
- * semver.coerce('42.6.7.9.3-alpha') // '42.6.7'
- */
-const FULL_VERSION_COERCED = semver.coerce(FULL_VERSION).version
+import {
+  resolve_environment,
+  set_panic_hook as core_misc_panic_hook,
+  supported_environments
+} from '../lib/core_misc.js'
+core_misc_panic_hook()
+export { resolve_environment, supported_environments } from '../lib/core_misc.js'
 
 export type NetworkOptions = {
   id: string
@@ -65,21 +60,14 @@ export type ResolvedEnvironment = {
   network_registry_contract_address: string // an Ethereum address,
 }
 
+const MONO_REPO_PATH = new URL('../../../', import.meta.url).pathname
+
 /**
  * @param version HOPR version
  * @returns environments that the given HOPR version should be able to use
  */
 export function supportedEnvironments(): Environment[] {
-  const environments = Object.entries((protocolConfig as ProtocolConfig).environments)
-
-  return environments
-    .filter(([_, env]) => {
-      return semver.satisfies(FULL_VERSION_COERCED, env.version_range)
-    })
-    .map(([id, env]) => ({
-      id,
-      ...env
-    }))
+  return supported_environments(MONO_REPO_PATH)
 }
 
 /**
@@ -88,32 +76,5 @@ export function supportedEnvironments(): Environment[] {
  * @returns the environment details, throws if environment is not supported
  */
 export function resolveEnvironment(environment_id: string, customProvider?: string): ResolvedEnvironment {
-  const environment = (protocolConfig as ProtocolConfig).environments[environment_id]
-  const network = (protocolConfig as ProtocolConfig).networks[environment?.network_id]
-
-  if (environment && network && semver.satisfies(FULL_VERSION_COERCED, environment.version_range)) {
-    network.id = environment.network_id
-    if (customProvider && customProvider.length > 0) {
-      network.default_provider = customProvider
-    }
-
-    return {
-      id: environment_id,
-      network,
-      environment_type: environment.environment_type,
-      channel_contract_deploy_block: environment.channel_contract_deploy_block,
-      token_contract_address: environment.token_contract_address,
-      channels_contract_address: environment.channels_contract_address,
-      xhopr_contract_address: environment.xhopr_contract_address,
-      boost_contract_address: environment.boost_contract_address,
-      stake_contract_address: environment.stake_contract_address,
-      network_registry_proxy_contract_address: environment.network_registry_proxy_contract_address,
-      network_registry_contract_address: environment.network_registry_contract_address
-    }
-  }
-
-  const supportedEnvsString: string = supportedEnvironments()
-    .map((env) => env.id)
-    .join(', ')
-  throw new Error(`environment '${environment_id}' is not supported, supported environments: ${supportedEnvsString}`)
+  return resolve_environment(MONO_REPO_PATH, environment_id, customProvider)
 }
