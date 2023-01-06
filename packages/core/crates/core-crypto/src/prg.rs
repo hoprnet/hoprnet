@@ -23,7 +23,7 @@ impl Default for PRGParameters {
 impl PRGParameters {
     pub fn new(secret: &[u8]) -> Result<Self> {
         let mut ret = PRGParameters::default();
-        generate_key_iv(secret, HASH_KEY_PRG.as_bytes(), &mut ret.key, &mut ret.iv)?;
+        generate_key_iv(secret, HASH_KEY_PRG.as_bytes(), &mut ret.key, &mut ret.iv, true)?;
         Ok(ret)
     }
 }
@@ -91,8 +91,9 @@ impl PRG {
 
 #[cfg(test)]
 mod tests {
-    use crate::parameters::{AES_BLOCK_SIZE, AES_KEY_SIZE};
-    use crate::prg::PRG;
+    use hex_literal::hex;
+    use crate::parameters::{AES_BLOCK_SIZE, AES_KEY_SIZE, SECRET_KEY_LENGTH};
+    use crate::prg::{PRG, PRGParameters};
 
     #[test]
     fn test_prg_single_block() {
@@ -132,6 +133,18 @@ mod tests {
 
         assert_eq!(AES_BLOCK_SIZE * 2 + 5, out.len());
     }
+
+    #[test]
+    fn test_prg_parameters() {
+        let expected_key = hex!("c642ceb7af7a65308ab2dbff9f6c7132");
+        let expected_iv = hex!("a735d1806513af957dd25de7");
+
+        let secret = [0u8; SECRET_KEY_LENGTH];
+        let params = PRGParameters::new(&secret).unwrap();
+
+        assert_eq!(expected_key, params.key);
+        assert_eq!(expected_iv, params.iv)
+    }
 }
 
 pub mod wasm {
@@ -146,10 +159,19 @@ pub mod wasm {
     #[wasm_bindgen]
     impl PRGParameters {
 
-        pub fn create(secret: &[u8]) -> JsResult<PRGParameters> {
+        #[wasm_bindgen(constructor)]
+        pub fn new(secret: &[u8]) -> JsResult<PRGParameters> {
             Ok(Self {
                 w: super::PRGParameters::new(secret).map_err(as_jsvalue)?
             })
+        }
+
+        pub fn key(&self) -> Box<[u8]> {
+            self.w.key.into()
+        }
+
+        pub fn iv(&self) -> Box<[u8]> {
+            self.w.iv.into()
         }
     }
 

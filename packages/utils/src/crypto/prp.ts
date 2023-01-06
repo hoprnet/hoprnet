@@ -1,5 +1,5 @@
 import { createCipheriv, createHmac } from 'crypto'
-import { u8aXOR } from '../u8a/index.js'
+import { u8aToHex, u8aXOR } from '../u8a/index.js'
 
 const HASH_ALGORITHM = 'blake2s256'
 const CIPHER_ALGORITHM = 'chacha20'
@@ -30,6 +30,8 @@ export class PRP {
   private readonly iv4: Uint8Array
 
   private constructor(iv: Uint8Array, key: Uint8Array) {
+    console.log(u8aToHex(key))
+    console.log(u8aToHex(iv))
     this.k1 = key.subarray(0, INTERMEDIATE_KEY_LENGTH)
     this.k2 = key.subarray(INTERMEDIATE_KEY_LENGTH, 2 * INTERMEDIATE_KEY_LENGTH)
     this.k3 = key.subarray(2 * INTERMEDIATE_KEY_LENGTH, 3 * INTERMEDIATE_KEY_LENGTH)

@@ -42,6 +42,33 @@ pub fn derive_packet_tag(secret: &[u8]) -> Result<Box<[u8]>> {
     Ok(out.into_boxed_slice())
 }
 
+pub fn generate_key_iv(secret: &[u8], info: &[u8], key: &mut [u8], iv: &mut [u8], iv_first: bool) -> Result<()> {
+    if secret.len() != SECRET_KEY_LENGTH {
+        return Err(InvalidParameterSize{name: "secret".into(), expected: SECRET_KEY_LENGTH})
+    }
+
+    let hkdf = SimpleHkdf::<Blake2s256>::from_prk(secret)
+        .map_err(|_| InvalidParameterSize{name: "secret".into(), expected: SECRET_KEY_LENGTH})?;
+
+    let mut out = vec![0u8; key.len() + iv.len()];
+    hkdf.expand(info, &mut out)
+        .map_err(|_| InvalidInputSize)?;
+
+    if iv_first {
+        let (v_iv, v_key) = out.split_at(iv.len());
+        iv.copy_from_slice(v_iv);
+        key.copy_from_slice(v_key);
+    }
+    else {
+        let (v_key, v_iv) = out.split_at(key.len());
+        key.copy_from_slice(v_key);
+        iv.copy_from_slice(v_iv);
+    }
+
+    Ok(())
+}
+
+
 pub mod wasm {
     use wasm_bindgen::prelude::*;
     use crate::utils::{as_jsvalue, JsResult};
@@ -76,21 +103,3 @@ mod tests {
     }
 }
 
-pub fn generate_key_iv(secret: &[u8], info: &[u8], key: &mut [u8], iv: &mut [u8]) -> Result<()> {
-    if secret.len() != SECRET_KEY_LENGTH {
-        return Err(InvalidParameterSize{name: "secret".into(), expected: SECRET_KEY_LENGTH})
-    }
-
-    let hkdf = SimpleHkdf::<Blake2s256>::from_prk(secret)
-        .map_err(|_| InvalidParameterSize{name: "secret".into(), expected: SECRET_KEY_LENGTH})?;
-
-    let mut out = vec![0u8; key.len() + iv.len()];
-    hkdf.expand(info, &mut out)
-        .map_err(|_| InvalidInputSize)?;
-
-    let (v_key, v_iv) = out.split_at(key.len());
-    key.copy_from_slice(v_key);
-    iv.copy_from_slice(v_iv);
-
-    Ok(())
-}

@@ -22,7 +22,7 @@ impl Default for PRPParameters {
 impl PRPParameters {
     pub fn new(secret: &[u8]) -> Result<Self> {
         let mut ret = PRPParameters::default();
-        generate_key_iv(secret, HASH_KEY_PRP.as_bytes(), &mut ret.key, &mut ret.iv)?;
+        generate_key_iv(secret, HASH_KEY_PRP.as_bytes(), &mut ret.key, &mut ret.iv, false)?;
         Ok(ret)
     }
 }
@@ -130,7 +130,8 @@ impl PRP {
 mod tests {
     use getrandom::getrandom;
     use hex_literal::hex;
-    use crate::prp::PRP;
+    use crate::parameters::SECRET_KEY_LENGTH;
+    use crate::prp::{PRP, PRPParameters};
 
     #[test]
     fn test_prp_fixed() {
@@ -196,10 +197,39 @@ mod tests {
 
         assert_eq!(&data, pt.as_ref());
     }
+
+    #[test]
+    fn test_prp_parameters() {
+        let expected_key = hex!("a9c6632c9f76e5e4dd03203196932350a47562f816cebb810c64287ff68586f35cb715a26e268fc3ce68680e16767581de4e2cb3944c563d1f1a0cc077f3e788a12f31ae07111d77a876a66de5bdd6176bdaa2e07d1cb2e36e428afafdebb2109f70ce8422c8821233053bdd5871523ffb108f1e0f86809999a99d407590df25");
+        let expected_iv = hex!("a59991716be504b26471dea53d688c4bab8e910328e54ebb6ebf07b49e6d12eacfc56e0935ba2300559b43ede25aa09eee7e8a2deea5f0bdaee2e859834edd38");
+
+        let secret = [0u8; SECRET_KEY_LENGTH];
+        let params = PRPParameters::new(&secret).unwrap();
+
+        assert_eq!(expected_key, params.key);
+        assert_eq!(expected_iv, params.iv)
+    }
+
+    #[test]
+    fn test_prp_ciphertext_from_params() {
+        let secret = [0u8; SECRET_KEY_LENGTH];
+        let params = PRPParameters::new(&secret).unwrap();
+
+        let expected_key = hex!("a9c6632c9f76e5e4dd03203196932350a47562f816cebb810c64287ff68586f35cb715a26e268fc3ce68680e16767581de4e2cb3944c563d1f1a0cc077f3e788a12f31ae07111d77a876a66de5bdd6176bdaa2e07d1cb2e36e428afafdebb2109f70ce8422c8821233053bdd5871523ffb108f1e0f86809999a99d407590df25");
+        let expected_iv = hex!("a59991716be504b26471dea53d688c4bab8e910328e54ebb6ebf07b49e6d12eacfc56e0935ba2300559b43ede25aa09eee7e8a2deea5f0bdaee2e859834edd38");
+
+        let prp = PRP::from_parameters(params);
+
+        let pt = [0u8; 100];
+        let ct = prp.forward(&pt).unwrap();
+
+        let expected_ct = hex!("5f5e27f0313d98b6aefbbe10dc042c654b41059974b126b2ffed1beec6a6a7388a826ca0d6e6155acef1d50f25a743e63030160243129952e0d3b2d86fc016b026fe1bb6c207b6dd60f5fe9d5288bb1d14d331b7129d613e64752c9a727ec0dc7fd6a8ed");
+        assert_eq!([0u8;100], pt); // input is not overwritten
+        assert_eq!(&expected_ct, ct.as_ref());
+    }
 }
 
 pub mod wasm {
-    use wasm_bindgen::JsValue;
     use wasm_bindgen::prelude::wasm_bindgen;
     use crate::utils::{as_jsvalue, JsResult};
 
@@ -210,11 +240,19 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl PRPParameters {
-
-        pub fn create(secret: &[u8]) -> Result<PRPParameters, JsValue> {
+        #[wasm_bindgen(constructor)]
+        pub fn new(secret: &[u8]) -> JsResult<PRPParameters> {
             Ok(Self {
                 w: super::PRPParameters::new(secret).map_err(as_jsvalue)?
             })
+        }
+
+        pub fn key(&self) -> Box<[u8]> {
+            self.w.key.into()
+        }
+
+        pub fn iv(&self) -> Box<[u8]> {
+            self.w.iv.into()
         }
     }
 
@@ -231,6 +269,12 @@ pub mod wasm {
             Self {
                 w: super::PRP::from_parameters(params.w)
             }
+        }
+
+        pub fn create(key: &[u8], iv: &[u8]) -> JsResult<PRP> {
+            Ok(Self {
+                w: super::PRP::new(key, iv).map_err(as_jsvalue)?
+            })
         }
 
         pub fn forward(&self, plaintext: &[u8]) -> JsResult<Box<[u8]>> {

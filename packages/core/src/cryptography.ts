@@ -6,4 +6,12 @@ import { webcrypto } from 'node:crypto'
 globalThis.crypto = webcrypto
 
 crypto_core_panic_hook()
-export { PRG, PRP, SharedKeys } from '../lib/core_crypto.js'
+export {
+  PRG,
+  PRGParameters,
+  PRP,
+  PRPParameters,
+  SharedKeys,
+  derive_packet_tag,
+  derive_commitment_seed
+} from '../lib/core_crypto.js'
