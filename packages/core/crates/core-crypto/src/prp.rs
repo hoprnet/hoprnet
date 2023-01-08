@@ -1,6 +1,6 @@
 use crate::derivation::generate_key_iv;
 use crate::errors::Result;
-use crate::errors::CryptoError::{InvalidInputSize, InvalidParameterSize};
+use crate::errors::CryptoError::{InvalidInputValue, InvalidParameterSize};
 
 use crate::parameters::{HASH_KEY_PRP, PRP_INTERMEDIATE_IV_LENGTH, PRP_INTERMEDIATE_KEY_LENGTH, PRP_IV_LENGTH, PRP_KEY_LENGTH, PRP_MIN_LENGTH};
 use crate::primitives::{calculate_mac, SimpleStreamCipher};
@@ -70,7 +70,7 @@ impl PRP {
     /// containing the result.
     pub fn forward(&self, plaintext: &[u8]) -> Result<Box<[u8]>> {
         if plaintext.len() < PRP_MIN_LENGTH {
-            return Err(InvalidInputSize);
+            return Err(InvalidInputValue);
         }
 
         let mut out = Vec::from(plaintext);
@@ -88,7 +88,7 @@ impl PRP {
     /// containing the result.
     pub fn inverse(&self, ciphertext: &[u8]) -> Result<Box<[u8]>> {
         if ciphertext.len() < PRP_MIN_LENGTH {
-            return Err(InvalidInputSize);
+            return Err(InvalidInputValue);
         }
 
         let mut out = Vec::from(ciphertext);

@@ -1,7 +1,7 @@
 use aes::cipher::{KeyIvInit, StreamCipher};
 use crate::derivation::generate_key_iv;
 use crate::errors::Result;
-use crate::errors::CryptoError::{InvalidInputSize, InvalidParameterSize};
+use crate::errors::CryptoError::{InvalidInputValue, InvalidParameterSize};
 use crate::parameters::{AES_BLOCK_SIZE, HASH_KEY_PRG, PRG_IV_LENGTH, PRG_KEY_LENGTH};
 
 type Aes128Ctr32BE = ctr::Ctr32BE<aes::Aes128>;
@@ -58,7 +58,7 @@ impl PRG {
 
     pub fn digest(&self, from: usize, to: usize) -> Result<Box<[u8]>> {
         if from >= to {
-            return Err(InvalidInputSize)
+            return Err(InvalidInputValue)
         }
 
         let first_block = from / AES_BLOCK_SIZE;

@@ -6,7 +6,7 @@ use chacha20::cipher::KeyIvInit;
 use digest::FixedOutputReset;
 
 use crate::errors::Result;
-use crate::errors::CryptoError::{InvalidInputSize, InvalidParameterSize};
+use crate::errors::CryptoError::{InvalidInputValue, InvalidParameterSize};
 use crate::parameters::SECRET_KEY_LENGTH;
 
 /// Simple Message Authentication Code (MAC) computation wrapper
@@ -60,7 +60,7 @@ impl SimpleStreamCipher {
         }
 
         Ok(Self {
-            instance: ChaCha20::new_from_slices(key, iv).map_err(|_| InvalidInputSize)?
+            instance: ChaCha20::new_from_slices(key, iv).map_err(|_| InvalidInputValue)?
         })
     }
 

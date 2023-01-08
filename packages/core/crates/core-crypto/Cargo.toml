@@ -25,6 +25,7 @@ hkdf = "0.12.3"
 hmac = "0.12.1"
 js-sys = "0.3.60"
 k256 = { version = "0.11.6", features = ["arithmetic", "ecdh"] }
+rand = "0.8.5"
 sha3 = "0.10.6"
 static_assertions = "1.1.0"
 typenum = "1.15.0"

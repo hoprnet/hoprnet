@@ -9,6 +9,7 @@ pub mod primitives;
 pub mod prp;
 pub mod prg;
 pub mod errors;
+pub mod random;
 
 #[allow(dead_code)]
 #[wasm_bindgen]
