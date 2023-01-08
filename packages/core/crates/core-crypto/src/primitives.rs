@@ -1,6 +1,6 @@
 use blake2::Blake2s256;
 use chacha20::ChaCha20;
-use chacha20::cipher::{IvSizeUser, KeySizeUser, StreamCipher};
+use chacha20::cipher::{IvSizeUser, KeySizeUser, StreamCipher, StreamCipherSeek};
 use hmac::{Mac, SimpleHmac};
 use chacha20::cipher::KeyIvInit;
 use digest::FixedOutputReset;
@@ -50,18 +50,22 @@ impl SimpleStreamCipher {
     /// with the given secret key and IV.
     pub fn new(key: &[u8], iv: &[u8]) -> Result<Self> {
         let chacha_iv_size = ChaCha20::iv_size();
-        if iv.len() < chacha_iv_size {
+        if iv.len() != chacha_iv_size {
             return Err(InvalidParameterSize {name: "iv".into(), expected: chacha_iv_size})
         }
 
         let chacha_key_size = ChaCha20::key_size();
-        if key.len() < chacha_key_size {
+        if key.len() != chacha_key_size {
             return Err(InvalidParameterSize {name: "key".into(), expected: chacha_key_size})
         }
 
         Ok(Self {
-            instance: ChaCha20::new_from_slices(key, &iv[0..chacha_iv_size]).map_err(|_| InvalidInputSize)?
+            instance: ChaCha20::new_from_slices(key, iv).map_err(|_| InvalidInputSize)?
         })
+    }
+
+    pub fn set_block_counter(&mut self, counter: u32) {
+        self.instance.seek(counter as u64 * 64u64)
     }
 
     /// Apply keystream to the given data in-place.
@@ -83,6 +87,44 @@ pub fn calculate_mac(key: &[u8], data: &[u8]) -> Result<Box<[u8]>> {
     let mut mac = SimpleMac::new(key)?;
     mac.update(data);
     Ok(mac.finalize())
+}
+
+#[cfg(test)]
+mod tests {
+    use hex_literal::hex;
+    use crate::primitives::SimpleStreamCipher;
+
+    #[test]
+    pub fn test_chacha20() {
+        let key = [0u8; 32];
+        let mut iv = [0u8; 12];
+        iv[11] = 2u8;
+
+        let mut cipher = SimpleStreamCipher::new(&key, &iv).unwrap();
+
+        let mut data = [0u8; 64];
+        cipher.apply(&mut data);
+
+        let expected_ct = hex!("c2c64d378cd536374ae204b9ef933fcd1a8b2288b3dfa49672ab765b54ee27c78a970e0e955c14f3a88e741b97c286f75f8fc299e8148362fa198a39531bed6d");
+        assert_eq!(expected_ct, data);
+    }
+
+   #[test]
+    pub fn test_chacha20_iv_block_counter() {
+        let key = hex!("a9c6632c9f76e5e4dd03203196932350a47562f816cebb810c64287ff68586f3");
+        let iv = hex!("6be504b26471dea53d688c4b");
+
+        let mut cipher = SimpleStreamCipher::new(&key, &iv).unwrap();
+
+        cipher.set_block_counter(0xa5999171u32.to_be());
+
+        let mut data = [0u8; 68];
+        cipher.apply(&mut data);
+
+        let expected_ct = hex!("abe088c198cb0a7b2591f1472fb1d0bd529a697a58a45d4ac5dc426ba6bf207deec4a5331149f93c6629d514ece8b0f49b4bc3eda74e07b78df5ac7d7f69fa75f611c926");
+        assert_eq!(expected_ct, data);
+    }
+
 }
 
 /// Functions and types exposed to WASM

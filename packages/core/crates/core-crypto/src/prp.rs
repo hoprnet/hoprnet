@@ -120,7 +120,12 @@ impl PRP {
     fn xor_keystream(data: &mut [u8], key: &[u8], iv: &[u8]) -> Result<()> {
         let mut key_cpy = Vec::from(key);
         Self::xor_inplace(key_cpy.as_mut_slice(), &data[0..PRP_MIN_LENGTH]);
-        let mut cipher = SimpleStreamCipher::new(key_cpy.as_slice(), iv)?;
+
+        let mut cipher = SimpleStreamCipher::new(key_cpy.as_slice(), &iv[4..iv.len()])?;
+
+        let block_counter = u32::from_le_bytes(iv[0..4].try_into().unwrap());
+        cipher.set_block_counter(block_counter);
+
         cipher.apply(&mut data[PRP_MIN_LENGTH..]);
         Ok(())
     }
@@ -217,13 +222,15 @@ mod tests {
 
         let expected_key = hex!("a9c6632c9f76e5e4dd03203196932350a47562f816cebb810c64287ff68586f35cb715a26e268fc3ce68680e16767581de4e2cb3944c563d1f1a0cc077f3e788a12f31ae07111d77a876a66de5bdd6176bdaa2e07d1cb2e36e428afafdebb2109f70ce8422c8821233053bdd5871523ffb108f1e0f86809999a99d407590df25");
         let expected_iv = hex!("a59991716be504b26471dea53d688c4bab8e910328e54ebb6ebf07b49e6d12eacfc56e0935ba2300559b43ede25aa09eee7e8a2deea5f0bdaee2e859834edd38");
+        assert_eq!(expected_key, params.key);
+        assert_eq!(expected_iv, params.iv);
 
         let prp = PRP::from_parameters(params);
 
         let pt = [0u8; 100];
         let ct = prp.forward(&pt).unwrap();
 
-        let expected_ct = hex!("5f5e27f0313d98b6aefbbe10dc042c654b41059974b126b2ffed1beec6a6a7388a826ca0d6e6155acef1d50f25a743e63030160243129952e0d3b2d86fc016b026fe1bb6c207b6dd60f5fe9d5288bb1d14d331b7129d613e64752c9a727ec0dc7fd6a8ed");
+        let expected_ct = hex!("f80036d72b5e61e20f3f5840a013d12b5dd496f2da55b930f961905fbbbc8158dc17b58510bf280d0359e0b233a099bde840e07d54ca308e55ee0196b8f013b5def9b6a3ec9a727071c5dbdbeabdedcecfbdc3ecdd69fdcd957ff60ac573cc0dbab45b04");
         assert_eq!([0u8;100], pt); // input is not overwritten
         assert_eq!(&expected_ct, ct.as_ref());
     }
