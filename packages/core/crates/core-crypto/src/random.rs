@@ -5,7 +5,7 @@ use crate::errors::CryptoError::InvalidInputValue;
 
 use crate::errors::Result;
 
-use rand::Rng;
+use rand::{Rng, RngCore};
 
 pub const MAX_RANDOM_INTEGER: u64 = 9007199254740991;
 
@@ -37,6 +37,12 @@ pub fn random_group_element(compressed: bool) -> (Box<[u8]>,Box<[u8]>) {
     let encoded = point.to_encoded_point(compressed);
 
     (scalar.to_bytes().as_slice().into() ,encoded.as_bytes().into())
+}
+
+pub fn random_fill(buffer: &mut [u8], from: usize, len: usize) {
+    assert!(from + len <= buffer.len());
+    let mut range = &buffer[from..from+len];
+    OsRng.fill_bytes(&mut range);
 }
 
 pub mod wasm {
