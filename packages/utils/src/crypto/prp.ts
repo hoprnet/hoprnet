@@ -30,8 +30,6 @@ export class PRP {
   private readonly iv4: Uint8Array
 
   private constructor(iv: Uint8Array, key: Uint8Array) {
-    console.log(u8aToHex(key))
-    console.log(u8aToHex(iv))
     this.k1 = key.subarray(0, INTERMEDIATE_KEY_LENGTH)
     this.k2 = key.subarray(INTERMEDIATE_KEY_LENGTH, 2 * INTERMEDIATE_KEY_LENGTH)
     this.k3 = key.subarray(2 * INTERMEDIATE_KEY_LENGTH, 3 * INTERMEDIATE_KEY_LENGTH)
