@@ -1,5 +1,5 @@
 import { createCipheriv, createHmac } from 'crypto'
-import { u8aToHex, u8aXOR } from '../u8a/index.js'
+import { u8aXOR } from '../u8a/index.js'
 
 const HASH_ALGORITHM = 'blake2s256'
 const CIPHER_ALGORITHM = 'chacha20'
