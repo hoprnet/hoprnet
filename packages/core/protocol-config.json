@@ -30,8 +30,8 @@
       "stake_season": 5,
       "indexer_start_block_number": 2
     },
-    "master-goerli": {
-      "network_id": "goerli",
+    "master-staging": {
+      "network_id": "xdai",
       "environment_type": "staging",
       "version_range": "*",
       "indexer_start_block_number": 0,
@@ -44,8 +44,8 @@
       "network_registry_contract_address": "0xf3374666487A58aa424BF9dB9bCf74250393a757",
       "tags": ["etherscan"]
     },
-    "debug-goerli": {
-      "network_id": "goerli",
+    "debug-staging": {
+      "network_id": "xdai",
       "environment_type": "staging",
       "version_range": "*",
       "indexer_start_block_number": 0,

@@ -50,7 +50,7 @@ $ yarn hopr-cover-traffic-daemon --help
 Options:
   --help             Show help  [boolean]
   --version          Show version number  [boolean]
-  --environment      Environment id which the node shall run on  [string] [choices: "anvil-localhost", "anvil-localhost2", "master-goerli", "debug-goerli", "tuttlingen", "prague", "budapest", "athens", "lisbon", "ouagadougou", "paleochora", "monte_rosa"] [default: ""]
+  --environment      Environment id which the node shall run on  [string] [choices: "anvil-localhost", "anvil-localhost2", "master-staging", "debug-staging", "tuttlingen", "prague", "budapest", "athens", "lisbon", "ouagadougou", "paleochora", "monte_rosa"] [default: ""]
   --privateKey       A private key to be used for the node  [string] [required]
   --provider         A custom RPC provider to be used for your HOPR node to connect to blockchain [string]
   --dbFile           A path to DB file for persistent storage  [string] [default: "./ct.json"]

@@ -24,7 +24,7 @@
       "boost_contract_address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
       "stake_contract_address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
     },
-    "master-goerli": {
+    "master-staging": {
       "network_registry_proxy_contract_address": "0xb311239b46feCde9D68d70Ae4bA8733C3dBC7023",
       "stake_contract_address": "0xab231873246daaff05c99b3682ea649e6C80AB68",
       "stake_season": 5,
@@ -36,7 +36,7 @@
       "environment_type": "staging",
       "indexer_start_block_number": 7459138
     },
-    "debug-goerli": {
+    "debug-staging": {
       "network_registry_contract_address": "0x8E750494e12914977a5C8B84E2D4677703f03B44",
       "indexer_start_block_number": 8250109,
       "stake_season": 5,
