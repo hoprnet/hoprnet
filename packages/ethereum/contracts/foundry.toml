@@ -15,10 +15,11 @@ build_info_path = "build-info"
 [rpc_endpoints]
 local = "http://localhost:8545"
 gnosis = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
-goerli = "https://provider-proxy.hoprnet.workers.dev/eth_goerli" # alternative can be "https://goerli.infura.io/v3/${INFURA_API_KEY}" or  "https://rpc.ankr.com/eth_goerli"
+mainnet = "https://mainnet.infura.io/v3/${INFURA_API_KEY}" or  "https://rpc.ankr.com/eth"
+
 
 [etherscan]
-goerli = { key = "${ETHERSCAN_API_KEY}", url = "https://api-goerli.etherscan.io" }
+mainnet = { key = "${ETHERSCAN_API_KEY}" }
 gnosis = { key = "${GNOSISSCAN_API_KEY}", url = "https://gnosisscan.io" }
 
 # testing and local network
@@ -27,12 +28,16 @@ eth_rpc_url = "http://localhost:8545" # cannot directly use profile.default.rpc_
 
 # staging environment
 [profile.staging]
-libraries = ["script/utils/BoostUtilsLib.sol:BoostUtilsLib:0x5e272b65a1b5e4e2F62B28607c05323daD85f7Fa"]
-eth_rpc_url = "https://provider-proxy.hoprnet.workers.dev/eth_goerli" # alternative can be "https://goerli.infura.io/v3/${INFURA_API_KEY}"
-# eth_rpc_url = "https://rpc.eu-central-2.gateway.fm/v3/gnosis/archival/chiado" # Gnosis Chiado testnet
+# provide deployed BoostUtilsLib
+libraries = ["script/utils/BoostUtilsLib.sol:BoostUtilsLib:0x8197525557233031b110038Ae52dfC3C4A75567A"]
+eth_rpc_url = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
 
 # production environment environment
 [profile.production]
 # provide deployed BoostUtilsLib
 libraries = ["script/utils/BoostUtilsLib.sol:BoostUtilsLib:0x8197525557233031b110038Ae52dfC3C4A75567A"]
 eth_rpc_url = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
+
+# production environment environment
+[profile.mainnet_ethereum]
+eth_rpc_url = "https://mainnet.infura.io/v3/${INFURA_API_KEY}" or  "https://rpc.ankr.com/eth"
