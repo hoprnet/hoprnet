@@ -10,6 +10,7 @@ pub mod prp;
 pub mod prg;
 pub mod errors;
 pub mod random;
+pub mod iterated_hash;
 
 #[allow(dead_code)]
 #[wasm_bindgen]
