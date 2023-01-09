@@ -65,7 +65,7 @@ FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-staging forge script --broadcast 
 If contracts are not properly verified on explorers, please try with the manual verification. E.g.
 
 ```
-# Verify Channal contract on staging
+# Verify Channal contract in staging environment
 forge verify-contract 0x78D92220eCe709A490F0831F9122535e0F9fe1b4 src/HoprChannels.sol:HoprChannels --chain-id 5 \
 --constructor-args $(cast abi-encode "constructor(address,uint32)" "0xa3C8f4044b30Fb3071F5b3b02913DE524F1041dc" 300)
 
