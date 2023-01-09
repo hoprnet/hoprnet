@@ -48,15 +48,8 @@ get_network() {
 # $1=environment id
 get_environment_type() {
   local environment_id="${1}"
-  local network_name=$(jq -r ".environments.\"${environment_id}\".network_id" "${mydir}/../packages/core/protocol-config.json")
-  
-  if [ "${network_name}" = 'xdai' ]; then
-    echo "production"
-  elif [ "${network_name}" = 'goerli' ]; then
-    echo "staging"
-  else
-    echo "development"
-  fi
+  # use `contracts-addresses.json` because it stores 
+  jq -r ".environments.\"${environment_id}\".environment_type" "${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
 }
 
 # $1=environment id
