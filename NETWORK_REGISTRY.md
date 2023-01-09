@@ -107,7 +107,7 @@ make disable-network-registry environment=master-goerli environment_type=staging
 or
 
 ```
-make enable-network-registry environment=master-goerli network=goerli environment_type=staging
+make enable-network-registry environment=master-goerli environment_type=staging
 ```
 
 ## Internal NR testing
