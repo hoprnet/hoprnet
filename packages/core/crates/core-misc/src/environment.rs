@@ -60,58 +60,58 @@ pub struct NetworkOptions {
 #[serde(deny_unknown_fields)]
 pub struct Environment {
     #[serde(skip_deserializing)]
-    id: String,
+    pub id: String,
     /// must match one of the Network.id
-    network_id: String,
-    environment_type: EnvironmentType,
+    pub network_id: String,
+    pub environment_type: EnvironmentType,
     // Node.js-fashioned semver string
-    version_range: String,
-    channel_contract_deploy_block: u32,
+    pub version_range: String,
+    pub channel_contract_deploy_block: u32,
     /// an Ethereum address
-    token_contract_address: String,
+    pub token_contract_address: String,
     /// an Ethereum address
-    channels_contract_address: String,
+    pub channels_contract_address: String,
     /// an Ethereum address
-    xhopr_contract_address: String,
+    pub xhopr_contract_address: String,
     /// an Ethereum address
-    boost_contract_address: String,
+    pub boost_contract_address: String,
     /// an Ethereum address
-    stake_contract_address: String,
+    pub stake_contract_address: String,
     /// an Ethereum address
-    network_registry_proxy_contract_address: String,
+    pub network_registry_proxy_contract_address: String,
     /// an Ethereum address
-    network_registry_contract_address: String,
-    tags: Vec<String>,
+    pub network_registry_contract_address: String,
+    pub tags: Vec<String>,
 }
 
 #[derive(Serialize, Clone)]
 pub struct ResolvedEnvironment {
     /// the environment identifier, e.g. monte_rosa
-    id: String,
-    network: NetworkOptions,
-    environment_type: EnvironmentType,
+    pub id: String,
+    pub network: NetworkOptions,
+    pub environment_type: EnvironmentType,
     /// an Ethereum address
-    channels_contract_address: String,
-    channel_contract_deploy_block: u32,
+    pub channels_contract_address: String,
+    pub channel_contract_deploy_block: u32,
     /// an Ethereum address
-    token_contract_address: String,
+    pub token_contract_address: String,
     /// an Ethereum address
-    xhopr_contract_address: String,
+    pub xhopr_contract_address: String,
     /// an Ethereum address
-    boost_contract_address: String,
+    pub boost_contract_address: String,
     /// an Ethereum address
-    stake_contract_address: String,
+    pub stake_contract_address: String,
     /// an Ethereum address
-    network_registry_proxy_contract_address: String,
+    pub network_registry_proxy_contract_address: String,
     /// an Ethereum address
-    network_registry_contract_address: String,
+    pub network_registry_contract_address: String,
 }
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProtocolConfig {
-    environments: std::collections::HashMap<String, Environment>,
-    networks: std::collections::HashMap<String, NetworkOptions>,
+    pub environments: std::collections::HashMap<String, Environment>,
+    pub networks: std::collections::HashMap<String, NetworkOptions>,
 }
 
 /// Reads current protocol config and returns it
@@ -129,7 +129,7 @@ struct PackageJsonFile {
 }
 
 /// Reads `hoprd` package.json file and returns its version
-fn get_package_version(mono_repo_path: &str) -> Result<String, JsValue> {
+pub fn get_package_version(mono_repo_path: &str) -> Result<String, JsValue> {
     let package_json_path = format!("{}/packages/hoprd/package.json", mono_repo_path);
 
     let data = real::read_file(package_json_path.as_str())?;
