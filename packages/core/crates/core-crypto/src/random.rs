@@ -42,6 +42,7 @@ pub fn random_fill(buffer: &mut [u8], from: usize, len: usize) {
     OsRng.fill_bytes(&mut buffer[from..from + len]);
 }
 
+#[cfg(feature = "wasm")]
 pub mod wasm {
     use js_sys::Uint8Array;
     use wasm_bindgen::prelude::wasm_bindgen;

@@ -68,7 +68,7 @@ pub fn generate_key_iv(secret: &[u8], info: &[u8], key: &mut [u8], iv: &mut [u8]
     Ok(())
 }
 
-
+#[cfg(feature = "wasm")]
 pub mod wasm {
     use wasm_bindgen::prelude::*;
     use crate::utils::{as_jsvalue, JsResult};

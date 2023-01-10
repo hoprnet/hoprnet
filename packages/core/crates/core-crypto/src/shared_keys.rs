@@ -225,6 +225,7 @@ mod tests {
 /// to be properly called from the JS.
 /// Code in this module does not need to be unit tested, as it already
 /// wraps code that has been unit tested in pure Rust.
+#[cfg(feature = "wasm")]
 pub mod wasm {
     use elliptic_curve::rand_core::OsRng;
     use wasm_bindgen::prelude::*;

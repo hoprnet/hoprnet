@@ -128,6 +128,7 @@ mod tests {
 }
 
 /// Functions and types exposed to WASM
+#[cfg(feature = "wasm")]
 pub mod wasm {
     use wasm_bindgen::prelude::*;
 

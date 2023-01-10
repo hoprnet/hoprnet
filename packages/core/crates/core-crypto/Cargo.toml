@@ -9,7 +9,8 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["console_error_panic_hook"]
+default = ["console_error_panic_hook", "wasm"]
+wasm = []
 
 [dependencies]
 aes = "0.8.2"
