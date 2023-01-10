@@ -133,7 +133,8 @@ build-solidity-types: ## generate Solidity typings
 # Change git = "http://..." into version = "1.0.2"
 	sed -i -e 's/https:\/\/github.com\/gakonst\/ethers-rs/1.0.2/g' ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
 	sed -i -e 's/git/version/g' ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
-	echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"] # rlib is necessary to run integration tests" >> ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
+# add [lib] as rlib is necessary to run integration tests
+	echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"]" >> ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
 
 .PHONY: build-yarn
 build-yarn: ## build yarn packages
@@ -316,8 +317,8 @@ ifeq ($(eligibility),)
 	echo "parameter <eligibility> missing" >&2 && exit 1
 endif
 	make -C packages/ethereum/contracts force-eligibility-update \
-	environment-name=$(environment) environment-type=$(environment_type) \
-	staking_addresses="$(native_addresses)" eligibility="$(eligibility)"
+		environment-name=$(environment) environment-type=$(environment_type) \
+		staking_addresses="$(native_addresses)" eligibility="$(eligibility)"
 
 sync-eligibility: ensure-environment-is-set
 sync-eligibility: ## owner sync eligibility of peers
@@ -325,8 +326,8 @@ ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
 	make -C packages/ethereum/contracts sync-eligibility \
-	environment-name=$(environment) environment-type=$(environment_type) \
-	peer_ids="$(peer_ids)"
+		environment-name=$(environment) environment-type=$(environment_type) \
+		peer_ids="$(peer_ids)"
 
 register-nodes: ensure-environment-is-set
 register-nodes: ## owner register given nodes in network registry contract
@@ -337,8 +338,8 @@ ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
 	make -C packages/ethereum/contracts register-nodes \
-	environment-name=$(environment) environment-type=$(environment_type) \
-	staking_addresses="$(native_addresses)" peer_ids="$(peer_ids)"
+		environment-name=$(environment) environment-type=$(environment_type) \
+		staking_addresses="$(native_addresses)" peer_ids="$(peer_ids)"
 
 deregister-nodes: ensure-environment-is-set
 deregister-nodes: ## owner de-register given nodes in network registry contract
@@ -346,8 +347,8 @@ ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
 	make -C packages/ethereum/contracts deregister-nodes \
-	environment-name=$(environment) environment-type=$(environment_type) \
-	staking_addresses="$(native_addresses)" peer_ids="$(peer_ids)"
+		environment-name=$(environment) environment-type=$(environment_type) \
+		staking_addresses="$(native_addresses)" peer_ids="$(peer_ids)"
 
 .PHONY: self-register-node
 self-register-node: ensure-environment-is-set
@@ -356,8 +357,8 @@ ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
 	make -C packages/ethereum/contracts self-register-node \
-	environment-name=$(environment) environment-type=$(environment_type) \
-	peer_ids="$(peer_ids)"
+		environment-name=$(environment) environment-type=$(environment_type) \
+		peer_ids="$(peer_ids)"
 
 .PHONY: self-deregister-node
 self-deregister-node: ensure-environment-is-set
@@ -366,8 +367,8 @@ ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
 	make -C packages/ethereum/contracts self-deregister-node \
-	environment-name=$(environment) environment-type=$(environment_type) \
-	peer_ids="$(peer_ids)"
+		environment-name=$(environment) environment-type=$(environment_type) \
+		peer_ids="$(peer_ids)"
 
 # .PHONY: register-node-when-dummy-proxy
 # # DEPRECATED. Only use it when a dummy network registry proxy is in use
