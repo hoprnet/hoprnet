@@ -276,12 +276,14 @@ struct CliArgs {
 }
 
 impl CliArgs {
+    /// Add values of those CLI arguments whose structure is known at runtime
     fn augment_runtime_args(&mut self, m: &ArgMatches) {
         self.environment = m.get_one::<String>("environment").unwrap().to_owned();
         self.data = m.get_one::<String>("data").unwrap().to_owned();
         self.identity = m.get_one::<String>("identity").unwrap().to_owned();
     }
 
+    /// Creates a new instance using custom cli_args and custom environment variables
     fn new_from(
         cli_args: Vec<&str>,
         env_vars: HashMap<OsString, OsString>,
@@ -360,6 +362,7 @@ impl FromJsonFile for DefaultEnvironmentFile {
     }
 }
 
+/// Checks for `default_environment.json` file and, if present, returns their environment id
 fn get_default_environment(mono_repo_path: &str) -> Option<String> {
     match DefaultEnvironmentFile::from_json_file(mono_repo_path) {
         Ok(json) => Some(json.id),
@@ -367,6 +370,7 @@ fn get_default_environment(mono_repo_path: &str) -> Option<String> {
     }
 }
 
+/// Gets the default path where the database is stored at
 fn get_data_path(mono_repo_path: &str, maybe_default_environment: Option<String>) -> String {
     match maybe_default_environment {
         Some(default_environment) => format!(
