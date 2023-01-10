@@ -1,21 +1,26 @@
 [package]
-name = "real-base"
+name = "core-misc"
 version = "0.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
-description = "Rust WASM modules for HOPR"
+description = "Selected core modules"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "LGPL-3.0-only"
 
 [lib]
-path = "src/lib.rs"
-crate-type = ["cdylib", "rlib"] # rlib is necessary to run integration tests
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-thiserror = "1.0.38"
+real-base = { path = "../../../real/crates/real-base" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde-wasm-bindgen = "0.4"
 wasm-bindgen = "0.2.83"
 wasm-bindgen-test = "0.3.30"
+
+console_error_panic_hook = { version = "0.1.6", optional = true }
+# wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.30"

@@ -56,8 +56,7 @@
     "levelup": "5.1.1",
     "libp2p": "0.37.3",
     "retimer": "3.0.0",
-    "secp256k1": "4.0.3",
-    "semver": "7.3.7"
+    "secp256k1": "4.0.3"
   },
   "devDependencies": {
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum",

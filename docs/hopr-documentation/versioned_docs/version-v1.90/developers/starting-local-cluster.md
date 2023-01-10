@@ -27,7 +27,7 @@ release. The latest stable release known at the time of writing is [`Valencia`](
 
 ## Which setup should I use?
 
-- [Playground](https://docs.hoprnet.org/developers/starting-local-cluster#playground) is the preferred setup for most dApp developers. You can launch a fully interconnected cluster without installation or funding and test with the generated endpoints and API Keys. 
+- [Playground](https://docs.hoprnet.org/developers/starting-local-cluster#playground) is the preferred setup for most dApp developers. You can launch a fully interconnected cluster without installation or funding and test with the generated endpoints and API Keys.
 
 - [Local setup:](https://docs.hoprnet.org/developers/starting-local-cluster#local-setup) is the setup used by our core developers. It requires installing Rust and quite a few dependencies and is generally a much longer setup but still relatively simple if you are on Linux or macOS. This comes with the advantage of not having to launch a new cluster every 20 minutes, as Playground clusters only last 20 minutes at a time.
 
