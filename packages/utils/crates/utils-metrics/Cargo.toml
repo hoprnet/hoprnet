@@ -12,7 +12,8 @@ license = "LGPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["console_error_panic_hook"]
+default = ["console_error_panic_hook", "wasm"]
+wasm = []
 
 [dependencies]
 prometheus = "0.13.2"

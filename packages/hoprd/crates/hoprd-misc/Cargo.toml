@@ -11,6 +11,10 @@ license = "LGPL-3.0-only"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+default = ["console_error_panic_hook", "wasm"]
+wasm = []
+
 [dependencies]
 real-base = { path = "../../../real/crates/real-base" }
 wasm-bindgen = "0.2.83"
