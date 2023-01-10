@@ -113,7 +113,7 @@ impl FromJsonFile for ProtocolConfig {
 
 impl ProtocolConfig {
     /// Returns a list of environments which the node is able to work with
-    fn supported_environments(&self, mono_repo_path: &str) -> Result<Vec<Environment>, String> {
+    pub fn supported_environments(&self, mono_repo_path: &str) -> Result<Vec<Environment>, String> {
         let version = PackageJsonFile::from_json_file(&mono_repo_path)
             .and_then(|p| ok_or_str!(real::coerce_version(p.version.as_str())))?;
 
@@ -132,7 +132,7 @@ impl ProtocolConfig {
 }
 
 #[derive(Deserialize)]
-struct PackageJsonFile {
+pub struct PackageJsonFile {
     version: String,
 }
 
@@ -147,7 +147,7 @@ impl FromJsonFile for PackageJsonFile {
 }
 
 impl PackageJsonFile {
-    fn coerced_version(&self) -> Result<String, String> {
+    pub fn coerced_version(&self) -> Result<String, String> {
         /*
          * Coerced full version using
          * coerce_version('42.6.7.9.3-alpha') // '42.6.7'
@@ -181,7 +181,7 @@ pub struct ResolvedEnvironment {
 
 impl ResolvedEnvironment {
     /// Returns the environment details, returns an error if environment is not supported
-    fn new(
+    pub fn new(
         mono_repo_path: &str,
         environment_id: &str,
         maybe_custom_provider: Option<&str>,

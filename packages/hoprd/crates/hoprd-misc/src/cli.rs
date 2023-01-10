@@ -3,11 +3,10 @@ use std::ffi::OsString;
 
 use clap::builder::PossibleValuesParser;
 use clap::{Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _};
-use core_misc::environment::{self, Environment};
+use core_misc::environment::{Environment, FromJsonFile, PackageJsonFile, ProtocolConfig};
 use real_base::real;
 use serde::{Deserialize, Serialize};
 use serde_json;
-use wasm_bindgen::JsValue;
 
 const HEARTBEAT_INTERVAL: u32 = 60000;
 const HEARTBEAT_THRESHOLD: u32 = 60000;
@@ -23,9 +22,15 @@ const DEFAULT_API_PORT: u16 = 3001;
 const DEFAULT_HEALTH_CHECK_HOST: &str = "localhost";
 const DEFAULT_HEALTH_CHECK_PORT: u16 = 8080;
 
-/// Takes all CLI arguments whose structure is known at compile-time. 
-/// Arguments whose structure, e.g. their default values depend on 
-/// file contents need be specified using `clap`s builder API 
+macro_rules! ok_or_str {
+    ($v:expr) => {
+        $v.map_err(|e| e.to_string())
+    };
+}
+
+/// Takes all CLI arguments whose structure is known at compile-time.
+/// Arguments whose structure, e.g. their default values depend on
+/// file contents need be specified using `clap`s builder API
 #[derive(Serialize, Args)]
 struct CliArgs {
     // Filled by Builder API at runtime
@@ -35,14 +40,14 @@ struct CliArgs {
     // Filled by Builder API at runtime
     #[arg(skip)]
     identity: String,
-    
+
     // Filled by Builder API at runtime
     #[arg(skip)]
     data: String,
 
     #[arg(
-        long, 
-        default_value_t = false, 
+        long,
+        default_value_t = false,
         env = "HOPRD_API", 
         help = format!("Expose the API on {}:{}", DEFAULT_API_HOST, DEFAULT_API_PORT), 
         action = ArgAction::SetTrue,
@@ -102,11 +107,7 @@ struct CliArgs {
     )]
     health_check_port: u16,
 
-    #[arg(
-        long,
-        env = "HOPRD_PASSWORD",
-        help = "A password to encrypt your keys"
-    )]
+    #[arg(long, env = "HOPRD_PASSWORD", help = "A password to encrypt your keys")]
     password: Option<String>,
 
     #[arg(
@@ -169,7 +170,7 @@ struct CliArgs {
         action = ArgAction::SetTrue,
         default_value_t = false
     )]
-    test_announce_local_addresses:bool,
+    test_announce_local_addresses: bool,
 
     #[arg(
         long = "testPreferLocalAddresses",
@@ -279,57 +280,37 @@ impl CliArgs {
         self.data = m.get_one::<String>("data").unwrap().to_owned();
         self.identity = m.get_one::<String>("identity").unwrap().to_owned();
     }
-}
 
-#[derive(Deserialize)]
-struct DefaultEnvironmentFile {
-    id: String,
-}
+    fn new(
+        cli_args: Vec<&str>,
+        env_vars: HashMap<OsString, OsString>,
+        mono_repo_path: &str,
+        home_path: &str,
+    ) -> Result<Self, String> {
+        let envs: Vec<Environment> = ProtocolConfig::from_json_file(mono_repo_path)
+            .and_then(|c| c.supported_environments(mono_repo_path))?;
 
-fn get_default_environment(mono_repo_path: &str) -> Result<Option<String>, JsValue> {
-    let default_environment_json_path: String = format!("{}/default-environment.json", mono_repo_path);
-    let data = match real::read_file(default_environment_json_path.as_str()) {
-        Ok(data) => data,
-        // File only exists in containers,
-        // so nothing to worry about if file cannot be read
-        Err(_) => return Ok(None)
-    };
+        let version =
+            PackageJsonFile::from_json_file(mono_repo_path).and_then(|p| p.coerced_version())?;
 
-    match serde_json::from_slice::<DefaultEnvironmentFile>(&data) {
-        Ok(json) => Ok(Some(json.id)),
-        Err(e) => Err(JsValue::from(e.to_string())),
-    }
-}
+        let maybe_default_environment = get_default_environment(mono_repo_path);
 
-fn get_data_path(mono_repo_path: &str, maybe_default_environment: Option<String>) -> String {
-    match maybe_default_environment {
-        Some(default_environment) => format!("{}/packages/hoprd/hoprd-db/{}", mono_repo_path, default_environment),
-        None => format!("{}/packages/hoprd/hoprd-db", mono_repo_path)
-    }
-}
+        let mut env_arg = Arg::new("environment")
+            .long("environment")
+            .required(true)
+            .env("HOPRD_ENVIRONMENT")
+            .value_name("ENVIRONMENT")
+            .help("Environment id which the node shall run on")
+            .value_parser(PossibleValuesParser::new(
+                envs.iter().map(|e| e.id.to_owned()),
+            ));
 
-pub fn parse_cli_arguments(cli_args: Vec<&str>, env_vars: HashMap<OsString, OsString>, mono_repo_path: &str, home_path: &str) -> Result<JsValue, JsValue> {
-    let envs: Vec<Environment> = environment::supported_environments(mono_repo_path)?;
+        if let Some(default_environment) = &maybe_default_environment {
+            // Add default value if we got one
+            env_arg = env_arg.default_value(default_environment);
+        }
 
-    let version = environment::get_package_version(mono_repo_path)?;
-
-    let maybe_default_environment = get_default_environment(mono_repo_path)?;
-
-    let mut env_arg = Arg::new("environment")
-        .long("environment")
-        .required(true)
-        .env("HOPRD_ENVIRONMENT")
-        .value_name("ENVIRONMENT")
-        .help("Environment id which the node shall run on")
-        .value_parser(PossibleValuesParser::new(envs.iter().map(|e| e.id.to_owned())));
-
-
-    if let Some(default_environment) = &maybe_default_environment {
-        // Add default value if we got one
-        env_arg = env_arg.default_value(default_environment);
-    }
-
-    let mut cmd = Command::new("hoprd")
+        let mut cmd = Command::new("hoprd")
         .about("HOPRd")
         .bin_name("index.cjs")
         .after_help("All CLI options can be configured through environment variables as well. CLI parameters have precedence over environment variables.")
@@ -346,30 +327,62 @@ pub fn parse_cli_arguments(cli_args: Vec<&str>, env_vars: HashMap<OsString, OsSt
             .env("HOPRD_DATA")
             .default_value(get_data_path(mono_repo_path, maybe_default_environment)));
 
-    // Add compile args to runtime-time args
-    cmd = CliArgs::augment_args(cmd);
+        // Add compile args to runtime-time args
+        cmd = Self::augment_args(cmd);
 
-    cmd.update_env_from(env_vars);
+        cmd.update_env_from(env_vars);
 
-    let derived_matches = match cmd.try_get_matches_from(cli_args) {
-        Ok(matches) => matches,
-        Err(e) => return Err(JsValue::from(e.to_string()))
-    };
+        let derived_matches = cmd
+            .try_get_matches_from(cli_args)
+            .map_err(|e| e.to_string())?;
 
-    let mut args = CliArgs::from_arg_matches(&derived_matches).unwrap();
+        let mut args = ok_or_str!(Self::from_arg_matches(&derived_matches))?;
 
-    args.augment_runtime_args(&derived_matches);
+        args.augment_runtime_args(&derived_matches);
 
-    serde_wasm_bindgen::to_value(&args).map_err(|e| JsValue::from(e.to_string()))
+        Ok(args)
+    }
+}
+
+#[derive(Deserialize)]
+struct DefaultEnvironmentFile {
+    id: String,
+}
+
+impl FromJsonFile for DefaultEnvironmentFile {
+    fn from_json_file(mono_repo_path: &str) -> Result<Self, String> {
+        let default_environment_json_path: String =
+            format!("{}/default-environment.json", mono_repo_path);
+        let data = ok_or_str!(real::read_file(default_environment_json_path.as_str()))?;
+
+        ok_or_str!(serde_json::from_slice::<DefaultEnvironmentFile>(&data))
+    }
+}
+
+fn get_default_environment(mono_repo_path: &str) -> Option<String> {
+    match DefaultEnvironmentFile::from_json_file(mono_repo_path) {
+        Ok(json) => Some(json.id),
+        Err(_) => None,
+    }
+}
+
+fn get_data_path(mono_repo_path: &str, maybe_default_environment: Option<String>) -> String {
+    match maybe_default_environment {
+        Some(default_environment) => format!(
+            "{}/packages/hoprd/hoprd-db/{}",
+            mono_repo_path, default_environment
+        ),
+        None => format!("{}/packages/hoprd/hoprd-db", mono_repo_path),
+    }
 }
 
 pub mod wasm {
     use js_sys::JsString;
-    use wasm_bindgen::prelude::*;
-    use wasm_bindgen::JsValue;
     use std::collections::HashMap;
     use std::ffi::OsString;
     use std::str::FromStr;
+    use wasm_bindgen::prelude::*;
+    use wasm_bindgen::JsValue;
 
     /// Macro used to convert Vec<JsString> to Vec<&str>
     macro_rules! convert_from_jstrvec {
@@ -378,10 +391,16 @@ pub mod wasm {
             let $r = _aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
         };
     }
-    
+
     macro_rules! clean_mono_repo_path {
         ($v:expr,$r:ident) => {
             let $r = $v.strip_suffix("/").unwrap_or($v);
+        };
+    }
+
+    macro_rules! ok_or_jserr {
+        ($v:expr) => {
+            $v.map_err(|e| JsValue::from(e.to_string()))
         };
     }
 
@@ -390,17 +409,44 @@ pub mod wasm {
         cli_args: Vec<JsString>,
         envs: &JsValue,
         mono_repo_path: &str,
-        home_path: &str
+        home_path: &str,
     ) -> Result<JsValue, JsValue> {
         convert_from_jstrvec!(cli_args, cli_str_args);
         clean_mono_repo_path!(mono_repo_path, cleaned_mono_repo_path);
 
-        let env_map = serde_wasm_bindgen::from_value::<std::collections::HashMap<String, String>>(envs.into()).map_err(|e| JsValue::from(e.to_string()))?;
-
-        // wasm_bindgen receives Strings but in order to
+        // wasm_bindgen receives Strings but to
         // comply with Rust standard, turn them into OsStrings
-        let env_os_string_map = HashMap::from_iter(env_map.iter().map(|(k,v)| (OsString::from_str(k).unwrap(),OsString::from_str(v).unwrap())));
+        let string_envs = ok_or_jserr!(serde_wasm_bindgen::from_value::<Vec<(String, String)>>(
+            envs.into(),
+        ))?;
 
-        super::parse_cli_arguments(cli_str_args, env_os_string_map, cleaned_mono_repo_path, home_path)
+        let mut env_map: HashMap<OsString, OsString> = HashMap::new();
+        for (ref k, ref v) in string_envs {
+            let key = OsString::from_str(k).or_else(|e| {
+                Err(format!(
+                    "Could not convert key {} to OsString: {}",
+                    k,
+                    e.to_string()
+                ))
+            })?;
+            let value = OsString::from_str(v).or_else(|e| {
+                Err(format!(
+                    "Could not convert value {} to OsString: {}",
+                    v,
+                    e.to_string()
+                ))
+            })?;
+
+            env_map.insert(key, value);
+        }
+
+        let args = ok_or_jserr!(super::CliArgs::new(
+            cli_str_args,
+            env_map,
+            cleaned_mono_repo_path,
+            home_path
+        ))?;
+
+        ok_or_jserr!(serde_wasm_bindgen::to_value(&args))
     }
 }
