@@ -266,18 +266,8 @@ To install Rust toolchain (at least version 1.60) please follow instructions at 
 # build deps and HOPRd code
 make -j deps && make -j build
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 # starting network
 make run-anvil
-=======
-# starting network (and put into background)
-make run-hardhat &
->>>>>>> 69cb561c2 (Add missing wasm-opt dependency)
-=======
-# starting network (and put into background)
-make run-hardhat &
->>>>>>> master
 
 # update protocol-config
 scripts/update-protocol-config.sh -e anvil-localhost
