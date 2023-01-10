@@ -13,6 +13,8 @@ mod utils;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use wasm_bindgen::prelude::wasm_bindgen;
+
     #[allow(dead_code)]
     #[wasm_bindgen]
     pub fn set_panic_hook() {
