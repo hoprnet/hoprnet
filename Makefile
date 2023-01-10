@@ -370,32 +370,6 @@ endif
 		environment-name=$(environment) environment-type=$(environment_type) \
 		peer_ids="$(peer_ids)"
 
-# .PHONY: register-node-when-dummy-proxy
-# # DEPRECATED. Only use it when a dummy network registry proxy is in use
-# # Register a node when a dummy proxy is in place of staking proxy
-# # node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'
-# register-node-when-dummy-proxy: ensure-environment-is-set
-# ifeq ($(endpoint),)
-# 	echo "parameter <endpoint> is default to localhost:3001" >&2
-# endif
-# ifeq ($(api_token),)
-# 	echo "parameter <api_token> missing" >&2 && exit 1
-# endif
-# ifeq ($(account),)
-# 	echo "parameter <account> missing" >&2 && exit 1
-# endif
-# ifeq ($(origin CI_DEPLOYER_PRIVKEY),undefined)
-# 	echo "<CI_DEPLOYER_PRIVKEY> environment variable missing" >&2 && exit 1
-# endif
-# 	TS_NODE_PROJECT=./tsconfig.hardhat.json \
-# 	HOPR_ENVIRONMENT_ID="$(environment)" \
-# 	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
-#    --network $(network) \
-#    --task add \
-#    --native-addresses "$(account)" \
-#    --peer-ids "$(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")" \
-#    --privatekey "$(CI_DEPLOYER_PRIVKEY)"
-
 .PHONY: register-node-with-nft
 # node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'
 register-node-with-nft: ensure-environment-is-set

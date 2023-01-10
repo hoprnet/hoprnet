@@ -153,38 +153,6 @@ source .env
   make register-node-with-stake endpoint=<hoprd_endpoint> account=<staking_account> environment=master-goerli environment_type=staging
   ```
 
-### [DEPRECATED] Production (with dummy proxy)
-
-Before "Network_registry" NFT gets minted in production environment, "Dummy proxy" is used to faciliate the process.
-
-Deployer wallet in the CI/CD registers node and its peerId when calling `make register-nodes` (followed by more flags and arguments). Developers must follow these steps to register their node in the registry:
-
-1. Create a MetaMask wallet (note as “account”)
-2. Start your local HOPR node
-3. Save private keys (`CI_DEPLOYER_PRIVKEY`) into `.env` file
-
-```
-export CI_DEPLOYER_PRIVKEY=<CI deployer account private key>
-```
-
-and
-
-```
-source .env
-```
-
-4. Run command
-
-```
-make register-node-when-dummy-proxy endpoint=<hoprd_endpoint> account=<staking_account> environment=monte_rosa environment_type=production
-```
-
-e.g.
-
-```
-make register-node-when-dummy-proxy endpoint="localhost:3001" api_token="^MYtoken4testing^" account=0x35A3e15A2E2C297686A4fac5999647312fdDfa3f environment=monte_rosa environment_type=production
-```
-
 ### Production
 
 For nodes running in the upcoming "monte_rosa" environment, only wallets with one "Network_registry" HoprBoost NFT (be `developer` or `community` rank) staked in the staking program are eligible to spin up HOPR nodes.
