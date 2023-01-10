@@ -54,6 +54,8 @@ const packageFile = path.normalize(new URL('../package.json', import.meta.url).p
 const version = get_package_version(packageFile)
 const on_avado = (process.env.AVADO ?? 'false').toLowerCase() === 'true'
 
+// Handmade type copy of Rust struct
+// see `../crates/hoprd-misc/src/cli.rs`
 type CliArgs = {
   environment: string
   host: string
