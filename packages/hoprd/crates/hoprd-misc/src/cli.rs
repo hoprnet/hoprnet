@@ -32,14 +32,15 @@ macro_rules! ok_or_str {
 /// Arguments whose structure, e.g. their default values depend on
 /// file contents need be specified using `clap`s builder API
 #[derive(Serialize, Args)]
+#[command(about = "HOPRd")]
 struct CliArgs {
     // Filled by Builder API at runtime
     #[arg(skip)]
-    environment: String,
+    pub environment: String,
 
     // Filled by Builder API at runtime
     #[arg(skip)]
-    identity: String,
+    pub identity: String,
 
     // Filled by Builder API at runtime
     #[arg(skip)]
@@ -193,14 +194,14 @@ struct CliArgs {
     test_use_weak_crypto: bool,
 
     #[arg(
-        long = "testNoAuthentication",
+        long = "disableApiAuthentication",
         help = "no remote authentication for easier testing",
         action = ArgAction::SetTrue,
         env = "HOPRD_TEST_NO_AUTHENTICATION",
         default_value_t = false,
         hide = true
     )]
-    test_no_authentication: bool,
+    disable_api_authentication: bool,
 
     #[arg(
         long = "testNoDirectConnections",
@@ -281,7 +282,7 @@ impl CliArgs {
         self.identity = m.get_one::<String>("identity").unwrap().to_owned();
     }
 
-    fn new(
+    fn new_from(
         cli_args: Vec<&str>,
         env_vars: HashMap<OsString, OsString>,
         mono_repo_path: &str,
@@ -416,7 +417,7 @@ pub mod wasm {
 
         // wasm_bindgen receives Strings but to
         // comply with Rust standard, turn them into OsStrings
-        let string_envs = ok_or_jserr!(serde_wasm_bindgen::from_value::<Vec<(String, String)>>(
+        let string_envs = ok_or_jserr!(serde_wasm_bindgen::from_value::<HashMap<String, String>>(
             envs.into(),
         ))?;
 
@@ -440,7 +441,7 @@ pub mod wasm {
             env_map.insert(key, value);
         }
 
-        let args = ok_or_jserr!(super::CliArgs::new(
+        let args = ok_or_jserr!(super::CliArgs::new_from(
             cli_str_args,
             env_map,
             cleaned_mono_repo_path,

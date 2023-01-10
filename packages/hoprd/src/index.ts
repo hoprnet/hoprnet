@@ -19,7 +19,7 @@ import {
   resolveEnvironment
 } from '@hoprnet/hopr-core'
 
-import { cl } from '../lib/hoprd_misc.js'
+import { parse_cli_arguments } from '../lib/hoprd_misc.js'
 import type { State } from './types.js'
 import setupAPI from './api/index.js'
 import setupHealthcheck from './healthcheck.js'
@@ -172,11 +172,23 @@ async function main() {
       strategy: 'passive'
     }
   }
+
   const setState = (newState: State): void => {
     state = newState
   }
+
   const getState = (): State => {
     return state
+  }
+
+  const mono_repo_path = new URL('../../../', import.meta.url).pathname
+  let argv: CliArgs
+  try {
+    argv = parse_cli_arguments(process.argv.slice(1), process.env, mono_repo_path, process.env.HOME) as CliArgs
+  } catch (err) {
+    // Show if CLI parser did not accept any of the provided arguments
+    console.log(err)
+    process.exit(1)
   }
 
   let metric_timerToGreen = metric_timeToGreen.start_measure()
@@ -207,20 +219,20 @@ async function main() {
     }
   }
 
-  if (!argv.disableApiAuthentication && argv.api) {
-    if (argv.apiToken == null) {
+  if (!argv.disable_api_authentication && argv.api) {
+    if (argv.api_token == null) {
       throw Error(`Must provide --apiToken when --api is specified`)
     }
-    if (argv.apiToken.length < 8) {
+    if (argv.api_token.length < 8) {
       throw new Error(`API token must be at least 8 characters long`)
     }
   }
 
-  const apiToken = argv.disableApiAuthentication ? null : argv.apiToken
+  const apiToken = argv.disable_api_authentication ? null : argv.api_token
 
   const environment = resolveEnvironment(argv.environment, argv.provider)
-  let options = generateNodeOptions(environment)
-  if (argv.dryRun) {
+  let options = generateNodeOptions(argv, environment)
+  if (argv.dry_run) {
     console.log(JSON.stringify(options, undefined, 2))
     process.exit(0)
   }
@@ -238,8 +250,8 @@ async function main() {
       initialize: argv.init,
       idPath: argv.identity,
       password: argv.password,
-      useWeakCrypto: argv.testUseWeakCrypto,
-      privateKey: argv.privateKey
+      useWeakCrypto: argv.test_use_weak_crypto,
+      privateKey: argv.private_key
     })
 
     // 2. Create node instance
@@ -264,16 +276,16 @@ async function main() {
         { getState, setState },
         {
           ...argv,
-          apiHost: argv.apiHost,
-          apiPort: argv.apiPort,
+          apiHost: argv.api_host,
+          apiPort: argv.api_port,
           apiToken
         }
       )
       // start API server only if API flag is true
       if (argv.api) startApiListen()
 
-      if (argv.healthCheck) {
-        setupHealthcheck(node, logs, argv.healthCheckHost, argv.healthCheckPort)
+      if (argv.health_check) {
+        setupHealthcheck(node, logs, argv.health_check_host, argv.health_check_port)
       }
 
       logs.log(`Node address: ${node.getId().toString()}`)
