@@ -1,9 +1,5 @@
-import {
-  resolve_environment,
-  set_panic_hook as core_misc_panic_hook,
-  supported_environments
-} from '../lib/core_misc.js'
-core_misc_panic_hook()
+import { resolve_environment, core_misc_set_panic_hook, supported_environments } from '../lib/core_misc.js'
+core_misc_set_panic_hook()
 export { resolve_environment, supported_environments } from '../lib/core_misc.js'
 
 export type NetworkOptions = {

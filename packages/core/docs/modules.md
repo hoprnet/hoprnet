@@ -132,7 +132,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/environment.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L54)
+[packages/core/src/environment.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L45)
 
 ___
 
@@ -416,7 +416,7 @@ the environment details, throws if environment is not supported
 
 #### Defined in
 
-[packages/core/src/environment.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L90)
+[packages/core/src/environment.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L74)
 
 ___
 
@@ -432,4 +432,4 @@ environments that the given HOPR version should be able to use
 
 #### Defined in
 
-[packages/core/src/environment.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L72)
+[packages/core/src/environment.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L65)
