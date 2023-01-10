@@ -246,6 +246,7 @@ impl ResolvedEnvironment {
     }
 }
 
+#[cfg(feature = "wasm")]
 pub mod wasm {
     use super::FromJsonFile;
     use wasm_bindgen::prelude::*;

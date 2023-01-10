@@ -19,6 +19,7 @@ pub fn get_package_version(package_file: &str) -> Result<String, RealError> {
     }
 }
 
+#[cfg(feature = "wasm")]
 pub mod wasm {
     use wasm_bindgen::prelude::*;
 
