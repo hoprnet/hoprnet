@@ -3047,7 +3047,6 @@ __metadata:
     nyc: 15.1.0
     retimer: 3.0.0
     secp256k1: 4.0.3
-    semver: 7.3.7
     sinon: 12.0.1
     typedoc: 0.23.20
     typedoc-plugin-markdown: 3.13.6
@@ -3089,6 +3088,7 @@ __metadata:
   dependencies:
     "@types/mocha": 9.1.1
     mocha: 9.2.2
+    semver: 7.3.8
     typedoc: 0.23.20
     typedoc-plugin-markdown: 3.13.6
     typescript: 4.8.4
@@ -18113,6 +18113,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"semver@npm:7.3.8":
+  version: 7.3.8
+  resolution: "semver@npm:7.3.8"
+  dependencies:
+    lru-cache: ^6.0.0
+  bin:
+    semver: bin/semver.js
+  checksum: ba9c7cbbf2b7884696523450a61fee1a09930d888b7a8d7579025ad93d459b2d1949ee5bbfeb188b2be5f4ac163544c5e98491ad6152df34154feebc2cc337c1
+  languageName: node
+  linkType: hard
+
 "semver@npm:^5.3.0, semver@npm:^5.4.1, semver@npm:^5.5.0, semver@npm:^5.6.0":
   version: 5.7.1
   resolution: "semver@npm:5.7.1"
@@ -18121,6 +18132,7 @@ __metadata:
   checksum: 57fd0acfd0bac382ee87cd52cd0aaa5af086a7dc8d60379dfe65fea491fb2489b6016400813930ecd61fd0952dae75c115287a1b16c234b1550887117744dfaf
   languageName: node
   linkType: hard
+
 
 "semver@npm:^6.0.0, semver@npm:^6.1.1, semver@npm:^6.1.2, semver@npm:^6.2.0, semver@npm:^6.3.0":
   version: 6.3.0

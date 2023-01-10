@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "1.92.0-next.30",
+  "version": "1.92.0-next.31",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -56,8 +56,7 @@
     "levelup": "5.1.1",
     "libp2p": "0.37.3",
     "retimer": "3.0.0",
-    "secp256k1": "4.0.3",
-    "semver": "7.3.7"
+    "secp256k1": "4.0.3"
   },
   "devDependencies": {
     "@libp2p/interface-content-routing": "1.0.2",

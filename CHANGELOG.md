@@ -4,8 +4,9 @@
   - Includes removal of CLI option `--admin`, `--adminHost` and `--adminPort`
   - HOPR admin may now be used as a stand-alone component, see https://github.com/hoprnet/hopr-admin
   - Add `--disableApiAuthentication` CLI option to allow using the API without authentication, default for Avado & Dappnode ([#4466](https://github.com/hoprnet/hoprnet/pull/4466))
-- Grafana dashboards integration for all supported platforms ([#4472](https://github.com/hoprnet/hoprnet/pull/4472))
-- Smart contract toolchain upgrade ([#4382](https://github.com/hoprnet/hoprnet/pull/4230))
+  - Grafana dashboards integration for all supported platforms ([#4472](https://github.com/hoprnet/hoprnet/pull/4472))
+  - Migrate environment checker code to Rust ([#4492](https://github.com/hoprnet/hoprnet/pull/4492))
+  - Smart contract toolchain upgrade ([#4382](https://github.com/hoprnet/hoprnet/pull/4230))
 
 <a name="1.91"></a>
 

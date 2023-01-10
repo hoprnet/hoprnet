@@ -41,7 +41,6 @@
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xa3C8f4044b30Fb3071F5b3b02913DE524F1041dc",
       "channels_contract_address": "0xc81E2Bf738f8018202c8Bd9dA85a12D5D7291d08",
-      "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
       "xhopr_contract_address": "0xe8aD2ac347dA7549Aaca8F5B1c5Bf979d85bC78F",
       "boost_contract_address": "0xDA335D985710b80e5BfC697C6Fba0A906Dd4a1CE",
       "stake_contract_address": "0xab231873246daaff05c99b3682ea649e6C80AB68",
@@ -56,7 +55,6 @@
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xa3C8f4044b30Fb3071F5b3b02913DE524F1041dc",
       "channels_contract_address": "0x43FBe6a5F571B7288Ce58F3b03a48Fcaa11fE58c",
-      "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
       "stake_contract_address": "0xA681e2Bd553648282322e3d11a7dC96344FCBcdA",
       "network_registry_contract_address": "0x57e74767075471B1B87C7d34968a5c91a6B6FEB4",
       "xhopr_contract_address": "0x552aBf0EBCd6B6162519132A831C181f87e46874",
@@ -71,8 +69,11 @@
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
       "channels_contract_address": "0xd2229d5d54bE8ABC9A2b2d5cFdEd22B48FB8ce2c",
+      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
+      "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
       "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "network_registry_proxy_contract_address": "${HARDHAT_REGISTRY_PROXY_CONTACT_ADDRESS}",
       "tags": []
     },
     "prague": {
@@ -82,8 +83,11 @@
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
       "channels_contract_address": "0x4f98F01cb02083eb5457CA0DDC6B37073ec5388a",
+      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
+      "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
       "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "network_registry_proxy_contract_address": "${HARDHAT_REGISTRY_PROXY_CONTACT_ADDRESS}",
       "tags": []
     },
     "budapest": {
@@ -93,8 +97,11 @@
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
       "channels_contract_address": "0xEee8AB66b7169b3f9024676165fB1D2a25E472c5",
+      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
+      "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
       "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "network_registry_proxy_contract_address": "${HARDHAT_REGISTRY_PROXY_CONTACT_ADDRESS}",
       "tags": []
     },
     "athens": {
@@ -104,8 +111,11 @@
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
       "channels_contract_address": "0xD2F008718EEdD7aF7E9a466F5D68bb77D03B8F7A",
+      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
+      "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
       "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "network_registry_proxy_contract_address": "${HARDHAT_REGISTRY_PROXY_CONTACT_ADDRESS}",
       "tags": []
     },
     "lisbon": {
@@ -115,8 +125,11 @@
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0x978D91ddFdb0c6eaCC22A258fE498957a79c5F4C",
       "channels_contract_address": "0x1753C9eE656c54f443ce2Fe7248076f9bA4eC100",
+      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
+      "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
       "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "network_registry_proxy_contract_address": "${HARDHAT_REGISTRY_PROXY_CONTACT_ADDRESS}",
       "tags": []
     },
     "ouagadougou": {
@@ -130,6 +143,7 @@
       "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
       "stake_contract_address": "0xae933331ef0bE122f9499512d3ed4Fa3896DCf20",
       "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "network_registry_proxy_contract_address": "${HARDHAT_REGISTRY_PROXY_CONTACT_ADDRESS}",
       "tags": []
     },
     "paleochora": {
@@ -149,7 +163,7 @@
     "monte_rosa": {
       "network_id": "xdai",
       "environment_type": "production",
-      "version_range": "1.89||1.90||1.91",
+      "version_range": "1.89||1.90||1.91||1.92",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0x66225dE86Cac02b32f34992eb3410F59DE416698",
       "channels_contract_address": "0xFaBeE463f31E39eC8952bBfB4490C41103bf573e",

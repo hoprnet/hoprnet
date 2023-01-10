@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-real",
-  "version": "1.92.0-next.30",
+  "version": "1.92.0-next.31",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0-only",
@@ -22,6 +22,9 @@
     "test": "yarn test:wasm && NODE_OPTIONS=\"--experimental-wasm-modules\" mocha",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
+  },
+  "dependencies": {
+    "semver": "7.3.8"
   },
   "devDependencies": {
     "@types/mocha": "9.1.1",
