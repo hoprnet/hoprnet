@@ -6,6 +6,7 @@
 - Add `--disableApiAuthentication` CLI option to allow using the API without authentication, default for Avado & Dappnode ([#4466](https://github.com/hoprnet/hoprnet/pull/4466))
 - Grafana dashboards integration for all supported platforms ([#4472](https://github.com/hoprnet/hoprnet/pull/4472))
 - Smart contract toolchain upgrade ([#4382](https://github.com/hoprnet/hoprnet/pull/4230))
+- Migrate environment checker code to Rust ([#4492](https://github.com/hoprnet/hoprnet/pull/4492))
 - Switch staging environment to using Gnosis Chain instead of Goerli ([#4497](https://github.com/hoprnet/hoprnet/pull/4497))
 
 <a name="1.91"></a>
