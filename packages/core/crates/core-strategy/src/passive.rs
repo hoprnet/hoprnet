@@ -3,46 +3,42 @@ use utils_types::primitives::Balance;
 
 use crate::generic::{ChannelStrategy, StrategyTickResult};
 
-pub struct PromiscuousStrategy ;
+pub struct PassiveStrategy;
 
-
-impl ChannelStrategy for PromiscuousStrategy {
+impl ChannelStrategy for PassiveStrategy {
     fn name(&self) -> &str {
-        "promiscuous"
+        "passive"
     }
 
-    fn tick<Q>(&self, balance: Balance, network_size: u32, outgoing_channel_peer_ids: &[&str], quality_of: Q, peer_ids: &[&str]) -> StrategyTickResult
+    fn tick<Q>(&self, _balance: Balance, _network_size: u32, _current_channels: &[&str], _quality_of: Q, _peer_ids: &[&str]) -> StrategyTickResult
         where Q: Fn(&str) -> f64 {
-        todo!()
+
+        StrategyTickResult{
+            to_open: vec![],
+            to_close: vec![]
+        }
     }
 }
 
-
-/// Unit tests of pure Rust code
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-}
-
-/// Module for WASM wrappers of Rust code
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use js_sys::JsString;
-    use wasm_bindgen::prelude::*;
+    use wasm_bindgen::JsValue;
+    use wasm_bindgen::prelude::wasm_bindgen;
+    use crate::generic::ChannelStrategy;
 
     use utils_types::primitives::wasm::Balance;
 
-    use crate::generic::ChannelStrategy;
     use crate::generic::wasm::StrategyTickResult;
 
     #[wasm_bindgen]
-    pub struct PromiscuousStrategy {
-        w: super::PromiscuousStrategy
+    pub struct PassiveStrategy {
+        w: super::PassiveStrategy
     }
 
+
     #[wasm_bindgen]
-    impl PromiscuousStrategy {
+    impl PassiveStrategy {
 
         #[wasm_bindgen(getter)]
         pub fn name(&self) -> String {
@@ -52,6 +48,6 @@ pub mod wasm {
         pub fn tick(&self, balance: Balance, network_size: u32, current_channels: Vec<JsString>, quality_of: &js_sys::Function, peer_ids: Vec<JsString>) ->  StrategyTickResult {
             crate::generic::wasm::tick_wrap(&self.w, balance, network_size, current_channels, quality_of, peer_ids)
         }
+
     }
 }
-

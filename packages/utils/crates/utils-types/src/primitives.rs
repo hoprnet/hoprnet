@@ -1,7 +1,12 @@
+use ethnum::u256;
 
-/// Pure Rust function
-pub fn foo() -> i32 {
-    42
+pub struct PublicKey {
+    data: Box<[u8]>
+}
+
+pub struct Balance {
+    value: u256,
+    symbol: &'static str
 }
 
 /// Unit tests of pure Rust code
@@ -9,10 +14,6 @@ pub fn foo() -> i32 {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_foo() {
-        assert_eq!(42, foo());
-    }
 }
 
 /// Module for WASM wrappers of Rust code
@@ -21,8 +22,9 @@ pub mod wasm {
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
-    pub fn foo() -> i32 {
-        super::foo()
+    pub struct Balance {
+        #[wasm_bindgen(skip)]
+        pub w: super::Balance
     }
 }
 

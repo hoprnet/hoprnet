@@ -1,5 +1,5 @@
-# Template for custom Rust WASM module
+# utils-types
 
-This is a starter template for Rust WASM module that uses `wasm-bindgen`.
+This crate contains basic types used throughout the entire HOPR codebase.
 
 
