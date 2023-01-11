@@ -4,6 +4,8 @@ use std::ffi::OsString;
 use clap::builder::PossibleValuesParser;
 use clap::{Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _};
 use core_misc::environment::{Environment, FromJsonFile, PackageJsonFile, ProtocolConfig};
+use core_misc::constants::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_THRESHOLD, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_NETWORK_QUALITY_THRESHOLD};
+use core_ethereum_misc::constants::DEFAULT_CONFIRMATIONS;
 use real_base::real;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -11,22 +13,14 @@ use serde_json;
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
-const HEARTBEAT_INTERVAL: u32 = 60000;
-const HEARTBEAT_THRESHOLD: u32 = 60000;
-const HEARTBEAT_INTERVAL_VARIANCE: u32 = 2000;
+pub const DEFAULT_API_HOST: &str = "localhost";
+pub const DEFAULT_API_PORT: u16 = 3001;
 
-const CONFIRMATIONS: u32 = 8;
+pub const DEFAULT_HOST: &str = "0.0.0.0";
+pub const DEFAULT_PORT: u16 = 9091;
 
-const NETWORK_QUALITY_THRESHOLD: f32 = 0.5;
-
-const DEFAULT_API_HOST: &str = "localhost";
-const DEFAULT_API_PORT: u16 = 3001;
-
-const DEFAULT_HOST: &str = "0.0.0.0";
-const DEFAULT_PORT: u16 = 9091;
-
-const DEFAULT_HEALTH_CHECK_HOST: &str = "localhost";
-const DEFAULT_HEALTH_CHECK_PORT: u16 = 8080;
+pub const DEFAULT_HEALTH_CHECK_HOST: &str = "localhost";
+pub const DEFAULT_HEALTH_CHECK_PORT: u16 = 8080;
 
 macro_rules! ok_or_str {
     ($v:expr) => {
@@ -262,7 +256,7 @@ struct CliArgs {
         help = "Interval in milliseconds in which the availability of other nodes get measured",
         value_name = "MILLISECONDS",
         value_parser = clap::value_parser!(u32),
-        default_value_t = HEARTBEAT_INTERVAL,
+        default_value_t = DEFAULT_HEARTBEAT_INTERVAL,
         env = "HOPRD_HEARTBEAT_INTERVAL",
     )]
     pub heartbeat_interval: u32,
@@ -272,7 +266,7 @@ struct CliArgs {
         help = "Timeframe in milliseconds after which a heartbeat to another peer is performed, if it hasn't been seen since",
         value_name = "MILLISECONDS",
         value_parser = clap::value_parser!(u32),
-        default_value_t = HEARTBEAT_THRESHOLD,
+        default_value_t = DEFAULT_HEARTBEAT_THRESHOLD,
         env = "HOPRD_HEARTBEAT_THRESHOLD",
     )]
     pub heartbeat_threshold: u32,
@@ -282,7 +276,7 @@ struct CliArgs {
         help = "Upper bound for variance applied to heartbeat interval in milliseconds",
         value_name = "MILLISECONDS",
         value_parser = clap::value_parser!(u32),
-        default_value_t = HEARTBEAT_INTERVAL_VARIANCE,
+        default_value_t = DEFAULT_HEARTBEAT_INTERVAL_VARIANCE,
         env = "HOPRD_HEARTBEAT_VARIANCE"
     )]
     pub heartbeat_variance: u32,
@@ -292,7 +286,7 @@ struct CliArgs {
         help = "Number of confirmations required for on-chain transactions",
         value_name = "CONFIRMATIONS",
         value_parser = clap::value_parser!(u32),
-        default_value_t = CONFIRMATIONS,
+        default_value_t = DEFAULT_CONFIRMATIONS,
         env = "HOPRD_ON_CHAIN_CONFIRMATIONS",
 
     )]
@@ -303,7 +297,7 @@ struct CliArgs {
         help = "Miniumum quality of a peer connection to be considered usable",
         value_name = "THRESHOLD",
         value_parser = clap::value_parser!(f32),
-        default_value_t = NETWORK_QUALITY_THRESHOLD,
+        default_value_t = DEFAULT_NETWORK_QUALITY_THRESHOLD,
         env = "HOPRD_NETWORK_QUALITY_THRESHOLD"
     )]
     pub network_quality_threshold: f32,

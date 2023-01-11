@@ -400,6 +400,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-ethereum-misc"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+ "wasm-opt",
+ "wasm-pack",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -876,6 +887,7 @@ version = "0.1.0"
 dependencies = [
  "clap 4.0.32",
  "console_error_panic_hook",
+ "core-ethereum-misc",
  "core-misc",
  "js-sys",
  "real-base",

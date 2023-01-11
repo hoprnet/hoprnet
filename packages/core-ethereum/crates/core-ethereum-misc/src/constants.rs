@@ -1,0 +1,1 @@
+pub const DEFAULT_CONFIRMATIONS: u32 = 8;

@@ -1,5 +1,4 @@
 pub mod constants;
-pub mod environment;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
@@ -7,7 +6,7 @@ pub mod wasm {
 
     #[allow(dead_code)]
     #[wasm_bindgen]
-    pub fn core_misc_set_panic_hook() {
+    pub fn core_ethereum_misc_set_panic_hook() {
         // When the `console_error_panic_hook` feature is enabled, we can call the
         // `set_panic_hook` function at least once during initialization, and then
         // we will get better error messages if our code ever panics.

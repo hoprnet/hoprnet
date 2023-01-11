@@ -1,9 +1,9 @@
 [package]
-name = "hoprd-misc"
+name = "core-ethereum-misc"
 version = "0.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
-description = "Rust WASM modules for HOPRd"
+description = "Selected core ethereum modules"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "LGPL-3.0-only"
@@ -16,19 +16,10 @@ default = ["console_error_panic_hook", "wasm"]
 wasm = []
 
 [dependencies]
-clap = { git = "https://github.com/hoprnet/clap", branch = "robertkiel/update-env-from", features = ["derive", "env", "string"] }
-core-misc = { path = "../../../core/crates/core-misc" }
-core-ethereum-misc = { path = "../../../core-ethereum/crates/core-ethereum-misc" }
-js-sys = "0.3.60"
-real-base = { path = "../../../real/crates/real-base" }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-serde-wasm-bindgen = "0.4"
 wasm-bindgen = "0.2.83"
-wasm-bindgen-test = "0.3.30"
 
 console_error_panic_hook = { version = "0.1.6", optional = true }
-#wee_alloc = { version = "0.4.5", optional = true }
+# wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.30"
