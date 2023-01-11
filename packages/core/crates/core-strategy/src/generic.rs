@@ -69,7 +69,7 @@ pub mod wasm {
             self.w.to_open.len()
         }
 
-        pub fn to_open(&self,index: usize) -> ChannelOpenRequest {
+        pub fn to_open(&self, index: usize) -> ChannelOpenRequest {
             ChannelOpenRequest {
                 w: self.w.to_open[index].clone()
             }
