@@ -1,3 +1,5 @@
+pub mod cli;
+
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;

@@ -22,6 +22,9 @@ const NETWORK_QUALITY_THRESHOLD: f32 = 0.5;
 const DEFAULT_API_HOST: &str = "localhost";
 const DEFAULT_API_PORT: u16 = 3001;
 
+const DEFAULT_HOST: &str = "0.0.0.0";
+const DEFAULT_PORT: u16 = 9091;
+
 const DEFAULT_HEALTH_CHECK_HOST: &str = "localhost";
 const DEFAULT_HEALTH_CHECK_PORT: u16 = 8080;
 
@@ -53,6 +56,30 @@ struct CliArgs {
     pub data: String,
 
     #[arg(
+        long, 
+        default_value_t = DEFAULT_HOST.to_string(), 
+        env = "HOPRD_HOST", 
+        help = "Host to listen on for P2P connections"
+    )]
+    pub host: String,
+
+    #[arg(
+        long,
+        default_value_t = DEFAULT_PORT,
+        env = "HOPRD_PORT",
+        help = "Port to liston on for P2P connections"
+    )]
+    pub port: u16,
+
+    #[arg(
+        long,
+        default_value_t = false,
+        env = "HOPRD_ANNOUNCE",
+        help = "Run as a Public Relay Node (PRN)"
+    )]
+    pub announce: bool,
+
+    #[arg(
         long,
         default_value_t = false,
         env = "HOPRD_API", 
@@ -81,6 +108,7 @@ struct CliArgs {
 
     #[arg(
         long = "apiToken",
+        alias = "api-token",
         help = "A REST API token and for user authentication",
         value_name = "TOKEN",
         env = "HOPRD_API_TOKEN"

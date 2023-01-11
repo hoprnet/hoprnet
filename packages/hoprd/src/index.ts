@@ -19,7 +19,7 @@ import {
   resolveEnvironment
 } from '@hoprnet/hopr-core'
 
-import { parse_cli_arguments } from '../lib/hoprd_misc.js'
+import { parse_cli_arguments, type CliArgs } from '../lib/hoprd_misc.js'
 import type { State } from './types.js'
 import setupAPI from './api/index.js'
 import setupHealthcheck from './healthcheck.js'
@@ -53,41 +53,6 @@ const metric_version = create_multi_gauge('hoprd_mgauge_version', 'Executed vers
 const packageFile = path.normalize(new URL('../package.json', import.meta.url).pathname)
 const version = get_package_version(packageFile)
 const on_avado = (process.env.AVADO ?? 'false').toLowerCase() === 'true'
-
-// Handmade type copy of Rust struct
-// see `../crates/hoprd-misc/src/cli.rs`
-type CliArgs = {
-  environment: string
-  host: string
-  announce: boolean
-  api: boolean
-  api_host: string
-  api_port: number
-  api_token?: string
-  health_check: boolean
-  health_check_host: string
-  health_check_port: number
-  password: string
-  provider: string
-  identity: string
-  dry_run: boolean
-  data: string
-  init: boolean
-  private_key?: string
-  allow_local_node_connections: boolean
-  allow_private_node_connections: boolean
-  disable_api_authentication: boolean
-  test_announce_local_addresses: boolean
-  test_prefer_local_addresses: boolean
-  test_use_weak_crypto: boolean
-  test_no_direct_connections: boolean
-  test_no_webrtc_upgrade: boolean
-  heartbeat_interval: number
-  heartbeat_threshold: number
-  heartbeat_variance: number
-  network_quality_threshold: number
-  on_chain_confirmations: number
-}
 
 function parseHosts(argv: CliArgs): HoprOptions['hosts'] {
   const hosts: HoprOptions['hosts'] = {}
