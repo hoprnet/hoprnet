@@ -15,11 +15,8 @@ build_info_path = "build-info"
 [rpc_endpoints]
 local = "http://localhost:8545"
 gnosis = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
-mainnet = "https://mainnet.infura.io/v3/${INFURA_API_KEY}" # or  "https://rpc.ankr.com/eth"
-
 
 [etherscan]
-mainnet = { key = "${ETHERSCAN_API_KEY}" }
 gnosis = { key = "${GNOSISSCAN_API_KEY}", url = "https://gnosisscan.io" }
 
 # testing and local network
@@ -37,7 +34,3 @@ eth_rpc_url = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
 # provide deployed BoostUtilsLib
 libraries = ["script/utils/BoostUtilsLib.sol:BoostUtilsLib:0x8197525557233031b110038Ae52dfC3C4A75567A"]
 eth_rpc_url = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
-
-# production environment environment
-[profile.mainnet_ethereum]
-eth_rpc_url = "https://mainnet.infura.io/v3/${INFURA_API_KEY}" # or  "https://rpc.ankr.com/eth"
