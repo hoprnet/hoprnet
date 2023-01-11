@@ -74,7 +74,7 @@ api_call(){
       sleep ${step_time}
 
       now=$(node -e "console.log(process.hrtime.bigint().toString());")
-      (( attempt++ ))
+      (( ++attempt ))
     fi
   done
 

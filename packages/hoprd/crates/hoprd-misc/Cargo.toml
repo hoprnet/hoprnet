@@ -11,6 +11,10 @@ license = "LGPL-3.0-only"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+default = ["console_error_panic_hook", "wasm"]
+wasm = []
+
 [dependencies]
 clap = { git = "https://github.com/hoprnet/clap", branch = "robertkiel/update-env-from", features = ["derive", "env", "string"] }
 core-misc = { path = "../../../core/crates/core-misc" }
