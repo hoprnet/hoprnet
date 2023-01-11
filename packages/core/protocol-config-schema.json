@@ -27,9 +27,6 @@
             "channels_contract_address": {
               "type": "string"
             },
-            "minted_token_receiver_address": {
-              "type": "string"
-            },
             "xhopr_contract_address": {
               "type": "string"
             },
