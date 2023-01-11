@@ -1,4 +1,5 @@
 import { retimer } from './retimer.js'
+import { defer } from '../async/index.js'
 import assert from 'assert'
 import { setTimeout } from 'timers/promises'
 
@@ -44,5 +45,32 @@ describe('test retimer', function () {
       },
       () => TWO_HOURS
     )
+  })
+
+  it('async / sync functionality', async function () {
+    const abort = new AbortController()
+    const longTimeout = setTimeout(TWO_HOURS, undefined, { signal: abort.signal })
+    const timeoutDone = defer<void>()
+
+    let i = 0
+
+    retimer(
+      async () => {
+        i++
+        if (i == 1) {
+          await longTimeout
+        } else if (i == 2) {
+          timeoutDone.resolve()
+        }
+      },
+      () => 1
+    )
+
+    await timeoutDone.promise
+
+    // Terminate timeout to prevent dangling timeouts
+    try {
+      abort.abort()
+    } catch {}
   })
 })

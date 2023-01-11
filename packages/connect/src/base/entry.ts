@@ -608,7 +608,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
         }
 
         return (initialDelay *= 1.5)
-      }
+      },
+      true
     )
   }
   /**
