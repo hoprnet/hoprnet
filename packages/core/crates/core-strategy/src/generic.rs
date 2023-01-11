@@ -11,7 +11,7 @@ pub trait ChannelStrategy {
             quality_of: Q,
             peer_ids: &[&str])
         -> StrategyTickResult
-    where Q: Fn(&str) -> f64;
+    where Q: Fn(&str) -> Option<f64>;
 }
 
 #[derive(Clone)]
@@ -94,8 +94,9 @@ pub mod wasm {
                            | peer_id: &str | {
                                let this = JsValue::null();
                                let str = JsString::from(peer_id);
+
                                let quality = quality_of.call1(&this, &str);
-                               quality.unwrap().as_f64().unwrap()
+                               quality.ok().map(|q| q.as_f64()).flatten()
                            },
                            bind_p.as_slice())
         }

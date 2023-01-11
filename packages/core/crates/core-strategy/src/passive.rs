@@ -11,7 +11,7 @@ impl ChannelStrategy for PassiveStrategy {
     }
 
     fn tick<Q>(&self, _balance: Balance, _network_size: u32, _current_channels: &[&str], _quality_of: Q, _peer_ids: &[&str]) -> StrategyTickResult
-        where Q: Fn(&str) -> f64 {
+        where Q: Fn(&str) -> Option<f64> {
 
         StrategyTickResult{
             to_open: vec![],
@@ -48,6 +48,5 @@ pub mod wasm {
         pub fn tick(&self, balance: Balance, network_size: u32, current_channels: Vec<JsString>, quality_of: &js_sys::Function, peer_ids: Vec<JsString>) ->  StrategyTickResult {
             crate::generic::wasm::tick_wrap(&self.w, balance, network_size, current_channels, quality_of, peer_ids)
         }
-
     }
 }

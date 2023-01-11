@@ -12,7 +12,7 @@ impl ChannelStrategy for PromiscuousStrategy {
     }
 
     fn tick<Q>(&self, balance: Balance, network_size: u32, outgoing_channel_peer_ids: &[&str], quality_of: Q, peer_ids: &[&str]) -> StrategyTickResult
-        where Q: Fn(&str) -> f64 {
+        where Q: Fn(&str) -> Option<f64> {
         todo!()
     }
 }
