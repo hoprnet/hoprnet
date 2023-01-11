@@ -5,7 +5,8 @@ import {
   MINIMUM_REASONABLE_CHANNEL_STAKE,
   MAX_AUTO_CHANNELS,
   PRICE_PER_PACKET,
-  debug, Balance
+  debug,
+  Balance
 } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { MAX_NEW_CHANNELS_PER_TICK, NETWORK_QUALITY_THRESHOLD, INTERMEDIATE_HOPS, CHECK_TIMEOUT } from './constants.js'
