@@ -8,6 +8,9 @@ use real_base::real;
 use serde::{Deserialize, Serialize};
 use serde_json;
 
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
+
 const HEARTBEAT_INTERVAL: u32 = 60000;
 const HEARTBEAT_THRESHOLD: u32 = 60000;
 const HEARTBEAT_INTERVAL_VARIANCE: u32 = 2000;
@@ -31,9 +34,12 @@ macro_rules! ok_or_str {
 /// Takes all CLI arguments whose structure is known at compile-time.
 /// Arguments whose structure, e.g. their default values depend on
 /// file contents need be specified using `clap`s builder API
-#[derive(Serialize, Args)]
+#[derive(Serialize, Args, Clone)]
 #[command(about = "HOPRd")]
+#[cfg(feature = "wasm")]
+#[wasm_bindgen(getter_with_clone)]
 struct CliArgs {
+    /// Environment
     // Filled by Builder API at runtime
     #[arg(skip)]
     pub environment: String,
@@ -44,7 +50,7 @@ struct CliArgs {
 
     // Filled by Builder API at runtime
     #[arg(skip)]
-    data: String,
+    pub data: String,
 
     #[arg(
         long,
@@ -53,7 +59,7 @@ struct CliArgs {
         help = format!("Expose the API on {}:{}", DEFAULT_API_HOST, DEFAULT_API_PORT), 
         action = ArgAction::SetTrue,
     )]
-    api: bool,
+    pub api: bool,
 
     #[arg(
         long = "apiHost",
@@ -62,7 +68,7 @@ struct CliArgs {
         help = "Set host IP to which the API server will bind",
         env = "HOPRD_API_HOST"
     )]
-    api_host: String,
+    pub api_host: String,
     #[arg(
         long = "apiPort",
         default_value_t = DEFAULT_API_PORT,
@@ -71,7 +77,7 @@ struct CliArgs {
         help = "Set port to which the API server will bind",
         env = "HOPRD_API_HOST"
     )]
-    api_port: u16,
+    pub api_port: u16,
 
     #[arg(
         long = "apiToken",
@@ -79,7 +85,7 @@ struct CliArgs {
         value_name = "TOKEN",
         env = "HOPRD_API_TOKEN"
     )]
-    api_token: Option<String>,
+    pub api_token: Option<String>,
 
     #[arg(
         long = "healthCheck",
@@ -87,7 +93,7 @@ struct CliArgs {
         env = "HOPRD_HEALTH_CHECK",
         help = format!("Run a health check end point on {}:{}", DEFAULT_HEALTH_CHECK_HOST, DEFAULT_HEALTH_CHECK_PORT)
     )]
-    health_check: bool,
+    pub health_check: bool,
 
     #[arg(
         long = "healthCheckHost",
@@ -96,7 +102,7 @@ struct CliArgs {
         help = "Updates the host for the healthcheck server",
         env = "HOPRD_HEALTH_CHECK_HOST",
     )]
-    health_check_host: String,
+    pub health_check_host: String,
 
     #[arg(
         long = "healthCheckPort",
@@ -106,10 +112,10 @@ struct CliArgs {
         help = "Updates the port for the healthcheck server",
         env = "HOPRD_HEALTH_CHECK_PORT"
     )]
-    health_check_port: u16,
+    pub health_check_port: u16,
 
     #[arg(long, env = "HOPRD_PASSWORD", help = "A password to encrypt your keys")]
-    password: Option<String>,
+    pub password: Option<String>,
 
     #[arg(
         long,
@@ -117,7 +123,7 @@ struct CliArgs {
         env = "HOPRD_PROVIDER",
         value_name = "PROVIDER"
     )]
-    provider: Option<String>,
+    pub provider: Option<String>,
 
     #[arg(
         long = "dryRun",
@@ -126,7 +132,7 @@ struct CliArgs {
         default_value_t = false,
         action = ArgAction:: SetTrue
     )]
-    dry_run: bool,
+    pub dry_run: bool,
 
     #[arg(
         long,
@@ -135,7 +141,7 @@ struct CliArgs {
         env = "HOPRD_INIT",
         default_value_t = false
     )]
-    init: bool,
+    pub init: bool,
 
     #[arg(
         long = "privateKey",
@@ -144,7 +150,7 @@ struct CliArgs {
         env = "HOPRD_PRIVATE_KEY",
         value_name = "PRIVATE_KEY"
     )]
-    private_key: Option<String>,
+    pub private_key: Option<String>,
 
     #[arg(
         long = "allowLocalNodeConnections",
@@ -153,7 +159,7 @@ struct CliArgs {
         help = "Allow connections to other nodes running on localhost",
         default_value_t = false
     )]
-    allow_local_node_connections: bool,
+    pub allow_local_node_connections: bool,
 
     #[arg(
         long = "allowPrivateNodeConnections",
@@ -162,7 +168,7 @@ struct CliArgs {
         default_value_t = false,
         help = "Allow connections to other nodes running on private addresses",
     )]
-    allow_private_node_connections: bool,
+    pub allow_private_node_connections: bool,
 
     #[arg(
         long = "testAnnounceLocalAddresses",
@@ -171,7 +177,7 @@ struct CliArgs {
         action = ArgAction::SetTrue,
         default_value_t = false
     )]
-    test_announce_local_addresses: bool,
+    pub test_announce_local_addresses: bool,
 
     #[arg(
         long = "testPreferLocalAddresses",
@@ -181,7 +187,7 @@ struct CliArgs {
         default_value_t = true,
         hide = true
     )]
-    test_prefer_local_addresses: bool,
+    pub test_prefer_local_addresses: bool,
 
     #[arg(
         long = "testUseWeakCrypto",
@@ -191,7 +197,7 @@ struct CliArgs {
         hide = true,
         default_value_t = false
     )]
-    test_use_weak_crypto: bool,
+    pub test_use_weak_crypto: bool,
 
     #[arg(
         long = "disableApiAuthentication",
@@ -201,7 +207,7 @@ struct CliArgs {
         default_value_t = false,
         hide = true
     )]
-    disable_api_authentication: bool,
+    pub disable_api_authentication: bool,
 
     #[arg(
         long = "testNoDirectConnections",
@@ -211,7 +217,7 @@ struct CliArgs {
         action = ArgAction::SetTrue,
         hide = true
     )]
-    test_no_direct_connections: bool,
+    pub test_no_direct_connections: bool,
 
     #[arg(
         long = "testNoWebRTCUpgrade",
@@ -221,7 +227,7 @@ struct CliArgs {
         action = ArgAction::SetTrue,
         hide = true
     )]
-    test_no_webrtc_upgrade: bool,
+    pub test_no_webrtc_upgrade: bool,
 
     #[arg(
         long = "heartbeatInterval",
@@ -231,7 +237,7 @@ struct CliArgs {
         default_value_t = HEARTBEAT_INTERVAL,
         env = "HOPRD_HEARTBEAT_INTERVAL",
     )]
-    heartbeat_interval: u32,
+    pub heartbeat_interval: u32,
 
     #[arg(
         long = "heartbeatThreshold",
@@ -241,7 +247,7 @@ struct CliArgs {
         default_value_t = HEARTBEAT_THRESHOLD,
         env = "HOPRD_HEARTBEAT_THRESHOLD",
     )]
-    heartbeat_threshold: u32,
+    pub heartbeat_threshold: u32,
 
     #[arg(
         long = "heartbeatVariance",
@@ -251,7 +257,7 @@ struct CliArgs {
         default_value_t = HEARTBEAT_INTERVAL_VARIANCE,
         env = "HOPRD_HEARTBEAT_VARIANCE"
     )]
-    heartbeat_variance: u32,
+    pub heartbeat_variance: u32,
 
     #[arg(
         long = "onChainConfirmations",
@@ -262,7 +268,7 @@ struct CliArgs {
         env = "HOPRD_ON_CHAIN_CONFIRMATIONS",
 
     )]
-    on_chain_confirmations: u32,
+    pub on_chain_confirmations: u32,
 
     #[arg(
         long = "networkQualityThreshold",
@@ -272,7 +278,7 @@ struct CliArgs {
         default_value_t = NETWORK_QUALITY_THRESHOLD,
         env = "HOPRD_NETWORK_QUALITY_THRESHOLD"
     )]
-    network_quality_threshold: f32,
+    pub network_quality_threshold: f32,
 }
 
 impl CliArgs {
@@ -381,6 +387,7 @@ fn get_data_path(mono_repo_path: &str, maybe_default_environment: Option<String>
     }
 }
 
+#[cfg(feature = "wasm")]
 pub mod wasm {
     use js_sys::JsString;
     use std::collections::HashMap;
