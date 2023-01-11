@@ -34,4 +34,6 @@ pkg_path="${mydir}/../packages/${pkg}/package.json"
 pkg_name=$(jq -r '.name' ${pkg_path})
 
 log "Get npm package info for ${pkg_name}@${pkg_vsn}"
-npm view "${pkg_name}@${pkg_vsn}" --json
+
+# handle errors in the npm execution gracefully
+npm view "${pkg_name}@${pkg_vsn}" --json || echo ""
