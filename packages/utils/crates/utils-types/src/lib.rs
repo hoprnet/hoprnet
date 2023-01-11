@@ -1,5 +1,4 @@
-pub mod promiscuous;
-pub mod generic;
+pub mod my_module;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

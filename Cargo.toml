@@ -6,7 +6,8 @@ members = [
     "packages/real/crates/real-base",
     "packages/hoprd/crates/hoprd-misc",
     "packages/utils/crates/utils-misc",
-    "packages/utils/crates/utils-metrics"
+    "packages/utils/crates/utils-metrics",
+    "packages/utils/crates/utils-types"
 ]
 
 [workspace.dependencies]

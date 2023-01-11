@@ -1,5 +1,8 @@
-# Template for custom Rust WASM module
+# core-strategy
 
-This is a starter template for Rust WASM module that uses `wasm-bindgen`.
+This crate contains all the Channel strategies for HOPRd.
+
+- promiscuous strategy
+- passive strategy
 
 
