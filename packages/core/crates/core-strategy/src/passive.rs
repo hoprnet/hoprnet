@@ -23,7 +23,6 @@ impl ChannelStrategy for PassiveStrategy {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use js_sys::JsString;
-    use wasm_bindgen::JsValue;
     use wasm_bindgen::prelude::wasm_bindgen;
     use crate::generic::ChannelStrategy;
 
