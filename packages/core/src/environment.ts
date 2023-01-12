@@ -24,7 +24,7 @@ export type Environment = {
   network_id: string // must match one of the Network.id
   environment_type: EnvironmentType
   version_range: string
-  channel_contract_deploy_block: number // >= 0
+  indexer_start_block_number: number // >= 0
   token_contract_address: string // an Ethereum address
   channels_contract_address: string // an Ethereum address
   xhopr_contract_address: string // an Ethereum address,

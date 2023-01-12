@@ -42,7 +42,7 @@ lsof -i :8545 -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
 
 #### Staging
 
-Apply for api keys for goerli etherscan and enter in `.env` file
+Staging environment is on the same chain as in production - Gnosis chain
 
 ```
 source .env
@@ -50,22 +50,22 @@ source .env
 
 ```
 // This verifies contract on sourcify
-FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-goerli forge script --broadcast --verify --verifier sourcify script/DeployAll.s.sol:DeployAllContractsScript
+FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-staging forge script --broadcast --verify --verifier sourcify script/DeployAll.s.sol:DeployAllContractsScript
 
-// This deploys contract to goerli testnet and verifies contracts on etherscan
-FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-goerli forge script --broadcast --verify --verifier etherscan --chain 5 script/DeployAll.s.sol:DeployAllContractsScript
+// This deploys contract to staging environment and verifies contracts on etherscan
+FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-staging forge script --broadcast --verify --verifier etherscan --chain 5 script/DeployAll.s.sol:DeployAllContractsScript
 ```
 
 #### Production
 
 ```
-FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-goerli forge script --broadcast --verify --verifier sourcify script/DeployAll.s.sol:DeployAllContractsScript
+FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-staging forge script --broadcast --verify --verifier sourcify script/DeployAll.s.sol:DeployAllContractsScript
 ```
 
 If contracts are not properly verified on explorers, please try with the manual verification. E.g.
 
 ```
-# Verify Channal contract on goerli
+# Verify Channal contract in staging environment
 forge verify-contract 0x78D92220eCe709A490F0831F9122535e0F9fe1b4 src/HoprChannels.sol:HoprChannels --chain-id 5 \
 --constructor-args $(cast abi-encode "constructor(address,uint32)" "0xa3C8f4044b30Fb3071F5b3b02913DE524F1041dc" 300)
 
