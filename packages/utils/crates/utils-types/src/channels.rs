@@ -1,5 +1,5 @@
 use ethnum::u256;
-use crate::primitives::{Balance, PublicKey};
+use crate::primitives::Balance;
 
 pub enum ChannelStatus {
     Closed = 0,
@@ -9,8 +9,8 @@ pub enum ChannelStatus {
 }
 
 pub struct ChannelEntry {
-    source: PublicKey,
-    destination: PublicKey,
+    source: Box<[u8]>,
+    destination: Box<[u8]>,
     balance: Balance,
     commitment: Box<[u8]>,
     ticket_epoch: u256,
@@ -27,6 +27,12 @@ pub mod wasm {
     #[wasm_bindgen]
     pub struct ChannelEntry {
         w: super::ChannelEntry
+    }
+
+    impl From<super::ChannelEntry> for ChannelEntry {
+        fn from(w: crate::channels::ChannelEntry) -> Self {
+            ChannelEntry { w }
+        }
     }
 
     #[wasm_bindgen]

@@ -17,4 +17,11 @@ pub mod wasm {
             $v.iter().map(|e| JsString::from(e.as_ref())).collect()
         };
     }
+
+    #[macro_export]
+    macro_rules! ok_or_jserr {
+        ($v:expr) => {
+            $v.map_err(|e| JsValue::from(e.to_string()))
+        };
+    }
 }

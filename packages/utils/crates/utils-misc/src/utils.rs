@@ -22,12 +22,7 @@ pub fn get_package_version(package_file: &str) -> Result<String, RealError> {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use wasm_bindgen::prelude::*;
-
-    macro_rules! ok_or_jserr {
-        ($v:expr) => {
-            $v.map_err(|e| JsValue::from(e.to_string()))
-        };
-    }
+    use crate::ok_or_jserr;
 
     /// Reads the given package.json file and determines its version.
     #[wasm_bindgen]

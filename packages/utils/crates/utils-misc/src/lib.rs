@@ -1,4 +1,5 @@
 pub mod utils;
+mod macros;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

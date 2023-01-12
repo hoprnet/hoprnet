@@ -90,7 +90,7 @@ pub mod wasm {
         convert_from_jstrvec!(peer_ids, bind_p);
 
         StrategyTickResult {
-            w: strategy.tick(balance.w,network_size,bind_ch.as_slice(),
+            w: strategy.tick(balance.w, network_size,bind_ch.as_slice(),
                            | peer_id: &str | {
                                let this = JsValue::null();
                                let str = JsString::from(peer_id);
