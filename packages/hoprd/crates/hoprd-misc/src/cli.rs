@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ffi::OsString;
 
-use clap::builder::PossibleValuesParser;
+use clap::builder::{PossibleValuesParser, ValueParser};
 use clap::{Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _};
 use core_misc::environment::{Environment, FromJsonFile, PackageJsonFile, ProtocolConfig};
 use core_misc::constants::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_THRESHOLD, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_NETWORK_QUALITY_THRESHOLD};
@@ -26,6 +26,20 @@ macro_rules! ok_or_str {
     ($v:expr) => {
         $v.map_err(|e| e.to_string())
     };
+}
+
+fn strip_quotes(mut s: &str) -> Result<String, String> {   
+    match (s.starts_with("'"), s.ends_with("'")) {
+        (true, true) => {
+            s = s.strip_prefix("'").unwrap();
+            s = s.strip_suffix("'").unwrap();
+
+            Ok(s.into())
+        },
+        (true, false) => Err(format!("Found leading quote but no trailing quote")),
+        (false, true) => Err(format!("Found trailing quote but no leading quote")),
+        (false, false) => Ok(s.into()),
+    }
 }
 
 /// Takes all CLI arguments whose structure is known at compile-time.
@@ -105,6 +119,7 @@ struct CliArgs {
         alias = "api-token",
         help = "A REST API token and for user authentication",
         value_name = "TOKEN",
+        value_parser = ValueParser::new(strip_quotes),
         env = "HOPRD_API_TOKEN"
     )]
     pub api_token: Option<String>,

@@ -195,8 +195,6 @@ async function main() {
     }
   }
 
-  const apiToken = argv.disable_api_authentication ? null : argv.api_token
-
   const environment = resolveEnvironment(argv.environment, argv.provider)
   let options = generateNodeOptions(argv, environment)
   if (argv.dry_run) {
@@ -242,10 +240,10 @@ async function main() {
         logs,
         { getState, setState },
         {
-          ...argv,
+          disableApiAuthentication: argv.disable_api_authentication,
           apiHost: argv.api_host,
           apiPort: argv.api_port,
-          apiToken
+          apiToken: argv.disable_api_authentication ? null : argv.api_token
         }
       )
       // start API server only if API flag is true
