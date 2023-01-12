@@ -5,23 +5,23 @@ import {
   MINIMUM_REASONABLE_CHANNEL_STAKE,
   MAX_AUTO_CHANNELS,
   PRICE_PER_PACKET,
-  debug,
-  Balance
+  debug
 } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { MAX_NEW_CHANNELS_PER_TICK, NETWORK_QUALITY_THRESHOLD, INTERMEDIATE_HOPS, CHECK_TIMEOUT } from './constants.js'
 import type NetworkPeers from './network/network-peers.js'
 import { NetworkPeersOrigin } from './network/network-peers.js'
-import type { PeerId } from '@libp2p/interface-peer-id'
 
 const log = debug('hopr-core:channel-strategy')
 
 export type StrategyTickResult = {
   toOpen: {
-    destination: string
-    stake: BigInt
+    destination: PublicKey
+    stake: BN
   }[]
-  toClose: string[]
+  toClose: {
+    destination: PublicKey
+  }[]
 }
 
 /**
@@ -37,11 +37,10 @@ export interface ChannelStrategyInterface {
   name: string
 
   tick(
-    balance: Balance,
-    networkSize: number,
+    balance: BN,
     currentChannels: ChannelEntry[],
-    qualityOf: (peerId: PeerId) => number,
-    peers: Iterable<PeerId>
+    networkPeers: NetworkPeers,
+    getRandomChannel: () => Promise<ChannelEntry>
   ): Promise<StrategyTickResult>
   // TBD: Include ChannelsToClose as well.
 
