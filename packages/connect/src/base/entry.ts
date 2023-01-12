@@ -571,7 +571,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
         // has finished
         return entriesRenewed.promise
       },
-      () => this.dhtRenewalInterval
+      () => this.dhtRenewalInterval,
+      true
     )
   }
 
@@ -608,7 +609,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
         }
 
         return (initialDelay *= 1.5)
-      }
+      },
+      true
     )
   }
   /**
