@@ -16,6 +16,13 @@ impl Balance {
         self.symbol.as_str()
     }
 
+    pub fn from_str(value: &str, symbol: &str) -> Result<Self,String> {
+        Ok(Balance {
+            value: u256::from_str_radix(value,10).map_err(|_| "failed to parse")?,
+            symbol: symbol.to_string()
+        })
+    }
+
     pub fn add(&self, other: &Balance) -> Self {
         assert_eq!(self.symbol(), other.symbol());
         Balance {
@@ -24,10 +31,24 @@ impl Balance {
         }
     }
 
+    pub fn iadd(&self, amount: u64) -> Self {
+        Balance {
+            value: self.value().add(u256::from(amount)),
+            symbol: self.symbol.clone()
+        }
+    }
+
     pub fn sub(&self, other: &Balance) -> Self {
         assert_eq!(self.symbol(), other.symbol());
         Balance {
             value: self.value().sub(other.value()),
+            symbol: self.symbol.clone()
+        }
+    }
+
+    pub fn isub(&self, amount: u64) -> Self {
+        Balance {
+            value: self.value().sub(u256::from(amount)),
             symbol: self.symbol.clone()
         }
     }

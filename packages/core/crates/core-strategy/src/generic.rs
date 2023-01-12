@@ -1,9 +1,13 @@
 use utils_types::channels::ChannelEntry;
 use utils_types::primitives::Balance;
 
+/// Basic strategy trait that all strategies must implement.
 pub trait ChannelStrategy {
+
+    /// Human readable name of the strategy
     fn name(&self) -> &str;
 
+    /// Performs the strategy tick
     fn tick<Q>(&self,
             balance: Balance,
             network_size: u32,
@@ -12,14 +16,22 @@ pub trait ChannelStrategy {
             peer_ids: &[&str])
         -> StrategyTickResult
     where Q: Fn(&str) -> Option<f64>;
+
+    /// Indicates if according to this strategy, a commitment should be made for the given channel.
+    fn should_commit_to_channel(&self, _channel: &ChannelEntry) -> bool {
+        true
+    }
 }
 
+/// Represents a request to open a channel with a stake.
 #[derive(Clone)]
 pub struct ChannelOpenRequest {
     pub peer_id: String,
     pub stake: f64
 }
 
+/// A decision made by the strategy on each tick,
+/// represents which channels should be closed and which should be opened.
 pub struct StrategyTickResult {
     pub(crate) to_open: Vec<ChannelOpenRequest>,
     pub(crate) to_close: Vec<String>
@@ -84,8 +96,10 @@ pub mod wasm {
         }
     }
 
-    pub fn tick_wrap<S>(strategy: &S, balance: Balance, network_size: u32, current_channels: Vec<JsString>, quality_of: &js_sys::Function, peer_ids: Vec<JsString>) ->  StrategyTickResult
-        where S: ChannelStrategy {
+
+    /// Generic binding for all strategies to use in WASM wrappers
+    /// Since wasm_bindgen annotation is not supported on trait impls, the WASM-wrapped strategies cannot implement a common trait.
+    pub fn tick_wrap<S: ChannelStrategy>(strategy: &S, balance: Balance, network_size: u32, current_channels: Vec<JsString>, quality_of: &js_sys::Function, peer_ids: Vec<JsString>) ->  StrategyTickResult {
         convert_from_jstrvec!(current_channels, bind_ch);
         convert_from_jstrvec!(peer_ids, bind_p);
 
