@@ -27,7 +27,7 @@ pub trait ChannelStrategy {
 #[derive(Clone)]
 pub struct ChannelOpenRequest {
     pub peer_id: String,
-    pub stake: f64
+    pub stake: Balance
 }
 
 /// A decision made by the strategy on each tick,
@@ -65,8 +65,8 @@ pub mod wasm {
             self.w.peer_id.clone()
         }
 
-        pub fn stake(&self) -> f64 {
-            self.w.stake
+        pub fn stake(&self) -> Balance {
+            self.w.stake.clone().into()
         }
     }
 

@@ -1,6 +1,7 @@
 use std::ops::{Add, Sub};
 use ethnum::u256;
 
+#[derive(Clone)]
 pub struct Balance {
     value: u256,
     symbol: String
