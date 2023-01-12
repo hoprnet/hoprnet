@@ -9,6 +9,7 @@ use core_ethereum_misc::constants::DEFAULT_CONFIRMATIONS;
 use real_base::real;
 use serde::{Deserialize, Serialize};
 use serde_json;
+use proc_macro_regex::regex;
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
@@ -22,13 +23,41 @@ pub const DEFAULT_PORT: u16 = 9091;
 pub const DEFAULT_HEALTH_CHECK_HOST: &str = "localhost";
 pub const DEFAULT_HEALTH_CHECK_PORT: u16 = 8080;
 
+pub const MINIMAL_API_TOKEN_LENGTH: usize = 8;
+
 macro_rules! ok_or_str {
     ($v:expr) => {
         $v.map_err(|e| e.to_string())
     };
 }
 
-fn strip_quotes(mut s: &str) -> Result<String, String> {   
+regex!(is_ipv4_host "^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}[:]{1}[0-9]{1,6}$");
+
+// no lookaround support
+regex!(is_private_key "^[a-fA-F0-9]{64}$");
+regex!(is_prefixed_private_key "^0x[a-fA-F0-9]{64}$");
+
+fn parse_host(s: &str) -> Result<Host, String> {
+    if !is_ipv4_host(s) {
+        return Err(format!("Given string {} is not a valid host, Example: {}:{}", s, DEFAULT_HOST.to_string(), DEFAULT_PORT.to_string()))
+    }
+
+    Host::from_ipv4_host_string(s)
+}
+
+fn parse_private_key(s: &str) -> Result<String, String> {
+    if is_private_key(s) || is_prefixed_private_key(s) {
+        Ok(s.into())
+    } else {
+        Err(format!("Given string is not a private key. A private key must contain 64 hex chars."))
+    }
+}
+
+fn parse_api_token(mut s: &str) -> Result<String, String> {
+    if s.len() < MINIMAL_API_TOKEN_LENGTH {
+        return Err(format!("Length of API token is too short, minimally required {} but given {}", MINIMAL_API_TOKEN_LENGTH.to_string(), s.len()))
+    }
+
     match (s.starts_with("'"), s.ends_with("'")) {
         (true, true) => {
             s = s.strip_prefix("'").unwrap();
@@ -39,6 +68,36 @@ fn strip_quotes(mut s: &str) -> Result<String, String> {
         (true, false) => Err(format!("Found leading quote but no trailing quote")),
         (false, true) => Err(format!("Found trailing quote but no leading quote")),
         (false, false) => Ok(s.into()),
+    }
+}
+
+#[derive(Serialize, Clone)]
+#[cfg(feature = "wasm")]
+#[wasm_bindgen(getter_with_clone)]
+pub struct Host {
+    pub ip: String,
+    pub port: u16
+}
+
+impl Host {
+    fn from_ipv4_host_string(s: &str) -> Result<Self,String> {
+        let (ip, str_port) = match s.split_once(":") {
+            None => return Err(format!("Invalid host")),
+            Some(splitted) => splitted
+        };
+
+        let port = u16::from_str_radix(str_port, 10).map_err(|e| e.to_string())?;
+
+        Ok(Self {
+            ip: ip.to_owned(),
+            port
+        })
+    }
+}
+
+impl ToString for Host {
+    fn to_string(&self) -> String {
+        format!("{}:{}", self.ip, self.port)
     }
 }
 
@@ -65,19 +124,15 @@ struct CliArgs {
 
     #[arg(
         long, 
-        default_value_t = DEFAULT_HOST.to_string(), 
+        default_value_t = Host {
+            ip: DEFAULT_HOST.to_string(),
+            port: DEFAULT_PORT
+        }, 
         env = "HOPRD_HOST", 
-        help = "Host to listen on for P2P connections"
+        help = "Host to listen on for P2P connections",
+        value_parser = ValueParser::new(parse_host)
     )]
-    pub host: String,
-
-    #[arg(
-        long,
-        default_value_t = DEFAULT_PORT,
-        env = "HOPRD_PORT",
-        help = "Port to liston on for P2P connections"
-    )]
-    pub port: u16,
+    pub host: Host,
 
     #[arg(
         long,
@@ -119,7 +174,7 @@ struct CliArgs {
         alias = "api-token",
         help = "A REST API token and for user authentication",
         value_name = "TOKEN",
-        value_parser = ValueParser::new(strip_quotes),
+        value_parser = ValueParser::new(parse_api_token),
         env = "HOPRD_API_TOKEN"
     )]
     pub api_token: Option<String>,
@@ -151,7 +206,12 @@ struct CliArgs {
     )]
     pub health_check_port: u16,
 
-    #[arg(long, env = "HOPRD_PASSWORD", help = "A password to encrypt your keys")]
+    #[arg(
+        long, 
+        env = "HOPRD_PASSWORD", 
+        help = "A password to encrypt your keys",
+        value_name = "PASSWORD"
+    )]
     pub password: Option<String>,
 
     #[arg(
@@ -185,7 +245,8 @@ struct CliArgs {
         hide = true,
         help = "A private key to be used for the node",
         env = "HOPRD_PRIVATE_KEY",
-        value_name = "PRIVATE_KEY"
+        value_name = "PRIVATE_KEY",
+        value_parser = ValueParser::new(parse_private_key)
     )]
     pub private_key: Option<String>,
 

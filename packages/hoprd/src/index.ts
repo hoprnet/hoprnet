@@ -54,29 +54,12 @@ const packageFile = path.normalize(new URL('../package.json', import.meta.url).p
 const version = get_package_version(packageFile)
 const on_avado = (process.env.AVADO ?? 'false').toLowerCase() === 'true'
 
-function parseHosts(argv: CliArgs): HoprOptions['hosts'] {
-  const hosts: HoprOptions['hosts'] = {}
-  if (argv.host !== undefined) {
-    const str = argv.host.replace(/\/\/.+/, '').trim()
-    const params = str.match(/([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})\:([0-9]{1,6})/)
-    if (params == null || params.length != 3) {
-      throw Error(`Invalid IPv4 host. Got ${str}`)
-    }
-
-    hosts.ip4 = {
-      ip: params[1],
-      port: parseInt(params[2])
-    }
-  }
-  return hosts
-}
-
 function generateNodeOptions(argv: CliArgs, environment: ResolvedEnvironment): HoprOptions {
   let options: HoprOptions = {
     createDbIfNotExist: argv.init,
     announce: argv.announce,
     dataPath: argv.data,
-    hosts: parseHosts(argv),
+    hosts: { ip4: argv.host },
     environment,
     allowLocalConnections: argv.allow_local_node_connections,
     allowPrivateConnections: argv.allow_private_node_connections,
@@ -189,9 +172,6 @@ async function main() {
   if (!argv.disable_api_authentication && argv.api) {
     if (argv.api_token == null) {
       throw Error(`Must provide --apiToken when --api is specified`)
-    }
-    if (argv.api_token.length < 8) {
-      throw new Error(`API token must be at least 8 characters long`)
     }
   }
 

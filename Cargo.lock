@@ -890,6 +890,7 @@ dependencies = [
  "core-ethereum-misc",
  "core-misc",
  "js-sys",
+ "proc-macro-regex",
  "real-base",
  "serde",
  "serde-wasm-bindgen",
@@ -1581,6 +1582,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "version_check",
+]
+
+[[package]]
+name = "proc-macro-regex"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25953f1376b0a33e2bcac2d7aa76029162ec6203536760c89e25d6a1f733c37d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "regex-syntax",
+ "syn",
+ "thiserror",
 ]
 
 [[package]]
