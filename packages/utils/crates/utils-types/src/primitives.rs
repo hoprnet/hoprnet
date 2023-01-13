@@ -1,26 +1,75 @@
 use std::ops::{Add, Sub};
-use ethnum::u256;
+use ethnum::{AsU256, u256};
+
+pub trait BaseBalance {
+    const SYMBOL: &'static str;
+
+    fn value(&self) -> &u256;
+
+    fn symbol(&self) -> &str { Self::SYMBOL }
+
+    fn to_hex(&self) -> String {
+        hex::encode(self.value().to_be_bytes())
+    }
+
+    fn serialize_value(&self) -> Box<[u8]> {
+        Box::new(self.value().to_be_bytes())
+    }
+
+    fn lt(&self, other: &impl BaseBalance) -> bool {
+        assert_eq!(self.symbol(), other.symbol());
+        self.value().lt(other.value())
+    }
+
+    fn lte(&self, other: &impl BaseBalance) -> bool {
+        assert_eq!(self.symbol(), other.symbol());
+        self.value().lt(other.value()) || self.value().eq(other.value())
+    }
+
+    fn gt(&self, other: &impl BaseBalance) -> bool {
+        assert_eq!(self.symbol(), other.symbol());
+        self.value().gt(other.value())
+    }
+
+    fn gte(&self, other: &impl BaseBalance) -> bool {
+        assert_eq!(self.symbol(), other.symbol());
+        self.value().gt(other.value()) || self.value().eq(other.value())
+    }
+
+    fn eq(&self, other: &impl BaseBalance) -> bool {
+        assert_eq!(self.symbol(), other.symbol());
+        self.value().eq(other.value())
+    }
+}
 
 #[derive(Clone)]
 pub struct Balance {
-    value: u256,
-    symbol: String
+    value: u256
+}
+
+impl BaseBalance for Balance {
+    const SYMBOL: &'static str = "txHOPR";
+
+    fn value(&self) -> &u256 {
+        &self.value
+    }
 }
 
 impl Balance {
 
-    pub fn value(&self) -> &u256 {
-        &self.value
+    pub fn from_u64(value: u64) -> Self {
+        Balance {
+            value: value.as_u256(),
+        }
     }
 
-    pub fn symbol(&self) -> &str {
-        self.symbol.as_str()
+    pub fn zero() -> Self {
+        Self::from_u64(0)
     }
 
-    pub fn from_str(value: &str, symbol: &str) -> Result<Self,String> {
+    pub fn from_str(value: &str) -> Result<Self,String> {
         Ok(Balance {
             value: u256::from_str_radix(value,10).map_err(|_| "failed to parse")?,
-            symbol: symbol.to_string()
         })
     }
 
@@ -28,14 +77,12 @@ impl Balance {
         assert_eq!(self.symbol(), other.symbol());
         Balance {
             value: self.value().add(other.value()),
-            symbol: self.symbol.clone()
         }
     }
 
     pub fn iadd(&self, amount: u64) -> Self {
         Balance {
-            value: self.value().add(u256::from(amount)),
-            symbol: self.symbol.clone()
+            value: self.value().add(amount.as_u256()),
         }
     }
 
@@ -43,55 +90,19 @@ impl Balance {
         assert_eq!(self.symbol(), other.symbol());
         Balance {
             value: self.value().sub(other.value()),
-            symbol: self.symbol.clone()
         }
     }
 
     pub fn isub(&self, amount: u64) -> Self {
         Balance {
-            value: self.value().sub(u256::from(amount)),
-            symbol: self.symbol.clone()
+            value: self.value().sub(amount.as_u256()),
         }
     }
 
-    pub fn to_hex(&self) -> String {
-        hex::encode(self.value().to_be_bytes())
-    }
-
-    pub fn serialize_value(&self) -> Box<[u8]> {
-        Box::new(self.value.to_be_bytes())
-    }
-
-    pub fn deserialize(data: &[u8], symbol: &str) -> Result<Self, String> {
+    pub fn deserialize(data: &[u8]) -> Result<Self, String> {
         Ok(Balance {
             value: u256::from_be_bytes(data.try_into().map_err(|_| "conversion error".to_string())?),
-            symbol: symbol.to_string()
         })
-    }
-
-    pub fn lt(&self, other: &Balance) -> bool {
-        assert_eq!(self.symbol(), other.symbol());
-        self.value().lt(other.value())
-    }
-
-    pub fn lte(&self, other: &Balance) -> bool {
-        assert_eq!(self.symbol(), other.symbol());
-        self.value().lt(other.value()) || self.value().eq(other.value())
-    }
-
-    pub fn gt(&self, other: &Balance) -> bool {
-        assert_eq!(self.symbol(), other.symbol());
-        self.value().gt(other.value())
-    }
-
-    pub fn gte(&self, other: &Balance) -> bool {
-        assert_eq!(self.symbol(), other.symbol());
-        self.value().gt(other.value()) || self.value().eq(other.value())
-    }
-
-    pub fn eq(&self, other: &Balance) -> bool {
-        assert_eq!(self.symbol(), other.symbol());
-        self.value().eq(other.value())
     }
 }
 
@@ -109,6 +120,8 @@ pub mod wasm {
     use std::str::FromStr;
     use ethnum::u256;
     use wasm_bindgen::prelude::*;
+
+    use crate::primitives::BaseBalance;
 
     fn as_jsvalue<T>(v: T) -> JsValue where T: Display {
         JsValue::from(v.to_string())
@@ -131,11 +144,10 @@ pub mod wasm {
     #[wasm_bindgen]
     impl Balance {
         #[wasm_bindgen(constructor)]
-        pub fn new(value: &str, symbol: &str) -> Result<Balance, JsValue> {
+        pub fn new(value: &str) -> Result<Balance, JsValue> {
             Ok(Self {
                 w: super::Balance {
-                    value: u256::from_str(value).map_err(as_jsvalue)?,
-                    symbol: symbol.to_string()
+                    value: u256::from_str(value).map_err(as_jsvalue)?
                 }
             })
         }

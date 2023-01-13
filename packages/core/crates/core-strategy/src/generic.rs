@@ -13,7 +13,7 @@ pub trait ChannelStrategy {
             network_size: u32,
             outgoing_channel_peer_ids: &[&str],
             quality_of: Q,
-            peer_ids: &[&str])
+            peer_ids: impl Iterator<Item=String>)
         -> StrategyTickResult
     where Q: Fn(&str) -> Option<f64>;
 
@@ -99,7 +99,7 @@ pub mod wasm {
 
     /// Generic binding for all strategies to use in WASM wrappers
     /// Since wasm_bindgen annotation is not supported on trait impls, the WASM-wrapped strategies cannot implement a common trait.
-    pub fn tick_wrap<S: ChannelStrategy>(strategy: &S, balance: Balance, network_size: u32, current_channels: Vec<JsString>, quality_of: &js_sys::Function, peer_ids: Vec<JsString>) ->  StrategyTickResult {
+    pub fn tick_wrap<S: ChannelStrategy>(strategy: &S, balance: Balance, network_size: u32, current_channels: Vec<JsString>, quality_of: &js_sys::Function, peer_ids: js_sys::Iterator) ->  StrategyTickResult {
         convert_from_jstrvec!(current_channels, bind_ch);
         convert_from_jstrvec!(peer_ids, bind_p);
 

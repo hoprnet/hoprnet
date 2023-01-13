@@ -10,7 +10,7 @@ impl ChannelStrategy for PassiveStrategy {
         "passive"
     }
 
-    fn tick<Q>(&self, _balance: Balance, _network_size: u32, _current_channels: &[&str], _quality_of: Q, _peer_ids: &[&str]) -> StrategyTickResult
+    fn tick<Q>(&self, _balance: Balance, _network_size: u32, _current_channels: &[&str], _quality_of: Q, _peer_ids: impl Iterator<Item=String>) -> StrategyTickResult
         where Q: Fn(&str) -> Option<f64> {
 
         StrategyTickResult{
