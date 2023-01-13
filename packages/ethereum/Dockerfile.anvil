@@ -1,0 +1,56 @@
+ARG HOPR_TOOLCHAIN_IMAGE=${HOPR_TOOLCHAIN_IMAGE:-hopr-toolchain:latest}
+
+# Use the latest foundry image
+FROM ghcr.io/foundry-rs/foundry as foundry-client
+
+# Creates a Docker container that encapsulates a local testnet with deployed smart contracts
+
+FROM ${HOPR_TOOLCHAIN_IMAGE} as build
+
+WORKDIR /app/hoprnet
+
+COPY --from=foundry-client /usr/local/bin/forge ./.foundry/bin/forge
+COPY --from=foundry-client /usr/local/bin/cast ./.foundry/bin/cast
+COPY --from=foundry-client /usr/local/bin/anvil ./.foundry/bin/anvil
+
+# Get all we need from the monorepo
+COPY .cargo .cargo/
+COPY vendor vendor/
+COPY packages/ethereum packages/ethereum/
+COPY Makefile Cargo.toml Cargo.lock rust-toolchain.toml ./
+
+LABEL description="Launches an anvil node running a local network with the HOPR contracts deployed and available." 
+
+# build smart contract bindings (can be omitted)
+RUN apk add --no-cache sed && \
+    make -C ./packages/ethereum/contracts/ overwrite-sc-bindings && \
+    # Change git = "http://..." into version = "1.0.2"
+	sed -i -e 's/https:\/\/github.com\/gakonst\/ethers-rs/1.0.2/g' ./packages/ethereum/crates/bindings/Cargo.toml && \
+	sed -i -e 's/git/version/g' ./packages/ethereum/crates/bindings/Cargo.toml && \
+    # add [lib] as rlib is necessary to run integration tests
+	echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"]" >> ./packages/ethereum/crates/bindings/Cargo.toml
+
+# build foundry-tool
+RUN cargo build --manifest-path ./packages/ethereum/foundry-tool/Cargo.toml && \
+    # install the package
+	cargo install --path ./packages/ethereum/foundry-tool --force
+
+# Alpine 3.16 x86_64 https://hub.docker.com/layers/library/alpine/3.16.3/images/sha256-3d426b0bfc361d6e8303f51459f17782b219dece42a1c7fe463b6014b189c86d
+FROM alpine:3.16@sha256:3d426b0bfc361d6e8303f51459f17782b219dece42a1c7fe463b6014b189c86d as runtime
+
+WORKDIR /app/anvil
+
+RUN mkdir -p scripts/toolchain
+
+COPY .nvmrc package.json Makefile .yarnrc.yml package.json yarn.lock tsconfig.json ./
+COPY scripts/toolchain/install-toolchain.sh ./scripts/toolchain
+
+COPY --from=build /app/hoprnet/.cargo .cargo/
+COPY --from=build /app/hoprnet/.foundry .foundry/
+COPY --from=build /app/hoprnet/packages/ethereum packages/ethereum/
+
+EXPOSE 8545
+
+# Start local anvil
+ENTRYPOINT ["make", "run-anvil"]
+

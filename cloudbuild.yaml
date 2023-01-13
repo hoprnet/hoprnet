@@ -43,11 +43,11 @@ steps:
     waitFor:
       - 'buildHoprToolchain'
   - name: 'gcr.io/kaniko-project/executor:v1.9.1'
-    id: buildHardhat
+    id: buildAnvil
     args:
       - --build-arg=HOPR_TOOLCHAIN_IMAGE=gcr.io/${PROJECT_ID}/hopr-toolchain:${_IMAGE_VERSION}
-      - --dockerfile=packages/ethereum/Dockerfile.hardhat
-      - --destination=gcr.io/${PROJECT_ID}/hopr-hardhat:${_IMAGE_VERSION}
+      - --dockerfile=packages/ethereum/Dockerfile.anvil
+      - --destination=gcr.io/${PROJECT_ID}/hopr-anvil:${_IMAGE_VERSION}
       - --cache=true
       - --cache-ttl=96h
     timeout: 1200s
@@ -69,7 +69,7 @@ steps:
       - buildHoprd
       - buildHoprdNat
       - buildCoverTrafficDaemon
-      - buildHardhat
+      - buildAnvil
   - name: 'gcr.io/kaniko-project/executor:v1.9.1'
     id: buildPluto
     args:
@@ -77,19 +77,19 @@ steps:
       - --destination=gcr.io/${PROJECT_ID}/hopr-pluto:${_IMAGE_VERSION}
       - --cache=true
       - --cache-ttl=96h
-      - --build-arg=HARDHAT_IMAGE=gcr.io/${PROJECT_ID}/hopr-hardhat:${_IMAGE_VERSION}
+      - --build-arg=ANVIL_IMAGE=gcr.io/${PROJECT_ID}/hopr-anvil:${_IMAGE_VERSION}
       - --build-arg=HOPRD_IMAGE=gcr.io/${PROJECT_ID}/hoprd:${_IMAGE_VERSION}
     timeout: 1200s
     waitFor:
       - buildHoprd
-      - buildHardhat
+      - buildAnvil
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: tagImages
     script: |
       #!/usr/bin/env bash
       set -Eeuo pipefail
       [ "${NO_TAGS}" = "true" ] && { exit 0; }
-      for image in hoprd hoprd-nat hopr-cover-traffic-daemon hopr-hardhat hopr-pluto; do
+      for image in hoprd hoprd-nat hopr-cover-traffic-daemon hopr-anvil hopr-pluto; do
         full_image="gcr.io/${PROJECT_ID}/${image}"
         gcloud container images add-tag ${full_image}:${IMAGE_VERSION} ${full_image}:${PACKAGE_VERSION}
         for release in ${RELEASES}; do
