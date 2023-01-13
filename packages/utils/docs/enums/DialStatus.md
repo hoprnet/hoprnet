@@ -17,7 +17,7 @@
 
 ### ABORTED
 
-• **ABORTED**
+• **ABORTED** = ``"E_ABORTED"``
 
 #### Defined in
 
@@ -27,7 +27,7 @@ ___
 
 ### DHT\_ERROR
 
-• **DHT\_ERROR**
+• **DHT\_ERROR** = ``"E_DHT_QUERY"``
 
 #### Defined in
 
@@ -37,7 +37,7 @@ ___
 
 ### DIAL\_ERROR
 
-• **DIAL\_ERROR**
+• **DIAL\_ERROR** = ``"E_DIAL"``
 
 #### Defined in
 
@@ -47,7 +47,7 @@ ___
 
 ### NO\_DHT
 
-• **NO\_DHT**
+• **NO\_DHT** = ``"E_NO_DHT"``
 
 #### Defined in
 
@@ -57,7 +57,7 @@ ___
 
 ### SUCCESS
 
-• **SUCCESS**
+• **SUCCESS** = ``"SUCCESS"``
 
 #### Defined in
 
@@ -67,7 +67,7 @@ ___
 
 ### TIMEOUT
 
-• **TIMEOUT**
+• **TIMEOUT** = ``"E_TIMEOUT"``
 
 #### Defined in
 

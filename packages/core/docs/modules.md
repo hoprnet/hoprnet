@@ -131,7 +131,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/environment.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L54)
+[packages/core/src/environment.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L45)
 
 ___
 
@@ -358,6 +358,10 @@ ___
 
 `Promise`<[`default`](classes/default.md)\>
 
+#### Defined in
+
+[packages/core/src/main.ts:204](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L204)
+
 ___
 
 ### findPath
@@ -386,6 +390,10 @@ Depth first search through potential paths based on weight
 path as Array<PeerId> (including start, but not including
 destination
 
+#### Defined in
+
+[packages/core/src/path/index.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/path/index.ts#L38)
+
 ___
 
 ### resolveEnvironment
@@ -405,6 +413,10 @@ ___
 
 the environment details, throws if environment is not supported
 
+#### Defined in
+
+[packages/core/src/environment.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L74)
+
 ___
 
 ### supportedEnvironments
@@ -416,3 +428,7 @@ ___
 `Environment`[]
 
 environments that the given HOPR version should be able to use
+
+#### Defined in
+
+[packages/core/src/environment.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L65)

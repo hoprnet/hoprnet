@@ -19,7 +19,7 @@ based on the different node types we can ping.
 
 ### GREEN
 
-• **GREEN**
+• **GREEN** = ``"Green"``
 
 #### Defined in
 
@@ -29,7 +29,7 @@ ___
 
 ### ORANGE
 
-• **ORANGE**
+• **ORANGE** = ``"Orange"``
 
 #### Defined in
 
@@ -39,7 +39,7 @@ ___
 
 ### RED
 
-• **RED**
+• **RED** = ``"Red"``
 
 #### Defined in
 
@@ -49,7 +49,7 @@ ___
 
 ### UNKNOWN
 
-• **UNKNOWN**
+• **UNKNOWN** = ``"Unknown"``
 
 #### Defined in
 
@@ -59,7 +59,7 @@ ___
 
 ### YELLOW
 
-• **YELLOW**
+• **YELLOW** = ``"Yellow"``
 
 #### Defined in
 

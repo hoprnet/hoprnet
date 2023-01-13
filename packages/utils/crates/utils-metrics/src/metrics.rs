@@ -522,6 +522,7 @@ mod tests {
 
 
 /// Bindings for JS/TS
+#[cfg(feature = "wasm")]
 pub mod wasm {
     use std::fmt::Display;
     use wasm_bindgen::prelude::*;

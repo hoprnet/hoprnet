@@ -1,5 +1,12 @@
 # Changelog
 
+- Removal of HOPR admin from `hoprd` ([#4420](https://github.com/hoprnet/hoprnet/pull/4420))
+  - Includes removal of CLI option `--admin`, `--adminHost` and `--adminPort`
+  - HOPR admin may now be used as a stand-alone component, see https://github.com/hoprnet/hopr-admin
+  - Add `--disableApiAuthentication` CLI option to allow using the API without authentication, default for Avado & Dappnode ([#4466](https://github.com/hoprnet/hoprnet/pull/4466))
+  - Grafana dashboards integration for all supported platforms ([#4472](https://github.com/hoprnet/hoprnet/pull/4472))
+  - Migrate environment checker code to Rust ([#4492](https://github.com/hoprnet/hoprnet/pull/4492))
+
 <a name="1.91"></a>
 
 ## [1.91](https://github.com/hoprnet/hoprnet/compare/release/valencia...hoprnet:release/bogota)
@@ -11,6 +18,7 @@
 - Add Health Status Indicator in the Admin UI ([#4197](https://github.com/hoprnet/hoprnet/pull/4197))
 - Allow connectivity indicator to be GREEN on public nodes too ([#4314](https://github.com/hoprnet/hoprnet/pull/4314))
 - Show correct counterparty in the `channels` command output ([#4370](https://github.com/hoprnet/hoprnet/pull/4370))
+- Docker build pipeline refactor: use Alpine Linux + toolchain base image ([#4362](https://github.com/hoprnet/hoprnet/pull/4362))
 - Improve error messages passed to the User ([#4375](https://github.com/hoprnet/hoprnet/pull/4375))
 - Fix channel metrics, add channel balances metrics ([#4374](https://github.com/hoprnet/hoprnet/pull/4374))
 - Fix ticket redemption ([#4382](https://github.com/hoprnet/hoprnet/pull/4382))
@@ -52,6 +60,8 @@
 - Close existing connections once there is new one ([#4281](https://github.com/hoprnet/hoprnet/pull/4281))
 - Properly remove closed connections from libp2p's `ConnectionManager`([#4281](https://github.com/hoprnet/hoprnet/pull/4281))
 - Reimplement stream handling `class`es with `function`s in `connect` package for better performance ([#4285](https://github.com/hoprnet/hoprnet/pull/4285))
+- Fix ticket redemption mechanism & acknowledged ticket fix in the DB ([#4437](https://github.com/hoprnet/hoprnet/pull/4437))
+- Pluto: Fix initialization of channels once the cluster has started up ([#4436](https://github.com/hoprnet/hoprnet/pull/4436))
 
 ---
 

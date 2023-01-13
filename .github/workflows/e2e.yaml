@@ -21,38 +21,45 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [16]
-        os: ['ubuntu-latest', 'macos-latest']
-        rust: ['stable']
+        os: ['ubuntu-latest']
 
     steps:
       - uses: actions/checkout@v3
 
+      - name: install toolchain
+        run: ./scripts/toolchain/install-toolchain.sh
+
+      - name: get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
+
+      - name: restore yarn cache
+        uses: actions/cache@v3
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
       - name: restore cargo cache
         uses: actions/cache@v3
         with:
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
           path: |
             ~/.cargo/bin/
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ matrix.node-version }}
-          registry-url: https://registry.npmjs.org/
-          cache: yarn
+            .cargo/.package-cache/
+            .cargo/bin/
 
       - name: Install dependencies
-        run: |
-          make -j deps
+        run: make -j deps-ci
 
       - name: Build
-        run: |
-          make -j build
+        run: make -j build
 
       - name: Install websocat
         run: ./scripts/install-websocat.sh
@@ -71,15 +78,6 @@ jobs:
           path: |
             /tmp/hopr-source-node-*.log
             /tmp/hopr-source-hardhat-rpc.log
-
-      - name: Upload node logs (macOS)
-        uses: actions/upload-artifact@v3
-        if: ${{ always() && runner.os == 'macOS' }}
-        with:
-          name: hopr-macOS-e2e-source-node-logs
-          path: |
-            /var/tmp/hopr-source-node-*.log
-            /var/tmp/hopr-source-hardhat-rpc.log
 
       - name: Send notification if anything failed on master or release branches
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}

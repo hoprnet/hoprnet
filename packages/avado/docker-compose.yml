@@ -1,4 +1,4 @@
-# NOTE: This cannot be built as is, it must be built using scripts/build_avado.sh
+# NOTE: This cannot be built as is, it must be built using scripts/build-avado.sh
 # %AVADO_VERSION%, %TOKEN%, %ENV_ID% and %PROVIDER_URL% will be replaced with actual values
 # when built using the above script.
 version: '3.4'
@@ -9,22 +9,21 @@ services:
       context: ./build
       args:
         UPSTREAM_VERSION: '%UPSTREAM_VERSION%'
-    network_mode: host
+        PROMETHEUS_VERSION: 2.30.0
+        GRAFANA_VERSION: 8.1.8
+        HOPR_ADMIN_VERSION: 07aec21b
     # Lines between *_JSON_EXPORT are intentionally also a valid JSON
     # Info: a hoprd node should never consume more than 1GByte of memory
     # DO NOT REMOVE
     # BEGIN_JSON_EXPORT
     #{
-    'volumes': ['db:/app/hoprd-db']
+    'volumes': [ 'db:/app/hoprd-db' ]
     'environment':
       [
         'DEBUG=hopr*',
         'HOPRD_ENVIRONMENT=%ENV_ID%',
         'HOPRD_HOST=0.0.0.0:9091',
         'HOPRD_ANNOUNCE=false',
-        'HOPRD_ADMIN=true',
-        'HOPRD_ADMIN_HOST=0.0.0.0',
-        'HOPRD_ADMIN_PORT=3000',
         'HOPRD_API=true',
         'HOPRD_API_HOST=0.0.0.0',
         'HOPRD_API_PORT=3001',
@@ -39,7 +38,15 @@ services:
         'HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS=false',
         'HOPRD_PROVIDER=%PROVIDER_URL%'
       ]
-    'ports': ['3000:3000/tcp', '3001:3001/tcp', '8080:8080/tcp', '9091:9091/tcp', '9091:9091/udp']
+    'ports':
+      [
+        '3000:3000/tcp',
+        '3030:3030/tcp',
+        '3001:3001/tcp',
+        '8080:8080/tcp',
+        '9091:9091/tcp',
+        '9091:9091/udp'
+      ]
     'deploy': { 'resources': { 'limits': { 'memory': '1G' } } }
     'restart': 'always'
     #}

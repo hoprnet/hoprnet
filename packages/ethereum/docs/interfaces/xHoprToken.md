@@ -400,6 +400,10 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:81
 
 BaseContract.\_checkRunningEvents
 
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:121
+
 ___
 
 ### \_deployed
@@ -419,6 +423,10 @@ ___
 #### Inherited from
 
 BaseContract.\_deployed
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:114
 
 ___
 
@@ -442,6 +450,10 @@ ___
 
 BaseContract.\_wrapEvent
 
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:122
+
 ___
 
 ### allowance
@@ -460,6 +472,10 @@ ___
 
 `Promise`<`BigNumber`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:286
+
 ___
 
 ### approve
@@ -477,6 +493,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:244
 
 ___
 
@@ -498,6 +518,10 @@ ___
 
 BaseContract.attach
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:170
+
 ___
 
 ### balanceOf
@@ -514,6 +538,10 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:272
 
 ___
 
@@ -535,6 +563,10 @@ ___
 
 BaseContract.connect
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:169
+
 ___
 
 ### decreaseAllowance
@@ -553,6 +585,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:274
+
 ___
 
 ### deployed
@@ -566,6 +602,10 @@ ___
 #### Overrides
 
 BaseContract.deployed
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:171
 
 ___
 
@@ -588,6 +628,10 @@ ___
 
 BaseContract.emit
 
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:127
+
 ___
 
 ### fallback
@@ -608,6 +652,10 @@ ___
 
 BaseContract.fallback
 
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:115
+
 ___
 
 ### increaseAllowance
@@ -625,6 +673,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:259
 
 ___
 
@@ -645,6 +697,10 @@ ___
 #### Inherited from
 
 BaseContract.listenerCount
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:128
 
 ___
 
@@ -672,6 +728,10 @@ ___
 
 BaseContract.listeners
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:181
+
 ▸ **listeners**(`eventName?`): `Listener`[]
 
 #### Parameters
@@ -687,6 +747,10 @@ BaseContract.listeners
 #### Overrides
 
 BaseContract.listeners
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:184
 
 ___
 
@@ -716,6 +780,10 @@ ___
 
 BaseContract.queryFilter
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:175
+
 ___
 
 ### removeAllListeners
@@ -742,6 +810,10 @@ ___
 
 BaseContract.removeAllListeners
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:185
+
 ▸ **removeAllListeners**(`eventName?`): [`xHoprToken`](xHoprToken.md)
 
 #### Parameters
@@ -758,6 +830,10 @@ BaseContract.removeAllListeners
 
 BaseContract.removeAllListeners
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:188
+
 ___
 
 ### totalSupply
@@ -773,6 +849,10 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:250
 
 ___
 
@@ -791,6 +871,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:280
 
 ___
 
@@ -811,6 +895,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:265
+
 ___
 
 ### transferFrom
@@ -829,3 +917,7 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/testing/PermittableToken.sol/ERC677.ts:252

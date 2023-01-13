@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.91.24",
+  "version": "1.92.0-next.33",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -12,8 +12,6 @@
   "files": [
     "lib",
     "npm-shrinkwrap.json",
-    "hopr-admin/.next/**",
-    "hoprd-default.sh",
     "releases.json",
     "default-environment.json",
     "rest-api-v2-spec.yaml"
@@ -26,10 +24,8 @@
     "build:wasm": "make -C crates all && make -C crates install",
     "test:wasm": "make -C crates test",
     "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo ./build ./rest-api-v2-full-spec.json",
-    "build": "yarn clean && yarn build:wasm && tsc -p . && yarn buildAdmin && chmod u+x lib/*.js",
-    "buildAdmin": "HOPRD_GIT_COMMIT=$(git rev-parse --short HEAD) next build hopr-admin",
-    "test": "yarn test:wasm && NODE_OPTIONS=\"--experimental-wasm-modules\" mocha --reporter=tap --full-trace --exit . test && yarn testAdmin",
-    "testAdmin": "cd hopr-admin && NODE_OPTIONS=\"--experimental-wasm-modules\" mocha --require ts-node/register ./**/*.spec.ts",
+    "build": "yarn clean && yarn build:wasm && tsc -p . && chmod u+x lib/*.js",
+    "test": "yarn test:wasm && NODE_OPTIONS=\"--experimental-wasm-modules\" mocha --reporter=tap --full-trace --exit . test",
     "prebuild": "next telemetry disable",
     "start": "NODE_OPTIONS=\"--experimental-wasm-modules\" node lib/main.cjs --init --api",
     "dev": "NODE_ENV=development yarn start --environment hardhat-localhost --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses --testPreferLocalAddresses --disableApiAuthentication",
@@ -50,17 +46,11 @@
     "debug": "4.3.4",
     "ethers": "5.7.0",
     "express": "4.17.3",
-    "express-openapi": "12.0.1",
-    "jazzicon": "1.5.0",
-    "js-cookie": "3.0.1",
-    "next": "12.2.3",
+    "express-openapi": "12.0.2",
     "prop-types": "15.7.2",
-    "react": "17.0.2",
-    "react-dom": "17.0.2",
     "rlp": "3.0.0",
     "semver": "7.3.7",
     "swagger-ui-express": "4.3.0",
-    "tiny-hashes": "1.0.1",
     "trace-unhandled": "2.0.1",
     "ws": "8.3.0",
     "yargs": "17.5.1"
@@ -68,9 +58,7 @@
   "devDependencies": {
     "@types/chai": "4.3.3",
     "@types/cors": "2.8.12",
-    "@types/js-cookie": "^3.0.1",
     "@types/mocha": "9.1.1",
-    "@types/react": "^17.0.2",
     "@types/supertest": "^2.0.11",
     "@types/yargs": "17.0.10",
     "chai": "4.3.6",
@@ -79,9 +67,9 @@
     "sinon": "12.0.1",
     "supertest": "^6.2.2",
     "ts-node": "^10.9.1",
-    "typedoc": "0.23.2",
-    "typedoc-plugin-markdown": "3.13.1",
-    "typescript": "4.7.4"
+    "typedoc": "0.23.20",
+    "typedoc-plugin-markdown": "3.13.6",
+    "typescript": "4.8.4"
   },
   "mocha": {
     "spec": "lib/**/*.spec.js"

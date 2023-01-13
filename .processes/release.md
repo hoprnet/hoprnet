@@ -69,11 +69,11 @@ Testing phases occur only when a release is queued and prioritized during [epic 
 
 For every phase completed, release owner must update the release's PR with the current testing phase status.
 
-| Phase name         | Description                                                  |
-| ------------------ | ------------------------------------------------------------ |
-| tech team testing  | First phase, testing by tech team members only               |
-| HOPR team testing  | Second phase, testing by available HOPR team members         |
-| ambassador testing | Third (optional) phase, testing with the help of ambassadors |
+| Phase name         | Description                                                                           |
+| ------------------ | ------------------------------------------------------------------------------------- |
+| CORE team testing  | First phase, testing by CORE team members only (see [Phase 1 testing](./testing.md) ) |
+| HOPR team testing  | Second phase, testing by available HOPR team members                                  |
+| ambassador testing | Third (optional) phase, testing with the help of ambassadors                          |
 
 ### Tech team testing
 
@@ -151,43 +151,53 @@ particular branch to deploy on every change.
 
 ```
 
-1. Create a release tracking issue on GitHub. Use previous issues as templates: https://github.com/hoprnet/hoprnet/issues/3044
-2. (on `master`) As a preparation for a release there should be a respective entry in `packages/hoprd/releases.json` and if needed in `packages/core/protocol-config.json`. If the entries are missing, create and merge them before starting the actual release process. This step can be done way in advance to plan environments and releases, too.
+1. Setup some environment variables:
 
-   1. In `packages/core/protocol-config.json` remember to _create_ or _update_ an environment's `version_range` with the upcoming version of the next release.
+- Give a name to the release like `paleochora`, `valencia`. For instance : `export RELEASE_NAME=bogota`.
+- Give a name to the previous release: `export OLD_RELEASE_NAME=valencia`
+- Give a name to the target environment of the release. For instance: `export ENVIRONMENT_NAME=monte_rosa`
 
-3. (on `master`) Now create the release branch locally. E.g. doing `git checkout -b release/${RELEASE_NAME}`.
-4. (on `release/${RELEASE_NAME}`) Before pushing the branch to GitHub, some release-specific changes should be applied to ensure the resulting CD artifacts actually are proper release artifacts.
+2. Create a release tracking issue on GitHub. Use previous issues as [templates](https://github.com/hoprnet/hoprnet/issues/4275)
+3. On the `master` branch, and before the creation of the release branch, there should be an entry in `packages/hoprd/releases.json` for the new release name.
 
-   1. Change all occurences of the last release name to the new release name within documentation files and Docker files. Don't touch the `protocol-config.json` and `releases.json` files in this step. Changes should be committed locally.
-   2. Update `CHANGELOG.md` with the new release's information. Changes should be committed locally.
-   3. Release owner checks if docs are correctly updated by comparing with the changes in `CHANGELOG.md`.
-   4. Copy contract deployment files from the old environment (this is only done when we have introduced a new environment in `packages/core/protocol-config.json`). This can be done doing
+- If the release will run in its own environment ($RELEASENAME == $ENVIRONMENT_NAME) then a new entry in `packages/core/protocol-config.json` should be created for the network.
+- If the release will run in a multienvironment network like `monte_rosa` then update the monte_rosa entry to accespt the new `version_range` of the new release.
+
+4. On the `master` branch, create the release branch locally by executing `git checkout -b release/${RELEASE_NAME}`.
+5. On the `release/${RELEASE_NAME}` branch, and before pushing the branch to GitHub, some release-specific changes should be applied to ensure the resulting CD artifacts actually are proper release artifacts.
+
+   - Change all occurences of the last release name to the new release name within documentation files and Docker files. Don't touch the `protocol-config.json` and `releases.json` files in this step. Changes should be committed locally.
+   - Update `CHANGELOG.md` with the new release's information. Changes should be committed locally.
+   - Release owner checks if docs are correctly updated by comparing with the changes in `CHANGELOG.md`.
+   - If the release will run in a new environment then, copy contract deployment files from the old environment by executing these commands:
 
    ```
-   mkdir -p packages/ethereum/deployments/${ENV}/xdai
-   cp packages/ethereum/deployments/${OLD_ENV}/xdai/* packages/ethereum/deployments/${ENV}/xdai/
-   cp packages/ethereum/deployments/${OLD_ENV}/xdai/.chainId packages/ethereum/deployments/${ENV}/xdai/
-   rm packages/ethereum/deployments/${ENV}/xdai/HoprChannels.json
+   mkdir -p packages/ethereum/deployments/${RELEASE_NAME}/xdai
+   cp packages/ethereum/deployments/${ENVIRONMENT_NAME}/xdai/* packages/ethereum/deployments/${RELEASE_NAME}/xdai/
+   cp packages/ethereum/deployments/${ENVIRONMENT_NAME}/xdai/.chainId packages/ethereum/deployments/${RELEASE_NAME}/xdai/
+   rm packages/ethereum/deployments/${RELEASE_NAME}/xdai/HoprChannels.json
    ```
 
    NOTE: Don't include the deployment of HoprChannels, because this will be re-deployed anyway by the CD system.
-
    Changes should be committed locally.
 
-5. Delete all topology VM instances of ${OLD_OLD_RELEASE} and ${OLD_RELEASE} and all instances of ${OLD_OLD_RELEASE}, e.g. `prague-1.84`. Check `gcloud compute instance-groups managed list` for a list and delete the instance groups using
-   ```sh
-   gcloud compute instance-groups managed delete ${INSTANCE_GROUP_NAME} --region=$REGION
-   ```
-6. (on `release/${RELEASE_NAME}`) Now everything is ready and can be pushed to GitHub: `git push origin`. Wait until the deployment of the basic cluster has completed by the CD.
-7. Create a release tracking PR which can be used to follow CD builds. However, the PR should never be merged! As a reference take a look at https://github.com/hoprnet/hoprnet/pull/3048
-8. (on `release/${RELEASE_NAME}`) Start a topology cluster using the [script](./release.md#topology-deployment-script) mentioned at the end of this document.
-9. Create a release testnet page in the wiki at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
-   You may use previous testnet pages as templates. Ensure all started nodes are documented.
-10. Share the links to the release tracking issue, tracking PR and testnet wiki page in the `#release` Element channel.
+6. Delete the topology VM instances of the ${OLD_RELEASE_NAME}
+
+- Check `gcloud compute instance-groups managed list` for a list and delete the instance groups using
+
+```sh
+HOPRD_PERFORM_CLEANUP=true ./scripts/setup-gcloud-cluster.sh "${ENVIRONMENT_NAME}" "" "${OLD_RELEASE_NAME}-topology-1-91"
+```
+
+7. On the `release/${RELEASE_NAME}` branch, check that everything is ready and push it to GitHub by executing : `git push origin`. Wait until the [deployment of the cluster](https://github.com/hoprnet/hoprnet/actions/workflows/deploy.yaml) has finished successfully.
+8. Create a Pull Request for tracking the release changes against the `master` branch. Remark in the PR description that it should never be merged!. Also use the label `DO NOT MERGE`, `release` and `release/${RELEASE_NAME}`. As a reference take a look at https://github.com/hoprnet/hoprnet/pull/4311
+9. On the `release/${RELEASE_NAME}` branch, create a topology cluster using the [script](./release.md#topology-deployment-script) mentioned at the end of this document.
+10. Create a release testnet page in the wiki at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
+    You may use previous testnet pages as templates. Ensure all started nodes are documented.
+11. Share the links to the release tracking issue, tracking PR and testnet wiki page in the `#release` Element channel.
     On the `#testing` channel, members are expected to run their own nodes (either AVADO or via their workstation) to participate in the release.
-11. For details how patches are applied to the release, see the `Release patching` section below.
-12. Once the first release version has been built and is running, the release branch should be merged-back into `master` once to trigger version upgrades on `master`. See [the next](./release.md#release-merge-back) section for details.
+12. For details how patches are applied to the release, see the `Release patching` section below.
+13. Once the first release version has been built and is running, the release branch should be merged-back into `master` once to trigger version upgrades on `master`. See [the next](./release.md#release-merge-back) section for details.
 
 Once the release testing has concluded, or if any significant amount of patches has been applied to the release branch, the release branch should be merged back into `master` again.
 
@@ -201,7 +211,7 @@ The developers are encourage to batch the hotfixes in the Staging branch and min
 If `staging/${RELEASE_NAME}` does not exist yet:
 
 1. (on `release/${RELEASE_NAME}`) if `staging/${RELEASE_NAME}` branch does not exist yet, create it: `git checkout -b staging/${RELEASE_NAME}`
-2. (on `staging/${RELEASE_NAME}`) create and push empty commit to trigger deployment: `git commit --allow-empty -m "Deploy staging ${RELEASE_NAME} && git push -u origin staging/${RELEASE_NAME}"`
+2. (on `staging/${RELEASE_NAME}`) create and push empty commit to trigger deployment: `git commit --allow-empty -m "Deploy staging ${RELEASE_NAME}" && git push -u origin staging/${RELEASE_NAME}`
 
 To create a hotfix:
 
@@ -228,16 +238,20 @@ Once the upgraded release is deployed, the Staging deployment must be updated as
 
 #### Release merge-back
 
-1. (on `release/${RELEASE_NAME}`) Create a PR branch off of the release branch: `git checkout -b merge-back-release-${RELEASE_NAME}`
-2. (on `merge-back-release-${RELEASE_NAME}`) Merge `master` into the branch: `git merge master`.
+1. On the `master` branch update the latest changes by executing: `git pull`
+2. On the `release/${RELEASE_NAME}` branch, create a PR branch of the release branch: `git checkout -b merge-back-release-${RELEASE_NAME}`
+3. On the `merge-back-release-${RELEASE_NAME}` branch, merge `master` into the branch: `git merge master`.
    For an example of a merge-back, take a look at older releases: https://github.com/hoprnet/hoprnet/pull/2956
    In case of conflicts (which is expected) changes from `master` have preference in the following cases:
    1. Revert changes in `packages/avado/docker-compose.yml`
    2. Revert any chain specific changes.
    3. Revert changes made to Avado configuration files as part of the initial release creation.
-3. merge the `merge-back-release-${RELEASE_NAME}` PR back to `master` (ask someone to review first)
-4. re-deploy `api.hoprnet.org` Vercel to pickup release specific changes from the `protocol-config.json`
-5. Release must be merged-back every week (Friday) to minimise conflicts whenever we want to merge a hotfix back to master.
+      In regards to version naming convention for the merge-back:
+   - If it is the first merge-back, then the version number to be used should be the one being used in the release branch which does not have the suffix `-next.XX`.
+   - If it is other merge-back, then the version number to be used should be the one being used in the master branch which it has the suffix `-next.XX`.
+4. Modify the above created PR to add reviewers, and labels accordingly. Wait for the review before merge the `merge-back-release-${RELEASE_NAME}` branch to `master`.
+5. If the release runs in a new environment, then redeploy `api.hoprnet.org` in Vercel to pickup release specific changes from the `protocol-config.json`.
+6. Remind that the release must be merged-back every week (Friday) to minimise conflicts whenever we want to merge a hotfix back to master.
 
 ### Actions
 
@@ -298,9 +312,16 @@ CT_PRIV_KEY=14e6...a6a5 \
 #### `topology` deployment script
 
 ```
+
+export PRIVATE_KEY=
+export FAUCET_SECRET_API_KEY=
+export HOPRD_PASSWORD=open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0
+export HOPRD_API_TOKEN=^binary6wire6GLEEMAN9urbanebetween1watch^
+
+
 HOPRD_PERFORM_CLEANUP=false \
-FUNDING_PRIV_KEY=0xa77a...21b8 \
 HOPRD_SHOW_PRESTART_INFO=true \
-  ./scripts/setup-gcloud-cluster.sh athens `pwd`/scripts/topologies/full_interconnected_cluster.sh \
-    athens-topology-1-86 gcr.io/hoprassociation/hoprd:athens 6 athens-topology-1-86 true
+./scripts/setup-gcloud-cluster.sh monte_rosa `pwd`/scripts/topologies/full_interconnected_cluster.sh bogota-topology-1-91 gcr.io/hoprassociation/hoprd:bogota 6 bogota-topology-1-91 true
+
+
 ```

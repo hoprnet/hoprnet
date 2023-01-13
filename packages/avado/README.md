@@ -4,7 +4,7 @@
 
 Avado images are based on the `hoprd` Docker images that can be found at [gcr.io/hoprassociation/hoprd](https://gcr.io/hoprassociation/hoprd).
 
-The creation of the Avado image happens automatically within the `deploy` [pipeline](../../.github/workflows/deploy.yaml) using the [build_avado.sh](../../scripts/build_avado.sh) script.
+The creation of the Avado image happens automatically within the `deploy` [pipeline](../../.github/workflows/deploy.yaml) using the [build-avado.sh](../../scripts/build-avado.sh) script.
 
 ## Releases
 

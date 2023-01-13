@@ -37,6 +37,10 @@ used to generate the initial channel commitment.
 | `channelId` | `Hash` |
 | `channelEpoch` | `UINT256` |
 
+#### Defined in
+
+[packages/core-ethereum/src/commitment.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L70)
+
 ## Properties
 
 ### chainId
@@ -96,3 +100,7 @@ All members need to be specified (non-null).
 #### Returns
 
 `Uint8Array`
+
+#### Defined in
+
+[packages/core-ethereum/src/commitment.ts:83](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L83)

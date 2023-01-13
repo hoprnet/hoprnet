@@ -11,6 +11,10 @@ license = "LGPL-3.0-only"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+default = ["console_error_panic_hook", "wasm"]
+wasm = []
+
 [dependencies]
 real-base = { path = "../../../real/crates/real-base" }
 wasm-bindgen = "0.2.83"
@@ -21,3 +25,7 @@ console_error_panic_hook = { version = "0.1.6", optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.30"
+
+[target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
+wasm-pack = { workspace = true }
+wasm-opt = { workspace = true }

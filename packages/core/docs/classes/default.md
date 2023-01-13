@@ -17,14 +17,19 @@
 ### Properties
 
 - [acknowledgements](default.md#acknowledgements)
+- [connector](default.md#connector)
+- [db](default.md#db)
 - [environment](default.md#environment)
 - [forward](default.md#forward)
 - [heartbeat](default.md#heartbeat)
+- [id](default.md#id)
 - [indexer](default.md#indexer)
 - [knownPublicNodesCache](default.md#knownpublicnodescache)
 - [libp2pComponents](default.md#libp2pcomponents)
 - [networkPeers](default.md#networkpeers)
+- [options](default.md#options)
 - [pubKey](default.md#pubkey)
+- [publicNodesEmitter](default.md#publicnodesemitter)
 - [status](default.md#status)
 - [stopLibp2p](default.md#stoplibp2p)
 - [stopPeriodicCheck](default.md#stopperiodiccheck)
@@ -107,6 +112,7 @@
 - [listenerCount](default.md#listenercount-1)
 - [on](default.md#on-1)
 - [once](default.md#once-1)
+- [setMaxListeners](default.md#setmaxlisteners-1)
 
 ## Constructors
 
@@ -130,6 +136,10 @@ Create an uninitialized Hopr Node
 
 EventEmitter.constructor
 
+#### Defined in
+
+[packages/core/src/index.ts:223](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L223)
+
 ## Properties
 
 ### acknowledgements
@@ -139,6 +149,30 @@ EventEmitter.constructor
 #### Defined in
 
 [packages/core/src/index.ts:197](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L197)
+
+___
+
+### connector
+
+• `Private` **connector**: `default`
+
+an instance of the blockchain wrapper
+
+#### Defined in
+
+[packages/core/src/index.ts:226](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L226)
+
+___
+
+### db
+
+• `Private` **db**: `HoprDB`
+
+used to persist protocol state
+
+#### Defined in
+
+[packages/core/src/index.ts:225](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L225)
 
 ___
 
@@ -169,6 +203,18 @@ ___
 #### Defined in
 
 [packages/core/src/index.ts:195](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L195)
+
+___
+
+### id
+
+• `Private` **id**: `PeerId`
+
+PeerId to use, determines node address
+
+#### Defined in
+
+[packages/core/src/index.ts:224](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L224)
 
 ___
 
@@ -212,6 +258,16 @@ ___
 
 ___
 
+### options
+
+• `Private` **options**: [`HoprOptions`](../modules.md#hoproptions)
+
+#### Defined in
+
+[packages/core/src/index.ts:227](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L227)
+
+___
+
 ### pubKey
 
 • `Private` **pubKey**: `PublicKey`
@@ -219,6 +275,18 @@ ___
 #### Defined in
 
 [packages/core/src/index.ts:200](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L200)
+
+___
+
+### publicNodesEmitter
+
+• `Private` **publicNodesEmitter**: `PublicNodesEmitter`
+
+used to pass information about newly announced nodes to transport module
+
+#### Defined in
+
+[packages/core/src/index.ts:228](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L228)
 
 ___
 
@@ -292,7 +360,7 @@ EventEmitter.captureRejectionSymbol
 
 #### Defined in
 
-node_modules/@types/node/events.d.ts:273
+node_modules/@types/node/ts4.8/events.d.ts:291
 
 ___
 
@@ -308,7 +376,7 @@ EventEmitter.captureRejections
 
 #### Defined in
 
-node_modules/@types/node/events.d.ts:278
+node_modules/@types/node/ts4.8/events.d.ts:296
 
 ___
 
@@ -322,7 +390,7 @@ EventEmitter.defaultMaxListeners
 
 #### Defined in
 
-node_modules/@types/node/events.d.ts:279
+node_modules/@types/node/ts4.8/events.d.ts:297
 
 ___
 
@@ -344,7 +412,7 @@ EventEmitter.errorMonitor
 
 #### Defined in
 
-node_modules/@types/node/events.d.ts:272
+node_modules/@types/node/ts4.8/events.d.ts:290
 
 ## Methods
 
@@ -354,7 +422,9 @@ node_modules/@types/node/events.d.ts:272
 
 Alias for `emitter.on(eventName, listener)`.
 
-**`since`** v0.1.26
+**`Since`**
+
+v0.1.26
 
 #### Parameters
 
@@ -371,6 +441,10 @@ Alias for `emitter.on(eventName, listener)`.
 
 EventEmitter.addListener
 
+#### Defined in
+
+node_modules/@types/node/ts4.8/events.d.ts:317
+
 ___
 
 ### announce
@@ -379,7 +453,9 @@ ___
 
 Announces address of node on-chain to be reachable by other nodes.
 
-**`dev`** Promise resolves before own announcement appears in the indexer
+**`Dev`**
+
+Promise resolves before own announcement appears in the indexer
 
 #### Parameters
 
@@ -392,6 +468,10 @@ Announces address of node on-chain to be reachable by other nodes.
 `Promise`<`void`\>
 
 a Promise that resolves once announce transaction has been published
+
+#### Defined in
+
+[packages/core/src/index.ts:1045](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1045)
 
 ___
 
@@ -409,6 +489,10 @@ ___
 #### Returns
 
 `Promise`<{ `receipt`: `string` ; `status`: `ChannelStatus`  }\>
+
+#### Defined in
+
+[packages/core/src/index.ts:1215](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1215)
 
 ___
 
@@ -430,13 +514,19 @@ Similar to `libp2p.hangUp` but catching all errors.
 
 `void`
 
+#### Defined in
+
+[packages/core/src/index.ts:971](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L971)
+
 ___
 
 ### connectionReport
 
 ▸ **connectionReport**(): `Promise`<`string`\>
 
-**`deprecated`** Used by API v1
+**`Deprecated`**
+
+Used by API v1
 
 #### Returns
 
@@ -444,6 +534,10 @@ ___
 
 a string describing the connection status between
 us and various nodes
+
+#### Defined in
+
+[packages/core/src/index.ts:991](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L991)
 
 ___
 
@@ -489,7 +583,9 @@ myEmitter.emit('event', 1, 2, 3, 4, 5);
 // event with parameters 1, 2, 3, 4, 5 in third listener
 ```
 
-**`since`** v0.1.26
+**`Since`**
+
+v0.1.26
 
 #### Parameters
 
@@ -506,6 +602,10 @@ myEmitter.emit('event', 1, 2, 3, 4, 5);
 
 EventEmitter.emit
 
+#### Defined in
+
+node_modules/@types/node/ts4.8/events.d.ts:573
+
 ___
 
 ### emitOnConnector
@@ -521,6 +621,10 @@ ___
 #### Returns
 
 `void`
+
+#### Defined in
+
+[packages/core/src/index.ts:1010](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1010)
 
 ___
 
@@ -544,7 +648,9 @@ console.log(myEE.eventNames());
 // Prints: [ 'foo', 'bar', Symbol(symbol) ]
 ```
 
-**`since`** v6.0.0
+**`Since`**
+
+v6.0.0
 
 #### Returns
 
@@ -553,6 +659,10 @@ console.log(myEE.eventNames());
 #### Inherited from
 
 EventEmitter.eventNames
+
+#### Defined in
+
+node_modules/@types/node/ts4.8/events.d.ts:632
 
 ___
 
@@ -574,6 +684,10 @@ Fund a payment channel
 
 `Promise`<`void`\>
 
+#### Defined in
+
+[packages/core/src/index.ts:1191](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1191)
+
 ___
 
 ### getAddressesAnnouncedOnChain
@@ -588,6 +702,10 @@ Takes a look into the indexer.
 
 a list of announced multi addresses
 
+#### Defined in
+
+[packages/core/src/index.ts:953](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L953)
+
 ___
 
 ### getAddressesAnnouncedToDHT
@@ -596,7 +714,9 @@ ___
 
 List of addresses that is announced to other nodes
 
-**`dev`** returned list can change at runtime
+**`Dev`**
+
+returned list can change at runtime
 
 #### Parameters
 
@@ -609,6 +729,10 @@ List of addresses that is announced to other nodes
 
 `Promise`<`Multiaddr`[]\>
 
+#### Defined in
+
+[packages/core/src/index.ts:771](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L771)
+
 ___
 
 ### getAllChannels
@@ -618,6 +742,10 @@ ___
 #### Returns
 
 `AsyncIterable`<`ChannelEntry`\>
+
+#### Defined in
+
+[packages/core/src/index.ts:709](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L709)
 
 ___
 
@@ -629,6 +757,10 @@ ___
 
 `Promise`<`Ticket`[]\>
 
+#### Defined in
+
+[packages/core/src/index.ts:1264](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1264)
+
 ___
 
 ### getBalance
@@ -638,6 +770,10 @@ ___
 #### Returns
 
 `Promise`<`Balance`\>
+
+#### Defined in
+
+[packages/core/src/index.ts:1126](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1126)
 
 ___
 
@@ -660,6 +796,10 @@ Get the channel entry between source and destination node.
 
 the channel entry of those two nodes
 
+#### Defined in
+
+[packages/core/src/index.ts:1317](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1317)
+
 ___
 
 ### getChannelStrategy
@@ -669,6 +809,10 @@ ___
 #### Returns
 
 `string`
+
+#### Defined in
+
+[packages/core/src/index.ts:1122](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1122)
 
 ___
 
@@ -686,6 +830,10 @@ ___
 
 `Promise`<`ChannelEntry`[]\>
 
+#### Defined in
+
+[packages/core/src/index.ts:1321](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1321)
+
 ___
 
 ### getChannelsTo
@@ -702,6 +850,10 @@ ___
 
 `Promise`<`ChannelEntry`[]\>
 
+#### Defined in
+
+[packages/core/src/index.ts:1325](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1325)
+
 ___
 
 ### getConnectedPeers
@@ -713,6 +865,10 @@ ___
 `Iterable`<`PeerId`\>
 
 a list connected peerIds
+
+#### Defined in
+
+[packages/core/src/index.ts:936](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L936)
 
 ___
 
@@ -732,6 +888,10 @@ ___
 
 various information about the connection
 
+#### Defined in
+
+[packages/core/src/index.ts:961](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L961)
+
 ___
 
 ### getConnectivityHealth
@@ -744,6 +904,10 @@ Recalculates and retrieves the current connectivity health indicator.
 
 [`NetworkHealthIndicator`](../enums/NetworkHealthIndicator.md)
 
+#### Defined in
+
+[packages/core/src/index.ts:723](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L723)
+
 ___
 
 ### getEntryNodes
@@ -754,6 +918,10 @@ ___
 
 `Promise`<{ `id`: `PeerId` ; `multiaddrs`: `Multiaddr`[]  }[]\>
 
+#### Defined in
+
+[packages/core/src/index.ts:1333](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1333)
+
 ___
 
 ### getEthereumAddress
@@ -763,6 +931,10 @@ ___
 #### Returns
 
 `Address`
+
+#### Defined in
+
+[packages/core/src/index.ts:1352](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1352)
 
 ___
 
@@ -775,6 +947,10 @@ Gets the peer ID of this HOPR node.
 #### Returns
 
 `PeerId`
+
+#### Defined in
+
+[packages/core/src/index.ts:761](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L761)
 
 ___
 
@@ -795,6 +971,10 @@ that will relay that message before it reaches its destination.
 
 `Promise`<`PublicKey`[]\>
 
+#### Defined in
+
+[packages/core/src/index.ts:1389](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1389)
+
 ___
 
 ### getListeningAddresses
@@ -807,6 +987,10 @@ List the addresses on which the node is listening
 
 `Multiaddr`[]
 
+#### Defined in
+
+[packages/core/src/index.ts:800](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L800)
+
 ___
 
 ### getMaxListeners
@@ -816,7 +1000,9 @@ ___
 Returns the current max listener value for the `EventEmitter` which is either
 set by `emitter.setMaxListeners(n)` or defaults to [defaultMaxListeners](default.md#defaultmaxlisteners).
 
-**`since`** v1.0.0
+**`Since`**
+
+v1.0.0
 
 #### Returns
 
@@ -825,6 +1011,10 @@ set by `emitter.setMaxListeners(n)` or defaults to [defaultMaxListeners](default
 #### Inherited from
 
 EventEmitter.getMaxListeners
+
+#### Defined in
+
+node_modules/@types/node/ts4.8/events.d.ts:489
 
 ___
 
@@ -835,6 +1025,10 @@ ___
 #### Returns
 
 `Promise`<`NativeBalance`\>
+
+#### Defined in
+
+[packages/core/src/index.ts:1130](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1130)
 
 ___
 
@@ -854,6 +1048,10 @@ Gets the observed addresses of a given peer.
 
 `Promise`<`Multiaddr`[]\>
 
+#### Defined in
+
+[packages/core/src/index.ts:814](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L814)
+
 ___
 
 ### getPublicKeyOf
@@ -870,6 +1068,10 @@ ___
 
 `Promise`<`PublicKey`\>
 
+#### Defined in
+
+[packages/core/src/index.ts:1329](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1329)
+
 ___
 
 ### getTicketStatistics
@@ -879,6 +1081,10 @@ ___
 #### Returns
 
 `Promise`<{ `losing`: `number` ; `neglected`: `number` ; `pending`: `number` ; `redeemed`: `number` ; `redeemedValue`: `Balance` ; `rejected`: `number` ; `rejectedValue`: `Balance` ; `unredeemed`: `number` = ack.length; `unredeemedValue`: `Balance` ; `winProportion`: `number`  }\>
+
+#### Defined in
+
+[packages/core/src/index.ts:1279](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1279)
 
 ___
 
@@ -896,6 +1102,10 @@ ___
 
 `Promise`<`Ticket`[]\>
 
+#### Defined in
+
+[packages/core/src/index.ts:1268](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1268)
+
 ___
 
 ### getVersion
@@ -907,6 +1117,10 @@ Returns the version of hopr-core.
 #### Returns
 
 `any`
+
+#### Defined in
+
+[packages/core/src/index.ts:716](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L716)
 
 ___
 
@@ -926,6 +1140,10 @@ ___
 
 true if allowed access
 
+#### Defined in
+
+[packages/core/src/index.ts:1379](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1379)
+
 ___
 
 ### listenerCount
@@ -934,7 +1152,9 @@ ___
 
 Returns the number of listeners listening to the event named `eventName`.
 
-**`since`** v3.2.0
+**`Since`**
+
+v3.2.0
 
 #### Parameters
 
@@ -949,6 +1169,10 @@ Returns the number of listeners listening to the event named `eventName`.
 #### Inherited from
 
 EventEmitter.listenerCount
+
+#### Defined in
+
+node_modules/@types/node/ts4.8/events.d.ts:579
 
 ___
 
@@ -966,7 +1190,9 @@ console.log(util.inspect(server.listeners('connection')));
 // Prints: [ [Function] ]
 ```
 
-**`since`** v0.1.26
+**`Since`**
+
+v0.1.26
 
 #### Parameters
 
@@ -981,6 +1207,10 @@ console.log(util.inspect(server.listeners('connection')));
 #### Inherited from
 
 EventEmitter.listeners
+
+#### Defined in
+
+node_modules/@types/node/ts4.8/events.d.ts:502
 
 ___
 
@@ -1001,6 +1231,10 @@ If error provided is considered an out of funds error
 
 `void`
 
+#### Defined in
+
+[packages/core/src/index.ts:534](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L534)
+
 ___
 
 ### maybeLogProfilingToGCloud
@@ -1011,6 +1245,10 @@ ___
 
 `Promise`<`void`\>
 
+#### Defined in
+
+[packages/core/src/index.ts:483](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L483)
+
 ___
 
 ### off
@@ -1019,7 +1257,9 @@ ___
 
 Alias for `emitter.removeListener()`.
 
-**`since`** v10.0.0
+**`Since`**
+
+v10.0.0
 
 #### Parameters
 
@@ -1035,6 +1275,10 @@ Alias for `emitter.removeListener()`.
 #### Inherited from
 
 EventEmitter.off
+
+#### Defined in
+
+node_modules/@types/node/ts4.8/events.d.ts:462
 
 ___
 
@@ -1068,7 +1312,9 @@ myEE.emit('foo');
 //   a
 ```
 
-**`since`** v0.1.101
+**`Since`**
+
+v0.1.101
 
 #### Parameters
 
@@ -1084,6 +1330,10 @@ myEE.emit('foo');
 #### Inherited from
 
 EventEmitter.on
+
+#### Defined in
+
+node_modules/@types/node/ts4.8/events.d.ts:348
 
 ___
 
@@ -1101,6 +1351,10 @@ ___
 
 `Promise`<`void`\>
 
+#### Defined in
+
+[packages/core/src/index.ts:502](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L502)
+
 ___
 
 ### onOwnChannelUpdated
@@ -1116,6 +1370,10 @@ ___
 #### Returns
 
 `Promise`<`void`\>
+
+#### Defined in
+
+[packages/core/src/index.ts:523](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L523)
 
 ___
 
@@ -1136,6 +1394,10 @@ Called whenever a peer is announced
 #### Returns
 
 `Promise`<`void`\>
+
+#### Defined in
+
+[packages/core/src/index.ts:552](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L552)
 
 ___
 
@@ -1167,7 +1429,9 @@ myEE.emit('foo');
 //   a
 ```
 
-**`since`** v0.3.0
+**`Since`**
+
+v0.3.0
 
 #### Parameters
 
@@ -1183,6 +1447,10 @@ myEE.emit('foo');
 #### Inherited from
 
 EventEmitter.once
+
+#### Defined in
+
+node_modules/@types/node/ts4.8/events.d.ts:377
 
 ___
 
@@ -1202,6 +1470,10 @@ Open a payment channel
 #### Returns
 
 `Promise`<{ `channelId`: `Hash` ; `receipt`: `string`  }\>
+
+#### Defined in
+
+[packages/core/src/index.ts:1151](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1151)
 
 ___
 
@@ -1223,6 +1495,10 @@ Ping a node.
 
 latency
 
+#### Defined in
+
+[packages/core/src/index.ts:915](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L915)
+
 ___
 
 ### prependListener
@@ -1242,7 +1518,9 @@ server.prependListener('connection', (stream) => {
 
 Returns a reference to the `EventEmitter`, so that calls can be chained.
 
-**`since`** v6.0.0
+**`Since`**
+
+v6.0.0
 
 #### Parameters
 
@@ -1258,6 +1536,10 @@ Returns a reference to the `EventEmitter`, so that calls can be chained.
 #### Inherited from
 
 EventEmitter.prependListener
+
+#### Defined in
+
+node_modules/@types/node/ts4.8/events.d.ts:597
 
 ___
 
@@ -1276,7 +1558,9 @@ server.prependOnceListener('connection', (stream) => {
 
 Returns a reference to the `EventEmitter`, so that calls can be chained.
 
-**`since`** v6.0.0
+**`Since`**
+
+v6.0.0
 
 #### Parameters
 
@@ -1292,6 +1576,10 @@ Returns a reference to the `EventEmitter`, so that calls can be chained.
 #### Inherited from
 
 EventEmitter.prependOnceListener
+
+#### Defined in
+
+node_modules/@types/node/ts4.8/events.d.ts:613
 
 ___
 
@@ -1326,7 +1614,9 @@ newListeners[0]();
 emitter.emit('log');
 ```
 
-**`since`** v9.4.0
+**`Since`**
+
+v9.4.0
 
 #### Parameters
 
@@ -1342,6 +1632,10 @@ emitter.emit('log');
 
 EventEmitter.rawListeners
 
+#### Defined in
+
+node_modules/@types/node/ts4.8/events.d.ts:532
+
 ___
 
 ### redeemAllTickets
@@ -1351,6 +1645,10 @@ ___
 #### Returns
 
 `Promise`<`void`\>
+
+#### Defined in
+
+[packages/core/src/index.ts:1300](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1300)
 
 ___
 
@@ -1368,6 +1666,10 @@ ___
 
 `Promise`<`void`\>
 
+#### Defined in
+
+[packages/core/src/index.ts:1304](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1304)
+
 ___
 
 ### removeAllListeners
@@ -1382,7 +1684,9 @@ component or module (e.g. sockets or file streams).
 
 Returns a reference to the `EventEmitter`, so that calls can be chained.
 
-**`since`** v0.1.26
+**`Since`**
+
+v0.1.26
 
 #### Parameters
 
@@ -1397,6 +1701,10 @@ Returns a reference to the `EventEmitter`, so that calls can be chained.
 #### Inherited from
 
 EventEmitter.removeAllListeners
+
+#### Defined in
+
+node_modules/@types/node/ts4.8/events.d.ts:473
 
 ___
 
@@ -1481,7 +1789,9 @@ ee.emit('ping');
 
 Returns a reference to the `EventEmitter`, so that calls can be chained.
 
-**`since`** v0.1.26
+**`Since`**
+
+v0.1.26
 
 #### Parameters
 
@@ -1497,6 +1807,10 @@ Returns a reference to the `EventEmitter`, so that calls can be chained.
 #### Inherited from
 
 EventEmitter.removeListener
+
+#### Defined in
+
+node_modules/@types/node/ts4.8/events.d.ts:457
 
 ___
 
@@ -1516,6 +1830,10 @@ ___
 
 `Promise`<`string`\>
 
+#### Defined in
+
+[packages/core/src/index.ts:861](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L861)
+
 ___
 
 ### setChannelStrategy
@@ -1532,6 +1850,10 @@ ___
 
 `void`
 
+#### Defined in
+
+[packages/core/src/index.ts:1109](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1109)
+
 ___
 
 ### setMaxListeners
@@ -1545,7 +1867,9 @@ modified for this specific `EventEmitter` instance. The value can be set to`Infi
 
 Returns a reference to the `EventEmitter`, so that calls can be chained.
 
-**`since`** v0.3.5
+**`Since`**
+
+v0.3.5
 
 #### Parameters
 
@@ -1560,6 +1884,10 @@ Returns a reference to the `EventEmitter`, so that calls can be chained.
 #### Inherited from
 
 EventEmitter.setMaxListeners
+
+#### Defined in
+
+node_modules/@types/node/ts4.8/events.d.ts:483
 
 ___
 
@@ -1576,6 +1904,10 @@ ___
 #### Returns
 
 `Uint8Array`
+
+#### Defined in
+
+[packages/core/src/index.ts:1341](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1341)
 
 ___
 
@@ -1594,6 +1926,10 @@ ___
 | `hoprNetworkRegistryAddress` | `string` |
 | `hoprTokenAddress` | `string` |
 | `network` | `string` |
+
+#### Defined in
+
+[packages/core/src/index.ts:1135](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1135)
 
 ___
 
@@ -1631,6 +1967,10 @@ If the node is not funded, it will throw.
 
 `Promise`<`void`\>
 
+#### Defined in
+
+[packages/core/src/index.ts:264](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L264)
+
 ___
 
 ### startPeriodicStrategyCheck
@@ -1640,6 +1980,10 @@ ___
 #### Returns
 
 `void`
+
+#### Defined in
+
+[packages/core/src/index.ts:1014](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1014)
 
 ___
 
@@ -1652,6 +1996,10 @@ Shuts down the node and saves keys and peerBook in the database
 #### Returns
 
 `Promise`<`void`\>
+
+#### Defined in
+
+[packages/core/src/index.ts:731](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L731)
 
 ___
 
@@ -1670,6 +2018,10 @@ ___
 
 `void`
 
+#### Defined in
+
+[packages/core/src/index.ts:1007](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1007)
+
 ___
 
 ### tickChannelStrategy
@@ -1679,6 +2031,10 @@ ___
 #### Returns
 
 `Promise`<`void`\>
+
+#### Defined in
+
+[packages/core/src/index.ts:596](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L596)
 
 ___
 
@@ -1700,6 +2056,10 @@ Throws an error if some channel is not opened.
 
 `Promise`<`void`\>
 
+#### Defined in
+
+[packages/core/src/index.ts:825](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L825)
+
 ___
 
 ### waitForFunds
@@ -1714,6 +2074,10 @@ MAX_DELAY is reached, this function will reject.
 
 `Promise`<`void`\>
 
+#### Defined in
+
+[packages/core/src/index.ts:1404](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1404)
+
 ___
 
 ### waitForRunning
@@ -1723,6 +2087,10 @@ ___
 #### Returns
 
 `Promise`<`void`\>
+
+#### Defined in
+
+[packages/core/src/index.ts:1448](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1448)
 
 ___
 
@@ -1743,6 +2111,10 @@ Withdraw on-chain assets to a given address
 #### Returns
 
 `Promise`<`string`\>
+
+#### Defined in
+
+[packages/core/src/index.ts:1363](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1363)
 
 ___
 
@@ -1775,7 +2147,9 @@ const { getEventListeners, EventEmitter } = require('events');
 }
 ```
 
-**`since`** v15.2.0
+**`Since`**
+
+v15.2.0
 
 #### Parameters
 
@@ -1791,6 +2165,10 @@ const { getEventListeners, EventEmitter } = require('events');
 #### Inherited from
 
 EventEmitter.getEventListeners
+
+#### Defined in
+
+node_modules/@types/node/ts4.8/events.d.ts:262
 
 ___
 
@@ -1809,9 +2187,13 @@ console.log(listenerCount(myEmitter, 'event'));
 // Prints: 2
 ```
 
-**`since`** v0.9.12
+**`Since`**
 
-**`deprecated`** Since v3.2.0 - Use `listenerCount` instead.
+v0.9.12
+
+**`Deprecated`**
+
+Since v3.2.0 - Use `listenerCount` instead.
 
 #### Parameters
 
@@ -1827,6 +2209,10 @@ console.log(listenerCount(myEmitter, 'event'));
 #### Inherited from
 
 EventEmitter.listenerCount
+
+#### Defined in
+
+node_modules/@types/node/ts4.8/events.d.ts:234
 
 ___
 
@@ -1888,7 +2274,9 @@ const ac = new AbortController();
 process.nextTick(() => ac.abort());
 ```
 
-**`since`** v13.6.0, v12.16.0
+**`Since`**
+
+v13.6.0, v12.16.0
 
 #### Parameters
 
@@ -1907,6 +2295,10 @@ that iterates `eventName` events emitted by the `emitter`
 #### Inherited from
 
 EventEmitter.on
+
+#### Defined in
+
+node_modules/@types/node/ts4.8/events.d.ts:217
 
 ___
 
@@ -1994,7 +2386,9 @@ ac.abort(); // Abort waiting for the event
 ee.emit('foo'); // Prints: Waiting for the event was canceled!
 ```
 
-**`since`** v11.13.0, v10.16.0
+**`Since`**
+
+v11.13.0, v10.16.0
 
 #### Parameters
 
@@ -2011,6 +2405,10 @@ ee.emit('foo'); // Prints: Waiting for the event was canceled!
 #### Inherited from
 
 EventEmitter.once
+
+#### Defined in
+
+node_modules/@types/node/ts4.8/events.d.ts:157
 
 ▸ `Static` **once**(`emitter`, `eventName`, `options?`): `Promise`<`any`[]\>
 
@@ -2029,3 +2427,48 @@ EventEmitter.once
 #### Inherited from
 
 EventEmitter.once
+
+#### Defined in
+
+node_modules/@types/node/ts4.8/events.d.ts:158
+
+___
+
+### setMaxListeners
+
+▸ `Static` **setMaxListeners**(`n?`, ...`eventTargets`): `void`
+
+```js
+const {
+  setMaxListeners,
+  EventEmitter
+} = require('events');
+
+const target = new EventTarget();
+const emitter = new EventEmitter();
+
+setMaxListeners(5, target, emitter);
+```
+
+**`Since`**
+
+v15.4.0
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `n?` | `number` | A non-negative number. The maximum number of listeners per `EventTarget` event. |
+| `...eventTargets` | (`EventEmitter` \| `DOMEventTarget`)[] | - |
+
+#### Returns
+
+`void`
+
+#### Inherited from
+
+EventEmitter.setMaxListeners
+
+#### Defined in
+
+node_modules/@types/node/ts4.8/events.d.ts:280

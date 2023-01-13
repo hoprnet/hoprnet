@@ -31,7 +31,6 @@ import {
 import type { State } from './types.js'
 import setupAPI from './api/index.js'
 import setupHealthcheck from './healthcheck.js'
-import { AdminServer } from './admin.js'
 import { LogStream } from './logs.js'
 import { getIdentity } from './identity.js'
 import { decodeMessage } from './api/utils.js'
@@ -105,21 +104,6 @@ const argv = yargsInstance
     boolean: true,
     describe: 'Announce public IP to the network [env: HOPRD_ANNOUNCE]',
     default: false
-  })
-  .option('admin', {
-    boolean: true,
-    describe: 'Run an admin interface on localhost:3000, requires --apiToken [env: HOPRD_ADMIN]',
-    default: false
-  })
-  .option('adminHost', {
-    string: true,
-    describe: 'Host to listen to for admin console [env: HOPRD_ADMIN_HOST]',
-    default: 'localhost'
-  })
-  .option('adminPort', {
-    string: true,
-    describe: 'Port to listen to for admin console [env: HOPRD_ADMIN_PORT]',
-    default: 3000
   })
   .option('api', {
     boolean: true,
@@ -341,15 +325,14 @@ async function main() {
   // Therefore adding a promise rejection handler to make sure that the origin of
   // the rejected promise can be detected.
   addUnhandledPromiseRejectionHandler()
-  // Increase the default maximum number of event listeners
-  ;(await import('events')).EventEmitter.defaultMaxListeners = 20
+    // Increase the default maximum number of event listeners
+    ; (await import('events')).EventEmitter.defaultMaxListeners = 20
 
   metric_processStartTime.set(Date.now() / 1000)
   const metric_startupTimer = metric_nodeStartupTime.start_measure()
 
   let node: Hopr
   let logs = new LogStream()
-  let adminServer: AdminServer = undefined
   let state: State = {
     aliases: new Map(),
     settings: {
@@ -402,18 +385,6 @@ async function main() {
   }
 
   const apiToken = argv.disableApiAuthentication ? null : argv.apiToken
-
-  // We need to setup the admin server before the HOPR node
-  // as if the HOPR node fails, we need to put an error message up.
-  if (argv.admin) {
-    adminServer = new AdminServer(logs, argv.adminHost, argv.adminPort)
-    try {
-      await adminServer.setup()
-    } catch (err) {
-      console.error(err)
-      process.exit(1)
-    }
-  }
 
   const environment = resolveEnvironment(argv.environment, argv.provider)
   let options = generateNodeOptions(environment)
@@ -487,10 +458,6 @@ async function main() {
       // 3. Start the node.
       await node.start()
 
-      if (adminServer) {
-        adminServer.registerNode(node)
-      }
-
       // alias self
       state.aliases.set('me', node.getId())
 
@@ -505,10 +472,7 @@ async function main() {
   } catch (e) {
     logs.log('Node failed to start:')
     logs.logFatalError('' + e)
-    if (!argv.admin) {
-      // If the admin interface is running, we should keep process alive
-      process.exit(1)
-    }
+    process.exit(1)
   }
 
   function stopGracefully(signal) {
