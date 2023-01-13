@@ -12,7 +12,7 @@ use serde_json;
 use proc_macro_regex::regex;
 
 #[cfg(feature = "wasm")]
-use wasm_bindgen::prelude::*;
+use utils_macros::wasm_bindgen_if;
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -72,8 +72,7 @@ fn parse_api_token(mut s: &str) -> Result<String, String> {
 }
 
 #[derive(Serialize, Clone)]
-#[cfg(feature = "wasm")]
-#[wasm_bindgen(getter_with_clone)]
+#[wasm_bindgen_if(getter_with_clone)]
 pub struct Host {
     pub ip: String,
     pub port: u16
@@ -106,8 +105,7 @@ impl ToString for Host {
 /// file contents need be specified using `clap`s builder API
 #[derive(Serialize, Args, Clone)]
 #[command(about = "HOPRd")]
-#[cfg(feature = "wasm")]
-#[wasm_bindgen(getter_with_clone)]
+#[wasm_bindgen_if(getter_with_clone)]
 struct CliArgs {
     /// Environment
     // Filled by Builder API at runtime

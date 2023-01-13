@@ -895,6 +895,7 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
+ "utils-macros",
  "wasm-bindgen",
  "wasm-bindgen-test",
  "wasm-opt",
@@ -2586,6 +2587,14 @@ dependencies = [
  "form_urlencoded",
  "idna 0.3.0",
  "percent-encoding 2.2.0",
+]
+
+[[package]]
+name = "utils-macros"
+version = "1.0.0"
+dependencies = [
+ "quote",
+ "wasm-bindgen-macro-support",
 ]
 
 [[package]]
