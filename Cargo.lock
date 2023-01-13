@@ -435,6 +435,8 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
+ "utils-misc",
+ "utils-proc-macros",
  "wasm-bindgen",
  "wasm-bindgen-test",
  "wasm-opt",
@@ -895,7 +897,8 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
- "utils-macros",
+ "utils-misc",
+ "utils-proc-macros",
  "wasm-bindgen",
  "wasm-bindgen-test",
  "wasm-opt",
@@ -2590,20 +2593,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "utils-macros"
-version = "1.0.0"
-dependencies = [
- "quote",
- "wasm-bindgen-macro-support",
-]
-
-[[package]]
 name = "utils-metrics"
 version = "1.0.0"
 dependencies = [
  "console_error_panic_hook",
  "js-sys",
  "prometheus",
+ "utils-misc",
  "wasm-bindgen",
  "wasm-bindgen-test",
  "wasm-opt",
@@ -2622,6 +2618,14 @@ dependencies = [
  "wasm-bindgen-test",
  "wasm-opt",
  "wasm-pack",
+]
+
+[[package]]
+name = "utils-proc-macros"
+version = "1.0.0"
+dependencies = [
+ "quote",
+ "wasm-bindgen-macro-support",
 ]
 
 [[package]]

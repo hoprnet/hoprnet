@@ -1,9 +1,9 @@
 [package]
 edition = "2021"
-name = "utils-macros"
+name = "utils-proc-macros"
 version = "1.0.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-description = "Rust WASM module containing support for general metrics collection"
+description = "Rust module that holds proc macros"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "LGPL-3.0-only"
@@ -17,18 +17,7 @@ version = "1.0"
 [dependencies.wasm-bindgen-macro-support]
 version = "=0.2.83"
 
-# [dev-dependencies.trybuild]
-# version = "1.0"
-
-# [dev-dependencies.wasm-bindgen]
-# version = "0.2.83"
-
-# [dev-dependencies.wasm-bindgen-futures]
-# version = "0.4.33"
-
 [features]
 default = ["wasm"]
 wasm = []
-spans = ["wasm-bindgen-macro-support/spans"]
-strict-macro = ["wasm-bindgen-macro-support/strict-macro"]
 xxx_debug_only_print_generated_code = []

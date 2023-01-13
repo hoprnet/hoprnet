@@ -5,6 +5,7 @@ members = [
     "packages/real/crates/real-base",
     "packages/hoprd/crates/hoprd-misc",
     "packages/utils/crates/utils-misc",
+    "packages/utils/crates/utils-proc-macros",
     "packages/utils/crates/utils-metrics"
 ]
 

@@ -101,9 +101,11 @@ build-cargo: ## build cargo packages and create boilerplate JS code
 # Skip building Rust crates
 ifeq ($(origin NO_CARGO),undefined)
 # First compile Rust crates and create bindings
-	$(MAKE) -j 1 $(CRATES)
+# filter out proc-macro crates since they need no compilation
+	$(MAKE) -j 1 $(filter-out %proc-macros/,$(CRATES))
 # Copy bindings to their destination
-	$(MAKE) ${WORKSPACES_WITH_RUST_MODULES}
+# filter out proc-macro crates since they need no compilation
+	$(MAKE) $(filter-out %proc-macros/,$(WORKSPACES_WITH_RUST_MODULES))
 endif
 
 .PHONY: build-yellowpaper

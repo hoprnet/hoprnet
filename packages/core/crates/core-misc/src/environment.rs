@@ -1,14 +1,7 @@
 use real_base::real;
 use serde::{Deserialize, Serialize};
-
-#[cfg(feature = "wasm")]
-use wasm_bindgen::prelude::*;
-
-macro_rules! ok_or_str {
-    ($v:expr) => {
-        $v.map_err(|e| e.to_string())
-    };
-}
+use utils_misc::ok_or_str;
+use utils_proc_macros::wasm_bindgen_if;
 
 pub trait FromJsonFile: Sized {
     fn from_json_file(mono_repo_path: &str) -> Result<Self, String>;
@@ -16,8 +9,7 @@ pub trait FromJsonFile: Sized {
 
 #[derive(Deserialize, Serialize, Clone, Copy)]
 #[serde(rename_all(deserialize = "lowercase"))]
-#[cfg(feature = "wasm")]
-#[wasm_bindgen]
+#[wasm_bindgen_if]
 pub enum EnvironmentType {
     Production,
     Staging,
@@ -38,8 +30,7 @@ impl ToString for EnvironmentType {
 /// the client is going to use
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
-#[cfg(feature = "wasm")]
-#[wasm_bindgen(getter_with_clone)]
+#[wasm_bindgen_if(getter_with_clone)]
 pub struct NetworkOptions {
     #[serde(skip_deserializing)]
     pub id: String,
@@ -66,8 +57,7 @@ pub struct NetworkOptions {
 /// to be used by the client
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
-#[cfg(feature = "wasm")]
-#[wasm_bindgen(getter_with_clone)]
+#[wasm_bindgen_if(getter_with_clone)]
 pub struct Environment {
     #[serde(skip_deserializing)]
     pub id: String,
@@ -171,7 +161,7 @@ impl PackageJsonFile {
 
 #[derive(Serialize, Clone)]
 #[cfg(feature = "wasm")]
-#[wasm_bindgen(getter_with_clone)]
+#[wasm_bindgen_if(getter_with_clone)]
 pub struct ResolvedEnvironment {
     /// the environment identifier, e.g. monte_rosa
     pub id: String,
@@ -264,22 +254,11 @@ impl ResolvedEnvironment {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use super::FromJsonFile;
+    use utils_misc::{clean_mono_repo_path, ok_or_jserr};
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
 
     pub type JsResult<T> = Result<T, JsValue>;
-
-    macro_rules! ok_or_jserr {
-        ($v:expr) => {
-            $v.map_err(|e| JsValue::from(e.to_string()))
-        };
-    }
-
-    macro_rules! clean_mono_repo_path {
-        ($v:expr,$r:ident) => {
-            let $r = $v.strip_suffix("/").unwrap_or($v);
-        };
-    }
 
     #[wasm_bindgen]
     pub fn supported_environments(mono_repo_path: &str) -> JsResult<JsValue> {

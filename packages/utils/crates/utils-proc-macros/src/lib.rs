@@ -5,6 +5,8 @@ extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::quote;
 
+/// Small wrapper around `wasm-bindgen` proc_macro to build wasm
+/// binding code only if `feature = "wasm"` is activated
 #[proc_macro_attribute]
 pub fn wasm_bindgen_if(attr: TokenStream, input: TokenStream) -> TokenStream {
     if cfg!(feature = "wasm") {

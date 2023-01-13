@@ -10,9 +10,8 @@ use real_base::real;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use proc_macro_regex::regex;
-
-#[cfg(feature = "wasm")]
-use utils_macros::wasm_bindgen_if;
+use utils_proc_macros::wasm_bindgen_if;
+use utils_misc::ok_or_str;
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -25,11 +24,6 @@ pub const DEFAULT_HEALTH_CHECK_PORT: u16 = 8080;
 
 pub const MINIMAL_API_TOKEN_LENGTH: usize = 8;
 
-macro_rules! ok_or_str {
-    ($v:expr) => {
-        $v.map_err(|e| e.to_string())
-    };
-}
 
 regex!(is_ipv4_host "^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}[:]{1}[0-9]{1,6}$");
 
@@ -491,26 +485,7 @@ pub mod wasm {
     use std::str::FromStr;
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
-
-    /// Macro used to convert Vec<JsString> to Vec<&str>
-    macro_rules! convert_from_jstrvec {
-        ($v:expr,$r:ident) => {
-            let _aux: Vec<String> = $v.iter().map(String::from).collect();
-            let $r = _aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
-        };
-    }
-
-    macro_rules! clean_mono_repo_path {
-        ($v:expr,$r:ident) => {
-            let $r = $v.strip_suffix("/").unwrap_or($v);
-        };
-    }
-
-    macro_rules! ok_or_jserr {
-        ($v:expr) => {
-            $v.map_err(|e| JsValue::from(e.to_string()))
-        };
-    }
+    use utils_misc::{clean_mono_repo_path, convert_from_jstrvec, ok_or_jserr};
 
     #[wasm_bindgen]
     pub fn parse_cli_arguments(

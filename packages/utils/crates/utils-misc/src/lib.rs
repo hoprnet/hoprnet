@@ -22,3 +22,43 @@ pub mod wasm {
     #[global_allocator]
     static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 }
+
+#[macro_export]
+macro_rules! ok_or_str {
+    ($v:expr) => {
+        $v.map_err(|e| e.to_string())
+    };
+}
+
+/// Macro used to convert Vec<JsString> to Vec<&str>
+#[cfg(feature = "wasm")]
+#[macro_export]
+macro_rules! convert_from_jstrvec {
+    ($v:expr,$r:ident) => {
+        let _aux: Vec<String> = $v.iter().map(String::from).collect();
+        let $r = _aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
+    };
+}
+
+/// Macro used to convert Vec<&str> or Vec<String> to Vec<JString>
+#[cfg(feature = "wasm")]
+#[macro_export]
+macro_rules! convert_to_jstrvec {
+    ($v:expr) => {
+        $v.iter().map(|e| JsString::from(e.as_ref())).collect()
+    };
+}
+
+#[macro_export]
+macro_rules! clean_mono_repo_path {
+    ($v:expr,$r:ident) => {
+        let $r = $v.strip_suffix("/").unwrap_or($v);
+    };
+}
+
+#[macro_export]
+macro_rules! ok_or_jserr {
+    ($v:expr) => {
+        $v.map_err(|e| JsValue::from(e.to_string()))
+    };
+}
