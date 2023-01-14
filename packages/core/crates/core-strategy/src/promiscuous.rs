@@ -24,13 +24,13 @@ impl ChannelStrategy for PromiscuousStrategy {
         "promiscuous"
     }
 
-    fn tick<Q>(&self, balance: Balance, network_size: u32, outgoing_channel_peer_ids: &[&str], quality_of: Q, peer_ids: impl Iterator<Item=String>) -> StrategyTickResult
+    fn tick<Q>(&self, balance: Balance, peer_ids: impl Iterator<Item=String>, outgoing_channel_peer_ids: &[&str], quality_of: Q) -> StrategyTickResult
         where Q: Fn(&str) -> Option<f64> {
-        // We compute the upper bound for channels as a square-root of the perceived network size
-        let max_channels = (network_size as f64).sqrt().ceil() as usize;
 
         let mut to_close: Vec<String> = vec![];
         let mut new_channel_candidates: Vec<(String, f64)> = vec![];
+        let mut network_size: usize = 0;
+
         for peer_id in peer_ids {
             let quality = quality_of(peer_id.as_str()).unwrap_or(0f64);
 
@@ -41,7 +41,13 @@ impl ChannelStrategy for PromiscuousStrategy {
             if quality >= self.network_quality_threshold && !outgoing_channel_peer_ids.contains(&peer_id.as_str()) {
                 new_channel_candidates.push((peer_id.to_string(), quality));
             }
+
+            network_size = network_size + 1;
         }
+
+        // We compute the upper bound for channels as a square-root of the perceived network size
+        let max_channels = (network_size as f64).sqrt().ceil() as usize;
+
 
         // Sort the new channel candidates by best quality first, then truncate to the number of available slots
         new_channel_candidates.sort_unstable_by(|(_, q1), (_, q2)| q1.partial_cmp(q2).unwrap() );
@@ -129,8 +135,8 @@ pub mod wasm {
             self.w.name().into()
         }
 
-        pub fn tick(&self, balance: Balance, network_size: u32, current_channels: Vec<JsString>, quality_of: &js_sys::Function, peer_ids: Vec<JsString>) ->  StrategyTickResult {
-            crate::generic::wasm::tick_wrap(&self.w, balance, network_size, current_channels, quality_of, peer_ids)
+        pub fn tick(&self, balance: Balance, peer_ids: &js_sys::Iterator, outgoing_channel_peer_ids: Vec<JsString>, quality_of: &js_sys::Function) ->  StrategyTickResult {
+            crate::generic::wasm::tick_wrap(&self.w, balance, peer_ids, outgoing_channel_peer_ids, quality_of)
         }
     }
 }

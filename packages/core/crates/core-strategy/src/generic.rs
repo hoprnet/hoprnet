@@ -10,10 +10,9 @@ pub trait ChannelStrategy {
     /// Performs the strategy tick
     fn tick<Q>(&self,
             balance: Balance,
-            network_size: u32,
+            peer_ids: impl Iterator<Item=String>,
             outgoing_channel_peer_ids: &[&str],
-            quality_of: Q,
-            peer_ids: impl Iterator<Item=String>)
+            quality_of: Q)
         -> StrategyTickResult
     where Q: Fn(&str) -> Option<f64>;
 
@@ -99,20 +98,20 @@ pub mod wasm {
 
     /// Generic binding for all strategies to use in WASM wrappers
     /// Since wasm_bindgen annotation is not supported on trait impls, the WASM-wrapped strategies cannot implement a common trait.
-    pub fn tick_wrap<S: ChannelStrategy>(strategy: &S, balance: Balance, network_size: u32, current_channels: Vec<JsString>, quality_of: &js_sys::Function, peer_ids: js_sys::Iterator) ->  StrategyTickResult {
-        convert_from_jstrvec!(current_channels, bind_ch);
-        convert_from_jstrvec!(peer_ids, bind_p);
+    pub fn tick_wrap<S: ChannelStrategy>(strategy: &S, balance: Balance, peer_ids: &js_sys::Iterator, outgoing_channel_peer_ids: Vec<JsString>, quality_of: &js_sys::Function) ->  StrategyTickResult {
+        convert_from_jstrvec!(outgoing_channel_peer_ids, bind_ch);
 
         StrategyTickResult {
-            w: strategy.tick(balance.w, network_size,bind_ch.as_slice(),
-                           | peer_id: &str | {
+            w: strategy.tick(balance.w,
+                             peer_ids.into_iter().map(|v| v.unwrap().as_string().unwrap()),
+                             bind_ch.as_slice(),
+                             | peer_id: &str | {
                                let this = JsValue::null();
                                let str = JsString::from(peer_id);
 
                                let quality = quality_of.call1(&this, &str);
                                quality.ok().map(|q| q.as_f64()).flatten()
-                           },
-                           bind_p.as_slice())
+                           })
         }
     }
 }

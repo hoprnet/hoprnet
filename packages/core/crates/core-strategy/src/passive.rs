@@ -10,7 +10,7 @@ impl ChannelStrategy for PassiveStrategy {
         "passive"
     }
 
-    fn tick<Q>(&self, _balance: Balance, _network_size: u32, _current_channels: &[&str], _quality_of: Q, _peer_ids: impl Iterator<Item=String>) -> StrategyTickResult
+    fn tick<Q>(&self, _balance: Balance, _peer_ids: impl Iterator<Item=String>, _outgoing_channel_peer_ids: &[&str], _quality_of: Q) -> StrategyTickResult
         where Q: Fn(&str) -> Option<f64> {
 
         StrategyTickResult{
@@ -44,8 +44,8 @@ pub mod wasm {
             self.w.name().into()
         }
 
-        pub fn tick(&self, balance: Balance, network_size: u32, current_channels: Vec<JsString>, quality_of: &js_sys::Function, peer_ids: Vec<JsString>) ->  StrategyTickResult {
-            crate::generic::wasm::tick_wrap(&self.w, balance, network_size, current_channels, quality_of, peer_ids)
+        pub fn tick(&self, balance: Balance, peer_ids: &js_sys::Iterator, outgoing_channel_peer_ids: Vec<JsString>, quality_of: &js_sys::Function) ->  StrategyTickResult {
+            crate::generic::wasm::tick_wrap(&self.w, balance, peer_ids, outgoing_channel_peer_ids, quality_of)
         }
     }
 }
