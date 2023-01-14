@@ -45,11 +45,11 @@ impl ChannelStrategy for PromiscuousStrategy {
         }
 
         // We compute the upper bound for channels as a square-root of the perceived network size
-        let max_channels = (network_size as f64).sqrt().ceil() as usize;
+        let max_auto_channels = (network_size as f64).sqrt().ceil() as usize;
 
         // Sort the new channel candidates by best quality first, then truncate to the number of available slots
         new_channel_candidates.sort_unstable_by(|(_, q1), (_, q2)| q1.partial_cmp(q2).unwrap().reverse() );
-        new_channel_candidates.truncate(max_channels - (outgoing_channel_peer_ids.len() - to_close.len()));
+        new_channel_candidates.truncate(max_auto_channels - (outgoing_channel_peer_ids.len() - to_close.len()));
 
         let mut to_open: Vec<ChannelOpenRequest> = vec![];
         let mut remaining_balance = balance.clone();
@@ -69,10 +69,7 @@ impl ChannelStrategy for PromiscuousStrategy {
             }
         }
 
-        StrategyTickResult {
-            to_open,
-            to_close
-        }
+        StrategyTickResult::new(max_auto_channels, to_open, to_close)
     }
 }
 
@@ -87,6 +84,8 @@ mod tests {
     fn test_promisc_basic() {
         let strat = PromiscuousStrategy::default();
 
+        assert_eq!(strat.name(), "promiscuous");
+
         let peers = BTreeMap::from([
             ("Alice".to_string(), 0.1),
             ("Bob".to_string(), 0.7),
@@ -98,12 +97,14 @@ mod tests {
 
         let results = strat.tick(balance, peers.iter().map(|x| x.0.clone()), &["Alice", "Charlie"], |s| peers.get(s).copied());
 
-        assert_eq!(results.to_close.len(), 1);
-        assert_eq!(results.to_open.len(), 2);
+        assert_eq!(results.max_auto_channels(), 3);
 
-        assert_eq!(results.to_open[0].peer_id, "Eugene".to_string());
-        assert_eq!(results.to_open[1].peer_id, "Bob".to_string());
-        assert_eq!(results.to_close[0], "Alice".to_string());
+        assert_eq!(results.to_close().len(), 1);
+        assert_eq!(results.to_open().len(), 2);
+
+        assert_eq!(results.to_open()[0].peer_id, "Eugene".to_string());
+        assert_eq!(results.to_open()[1].peer_id, "Bob".to_string());
+        assert_eq!(results.to_close()[0], "Alice".to_string());
     }
 }
 

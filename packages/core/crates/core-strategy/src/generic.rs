@@ -34,8 +34,30 @@ pub struct ChannelOpenRequest {
 /// A decision made by the strategy on each tick,
 /// represents which channels should be closed and which should be opened.
 pub struct StrategyTickResult {
-    pub(crate) to_open: Vec<ChannelOpenRequest>,
-    pub(crate) to_close: Vec<String>
+    max_auto_channels: usize,
+    to_open: Vec<ChannelOpenRequest>,
+    to_close: Vec<String>
+}
+
+impl StrategyTickResult {
+
+    pub fn new(max_auto_channels: usize, to_open: Vec<ChannelOpenRequest>, to_close: Vec<String>) -> Self {
+        StrategyTickResult {
+            max_auto_channels,
+            to_open,
+            to_close
+        }
+    }
+
+    pub fn max_auto_channels(&self) -> usize { self.max_auto_channels }
+
+    pub fn to_open(&self) -> &Vec<ChannelOpenRequest> {
+        &self.to_open
+    }
+
+    pub fn to_close(&self) -> &Vec<String> {
+        &self.to_close
+    }
 }
 
 #[cfg(feature = "wasm")]
@@ -78,6 +100,9 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl StrategyTickResult {
+        #[wasm_bindgen(getter)]
+        pub fn max_auto_channels(&self) -> usize { self.w.max_auto_channels }
+
         pub fn to_open_count(&self) -> usize {
             self.w.to_open.len()
         }
