@@ -6,9 +6,7 @@ use crate::generic::{ChannelStrategy, StrategyTickResult};
 pub struct PassiveStrategy;
 
 impl ChannelStrategy for PassiveStrategy {
-    fn name(&self) -> &str {
-        "passive"
-    }
+    const NAME: &'static str = "passive";
 
     fn tick<Q>(&self, _balance: Balance, _peer_ids: impl Iterator<Item=String>, _outgoing_channel_peer_ids: &[&str], _quality_of: Q) -> StrategyTickResult
         where Q: Fn(&str) -> Option<f64> {
@@ -34,7 +32,6 @@ pub mod wasm {
     pub struct PassiveStrategy {
         w: super::PassiveStrategy
     }
-
 
     #[wasm_bindgen]
     impl PassiveStrategy {

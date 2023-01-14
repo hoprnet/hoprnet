@@ -4,8 +4,10 @@ use utils_types::primitives::Balance;
 /// Basic strategy trait that all strategies must implement.
 pub trait ChannelStrategy {
 
+    const NAME: &'static str;
+
     /// Human readable name of the strategy
-    fn name(&self) -> &str;
+    fn name(&self) -> &str { Self::NAME }
 
     /// Performs the strategy tick
     fn tick<Q>(&self,

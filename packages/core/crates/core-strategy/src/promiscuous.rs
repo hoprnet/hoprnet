@@ -20,9 +20,7 @@ impl Default for PromiscuousStrategy {
 }
 
 impl ChannelStrategy for PromiscuousStrategy {
-    fn name(&self) -> &str {
-        "promiscuous"
-    }
+    const NAME: &'static str = "promiscuous";
 
     fn tick<Q>(&self, balance: Balance, peer_ids: impl Iterator<Item=String>, outgoing_channel_peer_ids: &[&str], quality_of: Q) -> StrategyTickResult
         where Q: Fn(&str) -> Option<f64> {
@@ -31,14 +29,15 @@ impl ChannelStrategy for PromiscuousStrategy {
         let mut new_channel_candidates: Vec<(String, f64)> = vec![];
         let mut network_size: usize = 0;
 
+        // Go through all the peer ids we know, get their qualities and find out which channels should be closed and
+        // which peer ids should become candidates for a new channel
         for peer_id in peer_ids {
             let quality = quality_of(peer_id.as_str()).unwrap_or(0f64);
 
             if quality <= self.network_quality_threshold && outgoing_channel_peer_ids.contains(&peer_id.as_str()) {
                 to_close.push(peer_id.to_string());
             }
-
-            if quality >= self.network_quality_threshold && !outgoing_channel_peer_ids.contains(&peer_id.as_str()) {
+            else if quality >= self.network_quality_threshold && !outgoing_channel_peer_ids.contains(&peer_id.as_str()) {
                 new_channel_candidates.push((peer_id.to_string(), quality));
             }
 
@@ -48,9 +47,8 @@ impl ChannelStrategy for PromiscuousStrategy {
         // We compute the upper bound for channels as a square-root of the perceived network size
         let max_channels = (network_size as f64).sqrt().ceil() as usize;
 
-
         // Sort the new channel candidates by best quality first, then truncate to the number of available slots
-        new_channel_candidates.sort_unstable_by(|(_, q1), (_, q2)| q1.partial_cmp(q2).unwrap() );
+        new_channel_candidates.sort_unstable_by(|(_, q1), (_, q2)| q1.partial_cmp(q2).unwrap().reverse() );
         new_channel_candidates.truncate(max_channels - (outgoing_channel_peer_ids.len() - to_close.len()));
 
         let mut to_open: Vec<ChannelOpenRequest> = vec![];
@@ -82,15 +80,30 @@ impl ChannelStrategy for PromiscuousStrategy {
 /// Unit tests of pure Rust code
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
     use super::*;
 
     #[test]
     fn test_promisc_basic() {
         let strat = PromiscuousStrategy::default();
 
+        let peers = BTreeMap::from([
+            ("Alice".to_string(), 0.1),
+            ("Bob".to_string(), 0.7),
+            ("Charlie".to_string(), 0.9),
+            ("Dahlia".to_string(), 0.1),
+            ("Eugene".to_string(), 0.8)]);
 
-        //let results = strat.tick(Balance::from_u64(10), )
+        let balance = Balance::from_str("1000000000000000000").unwrap();
 
+        let results = strat.tick(balance, peers.iter().map(|x| x.0.clone()), &["Alice", "Charlie"], |s| peers.get(s).copied());
+
+        assert_eq!(results.to_close.len(), 1);
+        assert_eq!(results.to_open.len(), 2);
+
+        assert_eq!(results.to_open[0].peer_id, "Eugene".to_string());
+        assert_eq!(results.to_open[1].peer_id, "Bob".to_string());
+        assert_eq!(results.to_close[0], "Alice".to_string());
     }
 }
 
