@@ -84,7 +84,7 @@ impl ChannelStrategy for PromiscuousStrategy {
 /// Unit tests of pure Rust code
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
+    use std::collections::HashMap;
     use super::*;
 
     #[test]
@@ -93,7 +93,7 @@ mod tests {
 
         assert_eq!(strat.name(), "promiscuous");
 
-        let peers = BTreeMap::from([
+        let peers = HashMap::from([
             ("Alice".to_string(), 0.1),
             ("Bob".to_string(), 0.7),
             ("Charlie".to_string(), 0.9),
