@@ -4,12 +4,14 @@ use utils_types::primitives::Balance;
 /// Basic strategy trait that all strategies must implement.
 pub trait ChannelStrategy {
 
+    /// Human readable name of the strategy
     const NAME: &'static str;
 
     /// Human readable name of the strategy
     fn name(&self) -> &str { Self::NAME }
 
-    /// Performs the strategy tick
+    /// Performs the strategy tick - deciding which new channels should be opened and
+    /// which existing channels should be closed.
     fn tick<Q>(&self,
             balance: Balance,
             peer_ids: impl Iterator<Item=String>,
@@ -31,8 +33,9 @@ pub struct ChannelOpenRequest {
     pub stake: Balance
 }
 
-/// A decision made by the strategy on each tick,
+/// A decision made by a strategy on each tick,
 /// represents which channels should be closed and which should be opened.
+/// Also indicates a number of maximum channels this strategy can ever open.
 pub struct StrategyTickResult {
     max_auto_channels: usize,
     to_open: Vec<ChannelOpenRequest>,
@@ -41,6 +44,7 @@ pub struct StrategyTickResult {
 
 impl StrategyTickResult {
 
+    /// Constructor for the strategy tick result.
     pub fn new(max_auto_channels: usize, to_open: Vec<ChannelOpenRequest>, to_close: Vec<String>) -> Self {
         StrategyTickResult {
             max_auto_channels,
@@ -49,17 +53,21 @@ impl StrategyTickResult {
         }
     }
 
+    /// Maximum number of channels this strategy can open.
     pub fn max_auto_channels(&self) -> usize { self.max_auto_channels }
 
+    /// Channels that this strategy wishes to open.
     pub fn to_open(&self) -> &Vec<ChannelOpenRequest> {
         &self.to_open
     }
 
+    /// Peer IDs to which any open channels should be closed according to this strategy.
     pub fn to_close(&self) -> &Vec<String> {
         &self.to_close
     }
 }
 
+/// WASM bindings for the generic strategy-related classes
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use js_sys::JsString;

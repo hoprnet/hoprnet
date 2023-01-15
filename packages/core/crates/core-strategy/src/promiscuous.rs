@@ -3,6 +3,9 @@ use utils_types::primitives::{BaseBalance, Balance};
 
 use crate::generic::{ChannelOpenRequest, ChannelStrategy, StrategyTickResult};
 
+/// Implements promiscuous strategy.
+/// This strategy opens channels to peers, which have quality above a given threshold.
+/// At the same time, it closes channels opened to peers whose quality dropped below this threshold.
 pub struct PromiscuousStrategy {
     network_quality_threshold: f64,
     minimum_channel_stake: Balance,
@@ -10,6 +13,10 @@ pub struct PromiscuousStrategy {
 }
 
 impl Default for PromiscuousStrategy {
+
+    /// Creates promiscuous strategy with default parameters,
+    /// that is quality threshold 0.5, minimum channel stake 0.1 txHOPR and
+    /// minimum token balance on the node should not drop below 0.1 txHOPR.
     fn default() -> Self {
         PromiscuousStrategy {
             network_quality_threshold: 0.5,
@@ -108,7 +115,7 @@ mod tests {
     }
 }
 
-/// Module for WASM wrappers of Rust code
+/// WASM bindings
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use js_sys::JsString;

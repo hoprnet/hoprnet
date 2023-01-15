@@ -3,6 +3,7 @@ use utils_types::primitives::Balance;
 
 use crate::generic::{ChannelStrategy, StrategyTickResult};
 
+/// Implements passive strategy which does nothing.
 pub struct PassiveStrategy;
 
 impl ChannelStrategy for PassiveStrategy {
@@ -11,10 +12,11 @@ impl ChannelStrategy for PassiveStrategy {
     fn tick<Q>(&self, _balance: Balance, _peer_ids: impl Iterator<Item=String>, _outgoing_channel_peer_ids: &[&str], _quality_of: Q) -> StrategyTickResult
         where Q: Fn(&str) -> Option<f64> {
 
-        StrategyTickResult::new(usize::MAX, vec![], vec![])
+        StrategyTickResult::new(0, vec![], vec![])
     }
 }
 
+/// WASM bindings
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use js_sys::JsString;
