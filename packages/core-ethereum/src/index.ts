@@ -80,7 +80,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     this.indexer = new Indexer(
       this.publicKey.toAddress(),
       this.db,
-      this.options.maxConfirmations,
+      this.options.maxConfirmations ?? constants.DEFAULT_CONFIRMATIONS,
       constants.INDEXER_BLOCK_RANGE
     )
   }
