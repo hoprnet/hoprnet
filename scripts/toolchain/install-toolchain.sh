@@ -202,13 +202,17 @@ function install_javascript_utilities() {
 if ${install_all}; then
     install_rustup
     install_cargo
+
+    # launch rustc once so it installs updated components
+    rustc --version
+
     install_wasm_pack
     install_wasm_opt
     install_node_js
     install_yarn
     install_javascript_utilities
 
-   # We got yarn, so let's remove no longer necessary cache
+    # We got yarn, so let's remove no longer necessary cache
     yarn cache clean --all
 else
     # We only need Node.js
@@ -221,14 +225,17 @@ else
 fi
 
 # Show some debug output
+echo ""
 echo "Checking installed tool versions"
 echo "================================"
-[ command -v rustc ] && rustc --version
-[ command -v cargo ] && cargo --version
-[ command -v wasm-pack ] && wasm-pack --version
-[ command -v wasm-opt ] && wasm-opt --version
-[ command -v node ] && echo "node $(node --version)"
-[ command -v yarn ] && echo "yarn $(yarn --version)"
-[ npx --no tsc --version ] && echo "Typescript $(npx tsc --version)"
+echo ""
+command -v rustc >/dev/null && rustc --version
+command -v cargo >/dev/null && cargo --version
+command -v wasm-pack >/dev/null && wasm-pack --version
+command -v wasm-opt >/dev/null && wasm-opt --version
+command -v node >/dev/null && echo "node $(node --version)"
+command -v yarn >/dev/null && echo "yarn $(yarn --version)"
+npx --no tsc --version >/dev/null && echo "Typescript $(npx tsc --version)"
+echo ""
 
 rm -R ${download_dir}

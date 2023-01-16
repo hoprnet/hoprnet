@@ -1,12 +1,12 @@
 ARG HOPRD_IMAGE=${HOPRD_IMAGE:-hoprd-local:latest}
-ARG HARDHAT_IMAGE=${HARDHAT_IMAGE:-hopr-hardhat-local:latest}
+ARG ANVIL_IMAGE=${HARDHAT_IMAGE:-hopr-anvil-local:latest}
 
 # simply import hoprd image to copy in files later
 FROM ${HOPRD_IMAGE} as hoprd
 
-FROM ${HARDHAT_IMAGE} as runtime
+FROM ${ANVIL_IMAGE} as runtime
 
-LABEL description="Docker image running a HOPR-enabled hardhat network with 5 hoprd nodes using it and being fully interconnected."
+LABEL description="Docker image running a HOPR-enabled anvil network with 5 hoprd nodes using it and being fully interconnected."
 
 # install tools required within our scripts
 RUN apk add --no-cache bash lsof curl jq
@@ -15,13 +15,9 @@ WORKDIR /app
 
 COPY --from=hoprd /app/hoprnet ./hoprnet
 
-COPY scripts /app/hardhat/scripts
+COPY scripts /app/anvil/scripts
 
-# copy deployment files to make them available to hoprd as well
-RUN mkdir /app/hardhat/packages/ethereum/deployments/hardhat-localhost \
- && ln -s /app/hardhat/packages/ethereum/deployments/hardhat-localhost ./hoprnet/packages/ethereum/deployments/
-
-# hardhat RPC port
+# anvil RPC port
 EXPOSE 8545
 # hoprd Rest API ports
 EXPOSE 13301
@@ -52,4 +48,4 @@ EXPOSE 19505
 ARG HOPRD_API_TOKEN
 ENV HOPRD_API_TOKEN=${HOPRD_API_TOKEN:-%th1s-IS-a-S3CR3T-ap1-PUSHING-b1ts-TO-you%}
 
-ENTRYPOINT /app/hardhat/scripts/setup-local-cluster.sh -p -t "${HOPRD_API_TOKEN}" -i /app/hardhat/scripts/topologies/full_interconnected_cluster.sh --hoprd-command "node --experimental-wasm-modules hoprnet/packages/hoprd/lib/main.cjs" --hardhat-basedir "/app/hardhat/packages/ethereum" -l "0.0.0.0"
+ENTRYPOINT /app/anvil/scripts/setup-local-cluster.sh -p -t "${HOPRD_API_TOKEN}" -i /app/anvil/scripts/topologies/full_interconnected_cluster.sh --hoprd-command "node --experimental-wasm-modules hoprnet/packages/hoprd/lib/main.cjs" -l "0.0.0.0"

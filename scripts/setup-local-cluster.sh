@@ -18,19 +18,17 @@ declare api_token="^^LOCAL-testing-123^^"
 declare myne_chat_url="http://app.myne.chat"
 declare init_script=""
 declare hoprd_command="node --experimental-wasm-modules packages/hoprd/lib/main.cjs"
-declare hardhat_basedir="packages/ethereum"
 declare listen_host="127.0.0.1"
 declare node_env="development"
 
 usage() {
   msg
-  msg "Usage: $0 [-h|--help] [-t|--api-token <api_token>] [-m|--myne-chat-url <myne_chat_url>] [-i|--init-script <init_script>] [--hoprd-command <hoprd_command>] [--hardhat-basedir <hardhat_basedir>] [--listen-host|-l <list_host>] [-p|--production]"
+  msg "Usage: $0 [-h|--help] [-t|--api-token <api_token>] [-m|--myne-chat-url <myne_chat_url>] [-i|--init-script <init_script>] [--hoprd-command <hoprd_command>] [--listen-host|-l <list_host>] [-p|--production]"
   msg
   msg "<api_token> is set to '${api_token}' by default"
   msg "<myne_chat_url> is set to '${myne_chat_url}' by default"
   msg "<init_script> is empty by default, expected to be path to a script which is called with all node API endpoints as parameters"
   msg "<hoprd_command> is used to start hoprd, default is '${hoprd_command}'"
-  msg "<hardhat_basedir> is entered before hardhat is started, default is '${hardhat_basedir}'"
   msg "<listen_host> is listened on by all hoprd instances, default is '${listen_host}'"
   msg "-p sets NODE_ENV to 'production'"
 }
@@ -68,11 +66,6 @@ while (( "$#" )); do
       ;;
     --hoprd-command)
       hoprd_command="${2}"
-      shift
-      shift
-      ;;
-    --hardhat-basedir)
-      hardhat_basedir="${2}"
       shift
       shift
       ;;
@@ -197,7 +190,7 @@ function setup_node() {
 
 # --- Log setup info {{{
 log "Node files and directories"
-log "\thardhat"
+log "\tanvil"
 log "\t\tlog: ${anvil_rpc_log}"
 log "\tnode1"
 log "\t\tdata dir: ${node1_dir} (will be removed)"
@@ -277,8 +270,7 @@ wait_for_regex ${node5_log} "unfunded"
 log "Funding nodes"
 
 #  --- Fund nodes --- {{{
-cd "${hardhat_basedir}" && \
-  NODE_OPTIONS=--experimental-wasm-modules yarn faucet --identity-directory "${tmp_dir}"
+make fund-local id_dir="${tmp_dir}"
 # }}}
 
 log "Waiting for nodes startup"

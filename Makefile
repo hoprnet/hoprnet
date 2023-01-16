@@ -233,9 +233,10 @@ run-local: ## run HOPRd from local repo
 		--testPreferLocalAddresses --disableApiAuthentication
 
 .PHONY: fund-local
+fund-local: id_dir=.
 fund-local: ## use faucet script to fund local identities
 	foundry-tool --environment-name anvil-localhost --environment-type development \
-		faucet --password local --use-local-identities --identity-directory "." \
+		faucet --password local --use-local-identities --identity-directory "${id_dir}" \
 		--private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 		--make-root "./packages/ethereum/contracts"
 
