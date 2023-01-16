@@ -607,6 +607,7 @@ class Hopr extends EventEmitter {
 
     let incomingChannels = 0,
       outgoingChannels = 0
+    let remoteChannelPeers: string[] = []
     for await (const channel of this.getAllChannels()) {
       // Determine which counter (incoming/outgoing) we need to increment
       if (selfAddr.eq(channel.destination.toAddress())) {
@@ -620,6 +621,7 @@ class Hopr extends EventEmitter {
           [channel.source.toAddress().toHex(), 'out'],
           +ethersUtils.formatEther(channel.balance.toBN().toString())
         )
+        remoteChannelPeers.push(channel.destination.toPeerId().toString())
         outgoingChannels++
       }
 
@@ -640,11 +642,12 @@ class Hopr extends EventEmitter {
     } catch (e) {
       throw new Error('failed to getBalance, aborting tick')
     }
+
     const tickResult: StrategyTickResult = await this.strategy.tick(
       balance.toBN(),
-      currentChannels,
-      this.networkPeers,
-      this.connector.getRandomOpenChannel.bind(this.connector)
+      this.networkPeers.all().map((p) => p.toString()),
+      remoteChannelPeers,
+      (peer_id_str: string) => this.networkPeers.qualityOf()
     )
 
     const closeChannelDestinationsCount = tickResult.toClose.length
