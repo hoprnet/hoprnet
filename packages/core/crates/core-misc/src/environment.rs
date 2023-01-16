@@ -1,7 +1,9 @@
 use real_base::real;
 use serde::{Deserialize, Serialize};
 use utils_misc::ok_or_str;
-use utils_proc_macros::wasm_bindgen_if;
+// import need to be called wasm_bindgen to make field annotations
+// such as `#[wasm_bindgen(skip)]` work
+use utils_proc_macros::wasm_bindgen_if as wasm_bindgen;
 
 pub trait FromJsonFile: Sized {
     fn from_json_file(mono_repo_path: &str) -> Result<Self, String>;
@@ -9,7 +11,7 @@ pub trait FromJsonFile: Sized {
 
 #[derive(Deserialize, Serialize, Clone, Copy)]
 #[serde(rename_all(deserialize = "lowercase"))]
-#[wasm_bindgen_if]
+#[wasm_bindgen]
 pub enum EnvironmentType {
     Production,
     Staging,
@@ -30,7 +32,7 @@ impl ToString for EnvironmentType {
 /// the client is going to use
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
-#[wasm_bindgen_if(getter_with_clone)]
+#[wasm_bindgen(getter_with_clone)]
 pub struct NetworkOptions {
     #[serde(skip_deserializing)]
     pub id: String,
@@ -48,7 +50,6 @@ pub struct NetworkOptions {
     pub max_priority_fee_per_gas: String,
     pub native_token_name: String,
     pub hopr_token_name: String,
-    #[cfg(feature = "wasm")]
     #[wasm_bindgen(skip)] // no tags in Typescript
     pub tags: Option<Vec<String>>,
 }
@@ -57,7 +58,7 @@ pub struct NetworkOptions {
 /// to be used by the client
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
-#[wasm_bindgen_if(getter_with_clone)]
+#[wasm_bindgen(getter_with_clone)]
 pub struct Environment {
     #[serde(skip_deserializing)]
     pub id: String,
@@ -81,7 +82,6 @@ pub struct Environment {
     pub network_registry_proxy_contract_address: String,
     /// an Ethereum address
     pub network_registry_contract_address: String,
-    #[cfg(feature = "wasm")]
     #[wasm_bindgen(skip)] // no tags in Typescript
     pub tags: Vec<String>,
 }
@@ -160,8 +160,7 @@ impl PackageJsonFile {
 }
 
 #[derive(Serialize, Clone)]
-#[cfg(feature = "wasm")]
-#[wasm_bindgen_if(getter_with_clone)]
+#[wasm_bindgen(getter_with_clone)]
 pub struct ResolvedEnvironment {
     /// the environment identifier, e.g. monte_rosa
     pub id: String,

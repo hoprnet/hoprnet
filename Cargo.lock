@@ -404,6 +404,7 @@ name = "core-ethereum-misc"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
+ "utils-proc-macros",
  "wasm-bindgen",
  "wasm-bindgen-test",
  "wasm-opt",

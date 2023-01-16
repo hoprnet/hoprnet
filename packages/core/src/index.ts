@@ -1467,5 +1467,5 @@ export {
   type ChannelStrategyInterface
 }
 export { resolveEnvironment, supportedEnvironments, type ResolvedEnvironment } from './environment.js'
+export { CORE_CONSTANTS as CONSTANTS } from '../lib/core_misc.js'
 export { sampleOptions } from './index.mock.js'
-export { CONFIRMATIONS } from '@hoprnet/hopr-core-ethereum'

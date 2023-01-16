@@ -19,7 +19,7 @@ import {
   type PublicKey
 } from '@hoprnet/hopr-utils'
 import Indexer from './indexer/index.js'
-import { CONFIRMATIONS, INDEXER_BLOCK_RANGE, PROVIDER_CACHE_TTL } from './constants.js'
+import { CORE_ETHEREUM_CONSTANTS } from '../lib/core_ethereum_misc.js'
 import { EventEmitter } from 'events'
 import { initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCommitmentInfo } from './commitment.js'
 import type { IndexerEvents } from './indexer/types.js'
@@ -56,6 +56,9 @@ type ticketRedemtionInChannelOperations = {
   [id: string]: Promise<void>
 }
 
+// Exported from Rust
+const constants = CORE_ETHEREUM_CONSTANTS()
+
 export default class HoprCoreEthereum extends EventEmitter {
   public indexer: Indexer
   private chain: ChainWrapper
@@ -77,8 +80,8 @@ export default class HoprCoreEthereum extends EventEmitter {
     this.indexer = new Indexer(
       this.publicKey.toAddress(),
       this.db,
-      this.options?.maxConfirmations ?? CONFIRMATIONS,
-      INDEXER_BLOCK_RANGE
+      this.options.maxConfirmations,
+      constants.INDEXER_BLOCK_RANGE
     )
   }
 
@@ -198,7 +201,7 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
   private cachedGetNativeBalance = cacheNoArgAsyncFunction<NativeBalance>(
     this.uncachedGetNativeBalance,
-    PROVIDER_CACHE_TTL
+    constants.PROVIDER_CACHE_TTL
   )
   public async getNativeBalance(useCache: boolean = false): Promise<NativeBalance> {
     return useCache ? this.cachedGetNativeBalance() : this.uncachedGetNativeBalance()
@@ -511,7 +514,5 @@ export {
   createChainWrapper,
   initializeCommitment,
   findCommitmentPreImage,
-  bumpCommitment,
-  INDEXER_BLOCK_RANGE,
-  CONFIRMATIONS
+  bumpCommitment
 }
