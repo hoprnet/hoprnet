@@ -143,9 +143,9 @@ reset: clean
 test: ## run unit tests for all packages, or a single package if package= is set
 ifeq ($(package),)
 	yarn workspaces foreach -pv run test
+	cargo test
+	cargo test --target wasm32-unknown-unknown
 else
-# Prebuild Rust unit tests
-	$(cargo) --frozen --offline build --tests
 	yarn workspace @hoprnet/${package} run test
 endif
 
