@@ -3056,12 +3056,8 @@ __metadata:
     retimer: 3.0.0
     simple-peer: 9.11.1
     stream-to-it: 0.2.4
-<<<<<<< HEAD
     stun: 2.1.0
-    typescript: 4.7.4
-=======
     typescript: 4.8.4
->>>>>>> master
     uint8arraylist: 2.3.2
     wrtc: 0.4.7
     yargs: 17.5.1
@@ -7945,8 +7941,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
 "btoa-lite@npm:^1.0.0":
   version: 1.0.0
   resolution: "btoa-lite@npm:1.0.0"
@@ -7954,14 +7948,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"buffer-crc32@npm:^0.2.13":
-  version: 0.2.13
-  resolution: "buffer-crc32@npm:0.2.13"
-  checksum: 06252347ae6daca3453b94e4b2f1d3754a3b146a111d81c68924c22d91889a40623264e95e67955b1cb4a68cbedf317abeabb5140a9766ed248973096db5ce1c
-  languageName: node
-  linkType: hard
-
->>>>>>> master
 "buffer-equal-constant-time@npm:1.0.1":
   version: 1.0.1
   resolution: "buffer-equal-constant-time@npm:1.0.1"
@@ -7990,7 +7976,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
 "buffer-xor@npm:^2.0.2":
   version: 2.0.2
   resolution: "buffer-xor@npm:2.0.2"
@@ -8000,10 +7985,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"buffer@npm:6.0.3, buffer@npm:^6.0.3":
-=======
 "buffer@npm:6.0.3, buffer@npm:^6.0.1, buffer@npm:^6.0.3":
->>>>>>> master
   version: 6.0.3
   resolution: "buffer@npm:6.0.3"
   dependencies:
@@ -14855,12 +14837,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-"is-property@npm:^1.0.2":
-  version: 1.0.2
-  resolution: "is-property@npm:1.0.2"
-  checksum: 33b661a3690bcc88f7e47bb0a21b9e3187e76a317541ea7ec5e8096d954f441b77a46d8930c785f7fbf4ef8dfd624c25495221e026e50f74c9048fe501773be5
-=======
 "is-plain-object@npm:^5.0.0":
   version: 5.0.0
   resolution: "is-plain-object@npm:5.0.0"
@@ -14872,7 +14848,13 @@ __metadata:
   version: 2.2.2
   resolution: "is-promise@npm:2.2.2"
   checksum: 18bf7d1c59953e0ad82a1ed963fb3dc0d135c8f299a14f89a17af312fc918373136e56028e8831700e1933519630cc2fd4179a777030330fde20d34e96f40c78
->>>>>>> master
+  languageName: node
+  linkType: hard
+
+"is-property@npm:^1.0.2":
+  version: 1.0.2
+  resolution: "is-property@npm:1.0.2"
+  checksum: 33b661a3690bcc88f7e47bb0a21b9e3187e76a317541ea7ec5e8096d954f441b77a46d8930c785f7fbf4ef8dfd624c25495221e026e50f74c9048fe501773be5
   languageName: node
   linkType: hard
 
@@ -20373,7 +20355,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
+"protocol-buffers-schema@npm:^3.3.1":
+  version: 3.6.0
+  resolution: "protocol-buffers-schema@npm:3.6.0"
+  checksum: 8713b5770f6745ddbcdf3bbd03ee020624d506233bb567927a6615a6f69a5bd620a5f49597f34f4115792b853a4c9cb9e2d5d6b930a1c04bf198023e45c1c349
+  languageName: node
+  linkType: hard
+
 "protocols@npm:^1.4.0":
   version: 1.4.8
   resolution: "protocols@npm:1.4.8"
@@ -20385,12 +20373,6 @@ __metadata:
   version: 2.0.1
   resolution: "protocols@npm:2.0.1"
   checksum: 4a9bef6aa0449a0245ded319ac3cbfd032c3e76ebb562777037a3a832c99253d0e8bc2847f7be350236df620a11f7d4fe683ea7f59a2cc14c69f746b6259eda4
-=======
-"protocol-buffers-schema@npm:^3.3.1":
-  version: 3.6.0
-  resolution: "protocol-buffers-schema@npm:3.6.0"
-  checksum: 8713b5770f6745ddbcdf3bbd03ee020624d506233bb567927a6615a6f69a5bd620a5f49597f34f4115792b853a4c9cb9e2d5d6b930a1c04bf198023e45c1c349
->>>>>>> master
   languageName: node
   linkType: hard
 
@@ -21071,7 +21053,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
 "redent@npm:^2.0.0":
   version: 2.0.0
   resolution: "redent@npm:2.0.0"
@@ -21082,14 +21063,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"redoc@npm:2.0.0-rc.72":
-  version: 2.0.0-rc.72
-  resolution: "redoc@npm:2.0.0-rc.72"
-=======
 "redoc@npm:2.0.0":
   version: 2.0.0
   resolution: "redoc@npm:2.0.0"
->>>>>>> master
   dependencies:
     "@redocly/openapi-core": ^1.0.0-beta.104
     classnames: ^2.3.1
@@ -24701,9 +24677,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-"universalify@npm:^0.1.0, universalify@npm:^0.1.2":
-=======
 "universal-user-agent@npm:^4.0.0":
   version: 4.0.1
   resolution: "universal-user-agent@npm:4.0.1"
@@ -24720,8 +24693,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"universalify@npm:^0.1.0":
->>>>>>> master
+"universalify@npm:^0.1.0, universalify@npm:^0.1.2":
   version: 0.1.2
   resolution: "universalify@npm:0.1.2"
   checksum: 40cdc60f6e61070fe658ca36016a8f4ec216b29bf04a55dce14e3710cc84c7448538ef4dad3728d0bfe29975ccd7bfb5f414c45e7b78883567fb31b246f02dff
