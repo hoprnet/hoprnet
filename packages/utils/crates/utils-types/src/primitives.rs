@@ -55,6 +55,12 @@ impl BaseBalance for Balance {
     }
 }
 
+impl ToString for Balance {
+    fn to_string(&self) -> String {
+        self.value.to_string()
+    }
+}
+
 impl Balance {
 
     pub fn from_u64(value: u64) -> Self {
@@ -111,6 +117,11 @@ impl Balance {
 mod tests {
     use super::*;
 
+    #[test]
+    fn balance_tests() {
+        let b = Balance::from_str("10").unwrap();
+        assert_eq!("10".to_string(), b.to_string());
+    }
 }
 
 /// Module for WASM wrappers of Rust code

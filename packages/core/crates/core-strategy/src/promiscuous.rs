@@ -1,7 +1,7 @@
 use utils_types::channels::ChannelEntry;
 use utils_types::primitives::{BaseBalance, Balance};
 
-use crate::generic::{ChannelOpenRequest, ChannelStrategy, StrategyTickResult};
+use crate::generic::{OutgoingChannelStatus, ChannelStrategy, StrategyTickResult};
 
 /// Implements promiscuous strategy.
 /// This strategy opens channels to peers, which have quality above a given threshold.
@@ -29,7 +29,7 @@ impl Default for PromiscuousStrategy {
 impl ChannelStrategy for PromiscuousStrategy {
     const NAME: &'static str = "promiscuous";
 
-    fn tick<Q>(&self, balance: Balance, peer_ids: impl Iterator<Item=String>, outgoing_channel_peer_ids: &[&str], quality_of: Q) -> StrategyTickResult
+    fn tick<Q>(&self, balance: Balance, peer_ids: impl Iterator<Item=String>, outgoing_channels: Vec<OutgoingChannelStatus>, quality_of: Q) -> StrategyTickResult
         where Q: Fn(&str) -> Option<f64> {
 
         let mut to_close: Vec<String> = vec![];
@@ -41,10 +41,14 @@ impl ChannelStrategy for PromiscuousStrategy {
         for peer_id in peer_ids {
             let quality = quality_of(peer_id.as_str()).unwrap_or(0f64);
 
-            if quality <= self.network_quality_threshold && outgoing_channel_peer_ids.contains(&peer_id.as_str()) {
+            let has_channel_with_peer = outgoing_channels.iter()
+                .find(|c| c.peer_id.eq(&peer_id.as_str()))
+                .is_some();
+
+            if quality <= self.network_quality_threshold && has_channel_with_peer {
                 to_close.push(peer_id.to_string());
             }
-            else if quality >= self.network_quality_threshold && !outgoing_channel_peer_ids.contains(&peer_id.as_str()) {
+            else if quality >= self.network_quality_threshold && !has_channel_with_peer {
                 new_channel_candidates.push((peer_id.to_string(), quality));
             }
 
@@ -56,9 +60,9 @@ impl ChannelStrategy for PromiscuousStrategy {
 
         // Sort the new channel candidates by best quality first, then truncate to the number of available slots
         new_channel_candidates.sort_unstable_by(|(_, q1), (_, q2)| q1.partial_cmp(q2).unwrap().reverse() );
-        new_channel_candidates.truncate(max_auto_channels - (outgoing_channel_peer_ids.len() - to_close.len()));
+        new_channel_candidates.truncate(max_auto_channels - (outgoing_channels.len() - to_close.len()));
 
-        let mut to_open: Vec<ChannelOpenRequest> = vec![];
+        let mut to_open: Vec<OutgoingChannelStatus> = vec![];
         let mut remaining_balance = balance.clone();
         for peer_id in new_channel_candidates.into_iter().map(|(p,_)| p)  {
             // Stop if we ran out of balance
@@ -68,7 +72,7 @@ impl ChannelStrategy for PromiscuousStrategy {
 
             // If we haven't added this peer id yet, add it to the list for channel opening
             if to_open.iter().find(|&p| p.peer_id.eq(&peer_id)).is_none() {
-                to_open.push(ChannelOpenRequest{
+                to_open.push(OutgoingChannelStatus {
                     peer_id,
                     stake: self.minimum_channel_stake.clone()
                 });
@@ -102,7 +106,18 @@ mod tests {
 
         let balance = Balance::from_str("1000000000000000000").unwrap();
 
-        let results = strat.tick(balance, peers.iter().map(|x| x.0.clone()), &["Alice", "Charlie"], |s| peers.get(s).copied());
+        let outgoing_channels = vec![
+            OutgoingChannelStatus {
+                peer_id: "Alice".to_string(),
+                stake: balance.clone()
+            },
+            OutgoingChannelStatus {
+                peer_id: "Charlie".to_string(),
+                stake: balance.clone()
+            },
+        ];
+
+        let results = strat.tick(balance, peers.iter().map(|x| x.0.clone()), outgoing_channels, |s| peers.get(s).copied());
 
         assert_eq!(results.max_auto_channels(), 3);
 
@@ -124,7 +139,7 @@ pub mod wasm {
     use utils_types::primitives::wasm::Balance;
 
     use crate::generic::ChannelStrategy;
-    use crate::generic::wasm::StrategyTickResult;
+    use crate::generic::wasm::{JsResult, StrategyTickResult};
 
     #[wasm_bindgen]
     pub struct PromiscuousStrategy {
@@ -156,8 +171,8 @@ pub mod wasm {
             self.w.name().into()
         }
 
-        pub fn tick(&self, balance: Balance, peer_ids: &js_sys::Iterator, outgoing_channel_peer_ids: Vec<JsString>, quality_of: &js_sys::Function) ->  StrategyTickResult {
-            crate::generic::wasm::tick_wrap(&self.w, balance, peer_ids, outgoing_channel_peer_ids, quality_of)
+        pub fn tick(&self, balance: Balance, peer_ids: &js_sys::Iterator, outgoing_channels: JsValue, quality_of: &js_sys::Function) ->  JsResult<StrategyTickResult> {
+            crate::generic::wasm::tick_wrap(&self.w, balance, peer_ids, outgoing_channels, quality_of)
         }
     }
 }

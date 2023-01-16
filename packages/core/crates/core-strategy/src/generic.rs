@@ -15,7 +15,7 @@ pub trait ChannelStrategy {
     fn tick<Q>(&self,
             balance: Balance,
             peer_ids: impl Iterator<Item=String>,
-            outgoing_channel_peer_ids: &[&str],
+            outgoing_channels: Vec<OutgoingChannelStatus>,
             quality_of: Q)
         -> StrategyTickResult
     where Q: Fn(&str) -> Option<f64>;
@@ -27,10 +27,19 @@ pub trait ChannelStrategy {
 }
 
 /// Represents a request to open a channel with a stake.
-#[derive(Clone)]
-pub struct ChannelOpenRequest {
+pub struct OutgoingChannelStatus {
     pub peer_id: String,
     pub stake: Balance
+}
+
+#[cfg(feature = "wasm")]
+impl From<&wasm::OutgoingChannelStatus> for OutgoingChannelStatus {
+    fn from(x: &wasm::OutgoingChannelStatus) -> Self {
+        OutgoingChannelStatus {
+            peer_id: x.peer_id.clone(),
+            stake: Balance::from_str(x.stake_str.as_str()).unwrap()
+        }
+    }
 }
 
 /// A decision made by a strategy on each tick,
@@ -38,14 +47,14 @@ pub struct ChannelOpenRequest {
 /// Also indicates a number of maximum channels this strategy can ever open.
 pub struct StrategyTickResult {
     max_auto_channels: usize,
-    to_open: Vec<ChannelOpenRequest>,
+    to_open: Vec<OutgoingChannelStatus>,
     to_close: Vec<String>
 }
 
 impl StrategyTickResult {
 
     /// Constructor for the strategy tick result.
-    pub fn new(max_auto_channels: usize, to_open: Vec<ChannelOpenRequest>, to_close: Vec<String>) -> Self {
+    pub fn new(max_auto_channels: usize, to_open: Vec<OutgoingChannelStatus>, to_close: Vec<String>) -> Self {
         StrategyTickResult {
             max_auto_channels,
             to_open,
@@ -57,7 +66,7 @@ impl StrategyTickResult {
     pub fn max_auto_channels(&self) -> usize { self.max_auto_channels }
 
     /// Channels that this strategy wishes to open.
-    pub fn to_open(&self) -> &Vec<ChannelOpenRequest> {
+    pub fn to_open(&self) -> &Vec<OutgoingChannelStatus> {
         &self.to_open
     }
 
@@ -78,26 +87,23 @@ pub mod wasm {
 
     use utils_types::primitives::wasm::Balance;
 
-    macro_rules! convert_from_jstrvec {
-        ($v:expr,$r:ident) => {
-            let _aux: Vec<String> = $v.iter().map(String::from).collect();
-            let $r = _aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
-        };
+    use serde::{Serialize, Deserialize};
+
+    pub type JsResult<T> = Result<T, JsValue>;
+
+    #[wasm_bindgen(getter_with_clone)]
+    #[derive(Serialize, Deserialize)]
+    pub struct OutgoingChannelStatus {
+        pub peer_id: String,
+        pub stake_str: String
     }
 
-    #[wasm_bindgen]
-    pub struct ChannelOpenRequest {
-        w: super::ChannelOpenRequest
-    }
-
-    #[wasm_bindgen]
-    impl ChannelOpenRequest {
-        pub fn peer_id(&self) -> String {
-            self.w.peer_id.clone()
-        }
-
-        pub fn stake(&self) -> Balance {
-            self.w.stake.clone().into()
+    impl From<&super::OutgoingChannelStatus> for OutgoingChannelStatus {
+        fn from(x: &crate::generic::OutgoingChannelStatus) -> Self {
+            OutgoingChannelStatus {
+                peer_id: x.peer_id.clone(),
+                stake_str: x.stake.to_string()
+            }
         }
     }
 
@@ -111,35 +117,28 @@ pub mod wasm {
         #[wasm_bindgen(getter)]
         pub fn max_auto_channels(&self) -> usize { self.w.max_auto_channels }
 
-        pub fn to_open_count(&self) -> usize {
-            self.w.to_open.len()
+        pub fn to_open(&self) -> JsResult<JsValue> {
+            let ret: Vec<OutgoingChannelStatus> = self.w.to_open().iter().map(|s| OutgoingChannelStatus::from(s)).collect();
+            serde_wasm_bindgen::to_value(&ret)
+                .map_err(|e| JsValue::from(e.to_string()))
         }
 
-        pub fn to_open(&self, index: usize) -> ChannelOpenRequest {
-            ChannelOpenRequest {
-                w: self.w.to_open[index].clone()
-            }
-        }
-
-        pub fn to_close_count(&self) -> usize {
-            self.w.to_close.len()
-        }
-
-        pub fn to_close_peer(&self, index: usize) -> String {
-            self.w.to_close[index].clone()
+        pub fn to_close(&self) -> Vec<JsString> {
+            self.w.to_close().iter().map(|s| JsString::from(s.clone())).collect()
         }
     }
 
 
     /// Generic binding for all strategies to use in WASM wrappers
     /// Since wasm_bindgen annotation is not supported on trait impls, the WASM-wrapped strategies cannot implement a common trait.
-    pub fn tick_wrap<S: ChannelStrategy>(strategy: &S, balance: Balance, peer_ids: &js_sys::Iterator, outgoing_channel_peer_ids: Vec<JsString>, quality_of: &js_sys::Function) ->  StrategyTickResult {
-        convert_from_jstrvec!(outgoing_channel_peer_ids, bind_ch);
+    pub fn tick_wrap<S: ChannelStrategy>(strategy: &S, balance: Balance, peer_ids: &js_sys::Iterator, outgoing_channels: JsValue, quality_of: &js_sys::Function) ->  JsResult<StrategyTickResult> {
 
-        StrategyTickResult {
+        let out_channels: Vec<OutgoingChannelStatus> = serde_wasm_bindgen::from_value(outgoing_channels)?;
+
+        Ok(StrategyTickResult {
             w: strategy.tick(balance.w,
                              peer_ids.into_iter().map(|v| v.unwrap().as_string().unwrap()),
-                             bind_ch.as_slice(),
+                             out_channels.iter().map(|c| super::OutgoingChannelStatus::from(c)).collect(),
                              | peer_id: &str | {
                                let this = JsValue::null();
                                let str = JsString::from(peer_id);
@@ -147,6 +146,6 @@ pub mod wasm {
                                let quality = quality_of.call1(&this, &str);
                                quality.ok().map(|q| q.as_f64()).flatten()
                            })
-        }
+        })
     }
 }
