@@ -13,10 +13,11 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = []
+wasm = [ "dep:wasm-bindgen" ]
+console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 
 [dependencies]
-wasm-bindgen = "0.2.83"
+wasm-bindgen = { version = "0.2.83", optional = true }
 utils-proc-macros = { path = "../../../utils/crates/utils-proc-macros" }
 
 console_error_panic_hook = { version = "0.1.6", optional = true }

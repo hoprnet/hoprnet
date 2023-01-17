@@ -12,7 +12,7 @@ pub const DEFAULT_NETWORK_QUALITY_THRESHOLD: f32 = 0.5;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    // Need load as wasm_bindgen to make field annotations work
+    // Need to load as wasm_bindgen to make field annotations work
     use utils_proc_macros::wasm_bindgen_if as wasm_bindgen;
 
     #[wasm_bindgen]
