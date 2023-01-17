@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.92.0-next.33",
+  "version": "1.92.0-next.34",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -25,7 +25,7 @@
     "test:wasm": "make -C crates test",
     "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo ./build ./rest-api-v2-full-spec.json",
     "build": "yarn clean && yarn build:wasm && tsc -p . && chmod u+x lib/*.js",
-    "test": "yarn test:wasm && NODE_OPTIONS=\"--experimental-wasm-modules\" mocha --reporter=tap --full-trace --exit . test",
+    "test": "NODE_OPTIONS=\"--experimental-wasm-modules\" mocha --reporter=tap --full-trace --exit . test",
     "prebuild": "next telemetry disable",
     "start": "NODE_OPTIONS=\"--experimental-wasm-modules\" node lib/main.cjs --init --api",
     "dev": "NODE_ENV=development yarn start --environment hardhat-localhost --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses --testPreferLocalAddresses --disableApiAuthentication",

@@ -52,12 +52,18 @@ export function isLocalhost(address: Uint8Array, family: NetworkInterfaceInfo['f
  * @returns true if private address
  */
 export function isPrivateAddress(address: Uint8Array, family: NetworkInterfaceInfo['family']): boolean {
-  // DAppnode/Avado consider 172.33.0.0/16 a private network
-  let priv_networks = PRIVATE_NETWORKS
-  if ((process.env.AVADO ?? 'false').toLowerCase() === 'true')
-    priv_networks = [...PRIVATE_NETWORKS, PRIVATE_V4_CLASS_AVADO]
+  return checkNetworks(PRIVATE_NETWORKS, address, family)
+}
 
-  return checkNetworks(priv_networks, address, family)
+/**
+ * Checks if given address is in internally network of
+ * Dappnode or AVADO based nodes.
+ * @param address
+ * @param family
+ * @returns
+ */
+export function isAvadoPrivateNetwork(address: Uint8Array, family: NetworkInterfaceInfo['family']): boolean {
+  return checkNetworks([PRIVATE_V4_CLASS_AVADO], address, family)
 }
 
 /**

@@ -1,5 +1,11 @@
 import { networkInterfaces, type NetworkInterfaceInfo } from 'os'
-import { isLocalhost, ipToU8aAddress, isPrivateAddress, isLinkLocaleAddress } from '@hoprnet/hopr-utils'
+import {
+  isLocalhost,
+  ipToU8aAddress,
+  isPrivateAddress,
+  isLinkLocaleAddress,
+  isAvadoPrivateNetwork
+} from '@hoprnet/hopr-utils'
 
 import Debug from 'debug'
 const log = Debug('hopr-connect')
@@ -90,6 +96,11 @@ export function getAddrs(
 
     for (const address of iface) {
       const u8aAddr = ipToU8aAddress(address.address, address.family)
+
+      if ((process.env.AVADO ?? 'false').toLowerCase() === 'true' && isAvadoPrivateNetwork(u8aAddr, address.family)) {
+        // Never expose internal container addresses of DAppnode or AVADO machines
+        continue
+      }
 
       if (isLinkLocaleAddress(u8aAddr, address.family)) {
         continue

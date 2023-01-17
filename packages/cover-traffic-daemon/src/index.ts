@@ -10,9 +10,7 @@ import {
   resolveEnvironment,
   supportedEnvironments,
   type ResolvedEnvironment,
-  HEARTBEAT_INTERVAL,
-  HEARTBEAT_THRESHOLD,
-  HEARTBEAT_INTERVAL_VARIANCE
+  CONSTANTS
 } from '@hoprnet/hopr-core'
 
 import {
@@ -65,6 +63,9 @@ const packageFile = path.normalize(new URL('../package.json', import.meta.url).p
 const version = get_package_version(packageFile)
 
 const yargsInstance = yargs(hideBin(process.argv))
+
+// Exported from Rust
+const constants = CONSTANTS()
 
 const argv = yargsInstance
   .env('HOPR_CTD') // enable options to be set as environment variables with the HOPR_CTD prefix
@@ -129,18 +130,18 @@ const argv = yargsInstance
     number: true,
     describe:
       'Interval in milliseconds in which the availability of other nodes get measured [env: HOPRD_HEARTBEAT_INTERVAL]',
-    default: HEARTBEAT_INTERVAL
+    default: constants.DEFAULT_HEARTBEAT_INTERVAL
   })
   .option('heartbeatThreshold', {
     number: true,
     describe:
       "Timeframe in milliseconds after which a heartbeat to another peer is performed, if it hasn't been seen since [env: HOPRD_HEARTBEAT_THRESHOLD]",
-    default: HEARTBEAT_THRESHOLD
+    default: constants.DEFAULT_HEARTBEAT_THRESHOLD
   })
   .option('heartbeatVariance', {
     number: true,
     describe: 'Upper bound for variance applied to heartbeat interval in milliseconds [env: HOPRD_HEARTBEAT_VARIANCE]',
-    default: HEARTBEAT_INTERVAL_VARIANCE
+    default: constants.DEFAULT_HEARTBEAT_INTERVAL_VARIANCE
   })
   .wrap(Math.min(120, yargsInstance.terminalWidth()))
   .parseSync()
