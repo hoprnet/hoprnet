@@ -148,6 +148,7 @@ ifeq ($(package),)
 # cargo test --target wasm32-unknown-unknow
 else
 	yarn workspace @hoprnet/${package} run test
+	yarn workspace @horpnet/${package} run test:wasm
 endif
 
 .PHONY: lint-check
