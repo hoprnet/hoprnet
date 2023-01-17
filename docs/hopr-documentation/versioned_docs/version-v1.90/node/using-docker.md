@@ -2,7 +2,6 @@
 id: using-docker
 title: Using Docker
 ---
-
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
@@ -86,7 +85,7 @@ To exit your current session without closing it. To be clear, you press ctrl and
 
 Please make sure you are in a newly opened session and haven't exited it before continuing.
 
-## Installing HOPRd: 1.90.68 (Valencia)
+## Installing HOPRd: 1.91.24 (Bogota)
 
 :::info NOTE
 
