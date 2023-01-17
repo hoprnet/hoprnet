@@ -40,6 +40,10 @@ The following sections document the metrics per package:
 | `connect_counter_relay_reconnects`         | counter | Number of re-established relayed connections |      |
 | `connect_counter_successful_conns`         | counter | Number of successful connection attempts     |      |
 | `connect_counter_failed_conns`             | counter | Number of failed connection attempts         |      |
+| `connect_counter_server_relayed_packets`   | counter | Number of relayed packets (TURN server)      |      |
+| `connect_counter_client_relayed_packets`   | counter | Number of relayed packets (TURN client)      |      |
+| `connect_counter_direct_packets`           | counter | Number of directly sent packets (TCP)        |      |
+| `connect_counter_webrtc_packets`           | counter | Number of directly sent packets (WebRTC)     |      |
 
 ### core
 
