@@ -360,7 +360,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/main.ts:204](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L204)
+[packages/core/src/main.ts:212](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L212)
 
 ___
 

@@ -347,7 +347,7 @@ array of PublicKey of the associated HOPR nodes
 
 #### Defined in
 
-[src/db/db.ts:953](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L953)
+[src/db/db.ts:967](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L967)
 
 ___
 
@@ -412,7 +412,7 @@ ETH address
 
 #### Defined in
 
-[src/db/db.ts:1026](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L1026)
+[src/db/db.ts:1030](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L1030)
 
 ___
 
@@ -1196,7 +1196,7 @@ true if account is eligible
 
 #### Defined in
 
-[src/db/db.ts:1067](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L1067)
+[src/db/db.ts:1071](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L1071)
 
 ___
 
@@ -1214,7 +1214,7 @@ true if register is enabled or if key is not preset in the dababase
 
 #### Defined in
 
-[src/db/db.ts:1092](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L1092)
+[src/db/db.ts:1096](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L1096)
 
 ___
 
@@ -1380,7 +1380,7 @@ Unlink hoprNode to an ETH address by removing the entry.
 
 #### Defined in
 
-[src/db/db.ts:974](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L974)
+[src/db/db.ts:988](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L988)
 
 ___
 
@@ -1489,7 +1489,7 @@ Set address as eligible.
 
 #### Defined in
 
-[src/db/db.ts:1036](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L1036)
+[src/db/db.ts:1040](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L1040)
 
 ___
 
@@ -1552,7 +1552,7 @@ Hopr Network Registry
 
 #### Defined in
 
-[src/db/db.ts:1075](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L1075)
+[src/db/db.ts:1079](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L1079)
 
 ___
 
@@ -1780,4 +1780,4 @@ ___
 
 #### Defined in
 
-[src/db/db.ts:1096](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L1096)
+[src/db/db.ts:1100](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L1100)
