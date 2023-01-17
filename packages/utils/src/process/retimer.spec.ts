@@ -24,7 +24,9 @@ describe('test retimer', function () {
 
   it('runs efficiently', async function () {
     let i = 0
-    const func = () => i++
+    const func = () => {
+      i++
+    }
 
     const stopRetimer = retimer(func, () => 0)
 

@@ -223,13 +223,6 @@ const argv = yargsInstance
       'NAT traversal testing: prevent nodes from establishing direct TCP connections [env: HOPRD_TEST_NO_WEB_RTC_UPGRADE]',
     default: false
   })
-  .option('testNoUPNP', {
-    hidden: true,
-    boolean: true,
-    describe:
-      'NAT traversal testing: disable automatic detection of external IP address using UPNP [env: HOPRD_TEST_NO_UPNP]',
-    default: false
-  })
   .option('heartbeatInterval', {
     number: true,
     describe:
@@ -297,8 +290,7 @@ function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
       announceLocalAddresses: argv.testAnnounceLocalAddresses,
       preferLocalAddresses: argv.testPreferLocalAddresses,
       noWebRTCUpgrade: argv.testNoWebRTCUpgrade,
-      noDirectConnections: argv.testNoDirectConnections,
-      noUPNP: argv.testNoUPNP
+      noDirectConnections: argv.testNoDirectConnections
     }
   }
 

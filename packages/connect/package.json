@@ -48,7 +48,7 @@
     "retimer": "3.0.0",
     "simple-peer": "9.11.1",
     "stream-to-it": "0.2.4",
-    "webrtc-stun": "3.0.0",
+    "stun": "2.1.0",
     "wrtc": "0.4.7"
   },
   "devDependencies": {
