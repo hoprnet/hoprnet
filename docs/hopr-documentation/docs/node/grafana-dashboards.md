@@ -5,7 +5,7 @@ title: Using Grafana
 
 Currently, there is only support for the Grafana dashboards on Dappnode. If you are using an Avado or VPS/Docker setup, these dashboards will become available to you on the next release: `Riga`.
 
-The Grafana dashboards will give you an advanced look into your node, with a dashboard breaking down several key metrics about your node.  
+The Grafana dashboards will give you an advanced look into your node, with a dashboard breaking down several key metrics about your node.
 
 ![Grafana Dashboard](/img/node/Grafana-Dashboard.png)
 
@@ -14,7 +14,7 @@ The Grafana dashboards will give you an advanced look into your node, with a das
 To access your node's Grafana Dashboard, you need to install both:
 
 - The latest release: `Bogota`
-- The DMS Package 
+- The DMS Package
 
 (**1**) First, make sure you are using the latest release, `Bogota`. Follow the instructions [here](using-dappnode#installing-the-hopr-client) to ensure you are up-to-date.
 
@@ -30,7 +30,7 @@ To access your node's Grafana Dashboard, you need to install both:
 
 ![Gashboard searchbar](/img/node/Grafana-dashboard-searchbar.png)
 
-(**5**) Opening this dashboard will give you access to your node metrics. 
+(**5**) Opening this dashboard will give you access to your node metrics.
 
 **Note:** The image below is of a node outside the network, hence why all the graphs are flat. Your graphs should not be flat if you have a registered working node within the network.
 
