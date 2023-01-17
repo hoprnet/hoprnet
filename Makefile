@@ -144,7 +144,8 @@ test: ## run unit tests for all packages, or a single package if package= is set
 ifeq ($(package),)
 	yarn workspaces foreach -pv run test
 	cargo test
-	cargo test --target wasm32-unknown-unknown
+# disabled until `wasm-bindgen-test-runner` supports ESM
+# cargo test --target wasm32-unknown-unknow
 else
 	yarn workspace @hoprnet/${package} run test
 endif

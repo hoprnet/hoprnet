@@ -1,7 +1,4 @@
-// #![cfg(target_arch = "wasm32")]
-
-// extern crate core;
-// extern crate wasm_bindgen_test;
+// Disabled until `wasm-bindgen-test-runner` supports ESM
 
 // use js_sys::Atomics::wait_with_timeout;
 // use js_sys::{Int32Array, SharedArrayBuffer};
