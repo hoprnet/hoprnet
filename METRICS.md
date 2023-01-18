@@ -43,6 +43,10 @@ The following sections document the metrics per package:
 | `connect_counter_udp_stun_requests`        | counter | Number of UDP STUN requests                                   |                            |
 | `connect_counter_tcp_stun_requests`        | counter | Number of TCP STUN requests                                   |                            |
 | `connect_gauge_node_is_exposed`            | gauge   | Shows whether a node believes that it runs on an exposed host | 1: exposed, 0: not exposed |
+| `connect_counter_server_relayed_packets`   | counter | Number of relayed packets (TURN server)                       |                            |
+| `connect_counter_client_relayed_packets`   | counter | Number of relayed packets (TURN client)                       |                            |
+| `connect_counter_direct_packets`           | counter | Number of directly sent packets (TCP)                         |                            |
+| `connect_counter_webrtc_packets`           | counter | Number of directly sent packets (WebRTC)                      |                            |
 
 ### core
 

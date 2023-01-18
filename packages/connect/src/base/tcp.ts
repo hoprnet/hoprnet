@@ -5,6 +5,8 @@ import { ip6Lookup, IPV4_EMBEDDED_ADDRESS, nodeToMultiaddr } from '../utils/inde
 // @ts-ignore untyped module
 import retimer from 'retimer'
 
+import { create_counter } from '@hoprnet/hopr-utils'
+
 const log = Debug('hopr-connect:tcp')
 const error = Debug('hopr-connect:tcp:error')
 const verbose = Debug('hopr-connect:verbose:tcp')
@@ -22,6 +24,8 @@ type SocketOptions = {
   signal?: AbortSignal
   closeTimeout?: number
 }
+
+const directPackets = create_counter('connect_counter_direct_packets', 'Number of directly sent packets (TCP)')
 
 /**
  * Class to encapsulate TCP sockets
@@ -150,7 +154,16 @@ export function TCPConnection(
 
   const sinkEndpoint = async (source: StreamSource): Promise<void> => {
     try {
-      await sink(options?.signal != undefined ? (abortableSource(source, options.signal) as StreamSource) : source)
+      await sink(
+        (async function* (): AsyncIterable<Uint8Array> {
+          for await (const msg of options?.signal != undefined
+            ? (abortableSource(source, options.signal) as StreamSource)
+            : source) {
+            yield msg
+            directPackets.increment()
+          }
+        })()
+      )
     } catch (err: any) {
       // If aborted we can safely ignore
       if (err.code !== 'ABORT_ERR' && err.type !== 'aborted') {
