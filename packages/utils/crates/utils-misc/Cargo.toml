@@ -13,7 +13,8 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = ["dep:wasm-bindgen"]
+wasm = [ "dep:wasm-bindgen" ]
+console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 
 [dependencies]
 real-base = { path = "../../../real/crates/real-base" }

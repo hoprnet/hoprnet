@@ -3,9 +3,11 @@
 members = [
     "packages/core/crates/core-misc",
     "packages/core/crates/core-strategy",
+    "packages/core-ethereum/crates/core-ethereum-misc",
     "packages/real/crates/real-base",
     "packages/hoprd/crates/hoprd-misc",
     "packages/utils/crates/utils-misc",
+    "packages/utils/crates/utils-proc-macros",
     "packages/utils/crates/utils-metrics",
     "packages/utils/crates/utils-types"
 ]
