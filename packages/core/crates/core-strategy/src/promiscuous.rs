@@ -74,6 +74,7 @@ impl ChannelStrategy for PromiscuousStrategy {
         let max_auto_channels = (network_size as f64).sqrt().ceil() as usize;
 
         // Sort the new channel candidates by best quality first, then truncate to the number of available slots
+        // This way, we'll prefer candidates with higher quality, when we don't have enough node balance
         new_channel_candidates.sort_unstable_by(|(_, q1), (_, q2)| q1.partial_cmp(q2).unwrap().reverse() );
         new_channel_candidates.truncate(max_auto_channels - (outgoing_channels.len() - to_close.len()));
 

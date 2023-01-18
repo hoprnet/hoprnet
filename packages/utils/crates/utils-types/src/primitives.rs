@@ -48,7 +48,7 @@ pub struct Balance {
 }
 
 impl BaseBalance for Balance {
-    const SYMBOL: &'static str = "txHOPR";
+    const SYMBOL: &'static str = "mHOPR";
 
     fn value(&self) -> &u256 {
         &self.value
