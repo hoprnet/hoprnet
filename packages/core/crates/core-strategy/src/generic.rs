@@ -98,6 +98,18 @@ pub mod wasm {
         pub stake_str: String
     }
 
+    #[wasm_bindgen]
+    impl OutgoingChannelStatus {
+
+        #[wasm_bindgen(constructor)]
+        pub fn new(peer_id: &str, stake_str: &str) -> Self {
+            OutgoingChannelStatus {
+                peer_id: peer_id.to_string(),
+                stake_str: stake_str.to_string()
+            }
+        }
+    }
+
     impl From<&super::OutgoingChannelStatus> for OutgoingChannelStatus {
         fn from(x: &crate::generic::OutgoingChannelStatus) -> Self {
             OutgoingChannelStatus {
@@ -114,6 +126,16 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl StrategyTickResult {
+        #[wasm_bindgen(constructor)]
+        pub fn new(max_auto_channels: u32, to_open: JsValue, to_close: Vec<JsString>) -> JsResult<StrategyTickResult> {
+            let open: Vec<OutgoingChannelStatus> = ok_or_jserr!(serde_wasm_bindgen::from_value(to_open))?;
+            Ok(StrategyTickResult {
+                w: super::StrategyTickResult::new(max_auto_channels as usize,
+                                                  open.into_iter().map(|x| super::OutgoingChannelStatus::from(&x)).collect(),
+                                                  to_close.iter().map(String::from).collect())
+            })
+        }
+
         #[wasm_bindgen(getter)]
         pub fn max_auto_channels(&self) -> usize { self.w.max_auto_channels }
 

@@ -8,8 +8,16 @@ import { CHECK_TIMEOUT } from './constants.js'
 
 const log = debug('hopr-core:channel-strategy')
 
-import { PromiscuousStrategy as RS_PromiscuousStrategy, PassiveStrategy as RS_PassiveStrategy, StrategyTickResult, Balance } from '../lib/core_strategy.js'
-export { StrategyTickResult } from '../lib/core_strategy.js'
+import {
+  PromiscuousStrategy as RS_PromiscuousStrategy,
+  PassiveStrategy as RS_PassiveStrategy,
+  StrategyTickResult,
+  OutgoingChannelStatus,
+  Balance,
+  utils_misc_set_panic_hook
+} from '../lib/core_strategy.js'
+utils_misc_set_panic_hook()
+export { OutgoingChannelStatus, StrategyTickResult } from '../lib/core_strategy.js'
 
 /**
  * Staked nodes will likely want to automate opening and closing of channels. By
@@ -26,14 +34,14 @@ export interface ChannelStrategyInterface {
   tick(
     balance: BN,
     network_peer_ids: Iterator<string>,
-    outgoing_channel_peer_ids: string[],
+    outgoing_channel: OutgoingChannelStatus[],
     peer_quality: (string) => number
   ): StrategyTickResult
   // TBD: Include ChannelsToClose as well.
 
   onChannelWillClose(channel: ChannelEntry, chain: HoprCoreEthereum): Promise<void> // Before a channel closes
   onWinningTicket(t: AcknowledgedTicket, chain: HoprCoreEthereum): Promise<void>
-  shouldCommitToChannel(c: ChannelEntry): Promise<boolean>
+  shouldCommitToChannel(c: ChannelEntry): boolean
 
   tickInterval: number
 }
@@ -63,7 +71,7 @@ export abstract class SaneDefaults {
     }
   }
 
-  async shouldCommitToChannel(c: ChannelEntry): Promise<boolean> {
+  shouldCommitToChannel(c: ChannelEntry): boolean {
     log(`committing to channel ${c.getId().toHex()}`)
     return true
   }
@@ -80,9 +88,9 @@ abstract class RustStrategyWrapper<T extends { tick, name }> extends SaneDefault
     super()
   }
 
-  tick(balance: BN, network_peer_ids: Iterator<string>, outgoing_channel_peer_ids: string[], peer_quality: (string) => number)
+  tick(balance: BN, network_peer_ids: Iterator<string>, outgoing_channels: OutgoingChannelStatus[], peer_quality: (string) => number)
   {
-    return this.strategy.tick(new Balance(balance.toString()), network_peer_ids, outgoing_channel_peer_ids, peer_quality)
+    return this.strategy.tick(new Balance(balance.toString()), network_peer_ids, outgoing_channels, peer_quality)
   }
 
   get name() {

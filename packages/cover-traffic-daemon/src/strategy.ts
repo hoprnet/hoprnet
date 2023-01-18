@@ -1,7 +1,7 @@
-import { type StrategyTickResult, SaneDefaults, type ChannelStrategyInterface } from '@hoprnet/hopr-core'
+import { StrategyTickResult, SaneDefaults, type ChannelStrategyInterface } from '@hoprnet/hopr-core'
 import Hopr from '@hoprnet/hopr-core'
-import type BN from 'bn.js'
-import { type PublicKey, type ChannelEntry, ChannelStatus } from '@hoprnet/hopr-utils'
+import BN from 'bn.js'
+import { PublicKey, ChannelStatus } from '@hoprnet/hopr-utils'
 import type { PersistedState, State } from './state.js'
 import { findCtChannelOpenTime, sendCTMessage } from './utils.js'
 import {
@@ -15,6 +15,7 @@ import {
   CT_OPEN_CHANNEL_QUALITY_THRESHOLD
 } from './constants.js'
 import { debug } from '@hoprnet/hopr-utils'
+import { OutgoingChannelStatus } from '@hoprnet/hopr-core/lib/core_strategy.js'
 
 const log = debug('hopr:cover-traffic')
 
@@ -23,6 +24,8 @@ type CtChannel = {
   latestQualityOf: number
   openFrom: number
 }
+
+const MAX_CT_AUTO_CHANNELS: number = 100;
 
 export class CoverTrafficStrategy extends SaneDefaults implements ChannelStrategyInterface {
   name = 'covertraffic'
@@ -41,57 +44,50 @@ export class CoverTrafficStrategy extends SaneDefaults implements ChannelStrateg
    * Also returns a list of ct channels.
    * @param state current persisted state
    * @param currentChannels recent payment channel graph
-   * @param peers known peers in the network
+   * @param peerQuality peer quality evaluator
    * @returns
    */
   revisitTopology(
     state: State,
-    currentChannels: ChannelEntry[],
-    peers: Hopr['networkPeers']
+    currentChannels: OutgoingChannelStatus[],
+    peerQuality: (string) => number
   ): {
     ctChannels: CtChannel[]
     tickResult: StrategyTickResult
   } {
-    const tickResult: StrategyTickResult = { toOpen: [], toClose: [] }
+    let channelsToClose = []
     const ctChannels: CtChannel[] = []
 
     for (let channel of currentChannels) {
-      if (channel.status === ChannelStatus.Closed) {
-        continue
-      }
-      const quality = peers.qualityOf(channel.destination.toPeerId())
+
+      const peerPubkey = PublicKey.fromPeerIdString(channel.peer_id)
+      const quality = peerQuality(channel.peer_id)
       ctChannels.push({
-        destination: channel.destination,
+        destination: peerPubkey,
         latestQualityOf: quality,
-        openFrom: findCtChannelOpenTime(channel.destination, state)
+        openFrom: findCtChannelOpenTime(peerPubkey, state)
       })
 
       // Cover traffic channels with quality below this threshold will be closed
       if (quality < CT_NETWORK_QUALITY_THRESHOLD) {
-        log(`closing channel ${channel.destination.toString()} with quality < ${CT_NETWORK_QUALITY_THRESHOLD}`)
-        tickResult.toClose.push({
-          destination: channel.destination
-        })
+        log(`closing channel ${channel.peer_id} with quality < ${CT_NETWORK_QUALITY_THRESHOLD}`)
+        channelsToClose.push(channel.peer_id)
       }
       // If the HOPR token balance of the current CT node is no larger than the `MINIMUM_STAKE_BEFORE_CLOSURE`, close all the non-closed channels.
-      if (channel.balance.toBN().lt(MINIMUM_STAKE_BEFORE_CLOSURE)) {
-        log(`closing channel with balance too low ${channel.destination.toString()}`)
-        tickResult.toClose.push({
-          destination: channel.destination
-        })
+      if (new BN(channel.stake_str).lt(MINIMUM_STAKE_BEFORE_CLOSURE)) {
+        log(`closing channel with balance too low ${channel.peer_id}`)
+        channelsToClose.push(channel.peer_id)
       }
       // Close the cover-traffic channel when the number of failed messages meets the threshold. Reset the failed message counter.
-      if (this.data.messageFails(channel.destination) > MESSAGE_FAIL_THRESHOLD) {
-        log(`closing channel with too many message fails: ${channel.destination.toString()}`)
-        this.data.resetMessageFails(channel.destination)
-        tickResult.toClose.push({
-          destination: channel.destination
-        })
+      if (this.data.messageFails(peerPubkey) > MESSAGE_FAIL_THRESHOLD) {
+        log(`closing channel with too many message fails: ${channel.peer_id}`)
+        this.data.resetMessageFails(peerPubkey)
+        channelsToClose.push(channel.peer_id)
       }
     }
 
     return {
-      tickResult,
+      tickResult: new StrategyTickResult(MAX_CT_AUTO_CHANNELS, [], channelsToClose),
       ctChannels
     }
   }
@@ -100,28 +96,31 @@ export class CoverTrafficStrategy extends SaneDefaults implements ChannelStrateg
    * Go through network state and get arrays of channels to be opened/closed
    * Called in `tickChannelStrategy` in `hopr-core`
    * @param balance HOPR token balance of the current node
+   * @param _peers
    * @param currentChannels All the channels that have ever been opened with the current node as `source`
-   * @param peers All the peers detected (destination of channels ever existed, destination of channels to be created, and peers connected through libp2p)
-   * @param _getRandomChannel Method to get a random open channel
+   * @param peerQuality Peer quality evaluator
    * @returns Array of channels to be opened and channels to be closed.
    */
-  async tick(
+  tick(
     balance: BN,
-    currentChannels: ChannelEntry[],
-    peers: Hopr['networkPeers'],
-    _getRandomChannel: () => Promise<ChannelEntry>
-  ): Promise<StrategyTickResult> {
+    _peers: Iterator<string>,
+    currentChannels: OutgoingChannelStatus[],
+    peerQuality: (string) => number
+  ): StrategyTickResult {
     log(`tick, balance ${balance.toString()}`)
     const state = this.data.get()
 
     // Refresh open channels.
-    const { tickResult, ctChannels } = this.revisitTopology(state, currentChannels, peers)
+    const { tickResult, ctChannels } = this.revisitTopology(state, currentChannels, peerQuality)
 
     this.data.setCTChannels(ctChannels)
     log(
       'channels',
       ctChannels.map((c: CtChannel) => `${c.destination.toString()} - ${c.latestQualityOf}, ${c.openFrom}`).join('; ')
     )
+
+    let toOpen: OutgoingChannelStatus[] = [...tickResult.to_open()]
+    let toClose: string[] = [...tickResult.to_close()]
 
     // Network must have at least some channels to create a full cover-traffic loop.
     if (this.data.openChannelCount() > CT_INTERMEDIATE_HOPS + 1) {
@@ -154,9 +153,7 @@ export class CoverTrafficStrategy extends SaneDefaults implements ChannelStrateg
           if (Date.now() - openChannel.openFrom >= CT_CHANNEL_STALL_TIMEOUT) {
             // handle waiting for commitment stalls
             log('channel is stalled in WAITING_FOR_COMMITMENT, closing', openChannel.destination.toString())
-            tickResult.toClose.push({
-              destination: openChannel.destination
-            })
+            toClose.push(openChannel.destination.toPeerId().toString())
           } else {
             log('channel is WAITING_FOR_COMMITMENT, waiting', openChannel.destination.toString())
           }
@@ -185,13 +182,13 @@ export class CoverTrafficStrategy extends SaneDefaults implements ChannelStrateg
     ) {
       attempts++
       const choice = this.data.weightedRandomChoice()
-      const quality = peers.qualityOf(choice.toPeerId())
+      const quality = peerQuality(choice.toPeerId().toString())
       // Ignore the randomly chosen node, if it's the cover traffic node itself, or a non-closed channel exists
       if (
         ctChannels.find((x: CtChannel) => x.destination.eq(choice)) ||
         choice.eq(this.selfPub) ||
-        tickResult.toOpen.find((x: StrategyTickResult['toOpen'][number]) => x.destination.eq(choice)) ||
-        tickResult.toClose.find((x: StrategyTickResult['toClose'][number]) => x.destination.eq(choice))
+        toOpen.find((x) => x.peer_id == choice.toPeerId().toString()) ||
+        toClose.find((x) => x == choice.toPeerId().toString())
       ) {
         //console.error('skipping node', c.toB58String())
         continue
@@ -204,20 +201,16 @@ export class CoverTrafficStrategy extends SaneDefaults implements ChannelStrateg
 
       log(`opening ${choice.toString()}`)
       currentChannelNum++
-      tickResult.toOpen.push({
-        destination: choice,
-        stake: CHANNEL_STAKE
-      })
+      toOpen.push(new OutgoingChannelStatus(choice.toPeerId().toString(), CHANNEL_STAKE.toString()))
     }
 
     log(
-      `strategy tick: ${Date.now()} balance:${balance.toString()} open:${tickResult.toOpen
-        .map((p: StrategyTickResult['toOpen'][number]) => p.destination.toPeerId().toString())
-        .join(',')} close: ${tickResult.toClose
-        .map((p: StrategyTickResult['toClose'][number]) => p.destination.toPeerId().toString())
-        .join(',')}`.replace('\n', ', ')
+      `strategy tick: ${Date.now()} balance:${balance.toString()} open:${toOpen
+        .map((p) => p.peer_id)
+        .join(',')} close: ${toClose.join(',')}`
+        .replace('\n', ', ')
     )
-    return tickResult
+    return new StrategyTickResult(MAX_CT_AUTO_CHANNELS, toOpen, toClose)
   }
 
   async onWinningTicket() {
