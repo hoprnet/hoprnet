@@ -1,4 +1,3 @@
-use utils_types::channels::ChannelEntry;
 use utils_types::primitives::{BaseBalance, Balance};
 
 use crate::generic::{OutgoingChannelStatus, ChannelStrategy, StrategyTickResult};
@@ -8,20 +7,23 @@ use crate::generic::{OutgoingChannelStatus, ChannelStrategy, StrategyTickResult}
 /// At the same time, it closes channels opened to peers whose quality dropped below this threshold.
 pub struct PromiscuousStrategy {
     network_quality_threshold: f64,
-    minimum_channel_stake: Balance,
+    new_channel_stake: Balance,
+    minimum_channel_balance: Balance,
     minimum_node_balance: Balance
 }
 
 impl Default for PromiscuousStrategy {
 
     /// Creates promiscuous strategy with default parameters,
-    /// that is quality threshold 0.5, minimum channel stake 0.1 txHOPR and
+    /// that is quality threshold 0.5, new channel stake 0.1 txHOPR,
+    /// minimum channel balance to 0.01 txHOPR (meaning an auto-channel can be used for 10 msgs)
     /// minimum token balance on the node should not drop below 0.1 txHOPR.
     fn default() -> Self {
         PromiscuousStrategy {
             network_quality_threshold: 0.5,
-            minimum_channel_stake: Balance::from_str("100000000000000000").unwrap(),
-            minimum_node_balance: Balance::from_str("100000000000000000").unwrap()
+            new_channel_stake:       Balance::from_str("100000000000000000").unwrap(),
+            minimum_channel_balance: Balance::from_str("10000000000000000").unwrap(),
+            minimum_node_balance:    Balance::from_str("100000000000000000").unwrap()
         }
     }
 }
@@ -35,20 +37,33 @@ impl ChannelStrategy for PromiscuousStrategy {
         let mut to_close: Vec<String> = vec![];
         let mut new_channel_candidates: Vec<(String, f64)> = vec![];
         let mut network_size: usize = 0;
+        let mut closed_due_to_quality: usize = 0;
 
         // Go through all the peer ids we know, get their qualities and find out which channels should be closed and
         // which peer ids should become candidates for a new channel
+        // Also re-open all the channels that have dropped under minimum given balance
         for peer_id in peer_ids {
-            let quality = quality_of(peer_id.as_str()).unwrap_or(0f64);
-
-            let has_channel_with_peer = outgoing_channels.iter()
-                .find(|c| c.peer_id.eq(&peer_id.as_str()))
-                .is_some();
-
-            if quality <= self.network_quality_threshold && has_channel_with_peer {
-                to_close.push(peer_id.to_string());
+            // Skip this peer if we already processed it (iterator may have duplicates)
+            if to_close.contains(&peer_id) || new_channel_candidates.iter().find(|(p,_)| p.eq(&peer_id)).is_some() {
+                continue;
             }
-            else if quality >= self.network_quality_threshold && !has_channel_with_peer {
+
+            // Retrieve quality of that peer and any channels we have opened with it
+            let quality = quality_of(peer_id.as_str()).unwrap_or(0f64);
+            let channel_with_peer = outgoing_channels.iter()
+                .find(|c| c.peer_id.eq(&peer_id.as_str()));
+
+            if let Some(channel) = channel_with_peer {
+                if quality <= self.network_quality_threshold {
+                    to_close.push(peer_id.to_string());
+                    closed_due_to_quality = closed_due_to_quality + 1;
+                }
+                else if channel.stake.lt(&self.minimum_channel_balance) {
+                    to_close.push(peer_id.to_string());
+                    new_channel_candidates.push((peer_id.to_string(), quality));
+                }
+            }
+            else if quality >= self.network_quality_threshold {
                 new_channel_candidates.push((peer_id.to_string(), quality));
             }
 
@@ -62,6 +77,7 @@ impl ChannelStrategy for PromiscuousStrategy {
         new_channel_candidates.sort_unstable_by(|(_, q1), (_, q2)| q1.partial_cmp(q2).unwrap().reverse() );
         new_channel_candidates.truncate(max_auto_channels - (outgoing_channels.len() - to_close.len()));
 
+        // Go through the new candidates for opening channels allow them to open based on our available node balance
         let mut to_open: Vec<OutgoingChannelStatus> = vec![];
         let mut remaining_balance = balance.clone();
         for peer_id in new_channel_candidates.into_iter().map(|(p,_)| p)  {
@@ -74,9 +90,9 @@ impl ChannelStrategy for PromiscuousStrategy {
             if to_open.iter().find(|&p| p.peer_id.eq(&peer_id)).is_none() {
                 to_open.push(OutgoingChannelStatus {
                     peer_id,
-                    stake: self.minimum_channel_stake.clone()
+                    stake: self.new_channel_stake.clone()
                 });
-                remaining_balance = balance.sub(&self.minimum_channel_stake);
+                remaining_balance = balance.sub(&self.new_channel_stake);
             }
         }
 
@@ -102,9 +118,16 @@ mod tests {
             ("Bob".to_string(), 0.7),
             ("Charlie".to_string(), 0.9),
             ("Dahlia".to_string(), 0.1),
-            ("Eugene".to_string(), 0.8)]);
+            ("Eugene".to_string(), 0.8),
+            ("Felicia".to_string(), 0.3),
+            ("Gustave".to_string(), 1.0),
+            ("Heather".to_string(), 0.1),
+            ("Ian".to_string(), 0.2),
+            ("Kate".to_string(), 0.3)
+        ]);
 
-        let balance = Balance::from_str("1000000000000000000").unwrap();
+        let balance     = Balance::from_str("1000000000000000000").unwrap();
+        let low_balance = Balance::from_str("1000000000000000").unwrap();
 
         let outgoing_channels = vec![
             OutgoingChannelStatus {
@@ -115,25 +138,31 @@ mod tests {
                 peer_id: "Charlie".to_string(),
                 stake: balance.clone()
             },
+            OutgoingChannelStatus {
+                peer_id: "Gustave".to_string(),
+                stake: low_balance
+            }
         ];
 
         let results = strat.tick(balance, peers.iter().map(|x| x.0.clone()), outgoing_channels, |s| peers.get(s).copied());
 
-        assert_eq!(results.max_auto_channels(), 3);
+        assert_eq!(results.max_auto_channels(), 4);
 
-        assert_eq!(results.to_close().len(), 1);
-        assert_eq!(results.to_open().len(), 2);
+        assert_eq!(results.to_close().len(), 2);
+        assert_eq!(results.to_open().len(), 3);
 
-        assert_eq!(results.to_open()[0].peer_id, "Eugene".to_string());
-        assert_eq!(results.to_open()[1].peer_id, "Bob".to_string());
-        assert_eq!(results.to_close()[0], "Alice".to_string());
+        assert!(results.to_close().contains(&"Alice".to_string()));
+        assert!(results.to_close().contains(&"Gustave".to_string()));
+
+        assert_eq!(results.to_open()[0].peer_id, "Gustave".to_string());
+        assert_eq!(results.to_open()[1].peer_id, "Eugene".to_string());
+        assert_eq!(results.to_open()[2].peer_id, "Bob".to_string());
     }
 }
 
 /// WASM bindings
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use js_sys::JsString;
     use wasm_bindgen::prelude::*;
 
     use utils_types::primitives::wasm::Balance;
@@ -150,12 +179,13 @@ pub mod wasm {
     impl PromiscuousStrategy {
 
         #[wasm_bindgen(constructor)]
-        pub fn new(network_quality_threshold: f64, minimum_node_balance: Balance, minimum_channel_stake: Balance) -> Self {
+        pub fn new(network_quality_threshold: f64, minimum_node_balance: Balance, new_channel_stake: Balance, minimum_channel_balance: Balance) -> Self {
             PromiscuousStrategy {
                 w: super::PromiscuousStrategy {
                     network_quality_threshold,
                     minimum_node_balance: minimum_node_balance.w,
-                    minimum_channel_stake: minimum_channel_stake.w
+                    new_channel_stake: new_channel_stake.w,
+                    minimum_channel_balance: minimum_channel_balance.w
                 }
             }
         }
