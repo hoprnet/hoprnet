@@ -12,6 +12,8 @@ default = ["console_error_panic_hook", "wasm"]
 wasm = ["dep:wasm-bindgen"]
 
 [dependencies]
+utils-misc = { path = "../../../utils/crates/utils-misc" }
+
 ethnum = "1.3.2"
 hex = "0.4.3"
 

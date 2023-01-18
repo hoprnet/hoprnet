@@ -23,8 +23,9 @@ pub mod wasm {
     use crate::generic::ChannelStrategy;
 
     use utils_types::primitives::wasm::Balance;
+    use utils_misc::utils::wasm::JsResult;
 
-    use crate::generic::wasm::{JsResult, StrategyTickResult};
+    use crate::generic::wasm::StrategyTickResult;
 
     #[wasm_bindgen]
     pub struct PassiveStrategy {

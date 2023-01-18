@@ -37,7 +37,6 @@ impl ChannelStrategy for PromiscuousStrategy {
         let mut to_close: Vec<String> = vec![];
         let mut new_channel_candidates: Vec<(String, f64)> = vec![];
         let mut network_size: usize = 0;
-        let mut closed_due_to_quality: usize = 0;
 
         // Go through all the peer ids we know, get their qualities and find out which channels should be closed and
         // which peer ids should become candidates for a new channel
@@ -56,7 +55,6 @@ impl ChannelStrategy for PromiscuousStrategy {
             if let Some(channel) = channel_with_peer {
                 if quality <= self.network_quality_threshold {
                     to_close.push(peer_id.to_string());
-                    closed_due_to_quality = closed_due_to_quality + 1;
                 }
                 else if channel.stake.lt(&self.minimum_channel_balance) {
                     to_close.push(peer_id.to_string());
@@ -167,9 +165,10 @@ pub mod wasm {
     use wasm_bindgen::prelude::*;
 
     use utils_types::primitives::wasm::Balance;
+    use utils_misc::utils::wasm::JsResult;
 
     use crate::generic::ChannelStrategy;
-    use crate::generic::wasm::{JsResult, StrategyTickResult};
+    use crate::generic::wasm::StrategyTickResult;
 
     #[wasm_bindgen]
     pub struct PromiscuousStrategy {

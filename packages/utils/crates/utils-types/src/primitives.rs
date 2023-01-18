@@ -127,16 +127,14 @@ mod tests {
 /// Module for WASM wrappers of Rust code
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use std::fmt::Display;
-    use std::str::FromStr;
-    use ethnum::u256;
     use wasm_bindgen::prelude::*;
 
-    use crate::primitives::BaseBalance;
+    use std::str::FromStr;
+    use ethnum::u256;
+    use utils_misc::utils::wasm::JsResult;
+    use utils_misc::ok_or_jserr;
 
-    fn as_jsvalue<T>(v: T) -> JsValue where T: Display {
-        JsValue::from(v.to_string())
-    }
+    use crate::primitives::BaseBalance;
 
     #[wasm_bindgen]
     pub struct Balance {
@@ -155,10 +153,10 @@ pub mod wasm {
     #[wasm_bindgen]
     impl Balance {
         #[wasm_bindgen(constructor)]
-        pub fn new(value: &str) -> Result<Balance, JsValue> {
+        pub fn new(value: &str) -> JsResult<Balance> {
             Ok(Self {
                 w: super::Balance {
-                    value: u256::from_str(value).map_err(as_jsvalue)?
+                    value: ok_or_jserr!(u256::from_str(value))?
                 }
             })
         }

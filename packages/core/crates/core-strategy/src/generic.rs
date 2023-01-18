@@ -86,10 +86,10 @@ pub mod wasm {
     use crate::generic::ChannelStrategy;
 
     use utils_types::primitives::wasm::Balance;
+    use utils_misc::utils::wasm::JsResult;
+    use utils_misc::ok_or_jserr;
 
     use serde::{Serialize, Deserialize};
-
-    pub type JsResult<T> = Result<T, JsValue>;
 
     #[wasm_bindgen(getter_with_clone)]
     #[derive(Serialize, Deserialize)]
@@ -118,13 +118,20 @@ pub mod wasm {
         pub fn max_auto_channels(&self) -> usize { self.w.max_auto_channels }
 
         pub fn to_open(&self) -> JsResult<JsValue> {
-            let ret: Vec<OutgoingChannelStatus> = self.w.to_open().iter().map(|s| OutgoingChannelStatus::from(s)).collect();
-            serde_wasm_bindgen::to_value(&ret)
-                .map_err(|e| JsValue::from(e.to_string()))
+            let ret: Vec<OutgoingChannelStatus> = self.w
+                .to_open()
+                .iter()
+                .map(|s| OutgoingChannelStatus::from(s)).collect();
+
+            ok_or_jserr!(serde_wasm_bindgen::to_value(&ret))
         }
 
         pub fn to_close(&self) -> Vec<JsString> {
-            self.w.to_close().iter().map(|s| JsString::from(s.clone())).collect()
+            self.w
+                .to_close()
+                .iter()
+                .map(|s| JsString::from(s.clone()))
+                .collect()
         }
     }
 
