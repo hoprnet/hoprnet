@@ -1,5 +1,5 @@
 # Use local foundry directory (for binaries)
-FOUNDRY_DIR := ${CURDIR}/../../../.foundry
+FOUNDRY_DIR ?= ${CURDIR}/../../../.foundry
 
 # add local Foundry install path (only once)
 PATH := $(subst :${FOUNDRY_DIR}/bin,,$(PATH)):${FOUNDRY_DIR}/bin

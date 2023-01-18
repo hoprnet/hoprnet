@@ -29,7 +29,8 @@ usage() {
   msg
 }
 
-declare image_version package_version releases branch force no_tags local_build image_name
+declare image_version package_version releases branch force no_tags local_build
+declare image_name=""
 
 while (( "$#" )); do
   case "$1" in
@@ -114,7 +115,7 @@ build_and_tag_images() {
       docker build -q -t hopr-pluto-local \
         --build-arg=ANVIL_IMAGE="hopr-anvil-local" \
         --build-arg=HOPRD_IMAGE="hoprd-local" \
-        -f scripts/pluto/Dockerfile &
+        -f scripts/pluto/Dockerfile . &
     fi
 
     log "Waiting for Docker builds (part 2) to finish"

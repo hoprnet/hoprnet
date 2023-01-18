@@ -15,7 +15,9 @@ WORKDIR /app
 
 COPY --from=hoprd /app/hoprnet ./hoprnet
 
-COPY scripts /app/anvil/scripts
+COPY packages/ethereum/contracts ./anvil/packages/ethereum/contracts
+COPY scripts/ ./anvil/scripts
+COPY Makefile ./anvil/
 
 # anvil RPC port
 EXPOSE 8545

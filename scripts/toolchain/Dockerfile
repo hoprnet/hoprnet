@@ -7,8 +7,22 @@ WORKDIR /app/hoprnet-toolchain
 
 RUN mkdir -p scripts/toolchain
 
-# python, perl are used by some nodejs dependencies as an installation requirement
-RUN apk add --no-cache bash build-base ca-certificates jq curl git
+# install glibc for alpine to be compatible with libc-based software
+ENV GLIBC_REPO=https://github.com/sgerrand/alpine-pkg-glibc
+ENV GLIBC_VERSION=2.34-r0
+
+RUN apk add --no-cache --update \
+      bash build-base ca-certificates jq curl git libstdc++ lsof && \
+    for pkg in glibc-${GLIBC_VERSION} glibc-bin-${GLIBC_VERSION}; do \
+      curl -sSL ${GLIBC_REPO}/releases/download/${GLIBC_VERSION}/${pkg}.apk -o /tmp/${pkg}.apk; \
+    done && \
+    apk add --force-overwrite --allow-untrusted /tmp/*.apk && \
+    apk fix --force-overwrite alpine-baselayout-data && \
+    rm -v /tmp/*.apk && \
+    /usr/glibc-compat/sbin/ldconfig /lib /usr/glibc-compat/lib && \
+    echo 'hosts: files mdns4_minimal [NOTFOUND=return] dns mdns4' >> /etc/nsswitch.conf
+    #ln -s /lib/glibc-compat/lib/ld-linux-x86-64.so.2 /lib/ && \
+    #ln -s /lib/glibc-compat/lib64/ld-linux-x86-64.so.2 /lib64/
 
 # Gets yarn executable
 COPY .yarn .yarn/

@@ -6,8 +6,10 @@ FROM ${HOPR_TOOLCHAIN_IMAGE} as build
 
 WORKDIR /app/hoprnet
 
-COPY .yarn/ .yarn/
-COPY .cargo .cargo/
+RUN mv /app/hoprnet-toolchain/.cargo . && \
+    mv /app/hoprnet-toolchain/.yarn .
+
+COPY .cargo/config.toml .cargo/
 COPY vendor vendor/
 COPY packages packages/
 COPY Makefile Cargo.toml Cargo.lock .yarnrc.yml yarn.lock package.json tsconfig.build.json tsconfig.json tsconfig.scripts.json yarn.lock rust-toolchain.toml ./
@@ -49,7 +51,7 @@ RUN apk add --no-cache tini libc6-compat bash curl tar jq xz libstdc++ && \
     apk del bash curl tar jq xz && \
     # Remove unused files and config
     rm -R scripts .nvmrc && \
-    # symlink required to get WRTC to work
+    # symlink required to get WRTC and other glibc-based tools to work
     ln -s /lib/libc.musl-x86_64.so.1 /lib/ld-linux-x86-64.so.2 && \
     # create directory which is later used for the database, so that it inherits
     # permissions when mapped to a volume

@@ -239,12 +239,11 @@ cleanup_local_protocol_config "${protocol_config}" "anvil-localhost2"
 
 # --- Running Mock Blockchain --- {{{
 log "Running anvil local node"
-make -C "${mydir}/.." run-anvil > \
-    "${anvil_rpc_log}" 2>&1 &
+make -C "${mydir}/.." run-anvil
 
 log "Wait for regex"
 wait_for_regex ${anvil_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
-log "Hardhat node started (127.0.0.1:8545)"
+log "Anvil node started (127.0.0.1:8545)"
 
 # need to mirror contract data because of anvil-deploy node only writing to localhost
 update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost"

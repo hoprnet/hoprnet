@@ -10,7 +10,7 @@ CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(cra
 FOUNDRY_TOOL_CRATE := ./packages/ethereum/foundry-tool
 
 # Set local foundry directory (for binaries) and versions
-FOUNDRY_DIR := ${CURDIR}/.foundry
+FOUNDRY_DIR ?= ${CURDIR}/.foundry
 FOUNDRY_VSN := be7084e
 
 # Set local cargo directory (for binaries)
@@ -52,6 +52,8 @@ all: help
 $(CRATES): ## builds all Rust crates with wasm-pack (except for foundry-tool)
 # --out-dir is relative to working directory
 	echo "use wasm-pack build"
+	which wasm-pack
+	wasm-pack --version
 	wasm-pack build --target=bundler --out-dir ./pkg $@
 
 .PHONY: $(FOUNDRY_TOOL_CRATE)
@@ -217,7 +219,11 @@ lint-fix: ## run linter in fix mode
 
 .PHONY: run-anvil
 run-anvil: ## spinup a local anvil instance (daemon) and deploy contracts
-	./script/run-local-anvil.sh
+	./scripts/run-local-anvil.sh
+
+.PHONY: run-anvil-foreground
+run-anvil-foreground: ## spinup a local anvil instance
+	./scripts/run-local-anvil.sh -f -s
 
 .PHONY: kill-anvil
 kill-anvil: ## kill process running at port 8545 (default port of anvil)

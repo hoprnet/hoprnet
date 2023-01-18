@@ -15,8 +15,8 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 # - Node.js -> /usr/local/bin
 # - Yarn -> /usr/local/bin + /opt/yarn-v${version}
 # - Typescript + related utilities, such as ts-node -> ${mydir}/node_modules
-# - Rust (rustc, cargo) -> $HOME/.cargo/bin
-# - wasm-pack + wasm-opt, necessary to build WebAssembly modules -> $HOME/.cargo/bin
+# - Rust (rustc, cargo) -> ./../../.cargo/bin
+# - wasm-pack + wasm-opt, necessary to build WebAssembly modules -> ./../../.cargo/bin
 #
 # Supposed to work for
 #   x86_64: Docker + Alpine
@@ -36,7 +36,9 @@ function usage() {
   msg
 }
 
-export PATH=${PATH}:${mydir}/../../.cargo/bin
+# Set PATH such that `cargo` is available within this script
+export CARGO_BIN_DIR="${mydir}/../../.cargo/bin"
+export PATH=${PATH}:${CARGO_BIN_DIR}
 
 declare install_all with_yarn
 install_all="true"
@@ -87,8 +89,6 @@ function install_rustup() {
         echo "Installing Rustup"
         # Get rustup but install toolchain later
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- ----no-modify-path --default-toolchain none -y
-        # Set PATH such that `cargo` is available within this script
-        PATH=${PATH}:${HOME}/.cargo/bin
     fi
 }
 
@@ -127,9 +127,9 @@ function install_wasm_pack() {
         esac
         curl -fsSLO --compressed "https://github.com/rustwasm/wasm-pack/releases/download/${wasm_pack_release}/wasm-pack-${wasm_pack_release}-${cputype}-${ostype}.tar.gz"
         tar -xzf "wasm-pack-${wasm_pack_release}-${cputype}-${ostype}.tar.gz"
-        local install_dir="${HOME}/.cargo"
-        mkdir -p "${install_dir}/bin"
-        cp "wasm-pack-${wasm_pack_release}-${cputype}-${ostype}/wasm-pack" "${install_dir}/bin"
+        local install_dir="${CARGO_BIN_DIR}"
+        mkdir -p "${install_dir}"
+        cp "wasm-pack-${wasm_pack_release}-${cputype}-${ostype}/wasm-pack" "${install_dir}"
         cd ${mydir}
     fi
 }
@@ -157,9 +157,9 @@ function install_wasm_opt() {
         local binaryen_release="version_$(echo "${wasm_opt_release}" | awk -F. '{ print $2; }')"
         curl -fsSLO --compressed "https://github.com/WebAssembly/binaryen/releases/download/${binaryen_release}/binaryen-${binaryen_release}-${cputype}-${ostype}.tar.gz"
         tar -xzf "binaryen-${binaryen_release}-${cputype}-${ostype}.tar.gz"
-        local install_dir="${HOME}/.cargo"
-        mkdir -p "${install_dir}/bin"
-        cp "binaryen-${binaryen_release}/bin/wasm-opt" "${install_dir}/bin"
+        local install_dir="${CARGO_BIN_DIR}"
+        mkdir -p "${install_dir}"
+        cp "binaryen-${binaryen_release}/bin/wasm-opt" "${install_dir}"
         cp -R "binaryen-${binaryen_release}/lib" "${install_dir}"
         cd ${mydir}
     fi
