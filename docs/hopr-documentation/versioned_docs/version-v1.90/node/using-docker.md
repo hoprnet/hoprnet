@@ -141,7 +141,7 @@ Otherwise, the installation process is complete! You can proceed to our [hopr-ad
 
 When migrating between releases, Docker users need to either move their identity file to the newly specified location or edit the command to point to their old location. Otherwise, you will be running a new node instead of accessing your old node's information. 
 
-For example, when we update from version `1.90.68`, which is internally known as `Valencia` to `1.91.24`, which is internally known as `Bogota`, the command will change as such:
+For example, when we update from version `1.90.68`, which is internally known as `Valencia` to `1.91.24`, which is internally known as `Bogota`, the location the command points to will change as such:
 
 1.) `$HOME/.hoprd-db-valencia` to `$HOME/.hoprd-db-bogota`
 2.) `$HOME/.hoprd-db-valencia/.hopr-id-valencia` to `$HOME/.hoprd-db-bogota/.hopr-id-bogota`
@@ -162,6 +162,8 @@ Following the above example of migration from Valencia to Bogota, you would just
 ```bash
 docker run --pull always --restart on-failure -m 2g -ti -v $HOME/.hoprd-db-valencia:/app/hoprd-db -p 9091:9091 -p 3000:3000 -p 3001:3001 -e DEBUG="hopr*" gcr.io/hoprassociation/hoprd:bogota --environment monte_rosa --init --api --admin --identity /app/hoprd-db/.hopr-id-valencia --data /app/hoprd-db --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --apiHost "0.0.0.0" --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --healthCheck --healthCheckHost "0.0.0.0"
 ```
+
+This also works fine as long as the other flags and details remain the same.
 
 ## Default ports
 
