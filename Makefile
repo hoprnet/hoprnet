@@ -10,7 +10,7 @@ CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(cra
 FOUNDRY_TOOL_CRATE := ./packages/ethereum/foundry-tool
 
 # Set local foundry directory (for binaries) and versions
-FOUNDRY_DIR := ${CURDIR}/.foundry
+FOUNDRY_DIR ?= ${CURDIR}/.foundry
 FOUNDRY_VSN := be7084e
 
 # Set local cargo directory (for binaries)
@@ -217,7 +217,11 @@ lint-fix: ## run linter in fix mode
 
 .PHONY: run-anvil
 run-anvil: ## spinup a local anvil instance (daemon) and deploy contracts
-	./script/run-local-anvil.sh
+	./scripts/run-local-anvil.sh
+
+.PHONY: run-anvil-foreground
+run-anvil-foreground: ## spinup a local anvil instance
+	./scripts/run-local-anvil.sh -f -s
 
 .PHONY: kill-anvil
 kill-anvil: ## kill process running at port 8545 (default port of anvil)
@@ -233,9 +237,10 @@ run-local: ## run HOPRd from local repo
 		--testPreferLocalAddresses --disableApiAuthentication
 
 .PHONY: fund-local
+fund-local: id_dir=.
 fund-local: ## use faucet script to fund local identities
 	foundry-tool --environment-name anvil-localhost --environment-type development \
-		faucet --password local --use-local-identities --identity-directory "." \
+		faucet --password local --use-local-identities --identity-directory "${id_dir}" \
 		--private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 		--make-root "./packages/ethereum/contracts"
 
