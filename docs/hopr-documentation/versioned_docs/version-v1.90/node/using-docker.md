@@ -140,7 +140,7 @@ Otherwise, the installation process is complete! You can proceed to our [hopr-ad
 
 ## Updating to a new release
 
-When migrating between releases, Docker users need to either move their identity file to the newly specified location or edit the command to point to their old location. Otherwise, you will be running a new node instead of accessing your old node's information. 
+When migrating between releases, Docker users need to either move their identity file to the newly specified location or edit the command to point to their old location. Otherwise, you will be running a new node instead of accessing your old node's information.
 
 For example, when we update from version `1.90.68`, which is internally known as `Valencia` to `1.91.24`, which is internally known as `Bogota`, the location the command points to will change as such:
 
