@@ -1,8 +1,5 @@
 import HoprCoreEthereum, { type ChannelEntry } from '@hoprnet/hopr-core-ethereum'
-import {
-  type AcknowledgedTicket,
-  debug
-} from '@hoprnet/hopr-utils'
+import { type AcknowledgedTicket, debug } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { CHECK_TIMEOUT } from './constants.js'
 
@@ -82,14 +79,17 @@ export abstract class SaneDefaults {
 /**
   Temporary wrapper class before we migrate rest of the core to use Rust exported types (before we migrate everything to Rust!)
  */
-abstract class RustStrategyWrapper<T extends { tick, name }> extends SaneDefaults implements ChannelStrategyInterface {
-
+abstract class RustStrategyWrapper<T extends { tick; name }> extends SaneDefaults implements ChannelStrategyInterface {
   protected constructor(private strategy: T) {
     super()
   }
 
-  tick(balance: BN, network_peer_ids: Iterator<string>, outgoing_channels: OutgoingChannelStatus[], peer_quality: (string) => number)
-  {
+  tick(
+    balance: BN,
+    network_peer_ids: Iterator<string>,
+    outgoing_channels: OutgoingChannelStatus[],
+    peer_quality: (string) => number
+  ) {
     return this.strategy.tick(new Balance(balance.toString()), network_peer_ids, outgoing_channels, peer_quality)
   }
 
