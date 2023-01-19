@@ -148,6 +148,7 @@ pub mod wasm {
         ) -> JsResult<StrategyTickResult> {
             let open: Vec<OutgoingChannelStatus> =
                 ok_or_jserr!(serde_wasm_bindgen::from_value(to_open))?;
+
             Ok(StrategyTickResult {
                 w: super::StrategyTickResult::new(
                     max_auto_channels as usize,
