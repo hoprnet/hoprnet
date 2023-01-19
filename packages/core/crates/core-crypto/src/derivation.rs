@@ -16,7 +16,7 @@ pub fn derive_commitment_seed(private_key: &[u8], channel_info: &[u8]) -> Result
     let hkdf = SimpleHkdf::<Blake2s256>::from_prk(private_key)
         .map_err(|_| InvalidInputValue)?;
 
-    let mut generated_key = [0u8; parameters::SECRET_KEY_LENGTH];
+    let mut generated_key = [0u8; SECRET_KEY_LENGTH];
 
     hkdf.expand(parameters::HASH_KEY_COMMITMENT_SEED.as_bytes(), &mut generated_key)
         .map_err(|_| InvalidInputValue)?;
@@ -92,8 +92,8 @@ mod tests {
     #[test]
     fn test_derive_commitment_seed() {
 
-        let priv_key = [0u8; parameters::SECRET_KEY_LENGTH];
-        let chinfo = [0u8; parameters::SECRET_KEY_LENGTH];
+        let priv_key = [0u8; SECRET_KEY_LENGTH];
+        let chinfo = [0u8; SECRET_KEY_LENGTH];
 
         let res = derive_commitment_seed(&priv_key, &chinfo);
         assert_eq!(false, res.is_err());
