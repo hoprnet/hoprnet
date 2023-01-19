@@ -58,8 +58,11 @@ impl ChannelStrategy for PromiscuousStrategy {
                 continue;
             }
 
-            // Retrieve quality of that peer and any channels we have opened with it
-            let quality = quality_of_peer(peer_id.as_str()).unwrap_or(0f64);
+            // Retrieve quality of that peer
+            let quality = quality_of_peer(peer_id.as_str())
+                .expect(format!("failed to retrieve quality of {}", peer_id).as_str());
+
+            // Also get channels we have opened with it
             let channel_with_peer = outgoing_channels
                 .iter()
                 .find(|c| c.peer_id.eq(&peer_id.as_str()));

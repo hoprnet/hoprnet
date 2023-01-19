@@ -208,11 +208,11 @@ pub mod wasm {
                     .map(|c| super::OutgoingChannelStatus::from(c))
                     .collect(),
                 |peer_id: &str| {
-                        let this = JsValue::null();
-                        let str = JsString::from(peer_id);
-
-                        let quality = quality_of.call1(&this, &str);
-                        quality.ok().map(|q| q.as_f64()).flatten()
+                        quality_of
+                            .call1(&JsValue::null(), &JsString::from(peer_id))
+                            .ok()
+                            .map(|q| q.as_f64())
+                            .flatten()
                     },
             ),
         })

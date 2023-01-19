@@ -88,7 +88,7 @@ abstract class RustStrategyWrapper<T extends { tick; name }> extends SaneDefault
     network_peer_ids: Iterator<string>,
     outgoing_channels: OutgoingChannelStatus[],
     peer_quality: (string) => number
-  ) {
+  ) : StrategyTickResult {
     return this.strategy.tick(new Balance(balance.toString()), network_peer_ids, outgoing_channels, peer_quality)
   }
 
