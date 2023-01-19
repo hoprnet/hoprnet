@@ -1,6 +1,8 @@
 pub mod generic;
+
 pub mod passive;
 pub mod promiscuous;
+pub mod random;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

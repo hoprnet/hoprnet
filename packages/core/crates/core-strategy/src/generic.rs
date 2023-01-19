@@ -43,7 +43,8 @@ impl From<&wasm::OutgoingChannelStatus> for OutgoingChannelStatus {
 
 /// A decision made by a strategy on each tick,
 /// represents which channels should be closed and which should be opened.
-/// Also indicates a number of maximum channels this strategy can ever open.
+/// Also indicates a number of maximum channels this strategy can open given the current network size.
+/// Note that the number changes as the network size changes.
 pub struct StrategyTickResult {
     max_auto_channels: usize,
     to_open: Vec<OutgoingChannelStatus>,
