@@ -25,7 +25,7 @@ type CtChannel = {
   openFrom: number
 }
 
-const MAX_CT_AUTO_CHANNELS: number = 100;
+const MAX_CT_AUTO_CHANNELS: number = 100
 
 export class CoverTrafficStrategy extends SaneDefaults implements ChannelStrategyInterface {
   name = 'covertraffic'
@@ -59,7 +59,6 @@ export class CoverTrafficStrategy extends SaneDefaults implements ChannelStrateg
     const ctChannels: CtChannel[] = []
 
     for (let channel of currentChannels) {
-
       const peerPubkey = PublicKey.fromPeerIdString(channel.peer_id)
       const quality = peerQuality(channel.peer_id)
       ctChannels.push({
@@ -207,8 +206,7 @@ export class CoverTrafficStrategy extends SaneDefaults implements ChannelStrateg
     log(
       `strategy tick: ${Date.now()} balance:${balance.toString()} open:${toOpen
         .map((p) => p.peer_id)
-        .join(',')} close: ${toClose.join(',')}`
-        .replace('\n', ', ')
+        .join(',')} close: ${toClose.join(',')}`.replace('\n', ', ')
     )
     return new StrategyTickResult(MAX_CT_AUTO_CHANNELS, toOpen, toClose)
   }

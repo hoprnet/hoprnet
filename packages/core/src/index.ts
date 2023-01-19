@@ -657,10 +657,11 @@ class Hopr extends EventEmitter {
       throw new Error('failed to getBalance, aborting tick')
     }
 
-    let allOutgoingChannels: OutgoingChannelStatus[] =  Array.from(currentChannels
-      .filter((c) => c.status == ChannelStatus.Open && c.source.toAddress().eq(selfAddr))
-      .map((c) => new OutgoingChannelStatus(c.destination.toPeerId().toString(), c.balance.toBN().toString())
-        ));
+    let allOutgoingChannels: OutgoingChannelStatus[] = Array.from(
+      currentChannels
+        .filter((c) => c.status == ChannelStatus.Open && c.source.toAddress().eq(selfAddr))
+        .map((c) => new OutgoingChannelStatus(c.destination.toPeerId().toString(), c.balance.toBN().toString()))
+    )
 
     let peersIterator = this.networkPeers.all().map((p) => p.toString())[Symbol.iterator]
 
@@ -676,22 +677,25 @@ class Hopr extends EventEmitter {
     let allClosedChannels = Array.from(tickResult.to_close())
 
     // Enhance with all channels which are in PendingToClose state to close them for good
-    allClosedChannels.push(...currentChannels
-      .filter((c) => c.status == ChannelStatus.PendingToClose
-              && !allClosedChannels.includes(c.destination.toPeerId().toString()))
-      .map((c) => c.destination.toPeerId().toString()));
-
-
-    verbose(
-      `strategy wants to finalize closure of ${allClosedChannels.length - tickResult.to_close().length} channels`
+    allClosedChannels.push(
+      ...currentChannels
+        .filter(
+          (c) =>
+            c.status == ChannelStatus.PendingToClose && !allClosedChannels.includes(c.destination.toPeerId().toString())
+        )
+        .map((c) => c.destination.toPeerId().toString())
     )
 
+    verbose(`strategy wants to finalize closure of ${allClosedChannels.length - tickResult.to_close().length} channels`)
+
     try {
-      await Promise.all(allClosedChannels.map((destination) => async () => {
+      await Promise.all(
+        allClosedChannels.map((destination) => async () => {
           await this.closeChannel(peerIdFromString(destination), 'outgoing')
           verbose(`closed channel to ${destination.toString()}`)
           this.emit('hopr:channel:closed', destination)
-      }))
+        })
+      )
     } catch (e) {
       log(`error when strategy trying to close channels`, e)
     }
@@ -700,7 +704,8 @@ class Hopr extends EventEmitter {
     verbose(`strategy wants to open ${allOpenedChannels.length} new channels`)
 
     try {
-      await Promise.all(allOpenedChannels.map((status) => async () => {
+      await Promise.all(
+        allOpenedChannels.map((status) => async () => {
           const destination = peerIdFromString(status.peer_id)
           const stake = new BN(status.stake_str)
 
@@ -713,10 +718,9 @@ class Hopr extends EventEmitter {
           } else {
             error(`Protocol error: strategy wants to open channel to non-registered peer ${destination.toString()}`)
           }
-        }
-      ))
-    }
-    catch (e) {
+        })
+      )
+    } catch (e) {
       log(`error when strategy trying to open channels`, e)
     }
   }
