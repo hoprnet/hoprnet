@@ -88,8 +88,6 @@ The following sections document the metrics per package:
 | `core_ethereum_counter_indexer_tickets_redeemed`             | counter       | Number of redeemed tickets                  |                                                                     |
 | `core_ethereum_counter_num_send_transactions`                | counter       | The number of sendTransaction calls         |                                                                     |
 
-### cover-traffic-daemon
-
 ### ethereum
 
 ### hoprd

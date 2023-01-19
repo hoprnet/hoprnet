@@ -22,7 +22,7 @@ usage() {
   msg
   msg "Use -l to build the images locally instead and not publish them to a
   remote Docker repository. In addition -i can be used to build a single image locally instead of all images."
-  msg "Supported values for -p are 'hoprd', 'hoprd-nat', 'cover-traffic-daemon',
+  msg "Supported values for -p are 'hoprd', 'hoprd-nat',
   'hardhat', 'pluto', 'pluto-complete'"
   msg
   msg "Use -f to force a Docker builds even though no environment can be found. This is useful for local testing. No additional docker tags will be applied though if no environment has been found which is in contrast to the normal execution of the script."
@@ -85,12 +85,6 @@ build_and_tag_images() {
       log "Building Docker image hoprd-local"
       docker build -q -t hoprd-local \
         -f packages/hoprd/Dockerfile . &
-    fi
-
-    if [ -z "${image_name}" ] || [ "${image_name}" = "cover-traffic-daemon" ]; then
-      log "Building Docker image hopr-cover-traffic-daemon-local"
-      docker build -q -t hopr-cover-traffic-daemon-local \
-        -f packages/cover-traffic-daemon/Dockerfile . &
     fi
 
     if [ -z "${image_name}" ] || [ "${image_name}" = "hoprd-nat" ]; then

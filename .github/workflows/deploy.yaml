@@ -125,7 +125,6 @@ jobs:
           ./scripts/wait-for-npm-package.sh core-ethereum
           ./scripts/wait-for-npm-package.sh utils
           ./scripts/wait-for-npm-package.sh ethereum
-          ./scripts/wait-for-npm-package.sh cover-traffic-daemon
           ./scripts/wait-for-npm-package.sh connect
 
       - name: "[FINISH] Send notification if anything failed on master or release/staging branches"
