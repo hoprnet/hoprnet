@@ -21,8 +21,6 @@ RUN apk add --no-cache --update \
     rm -v /tmp/*.apk && \
     /usr/glibc-compat/sbin/ldconfig /lib /usr/glibc-compat/lib && \
     echo 'hosts: files mdns4_minimal [NOTFOUND=return] dns mdns4' >> /etc/nsswitch.conf
-    #ln -s /lib/glibc-compat/lib/ld-linux-x86-64.so.2 /lib/ && \
-    #ln -s /lib/glibc-compat/lib64/ld-linux-x86-64.so.2 /lib64/
 
 # Gets yarn executable
 COPY .yarn .yarn/

@@ -52,8 +52,6 @@ all: help
 $(CRATES): ## builds all Rust crates with wasm-pack (except for foundry-tool)
 # --out-dir is relative to working directory
 	echo "use wasm-pack build"
-	which wasm-pack
-	wasm-pack --version
 	wasm-pack build --target=bundler --out-dir ./pkg $@
 
 .PHONY: $(FOUNDRY_TOOL_CRATE)

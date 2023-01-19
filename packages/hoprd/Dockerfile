@@ -34,8 +34,6 @@ RUN make deps-docker package=hoprd && \
     # Install without devDependencies
     PRODUCTION=true make deps-docker package=hoprd
 
-RUN find .cargo/bin
-
 # Alpine 3.16 x86_64 https://hub.docker.com/layers/library/alpine/3.16.3/images/sha256-3d426b0bfc361d6e8303f51459f17782b219dece42a1c7fe463b6014b189c86d
 FROM alpine:3.16@sha256:3d426b0bfc361d6e8303f51459f17782b219dece42a1c7fe463b6014b189c86d as runtime
 
