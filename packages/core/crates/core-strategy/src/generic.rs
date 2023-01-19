@@ -1,4 +1,3 @@
-use utils_types::channels::ChannelEntry;
 use utils_types::primitives::Balance;
 
 /// Basic strategy trait that all strategies must implement.
@@ -21,7 +20,7 @@ pub trait ChannelStrategy {
     where Q: Fn(&str) -> Option<f64>;
 
     /// Indicates if according to this strategy, a commitment should be made for the given channel.
-    fn should_commit_to_channel(&self, _channel: &ChannelEntry) -> bool {
+    fn should_commit_to_channel(&self, _channel: &OutgoingChannelStatus) -> bool {
         true
     }
 }
