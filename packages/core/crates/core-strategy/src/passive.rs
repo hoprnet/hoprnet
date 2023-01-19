@@ -22,7 +22,7 @@ mod tests {
 
     #[test]
     fn test_passive() {
-        let strat = PassiveStrategy{};
+        let strat = PassiveStrategy {};
         assert_eq!("passive", strat.name());
     }
 }
@@ -30,18 +30,18 @@ mod tests {
 /// WASM bindings
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use wasm_bindgen::JsValue;
-    use wasm_bindgen::prelude::wasm_bindgen;
     use crate::generic::ChannelStrategy;
+    use wasm_bindgen::prelude::wasm_bindgen;
+    use wasm_bindgen::JsValue;
 
-    use utils_types::primitives::wasm::Balance;
     use utils_misc::utils::wasm::JsResult;
+    use utils_types::primitives::wasm::Balance;
 
     use crate::generic::wasm::StrategyTickResult;
 
     #[wasm_bindgen]
     pub struct PassiveStrategy {
-        w: super::PassiveStrategy
+        w: super::PassiveStrategy,
     }
 
     #[wasm_bindgen]
@@ -49,7 +49,7 @@ pub mod wasm {
         #[wasm_bindgen(constructor)]
         pub fn new() -> Self {
             PassiveStrategy {
-                w: super::PassiveStrategy{}
+                w: super::PassiveStrategy {},
             }
         }
 

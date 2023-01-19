@@ -2,7 +2,7 @@ use utils_types::primitives::Balance;
 
 use crate::generic::{ChannelStrategy, OutgoingChannelStatus, StrategyTickResult};
 
-/// Implements passive strategy which does nothing.
+/// Implements random strategy (cover traffic)
 pub struct RandomStrategy;
 
 impl ChannelStrategy for RandomStrategy {
@@ -21,7 +21,7 @@ mod tests {
 
     #[test]
     fn test_random() {
-        let strat = RandomStrategy{};
+        let strat = RandomStrategy {};
         assert_eq!("random", strat.name());
     }
 }
@@ -29,18 +29,18 @@ mod tests {
 /// WASM bindings
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use wasm_bindgen::JsValue;
-    use wasm_bindgen::prelude::wasm_bindgen;
     use crate::generic::ChannelStrategy;
+    use wasm_bindgen::prelude::wasm_bindgen;
+    use wasm_bindgen::JsValue;
 
-    use utils_types::primitives::wasm::Balance;
     use utils_misc::utils::wasm::JsResult;
+    use utils_types::primitives::wasm::Balance;
 
     use crate::generic::wasm::StrategyTickResult;
 
     #[wasm_bindgen]
     pub struct RandomStrategy {
-        w: super::RandomStrategy
+        w: super::RandomStrategy,
     }
 
     #[wasm_bindgen]
@@ -48,7 +48,7 @@ pub mod wasm {
         #[wasm_bindgen(constructor)]
         pub fn new() -> Self {
             RandomStrategy {
-                w: super::RandomStrategy{}
+                w: super::RandomStrategy {},
             }
         }
 
