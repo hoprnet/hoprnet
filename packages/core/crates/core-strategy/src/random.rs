@@ -20,7 +20,7 @@ mod tests {
     use crate::random::RandomStrategy;
 
     #[test]
-    fn test_passive() {
+    fn test_random() {
         let strat = RandomStrategy{};
         assert_eq!("random", strat.name());
     }

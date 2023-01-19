@@ -7,6 +7,7 @@
 - Grafana dashboards integration for all supported platforms ([#4472](https://github.com/hoprnet/hoprnet/pull/4472))
 - Migrate environment checker code to Rust ([#4492](https://github.com/hoprnet/hoprnet/pull/4492))
 - Migrate hoprd CLI to Rust ([#4491](https://github.com/hoprnet/hoprnet/pull/4491))
+- Introduced Promiscuous Strategy v1, strategies migrated to Rust ([#4506](https://github.com/hoprnet/hoprnet/pull/4506))
 
 <a name="1.91"></a>
 
