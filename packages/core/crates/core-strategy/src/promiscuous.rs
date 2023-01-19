@@ -194,7 +194,12 @@ pub mod wasm {
     #[wasm_bindgen]
     impl PromiscuousStrategy {
         #[wasm_bindgen(constructor)]
-        pub fn new(network_quality_threshold: f64, minimum_node_balance: Balance, new_channel_stake: Balance, minimum_channel_balance: Balance) -> Self {
+        pub fn new(
+            network_quality_threshold: f64,
+            minimum_node_balance: Balance,
+            new_channel_stake: Balance,
+            minimum_channel_balance: Balance,
+        ) -> Self {
             PromiscuousStrategy {
                 w: super::PromiscuousStrategy {
                     network_quality_threshold,
@@ -216,8 +221,20 @@ pub mod wasm {
             self.w.name().into()
         }
 
-        pub fn tick(&self, balance: Balance, peer_ids: &js_sys::Iterator, outgoing_channels: JsValue, quality_of: &js_sys::Function) ->  JsResult<StrategyTickResult> {
-            crate::generic::wasm::tick_wrap(&self.w, balance, peer_ids, outgoing_channels, quality_of)
+        pub fn tick(
+            &self,
+            balance: Balance,
+            peer_ids: &js_sys::Iterator,
+            outgoing_channels: JsValue,
+            quality_of: &js_sys::Function,
+        ) -> JsResult<StrategyTickResult> {
+            crate::generic::wasm::tick_wrap(
+                &self.w,
+                balance,
+                peer_ids,
+                outgoing_channels,
+                quality_of,
+            )
         }
     }
 }

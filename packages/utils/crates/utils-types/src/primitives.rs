@@ -1,12 +1,14 @@
+use ethnum::{u256, AsU256};
 use std::ops::{Add, Sub};
-use ethnum::{AsU256, u256};
 
 pub trait BaseBalance {
     const SYMBOL: &'static str;
 
     fn value(&self) -> &u256;
 
-    fn symbol(&self) -> &str { Self::SYMBOL }
+    fn symbol(&self) -> &str {
+        Self::SYMBOL
+    }
 
     fn to_hex(&self) -> String {
         hex::encode(self.value().to_be_bytes())
@@ -44,7 +46,7 @@ pub trait BaseBalance {
 
 #[derive(Clone)]
 pub struct Balance {
-    value: u256
+    value: u256,
 }
 
 impl BaseBalance for Balance {
@@ -62,7 +64,6 @@ impl ToString for Balance {
 }
 
 impl Balance {
-
     pub fn from_u64(value: u64) -> Self {
         Balance {
             value: value.as_u256(),
@@ -73,9 +74,9 @@ impl Balance {
         Self::from_u64(0)
     }
 
-    pub fn from_str(value: &str) -> Result<Self,String> {
+    pub fn from_str(value: &str) -> Result<Self, String> {
         Ok(Balance {
-            value: u256::from_str_radix(value,10).map_err(|_| "failed to parse")?,
+            value: u256::from_str_radix(value, 10).map_err(|_| "failed to parse")?,
         })
     }
 
@@ -107,7 +108,10 @@ impl Balance {
 
     pub fn deserialize(data: &[u8]) -> Result<Self, String> {
         Ok(Balance {
-            value: u256::from_be_bytes(data.try_into().map_err(|_| "conversion error".to_string())?),
+            value: u256::from_be_bytes(
+                data.try_into()
+                    .map_err(|_| "conversion error".to_string())?,
+            ),
         })
     }
 }
@@ -129,24 +133,22 @@ mod tests {
 pub mod wasm {
     use wasm_bindgen::prelude::*;
 
-    use std::str::FromStr;
     use ethnum::u256;
-    use utils_misc::utils::wasm::JsResult;
+    use std::str::FromStr;
     use utils_misc::ok_or_jserr;
+    use utils_misc::utils::wasm::JsResult;
 
     use crate::primitives::BaseBalance;
 
     #[wasm_bindgen]
     pub struct Balance {
         #[wasm_bindgen(skip)]
-        pub w: super::Balance
+        pub w: super::Balance,
     }
 
     impl From<super::Balance> for Balance {
         fn from(b: crate::primitives::Balance) -> Self {
-            Balance {
-                w: b
-            }
+            Balance { w: b }
         }
     }
 
@@ -156,8 +158,8 @@ pub mod wasm {
         pub fn new(value: &str) -> JsResult<Balance> {
             Ok(Self {
                 w: super::Balance {
-                    value: ok_or_jserr!(u256::from_str(value))?
-                }
+                    value: ok_or_jserr!(u256::from_str(value))?,
+                },
             })
         }
 
@@ -206,4 +208,3 @@ pub mod wasm {
         }
     }
 }
-

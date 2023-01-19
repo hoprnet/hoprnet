@@ -8,9 +8,16 @@ pub struct PassiveStrategy;
 impl ChannelStrategy for PassiveStrategy {
     const NAME: &'static str = "passive";
 
-    fn tick<Q>(&self, _balance: Balance, _peer_ids: impl Iterator<Item=String>, _outgoing_channel_peer_ids: Vec<OutgoingChannelStatus>, _quality_of: Q) -> StrategyTickResult
-        where Q: Fn(&str) -> Option<f64> {
-
+    fn tick<Q>(
+        &self,
+        _balance: Balance,
+        _peer_ids: impl Iterator<Item = String>,
+        _outgoing_channel_peer_ids: Vec<OutgoingChannelStatus>,
+        _quality_of: Q,
+    ) -> StrategyTickResult
+    where
+        Q: Fn(&str) -> Option<f64>,
+    {
         StrategyTickResult::new(0, vec![], vec![])
     }
 }
@@ -58,8 +65,20 @@ pub mod wasm {
             self.w.name().into()
         }
 
-        pub fn tick(&self, balance: Balance, peer_ids: &js_sys::Iterator, outgoing_channels: JsValue, quality_of: &js_sys::Function) ->  JsResult<StrategyTickResult> {
-            crate::generic::wasm::tick_wrap(&self.w, balance, peer_ids, outgoing_channels, quality_of)
+        pub fn tick(
+            &self,
+            balance: Balance,
+            peer_ids: &js_sys::Iterator,
+            outgoing_channels: JsValue,
+            quality_of: &js_sys::Function,
+        ) -> JsResult<StrategyTickResult> {
+            crate::generic::wasm::tick_wrap(
+                &self.w,
+                balance,
+                peer_ids,
+                outgoing_channels,
+                quality_of,
+            )
         }
     }
 }

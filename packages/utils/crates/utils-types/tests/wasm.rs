@@ -5,7 +5,6 @@ extern crate wasm_bindgen_test;
 use wasm_bindgen_test::*;
 
 /// All integration tests for WASM wrappers go in this directory.
-
 use utils_types::primitives::wasm::*;
 
 // wasm_bindgen_test_configure!(run_in_browser);

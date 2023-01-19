@@ -62,7 +62,11 @@ pub struct StrategyTickResult {
 
 impl StrategyTickResult {
     /// Constructor for the strategy tick result.
-    pub fn new(max_auto_channels: usize, to_open: Vec<OutgoingChannelStatus>, to_close: Vec<String>) -> Self {
+    pub fn new(
+        max_auto_channels: usize,
+        to_open: Vec<OutgoingChannelStatus>,
+        to_close: Vec<String>,
+    ) -> Self {
         StrategyTickResult {
             max_auto_channels,
             to_open,
@@ -137,8 +141,13 @@ pub mod wasm {
     #[wasm_bindgen]
     impl StrategyTickResult {
         #[wasm_bindgen(constructor)]
-        pub fn new(max_auto_channels: u32, to_open: JsValue, to_close: Vec<JsString>) -> JsResult<StrategyTickResult> {
-            let open: Vec<OutgoingChannelStatus> = ok_or_jserr!(serde_wasm_bindgen::from_value(to_open))?;
+        pub fn new(
+            max_auto_channels: u32,
+            to_open: JsValue,
+            to_close: Vec<JsString>,
+        ) -> JsResult<StrategyTickResult> {
+            let open: Vec<OutgoingChannelStatus> =
+                ok_or_jserr!(serde_wasm_bindgen::from_value(to_open))?;
             Ok(StrategyTickResult {
                 w: super::StrategyTickResult::new(
                     max_auto_channels as usize,
@@ -177,9 +186,15 @@ pub mod wasm {
 
     /// Generic binding for all strategies to use in WASM wrappers
     /// Since wasm_bindgen annotation is not supported on trait impls, the WASM-wrapped strategies cannot implement a common trait.
-    pub fn tick_wrap<S: ChannelStrategy>(strategy: &S, balance: Balance, peer_ids: &js_sys::Iterator, outgoing_channels: JsValue, quality_of: &js_sys::Function) ->  JsResult<StrategyTickResult> {
-
-        let out_channels: Vec<OutgoingChannelStatus> = serde_wasm_bindgen::from_value(outgoing_channels)?;
+    pub fn tick_wrap<S: ChannelStrategy>(
+        strategy: &S,
+        balance: Balance,
+        peer_ids: &js_sys::Iterator,
+        outgoing_channels: JsValue,
+        quality_of: &js_sys::Function,
+    ) -> JsResult<StrategyTickResult> {
+        let out_channels: Vec<OutgoingChannelStatus> =
+            serde_wasm_bindgen::from_value(outgoing_channels)?;
 
         Ok(StrategyTickResult {
             w: strategy.tick(
@@ -192,12 +207,12 @@ pub mod wasm {
                     .map(|c| super::OutgoingChannelStatus::from(c))
                     .collect(),
                 |peer_id: &str| {
-                    let this = JsValue::null();
-                    let str = JsString::from(peer_id);
+                        let this = JsValue::null();
+                        let str = JsString::from(peer_id);
 
-                    let quality = quality_of.call1(&this, &str);
-                    quality.ok().map(|q| q.as_f64()).flatten()
-                },
+                        let quality = quality_of.call1(&this, &str);
+                        quality.ok().map(|q| q.as_f64()).flatten()
+                    },
             ),
         })
     }

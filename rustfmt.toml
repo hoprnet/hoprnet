@@ -1,4 +1,4 @@
 edition = "2021"
 reorder_imports = true
-fn_args_layout = "Compressed"
+fn_args_layout = "Tall"
 #group_imports = "StdExternalCrate"
