@@ -6,7 +6,7 @@ pub mod wasm {
 
     #[allow(dead_code)]
     #[wasm_bindgen]
-    pub fn set_panic_hook() {
+    pub fn utils_misc_set_panic_hook() {
         // When the `console_error_panic_hook` feature is enabled, we can call the
         // `set_panic_hook` function at least once during initialization, and then
         // we will get better error messages if our code ever panics.
@@ -23,3 +23,42 @@ pub mod wasm {
     static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 }
 
+#[macro_export]
+macro_rules! ok_or_str {
+    ($v:expr) => {
+        $v.map_err(|e| e.to_string())
+    };
+}
+
+/// Macro used to convert Vec<JsString> to Vec<&str>
+#[cfg(feature = "wasm")]
+#[macro_export]
+macro_rules! convert_from_jstrvec {
+    ($v:expr,$r:ident) => {
+        let _aux: Vec<String> = $v.iter().map(String::from).collect();
+        let $r = _aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
+    };
+}
+
+/// Macro used to convert Vec<&str> or Vec<String> to Vec<JString>
+#[cfg(feature = "wasm")]
+#[macro_export]
+macro_rules! convert_to_jstrvec {
+    ($v:expr) => {
+        $v.iter().map(|e| JsString::from(e.as_ref())).collect()
+    };
+}
+
+#[macro_export]
+macro_rules! clean_mono_repo_path {
+    ($v:expr,$r:ident) => {
+        let $r = $v.strip_suffix("/").unwrap_or($v);
+    };
+}
+
+#[macro_export]
+macro_rules! ok_or_jserr {
+    ($v:expr) => {
+        $v.map_err(|e| JsValue::from(e.to_string()))
+    };
+}

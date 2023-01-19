@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "1.92.0-next.31",
+  "version": "1.92.0-next.39",
   "description": "On-chain logic for hoprnet.org",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "license": "GPL-3.0",
@@ -20,7 +20,7 @@
     "faucet": "NODE_OPTIONS=--experimental-wasm-modules TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost hardhat faucet --use-local-identities --identity-prefix local --password local",
     "accounts": "NODE_OPTIONS=--experimental-wasm-modules TS_NODE_PROJECT=./tsconfig.hardhat.json hardhat accounts",
     "run:network": "NODE_OPTIONS=--experimental-wasm-modules TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost hardhat node",
-    "test": "yarn test:wasm && NODE_OPTIONS=--experimental-wasm-modules TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost HOPR_HARDHAT_TAG=testing hardhat test:in-group",
+    "test": "NODE_OPTIONS=--experimental-wasm-modules TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost HOPR_HARDHAT_TAG=testing hardhat test:in-group",
     "coverage": "NODE_OPTIONS=--experimental-wasm-modules TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost HOPR_HARDHAT_TAG=testing hardhat coverage",
     "deploy:local": "NODE_OPTIONS=--experimental-wasm-modules TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost hardhat deploy --network hardhat --write true",
     "deploy:goerli": "NODE_OPTIONS=--experimental-wasm-modules TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=master-goerli hardhat deploy --network goerli --write true",

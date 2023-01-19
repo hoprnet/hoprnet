@@ -27,18 +27,15 @@ usage() {
 cleanup() {
   # Remove lock files due to conflicts with workspaces
   rm -f \
-    "${mydir}/../packages/cover-traffic-daemon/npm-shrinkwrap.json" \
     "${mydir}/../packages/hoprd/npm-shrinkwrap.json"
 
   # Don't commit changed package.json files as package resolutions are
   # supposed to interfer with workspaces according to https://yarnpkg.com/configuration/manifest#resolutions
   git restore packages/hoprd/package.json
-  git restore packages/cover-traffic-daemon/package.json
 
   # delete default environments
   rm -f \
-    "${mydir}/../packages/hoprd/default-environment.json" \
-    "${mydir}/../packages/cover-traffic-daemon/default-environment.json"
+    "${mydir}/../packages/hoprd/default-environment.json"
 }
 
 # return early with help info when requested
@@ -57,7 +54,7 @@ if [ ! "${version_type}" = "patch" ] &&
 fi
 
 # define packages
-declare -a versioned_packages=( utils connect ethereum core-ethereum core real hoprd cover-traffic-daemon )
+declare -a versioned_packages=( utils connect ethereum core-ethereum core real hoprd )
 
 # ensure local copy is up-to-date with origin
 branch=$(git rev-parse --abbrev-ref HEAD)
@@ -123,7 +120,7 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   # pack and publish packages
   yarn workspaces foreach -piv --topological-dev \
     --exclude hoprnet --exclude hopr-docs \
-    --exclude @hoprnet/hoprd --exclude @hoprnet/hopr-cover-traffic-daemon \
+    --exclude @hoprnet/hoprd \
     npm publish --access public
 
   "${mydir}/wait-for-npm-package.sh" utils
@@ -138,15 +135,12 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   # set default environments
   log "adding default environments to packages"
   echo "{\"id\": \"${environment_id}\"}" > "${mydir}/../packages/hoprd/default-environment.json"
-  echo "{\"id\": \"${environment_id}\"}" > "${mydir}/../packages/cover-traffic-daemon/default-environment.json"
 
   # special treatment for end-of-chain packages
   # to create lockfiles with resolution overrides
   "${mydir}/build-lockfiles.sh" hoprd
-  "${mydir}/build-lockfiles.sh" cover-traffic-daemon
 
   yarn workspace @hoprnet/hoprd npm publish --access public
-  yarn workspace @hoprnet/hopr-cover-traffic-daemon npm publish --access public
 
   cleanup
 fi

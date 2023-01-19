@@ -1,9 +1,11 @@
-import net, { type Socket } from 'net'
+import net, { isIPv6, type Socket } from 'net'
 import { abortableSource } from 'abortable-iterator'
 import Debug from 'debug'
-import { nodeToMultiaddr } from '../utils/index.js'
+import { ip6Lookup, IPV4_EMBEDDED_ADDRESS, nodeToMultiaddr } from '../utils/index.js'
 // @ts-ignore untyped module
 import retimer from 'retimer'
+
+import { create_counter } from '@hoprnet/hopr-utils'
 
 const log = Debug('hopr-connect:tcp')
 const error = Debug('hopr-connect:tcp:error')
@@ -22,6 +24,8 @@ type SocketOptions = {
   signal?: AbortSignal
   closeTimeout?: number
 }
+
+const directPackets = create_counter('connect_counter_direct_packets', 'Number of directly sent packets (TCP)')
 
 /**
  * Class to encapsulate TCP sockets
@@ -150,7 +154,16 @@ export function TCPConnection(
 
   const sinkEndpoint = async (source: StreamSource): Promise<void> => {
     try {
-      await sink(options?.signal != undefined ? (abortableSource(source, options.signal) as StreamSource) : source)
+      await sink(
+        (async function* (): AsyncIterable<Uint8Array> {
+          for await (const msg of options?.signal != undefined
+            ? (abortableSource(source, options.signal) as StreamSource)
+            : source) {
+            yield msg
+            directPackets.increment()
+          }
+        })()
+      )
     } catch (err: any) {
       // If aborted we can safely ignore
       if (err.code !== 'ABORT_ERR' && err.type !== 'aborted') {
@@ -191,6 +204,10 @@ export async function createTCPConnection(
   return new Promise<MultiaddrConnection>((resolve, reject) => {
     const start = Date.now()
     const cOpts = ma.toOptions()
+
+    if (!isIPv6(cOpts.host)) {
+      cOpts.host = `::ffff:${cOpts.host}`
+    }
 
     let rawSocket: Socket
     let finished = false
@@ -238,7 +255,9 @@ export async function createTCPConnection(
       .createConnection({
         host: cOpts.host,
         port: cOpts.port,
-        signal: options?.signal
+        signal: options?.signal,
+        family: 6,
+        lookup: ip6Lookup
       })
       .once('error', onError)
       .once('timeout', onTimeout)
@@ -261,12 +280,22 @@ export function fromSocket(socket: Socket, onClose: () => void) {
     }
   })
 
+  let remoteAddress: string
+  let remoteFamily: 'IPv4' | 'IPv6'
+  const ipv4Embedded = socket.remoteAddress.match(IPV4_EMBEDDED_ADDRESS)
+  if (ipv4Embedded) {
+    remoteAddress = ipv4Embedded[0]
+    remoteFamily = 'IPv4'
+  } else {
+    remoteAddress = socket.remoteAddress
+    remoteFamily = socket.remoteFamily as 'IPv4' | 'IPv6'
+  }
   // PeerId of remote peer is not yet known,
   // will be available after encryption is set up
   const remoteAddr = nodeToMultiaddr({
-    address: socket.remoteAddress,
+    address: remoteAddress,
     port: socket.remotePort,
-    family: socket.remoteFamily
+    family: remoteFamily
   })
 
   return TCPConnection(remoteAddr, socket, onClose)

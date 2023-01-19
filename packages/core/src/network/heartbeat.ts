@@ -1,5 +1,4 @@
 import type NetworkPeers from './network-peers.js'
-import type AccessControl from './access-control.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 
 import {
@@ -19,7 +18,6 @@ import {
 import { createHash, randomBytes } from 'crypto'
 
 import type { Subscribe, SendMessage } from '../index.js'
-import EventEmitter from 'events'
 import { NetworkPeersOrigin } from './network-peers.js'
 
 const log = debug('hopr-core:heartbeat')
@@ -101,8 +99,7 @@ export default class Heartbeat {
     private subscribe: Subscribe,
     protected sendMessage: SendMessage,
     private closeConnectionsTo: (peer: PeerId) => void,
-    private reviewConnection: AccessControl['reviewConnection'],
-    private stateChangeEmitter: EventEmitter,
+    private onNetworkHealthChange: (oldValue: NetworkHealthIndicator, currentHealth: NetworkHealthIndicator) => void,
     private isPublicNode: (addr: PeerId) => boolean,
     environmentId: string,
     config?: Partial<HeartbeatConfig>
@@ -120,6 +117,8 @@ export default class Heartbeat {
       // deprecated
       `/hopr/${environmentId}/heartbeat`
     ]
+
+    this.pingNode = this.pingNode.bind(this)
   }
 
   private errHandler(err: any) {
@@ -129,7 +128,6 @@ export default class Heartbeat {
   public async start() {
     await this.subscribe(this.protocolHeartbeat, this.handleHeartbeatRequest.bind(this), true, this.errHandler)
 
-    this.pingNode = this.pingNode.bind(this)
     this.startHeartbeatInterval()
     log(`Heartbeat started`)
   }
@@ -164,36 +162,35 @@ export default class Heartbeat {
   public async pingNode(destination: PeerId): Promise<HeartbeatPingResult> {
     log(`ping ${destination.toString()}`)
 
-    const origin = this.networkPeers.has(destination)
-      ? this.networkPeers.getConnectionInfo(destination).origin
-      : NetworkPeersOrigin.OUTGOING_CONNECTION
-    const allowed = await this.reviewConnection(destination, origin)
-    if (!allowed) throw Error('Connection to node is not allowed')
-
     const challenge = randomBytes(16)
     let pingResponse: Uint8Array[] | undefined
 
     const ping_timer = metric_timeToPing.start_measure()
+    // Dial attempt will fail if `destination` is not registered
+    let pingError: any
+    let pingErrorThrown = false
     try {
       pingResponse = await this.sendMessage(destination, this.protocolHeartbeat, challenge, true)
     } catch (err) {
-      log(`Connection to ${destination.toString()} failed: ${err?.message}`)
-
-      metric_pingFailureCount.increment()
-      return {
-        destination,
-        lastSeen: -1
-      }
+      pingErrorThrown = true
+      pingError = err
     }
 
-    const expectedResponse = Heartbeat.calculatePingResponse(challenge)
+    if (pingErrorThrown || pingResponse == null || pingResponse.length != 1) {
+      if (pingErrorThrown) {
+        log(`Error while pinging ${destination.toString()}`, pingError)
+      } else if (pingResponse == null || pingResponse.length == 1) {
+        const expectedResponse = Heartbeat.calculatePingResponse(challenge)
 
-    if (pingResponse == null || pingResponse.length != 1 || !u8aEquals(expectedResponse, pingResponse[0])) {
-      log(`Mismatched challenge. Got ${u8aToHex(pingResponse[0])} but expected ${u8aToHex(expectedResponse)}`)
+        if (!u8aEquals(expectedResponse, pingResponse[0])) {
+          log(`Mismatched challenge. Got ${u8aToHex(pingResponse[0])} but expected ${u8aToHex(expectedResponse)}`)
+        }
 
-      // Eventually close the connections, all errors are handled
-      this.closeConnectionsTo(destination)
+        // Eventually close the connections, all errors are handled
+        this.closeConnectionsTo(destination)
+      }
 
+      metric_timeToPing.cancel_measure(ping_timer)
       metric_pingFailureCount.increment()
       return {
         destination,
@@ -262,7 +259,7 @@ export default class Heartbeat {
     if (newHealthValue != this.currentHealth) {
       let oldValue = this.currentHealth
       this.currentHealth = newHealthValue
-      this.stateChangeEmitter.emit('hopr:network-health-changed', oldValue, this.currentHealth)
+      this.onNetworkHealthChange(oldValue, this.currentHealth)
 
       // Map network state to integers
       switch (newHealthValue as NetworkHealthIndicator) {

@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-connect",
-  "version": "1.92.0-next.31",
+  "version": "1.92.0-next.39",
   "description": "A libp2p-complaint transport module that handles NAT traversal by using WebRTC",
   "repository": "https://github.com/hoprnet/hopr-connect.git",
   "homepage": "https://github.com/hoprnet/hopr-connect",
@@ -25,7 +25,7 @@
     "test:wasm": "make -C crates test",
     "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo ./tests/tsconfig.tsbuildinfo",
     "build": "yarn clean && yarn build:wasm && tsc -p .",
-    "test": "yarn test:wasm && NODE_OPTIONS=\"--experimental-wasm-modules\" mocha --full-trace",
+    "test": "NODE_OPTIONS=\"--experimental-wasm-modules\" mocha --full-trace",
     "prepublishOnly": "yarn clean && yarn build:wasm && tsc -p ./tsconfig.npm.json"
   },
   "dependencies": {
@@ -48,7 +48,7 @@
     "retimer": "3.0.0",
     "simple-peer": "9.11.1",
     "stream-to-it": "0.2.4",
-    "webrtc-stun": "3.0.0",
+    "stun": "2.1.0",
     "wrtc": "0.4.7"
   },
   "devDependencies": {
