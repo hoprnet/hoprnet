@@ -97,7 +97,7 @@ function cleanup {
 trap cleanup SIGINT SIGTERM ERR
 
 # mine a block every 2 seconds
-declare flags="--block-time 2 --config-out ${cfg_file} --state ${state_file} -s 1"
+declare flags="--block-time 2 --config-out ${cfg_file}"
 
 if ! lsof -i ":8545" -s TCP:LISTEN; then
   log "Start local anvil network"

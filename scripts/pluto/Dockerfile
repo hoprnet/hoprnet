@@ -8,16 +8,19 @@ FROM ${ANVIL_IMAGE} as runtime
 
 LABEL description="Docker image running a HOPR-enabled anvil network with 5 hoprd nodes using it and being fully interconnected."
 
-# install tools required within our scripts
-RUN apk add --no-cache bash lsof curl jq
+# 1. install tools required within our scripts
+# 2. overwrite libc link under lib to make nodejs work alongside forge
+RUN apk add --no-cache bash lsof curl jq \
+ && ln -sf /lib/libc.musl-x86_64.so.1 /lib/ld-linux-x86-64.so.2
 
-WORKDIR /app
+WORKDIR /app/hoprnet
 
-COPY --from=hoprd /app/hoprnet ./hoprnet
+COPY --from=hoprd /app/hoprnet/ ./
+COPY --from=hoprd /app/hoprnet/.cargo/ ./.cargo/
 
-COPY packages/ethereum/contracts ./anvil/packages/ethereum/contracts
-COPY scripts/ ./anvil/scripts
-COPY Makefile ./anvil/
+COPY packages/ethereum/contracts/ ./packages/ethereum/contracts/
+COPY scripts/ ./scripts/
+COPY Makefile .
 
 # anvil RPC port
 EXPOSE 8545
@@ -50,4 +53,4 @@ EXPOSE 19505
 ARG HOPRD_API_TOKEN
 ENV HOPRD_API_TOKEN=${HOPRD_API_TOKEN:-%th1s-IS-a-S3CR3T-ap1-PUSHING-b1ts-TO-you%}
 
-ENTRYPOINT /app/anvil/scripts/setup-local-cluster.sh -p -t "${HOPRD_API_TOKEN}" -i /app/anvil/scripts/topologies/full_interconnected_cluster.sh --hoprd-command "node --experimental-wasm-modules hoprnet/packages/hoprd/lib/main.cjs" -l "0.0.0.0"
+ENTRYPOINT /app/hoprnet/scripts/setup-local-cluster.sh -p -t "${HOPRD_API_TOKEN}" -i /app/hoprnet/scripts/topologies/full_interconnected_cluster.sh --hoprd-command "node --experimental-wasm-modules packages/hoprd/lib/main.cjs" -l "0.0.0.0"

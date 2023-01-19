@@ -280,7 +280,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
 
         vm.stopBroadcast();
     }
-    
+
     /**
      * @dev send some HOPR tokens to the recipient address
      */

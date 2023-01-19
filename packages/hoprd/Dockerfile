@@ -26,13 +26,15 @@ RUN make deps-docker package=hoprd && \
     # No need for these packages
     rm -R packages/avado packages/cover-traffic-daemon && \
     # Everything that we don't need in ethereum package
-    rm -R packages/ethereum/contracts packages/ethereum/deploy packages/ethereum/hardhat packages/ethereum/tasks packages/ethereum/test && \
+    rm -R packages/ethereum/contracts packages/ethereum/deploy packages/ethereum/tasks packages/ethereum/test && \
     # Remove node_modules as they include devDependencies
     rm -R node_modules && \
     # As we are on *nix, use hardlinks in node_modules to save some space
     yarn config set nmMode hardlinks-local && \
     # Install without devDependencies
     PRODUCTION=true make deps-docker package=hoprd
+
+RUN find .cargo/bin
 
 # Alpine 3.16 x86_64 https://hub.docker.com/layers/library/alpine/3.16.3/images/sha256-3d426b0bfc361d6e8303f51459f17782b219dece42a1c7fe463b6014b189c86d
 FROM alpine:3.16@sha256:3d426b0bfc361d6e8303f51459f17782b219dece42a1c7fe463b6014b189c86d as runtime
@@ -59,6 +61,9 @@ RUN apk add --no-cache tini libc6-compat bash curl tar jq xz libstdc++ && \
 
 COPY --from=build /app/hoprnet/packages ./packages
 COPY --from=build /app/hoprnet/node_modules ./node_modules
+
+# we copy foundry-tool over since we might need it at some point as a binary
+COPY --from=build /app/hoprnet/.cargo/bin/foundry-tool .cargo/bin/
 
 # set volume which can be mapped by users on the host system
 VOLUME ["/app/hoprnet/hoprd-db"]

@@ -20,6 +20,8 @@ declare init_script=""
 declare hoprd_command="node --experimental-wasm-modules packages/hoprd/lib/main.cjs"
 declare listen_host="127.0.0.1"
 declare node_env="development"
+# first anvil account
+declare deployer_private_key=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
 usage() {
   msg
@@ -231,24 +233,23 @@ ensure_port_is_free 19095
 declare protocol_config="${mydir}/../packages/core/protocol-config.json"
 declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
 
-# --- Cleanup old contract deployments {{{
-log "Removing artifacts from old contract deployments"
-cleanup_local_protocol_config "${protocol_config}" "anvil-localhost"
-cleanup_local_protocol_config "${protocol_config}" "anvil-localhost2"
-# }}}
-
 # --- Running Mock Blockchain --- {{{
 log "Running anvil local node"
-make -C "${mydir}/.." run-anvil
+"${mydir}/run-local-anvil.sh" -l ${anvil_rpc_log}
 
-log "Wait for regex"
-wait_for_regex ${anvil_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
+log "Wait for anvil local node to complete startup"
+wait_for_regex ${anvil_rpc_log} "Listening on 127.0.0.1:8545"
 log "Anvil node started (127.0.0.1:8545)"
 
 # need to mirror contract data because of anvil-deploy node only writing to localhost
 update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost"
 update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost2"
 # }}}
+
+log "Disable network registry"
+env PRIVATE_KEY="${deployer_private_key}" \
+  make -C "${mydir}/.." disable-network-registry \
+  environment=anvil-localhost environment_type=development
 
 #  --- Run nodes --- {{{
 setup_node 13301 19091 18081 "${node1_dir}" "${node1_log}" "${node1_id}" "${listen_host}"
