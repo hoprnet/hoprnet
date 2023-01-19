@@ -23,13 +23,14 @@ usage() {
   msg "Use -l to build the images locally instead and not publish them to a
   remote Docker repository. In addition -i can be used to build a single image locally instead of all images."
   msg "Supported values for -p are 'hoprd', 'hoprd-nat', 'cover-traffic-daemon',
-  'hardhat', 'pluto', 'pluto-complete'"
+  'anvil', 'pluto', 'pluto-complete'"
   msg
   msg "Use -f to force a Docker builds even though no environment can be found. This is useful for local testing. No additional docker tags will be applied though if no environment has been found which is in contrast to the normal execution of the script."
   msg
 }
 
-declare image_version package_version releases branch force no_tags local_build image_name
+declare image_version package_version releases branch force no_tags local_build
+declare image_name=""
 
 while (( "$#" )); do
   case "$1" in
@@ -100,10 +101,10 @@ build_and_tag_images() {
         scripts/nat &
     fi
 
-    if [ -z "${image_name}" ] || [ "${image_name}" = "hardhat" ] || [ "${image_name}" = "pluto-complete" ]; then
-      log "Building Docker image hopr-hardhat-local"
-      docker build -t hopr-hardhat-local \
-        -f packages/ethereum/Dockerfile.hardhat . &
+    if [ -z "${image_name}" ] || [ "${image_name}" = "anvil" ] || [ "${image_name}" = "pluto-complete" ]; then
+      log "Building Docker image hopr-anvil-local"
+      docker build -t hopr-anvil-local \
+        -f packages/ethereum/Dockerfile.anvil . &
     fi
 
     log "Waiting for Docker builds (part 1) to finish"
@@ -112,9 +113,9 @@ build_and_tag_images() {
     if [ -z "${image_name}" ] || [ "${image_name}" = "pluto" ] || [ "${image_name}" = "pluto-complete" ]; then
       log "Building Docker image hopr-pluto-local"
       docker build -q -t hopr-pluto-local \
-        --build-arg=HARDHAT_IMAGE="hopr-hardhat-local" \
+        --build-arg=ANVIL_IMAGE="hopr-anvil-local" \
         --build-arg=HOPRD_IMAGE="hoprd-local" \
-        -f scripts/pluto/Dockerfile &
+        -f scripts/pluto/Dockerfile . &
     fi
 
     log "Waiting for Docker builds (part 2) to finish"

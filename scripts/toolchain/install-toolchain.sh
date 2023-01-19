@@ -15,8 +15,8 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 # - Node.js -> /usr/local/bin
 # - Yarn -> /usr/local/bin + /opt/yarn-v${version}
 # - Typescript + related utilities, such as ts-node -> ${mydir}/node_modules
-# - Rust (rustc, cargo) -> $HOME/.cargo/bin
-# - wasm-pack + wasm-opt, necessary to build WebAssembly modules -> $HOME/.cargo/bin
+# - Rust (rustc, cargo) -> ./../../.cargo/bin
+# - wasm-pack + wasm-opt, necessary to build WebAssembly modules -> ./../../.cargo/bin
 #
 # Supposed to work for
 #   x86_64: Docker + Alpine
@@ -36,7 +36,9 @@ function usage() {
   msg
 }
 
-export PATH=${PATH}:${mydir}/../../.cargo/bin
+# Set PATH such that `cargo` is available within this script
+export CARGO_BIN_DIR="${mydir}/../../.cargo/bin"
+export PATH=${PATH}:${CARGO_BIN_DIR}
 
 declare install_all with_yarn
 install_all="true"
@@ -87,8 +89,6 @@ function install_rustup() {
         echo "Installing Rustup"
         # Get rustup but install toolchain later
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- ----no-modify-path --default-toolchain none -y
-        # Set PATH such that `cargo` is available within this script
-        PATH=${PATH}:${HOME}/.cargo/bin
     fi
 }
 
@@ -127,9 +127,9 @@ function install_wasm_pack() {
         esac
         curl -fsSLO --compressed "https://github.com/rustwasm/wasm-pack/releases/download/${wasm_pack_release}/wasm-pack-${wasm_pack_release}-${cputype}-${ostype}.tar.gz"
         tar -xzf "wasm-pack-${wasm_pack_release}-${cputype}-${ostype}.tar.gz"
-        local install_dir="${HOME}/.cargo"
-        mkdir -p "${install_dir}/bin"
-        cp "wasm-pack-${wasm_pack_release}-${cputype}-${ostype}/wasm-pack" "${install_dir}/bin"
+        local install_dir="${CARGO_BIN_DIR}"
+        mkdir -p "${install_dir}"
+        cp "wasm-pack-${wasm_pack_release}-${cputype}-${ostype}/wasm-pack" "${install_dir}"
         cd ${mydir}
     fi
 }
@@ -157,9 +157,9 @@ function install_wasm_opt() {
         local binaryen_release="version_$(echo "${wasm_opt_release}" | awk -F. '{ print $2; }')"
         curl -fsSLO --compressed "https://github.com/WebAssembly/binaryen/releases/download/${binaryen_release}/binaryen-${binaryen_release}-${cputype}-${ostype}.tar.gz"
         tar -xzf "binaryen-${binaryen_release}-${cputype}-${ostype}.tar.gz"
-        local install_dir="${HOME}/.cargo"
-        mkdir -p "${install_dir}/bin"
-        cp "binaryen-${binaryen_release}/bin/wasm-opt" "${install_dir}/bin"
+        local install_dir="${CARGO_BIN_DIR}"
+        mkdir -p "${install_dir}"
+        cp "binaryen-${binaryen_release}/bin/wasm-opt" "${install_dir}"
         cp -R "binaryen-${binaryen_release}/lib" "${install_dir}"
         cd ${mydir}
     fi
@@ -202,13 +202,17 @@ function install_javascript_utilities() {
 if ${install_all}; then
     install_rustup
     install_cargo
+
+    # launch rustc once so it installs updated components
+    rustc --version
+
     install_wasm_pack
     install_wasm_opt
     install_node_js
     install_yarn
     install_javascript_utilities
 
-   # We got yarn, so let's remove no longer necessary cache
+    # We got yarn, so let's remove no longer necessary cache
     yarn cache clean --all
 else
     # We only need Node.js
@@ -221,14 +225,17 @@ else
 fi
 
 # Show some debug output
+echo ""
 echo "Checking installed tool versions"
 echo "================================"
-[ command -v rustc ] && rustc --version
-[ command -v cargo ] && cargo --version
-[ command -v wasm-pack ] && wasm-pack --version
-[ command -v wasm-opt ] && wasm-opt --version
-[ command -v node ] && echo "node $(node --version)"
-[ command -v yarn ] && echo "yarn $(yarn --version)"
-[ npx --no tsc --version ] && echo "Typescript $(npx tsc --version)"
+echo ""
+command -v rustc >/dev/null && rustc --version
+command -v cargo >/dev/null && cargo --version
+command -v wasm-pack >/dev/null && wasm-pack --version
+command -v wasm-opt >/dev/null && wasm-opt --version
+command -v node >/dev/null && echo "node $(node --version)"
+command -v yarn >/dev/null && echo "yarn $(yarn --version)"
+npx --no tsc --version >/dev/null && echo "Typescript $(npx tsc --version)"
+echo ""
 
 rm -R ${download_dir}
