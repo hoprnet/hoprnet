@@ -9,7 +9,7 @@ To set up your DAppNode, follow the instructions that came with the box. Then, j
 Please withdraw all your funds and delete the old package before installing a new one.
 :::
 
-## Installing the HOPR Client: 1.90.68 (Valencia)
+## Installing the HOPR Client: 1.91.24 (Bogota)
 
 (**1**) Open the DAppStore using the sidebar to the left.
 
