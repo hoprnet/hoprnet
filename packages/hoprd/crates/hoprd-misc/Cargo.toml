@@ -11,10 +11,24 @@ license = "LGPL-3.0-only"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+default = ["console_error_panic_hook", "wasm"]
+wasm = [ "dep:wasm-bindgen", "dep:serde-wasm-bindgen" ]
+console_error_panic_hook = [ "dep:console_error_panic_hook" ]
+
 [dependencies]
+clap = { git = "https://github.com/hoprnet/clap", branch = "robertkiel/update-env-from", features = ["derive", "env", "string"] }
+core-misc = { path = "../../../core/crates/core-misc" }
+core-ethereum-misc = { path = "../../../core-ethereum/crates/core-ethereum-misc" }
+js-sys = "0.3.60"
 real-base = { path = "../../../real/crates/real-base" }
-wasm-bindgen = "0.2.83"
-wasm-bindgen-test = "0.3.30"
+proc-macro-regex = "~1.1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde-wasm-bindgen = { version = "0.4", optional = true }
+utils-misc = { path = "../../../utils/crates/utils-misc" }
+utils-proc-macros = { path = "../../../utils/crates/utils-proc-macros" }
+wasm-bindgen = { version = "0.2.83", optional = true }
 
 console_error_panic_hook = { version = "0.1.6", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }

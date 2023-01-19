@@ -214,7 +214,6 @@ function setup_node() {
       --testAnnounceLocalAddresses \
       --testPreferLocalAddresses \
       --testUseWeakCrypto \
-      --testNoUPNP \
       --allowLocalNodeConnections \
       --allowPrivateNodeConnections \
       ${additional_args} \

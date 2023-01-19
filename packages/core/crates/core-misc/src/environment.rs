@@ -1,11 +1,9 @@
 use real_base::real;
 use serde::{Deserialize, Serialize};
-
-macro_rules! ok_or_str {
-    ($v:expr) => {
-        $v.map_err(|e| e.to_string())
-    };
-}
+use utils_misc::ok_or_str;
+// import need to be called wasm_bindgen to make field annotations
+// such as `#[wasm_bindgen(skip)]` work
+use utils_proc_macros::wasm_bindgen_if as wasm_bindgen;
 
 pub trait FromJsonFile: Sized {
     fn from_json_file(mono_repo_path: &str) -> Result<Self, String>;
@@ -13,6 +11,7 @@ pub trait FromJsonFile: Sized {
 
 #[derive(Deserialize, Serialize, Clone, Copy)]
 #[serde(rename_all(deserialize = "lowercase"))]
+#[wasm_bindgen]
 pub enum EnvironmentType {
     Production,
     Staging,
@@ -33,6 +32,7 @@ impl ToString for EnvironmentType {
 /// the client is going to use
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
+#[wasm_bindgen(getter_with_clone)]
 pub struct NetworkOptions {
     #[serde(skip_deserializing)]
     pub id: String,
@@ -50,6 +50,7 @@ pub struct NetworkOptions {
     pub max_priority_fee_per_gas: String,
     pub native_token_name: String,
     pub hopr_token_name: String,
+    #[wasm_bindgen(skip)] // no tags in Typescript
     pub tags: Option<Vec<String>>,
 }
 
@@ -57,6 +58,7 @@ pub struct NetworkOptions {
 /// to be used by the client
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
+#[wasm_bindgen(getter_with_clone)]
 pub struct Environment {
     #[serde(skip_deserializing)]
     pub id: String,
@@ -80,6 +82,7 @@ pub struct Environment {
     pub network_registry_proxy_contract_address: String,
     /// an Ethereum address
     pub network_registry_contract_address: String,
+    #[wasm_bindgen(skip)] // no tags in Typescript
     pub tags: Vec<String>,
     /// the associated staking season
     pub stake_season: Option<u32>,
@@ -115,7 +118,7 @@ impl FromJsonFile for ProtocolConfig {
 
 impl ProtocolConfig {
     /// Returns a list of environments which the node is able to work with
-    fn supported_environments(&self, mono_repo_path: &str) -> Result<Vec<Environment>, String> {
+    pub fn supported_environments(&self, mono_repo_path: &str) -> Result<Vec<Environment>, String> {
         let version = PackageJsonFile::from_json_file(&mono_repo_path)
             .and_then(|p| ok_or_str!(real::coerce_version(p.version.as_str())))?;
 
@@ -134,7 +137,7 @@ impl ProtocolConfig {
 }
 
 #[derive(Deserialize)]
-struct PackageJsonFile {
+pub struct PackageJsonFile {
     version: String,
 }
 
@@ -149,7 +152,7 @@ impl FromJsonFile for PackageJsonFile {
 }
 
 impl PackageJsonFile {
-    fn coerced_version(&self) -> Result<String, String> {
+    pub fn coerced_version(&self) -> Result<String, String> {
         /*
          * Coerced full version using
          * coerce_version('42.6.7.9.3-alpha') // '42.6.7'
@@ -159,6 +162,7 @@ impl PackageJsonFile {
 }
 
 #[derive(Serialize, Clone)]
+#[wasm_bindgen(getter_with_clone)]
 pub struct ResolvedEnvironment {
     /// the environment identifier, e.g. monte_rosa
     pub id: String,
@@ -183,7 +187,7 @@ pub struct ResolvedEnvironment {
 
 impl ResolvedEnvironment {
     /// Returns the environment details, returns an error if environment is not supported
-    fn new(
+    pub fn new(
         mono_repo_path: &str,
         environment_id: &str,
         maybe_custom_provider: Option<&str>,
@@ -248,24 +252,14 @@ impl ResolvedEnvironment {
     }
 }
 
+#[cfg(feature = "wasm")]
 pub mod wasm {
     use super::FromJsonFile;
+    use utils_misc::{clean_mono_repo_path, ok_or_jserr};
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
 
     pub type JsResult<T> = Result<T, JsValue>;
-
-    macro_rules! ok_or_jserr {
-        ($v:expr) => {
-            $v.map_err(|e| JsValue::from(e.to_string()))
-        };
-    }
-
-    macro_rules! clean_mono_repo_path {
-        ($v:expr,$r:ident) => {
-            let $r = $v.strip_suffix("/").unwrap_or($v);
-        };
-    }
 
     #[wasm_bindgen]
     pub fn supported_environments(mono_repo_path: &str) -> JsResult<JsValue> {

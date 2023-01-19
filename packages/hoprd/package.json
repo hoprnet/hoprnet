@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.92.0-next.31",
+  "version": "1.92.0-next.38",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -25,7 +25,7 @@
     "test:wasm": "make -C crates test",
     "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo ./build ./rest-api-v2-full-spec.json",
     "build": "yarn clean && yarn build:wasm && tsc -p . && chmod u+x lib/*.js",
-    "test": "yarn test:wasm && NODE_OPTIONS=\"--experimental-wasm-modules\" mocha --reporter=tap --full-trace --exit . test",
+    "test": "NODE_OPTIONS=\"--experimental-wasm-modules\" mocha --reporter=tap --full-trace --exit . test",
     "prebuild": "next telemetry disable",
     "start": "NODE_OPTIONS=\"--experimental-wasm-modules\" node lib/main.cjs --init --api",
     "dev": "NODE_ENV=development yarn start --environment anvil-localhost --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses --testPreferLocalAddresses --disableApiAuthentication",
@@ -52,15 +52,13 @@
     "semver": "7.3.7",
     "swagger-ui-express": "4.3.0",
     "trace-unhandled": "2.0.1",
-    "ws": "8.3.0",
-    "yargs": "17.5.1"
+    "ws": "8.3.0"
   },
   "devDependencies": {
     "@types/chai": "4.3.3",
     "@types/cors": "2.8.12",
     "@types/mocha": "9.1.1",
     "@types/supertest": "^2.0.11",
-    "@types/yargs": "17.0.10",
     "chai": "4.3.6",
     "chai-openapi-response-validator": "^0.14.2",
     "mocha": "9.2.2",

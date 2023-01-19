@@ -21,7 +21,7 @@ jobs:
 
     strategy:
       matrix:
-        os: ['ubuntu-latest', 'macos-latest']
+        os: ['ubuntu-latest']
 
     steps:
       - uses: actions/checkout@v3
@@ -79,15 +79,6 @@ jobs:
           path: |
             /tmp/hopr-source-node-*.log
             /tmp/hopr-source-hardhat-rpc.log
-
-      - name: Upload node logs (macOS)
-        uses: actions/upload-artifact@v3
-        if: ${{ always() && runner.os == 'macOS' }}
-        with:
-          name: hopr-macOS-e2e-source-node-logs
-          path: |
-            /var/tmp/hopr-source-node-*.log
-            /var/tmp/hopr-source-hardhat-rpc.log
 
       - name: Send notification if anything failed on master or release branches
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}

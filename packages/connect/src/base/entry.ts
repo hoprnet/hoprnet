@@ -349,25 +349,25 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    * entry nodes
    */
   public async afterStart() {
+    if (this.options.publicNodes != undefined) {
+      this._onNewRelay = function (this: EntryNodes, peer: PeerStoreType) {
+        this.addToUpdateQueue(async () => {
+          log(`peer online`, peer.id.toString())
+          await this.onNewRelay(peer)
+        })
+      }.bind(this)
+      this._onRemoveRelay = function (this: EntryNodes, peer: PeerId) {
+        this.addToUpdateQueue(async () => {
+          log(`peer offline`, peer.toString())
+          await this.onRemoveRelay(peer)
+        })
+      }.bind(this)
+
+      this.options.publicNodes.on('addPublicNode', this._onNewRelay)
+      this.options.publicNodes.on('removePublicNode', this._onRemoveRelay)
+    }
+
     if (this.enabled) {
-      if (this.options.publicNodes != undefined) {
-        this._onNewRelay = function (this: EntryNodes, peer: PeerStoreType) {
-          this.addToUpdateQueue(async () => {
-            log(`peer online`, peer.id.toString())
-            await this.onNewRelay(peer)
-          })
-        }.bind(this)
-        this._onRemoveRelay = function (this: EntryNodes, peer: PeerId) {
-          this.addToUpdateQueue(async () => {
-            log(`peer offline`, peer.toString())
-            await this.onRemoveRelay(peer)
-          })
-        }.bind(this)
-
-        this.options.publicNodes.on('addPublicNode', this._onNewRelay)
-        this.options.publicNodes.on('removePublicNode', this._onRemoveRelay)
-      }
-
       this.startDHTRenewInterval()
 
       await new Promise((resolve, reject) => {
@@ -384,13 +384,13 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       return
     }
 
+    if (this.options.publicNodes != undefined && this._onNewRelay != undefined && this._onRemoveRelay != undefined) {
+      this.options.publicNodes.removeListener('addPublicNode', this._onNewRelay)
+
+      this.options.publicNodes.removeListener('removePublicNode', this._onRemoveRelay)
+    }
+
     if (this.enabled) {
-      if (this.options.publicNodes != undefined && this._onNewRelay != undefined && this._onRemoveRelay != undefined) {
-        this.options.publicNodes.removeListener('addPublicNode', this._onNewRelay)
-
-        this.options.publicNodes.removeListener('removePublicNode', this._onRemoveRelay)
-      }
-
       this.stopReconnectAttempts?.()
       this.stopDHTRenewal?.()
     }
@@ -700,7 +700,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
     // Stop adding and checking relay nodes if we already have enough.
     // Once a relay goes offline, the node will try to replace the offline relay.
-    if (receivedNewAddrs && this.usedRelays.length < this.maxRelaysPerNode) {
+    if (this.enabled && receivedNewAddrs && this.usedRelays.length < this.maxRelaysPerNode) {
       log(
         `Number of connected relay nodes (${this.usedRelays.length} nodes) below threshold of ${this.minRelaysPerNode}, using new addresses to rebuild list`
       )
@@ -725,29 +725,31 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       }
     }
 
-    let inUse = false
-    for (const relayPeer of this.getUsedRelayPeerIds()) {
-      // remove second part of relay address to get relay peerId
-      if (relayPeer.equals(peer)) {
-        inUse = true
-        break
+    if (this.enabled) {
+      let inUse = false
+      for (const relayPeer of this.getUsedRelayPeerIds()) {
+        // remove second part of relay address to get relay peerId
+        if (relayPeer.equals(peer)) {
+          inUse = true
+          break
+        }
       }
-    }
 
-    // Only rebuild list of relay nodes if node is *in use*
-    if (inUse) {
-      if (this.usedRelays.length - 1 < this.minRelaysPerNode) {
-        log(
-          `Peer ${peer.toString()} appeared to be offline. Number of connected relay nodes (${
-            this.usedRelays.length
-          }) below threshold of ${this.minRelaysPerNode}, rebuilding list`
-        )
-        // full rebuild because below threshold
-        await this.updatePublicNodes()
-      } else {
-        this.updateUsedRelays([[peer.toString(), [undefined]]])
-        this.trackEntryNodeConnections()
-        this.emit(RELAY_CHANGED_EVENT)
+      // Only rebuild list of relay nodes if node is *in use*
+      if (inUse) {
+        if (this.usedRelays.length - 1 < this.minRelaysPerNode) {
+          log(
+            `Peer ${peer.toString()} appeared to be offline. Number of connected relay nodes (${
+              this.usedRelays.length
+            }) below threshold of ${this.minRelaysPerNode}, rebuilding list`
+          )
+          // full rebuild because below threshold
+          await this.updatePublicNodes()
+        } else {
+          this.updateUsedRelays([[peer.toString(), [undefined]]])
+          this.trackEntryNodeConnections()
+          this.emit(RELAY_CHANGED_EVENT)
+        }
       }
     }
   }
