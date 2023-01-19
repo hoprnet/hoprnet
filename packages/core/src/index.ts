@@ -665,7 +665,7 @@ class Hopr extends EventEmitter {
 
     let peersIterator = this.networkPeers.all().map((p) => p.toString())[Symbol.iterator]
 
-    const tickResult: StrategyTickResult = await this.strategy.tick(
+    const tickResult: StrategyTickResult = this.strategy.tick(
       balance.toBN(),
       peersIterator(),
       allOutgoingChannels,

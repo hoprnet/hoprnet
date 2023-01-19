@@ -15,6 +15,18 @@ impl ChannelStrategy for PassiveStrategy {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use crate::generic::ChannelStrategy;
+    use crate::passive::PassiveStrategy;
+
+    #[test]
+    fn test_passive() {
+        let strat = PassiveStrategy{};
+        assert_eq!("passive", strat.name());
+    }
+}
+
 /// WASM bindings
 #[cfg(feature = "wasm")]
 pub mod wasm {
@@ -34,6 +46,12 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl PassiveStrategy {
+        #[wasm_bindgen(constructor)]
+        pub fn new() -> Self {
+            PassiveStrategy {
+                w: super::PassiveStrategy{}
+            }
+        }
 
         #[wasm_bindgen(getter)]
         pub fn name(&self) -> String {

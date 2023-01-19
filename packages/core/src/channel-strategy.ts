@@ -34,7 +34,6 @@ export interface ChannelStrategyInterface {
     outgoing_channel: OutgoingChannelStatus[],
     peer_quality: (string) => number
   ): StrategyTickResult
-  // TBD: Include ChannelsToClose as well.
 
   onChannelWillClose(channel: ChannelEntry, chain: HoprCoreEthereum): Promise<void> // Before a channel closes
   onWinningTicket(t: AcknowledgedTicket, chain: HoprCoreEthereum): Promise<void>
