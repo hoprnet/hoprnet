@@ -107,8 +107,8 @@ async function main() {
   // Therefore adding a promise rejection handler to make sure that the origin of
   // the rejected promise can be detected.
   addUnhandledPromiseRejectionHandler()
-    // Increase the default maximum number of event listeners
-    ; (await import('events')).EventEmitter.defaultMaxListeners = 20
+  // Increase the default maximum number of event listeners
+  ;(await import('events')).EventEmitter.defaultMaxListeners = 20
 
   metric_processStartTime.set(Date.now() / 1000)
   const metric_startupTimer = metric_nodeStartupTime.start_measure()
