@@ -11,7 +11,7 @@ describe('test environment and flags', async function () {
   })
 
   it('should get supported environments', function () {
-    // Assuming that `hardhat-localhost` is always supported
+    // Assuming that `anvil-localhost` is always supported
     assert(supportedEnvironments().length > 0)
   })
 })

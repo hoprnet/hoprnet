@@ -78,7 +78,7 @@ jobs:
           name: hopr-linux-e2e-source-node-logs
           path: |
             /tmp/hopr-source-node-*.log
-            /tmp/hopr-source-hardhat-rpc.log
+            /tmp/hopr-source-anvil-rpc.log
 
       - name: Send notification if anything failed on master or release branches
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}

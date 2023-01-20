@@ -119,7 +119,7 @@ function cleanup {
 
   local log exit_code non_zero
   for node_log in "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}" "${node5_log}" "${node6_log}" "${node7_log}"; do
-    log=$(grep -E ${node_log} "Process exiting with signal [0-9]" || echo "")
+    log=$(grep -E "Process exiting with signal [0-9]" ${node_log} || echo "")
 
     if [ -z "${log}" ]; then
       log "${node_log}: Process did not exit properly"

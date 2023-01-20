@@ -1,5 +1,5 @@
 ARG HOPRD_IMAGE=${HOPRD_IMAGE:-hoprd-local:latest}
-ARG ANVIL_IMAGE=${HARDHAT_IMAGE:-hopr-anvil-local:latest}
+ARG ANVIL_IMAGE=${ANVIL_IMAGE:-hopr-anvil-local:latest}
 
 # simply import hoprd image to copy in files later
 FROM ${HOPRD_IMAGE} as hoprd
