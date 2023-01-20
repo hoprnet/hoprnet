@@ -14,7 +14,10 @@ pub enum CryptoError {
     InvalidSecretScalar,
 
     #[error("elliptic curve error: {0}")]
-    EllipticCurveError(#[from] elliptic_curve::Error)
+    EllipticCurveError(#[from] elliptic_curve::Error),
+
+    #[error("error while performing cryptographic calculation")]
+    CalculationError
 
 }
 
