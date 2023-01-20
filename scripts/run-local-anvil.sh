@@ -99,6 +99,15 @@ trap cleanup SIGINT SIGTERM ERR
 # mine a block every 2 seconds
 declare flags="--block-time 2 --config-out ${cfg_file}"
 
+# prepare PATH if anvil is not present yet
+if ! command -v anvil ; then
+  PATH=${PATH}:${mydir}/../.foundry/bin
+fi
+if ! command -v anvil ; then
+  echo "Error: cannot find anvil"
+  exit 1
+fi
+
 if ! lsof -i ":8545" -s TCP:LISTEN; then
   log "Start local anvil network"
   anvil ${flags} > "${log_file}" 2>&1 &

@@ -257,7 +257,7 @@ declare protocol_config="${mydir}/../packages/core/protocol-config.json"
 declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
 
 # --- Running Mock Blockchain --- {{{
-${mydir}/run-local-anvil.sh "${anvil_rpc_log}" "${anvil_cfg_file}"
+${mydir}/run-local-anvil.sh -l "${anvil_rpc_log}" -c "${anvil_cfg_file}"
 
 # read auto-generated private key from anvil configuration
 declare anvil_private_key
