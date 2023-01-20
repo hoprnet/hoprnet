@@ -1,27 +1,28 @@
 ARG HOPRD_IMAGE=${HOPRD_IMAGE:-hoprd-local:latest}
-ARG HARDHAT_IMAGE=${HARDHAT_IMAGE:-hopr-hardhat-local:latest}
+ARG ANVIL_IMAGE=${ANVIL_IMAGE:-hopr-anvil-local:latest}
 
 # simply import hoprd image to copy in files later
 FROM ${HOPRD_IMAGE} as hoprd
 
-FROM ${HARDHAT_IMAGE} as runtime
+FROM ${ANVIL_IMAGE} as runtime
 
-LABEL description="Docker image running a HOPR-enabled hardhat network with 5 hoprd nodes using it and being fully interconnected."
+LABEL description="Docker image running a HOPR-enabled anvil network with 5 hoprd nodes using it and being fully interconnected."
 
-# install tools required within our scripts
-RUN apk add --no-cache bash lsof curl jq
+# 1. install tools required within our scripts
+# 2. overwrite libc link under lib to make nodejs work alongside forge
+RUN apk add --no-cache bash lsof curl jq \
+ && ln -sf /lib/libc.musl-x86_64.so.1 /lib/ld-linux-x86-64.so.2
 
-WORKDIR /app
+WORKDIR /app/hoprnet
 
-COPY --from=hoprd /app/hoprnet ./hoprnet
+COPY --from=hoprd /app/hoprnet/ ./
+COPY --from=hoprd /app/hoprnet/.cargo/ ./.cargo/
 
-COPY scripts /app/hardhat/scripts
+COPY packages/ethereum/contracts/ ./packages/ethereum/contracts/
+COPY scripts/ ./scripts/
+COPY Makefile .
 
-# copy deployment files to make them available to hoprd as well
-RUN mkdir /app/hardhat/packages/ethereum/deployments/hardhat-localhost \
- && ln -s /app/hardhat/packages/ethereum/deployments/hardhat-localhost ./hoprnet/packages/ethereum/deployments/
-
-# hardhat RPC port
+# anvil RPC port
 EXPOSE 8545
 # hoprd Rest API ports
 EXPOSE 13301
@@ -52,4 +53,4 @@ EXPOSE 19505
 ARG HOPRD_API_TOKEN
 ENV HOPRD_API_TOKEN=${HOPRD_API_TOKEN:-%th1s-IS-a-S3CR3T-ap1-PUSHING-b1ts-TO-you%}
 
-ENTRYPOINT /app/hardhat/scripts/setup-local-cluster.sh -p -t "${HOPRD_API_TOKEN}" -i /app/hardhat/scripts/topologies/full_interconnected_cluster.sh --hoprd-command "node --experimental-wasm-modules hoprnet/packages/hoprd/lib/main.cjs" --hardhat-basedir "/app/hardhat/packages/ethereum" -l "0.0.0.0"
+ENTRYPOINT /app/hoprnet/scripts/setup-local-cluster.sh -p -t "${HOPRD_API_TOKEN}" -i /app/hoprnet/scripts/topologies/full_interconnected_cluster.sh --hoprd-command "node --experimental-wasm-modules packages/hoprd/lib/main.cjs" -l "0.0.0.0"

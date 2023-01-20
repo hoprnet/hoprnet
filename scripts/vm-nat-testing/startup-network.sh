@@ -3,31 +3,33 @@
 declare hopr_dir="/opt/hopr"
 
 cd ${hopr_dir} || exit 1
+source "${hopr_dir}/scripts/utils.sh"
 
-declare hardhat_rpc_log="/tmp/hardhat.logs"
+declare anvil_rpc_log="/tmp/anvil.logs"
 
 if [ "$(curl -s -o /dev/null -w ''%{http_code}'' 127.0.0.1:8545)" != "200" ]; then
 	# make sure other node instances are killed
 	sudo pkill node || :
-	# Start the HardHat network on localhost
-	echo "Starting HardHat network..."
-	TS_NODE_PROJECT=${hopr_dir}/packages/ethereum/tsconfig.hardhat.json \
-	HOPR_ENVIRONMENT_ID=hardhat-localhost \
-	yarn workspace @hoprnet/hopr-ethereum hardhat node > ${hardhat_rpc_log} 2>&1 &
+	# Start the Anvil network on localhost
+	echo "Starting Anvil network..."
+	make -C "${hopr_dir}" run-anvil
 fi
 
 while [[
 	"$(curl -s -o /dev/null -w ''%{http_code}'' 127.0.0.1:8545)" != "200" ||
-	! -f "${hardhat_rpc_log}" ||
-  -z "$(grep "Started HTTP and WebSocket JSON-RPC server" "${hardhat_rpc_log}" || echo "")"
+	! -f "${anvil_rpc_log}" ||
+  -z "$(grep "Listening on 127.0.0.1:8545" "${anvil_rpc_log}" || echo "")"
 	]] ; do
-	echo "Waiting for hardhat network to come up..."
+	echo "Waiting for anvil network to come up..."
 	sleep 5;
 done
 
-echo "HardHat provider started up!"
+echo "Anvil provider started up!"
 # Copies all the deployment files including the .chainId file
-cp -R packages/ethereum/deployments/hardhat-localhost/localhost/. packages/ethereum/deployments/hardhat-localhost/hardhat
+declare protocol_config="${mydir}/../packages/core/protocol-config.json"
+declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
+update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost"
+update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost2"
 
 if [ "$(curl -s -o /dev/null -w ''%{http_code}'' $provider_ip:8546)" != "200" ]; then
 	# Mirror localhost:8545 -> outboud 8546

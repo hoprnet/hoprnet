@@ -15,5 +15,5 @@
     // when building docs for releases we can fix the revision on the cmdline
     "gitRevision": "master"
   },
-  "references": [{ "path": "../ethereum" }, { "path": "../utils" }]
+  "references": [{ "path": "../utils" }]
 }

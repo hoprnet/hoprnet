@@ -1,0 +1,10 @@
+[package]
+name = "base58"
+version = "0.1.0"
+authors = ["debris <marek.kotewicz@gmail.com>"]
+license = "MIT"
+homepage = "https://github.com/debris/base58"
+repository = "https://github.com/debris/base58"
+keywords = ["base58", "bitcoin", "address", "encoding"]
+
+[dependencies]

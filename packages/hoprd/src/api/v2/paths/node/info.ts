@@ -59,7 +59,7 @@ GET.apiDoc = {
             properties: {
               environment: {
                 type: 'string',
-                example: 'hardhat-localhost',
+                example: 'anvil-localhost',
                 description: 'Name of the enviroment the node is running on.'
               },
               announcedAddress: {
@@ -86,7 +86,7 @@ GET.apiDoc = {
               },
               network: {
                 type: 'string',
-                example: 'hardhat',
+                example: 'anvil',
                 description: 'Name of the Hopr network this node connects to.'
               },
               hoprToken: {

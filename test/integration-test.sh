@@ -100,43 +100,42 @@ redeem_tickets() {
   [[ ${redeemed} -gt 0 && ${redeemed} -gt ${last_redeemed} ]] || { msg "redeemed tickets count on node ${node_id} is ${redeemed}, previously ${last_redeemed}"; exit 1; }
 }
 
-# Performs a hardhat-specific EVM RPC call
-# to disable auto-mining at runtime
-disable_hardhat_auto_mining() {
-  log "Disabling hardhat automining"
-  env \
-    HOPR_ENVIRONMENT_ID=hardhat-localhost \
-    TS_NODE_PROJECT="./tsconfig.hardhat.json" \
-    yarn workspace @hoprnet/hopr-ethereum hardhat disable-automine \
-      --network hardhat
-}
-
 # $1 native addresses ("Ethereum addresses"), comma-separated list
 # $2 peerIds, comma-separated list
 register_nodes() {
-  make -C "${mydir}/.. register-nodes" \
-    environment=hardhat-localhost \
-    native_addresses="${1}" \
-    peer_ids="${2}"
+  log "Registering nodes"
+
+  make -C "${mydir}/.." register-nodes \
+    environment=anvil-localhost environment_type=development \
+    native_addresses="[${1}]" \
+    peer_ids="[${2}]"
+
+  log "Registering nodes finished"
+}
+
+# $1 - peerIds, comma-separated list
+sync_nodes_in_network_registry() {
+  log "Sync nodes in network registry"
+
+  make -C "${mydir}/.." sync-eligibility \
+    environment=anvil-localhost environment_type=development \
+    peer_ids="[${1}]"
+
+  log "Sync nodes in network registry finished"
 }
 
 enable_network_registry() {
-  log "Enabling register"
-  env \
-    HOPR_ENVIRONMENT_ID=hardhat-localhost \
-    TS_NODE_PROJECT="./tsconfig.hardhat.json" \
-    yarn workspace @hoprnet/hopr-ethereum hardhat register \
-      --network hardhat \
-      --task enable
+  log "Enabling network registry"
 
-  log "Register enabled"
+  make -C "${mydir}/.." enable-network-registry \
+    environment=anvil-localhost environment_type=development
+
+  log "Enabling network registry finished"
 }
 
 log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5}, ${api6}, ${api7}"
 
-# Setup is done, so disable hardhat's auto-mining to correctly mimic
 # real blockchain networks
-disable_hardhat_auto_mining
 
 validate_native_address "${api1}" "${api_token}" & jobs+=( "$!" )
 validate_native_address "${api2}" "${api_token}" & jobs+=( "$!" )
@@ -206,23 +205,10 @@ if ! [ -z $additional_nodes_addrs ] && ! [ -z $additional_nodes_peerids ]; then
 fi
 
 # Register nodes in the NR, emit "Registered" events
-HOPR_ENVIRONMENT_ID=hardhat-localhost \
-TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-yarn workspace @hoprnet/hopr-ethereum hardhat register \
-  --network hardhat \
-  --task add \
-  --native-addresses "${native_addrs_to_register}" \
-  --peer-ids "${native_peerids_to_register}"
-log "Nodes added to register (Registered)"
+register_nodes "${native_addrs_to_register}" "${native_peerids_to_register}"
 
 # Sync nodes in the NR, emit "EligibilityUpdated" events
-HOPR_ENVIRONMENT_ID=hardhat-localhost \
-TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-yarn workspace @hoprnet/hopr-ethereum hardhat register \
-  --network hardhat \
-  --task sync \
-  --peer-ids "${native_peerids_to_register}"
-log "Nodes added to register (EligibilityUpdated)"
+sync_nodes_in_network_registry "${native_peerids_to_register}"
 
 # running withdraw and checking it results at the end of this test run
 balances=$(api_get_balances ${api1})

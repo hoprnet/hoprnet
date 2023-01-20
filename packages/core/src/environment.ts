@@ -6,6 +6,7 @@ import {
   type ResolvedEnvironment,
   type Environment
 } from '../lib/core_misc.js'
+import { DeploymentExtract } from '@hoprnet/hopr-core-ethereum/src/utils/utils.js'
 core_misc_set_panic_hook()
 export {
   resolve_environment,
@@ -43,4 +44,14 @@ export function supportedEnvironments(): Environment[] {
  */
 export function resolveEnvironment(environment_id: string, customProvider?: string): ResolvedEnvironment {
   return resolve_environment(MONO_REPO_PATH, environment_id, customProvider)
+}
+
+export const getContractData = (environment_id: string): DeploymentExtract => {
+  const resolvedEnvironment = resolveEnvironment(environment_id)
+  return {
+    hoprTokenAddress: resolvedEnvironment.token_contract_address,
+    hoprChannelsAddress: resolvedEnvironment.channels_contract_address,
+    hoprNetworkRegistryAddress: resolvedEnvironment.network_registry_contract_address,
+    indexerStartBlockNumber: resolvedEnvironment.channel_contract_deploy_block
+  }
 }

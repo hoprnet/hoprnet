@@ -41,7 +41,7 @@
       },
       "original": {
         "owner": "NixOS",
-        "ref": "nixpkgs-unstable",
+        "ref": "nixos-22.11",
         "repo": "nixpkgs",
         "type": "github"
       }

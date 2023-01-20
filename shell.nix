@@ -16,6 +16,7 @@ mkShell {
   buildInputs = [
     ## base
     envsubst
+    curl
 
     ## node, minimum recommended version is v16, see README for more details
     nodejs-16_x # v16.5.0
@@ -46,4 +47,10 @@ mkShell {
     macosPkgs
     linuxPkgs
   ];
+  shellHook = ''
+    make deps
+    patchelf --interpreter `cat $NIX_CC/nix-support/dynamic-linker` .foundry/bin/anvil
+    patchelf --interpreter `cat $NIX_CC/nix-support/dynamic-linker` .foundry/bin/cast
+    patchelf --interpreter `cat $NIX_CC/nix-support/dynamic-linker` .foundry/bin/forge
+  '';
 }
