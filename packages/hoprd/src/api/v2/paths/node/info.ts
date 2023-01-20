@@ -86,7 +86,7 @@ GET.apiDoc = {
               },
               network: {
                 type: 'string',
-                example: 'hardhat',
+                example: 'anvil',
                 description: 'Name of the Hopr network this node connects to.'
               },
               hoprToken: {
