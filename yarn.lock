@@ -3015,7 +3015,7 @@ __metadata:
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@libp2p/crypto": 1.0.0
-    "@libp2p/interface-content-routing": 1.0.2
+    "@libp2p/interface-content-routing": 1.0.7
     "@libp2p/interface-peer-id": 1.0.5
     "@libp2p/interface-registrar": 1.1.0
     "@libp2p/interfaces": 2.0.4
@@ -3400,14 +3400,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@libp2p/interface-content-routing@npm:1.0.2":
-  version: 1.0.2
-  resolution: "@libp2p/interface-content-routing@npm:1.0.2"
+"@libp2p/interface-content-routing@npm:1.0.7":
+  version: 1.0.7
+  resolution: "@libp2p/interface-content-routing@npm:1.0.7"
   dependencies:
     "@libp2p/interface-peer-info": ^1.0.0
     "@libp2p/interfaces": ^3.0.0
-    multiformats: ^9.6.3
-  checksum: 205ad6165dcf2a8fc1b4d416eca94c667d43acddb40ade756dea77511631e996b66850579e28e421e1929145a053b8d96b0ce9978c252540c2a39b30f50085b6
+    multiformats: ^10.0.0
+  checksum: 4e1d00f49297d39af577279fb101dc9561d519ac99825ef19f0c135abe3efaea6c46361594805a92cc57dc93354dbee3c57aa88320b17ee541475501baa2c9a5
   languageName: node
   linkType: hard
 

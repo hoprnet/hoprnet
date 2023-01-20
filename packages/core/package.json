@@ -59,7 +59,7 @@
     "secp256k1": "4.0.3"
   },
   "devDependencies": {
-    "@libp2p/interface-content-routing": "1.0.2",
+    "@libp2p/interface-content-routing": "1.0.7",
     "@libp2p/interface-registrar": "1.1.0",
     "@libp2p/tcp": "1.0.11",
     "@types/chai": "4.3.3",
